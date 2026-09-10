@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Quale motore esegue questo workspace. Non il backend di esecuzione, che sceglie il binario all'interno del motore Terraform.",
       "namePatternPulumi": "Due parti separate da '::' — project::stack. Solo lettere, numeri, trattini e trattini bassi; ogni parte deve iniziare con una lettera o un numero.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Punta la CLI su di esso con <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Totale",
@@ -114,7 +115,9 @@
       "hintHealth": "salute",
       "hintLabel": "etichetta",
       "hintLabelKey": "chiave etichetta",
-      "hintName": "nome"
+      "hintName": "nome",
+      "engineLabel": "Motore",
+      "engineAll": "Tutti i motori"
     },
     "row": {
       "removeLabelFilter": "Clicca per rimuovere dal filtro",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Percorsi di indirizzi Terraform + attributi con supporto glob soppressi dal classificatore di deriva. <star></star> corrisponde a zero o più caratteri diversi da <dot></dot> (copre <n></n> indici); <starIdx></starIdx> corrisponde a qualsiasi indice tra parentesi. Un indirizzo nudo senza suffisso di attributo silenzia qualsiasi modifica a quella risorsa — incluse le distruzioni. Riguarda solo la deriva, non il normale plan/apply. Consulta <docs>drift-ignore-rules.md</docs> per la grammatica completa.",
       "driftIgnoreRulesNone": "Nessuna (ogni diff del plan conta come deriva)",
       "parallelism": "Parallelismo",
-      "parallelismTitle": "Quante operazioni vengono eseguite contemporaneamente (1-256). Predefinito: 10."
+      "parallelismTitle": "Quante operazioni vengono eseguite contemporaneamente (1-256). Predefinito: 10.",
+      "engine": "Motore",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Due parti separate da '::' — project::stack. Solo lettere, numeri, trattini e trattini bassi; ogni parte deve iniziare con una lettera o un numero.",
+      "bindPlan": "Vincola l''aggiornamento all''anteprima approvata",
+      "bindPlanHelp": "Se attivo, l''aggiornamento applica esattamente il piano salvato dall''anteprima, quindi qualsiasi cosa cambiata dopo l''anteprima fa fallire l''aggiornamento invece di essere applicata. Si basa sui piani di aggiornamento di Pulumi, ancora sperimentali. Se disattivo, l''aggiornamento determina da sé le proprie modifiche, come un semplice pulumi up. <docs>Come funzionano le esecuzioni Pulumi</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",

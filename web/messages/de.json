@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Welche Engine diesen Workspace ausführt. Nicht das Ausführungs-Backend, das die Binärdatei innerhalb der Terraform-Engine auswählt.",
       "namePatternPulumi": "Zwei durch '::' getrennte Teile — project::stack. Nur Buchstaben, Zahlen, Bindestriche und Unterstriche; jeder Teil muss mit einem Buchstaben oder einer Zahl beginnen.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Richten Sie die CLI mit <code>pulumi stack select default/project/stack</code> darauf aus."
     },
     "stats": {
       "total": "Gesamt",
@@ -114,7 +115,9 @@
       "hintHealth": "Zustand",
       "hintLabel": "Label",
       "hintLabelKey": "Label-Schlüssel",
-      "hintName": "Name"
+      "hintName": "Name",
+      "engineLabel": "Engine",
+      "engineAll": "Alle Engines"
     },
     "row": {
       "removeLabelFilter": "Klicken, um aus dem Filter zu entfernen",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Glob-fähige Terraform-Adress- und Attributpfade, die vom Drift-Klassifikator unterdrückt werden. <star></star> passt auf null oder mehr Zeichen außer <dot></dot> (umfasst <n></n>-Indizes); <starIdx></starIdx> passt auf jeden eingeklammerten Index. Eine bloße Adresse ohne Attributsuffix unterdrückt jede Änderung an dieser Ressource — einschließlich Löschungen. Betrifft nur den Drift, nicht das reguläre plan/apply. Die vollständige Grammatik finden Sie unter <docs>drift-ignore-rules.md</docs>.",
       "driftIgnoreRulesNone": "Keine (jede Plan-Differenz zählt als Drift)",
       "parallelism": "Parallelität",
-      "parallelismTitle": "Wie viele Vorgänge gleichzeitig ausgeführt werden (1-256). Standard: 10."
+      "parallelismTitle": "Wie viele Vorgänge gleichzeitig ausgeführt werden (1-256). Standard: 10.",
+      "engine": "Engine",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Zwei durch '::' getrennte Teile — project::stack. Nur Buchstaben, Zahlen, Bindestriche und Unterstriche; jeder Teil muss mit einem Buchstaben oder einer Zahl beginnen.",
+      "bindPlan": "Update an die genehmigte Vorschau binden",
+      "bindPlanHelp": "Wenn aktiviert, wendet das Update genau den Plan an, den die Vorschau gespeichert hat. Was sich seit der Vorschau geändert hat, lässt das Update fehlschlagen, statt angewendet zu werden. Das beruht auf Pulumi-Update-Plänen, die noch experimentell sind. Wenn deaktiviert, ermittelt das Update seine Änderungen selbst, wie ein einfaches pulumi up. <docs>So funktionieren Pulumi-Läufe</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

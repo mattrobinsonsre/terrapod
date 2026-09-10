@@ -148,6 +148,7 @@ function WorkspaceGroupRows({
                         className="text-sm font-medium text-brand-400 hover:text-brand-300"
                       >
                         {item.name}
+                        <EngineBadge engine={ws.attributes.engine} />
                       </Link>
                       {ws.attributes.labels && Object.keys(ws.attributes.labels).length > 0 && (
                         <div className="flex flex-wrap gap-1">
@@ -259,6 +260,9 @@ function WorkspacesPageInner() {
   // label key set. Mirrored to the URL via ?q=… so refresh + share work.
   const [filterInput, setFilterInput] = useState(searchParams.get('q') || '')
   const parsedFilter = useMemo(() => parseFilterQuery(filterInput), [filterInput])
+  // Engine filter (#1555): a dropdown rather than an `engine:` term, which would
+  // collide with a label of that name. Offered only when more than one engine is on.
+  const [engineFilter, setEngineFilter] = useState(searchParams.get('engine') || '')
 
   // Grouping mode — URL param takes priority, localStorage as fallback.
   const [groupMode, setGroupModeState] = useState<GroupMode>(() => {
@@ -426,31 +430,36 @@ function WorkspacesPageInner() {
   // Initialised to the URL's current `q` so that mounting on a page
   // already loaded with `?q=...` (refresh, shared link) doesn't fire a
   // redundant `router.replace` over the unchanged URL on first render.
-  const lastSyncedQueryRef = useRef<string | null>(searchParams.get('q') || '')
+  const lastSyncedQueryRef = useRef<string | null>(`${searchParams.get('q') || ''}|${searchParams.get('engine') || ''}`)
   useEffect(() => {
     const serialized = serializeFilter(parsedFilter)
-    if (lastSyncedQueryRef.current === serialized) return
+    const syncKey = `${serialized}|${engineFilter}`
+    if (lastSyncedQueryRef.current === syncKey) return
     const timer = setTimeout(() => {
-      lastSyncedQueryRef.current = serialized
+      lastSyncedQueryRef.current = syncKey
       const params = new URLSearchParams()
       if (serialized) params.set('q', serialized)
+      if (engineFilter) params.set('engine', engineFilter)
       const groupSerialized = serializeGroupParam(groupMode)
       if (groupSerialized) params.set('group', groupSerialized)
       const qs = params.toString()
       router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
     }, 250)
     return () => clearTimeout(timer)
-  }, [parsedFilter, groupMode, router])
+  }, [parsedFilter, engineFilter, groupMode, router])
 
   const filteredWorkspaces = useMemo(() => {
-    if (parsedFilter.terms.length === 0) return workspaces
-    return workspaces.filter(ws => {
+    const byEngine = engineFilter
+      ? workspaces.filter(ws => (ws.attributes.engine || 'terraform') === engineFilter)
+      : workspaces
+    if (parsedFilter.terms.length === 0) return byEngine
+    return byEngine.filter(ws => {
       // Status terms need the resolved status; pass it conditionally so
       // workspaces without a status (— display) don't accidentally match
       // an empty `status:` predicate.
       return matchWorkspace(ws, parsedFilter, resolveStatus(ws).def?.filter ?? undefined)
     })
-  }, [workspaces, parsedFilter])
+  }, [workspaces, parsedFilter, engineFilter])
 
 
   // Create form
@@ -487,6 +496,20 @@ function WorkspacesPageInner() {
   // Agent pools
   const [agentPools, setAgentPools] = useState<{ id: string; attributes: { name: string } }[]>([])
   const [agentPoolsLoaded, setAgentPoolsLoaded] = useState(false)
+
+  // Engines this deployment enables (#1555). Terraform alone means no engine UI.
+  const [engines, setEngines] = useState<string[]>(['terraform'])
+  useEffect(() => {
+    apiFetch('/api/v1/engines')
+      .then(res => (res.ok ? res.json() : { data: [] }))
+      .then((d: { data?: { id: string }[] }) => {
+        const ids = (d.data || []).map(e => e.id)
+        if (ids.length > 0) setEngines(ids)
+      })
+      .catch(() => {})
+  }, [])
+  const engineName = (e: string) =>
+    e === 'pulumi' ? t('form.enginePulumi') : e === 'terraform' ? t('form.engineTerraform') : e
 
   type WsSortKey = 'name' | 'mode' | 'pool' | 'resources' | 'status' | 'created'
 
@@ -846,7 +869,13 @@ function WorkspacesPageInner() {
                   placeholder={newEngine === 'pulumi' ? t('form.namePlaceholderPulumi') : t('form.namePlaceholder')}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
+                {newEngine === 'pulumi' && (
+                  <p className="mt-1 text-xs text-slate-400" data-testid="ws-pulumi-name-hint">
+                    {t.rich('form.pulumiNameHint', { code: (c) => <code className="bg-slate-700 px-1 rounded">{c}</code> })}
+                  </p>
+                )}
               </div>
+              {engines.length > 1 && (
               <div>
                 <label htmlFor="ws-engine" className="block text-sm font-medium text-slate-300 mb-1">{t('form.engine')}</label>
                 <select
@@ -855,11 +884,13 @@ function WorkspacesPageInner() {
                   onChange={(e) => setNewEngine(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 >
-                  <option value="terraform">{t('form.engineTerraform')}</option>
-                  <option value="pulumi">{t('form.enginePulumi')}</option>
+                  {engines.map(e => (
+                    <option key={e} value={e}>{engineName(e)}</option>
+                  ))}
                 </select>
                 <p className="mt-1 text-xs text-slate-400">{t('form.engineHelp')}</p>
               </div>
+              )}
               <div>
                 <label htmlFor="ws-exec" className="block text-sm font-medium text-slate-300 mb-1">{t('form.executionMode')}</label>
                 <select
@@ -872,6 +903,8 @@ function WorkspacesPageInner() {
                   <option value="agent">{t('form.agent')}</option>
                 </select>
               </div>
+              {newEngine !== 'pulumi' && (
+                <>
               <div>
                 <label htmlFor="ws-backend" className="block text-sm font-medium text-slate-300 mb-1">{t('form.executionBackend')}</label>
                 <select
@@ -903,6 +936,8 @@ function WorkspacesPageInner() {
                   ))}
                 </datalist>
               </div>
+                </>
+              )}
               <div>
                 <label htmlFor="ws-cpu" className="block text-sm font-medium text-slate-300 mb-1">{t('form.cpuRequest')}</label>
                 <input
@@ -1071,6 +1106,20 @@ function WorkspacesPageInner() {
                   ariaLabel={lockedFilterActive ? t('stats.clearLockedFilter') : t('stats.filterLocked')}
                   className="order-3 max-sm:hidden"
                 />
+                {engines.length > 1 && (
+                  <select
+                    value={engineFilter}
+                    onChange={e => setEngineFilter(e.target.value)}
+                    aria-label={t('filter.engineLabel')}
+                    data-testid="ws-engine-filter"
+                    className="order-3 min-h-11 sm:min-h-0 px-2 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/50 text-base sm:text-sm text-slate-200 focus:outline-none focus:border-brand-500"
+                  >
+                    <option value="">{t('filter.engineAll')}</option>
+                    {engines.map(e => (
+                      <option key={e} value={e}>{engineName(e)}</option>
+                    ))}
+                  </select>
+                )}
                 <div className="order-4 flex-1 min-w-0" />
                 {/* Input + Clear share their own full-width row (order-8),
                     Clear pinned to the right of the input — desktop and mobile. */}
@@ -1454,7 +1503,8 @@ function WorkspacesPageInner() {
                           href={`/workspaces/${ws.id}`}
                           className="text-sm font-medium text-brand-400 hover:text-brand-300 break-all"
                         >
-                          {ws.attributes.name}
+                          {stackLabel(ws.attributes.name, ws.attributes.engine)}
+                          <EngineBadge engine={ws.attributes.engine} />
                         </Link>
                         {ws.attributes.labels && Object.keys(ws.attributes.labels).length > 0 && (
                           <div className="flex flex-wrap gap-1">
@@ -1535,6 +1585,28 @@ function WorkspacesPageInner() {
         )}
       </main>
     </>
+  )
+}
+
+/** A Pulumi workspace is named project::stack; shown as "project / stack". */
+function stackLabel(name: string, engine?: string): string {
+  return engine === 'pulumi' && name.includes('::') ? name.split('::').join(' / ') : name
+}
+
+/**
+ * Names the engine on a non-Terraform row (#1555). Terraform rows carry no badge,
+ * so a Terraform-only deployment sees exactly what it always did.
+ */
+function EngineBadge({ engine }: { engine?: string }) {
+  const t = useTranslations('workspaces')
+  if (!engine || engine === 'terraform') return null
+  return (
+    <span
+      data-testid="ws-engine-badge"
+      className="ms-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium align-middle bg-violet-500/15 text-violet-300"
+    >
+      {engine === 'pulumi' ? t('form.enginePulumi') : engine}
+    </span>
   )
 }
 

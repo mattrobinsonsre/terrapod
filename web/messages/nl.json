@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Welke engine deze workspace uitvoert. Niet de uitvoeringsbackend, die het binaire bestand binnen de Terraform-engine kiest.",
       "namePatternPulumi": "Twee delen gescheiden door '::' — project::stack. Alleen letters, cijfers, koppeltekens en underscores; elk deel moet met een letter of cijfer beginnen.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Richt de CLI erop met <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Totaal",
@@ -114,7 +115,9 @@
       "hintHealth": "toestand",
       "hintLabel": "label",
       "hintLabelKey": "labelsleutel",
-      "hintName": "naam"
+      "hintName": "naam",
+      "engineLabel": "Engine",
+      "engineAll": "Alle engines"
     },
     "row": {
       "removeLabelFilter": "Klik om uit het filter te verwijderen",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Glob-bewuste Terraform-adres- + attribuutpaden die door de drift-classificator worden onderdrukt. <star></star> komt overeen met nul of meer niet-<dot></dot>-tekens (overspant <n></n> indices); <starIdx></starIdx> komt overeen met elke index tussen haakjes. Een kaal adres zonder attribuutachtervoegsel dempt elke wijziging aan die resource — inclusief destroys. Beïnvloedt alleen drift, niet gewone plan/apply. Zie <docs>drift-ignore-rules.md</docs> voor de volledige grammatica.",
       "driftIgnoreRulesNone": "Geen (elk planverschil telt als drift)",
       "parallelism": "Parallellisme",
-      "parallelismTitle": "Hoeveel bewerkingen tegelijk worden uitgevoerd (1-256). Standaard: 10."
+      "parallelismTitle": "Hoeveel bewerkingen tegelijk worden uitgevoerd (1-256). Standaard: 10.",
+      "engine": "Engine",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Twee delen gescheiden door '::' — project::stack. Alleen letters, cijfers, koppeltekens en underscores; elk deel moet met een letter of cijfer beginnen.",
+      "bindPlan": "Update vastleggen op de goedgekeurde preview",
+      "bindPlanHelp": "Als dit aan staat, past de update precies het plan toe dat de preview heeft opgeslagen, zodat alles wat sinds de preview is veranderd de update laat mislukken in plaats van te worden toegepast. Dit steunt op Pulumi-updateplannen, die nog experimenteel zijn. Als dit uit staat, bepaalt de update zelf zijn wijzigingen, zoals een gewone pulumi up doet. <docs>Hoe Pulumi-runs werken</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

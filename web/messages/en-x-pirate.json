@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Which engine be drivin' this workspace, matey. Not the execution backend, which picks the binary within the Terraform engine.",
       "namePatternPulumi": "Two parts split by '::' — project::stack, matey. Letters, numbers, hyphens and underscores only; each part must start with a letter or number.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Point yer CLI at it with <code>pulumi stack select default/project/stack</code>, matey."
     },
     "stats": {
       "total": "Total",
@@ -114,7 +115,9 @@
       "hintHealth": "health",
       "hintLabel": "label",
       "hintLabelKey": "label key",
-      "hintName": "name"
+      "hintName": "name",
+      "engineLabel": "Engine",
+      "engineAll": "All engines, arr"
     },
     "row": {
       "removeLabelFilter": "Click t'' cast off from th'' filter",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths hushed by th'' drift classifier. <star></star> matches zero or more non-<dot></dot> chars (spans <n></n> indices); <starIdx></starIdx> matches any bracketed index. A bare address with no attribute suffix silences any change t'' that resource — includin'' sendin'' t'' Davy Jones. Affects drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> fer th'' full grammar.",
       "driftIgnoreRulesNone": "None (every plan diff counts as drift)",
       "parallelism": "Hands at Once",
-      "parallelismTitle": "How many deeds be done at once (1-256). Ten be the default, arr."
+      "parallelismTitle": "How many deeds be done at once (1-256). Ten be the default, arr.",
+      "engine": "Engine",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Two parts split by '::' — project::stack, matey. Letters, numbers, hyphens and underscores only; each part must start with a letter or number.",
+      "bindPlan": "Lash the update to the approved preview",
+      "bindPlanHelp": "When she be on, the update hoists exactly the plan the preview stowed away, so anythin'' that shifted since the preview scuttles the update instead o'' bein'' applied. This rests on Pulumi update plans, which be still experimental. When she be off, the update charts its own course, as a plain pulumi up does. <docs>How Pulumi voyages work</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

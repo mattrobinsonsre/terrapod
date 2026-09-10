@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Bu çalışma alanını hangi motorun çalıştıracağı. Terraform motoru içindeki ikili dosyayı seçen yürütme arka ucu ile aynı şey değildir.",
       "namePatternPulumi": "'::' ile ayrılmış iki bölüm — project::stack. Yalnızca harf, rakam, tire ve alt çizgi; her bölüm bir harf veya rakamla başlamalıdır.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "CLI''ı <code>pulumi stack select default/project/stack</code> ile ona yönlendirin."
     },
     "stats": {
       "total": "Toplam",
@@ -114,7 +115,9 @@
       "hintHealth": "sağlık",
       "hintLabel": "etiket",
       "hintLabelKey": "etiket anahtarı",
-      "hintName": "ad"
+      "hintName": "ad",
+      "engineLabel": "Motor",
+      "engineAll": "Tüm motorlar"
     },
     "row": {
       "removeLabelFilter": "Filtreden kaldırmak için tıklayın",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Sürüklenme sınıflandırıcısı tarafından bastırılan glob duyarlı Terraform adres + öznitelik yolları. <star></star> sıfır veya daha fazla <dot></dot> olmayan karakterle eşleşir (<n></n> dizin boyunca yayılır); <starIdx></starIdx> herhangi bir köşeli parantezli dizinle eşleşir. Öznitelik son eki olmayan çıplak bir adres, o kaynağa yapılan her değişikliği — yok etmeler dahil — susturur. Yalnızca sürüklenmeyi etkiler, normal plan/apply''ı değil. Tam dilbilgisi için <docs>drift-ignore-rules.md</docs> bölümüne bakın.",
       "driftIgnoreRulesNone": "Yok (her plan farkı sürüklenme sayılır)",
       "parallelism": "Paralellik",
-      "parallelismTitle": "Aynı anda kaç işlemin çalıştırılacağı (1-256). Varsayılan 10."
+      "parallelismTitle": "Aynı anda kaç işlemin çalıştırılacağı (1-256). Varsayılan 10.",
+      "engine": "Motor",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "'::' ile ayrılmış iki bölüm — project::stack. Yalnızca harf, rakam, tire ve alt çizgi; her bölüm bir harf veya rakamla başlamalıdır.",
+      "bindPlan": "Güncellemeyi onaylanan önizlemeye kilitle",
+      "bindPlanHelp": "Açıkken güncelleme, önizlemenin kaydettiği planı birebir uygular; önizlemeden bu yana değişen her şey uygulanmak yerine güncellemenin başarısız olmasına yol açar. Bu, hâlâ deneysel olan Pulumi güncelleme planlarına dayanır. Kapalıyken güncelleme, sıradan bir pulumi up gibi değişikliklerini kendisi belirler. <docs>Pulumi çalıştırmaları nasıl işler</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

@@ -84,7 +84,8 @@
       "enginePulumi": "Pulum1",
       "engineHelp": "Wh1ch 3ng1n3 run5 7h15 w0rk5p4c3. N07 7h3 3x3cu710n b4ck3nd, wh1ch p1ck5 7h3 b1n4ry w17h1n 7h3 73rr4f0rm 3ng1n3.",
       "namePatternPulumi": "7w0 p4r75 53p4r473d by '::' — pr0j3c7::574ck. L3773r5, numb3r5, hyph3n5 4nd und3r5c0r35 0nly; 34ch p4r7 mu57 574r7 w17h 4 l3773r 0r numb3r.",
-      "namePlaceholderPulumi": "my-pr0j3c7::d3v"
+      "namePlaceholderPulumi": "my-pr0j3c7::d3v",
+      "pulumiNameHint": "P01n7 7h3 CL1 47 17 w17h <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "7074l",
@@ -114,7 +115,9 @@
       "hintHealth": "h34l7h",
       "hintLabel": "l4b3l",
       "hintLabelKey": "l4b3l k3y",
-      "hintName": "n4m3"
+      "hintName": "n4m3",
+      "engineLabel": "3ng1n3",
+      "engineAll": "4ll 3ng1n35"
     },
     "row": {
       "removeLabelFilter": "Cl1ck 70 r3m0v3 fr0m f1l73r",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Gl0b-4w4r3 73rr4f0rm 4ddr355 + 477r1bu73 p47h5 5uppr3553d by 7h3 dr1f7 cl4551f13r. <star></star> m47ch35 z3r0 0r m0r3 n0n-<dot></dot> ch4r5 (5p4n5 <n></n> 1nd1c35); <starIdx></starIdx> m47ch35 4ny br4ck373d 1nd3x. 4 b4r3 4ddr355 w17h n0 477r1bu73 5uff1x 51l3nc35 4ny ch4ng3 70 7h47 r350urc3 — 1nclud1ng d357r0y5. 4ff3c75 dr1f7 0nly, n07 r3gul4r pl4n/4pply. 533 <docs>dr1f7-1gn0r3-rul35.md</docs> f0r 7h3 full gr4mm4r.",
       "driftIgnoreRulesNone": "N0n3 (3v3ry pl4n d1ff c0un75 45 dr1f7)",
       "parallelism": "P4r4ll3l15m",
-      "parallelismTitle": "H0w m4ny 0p3r4710n5 run 47 0nc3 (1-256). D3f4ul7 10."
+      "parallelismTitle": "H0w m4ny 0p3r4710n5 run 47 0nc3 (1-256). D3f4ul7 10.",
+      "engine": "3ng1n3",
+      "enginePulumi": "Pulum1",
+      "nameTitlePulumi": "7w0 p4r75 53p4r473d by '::' — pr0j3c7::574ck. L3773r5, numb3r5, hyph3n5 4nd und3r5c0r35 0nly; 34ch p4r7 mu57 574r7 w17h 4 l3773r 0r numb3r.",
+      "bindPlan": "L0ck 7h3 upd473 70 7h3 4ppr0v3d pr3v13w",
+      "bindPlanHelp": "Wh3n 0n, 7h3 upd473 4ppl135 3x4c7ly 7h3 pl4n 7h3 pr3v13w 54v3d, 50 4ny7h1ng 7h47 ch4ng3d 51nc3 7h3 pr3v13w f41l5 7h3 upd473 1n5734d 0f b31ng 4ppl13d. 7h15 r3575 0n Pulum1 upd473 pl4n5, wh1ch 4r3 571ll 3xp3r1m3n74l. Wh3n 0ff, 7h3 upd473 w0rk5 0u7 175 0wn ch4ng35, 45 4 pl41n pulum1 up d035. <docs>H0w Pulum1 run5 w0rk</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",

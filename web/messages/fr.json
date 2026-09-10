@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Quel moteur exécute cet espace de travail. À ne pas confondre avec le backend d'exécution, qui choisit le binaire au sein du moteur Terraform.",
       "namePatternPulumi": "Deux parties séparées par '::' — project::stack. Uniquement lettres, chiffres, tirets et traits de soulignement ; chaque partie doit commencer par une lettre ou un chiffre.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Pointez la CLI dessus avec <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Total",
@@ -114,7 +115,9 @@
       "hintHealth": "santé",
       "hintLabel": "label",
       "hintLabelKey": "clé de label",
-      "hintName": "nom"
+      "hintName": "nom",
+      "engineLabel": "Moteur",
+      "engineAll": "Tous les moteurs"
     },
     "row": {
       "removeLabelFilter": "Cliquez pour retirer du filtre",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Chemins d'adresses Terraform + attributs, avec prise en charge des globs, supprimés par le classificateur de dérive. <star></star> correspond à zéro ou plusieurs caractères non-<dot></dot> (couvre <n></n> indices) ; <starIdx></starIdx> correspond à tout indice entre crochets. Une adresse seule sans suffixe d'attribut fait taire toute modification de cette ressource — y compris les destructions. N'affecte que la dérive, pas le plan/apply normal. Voir <docs>drift-ignore-rules.md</docs> pour la grammaire complète.",
       "driftIgnoreRulesNone": "Aucune (chaque écart de plan compte comme une dérive)",
       "parallelism": "Parallélisme",
-      "parallelismTitle": "Nombre d''opérations exécutées simultanément (1-256). Par défaut : 10."
+      "parallelismTitle": "Nombre d''opérations exécutées simultanément (1-256). Par défaut : 10.",
+      "engine": "Moteur",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Deux parties séparées par '::' — project::stack. Uniquement lettres, chiffres, tirets et traits de soulignement ; chaque partie doit commencer par une lettre ou un chiffre.",
+      "bindPlan": "Lier la mise à jour à l''aperçu approuvé",
+      "bindPlanHelp": "Si activé, la mise à jour applique exactement le plan enregistré par l''aperçu : tout ce qui a changé depuis l''aperçu fait échouer la mise à jour au lieu d''être appliqué. Cela repose sur les plans de mise à jour de Pulumi, encore expérimentaux. Si désactivé, la mise à jour détermine elle-même ses changements, comme un simple pulumi up. <docs>Fonctionnement des exécutions Pulumi</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

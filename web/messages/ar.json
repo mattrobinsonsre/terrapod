@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "المحرك الذي يشغّل مساحة العمل هذه. وليس خلفية التنفيذ التي تختار الملف الثنائي داخل محرك Terraform.",
       "namePatternPulumi": "جزآن يفصل بينهما '::' — project::stack. الحروف والأرقام والشرطات والشرطات السفلية فقط؛ ويجب أن يبدأ كل جزء بحرف أو رقم.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "وجّه واجهة سطر الأوامر إليه باستخدام <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "الإجمالي",
@@ -114,7 +115,9 @@
       "hintHealth": "الحالة الصحية",
       "hintLabel": "التسمية",
       "hintLabelKey": "مفتاح التسمية",
-      "hintName": "الاسم"
+      "hintName": "الاسم",
+      "engineLabel": "المحرك",
+      "engineAll": "كل المحركات"
     },
     "row": {
       "removeLabelFilter": "انقر للإزالة من عامل التصفية",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "مسارات عناوين Terraform + سمات تدعم أنماط glob يقمعها مُصنّف الانحراف. يطابق <star></star> صفرًا أو أكثر من الأحرف غير <dot></dot> (يمتد عبر <n></n> مؤشرات)؛ ويطابق <starIdx></starIdx> أي مؤشر بين قوسين. عنوان مجرد بلا لاحقة سمة يُسكت أي تغيير على ذلك المورد — بما في ذلك عمليات الحذف. يؤثر على الانحراف فقط، لا على plan/apply العادي. راجع <docs>drift-ignore-rules.md</docs> للنحو الكامل.",
       "driftIgnoreRulesNone": "لا شيء (يُحتسب كل اختلاف في الخطة كانحراف)",
       "parallelism": "التوازي",
-      "parallelismTitle": "عدد العمليات التي تُنفَّذ في الوقت نفسه (1-256). الافتراضي 10."
+      "parallelismTitle": "عدد العمليات التي تُنفَّذ في الوقت نفسه (1-256). الافتراضي 10.",
+      "engine": "المحرك",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "جزآن يفصل بينهما '::' — project::stack. الحروف والأرقام والشرطات والشرطات السفلية فقط؛ ويجب أن يبدأ كل جزء بحرف أو رقم.",
+      "bindPlan": "اقفل التحديث على المعاينة المعتمدة",
+      "bindPlanHelp": "عند التفعيل، يطبّق التحديث الخطة التي حفظتها المعاينة بالضبط، فأي شيء تغيّر منذ المعاينة يُفشل التحديث بدل أن يُطبَّق. يعتمد هذا على خطط التحديث في Pulumi، وهي لا تزال تجريبية. عند الإيقاف، يحدّد التحديث تغييراته بنفسه كما يفعل أمر pulumi up العادي. <docs>كيف تعمل تشغيلات Pulumi</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "تم تفويض الترخيص إلى مستودع VCS الخاص بك.",

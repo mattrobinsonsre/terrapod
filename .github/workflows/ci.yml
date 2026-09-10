@@ -498,31 +498,46 @@ jobs:
             # never runs in CI. All of these are pure-unit (no Postgres/Redis/S3).
             paths: tests/auth tests/meta tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/oci tests/test_logging_config.py tests/test_dependency_pins.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py
             pytest_args: -n auto
-          - name: services-api
+          # services-api is sharded across three runners as well as run under
+          # xdist within each. One job took ~8.5 min (#1555): ~6 min of pytest
+          # on a 4-vCPU runner, which `-n auto` cannot widen, most of it
+          # building the FastAPI app ~1000 times. Split by file on collected
+          # test count, the same way as integration below.
+          - name: services-api-1
             paths: tests/services tests/api
-            pytest_args: -n auto
-          # Three runner-level shards, balanced on collected test count by
+            pytest_args: -n auto --shard 1/3
+          - name: services-api-2
+            paths: tests/services tests/api
+            pytest_args: -n auto --shard 2/3
+          - name: services-api-3
+            paths: tests/services tests/api
+            pytest_args: -n auto --shard 3/3
+          # Four runner-level shards, balanced on collected test count by
           # `--shard` (services/tests/shard_plan.py). Measured across five CI
           # runs: per-test cost is uniform at 0.58-1.07s — the work is fixture
           # setup and teardown, which every test pays equally — so a file's
           # duration is its test count times a constant, and counting balances it.
           #
-          # Three, not more: ~100s of every job is fixed cost (checkout, image,
-          # compose stack, collection), measured at 95s and 112s on real runs. A
-          # fourth shard buys 20-50s of wall-clock for another ~100s of runner
-          # time.
+          # Four (#1555): ~100s of every job is fixed cost (checkout, image,
+          # compose stack, collection), measured at 95s and 112s on real runs, so
+          # each further shard buys less wall-clock for the same ~100s of runner
+          # time. Three became four once the suite grew to ~400 tests; beyond
+          # that the fixed cost dominates.
           #
           # The split happens after collection, so a new test file is assigned
           # automatically and cannot be silently missed (#1468).
           - name: integration-1
             paths: tests/integration
-            pytest_args: "--shard 1/3"
+            pytest_args: "--shard 1/4"
           - name: integration-2
             paths: tests/integration
-            pytest_args: "--shard 2/3"
+            pytest_args: "--shard 2/4"
           - name: integration-3
             paths: tests/integration
-            pytest_args: "--shard 3/3"
+            pytest_args: "--shard 3/4"
+          - name: integration-4
+            paths: tests/integration
+            pytest_args: "--shard 4/4"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}

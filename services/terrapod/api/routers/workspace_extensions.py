@@ -605,6 +605,29 @@ async def _latest_runs_any_engine(ws_ids: list, db: AsyncSession) -> dict:
     return {run.workspace_id: run for run in result.scalars().all()}
 
 
+@router.get("/engines")
+async def list_engines(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> JSONResponse:
+    """The engines this deployment enables (#1555).
+
+    What the UI needs to decide whether to offer an engine at all: the create
+    form and the list filter appear only when more than one is on, so a
+    Terraform-only deployment sees nothing it does not use. An engine turned off
+    is absent here, like everywhere else. Terraform is always present.
+    """
+    from terrapod.engines import known_engines
+
+    return JSONResponse(
+        content={
+            "data": [
+                {"type": "engines", "id": name, "attributes": {"name": name}}
+                for name in known_engines()
+            ]
+        }
+    )
+
+
 @router.get("/workspaces")
 async def list_workspaces(
     request: Request,

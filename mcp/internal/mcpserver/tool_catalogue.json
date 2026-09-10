@@ -809,6 +809,13 @@
           "description": "rename the workspace (empty = leave)",
           "type": "string"
         },
+        "pulumi_bind_plan": {
+          "description": "Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; rejected on any other engine",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "terraform_version": {
           "description": "partial version like 1.15",
           "type": "string"

@@ -1272,6 +1272,7 @@ method (*Client) ListArchitectureCritiqueMessages( ctx context.Context, workspac
 method (*Client) ListCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListCatalogItems(ctx context.Context) ([]CatalogItem, error)
 method (*Client) ListDeletedWorkspaces(ctx context.Context, opts DeletedWorkspaceListOptions) (*DeletedWorkspaceList, error)
+method (*Client) ListEngines(ctx context.Context) ([]string, error)
 method (*Client) ListExecutionHooks(ctx context.Context) ([]ExecutionHook, error)
 method (*Client) ListExpiringAPITokens(ctx context.Context) ([]APIToken, error)
 method (*Client) ListGPGKeys(ctx context.Context) ([]GPGKey, error)

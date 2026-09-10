@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "このワークスペースを実行するエンジンです。Terraform エンジン内のバイナリを選ぶ実行バックエンドとは異なります。",
       "namePatternPulumi": "'::' で区切られた 2 つの部分 — project::stack。使用できるのは英数字、ハイフン、アンダースコアのみで、各部分は英字または数字で始まる必要があります。",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> で CLI をこのワークスペースに向けます。"
     },
     "stats": {
       "total": "合計",
@@ -114,7 +115,9 @@
       "hintHealth": "ヘルス",
       "hintLabel": "ラベル",
       "hintLabelKey": "ラベルキー",
-      "hintName": "名前"
+      "hintName": "名前",
+      "engineLabel": "エンジン",
+      "engineAll": "すべてのエンジン"
     },
     "row": {
       "removeLabelFilter": "クリックしてフィルターから削除",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "ドリフト分類器によって抑制される、glob対応のTerraformアドレス + 属性パスです。<star></star>は非<dot></dot>文字の0個以上に一致します（<n></n>個のインデックスにまたがります）。<starIdx></starIdx>は任意の括弧付きインデックスに一致します。属性の接尾辞なしの単なるアドレスは、そのリソースへのあらゆる変更（破棄を含む）を抑制します。ドリフトのみに影響し、通常のplan/applyには影響しません。完全な文法については<docs>drift-ignore-rules.md</docs>を参照してください。",
       "driftIgnoreRulesNone": "なし（すべてのプラン差分がドリフトとして扱われます）",
       "parallelism": "並列度",
-      "parallelismTitle": "同時に実行される操作の数 (1-256)。既定値は 10。"
+      "parallelismTitle": "同時に実行される操作の数 (1-256)。既定値は 10。",
+      "engine": "エンジン",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "'::' で区切られた 2 つの部分 — project::stack。使用できるのは英数字、ハイフン、アンダースコアのみで、各部分は英字または数字で始まる必要があります。",
+      "bindPlan": "承認済みのプレビューに更新を固定する",
+      "bindPlanHelp": "オンにすると、更新はプレビューが保存したプランをそのまま適用します。プレビュー以降に変化したものがあれば、適用されずに更新が失敗します。これは Pulumi の更新プランに基づいており、まだ実験的な機能です。オフにすると、通常の pulumi up と同様に、更新が自ら変更内容を判断します。<docs>Pulumi の実行の仕組み</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

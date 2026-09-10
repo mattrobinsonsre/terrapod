@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Quae machina hoc spatium operis exsequitur. Non instrumentum exsecutionis, quod binarium intra machinam Terraform eligit.",
       "namePatternPulumi": "Duae partes signo '::' divisae — project::stack. Tantum litterae, numeri, lineolae et lineolae subscriptae; utraque pars littera vel numero incipiat.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Instrumentum CLI eo dirige per <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Summa",
@@ -114,7 +115,9 @@
       "hintHealth": "salus",
       "hintLabel": "titulus",
       "hintLabelKey": "clavis tituli",
-      "hintName": "nomen"
+      "hintName": "nomen",
+      "engineLabel": "Machina",
+      "engineAll": "Omnes machinae"
     },
     "row": {
       "removeLabelFilter": "Preme ut ex cribro removeatur",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Semitae inscriptionum et attributorum Terraform globi-gnarae a classificatore aberrationis suppressae. <star></star> zero aut plures characteres non-<dot></dot> convenit (spatium <n></n> indicum); <starIdx></starIdx> quemvis indicem uncinatum convenit. Inscriptio nuda sine suffixo attributi quamvis mutationem illius facultatis silet — destructiones inclusas. Solam aberrationem afficit, non normale plan/apply. Vide <docs>drift-ignore-rules.md</docs> pro grammatica plena.",
       "driftIgnoreRulesNone": "Nulla (omnis differentia consilii ut aberratio numeratur)",
       "parallelism": "Parallelismus",
-      "parallelismTitle": "Quot operationes simul exercentur (1-256). Praedefinitum 10."
+      "parallelismTitle": "Quot operationes simul exercentur (1-256). Praedefinitum 10.",
+      "engine": "Machina",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Duae partes signo '::' divisae — project::stack. Tantum litterae, numeri, lineolae et lineolae subscriptae; utraque pars littera vel numero incipiat.",
+      "bindPlan": "Renovationem ad praevisionem probatam alliga",
+      "bindPlanHelp": "Cum activatum est, renovatio ipsum consilium quod praevisio servavit adhibet, ita ut quidquid post praevisionem mutatum est renovationem deficere faciat potius quam adhibeatur. Hoc consiliis renovationis Pulumi nititur, quae adhuc experimentalia sunt. Cum inactivatum est, renovatio mutationes suas ipsa invenit, sicut simplex pulumi up facit. <docs>Quomodo cursus Pulumi operantur</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

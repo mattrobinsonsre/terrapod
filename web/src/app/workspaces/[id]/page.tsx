@@ -49,6 +49,10 @@ interface WorkspacePermissions {
 
 interface WorkspaceAttrs {
   name: string
+  // Which engine runs this workspace (#1407). Absent from an older API: Terraform.
+  engine?: string
+  // Pulumi only (#1553): bind the update to the approved preview.
+  'pulumi-bind-plan'?: boolean
   'execution-mode': string
   'execution-backend': string
   'auto-apply': boolean
@@ -303,6 +307,7 @@ function WorkspaceDetailContent() {
   const [editDriftIgnoreRules, setEditDriftIgnoreRules] = useState<string[]>([])
   const [newDriftIgnoreRule, setNewDriftIgnoreRule] = useState('')
   const [editWorkingDir, setEditWorkingDir] = useState('')
+  const [editBindPlan, setEditBindPlan] = useState(false)
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
   const [editVcsBranch, setEditVcsBranch] = useState('')
@@ -1063,6 +1068,7 @@ function WorkspaceDetailContent() {
     setEditDriftIgnoreRules(workspace.attributes['drift-ignore-rules'] || [])
     setNewDriftIgnoreRule('')
     setEditWorkingDir(workspace.attributes['working-directory'] || '')
+    setEditBindPlan(workspace.attributes['pulumi-bind-plan'] ?? false)
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
     setEditVcsBranch(workspace.attributes['vcs-branch'] || '')
@@ -1130,6 +1136,8 @@ function WorkspaceDetailContent() {
               'auto-merge': editAutoMerge,
               'auto-merge-strategy': editAutoMergeStrategy,
               labels: editLabels,
+              // Pulumi only: the API refuses it on any other engine.
+              ...(workspace?.attributes.engine === 'pulumi' ? { 'pulumi-bind-plan': editBindPlan } : {}),
               ...(isAdmin() ? { 'owner-email': editOwner } : {}),
               ...(force ? { force: true } : {}),
             },
@@ -1919,6 +1927,9 @@ function WorkspaceDetailContent() {
 
   const attrs = workspace.attributes
   const perms = attrs.permissions || {} as WorkspacePermissions
+  // Settings that only mean something to Terraform are hidden for Pulumi rather
+  // than shown and ignored (#1555).
+  const isPulumi = attrs.engine === 'pulumi'
 
   // VCS polling is stalled when the most recent ATTEMPT is newer than the most
   // recent SUCCESS. Comparing the two needs no knowledge of the poll interval,
@@ -2114,13 +2125,20 @@ function WorkspaceDetailContent() {
                   <dt className="text-xs text-slate-500">{t('fields.name')}</dt>
                   {editing ? (
                     <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
-                      pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*" maxLength={90}
-                      title={t('fields.nameTitle')}
+                      // A Pulumi workspace is named project::stack, which the plain rule rejects.
+                      pattern={isPulumi ? '[a-zA-Z0-9][a-zA-Z0-9_\\-]*::[a-zA-Z0-9][a-zA-Z0-9_\\-]*' : '[a-zA-Z0-9][a-zA-Z0-9_\\-]*'} maxLength={90}
+                      title={isPulumi ? t('fields.nameTitlePulumi') : t('fields.nameTitle')}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs.name}</dd>
                   )}
                 </div>
+                {attrs.engine && attrs.engine !== 'terraform' && (
+                  <div>
+                    <dt className="text-xs text-slate-500">{t('fields.engine')}</dt>
+                    <dd className="mt-1 text-sm text-slate-200" data-testid="ws-engine">{isPulumi ? t('fields.enginePulumi') : attrs.engine}</dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-xs text-slate-500">{t('fields.executionMode')}</dt>
                   {editing ? (
@@ -2184,6 +2202,8 @@ function WorkspaceDetailContent() {
                     <dd className="mt-1 text-sm text-slate-200">{attrs.parallelism ?? 10}</dd>
                   )}
                 </div>
+                {!isPulumi && (
+                  <>
                 <div>
                   <dt className="text-xs text-slate-500">{t('fields.executionBackend')}</dt>
                   {editing ? (
@@ -2232,6 +2252,30 @@ function WorkspaceDetailContent() {
                     <dd className="mt-1 text-sm text-slate-200">{attrs['terragrunt-enabled'] ? t('fields.terragruntEnabledVersion', { version: attrs['terragrunt-version'] || '1.0' }) : t('common.disabled')}</dd>
                   )}
                 </div>
+                  </>
+                )}
+                {isPulumi && (
+                  <div className="sm:col-span-2">
+                    <dt className="text-xs text-slate-500">{t('fields.bindPlan')}</dt>
+                    {editing ? (
+                      <label className="mt-1 flex items-center gap-2 min-h-11 sm:min-h-0">
+                        <input type="checkbox" checked={editBindPlan} onChange={(e) => setEditBindPlan(e.target.checked)}
+                          aria-label={t('fields.bindPlan')} data-testid="ws-bind-plan"
+                          className="rounded border-slate-600 bg-slate-700 text-brand-600" />
+                        <span className="text-sm text-slate-200">{editBindPlan ? t('common.enabled') : t('common.disabled')}</span>
+                      </label>
+                    ) : (
+                      <dd className="mt-1 text-sm text-slate-200" data-testid="ws-bind-plan-value">{attrs['pulumi-bind-plan'] ? t('common.enabled') : t('common.disabled')}</dd>
+                    )}
+                    <p className="mt-1 text-xs text-slate-400">
+                      {t.rich('fields.bindPlanHelp', {
+                        docs: (chunks) => (
+                          <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/pulumi-cli-surface.md" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:text-brand-300 underline">{chunks}</a>
+                        ),
+                      })}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <dt className="text-xs text-slate-500">{t('fields.workingDirectory')}</dt>
                   {editing ? (
@@ -2460,6 +2504,7 @@ function WorkspaceDetailContent() {
                     </dd>
                   )}
                 </div>
+                {!isPulumi && (
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-slate-500 mb-1">{t('fields.varFiles')}</dt>
                   {editing && perms['can-update'] ? (
@@ -2519,6 +2564,7 @@ function WorkspaceDetailContent() {
                     </dd>
                   )}
                 </div>
+                )}
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-slate-500 mb-1">{t('fields.triggerPrefixes')}</dt>
                   {editing && perms['can-update'] ? (

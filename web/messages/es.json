@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Qué motor ejecuta este espacio de trabajo. No el backend de ejecución, que elige el binario dentro del motor de Terraform.",
       "namePatternPulumi": "Dos partes separadas por '::' — project::stack. Solo letras, números, guiones y guiones bajos; cada parte debe empezar por una letra o un número.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Apunta la CLI a él con <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Total",
@@ -114,7 +115,9 @@
       "hintHealth": "salud",
       "hintLabel": "etiqueta",
       "hintLabelKey": "clave de etiqueta",
-      "hintName": "nombre"
+      "hintName": "nombre",
+      "engineLabel": "Motor",
+      "engineAll": "Todos los motores"
     },
     "row": {
       "removeLabelFilter": "Haga clic para quitar del filtro",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Rutas de dirección de Terraform + atributo compatibles con globs, suprimidas por el clasificador de desviación. <star></star> coincide con cero o más caracteres que no sean <dot></dot> (abarca <n></n> índices); <starIdx></starIdx> coincide con cualquier índice entre corchetes. Una dirección simple sin sufijo de atributo silencia cualquier cambio en ese recurso — incluidas las destrucciones. Solo afecta a la desviación, no al plan/apply normal. Consulte <docs>drift-ignore-rules.md</docs> para la gramática completa.",
       "driftIgnoreRulesNone": "Ninguna (cada diferencia del plan cuenta como desviación)",
       "parallelism": "Paralelismo",
-      "parallelismTitle": "Cuántas operaciones se ejecutan a la vez (1-256). Predeterminado: 10."
+      "parallelismTitle": "Cuántas operaciones se ejecutan a la vez (1-256). Predeterminado: 10.",
+      "engine": "Motor",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Dos partes separadas por '::' — project::stack. Solo letras, números, guiones y guiones bajos; cada parte debe empezar por una letra o un número.",
+      "bindPlan": "Vincular la actualización a la vista previa aprobada",
+      "bindPlanHelp": "Si está activado, la actualización aplica exactamente el plan que guardó la vista previa, así que cualquier cambio desde la vista previa hace fallar la actualización en lugar de aplicarse. Se basa en los planes de actualización de Pulumi, que siguen siendo experimentales. Si está desactivado, la actualización calcula sus propios cambios, como hace un pulumi up normal. <docs>Cómo funcionan las ejecuciones de Pulumi</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",
