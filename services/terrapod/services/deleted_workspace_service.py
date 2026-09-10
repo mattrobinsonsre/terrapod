@@ -92,6 +92,8 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         # Which engine, not which binary — restoring without it would bring a
         # workspace back as Terraform regardless of what it was (#1407).
         "engine": ws.engine,
+        # How a Pulumi update is executed, not something that can start one (#1553).
+        "pulumi_bind_plan": ws.pulumi_bind_plan,
         "execution_backend": ws.execution_backend,
         "terraform_version": ws.terraform_version,
         "terragrunt_enabled": ws.terragrunt_enabled,
@@ -466,6 +468,8 @@ async def restore_workspace(
         id=uuid_mod.uuid4(),
         name=await _unique_name(db, name or marker.get("workspace_name") or "", engine),
         engine=engine,
+        # Only a Pulumi workspace may carry it; an older marker has no key.
+        pulumi_bind_plan=engine == "pulumi" and bool(settings.get("pulumi_bind_plan")),
         labels=labels,
         owner_email=settings.get("owner_email") or restored_by,
         execution_mode=settings.get("execution_mode") or "local",

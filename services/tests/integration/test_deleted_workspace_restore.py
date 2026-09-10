@@ -805,3 +805,46 @@ class TestRestoreResilience:
         ws = await client.get(f"/api/v2/workspaces/{new_id}", headers=AUTH)
         labels = ws.json()["data"]["attributes"]["labels"]
         assert labels == {"team": "platform"}
+
+
+class TestRestoreKeepsHowAPulumiUpdateRuns:
+    """`pulumi_bind_plan` (#1553) is configuration, so a restore brings it back —
+    it decides how an update runs, not whether one starts, so it is not among
+    the settings forced off on return. Only a Pulumi workspace may carry it; a
+    marker claiming it on any other engine restores it off.
+
+    Read from the row directly: the TFE surface does not serve Pulumi workspaces.
+    """
+
+    @pytest.mark.parametrize(
+        ("engine", "name", "want"),
+        [("pulumi", "proj::bound", True), ("terraform", "restore-notpulumi", False)],
+    )
+    async def test_the_setting_survives_only_on_pulumi(self, app, client, engine, name, want):
+        import uuid
+
+        from sqlalchemy import select
+
+        from terrapod.db.models import Workspace
+        from terrapod.db.session import get_db_session
+
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, f"restore-bind-{engine}", [1], f"lin-{engine}")
+
+        storage = get_storage()
+        marker = await dws.read_marker(storage, old_id)
+        marker["workspace_name"] = name
+        marker["settings"]["engine"] = engine
+        marker["settings"]["pulumi_bind_plan"] = True
+        await dws.write_marker(storage, old_id, marker)
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        new_id = uuid.UUID(resp.json()["data"]["id"].removeprefix("ws-"))
+
+        async with get_db_session() as db:
+            ws = (await db.execute(select(Workspace).where(Workspace.id == new_id))).scalar_one()
+        assert ws.engine == engine
+        assert ws.pulumi_bind_plan is want
