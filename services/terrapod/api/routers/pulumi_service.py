@@ -80,7 +80,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
-from terrapod.db.models import Workspace
+from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
@@ -218,6 +218,72 @@ async def _find_stack(db: AsyncSession, stack_id: str) -> Workspace:
     return ws
 
 
+async def _runner_caps_on(
+    db: AsyncSession, user: AuthenticatedUser, ws: Workspace
+) -> frozenset[str]:
+    """What a run's own runner token may do on a stack.
+
+    Agent-mode Pulumi runs call this API from the runner Job with the run's
+    runner token, which carries only the `everyone` role — so ordinary
+    resolution grants it nothing, and the gates below would 404 the run's own
+    `pulumi preview`. That is not hypothetical: it is what a live run did the
+    first time these gates existed, with every test green.
+
+    Mirrors what the Terraform surface allows a runner
+    (`tfe_v2._runner_state_read_allowed`), derived from the run rather than from
+    roles:
+
+    - On its **own** run's stack: read, state read and preview always; apply for
+      an apply run; destroy for a destroy run. Never `state:write` (wholesale
+      import) or `workspace:delete` — no run does either, and a runner token
+      that could would be a far wider credential than the run it was minted for.
+      A run writes state through checkpoints, which its update's lease governs.
+    - On **another** stack: read only, and only where #344's consumer allowlist
+      names the run's workspace — a StackReference, governed exactly as
+      `terraform_remote_state` is.
+
+    Fails safe: no run, a malformed id, or a run that has gone yields nothing.
+    """
+    if not user.run_id:
+        return frozenset()
+    try:
+        run_uuid = uuid.UUID(user.run_id)
+    except (ValueError, TypeError):
+        return frozenset()
+    row = (
+        await db.execute(
+            select(Run.workspace_id, Run.plan_only, Run.is_destroy).where(Run.id == run_uuid)
+        )
+    ).first()
+    if row is None:
+        return frozenset()
+    if row.workspace_id != ws.id:
+        from terrapod.api.routers.tfe_v2 import _runner_state_read_allowed
+
+        if await _runner_state_read_allowed(db, user, ws):
+            return frozenset({cap.WORKSPACE_READ, cap.STATE_READ})
+        return frozenset()
+    caps = {cap.WORKSPACE_READ, cap.RUN_READ, cap.STATE_READ, cap.RUN_PLAN}
+    if not row.plan_only:
+        caps.add(cap.RUN_APPLY)
+        if row.is_destroy:
+            caps.add(cap.RUN_APPLY_DESTROY)
+    return frozenset(caps)
+
+
+async def _caps_on(db: AsyncSession, user: AuthenticatedUser, ws: Workspace) -> frozenset[str]:
+    """The caller's capabilities on a stack's workspace.
+
+    One place for both kinds of caller: a run's runner token is authorized from
+    its run (`_runner_caps_on`); everyone else through the same RBAC resolution
+    the Terraform routes use. Every gate on this surface asks this, so the two
+    can never be decided differently in different handlers.
+    """
+    if user.auth_method == "runner_token":
+        return await _runner_caps_on(db, user, ws)
+    return await resolve_workspace_capabilities_for(db, user, ws)
+
+
 async def _authorized_stack(
     db: AsyncSession, user: AuthenticatedUser, stack_id: str, required: str
 ) -> Workspace:
@@ -237,7 +303,7 @@ async def _authorized_stack(
     because of what a 404 means to the Pulumi CLI.)
     """
     ws = await _find_stack(db, stack_id)
-    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    caps = await _caps_on(db, user, ws)
     if not has_capability(caps, cap.WORKSPACE_READ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_STACK_NOT_FOUND)
     if not has_capability(caps, required):
@@ -346,7 +412,7 @@ async def list_stacks(
         proj, _, stack = ws.name.partition("::")
         if project and proj != project:
             continue
-        caps = await resolve_workspace_capabilities_for(db, user, ws)
+        caps = await _caps_on(db, user, ws)
         if not has_capability(caps, cap.WORKSPACE_READ):
             continue
         stacks.append(
@@ -391,7 +457,7 @@ async def create_stack(
         # Saying it to anyone would make this an oracle for which workspace names
         # are taken — the caller could probe names they have no access to. A
         # caller who cannot read it gets the ordinary refusal below instead.
-        caps = await resolve_workspace_capabilities_for(db, user, existing)
+        caps = await _caps_on(db, user, existing)
         if has_capability(caps, cap.WORKSPACE_READ):
             # The CLI probes with GET first, so reaching here means a genuine
             # race or a name already taken by another engine's workspace.

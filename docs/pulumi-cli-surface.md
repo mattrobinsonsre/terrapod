@@ -199,6 +199,15 @@ without a valid lease learns nothing about which stacks exist. A preview's lease
 `checkpoint` — a preview never writes state, and allowing it would let `run:plan` buy
 `state:write`.
 
+**A run's own CLI.** Agent-mode Pulumi runs call this API from the runner Job with the
+run's runner token, which holds no workspace role of its own. It is authorized from the
+run instead, mirroring what the Terraform surface allows a runner: on its **own** run's
+stack it may read, read state and preview, plus `run:apply` for an apply run and
+`run:apply-destroy` for a destroy run — never `stack import` or `stack rm`, which no run
+performs. On **another** stack it may only read, and only where that stack's remote-state
+consumer allowlist names the run's workspace (a `StackReference`, governed exactly as
+`terraform_remote_state` is).
+
 `stack init` never creates a stack (below), and it reports a name as already taken only
 to someone who can read that stack.
 
