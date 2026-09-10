@@ -17,9 +17,12 @@ test.describe('Pulumi workspace', () => {
     const name = `${uniqueName('e2e-pulumi')}::dev`;
     const wsId = await createPulumiWorkspace(token, name);
 
-    // The list shows a stack name as "project / stack" (#1555).
+    // The list shows a stack name as "project / stack" (#1555). By link name,
+    // not exact text: the link also holds the engine badge.
     await page.goto('/workspaces');
-    await expect(page.getByText(name.replace('::', ' / '), { exact: true }).first()).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByRole('link', { name: new RegExp(name.replace('::', ' / ')) }).first(),
+    ).toBeVisible({ timeout: 20_000 });
 
     await page.goto(`/workspaces/${wsId}`);
     await expect(page.getByText(name, { exact: true }).first()).toBeVisible({ timeout: 20_000 });
