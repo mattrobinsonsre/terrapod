@@ -36,6 +36,25 @@ otherwise have been built wrong:
    verbatim. Terrapod's existing per-workspace serialisation maps straight onto
    it.
 
+**Authorization is the workspace's (#1550).** Authenticating a caller says who
+they are, not what they may do to a given stack, and this surface first shipped
+doing only the former. Every route addressed at a stack now resolves the caller's
+capabilities on the workspace behind it — the same resolution the Terraform routes
+use — through exactly two doors:
+
+- `_authorized_stack` for calls made with the user's token. A caller who cannot
+  read the workspace gets the same 404 as for a stack that does not exist, so
+  names cannot be probed; one who can read it but lacks the capability the call
+  needs gets a 403 saying which.
+- `_require_lease` for the three in-update calls, which carry a lease instead of
+  a user. A lease authorizes one update on one stack: it is checked before the
+  stack is even looked up (so an unauthenticated caller learns nothing about which
+  stacks exist) and then bound to the stack in the URL.
+
+`_find_stack` is the lookup both are built on and is never called by a route
+directly; `tests/api/test_pulumi_authz.py` enforces that, and pins which
+capability each route requires.
+
 **Mounted natively, not at the root.** The CLI appends `/api/...` to whatever
 base URL it is given, path prefix included, so this lives under the Terrapod
 prefix. Root space is reserved for the two surfaces genuinely forced there — the
@@ -59,9 +78,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser
-from terrapod.db.models import Workspace
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
+from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
 
 class PulumiError(HTTPException):
@@ -118,6 +140,18 @@ DEFAULT_ORG = "default"
 #: The engine discriminator a Pulumi-backed workspace carries (#1487).
 PULUMI_ENGINE = "pulumi"
 
+#: What each kind of update requires, the same verbs a Terraform run needs. Used
+#: both where an update is begun and where it is started, so the two can never
+#: disagree about what, say, a destroy costs.
+_KIND_CAPABILITY: dict[str, str] = {
+    "preview": cap.RUN_PLAN,
+    "update": cap.RUN_APPLY,
+    "refresh": cap.RUN_APPLY,
+    "destroy": cap.RUN_APPLY_DESTROY,
+}
+
+_STACK_NOT_FOUND = "Stack not found"
+
 
 def _stack_workspace_name(project: str, stack: str) -> str:
     """The workspace name backing a stack.
@@ -161,11 +195,17 @@ def _split_stack_id(stack_id: str) -> tuple[str, str, str]:
     return parts[0], parts[1], parts[2]
 
 
-async def _load_stack(db: AsyncSession, stack_id: str) -> Workspace:
-    """The workspace backing a stack, or 404.
+async def _find_stack(db: AsyncSession, stack_id: str) -> Workspace:
+    """The workspace backing a stack, or 404. A lookup and NOTHING more.
 
-    404 is load-bearing here: `stack init` probes with a GET first and reads a
-    404 as "does not exist, safe to create".
+    It authorizes no one, so no route calls it directly: user calls go through
+    `_authorized_stack` and lease calls through `_require_lease`, both of which
+    call this and then decide whether the caller may proceed. A guard test fails
+    if a route reaches for it on its own — which is exactly how every handler here
+    once ended up authenticated but unauthorized (#1550).
+
+    404 is load-bearing: `stack init` probes with a GET first and reads a 404 as
+    "does not exist, safe to create".
     """
     _, project, stack = _split_stack_id(stack_id)
     name = _stack_workspace_name(project, stack)
@@ -174,7 +214,103 @@ async def _load_stack(db: AsyncSession, stack_id: str) -> Workspace:
     )
     ws = result.scalar_one_or_none()
     if ws is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stack not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_STACK_NOT_FOUND)
+    return ws
+
+
+async def _runner_caps_on(
+    db: AsyncSession, user: AuthenticatedUser, ws: Workspace
+) -> frozenset[str]:
+    """What a run's own runner token may do on a stack.
+
+    Agent-mode Pulumi runs call this API from the runner Job with the run's
+    runner token, which carries only the `everyone` role — so ordinary
+    resolution grants it nothing, and the gates below would 404 the run's own
+    `pulumi preview`. That is not hypothetical: it is what a live run did the
+    first time these gates existed, with every test green.
+
+    Mirrors what the Terraform surface allows a runner
+    (`tfe_v2._runner_state_read_allowed`), derived from the run rather than from
+    roles:
+
+    - On its **own** run's stack: read, state read and preview always; apply for
+      an apply run; destroy for a destroy run. Never `state:write` (wholesale
+      import) or `workspace:delete` — no run does either, and a runner token
+      that could would be a far wider credential than the run it was minted for.
+      A run writes state through checkpoints, which its update's lease governs.
+    - On **another** stack: read only, and only where #344's consumer allowlist
+      names the run's workspace — a StackReference, governed exactly as
+      `terraform_remote_state` is.
+
+    Fails safe: no run, a malformed id, or a run that has gone yields nothing.
+    """
+    if not user.run_id:
+        return frozenset()
+    try:
+        run_uuid = uuid.UUID(user.run_id)
+    except (ValueError, TypeError):
+        return frozenset()
+    row = (
+        await db.execute(
+            select(Run.workspace_id, Run.plan_only, Run.is_destroy).where(Run.id == run_uuid)
+        )
+    ).first()
+    if row is None:
+        return frozenset()
+    if row.workspace_id != ws.id:
+        from terrapod.api.routers.tfe_v2 import _runner_state_read_allowed
+
+        if await _runner_state_read_allowed(db, user, ws):
+            return frozenset({cap.WORKSPACE_READ, cap.STATE_READ})
+        return frozenset()
+    caps = {cap.WORKSPACE_READ, cap.RUN_READ, cap.STATE_READ, cap.RUN_PLAN}
+    if not row.plan_only:
+        caps.add(cap.RUN_APPLY)
+        if row.is_destroy:
+            caps.add(cap.RUN_APPLY_DESTROY)
+    return frozenset(caps)
+
+
+async def _caps_on(db: AsyncSession, user: AuthenticatedUser, ws: Workspace) -> frozenset[str]:
+    """The caller's capabilities on a stack's workspace.
+
+    One place for both kinds of caller: a run's runner token is authorized from
+    its run (`_runner_caps_on`); everyone else through the same RBAC resolution
+    the Terraform routes use. Every gate on this surface asks this, so the two
+    can never be decided differently in different handlers.
+    """
+    if user.auth_method == "runner_token":
+        return await _runner_caps_on(db, user, ws)
+    return await resolve_workspace_capabilities_for(db, user, ws)
+
+
+async def _authorized_stack(
+    db: AsyncSession, user: AuthenticatedUser, stack_id: str, required: str
+) -> Workspace:
+    """The workspace backing a stack, provided the caller holds `required` on it.
+
+    The same capability resolution the Terraform routes use, so a Pulumi
+    workspace is governed exactly as a Terraform one is — owner, label RBAC,
+    platform roles and the `everyone` floor all apply unchanged.
+
+    Two refusals, deliberately different. A caller who cannot even read the
+    workspace gets the same 404, with the same message, as for a stack that does
+    not exist: a 403 would confirm the name to someone with no access to it, and
+    the CLI already reads 404 as "no such stack". A caller who can read it but
+    lacks the capability this call needs gets a 403 naming it — they can see the
+    stack, so saying what they are missing gives nothing away and tells them what
+    to ask for. (The Terraform surface answers 403 in both cases; this one differs
+    because of what a 404 means to the Pulumi CLI.)
+    """
+    ws = await _find_stack(db, stack_id)
+    caps = await _caps_on(db, user, ws)
+    if not has_capability(caps, cap.WORKSPACE_READ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_STACK_NOT_FOUND)
+    if not has_capability(caps, required):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires the {required} capability on stack {ws.name}",
+        )
     return ws
 
 
@@ -262,7 +398,12 @@ async def list_stacks(
     user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """`pulumi stack ls`."""
+    """`pulumi stack ls` — the stacks this caller can read, not every stack.
+
+    RBAC-filtered the same way the workspace list is (#1550): a stack the caller
+    cannot read is absent, not listed-then-refused. The project filter runs first
+    so capabilities are only resolved for rows that would be shown.
+    """
     query = select(Workspace).where(Workspace.engine == PULUMI_ENGINE).order_by(Workspace.name)
     rows = (await db.execute(query)).scalars().all()
 
@@ -270,6 +411,9 @@ async def list_stacks(
     for ws in rows:
         proj, _, stack = ws.name.partition("::")
         if project and proj != project:
+            continue
+        caps = await _caps_on(db, user, ws)
+        if not has_capability(caps, cap.WORKSPACE_READ):
             continue
         stacks.append(
             {
@@ -309,14 +453,20 @@ async def create_stack(
         await db.execute(select(Workspace).where(Workspace.name == name))
     ).scalar_one_or_none()
     if existing is not None:
-        # The CLI probes with GET first, so reaching here means a genuine race or
-        # a name already taken by another engine's workspace. 409 either way —
-        # silently adopting someone else's workspace would be worse.
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=f"Stack {project}/{stack} already exists"
-        )
+        # "Already exists" is only said to someone who can read it (#1550).
+        # Saying it to anyone would make this an oracle for which workspace names
+        # are taken — the caller could probe names they have no access to. A
+        # caller who cannot read it gets the ordinary refusal below instead.
+        caps = await _caps_on(db, user, existing)
+        if has_capability(caps, cap.WORKSPACE_READ):
+            # The CLI probes with GET first, so reaching here means a genuine
+            # race or a name already taken by another engine's workspace.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Stack {project}/{stack} already exists",
+            )
 
-    # The stack does not exist, and this endpoint will not create it (#1535).
+    # This endpoint will not create the stack (#1535).
     #
     # Terraform's CLI has never created a workspace — `init` looks one up and
     # fails if it is absent, and the operator creates it in Terrapod first. Doing
@@ -331,10 +481,10 @@ async def create_stack(
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=(
-            f"Stack {project}/{stack} does not exist, and `pulumi stack init` cannot "
-            f"create it. Terrapod workspaces are created in the UI, with the Terrapod "
-            f"Terraform provider, or via the API — then select the stack with "
-            f"`pulumi stack select {org}/{project}/{stack}`."
+            f"Stack {project}/{stack} does not exist or is not visible to you, and "
+            f"`pulumi stack init` cannot create it. Terrapod workspaces are created in "
+            f"the UI, with the Terrapod Terraform provider, or via the API — then "
+            f"select the stack with `pulumi stack select {org}/{project}/{stack}`."
         ),
     )
 
@@ -348,7 +498,7 @@ async def get_stack(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Stack lookup. A 404 here is how the CLI decides a stack needs creating."""
-    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.WORKSPACE_READ)
     return {
         "orgName": org,
         "projectName": project,
@@ -366,7 +516,7 @@ async def delete_stack(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """`pulumi stack rm`."""
-    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.WORKSPACE_DELETE)
     await db.delete(ws)
     await db.commit()
     logger.info("pulumi_stack_deleted", stack=ws.name, actor=user.email)
@@ -467,7 +617,7 @@ async def export_stack(
     deployment, so "nothing yet" has to be expressed as null rather than as an
     empty shape that looks tidier.
     """
-    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_READ)
     return {"version": DEPLOYMENT_VERSION, "deployment": await _read_deployment(ws, db)}
 
 
@@ -481,7 +631,7 @@ async def import_stack(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """`pulumi stack import` — writes state wholesale. Body may be gzipped."""
-    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_WRITE)
     body = await read_body(request)
     await _write_deployment(ws, db, body.get("deployment"))
     logger.info("pulumi_state_imported", stack=ws.name, actor=user.email)
@@ -505,6 +655,12 @@ async def import_stack(
 # An operator who would rather Terrapod did not hold that key keeps a passphrase
 # or KMS provider instead (`pulumi stack init --secrets-provider=...`), in which
 # case the CLI encrypts locally and never calls these.
+#
+# All three require `state:read` (#1550). Decrypt returns secret values, which is
+# exactly what reading raw state would reveal, so it costs the same. Encrypt
+# reveals nothing, but it is called during `up` and `preview`, and `state:read`
+# is held by every preset that can run either — so asking for it refuses nobody
+# who needs it while keeping the oracle closed to someone with no grant at all.
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/encrypt")
@@ -526,7 +682,7 @@ async def encrypt_secret(
 
     from terrapod.crypto.service import get_encryption
 
-    await _load_stack(db, f"{org}/{project}/{stack}")
+    await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_READ)
     body = await read_body(request)
     plaintext = body.get("plaintext")
     if plaintext is None:
@@ -557,7 +713,7 @@ async def decrypt_secret(
 
     from terrapod.crypto.service import get_encryption
 
-    await _load_stack(db, f"{org}/{project}/{stack}")
+    await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_READ)
     body = await read_body(request)
     ciphertext = body.get("ciphertext")
     if ciphertext is None:
@@ -584,7 +740,7 @@ async def batch_decrypt(
 
     from terrapod.crypto.service import get_encryption
 
-    await _load_stack(db, f"{org}/{project}/{stack}")
+    await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_READ)
     body = await read_body(request)
     svc = get_encryption()
     out: dict[str, str] = {}
@@ -619,6 +775,14 @@ def _update_key(update_id: str) -> str:
 #: the stack forever.
 def _stack_lock_key(workspace_id: str) -> str:
     return f"tp:pulumi:stack_active:{workspace_id}"
+
+
+def _decode_record(raw: dict | None) -> dict[str, str]:
+    """A Redis hash as plain strings, whichever way the client returned it."""
+    return {
+        (k.decode() if isinstance(k, bytes) else k): (v.decode() if isinstance(v, bytes) else v)
+        for k, v in (raw or {}).items()
+    }
 
 
 async def _begin_update(ws: Workspace, kind: str, user: AuthenticatedUser) -> dict[str, Any]:
@@ -659,13 +823,27 @@ async def _begin_update(ws: Workspace, kind: str, user: AuthenticatedUser) -> di
     return {"updateID": update_id}
 
 
-async def _require_lease(request: Request, update_id: str) -> dict[str, str]:
-    """Authenticate an in-update call by its lease.
+async def _require_lease(
+    request: Request, update_id: str, db: AsyncSession, stack_id: str
+) -> tuple[dict[str, str], Workspace]:
+    """Authenticate an in-update call by its lease, bound to the stack it names.
 
     The second auth scheme, and the reason it needs its own dependency: these
-    three endpoints are called with `Authorization: update-token <lease>` rather
-    than the user's API token. A test that injects an authenticated client never
-    exercises this path, so the scheme would look fine and be wrong.
+    calls are made with `Authorization: update-token <lease>` rather than the
+    user's API token. A test that injects an authenticated client never exercises
+    this path, so the scheme would look fine and be wrong.
+
+    Two properties matter as much as the token check itself (#1550):
+
+    - **Order.** The lease is checked BEFORE the stack is looked up. These calls
+      carry no user, so answering 404 for a missing stack but 401 for a bad lease
+      on an existing one would let anyone, unauthenticated, test which stacks
+      exist. With the lease first, every bad-lease request gets the same 401.
+    - **Binding.** A lease authorizes one update on one stack. It is refused when
+      the stack in the URL is not the one the update was begun on, so a lease
+      obtained for a stack the caller may write cannot be pointed at one they may
+      not. The lookup and the comparison live here, in one function, so no route
+      can do the first without the second.
     """
     from terrapod.redis.client import get_redis_client
 
@@ -677,11 +855,7 @@ async def _require_lease(request: Request, update_id: str) -> dict[str, str]:
             detail="This endpoint requires an update-token lease",
         )
 
-    record = await get_redis_client().hgetall(_update_key(update_id))
-    record = {
-        (k.decode() if isinstance(k, bytes) else k): (v.decode() if isinstance(v, bytes) else v)
-        for k, v in (record or {}).items()
-    }
+    record = _decode_record(await get_redis_client().hgetall(_update_key(update_id)))
     if not record:
         # Expired or never existed — the same answer either way, because a lease
         # that has timed out is exactly as invalid as one that was invented.
@@ -690,7 +864,14 @@ async def _require_lease(request: Request, update_id: str) -> dict[str, str]:
         )
     if record.get("lease") != value:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid lease token")
-    return record
+
+    ws = await _find_stack(db, stack_id)
+    if record.get("workspace_id") != str(ws.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This lease was issued for a different stack",
+        )
+    return record, ws
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/preview")
@@ -702,7 +883,8 @@ async def begin_preview(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """A preview IS an update — same creation, same start path, same lease."""
-    return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "preview", user)
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", _KIND_CAPABILITY["preview"])
+    return await _begin_update(ws, "preview", user)
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/update")
@@ -713,7 +895,8 @@ async def begin_up(
     user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "update", user)
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", _KIND_CAPABILITY["update"])
+    return await _begin_update(ws, "update", user)
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/refresh")
@@ -724,7 +907,8 @@ async def begin_refresh(
     user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "refresh", user)
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", _KIND_CAPABILITY["refresh"])
+    return await _begin_update(ws, "refresh", user)
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/destroy")
@@ -735,7 +919,8 @@ async def begin_destroy(
     user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    return await _begin_update(await _load_stack(db, f"{org}/{project}/{stack}"), "destroy", user)
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", _KIND_CAPABILITY["destroy"])
+    return await _begin_update(ws, "destroy", user)
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/update/{update_id}")
@@ -752,12 +937,24 @@ async def start_update(
     The token is not optional decoration: without it the CLI aborts with
     `fatal: An assertion has failed: persisted actions require a token` before
     doing any work. That failure mode is why this is asserted in its own test.
+
+    Starting costs what beginning cost — the capability the update's kind
+    requires, looked up from the record rather than trusted from the URL — and
+    the update must belong to the stack addressed (#1550). Otherwise the lease,
+    which is what authorizes everything after this, could be minted for a stack
+    other than the one the update was begun on.
     """
     from terrapod.redis.client import get_redis_client
 
-    await _load_stack(db, f"{org}/{project}/{stack}")
     redis = get_redis_client()
-    if not await redis.exists(_update_key(update_id)):
+    record = _decode_record(await redis.hgetall(_update_key(update_id)))
+    required = _KIND_CAPABILITY.get(record.get("kind", "")) if record else None
+    if required is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown update")
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", required)
+    if record.get("workspace_id") != str(ws.id):
+        # Same answer as an update that does not exist: from this stack's point
+        # of view, it doesn't.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown update")
 
     lease = str(uuid.uuid4())
@@ -778,17 +975,16 @@ async def get_update_status(
     """Poll an update. `stack import` waits on this."""
     from terrapod.redis.client import get_redis_client
 
-    await _load_stack(db, f"{org}/{project}/{stack}")
-    record = await get_redis_client().hgetall(_update_key(update_id))
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.RUN_READ)
+    record = _decode_record(await get_redis_client().hgetall(_update_key(update_id)))
     if not record:
         # A completed update's record is gone, and the CLI reads "succeeded" as
         # done rather than erroring — which is the right answer for anything it
         # is still polling after the fact.
         return {"status": "succeeded"}
-    status_value = record.get(b"status") or record.get("status") or b"running"
-    if isinstance(status_value, bytes):
-        status_value = status_value.decode()
-    return {"status": status_value}
+    if record.get("workspace_id") != str(ws.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown update")
+    return {"status": record.get("status") or "running"}
 
 
 @router.patch("/api/stacks/{org}/{project}/{stack}/update/{update_id}/checkpoint")
@@ -800,9 +996,20 @@ async def write_checkpoint(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Write state mid-update. Lease-authenticated, and gzipped."""
-    await _require_lease(request, update_id)
-    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    """Write state mid-update. Lease-authenticated, and gzipped.
+
+    A preview's lease may not write state (#1550). A preview never persists a
+    checkpoint — on a live stack, previews leave no state version behind and
+    every one that exists was written by an update — so refusing costs nothing.
+    Accepting would let `run:plan`, the capability that begins a preview, buy a
+    `state:write` its holder was never granted.
+    """
+    record, ws = await _require_lease(request, update_id, db, f"{org}/{project}/{stack}")
+    if record.get("kind") == "preview":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A preview does not write state; this lease cannot checkpoint",
+        )
     body = await read_body(request)
     await _write_deployment(ws, db, body.get("deployment"))
     return {}
@@ -815,6 +1022,7 @@ async def post_events(
     stack: str,
     update_id: str,
     request: Request,
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Engine events. Lease-authenticated, gzipped, and accepted-and-dropped.
 
@@ -823,7 +1031,7 @@ async def post_events(
     for no gain, and storing them without a reader would be storage nobody asked
     for — worth revisiting when there is a run view to feed.
     """
-    await _require_lease(request, update_id)
+    await _require_lease(request, update_id, db, f"{org}/{project}/{stack}")
     await read_body(request)
     return {}
 
@@ -840,8 +1048,7 @@ async def complete_update(
     """End the update and release the stack."""
     from terrapod.redis.client import get_redis_client
 
-    record = await _require_lease(request, update_id)
-    ws = await _load_stack(db, f"{org}/{project}/{stack}")
+    record, ws = await _require_lease(request, update_id, db, f"{org}/{project}/{stack}")
     body = await read_body(request)
 
     redis = get_redis_client()
@@ -870,13 +1077,14 @@ async def renew_lease(
     stack: str,
     update_id: str,
     request: Request,
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Extend a lease. Not exercised by the capture — the runs were too short to
     need it — so the shape follows the CLI's expectations and is covered by test
     rather than by observed traffic."""
     from terrapod.redis.client import get_redis_client
 
-    await _require_lease(request, update_id)
+    await _require_lease(request, update_id, db, f"{org}/{project}/{stack}")
     redis = get_redis_client()
     await redis.expire(_update_key(update_id), LEASE_TTL_SECONDS)
     return {}

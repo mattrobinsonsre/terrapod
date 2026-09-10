@@ -103,7 +103,7 @@ class TestTheSecondAuthScheme:
         request = MagicMock()
         request.headers = {}
         with pytest.raises(HTTPException) as exc:
-            await _require_lease(request, "u-1")
+            await _require_lease(request, "u-1", AsyncMock(), "default/p/d")
         assert exc.value.status_code == 401
         assert "update-token" in exc.value.detail
 
@@ -116,7 +116,7 @@ class TestTheSecondAuthScheme:
         request = MagicMock()
         request.headers = {"authorization": "Bearer some-api-token"}
         with pytest.raises(HTTPException) as exc:
-            await _require_lease(request, "u-1")
+            await _require_lease(request, "u-1", AsyncMock(), "default/p/d")
         assert exc.value.status_code == 401
 
     async def test_a_wrong_lease_is_refused(self) -> None:
@@ -128,19 +128,28 @@ class TestTheSecondAuthScheme:
         request.headers = {"authorization": "update-token not-the-real-one"}
         with patch("terrapod.redis.client.get_redis_client", return_value=redis):
             with pytest.raises(HTTPException) as exc:
-                await _require_lease(request, "u-1")
+                await _require_lease(request, "u-1", AsyncMock(), "default/p/d")
         assert exc.value.status_code == 401
 
     async def test_the_right_lease_is_accepted(self) -> None:
         from terrapod.api.routers.pulumi_service import _require_lease
 
         redis = AsyncMock()
-        redis.hgetall.return_value = {"lease": "good", "kind": "update"}
+        ws = MagicMock(id=uuid.uuid4())
+        redis.hgetall.return_value = {
+            "lease": "good",
+            "kind": "update",
+            "workspace_id": str(ws.id),
+        }
         request = MagicMock()
         request.headers = {"authorization": "update-token good"}
-        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
-            record = await _require_lease(request, "u-1")
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch("terrapod.api.routers.pulumi_service._find_stack", AsyncMock(return_value=ws)),
+        ):
+            record, bound = await _require_lease(request, "u-1", AsyncMock(), "default/p/d")
         assert record["kind"] == "update"
+        assert bound is ws
 
     async def test_an_expired_lease_reads_as_invalid(self) -> None:
         """A lease is a TTL, so "expired" and "never existed" are the same
@@ -153,7 +162,7 @@ class TestTheSecondAuthScheme:
         request.headers = {"authorization": "update-token whatever"}
         with patch("terrapod.redis.client.get_redis_client", return_value=redis):
             with pytest.raises(HTTPException) as exc:
-                await _require_lease(request, "gone")
+                await _require_lease(request, "gone", AsyncMock(), "default/p/d")
         assert exc.value.status_code == 401
 
 
@@ -272,7 +281,7 @@ class TestSecrets:
         with (
             patch("terrapod.crypto.service.get_encryption", return_value=svc),
             patch(
-                "terrapod.api.routers.pulumi_service._load_stack",
+                "terrapod.api.routers.pulumi_service._authorized_stack",
                 AsyncMock(return_value=MagicMock(id=uuid.uuid4())),
             ),
         ):

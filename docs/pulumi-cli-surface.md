@@ -168,6 +168,49 @@ CLI's behaviour rather than observed traffic — treat their shapes as unconfirm
   read back. `encrypt` was called six times during an ordinary `up`, so the
   provider obligation itself is confirmed; only the read direction is not.
 
+## Who may call what
+
+Every stack is a Terrapod workspace, and every call addressed at one is authorized
+against that workspace exactly as the Terraform routes are (#1550): owner, label RBAC,
+platform roles and the `everyone` floor all apply unchanged. What each call needs:
+
+| Call | Requires |
+|---|---|
+| `stack ls` | `workspace:read` on each stack — stacks you cannot read are not listed |
+| stack lookup | `workspace:read` |
+| `stack rm` | `workspace:delete` |
+| `stack export` | `state:read` |
+| `stack import` | `state:write` |
+| `encrypt`, `decrypt`, `batch-decrypt` | `state:read` — decrypt returns secret values |
+| `preview` | `run:plan` |
+| `up`, `refresh` | `run:apply` |
+| `destroy` | `run:apply-destroy` |
+| starting an update | whatever beginning it required — read from the update, not the URL |
+| polling an update | `run:read` |
+
+Without `workspace:read`, every call answers exactly as it would for a stack that does
+not exist — the same 404 and the same message — so stack names cannot be probed. With
+read access but without the capability a call needs, the answer is a 403 naming it.
+
+The in-update calls (`checkpoint`, `events/batch`, `complete`, `renew_lease`) carry a
+lease rather than a user. A lease authorizes one update on one stack: it is refused
+against any other stack, and it is checked before the stack is looked up, so a caller
+without a valid lease learns nothing about which stacks exist. A preview's lease cannot
+`checkpoint` — a preview never writes state, and allowing it would let `run:plan` buy
+`state:write`.
+
+**A run's own CLI.** Agent-mode Pulumi runs call this API from the runner Job with the
+run's runner token, which holds no workspace role of its own. It is authorized from the
+run instead, mirroring what the Terraform surface allows a runner: on its **own** run's
+stack it may read, read state and preview, plus `run:apply` for an apply run and
+`run:apply-destroy` for a destroy run — never `stack import` or `stack rm`, which no run
+performs. On **another** stack it may only read, and only where that stack's remote-state
+consumer allowlist names the run's workspace (a `StackReference`, governed exactly as
+`terraform_remote_state` is).
+
+`stack init` never creates a stack (below), and it reports a name as already taken only
+to someone who can read that stack.
+
 ## `stack init` does not create a stack
 
 `POST /api/stacks/{org}/{project}` is served, but it always refuses: a 404 whose
