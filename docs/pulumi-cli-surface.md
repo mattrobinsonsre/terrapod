@@ -246,6 +246,16 @@ The route stays mounted rather than being removed so the refusal can carry that
 instruction — the CLI prints the message verbatim, and an unmounted route would
 give the operator a bare 404 with nothing to act on.
 
+## Pulumi workspaces in the UI
+
+A Pulumi workspace is listed, opened and edited like any other (#1554, #1555), through the native `/api/v1/workspaces` routes. The TFE-compatible surface serves Terraform alone.
+
+- **List.** A Pulumi row carries a *Pulumi* badge, and its `project::stack` name is shown as `project / stack`. An engine filter appears when more than one engine is enabled.
+- **Page.** It shows the engine and hides the settings that only mean something to Terraform: execution backend, version, Terragrunt and var files. It adds **Lock the update to the approved preview** (`pulumi-bind-plan`, off by default; see [#1553](https://github.com/mattrobinsonsre/terrapod/issues/1553)).
+- **Create.** The form offers an engine only when more than one is enabled (`GET /api/v1/engines`). For Pulumi it asks for a `project::stack` name, which you then select with `pulumi stack select default/{project}/{stack}`.
+
+A deployment with only Terraform enabled shows none of this: no badge, no filter and no engine picker.
+
 ## Findings
 
 **Auth is `token <value>`, and it changes mid-run.** Not `Bearer`. Everything

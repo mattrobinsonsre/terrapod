@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Which engine runs this workspace. Not the execution backend, which picks the binary within the Terraform engine.",
       "namePatternPulumi": "Two parts separated by '::' — project::stack. Letters, numbers, hyphens and underscores only; each part must start with a letter or number.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Point the CLI at it with <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Total",
@@ -114,7 +115,9 @@
       "hintHealth": "health",
       "hintLabel": "label",
       "hintLabelKey": "label key",
-      "hintName": "name"
+      "hintName": "name",
+      "engineLabel": "Engine",
+      "engineAll": "All engines"
     },
     "row": {
       "removeLabelFilter": "Click to remove from filter",
@@ -2351,7 +2354,12 @@
       "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths suppressed by the drift classifier. <star></star> matches zero or more non-<dot></dot> chars (spans <n></n> indices); <starIdx></starIdx> matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys. Affects drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> for the full grammar.",
       "driftIgnoreRulesNone": "None (every plan diff counts as drift)",
       "parallelism": "Parallelism",
-      "parallelismTitle": "How many operations run at once (1-256). Default 10."
+      "parallelismTitle": "How many operations run at once (1-256). Default 10.",
+      "engine": "Engine",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Two parts separated by '::' — project::stack. Letters, numbers, hyphens and underscores only; each part must start with a letter or number.",
+      "bindPlan": "Lock the update to the approved preview",
+      "bindPlanHelp": "When on, the update applies exactly the plan the preview saved, so anything that changed since the preview fails the update instead of being applied. This rests on Pulumi update plans, which are still experimental. When off, the update works out its own changes, as a plain pulumi up does. <docs>How Pulumi runs work</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",

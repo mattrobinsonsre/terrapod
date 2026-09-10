@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumiz",
       "engineHelp": "Wich enginz runz dis werkspace. Not teh execushun bakend, wich pikz teh binry insyde teh Terraform enginz.",
       "namePatternPulumi": "Two partz separatd by '::' — projekt::stak. Letterz, numberz, hyfenz an underskorez only; each part gotta start wif a letter or number. KTHX",
-      "namePlaceholderPulumi": "mah-projekt::dev"
+      "namePlaceholderPulumi": "mah-projekt::dev",
+      "pulumiNameHint": "Point teh CLI at it wif <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Total",
@@ -114,7 +115,9 @@
       "hintHealth": "helth",
       "hintLabel": "labul",
       "hintLabelKey": "labul key",
-      "hintName": "naym"
+      "hintName": "naym",
+      "engineLabel": "Enginz",
+      "engineAll": "All teh enginz"
     },
     "row": {
       "removeLabelFilter": "Clik ta remoove frum filtur",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Glob-aware Terraform addresz + attribyoot pathz supprest by teh drift classifiur. <star></star> matchez zero or moar non-<dot></dot> charz (spanz <n></n> indicez); <starIdx></starIdx> matchez any brackeded indeks. A bare addresz wif no attribyoot suffiks silencez any change ta dat resorce — includin destroyz. Affectz drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> fer teh full grammur.",
       "driftIgnoreRulesNone": "Noes (evry plan diff countz az drift)",
       "parallelism": "Parallelizm",
-      "parallelismTitle": "How many fingz runz at teh same tiem (1-256). Defawlt 10. srsly"
+      "parallelismTitle": "How many fingz runz at teh same tiem (1-256). Defawlt 10. srsly",
+      "engine": "Enginz",
+      "enginePulumi": "Pulumiz",
+      "nameTitlePulumi": "Two partz separatd by '::' — projekt::stak. Letterz, numberz, hyfenz an underskorez only; each part gotta start wif a letter or number. KTHX",
+      "bindPlan": "Lok teh updayt 2 teh approvd preview",
+      "bindPlanHelp": "Wen on, teh updayt applyz exakly teh plan teh preview savd, so anyfin dat changd sinse teh preview failz teh updayt insted ov gettin applyd. Dis sitz on Pulumi updayt planz, wich r stil experimentul. Wen off, teh updayt werkz out itz own changez, liek a plain pulumi up duz. <docs>How Pulumi runz werk</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

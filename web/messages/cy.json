@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Pa beiriant sy'n rhedeg y gweithle hwn. Nid y backend gweithredu, sy'n dewis y ffeil ddeuaidd o fewn peiriant Terraform.",
       "namePatternPulumi": "Dwy ran wedi'u gwahanu gan '::' — project::stack. Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig; rhaid i bob rhan ddechrau â llythyren neu rif.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Cyfeiriwch y CLI ato gyda <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Cyfanswm",
@@ -114,7 +115,9 @@
       "hintHealth": "iechyd",
       "hintLabel": "label",
       "hintLabelKey": "allwedd label",
-      "hintName": "enw"
+      "hintName": "enw",
+      "engineLabel": "Peiriant",
+      "engineAll": "Pob peiriant"
     },
     "row": {
       "removeLabelFilter": "Cliciwch i dynnu o'r hidlydd",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Llwybrau cyfeiriad Terraform + priodwedd sy'n ymwybodol o globiau a atalir gan y dosbarthwr drifft. Mae <star></star> yn cyfateb i sero neu ragor o nodau nad ydynt yn <dot></dot> (yn rhychwantu <n></n> mynegai); mae <starIdx></starIdx> yn cyfateb i unrhyw fynegai mewn cromfachau. Mae cyfeiriad moel heb ôl-ddodiad priodwedd yn distewi unrhyw newid i'r adnodd hwnnw — gan gynnwys dinistriadau. Yn effeithio ar ddrifft yn unig, nid cynllun/gweithredu arferol. Gweler <docs>drift-ignore-rules.md</docs> am y gramadeg llawn.",
       "driftIgnoreRulesNone": "Dim (mae pob gwahaniaeth cynllun yn cyfrif fel drifft)",
       "parallelism": "Cyfochredd",
-      "parallelismTitle": "Sawl gweithred sy''n rhedeg ar yr un pryd (1-256). Rhagosodiad 10."
+      "parallelismTitle": "Sawl gweithred sy''n rhedeg ar yr un pryd (1-256). Rhagosodiad 10.",
+      "engine": "Peiriant",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Dwy ran wedi'u gwahanu gan '::' — project::stack. Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig; rhaid i bob rhan ddechrau â llythyren neu rif.",
+      "bindPlan": "Cloi''r diweddariad i''r rhagolwg a gymeradwywyd",
+      "bindPlanHelp": "Pan fydd ymlaen, mae''r diweddariad yn gweithredu''r union gynllun a gadwodd y rhagolwg, felly mae unrhyw beth a newidiodd ers y rhagolwg yn methu''r diweddariad yn hytrach na chael ei weithredu. Mae hyn yn dibynnu ar gynlluniau diweddaru Pulumi, sy''n dal yn arbrofol. Pan fydd i ffwrdd, mae''r diweddariad yn cyfrifo ei newidiadau ei hun, fel y mae pulumi up plaen yn ei wneud. <docs>Sut mae rhediadau Pulumi yn gweithio</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

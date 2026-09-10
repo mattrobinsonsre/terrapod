@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Runs this workspace, which engine does. The execution backend it is not, which picks the binary within the Terraform engine.",
       "namePatternPulumi": "Separated by '::', two parts there are — project::stack. Only letters, numbers, hyphens and underscores; start with a letter or number, each part must.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "At it, point the CLI with <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Total",
@@ -114,7 +115,9 @@
       "hintHealth": "health",
       "hintLabel": "label",
       "hintLabelKey": "label key",
-      "hintName": "name"
+      "hintName": "name",
+      "engineLabel": "Engine",
+      "engineAll": "All engines, these are"
     },
     "row": {
       "removeLabelFilter": "To remove from the filter, click you must",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths, by the drift classifier suppressed. Zero or more non-<dot></dot> chars, <star></star> matches (spans <n></n> indices); any bracketed index, <starIdx></starIdx> matches. A bare address with no attribute suffix, any change to that resource silences it — including destroys. Drift only, this affects, not regular plan/apply. For the full grammar, <docs>drift-ignore-rules.md</docs> see.",
       "driftIgnoreRulesNone": "None (as drift, every plan diff counts)",
       "parallelism": "Parallelism",
-      "parallelismTitle": "Run at once, how many operations do (1-256). Ten, the default is."
+      "parallelismTitle": "Run at once, how many operations do (1-256). Ten, the default is.",
+      "engine": "Engine",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Separated by '::', two parts there are — project::stack. Only letters, numbers, hyphens and underscores; start with a letter or number, each part must.",
+      "bindPlan": "To the approved preview, lock the update",
+      "bindPlanHelp": "When on, exactly the plan the preview saved, the update applies — so fail the update, anything changed since the preview does, instead of applied being. On Pulumi update plans this rests; experimental still, they are. When off, its own changes the update works out, as a plain pulumi up does. <docs>How Pulumi runs work, learn you will</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",

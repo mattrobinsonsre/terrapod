@@ -23,6 +23,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	type workspaceSummary struct {
 		ID            string            `json:"id"`
 		Name          string            `json:"name"`
+		Engine        string            `json:"engine,omitempty"`
 		ExecutionMode string            `json:"execution_mode"`
 		Locked        bool              `json:"locked"`
 		DriftStatus   string            `json:"drift_status,omitempty"`
@@ -62,7 +63,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		for i := range list.Items {
 			w := &list.Items[i]
 			out.Workspaces = append(out.Workspaces, workspaceSummary{
-				ID: w.ID, Name: w.Name, ExecutionMode: w.ExecutionMode,
+				ID: w.ID, Name: w.Name, Engine: w.Engine, ExecutionMode: w.ExecutionMode,
 				Locked: w.Locked, DriftStatus: w.DriftStatus, Labels: w.Labels,
 			})
 		}

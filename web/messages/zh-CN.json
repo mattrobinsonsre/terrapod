@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "运行此工作区的引擎。不同于执行后端，后者用于在 Terraform 引擎内选择二进制文件。",
       "namePatternPulumi": "由 '::' 分隔的两部分 — project::stack。仅限字母、数字、连字符和下划线；每部分必须以字母或数字开头。",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "使用 <code>pulumi stack select default/project/stack</code> 让 CLI 指向它。"
     },
     "stats": {
       "total": "总计",
@@ -114,7 +115,9 @@
       "hintHealth": "健康状况",
       "hintLabel": "标签",
       "hintLabelKey": "标签键",
-      "hintName": "名称"
+      "hintName": "名称",
+      "engineLabel": "引擎",
+      "engineAll": "所有引擎"
     },
     "row": {
       "removeLabelFilter": "点击以从筛选中移除",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "由漂移分类器抑制的、支持通配符的 Terraform 地址 + 属性路径。<star></star> 匹配零个或多个非 <dot></dot> 字符（跨越 <n></n> 个索引）；<starIdx></starIdx> 匹配任意方括号索引。没有属性后缀的裸地址会静默该资源的任何更改 — 包括销毁。仅影响漂移，不影响常规 plan/apply。完整语法见 <docs>drift-ignore-rules.md</docs>。",
       "driftIgnoreRulesNone": "无（每个计划差异都计为漂移）",
       "parallelism": "并行度",
-      "parallelismTitle": "同时执行的操作数 (1-256)。默认值为 10。"
+      "parallelismTitle": "同时执行的操作数 (1-256)。默认值为 10。",
+      "engine": "引擎",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "由 '::' 分隔的两部分 — project::stack。仅限字母、数字、连字符和下划线；每部分必须以字母或数字开头。",
+      "bindPlan": "将更新锁定到已批准的预览",
+      "bindPlanHelp": "开启后，更新会严格应用预览保存的计划，因此自预览以来发生的任何变化都会导致更新失败，而不会被应用。此功能依赖 Pulumi 的更新计划，该功能仍处于实验阶段。关闭后，更新会像普通的 pulumi up 一样自行确定变更。<docs>Pulumi 运行的工作方式</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

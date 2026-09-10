@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Dochvam vangbogh QuQ. vangmeH mIw 'oHbe'.",
       "namePatternPulumi": "cha' 'ay' '::' Sepbogh — project::stack. ghItlh mI' je neH; ghItlh mI' joq taghnIS 'ay' Hoch.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> yIlo''."
     },
     "stats": {
       "total": "naQ",
@@ -114,7 +115,9 @@
       "hintHealth": "pIvlaw'",
       "hintLabel": "per",
       "hintLabelKey": "per ngaQHa'wI'",
-      "hintName": "pong"
+      "hintName": "pong",
+      "engineLabel": "QuQ",
+      "engineAll": "Hoch QuQ"
     },
     "row": {
       "removeLabelFilter": "DarSeHvo' teqmeH qIp",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "glob-Sovbogh Terraform Sum + Sep Hemmey, tlhotlh chevwI' So'lu'. <star></star> pagh joq law' <dot></dot>-Hutlhbogh ghItlhmey rur (<n></n> Summey Suq); <starIdx></starIdx> HIvje' Sum vay' rur. Sep neH ghajbogh Sum tuHHa' Sep vaH Doch — Qaw'mey je. tlhotlh neH qaS, motlh nab/lo' qaSbe'. tlhegh naQ legh <docs>drift-ignore-rules.md</docs>.",
       "driftIgnoreRulesNone": "pagh (Hoch nab pImmoH tlhotlh moj)",
       "parallelism": "tay'' Qu''mey",
-      "parallelismTitle": "wa'' poH Qu''mey mI''. 10 ''oH."
+      "parallelismTitle": "wa'' poH Qu''mey mI''. 10 ''oH.",
+      "engine": "QuQ",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "cha' 'ay' '::' Sepbogh — project::stack. ghItlh mI' je neH; ghItlh mI' joq taghnIS 'ay' Hoch.",
+      "bindPlan": "chovnatlh lulaj''pu''bogh yIbagh",
+      "bindPlanHelp": "chu''lu''DI'' chovnatlh nab lulaj''pu''bogh ta''. chovnatlh ret choHmoHlu''chugh, Qapbe'' ta''. Pulumi nab ghun ''oH, chu''qu''be''. chu''be''lu''DI'' pulumi up rur. <docs>Pulumi Qu'' mIw</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

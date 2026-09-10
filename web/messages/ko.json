@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "이 워크스페이스를 실행하는 엔진입니다. Terraform 엔진 내에서 바이너리를 선택하는 실행 백엔드와는 다릅니다.",
       "namePatternPulumi": "'::' 로 구분된 두 부분 — project::stack. 문자, 숫자, 하이픈, 밑줄만 사용할 수 있으며 각 부분은 문자 또는 숫자로 시작해야 합니다.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "<code>pulumi stack select default/project/stack</code> 명령으로 CLI가 이 워크스페이스를 가리키게 하세요."
     },
     "stats": {
       "total": "전체",
@@ -114,7 +115,9 @@
       "hintHealth": "상태",
       "hintLabel": "라벨",
       "hintLabelKey": "라벨 키",
-      "hintName": "이름"
+      "hintName": "이름",
+      "engineLabel": "엔진",
+      "engineAll": "모든 엔진"
     },
     "row": {
       "removeLabelFilter": "클릭하여 필터에서 제거",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "드리프트 분류기가 억제하는 글롭 인식 Terraform 주소 + 속성 경로입니다. <star></star>는 0개 이상의 비-<dot></dot> 문자와 일치합니다(<n></n>개 인덱스에 걸침). <starIdx></starIdx>는 대괄호로 묶인 모든 인덱스와 일치합니다. 속성 접미사가 없는 순수 주소는 해당 리소스에 대한 모든 변경(삭제 포함)을 억제합니다. 일반 plan/apply가 아니라 드리프트에만 영향을 줍니다. 전체 문법은 <docs>drift-ignore-rules.md</docs>를 참조하세요.",
       "driftIgnoreRulesNone": "없음 (모든 계획 차이가 드리프트로 계산됨)",
       "parallelism": "병렬 처리 수",
-      "parallelismTitle": "동시에 실행되는 작업 수 (1-256). 기본값 10."
+      "parallelismTitle": "동시에 실행되는 작업 수 (1-256). 기본값 10.",
+      "engine": "엔진",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "'::' 로 구분된 두 부분 — project::stack. 문자, 숫자, 하이픈, 밑줄만 사용할 수 있으며 각 부분은 문자 또는 숫자로 시작해야 합니다.",
+      "bindPlan": "승인된 미리보기에 업데이트 고정",
+      "bindPlanHelp": "켜면 업데이트는 미리보기가 저장한 계획을 그대로 적용하므로, 미리보기 이후 바뀐 것이 있으면 적용되는 대신 업데이트가 실패합니다. 이 기능은 아직 실험적인 Pulumi 업데이트 계획에 기반합니다. 끄면 일반 pulumi up처럼 업데이트가 스스로 변경 사항을 판단합니다. <docs>Pulumi 실행 방식</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",

@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Hvilken motor som kjører dette arbeidsområdet. Ikke kjøre-backenden, som velger binærfilen innenfor Terraform-motoren.",
       "namePatternPulumi": "To deler atskilt av '::' — project::stack. Bare bokstaver, tall, bindestreker og understreker; hver del må begynne med en bokstav eller et tall.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Pek CLI-en mot den med <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Totalt",
@@ -114,7 +115,9 @@
       "hintHealth": "helse",
       "hintLabel": "etikett",
       "hintLabelKey": "etikettnøkkel",
-      "hintName": "navn"
+      "hintName": "navn",
+      "engineLabel": "Motor",
+      "engineAll": "Alle motorer"
     },
     "row": {
       "removeLabelFilter": "Klikk for å fjerne fra filter",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Glob-bevisste Terraform-adresser + attributtstier som undertrykkes av avdriftsklassifisereren. <star></star> samsvarer med null eller flere ikke-<dot></dot>-tegn (spenner over <n></n> indekser); <starIdx></starIdx> samsvarer med enhver indeks i hakeparenteser. En bar adresse uten attributtsuffiks demper enhver endring på den ressursen – inkludert nedrivinger. Påvirker kun avdrift, ikke vanlig plan/apply. Se <docs>drift-ignore-rules.md</docs> for den fullstendige grammatikken.",
       "driftIgnoreRulesNone": "Ingen (hvert plandiff regnes som avdrift)",
       "parallelism": "Parallellitet",
-      "parallelismTitle": "Hvor mange operasjoner som kjøres samtidig (1-256). Standard 10."
+      "parallelismTitle": "Hvor mange operasjoner som kjøres samtidig (1-256). Standard 10.",
+      "engine": "Motor",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "To deler atskilt av '::' — project::stack. Bare bokstaver, tall, bindestreker og understreker; hver del må begynne med en bokstav eller et tall.",
+      "bindPlan": "Lås oppdateringen til den godkjente forhåndsvisningen",
+      "bindPlanHelp": "Når dette er på, bruker oppdateringen nøyaktig planen forhåndsvisningen lagret, så alt som har endret seg siden forhåndsvisningen får oppdateringen til å feile i stedet for å bli tatt i bruk. Dette bygger på Pulumis oppdateringsplaner, som fortsatt er eksperimentelle. Når dette er av, finner oppdateringen selv ut av endringene sine, slik en vanlig pulumi up gjør. <docs>Slik fungerer Pulumi-kjøringer</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

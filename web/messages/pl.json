@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Który silnik uruchamia tę przestrzeń roboczą. Nie backend wykonawczy, który wybiera plik binarny w silniku Terraform.",
       "namePatternPulumi": "Dwie części oddzielone '::' — project::stack. Tylko litery, cyfry, myślniki i podkreślenia; każda część musi zaczynać się od litery lub cyfry.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Wskaż go w CLI poleceniem <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Łącznie",
@@ -114,7 +115,9 @@
       "hintHealth": "kondycja",
       "hintLabel": "etykieta",
       "hintLabelKey": "klucz etykiety",
-      "hintName": "nazwa"
+      "hintName": "nazwa",
+      "engineLabel": "Silnik",
+      "engineAll": "Wszystkie silniki"
     },
     "row": {
       "removeLabelFilter": "Kliknij, aby usunąć z filtra",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Ścieżki adresów Terraform + atrybutów obsługujące globy, tłumione przez klasyfikator dryfu. <star></star> dopasowuje zero lub więcej znaków innych niż <dot></dot> (obejmuje <n></n> indeksów); <starIdx></starIdx> dopasowuje dowolny indeks w nawiasach. Sam adres bez przyrostka atrybutu wycisza każdą zmianę tego zasobu — w tym niszczenie. Wpływa tylko na dryf, nie na zwykły plan/apply. Pełną gramatykę zobacz w <docs>drift-ignore-rules.md</docs>.",
       "driftIgnoreRulesNone": "Brak (każda różnica planu liczy się jako dryf)",
       "parallelism": "Równoległość",
-      "parallelismTitle": "Ile operacji wykonuje się jednocześnie (1-256). Domyślnie 10."
+      "parallelismTitle": "Ile operacji wykonuje się jednocześnie (1-256). Domyślnie 10.",
+      "engine": "Silnik",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Dwie części oddzielone '::' — project::stack. Tylko litery, cyfry, myślniki i podkreślenia; każda część musi zaczynać się od litery lub cyfry.",
+      "bindPlan": "Zablokuj aktualizację na zatwierdzonym podglądzie",
+      "bindPlanHelp": "Gdy włączone, aktualizacja stosuje dokładnie plan zapisany przez podgląd, więc wszystko, co zmieniło się od podglądu, powoduje niepowodzenie aktualizacji zamiast zostać zastosowane. Opiera się to na planach aktualizacji Pulumi, które wciąż są eksperymentalne. Gdy wyłączone, aktualizacja sama ustala swoje zmiany, tak jak zwykłe pulumi up. <docs>Jak działają uruchomienia Pulumi</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

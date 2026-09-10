@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "המנוע שמריץ סביבת עבודה זו. לא קצה העורף להרצה, שבוחר את הקובץ הבינארי בתוך מנוע Terraform.",
       "namePatternPulumi": "שני חלקים המופרדים ב-'::' — project::stack. אותיות, ספרות, מקפים וקווים תחתונים בלבד; כל חלק חייב להתחיל באות או בספרה.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "כוונו את ה-CLI אליו עם <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "סה\"כ",
@@ -114,7 +115,9 @@
       "hintHealth": "תקינות",
       "hintLabel": "תווית",
       "hintLabelKey": "מפתח תווית",
-      "hintName": "שם"
+      "hintName": "שם",
+      "engineLabel": "מנוע",
+      "engineAll": "כל המנועים"
     },
     "row": {
       "removeLabelFilter": "לחץ להסרה מהמסנן",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "נתיבי כתובת Terraform + מאפיינים תומכי glob המושתקים על ידי מסווג הסטייה. <star></star> מתאים לאפס או יותר תווים שאינם <dot></dot> (משתרע על פני <n></n> אינדקסים); <starIdx></starIdx> מתאים לכל אינדקס בסוגריים. כתובת חשופה ללא סיומת מאפיין משתיקה כל שינוי במשאב זה — כולל מחיקות. משפיע על סטייה בלבד, לא על plan/apply רגילים. ראו <docs>drift-ignore-rules.md</docs> לדקדוק המלא.",
       "driftIgnoreRulesNone": "ללא (כל הבדל בתוכנית נחשב סטייה)",
       "parallelism": "מקביליות",
-      "parallelismTitle": "כמה פעולות מתבצעות בו-זמנית (1-256). ברירת המחדל 10."
+      "parallelismTitle": "כמה פעולות מתבצעות בו-זמנית (1-256). ברירת המחדל 10.",
+      "engine": "מנוע",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "שני חלקים המופרדים ב-'::' — project::stack. אותיות, ספרות, מקפים וקווים תחתונים בלבד; כל חלק חייב להתחיל באות או בספרה.",
+      "bindPlan": "נעילת העדכון לתצוגה המקדימה שאושרה",
+      "bindPlanHelp": "כשהאפשרות פעילה, העדכון מחיל בדיוק את התוכנית שהתצוגה המקדימה שמרה, כך שכל מה שהשתנה מאז התצוגה המקדימה מכשיל את העדכון במקום להיות מוחל. הדבר נשען על תוכניות העדכון של Pulumi, שעדיין ניסיוניות. כשהאפשרות כבויה, העדכון קובע בעצמו את השינויים שלו, כמו pulumi up רגיל. <docs>איך הרצות Pulumi עובדות</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "ההרשאה הואצלה למאגר ה-VCS שלכם.",

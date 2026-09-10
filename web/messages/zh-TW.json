@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "執行此工作區的引擎。不同於執行後端，後者用於在 Terraform 引擎內選擇二進位檔。",
       "namePatternPulumi": "由 '::' 分隔的兩部分 — project::stack。僅限字母、數字、連字號與底線；每部分必須以字母或數字開頭。",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "使用 <code>pulumi stack select default/project/stack</code> 讓 CLI 指向它。"
     },
     "stats": {
       "total": "總計",
@@ -114,7 +115,9 @@
       "hintHealth": "健康狀況",
       "hintLabel": "標籤",
       "hintLabelKey": "標籤鍵",
-      "hintName": "名稱"
+      "hintName": "名稱",
+      "engineLabel": "引擎",
+      "engineAll": "所有引擎"
     },
     "row": {
       "removeLabelFilter": "點選以從篩選中移除",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "由漂移分類器抑制的、支援萬用字元的 Terraform 地址 + 屬性路徑。<star></star> 匹配零個或多個非 <dot></dot> 字元（跨越 <n></n> 個索引）；<starIdx></starIdx> 匹配任意方括號索引。沒有屬性字尾的裸地址會靜默該資源的任何更改 — 包括銷毀。僅影響漂移，不影響常規 plan/apply。完整語法見 <docs>drift-ignore-rules.md</docs>。",
       "driftIgnoreRulesNone": "無（每個計畫差異都計為漂移）",
       "parallelism": "平行度",
-      "parallelismTitle": "同時執行的作業數 (1-256)。預設值為 10。"
+      "parallelismTitle": "同時執行的作業數 (1-256)。預設值為 10。",
+      "engine": "引擎",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "由 '::' 分隔的兩部分 — project::stack。僅限字母、數字、連字號與底線；每部分必須以字母或數字開頭。",
+      "bindPlan": "將更新鎖定至已核准的預覽",
+      "bindPlanHelp": "開啟後，更新會嚴格套用預覽儲存的計畫，因此自預覽以來的任何變化都會使更新失敗，而不會被套用。此功能仰賴 Pulumi 的更新計畫，目前仍屬實驗性質。關閉後，更新會像一般的 pulumi up 一樣自行判斷變更。<docs>Pulumi 執行的運作方式</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",

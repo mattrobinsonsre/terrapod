@@ -78,6 +78,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		AgentPoolIDs     []string          `json:"agent_pool_ids,omitempty" jsonschema:"replace the workspace''s agent-pool set (apool-...). Flat set — every pool is equally eligible to claim a run. Mutually exclusive with agent_pool_id"`
 		WorkingDirectory string            `json:"working_directory,omitempty" jsonschema:"subdirectory within the repo"`
 		Labels           map[string]string `json:"labels,omitempty" jsonschema:"replace the label set (reserved keys rejected)"`
+		PulumiBindPlan   *bool             `json:"pulumi_bind_plan,omitempty" jsonschema:"Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; rejected on any other engine"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_update",
@@ -98,6 +99,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AgentPoolIDs:     in.AgentPoolIDs,
 			WorkingDirectory: in.WorkingDirectory,
 			Labels:           in.Labels,
+			PulumiBindPlan:   in.PulumiBindPlan,
 		})
 		if err != nil {
 			return errResult(err), nil, nil

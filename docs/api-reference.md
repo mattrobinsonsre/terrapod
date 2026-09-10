@@ -283,6 +283,14 @@ GET /api/tfe/v2/workspaces/{id}                       # TFE-compatible — Terra
 
 The native read answers **404** both for a workspace that does not exist and for one the caller cannot read, so a lookup by name reveals nothing about names the caller has no access to.
 
+### List Engines
+
+```
+GET /api/v1/engines
+```
+
+The engines this deployment enables, as `{"data": [{"type": "engines", "id": "pulumi", ...}, {"type": "engines", "id": "terraform", ...}]}`. `terraform` is always present. An engine that is turned off is absent from the list, not listed and then refused. The web UI shows engine choices (the create form's picker and the list's engine filter) only when more than one engine is enabled, so a Terraform-only deployment shows no engine UI at all.
+
 ### Create Workspace
 
 ```

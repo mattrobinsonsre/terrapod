@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Mikä moottori suorittaa tämän työtilan. Ei suoritustaustajärjestelmä, joka valitsee binäärin Terraform-moottorin sisällä.",
       "namePatternPulumi": "Kaksi osaa erotettuna merkeillä '::' — project::stack. Vain kirjaimia, numeroita, väliviivoja ja alaviivoja; kummankin osan on alettava kirjaimella tai numerolla.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Osoita CLI siihen komennolla <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Yhteensä",
@@ -114,7 +115,9 @@
       "hintHealth": "kunto",
       "hintLabel": "tunniste",
       "hintLabelKey": "tunnisteavain",
-      "hintName": "nimi"
+      "hintName": "nimi",
+      "engineLabel": "Moottori",
+      "engineAll": "Kaikki moottorit"
     },
     "row": {
       "removeLabelFilter": "Napsauta poistaaksesi suodattimesta",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Glob-tietoiset Terraform-osoite- ja attribuuttipolut, jotka ajautumaluokitin vaimentaa. <star></star> vastaa nollaa tai useampaa ei-<dot></dot>-merkkiä (kattaa <n></n> indeksiä); <starIdx></starIdx> vastaa mitä tahansa hakasulkeissa olevaa indeksiä. Pelkkä osoite ilman attribuuttipäätettä vaimentaa minkä tahansa muutoksen kyseiseen resurssiin — mukaan lukien tuhot. Vaikuttaa vain ajautumaan, ei tavalliseen suunnitteluun/käyttöönottoon. Katso koko kielioppi kohdasta <docs>drift-ignore-rules.md</docs>.",
       "driftIgnoreRulesNone": "Ei mitään (jokainen suunnitelmaero lasketaan ajautumaksi)",
       "parallelism": "Rinnakkaisuus",
-      "parallelismTitle": "Kuinka monta toimintoa suoritetaan samanaikaisesti (1-256). Oletus 10."
+      "parallelismTitle": "Kuinka monta toimintoa suoritetaan samanaikaisesti (1-256). Oletus 10.",
+      "engine": "Moottori",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Kaksi osaa erotettuna merkeillä '::' — project::stack. Vain kirjaimia, numeroita, väliviivoja ja alaviivoja; kummankin osan on alettava kirjaimella tai numerolla.",
+      "bindPlan": "Lukitse päivitys hyväksyttyyn esikatseluun",
+      "bindPlanHelp": "Kun asetus on päällä, päivitys soveltaa täsmälleen esikatselun tallentamaa suunnitelmaa, joten kaikki esikatselun jälkeen muuttunut kaataa päivityksen sen sijaan, että se sovellettaisiin. Tämä perustuu Pulumin päivityssuunnitelmiin, jotka ovat vielä kokeellisia. Kun asetus on pois päältä, päivitys selvittää muutoksensa itse, kuten tavallinen pulumi up. <docs>Näin Pulumi-ajot toimivat</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

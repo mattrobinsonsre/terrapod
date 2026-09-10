@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Vilken motor som kör denna arbetsyta. Inte exekveringsbackenden, som väljer binären inom Terraform-motorn.",
       "namePatternPulumi": "Två delar åtskilda av '::' — project::stack. Endast bokstäver, siffror, bindestreck och understreck; varje del måste börja med en bokstav eller siffra.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Peka CLI:t mot den med <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Totalt",
@@ -114,7 +115,9 @@
       "hintHealth": "hälsa",
       "hintLabel": "etikett",
       "hintLabelKey": "etikettnyckel",
-      "hintName": "namn"
+      "hintName": "namn",
+      "engineLabel": "Motor",
+      "engineAll": "Alla motorer"
     },
     "row": {
       "removeLabelFilter": "Klicka för att ta bort från filtret",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Glob-medvetna Terraform-adresser + attributsökvägar som undertrycks av driftklassificeraren. <star></star> matchar noll eller fler tecken som inte är <dot></dot> (spänner över <n></n> index); <starIdx></starIdx> matchar valfritt index inom hakparenteser. En ren adress utan attributsuffix tystar alla ändringar av den resursen — inklusive förstörelser. Påverkar endast drift, inte vanlig plan/apply. Se <docs>drift-ignore-rules.md</docs> för den fullständiga grammatiken.",
       "driftIgnoreRulesNone": "Ingen (varje plandiff räknas som drift)",
       "parallelism": "Parallellitet",
-      "parallelismTitle": "Hur många åtgärder som körs samtidigt (1-256). Standard 10."
+      "parallelismTitle": "Hur många åtgärder som körs samtidigt (1-256). Standard 10.",
+      "engine": "Motor",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Två delar åtskilda av '::' — project::stack. Endast bokstäver, siffror, bindestreck och understreck; varje del måste börja med en bokstav eller siffra.",
+      "bindPlan": "Lås uppdateringen till den godkända förhandsgranskningen",
+      "bindPlanHelp": "När det är på tillämpar uppdateringen exakt den plan som förhandsgranskningen sparade, så allt som har ändrats sedan förhandsgranskningen får uppdateringen att misslyckas i stället för att tillämpas. Det bygger på Pulumis uppdateringsplaner, som fortfarande är experimentella. När det är av räknar uppdateringen själv ut sina ändringar, precis som en vanlig pulumi up. <docs>Så fungerar Pulumi-körningar</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

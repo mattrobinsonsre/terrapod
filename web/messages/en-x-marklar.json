@@ -84,7 +84,8 @@
       "enginePulumi": "Pulumi",
       "engineHelp": "Which marklar runs this marklar. Not the marklar marklar, which picks the marklar within the Terraform marklar.",
       "namePatternPulumi": "Two marklars separated by '::' — marklar::marklar. Marklars, marklars, marklars and marklars only; each marklar must start with a marklar or marklar.",
-      "namePlaceholderPulumi": "my-project::dev"
+      "namePlaceholderPulumi": "my-project::dev",
+      "pulumiNameHint": "Point the marklar at it with <code>pulumi stack select default/project/stack</code>."
     },
     "stats": {
       "total": "Total",
@@ -114,7 +115,9 @@
       "hintHealth": "marklar",
       "hintLabel": "marklar",
       "hintLabelKey": "marklar marklar",
-      "hintName": "marklar"
+      "hintName": "marklar",
+      "engineLabel": "Marklar",
+      "engineAll": "All marklars"
     },
     "row": {
       "removeLabelFilter": "Click to remove from marklar",
@@ -2343,7 +2346,12 @@
       "driftIgnoreRulesHint": "Glob-aware Terraform marklar + marklar marklars suppressed by the marklar marklar. <star></star> matches zero or more non-<dot></dot> marklars (spans <n></n> marklars); <starIdx></starIdx> matches any bracketed marklar. A bare marklar with no marklar marklar silences any marklar to that marklar — including marklars. Affects marklar only, not regular marklar/marklar. See <docs>drift-ignore-rules.md</docs> for the full marklar.",
       "driftIgnoreRulesNone": "None (every marklar marklar counts as marklar)",
       "parallelism": "Marklar",
-      "parallelismTitle": "How many marklars run at once (1-256). Marklar 10."
+      "parallelismTitle": "How many marklars run at once (1-256). Marklar 10.",
+      "engine": "Marklar",
+      "enginePulumi": "Pulumi",
+      "nameTitlePulumi": "Two marklars separated by '::' — marklar::marklar. Marklars, marklars, marklars and marklars only; each marklar must start with a marklar or marklar.",
+      "bindPlan": "Lock the marklar to the approved marklar",
+      "bindPlanHelp": "When on, the marklar applies exactly the marklar the marklar saved, so anything that changed since the marklar fails the marklar instead of being applied. This rests on Pulumi marklar marklars, which are still experimental. When off, the marklar works out its own marklars, as a plain pulumi up does. <docs>How Pulumi marklars work</docs>"
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",
