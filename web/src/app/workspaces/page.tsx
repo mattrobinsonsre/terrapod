@@ -725,7 +725,7 @@ function WorkspacesPageInner() {
     try {
       // Fetch the whole list (paging through internally) and filter/sort
       // client-side — the workspace list is deliberately not page-through UI.
-      const items = await fetchAllPages<Workspace>('/api/v2/organizations/default/workspaces')
+      const items = await fetchAllPages<Workspace>('/api/v1/workspaces')
       setWorkspaces(items)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('loadFailed'))

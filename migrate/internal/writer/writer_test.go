@@ -88,7 +88,7 @@ func newFakeServer(t *testing.T) (*fakeTerrapodServer, *terrapod.Client) {
 			fs.gpgKeysCreated++
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"gpg-fixt","type":"gpg-keys","attributes":{"key-id":"ABC123"}}}`))
-		case r.Method == http.MethodPatch && strings.Contains(r.URL.Path, "/api/v2/workspaces/"):
+		case r.Method == http.MethodPatch && (strings.Contains(r.URL.Path, "/api/v1/workspaces/") || strings.Contains(r.URL.Path, "/api/v2/workspaces/")):
 			fs.workspacePatches++
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"data":{"id":"ws-fixt","type":"workspaces","attributes":{"name":"app","agent-pool-id":"ap-fixt"}}}`))

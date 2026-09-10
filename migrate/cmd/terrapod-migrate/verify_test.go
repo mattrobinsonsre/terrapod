@@ -31,7 +31,7 @@ func newVerifyServer(t *testing.T, name string, varCount int, serial int64, line
 				return
 			}
 			_, _ = fmt.Fprintf(w, `{"data":{"id":"sv-x","type":"state-versions","attributes":{"serial":%d,"lineage":%q,"state-size":10}}}`, serial, lineage)
-		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v2/workspaces/"):
+		case r.Method == http.MethodGet && (strings.HasPrefix(r.URL.Path, "/api/v1/workspaces/") || strings.HasPrefix(r.URL.Path, "/api/v2/workspaces/")):
 			_, _ = fmt.Fprintf(w, `{"data":{"id":"ws-a","type":"workspaces","attributes":{"name":%q}}}`, name)
 		default:
 			http.Error(w, "unhandled "+r.Method+" "+r.URL.Path, http.StatusNotFound)

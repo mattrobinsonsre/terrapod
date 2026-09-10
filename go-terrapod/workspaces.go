@@ -2,7 +2,9 @@ package terrapod
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 )
@@ -273,6 +275,9 @@ type WorkspaceListOptions struct {
 	// Search matches workspace names with prefix/substring semantics
 	// (server-controlled). Empty means no name filter.
 	Search string
+	// Engine narrows the list to one engine ("terraform", "pulumi"). Empty
+	// means every engine the server enables (#1554).
+	Engine string
 }
 
 // WorkspaceList is the paginated result of ListWorkspaces.
@@ -317,7 +322,10 @@ func (c *Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest
 // GetWorkspace reads a workspace by id ("ws-..."). Returns
 // *NotFoundError when the id is unknown.
 func (c *Client) GetWorkspace(ctx context.Context, id string) (*Workspace, error) {
-	data, err := c.Get(ctx, "/api/v2/workspaces/"+url.PathEscape(id))
+	data, err := c.nativeFirst(
+		func() ([]byte, error) { return c.Get(ctx, "/api/v1/workspaces/"+url.PathEscape(id)) },
+		func() ([]byte, error) { return c.Get(ctx, "/api/v2/workspaces/"+url.PathEscape(id)) },
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +337,12 @@ func (c *Client) GetWorkspace(ctx context.Context, id string) (*Workspace, error
 // where the operator types the name they see in the UI rather than
 // the typed-id form.
 func (c *Client) GetWorkspaceByName(ctx context.Context, name string) (*Workspace, error) {
-	data, err := c.Get(ctx, "/api/v2/organizations/default/workspaces/"+url.PathEscape(name))
+	data, err := c.nativeFirst(
+		func() ([]byte, error) { return c.Get(ctx, "/api/v1/workspaces/"+url.PathEscape(name)) },
+		func() ([]byte, error) {
+			return c.Get(ctx, "/api/v2/organizations/default/workspaces/"+url.PathEscape(name))
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +362,10 @@ func (c *Client) UpdateWorkspace(ctx context.Context, id string, req UpdateWorks
 	if err != nil {
 		return nil, fmt.Errorf("marshal update workspace: %w", err)
 	}
-	data, err := c.Patch(ctx, "/api/v2/workspaces/"+url.PathEscape(id), body)
+	data, err := c.nativeFirst(
+		func() ([]byte, error) { return c.Patch(ctx, "/api/v1/workspaces/"+url.PathEscape(id), body) },
+		func() ([]byte, error) { return c.Patch(ctx, "/api/v2/workspaces/"+url.PathEscape(id), body) },
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -382,11 +398,24 @@ func (c *Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) 
 	if opts.Search != "" {
 		q.Set("search[name]", opts.Search)
 	}
-	path := "/api/v2/organizations/default/workspaces"
-	if encoded := q.Encode(); encoded != "" {
-		path += "?" + encoded
+	if opts.Engine != "" {
+		q.Set("filter[engine]", opts.Engine)
 	}
-	data, err := c.Get(ctx, path)
+	query := ""
+	if encoded := q.Encode(); encoded != "" {
+		query = "?" + encoded
+	}
+	data, err := c.nativeFirst(
+		func() ([]byte, error) { return c.Get(ctx, "/api/v1/workspaces"+query) },
+		func() ([]byte, error) {
+			// The TFE list is Terraform-only, so it cannot answer for another
+			// engine; say so rather than return the wrong set.
+			if opts.Engine != "" && opts.Engine != "terraform" {
+				return nil, fmt.Errorf("this server cannot list %s workspaces: it predates the native workspace list", opts.Engine)
+			}
+			return c.Get(ctx, "/api/v2/organizations/default/workspaces"+query)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -432,6 +461,7 @@ func (c *Client) ListAllWorkspaces(ctx context.Context, opts WorkspaceListOption
 			PageNumber: page,
 			PageSize:   pageSize,
 			Search:     opts.Search,
+			Engine:     opts.Engine,
 		})
 		if err != nil {
 			return nil, err
@@ -769,4 +799,21 @@ func workspaceFromResource(res *Resource) *Workspace {
 		ws.DriftDetectionIntervalSeconds = &v
 	}
 	return ws
+}
+
+// nativeFirst reads or writes a workspace through the native route, and falls
+// back to the TFE-compatible one only when the server predates it (#1554).
+//
+// The TFE surface serves Terraform workspaces alone, so the native route is the
+// one that reaches every engine. An older server answers the native path with
+// 405, because the path exists there for another method; that status, and only
+// that one, means "not here yet". Any other answer, a 404 included, is the real
+// answer and is returned as is.
+func (c *Client) nativeFirst(native, legacy func() ([]byte, error)) ([]byte, error) {
+	data, err := native()
+	var apiErr *APIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusMethodNotAllowed {
+		return legacy()
+	}
+	return data, err
 }

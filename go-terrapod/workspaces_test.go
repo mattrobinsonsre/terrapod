@@ -40,8 +40,17 @@ func newWorkspaceFixtureServer(t *testing.T) *workspaceFixtureServer {
 			r.Body = io.NopCloser(strings.NewReader(string(f.lastBody)))
 		}
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/organizations/default/workspaces":
+		case r.Method == http.MethodPost && (r.URL.Path == "/api/v2/organizations/default/workspaces" || r.URL.Path == "/api/v1/workspaces"):
 			f.createHandler(w, r)
+		// The native routes (#1554): an id is ws-prefixed, anything else is a name.
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/workspaces":
+			f.listHandler(w, r)
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/workspaces/ws-"):
+			f.readHandler(w, r)
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/workspaces/"):
+			f.byNameHandler(w, r)
+		case r.Method == http.MethodPatch && strings.HasPrefix(r.URL.Path, "/api/v1/workspaces/"):
+			f.updateHandler(w, r)
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v2/organizations/default/workspaces/"):
 			f.byNameHandler(w, r)
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/organizations/default/workspaces":
@@ -867,5 +876,90 @@ func TestWorkspace_PulumiBindPlan_RoundTrip(t *testing.T) {
 	}
 	if _, ok := attrsOf()["pulumi-bind-plan"]; ok {
 		t.Errorf("an update that did not set pulumi-bind-plan sent it anyway")
+	}
+}
+
+// A server older than the native routes answers them with 405 (#1554); every
+// workspace call must then fall back to the TFE surface and still work.
+func TestWorkspace_FallsBackToTheTFESurfaceOnAnOlderServer(t *testing.T) {
+	var native, legacy []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/v1/") {
+			native = append(native, r.Method+" "+r.URL.Path)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		legacy = append(legacy, r.Method+" "+r.URL.Path)
+		if r.URL.Path == "/api/v2/organizations/default/workspaces" {
+			_, _ = w.Write([]byte(`{"data":[{"id":"ws-a","type":"workspaces","attributes":{"name":"a"}}]}`))
+			return
+		}
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-a", "a", nil)))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := t.Context()
+	if _, err := c.GetWorkspace(ctx, "ws-a"); err != nil {
+		t.Errorf("GetWorkspace: %v", err)
+	}
+	if _, err := c.GetWorkspaceByName(ctx, "a"); err != nil {
+		t.Errorf("GetWorkspaceByName: %v", err)
+	}
+	if _, err := c.UpdateWorkspace(ctx, "ws-a", UpdateWorkspaceRequest{}); err != nil {
+		t.Errorf("UpdateWorkspace: %v", err)
+	}
+	if list, err := c.ListWorkspaces(ctx, WorkspaceListOptions{}); err != nil || len(list.Items) != 1 {
+		t.Errorf("ListWorkspaces: %v (%d items)", err, len(list.Items))
+	}
+	if len(native) != 4 || len(legacy) != 4 {
+		t.Errorf("want each call tried natively then on the TFE surface; native=%v legacy=%v", native, legacy)
+	}
+	// The TFE list cannot answer for another engine, so it must refuse rather
+	// than hand back Terraform workspaces as if they were the answer.
+	if _, err := c.ListWorkspaces(ctx, WorkspaceListOptions{Engine: "pulumi"}); err == nil {
+		t.Error("listing pulumi workspaces on an old server should fail, not return the Terraform list")
+	}
+}
+
+// Only a 405 means "not here yet". A 404 from the native route is the answer —
+// falling back would ask the Terraform-only surface and could find nothing, or
+// the wrong thing.
+func TestWorkspace_ANativeNotFoundIsFinal(t *testing.T) {
+	var legacyHits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/v2/") {
+			legacyHits++
+		}
+		http.Error(w, `{"errors":[{"detail":"Workspace not found"}]}`, http.StatusNotFound)
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.GetWorkspace(t.Context(), "ws-gone"); !IsNotFound(err) {
+		t.Errorf("want NotFound, got %v", err)
+	}
+	if legacyHits != 0 {
+		t.Errorf("a native 404 fell back to the TFE surface %d time(s)", legacyHits)
+	}
+}
+
+// filter[engine] reaches the native list.
+func TestListWorkspaces_EngineFilter(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	var got string
+	f.listHandler = func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query().Get("filter[engine]")
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}
+	if _, err := f.client().ListWorkspaces(t.Context(), WorkspaceListOptions{Engine: "pulumi"}); err != nil {
+		t.Fatal(err)
+	}
+	if got != "pulumi" {
+		t.Errorf("filter[engine] = %q, want pulumi", got)
 	}
 }

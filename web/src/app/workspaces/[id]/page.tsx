@@ -562,7 +562,7 @@ function WorkspaceDetailContent() {
 
   const loadWorkspace = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`)
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`)
       if (!res.ok) throw new Error(t('errors.loadWorkspace'))
       const data = await res.json()
       setWorkspace(data.data)
@@ -1100,7 +1100,7 @@ function WorkspaceDetailContent() {
     setError('')
     setLockoutWarning('')
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -1181,7 +1181,7 @@ function WorkspaceDetailContent() {
     if (!workspace) return
     setSavingAiSummary(true)
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'workspaces', attributes: patch } }),
@@ -1205,7 +1205,7 @@ function WorkspaceDetailContent() {
     if (!workspace) return
     setSavingSlackChannel(true)
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -1231,7 +1231,7 @@ function WorkspaceDetailContent() {
     setSavingDrift(true)
     try {
       const newEnabled = !attrs['drift-detection-enabled']
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -1251,7 +1251,7 @@ function WorkspaceDetailContent() {
   async function handleDriftIntervalChange(seconds: number) {
     setSavingDrift(true)
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -1272,7 +1272,7 @@ function WorkspaceDetailContent() {
   async function handlePlanExpiryChange(seconds: number) {
     setSavingPlanExpiry(true)
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({

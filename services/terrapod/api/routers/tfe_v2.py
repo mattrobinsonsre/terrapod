@@ -1057,9 +1057,23 @@ async def list_workspaces(
     db: AsyncSession = Depends(get_db),
     request: Request = None,
 ) -> JSONResponse:
-    """List all workspaces (filtered by user permissions)."""
+    """List Terraform workspaces (filtered by user permissions).
 
+    Terraform only, by design (#1487): a `terraform` CLI must never be handed
+    another engine's row. The native `GET /api/v1/workspaces` lists every engine
+    this deployment enables (#1554), through the same body below.
+    """
     query = select(Workspace).where(_engine_filter(Workspace)).order_by(Workspace.name)
+    return await _list_workspaces_impl(query, user, db, request, _latest_runs_for)
+
+
+async def _list_workspaces_impl(query, user, db, request, latest_runs_for) -> JSONResponse:
+    """The list body both surfaces share.
+
+    The caller's base query decides which engines are in scope, and
+    ``latest_runs_for`` which runs count as a workspace's latest; this adds the
+    search and tag filters, RBAC and paging, so the two lists cannot drift.
+    """
 
     # Support ?search[name]= filter
     search_name = request.query_params.get("search[name]", "") if request else ""
@@ -1093,7 +1107,7 @@ async def list_workspaces(
             .scalars()
             .all()
         )
-        latest_runs = await _latest_runs_for([ws.id for ws in page_ws], db)
+        latest_runs = await latest_runs_for([ws.id for ws in page_ws], db)
         live_pools = await _resolve_live_pools(list(page_ws))
         data = []
         for ws in page_ws:
@@ -1112,7 +1126,7 @@ async def list_workspaces(
     workspaces = result.scalars().all()
 
     # Batch-load latest run per workspace using DISTINCT ON
-    latest_runs = await _latest_runs_for([ws.id for ws in workspaces], db)
+    latest_runs = await latest_runs_for([ws.id for ws in workspaces], db)
 
     # Filter to workspaces user has at least read access to
     live_pools = await _resolve_live_pools(list(workspaces))
@@ -1703,21 +1717,39 @@ async def remove_workspace_tag_names(
 
 
 @router.patch("/workspaces/{workspace_id}")
-async def update_workspace(
+async def patch_workspace(
     workspace_id: str = Path(...),
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Update workspace settings. Requires admin on workspace."""
-    ws, old_caps = await _require_ws_capability(workspace_id, cap.WORKSPACE_SETTINGS, user, db)
+    """Update a Terraform workspace's settings. Requires admin on workspace.
 
+    The native `PATCH /api/v1/workspaces/{id}` does the same for every enabled
+    engine (#1554); both go through `update_workspace`.
+    """
+    ws, old_caps = await _require_ws_capability(workspace_id, cap.WORKSPACE_SETTINGS, user, db)
+    return await update_workspace(ws, old_caps, body, user, db)
+
+
+async def update_workspace(
+    ws: Workspace,
+    old_caps: frozenset[str],
+    body: dict,
+    user: AuthenticatedUser,
+    db: AsyncSession,
+) -> JSONResponse:
+    """Apply a settings update to a workspace the caller already looked up.
+
+    Shared by both surfaces. The lookup and the settings check stay with each
+    route, so which engines a surface can reach is decided there and nowhere here.
+    """
     attrs = body.get("data", {}).get("attributes", {})
 
     # Handle workspace rename
     old_name = None
     if "name" in attrs:
-        new_name = _validate_workspace_name(attrs["name"])
+        new_name = _validate_workspace_name(attrs["name"], ws.engine)
         if new_name != ws.name:
             existing = await db.execute(
                 select(Workspace).where(Workspace.name == new_name, Workspace.id != ws.id)

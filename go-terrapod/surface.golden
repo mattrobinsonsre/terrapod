@@ -1104,6 +1104,7 @@ field WorkspaceList.Items []Workspace
 field WorkspaceList.PageSize int
 field WorkspaceList.TotalCount int
 field WorkspaceList.TotalPages int
+field WorkspaceListOptions.Engine string
 field WorkspaceListOptions.PageNumber int
 field WorkspaceListOptions.PageSize int
 field WorkspaceListOptions.Search string
