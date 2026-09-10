@@ -159,14 +159,11 @@ further — the same method as the four protocol captures before it.
 | POST | `/api/stacks/{stack}/update/{updateID}/complete` | end it — `{"status":"succeeded"}` |
 | POST | `/api/stacks/{stack}/update/{updateID}/renew_lease` | extend the lease |
 
-**Three of those rows were not exercised by the capture** and are listed from the
-CLI's behaviour rather than observed traffic — treat their shapes as unconfirmed:
+**Three of those rows were not exercised by this first capture.** #1571 has since exercised two of them; see [the secondary commands](#the-secondary-commands-1571):
 
-* `renew_lease` — the runs were too short to need it, but the CLI holds a lease
-  for the life of an update.
-* `decrypt` and `batch-decrypt` — the captured program had no secret *config* to
-  read back. `encrypt` was called six times during an ordinary `up`, so the
-  provider obligation itself is confirmed; only the read direction is not.
+* `renew_lease` — **now observed**, with body `{"token": "", "duration": 300}` part-way through a long update. The CLI adopts the token in the response, and Terrapod's renewal returns none, which breaks every long update (#1562).
+* `batch-decrypt` — **now observed**. Every state command and every read of a deployment with secrets calls it, and Terrapod's map-shaped response works.
+* `decrypt` (the single-value form) — still not observed.
 
 ## Who may call what
 
@@ -378,11 +375,48 @@ That capture predates #1535: `stack init` now refuses, and the workspace is
 created in Terrapod first with `stack select` in its place. The rest of the
 cycle — which is what this section is about — is unchanged.
 
+## The secondary commands (#1571)
+
+The main lifecycle above was captured in #1502. This section covers the rest of what a Pulumi user runs day to day. It was captured with `scripts/pulumi-secondary-capture.py` against CLI v3.262.0, in two passes:
+
+- **Stub pass:** a recording stub, which shows what the CLI sends.
+- **Live pass:** a real Terrapod behind its BFF, which shows what Terrapod answers.
+
+"Live" statuses are the ones Terrapod returned on a Tilt stack.
+
+| Command | What the CLI sends | What Terrapod answers today | What it should answer |
+|---|---|---|---|
+| `stack history` | `GET …/updates?pageSize=10&page=1` | **404** — the command fails | The workspace's runs and updates, newest first |
+| `stack tag set` / `tag rm` | `PATCH …/tags`, whose body is the **complete** tag map, including `pulumi:project` and `pulumi:runtime` — it replaces, it does not merge | **404** | A decision on how stack tags relate to workspace labels, then a route |
+| `stack tag ls` | nothing new — it reads `tags` from `GET` on the stack | works (labels are returned as tags) | — |
+| `stack rename` | `POST …/rename` with `{"newName", "newProject"}` | **404** | A rename of the workspace to `newProject::newName`, subject to the same validation as any rename |
+| `state protect`, `unprotect`, `delete`, `edit` | `GET …/export` → `batch-decrypt` → `encrypt` → `POST …/import` → poll `GET …/update/{id}` | **works** — all four round-trip through export and import | — |
+| `change-secrets-provider passphrase` | export → `batch-decrypt` → import | **works** | — |
+| `change-secrets-provider default` (back to the service) | `encrypt`, then export → import | **fails**: `encrypt` returns 500 (see below), and the stack is left on the passphrase provider | Byte-safe encryption |
+| `change-secrets-provider awskms://…` | a KMS call made **by the CLI itself**; the service only sees `GET` on the stack | nothing to serve | Nothing: KMS credentials belong wherever the CLI runs |
+| lease renewal | `POST …/update/{id}/renew_lease` with `{"token": "", "duration": 300}`, part-way through an update of a few minutes | **200 `{}` — no token** | `{"token": "<lease>"}`, and the stack lock extended to match |
+| `cancel` | `GET` on the stack, to read its `activeUpdate`; then `POST …/update/{activeUpdate}/cancel` with an empty body | the CLI stops at "stack has never been updated": `GET` on the stack never reports an `activeUpdate` | `activeUpdate` while an update runs, and the cancel route |
+
+**Three findings the table understates.**
+
+- **Every update longer than a few minutes fails.** The CLI renews its lease part-way through and uses the token in the response. Terrapod's renewal returns none, so every call after it carries an empty lease and gets a 401. The update then ends with "this command requires logging in". Its `complete` never lands, so the stack lock stays held until the lease runs out: 30 minutes in which the next update is refused with a 409. The live pass hit exactly this on a 200-second update.
+- **`encrypt` is not byte-safe.** The CLI encrypts binary values, not only text. Terrapod decodes the plaintext as UTF-8 with `surrogateescape`, and the encryption layer then fails to encode it. The result is a 500 (`UnicodeEncodeError`) that the CLI retries four times at the start of every `up`, and a hard failure when moving a stack back to the service's own secrets provider. `decrypt` has the mirror-image problem.
+- **A Pulumi workspace cannot be deleted through the native API.** `DELETE /api/v1/workspaces/{id}` still goes through the Terraform-only lookup, so it answers 404. That is how the live pass's cleanup failed. It is the delete half of #1554.
+
+The passphrase and cloud-KMS providers can no longer be chosen at `stack init`, which refuses (#1535). They are reached with `change-secrets-provider` on a workspace that already exists, and the rows above cover that path.
+
 ## Reproducing the service capture
 
 ```sh
-python3 scripts/pulumi-service-capture.py
+python3 scripts/pulumi-service-capture.py                 # the main lifecycle
+python3 scripts/pulumi-secondary-capture.py               # the secondary commands, against a stub
+python3 scripts/pulumi-secondary-capture.py \
+  --backend https://terrapod.local --token "$TOKEN"       # …and what a real Terrapod answers
 ```
+
+The live pass creates the workspace `proj::capture` through the native API and
+tries to delete it afterwards. Until the native delete serves Pulumi workspaces,
+that clean-up fails and the workspace has to be removed by hand.
 
 Requires Docker. Re-run it against a new CLI rather than assuming this still
 holds; that is what the script is for.
