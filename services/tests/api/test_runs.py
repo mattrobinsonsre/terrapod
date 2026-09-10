@@ -125,6 +125,7 @@ def _mock_workspace(ws_id=None, name="test-ws", catalog_item_id=None):
     ws.name = name
     ws.vcs_connection_id = None
     ws.engine = "terraform"
+    ws.pulumi_bind_plan = False
     ws.vcs_connection = None
     ws.vcs_repo_url = ""
     ws.vcs_last_polled_at = None

@@ -816,6 +816,13 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     log = structlog.get_logger("runner.job_entrypoint")
     plan_file = os.environ.get("TP_PULUMI_PLAN_FILE", "/workspace/plan.json")
     phase = os.environ.get("TP_PULUMI_PHASE", cfg.phase)
+    # Saving the preview's plan and binding the update to it is an opt-in
+    # (#1553): Pulumi's update plans are still experimental upstream. Unbound —
+    # the default — the preview saves nothing, nothing is uploaded or fetched,
+    # and the update is a plain `pulumi up`.
+    bind_plan = pulumi_exec.bind_plan_enabled()
+    if not bind_plan:
+        plan_file = ""
 
     # The CLI reads its plugin-download override and its backend from the
     # environment, and `exec_subprocess.run` inherits this process's, so both are
@@ -834,7 +841,7 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         # `tfplan`, or `up` fails outright with "open /workspace/plan.json: no
         # such file or directory" — which is what happened before this, on a run
         # whose preview had succeeded moments earlier.
-        if not _fetch_pulumi_plan(cfg, plan_file):
+        if bind_plan and not _fetch_pulumi_plan(cfg, plan_file):
             log.warning(
                 "pulumi plan file not available; update will compute its own. "
                 "The applied configuration is the same, but the update is no "

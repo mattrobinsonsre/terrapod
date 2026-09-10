@@ -863,6 +863,7 @@ Run objects include peak resource usage + an abnormal-exit signal so the UI (and
 |---|---|---|---|
 | `resource-cpu` | string | Workspace setting (snapshot) | CPU request applied to the Job (K8s quantity, e.g. `"1"`, `"500m"`). Limit is `2×` this |
 | `parallelism` | integer | Workspace setting (snapshot) | Concurrent operations the engine performs — `-parallelism` for terraform/tofu. Default `10`, minimum `1`, maximum `256` |
+| `pulumi-bind-plan` | boolean | Workspace setting | Pulumi workspaces only (#1553): save the preview's plan and bind the update to it (`preview --save-plan` / `up --plan`). Default `false` — the preview saves nothing and the update is a plain `pulumi up`. Off by default because Pulumi's update plans are still experimental upstream. Refused (422) with `true` on any other engine |
 | `resource-memory` | string | Workspace setting (snapshot) | Memory request applied to the Job (K8s quantity, e.g. `"2Gi"`). Limit is `2×` this |
 | `peak-memory-bytes` | integer or null | Runner (cgroup v2) | Peak resident memory observed during the run — `/sys/fs/cgroup/memory.peak` |
 | `peak-cpu-usec` | integer or null | Runner (cgroup v2) | Cumulative CPU time consumed by the run, microseconds — `usage_usec` from `/sys/fs/cgroup/cpu.stat`. **Captured but not surfaced in the UI** — see note below |

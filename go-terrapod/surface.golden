@@ -314,6 +314,7 @@ field CreateWorkspaceRequest.Name string `json:"name"`
 field CreateWorkspaceRequest.OwnerEmail string `json:"owner-email,omitempty"`
 field CreateWorkspaceRequest.Parallelism int64 `json:"parallelism,omitempty"`
 field CreateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
+field CreateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field CreateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
 field CreateWorkspaceRequest.SecurityScanEnforcement string `json:"security-scan-enforcement,omitempty"`
@@ -901,6 +902,7 @@ field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field UpdateWorkspaceRequest.Name string `json:"name,omitempty"`
 field UpdateWorkspaceRequest.Parallelism int64 `json:"parallelism,omitempty"`
 field UpdateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
+field UpdateWorkspaceRequest.PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field UpdateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
 field UpdateWorkspaceRequest.SecurityScanEnforcement string `json:"security-scan-enforcement,omitempty"`
@@ -1047,6 +1049,7 @@ field Workspace.Name string `json:"name"`
 field Workspace.OwnerEmail string `json:"owner-email,omitempty"`
 field Workspace.Parallelism int64 `json:"parallelism,omitempty"`
 field Workspace.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
+field Workspace.PulumiBindPlan bool `json:"pulumi-bind-plan"`
 field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`
 field Workspace.ResourceMemory string `json:"resource-memory,omitempty"`
 field Workspace.SecurityScanEnforcement string `json:"security-scan-enforcement,omitempty"`

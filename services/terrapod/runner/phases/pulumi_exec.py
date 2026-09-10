@@ -2,8 +2,8 @@
 
 Two phases, mirroring Terraform's plan/apply in Pulumi's own words:
 
-    pulumi preview --save-plan=<file>     the preview phase
-    pulumi up      --plan=<file>          the update phase
+    pulumi preview [--save-plan=<file>]   the preview phase
+    pulumi up      [--plan=<file>]        the update phase
 
 #1501 verified that pairing end to end. Saving the plan and applying *that* plan
 is what makes the two phases one decision rather than two independent runs — the
@@ -107,13 +107,28 @@ def _common_argv(cfg) -> list[str]:  # type: ignore[no-untyped-def]
     return argv
 
 
-def preview_argv(plan_file: str, cfg=None) -> list[str]:  # type: ignore[no-untyped-def]
-    """`pulumi preview --save-plan=<file>`.
+def bind_plan_enabled() -> bool:
+    """Whether this run binds its update to the preview's saved plan (#1553).
 
-    The saved plan is what the update consumes, so the two phases agree on one
-    file path — a mismatch surfaces as "no plan file" on the update, a long way
-    from the preview that should have written it.
+    The engine sets `TP_PULUMI_BIND_PLAN` only when the workspace opts in.
+    Absent — the default, and also what a listener older than the setting
+    sends — means unbound.
     """
+    return os.environ.get("TP_PULUMI_BIND_PLAN", "").lower() == "true"
+
+
+def preview_argv(plan_file: str, cfg=None) -> list[str]:  # type: ignore[no-untyped-def]
+    """`pulumi preview`, saving its plan only when the workspace binds updates to it.
+
+    An empty `plan_file` — the default, since binding is an opt-in (#1553) —
+    saves nothing: the preview is there for a person to review, and the
+    update works out its own changes, as Pulumi is normally run. With binding
+    on, the saved plan is what the update consumes, so the two phases agree on
+    one file path — a mismatch surfaces as "no plan file" on the update, a
+    long way from the preview that should have written it.
+    """
+    if not plan_file:
+        return ["preview", *_common_argv(cfg)]
     return ["preview", f"--save-plan={plan_file}", *_common_argv(cfg)]
 
 

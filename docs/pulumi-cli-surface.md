@@ -345,6 +345,18 @@ to Terrapod's package cache the same way. Both matter most in an air-gapped
 deployment, where the CLI's defaults would otherwise reach for
 `app.pulumi.com` and `get.pulumi.com` and simply hang.
 
+**The update is not bound to the preview unless you ask.** By default the
+preview saves nothing and the update is a plain `pulumi up`, which works out its
+changes afresh — the way Pulumi is normally run in CI, with the preview there for
+a person to review. A workspace can opt in with `pulumi-bind-plan` (#1553): the
+preview then saves its plan (`--save-plan`), the plan is carried to the update's
+pod, and `pulumi up --plan` refuses any operation the approved preview did not
+show. It is off by default because Pulumi's update plans are still marked
+experimental upstream, and an open bug (pulumi/pulumi#17546) makes them fail
+spuriously when cloud credentials are resolved during the preview — exactly how
+a Terrapod runner gets its credentials. Either way, Terrapod refuses to confirm
+an approved run whose stack state has moved since its preview (#647).
+
 ## Nothing from the management surface was required
 
 A full `login → stack init → stack ls → preview → up → refresh → export →

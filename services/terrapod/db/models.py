@@ -568,6 +568,13 @@ class Workspace(Base):
     engine: Mapped[str] = mapped_column(
         String(20), nullable=False, default="terraform", server_default="terraform"
     )
+    #: Pulumi only (#1553): save the preview's plan and bind the update to it
+    #: (`preview --save-plan` / `up --plan`). Off by default, because Pulumi's
+    #: update plans are still experimental upstream; unbound, the update is a
+    #: plain `pulumi up`, as Pulumi is normally run.
+    pulumi_bind_plan: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.false()
+    )
 
     __table_args__ = (sa.UniqueConstraint("name", name="uq_workspaces"),)
 

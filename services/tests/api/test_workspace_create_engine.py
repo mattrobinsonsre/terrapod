@@ -268,3 +268,61 @@ class TestTheNameRuleKnowsTheEngine:
 
         assert r.status_code == 201, r.text
         assert db.add.call_args[0][0].name == "proj::dev"
+
+
+class TestPulumiBindPlan:
+    """`pulumi-bind-plan` (#1553): off by default, Pulumi only.
+
+    Binding the update to the preview's saved plan rests on Pulumi's update plans,
+    still experimental upstream, so a workspace opts in; any other engine is
+    refused rather than handed a setting that would do nothing.
+    """
+
+    async def _create(self, body: dict):
+        db = _empty_db()
+        with (
+            patch("terrapod.engines.known_engines", return_value=("pulumi", "terraform")),
+            patch("terrapod.redis.client.publish_workspace_event", AsyncMock()),
+        ):
+            async with _client(_app(db)) as c:
+                r = await c.post("/api/v1/workspaces", json=body)
+        return r, db
+
+    async def test_off_unless_asked(self) -> None:
+        r, db = await self._create(_body(name="proj::dev", engine="pulumi"))
+        assert r.status_code == 201, r.text
+        assert db.add.call_args[0][0].pulumi_bind_plan is False
+        assert r.json()["data"]["attributes"]["pulumi-bind-plan"] is False
+
+    async def test_a_pulumi_workspace_can_opt_in(self) -> None:
+        r, db = await self._create(
+            _body(name="proj::dev", engine="pulumi", **{"pulumi-bind-plan": True})
+        )
+        assert r.status_code == 201, r.text
+        assert db.add.call_args[0][0].pulumi_bind_plan is True
+        assert r.json()["data"]["attributes"]["pulumi-bind-plan"] is True
+
+    async def test_any_other_engine_is_refused(self) -> None:
+        r, db = await self._create(_body(engine="terraform", **{"pulumi-bind-plan": True}))
+        assert r.status_code == 422
+        assert "Pulumi" in r.json()["detail"]
+        db.add.assert_not_called()
+
+    async def test_a_non_boolean_is_refused(self) -> None:
+        r, _ = await self._create(
+            _body(name="proj::dev", engine="pulumi", **{"pulumi-bind-plan": "yes"})
+        )
+        assert r.status_code == 422
+
+    def test_the_update_path_applies_the_same_rule(self) -> None:
+        """The update route shares the validator, so the rule holds there too —
+        on the TFE surface today, and on the native one when #1554 adds it."""
+        from fastapi import HTTPException
+
+        from terrapod.api.routers.tfe_v2 import _validate_pulumi_bind_plan
+
+        assert _validate_pulumi_bind_plan(True, "pulumi") is True
+        assert _validate_pulumi_bind_plan(False, "terraform") is False
+        with pytest.raises(HTTPException) as exc:
+            _validate_pulumi_bind_plan(True, "terraform")
+        assert exc.value.status_code == 422

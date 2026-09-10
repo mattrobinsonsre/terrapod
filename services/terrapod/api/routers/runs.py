@@ -2162,6 +2162,11 @@ async def next_run(
     if ws is not None and ws.engine == PULUMI_ENGINE and "::" in ws.name:
         project, _, stack = ws.name.partition("::")
         run_data["data"]["attributes"]["pulumi-stack"] = f"{DEFAULT_ORG}/{project}/{stack}"
+    if ws is not None and ws.engine == PULUMI_ENGINE:
+        # Whether this run saves its preview's plan and binds the update to it
+        # (#1553). Pulumi runs only, like the stack above, so the Terraform wire
+        # is unchanged; a listener that predates it reads its absence as unbound.
+        run_data["data"]["attributes"]["pulumi-bind-plan"] = bool(ws.pulumi_bind_plan)
 
     # Onboarding discovery (#824 P2): surface the session's provider + selected
     # types so the Job can run terrapod-query. The run stays plan-phase; the
