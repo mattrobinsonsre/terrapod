@@ -1754,14 +1754,8 @@ class ConfigurationVersion(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
-    #: Which IaC engine this belongs to (#1407). NOT `execution_backend`, which
-    #: picks the *binary* within the Terraform family (tofu vs terraform); this
-    #: names the family itself. A server default means every pre-existing row is
-    #: correct with no backfill, and an older replica mid-rollout never reads a
-    #: value it cannot interpret.
-    engine: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="terraform", server_default="terraform"
-    )
+    # No `engine` column, deliberately (#1536): a configuration version is reached
+    # only through its workspace, which carries the engine. Read it from there.
 
     __table_args__ = (Index("ix_configuration_versions_workspace_id", "workspace_id"),)
 
