@@ -115,19 +115,30 @@ class TestPulumiStackInitRefuses:
         db.add.assert_not_called()
         db.commit.assert_not_called()
 
-    async def test_an_existing_stack_still_conflicts(self) -> None:
-        """Unchanged, and distinct from the refusal: "already there" and "cannot
-        be created here" have different fixes."""
+    async def test_an_existing_stack_still_conflicts_for_someone_who_can_see_it(self) -> None:
+        """Distinct from the refusal: "already there" and "cannot be created here"
+        have different fixes.
+
+        Only for a caller who can read the stack, though (#1550). Telling anyone
+        at all that a name is taken would make this an oracle for workspace names
+        they have no access to; that side is covered in test_pulumi_authz.py.
+        """
+        from terrapod.auth import capabilities as cap
+
         db = AsyncMock()
         result = MagicMock()
         result.scalar_one_or_none.return_value = MagicMock()
         db.execute.return_value = result
 
-        async with _client(_app(db)) as c:
-            r = await c.post(
-                f"{PULUMI_BASE}/stacks/default/proj",
-                content=json.dumps({"stackName": "dev"}),
-            )
+        with patch(
+            "terrapod.api.routers.pulumi_service.resolve_workspace_capabilities_for",
+            AsyncMock(return_value=frozenset({cap.WORKSPACE_READ})),
+        ):
+            async with _client(_app(db)) as c:
+                r = await c.post(
+                    f"{PULUMI_BASE}/stacks/default/proj",
+                    content=json.dumps({"stackName": "dev"}),
+                )
         assert r.status_code == 409
 
 
