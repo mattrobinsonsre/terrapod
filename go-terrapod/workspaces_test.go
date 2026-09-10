@@ -806,3 +806,66 @@ func TestCreateWorkspace_EngineChoosesTheSurface(t *testing.T) {
 		})
 	}
 }
+
+// #1553: pulumi-bind-plan must actually reach the wire. Create and update build
+// their attributes by hand, so a struct field alone would be silently dropped.
+func TestWorkspace_PulumiBindPlan_RoundTrip(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	f.readHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-p", "proj::dev", map[string]any{
+			"pulumi-bind-plan": true,
+		})))
+	}
+	c := f.client()
+	ws, err := c.GetWorkspace(t.Context(), "ws-p")
+	if err != nil {
+		t.Fatalf("GetWorkspace: %v", err)
+	}
+	if !ws.PulumiBindPlan {
+		t.Errorf("pulumi-bind-plan not decoded: %+v", ws)
+	}
+
+	attrsOf := func() map[string]any {
+		var req struct {
+			Data struct {
+				Attributes map[string]any `json:"attributes"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(f.lastBody, &req); err != nil {
+			t.Fatalf("request body: %v", err)
+		}
+		return req.Data.Attributes
+	}
+
+	on := true
+	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-p", "proj::dev", nil)))
+	}
+	if _, err := c.CreateWorkspace(t.Context(), CreateWorkspaceRequest{Name: "proj::dev", PulumiBindPlan: &on}); err != nil {
+		t.Fatalf("CreateWorkspace: %v", err)
+	}
+	if got := attrsOf()["pulumi-bind-plan"]; got != true {
+		t.Errorf("create body pulumi-bind-plan = %v, want true", got)
+	}
+
+	// An explicit false must be sent — the pointer is what makes that possible.
+	off := false
+	f.updateHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-p", "proj::dev", nil)))
+	}
+	if _, err := c.UpdateWorkspace(t.Context(), "ws-p", UpdateWorkspaceRequest{PulumiBindPlan: &off}); err != nil {
+		t.Fatalf("UpdateWorkspace: %v", err)
+	}
+	if got, ok := attrsOf()["pulumi-bind-plan"]; !ok || got != false {
+		t.Errorf("update body pulumi-bind-plan = %v (present=%v), want explicit false", got, ok)
+	}
+
+	// Omitted means omitted: an update that does not mention it leaves it alone.
+	if _, err := c.UpdateWorkspace(t.Context(), "ws-p", UpdateWorkspaceRequest{}); err != nil {
+		t.Fatalf("UpdateWorkspace: %v", err)
+	}
+	if _, ok := attrsOf()["pulumi-bind-plan"]; ok {
+		t.Errorf("an update that did not set pulumi-bind-plan sent it anyway")
+	}
+}

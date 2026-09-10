@@ -33,8 +33,11 @@ type Workspace struct {
 	// The TFE-compatible /api/v2 surface is filtered to Terraform, so a
 	// workspace on another engine is never visible to a terraform/tofu
 	// client and its responses are free to use that engine's own vocabulary.
-	Engine    string `json:"engine,omitempty"`
-	AutoApply bool   `json:"auto-apply"`
+	Engine string `json:"engine,omitempty"`
+	// PulumiBindPlan: Pulumi workspaces only (#1553) — the update is bound to
+	// the approved preview's saved plan. False by default.
+	PulumiBindPlan bool `json:"pulumi-bind-plan"`
+	AutoApply      bool `json:"auto-apply"`
 	// AutoApplyMode is the conditional auto-apply setting (#1274):
 	// "never", "always", "create" or "create_update". AutoApply stays the
 	// boolean projection — true whenever the workspace applies unattended
@@ -153,7 +156,9 @@ type CreateWorkspaceRequest struct {
 	//
 	// Workspaces are created here, or in the UI, or with the Terraform provider
 	// — never by an engine's own CLI (#1535).
-	Engine           string `json:"engine,omitempty"`
+	Engine string `json:"engine,omitempty"`
+	// PulumiBindPlan (#1553); the API refuses true for non-Pulumi engines.
+	PulumiBindPlan   *bool  `json:"pulumi-bind-plan,omitempty"`
 	ExecutionMode    string `json:"execution-mode,omitempty"`
 	ExecutionBackend string `json:"execution-backend,omitempty"`
 	AutoApply        *bool  `json:"auto-apply,omitempty"`
@@ -209,6 +214,8 @@ type CreateWorkspaceRequest struct {
 // flip a workspace's auto-apply to false on every PATCH that didn't
 // explicitly set it.
 type UpdateWorkspaceRequest struct {
+	// PulumiBindPlan (#1553); the API refuses true for non-Pulumi engines.
+	PulumiBindPlan   *bool  `json:"pulumi-bind-plan,omitempty"`
 	Name             string `json:"name,omitempty"`
 	ExecutionMode    string `json:"execution-mode,omitempty"`
 	ExecutionBackend string `json:"execution-backend,omitempty"`
@@ -464,6 +471,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.AutoApply != nil {
 		attrs["auto-apply"] = *req.AutoApply
 	}
+	if req.PulumiBindPlan != nil {
+		attrs["pulumi-bind-plan"] = *req.PulumiBindPlan
+	}
 	if req.AutoApplyMode != nil {
 		attrs["auto-apply-mode"] = *req.AutoApplyMode
 	}
@@ -575,6 +585,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.AutoApply != nil {
 		attrs["auto-apply"] = *req.AutoApply
+	}
+	if req.PulumiBindPlan != nil {
+		attrs["pulumi-bind-plan"] = *req.PulumiBindPlan
 	}
 	if req.AutoApplyMode != nil {
 		attrs["auto-apply-mode"] = *req.AutoApplyMode
@@ -703,6 +716,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		Name:                          GetStringAttr(res, "name"),
 		ExecutionMode:                 GetStringAttr(res, "execution-mode"),
 		Engine:                        GetStringAttr(res, "engine"),
+		PulumiBindPlan:                GetBoolAttr(res, "pulumi-bind-plan"),
 		ExecutionBackend:              GetStringAttr(res, "execution-backend"),
 		AutoApply:                     GetBoolAttr(res, "auto-apply"),
 		AutoApplyMode:                 GetStringAttr(res, "auto-apply-mode"),

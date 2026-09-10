@@ -58,6 +58,8 @@ class PulumiRunOptions:
     parallelism: int = 0
     timeout_minutes: int = 0
     env_vars: list[dict[str, Any]] = field(default_factory=list)
+    #: Save the preview's plan and bind the update to it (#1553). Off by default.
+    bind_plan: bool = False
 
 
 class PulumiStrategy:
@@ -119,6 +121,8 @@ class PulumiStrategy:
             env.append({"name": "TP_TARGET_URNS", "value": json.dumps(options.target_urns)})
         if options.parallelism:
             env.append({"name": "TP_PARALLELISM", "value": str(options.parallelism)})
+        if options.bind_plan:
+            env.append({"name": "TP_PULUMI_BIND_PLAN", "value": "true"})
         return env
 
     def options_from_attrs(self, attrs: dict, phase: str) -> PulumiRunOptions:
@@ -143,6 +147,7 @@ class PulumiStrategy:
             resource_memory=attrs.get("resource-memory", ""),
             parallelism=attrs.get("parallelism", 0),
             timeout_minutes=attrs.get("timeout-minutes", 0),
+            bind_plan=bool(attrs.get("pulumi-bind-plan", False)),
         )
 
     def build_job_spec(self, **kwargs: Any) -> dict:

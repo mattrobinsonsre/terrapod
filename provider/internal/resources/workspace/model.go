@@ -18,6 +18,7 @@
 //	"auto-apply"                        → auto_apply          (bool,   optional, default false)
 //	"execution-backend"                 → execution_backend   (string, optional, default "terraform")
 //	"engine"                            → engine              (string, read-only)
+//	"pulumi-bind-plan"                  → pulumi_bind_plan    (bool,   optional+computed)
 //	"terraform-version"                 → terraform_version   (string, optional)
 //	"working-directory"                 → working_directory   (string, optional)
 //	"parallelism"                       → parallelism
@@ -64,6 +65,7 @@ type workspaceModel struct {
 	AutoApplyMode                 types.String `tfsdk:"auto_apply_mode"`
 	ExecutionBackend              types.String `tfsdk:"execution_backend"`
 	Engine                        types.String `tfsdk:"engine"`
+	PulumiBindPlan                types.Bool   `tfsdk:"pulumi_bind_plan"`
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`

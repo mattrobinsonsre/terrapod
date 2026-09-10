@@ -31,6 +31,7 @@ def _mock_workspace(ws_id=None, pool_id=None, extra_pool_ids=None):
     # The engine this belongs to (#1521) — set explicitly because a MagicMock
     # attribute is not JSON-serialisable and the serializer now reports it.
     ws.engine = "terraform"
+    ws.pulumi_bind_plan = False
     ws.id = ws_id or uuid.uuid4()
     ws.name = "test-ws"
     ws.execution_mode = "agent"

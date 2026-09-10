@@ -314,6 +314,22 @@ def _validate_workspace_name(name: str, engine: str = TERRAFORM) -> str:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+def _validate_pulumi_bind_plan(raw: object, engine: str) -> bool:
+    """`pulumi-bind-plan` (#1553): a boolean, meaningful only on a Pulumi workspace.
+
+    Refused rather than ignored on any other engine. Terraform always applies
+    its own saved plan, so accepting `true` there would record a setting that
+    does nothing while saying it did something.
+    """
+    if not isinstance(raw, bool):
+        raise HTTPException(status_code=422, detail="pulumi-bind-plan must be a boolean")
+    if raw and engine != "pulumi":
+        raise HTTPException(
+            status_code=422, detail="pulumi-bind-plan applies only to Pulumi workspaces"
+        )
+    return raw
+
+
 def _validate_parallelism(raw: object) -> int:
     """HTTP wrapper over the canonical rule in `services.parallelism`."""
     try:
@@ -801,6 +817,8 @@ def _workspace_json(
                 # reads workspaces from here and resolves phase vocabulary from
                 # it, so serialising it beats the UI assuming.
                 "engine": ws.engine,
+                # Pulumi only (#1553); always false elsewhere.
+                "pulumi-bind-plan": ws.pulumi_bind_plan,
                 "terraform-version": ws.terraform_version or "",
                 "terragrunt-enabled": ws.terragrunt_enabled,
                 "terragrunt-version": ws.terragrunt_version or "",
@@ -1354,6 +1372,7 @@ async def _create_workspace_impl(
         working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),
         resource_cpu=attrs.get("resource-cpu", "1"),
         parallelism=_validate_parallelism(attrs.get("parallelism", DEFAULT_PARALLELISM)),
+        pulumi_bind_plan=_validate_pulumi_bind_plan(attrs.get("pulumi-bind-plan", False), engine),
         resource_memory=attrs.get("resource-memory", "2Gi"),
         labels=validate_labels(attrs.get("labels", {})),
         owner_email=user.email,
@@ -1872,6 +1891,8 @@ async def update_workspace(
         ws.working_directory = _sanitize_working_directory(attrs["working-directory"])
     if "parallelism" in attrs:
         ws.parallelism = _validate_parallelism(attrs["parallelism"])
+    if "pulumi-bind-plan" in attrs:
+        ws.pulumi_bind_plan = _validate_pulumi_bind_plan(attrs["pulumi-bind-plan"], ws.engine)
     if "resource-cpu" in attrs:
         ws.resource_cpu = attrs["resource-cpu"]
     if "resource-memory" in attrs:

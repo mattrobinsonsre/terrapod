@@ -32,6 +32,7 @@ type workspaceDataSourceModel struct {
 	AutoApplyMode                 types.String `tfsdk:"auto_apply_mode"`
 	ExecutionBackend              types.String `tfsdk:"execution_backend"`
 	Engine                        types.String `tfsdk:"engine"`
+	PulumiBindPlan                types.Bool   `tfsdk:"pulumi_bind_plan"`
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
@@ -97,6 +98,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"auto_apply_mode":                  computedString("Conditional auto-apply mode: never, always, create or create_update."),
 			"execution_backend":                computedString("Execution backend."),
 			"engine":                           computedString("The execution engine family (\"terraform\")."),
+			"pulumi_bind_plan":                 computedBool("Pulumi only: whether the update is bound to the approved preview."),
 			"terraform_version":                computedString("Terraform/tofu version."),
 			"terragrunt_enabled":               computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
 			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
@@ -193,6 +195,7 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.AutoApply = types.BoolValue(terrapod.GetBoolAttr(res, "auto-apply"))
 	m.ExecutionBackend = types.StringValue(terrapod.GetStringAttr(res, "execution-backend"))
 	m.Engine = types.StringValue(terrapod.GetStringAttr(res, "engine"))
+	m.PulumiBindPlan = types.BoolValue(terrapod.GetBoolAttr(res, "pulumi-bind-plan"))
 	m.WorkingDirectory = types.StringValue(terrapod.GetStringAttr(res, "working-directory"))
 	m.Parallelism = types.Int64Value(terrapod.GetIntAttr(res, "parallelism"))
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))

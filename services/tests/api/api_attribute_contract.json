@@ -729,6 +729,7 @@
     "permissions.can-update",
     "permissions.can-update-variable",
     "plan-expiry-seconds",
+    "pulumi-bind-plan",
     "resource-cpu",
     "resource-memory",
     "security-scan-enforcement",
