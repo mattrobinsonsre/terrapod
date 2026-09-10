@@ -110,6 +110,14 @@ class TestThePhaseRunner:
             return True
 
         monkeypatch.setattr(job_entrypoint, "_fetch_pulumi_plan", fake_fetch)
+        # The stack set-up and hand-back have tests of their own
+        # (test_pulumi_local_state.py); here they only need to get out of the way.
+        monkeypatch.setattr(
+            pulumi_exec,
+            "prepare_local_stack",
+            lambda *a, **k: MagicMock(keys=pulumi_exec.StackKeys("v1:salt", "pw")),
+        )
+        monkeypatch.setattr(job_entrypoint, "_hand_back_pulumi_state", lambda *a, **k: 0)
         cfg = _cfg()
         cfg.phase = phase
         cfg.plan_only = False

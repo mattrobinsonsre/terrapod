@@ -5,7 +5,8 @@ is wrong — the CLI carries on and does something plausible with a default — 
 is why they are worth pinning rather than left to the live smoke:
 
   * a plugin-override pattern that matches nothing falls back to get.pulumi.com
-  * a missing backend URL falls back to Pulumi's own SaaS
+  * a backend pointed anywhere but the Job's own directory puts an agent run on
+    a live backend, which #1576 forbids
   * a preview and its update disagreeing about the plan file surfaces as "no
     plan file" on the update, a long way from the preview that should have
     written it
@@ -50,27 +51,23 @@ def _clean_env(monkeypatch):
 
 
 class TestTheBackend:
-    def test_it_points_at_terrapod(self) -> None:
-        env = pulumi_exec.backend_env(API)
-        assert env["PULUMI_BACKEND_URL"] == f"{API}/api/terrapod/v1/pulumi"
+    """#1576: an agent run's backend is a directory in its own Job — never
+    Terrapod's service surface, which serves the CLI in local mode only."""
 
-    def test_it_uses_the_alias_prefix_not_the_canonical_one(self) -> None:
-        """A runner lags the API by design, so it may be talking to a server on
-        either side of #1528 — and only the alias is served by both."""
-        url = pulumi_exec.backend_env(API)["PULUMI_BACKEND_URL"]
-        assert "/api/terrapod/v1/" in url
-        assert "/api/v1/" not in url
+    def test_it_is_a_file_backend(self, tmp_path) -> None:
+        env = pulumi_exec.local_backend_env(tmp_path, "pw")
+        assert env["PULUMI_BACKEND_URL"] == tmp_path.resolve().as_uri()
+        assert env["PULUMI_BACKEND_URL"].startswith("file://")
+        assert env["PULUMI_CONFIG_PASSPHRASE"] == "pw"
 
-    def test_a_trailing_slash_does_not_double_up(self) -> None:
-        assert (
-            pulumi_exec.backend_env(API + "/")["PULUMI_BACKEND_URL"]
-            == pulumi_exec.backend_env(API)["PULUMI_BACKEND_URL"]
-        )
+    def test_nothing_points_the_cli_at_the_service_surface(self) -> None:
+        """The old runner exported `{api}/api/terrapod/v1/pulumi` as its backend.
+        A path like that reappearing here would put agent runs back on it."""
+        import inspect
 
-    def test_no_api_url_sets_nothing(self) -> None:
-        """Better to leave it unset than to export a malformed URL the CLI would
-        try to reach."""
-        assert pulumi_exec.backend_env("") == {}
+        src = inspect.getsource(pulumi_exec)
+        assert '_API_PREFIX}/pulumi"' not in src
+        assert not hasattr(pulumi_exec, "backend_env")
 
 
 class TestThePluginOverride:
@@ -136,10 +133,12 @@ class TestThePhaseArgv:
         assert argv[0] == "destroy"
         assert not any(a.startswith("--plan=") for a in argv)
 
-    def test_the_stack_is_passed_when_set(self, monkeypatch) -> None:
-        monkeypatch.setenv("TP_PULUMI_STACK", "proj/dev")
+    def test_the_stack_is_passed_as_the_file_backend_names_it(self, monkeypatch) -> None:
+        """The API sends `default/<project>/<stack>`; the file backend accepts a
+        qualified name only under the literal organization `organization`."""
+        monkeypatch.setenv("TP_PULUMI_STACK", "default/proj/dev")
         argv = pulumi_exec.preview_argv("p", _cfg())
-        assert argv[argv.index("--stack") + 1] == "proj/dev"
+        assert argv[argv.index("--stack") + 1] == "organization/proj/dev"
 
     def test_refresh_is_only_disabled_when_asked(self, monkeypatch) -> None:
         assert "--refresh=false" not in pulumi_exec.preview_argv("p", _cfg())

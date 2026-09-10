@@ -20,10 +20,61 @@ from pathlib import Path
 import httpx
 import structlog
 
+from terrapod.http_retry import request_with_retry
 from terrapod.runner.download import download_to_file
 from terrapod.runner.runner_config import RunnerConfig
 
 logger = structlog.get_logger("runner.phase.state")
+
+#: The header carrying the serial a Pulumi deployment was read at. The API's
+#: `run_artifacts.PULUMI_STATE_SERIAL_HEADER`, repeated because the runner image
+#: ships no `api/` package; a test pins the two together.
+PULUMI_STATE_SERIAL_HEADER = "X-Terrapod-State-Serial"
+
+
+class StateDownloadError(RuntimeError):
+    """The run's state could not be fetched, and the run must not guess."""
+
+
+def download_pulumi_deployment(
+    cfg: RunnerConfig,
+    *,
+    client: httpx.Client | None = None,
+) -> tuple[int, dict | None]:
+    """The run's Pulumi stack and the state serial it was read at (#1576).
+
+    Unlike the Terraform state download above, this one fails closed. The API
+    answers 200 with `deployment: null` for a stack that has no state yet, so any
+    other answer is a failure — and treating a failure as "no state" would
+    preview against an empty stack and propose creating everything that already
+    exists.
+    """
+    url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/pulumi-deployment"
+    own_client = client is None
+    if client is None:
+        client = httpx.Client(
+            timeout=httpx.Timeout(float(cfg.upload_timeout_seconds), connect=10.0),
+            headers={"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {},
+        )
+    try:
+        resp = request_with_retry(client, "GET", url, idempotent=True, retries=cfg.download_retries)
+    except httpx.RequestError as exc:
+        raise StateDownloadError(f"could not fetch the stack's state: {exc}") from exc
+    finally:
+        if own_client:
+            client.close()
+
+    if resp.status_code != 200:
+        raise StateDownloadError(
+            f"could not fetch the stack's state: HTTP {resp.status_code}: {resp.text[:500]}"
+        )
+    try:
+        serial = int(resp.headers.get(PULUMI_STATE_SERIAL_HEADER, "0") or 0)
+        deployment = resp.json().get("deployment")
+    except ValueError as exc:
+        raise StateDownloadError(f"the stack's state could not be read: {exc}") from exc
+    logger.info("pulumi deployment fetched", serial=serial, empty=deployment is None)
+    return serial, deployment if isinstance(deployment, dict) else None
 
 
 def download_state(
