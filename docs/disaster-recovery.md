@@ -10,7 +10,15 @@ When Terrapod is unavailable (database down, API unreachable, cluster failure), 
 
 ## State Index
 
-Terrapod maintains a `state/index.yaml` file in object storage that maps workspace names to their latest state file paths. This index is updated on every state upload, workspace rename, and workspace deletion.
+Terrapod maintains a `state/index.yaml` file in object storage that maps workspace names to their latest state file paths. It is updated whenever a state version is written:
+- a Terraform or OpenTofu agent run's apply;
+- a CLI state upload in local mode;
+- a Pulumi update, in either mode;
+- a manual upload;
+- a rollback;
+- a workspace restore.
+
+It is also updated on a workspace rename and deletion. Writers from every API replica take a short lock before updating it, so concurrent writes do not drop each other's entries.
 
 Example index contents:
 
@@ -157,7 +165,9 @@ During break-glass recovery with a local backend, there is no state locking. Coo
 
 ### Index Accuracy
 
-The state index is best-effort — it is updated on every state upload but failures are swallowed to avoid blocking state operations. In rare cases, the index may be slightly out of date. If you cannot find a workspace in the index, state files are stored at `state/<workspace_uuid>/<state_version_uuid>.tfstate` — list the workspace's directory to find the latest file by timestamp.
+The state index is best-effort. It is updated on every state write, but a failure to update it is logged rather than failing the write. A failed read of the index never replaces it: the index is only rewritten after a successful read, or when it does not exist yet. In rare cases, the index may be slightly out of date.
+
+Releases before #1581 did not update the index on agent-run applies, so on an older deployment it may name an older state version for agent-mode workspaces. If you cannot find a workspace in the index, state files are stored at `state/<workspace_uuid>/<state_version_uuid>.tfstate` — list the workspace's directory to find the latest file by timestamp.
 
 ## Routine Backup & Restore
 

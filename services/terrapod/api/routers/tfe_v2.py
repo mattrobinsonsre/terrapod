@@ -81,7 +81,7 @@ from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
 from terrapod.storage import get_storage
-from terrapod.storage.keys import state_index_key, state_key
+from terrapod.storage.keys import state_key
 
 router = APIRouter(tags=["tfe-v2"])
 
@@ -381,77 +381,6 @@ def _parse_plan_expiry(value) -> int | None:
     if seconds < 0:
         raise HTTPException(status_code=422, detail="plan-expiry-seconds must not be negative")
     return seconds or None
-
-
-async def _update_state_index(
-    workspace_name: str,
-    workspace_id: str,
-    sv_key: str,
-    serial: int,
-) -> None:
-    """Best-effort update of state/index.yaml with the latest state path.
-
-    This index enables break-glass DR recovery: operators can download
-    the index from object storage to find state files by workspace name
-    without needing PostgreSQL access.
-
-    Failures are logged and swallowed — index updates must never break
-    state uploads.
-    """
-    try:
-        import yaml
-
-        storage = get_storage()
-        idx_key = state_index_key()
-
-        # Read existing index (or start fresh)
-        try:
-            raw = await storage.get(idx_key)
-            index = yaml.safe_load(raw) or {}
-        except Exception:
-            index = {}
-
-        index[workspace_name] = {
-            "workspace_id": workspace_id,
-            "state_key": sv_key,
-            "serial": serial,
-            "updated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        }
-
-        await storage.put(
-            idx_key,
-            yaml.dump(index, default_flow_style=False).encode(),
-            content_type="application/x-yaml",
-        )
-    except Exception:
-        logger.warning("Failed to update state index", workspace=workspace_name, exc_info=True)
-
-
-async def _remove_state_index_entry(workspace_name: str) -> None:
-    """Best-effort remove a workspace entry from state/index.yaml."""
-    try:
-        import yaml
-
-        storage = get_storage()
-        idx_key = state_index_key()
-
-        try:
-            raw = await storage.get(idx_key)
-            index = yaml.safe_load(raw) or {}
-        except Exception:
-            return  # No index to update
-
-        if workspace_name in index:
-            del index[workspace_name]
-            await storage.put(
-                idx_key,
-                yaml.dump(index, default_flow_style=False).encode(),
-                content_type="application/x-yaml",
-            )
-    except Exception:
-        logger.warning(
-            "Failed to remove state index entry", workspace=workspace_name, exc_info=True
-        )
 
 
 @router.get("/ping")
@@ -2109,7 +2038,9 @@ async def update_workspace(
 
     # Update state index on rename
     if old_name is not None:
-        await _remove_state_index_entry(old_name)
+        from terrapod.services import state_index_service
+
+        await state_index_service.remove_workspace(old_name)
         latest_sv_result = await db.execute(
             select(StateVersion)
             .where(StateVersion.workspace_id == ws.id)
@@ -2118,8 +2049,11 @@ async def update_workspace(
         )
         sv = latest_sv_result.scalar_one_or_none()
         if sv:
-            await _update_state_index(
-                ws.name, str(ws.id), state_key(str(ws.id), str(sv.id)), sv.serial
+            await state_index_service.record_latest_state(
+                workspace_name=ws.name,
+                workspace_id=ws.id,
+                state_version_id=sv.id,
+                serial=sv.serial,
             )
         logger.info("Workspace renamed", old_name=old_name, new_name=ws.name)
 
@@ -2172,7 +2106,9 @@ async def delete_workspace(
     await dws.write_marker_best_effort(ws_id, marker)
 
     # Best-effort remove from DR state index
-    await _remove_state_index_entry(ws_name)
+    from terrapod.services import state_index_service
+
+    await state_index_service.remove_workspace(ws_name)
 
     return Response(status_code=204)
 
@@ -2631,9 +2567,13 @@ async def upload_state_content(
 
     await publish_workspace_event(str(sv.workspace_id), "state_version_created")
 
-    # Best-effort update the DR state index
+    # Best-effort update the DR state index (#1581)
     if ws:
-        await _update_state_index(ws.name, str(ws.id), key, sv.serial)
+        from terrapod.services import state_index_service
+
+        await state_index_service.record_latest_state(
+            workspace_name=ws.name, workspace_id=ws.id, state_version_id=sv.id, serial=sv.serial
+        )
 
     # Best-effort: enqueue an AI architecture critique for the new state (#1036
     # Part 2). The critic infers the architecture from this state version and

@@ -126,6 +126,29 @@ class TestRestore:
         )
         assert json.loads(dl.content)["lineage"] == lineage
 
+    async def test_restore_points_the_state_index_at_the_new_workspace(self, app, client):
+        """The break-glass index must name the restored workspace's latest
+        state, not the deleted workspace's (#1581)."""
+        import yaml
+
+        from terrapod.storage.keys import state_index_key
+
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(
+            client, "restore-index", [1, 2], "11111111-2222-3333-4444-555555555555"
+        )
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+
+        data = resp.json()["data"]
+        index = yaml.safe_load(await get_storage().get(state_index_key()))
+        entry = index[data["attributes"]["name"]]
+        assert entry["workspace_id"] == data["id"].removeprefix("ws-")
+        assert entry["serial"] == 2
+        assert entry["workspace_id"] != old_id
+
     async def test_restore_is_a_new_workspace_not_a_revival(self, app, client):
         """Restore produces a NEW id and leaves the original prefix alone.
 

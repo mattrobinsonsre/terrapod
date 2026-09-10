@@ -535,6 +535,7 @@ async def restore_workspace(
 
     new_id = str(ws.id)
     seen_serials: set[int] = set()
+    latest_sv: StateVersion | None = None
     for key in keys:
         raw = await storage.get(key)
         try:
@@ -576,6 +577,22 @@ async def restore_workspace(
             content_type="application/json",
         )
         report["state_versions_restored"] += 1
+        if latest_sv is None or sv.serial > latest_sv.serial:
+            latest_sv = sv
+
+    # The restored workspace is a new id under (usually) the old name, so the
+    # break-glass index must point at it rather than at the deleted one (#1581).
+    # Recorded before the caller commits: the objects are already written, and
+    # an index naming stored state is still useful if the commit then fails.
+    if latest_sv is not None:
+        from terrapod.services import state_index_service
+
+        await state_index_service.record_latest_state(
+            workspace_name=ws.name,
+            workspace_id=ws.id,
+            state_version_id=latest_sv.id,
+            serial=latest_sv.serial,
+        )
 
     return ws, report
 
