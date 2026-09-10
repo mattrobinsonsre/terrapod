@@ -323,6 +323,33 @@ def upload_state(
     return ok
 
 
+def upload_pulumi_deployment(
+    cfg: RunnerConfig,
+    path: Path,
+    *,
+    base_serial: int,
+    client: httpx.Client | None = None,
+) -> bool:
+    """Update phase, Pulumi (#1576): hand the stack back after an update.
+
+    `path` is `pulumi stack export --show-secrets` output; the API seals the
+    secrets again before storing it. `base_serial` is the serial the run
+    imported, so a state that moved in between is refused with 409. FATAL on
+    failure, exactly as `upload_state` is.
+    """
+    url = (
+        f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/pulumi-deployment"
+        f"?base-serial={base_serial}"
+    )
+    ok, status = _put_file(cfg, url, path, content_type="application/json", client=client)
+    if not ok:
+        logger.error(
+            "FATAL: pulumi state upload failed — caller will flag state-diverged",
+            status=status,
+        )
+    return ok
+
+
 def signal_state_diverged(
     cfg: RunnerConfig,
     *,

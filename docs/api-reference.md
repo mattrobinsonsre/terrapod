@@ -2943,6 +2943,23 @@ Content-Type: application/octet-stream
 
 Upload new state after apply. Returns 204 on success.
 
+### Download a Pulumi Deployment
+
+```
+GET /api/v1/runs/{run_id}/artifacts/pulumi-deployment
+```
+
+Pulumi workspaces only (#1576). Returns 200 with `{"version": 3, "deployment": ...}`, the body `pulumi stack import` reads: the stack's current deployment with its secrets in plaintext and no `secrets_providers` block. `deployment` is `null` for a stack with no state. The `X-Terrapod-State-Serial` header carries the serial of the state version it was read from, or `0`. Returns 409 when the stored secrets are sealed by a provider Terrapod holds no key for, and 404 for a workspace that is not Pulumi.
+
+### Upload a Pulumi Deployment
+
+```
+PUT /api/v1/runs/{run_id}/artifacts/pulumi-deployment?base-serial={serial}
+Content-Type: application/json
+```
+
+Pulumi workspaces only (#1576). The body is `pulumi stack export --show-secrets` output. Terrapod seals the secrets with its own key and stores the result as the next state version, linked to the run. `base-serial` is the serial the download reported; if the stack has moved on since, the upload is refused with 409. A retry of an upload that already landed returns 200. Also returns 400 for a body with sealed secrets or no `deployment`, and 409 for a plan-only run. Returns 204 on success.
+
 ### Download Plan Artifacts
 
 ```

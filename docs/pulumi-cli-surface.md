@@ -196,14 +196,11 @@ without a valid lease learns nothing about which stacks exist. A preview's lease
 `checkpoint` — a preview never writes state, and allowing it would let `run:plan` buy
 `state:write`.
 
-**A run's own CLI.** Agent-mode Pulumi runs call this API from the runner Job with the
-run's runner token, which holds no workspace role of its own. It is authorized from the
-run instead, mirroring what the Terraform surface allows a runner: on its **own** run's
-stack it may read, read state and preview, plus `run:apply` for an apply run and
-`run:apply-destroy` for a destroy run — never `stack import` or `stack rm`, which no run
-performs. On **another** stack it may only read, and only where that stack's remote-state
-consumer allowlist names the run's workspace (a `StackReference`, governed exactly as
-`terraform_remote_state` is).
+**Runner tokens are refused.** This surface serves the CLI in local mode only. An
+agent-mode run never uses it: its stack lives in a file backend inside the runner Job,
+and its state is handed over through the run's artifacts (see
+[how Terrapod runs Pulumi on an agent](#how-terrapod-runs-pulumi-on-an-agent)). Every
+call made with a runner token is answered 403, whatever route it names (#1576).
 
 `stack init` never creates a stack (below), and it reports a name as already taken only
 to someone who can read that stack.
@@ -336,7 +333,49 @@ runs `pulumi preview` then `pulumi up` against the fetched configuration — the
 same shape as a Terraform run, and the same one an operator selects with
 `execution_mode = "agent"`. **The engine does not decide where a run executes.**
 
-Two things the Job arranges that are worth knowing about as an operator:
+What the Job arranges that is worth knowing about as an operator:
+
+**State stays in the Job, as Terraform's does (#1576).** An agent run does not use
+Terrapod as a live Pulumi backend, and does not call the service surface above at
+all. The Job runs the CLI against a file backend in its own workspace, the way a
+Terraform run keeps `terraform.tfstate` beside its configuration:
+
+1. **At the start**, the Job fetches the stack's deployment from
+   `GET /runs/{run_id}/artifacts/pulumi-deployment`, with its secrets opened. It
+   creates the stack locally with a passphrase that exists only for the life of
+   the Job, and imports the deployment. The CLI stores it sealed under that
+   passphrase.
+2. **The preview and the update run against that local stack.** Nothing is
+   written to Terrapod while they run: no leases, no checkpoints, no engine
+   events.
+3. **After an update**, the Job exports the stack with `--show-secrets` and hands
+   it back once, with `PUT` to the same path. Terrapod seals the secrets again
+   with its own key and stores the result as the next state version, linked to
+   the run. It does this whether or not the update succeeded, because a failed
+   `up` can still have created resources. An update that changed nothing hands
+   back nothing, and a preview never hands anything back.
+4. **If anything else wrote the stack while the run held it**, the hand-back is
+   refused and the workspace is flagged state-diverged, as for a Terraform run
+   whose state upload fails.
+
+What this means for a program:
+
+- **A committed `Pulumi.<stack>.yaml` keeps working**, with one change: its
+  `encryptionsalt`, `secretsprovider` and `encryptedkey` lines are removed from
+  the Job's working copy (never from your repository), because they name a
+  provider the Job's stack does not use.
+- **`secure:` values in that file are not yet supported in agent runs.** They are
+  sealed by the provider the stack used when they were set, and the Job's
+  passphrase cannot open them. A run whose stack file holds any fails early, with
+  a message saying so. Supply those values as workspace variables instead.
+- **A stack whose secrets are sealed by a passphrase or cloud KMS** — one moved
+  there with `pulumi stack change-secrets-provider` — cannot be run on an agent,
+  because Terrapod holds no key for it. The run fails, saying which provider is
+  in the way. `pulumi stack change-secrets-provider default` moves the stack
+  back.
+- **`PULUMI_BACKEND_URL` and `PULUMI_CONFIG_PASSPHRASE` set as workspace
+  variables are overridden.** Agent mode owns the backend, as it does
+  Terraform's.
 
 **The binary is fetched, not baked in.** `pulumi` is pulled through the same
 cache that serves `tofu`/`terraform`, so the version is
@@ -345,10 +384,10 @@ an upstream fix reaches a deployment with a `helm upgrade` rather than a Terrapo
 release. If the cache cannot supply it the run fails rather than falling back to
 whatever `pulumi` might be on the image.
 
-**The backend is set for it.** The Job exports `PULUMI_BACKEND_URL` pointing at
-this deployment's service surface, plus the run's own short-lived token, so there
-is no `pulumi login` to perform inside the Job. Plugin downloads are redirected
-to Terrapod's package cache the same way. Both matter most in an air-gapped
+**Nothing reaches for Pulumi Cloud.** The backend is a directory in the Job, set
+through `PULUMI_BACKEND_URL`, so there is no `pulumi login` to perform. Plugin
+downloads are redirected to Terrapod's package cache, which the run's own
+short-lived token authenticates to. Both matter most in an air-gapped
 deployment, where the CLI's defaults would otherwise reach for
 `app.pulumi.com` and `get.pulumi.com` and simply hang.
 
@@ -358,7 +397,10 @@ changes afresh — the way Pulumi is normally run in CI, with the preview there 
 a person to review. A workspace can opt in with `pulumi-bind-plan` (#1553): the
 preview then saves its plan (`--save-plan`), the plan is carried to the update's
 pod, and `pulumi up --plan` refuses any operation the approved preview did not
-show. It is off by default because Pulumi's update plans are still marked
+show. A saved plan carries its secrets sealed under the preview's stack key, so
+the key travels with the plan and the update's stack is made with the same one.
+That leaves a plan's secrets as exposed as a Terraform plan file leaves its
+sensitive values, which it holds in the clear. It is off by default because Pulumi's update plans are still marked
 experimental upstream, and an open bug (pulumi/pulumi#17546) makes them fail
 spuriously when cloud credentials are resolved during the preview — exactly how
 a Terrapod runner gets its credentials. Either way, Terrapod refuses to confirm

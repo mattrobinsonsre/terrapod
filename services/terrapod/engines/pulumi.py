@@ -194,18 +194,13 @@ class PulumiStrategy:
     ) -> TerminalOutcome:
         """What a finished Job means for Pulumi.
 
-        **Pulumi asks about the checkpoint** (#1407 §11), and that is the real
-        divergence from Terraform rather than a rewording of it. Terraform's plan
-        is an artifact the apply consumes, so a succeeded plan Job means "a plan
-        exists to approve". Pulumi's `preview --save-plan` writes a plan file
-        too, but the authoritative record of what happened is the checkpoint the
-        CLI pushes to the service — which arrives over the #1522 surface *during*
-        the run, not at the end of it.
-
-        The consequence: a succeeded Job is the same signal in both engines, but
-        for Pulumi the state is already durable by the time the Job exits,
-        because the checkpoint was written mid-run. There is nothing to collect
-        afterwards, so completion is a state transition and nothing more.
+        The same answer as Terraform's, because the Job has the same shape. An
+        agent-mode Pulumi run keeps its stack in a file backend inside the Job and
+        hands the deployment back through the run's artifacts before it exits
+        (#1576) — as a Terraform apply uploads its state — so by the time a Job
+        succeeds its state is already stored, and completion is a state
+        transition and nothing more. Pulumi never writes checkpoints to Terrapod
+        from an agent run; that surface serves local mode.
 
         A failed or deleted Job errors the run, as for Terraform. Pulumi has no
         equivalent of Ansible's `ignore_errors`, so a non-zero exit means the

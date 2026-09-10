@@ -689,13 +689,19 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         log.warning("git module auth setup skipped", error=str(exc))
 
     # 5. State download — AFTER chdir so terraform.tfstate lands beside
-    # the user's .tf files.
-    state_present = download_state(cfg, strip_dir=cwd)
-    if state_present:
-        log.info("state file present after download")
+    # the user's .tf files. Terraform's alone, like step 6: a Pulumi run fetches
+    # its stack itself, in the shape its CLI imports (#1576). Fetched here, a
+    # Pulumi workspace's state would be the stored deployment with its secrets
+    # still sealed, dropped into the working directory as terraform.tfstate for
+    # nothing to read.
+    is_pulumi = os.environ.get("TP_ENGINE", "") == "pulumi"
+    if not is_pulumi:
+        state_present = download_state(cfg, strip_dir=cwd)
+        if state_present:
+            log.info("state file present after download")
 
     # 6. Apply-phase: try to reuse plan-phase lock file.
-    if cfg.phase == "apply":
+    if cfg.phase == "apply" and not is_pulumi:
         reuse_plan_lock_file(cfg, strip_dir=cwd)
 
     # 7. pre_init execution hooks (#619) — operator-supplied setup steps
@@ -724,8 +730,10 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # tarball, the chdir into the working directory, private-git-module auth, and
     # the operator's `pre_init` hooks — all engine-neutral. What it skips is
     # Terraform's alone: var-file argv, `init`, terragrunt relocation and the
-    # backstop. Pulumi's own state lives in the service surface (#1522), so there
-    # is no state file to place and no backend to neutralise.
+    # backstop. Pulumi's state is handled inside its own phase: a file backend in
+    # this Job, seeded from the stack's deployment and handed back after an
+    # update (#1576), so there is no terraform.tfstate to place and no backend
+    # block to neutralise.
     if os.environ.get("TP_ENGINE", "") == "pulumi":
         return _run_pulumi_phase(cfg, child_grace=_child_grace_seconds(cfg))
 
@@ -801,9 +809,14 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
 def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyped-def]
     """Run one Pulumi phase.
 
-    `preview --save-plan` then `up --plan` — the saved plan is what makes an
-    approved preview and its update the same decision, exactly as Terraform gets
-    from `plan -out` / `apply <file>`.
+    `preview` then `up`, against a file backend in this Job (#1576): the stack's
+    deployment is imported at the start and, after an update, exported and handed
+    back once — the way a Terraform run downloads `terraform.tfstate` and uploads
+    it after apply. Pulumi never uses Terrapod as a live backend from here.
+
+    With the workspace's opt-in (#1553), `preview --save-plan` then `up --plan`
+    makes an approved preview and its update the same decision, exactly as
+    Terraform gets from `plan -out` / `apply <file>`.
 
     Writes to the same per-phase log files the Terraform path uses, so the
     upload/rollup at the end of the run needs no engine-specific handling.
@@ -824,18 +837,20 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     if not bind_plan:
         plan_file = ""
 
-    # The CLI reads its plugin-download override and its backend from the
-    # environment, and `exec_subprocess.run` inherits this process's, so both are
-    # set here rather than passed.
+    # The CLI reads its plugin-download override from the environment, and
+    # `exec_subprocess.run` inherits this process's, so it is set here rather
+    # than passed. The backend is set the same way, by `prepare_local_stack`.
     os.environ.update(pulumi_exec.plugin_override_env(cfg.api_url, cfg.auth_token))
-    os.environ.update(pulumi_exec.backend_env(cfg.api_url))
 
     # Decide what to run before fetching what runs it, so an unrecognised phase
     # costs nothing.
+    keys = None
     if phase in ("preview", "plan"):
+        is_update = False
         argv = pulumi_exec.preview_argv(plan_file, cfg)
         log_file = str(_PLAN_LOG)
     elif phase in ("update", "apply"):
+        is_update = True
         # The preview ran in a *different pod*, so its `--save-plan` file is not
         # on this filesystem. Fetch it back the way the Terraform apply fetches
         # `tfplan`, or `up` fails outright with "open /workspace/plan.json: no
@@ -848,6 +863,15 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
                 "longer constrained to the operations the approved preview showed",
             )
             plan_file = ""
+        if plan_file:
+            # The plan's secrets are sealed under the preview's stack key, which
+            # travels with it; this stack must be made with the same one.
+            keys = pulumi_exec.unbundle_plan(Path(plan_file))
+            if keys is None:
+                log.warning(
+                    "pulumi plan carries no stack key; a plan holding secrets will "
+                    "not open under this run's stack"
+                )
         argv = pulumi_exec.update_argv(plan_file, cfg)
         log_file = str(_APPLY_LOG)
     else:
@@ -869,6 +893,14 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         log.error("could not obtain the pulumi binary", error=str(exc))
         return 1
 
+    try:
+        stack = pulumi_exec.prepare_local_stack(
+            cfg, binary, keys=keys, child_grace=float(child_grace)
+        )
+    except pulumi_exec.LocalStackError as exc:
+        log.error("could not prepare the run's stack", error=str(exc))
+        return 1
+
     log.info("running pulumi", phase=phase, argv=argv)
     result = exec_subprocess.run(
         [binary, *argv],
@@ -883,7 +915,7 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     # here costs the plan-constraint, not the run.
     if (
         result.exit_code == 0
-        and phase in ("preview", "plan")
+        and not is_update
         and not cfg.plan_only
         and cfg.has_api
         and plan_file
@@ -892,11 +924,57 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         try:
             from terrapod.runner.phases import uploads
 
+            pulumi_exec.bundle_plan(Path(plan_file), stack.keys)
             uploads.upload_plan_file(cfg, Path(plan_file))
         except Exception as exc:  # noqa: BLE001
             log.warning("pulumi plan-file upload raised (non-fatal)", err=str(exc))
 
+    if is_update:
+        return _hand_back_pulumi_state(
+            cfg, binary, stack, exit_code=result.exit_code, child_grace=float(child_grace)
+        )
     return result.exit_code
+
+
+def _hand_back_pulumi_state(  # type: ignore[no-untyped-def]
+    cfg, binary: str, stack, *, exit_code: int, child_grace: float
+) -> int:
+    """After an update, export the run's stack and hand it back — once.
+
+    Whether or not the update succeeded, as Terraform's state upload is: a failed
+    `up` can still have created resources, and leaving them out of the stored
+    state would orphan them. An update that left the stack as it found it hands
+    back nothing, so a no-op run adds no state version.
+
+    Failing to export or upload is fatal and flags the workspace state-diverged,
+    exactly as a failed Terraform state upload does: infrastructure may have
+    changed and Terrapod no longer knows how.
+    """
+    import structlog
+
+    from terrapod.runner.phases import pulumi_exec, uploads
+
+    log = structlog.get_logger("runner.job_entrypoint")
+    try:
+        path, after = pulumi_exec.export_local_stack(binary, stack, child_grace=child_grace)
+    except pulumi_exec.LocalStackError as exc:
+        log.error("FATAL: could not read the stack back after the update", error=str(exc))
+        uploads.signal_state_diverged(cfg)
+        return exit_code or 1
+
+    try:
+        if not pulumi_exec.deployment_changed(stack.deployment, after):
+            log.info("the update left the stack unchanged; nothing to hand back")
+            return exit_code
+        if not cfg.has_api:
+            return exit_code
+        if not uploads.upload_pulumi_deployment(cfg, path, base_serial=stack.base_serial):
+            uploads.signal_state_diverged(cfg)
+            return exit_code or 1
+        log.info("pulumi state handed back", serial=stack.base_serial + 1)
+        return exit_code
+    finally:
+        path.unlink(missing_ok=True)
 
 
 def _fetch_pulumi_plan(cfg, plan_file: str) -> bool:  # type: ignore[no-untyped-def]

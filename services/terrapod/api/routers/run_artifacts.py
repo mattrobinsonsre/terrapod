@@ -19,6 +19,8 @@ Endpoints:
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-json-output — upload plan JSON
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/apply-log       — upload apply log
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/state           — upload new state
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/pulumi-deployment — a Pulumi stack, secrets opened
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/pulumi-deployment — a Pulumi stack after an update
 """
 
 import asyncio
@@ -718,6 +720,258 @@ async def _persist_runner_state(
 
     await publish_workspace_event(str(run.workspace_id), "state_version_created")
 
+    return Response(status_code=204)
+
+
+# ── Pulumi deployments (#1576) ───────────────────────────────────────────
+# An agent-mode Pulumi run keeps its stack in a file backend inside the Job, the
+# way a Terraform run keeps terraform.tfstate in its working directory. It never
+# uses Terrapod as a live Pulumi backend: the deployment comes in through the
+# first endpoint below at the start of the run and goes back through the second,
+# once, after an update. Previews write nothing.
+
+#: The serial of the state version a deployment download was read from. The
+#: runner quotes it back on upload, so a state that moved while the run held it
+#: is refused rather than silently overwritten. Mirrored in the runner's
+#: `phases/state.py`, which cannot import this module; a test pins the two.
+PULUMI_STATE_SERIAL_HEADER = "X-Terrapod-State-Serial"
+
+#: The deployment-schema version `pulumi stack import` expects alongside a body.
+_PULUMI_DEPLOYMENT_VERSION = 3
+
+
+async def _pulumi_workspace(run: Run, db: AsyncSession) -> Workspace:
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws is None or ws.engine != "pulumi":
+        raise HTTPException(status_code=404, detail="Not a Pulumi workspace")
+    return ws
+
+
+async def _latest_state_version(db: AsyncSession, workspace_id: uuid.UUID) -> StateVersion | None:
+    return (
+        await db.execute(
+            select(StateVersion)
+            .where(StateVersion.workspace_id == workspace_id)
+            .order_by(StateVersion.serial.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+async def _load_deployment(workspace_id: uuid.UUID, sv: StateVersion) -> dict | None:
+    """The stored deployment behind a state version.
+
+    Storage and parse errors propagate. The service surface's reader treats them
+    as "no state", which is survivable for a CLI that will just report an empty
+    stack; for a runner it would mean previewing against nothing and proposing to
+    create every resource that already exists.
+    """
+    from terrapod.crypto.state import decrypt_state_bytes
+
+    raw = await get_storage().get(state_key(str(workspace_id), str(sv.id)))
+    raw = await decrypt_state_bytes(raw)
+    deployment = await asyncio.to_thread(json.loads, raw)
+    return deployment if isinstance(deployment, dict) else None
+
+
+def _pulumi_service_url(request: Request) -> str:
+    """The canonical address of this deployment's Pulumi service surface."""
+    base = settings.external_url or str(request.base_url)
+    return f"{base.rstrip('/')}/api/v1/pulumi"
+
+
+def _seal_uploaded_deployment(path: str, encrypt, provider: dict) -> tuple[bytes, str, str]:  # type: ignore[no-untyped-def]
+    """Parse an uploaded export and seal it for storage (worker thread).
+
+    Returns the stored payload with its md5 and sha256. Raises ValueError for a
+    body that is not `pulumi stack export` output, and `SealedSecretInUploadError`
+    for one exported without `--show-secrets`.
+    """
+    from terrapod.services.pulumi_state_service import seal_secrets
+
+    with open(path, "rb") as fh:
+        doc = json.load(fh)
+    deployment = doc.get("deployment") if isinstance(doc, dict) else None
+    if not isinstance(deployment, dict):
+        raise ValueError(
+            "expected the output of `pulumi stack export`: an object with a `deployment`"
+        )
+    payload = json.dumps(seal_secrets(deployment, encrypt, provider)).encode()
+    md5 = hashlib.md5(payload).hexdigest()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+    return payload, md5, hashlib.sha256(payload).hexdigest()
+
+
+@router.get("/runs/{run_id}/artifacts/pulumi-deployment")
+async def download_pulumi_deployment(
+    run_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """The run's stack, with its secrets opened, for the runner to import.
+
+    The body is `{"version": 3, "deployment": ...}`, the shape
+    `pulumi stack import` reads, with no `secrets_providers` block: the runner
+    supplies its own. Always 200 — a stack with no state answers
+    `deployment: null` — so "nothing yet" can never be confused with a failed
+    download.
+    """
+    from terrapod.crypto.service import get_encryption
+    from terrapod.services.pulumi_state_service import UnreadableSecretsError, reveal_secrets
+
+    require_runner_for_run(user, run_id)
+    run = await _get_run(run_id, db)
+    ws = await _pulumi_workspace(run, db)
+
+    sv = await _latest_state_version(db, ws.id)
+    deployment = None
+    if sv is not None:
+        stored = await _load_deployment(ws.id, sv)
+        if stored:
+            try:
+                deployment = await asyncio.to_thread(
+                    reveal_secrets, stored, get_encryption().decrypt
+                )
+            except UnreadableSecretsError as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"This stack's secrets are sealed by the '{exc.provider}' secrets "
+                        "provider, which Terrapod holds no key for, so an agent run cannot "
+                        "read them. Move the stack back to Terrapod's own provider with "
+                        "`pulumi stack change-secrets-provider default`, or run it in "
+                        "local mode."
+                    ),
+                ) from None
+
+    body = await asyncio.to_thread(
+        json.dumps, {"version": _PULUMI_DEPLOYMENT_VERSION, "deployment": deployment}
+    )
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={PULUMI_STATE_SERIAL_HEADER: str(sv.serial if sv else 0)},
+    )
+
+
+@router.put("/runs/{run_id}/artifacts/pulumi-deployment")
+async def upload_pulumi_deployment(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Store the stack as an update left it — `pulumi stack export --show-secrets`.
+
+    `base-serial` is the serial the run imported (the download's
+    `X-Terrapod-State-Serial`). The upload becomes the next state version only if
+    that is still the latest, and is refused with 409 if anything else wrote the
+    stack meanwhile: the Terraform upload's divergence check, keyed on the serial
+    Terrapod issued because a Pulumi deployment carries none of its own. A retry
+    of an upload that already landed is answered 200.
+    """
+    from terrapod.crypto.service import get_encryption
+    from terrapod.services import run_service
+    from terrapod.services.pulumi_state_service import (
+        SealedSecretInUploadError,
+        provider_of,
+        service_provider,
+    )
+
+    require_runner_for_run(user, run_id)
+    run = await _get_run(run_id, db)
+    ws = await _pulumi_workspace(run, db)
+    if run.plan_only:
+        raise HTTPException(status_code=409, detail="A plan-only run does not write state")
+    try:
+        base_serial = int(request.query_params.get("base-serial", ""))
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="base-serial is required: the serial of the state the run imported",
+        ) from None
+
+    latest = await _latest_state_version(db, ws.id)
+    latest_serial = latest.serial if latest else 0
+    if latest_serial != base_serial:
+        if latest is not None and latest.run_id == run.id and latest_serial == base_serial + 1:
+            # This run's own upload already landed; the runner is retrying a
+            # response it never saw.
+            return Response(status_code=200)
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"The stack's state moved while this run held it: the run imported serial "
+                f"{base_serial}, and serial {latest_serial} is now current."
+            ),
+        )
+
+    prior = await _load_deployment(ws.id, latest) if latest is not None else None
+    project, _, stack = ws.name.partition("::")
+    provider = service_provider(
+        provider_of(prior), url=_pulumi_service_url(request), project=project, stack=stack
+    )
+
+    tmp_path, _size = await stream_to_tempfile(request, suffix=".pulumi.json")
+    try:
+        try:
+            payload, md5, sha256 = await asyncio.to_thread(
+                _seal_uploaded_deployment, tmp_path, get_encryption().encrypt, provider
+            )
+        except SealedSecretInUploadError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        except (ValueError, UnicodeDecodeError) as exc:
+            # json.JSONDecodeError is a ValueError.
+            raise HTTPException(status_code=400, detail=f"Invalid deployment: {exc}") from None
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
+
+    sv = StateVersion(
+        workspace_id=ws.id,
+        serial=latest_serial + 1,
+        md5=md5,
+        sha256=sha256,
+        state_size=len(payload),
+        run_id=run.id,
+        created_by=run.created_by or None,
+    )
+    db.add(sv)
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409, detail="The stack's state moved while this run held it"
+        ) from None
+
+    from terrapod.crypto.state import encrypt_state_bytes
+
+    await get_storage().put(
+        state_key(str(ws.id), str(sv.id)),
+        await encrypt_state_bytes(payload),
+        content_type="application/octet-stream",
+    )
+
+    if ws.state_diverged:
+        ws.state_diverged = False
+    # Every site that writes a state version owes this call (#647).
+    await run_service.discard_stale_plans_for_state_change(
+        db, ws.id, sv.serial, exclude_run_id=run.id
+    )
+    await db.commit()
+    logger.info(
+        "pulumi_state_version_created_from_runner",
+        run_id=run_id,
+        workspace_id=str(ws.id),
+        state_version_id=str(sv.id),
+        serial=sv.serial,
+    )
+
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "state_version_created")
     return Response(status_code=204)
 
 

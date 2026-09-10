@@ -18,6 +18,8 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
+import pytest
+
 from terrapod.runner import job_entrypoint
 from terrapod.runner.phases.binary import BinaryDownloadError
 
@@ -427,12 +429,53 @@ class TestThePulumiPhase:
                 "terrapod.runner.phases.platform_tool.ensure_tool",
                 return_value="/cache/pulumi",
             ),
+            patch("terrapod.runner.phases.pulumi_exec.prepare_local_stack") as prepare,
             patch("terrapod.runner.exec_subprocess.run") as run,
         ):
             run.return_value.exit_code = 0
             assert job_entrypoint._run_pulumi_phase(cfg, child_grace=5) == 0
 
         assert run.call_args[0][0][0] == "/cache/pulumi"
+        assert prepare.call_args[0][1] == "/cache/pulumi"
+
+    def test_a_stack_that_cannot_be_prepared_stops_the_run(self, monkeypatch) -> None:
+        """Previewing without the stack's state would propose creating
+        everything that already exists."""
+        from terrapod.runner.phases import pulumi_exec
+
+        cfg = self._cfg(monkeypatch)
+        with (
+            patch(
+                "terrapod.runner.phases.platform_tool.ensure_tool",
+                return_value="/cache/pulumi",
+            ),
+            patch(
+                "terrapod.runner.phases.pulumi_exec.prepare_local_stack",
+                side_effect=pulumi_exec.LocalStackError("download failed"),
+            ),
+            patch("terrapod.runner.exec_subprocess.run") as run,
+        ):
+            assert job_entrypoint._run_pulumi_phase(cfg, child_grace=5) == 1
+        run.assert_not_called()
+
+    @pytest.mark.parametrize("phase,hands_back", [("preview", False), ("update", True)])
+    def test_only_an_update_hands_the_stack_back(self, monkeypatch, phase, hands_back) -> None:
+        cfg = self._cfg(monkeypatch)
+        monkeypatch.setenv("TP_PULUMI_PHASE", phase)
+        with (
+            patch(
+                "terrapod.runner.phases.platform_tool.ensure_tool",
+                return_value="/cache/pulumi",
+            ),
+            patch("terrapod.runner.phases.pulumi_exec.prepare_local_stack"),
+            patch("terrapod.runner.exec_subprocess.run") as run,
+            patch.object(job_entrypoint, "_hand_back_pulumi_state", return_value=7) as hand_back,
+        ):
+            run.return_value.exit_code = 0
+            rc = job_entrypoint._run_pulumi_phase(cfg, child_grace=5)
+
+        assert hand_back.called is hands_back
+        assert rc == (7 if hands_back else 0)
 
     def test_it_fails_closed_when_the_binary_cannot_be_fetched(self, monkeypatch) -> None:
         """There is nothing to fall back to, and falling back to the name would
@@ -449,9 +492,11 @@ class TestThePulumiPhase:
 
         run.assert_not_called()
 
-    def test_it_exports_the_backend_and_the_plugin_override(self, monkeypatch) -> None:
-        """Both are read from the environment by the CLI, so the assertion is
-        that they are actually in it by the time the subprocess is spawned."""
+    def test_it_exports_the_plugin_override_and_no_service_backend(self, monkeypatch) -> None:
+        """The CLI reads both from the environment, so the assertion is about
+        what is actually in it when the subprocess is spawned. The backend is set
+        by `prepare_local_stack` to a directory in the Job (#1576); nothing here
+        may point it at Terrapod."""
         cfg = self._cfg(monkeypatch)
         monkeypatch.delenv("PULUMI_BACKEND_URL", raising=False)
         monkeypatch.delenv("PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES", raising=False)
@@ -462,13 +507,14 @@ class TestThePulumiPhase:
                 "terrapod.runner.phases.platform_tool.ensure_tool",
                 return_value="/cache/pulumi",
             ),
+            patch("terrapod.runner.phases.pulumi_exec.prepare_local_stack"),
             patch("terrapod.runner.exec_subprocess.run") as run,
         ):
             run.side_effect = lambda *a, **k: seen.update(os.environ) or run.return_value
             run.return_value.exit_code = 0
             job_entrypoint._run_pulumi_phase(cfg, child_grace=5)
 
-        assert seen["PULUMI_BACKEND_URL"].endswith("/api/terrapod/v1/pulumi")
+        assert "PULUMI_BACKEND_URL" not in seen
         assert seen["PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES"].startswith(".*=")
 
     def test_an_unknown_phase_is_refused_without_fetching_anything(self, monkeypatch) -> None:
