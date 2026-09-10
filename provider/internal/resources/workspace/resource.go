@@ -258,6 +258,19 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Optional:    true,
 				Computed:    true,
 			},
+			// Optional+Computed with no default, like auto_apply: a config that
+			// never mentions it inherits the server value (false) and never drifts.
+			"pulumi_bind_plan": schema.BoolAttribute{
+				Description: "Pulumi workspaces only: bind the update to the approved preview " +
+					"(`preview --save-plan` then `up --plan`). Off by default, which runs a plain " +
+					"`pulumi up`. Rests on Pulumi update plans, still experimental upstream. " +
+					"Setting it true on any other engine is rejected.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"execution_backend": schema.StringAttribute{
 				Description: "Execution backend: terraform or tofu.",
 				Optional:    true,
@@ -832,6 +845,10 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.Engine.IsNull() && !m.Engine.IsUnknown() {
 		req.Engine = m.Engine.ValueString()
 	}
+	if !m.PulumiBindPlan.IsNull() && !m.PulumiBindPlan.IsUnknown() {
+		v := m.PulumiBindPlan.ValueBool()
+		req.PulumiBindPlan = &v
+	}
 	if !m.ExecutionMode.IsNull() && !m.ExecutionMode.IsUnknown() {
 		req.ExecutionMode = m.ExecutionMode.ValueString()
 	}
@@ -972,6 +989,10 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 
 	if !m.Name.IsNull() && !m.Name.IsUnknown() {
 		req.Name = m.Name.ValueString()
+	}
+	if !m.PulumiBindPlan.IsNull() && !m.PulumiBindPlan.IsUnknown() {
+		v := m.PulumiBindPlan.ValueBool()
+		req.PulumiBindPlan = &v
 	}
 	if !m.ExecutionMode.IsNull() && !m.ExecutionMode.IsUnknown() {
 		req.ExecutionMode = m.ExecutionMode.ValueString()
@@ -1117,6 +1138,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.AutoApplyMode = types.StringValue(ws.AutoApplyMode)
 	m.ExecutionBackend = types.StringValue(ws.ExecutionBackend)
 	m.Engine = types.StringValue(ws.Engine)
+	m.PulumiBindPlan = types.BoolValue(ws.PulumiBindPlan)
 	m.WorkingDirectory = types.StringValue(ws.WorkingDirectory)
 	m.ResourceCPU = types.StringValue(ws.ResourceCPU)
 	m.Parallelism = types.Int64Value(ws.Parallelism)
