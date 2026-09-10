@@ -119,9 +119,23 @@ def _plan_summary_attr(run: Run) -> dict[str, int] | None:
     }
 
 
+async def _engine_of(run: Run, db: AsyncSession) -> str:
+    """The engine a run executes with, which is always its workspace's (#1536).
+
+    For handlers that have not loaded the workspace themselves. `db.get` is
+    served from the session's identity map when an RBAC check already did, so
+    this is usually no query at all.
+    """
+    ws = await db.get(Workspace, run.workspace_id)
+    return ws.engine
+
+
 def _run_json(
     run: Run,
     *,
+    # Required, with no default (#1536): a run has no engine of its own, and a
+    # default is how a Pulumi run came to be reported as a Terraform one (#1523).
+    engine: str,
     workspace_name: str = "",
     workspace_has_vcs: bool = False,
     state_version_id: str | None = None,
@@ -152,8 +166,9 @@ def _run_json(
                 "execution-backend": run.execution_backend,
                 # Which engine, not which binary (#1407). The UI resolves phase
                 # vocabulary from this — a run is `planning` internally whatever
-                # engine it is, but what a person is shown differs.
-                "engine": run.engine,
+                # engine it is, but what a person is shown differs. Derived from
+                # the workspace and passed in; runs store no copy (#1536).
+                "engine": engine,
                 "terraform-version": run.terraform_version,
                 "terragrunt-enabled": run.terragrunt_enabled,
                 "terragrunt-version": run.terragrunt_version,
@@ -546,6 +561,7 @@ async def create_run(
     return JSONResponse(
         content=_run_json(
             run,
+            engine=ws.engine,
             workspace_name=ws.name,
             workspace_has_vcs=ws.vcs_connection_id is not None,
         ),
@@ -574,6 +590,7 @@ async def show_run(
     return JSONResponse(
         content=_run_json(
             run,
+            engine=ws.engine,
             workspace_name=ws.name if ws else "",
             workspace_has_vcs=bool(ws and ws.vcs_connection_id),
             state_version_id=sv_id,
@@ -614,7 +631,9 @@ async def list_workspace_runs(
     return JSONResponse(
         content={
             "data": [
-                _run_json(r, workspace_name=ws.name, workspace_has_vcs=has_vcs)["data"]
+                _run_json(r, engine=ws.engine, workspace_name=ws.name, workspace_has_vcs=has_vcs)[
+                    "data"
+                ]
                 for r in runs
             ],
             "meta": build_meta(total, page_number, page_size),
@@ -690,7 +709,7 @@ async def confirm_run(
         raise HTTPException(status_code=422, detail=str(e.reason)) from e
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
-    return JSONResponse(content=_run_json(run))
+    return JSONResponse(content=_run_json(run, engine=await _engine_of(run, db)))
 
 
 @router.post("/runs/{run_id}/actions/discard")
@@ -707,7 +726,7 @@ async def discard_run(
         await db.commit()
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
-    return JSONResponse(content=_run_json(run))
+    return JSONResponse(content=_run_json(run, engine=await _engine_of(run, db)))
 
 
 @router.post("/runs/{run_id}/actions/cancel")
@@ -724,7 +743,7 @@ async def cancel_run(
         await db.commit()
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
-    return JSONResponse(content=_run_json(run))
+    return JSONResponse(content=_run_json(run, engine=await _engine_of(run, db)))
 
 
 @extensions_router.post("/runs/{run_id}/actions/retry")
@@ -810,7 +829,7 @@ async def retry_run(
     new_run = await run_service.queue_run(db, new_run)
     await db.commit()
 
-    return JSONResponse(content=_run_json(new_run), status_code=201)
+    return JSONResponse(content=_run_json(new_run, engine=ws.engine), status_code=201)
 
 
 # ── Phase Status Mapping ─────────────────────────────────────────────────
@@ -2108,13 +2127,13 @@ async def next_run(
 
     await db.commit()
 
-    run_data = _run_json(run)
+    run_data = _run_json(run, engine=ws.engine)
     # Which engine this run belongs to (#1407 phase 1). Sent on the runner wire
     # only, not on the public run serializer: nothing outside the listener has a
     # use for it yet, and adding it here keeps the attribute contract still.
     # A listener too old to read it is unaffected — it ignores unknown keys, and
     # its absence resolves to terraform on the far side.
-    run_data["data"]["attributes"]["engine"] = run.engine
+    run_data["data"]["attributes"]["engine"] = ws.engine
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
     run_data["data"]["attributes"]["execution-hooks"] = execution_hooks
@@ -2140,7 +2159,7 @@ async def next_run(
     # the Terraform wire is byte-identical.
     from terrapod.api.routers.pulumi_service import DEFAULT_ORG, PULUMI_ENGINE
 
-    if run.engine == PULUMI_ENGINE and ws is not None and "::" in ws.name:
+    if ws is not None and ws.engine == PULUMI_ENGINE and "::" in ws.name:
         project, _, stack = ws.name.partition("::")
         run_data["data"]["attributes"]["pulumi-stack"] = f"{DEFAULT_ORG}/{project}/{stack}"
 
@@ -2247,7 +2266,7 @@ async def update_run_status(
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
 
-    return JSONResponse(content=_run_json(run))
+    return JSONResponse(content=_run_json(run, engine=await _engine_of(run, db)))
 
 
 # ── Runner Token ──────────────────────────────────────────────────────

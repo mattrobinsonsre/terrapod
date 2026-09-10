@@ -1938,14 +1938,10 @@ class Run(Base):
     )
 
     workspace: Mapped[Workspace] = relationship(back_populates="runs")
-    #: Which IaC engine this belongs to (#1407). NOT `execution_backend`, which
-    #: picks the *binary* within the Terraform family (tofu vs terraform); this
-    #: names the family itself. A server default means every pre-existing row is
-    #: correct with no backfill, and an older replica mid-rollout never reads a
-    #: value it cannot interpret.
-    engine: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="terraform", server_default="terraform"
-    )
+    # No `engine` column, deliberately (#1536): a run's engine is its workspace's.
+    # Engine is identity and never changes, so unlike resource_cpu there is
+    # nothing to snapshot — join to the workspace, or take it from one already
+    # loaded. `workspaces.engine` is the only place the fact is stored.
 
     __table_args__ = (
         Index("ix_runs_workspace_id", "workspace_id"),

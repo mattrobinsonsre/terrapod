@@ -118,6 +118,12 @@ def _engine_filter(model):
     name was free and then hit an IntegrityError — turning a clean 422 into a 500.
     The introspection test knows about that exception by name.
     """
+    if model is Run:
+        # Runs store no engine (#1536); a run's is its workspace's. Every call
+        # site already reaches runs through engine-filtered workspaces, so this
+        # is defence in depth, kept because handing a non-Terraform row to a
+        # `terraform` client is a silent wrong answer.
+        return Run.workspace_id.in_(select(Workspace.id).where(Workspace.engine == TERRAFORM))
     return model.engine == TERRAFORM
 
 

@@ -205,17 +205,21 @@ async def reconcile_runs() -> None:
         # check_job_status reports "deleted") and then resolves the
         # canceling run to applied/canceled/errored based on whether a
         # state-version was actually uploaded.
+        # The engine comes from the workspace (#1536) — runs store no copy.
+        # One join per cycle, not a lookup per in-flight run.
         result = await db.execute(
-            select(Run).where(Run.status.in_(["planning", "applying", "canceling"]))
+            select(Run, Workspace.engine)
+            .join(Workspace, Workspace.id == Run.workspace_id)
+            .where(Run.status.in_(["planning", "applying", "canceling"]))
         )
-        runs = list(result.scalars().all())
+        runs = list(result.all())
 
         if not runs:
             return
 
-        for run in runs:
+        for run, engine in runs:
             try:
-                await _reconcile_one(db, run)
+                await _reconcile_one(db, run, engine)
             except Exception as e:
                 logger.error(
                     "Failed to reconcile run",
@@ -226,7 +230,7 @@ async def reconcile_runs() -> None:
         await db.commit()
 
 
-async def _reconcile_one(db: AsyncSession, run: Run) -> None:
+async def _reconcile_one(db: AsyncSession, run: Run, engine: str) -> None:
     """Reconcile a single run."""
     from terrapod.redis.client import get_job_status_from_redis, publish_listener_event
 
@@ -304,7 +308,7 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
     # (#1407 phase 3). The strategy decides from plain values; the database work
     # of acting on that decision stays here, which is what keeps the engine
     # package free of the DB layer the listener image does not ship.
-    outcome = strategy_for(run.engine).resolve_terminal(
+    outcome = strategy_for(engine).resolve_terminal(
         run_status=run.status, run_source=run.source, job_status=status
     )
     if outcome.action in ("complete_plan", "complete_apply", "discovery_succeeded"):

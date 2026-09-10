@@ -1,14 +1,15 @@
-"""Where the `engine` discriminator lives, and where it must not (#1536).
+"""The `engine` discriminator lives on workspaces and nowhere else (#1536).
 
 Migration 697c42296453 first put `engine` on three tables for symmetry —
-workspaces, configuration_versions and runs — and nothing ever read the
-configuration-version copy. A configuration version is reachable only through
-its workspace, which carries the engine, and engine is identity (replace-forcing,
-never edited), so there is no mid-flight change a copy would snapshot against.
+workspaces, configuration_versions and runs. The configuration-version copy was
+never read; the run's copy was read, but only because it was there, and it is
+how #1523 happened: it defaulted to terraform and sent a Pulumi workspace's runs
+down the Terraform path, reporting success.
 
-Pinned because the symmetry argument is attractive and will be made again. The
-only copy that earns its place is the run's: the reconciler holds a Run and no
-Workspace, every few seconds, over every in-flight run.
+Engine is identity — replace-forcing, never edited — so there is nothing to
+snapshot. One row owns the fact and everything else joins to it. Pinned because
+"store a copy next to where it is read" is attractive and will be proposed
+again.
 """
 
 from __future__ import annotations
@@ -42,20 +43,23 @@ def _migration_tables() -> tuple[str, ...]:
 
 def test_configuration_versions_carry_no_engine() -> None:
     assert "engine" not in ConfigurationVersion.__table__.columns, (
-        "configuration_versions.engine is back. Nothing reads it — read the engine "
-        "from the workspace the configuration version belongs to (#1536)."
+        "configuration_versions.engine is back. Read the engine from the workspace "
+        "the configuration version belongs to (#1536)."
     )
 
 
-def test_the_migration_does_not_add_it_either() -> None:
-    """The model and the migration must agree, or a fresh install grows a column
-    the ORM never maps — invisible until someone inserts without the server default."""
-    assert "configuration_versions" not in _migration_tables()
+def test_runs_carry_no_engine() -> None:
+    assert "engine" not in Run.__table__.columns, (
+        "runs.engine is back. A run's engine is its workspace's: join to it, or take "
+        "it from a workspace already loaded. A stored copy is what caused #1523."
+    )
 
 
-def test_workspaces_and_runs_keep_theirs() -> None:
-    """The other half of the acceptance: this was a removal from one table, not
-    a general retreat from the discriminator."""
+def test_the_workspace_is_the_one_place_it_is_stored() -> None:
     assert "engine" in Workspace.__table__.columns
-    assert "engine" in Run.__table__.columns
-    assert set(_migration_tables()) == {"workspaces", "runs"}
+
+
+def test_the_migration_agrees_with_the_models() -> None:
+    """Or a fresh install grows columns the ORM never maps — invisible until
+    something inserts without the server default."""
+    assert _migration_tables() == ("workspaces",)
