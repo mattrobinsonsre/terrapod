@@ -318,7 +318,7 @@ def prepare_local_stack(
         # were set, and a passphrase made for this Job cannot open them.
         raise LocalStackError(
             f"{config_path.name} holds `secure:` config values. Agent runs cannot "
-            "open them yet; supply those values as workspace variables instead"
+            "open them yet (#1577); supply those values as workspace variables instead"
         )
 
     state_dir = Path(os.environ.get("TP_PULUMI_STATE_DIR", DEFAULT_STATE_DIR))

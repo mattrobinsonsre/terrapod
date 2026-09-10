@@ -1354,8 +1354,14 @@ def create_application() -> FastAPI:
 
     if engine_enabled("pulumi"):
         from terrapod.api.routers.pulumi_service import router as pulumi_router
+        from terrapod.api.routers.run_artifacts import (
+            pulumi_router as pulumi_run_artifacts_router,
+        )
 
         include_terrapod(pulumi_router)
+        # How an agent-mode Pulumi run hands its stack over (#1576) — gated with
+        # the engine, like the surface above, which such a run never uses.
+        include_terrapod(pulumi_run_artifacts_router)
 
     # Audit log query endpoint — Terrapod-specific.
     from terrapod.api.routers.audit import router as audit_router

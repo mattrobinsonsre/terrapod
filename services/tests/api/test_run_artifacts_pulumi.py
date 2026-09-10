@@ -19,6 +19,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.config import settings
 from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.services.pulumi_state_service import SECRET_SIG, SECRET_SIG_KEY
@@ -116,6 +117,8 @@ class _Harness:
 
     def __enter__(self) -> _Harness:
         self._stack = ExitStack()
+        # The routes are mounted only with the Pulumi engine on (#1429).
+        self._stack.enter_context(patch.object(settings.engines.pulumi, "enabled", True))
         for target in (
             patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
             patch("terrapod.api.app.init_redis"),

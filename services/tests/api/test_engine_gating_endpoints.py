@@ -257,6 +257,20 @@ class TestThePackageProxies:
 
         assert [r for r in _app().routes if "package-cache/pulumi" in r.path]
 
+    def test_the_pulumi_run_hand_over_does_not_exist_with_pulumi_off(self) -> None:
+        """#1576's artifact routes serve only Pulumi runs, so they go with the
+        engine — and the Terraform state routes beside them stay."""
+        settings.engines.pulumi.enabled = False
+        paths = [r.path for r in _app().routes]
+
+        assert not [p for p in paths if "pulumi-deployment" in p]
+        assert [p for p in paths if p.endswith("/runs/{run_id}/artifacts/state")]
+
+    def test_the_pulumi_run_hand_over_exists_with_pulumi_on(self) -> None:
+        settings.engines.pulumi.enabled = True
+
+        assert [r for r in _app().routes if "pulumi-deployment" in r.path]
+
     async def test_pulumi_off_silences_go_and_nuget(self) -> None:
         """Both serve Pulumi's Go and C# SDKs, so both go with the engine."""
         settings.engines.pulumi.enabled = False

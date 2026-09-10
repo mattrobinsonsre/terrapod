@@ -364,10 +364,13 @@ What this means for a program:
   `encryptionsalt`, `secretsprovider` and `encryptedkey` lines are removed from
   the Job's working copy (never from your repository), because they name a
   provider the Job's stack does not use.
-- **`secure:` values in that file are not yet supported in agent runs.** They are
-  sealed by the provider the stack used when they were set, and the Job's
-  passphrase cannot open them. A run whose stack file holds any fails early, with
-  a message saying so. Supply those values as workspace variables instead.
+- **`secure:` values in that file are not yet supported in agent runs (#1577).**
+  They are sealed by the provider the stack used when they were set, and the
+  Job's passphrase cannot open them. A run whose stack file holds any fails
+  early, with a message saying so. Supply those values as workspace variables
+  instead.
+- **`StackReference` does not yet work in agent runs (#1578).** It resolves
+  against the Job's own backend, which holds only the run's stack.
 - **A stack whose secrets are sealed by a passphrase or cloud KMS** — one moved
   there with `pulumi stack change-secrets-provider` — cannot be run on an agent,
   because Terrapod holds no key for it. The run fails, saying which provider is

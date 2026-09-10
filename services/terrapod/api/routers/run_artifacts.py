@@ -57,6 +57,9 @@ from terrapod.storage.keys import (
 )
 
 router = APIRouter(tags=["run-artifacts"])
+#: The Pulumi hand-over routes (#1576), mounted only when the Pulumi engine is
+#: on — absent, not present-and-404ing, like every other Pulumi surface (#1429).
+pulumi_router = APIRouter(tags=["run-artifacts"])
 logger = get_logger(__name__)
 
 
@@ -801,7 +804,7 @@ def _seal_uploaded_deployment(path: str, encrypt, provider: dict) -> tuple[bytes
     return payload, md5, hashlib.sha256(payload).hexdigest()
 
 
-@router.get("/runs/{run_id}/artifacts/pulumi-deployment")
+@pulumi_router.get("/runs/{run_id}/artifacts/pulumi-deployment")
 async def download_pulumi_deployment(
     run_id: str,
     user: AuthenticatedUser = Depends(get_current_user),
@@ -853,7 +856,7 @@ async def download_pulumi_deployment(
     )
 
 
-@router.put("/runs/{run_id}/artifacts/pulumi-deployment")
+@pulumi_router.put("/runs/{run_id}/artifacts/pulumi-deployment")
 async def upload_pulumi_deployment(
     run_id: str,
     request: Request,
