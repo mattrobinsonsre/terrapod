@@ -498,9 +498,20 @@ jobs:
             # never runs in CI. All of these are pure-unit (no Postgres/Redis/S3).
             paths: tests/auth tests/meta tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/oci tests/test_logging_config.py tests/test_dependency_pins.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py
             pytest_args: -n auto
-          - name: services-api
+          # services-api is sharded across three runners as well as run under
+          # xdist within each. One job took ~8.5 min (#1555): ~6 min of pytest
+          # on a 4-vCPU runner, which `-n auto` cannot widen, most of it
+          # building the FastAPI app ~1000 times. Split by file on collected
+          # test count, the same way as integration below.
+          - name: services-api-1
             paths: tests/services tests/api
-            pytest_args: -n auto
+            pytest_args: -n auto --shard 1/3
+          - name: services-api-2
+            paths: tests/services tests/api
+            pytest_args: -n auto --shard 2/3
+          - name: services-api-3
+            paths: tests/services tests/api
+            pytest_args: -n auto --shard 3/3
           # Three runner-level shards, balanced on collected test count by
           # `--shard` (services/tests/shard_plan.py). Measured across five CI
           # runs: per-test cost is uniform at 0.58-1.07s — the work is fixture

@@ -66,6 +66,15 @@ def _patched(rec):
 
 
 @pytest.fixture(autouse=True)
+def _no_backoff(monkeypatch):
+    """Retry without waiting. The retry itself is what these tests exercise;
+    the real backoff made each failure-path test sleep for seven seconds."""
+    from terrapod import http_retry
+
+    monkeypatch.setattr(http_retry, "_backoff_seconds", lambda *_a, **_k: 0)
+
+
+@pytest.fixture(autouse=True)
 def _clear_cache():
     reset_token_cache()
     yield
