@@ -723,6 +723,18 @@ async def _persist_runner_state(
 
     await publish_workspace_event(str(run.workspace_id), "state_version_created")
 
+    # Keep the break-glass index current (#1581): an agent-run apply is how most
+    # workspaces' state changes, and this path used to leave the index stale.
+    from terrapod.services import state_index_service
+
+    if ws is not None:
+        await state_index_service.record_latest_state(
+            workspace_name=ws.name,
+            workspace_id=run.workspace_id,
+            state_version_id=sv.id,
+            serial=serial,
+        )
+
     return Response(status_code=204)
 
 
@@ -975,6 +987,12 @@ async def upload_pulumi_deployment(
     from terrapod.redis.client import publish_workspace_event
 
     await publish_workspace_event(str(ws.id), "state_version_created")
+
+    from terrapod.services import state_index_service
+
+    await state_index_service.record_latest_state(
+        workspace_name=ws.name, workspace_id=ws.id, state_version_id=sv.id, serial=sv.serial
+    )
     return Response(status_code=204)
 
 

@@ -219,6 +219,16 @@ async def rollback_state_version(
     await db.commit()
     await db.refresh(new_sv)
 
+    # The break-glass index names every workspace's latest state (#1581).
+    from terrapod.services import state_index_service
+
+    await state_index_service.record_latest_state(
+        workspace_name=ws.name,
+        workspace_id=sv.workspace_id,
+        state_version_id=new_sv.id,
+        serial=new_serial,
+    )
+
     logger.info(
         "state_version_rolled_back",
         workspace=ws.name,
@@ -328,6 +338,13 @@ async def upload_state_manual(
             await asyncio.to_thread(os.unlink, tmp_path)
         except OSError:
             pass
+
+    # The break-glass index names every workspace's latest state (#1581).
+    from terrapod.services import state_index_service
+
+    await state_index_service.record_latest_state(
+        workspace_name=ws.name, workspace_id=ws.id, state_version_id=sv.id, serial=new_serial
+    )
 
     logger.info(
         "state_version_uploaded_manually",

@@ -246,12 +246,19 @@ class TestRollbackStateVersion:
         app, _ = _make_app(user, mock_db)
 
         sv_id = f"sv-{sv.id}"
-        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            resp = await client.post(
-                f"/api/terrapod/v1/state-versions/{sv_id}/actions/rollback", headers=_AUTH
-            )
+        with patch(
+            "terrapod.services.state_index_service.record_latest_state", new_callable=AsyncMock
+        ) as record:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+                resp = await client.post(
+                    f"/api/terrapod/v1/state-versions/{sv_id}/actions/rollback", headers=_AUTH
+                )
 
         assert resp.status_code == 201
+        # A rollback makes a new latest version; the break-glass index follows (#1581).
+        record.assert_awaited_once()
+        assert record.await_args.kwargs["serial"] == 4
+        assert record.await_args.kwargs["workspace_name"] == ws.name
         mock_db.add.assert_called_once()
         mock_storage.put.assert_called_once()
         mock_counter.inc.assert_called_once()
@@ -340,14 +347,21 @@ class TestUploadState:
 
         state_json = json.dumps({"version": 4, "serial": 1, "lineage": "test-lineage"})
         ws_id_str = f"ws-{ws_id}"
-        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            resp = await client.post(
-                f"/api/terrapod/v1/workspaces/{ws_id_str}/state-versions/actions/upload",
-                content=state_json,
-                headers={**_AUTH, "Content-Type": "application/json"},
-            )
+        with patch(
+            "terrapod.services.state_index_service.record_latest_state", new_callable=AsyncMock
+        ) as record:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+                resp = await client.post(
+                    f"/api/terrapod/v1/workspaces/{ws_id_str}/state-versions/actions/upload",
+                    content=state_json,
+                    headers={**_AUTH, "Content-Type": "application/json"},
+                )
 
         assert resp.status_code == 201
+        # The break-glass index names the uploaded version (#1581).
+        record.assert_awaited_once()
+        assert record.await_args.kwargs["serial"] == 6
+        assert record.await_args.kwargs["workspace_id"] == ws.id
         mock_db.add.assert_called_once()
         # Manual state upload streams the body to a PVC tempfile, then
         # `put_stream`s it to storage — never buffers it in RAM (CLAUDE.md #14).

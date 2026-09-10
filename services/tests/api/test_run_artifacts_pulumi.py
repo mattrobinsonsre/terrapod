@@ -114,6 +114,7 @@ class _Harness:
         self.storage.put = AsyncMock()
         self.discard = AsyncMock()
         self.publish = AsyncMock()
+        self.record = AsyncMock()
 
     def __enter__(self) -> _Harness:
         self._stack = ExitStack()
@@ -131,6 +132,7 @@ class _Harness:
                 "terrapod.services.run_service.discard_stale_plans_for_state_change", self.discard
             ),
             patch("terrapod.redis.client.publish_workspace_event", self.publish),
+            patch("terrapod.services.state_index_service.record_latest_state", self.record),
         ):
             self._stack.enter_context(target)
         app = create_app()
@@ -218,6 +220,10 @@ class TestUpload:
         assert stored["secrets_providers"] == STORED["secrets_providers"]
         h.discard.assert_awaited_once()
         h.publish.assert_awaited_once()
+        # The break-glass index names the new version (#1581).
+        h.record.assert_awaited_once()
+        assert h.record.await_args.kwargs["serial"] == 5
+        assert h.record.await_args.kwargs["workspace_name"] == "proj::dev"
 
     async def test_a_first_state_names_this_deployments_service(self) -> None:
         run = _run()
@@ -236,6 +242,7 @@ class TestUpload:
             resp = await h.client.put(h.url("?base-serial=4"), content=_export(x=1))
         assert resp.status_code == 409
         h.storage.put.assert_not_awaited()
+        h.record.assert_not_awaited()
 
     async def test_a_retry_of_a_landed_upload_succeeds(self) -> None:
         run = _run()

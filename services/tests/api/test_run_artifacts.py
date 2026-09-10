@@ -154,14 +154,22 @@ class TestUploadStateDuplicateSerial:
         app = _make_app(_runner_user(run_id), mock_db)
 
         state_json = json.dumps({"version": 4, "serial": 9, "lineage": "abc"})
-        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            resp = await client.put(
-                f"/api/terrapod/v1/runs/{run.id}/artifacts/state",
-                content=state_json,
-                headers={**_AUTH, "Content-Type": "application/json"},
-            )
+        with patch(
+            "terrapod.services.state_index_service.record_latest_state", new_callable=AsyncMock
+        ) as record:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+                resp = await client.put(
+                    f"/api/terrapod/v1/runs/{run.id}/artifacts/state",
+                    content=state_json,
+                    headers={**_AUTH, "Content-Type": "application/json"},
+                )
 
         assert resp.status_code == 204
+        # The break-glass index names the new version (#1581): an agent-run apply
+        # is how most workspaces' state changes, and this path used to skip it.
+        record.assert_awaited_once()
+        assert record.await_args.kwargs["serial"] == 9
+        assert record.await_args.kwargs["workspace_id"] == ws_id
         mock_db.add.assert_called_once()
         # State is streamed from a PVC tempfile into storage (CLAUDE.md #14),
         # never buffered in RAM, so `put_stream` is the call — not `put`.

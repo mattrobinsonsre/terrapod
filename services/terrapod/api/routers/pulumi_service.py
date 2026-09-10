@@ -560,6 +560,13 @@ async def _write_deployment(
     await discard_stale_plans_for_state_change(db, ws.id, serial)
     await db.commit()
 
+    # The break-glass index names every workspace's latest state (#1581).
+    from terrapod.services import state_index_service
+
+    await state_index_service.record_latest_state(
+        workspace_name=ws.name, workspace_id=ws.id, state_version_id=sv.id, serial=serial
+    )
+
 
 @router.get("/api/stacks/{org}/{project}/{stack}/export")
 async def export_stack(
