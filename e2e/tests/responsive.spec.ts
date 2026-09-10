@@ -428,6 +428,54 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('the run log pane reserves no height on touch (#1547, #722)', async ({ page }) => {
+    // #1547 reserves the pane's full height while a phase streams — with a
+    // precise pointer only. On touch the page is the scroll container (#722):
+    // no fixed-height box, no inner scrollbar. This project is a Pixel 7, so
+    // `pointer: coarse`, which is exactly the case the `fine:` gate must exclude.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('resp-log'));
+    const runId = await seedRun(token, wsId);
+    const body = Array.from({ length: 40 }, (_, i) => `plan ${i}  Still reading...`).join('\n') + '\n';
+
+    await page.route(`**/api/v2/runs/${runId}`, async (route: Route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.data.attributes.status = 'planning';
+      await route.fulfill({ response: res, body: JSON.stringify(json) });
+    });
+    await page.route(`**/api/terrapod/v1/runs/${runId}/plan`, (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.api+json',
+        body: JSON.stringify({
+          data: { id: 'p', type: 'plans', attributes: { 'log-read-url': '/__e2e_resp_log', status: 'running' } },
+        }),
+      }));
+    await page.route('**/__e2e_resp_log*', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/plain',
+        body: new URL(route.request().url()).searchParams.get('offset') === '0' ? body : '',
+      }));
+
+    await page.goto(`/workspaces/${wsId}/runs/${runId}?view=plan`);
+    const pre = page.getByTestId('log-pre-plan');
+    await expect(pre).toBeVisible({ timeout: 20_000 });
+
+    const reserved = await page
+      .getByTestId('log-reserve-plan')
+      .evaluate((el) => getComputedStyle(el).minHeight);
+    expect(reserved).toBe('0px');
+    const { overflowY, maxHeight } = await pre.evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { overflowY: s.overflowY, maxHeight: s.maxHeight };
+    });
+    expect(overflowY).toBe('visible');
+    expect(maxHeight).toBe('none');
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('run detail page: native view picker drives navigation at phone width', async ({ page }) => {
     // The run-detail page is the hard mobile surface (#721/#722): the view
     // tabs collapse to a native <select> (no horizontal-scroll strip), the URL

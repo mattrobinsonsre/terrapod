@@ -118,6 +118,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // #1547: the run log pane is full height from first paint while streaming.
+      name: 'log-reserve',
+      testMatch: 'log-reserve.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'impact-graph',
       testMatch: 'impact-graph.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
