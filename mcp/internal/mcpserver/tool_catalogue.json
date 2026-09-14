@@ -1,5 +1,22 @@
 [
   {
+    "name": "terrapod_catalog_item_interface",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "catalog_item_id": {
+          "description": "the service-catalog item's id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "catalog_item_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_deleted_workspace_list",
     "read_only": true,
     "input_schema": {
