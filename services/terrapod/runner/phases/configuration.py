@@ -11,10 +11,12 @@ combination is meaningful:
   2. Extract under work_dir, preserving the user's directory layout.
      `--no-same-owner` equivalent: tarfile defaults to current uid,
      `--no-same-permissions` equivalent: we strip the setuid/setgid
-     bits because the runner Pod runs as a non-root UID. Tar errors
-     for utime/chmod warnings on the "." entry are tolerated — those
-     are cosmetic on non-root and tofu will fail later if extraction
-     actually didn't lay files down.
+     bits because the runner Pod runs as a non-root UID. Per-member
+     utime/chmod failures on non-root are tolerated — they are cosmetic.
+     An archive that cannot be READ is not tolerated: it is downloaded
+     again, and if it is still unreadable the run fails naming the
+     archive (#1600). Carrying on used to surface later as an unrelated-
+     looking error, typically "working directory not found in config".
   3. Write `zzzz_terrapod_backend_override.tf` into the STRIP_DIR (the
      working-directory subpath inside the extracted tree, or the root
      if no working-directory is set). The zzzz prefix sorts last in
@@ -27,6 +29,8 @@ from __future__ import annotations
 
 import stat
 import tarfile
+import time
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -49,6 +53,11 @@ terraform {
   backend "local" {}
 }
 """
+
+
+class ConfigurationArchiveError(RuntimeError):
+    """The run's configuration archive is not a readable tar.gz, even after
+    downloading it again."""
 
 
 @dataclass
@@ -86,6 +95,38 @@ def _safe_extract(tar: tarfile.TarFile, dest: Path) -> None:
             # BusyBox tar tolerated utime/chmod failures on non-root;
             # so do we. tofu will fail later if files are missing.
             logger.debug("tar member extract warning", member=member.name, err=str(exc))
+
+
+def _extract(tarball: Path, dest: Path) -> str | None:
+    """Extract the archive; return why it is unusable, or None on success.
+
+    `_safe_extract` lists every member before extracting any, which reads
+    the whole compressed stream — so a truncated or non-gzip archive fails
+    here before a single file is laid down.
+    """
+    if tarball.stat().st_size == 0:
+        return "the download was empty"
+    try:
+        with tarfile.open(tarball, "r:gz") as tar:
+            _safe_extract(tar, dest)
+    except (tarfile.TarError, EOFError, OSError, zlib.error) as exc:
+        # tarfile.ReadError for "not a gzip file"; EOFError for a gzip
+        # stream cut short; zlib.error for corrupt compressed data.
+        return f"{type(exc).__name__}: {exc}"
+    return None
+
+
+def _describe(tarball: Path) -> str:
+    """Size and leading bytes of a bad archive — enough to tell a truncated
+    gzip (starts 1f 8b) from an error page or JSON stored in its place."""
+    try:
+        size = tarball.stat().st_size
+        with tarball.open("rb") as f:
+            head = f.read(16)
+    except OSError as exc:
+        return f"unreadable ({exc})"
+    printable = "".join(chr(b) if 32 <= b < 127 else "." for b in head)
+    return f"{size} bytes, starting {head.hex(' ')} ({printable})"
 
 
 def _warn_on_user_override(strip_dir: Path) -> None:
@@ -131,6 +172,9 @@ def download_configuration(
     Without API context (degenerate dev invocations) returns
     `downloaded=False` and trusts the operator pre-populated the
     workspace. Matches the bash behaviour at line 524.
+
+    Raises ConfigurationArchiveError when the archive downloads but cannot
+    be read, every time it is downloaded.
     """
     work_dir.mkdir(parents=True, exist_ok=True)
     # `override_dir` is where the local-backend override file goes — it
@@ -164,30 +208,51 @@ def download_configuration(
     tarball = Path("/tmp") / "config.tar.gz"
     headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
 
-    logger.info("downloading configuration tarball", run_id=cfg.run_id)
-    result = download_to_file(
-        f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/config",
-        tarball,
-        headers=headers,
-        api_url=cfg.api_url,
-        retries=cfg.download_retries,
-        retry_delay_seconds=cfg.download_retry_delay_seconds,
-        client=client,
-    )
-
-    if not result.ok or not tarball.exists() or tarball.stat().st_size == 0:
-        logger.warning(
-            "configuration archive download failed — see storage error above",
-            status=result.status,
+    # download_to_file retries transient HTTP failures itself. A download
+    # that succeeds but yields an unreadable archive is retried here: a
+    # fetch cut short is worth another try, and if the stored archive is
+    # itself damaged every attempt fails the same way and we say so.
+    attempts = max(1, cfg.download_retries)
+    for attempt in range(1, attempts + 1):
+        logger.info("downloading configuration tarball", run_id=cfg.run_id, attempt=attempt)
+        result = download_to_file(
+            f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/config",
+            tarball,
+            headers=headers,
+            api_url=cfg.api_url,
+            retries=cfg.download_retries,
+            retry_delay_seconds=cfg.download_retry_delay_seconds,
+            client=client,
         )
-        return ConfigurationResult(downloaded=False, strip_dir=work_dir)
 
-    try:
-        with tarfile.open(tarball, "r:gz") as tar:
-            _safe_extract(tar, work_dir)
-    except tarfile.TarError as exc:
-        # Match bash: tolerate but log. tofu will fail later if needed.
-        logger.warning("tar extract reported a problem", err=str(exc))
+        if not result.ok or not tarball.exists():
+            logger.warning(
+                "configuration archive download failed — see storage error above",
+                status=result.status,
+            )
+            return ConfigurationResult(downloaded=False, strip_dir=work_dir)
+
+        problem = _extract(tarball, work_dir)
+        if problem is None:
+            break
+        detail = f"{problem}; {_describe(tarball)}"
+        if attempt < attempts:
+            logger.warning(
+                "configuration archive is not a readable tar.gz — downloading it again",
+                run_id=cfg.run_id,
+                attempt=attempt,
+                of=attempts,
+                detail=detail,
+            )
+            tarball.unlink(missing_ok=True)
+            time.sleep(cfg.download_retry_delay_seconds)
+            continue
+        raise ConfigurationArchiveError(
+            f"the configuration archive for run {cfg.run_id} is not a readable tar.gz "
+            f"after {attempts} download(s): {detail}. The archive stored for this "
+            "configuration version is damaged, so retrying this run downloads it "
+            "again; queue a new run so a new configuration version is built."
+        )
 
     # Resolve override_dir again in case the configured working_dir
     # appeared during extraction (this is the common case — the tarball

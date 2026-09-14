@@ -515,34 +515,45 @@ async def sparse_archive_to_storage(
     await _init_submodules(clone_dir, norm_paths, auth_header=auth_header, host=host, conn=conn)
 
     # Step 5: tar the working tree (excluding .git) and stream to storage.
+    #
+    # The producer thread writes the gzip tar into a pipe and the upload reads
+    # the other end. A producer that fails part-way ALSO closes its end, so the
+    # end of the pipe on its own says nothing about whether the archive is
+    # whole. Treating it as the end of the archive stored truncated archives
+    # under the commit's cache key, which every later config version for that
+    # commit then inherited (#1600). So the stream waits for the producer at
+    # the end of the pipe and re-raises its failure from inside the stream:
+    # the backend abandons the object instead of completing it. And the upload
+    # is always awaited to the end — never left running after a failure has
+    # already been reported and the partial entry "cleaned up".
     storage = get_storage()
     read_fd, write_fd = os.pipe()
+    # Opened here, not inside the stream, so the read end is closed below even
+    # if the upload fails before it starts reading.
+    reader = os.fdopen(read_fd, "rb")
     bytes_uploaded = 0
+    # The producer owns write_fd from here and closes it on success and on
+    # failure; never close it from this side, where the number may already
+    # have been reused for another file.
+    producer = asyncio.ensure_future(asyncio.to_thread(_producer_thread, write_fd, clone_dir))
 
-    async def _upload() -> int:
+    async def _stream() -> AsyncIterator[bytes]:
         nonlocal bytes_uploaded
+        async for chunk in _consumer_chunks(reader):
+            bytes_uploaded += len(chunk)
+            yield chunk
+        await producer  # the pipe is drained; this raises if the build failed
 
-        async def _counted() -> AsyncIterator[bytes]:
-            nonlocal bytes_uploaded
-            async for chunk in _consumer_chunks(read_fd):
-                bytes_uploaded += len(chunk)
-                yield chunk
-
-        await storage.put_stream(storage_key, _counted(), content_type="application/x-tar")
-        return bytes_uploaded
-
-    producer_task = asyncio.to_thread(_producer_thread, write_fd, clone_dir)
-    upload_task = _upload()
-
+    stream = _stream()
     try:
-        await asyncio.gather(producer_task, upload_task)
+        await storage.put_stream(storage_key, stream, content_type="application/x-tar")
     finally:
-        # Defensive close — usually the producer already closed it via
-        # the os.fdopen context manager.
-        try:
-            os.close(write_fd)
-        except OSError:
-            pass
+        # If the upload failed first, closing the read end gives a producer
+        # still writing a broken pipe instead of a write that blocks forever.
+        # Then wait for it, so no thread outlives this call.
+        await stream.aclose()
+        reader.close()
+        await asyncio.gather(producer, return_exceptions=True)
 
     logger.info(
         "Sparse VCS archive uploaded",
@@ -614,18 +625,16 @@ def _producer_thread(write_fd: int, working_tree: str) -> None:
         raise
 
 
-async def _consumer_chunks(read_fd: int) -> AsyncIterator[bytes]:
+async def _consumer_chunks(reader) -> AsyncIterator[bytes]:  # noqa: ANN001
     """Async-iterate the read end of the pipe in `_CHUNK_SIZE` chunks.
 
-    The fd is wrapped in a buffered file so partial reads are handled
-    by the stdlib. Reads are dispatched to a thread to avoid blocking.
+    `reader` is the read end wrapped in a buffered file (`os.fdopen`), so
+    partial reads are handled by the stdlib. Reads are dispatched to a thread
+    to avoid blocking. The caller owns `reader` and closes it, so the read end
+    is closed even when the stream is abandoned before its first read.
     """
-    f = os.fdopen(read_fd, "rb")
-    try:
-        while True:
-            chunk = await asyncio.to_thread(f.read, _CHUNK_SIZE)
-            if not chunk:
-                return
-            yield chunk
-    finally:
-        f.close()
+    while True:
+        chunk = await asyncio.to_thread(reader.read, _CHUNK_SIZE)
+        if not chunk:
+            return
+        yield chunk

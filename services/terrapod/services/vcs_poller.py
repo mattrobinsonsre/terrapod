@@ -393,12 +393,36 @@ async def _stream_cv_upload_from_cache(
     """Materialise a cached VCS archive and stream-upload it to the workspace CV key.
 
     Uses temp files end-to-end — never holds the tarball in process memory.
+
+    The archive is checked before it is copied (#1600). A damaged one is
+    removed from the cache and the error raised, so this config version is
+    never marked uploaded and the next attempt builds the archive afresh —
+    rather than every run and retry for the commit downloading the same
+    broken bytes.
     """
     storage = get_storage()
     cv_key = config_version_key(str(workspace_id), str(cv_id))
 
     async with materialize_archive(cache_storage_key) as path:
-        from terrapod.services.vcs_archive_cache import _file_chunks
+        from terrapod.services.vcs_archive_cache import (
+            CorruptArchiveError,
+            _file_chunks,
+            verify_archive,
+        )
+
+        try:
+            await asyncio.to_thread(verify_archive, path)
+        except CorruptArchiveError as exc:
+            logger.error(
+                "Cached VCS archive is damaged; removing it so it is rebuilt",
+                cache_key=cache_storage_key,
+                error=str(exc),
+            )
+            try:
+                await storage.delete(cache_storage_key)
+            except Exception:
+                logger.warning("Could not remove the damaged archive", exc_info=True)
+            raise
 
         await storage.put_stream(
             cv_key,

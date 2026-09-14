@@ -452,3 +452,35 @@ async def materialize_archive(storage_key: str):
             await asyncio.to_thread(os.unlink, path)
         except FileNotFoundError:
             pass
+
+
+class CorruptArchiveError(RuntimeError):
+    """A cached VCS archive is not a complete gzip tar."""
+
+
+def verify_archive(path: str) -> None:
+    """Read an archive end to end; raise CorruptArchiveError if it is not a
+    complete gzip tar.
+
+    Walking the members reads every header and decompresses past every file,
+    and draining what follows the last member runs gzip through to its
+    trailer, where the CRC and length are checked — so a stream cut short
+    anywhere fails, not just one cut inside a file. Synchronous: call it via
+    `asyncio.to_thread` (rule 13).
+
+    This is the backstop for #1600. The build that produces an archive no
+    longer stores a partial one, but anything already in the cache predates
+    that, and a config version built from a damaged archive fails every run
+    and every retry.
+    """
+    import tarfile
+    import zlib
+
+    try:
+        with tarfile.open(path, mode="r:gz") as tf:
+            for _member in tf:
+                pass
+            while tf.fileobj.read(1 << 20):
+                pass
+    except (tarfile.TarError, EOFError, OSError, zlib.error) as exc:
+        raise CorruptArchiveError(f"{type(exc).__name__}: {exc}") from exc
