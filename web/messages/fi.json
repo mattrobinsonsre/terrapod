@@ -13,6 +13,7 @@
     "vcsConnections": "VCS-yhteydet",
     "variableSets": "Muuttujajoukot",
     "autodiscovery": "Automaattinen löytäminen",
+    "moduleAutodiscovery": "Moduulien tunnistus",
     "bulkUpdate": "Massapäivitys",
     "executionHooks": "Suorituskoukut",
     "policySets": "Käytäntöjoukot",
@@ -387,7 +388,8 @@
         "select": "Rekisteröi moduuli kohteessa {path}",
         "register": "{count, plural, one {Rekisteröi # moduuli} other {Rekisteröi # moduulia}}",
         "registering": "Rekisteröidään…",
-        "failed": "Haku epäonnistui"
+        "failed": "Haku epäonnistui",
+        "ruleLink": "Luo sääntö, joka rekisteröi uudet moduulit automaattisesti"
       },
       "versionCount": "{count, plural, one {# versio} other {# versiota}}",
       "loadFailed": "Moduulien lataaminen epäonnistui",
@@ -1090,6 +1092,32 @@
       "scanFailed": "Skannaus epäonnistui ({status})",
       "scan": "Skannaus epäonnistui"
     }
+  },
+  "adminModuleAutodiscovery": {
+    "title": "Moduulien automaattinen tunnistus",
+    "description": "Säännöt, jotka etsivät repositorion moduulit – juuren ja mahdolliset alimoduulit – ja rekisteröivät ne yksityiseen rekisteriin.",
+    "empty": "Moduulien tunnistussääntöjä ei vielä ole. Luo sääntö, jotta voit etsiä ja rekisteröidä repositorion moduulit.",
+    "howItWorks": "Säännön tallentaminen ei rekisteröi mitään. Valitse esikatselussa, mitkä repositoriossa jo olevista moduuleista rekisteröidään. Kun sääntö on käytössä, seuratulle haaralle ilmestyvät uudet hakemistot rekisteröidään automaattisesti, ja rekisteröimättä jättämäsi pysyvät rekisteröimättöminä.",
+    "patternHint": "Verrataan tiedostopolkuihin. Vain .tf- ja .tf.json-tiedostot lasketaan; examples-, tests-, fixtures- ja piilohakemistot ohitetaan aina.",
+    "nameTemplate": "Moduulin nimen malli (valinnainen)",
+    "nameTemplateHint": "Paikkamerkit: <repo></repo>, <path></path>, <leaf></leaf> ja <root></root>. Tyhjänä käytetään repositorion moduulinimeä ja sen perään alimoduulin hakemistoa.",
+    "provider": "Provider (valinnainen)",
+    "providerHint": "Jätä tyhjäksi, niin se otetaan repositorion nimestä, jos nimi noudattaa käytäntöä terraform-PROVIDER-NAME.",
+    "tagPattern": "Tagien malli",
+    "labels": "Tunnisteet (kopioidaan rekisteröityihin moduuleihin)",
+    "createTitle": "Uusi moduulien tunnistussääntö",
+    "editTitle": "Muokkaa moduulien tunnistussääntöä",
+    "nameTaken": "Nimi on jo toisen moduulin käytössä",
+    "needsProvider": "Repositorion nimestä ei saatu provideria",
+    "registerAll": "Rekisteröi kaikki",
+    "saveToRegister": "Tallenna sääntö, jotta voit rekisteröidä nämä moduulit.",
+    "scanResult": "{count, plural, one {Rekisteröitiin # moduuli.} other {Rekisteröitiin # moduulia.}}",
+    "scanSkipped": "{path} ohitettiin: {reason}",
+    "reasonAlreadyRegistered": "jo rekisteröity",
+    "reasonNameTaken": "nimi on jo käytössä",
+    "reasonMissingProvider": "ei provideria",
+    "confirmDelete": "Poistetaanko sääntö {name}? Sen rekisteröimät moduulit pysyvät rekisteröityinä.",
+    "loadFailed": "Moduulien tunnistussääntöjen lataaminen epäonnistui"
   },
   "adminBulkUpdate": {
     "title": "Massapäivitys",

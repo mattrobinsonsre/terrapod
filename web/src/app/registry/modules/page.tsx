@@ -34,19 +34,24 @@ interface Module {
   }
 }
 
-// A scan of one repository (#1584): proposals, nothing registered.
+// A one-off scan of one repository (#1584), through the unsaved-rule preview of
+// module autodiscovery: proposals, nothing registered.
 interface DiscoveryCandidate {
   subdirectory: string
-  'suggested-name': string
-  'suggested-provider': string
+  name: string
+  provider: string
   'registered-as': { name: string; provider: string } | null
+  collision: boolean
+  'missing-provider': boolean
 }
 
 interface Discovery {
-  'vcs-repo-url': string
-  'vcs-branch': string
+  repoUrl: string
   candidates: DiscoveryCandidate[]
 }
+
+// Every Terraform file in the repository; the preview narrows to module files.
+const DISCOVERY_PATTERN = '**/*.tf*'
 
 interface DiscoveryPick {
   selected: boolean
@@ -59,6 +64,7 @@ const DISCOVERY_INPUT = 'w-full px-3 py-2 border border-slate-600 rounded-lg bg-
 export default function ModulesPage() {
   const router = useRouter()
   const t = useTranslations('registry')
+  const tRule = useTranslations('adminModuleAutodiscovery')
   const [modules, setModules] = useState<Module[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -165,22 +171,25 @@ export default function ModulesPage() {
     setDiscScanning(true)
     setError('')
     try {
-      const attributes: Record<string, string> = {
+      const repoUrl = discRepoUrl.trim()
+      const attributes = {
+        name: 'discover',
         'vcs-connection-id': discConnectionId,
-        'vcs-repo-url': discRepoUrl.trim(),
+        'repo-url': repoUrl,
+        branch: discBranch.trim(),
+        pattern: DISCOVERY_PATTERN,
       }
-      if (discBranch.trim()) attributes['vcs-branch'] = discBranch.trim()
-      const res = await apiFetch('/api/terrapod/v1/registry-modules/discover', {
+      const res = await apiFetch('/api/terrapod/v1/module-autodiscovery-rules/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
-        body: JSON.stringify({ data: { type: 'registry-module-discoveries', attributes } }),
+        body: JSON.stringify({ data: { type: 'module-autodiscovery-rules', attributes } }),
       })
       if (!res.ok) throw new Error(await parseApiError(res, t('modules.discover.failed')))
       const data = await res.json()
-      const result: Discovery = data.data.attributes
+      const result: Discovery = { repoUrl, candidates: data.data.attributes.entries ?? [] }
       const picks: Record<string, DiscoveryPick> = {}
       for (const c of result.candidates) {
-        picks[c.subdirectory] = { selected: false, name: c['suggested-name'], provider: c['suggested-provider'] }
+        picks[c.subdirectory] = { selected: false, name: c.name, provider: c.provider }
       }
       setDiscResult(result)
       setDiscPicks(picks)
@@ -205,7 +214,7 @@ export default function ModulesPage() {
         name: pick.name.trim(),
         provider: pick.provider.trim(),
         'vcs-connection-id': discConnectionId,
-        'vcs-repo-url': discResult['vcs-repo-url'],
+        'vcs-repo-url': discResult.repoUrl,
         'vcs-branch': discBranch.trim(),
         'vcs-tag-pattern': 'v*',
       }
@@ -325,6 +334,12 @@ export default function ModulesPage() {
             <div>
               <h2 id="discover-title" className="text-sm font-semibold text-slate-200">{t('modules.discover.title')}</h2>
               <p className="mt-1 text-xs text-slate-400">{t('modules.discover.intro')}</p>
+              <Link
+                href="/admin/module-autodiscovery"
+                className="mt-2 inline-flex items-center min-h-11 text-sm text-brand-400 hover:text-brand-300 underline underline-offset-2"
+              >
+                {t('modules.discover.ruleLink')}
+              </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -406,6 +421,12 @@ export default function ModulesPage() {
                           </p>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ms-8">
+                            {c.collision && pick?.name === c.name && (
+                              <p className="sm:col-span-2 text-xs text-amber-300">{tRule('nameTaken')}</p>
+                            )}
+                            {c['missing-provider'] && !pick?.provider.trim() && (
+                              <p className="sm:col-span-2 text-xs text-amber-300">{tRule('needsProvider')}</p>
+                            )}
                             <div>
                               <label htmlFor={`disc-name-${c.subdirectory}`} className="block text-xs text-slate-400 mb-1">{t('modules.form.name')}</label>
                               <input

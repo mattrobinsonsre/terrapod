@@ -73,6 +73,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      name: 'module-autodiscovery',
+      testMatch: 'module-autodiscovery.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'tokens',
       testMatch: 'tokens.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

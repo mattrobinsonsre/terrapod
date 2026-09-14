@@ -45,31 +45,35 @@ test.describe('Registry — Modules', () => {
           },
         }),
     );
+    // The panel scans through an unsaved module autodiscovery rule's preview.
     let scanned: Record<string, unknown> | null = null;
     await page.route(
-      (url) => url.pathname === '/api/terrapod/v1/registry-modules/discover',
+      (url) => url.pathname === '/api/terrapod/v1/module-autodiscovery-rules/preview',
       async (route) => {
         scanned = route.request().postDataJSON().data.attributes;
         await route.fulfill({
           json: {
             data: {
-              id: 'discovery-e2e',
-              type: 'registry-module-discoveries',
+              type: 'module-autodiscovery-rule-previews',
               attributes: {
-                'vcs-repo-url': repo,
-                'vcs-branch': 'main',
-                candidates: [
+                ref: 'main',
+                'files-walked': 3,
+                entries: [
                   {
                     subdirectory: '',
-                    'suggested-name': 'mg',
-                    'suggested-provider': 'azurerm',
+                    name: 'mg',
+                    provider: 'azurerm',
                     'registered-as': { name: 'mg', provider: 'azurerm' },
+                    collision: false,
+                    'missing-provider': false,
                   },
                   {
                     subdirectory: 'modules/create',
-                    'suggested-name': 'mg-create',
-                    'suggested-provider': 'azurerm',
+                    name: 'mg-create',
+                    provider: 'azurerm',
                     'registered-as': null,
+                    collision: false,
+                    'missing-provider': false,
                   },
                 ],
               },
@@ -106,7 +110,7 @@ test.describe('Registry — Modules', () => {
 
     await expect(page.getByText('Already registered as mg/azurerm')).toBeVisible();
     await expect(page.getByRole('checkbox', { name: 'Register the module in (repository root)' })).toBeDisabled();
-    expect(scanned).toMatchObject({ 'vcs-connection-id': 'vcs-e2e', 'vcs-repo-url': repo });
+    expect(scanned).toMatchObject({ 'vcs-connection-id': 'vcs-e2e', 'repo-url': repo });
 
     await page.getByRole('checkbox', { name: 'Register the module in modules/create' }).check();
     const row = page.locator('li', { hasText: 'modules/create' });

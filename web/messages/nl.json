@@ -13,6 +13,7 @@
     "vcsConnections": "VCS-verbindingen",
     "variableSets": "Variabelensets",
     "autodiscovery": "Autodetectie",
+    "moduleAutodiscovery": "Moduledetectie",
     "bulkUpdate": "Bulkupdate",
     "executionHooks": "Uitvoerings-hooks",
     "policySets": "Beleidssets",
@@ -387,7 +388,8 @@
         "select": "De module in {path} registreren",
         "register": "{count, plural, one {# module registreren} other {# modules registreren}}",
         "registering": "Bezig met registreren…",
-        "failed": "Doorzoeken mislukt"
+        "failed": "Doorzoeken mislukt",
+        "ruleLink": "Maak een regel om nieuwe modules automatisch te registreren"
       },
       "versionCount": "{count, plural, one {# versie} other {# versies}}",
       "loadFailed": "Kan modules niet laden",
@@ -1090,6 +1092,32 @@
       "scanFailed": "Scan mislukt ({status})",
       "scan": "Scan mislukt"
     }
+  },
+  "adminModuleAutodiscovery": {
+    "title": "Moduledetectie",
+    "description": "Regels die de modules in een repository vinden — de hoofdmap en eventuele submodules — en ze in het privéregister registreren.",
+    "empty": "Nog geen regels voor moduledetectie. Maak er een om de modules in een repository te vinden en te registreren.",
+    "howItWorks": "Een regel opslaan registreert niets. Kies met Voorbeeld welke modules die al in de repository staan u wilt registreren. Zolang de regel is ingeschakeld, worden nieuwe mappen op de gevolgde branch automatisch geregistreerd, en mappen die u niet koos blijven ongeregistreerd.",
+    "patternHint": "Wordt vergeleken met bestandspaden. Alleen .tf- en .tf.json-bestanden tellen mee; examples, tests, fixtures en verborgen mappen worden altijd overgeslagen.",
+    "nameTemplate": "Sjabloon voor de modulenaam (optioneel)",
+    "nameTemplateHint": "Plaatshouders: <repo></repo>, <path></path>, <leaf></leaf> en <root></root>. Leeg betekent de modulenaam van de repository gevolgd door de map van de submodule.",
+    "provider": "Provider (optioneel)",
+    "providerHint": "Laat leeg om hem uit de repositorynaam te halen, als die de conventie terraform-PROVIDER-NAME volgt.",
+    "tagPattern": "Tagpatroon",
+    "labels": "Labels (worden naar geregistreerde modules gekopieerd)",
+    "createTitle": "Nieuwe regel voor moduledetectie",
+    "editTitle": "Regel voor moduledetectie bewerken",
+    "nameTaken": "Naam al in gebruik door een andere module",
+    "needsProvider": "Uit de repositorynaam kon geen provider worden afgeleid",
+    "registerAll": "Alles registreren",
+    "saveToRegister": "Sla de regel op om deze modules te registreren.",
+    "scanResult": "{count, plural, one {# module geregistreerd.} other {# modules geregistreerd.}}",
+    "scanSkipped": "{path} overgeslagen: {reason}",
+    "reasonAlreadyRegistered": "al geregistreerd",
+    "reasonNameTaken": "naam al in gebruik",
+    "reasonMissingProvider": "geen provider",
+    "confirmDelete": "Regel {name} verwijderen? De modules die ze registreerde blijven geregistreerd.",
+    "loadFailed": "Regels voor moduledetectie konden niet worden geladen"
   },
   "adminBulkUpdate": {
     "title": "Bulkupdate",

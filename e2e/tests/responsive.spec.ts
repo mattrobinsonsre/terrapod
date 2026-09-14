@@ -749,22 +749,23 @@ test.describe('Responsive harness (phone viewport)', () => {
         }),
     );
     await page.route(
-      (url) => url.pathname === '/api/terrapod/v1/registry-modules/discover',
+      (url) => url.pathname === '/api/terrapod/v1/module-autodiscovery-rules/preview',
       (route) =>
         route.fulfill({
           json: {
             data: {
-              id: 'discovery-e2e',
-              type: 'registry-module-discoveries',
+              type: 'module-autodiscovery-rule-previews',
               attributes: {
-                'vcs-repo-url': 'https://github.com/e2e-org/terraform-aws-network',
-                'vcs-branch': 'main',
-                candidates: [
+                ref: 'main',
+                'files-walked': 2,
+                entries: [
                   {
                     subdirectory: 'modules/a-rather-long-directory-name/that-has-to-wrap-on-a-phone',
-                    'suggested-name': 'network-that-has-to-wrap-on-a-phone',
-                    'suggested-provider': 'aws',
+                    name: 'network-that-has-to-wrap-on-a-phone',
+                    provider: 'aws',
                     'registered-as': null,
+                    collision: false,
+                    'missing-provider': false,
                   },
                 ],
               },
