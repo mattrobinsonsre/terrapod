@@ -626,6 +626,12 @@ class RegistryModule(Base):
         nullable=True,
     )
     vcs_repo_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    #: Path of the module within its repository — the `//subdir` of a
+    #: Terraform/OpenTofu source (#1583). Empty for a module at the repository
+    #: root, which every module was before this existed.
+    subdirectory: Mapped[str] = mapped_column(
+        String(500), nullable=False, default="", server_default=""
+    )
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     vcs_tag_pattern: Mapped[str] = mapped_column(String(255), nullable=False, default="v*")
     vcs_last_tag: Mapped[str] = mapped_column(String(255), nullable=False, default="")
@@ -647,6 +653,15 @@ class RegistryModule(Base):
 
     __table_args__ = (
         sa.UniqueConstraint("namespace", "name", "provider", name="uq_registry_modules"),
+        # One registration per subdirectory of a repository. Partial, so root
+        # modules (empty subdirectory) are as unconstrained as they always were.
+        Index(
+            "uq_registry_modules_repo_subdirectory",
+            "vcs_repo_url",
+            "subdirectory",
+            unique=True,
+            postgresql_where=sa.text("subdirectory <> ''"),
+        ),
     )
 
 
