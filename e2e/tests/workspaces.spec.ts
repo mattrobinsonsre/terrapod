@@ -176,6 +176,40 @@ test.describe('Workspaces', () => {
     await expect(page.getByRole('combobox', { name: 'Auto Apply' })).toHaveValue('create_update');
   });
 
+  test("a refused settings save shows the API's reason, not a generic failure (#1586)", async ({
+    page,
+  }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-save-detail'));
+    const detail =
+      'Cannot change vcs-workflow while 7 PR run(s) are in flight. Cancel or discard them first.';
+
+    // Refuse the save the way the API does (#282) — the exact body from the
+    // report, both error shapes — without having to put real PR runs in flight.
+    // Only the PATCH is stubbed; the page's reads go through.
+    await page.route(`**/api/v2/workspaces/${wsId}`, (route) =>
+      route.request().method() === 'PATCH'
+        ? route.fulfill({
+            status: 422,
+            contentType: 'application/vnd.api+json',
+            body: JSON.stringify({ errors: [{ status: '422', detail }], detail }),
+          })
+        : route.continue(),
+    );
+
+    await page.goto(`/workspaces/${wsId}`);
+    // Retry the click until the form opens: a click that lands before
+    // hydration is otherwise lost.
+    await expect(async () => {
+      await page.locator('button:has-text("Edit")').first().click();
+      await expect(page.locator('button:has-text("Save")').first()).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await page.locator('button:has-text("Save")').first().click();
+
+    await expect(page.getByText(detail)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Failed to update workspace')).toHaveCount(0);
+  });
+
   test('terragrunt toggle + version persists through settings (#534)', async ({ page }) => {
     // Enabling terragrunt reveals a version input; both must round-trip the
     // workspace PATCH and re-render on reload. Failure modes this catches:

@@ -22,7 +22,7 @@ import { ResourceAccessPanel } from '@/components/resource-access-panel'
 import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch, fetchAllPages } from '@/lib/api'
+import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { VaultValueDisplay } from '@/components/vault-value-display'
 import { VaultReferenceFields } from '@/components/vault-reference-fields'
 import { VariableEditPanel } from '@/components/variable-edit-panel'
@@ -561,7 +561,7 @@ function WorkspaceDetailContent() {
   const loadWorkspace = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`)
-      if (!res.ok) throw new Error(t('errors.loadWorkspace'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.loadWorkspace')))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
@@ -579,7 +579,7 @@ function WorkspaceDetailContent() {
   const loadRuns = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/runs`)
-      if (!res.ok) throw new Error(t('errors.loadRuns'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.loadRuns')))
       const data = await res.json()
       setRuns(data.data || [])
     } catch (err) {
@@ -718,7 +718,7 @@ function WorkspaceDetailContent() {
       const res = await apiFetch(
         `/api/v2/workspaces/${workspaceId}/configuration-versions?page%5Bsize%5D=100`,
       )
-      if (!res.ok) throw new Error(t('errors.loadConfigurations'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.loadConfigurations')))
       const data = await res.json()
       setCvs(data.data || [])
       setCvCurrentId(data.meta?.['current-id'] ?? null)
@@ -1019,7 +1019,7 @@ function WorkspaceDetailContent() {
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'run-tasks', attributes: { enabled: !rt.attributes.enabled } } }),
       })
-      if (!res.ok) throw new Error(t('errors.update'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.update')))
       await loadRunTasks()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.toggleRunTask'))
@@ -1031,7 +1031,7 @@ function WorkspaceDetailContent() {
     if (!confirmDelete(t('runTasks.deleteConfirm', { name: runTasks.find(r => r.id === rtId)?.attributes.name ?? '' }))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/run-tasks/${rtId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(t('errors.delete'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.delete')))
       await loadRunTasks()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.deleteRunTask'))
@@ -1143,7 +1143,7 @@ function WorkspaceDetailContent() {
         setLockoutWarning(detail)
         return
       }
-      if (!res.ok) throw new Error(t('errors.updateWorkspace'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.updateWorkspace')))
       const data = await res.json()
       const wasRenamed = workspace && data.data.attributes.name !== workspace.attributes.name
       setWorkspace(data.data)
@@ -1165,7 +1165,11 @@ function WorkspaceDetailContent() {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/actions/${action}`, {
         method: 'POST',
       })
-      if (!res.ok) throw new Error(action === 'unlock' ? t('errors.unlockWorkspace') : t('errors.lockWorkspace'))
+      if (!res.ok) {
+        throw new Error(
+          await parseApiError(res, action === 'unlock' ? t('errors.unlockWorkspace') : t('errors.lockWorkspace'))
+        )
+      }
       await loadWorkspace()
     } catch (err) {
       setError(err instanceof Error ? err.message : action === 'unlock' ? t('errors.unlockWorkspace') : t('errors.lockWorkspace'))
@@ -1183,8 +1187,7 @@ function WorkspaceDetailContent() {
         body: JSON.stringify({ data: { type: 'workspaces', attributes: patch } }),
       })
       if (!res.ok) {
-        const body = await res.text()
-        throw new Error(body || t('errors.updateAiSummary'))
+        throw new Error(await parseApiError(res, t('errors.updateAiSummary')))
       }
       const data = await res.json()
       setWorkspace(data.data)
@@ -1209,8 +1212,7 @@ function WorkspaceDetailContent() {
         }),
       })
       if (!res.ok) {
-        const body = await res.text()
-        throw new Error(body || t('errors.updateSlackChannel'))
+        throw new Error(await parseApiError(res, t('errors.updateSlackChannel')))
       }
       const data = await res.json()
       setWorkspace(data.data)
@@ -1234,7 +1236,7 @@ function WorkspaceDetailContent() {
           data: { type: 'workspaces', attributes: { 'drift-detection-enabled': newEnabled } },
         }),
       })
-      if (!res.ok) throw new Error(t('errors.updateDriftSettings'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.updateDriftSettings')))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
@@ -1254,7 +1256,7 @@ function WorkspaceDetailContent() {
           data: { type: 'workspaces', attributes: { 'drift-detection-interval-seconds': seconds } },
         }),
       })
-      if (!res.ok) throw new Error(t('errors.updateDriftInterval'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.updateDriftInterval')))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
@@ -1278,7 +1280,7 @@ function WorkspaceDetailContent() {
           },
         }),
       })
-      if (!res.ok) throw new Error(t('errors.updatePlanExpiry'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.updatePlanExpiry')))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
@@ -1350,7 +1352,7 @@ function WorkspaceDetailContent() {
     setDeleting(true)
     try {
       const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(t('errors.deleteWorkspace'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.deleteWorkspace')))
       router.push('/workspaces')
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.deleteWorkspace'))
@@ -1521,7 +1523,7 @@ function WorkspaceDetailContent() {
     if (!confirmDelete(t('variables.deleteConfirm', { key: variables.find(v => v.id === varId)?.attributes.key ?? '' }))) return
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vars/${varId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(t('errors.deleteVariable'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.deleteVariable')))
       await loadVariables()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.deleteVariable'))
@@ -1754,7 +1756,7 @@ function WorkspaceDetailContent() {
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'notification-configurations', attributes: { enabled: !nc.attributes.enabled } } }),
       })
-      if (!res.ok) throw new Error(t('errors.update'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.update')))
       await loadNotifications()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.toggleNotification'))
@@ -1766,7 +1768,7 @@ function WorkspaceDetailContent() {
     if (!confirmDelete(t('notifications.deleteConfirm', { name: notifications.find(n => n.id === ncId)?.attributes.name ?? '' }))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${ncId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(t('errors.delete'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.delete')))
       await loadNotifications()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.deleteNotification'))
@@ -1778,7 +1780,7 @@ function WorkspaceDetailContent() {
     setError('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${ncId}/actions/verify`, { method: 'POST' })
-      if (!res.ok) throw new Error(t('errors.verificationFailed'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.verificationFailed')))
       const data = await res.json()
       const success = data?.data?.attributes?.success
       if (success) {
