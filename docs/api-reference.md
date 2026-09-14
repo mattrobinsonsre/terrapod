@@ -1824,6 +1824,13 @@ DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versi
 
 **Submodules.** Create, `PATCH …/{name}/{provider}` and `PATCH …/{name}/{provider}/vcs` accept an optional `subdirectory`: the path within the module's repository to publish it from, for a submodule (see [Submodules](registry.md#submodules-a-module-in-a-subdirectory)). It needs a `vcs-repo-url`; a path with `..`, `.` or empty segments is refused with `422`, and a repository subdirectory that is already registered with `409`. Modules report it as the `subdirectory` attribute, `""` for a module at the repository root. On `PATCH …/vcs`, omitting it leaves it unchanged; removing the repository clears it.
 
+**Discovery.** `POST /api/terrapod/v1/registry-modules/discover` (platform `admin`) takes a `registry-module-discoveries` document with `vcs-connection-id`, `vcs-repo-url`, and an optional `vcs-branch` (the repository's default branch when omitted). It creates nothing, and returns a document of the same type:
+- `vcs-repo-url`
+- `vcs-branch`: the branch it read.
+- `candidates[]`: each with `subdirectory`, `suggested-name`, `suggested-provider`, and `registered-as` (the `{name, provider}` of the module already registering that subdirectory, or `null`).
+
+It returns `422` for an unknown or malformed connection or a missing repository URL, and `413` for a repository too large to walk. See [Discovering the modules in a repository](registry.md#discovering-the-modules-in-a-repository).
+
 ### Update Module
 
 ```

@@ -251,6 +251,37 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules \
 - **Grouped in the UI.** The module list shows modules that share a repository together, the root module first.
 - The path is repository-relative (`modules/create`); `..`, `.` and empty segments are rejected. Leave it empty for a module at the repository root.
 
+### Discovering the modules in a repository
+
+Instead of working out each path yourself, have Terrapod scan the repository and propose its modules. `POST /api/terrapod/v1/registry-modules/discover` reads the repository through a VCS connection, at `vcs-branch` or the repository's default branch. It returns every directory holding `.tf` or `.tf.json` files, the root first. Directories named `examples`, `test`, `tests`, `testdata` or `fixtures` are skipped, as are hidden ones.
+
+```zsh
+curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules/discover \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{
+    "data": {
+      "type": "registry-module-discoveries",
+      "attributes": {
+        "vcs-connection-id": "<connection-id>",
+        "vcs-repo-url": "https://github.com/my-org/terraform-azurerm-management-groups"
+      }
+    }
+  }'
+```
+
+Each candidate carries these fields:
+- `subdirectory`: `""` for the root.
+- `suggested-name` and `suggested-provider`: taken from the `terraform-<provider>-<name>` repository convention. For the repository above, `modules/create` is proposed as `management-groups-create` for `azurerm`. A repository that doesn't follow the convention gets an empty provider for you to fill in.
+- `registered-as`: the module that already publishes that directory, or `null`.
+
+The scan registers nothing. Register the candidates you want with the create call above, passing each one's `subdirectory`. Discovery requires the platform `admin` role. Three surfaces run it:
+- **Web UI:** **Discover modules** on the module list page scans a repository. You tick the candidates you want, adjust their names and providers, and register them together.
+- **MCP:** the `terrapod_registry_module_discover` tool returns the same candidates.
+- **go-terrapod:** `DiscoverRegistryModules`.
+
+The Terraform provider has no discovery data source. Declare the modules you choose as `terrapod_registry_module` resources.
+
 ### Manual Upload Still Works
 
 Even with VCS connected, you can still upload versions directly via the API or web UI. Manually-uploaded versions will have empty `vcs-commit-sha` and `vcs-tag` fields.

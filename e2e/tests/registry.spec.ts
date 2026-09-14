@@ -26,6 +26,103 @@ test.describe('Registry — Modules', () => {
     await expect(group.getByText('Submodule: modules/create')).toBeVisible();
   });
 
+  test('discover proposes a repository\'s modules and registers the ticked ones with their subdirectory (#1584)', async ({
+    page,
+  }) => {
+    // The e2e stack has no repository to read, so the VCS connection and the
+    // scan are stubbed, and so is the create call: the test asserts what the
+    // page sends for the candidate it registers.
+    const repo = 'https://github.com/e2e-org/terraform-azurerm-mg';
+    await page.route(
+      (url) => url.pathname === '/api/terrapod/v1/vcs-connections',
+      (route) =>
+        route.fulfill({
+          json: {
+            data: [
+              { id: 'vcs-e2e', type: 'vcs-connections', attributes: { name: 'e2e-github', provider: 'github' } },
+            ],
+            meta: { pagination: { 'current-page': 1, 'page-size': 1, 'total-count': 1, 'total-pages': 1 } },
+          },
+        }),
+    );
+    let scanned: Record<string, unknown> | null = null;
+    await page.route(
+      (url) => url.pathname === '/api/terrapod/v1/registry-modules/discover',
+      async (route) => {
+        scanned = route.request().postDataJSON().data.attributes;
+        await route.fulfill({
+          json: {
+            data: {
+              id: 'discovery-e2e',
+              type: 'registry-module-discoveries',
+              attributes: {
+                'vcs-repo-url': repo,
+                'vcs-branch': 'main',
+                candidates: [
+                  {
+                    subdirectory: '',
+                    'suggested-name': 'mg',
+                    'suggested-provider': 'azurerm',
+                    'registered-as': { name: 'mg', provider: 'azurerm' },
+                  },
+                  {
+                    subdirectory: 'modules/create',
+                    'suggested-name': 'mg-create',
+                    'suggested-provider': 'azurerm',
+                    'registered-as': null,
+                  },
+                ],
+              },
+            },
+          },
+        });
+      },
+    );
+    const created: Record<string, unknown>[] = [];
+    await page.route(
+      (url) => url.pathname === '/api/terrapod/v1/registry-modules',
+      async (route) => {
+        if (route.request().method() !== 'POST') return route.fallback();
+        created.push(route.request().postDataJSON().data.attributes);
+        await route.fulfill({
+          status: 201,
+          json: { data: { id: 'mod-e2e', type: 'registry-modules', attributes: {} } },
+        });
+      },
+    );
+
+    await page.goto('/registry/modules');
+    // The toggle is a client component: retry a click lost before hydration,
+    // clicking only while the panel is still closed.
+    const panel = page.getByRole('heading', { name: 'Discover modules in a repository' });
+    await expect(async () => {
+      if (!(await panel.isVisible())) await page.getByRole('button', { name: 'Discover modules' }).click();
+      await expect(panel).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+
+    await page.getByLabel('VCS connection').selectOption('vcs-e2e');
+    await page.getByLabel('Repository URL').fill(repo);
+    await page.getByRole('button', { name: 'Scan repository' }).click();
+
+    await expect(page.getByText('Already registered as mg/azurerm')).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Register the module in (repository root)' })).toBeDisabled();
+    expect(scanned).toMatchObject({ 'vcs-connection-id': 'vcs-e2e', 'vcs-repo-url': repo });
+
+    await page.getByRole('checkbox', { name: 'Register the module in modules/create' }).check();
+    const row = page.locator('li', { hasText: 'modules/create' });
+    await row.getByLabel('Name').fill('mgcreate');
+    await page.getByRole('button', { name: 'Register 1 module' }).click();
+
+    await expect.poll(() => created.length).toBe(1);
+    expect(created[0]).toMatchObject({
+      name: 'mgcreate',
+      provider: 'azurerm',
+      subdirectory: 'modules/create',
+      'vcs-connection-id': 'vcs-e2e',
+      'vcs-repo-url': repo,
+    });
+  });
+
   test('module list page loads', async ({ page }) => {
     await page.goto('/registry/modules');
     await expect(page.locator('h1:has-text("Modules")')).toBeVisible();
