@@ -154,7 +154,7 @@ further — the same method as the four protocol captures before it.
 | POST | `/api/stacks/{stack}/destroy` | begin a destroy |
 | POST | `/api/stacks/{stack}/update/{updateID}` | **start** it; must return a lease token |
 | GET | `/api/stacks/{stack}/update/{updateID}` | poll status (used by `stack import`) |
-| PATCH | `/api/stacks/{stack}/update/{updateID}/checkpoint` | **write state**; gzipped |
+| PATCH | `/api/stacks/{stack}/update/{updateID}/checkpoint` | **write state**; gzipped. Held against the update; the last one becomes its state version (#1564) |
 | POST | `/api/stacks/{stack}/update/{updateID}/events/batch` | engine events; gzipped |
 | POST | `/api/stacks/{stack}/update/{updateID}/complete` | end it — `{"status":"succeeded"}` |
 | POST | `/api/stacks/{stack}/update/{updateID}/renew_lease` | extend the lease |
@@ -214,6 +214,30 @@ update completes or is cancelled with `pulumi cancel`. If the CLI dies instead, 
 lapses after 30 minutes without renewal, and a periodic sweep releases the lock within a
 minute of that. An operator can also clear it with force-unlock, as for any lock a
 crashed CLI leaves behind.
+
+**One state version per update (#1564).** A local update checkpoints the stack many
+times as it runs. Each checkpoint replaces the one before it and is held against the
+update, and the last one becomes a single state version when the update ends:
+- when it completes, whatever its status. A failed update keeps its partial state,
+  because that is the only record of what it created;
+- when it is cancelled with `pulumi cancel`;
+- when its CLI dies, through the same sweep that releases its lock.
+
+An update that changes nothing leaves no version behind. Agent-mode runs have written
+one state version per state-changing update since #1576, so the two modes now match.
+Each version records its size, md5, sha256 and who made it, and the current one cannot
+be deleted, as for Terraform.
+
+**`pulumi stack rm` can be undone.** It goes through the same delete as the UI and API,
+so the stack is listed under deleted workspaces and can be restored with its state
+history. A deployment carries no serial of its own, so a restored stack numbers its
+versions from 1, oldest first.
+
+**Manual upload takes `pulumi stack export` output.** Upload the file as it is to a
+Pulumi workspace (`POST /api/v1/workspaces/{id}/state-versions/actions/upload`). It is
+stored unwrapped and exports back unchanged. An export made with `--show-secrets` is
+refused, because storing it would put the stack's secrets in state in the clear; load
+that one with `pulumi stack import`, which seals them first.
 
 **Runner tokens are refused.** This surface serves the CLI in local mode only. An
 agent-mode run never uses it: its stack lives in a file backend inside the runner Job,

@@ -25,12 +25,11 @@ pytestmark = pytest.mark.asyncio
 WS = uuid.uuid4()
 
 
-def _result(*, first=None, rowcount=None, scalar=None, rows=None) -> MagicMock:
+def _result(*, first=None, scalar=None, scalars=None) -> MagicMock:
     r = MagicMock()
     r.first.return_value = first
-    r.rowcount = rowcount
     r.scalar_one_or_none.return_value = scalar
-    r.all.return_value = rows or []
+    r.scalars.return_value.all.return_value = scalars or []
     return r
 
 
@@ -128,42 +127,60 @@ def _session(db):
 
 
 class TestTheSweep:
-    async def test_an_abandoned_updates_lock_is_released(self) -> None:
-        other = uuid.uuid4()
-        db = _db(
-            _result(rows=[(WS, "pulumi-update:gone"), (other, "pulumi-update:alive")]),
-            _result(scalar=_ws(locked=True, lock_id="pulumi-update:gone")),
-        )
+    PROMOTE = "terrapod.services.pulumi_checkpoint_service.promote_checkpoint"
+
+    def _redis(self, *alive: str) -> AsyncMock:
         redis = AsyncMock()
-        redis.exists.side_effect = lambda key: key.endswith(":alive")
+        redis.exists.side_effect = lambda key: any(key.endswith(f":{a}") for a in alive)
         redis.get.return_value = b"gone"
+        return redis
+
+    async def _sweep(self, db, redis, promote) -> int:
         with (
             patch("terrapod.db.session.get_db_session", _session(db)),
             patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(self.PROMOTE, promote),
         ):
-            assert await locks.sweep_abandoned_updates() == 1
+            return await locks.sweep_abandoned_updates()
+
+    async def test_an_abandoned_update_is_stored_and_then_released(self) -> None:
+        """Its last checkpoint is the only record of what it created (#1564)."""
+        gone = _ws(locked=True, lock_id="pulumi-update:gone")
+        alive = SimpleNamespace(id=uuid.uuid4(), locked=True, lock_id="pulumi-update:alive")
+        db = _db(_result(scalars=[gone, alive]), _result(scalar=gone))
+        redis = self._redis("alive")
+        promote = AsyncMock()
+        assert await self._sweep(db, redis, promote) == 1
+        promote.assert_awaited_once_with(db, gone, "gone")
+        assert gone.locked is False
+        assert alive.locked is True
         # The stack mutex it still held is cleared with it.
         redis.delete.assert_awaited_once_with(f"tp:pulumi:stack_active:{WS}")
 
-    async def test_a_live_update_keeps_its_lock(self) -> None:
-        db = _db(_result(rows=[(WS, "pulumi-update:alive")]))
-        redis = AsyncMock()
-        redis.exists.return_value = True
-        with (
-            patch("terrapod.db.session.get_db_session", _session(db)),
-            patch("terrapod.redis.client.get_redis_client", return_value=redis),
-        ):
-            assert await locks.sweep_abandoned_updates() == 0
+    async def test_a_live_update_is_left_alone(self) -> None:
+        alive = _ws(locked=True, lock_id="pulumi-update:alive")
+        db = _db(_result(scalars=[alive]))
+        promote = AsyncMock()
+        assert await self._sweep(db, self._redis("alive"), promote) == 0
+        promote.assert_not_awaited()
+        assert alive.locked is True
         assert db.execute.await_count == 1
+
+    async def test_a_failed_promotion_keeps_the_lock_for_the_next_cycle(self) -> None:
+        """Releasing first would leave the checkpoint held against an update
+        nothing looks at again."""
+        gone = _ws(locked=True, lock_id="pulumi-update:gone")
+        db = _db(_result(scalars=[gone]))
+        promote = AsyncMock(side_effect=RuntimeError("storage down"))
+        assert await self._sweep(db, self._redis(), promote) == 0
+        assert gone.locked is True
+        assert gone.lock_id == "pulumi-update:gone"
+        db.rollback.assert_awaited_once()
 
     async def test_it_only_looks_at_pulumi_locks(self) -> None:
         """A Terraform CLI lock or a manual one is never the sweep's to release."""
-        db = _db(_result(rows=[]))
-        with (
-            patch("terrapod.db.session.get_db_session", _session(db)),
-            patch("terrapod.redis.client.get_redis_client", return_value=AsyncMock()),
-        ):
-            await locks.sweep_abandoned_updates()
+        db = _db(_result(scalars=[]))
+        await self._sweep(db, self._redis(), AsyncMock())
         compiled = db.execute.await_args.args[0].compile(compile_kwargs={"literal_binds": True})
         assert "LIKE 'pulumi-update:%'" in str(compiled)
 

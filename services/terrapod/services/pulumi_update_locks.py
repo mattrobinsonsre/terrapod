@@ -175,17 +175,38 @@ async def sweep_abandoned_updates() -> int:
 
     redis = get_redis_client()
     released = 0
+    from terrapod.services.pulumi_checkpoint_service import promote_checkpoint
+
     async with get_db_session() as db:
-        rows = (
-            await db.execute(
-                select(Workspace.id, Workspace.lock_id).where(
-                    Workspace.lock_id.like(f"{LOCK_ID_PREFIX}%")
+        held = (
+            (
+                await db.execute(
+                    select(Workspace).where(Workspace.lock_id.like(f"{LOCK_ID_PREFIX}%"))
                 )
             )
-        ).all()
-        for workspace_id, lock_id in rows:
-            update_id = lock_id[len(LOCK_ID_PREFIX) :]
+            .scalars()
+            .all()
+        )
+        for ws in held:
+            workspace_id = ws.id
+            update_id = (ws.lock_id or "")[len(LOCK_ID_PREFIX) :]
             if await redis.exists(update_key(update_id)):
+                continue
+            # The update's last checkpoint is the only record of what it
+            # created, so it becomes a state version before the stack is let go
+            # (#1564). If that fails the lock stays and the next cycle tries
+            # again: releasing it first would leave the checkpoint held against
+            # an update nothing will ever look at again.
+            try:
+                await promote_checkpoint(db, ws, update_id)
+            except Exception:  # noqa: BLE001 — one stack must not stop the sweep
+                await db.rollback()
+                logger.warning(
+                    "pulumi_abandoned_update_checkpoint_not_promoted",
+                    workspace_id=str(workspace_id),
+                    update_id=update_id,
+                    exc_info=True,
+                )
                 continue
             if await release_workspace_lock(db, workspace_id, update_id):
                 released += 1

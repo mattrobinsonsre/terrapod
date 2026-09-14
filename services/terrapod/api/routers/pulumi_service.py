@@ -83,6 +83,11 @@ from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.pulumi_checkpoint_service import (
+    hold_checkpoint,
+    promote_checkpoint,
+    write_deployment,
+)
 from terrapod.services.pulumi_update_locks import (
     LEASE_TTL_SECONDS,
     LockRefused,
@@ -497,11 +502,17 @@ async def delete_stack(
     user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """`pulumi stack rm`."""
+    """`pulumi stack rm` — the same recoverable delete as the native one.
+
+    It used to delete the row directly, skipping the undelete marker and the
+    index cleanup, so a removed stack could not be restored (#1564).
+    """
+    from terrapod.services import deleted_workspace_service
+
     ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.WORKSPACE_DELETE)
-    await db.delete(ws)
-    await db.commit()
-    logger.info("pulumi_stack_deleted", stack=ws.name, actor=user.email)
+    ws_name = ws.name
+    await deleted_workspace_service.delete_workspace(db, ws, deleted_by=user.email)
+    logger.info("pulumi_stack_deleted", stack=ws_name, actor=user.email)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -545,52 +556,6 @@ async def _read_deployment(ws: Workspace, db: AsyncSession) -> dict[str, Any] | 
         return None
 
 
-async def _write_deployment(
-    ws: Workspace, db: AsyncSession, deployment: dict[str, Any] | None
-) -> None:
-    """Persist a deployment as the stack's next state version."""
-    from terrapod.crypto.state import encrypt_state_bytes
-    from terrapod.db.models import StateVersion
-    from terrapod.storage import get_storage
-    from terrapod.storage.keys import state_key
-
-    latest = (
-        await db.execute(
-            select(StateVersion)
-            .where(StateVersion.workspace_id == ws.id)
-            .order_by(StateVersion.serial.desc())
-            .limit(1)
-        )
-    ).scalar_one_or_none()
-    serial = (latest.serial + 1) if latest else 1
-
-    sv = StateVersion(id=uuid.uuid4(), workspace_id=ws.id, serial=serial)
-    db.add(sv)
-    await db.flush()
-
-    payload = json.dumps(deployment).encode()
-    storage = get_storage()
-    await storage.put(state_key(str(ws.id), str(sv.id)), await encrypt_state_bytes(payload))
-
-    # State moved underneath any plan that was already made against this
-    # workspace, so those plans are now stale (#647). Every site that writes a
-    # state version owes this call — a guard test enforces it, and it caught
-    # this one being missed. A Pulumi checkpoint is exactly the "state moved"
-    # case the hook was written for: the CLI applies locally and pushes the
-    # result, the same shape as a terraform CLI apply.
-    from terrapod.services.run_service import discard_stale_plans_for_state_change
-
-    await discard_stale_plans_for_state_change(db, ws.id, serial)
-    await db.commit()
-
-    # The break-glass index names every workspace's latest state (#1581).
-    from terrapod.services import state_index_service
-
-    await state_index_service.record_latest_state(
-        workspace_name=ws.name, workspace_id=ws.id, state_version_id=sv.id, serial=serial
-    )
-
-
 @router.get("/api/stacks/{org}/{project}/{stack}/export")
 async def export_stack(
     org: str,
@@ -622,7 +587,7 @@ async def import_stack(
     """`pulumi stack import` — writes state wholesale. Body may be gzipped."""
     ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_WRITE)
     body = await read_body(request)
-    await _write_deployment(ws, db, body.get("deployment"))
+    await write_deployment(db, ws, body.get("deployment"), created_by=user.email)
     logger.info("pulumi_state_imported", stack=ws.name, actor=user.email)
     # `stack import` is asynchronous: the CLI takes this id and polls
     # GET .../update/{id} until it reports a terminal status. The id must be
@@ -1007,6 +972,10 @@ async def write_checkpoint(
     every one that exists was written by an update — so refusing costs nothing.
     Accepting would let `run:plan`, the capability that begins a preview, buy a
     `state:write` its holder was never granted.
+
+    The checkpoint is held against the update, replacing the one before it,
+    and becomes a state version only when the update ends (#1564). One
+    version per update, not one per checkpoint.
     """
     record, ws = await _require_lease(request, update_id, db, f"{org}/{project}/{stack}")
     if record.get("kind") == "preview":
@@ -1015,7 +984,9 @@ async def write_checkpoint(
             detail="A preview does not write state; this lease cannot checkpoint",
         )
     body = await read_body(request)
-    await _write_deployment(ws, db, body.get("deployment"))
+    await hold_checkpoint(
+        ws.id, update_id, body.get("deployment"), created_by=record.get("actor") or None
+    )
     return {}
 
 
@@ -1049,11 +1020,20 @@ async def complete_update(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """End the update and release the stack."""
+    """End the update, store what it wrote, and release the stack.
+
+    The last checkpoint becomes the update's one state version whatever status
+    it ended with: a failed update's partial state is the only record of what
+    it created (#1564). That happens before the lease is dropped, so if it
+    fails the update is still findable, and the sweep promotes it once the
+    lease lapses.
+    """
     from terrapod.redis.client import get_redis_client
 
     record, ws = await _require_lease(request, update_id, db, f"{org}/{project}/{stack}")
     body = await read_body(request)
+    if record.get("kind") != "preview":
+        await promote_checkpoint(db, ws, update_id)
 
     redis = get_redis_client()
     await redis.delete(_update_key(update_id))
@@ -1130,7 +1110,8 @@ async def cancel_update(
     the URL, as starting one does.
 
     Deleting the record invalidates the lease, so the running CLI's next call is
-    a 401 and it stops.
+    a 401 and it stops. Whatever it had checkpointed is kept, as a failed
+    update's is (#1564).
     """
     from terrapod.redis.client import get_redis_client
 
@@ -1144,6 +1125,8 @@ async def cancel_update(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown update")
 
     await redis.delete(_update_key(update_id))
+    if record.get("kind") != "preview":
+        await promote_checkpoint(db, ws, update_id)
     if text_of(await redis.get(_stack_lock_key(str(ws.id)))) == update_id:
         await redis.delete(_stack_lock_key(str(ws.id)))
     if record.get("kind") != "preview":

@@ -248,7 +248,7 @@ class TestEveryStateWriteRecordsTheIndex:
         assert {
             "run_artifacts.py",
             "tfe_v2.py",
-            "pulumi_service.py",
+            "pulumi_checkpoint_service.py",
             "state_management.py",
             "deleted_workspace_service.py",
         } <= writers

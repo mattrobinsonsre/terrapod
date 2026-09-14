@@ -871,3 +871,52 @@ class TestRestoreKeepsHowAPulumiUpdateRuns:
             ws = (await db.execute(select(Workspace).where(Workspace.id == new_id))).scalar_one()
         assert ws.engine == engine
         assert ws.pulumi_bind_plan is want
+
+
+class TestPulumiRestore:
+    """A removed Pulumi stack comes back with its state (#1564).
+
+    A deployment carries no serial, so read as Terraform state every version
+    would be skipped and the restore would report nothing recoverable.
+    """
+
+    async def test_the_versions_come_back_in_order_newest_current(self, app, client):
+        set_auth(app, admin_user())
+        old_id = await _delete_with_state(client, "restore-pulumi", [1, 2], "unused")
+
+        storage = get_storage()
+        keys = sorted(
+            o.key
+            for o in await storage.list_prefix(f"state/{old_id}/")
+            if o.key.endswith(".tfstate")
+        )
+        for n, key in enumerate(keys, start=1):
+            await storage.put(
+                key,
+                json.dumps({"manifest": {"n": n}, "resources": []}).encode(),
+                content_type="application/json",
+            )
+        marker = await dws.read_marker(storage, old_id)
+        marker["settings"]["engine"] = "pulumi"
+        marker["workspace_name"] = "restore::pulumi"
+        await dws.write_marker(storage, old_id, marker)
+
+        resp = await client.post(
+            f"/api/terrapod/v1/deleted-workspaces/{old_id}/restore", headers=AUTH
+        )
+        assert resp.status_code == 201, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["state-versions-restored"] == 2
+        assert attrs["state-versions-skipped"] == []
+
+        new_id = resp.json()["data"]["id"]
+        current = await client.get(
+            f"/api/v2/workspaces/{new_id}/current-state-version", headers=AUTH
+        )
+        body = current.json()["data"]
+        assert body["attributes"]["serial"] == 2
+        raw = await storage.get(
+            f"state/{new_id.removeprefix('ws-')}/{body['id'].removeprefix('sv-')}.tfstate"
+        )
+        restored = json.loads(await dws.decrypt_state_bytes(raw))
+        assert restored["manifest"] == {"n": 2}

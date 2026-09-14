@@ -586,3 +586,94 @@ def _mock_run(run_id=None, status="pending", ws_id=None):
     run.configuration_version_id = None
     run.module_overrides = None
     return run
+
+
+class TestUploadPulumiState:
+    """`pulumi stack export` output uploads to a Pulumi workspace and reads back
+    unchanged (#1564). Stored wrapped, every later read of the stack would find
+    the wrapper where the deployment should be."""
+
+    DEPLOYMENT = {
+        "manifest": {"time": "2026-09-14T00:00:00Z", "version": "v3.262.0"},
+        "resources": [{"urn": "urn:pulumi:dev::proj::pulumi:pulumi:Stack::proj-dev"}],
+    }
+    SIG = {"4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270"}
+
+    async def _upload(self, body: bytes):
+        ws = _mock_workspace()
+        ws.engine = "pulumi"
+        storage = AsyncMock()
+        db = AsyncMock()
+        db.execute.return_value = _scalar_result(2)
+        sv_json = {"data": {"id": "sv-new", "type": "state-versions", "attributes": {}}}
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+            patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock),
+            patch("terrapod.api.metrics.STATE_VERSIONS_CREATED"),
+            patch("terrapod.api.routers.tfe_v2._state_version_json", return_value=sv_json),
+            patch("terrapod.api.routers.state_management.get_storage", return_value=storage),
+            patch(
+                "terrapod.api.routers.state_management.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=caps_for_level("write")),
+            ),
+            patch("terrapod.api.routers.tfe_v2._get_workspace_by_id", AsyncMock(return_value=ws)),
+            patch(
+                "terrapod.services.state_index_service.record_latest_state",
+                new_callable=AsyncMock,
+            ),
+        ):
+            app, _ = _make_app(_user(email="test@example.com"), db)
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+                resp = await client.post(
+                    f"/api/terrapod/v1/workspaces/ws-{ws.id}/state-versions/actions/upload",
+                    content=body,
+                    headers={**_AUTH, "Content-Type": "application/json"},
+                )
+        return resp, storage, db
+
+    async def test_an_export_is_stored_unwrapped(self):
+        import hashlib
+
+        export = json.dumps({"version": 3, "deployment": self.DEPLOYMENT}).encode()
+        resp, storage, db = await self._upload(export)
+        assert resp.status_code == 201, resp.text
+        storage.put.assert_awaited_once()
+        storage.put_stream.assert_not_called()
+        stored = storage.put.await_args.args[1]
+        assert json.loads(stored) == self.DEPLOYMENT
+        sv = db.add.call_args.args[0]
+        assert sv.serial == 3
+        assert sv.state_size == len(stored) > 0
+        assert sv.sha256 == hashlib.sha256(stored).hexdigest()
+        assert sv.lineage == ""
+
+    async def test_a_bare_deployment_is_accepted_too(self):
+        resp, storage, _ = await self._upload(json.dumps(self.DEPLOYMENT).encode())
+        assert resp.status_code == 201, resp.text
+        assert json.loads(storage.put.await_args.args[1]) == self.DEPLOYMENT
+
+    async def test_a_terraform_state_is_refused(self):
+        tf = json.dumps({"version": 4, "serial": 1, "lineage": "l", "resources": []}).encode()
+        resp, storage, _ = await self._upload(tf)
+        assert resp.status_code == 400
+        storage.put.assert_not_awaited()
+
+    async def test_plaintext_secrets_are_refused(self):
+        secret = {**self.SIG, "plaintext": '"hunter2"'}
+        deployment = {**self.DEPLOYMENT, "resources": [{"outputs": {"password": secret}}]}
+        export = json.dumps({"version": 3, "deployment": deployment}).encode()
+        resp, storage, _ = await self._upload(export)
+        assert resp.status_code == 400
+        assert "plaintext secrets" in resp.json()["detail"]
+        storage.put.assert_not_awaited()
+
+    async def test_sealed_secrets_are_kept_as_they_are(self):
+        secret = {**self.SIG, "ciphertext": "c2VhbGVk"}
+        deployment = {**self.DEPLOYMENT, "resources": [{"outputs": {"password": secret}}]}
+        resp, storage, _ = await self._upload(
+            json.dumps({"version": 3, "deployment": deployment}).encode()
+        )
+        assert resp.status_code == 201, resp.text
+        assert json.loads(storage.put.await_args.args[1]) == deployment

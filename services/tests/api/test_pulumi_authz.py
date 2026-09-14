@@ -148,7 +148,10 @@ async def _call(method: str, path: str, grants: dict, *, headers=None, redis=Non
         # Past the gate, a call should not need a real store to answer; these stop
         # a correctly-authorized request failing for reasons unrelated to authz.
         patch(f"{MOD}._read_deployment", AsyncMock(return_value=None)),
-        patch(f"{MOD}._write_deployment", AsyncMock()),
+        patch(f"{MOD}.write_deployment", AsyncMock()),
+        patch(f"{MOD}.hold_checkpoint", AsyncMock()),
+        patch(f"{MOD}.promote_checkpoint", AsyncMock(return_value=None)),
+        patch("terrapod.services.deleted_workspace_service.delete_workspace", AsyncMock()),
         patch(f"{MOD}._begin_update", AsyncMock(return_value={"updateID": "u-new"})),
         patch(f"{MOD}.release_workspace_lock", AsyncMock(return_value=True)),
         patch("terrapod.redis.client.get_redis_client", return_value=redis or _quiet_redis()),
