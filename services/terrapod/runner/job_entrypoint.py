@@ -59,7 +59,10 @@ from terrapod.runner.phases import (
     working_dir,
 )
 from terrapod.runner.phases.binary import BinaryDownloadError, download_binary
-from terrapod.runner.phases.configuration import download_configuration
+from terrapod.runner.phases.configuration import (
+    ConfigurationArchiveError,
+    download_configuration,
+)
 from terrapod.runner.phases.state import (
     download_plan_artifacts,
     download_state,
@@ -797,6 +800,11 @@ def main(argv: list[str] | None = None) -> int:
             exit_code = _run_body(cfg, work_dir)
         except BinaryDownloadError as exc:
             log.error("binary download failed", err=str(exc))
+            exit_code = 1
+        except ConfigurationArchiveError as exc:
+            # A known failure that explains itself (#1600): log it as one, not
+            # as a crash whose traceback buries the cause.
+            log.error("configuration archive unusable", err=str(exc))
             exit_code = 1
         except SystemExit as exc:
             exit_code = int(exc.code) if isinstance(exc.code, int) else 1

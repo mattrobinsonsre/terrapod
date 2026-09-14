@@ -32,6 +32,9 @@ from terrapod.storage.protocol import (
 
 logger = get_logger(__name__)
 
+# Suffix of the temporary file put_stream writes before renaming it into place.
+_PARTIAL_SUFFIX = ".partial"
+
 
 class FilesystemStore:
     """Object store backed by the local filesystem."""
@@ -109,17 +112,33 @@ class FilesystemStore:
         content_type: str = "application/octet-stream",
         metadata: dict[str, str] | None = None,
     ) -> ObjectMeta:
-        """Store an object by streaming chunks directly to file."""
+        """Store an object by streaming chunks to a temporary file, then
+        renaming it into place.
+
+        The object appears at `key` only once every chunk is written: a
+        stream that fails part-way leaves nothing there (and any previous
+        object untouched), and a reader never sees a half-written file. The
+        cloud backends behave this way already; writing straight to the key
+        here let a failed or in-progress upload be read as a whole object
+        (#1600). The temporary name is a dot-file ending `.partial` in the
+        same directory, so the rename is atomic and listings skip it.
+        """
         path = self._full_path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = path.with_name(f".{path.name}.{secrets.token_hex(6)}{_PARTIAL_SUFFIX}")
         md5_hasher = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
         total_size = 0
 
-        async with aiofiles.open(path, "wb") as f:
-            async for chunk in chunks:
-                await f.write(chunk)
-                md5_hasher.update(chunk)
-                total_size += len(chunk)
+        try:
+            async with aiofiles.open(tmp_path, "wb") as f:
+                async for chunk in chunks:
+                    await f.write(chunk)
+                    md5_hasher.update(chunk)
+                    total_size += len(chunk)
+            await asyncio.to_thread(os.replace, tmp_path, path)
+        except BaseException:
+            await asyncio.to_thread(tmp_path.unlink, True)
+            raise
 
         # Store content type in sidecar file
         meta_path = Path(str(path) + ".meta")
@@ -233,10 +252,11 @@ class FilesystemStore:
         # shape stat'd every file in the tree before any filtering, so a bounded
         # page still paid for the whole walk. Sorted on the KEY rather than the
         # Path so the order matches what the object-store backends produce.
+        # `.partial` files are uploads in flight (or left by a crash), not objects.
         keys = sorted(
             self._key_from_path(path)
             for path in search_dir.rglob("*")
-            if path.is_file() and not path.name.endswith(".meta")
+            if path.is_file() and not path.name.endswith((".meta", _PARTIAL_SUFFIX))
         )
 
         for key in keys:
