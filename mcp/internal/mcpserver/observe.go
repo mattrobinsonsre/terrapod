@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
@@ -175,25 +176,124 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 
 	// ── terrapod_run_plan_json ───────────────────────────────────────
 	type planJSONIn struct {
-		RunID string `json:"run_id" jsonschema:"the run id whose structured JSON plan output to fetch"`
+		RunID    string   `json:"run_id" jsonschema:"the run id whose structured JSON plan output to fetch"`
+		View     string   `json:"view,omitempty" jsonschema:"changes (default): the resources the plan acts on, each with only the attributes that change. full: the raw tofu show -json document"`
+		Address  string   `json:"address,omitempty" jsonschema:"changes view: keep resources whose address starts with this, or matches it as a glob when it contains * or ? (brackets are literal, as in an index like web[0])"`
+		Actions  []string `json:"actions,omitempty" jsonschema:"changes view: keep resources with any of these actions: create, update, delete, replace, read, no-op. Default is every action except no-op"`
+		Start    int      `json:"start,omitempty" jsonschema:"changes view: index of the first change to return, for paging"`
+		Limit    int      `json:"limit,omitempty" jsonschema:"changes view: max changes to return (default 100)"`
+		Offset   int64    `json:"offset,omitempty" jsonschema:"full view: byte offset to read the document from, for paging"`
+		MaxBytes int64    `json:"max_bytes,omitempty" jsonschema:"full view: cap on returned bytes (default 65536)"`
 	}
 	type planJSONOut struct {
-		RunID    string          `json:"run_id"`
-		PlanJSON json.RawMessage `json:"plan_json"`
+		RunID            string      `json:"run_id"`
+		View             string      `json:"view"`
+		TerraformVersion string      `json:"terraform_version,omitempty"`
+		Errored          bool        `json:"errored,omitempty"`
+		Summary          planSummary `json:"summary"`
+		// TotalBytes is the size of the whole document, whichever view.
+		TotalBytes int64 `json:"total_bytes"`
+		Truncated  bool  `json:"truncated"`
+
+		// changes view. Matched is how many changes passed the filters; it is
+		// a pointer so that "none matched" (0) is distinct from the full view,
+		// where it does not apply.
+		Matched *int         `json:"matched,omitempty"`
+		Start   int          `json:"start,omitempty"`
+		Changes []planChange `json:"changes,omitempty"`
+
+		// full view: the parsed document when it fits in max_bytes, otherwise a
+		// chunk of its text starting at Offset.
+		PlanJSON     map[string]any `json:"plan_json,omitempty"`
+		PlanJSONText string         `json:"plan_json_text,omitempty"`
+		Offset       int64          `json:"offset,omitempty"`
+		NextOffset   int64          `json:"next_offset,omitempty"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "terrapod_run_plan_json",
-		Description: "Fetch the structured JSON plan output (`tofu show -json`) for a run — the resource_changes, so you can reason precisely about what a plan will create/update/destroy. Returns 'not available' if the run produced no JSON plan.",
+		Name: "terrapod_run_plan_json",
+		Description: "Fetch what a run's plan will do, from its structured JSON plan (`tofu show -json`). " +
+			"The default view=changes is compact, usually a few KB: tofu's add/change/destroy counts, then each resource the plan acts on with only the attributes that change (before and after), sensitive values redacted and values not known until apply marked as such. " +
+			"Narrow it with `address` (a prefix, or a glob) and `actions`; `matched` and `truncated` say whether there is more, and `start`/`limit` page through it. " +
+			"view=full returns the raw document: as the parsed `plan_json` object when it fits in max_bytes, otherwise as a `plan_json_text` chunk to page through with `offset` (pass back `next_offset`). A full plan is often megabytes and its values are NOT redacted. " +
+			"An error saying no JSON plan is available means the run has not finished planning, or produced none; terrapod_run_logs has the text plan.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in planJSONIn) (*mcp.CallToolResult, planJSONOut, error) {
 		if in.RunID == "" {
 			return errText("run_id is required"), planJSONOut{}, nil
 		}
+		view := in.View
+		if view == "" {
+			view = "changes"
+		}
+		if view != "changes" && view != "full" {
+			return errText("view must be 'changes' or 'full'"), planJSONOut{}, nil
+		}
+		filter := planFilter{Address: in.Address, Actions: in.Actions}
+		if err := filter.validate(); err != nil {
+			return errText(err.Error()), planJSONOut{}, nil
+		}
+
 		raw, err := c.GetRunPlanJSON(ctx, in.RunID)
 		if err != nil {
+			if terrapod.IsNotFound(err) {
+				return errText("no JSON plan is available for run " + in.RunID +
+					": it has not finished planning, or it produced none. terrapod_run_logs shows the text plan."), planJSONOut{}, nil
+			}
 			return errResult(err), planJSONOut{}, nil
 		}
-		return nil, planJSONOut{RunID: in.RunID, PlanJSON: raw}, nil
+		plan, err := parsePlan(raw)
+		if err != nil {
+			// Never echo the body: it can be megabytes.
+			return errText(fmt.Sprintf("the run's JSON plan (%d bytes) could not be parsed: %v", len(raw), err)), planJSONOut{}, nil
+		}
+
+		total := int64(len(raw))
+		out := planJSONOut{
+			RunID:            in.RunID,
+			View:             view,
+			TerraformVersion: plan.TerraformVersion,
+			Errored:          plan.Errored,
+			Summary:          summarise(plan),
+			TotalBytes:       total,
+		}
+
+		if view == "changes" {
+			changes := compactChanges(plan, filter)
+			matched := len(changes)
+			limit := in.Limit
+			if limit <= 0 {
+				limit = 100
+			}
+			start := min(max(in.Start, 0), matched)
+			end := min(start+limit, matched)
+			out.Matched = &matched
+			out.Start = start
+			out.Changes = changes[start:end]
+			out.Truncated = end < matched
+			return nil, out, nil
+		}
+
+		maxBytes := in.MaxBytes
+		if maxBytes <= 0 {
+			maxBytes = 65536
+		}
+		off := min(max(in.Offset, 0), total)
+		if off == 0 && total <= maxBytes {
+			var doc map[string]any
+			if err := json.Unmarshal(raw, &doc); err != nil {
+				return errText(fmt.Sprintf("the run's JSON plan (%d bytes) could not be parsed: %v", total, err)), planJSONOut{}, nil
+			}
+			out.PlanJSON = doc
+			return nil, out, nil
+		}
+		end := min(off+maxBytes, total)
+		out.PlanJSONText = string(raw[off:end])
+		out.Offset = off
+		out.Truncated = end < total
+		if out.Truncated {
+			out.NextOffset = end
+		}
+		return nil, out, nil
 	})
 
 	// ── terrapod_run_logs ────────────────────────────────────────────

@@ -104,7 +104,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_workspace_get` | One workspace by id or name — full config + status. |
 | `terrapod_run_list` | Recent runs for a workspace (status, plan-only/destroy, has-changes). |
 | `terrapod_run_get` | One run's full status incl. Terrapod-native detail (has-changes, drift, resource profile, permitted actions). |
-| `terrapod_run_plan_json` | The structured JSON plan output (`tofu show -json`) — reason precisely about resource changes. |
+| `terrapod_run_plan_json` | What a plan will do, from its structured JSON plan (`tofu show -json`). The default `view: changes` is compact, usually a few KB: tofu's add/change/destroy counts plus each resource the plan acts on, with only the attributes that change, sensitive values redacted. Narrow it with `address` (prefix or glob) and `actions`; page with `start`/`limit`. `view: full` returns the raw document, paged by `offset` once it is larger than `max_bytes` — often megabytes, and unredacted. |
 | `terrapod_run_logs` | The plan or apply LOG — the terraform/tofu output, i.e. *why* a run failed rather than merely that it did. Returns the end of the log by default (a failure is reported last, and an apply log can be megabytes), ANSI stripped; `offset` pages further back. |
 | `terrapod_run_cost` | A run's monthly cost estimate — the plan's cost *delta* (projected total, this-run delta, previous, per-resource, unpriced). Data only, no AI. |
 | `terrapod_workspace_cost` | A workspace's *current* monthly cost from its latest state — total, per-resource, unpriced, and which state version was priced. Data only, no AI. |
