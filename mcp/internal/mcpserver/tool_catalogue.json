@@ -151,6 +151,32 @@
     }
   },
   {
+    "name": "terrapod_registry_module_discover",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "vcs_branch": {
+          "description": "branch to scan; the repository's default branch when omitted",
+          "type": "string"
+        },
+        "vcs_connection_id": {
+          "description": "the VCS connection whose credentials read the repository",
+          "type": "string"
+        },
+        "vcs_repo_url": {
+          "description": "the repository to scan, e.g. https://github.com/org/terraform-aws-vpc",
+          "type": "string"
+        }
+      },
+      "required": [
+        "vcs_connection_id",
+        "vcs_repo_url"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_registry_module_get",
     "read_only": true,
     "input_schema": {

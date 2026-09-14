@@ -353,6 +353,9 @@ field DeletedWorkspaceListOptions.PageSize int
 field DeletedWorkspaceVariable.Category string `json:"category"`
 field DeletedWorkspaceVariable.Key string `json:"key"`
 field DeletedWorkspaceVariable.Sensitive bool `json:"sensitive"`
+field DiscoverRegistryModulesRequest.VCSBranch string
+field DiscoverRegistryModulesRequest.VCSConnectionID string
+field DiscoverRegistryModulesRequest.VCSRepoURL string
 field DiscoverySurface.Count int `json:"count"`
 field DiscoverySurface.DataSources []OnboardingDataSource `json:"data_sources"`
 field Document.Data json.RawMessage `json:"data"`
@@ -568,6 +571,8 @@ field ProviderTemplate.Attributes map[string]any
 field ProviderTemplate.CreatedAt string
 field ProviderTemplate.ID string
 field ProviderTemplate.UpdatedAt string
+field RegisteredModuleRef.Name string `json:"name"`
+field RegisteredModuleRef.Provider string `json:"provider"`
 field RegistryModule.CreatedAt string `json:"created-at,omitempty"`
 field RegistryModule.ID string `json:"id"`
 field RegistryModule.Labels map[string]string `json:"labels,omitempty"`
@@ -583,6 +588,13 @@ field RegistryModule.VCSBranch string `json:"vcs-branch,omitempty"`
 field RegistryModule.VCSConnectionID string `json:"vcs-connection-id,omitempty"`
 field RegistryModule.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
 field RegistryModule.VCSTagPattern string `json:"vcs-tag-pattern,omitempty"`
+field RegistryModuleCandidate.RegisteredAs *RegisteredModuleRef `json:"registered-as,omitempty"`
+field RegistryModuleCandidate.Subdirectory string `json:"subdirectory"`
+field RegistryModuleCandidate.SuggestedName string `json:"suggested-name"`
+field RegistryModuleCandidate.SuggestedProvider string `json:"suggested-provider"`
+field RegistryModuleDiscovery.Candidates []RegistryModuleCandidate `json:"candidates"`
+field RegistryModuleDiscovery.VCSBranch string `json:"vcs-branch"`
+field RegistryModuleDiscovery.VCSRepoURL string `json:"vcs-repo-url"`
 field RegistryProvider.CreatedAt string `json:"created-at,omitempty"`
 field RegistryProvider.ID string `json:"id"`
 field RegistryProvider.Labels map[string]string `json:"labels,omitempty"`
@@ -1195,6 +1207,7 @@ method (*Client) DeleteWorkspace(ctx context.Context, id string) error
 method (*Client) DestroyCatalogInstance(ctx context.Context, wsID string, attrs map[string]any) (*CatalogRunRef, error)
 method (*Client) DiscardCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error)
 method (*Client) DiscardRun(ctx context.Context, runID string) (*Run, error)
+method (*Client) DiscoverRegistryModules(ctx context.Context, req DiscoverRegistryModulesRequest) (*RegistryModuleDiscovery, error)
 method (*Client) Get(ctx context.Context, path string) ([]byte, error)
 method (*Client) GetAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
 method (*Client) GetAgentPool(ctx context.Context, id string) (*AgentPool, error)
@@ -1410,6 +1423,7 @@ type DeletedWorkspace struct
 type DeletedWorkspaceList struct
 type DeletedWorkspaceListOptions struct
 type DeletedWorkspaceVariable struct
+type DiscoverRegistryModulesRequest struct
 type DiscoverySurface struct
 type Document struct
 type EncryptionStatus struct
@@ -1447,7 +1461,10 @@ type PlanSummaryRiskFactor struct
 type Policy struct
 type PolicySet struct
 type ProviderTemplate struct
+type RegisteredModuleRef struct
 type RegistryModule struct
+type RegistryModuleCandidate struct
+type RegistryModuleDiscovery struct
 type RegistryProvider struct
 type Relationship struct
 type RelationshipResource struct

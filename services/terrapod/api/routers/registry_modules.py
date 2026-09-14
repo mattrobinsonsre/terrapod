@@ -24,6 +24,7 @@ TFE V2 Management:
 """
 
 import asyncio
+import hashlib
 import os
 import uuid as _uuid
 
@@ -39,6 +40,7 @@ from terrapod.api.dependencies import (
     AuthenticatedUser,
     effective_platform_roles,
     get_current_user,
+    require_admin,
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
@@ -46,9 +48,22 @@ from terrapod.api.pagination import paginate
 from terrapod.api.serialization import rfc3339
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
-from terrapod.db.models import ModuleWorkspaceLink, RegistryModuleVersion, Workspace
+from terrapod.db.models import (
+    ModuleWorkspaceLink,
+    RegistryModule,
+    RegistryModuleVersion,
+    VCSConnection,
+    Workspace,
+)
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services import vcs_rate_limit
+from terrapod.services.module_discovery import (
+    candidate_directories,
+    repo_name_from_url,
+    suggest_name,
+    suggest_provider,
+)
 from terrapod.services.module_subdirectory import SubdirectoryError, normalize_subdirectory
 from terrapod.services.registry_module_service import (
     create_module,
@@ -320,6 +335,116 @@ async def _commit_module(db: AsyncSession, module) -> None:  # type: ignore[no-u
                 "as another module"
             ),
         ) from e
+
+
+class DiscoverModulesRequest(BaseModel):
+    class Data(BaseModel):
+        class Attributes(BaseModel):
+            vcs_connection_id: str
+            vcs_repo_url: str
+            vcs_branch: str = ""
+
+            model_config = {
+                "alias_generator": lambda f: f.replace("_", "-"),
+                "populate_by_name": True,
+            }
+
+        type: str = "registry-module-discoveries"
+        attributes: Attributes
+
+    data: Data
+
+
+@management_router.post("/registry-modules/discover")
+async def discover_modules_endpoint(
+    body: DiscoverModulesRequest,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Propose the modules in a repository (#1584). Nothing is registered.
+
+    Walks the repository's file tree at the branch (the default branch when
+    none is given) and returns every directory holding Terraform files — the
+    root and any submodules — each with a suggested name and provider, and
+    whichever module already registers it. The operator picks; each pick is
+    then an ordinary create with its ``subdirectory``.
+
+    Platform admin only, like workspace autodiscovery's scan: it reads the
+    repository with the platform's VCS credentials, not the caller's.
+    """
+    from types import SimpleNamespace
+
+    from terrapod.api.routers.autodiscovery_rules import _walk_repo_for_rule
+
+    attrs = body.data.attributes
+    try:
+        conn_id = _uuid.UUID(attrs.vcs_connection_id.removeprefix("vcs-"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Invalid vcs-connection-id") from exc
+    conn = (
+        (await db.execute(select(VCSConnection).where(VCSConnection.id == conn_id)))
+        .scalars()
+        .first()
+    )
+    if conn is None:
+        raise HTTPException(status_code=422, detail="VCS connection not found")
+    if not attrs.vcs_repo_url:
+        raise HTTPException(status_code=422, detail="vcs-repo-url is required")
+
+    # The same walk workspace autodiscovery uses — branch resolution, provider
+    # dispatch and truncation behave identically — under its own rate-limit
+    # label, so a scan's spend is not charged to "unknown".
+    target = SimpleNamespace(
+        vcs_connection=conn, repo_url=attrs.vcs_repo_url, branch=attrs.vcs_branch
+    )
+    try:
+        with vcs_rate_limit.vcs_source("module-discovery"):
+            file_paths, branch = await _walk_repo_for_rule(target)
+    except HTTPException as exc:
+        if exc.status_code == 413:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    "the VCS provider truncated this repository's tree, so it is too large "
+                    "to scan in one pass; register its modules individually instead"
+                ),
+            ) from exc
+        raise
+
+    registered: dict[str, dict] = {}
+    rows = await db.execute(
+        select(RegistryModule.name, RegistryModule.provider, RegistryModule.subdirectory).where(
+            RegistryModule.vcs_repo_url == attrs.vcs_repo_url
+        )
+    )
+    for name, provider, subdirectory in rows.all():
+        registered.setdefault(subdirectory or "", {"name": name, "provider": provider})
+
+    repo_name = repo_name_from_url(attrs.vcs_repo_url)
+    provider = suggest_provider(repo_name)
+    candidates = [
+        {
+            "subdirectory": d,
+            "suggested-name": suggest_name(repo_name, d),
+            "suggested-provider": provider,
+            "registered-as": registered.get(d),
+        }
+        for d in candidate_directories(file_paths)
+    ]
+    digest = hashlib.sha256(f"{attrs.vcs_repo_url}@{branch}".encode()).hexdigest()[:16]
+    return JSONResponse(
+        content={
+            "data": {
+                "type": "registry-module-discoveries",
+                "id": f"discovery-{digest}",
+                "attributes": {
+                    "vcs-repo-url": attrs.vcs_repo_url,
+                    "vcs-branch": branch,
+                    "candidates": candidates,
+                },
+            }
+        }
+    )
 
 
 @management_router.post("/registry-modules")

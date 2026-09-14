@@ -379,6 +379,11 @@
     "status",
     "version"
   ],
+  "registry_modules.discover_modules_endpoint": [
+    "candidates",
+    "vcs-branch",
+    "vcs-repo-url"
+  ],
   "registry_modules.module_interface_endpoint": [
     "inputs",
     "outputs",

@@ -273,6 +273,7 @@
   "POST /api/terrapod/v1/policy-sets/{ps_id}/policies",
   "POST /api/terrapod/v1/provider-templates",
   "POST /api/terrapod/v1/registry-modules",
+  "POST /api/terrapod/v1/registry-modules/discover",
   "POST /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versions",
   "POST /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/workspace-links",
   "POST /api/terrapod/v1/registry-providers",

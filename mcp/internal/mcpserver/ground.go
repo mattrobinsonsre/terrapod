@@ -93,6 +93,32 @@ func registerGround(s *mcp.Server, c *terrapod.Client) {
 		return nil, iface, nil
 	})
 
+	// ── terrapod_registry_module_discover ────────────────────────────
+	type moduleDiscoverIn struct {
+		VCSConnectionID string `json:"vcs_connection_id" jsonschema:"the VCS connection whose credentials read the repository"`
+		VCSRepoURL      string `json:"vcs_repo_url" jsonschema:"the repository to scan, e.g. https://github.com/org/terraform-aws-vpc"`
+		VCSBranch       string `json:"vcs_branch,omitempty" jsonschema:"branch to scan; the repository's default branch when omitted"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_registry_module_discover",
+		Description: "Propose the modules in a repository for the private registry: every directory holding Terraform files — the root and any submodules — each with a suggested name and provider, and whichever module already registers it. " +
+			"Registers nothing: to add one, create a registry module with its subdirectory. Platform admin only.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in moduleDiscoverIn) (*mcp.CallToolResult, *terrapod.RegistryModuleDiscovery, error) {
+		if in.VCSConnectionID == "" || in.VCSRepoURL == "" {
+			return errText("vcs_connection_id and vcs_repo_url are required"), nil, nil
+		}
+		d, err := c.DiscoverRegistryModules(ctx, terrapod.DiscoverRegistryModulesRequest{
+			VCSConnectionID: in.VCSConnectionID,
+			VCSRepoURL:      in.VCSRepoURL,
+			VCSBranch:       in.VCSBranch,
+		})
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, d, nil
+	})
+
 	// ── terrapod_registry_provider_list ──────────────────────────────
 	type providerListOut struct {
 		Count     int                         `json:"count"`
