@@ -277,6 +277,36 @@
     "node-id",
     "role"
   ],
+  "module_autodiscovery_rules._preview_json": [
+    "entries",
+    "files-walked",
+    "ref"
+  ],
+  "module_autodiscovery_rules._rule_json": [
+    "branch",
+    "created-at",
+    "enabled",
+    "first-scan-at",
+    "ignore-patterns",
+    "labels",
+    "last-scanned-sha",
+    "name",
+    "name-template",
+    "owner-email",
+    "pattern",
+    "provider",
+    "repo-url",
+    "updated-at",
+    "vcs-connection-id",
+    "vcs-tag-pattern"
+  ],
+  "module_autodiscovery_rules.scan_rule": [
+    "files-walked",
+    "modules",
+    "modules-registered",
+    "ref",
+    "skipped"
+  ],
   "notification_configurations._nc_json": [
     "created-at",
     "delivery-responses",

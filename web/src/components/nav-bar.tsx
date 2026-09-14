@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
+  FolderSearch,
   Layers,
   Network,
   Package,
@@ -80,6 +81,7 @@ const ADMIN_ITEMS: NavItem[] = [
   { href: '/admin/vcs-connections', labelKey: 'vcsConnections', icon: GitBranch },
   { href: '/admin/variable-sets', labelKey: 'variableSets', icon: Variable },
   { href: '/admin/autodiscovery', labelKey: 'autodiscovery', icon: Compass },
+  { href: '/admin/module-autodiscovery', labelKey: 'moduleAutodiscovery', icon: FolderSearch },
   { href: '/admin/bulk-update', labelKey: 'bulkUpdate', icon: Wrench },
   { href: '/admin/execution-hooks', labelKey: 'executionHooks', icon: TerminalSquare },
   { href: '/admin/policy-sets', labelKey: 'policySets', icon: ScrollText },

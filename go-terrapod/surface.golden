@@ -458,6 +458,55 @@ field ListMeta.TotalPages int `json:"total-pages"`
 field LogOptions.Limit int64
 field LogOptions.Offset int64
 field LogOptions.Plain bool
+field ModuleAutodiscoveryCandidate.Collision bool `json:"collision"`
+field ModuleAutodiscoveryCandidate.MissingProvider bool `json:"missing-provider"`
+field ModuleAutodiscoveryCandidate.Name string `json:"name"`
+field ModuleAutodiscoveryCandidate.Provider string `json:"provider"`
+field ModuleAutodiscoveryCandidate.RegisteredAs *RegisteredModuleRef `json:"registered-as,omitempty"`
+field ModuleAutodiscoveryCandidate.Subdirectory string `json:"subdirectory"`
+field ModuleAutodiscoveryModule.ID string `json:"id"`
+field ModuleAutodiscoveryModule.Name string `json:"name"`
+field ModuleAutodiscoveryModule.Provider string `json:"provider"`
+field ModuleAutodiscoveryModule.Subdirectory string `json:"subdirectory"`
+field ModuleAutodiscoveryPreview.Entries []ModuleAutodiscoveryCandidate `json:"entries"`
+field ModuleAutodiscoveryPreview.FilesWalked int `json:"files-walked"`
+field ModuleAutodiscoveryPreview.Ref string `json:"ref"`
+field ModuleAutodiscoveryRule.Branch string `json:"branch"`
+field ModuleAutodiscoveryRule.CreatedAt string `json:"created-at"`
+field ModuleAutodiscoveryRule.Enabled bool `json:"enabled"`
+field ModuleAutodiscoveryRule.FirstScanAt string `json:"first-scan-at"`
+field ModuleAutodiscoveryRule.ID string `json:"id"`
+field ModuleAutodiscoveryRule.IgnorePatterns []string `json:"ignore-patterns"`
+field ModuleAutodiscoveryRule.Labels map[string]string `json:"labels"`
+field ModuleAutodiscoveryRule.LastScannedSHA string `json:"last-scanned-sha"`
+field ModuleAutodiscoveryRule.Name string `json:"name"`
+field ModuleAutodiscoveryRule.NameTemplate string `json:"name-template"`
+field ModuleAutodiscoveryRule.OwnerEmail string `json:"owner-email"`
+field ModuleAutodiscoveryRule.Pattern string `json:"pattern"`
+field ModuleAutodiscoveryRule.Provider string `json:"provider"`
+field ModuleAutodiscoveryRule.RepoURL string `json:"repo-url"`
+field ModuleAutodiscoveryRule.UpdatedAt string `json:"updated-at"`
+field ModuleAutodiscoveryRule.VCSConnectionID string `json:"vcs-connection-id"`
+field ModuleAutodiscoveryRule.VCSTagPattern string `json:"vcs-tag-pattern"`
+field ModuleAutodiscoveryRuleRequest.Branch *string
+field ModuleAutodiscoveryRuleRequest.Enabled *bool
+field ModuleAutodiscoveryRuleRequest.IgnorePatterns *[]string
+field ModuleAutodiscoveryRuleRequest.Labels *map[string]string
+field ModuleAutodiscoveryRuleRequest.Name *string
+field ModuleAutodiscoveryRuleRequest.NameTemplate *string
+field ModuleAutodiscoveryRuleRequest.OwnerEmail *string
+field ModuleAutodiscoveryRuleRequest.Pattern *string
+field ModuleAutodiscoveryRuleRequest.Provider *string
+field ModuleAutodiscoveryRuleRequest.RepoURL *string
+field ModuleAutodiscoveryRuleRequest.VCSConnectionID *string
+field ModuleAutodiscoveryRuleRequest.VCSTagPattern *string
+field ModuleAutodiscoveryScan.FilesWalked int `json:"files-walked"`
+field ModuleAutodiscoveryScan.Modules []ModuleAutodiscoveryModule `json:"modules"`
+field ModuleAutodiscoveryScan.ModulesRegistered int `json:"modules-registered"`
+field ModuleAutodiscoveryScan.Ref string `json:"ref"`
+field ModuleAutodiscoveryScan.Skipped []ModuleAutodiscoverySkip `json:"skipped"`
+field ModuleAutodiscoverySkip.Reason string `json:"reason"`
+field ModuleAutodiscoverySkip.Subdirectory string `json:"subdirectory"`
 field ModuleInterface.Inputs []map[string]any `json:"inputs"`
 field ModuleInterface.Outputs []map[string]any `json:"outputs"`
 field ModuleInterface.Version string `json:"version"`
@@ -575,6 +624,8 @@ field ProviderTemplate.Attributes map[string]any
 field ProviderTemplate.CreatedAt string
 field ProviderTemplate.ID string
 field ProviderTemplate.UpdatedAt string
+field RegisteredModuleRef.Name string `json:"name"`
+field RegisteredModuleRef.Provider string `json:"provider"`
 field RegistryModule.CreatedAt string `json:"created-at,omitempty"`
 field RegistryModule.ID string `json:"id"`
 field RegistryModule.Labels map[string]string `json:"labels,omitempty"`
@@ -1165,6 +1216,7 @@ method (*Client) CreateAutodiscoveryRule(ctx context.Context, attrs map[string]a
 method (*Client) CreateCatalogItem(ctx context.Context, attrs map[string]any) (*CatalogItem, error)
 method (*Client) CreateExecutionHook(ctx context.Context, req CreateExecutionHookRequest) (*ExecutionHook, error)
 method (*Client) CreateGPGKey(ctx context.Context, req CreateGPGKeyRequest) (*GPGKey, error)
+method (*Client) CreateModuleAutodiscoveryRule(ctx context.Context, req ModuleAutodiscoveryRuleRequest) (*ModuleAutodiscoveryRule, error)
 method (*Client) CreateModuleWorkspaceLink(ctx context.Context, req CreateModuleWorkspaceLinkRequest) (*ModuleWorkspaceLink, error)
 method (*Client) CreateNotificationConfiguration(ctx context.Context, workspaceID string, req CreateNotificationConfigurationRequest) (*NotificationConfiguration, error)
 method (*Client) CreateOnboardingSession(ctx context.Context, req CreateOnboardingSessionRequest) (*OnboardingSession, error)
@@ -1191,6 +1243,7 @@ method (*Client) DeleteAutodiscoveryRule(ctx context.Context, id string) error
 method (*Client) DeleteCatalogItem(ctx context.Context, id string) error
 method (*Client) DeleteExecutionHook(ctx context.Context, id string) error
 method (*Client) DeleteGPGKey(ctx context.Context, id string) error
+method (*Client) DeleteModuleAutodiscoveryRule(ctx context.Context, id string) error
 method (*Client) DeleteModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) error
 method (*Client) DeleteNotificationConfiguration(ctx context.Context, id string) error
 method (*Client) DeletePolicy(ctx context.Context, policyID string) error
@@ -1231,6 +1284,7 @@ method (*Client) GetEstateGraph(ctx context.Context) (*EstateGraph, error)
 method (*Client) GetExecutionHook(ctx context.Context, id string) (*ExecutionHook, error)
 method (*Client) GetGPGKey(ctx context.Context, id string) (*GPGKey, error)
 method (*Client) GetHAStatus(ctx context.Context) (*HAStatus, error)
+method (*Client) GetModuleAutodiscoveryRule(ctx context.Context, id string) (*ModuleAutodiscoveryRule, error)
 method (*Client) GetModuleInterface(ctx context.Context, name, provider, version string) (*ModuleInterface, error)
 method (*Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) (*ModuleWorkspaceLink, error)
 method (*Client) GetNotificationConfiguration(ctx context.Context, id string) (*NotificationConfiguration, error)
@@ -1272,6 +1326,7 @@ method (*Client) ListAllAPITokens(ctx context.Context, kind string) ([]APIToken,
 method (*Client) ListAllAgentPools(ctx context.Context) ([]AgentPool, error)
 method (*Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListAllDeletedWorkspaces(ctx context.Context) ([]DeletedWorkspace, error)
+method (*Client) ListAllModuleAutodiscoveryRules(ctx context.Context) ([]ModuleAutodiscoveryRule, error)
 method (*Client) ListAllVCSConnections(ctx context.Context) ([]VCSConnection, error)
 method (*Client) ListAllVariables(ctx context.Context, workspaceID string) ([]Variable, error)
 method (*Client) ListAllWorkspaces(ctx context.Context, opts WorkspaceListOptions) ([]Workspace, error)
@@ -1287,6 +1342,7 @@ method (*Client) ListInboundRunTriggers(ctx context.Context, workspaceID string)
 method (*Client) ListLabelEntities(ctx context.Context, key, value string) (map[string][]LabelEntity, error)
 method (*Client) ListLabelKeys(ctx context.Context) ([]LabelKey, error)
 method (*Client) ListLabelValues(ctx context.Context, key string) ([]LabelValue, error)
+method (*Client) ListModuleAutodiscoveryRules(ctx context.Context) ([]ModuleAutodiscoveryRule, error)
 method (*Client) ListModuleWorkspaceLinks(ctx context.Context, moduleName, moduleProvider string) ([]ModuleWorkspaceLink, error)
 method (*Client) ListNotificationConfigurations(ctx context.Context, workspaceID string) ([]NotificationConfiguration, error)
 method (*Client) ListOnboardingSessions(ctx context.Context, workspaceID string) ([]OnboardingSession, error)
@@ -1319,7 +1375,9 @@ method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte,
 method (*Client) PostArchitectureCritiqueMessage( ctx context.Context, workspaceID, content string, ) (*ArchitectureCritiqueMessage, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
 method (*Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error)
+method (*Client) PreviewModuleAutodiscoveryRule(ctx context.Context, id string) (*ModuleAutodiscoveryPreview, error)
 method (*Client) PreviewRoleReach(ctx context.Context, name string, opts *RoleReachOptions) (*RoleReach, error)
+method (*Client) PreviewUnsavedModuleAutodiscoveryRule(ctx context.Context, req ModuleAutodiscoveryRuleRequest) (*ModuleAutodiscoveryPreview, error)
 method (*Client) PreviewUnsavedRoleReach(ctx context.Context, req CreateRoleRequest, opts *RoleReachOptions) (*RoleReach, error)
 method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs map[string]any) (*CatalogInstance, error)
 method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
@@ -1337,6 +1395,7 @@ method (*Client) RevokeAllAPITokensForUser(ctx context.Context, email string) (i
 method (*Client) RevokeGPGKey(ctx context.Context, id, revocationCertificate string) (*GPGKey, error)
 method (*Client) RotateAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
 method (*Client) RotateDEK(ctx context.Context) (*EncryptionStatus, error)
+method (*Client) ScanModuleAutodiscoveryRule(ctx context.Context, id string, subdirectories []string) (*ModuleAutodiscoveryScan, error)
 method (*Client) SearchWorkspaces(ctx context.Context, filter WorkspaceFilter) (*SearchWorkspacesResult, error)
 method (*Client) SetRolesForIdentity(ctx context.Context, providerName, email string, roles []string) error
 method (*Client) StartOnboardingDiscovery(ctx context.Context, sessionID string, selectedTypes []string) (*OnboardingSession, error)
@@ -1347,6 +1406,7 @@ method (*Client) UpdateAgentPool(ctx context.Context, id string, req UpdateAgent
 method (*Client) UpdateAutodiscoveryRule(ctx context.Context, id string, attrs map[string]any) (*AutodiscoveryRule, error)
 method (*Client) UpdateCatalogItem(ctx context.Context, id string, attrs map[string]any) (*CatalogItem, error)
 method (*Client) UpdateExecutionHook(ctx context.Context, id string, req UpdateExecutionHookRequest) (*ExecutionHook, error)
+method (*Client) UpdateModuleAutodiscoveryRule(ctx context.Context, id string, req ModuleAutodiscoveryRuleRequest) (*ModuleAutodiscoveryRule, error)
 method (*Client) UpdateNotificationConfiguration(ctx context.Context, id string, req UpdateNotificationConfigurationRequest) (*NotificationConfiguration, error)
 method (*Client) UpdatePolicy(ctx context.Context, policyID string, req UpdatePolicyRequest) (*Policy, error)
 method (*Client) UpdatePolicySet(ctx context.Context, id string, req UpdatePolicySetRequest) (*PolicySet, error)
@@ -1452,6 +1512,13 @@ type LabelKey struct
 type LabelValue struct
 type ListMeta struct
 type LogOptions struct
+type ModuleAutodiscoveryCandidate struct
+type ModuleAutodiscoveryModule struct
+type ModuleAutodiscoveryPreview struct
+type ModuleAutodiscoveryRule struct
+type ModuleAutodiscoveryRuleRequest struct
+type ModuleAutodiscoveryScan struct
+type ModuleAutodiscoverySkip struct
 type ModuleInterface struct
 type ModuleWorkspaceLink struct
 type NotFoundError struct
@@ -1466,6 +1533,7 @@ type PlanSummaryRiskFactor struct
 type Policy struct
 type PolicySet struct
 type ProviderTemplate struct
+type RegisteredModuleRef struct
 type RegistryModule struct
 type RegistryProvider struct
 type Relationship struct

@@ -10,8 +10,8 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { LabelsEditor } from '@/components/labels-editor'
-import { getAuthState } from '@/lib/auth'
-import { apiFetch, fetchAllPages } from '@/lib/api'
+import { getAuthState, isAdmin } from '@/lib/auth'
+import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface VCSConnection {
@@ -34,9 +34,37 @@ interface Module {
   }
 }
 
+// A one-off scan of one repository (#1584), through the unsaved-rule preview of
+// module autodiscovery: proposals, nothing registered.
+interface DiscoveryCandidate {
+  subdirectory: string
+  name: string
+  provider: string
+  'registered-as': { name: string; provider: string } | null
+  collision: boolean
+  'missing-provider': boolean
+}
+
+interface Discovery {
+  repoUrl: string
+  candidates: DiscoveryCandidate[]
+}
+
+// Every Terraform file in the repository; the preview narrows to module files.
+const DISCOVERY_PATTERN = '**/*.tf*'
+
+interface DiscoveryPick {
+  selected: boolean
+  name: string
+  provider: string
+}
+
+const DISCOVERY_INPUT = 'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent'
+
 export default function ModulesPage() {
   const router = useRouter()
   const t = useTranslations('registry')
+  const tRule = useTranslations('adminModuleAutodiscovery')
   const [modules, setModules] = useState<Module[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -53,6 +81,16 @@ export default function ModulesPage() {
   const [newSubdirectory, setNewSubdirectory] = useState('')
   const [vcsConnections, setVcsConnections] = useState<VCSConnection[]>([])
   const [creating, setCreating] = useState(false)
+
+  // Module discovery (#1584): scan a repository, then pick what to register.
+  const [showDiscover, setShowDiscover] = useState(false)
+  const [discConnectionId, setDiscConnectionId] = useState('')
+  const [discRepoUrl, setDiscRepoUrl] = useState('')
+  const [discBranch, setDiscBranch] = useState('')
+  const [discScanning, setDiscScanning] = useState(false)
+  const [discResult, setDiscResult] = useState<Discovery | null>(null)
+  const [discPicks, setDiscPicks] = useState<Record<string, DiscoveryPick>>({})
+  const [discRegistering, setDiscRegistering] = useState(false)
 
 
 
@@ -129,6 +167,82 @@ export default function ModulesPage() {
     }
   }
 
+  async function runDiscoveryScan() {
+    setDiscScanning(true)
+    setError('')
+    try {
+      const repoUrl = discRepoUrl.trim()
+      const attributes = {
+        name: 'discover',
+        'vcs-connection-id': discConnectionId,
+        'repo-url': repoUrl,
+        branch: discBranch.trim(),
+        pattern: DISCOVERY_PATTERN,
+      }
+      const res = await apiFetch('/api/terrapod/v1/module-autodiscovery-rules/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'module-autodiscovery-rules', attributes } }),
+      })
+      if (!res.ok) throw new Error(await parseApiError(res, t('modules.discover.failed')))
+      const data = await res.json()
+      const result: Discovery = { repoUrl, candidates: data.data.attributes.entries ?? [] }
+      const picks: Record<string, DiscoveryPick> = {}
+      for (const c of result.candidates) {
+        picks[c.subdirectory] = { selected: false, name: c.name, provider: c.provider }
+      }
+      setDiscResult(result)
+      setDiscPicks(picks)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('modules.discover.failed'))
+    } finally {
+      setDiscScanning(false)
+    }
+  }
+
+  // Register the ticked candidates through the ordinary create path, each with
+  // its subdirectory, then scan again so what was registered shows as such.
+  async function registerDiscoveryPicks() {
+    if (!discResult) return
+    setDiscRegistering(true)
+    setError('')
+    const failures: string[] = []
+    for (const c of discResult.candidates) {
+      const pick = discPicks[c.subdirectory]
+      if (!pick?.selected || c['registered-as']) continue
+      const attributes: Record<string, unknown> = {
+        name: pick.name.trim(),
+        provider: pick.provider.trim(),
+        'vcs-connection-id': discConnectionId,
+        'vcs-repo-url': discResult.repoUrl,
+        'vcs-branch': discBranch.trim(),
+        'vcs-tag-pattern': 'v*',
+      }
+      if (c.subdirectory) attributes.subdirectory = c.subdirectory
+      const res = await apiFetch('/api/terrapod/v1/registry-modules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'registry-modules', attributes } }),
+      })
+      if (!res.ok) {
+        const where = c.subdirectory || t('modules.discover.root')
+        failures.push(`${where}: ${await parseApiError(res, t('modules.createFailed'))}`)
+      }
+    }
+    setDiscRegistering(false)
+    await loadModules()
+    await runDiscoveryScan()
+    if (failures.length) setError(failures.join(' · '))
+  }
+
+  const discSelected = discResult
+    ? discResult.candidates.filter((c) => discPicks[c.subdirectory]?.selected && !c['registered-as'])
+    : []
+  const discReady =
+    discSelected.length > 0 &&
+    discSelected.every((c) => discPicks[c.subdirectory].name.trim() && discPicks[c.subdirectory].provider.trim())
+  const canDiscover = isAdmin()
+
   // Modules that share a repository — a root module and its submodules
   // (#1583) — are listed together under it. Everything else is listed as it
   // always was.
@@ -190,16 +304,171 @@ export default function ModulesPage() {
           title={t('modules.title')}
           description={t('modules.description')}
           actions={
-            <button
-              onClick={() => setShowCreate(!showCreate)}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
-            >
-              {showCreate ? t('modules.cancel') : t('modules.createModule')}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {canDiscover && (
+                <button
+                  type="button"
+                  onClick={() => setShowDiscover(!showDiscover)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                >
+                  {showDiscover ? t('modules.cancel') : t('modules.discover.open')}
+                </button>
+              )}
+              <button
+                onClick={() => setShowCreate(!showCreate)}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
+              >
+                {showCreate ? t('modules.cancel') : t('modules.createModule')}
+              </button>
+            </div>
           }
         />
 
         {error && <ErrorBanner message={error} />}
+
+        {showDiscover && canDiscover && (
+          <section
+            aria-labelledby="discover-title"
+            className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-4"
+          >
+            <div>
+              <h2 id="discover-title" className="text-sm font-semibold text-slate-200">{t('modules.discover.title')}</h2>
+              <p className="mt-1 text-xs text-slate-400">{t('modules.discover.intro')}</p>
+              <Link
+                href="/admin/module-autodiscovery"
+                className="mt-2 inline-flex items-center min-h-11 text-sm text-brand-400 hover:text-brand-300 underline underline-offset-2"
+              >
+                {t('modules.discover.ruleLink')}
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label htmlFor="disc-conn" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.discover.connection')}</label>
+                <select
+                  id="disc-conn"
+                  value={discConnectionId}
+                  onChange={(e) => setDiscConnectionId(e.target.value)}
+                  className={DISCOVERY_INPUT}
+                >
+                  <option value="">{t('moduleDetail.vcs.selectConnection')}</option>
+                  {vcsConnections.map((conn) => (
+                    <option key={conn.id} value={conn.id}>
+                      {conn.attributes.name} ({conn.attributes.provider})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="disc-repo" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.repositoryUrl')}</label>
+                <input
+                  id="disc-repo"
+                  type="text"
+                  value={discRepoUrl}
+                  onChange={(e) => setDiscRepoUrl(e.target.value)}
+                  placeholder="https://github.com/org/terraform-aws-vpc" // i18n-ignore — an example URL, not copy
+                  className={DISCOVERY_INPUT}
+                />
+              </div>
+              <div>
+                <label htmlFor="disc-branch" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.branchOptional')}</label>
+                <input
+                  id="disc-branch"
+                  type="text"
+                  value={discBranch}
+                  onChange={(e) => setDiscBranch(e.target.value)}
+                  placeholder={t('modules.form.branchPlaceholder')}
+                  className={DISCOVERY_INPUT}
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={runDiscoveryScan}
+              disabled={discScanning || !discConnectionId || !discRepoUrl.trim()}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+            >
+              {discScanning ? t('modules.discover.scanning') : t('modules.discover.scan')}
+            </button>
+
+            {discResult && discResult.candidates.length === 0 && (
+              <p className="text-sm text-slate-400">{t('modules.discover.none')}</p>
+            )}
+            {discResult && discResult.candidates.length > 0 && (
+              <>
+                <ul className="space-y-2">
+                  {discResult.candidates.map((c) => {
+                    const pick = discPicks[c.subdirectory]
+                    const registered = c['registered-as']
+                    const where = c.subdirectory || t('modules.discover.root')
+                    const setPick = (patch: Partial<DiscoveryPick>) =>
+                      setDiscPicks({ ...discPicks, [c.subdirectory]: { ...pick, ...patch } })
+                    return (
+                      <li key={c.subdirectory} className="rounded-lg border border-slate-700/50 p-3 space-y-2">
+                        <label className="flex items-center gap-3 min-h-11 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="h-5 w-5 shrink-0"
+                            checked={!!pick?.selected && !registered}
+                            disabled={!!registered}
+                            aria-label={t('modules.discover.select', { path: where })}
+                            onChange={(e) => setPick({ selected: e.target.checked })}
+                          />
+                          <span className="font-mono text-xs text-slate-300 break-all">{where}</span>
+                        </label>
+                        {registered ? (
+                          <p className="text-xs text-green-300 ms-8">
+                            {t('modules.discover.registeredAs', { name: `${registered.name}/${registered.provider}` })}
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 ms-8">
+                            {c.collision && pick?.name === c.name && (
+                              <p className="sm:col-span-2 text-xs text-amber-300">{tRule('nameTaken')}</p>
+                            )}
+                            {c['missing-provider'] && !pick?.provider.trim() && (
+                              <p className="sm:col-span-2 text-xs text-amber-300">{tRule('needsProvider')}</p>
+                            )}
+                            <div>
+                              <label htmlFor={`disc-name-${c.subdirectory}`} className="block text-xs text-slate-400 mb-1">{t('modules.form.name')}</label>
+                              <input
+                                id={`disc-name-${c.subdirectory}`}
+                                type="text"
+                                value={pick?.name ?? ''}
+                                onChange={(e) => setPick({ name: e.target.value })}
+                                pattern="[a-z][a-z0-9-]*"
+                                className={DISCOVERY_INPUT}
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor={`disc-provider-${c.subdirectory}`} className="block text-xs text-slate-400 mb-1">{t('modules.form.provider')}</label>
+                              <input
+                                id={`disc-provider-${c.subdirectory}`}
+                                type="text"
+                                value={pick?.provider ?? ''}
+                                onChange={(e) => setPick({ provider: e.target.value })}
+                                pattern="[a-z][a-z0-9-]*"
+                                className={DISCOVERY_INPUT}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+                <button
+                  type="button"
+                  onClick={registerDiscoveryPicks}
+                  disabled={discRegistering || !discReady}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                >
+                  {discRegistering
+                    ? t('modules.discover.registering')
+                    : t('modules.discover.register', { count: discSelected.length })}
+                </button>
+              </>
+            )}
+          </section>
+        )}
 
         {showCreate && (
           <form onSubmit={handleCreate} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-4">

@@ -732,6 +732,68 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('the module discovery panel fits a phone, with real checkboxes (#1584)', async ({ page }) => {
+    // The scan is stubbed (the e2e stack has no repository to read). The panel's
+    // inputs stack to one column, the long path wraps, and each candidate's
+    // checkbox label is a full-width tap target.
+    await page.route(
+      (url) => url.pathname === '/api/terrapod/v1/vcs-connections',
+      (route) =>
+        route.fulfill({
+          json: {
+            data: [
+              { id: 'vcs-e2e', type: 'vcs-connections', attributes: { name: 'e2e-github', provider: 'github' } },
+            ],
+            meta: { pagination: { 'current-page': 1, 'page-size': 1, 'total-count': 1, 'total-pages': 1 } },
+          },
+        }),
+    );
+    await page.route(
+      (url) => url.pathname === '/api/terrapod/v1/module-autodiscovery-rules/preview',
+      (route) =>
+        route.fulfill({
+          json: {
+            data: {
+              type: 'module-autodiscovery-rule-previews',
+              attributes: {
+                ref: 'main',
+                'files-walked': 2,
+                entries: [
+                  {
+                    subdirectory: 'modules/a-rather-long-directory-name/that-has-to-wrap-on-a-phone',
+                    name: 'network-that-has-to-wrap-on-a-phone',
+                    provider: 'aws',
+                    'registered-as': null,
+                    collision: false,
+                    'missing-provider': false,
+                  },
+                ],
+              },
+            },
+          },
+        }),
+    );
+
+    await page.goto('/registry/modules');
+    const panel = page.getByRole('heading', { name: 'Discover modules in a repository' });
+    await expect(async () => {
+      if (!(await panel.isVisible())) await page.getByRole('button', { name: 'Discover modules' }).click();
+      await expect(panel).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await page.getByLabel('VCS connection').selectOption('vcs-e2e');
+    await page.getByLabel('Repository URL').fill('https://github.com/e2e-org/terraform-aws-network');
+    await page.getByRole('button', { name: 'Scan repository' }).click();
+
+    const box = page.getByRole('checkbox', {
+      name: 'Register the module in modules/a-rather-long-directory-name/that-has-to-wrap-on-a-phone',
+    });
+    await expect(box).toBeVisible();
+    await box.check();
+    await expect(page.getByRole('button', { name: 'Register 1 module' })).toBeEnabled();
+
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('estate topology defaults to the table at phone width (#763)', async ({ page }) => {
     // On a phone the estate page defaults to the accessible Table view rather
     // than heavy WebGL (#736 a11y + #719 mobile). Assert the table renders and

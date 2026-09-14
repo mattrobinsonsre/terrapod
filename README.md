@@ -135,7 +135,7 @@ Everything below is implemented and shipped today.
 | Workspaces | Isolate state, variables, and runs per workspace |
 | Remote state | Versioned state with locking and rollback; encrypted at rest by your object store, with optional app-layer BYOK envelope encryption |
 | CLI-driven runs | `terraform` / `tofu` plan / apply via the `cloud` backend (both verified) |
-| Terraform / OpenTofu provider | **Manage Terrapod itself as code** — [`terraform-provider-terrapod`](docs/terraform-provider.md) ships **25 resources + 10 data sources** (`terrapod_workspace`, `terrapod_variable`, `terrapod_role`, `terrapod_vcs_connection`, `terrapod_agent_pool`, `terrapod_run_task`, `terrapod_catalog_item`, `terrapod_execution_hook`, …), served per-instance from `<host>/default/terrapod` and GPG-signed |
+| Terraform / OpenTofu provider | **Manage Terrapod itself as code** — [`terraform-provider-terrapod`](docs/terraform-provider.md) ships **26 resources + 10 data sources** (`terrapod_workspace`, `terrapod_variable`, `terrapod_role`, `terrapod_vcs_connection`, `terrapod_agent_pool`, `terrapod_run_task`, `terrapod_catalog_item`, `terrapod_execution_hook`, …), served per-instance from `<host>/default/terrapod` and GPG-signed |
 | AI agent integration (MCP) | **Drive Terrapod from an AI agent** (Claude, Cursor, …) via an official [MCP server](docs/mcp.md), `terrapod-mcp` — a local stdio binary authed with your `tofu login` token. Read-rich Observe tools (workspaces, runs, **structured plan JSON**, drift) + gated Act tools (plan/apply through the normal RBAC'd lifecycle). One server per instance = strict prod/dev isolation |
 | Agent execution | Server-side plan / apply on ephemeral K8s Jobs (ARC pattern) |
 | Agent pools | Named runner-listener groups; join-token → certificate exchange for auth |
@@ -177,6 +177,7 @@ Everything below is implemented and shipped today.
 |---|---|
 | VCS integration | GitHub App + GitLab token; inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, with outbound polling as the resilient default — so webhooks are optional, never required |
 | Workspace autodiscovery | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories |
+| Module autodiscovery | Rules that find the modules in a repository — the root and any submodules — preview them, register all or a picked subset, and automatically register directories that appear later ([docs](docs/registry.md#module-autodiscovery)) |
 | Terragrunt | Per-workspace Terragrunt for agent-mode runs (a flag + pinned version, pull-through binary cache, local-backend reconciliation so Terrapod still owns state); CLI-driven runs need no extra config |
 | Variables & secrets | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets, assignable by rule (labels/globs) as well as one by one; values can be [read from HashiCorp Vault](docs/vault.md) at run time, including dynamic secrets |
 | Private module source auth | First-class auth for private `git::https://` / `git::ssh://` module sources — a scoped `git_http_auth` / `git_ssh_auth` variable (static token or minted from a VCS connection), with ssh↔https protocol rewriting; credentials are log-safe and delivered only via the per-run Secret ([module-auth.md](docs/module-auth.md)) |

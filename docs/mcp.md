@@ -119,6 +119,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_run_discard` | — | Discard a planned run without applying. |
 | `terrapod_run_cancel` | — | Cancel a non-terminal run. |
 | `terrapod_run_retry` | destructive | Queue a **new** run from a finished one, with the same configuration version and options, and return it. A plan-only run retries as plan-only; an apply-capable run follows the workspace's auto-apply setting, so treat it like an apply. Needs the same permission as queuing that kind of run. Refused on a run that hasn't finished. |
+| `terrapod_module_autodiscovery_rule_scan` | — | Register the modules a module autodiscovery rule finds — every candidate, or just the `subdirectories` you pass (preview first). Skips candidates already registered or whose name is taken, and reports them. Creates registry modules; touches no infrastructure. Platform admin only. |
 
 ### Manage (gated) — shape the estate
 
@@ -139,6 +140,8 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_registry_module_list` | List the private registry modules published here (name, provider, VCS, status). |
 | `terrapod_registry_module_get` | One module by name + provider — source, status, owner, labels. |
 | `terrapod_registry_module_interface` | A module version's **inputs + outputs** — the exact surface to author a correct `module` block against it, instead of guessing variable names. |
+| `terrapod_module_autodiscovery_rule_list` | The module autodiscovery rules — each names a repository, which directories count as modules (a glob pattern and ignore paths) and how they are named. Platform admin only. |
+| `terrapod_module_autodiscovery_rule_preview` | What a rule finds in its repository now: each module directory (root and submodules) with the name and provider it would get, the module already registered from it, and whether its name is taken. Registers nothing. Platform admin only. |
 | `terrapod_catalog_item_interface` | A service-catalog item's module interface — the **inputs + outputs** of the module version the item resolves to (its pin, or the latest uploaded version). Needs catalog read on the item. |
 | `terrapod_registry_provider_list` | List the private registry providers published here. |
 | `terrapod_registry_provider_get` | One provider by name — namespace, owner, labels. |

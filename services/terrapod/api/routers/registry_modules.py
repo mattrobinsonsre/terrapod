@@ -46,7 +46,11 @@ from terrapod.api.pagination import paginate
 from terrapod.api.serialization import rfc3339
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
-from terrapod.db.models import ModuleWorkspaceLink, RegistryModuleVersion, Workspace
+from terrapod.db.models import (
+    ModuleWorkspaceLink,
+    RegistryModuleVersion,
+    Workspace,
+)
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.module_subdirectory import SubdirectoryError, normalize_subdirectory

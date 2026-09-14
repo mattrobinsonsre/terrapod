@@ -93,6 +93,44 @@ func registerGround(s *mcp.Server, c *terrapod.Client) {
 		return nil, iface, nil
 	})
 
+	// ── terrapod_module_autodiscovery_rule_list ──────────────────────
+	type moduleRuleListOut struct {
+		Count int                                `json:"count"`
+		Rules []terrapod.ModuleAutodiscoveryRule `json:"rules"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_module_autodiscovery_rule_list",
+		Description: "List the module autodiscovery rules: each names a repository, which directories count as modules (a glob pattern and ignore paths) and how they are named. " +
+			"A rule registers new module directories as they appear on its branch. Platform admin only.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, moduleRuleListOut, error) {
+		rules, err := c.ListAllModuleAutodiscoveryRules(ctx)
+		if err != nil {
+			return errResult(err), moduleRuleListOut{}, nil
+		}
+		return nil, moduleRuleListOut{Count: len(rules), Rules: rules}, nil
+	})
+
+	// ── terrapod_module_autodiscovery_rule_preview ───────────────────
+	type moduleRulePreviewIn struct {
+		RuleID string `json:"rule_id" jsonschema:"the rule id (modrule-...)"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_module_autodiscovery_rule_preview",
+		Description: "What a module autodiscovery rule finds in its repository now: each module directory (the root and any submodules) with the name and provider it would be registered under, " +
+			"the module already registered from it, and whether its name is taken. Registers nothing. Platform admin only.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in moduleRulePreviewIn) (*mcp.CallToolResult, *terrapod.ModuleAutodiscoveryPreview, error) {
+		if in.RuleID == "" {
+			return errText("rule_id is required"), nil, nil
+		}
+		p, err := c.PreviewModuleAutodiscoveryRule(ctx, in.RuleID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, p, nil
+	})
+
 	// ── terrapod_registry_provider_list ──────────────────────────────
 	type providerListOut struct {
 		Count     int                         `json:"count"`

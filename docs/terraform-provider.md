@@ -29,7 +29,7 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 | VCS | `terrapod_vcs_connection` |
 | Agent pools | `terrapod_agent_pool`, `terrapod_agent_pool_token` |
 | Governance | `terrapod_run_task`, `terrapod_run_trigger`, `terrapod_notification_configuration`, `terrapod_execution_hook`, `terrapod_execution_hook_workspace` |
-| Registry | `terrapod_registry_module`, `terrapod_registry_provider`, `terrapod_gpg_key` |
+| Registry | `terrapod_registry_module`, `terrapod_module_autodiscovery_rule`, `terrapod_registry_provider`, `terrapod_gpg_key` |
 | Service catalog | `terrapod_catalog_item`, `terrapod_catalog_instance`, `terrapod_provider_template` |
 
 **Data sources** (`terrapod_*`): `terrapod_workspace`, `terrapod_workspaces`,

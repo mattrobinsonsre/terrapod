@@ -251,6 +251,80 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules \
 - **Grouped in the UI.** The module list shows modules that share a repository together, the root module first.
 - The path is repository-relative (`modules/create`); `..`, `.` and empty segments are rejected. Leave it empty for a module at the repository root.
 
+### Module autodiscovery
+
+Instead of registering the modules in a repository one at a time, give Terrapod a **module autodiscovery rule** and let it find them. It is the registry's counterpart to [workspace autodiscovery](autodiscovery.md). A rule is scoped to one repository on a VCS connection, and it registers each module it finds as an ordinary VCS-sourced registry module: the root, and any submodule with its `subdirectory`.
+
+**What counts as a module.** The rule's `pattern` and `ignore-patterns` are the same gitignore-style globs as workspace autodiscovery, matched against file paths: `**` spans directories, `*` stays within one, and `?` matches one character. Only `.tf` and `.tf.json` files count; a directory of `.tfvars` files is a root configuration, not a module. Every directory holding a matching file is a candidate, the repository root (`""`) first. Directories named `examples`, `example`, `test`, `tests`, `testdata` or `fixtures`, and hidden directories, are never candidates, whatever the pattern says.
+
+**Naming.** Without a `name-template`, a module takes the repository's module name (its `terraform-<provider>-` prefix dropped), followed for a submodule by the last segment of its path. So `terraform-azurerm-management-groups` plus `modules/create` gives `management-groups-create`. A template can use four placeholders, for example `platform-{leaf}`:
+- `{repo}`: the repository's module name;
+- `{path}`: the subdirectory, with `/` replaced by `-`;
+- `{leaf}`: the subdirectory's last segment;
+- `{root}`: the subdirectory as-is.
+
+A template using any other placeholder is refused with `422`. Either way, the name is then fitted to the registry's rule: lowercase letters, digits and hyphens, starting with a letter, and at most 64 characters.
+
+**Provider, tags, labels and owner.**
+- `provider` applies to every module the rule registers. Left empty, it's taken from a `terraform-<provider>-<name>` repository name. In a repository without that convention, candidates are reported as `missing-provider` and not registered.
+- `vcs-tag-pattern` (default `v*`) becomes each module's tag pattern.
+- Each module tracks the rule's `branch`.
+- `labels` and `owner-email` are copied onto every module the rule registers. Labels are validated like any other label write, so reserved keys are refused with `422`.
+
+**Lifecycle:**
+- **Saving a rule registers nothing.** The first poll of an enabled rule records the candidates already in the repository as seen, and registers none of them.
+- **Preview** (`GET …/{id}/preview`, or `POST …/preview` for a rule you haven't saved) lists the candidates, each with its derived `name` and `provider`. It also reports:
+  - `registered-as`: the module already registered from that directory, or `null`;
+  - `collision`: `true` when the derived name and provider belong to another module;
+  - `missing-provider`: `true` when no provider could be worked out.
+- **Scan** (`POST …/{id}/scan`) registers the candidates: all of them, or just the `subdirectories` you list. Anything already registered, taken or missing a provider is skipped, and reported with its reason. A scan works whether or not the rule is enabled.
+- **What has been seen stays seen.** Everything a scan or poll has walked counts as seen, so a candidate you left out of a scan stays unregistered until you scan it explicitly.
+- **New directories register themselves.** While a rule is enabled, the registry poll checks the tracked branch's head every `vcs.module_poll_interval_seconds` (default 300). When the head has moved, the poll registers any candidate directory the rule hasn't seen before, and polls those modules' tags in the same cycle. So a new submodule's first tagged version publishes without anyone touching the registry. If the repository can't be read, or the provider truncates its tree, the poll retries on the next cycle.
+- **Changing the repository, connection or branch starts the rule afresh.** The next poll records a new baseline.
+- **Nothing is ever deleted or renamed.** A directory that disappears simply stops producing versions, because tags without it are skipped. Deleting a rule leaves the modules it registered; they simply stop naming a rule.
+
+Create a rule:
+
+```zsh
+curl -X POST https://terrapod.example.com/api/terrapod/v1/module-autodiscovery-rules \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{
+    "data": {
+      "type": "module-autodiscovery-rules",
+      "attributes": {
+        "name": "management-groups",
+        "vcs-connection-id": "<connection-id>",
+        "repo-url": "https://github.com/my-org/terraform-azurerm-management-groups",
+        "pattern": "**/*.tf",
+        "ignore-patterns": ["modules/legacy/**"]
+      }
+    }
+  }'
+```
+
+Then preview it, and register only the submodules you want:
+
+```zsh
+curl https://terrapod.example.com/api/terrapod/v1/module-autodiscovery-rules/<rule-id>/preview \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN"
+
+curl -X POST https://terrapod.example.com/api/terrapod/v1/module-autodiscovery-rules/<rule-id>/scan \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{"data": {"attributes": {"subdirectories": ["", "modules/create"]}}}'
+```
+
+Leave out the body to register every candidate. Module autodiscovery requires the platform `admin` role, and every surface drives the same rules:
+- **Web UI:** **Admin → Module autodiscovery**, to create, preview and scan rules, ticking the candidates to register.
+- **API:** [Module Autodiscovery Rules](api-reference.md#module-autodiscovery-rules).
+- **MCP:** `terrapod_module_autodiscovery_rule_list`, `terrapod_module_autodiscovery_rule_preview` and `terrapod_module_autodiscovery_rule_scan`.
+- **Terraform provider:** the `terrapod_module_autodiscovery_rule` resource.
+- **go-terrapod:**
+  - `ListModuleAutodiscoveryRules`, `CreateModuleAutodiscoveryRule`, `GetModuleAutodiscoveryRule`, `UpdateModuleAutodiscoveryRule` and `DeleteModuleAutodiscoveryRule`;
+  - `PreviewModuleAutodiscoveryRule` and `PreviewUnsavedModuleAutodiscoveryRule`;
+  - `ScanModuleAutodiscoveryRule`.
+
 ### Manual Upload Still Works
 
 Even with VCS connected, you can still upload versions directly via the API or web UI. Manually-uploaded versions will have empty `vcs-commit-sha` and `vcs-tag` fields.

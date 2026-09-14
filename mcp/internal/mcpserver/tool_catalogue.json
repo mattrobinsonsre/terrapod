@@ -57,6 +57,57 @@
     }
   },
   {
+    "name": "terrapod_module_autodiscovery_rule_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_module_autodiscovery_rule_preview",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "description": "the rule id (modrule-...)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_module_autodiscovery_rule_scan",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "description": "the rule id (modrule-...)",
+          "type": "string"
+        },
+        "subdirectories": {
+          "description": "register only these candidate directories (the repository root is the empty string); omit to register every candidate",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "rule_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_onboard_availability",
     "read_only": true,
     "input_schema": {
