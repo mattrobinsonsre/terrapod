@@ -83,6 +83,15 @@ from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.pulumi_update_locks import (
+    LEASE_TTL_SECONDS,
+    LockRefused,
+    release_workspace_lock,
+    take_workspace_lock,
+    text_of,
+)
+from terrapod.services.pulumi_update_locks import stack_lock_key as _stack_lock_key
+from terrapod.services.pulumi_update_locks import update_key as _update_key
 from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
 
@@ -456,14 +465,28 @@ async def get_stack(
     user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Stack lookup. A 404 here is how the CLI decides a stack needs creating."""
+    """Stack lookup. A 404 here is how the CLI decides a stack needs creating.
+
+    `activeUpdate` names the update in flight, if any. `pulumi cancel` reads it
+    to know what to cancel, and without it stops at "stack has never been
+    updated" (#1571).
+    """
     ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.WORKSPACE_READ)
-    return {
+    body: dict[str, Any] = {
         "orgName": org,
         "projectName": project,
         "stackName": stack,
         "tags": ws.labels or {},
     }
+    try:
+        from terrapod.redis.client import get_redis_client
+
+        active = text_of(await get_redis_client().get(_stack_lock_key(str(ws.id))))
+    except Exception:  # noqa: BLE001 — a lookup must not fail for want of this hint
+        active = None
+    if active:
+        body["activeUpdate"] = active
+    return body
 
 
 @router.delete("/api/stacks/{org}/{project}/{stack}")
@@ -722,25 +745,15 @@ async def batch_decrypt(
 # `POST .../update/{id}`, which must hand back a lease token — without one the
 # CLI aborts with "persisted actions require a token".
 #
-# Leases live in Redis with a TTL rather than in a table, because expiry is the
-# point: a run that dies mid-update leaves a started-but-never-completed update,
-# and the lease timing out is what releases the stack. A row would need a sweeper
-# to do what a TTL does for free.
-
-#: How long a lease is good for before the update is considered abandoned.
-LEASE_TTL_SECONDS = 30 * 60
-
-
-#: Redis key holding one update's record.
-def _update_key(update_id: str) -> str:
-    return f"tp:pulumi:update:{update_id}"
-
-
-#: Redis key marking the stack as having an update in flight. Its presence is
-#: what makes a second begin a 409, and its TTL is what stops a dead run holding
-#: the stack forever.
-def _stack_lock_key(workspace_id: str) -> str:
-    return f"tp:pulumi:stack_active:{workspace_id}"
+# Leases live in Redis with a TTL, because expiry is the point: a CLI that dies
+# mid-update leaves a started-but-never-completed update, and the lease timing
+# out is what releases the stack.
+#
+# An update (not a preview) also holds the workspace lock, as a Terraform CLI
+# apply does (#1562), so the rest of Terrapod — the UI, the run dispatcher —
+# sees the stack as busy. That lock is a row with no TTL, so a periodic sweep in
+# `services/pulumi_update_locks.py` releases it once the lease has lapsed. The
+# lease constants and keys live there too, shared with the sweep.
 
 
 def _decode_record(raw: dict | None) -> dict[str, str]:
@@ -751,29 +764,54 @@ def _decode_record(raw: dict | None) -> dict[str, str]:
     }
 
 
-async def _begin_update(ws: Workspace, kind: str, user: AuthenticatedUser) -> dict[str, Any]:
-    """Create an update, refusing if one is already in flight.
+async def _begin_update(
+    ws: Workspace, kind: str, user: AuthenticatedUser, db: AsyncSession
+) -> dict[str, Any]:
+    """Create an update, refusing if the stack cannot take one now.
 
-    Concurrency on this surface is refuse-to-start: there is no lock endpoint,
-    and a 409 here ends the CLI immediately, printing `message` verbatim. So the
-    message is the whole of the user's explanation — it is worth writing for a
-    person rather than a log.
+    Concurrency on this surface is refuse-to-start: a 409 here ends the CLI
+    immediately, printing `message` verbatim. So the message is the whole of the
+    user's explanation — it is worth writing for a person rather than a log.
+
+    A preview takes no lock. It writes no state, and locking it made two
+    previews of one stack collide (#1562). Everything else takes two:
+
+    - the Redis stack mutex, SET NX, so a second Pulumi update loses atomically;
+    - the workspace lock, as a Terraform CLI apply does, so the dispatcher holds
+      agent applies back and a manual lock is respected.
     """
     from terrapod.redis.client import get_redis_client
 
     redis = get_redis_client()
     update_id = str(uuid.uuid4())
 
-    # SET NX is the whole serialisation: the first begin wins, the rest are told
-    # why. Same pattern the scheduler uses for its periodic-task mutex.
-    acquired = await redis.set(
-        _stack_lock_key(str(ws.id)), update_id, nx=True, ex=LEASE_TTL_SECONDS
-    )
-    if not acquired:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="another update is currently in progress",
+    if kind != "preview":
+        # Terraform's rule for a VCS-connected agent workspace: its changes come
+        # from the repository, through Terrapod, not from someone's local CLI.
+        if ws.execution_mode == "agent" and ws.vcs_connection_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "this stack is connected to a VCS repository, so its updates run "
+                    "through Terrapod from the repository, not from a local CLI"
+                ),
+            )
+
+        # SET NX serialises Pulumi updates: the first begin wins, the rest are
+        # told why. Same pattern the scheduler uses for its periodic-task mutex.
+        acquired = await redis.set(
+            _stack_lock_key(str(ws.id)), update_id, nx=True, ex=LEASE_TTL_SECONDS
         )
+        if not acquired:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="another update is currently in progress",
+            )
+        try:
+            await take_workspace_lock(db, ws.id, update_id)
+        except LockRefused as exc:
+            await redis.delete(_stack_lock_key(str(ws.id)))
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.message) from None
 
     await redis.hset(
         _update_key(update_id),
@@ -850,7 +888,7 @@ async def begin_preview(
 ) -> dict[str, Any]:
     """A preview IS an update — same creation, same start path, same lease."""
     ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", _KIND_CAPABILITY["preview"])
-    return await _begin_update(ws, "preview", user)
+    return await _begin_update(ws, "preview", user, db)
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/update")
@@ -862,7 +900,7 @@ async def begin_up(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", _KIND_CAPABILITY["update"])
-    return await _begin_update(ws, "update", user)
+    return await _begin_update(ws, "update", user, db)
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/refresh")
@@ -874,7 +912,7 @@ async def begin_refresh(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", _KIND_CAPABILITY["refresh"])
-    return await _begin_update(ws, "refresh", user)
+    return await _begin_update(ws, "refresh", user, db)
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/destroy")
@@ -886,7 +924,7 @@ async def begin_destroy(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", _KIND_CAPABILITY["destroy"])
-    return await _begin_update(ws, "destroy", user)
+    return await _begin_update(ws, "destroy", user, db)
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/update/{update_id}")
@@ -1022,9 +1060,10 @@ async def complete_update(
     # Release only if this update still holds it: a lease that expired may have
     # been replaced by a newer update, and deleting that one's lock would let a
     # third start alongside it.
-    held = await redis.get(_stack_lock_key(str(ws.id)))
-    if held and (held.decode() if isinstance(held, bytes) else held) == update_id:
+    if text_of(await redis.get(_stack_lock_key(str(ws.id)))) == update_id:
         await redis.delete(_stack_lock_key(str(ws.id)))
+    if record.get("kind") != "preview":
+        await release_workspace_lock(db, ws.id, update_id)
 
     logger.info(
         "pulumi_update_completed",
@@ -1045,12 +1084,75 @@ async def renew_lease(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Extend a lease. Not exercised by the capture — the runs were too short to
-    need it — so the shape follows the CLI's expectations and is covered by test
-    rather than by observed traffic."""
+    """Extend a lease, and hand it back.
+
+    #1571 captured the call: `{"token": "", "duration": 300}`, part-way through
+    an update of a few minutes. The CLI adopts the token in the response for
+    every call after it, so answering `{}` — as this once did — made every one of
+    them a 401, the update died, and its lock was held until the lease ran out.
+
+    Both the update record and the stack mutex are extended, to at least the
+    lease's own length, so a renewed update keeps the stack for as long as it
+    keeps renewing.
+    """
     from terrapod.redis.client import get_redis_client
 
-    await _require_lease(request, update_id, db, f"{org}/{project}/{stack}")
+    record, ws = await _require_lease(request, update_id, db, f"{org}/{project}/{stack}")
+    body = await read_body(request)
+    try:
+        duration = int(body.get("duration") or 0)
+    except (TypeError, ValueError):
+        duration = 0
+    ttl = max(LEASE_TTL_SECONDS, duration)
+
     redis = get_redis_client()
-    await redis.expire(_update_key(update_id), LEASE_TTL_SECONDS)
+    await redis.expire(_update_key(update_id), ttl)
+    if text_of(await redis.get(_stack_lock_key(str(ws.id)))) == update_id:
+        await redis.expire(_stack_lock_key(str(ws.id)), ttl)
+    return {"token": record.get("lease", "")}
+
+
+@router.post("/api/stacks/{org}/{project}/{stack}/update/{update_id}/cancel")
+async def cancel_update(
+    org: str,
+    project: str,
+    stack: str,
+    update_id: str,
+    user: AuthenticatedUser = Depends(pulumi_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """`pulumi cancel` — end an update from outside it, and release the stack.
+
+    The CLI finds the update from `activeUpdate` on the stack and posts here with
+    an empty body (#1571). It carries the user's token, not the lease: the
+    person cancelling is usually not the one whose update it is. Cancelling
+    costs what beginning cost, read from the update rather than trusted from
+    the URL, as starting one does.
+
+    Deleting the record invalidates the lease, so the running CLI's next call is
+    a 401 and it stops.
+    """
+    from terrapod.redis.client import get_redis_client
+
+    redis = get_redis_client()
+    record = _decode_record(await redis.hgetall(_update_key(update_id)))
+    required = _KIND_CAPABILITY.get(record.get("kind", "")) if record else None
+    if required is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown update")
+    ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", required)
+    if record.get("workspace_id") != str(ws.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown update")
+
+    await redis.delete(_update_key(update_id))
+    if text_of(await redis.get(_stack_lock_key(str(ws.id)))) == update_id:
+        await redis.delete(_stack_lock_key(str(ws.id)))
+    if record.get("kind") != "preview":
+        await release_workspace_lock(db, ws.id, update_id)
+    logger.info(
+        "pulumi_update_cancelled",
+        stack=ws.name,
+        update_id=update_id,
+        kind=record.get("kind"),
+        actor=user.email,
+    )
     return {}

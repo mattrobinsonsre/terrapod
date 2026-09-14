@@ -150,6 +150,7 @@ async def _call(method: str, path: str, grants: dict, *, headers=None, redis=Non
         patch(f"{MOD}._read_deployment", AsyncMock(return_value=None)),
         patch(f"{MOD}._write_deployment", AsyncMock()),
         patch(f"{MOD}._begin_update", AsyncMock(return_value={"updateID": "u-new"})),
+        patch(f"{MOD}.release_workspace_lock", AsyncMock(return_value=True)),
         patch("terrapod.redis.client.get_redis_client", return_value=redis or _quiet_redis()),
     ]
     for p in patches:
@@ -427,6 +428,7 @@ EXPECTED = {
     "begin_destroy": "_KIND_CAPABILITY['destroy']",
     "start_update": "required",
     "get_update_status": "cap.RUN_READ",
+    "cancel_update": "required",
 }
 
 

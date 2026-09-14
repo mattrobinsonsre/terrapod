@@ -208,33 +208,313 @@ class TestConcurrency:
     async def test_a_second_update_is_refused_while_one_is_in_flight(self) -> None:
         from terrapod.api.routers.pulumi_service import _begin_update
 
-        ws = MagicMock()
-        ws.id = uuid.uuid4()
-        ws.name = "proj::dev"
         redis = AsyncMock()
         redis.set.return_value = None  # SET NX found the key already there
+        take = AsyncMock()
 
-        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}.take_workspace_lock", take),
+        ):
             with pytest.raises(HTTPException) as exc:
-                await _begin_update(ws, "update", _user())
+                await _begin_update(_stack_ws(), "update", _user(), AsyncMock())
         assert exc.value.status_code == 409
         # Printed verbatim by the CLI, so it is the whole of the explanation.
         assert exc.value.detail == "another update is currently in progress"
+        take.assert_not_awaited()
 
-    async def test_the_first_update_is_allowed(self) -> None:
+    async def test_the_first_update_is_allowed_and_locks_the_workspace(self) -> None:
         from terrapod.api.routers.pulumi_service import _begin_update
 
-        ws = MagicMock()
-        ws.id = uuid.uuid4()
-        ws.name = "proj::dev"
+        ws = _stack_ws()
         redis = AsyncMock()
         redis.set.return_value = True
+        take = AsyncMock()
 
-        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
-            out = await _begin_update(ws, "update", _user())
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}.take_workspace_lock", take),
+        ):
+            out = await _begin_update(ws, "update", _user(), AsyncMock())
         assert out["updateID"]
         # NX is what makes this a mutex rather than a read-then-write race.
         assert redis.set.await_args.kwargs.get("nx") is True
+        # And the workspace lock, as a Terraform CLI apply takes (#1562).
+        assert take.await_args.args[1:] == (ws.id, out["updateID"])
+
+    async def test_a_locked_workspace_refuses_the_update_and_says_why(self) -> None:
+        from terrapod.api.routers.pulumi_service import _begin_update
+        from terrapod.services.pulumi_update_locks import LockRefused
+
+        ws = _stack_ws()
+        redis = AsyncMock()
+        redis.set.return_value = True
+        refused = AsyncMock(side_effect=LockRefused('the workspace is locked (lock ID: "x")'))
+
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}.take_workspace_lock", refused),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await _begin_update(ws, "update", _user(), AsyncMock())
+        assert exc.value.status_code == 409
+        assert "locked" in exc.value.detail
+        # The mutex it had taken is given back, or the next attempt would wait
+        # out a lease for an update that never started.
+        redis.delete.assert_awaited_once()
+
+    @pytest.mark.parametrize("kind", ["preview"])
+    async def test_a_preview_takes_no_lock_at_all(self, kind) -> None:
+        """Two previews of one stack used to collide on the update mutex."""
+        from terrapod.api.routers.pulumi_service import _begin_update
+
+        redis = AsyncMock()
+        take = AsyncMock()
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}.take_workspace_lock", take),
+        ):
+            out = await _begin_update(_stack_ws(), kind, _user(), AsyncMock())
+        assert out["updateID"]
+        redis.set.assert_not_awaited()
+        take.assert_not_awaited()
+
+    async def test_a_vcs_connected_agent_workspace_refuses_a_local_update(self) -> None:
+        """Terraform's rule: such a workspace's changes come from the repository."""
+        from terrapod.api.routers.pulumi_service import _begin_update
+
+        ws = _stack_ws(execution_mode="agent", vcs_connection_id=uuid.uuid4())
+        redis = AsyncMock()
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            with pytest.raises(HTTPException) as exc:
+                await _begin_update(ws, "update", _user(), AsyncMock())
+        assert exc.value.status_code == 409
+        assert "VCS" in exc.value.detail
+        redis.set.assert_not_awaited()
+
+    async def test_but_may_still_preview(self) -> None:
+        from terrapod.api.routers.pulumi_service import _begin_update
+
+        ws = _stack_ws(execution_mode="agent", vcs_connection_id=uuid.uuid4())
+        with patch("terrapod.redis.client.get_redis_client", return_value=AsyncMock()):
+            assert (await _begin_update(ws, "preview", _user(), AsyncMock()))["updateID"]
+
+
+MOD = "terrapod.api.routers.pulumi_service"
+
+
+def _stack_ws(*, execution_mode: str = "local", vcs_connection_id=None) -> MagicMock:
+    ws = MagicMock()
+    ws.id = uuid.uuid4()
+    ws.name = "proj::dev"
+    ws.labels = {}
+    ws.execution_mode = execution_mode
+    ws.vcs_connection_id = vcs_connection_id
+    return ws
+
+
+def _lease_request(body: dict | None = None) -> MagicMock:
+    request = MagicMock()
+    request.headers = {"authorization": "update-token good"}
+    request.body = AsyncMock(return_value=json.dumps(body or {}).encode())
+    return request
+
+
+class TestTheLeaseIsRenewed:
+    """#1571: the CLI renews part-way through a long update and adopts the token
+    in the response. Answering without one made every later call a 401."""
+
+    async def test_the_lease_comes_back(self) -> None:
+        from terrapod.api.routers.pulumi_service import renew_lease
+
+        ws = _stack_ws()
+        redis = AsyncMock()
+        redis.get.return_value = b"u-1"
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(
+                f"{MOD}._require_lease",
+                AsyncMock(return_value=({"lease": "good", "kind": "update"}, ws)),
+            ),
+        ):
+            out = await renew_lease(
+                "default",
+                "proj",
+                "dev",
+                "u-1",
+                _lease_request({"token": "", "duration": 300}),
+                AsyncMock(),
+            )
+        assert out == {"token": "good"}
+
+    async def test_both_the_record_and_the_stack_mutex_are_extended(self) -> None:
+        from terrapod.api.routers.pulumi_service import LEASE_TTL_SECONDS, renew_lease
+
+        ws = _stack_ws()
+        redis = AsyncMock()
+        redis.get.return_value = b"u-1"
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}._require_lease", AsyncMock(return_value=({"lease": "good"}, ws))),
+        ):
+            await renew_lease(
+                "default", "proj", "dev", "u-1", _lease_request({"duration": 300}), AsyncMock()
+            )
+        keys = [c.args for c in redis.expire.await_args_list]
+        assert ("tp:pulumi:update:u-1", LEASE_TTL_SECONDS) in keys
+        assert (f"tp:pulumi:stack_active:{ws.id}", LEASE_TTL_SECONDS) in keys
+
+    async def test_a_longer_duration_than_the_lease_is_honoured(self) -> None:
+        from terrapod.api.routers.pulumi_service import LEASE_TTL_SECONDS, renew_lease
+
+        redis = AsyncMock()
+        redis.get.return_value = None
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}._require_lease", AsyncMock(return_value=({"lease": "g"}, _stack_ws()))),
+        ):
+            await renew_lease(
+                "default",
+                "proj",
+                "dev",
+                "u-1",
+                _lease_request({"duration": LEASE_TTL_SECONDS * 2}),
+                AsyncMock(),
+            )
+        assert redis.expire.await_args_list[0].args[1] == LEASE_TTL_SECONDS * 2
+
+    async def test_another_updates_mutex_is_not_extended(self) -> None:
+        from terrapod.api.routers.pulumi_service import renew_lease
+
+        redis = AsyncMock()
+        redis.get.return_value = b"someone-else"
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}._require_lease", AsyncMock(return_value=({"lease": "g"}, _stack_ws()))),
+        ):
+            await renew_lease("default", "proj", "dev", "u-1", _lease_request(), AsyncMock())
+        assert len(redis.expire.await_args_list) == 1
+
+
+class TestCompletingReleasesTheWorkspace:
+    @pytest.mark.parametrize("kind,releases", [("update", True), ("preview", False)])
+    async def test_the_workspace_lock_goes_with_the_update(self, kind, releases) -> None:
+        from terrapod.api.routers.pulumi_service import complete_update
+
+        ws = _stack_ws()
+        redis = AsyncMock()
+        redis.get.return_value = b"u-1"
+        release = AsyncMock(return_value=True)
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}._require_lease", AsyncMock(return_value=({"kind": kind}, ws))),
+            patch(f"{MOD}.release_workspace_lock", release),
+        ):
+            await complete_update(
+                "default",
+                "proj",
+                "dev",
+                "u-1",
+                _lease_request({"status": "succeeded"}),
+                AsyncMock(),
+            )
+        assert release.called is releases
+
+
+class TestCancel:
+    """`pulumi cancel` reads `activeUpdate`, then posts to the update's cancel
+    route with the user's token (#1571)."""
+
+    async def test_the_stack_reports_its_active_update(self) -> None:
+        from terrapod.api.routers.pulumi_service import get_stack
+
+        ws = _stack_ws()
+        redis = AsyncMock()
+        redis.get.return_value = b"u-9"
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}._authorized_stack", AsyncMock(return_value=ws)),
+        ):
+            out = await get_stack("default", "proj", "dev", _user(), AsyncMock())
+        assert out["activeUpdate"] == "u-9"
+
+    async def test_an_idle_stack_reports_none(self) -> None:
+        from terrapod.api.routers.pulumi_service import get_stack
+
+        redis = AsyncMock()
+        redis.get.return_value = None
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}._authorized_stack", AsyncMock(return_value=_stack_ws())),
+        ):
+            out = await get_stack("default", "proj", "dev", _user(), AsyncMock())
+        assert "activeUpdate" not in out
+
+    async def test_cancelling_ends_the_update_and_frees_the_stack(self) -> None:
+        from terrapod.api.routers.pulumi_service import cancel_update
+
+        ws = _stack_ws()
+        redis = AsyncMock()
+        redis.hgetall.return_value = {"kind": "update", "workspace_id": str(ws.id), "lease": "l"}
+        redis.get.return_value = b"u-1"
+        release = AsyncMock(return_value=True)
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}._authorized_stack", AsyncMock(return_value=ws)),
+            patch(f"{MOD}.release_workspace_lock", release),
+        ):
+            assert await cancel_update("default", "proj", "dev", "u-1", _user(), AsyncMock()) == {}
+        deleted = [c.args[0] for c in redis.delete.await_args_list]
+        # The record goes, so the running CLI's lease stops working...
+        assert "tp:pulumi:update:u-1" in deleted
+        # ...and the stack is free for the next update.
+        assert f"tp:pulumi:stack_active:{ws.id}" in deleted
+        release.assert_awaited_once()
+
+    async def test_an_unknown_update_is_a_404(self) -> None:
+        from terrapod.api.routers.pulumi_service import cancel_update
+
+        redis = AsyncMock()
+        redis.hgetall.return_value = {}
+        with patch("terrapod.redis.client.get_redis_client", return_value=redis):
+            with pytest.raises(HTTPException) as exc:
+                await cancel_update("default", "proj", "dev", "gone", _user(), AsyncMock())
+        assert exc.value.status_code == 404
+
+    async def test_cancelling_costs_what_beginning_cost(self) -> None:
+        """A destroy is cancelled with the destroy capability, read from the
+        update, not with whatever the URL implies."""
+        from terrapod.api.routers.pulumi_service import cancel_update
+        from terrapod.auth import capabilities as cap
+
+        ws = _stack_ws()
+        redis = AsyncMock()
+        redis.hgetall.return_value = {"kind": "destroy", "workspace_id": str(ws.id)}
+        redis.get.return_value = None
+        authorized = AsyncMock(return_value=ws)
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}._authorized_stack", authorized),
+            patch(f"{MOD}.release_workspace_lock", AsyncMock()),
+        ):
+            await cancel_update("default", "proj", "dev", "u-1", _user(), AsyncMock())
+        assert authorized.await_args.args[3] == cap.RUN_APPLY_DESTROY
+
+    async def test_an_update_on_another_stack_cannot_be_cancelled_through_this_one(
+        self,
+    ) -> None:
+        from terrapod.api.routers.pulumi_service import cancel_update
+
+        redis = AsyncMock()
+        redis.hgetall.return_value = {"kind": "update", "workspace_id": str(uuid.uuid4())}
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}._authorized_stack", AsyncMock(return_value=_stack_ws())),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await cancel_update("default", "proj", "dev", "u-1", _user(), AsyncMock())
+        assert exc.value.status_code == 404
+        redis.delete.assert_not_awaited()
 
 
 class TestStackIdentity:

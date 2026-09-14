@@ -107,6 +107,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         logger.warning("CA initialization skipped (migration may be pending)", error=str(e))
 
     # Register and start distributed scheduler (multi-replica safe)
+    from terrapod.services.engine_gating import engine_enabled as _engine_enabled
     from terrapod.services.scheduler import (
         AI_LANE,
         register_periodic_task,
@@ -114,6 +115,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         start_scheduler,
         stop_scheduler,
     )
+
+    # A local Pulumi update holds the workspace lock while it runs (#1562); this
+    # releases the lock of one whose CLI died and stopped renewing its lease.
+    # Registered only with the engine on, like every Pulumi surface (#1429).
+    if _engine_enabled("pulumi"):
+        from terrapod.services.pulumi_update_locks import sweep_abandoned_updates
+
+        register_periodic_task(
+            "pulumi_update_sweep",
+            interval_seconds=60,
+            handler=sweep_abandoned_updates,
+            description="Release the workspace lock of an abandoned local Pulumi update",
+        )
 
     if settings.vcs.enabled:
         from terrapod.services.vcs_poller import handle_immediate_poll, poll_cycle

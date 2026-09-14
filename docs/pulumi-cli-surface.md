@@ -184,6 +184,7 @@ platform roles and the `everyone` floor all apply unchanged. What each call need
 | `destroy` | `run:apply-destroy` |
 | starting an update | whatever beginning it required — read from the update, not the URL |
 | polling an update | `run:read` |
+| cancelling an update (`pulumi cancel`) | whatever beginning it required — read from the update, not the URL |
 
 Without `workspace:read`, every call answers exactly as it would for a stack that does
 not exist — the same 404 and the same message — so stack names cannot be probed. With
@@ -195,6 +196,24 @@ against any other stack, and it is checked before the stack is looked up, so a c
 without a valid lease learns nothing about which stacks exist. A preview's lease cannot
 `checkpoint` — a preview never writes state, and allowing it would let `run:plan` buy
 `state:write`.
+
+**A local update holds the workspace lock (#1562).** An `up`, `refresh` or `destroy`
+from a CLI logged in to Terrapod takes the same workspace lock a Terraform CLI apply
+takes, for as long as the update runs:
+- The stack shows as locked in the UI, and the run dispatcher will not start an agent
+  apply against it meanwhile.
+- A workspace that is already locked, manually or by another update, refuses the update
+  with a 409 naming the lock.
+- An update is also refused while an agent run's apply is in progress on the stack.
+- A VCS-connected agent workspace refuses a local update entirely, as Terraform refuses
+  a CLI apply there, because its changes come from the repository. It can still be
+  previewed.
+
+Previews take no lock, so any number can run at once. The lock is released when the
+update completes or is cancelled with `pulumi cancel`. If the CLI dies instead, its lease
+lapses after 30 minutes without renewal, and a periodic sweep releases the lock within a
+minute of that. An operator can also clear it with force-unlock, as for any lock a
+crashed CLI leaves behind.
 
 **Runner tokens are refused.** This surface serves the CLI in local mode only. An
 agent-mode run never uses it: its stack lives in a file backend inside the runner Job,
@@ -439,12 +458,12 @@ The main lifecycle above was captured in #1502. This section covers the rest of 
 | `change-secrets-provider passphrase` | export → `batch-decrypt` → import | **works** | — |
 | `change-secrets-provider default` (back to the service) | `encrypt`, then export → import | **fails**: `encrypt` returns 500 (see below), and the stack is left on the passphrase provider | Byte-safe encryption |
 | `change-secrets-provider awskms://…` | a KMS call made **by the CLI itself**; the service only sees `GET` on the stack | nothing to serve | Nothing: KMS credentials belong wherever the CLI runs |
-| lease renewal | `POST …/update/{id}/renew_lease` with `{"token": "", "duration": 300}`, part-way through an update of a few minutes | **200 `{}` — no token** | `{"token": "<lease>"}`, and the stack lock extended to match |
-| `cancel` | `GET` on the stack, to read its `activeUpdate`; then `POST …/update/{activeUpdate}/cancel` with an empty body | the CLI stops at "stack has never been updated": `GET` on the stack never reports an `activeUpdate` | `activeUpdate` while an update runs, and the cancel route |
+| lease renewal | `POST …/update/{id}/renew_lease` with `{"token": "", "duration": 300}`, part-way through an update of a few minutes | **Fixed by #1562:** the lease comes back, and the update record and stack lock are extended to match. Before that, `200 {}` with no token | — |
+| `cancel` | `GET` on the stack, to read its `activeUpdate`; then `POST …/update/{activeUpdate}/cancel` with an empty body | **Fixed by #1562:** the stack reports `activeUpdate` while an update runs, and the cancel route ends it and releases the stack. Before that, the CLI stopped at "stack has never been updated" | — |
 
 **Three findings the table understates.**
 
-- **Every update longer than a few minutes fails.** The CLI renews its lease part-way through and uses the token in the response. Terrapod's renewal returns none, so every call after it carries an empty lease and gets a 401. The update then ends with "this command requires logging in". Its `complete` never lands, so the stack lock stays held until the lease runs out: 30 minutes in which the next update is refused with a 409. The live pass hit exactly this on a 200-second update.
+- **Every update longer than a few minutes fails.** The CLI renews its lease part-way through and uses the token in the response. Terrapod's renewal returns none, so every call after it carries an empty lease and gets a 401. The update then ends with "this command requires logging in". Its `complete` never lands, so the stack lock stays held until the lease runs out: 30 minutes in which the next update is refused with a 409. The live pass hit exactly this on a 200-second update. **Fixed by #1562**, which returns the lease from the renewal.
 - **`encrypt` is not byte-safe.** The CLI encrypts binary values, not only text. Terrapod decodes the plaintext as UTF-8 with `surrogateescape`, and the encryption layer then fails to encode it. The result is a 500 (`UnicodeEncodeError`) that the CLI retries four times at the start of every `up`, and a hard failure when moving a stack back to the service's own secrets provider. `decrypt` has the mirror-image problem.
 - **A Pulumi workspace cannot be deleted through the native API.** `DELETE /api/v1/workspaces/{id}` still goes through the Terraform-only lookup, so it answers 404. That is how the live pass's cleanup failed. It is the delete half of #1554.
 
