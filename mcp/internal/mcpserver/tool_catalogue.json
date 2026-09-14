@@ -443,8 +443,42 @@
     "input_schema": {
       "additionalProperties": false,
       "properties": {
+        "actions": {
+          "description": "changes view: keep resources with any of these actions: create, update, delete, replace, read, no-op. Default is every action except no-op",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "address": {
+          "description": "changes view: keep resources whose address starts with this, or matches it as a glob when it contains * or ? (brackets are literal, as in an index like web[0])",
+          "type": "string"
+        },
+        "limit": {
+          "description": "changes view: max changes to return (default 100)",
+          "type": "integer"
+        },
+        "max_bytes": {
+          "description": "full view: cap on returned bytes (default 65536)",
+          "type": "integer"
+        },
+        "offset": {
+          "description": "full view: byte offset to read the document from, for paging",
+          "type": "integer"
+        },
         "run_id": {
           "description": "the run id whose structured JSON plan output to fetch",
+          "type": "string"
+        },
+        "start": {
+          "description": "changes view: index of the first change to return, for paging",
+          "type": "integer"
+        },
+        "view": {
+          "description": "changes (default): the resources the plan acts on, each with only the attributes that change. full: the raw tofu show -json document",
           "type": "string"
         }
       },
