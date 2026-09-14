@@ -22,11 +22,14 @@ type RegistryModule struct {
 	VCSRepoURL      string            `json:"vcs-repo-url,omitempty"`
 	VCSBranch       string            `json:"vcs-branch,omitempty"`
 	VCSTagPattern   string            `json:"vcs-tag-pattern,omitempty"`
-	Status          string            `json:"status,omitempty"`
-	OwnerEmail      string            `json:"owner-email,omitempty"`
-	Source          string            `json:"source,omitempty"`
-	CreatedAt       string            `json:"created-at,omitempty"`
-	UpdatedAt       string            `json:"updated-at,omitempty"`
+	// Subdirectory is the path within the repository a submodule is
+	// published from (#1583); empty for a module at the repository root.
+	Subdirectory string `json:"subdirectory,omitempty"`
+	Status       string `json:"status,omitempty"`
+	OwnerEmail   string `json:"owner-email,omitempty"`
+	Source       string `json:"source,omitempty"`
+	CreatedAt    string `json:"created-at,omitempty"`
+	UpdatedAt    string `json:"updated-at,omitempty"`
 }
 
 // ModuleInterface is a published module version's input/output surface —
@@ -46,6 +49,9 @@ type CreateRegistryModuleRequest struct {
 	VCSRepoURL      string
 	VCSBranch       string
 	VCSTagPattern   string
+	// Subdirectory publishes the module from a subdirectory of the
+	// repository (#1583). Requires VCSRepoURL.
+	Subdirectory string
 }
 
 // UpdateRegistryModuleRequest patches a module. Name and provider
@@ -57,6 +63,7 @@ type UpdateRegistryModuleRequest struct {
 	VCSRepoURL      *string
 	VCSBranch       *string
 	VCSTagPattern   *string
+	Subdirectory    *string
 }
 
 // CreateRegistryModule creates a module. Caller becomes owner.
@@ -177,6 +184,9 @@ func regModuleCreateAttrs(req CreateRegistryModuleRequest) map[string]any {
 	if req.VCSTagPattern != "" {
 		attrs["vcs-tag-pattern"] = req.VCSTagPattern
 	}
+	if req.Subdirectory != "" {
+		attrs["subdirectory"] = req.Subdirectory
+	}
 	return attrs
 }
 
@@ -196,6 +206,9 @@ func regModuleUpdateAttrs(req UpdateRegistryModuleRequest) map[string]any {
 	}
 	if req.VCSTagPattern != nil {
 		attrs["vcs-tag-pattern"] = *req.VCSTagPattern
+	}
+	if req.Subdirectory != nil {
+		attrs["subdirectory"] = *req.Subdirectory
 	}
 	return attrs
 }
@@ -218,6 +231,7 @@ func registryModuleFromResource(res *Resource) *RegistryModule {
 		VCSRepoURL:      GetStringAttr(res, "vcs-repo-url"),
 		VCSBranch:       GetStringAttr(res, "vcs-branch"),
 		VCSTagPattern:   GetStringAttr(res, "vcs-tag-pattern"),
+		Subdirectory:    GetStringAttr(res, "subdirectory"),
 		Status:          GetStringAttr(res, "status"),
 		OwnerEmail:      GetStringAttr(res, "owner-email"),
 		Source:          GetStringAttr(res, "source"),

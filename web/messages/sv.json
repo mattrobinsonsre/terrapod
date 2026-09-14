@@ -381,6 +381,8 @@
       "createModule": "Skapa modul",
       "empty": "Inga moduler ännu. Skapa en för att komma igång.",
       "providerLabel": "Provider: {provider}",
+      "repoModuleCount": "{count, plural, one {# modul} other {# moduler}} i det här repositoriet",
+      "submoduleAt": "Undermodul: {path}",
       "versionCount": "{count, plural, one {# version} other {# versioner}}",
       "loadFailed": "Det gick inte att läsa in moduler",
       "createFailed": "Det gick inte att skapa modulen",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (lämna tomt för standard)",
         "tagPattern": "Taggmönster",
         "tagPatternHint": "Endast taggar som matchar detta mönster skapar versioner (t.ex. v1.0.0)",
+        "subdirectoryOptional": "Underkatalog (valfritt)",
+        "subdirectoryHint": "För en undermodul: sökvägen i repositoriet att publicera från, t.ex. modules/create. Lämna tomt för repositoriets rot.",
         "labelsOptional": "Etiketter (valfritt)",
         "creating": "Skapar...",
         "create": "Skapa"

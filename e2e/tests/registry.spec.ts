@@ -1,6 +1,31 @@
 import { test, expect } from '@playwright/test';
+import { getStoredToken, createRegistryModule } from '../helpers/api';
 
 test.describe('Registry — Modules', () => {
+  test('modules sharing a repository are grouped, with the submodule path shown (#1583)', async ({
+    page,
+  }) => {
+    // A root module and a submodule of the same repository. Each run gets its
+    // own repository URL, so parallel runs never share a group. Module names
+    // are registry-safe: lowercase letters and digits, no hyphens.
+    const token = getStoredToken();
+    const stamp = Date.now().toString(36);
+    const repo = `https://github.com/e2e-org/terraform-mg-${stamp}`;
+    const root = `e2emgroot${stamp}`;
+    await createRegistryModule(token, root, 'azurerm', { 'vcs-repo-url': repo });
+    await createRegistryModule(token, `e2emgcreate${stamp}`, 'azurerm', {
+      'vcs-repo-url': repo,
+      subdirectory: 'modules/create',
+    });
+
+    await page.goto('/registry/modules');
+    const group = page.locator('section', { has: page.getByRole('heading', { name: repo }) });
+    await expect(group).toBeVisible({ timeout: 10_000 });
+    await expect(group).toContainText('2 modules in this repository');
+    await expect(group.getByText(root, { exact: true })).toBeVisible();
+    await expect(group.getByText('Submodule: modules/create')).toBeVisible();
+  });
+
   test('module list page loads', async ({ page }) => {
     await page.goto('/registry/modules');
     await expect(page.locator('h1:has-text("Modules")')).toBeVisible();

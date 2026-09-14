@@ -381,6 +381,8 @@
       "createModule": "Vytvořit modul",
       "empty": "Zatím žádné moduly. Vytvořte jeden a začněte.",
       "providerLabel": "Provider: {provider}",
+      "repoModuleCount": "{count, plural, one {# modul} few {# moduly} many {# modulu} other {# modulů}} v tomto repozitáři",
+      "submoduleAt": "Submodul: {path}",
       "versionCount": "{count, plural, one {# verze} few {# verze} many {# verze} other {# verzí}}",
       "loadFailed": "Nepodařilo se načíst moduly",
       "createFailed": "Nepodařilo se vytvořit modul",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (ponechte prázdné pro výchozí)",
         "tagPattern": "Vzor tagů",
         "tagPatternHint": "Verze vytvářejí pouze tagy odpovídající tomuto vzoru (např. v1.0.0)",
+        "subdirectoryOptional": "Podadresář (volitelné)",
+        "subdirectoryHint": "Pro submodul: cesta v repozitáři, ze které se publikuje, např. modules/create. Pro kořen repozitáře ponechte prázdné.",
         "labelsOptional": "Štítky (volitelné)",
         "creating": "Vytváření...",
         "create": "Vytvořit"

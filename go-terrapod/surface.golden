@@ -217,6 +217,7 @@ field CreatePolicySetRequest.VCSRepoURL string
 field CreateRegistryModuleRequest.Labels map[string]string
 field CreateRegistryModuleRequest.Name string
 field CreateRegistryModuleRequest.ProviderName string
+field CreateRegistryModuleRequest.Subdirectory string
 field CreateRegistryModuleRequest.VCSBranch string
 field CreateRegistryModuleRequest.VCSConnectionID string
 field CreateRegistryModuleRequest.VCSRepoURL string
@@ -580,6 +581,7 @@ field RegistryModule.OwnerEmail string `json:"owner-email,omitempty"`
 field RegistryModule.ProviderName string `json:"provider"`
 field RegistryModule.Source string `json:"source,omitempty"`
 field RegistryModule.Status string `json:"status,omitempty"`
+field RegistryModule.Subdirectory string `json:"subdirectory,omitempty"`
 field RegistryModule.UpdatedAt string `json:"updated-at,omitempty"`
 field RegistryModule.VCSBranch string `json:"vcs-branch,omitempty"`
 field RegistryModule.VCSConnectionID string `json:"vcs-connection-id,omitempty"`
@@ -832,6 +834,7 @@ field UpdatePolicySetRequest.PolicyPath *string
 field UpdatePolicySetRequest.VCSBranch *string
 field UpdatePolicySetRequest.VCSRepoURL *string
 field UpdateRegistryModuleRequest.Labels *map[string]string
+field UpdateRegistryModuleRequest.Subdirectory *string
 field UpdateRegistryModuleRequest.VCSBranch *string
 field UpdateRegistryModuleRequest.VCSConnectionID *string
 field UpdateRegistryModuleRequest.VCSRepoURL *string

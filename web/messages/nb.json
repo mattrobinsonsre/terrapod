@@ -381,6 +381,8 @@
       "createModule": "Opprett modul",
       "empty": "Ingen moduler ennå. Opprett en for å komme i gang.",
       "providerLabel": "Leverandør: {provider}",
+      "repoModuleCount": "{count, plural, one {# modul} other {# moduler}} i dette repositoriet",
+      "submoduleAt": "Undermodul: {path}",
       "versionCount": "{count, plural, one {# versjon} other {# versjoner}}",
       "loadFailed": "Kunne ikke laste moduler",
       "createFailed": "Kunne ikke opprette modul",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (la stå tom for standard)",
         "tagPattern": "Etikettmønster",
         "tagPatternHint": "Kun etiketter som samsvarer med dette mønsteret oppretter versjoner (f.eks. v1.0.0)",
+        "subdirectoryOptional": "Underkatalog (valgfritt)",
+        "subdirectoryHint": "For en undermodul: stien i repositoriet det skal publiseres fra, f.eks. modules/create. La stå tom for roten av repositoriet.",
         "labelsOptional": "Etiketter (valgfritt)",
         "creating": "Oppretter …",
         "create": "Opprett"

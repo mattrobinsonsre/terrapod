@@ -381,6 +381,8 @@
       "createModule": "创建模块",
       "empty": "暂无模块。创建一个以开始使用。",
       "providerLabel": "提供程序：{provider}",
+      "repoModuleCount": "此仓库中的 {count, plural, one {# 个模块} other {# 个模块}}",
+      "submoduleAt": "子模块：{path}",
       "versionCount": "{count, plural, one {# 个版本} other {# 个版本}}",
       "loadFailed": "加载模块失败",
       "createFailed": "创建模块失败",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main（留空则使用默认）",
         "tagPattern": "标签模式",
         "tagPatternHint": "仅匹配此模式的标签会创建版本（例如 v1.0.0）",
+        "subdirectoryOptional": "子目录（可选）",
+        "subdirectoryHint": "对于子模块：要发布的仓库内路径，例如 modules/create。仓库根目录请留空。",
         "labelsOptional": "标签（可选）",
         "creating": "正在创建...",
         "create": "创建"

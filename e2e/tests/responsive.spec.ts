@@ -712,6 +712,26 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('a repository group of modules does not scroll sideways at phone width (#1583)', async ({
+    page,
+  }) => {
+    // Modules sharing a repository are headed by its URL, which can be long;
+    // it has to wrap rather than push the page wider than the phone.
+    const token = getStoredToken();
+    const stamp = Date.now().toString(36);
+    const repo = `https://github.com/e2e-org/a-rather-long-repository-name-to-wrap-${stamp}`;
+    await createRegistryModule(token, `respmgroot${stamp}`, 'aws', { 'vcs-repo-url': repo });
+    await createRegistryModule(token, `respmgsub${stamp}`, 'aws', {
+      'vcs-repo-url': repo,
+      subdirectory: 'modules/create',
+    });
+
+    await page.goto('/registry/modules');
+    await expect(page.getByRole('heading', { name: repo })).toBeVisible({ timeout: 15_000 });
+
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('estate topology defaults to the table at phone width (#763)', async ({ page }) => {
     // On a phone the estate page defaults to the accessible Table view rather
     // than heavy WebGL (#736 a11y + #719 mobile). Assert the table renders and

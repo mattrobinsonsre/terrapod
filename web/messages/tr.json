@@ -381,6 +381,8 @@
       "createModule": "Modül Oluştur",
       "empty": "Henüz modül yok. Başlamak için bir tane oluşturun.",
       "providerLabel": "Sağlayıcı: {provider}",
+      "repoModuleCount": "Bu depoda {count, plural, one {# modül} other {# modül}}",
+      "submoduleAt": "Alt modül: {path}",
       "versionCount": "{count, plural, one {# sürüm} other {# sürüm}}",
       "loadFailed": "Modüller yüklenemedi",
       "createFailed": "Modül oluşturulamadı",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (varsayılan için boş bırakın)",
         "tagPattern": "Etiket Deseni",
         "tagPatternHint": "Yalnızca bu desenle eşleşen etiketler sürüm oluşturur (örn. v1.0.0)",
+        "subdirectoryOptional": "Alt dizin (isteğe bağlı)",
+        "subdirectoryHint": "Bir alt modül için: deponun içinde yayımlanacak yol, ör. modules/create. Deponun kökü için boş bırakın.",
         "labelsOptional": "Etiketler (isteğe bağlı)",
         "creating": "Oluşturuluyor...",
         "create": "Oluştur"

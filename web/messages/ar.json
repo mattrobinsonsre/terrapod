@@ -381,6 +381,8 @@
       "createModule": "إنشاء وحدة",
       "empty": "لا توجد وحدات بعد. أنشئ واحدة للبدء.",
       "providerLabel": "المزوّد: {provider}",
+      "repoModuleCount": "{count, plural, zero {لا وحدات} one {وحدة واحدة} two {وحدتان} few {# وحدات} many {# وحدة} other {# وحدة}} في هذا المستودع",
+      "submoduleAt": "وحدة فرعية: {path}",
       "versionCount": "{count, plural, zero {لا إصدارات} one {إصدار واحد} two {إصداران} few {# إصدارات} many {# إصدارًا} other {# إصدار}}",
       "loadFailed": "فشل تحميل الوحدات",
       "createFailed": "فشل إنشاء الوحدة",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (اتركه فارغًا للفرع الافتراضي)",
         "tagPattern": "نمط الوسم",
         "tagPatternHint": "تنشئ الوسوم المطابقة لهذا النمط فقط إصدارات (مثل v1.0.0)",
+        "subdirectoryOptional": "الدليل الفرعي (اختياري)",
+        "subdirectoryHint": "للوحدة الفرعية: المسار داخل المستودع الذي يُنشر منه، مثل modules/create. اتركه فارغًا لجذر المستودع.",
         "labelsOptional": "التسميات (اختياري)",
         "creating": "جارٍ الإنشاء...",
         "create": "إنشاء"

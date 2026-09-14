@@ -53,6 +53,7 @@ interface ModuleDetail {
     'vcs-branch': string
     'vcs-tag-pattern': string
     'vcs-last-tag': string
+    subdirectory?: string
     'version-statuses': VersionStatus[]
     'created-at': string | null
     'updated-at': string | null
@@ -168,6 +169,7 @@ export default function ModuleDetailPage() {
   const [vcsRepoUrl, setVcsRepoUrl] = useState('')
   const [vcsBranch, setVcsBranch] = useState('')
   const [vcsTagPattern, setVcsTagPattern] = useState('v*')
+  const [vcsSubdirectory, setVcsSubdirectory] = useState('')
   const [savingVcs, setSavingVcs] = useState(false)
 
   // Module interface (inputs/outputs)
@@ -231,6 +233,7 @@ export default function ModuleDetailPage() {
         setVcsRepoUrl(attrs['vcs-repo-url'] || '')
         setVcsBranch(attrs['vcs-branch'] || '')
         setVcsTagPattern(attrs['vcs-tag-pattern'] || 'v*')
+        setVcsSubdirectory(attrs.subdirectory || '')
 
         // Load interface for latest uploaded version
         const versions = (attrs['version-statuses'] || []) as VersionStatus[]
@@ -394,6 +397,7 @@ export default function ModuleDetailPage() {
                 vcs_repo_url: vcsRepoUrl,
                 vcs_branch: vcsBranch,
                 vcs_tag_pattern: vcsTagPattern,
+                subdirectory: vcsSubdirectory.trim(),
               },
             },
           }),
@@ -676,6 +680,18 @@ export default function ModuleDetailPage() {
                     />
                     <p className="mt-1 text-xs text-slate-500">{t('moduleDetail.vcs.tagPatternHint')}</p>
                   </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="vcs-subdir" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.subdirectoryOptional')}</label>
+                    <input
+                      id="vcs-subdir"
+                      type="text"
+                      value={vcsSubdirectory}
+                      onChange={(e) => setVcsSubdirectory(e.target.value)}
+                      placeholder="modules/create" // i18n-ignore — an example path, not copy
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    />
+                    <p className="mt-1 text-xs text-slate-500">{t('modules.form.subdirectoryHint')}</p>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -707,6 +723,9 @@ export default function ModuleDetailPage() {
                   <div className="text-sm">
                     <span className="text-green-300">{t('moduleDetail.vcsStatus.connected')}</span>{' '}
                     <span className="text-slate-300 font-mono text-xs">{module.attributes['vcs-repo-url']}</span>
+                    {module.attributes.subdirectory && (
+                      <span className="text-slate-400 font-mono text-xs ms-2">{t('modules.submoduleAt', { path: module.attributes.subdirectory })}</span>
+                    )}
                     {module.attributes['vcs-last-tag'] && (
                       <span className="text-slate-400 ms-2">{t('moduleDetail.vcsStatus.lastTag', { tag: module.attributes['vcs-last-tag'] })}</span>
                     )}

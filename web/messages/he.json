@@ -381,6 +381,8 @@
       "createModule": "יצירת מודול",
       "empty": "אין עדיין מודולים. צרו אחד כדי להתחיל.",
       "providerLabel": "ספק: {provider}",
+      "repoModuleCount": "{count, plural, one {מודול אחד} two {# מודולים} many {# מודולים} other {# מודולים}} במאגר הזה",
+      "submoduleAt": "מודול משנה: {path}",
       "versionCount": "{count, plural, one {# גרסה} two {# גרסאות} many {# גרסאות} other {# גרסאות}}",
       "loadFailed": "טעינת המודולים נכשלה",
       "createFailed": "יצירת המודול נכשלה",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (השאירו ריק לברירת מחדל)",
         "tagPattern": "תבנית תגית",
         "tagPatternHint": "רק תגיות התואמות לתבנית זו יוצרות גרסאות (למשל v1.0.0)",
+        "subdirectoryOptional": "תיקיית משנה (אופציונלי)",
+        "subdirectoryHint": "עבור מודול משנה: הנתיב במאגר שממנו מפרסמים, לדוגמה modules/create. השאירו ריק עבור שורש המאגר.",
         "labelsOptional": "תוויות (אופציונלי)",
         "creating": "יוצר...",
         "create": "יצירה"

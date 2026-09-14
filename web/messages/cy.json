@@ -381,6 +381,8 @@
       "createModule": "Creu Modiwl",
       "empty": "Dim modiwlau eto. Crëwch un i ddechrau.",
       "providerLabel": "Darparwr: {provider}",
+      "repoModuleCount": "{count, plural, one {# modiwl} other {# modiwl}} yn y storfa hon",
+      "submoduleAt": "Is-fodiwl: {path}",
       "versionCount": "{count, plural, one {# fersiwn} other {# fersiwn}}",
       "loadFailed": "Methwyd llwytho'r modiwlau",
       "createFailed": "Methwyd creu'r modiwl",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (gadewch yn wag am y rhagosodiad)",
         "tagPattern": "Patrwm Tag",
         "tagPatternHint": "Dim ond tagiau sy'n cyfateb i'r patrwm hwn sy'n creu fersiynau (e.e. v1.0.0)",
+        "subdirectoryOptional": "Is-gyfeiriadur (dewisol)",
+        "subdirectoryHint": "Ar gyfer is-fodiwl: y llwybr yn y storfa i gyhoeddi ohono, e.e. modules/create. Gadewch yn wag ar gyfer gwraidd y storfa.",
         "labelsOptional": "Labeli (dewisol)",
         "creating": "Wrthi'n creu...",
         "create": "Creu"

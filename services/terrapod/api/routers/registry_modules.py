@@ -49,6 +49,7 @@ from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import ModuleWorkspaceLink, RegistryModuleVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.module_subdirectory import SubdirectoryError, normalize_subdirectory
 from terrapod.services.registry_module_service import (
     create_module,
     create_module_version,
@@ -95,6 +96,7 @@ class CreateModuleRequest(BaseModel):
             vcs_repo_url: str = ""
             vcs_branch: str = ""
             vcs_tag_pattern: str = ""
+            subdirectory: str = ""
 
             model_config = {
                 "alias_generator": lambda f: f.replace("_", "-"),
@@ -164,6 +166,7 @@ def _module_to_jsonapi(module, caps: frozenset[str] | None = None) -> dict:  # t
             "vcs-branch": module.vcs_branch,
             "vcs-tag-pattern": module.vcs_tag_pattern,
             "vcs-last-tag": module.vcs_last_tag,
+            "subdirectory": module.subdirectory or "",
             "version-statuses": versions,
             "created-at": rfc3339(module.created_at),
             "updated-at": rfc3339(module.updated_at),
@@ -274,6 +277,51 @@ async def download_module_cli(
 # --- TFE V2 Management Endpoints ---
 
 
+def _normalized_subdirectory(value: str | None) -> str:
+    """A requested subdirectory in canonical form, or 422 (#1583)."""
+    try:
+        return normalize_subdirectory(value)
+    except SubdirectoryError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid subdirectory: {e}") from e
+
+
+_SUBDIRECTORY_NEEDS_REPO = "A subdirectory needs a VCS repository URL"
+
+
+def _reconcile_subdirectory(module, *, explicit: bool) -> None:  # type: ignore[no-untyped-def]
+    """A subdirectory means something only inside a repository (#1583).
+
+    Asked for without one, it is refused. Left over after the repository was
+    removed — VCS disconnected — it is cleared: a submodule of no repository
+    is not a thing.
+    """
+    if module.subdirectory and not module.vcs_repo_url:
+        if explicit:
+            raise HTTPException(status_code=422, detail=_SUBDIRECTORY_NEEDS_REPO)
+        module.subdirectory = ""
+
+
+async def _commit_module(db: AsyncSession, module) -> None:  # type: ignore[no-untyped-def]
+    """Commit, turning a second registration of one repository subdirectory
+    (the partial unique index, #1583) into a 409 rather than a 500."""
+    # Read before committing: after a failed commit and rollback these would be
+    # expired, and reloading them is not possible outside the session's greenlet.
+    subdirectory, repo_url = module.subdirectory, module.vcs_repo_url
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        if not subdirectory:
+            raise
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Subdirectory {subdirectory!r} of {repo_url} is already registered "
+                "as another module"
+            ),
+        ) from e
+
+
 @management_router.post("/registry-modules")
 async def create_module_endpoint(
     body: CreateModuleRequest,
@@ -282,6 +330,9 @@ async def create_module_endpoint(
 ) -> JSONResponse:
     """Create a new registry module. Any authenticated user; creator becomes owner."""
     attrs = body.data.attributes
+    subdirectory = _normalized_subdirectory(attrs.subdirectory)
+    if subdirectory and not attrs.vcs_repo_url:
+        raise HTTPException(status_code=422, detail=_SUBDIRECTORY_NEEDS_REPO)
 
     module = await create_module(db, "default", attrs.name, attrs.provider)
     module.owner_email = user.email
@@ -311,8 +362,9 @@ async def create_module_endpoint(
         module.vcs_branch = attrs.vcs_branch
     if attrs.vcs_tag_pattern:
         module.vcs_tag_pattern = attrs.vcs_tag_pattern
+    module.subdirectory = subdirectory
 
-    await db.commit()
+    await _commit_module(db, module)
     await db.refresh(module, attribute_names=["versions"])
 
     logger.info(
@@ -569,8 +621,11 @@ async def update_module_endpoint(
         module.vcs_branch = attrs["vcs-branch"] or ""
     if "vcs-tag-pattern" in attrs:
         module.vcs_tag_pattern = attrs["vcs-tag-pattern"] or "v*"
+    if "subdirectory" in attrs:
+        module.subdirectory = _normalized_subdirectory(attrs["subdirectory"])
+    _reconcile_subdirectory(module, explicit="subdirectory" in attrs)
 
-    await db.commit()
+    await _commit_module(db, module)
     await db.refresh(module)
     return JSONResponse(content={"data": _module_to_jsonapi(module, caps)})
 
@@ -779,6 +834,9 @@ class UpdateModuleVCSRequest(BaseModel):
             vcs_repo_url: str = ""
             vcs_branch: str = ""
             vcs_tag_pattern: str = "v*"
+            # Absent means leave it alone: an older client updating the VCS
+            # settings must not clear a submodule's subdirectory (#1583).
+            subdirectory: str | None = None
 
         type: str = "registry-modules"
         attributes: Attributes
@@ -838,7 +896,10 @@ async def update_module_vcs_endpoint(
     module.vcs_repo_url = attrs.vcs_repo_url
     module.vcs_branch = attrs.vcs_branch
     module.vcs_tag_pattern = attrs.vcs_tag_pattern or "v*"
-    await db.commit()
+    if attrs.subdirectory is not None:
+        module.subdirectory = _normalized_subdirectory(attrs.subdirectory)
+    _reconcile_subdirectory(module, explicit=attrs.subdirectory is not None)
+    await _commit_module(db, module)
     await db.refresh(module, attribute_names=["versions"])
 
     logger.info(
