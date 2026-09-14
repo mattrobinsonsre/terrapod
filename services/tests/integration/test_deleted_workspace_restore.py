@@ -909,14 +909,31 @@ class TestPulumiRestore:
         assert attrs["state-versions-restored"] == 2
         assert attrs["state-versions-skipped"] == []
 
-        new_id = resp.json()["data"]["id"]
-        current = await client.get(
-            f"/api/v2/workspaces/{new_id}/current-state-version", headers=AUTH
-        )
-        body = current.json()["data"]
-        assert body["attributes"]["serial"] == 2
-        raw = await storage.get(
-            f"state/{new_id.removeprefix('ws-')}/{body['id'].removeprefix('sv-')}.tfstate"
-        )
+        # Read from the database: the TFE `current-state-version` route serves
+        # Terraform workspaces only, so it has nothing to say about a stack.
+        import uuid
+
+        from sqlalchemy import select
+
+        from terrapod.db.models import StateVersion
+        from terrapod.db.session import get_db_session
+
+        new_raw = resp.json()["data"]["id"].removeprefix("ws-")
+        async with get_db_session() as db:
+            versions = (
+                (
+                    await db.execute(
+                        select(StateVersion)
+                        .where(StateVersion.workspace_id == uuid.UUID(new_raw))
+                        .order_by(StateVersion.serial)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert [v.serial for v in versions] == [1, 2]
+        assert all(v.state_size > 0 and v.sha256 for v in versions)
+
+        raw = await storage.get(f"state/{new_raw}/{versions[-1].id}.tfstate")
         restored = json.loads(await dws.decrypt_state_bytes(raw))
         assert restored["manifest"] == {"n": 2}
