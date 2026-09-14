@@ -13,6 +13,7 @@ When a new module version is published (tag-based or manual upload), standard ru
 are queued on all linked workspaces to apply the updated module.
 """
 
+import asyncio
 import uuid
 
 from sqlalchemy import select
@@ -30,6 +31,7 @@ from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service, vcs_rate_limit
 from terrapod.services.archive_utils import strip_archive_top_level_dir_async
+from terrapod.services.module_subdirectory import scope_archive_to_subdirectory
 from terrapod.services.vcs_provider import PullRequest
 from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key, module_override_key
@@ -333,6 +335,22 @@ async def _create_module_test_runs(
 
     # Strip top-level directory wrapper from VCS archive before storing
     archive_bytes = await strip_archive_top_level_dir_async(archive_bytes)
+
+    # A submodule (#1583) is tested as it is published: its own subdirectory,
+    # re-rooted — not the whole repository.
+    if module.subdirectory:
+        scoped = await asyncio.to_thread(
+            scope_archive_to_subdirectory, archive_bytes, module.subdirectory
+        )
+        if scoped is None:
+            logger.info(
+                "Module PR has nothing under the module's subdirectory; no impact runs",
+                module=module.name,
+                pr_number=pr.number,
+                subdirectory=module.subdirectory,
+            )
+            return
+        archive_bytes = scoped
 
     # Upload override tarball (keyed by commit SHA for reuse across workspaces/retries)
     override_key = module_override_key(pr.head_sha, module.namespace, module.name, module.provider)

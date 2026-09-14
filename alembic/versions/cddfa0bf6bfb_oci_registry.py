@@ -4,7 +4,7 @@ Pure expand: six new tables, nothing altered and nothing dropped, so a lagging
 replica during a rolling upgrade neither sees nor needs them.
 
 Revision ID: cddfa0bf6bfb
-Revises: e1bf96919d09
+Revises: 6dee2fd6e9b0
 Create Date: 2026-08-21
 
 """
@@ -14,12 +14,14 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "cddfa0bf6bfb"
-# Ordered so that release/v1.6's chain is a PREFIX of main's: a v1.6
-# deployment upgrading to a main-based release must find its own head
-# partway down this chain with main's extra work still ahead of it. If
-# these two lines are "tidied" back, `alembic upgrade head` on such a
-# database runs NOTHING and silently skips main's OCI/package-cache work.
-down_revision = "8c02c0a6b39b"
+# Ordered so that every release line's chain is a PREFIX of main's: release
+# v1.6 ends at 8c02c0a6b39b and release v1.7 at 6dee2fd6e9b0, and a deployment
+# on either must find its own head partway down this chain with main's extra
+# work still ahead of it. This is the first main-only migration, so it sits on
+# the newest release line's head. If this is "tidied" back, `alembic upgrade
+# head` on such a database skips main's OCI/package-cache work, or finds two
+# heads. tests/db/test_alembic_revision_graph.py fails if it is (#1594).
+down_revision = "6dee2fd6e9b0"
 branch_labels = None
 depends_on = None
 

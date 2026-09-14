@@ -381,6 +381,8 @@
       "createModule": "モジュールを作成",
       "empty": "モジュールがまだありません。作成して始めましょう。",
       "providerLabel": "プロバイダー: {provider}",
+      "repoModuleCount": "このリポジトリ内の{count, plural, one {# 個のモジュール} other {# 個のモジュール}}",
+      "submoduleAt": "サブモジュール：{path}",
       "versionCount": "{count, plural, one {# 個のバージョン} other {# 個のバージョン}}",
       "loadFailed": "モジュールの読み込みに失敗しました",
       "createFailed": "モジュールの作成に失敗しました",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main（空欄でデフォルト）",
         "tagPattern": "タグパターン",
         "tagPatternHint": "このパターンに一致するタグのみがバージョンを作成します（例: v1.0.0）",
+        "subdirectoryOptional": "サブディレクトリ（任意）",
+        "subdirectoryHint": "サブモジュールの場合：公開元となるリポジトリ内のパス（例：modules/create）。リポジトリのルートの場合は空欄のままにします。",
         "labelsOptional": "ラベル（任意）",
         "creating": "作成中...",
         "create": "作成"

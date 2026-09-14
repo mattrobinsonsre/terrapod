@@ -381,6 +381,8 @@
       "createModule": "建立模組",
       "empty": "暫無模組。建立一個以開始使用。",
       "providerLabel": "提供者：{provider}",
+      "repoModuleCount": "此倉庫中的 {count, plural, one {# 個模組} other {# 個模組}}",
+      "submoduleAt": "子模組：{path}",
       "versionCount": "{count, plural, one {# 個版本} other {# 個版本}}",
       "loadFailed": "載入模組失敗",
       "createFailed": "建立模組失敗",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main（留空則使用預設）",
         "tagPattern": "標籤模式",
         "tagPatternHint": "僅匹配此模式的標籤會建立版本（例如 v1.0.0）",
+        "subdirectoryOptional": "子目錄（選填）",
+        "subdirectoryHint": "對於子模組：要發佈的倉庫內路徑，例如 modules/create。倉庫根目錄請留空。",
         "labelsOptional": "標籤（可選）",
         "creating": "正在建立...",
         "create": "建立"

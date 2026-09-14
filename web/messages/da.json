@@ -381,6 +381,8 @@
       "createModule": "Opret modul",
       "empty": "Ingen moduler endnu. Opret et for at komme i gang.",
       "providerLabel": "Provider: {provider}",
+      "repoModuleCount": "{count, plural, one {# modul} other {# moduler}} i dette repositorie",
+      "submoduleAt": "Undermodul: {path}",
       "versionCount": "{count, plural, one {# version} other {# versioner}}",
       "loadFailed": "Kunne ikke indlæse moduler",
       "createFailed": "Kunne ikke oprette modul",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (lad stå tom for standard)",
         "tagPattern": "Tag-mønster",
         "tagPatternHint": "Kun tags, der matcher dette mønster, opretter versioner (f.eks. v1.0.0)",
+        "subdirectoryOptional": "Undermappe (valgfri)",
+        "subdirectoryHint": "For et undermodul: stien i repositoriet, der skal udgives fra, f.eks. modules/create. Lad stå tom for roden af repositoriet.",
         "labelsOptional": "Labels (valgfri)",
         "creating": "Opretter...",
         "create": "Opret"

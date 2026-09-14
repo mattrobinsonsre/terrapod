@@ -37,6 +37,18 @@ def state_key(workspace_id: str, version_id: str) -> str:
     return f"state/{workspace_id}/{version_id}.tfstate"
 
 
+def pulumi_checkpoint_key(workspace_id: str, update_id: str) -> str:
+    """Key for a local Pulumi update's latest checkpoint, until it is promoted (#1564).
+
+    Under `state/`, so it is state for replication and encryption. It is not under
+    `state/{workspace_id}/`: restore reads every object there as a state version,
+    and a checkpoint is not one until the update ends. The segment is not a uuid,
+    so the orphaned-state reaper passes over it, and the `.json` suffix keeps it out
+    of anything that looks for `.tfstate`.
+    """
+    return f"state/pulumi-checkpoints/{workspace_id}/{update_id}.json"
+
+
 def state_backup_key(workspace_id: str, version_id: str) -> str:
     """Key for a backup of a workspace state version."""
     return f"state/{workspace_id}/{version_id}.backup.tfstate"

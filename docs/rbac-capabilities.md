@@ -99,8 +99,8 @@ capabilities).
 
 | Capability | Gates |
 |---|---|
-| `run:plan` | POST runs (plan-only branch: `plan_only=true`) |
-| `run:cancel` | POST runs/{id}/actions/discard; .../cancel; .../retry |
+| `run:plan` | POST runs (plan-only branch: `plan_only=true`); POST runs/{id}/actions/retry of a plan-only run |
+| `run:cancel` | POST runs/{id}/actions/discard; .../cancel |
 | `workspace:lock` | POST workspaces/{id}/actions/lock; .../unlock (own lock) |
 | `state:read` | GET state-versions/{id}/download (**raw** state JSON — contains secrets) |
 | `drift:dismiss` | POST workspaces/{id}/actions/dismiss-drift |
@@ -110,8 +110,8 @@ capabilities).
 
 | Capability | Gates |
 |---|---|
-| `run:apply` | POST runs (apply branch: not plan-only); POST runs/{id}/actions/apply (confirm) |
-| `run:apply-destroy` | the same two gates **when `is_destroy=true`** (separable enforcement lands with the enforcement slice; in the `write` preset so migrated write roles keep destroy) |
+| `run:apply` | POST runs (apply branch: not plan-only); POST runs/{id}/actions/apply (confirm); POST runs/{id}/actions/retry of an apply-capable run |
+| `run:apply-destroy` | the same three gates **when `is_destroy=true`** (separable enforcement lands with the enforcement slice; in the `write` preset so migrated write roles keep destroy) |
 | `var:write` | POST/PATCH/DELETE workspace vars |
 | `state:write` | POST workspaces/{id}/state-versions; POST state-versions actions/upload; POST state-versions/{id}/actions/rollback |
 | `config:upload` | POST workspaces/{id}/configuration-versions |

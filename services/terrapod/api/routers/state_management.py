@@ -66,6 +66,35 @@ def _read_state_lineage_md5(path: str) -> tuple[str, str]:
     return state_data.get("lineage", ""), h.hexdigest()
 
 
+def _read_pulumi_export(path: str) -> tuple[bytes, str, str]:
+    """A Pulumi state upload as the deployment to store, with md5 and sha256 (worker thread).
+
+    Accepts `pulumi stack export` output — `{"version": 3, "deployment": {...}}` —
+    and a bare deployment, which is what `export` prints the deployment as.
+    Anything else, a Terraform state included, is refused: stored, it would be
+    read back as the stack's deployment.
+
+    An export made with `--show-secrets` is refused too. Stored as it stands it
+    would put the stack's secrets in the state in the clear; `pulumi stack import`
+    is the way to load one, because the CLI seals them first.
+    """
+    from terrapod.services.pulumi_state_service import has_plaintext_secrets
+
+    with open(path, "rb") as fh:
+        doc = json.load(fh)
+    deployment = doc.get("deployment") if isinstance(doc, dict) and "deployment" in doc else doc
+    if not isinstance(deployment, dict) or "manifest" not in deployment:
+        raise ValueError("expected the output of `pulumi stack export`")
+    if has_plaintext_secrets(deployment):
+        raise ValueError(
+            "the export carries plaintext secrets; export without --show-secrets, "
+            "or load it with `pulumi stack import`"
+        )
+    payload = json.dumps(deployment).encode()
+    md5 = hashlib.md5(payload).hexdigest()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+    return payload, md5, hashlib.sha256(payload).hexdigest()
+
+
 async def _require_sv_workspace_capability(
     sv: StateVersion,
     required: str,
@@ -285,10 +314,23 @@ async def upload_state_manual(
         if state_size == 0:
             raise HTTPException(status_code=400, detail="Empty request body")
 
-        try:
-            lineage, md5 = await asyncio.to_thread(_read_state_lineage_md5, tmp_path)
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise HTTPException(status_code=400, detail="Invalid state JSON") from exc
+        # A Pulumi stack's state is its deployment, and what an operator has to
+        # hand is `pulumi stack export` output, which wraps it. It is stored
+        # unwrapped, as the service surface stores it, or every later read of
+        # the stack would find the wrapper where the deployment should be (#1564).
+        pulumi_payload: bytes | None = None
+        sha256 = ""
+        if ws.engine == "pulumi":
+            try:
+                pulumi_payload, md5, sha256 = await asyncio.to_thread(_read_pulumi_export, tmp_path)
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid Pulumi state: {exc}") from exc
+            lineage, state_size = "", len(pulumi_payload)
+        else:
+            try:
+                lineage, md5 = await asyncio.to_thread(_read_state_lineage_md5, tmp_path)
+            except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                raise HTTPException(status_code=400, detail="Invalid state JSON") from exc
 
         # Auto-assign serial
         max_serial_result = await db.execute(
@@ -302,6 +344,7 @@ async def upload_state_manual(
             serial=new_serial,
             lineage=lineage,
             md5=md5,
+            sha256=sha256,
             state_size=state_size,
             created_by=user.email,
         )
@@ -315,7 +358,13 @@ async def upload_state_manual(
 
         storage = get_storage()
         key = state_key(str(ws.id), str(sv.id))
-        if state_encryption_active():
+        if pulumi_payload is not None:
+            await storage.put(
+                key,
+                await encrypt_state_bytes(pulumi_payload),
+                content_type="application/octet-stream",
+            )
+        elif state_encryption_active():
             plaintext = await asyncio.to_thread(read_file_bytes, tmp_path)
             await storage.put(
                 key, await encrypt_state_bytes(plaintext), content_type="application/octet-stream"

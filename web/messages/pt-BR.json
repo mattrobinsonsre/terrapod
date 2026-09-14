@@ -381,6 +381,8 @@
       "createModule": "Criar Módulo",
       "empty": "Nenhum módulo ainda. Crie um para começar.",
       "providerLabel": "Provider: {provider}",
+      "repoModuleCount": "{count, plural, one {# módulo} other {# módulos}} neste repositório",
+      "submoduleAt": "Submódulo: {path}",
       "versionCount": "{count, plural, one {# versão} other {# versões}}",
       "loadFailed": "Falha ao carregar os módulos",
       "createFailed": "Falha ao criar o módulo",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (deixe em branco para o padrão)",
         "tagPattern": "Padrão de Tag",
         "tagPatternHint": "Apenas as tags que correspondem a este padrão criam versões (ex.: v1.0.0)",
+        "subdirectoryOptional": "Subdiretório (opcional)",
+        "subdirectoryHint": "Para um submódulo: o caminho no repositório a partir do qual publicar, por exemplo modules/create. Deixe em branco para a raiz do repositório.",
         "labelsOptional": "Rótulos (opcional)",
         "creating": "Criando...",
         "create": "Criar"

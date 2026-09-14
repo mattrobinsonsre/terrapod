@@ -119,6 +119,31 @@ class TestBinaryDownloadError:
         upro.assert_called_once()
 
 
+class TestConfigurationArchiveError:
+    def test_returns_1_still_uploads_and_is_not_logged_as_a_crash(
+        self, monkeypatch, tmp_path
+    ) -> None:
+        _env(monkeypatch)
+        monkeypatch.setenv("WORK_DIR", str(tmp_path))
+        with (
+            patch.object(
+                job_entrypoint,
+                "_run_body",
+                side_effect=job_entrypoint.ConfigurationArchiveError("archive is truncated"),
+            ),
+            patch.object(job_entrypoint.log_capture, "upload_combined_log") as ulog,
+            patch.object(job_entrypoint.resource_profile, "post_profile") as upro,
+            patch("structlog.get_logger") as get_logger,
+        ):
+            rc = job_entrypoint.main()
+        assert rc == 1
+        ulog.assert_called_once()
+        upro.assert_called_once()
+        log = get_logger.return_value
+        log.error.assert_any_call("configuration archive unusable", err="archive is truncated")
+        log.exception.assert_not_called()
+
+
 class TestWorkDirOverride:
     def test_honours_WORK_DIR_env(self, monkeypatch, tmp_path) -> None:
         _env(monkeypatch)

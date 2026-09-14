@@ -335,6 +335,49 @@ def _state_facts(plaintext: bytes) -> dict[str, Any]:
     }
 
 
+def _pulumi_facts(plaintext: bytes, serial: int) -> dict[str, Any]:
+    """`_state_facts` for a Pulumi deployment, which carries no serial or lineage.
+
+    Terrapod issued the serials of a Pulumi stack; the document never held
+    them. So a restored stack is numbered afresh, oldest version first, and the
+    caller passes the number. Nothing outside Terrapod ever saw the old ones: an
+    agent run reads the serial back from Terrapod, and the CLI never reads it.
+    """
+    doc = json.loads(plaintext)
+    if doc is not None and not isinstance(doc, dict):
+        raise ValueError("deployment is not an object")
+    return {
+        "serial": serial,
+        "lineage": "",
+        "md5": hashlib.md5(plaintext).hexdigest(),  # noqa: S324 — TFE protocol field
+        "sha256": hashlib.sha256(plaintext).hexdigest(),
+        "size": len(plaintext),
+    }
+
+
+def _is_uuid7_key(key: str) -> bool:
+    stem = key.rsplit("/", 1)[-1].removesuffix(".tfstate")
+    try:
+        return uuid_mod.UUID(stem).version == 7
+    except ValueError:
+        return False
+
+
+def _oldest_first(objects: list[Any], keys: list[str]) -> list[str]:
+    """State keys in the order they were written.
+
+    A Pulumi deployment has no serial, so the order is all a restore has to
+    number its versions by. Keys are already in that order when every id is a
+    time-ordered uuid7. The service surface named its versions with random
+    uuid4 ids before #1564, so when any key is one of those, the object's
+    write time decides and the key only breaks ties.
+    """
+    if all(_is_uuid7_key(k) for k in keys):
+        return keys
+    written = {o.key: o.last_modified for o in objects}
+    return sorted(keys, key=lambda k: (written[k], k))
+
+
 async def _unique_name(db: AsyncSession, wanted: str, engine: str = "terraform") -> str:
     """A free, VALID workspace name, suffixed if `wanted` is taken.
 
@@ -381,6 +424,35 @@ async def _unique_name(db: AsyncSession, wanted: str, engine: str = "terraform")
     raise ValueError(f"could not find a free name based on {base!r}")
 
 
+async def delete_workspace(db: AsyncSession, ws: Workspace, *, deleted_by: str) -> None:
+    """Delete a workspace so that it can be restored — the one delete path.
+
+    The native `DELETE /workspaces/{id}` and `pulumi stack rm` both come through
+    here. `stack rm` used to delete the row itself, which skipped the marker and
+    the index cleanup, so a removed stack could not be found in deleted
+    workspaces or restored (#1564).
+
+    The marker is built BEFORE the delete, while the row and its variables and
+    state versions are still readable (#1253). It is written after the commit:
+    a marker for a workspace that then failed to delete would be a lie, and the
+    delete must not fail because storage is briefly unavailable.
+    """
+    ws_name = ws.name
+    ws_id = str(ws.id)
+    marker = await build_marker(db, ws, deleted_by=deleted_by)
+
+    await db.delete(ws)
+    await db.commit()
+    logger.info("Workspace deleted", workspace=ws_name, deleted_by=deleted_by)
+
+    await write_marker_best_effort(ws_id, marker)
+
+    # Best-effort: the break-glass index should not name a deleted workspace.
+    from terrapod.services import state_index_service
+
+    await state_index_service.remove_workspace(ws_name)
+
+
 #: Upper bound on how many state versions one restore will copy when the
 #: deployment's own `state_versions_keep` is disabled (0 = keep everything).
 #: Without a bound, one request walks every version ever written through the
@@ -425,8 +497,14 @@ async def restore_workspace(
     if marker is None:
         raise LookupError(f"no delete marker for workspace {workspace_id}")
 
+    # Read ahead of the other settings because it decides how the versions
+    # are ordered and numbered.
+    engine = (marker.get("settings") or {}).get("engine") or "terraform"
+
     objects = await storage.list_prefix(f"state/{workspace_id}/")
     keys = _state_object_keys(objects, workspace_id)
+    if engine == "pulumi":
+        keys = _oldest_first(objects, keys)
 
     # Keys sort by the time-ordered uuid7 state-version id, so the newest
     # versions are at the end. When the cap bites, keep those: a restore is
@@ -462,7 +540,6 @@ async def restore_workspace(
     # so every restore rebuilt the workspace as Terraform regardless of what it
     # was, exactly as the comment at the capture site warns. It also decides
     # what a valid name looks like: a Pulumi workspace is named `project::stack`.
-    engine = settings.get("engine") or "terraform"
 
     ws = Workspace(
         id=uuid_mod.uuid4(),
@@ -540,7 +617,10 @@ async def restore_workspace(
         raw = await storage.get(key)
         try:
             plaintext = await decrypt_state_bytes(raw)
-            facts = await asyncio.to_thread(_state_facts, plaintext)
+            if engine == "pulumi":
+                facts = await asyncio.to_thread(_pulumi_facts, plaintext, len(seen_serials) + 1)
+            else:
+                facts = await asyncio.to_thread(_state_facts, plaintext)
         except Exception as e:  # noqa: BLE001 — one bad blob must not sink the restore
             logger.warning("Skipping unreadable state blob during restore", key=key, error=str(e))
             report["state_versions_skipped"].append({"key": key, "reason": str(e)})

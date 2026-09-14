@@ -82,6 +82,19 @@ def _map_secrets(node: Any, fn: Any) -> Any:
     return node
 
 
+def has_plaintext_secrets(deployment: Any) -> bool:
+    """Whether any secret in the deployment is in plaintext — `--show-secrets` output."""
+    found = False
+
+    def _check(secret: dict[str, Any]) -> dict[str, Any]:
+        nonlocal found
+        found = found or "plaintext" in secret
+        return secret
+
+    _map_secrets(deployment, _check)
+    return found
+
+
 def provider_of(deployment: dict[str, Any] | None) -> dict[str, Any] | None:
     """The deployment's `secrets_providers` block, if it has one."""
     if not deployment:

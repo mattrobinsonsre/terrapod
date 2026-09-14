@@ -381,6 +381,8 @@
       "createModule": "Создать модуль",
       "empty": "Модулей пока нет. Создайте один, чтобы начать.",
       "providerLabel": "Провайдер: {provider}",
+      "repoModuleCount": "{count, plural, one {# модуль} few {# модуля} many {# модулей} other {# модуля}} в этом репозитории",
+      "submoduleAt": "Подмодуль: {path}",
       "versionCount": "{count, plural, one {# версия} few {# версии} many {# версий} other {# версий}}",
       "loadFailed": "Не удалось загрузить модули",
       "createFailed": "Не удалось создать модуль",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (оставьте пустым для значения по умолчанию)",
         "tagPattern": "Шаблон тега",
         "tagPatternHint": "Версии создаются только для тегов, соответствующих этому шаблону (например, v1.0.0)",
+        "subdirectoryOptional": "Подкаталог (необязательно)",
+        "subdirectoryHint": "Для подмодуля: путь в репозитории, из которого публикуется модуль, например modules/create. Оставьте пустым для корня репозитория.",
         "labelsOptional": "Метки (необязательно)",
         "creating": "Создание...",
         "create": "Создать"

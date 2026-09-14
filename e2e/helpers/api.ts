@@ -279,6 +279,8 @@ export async function createRegistryModule(
   token: string,
   name: string,
   provider = 'aws',
+  // Extra attributes, e.g. `vcs-repo-url` and `subdirectory` for a submodule.
+  attrs: Record<string, unknown> = {},
 ): Promise<string> {
   const res = await fetch(`${API_URL}/api/terrapod/v1/registry-modules`, {
     method: 'POST',
@@ -287,7 +289,7 @@ export async function createRegistryModule(
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      data: { type: 'registry-modules', attributes: { name, provider } },
+      data: { type: 'registry-modules', attributes: { name, provider, ...attrs } },
     }),
   });
   if (!res.ok) {

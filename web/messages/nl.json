@@ -381,6 +381,8 @@
       "createModule": "Module aanmaken",
       "empty": "Nog geen modules. Maak er een aan om te beginnen.",
       "providerLabel": "Provider: {provider}",
+      "repoModuleCount": "{count, plural, one {# module} other {# modules}} in deze repository",
+      "submoduleAt": "Submodule: {path}",
       "versionCount": "{count, plural, one {# versie} other {# versies}}",
       "loadFailed": "Kan modules niet laden",
       "createFailed": "Kan module niet aanmaken",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (leeg laten voor standaard)",
         "tagPattern": "Tag-patroon",
         "tagPatternHint": "Alleen tags die aan dit patroon voldoen maken versies aan (bijv. v1.0.0)",
+        "subdirectoryOptional": "Submap (optioneel)",
+        "subdirectoryHint": "Voor een submodule: het pad binnen de repository van waaruit wordt gepubliceerd, bijv. modules/create. Leeg laten voor de hoofdmap van de repository.",
         "labelsOptional": "Labels (optioneel)",
         "creating": "Bezig met aanmaken...",
         "create": "Aanmaken"

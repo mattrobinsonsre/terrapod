@@ -2087,29 +2087,10 @@ async def delete_workspace(
                 "infrastructure, or explicitly orphan it (discouraged)."
             ),
         )
-    ws_name = ws.name
-    ws_id = str(ws.id)
-
-    # Build the undelete marker BEFORE the delete, while the row and its
-    # variables/state-versions are still readable (#1253). The write itself
-    # happens after the commit — a marker for a workspace that then failed to
-    # delete would be a lie, and the delete must not fail because storage is
-    # briefly unavailable.
+    # Marker, delete and index cleanup, shared with `pulumi stack rm` (#1564).
     from terrapod.services import deleted_workspace_service as dws
 
-    marker = await dws.build_marker(db, ws, deleted_by=user.email)
-
-    await db.delete(ws)
-    await db.commit()
-    logger.info("Workspace deleted", workspace=ws_name)
-
-    await dws.write_marker_best_effort(ws_id, marker)
-
-    # Best-effort remove from DR state index
-    from terrapod.services import state_index_service
-
-    await state_index_service.remove_workspace(ws_name)
-
+    await dws.delete_workspace(db, ws, deleted_by=user.email)
     return Response(status_code=204)
 
 

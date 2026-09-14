@@ -381,6 +381,8 @@
       "createModule": "Modul erstellen",
       "empty": "Noch keine Module. Erstellen Sie eines, um zu beginnen.",
       "providerLabel": "Provider: {provider}",
+      "repoModuleCount": "{count, plural, one {# Modul} other {# Module}} in diesem Repository",
+      "submoduleAt": "Submodul: {path}",
       "versionCount": "{count, plural, one {# Version} other {# Versionen}}",
       "loadFailed": "Module konnten nicht geladen werden",
       "createFailed": "Modul konnte nicht erstellt werden",
@@ -397,6 +399,8 @@
         "branchPlaceholder": "main (leer lassen für Standard)",
         "tagPattern": "Tag-Muster",
         "tagPatternHint": "Nur Tags, die diesem Muster entsprechen, erstellen Versionen (z. B. v1.0.0)",
+        "subdirectoryOptional": "Unterverzeichnis (optional)",
+        "subdirectoryHint": "Für ein Submodul: der Pfad im Repository, aus dem veröffentlicht wird, z. B. modules/create. Für das Stammverzeichnis des Repositorys leer lassen.",
         "labelsOptional": "Labels (optional)",
         "creating": "Wird erstellt...",
         "create": "Erstellen"

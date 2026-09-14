@@ -100,6 +100,9 @@ field CatalogItem.Attributes map[string]any
 field CatalogItem.CreatedAt string
 field CatalogItem.ID string
 field CatalogItem.UpdatedAt string
+field CatalogItemInterface.Inputs []map[string]any `json:"inputs"`
+field CatalogItemInterface.Outputs []map[string]any `json:"outputs"`
+field CatalogItemInterface.ResolvedVersion string `json:"resolved-version"`
 field CatalogRunRef.ID string
 field CatalogRunRef.IsDestroy bool
 field CatalogRunRef.Status string
@@ -217,6 +220,7 @@ field CreatePolicySetRequest.VCSRepoURL string
 field CreateRegistryModuleRequest.Labels map[string]string
 field CreateRegistryModuleRequest.Name string
 field CreateRegistryModuleRequest.ProviderName string
+field CreateRegistryModuleRequest.Subdirectory string
 field CreateRegistryModuleRequest.VCSBranch string
 field CreateRegistryModuleRequest.VCSConnectionID string
 field CreateRegistryModuleRequest.VCSRepoURL string
@@ -580,6 +584,7 @@ field RegistryModule.OwnerEmail string `json:"owner-email,omitempty"`
 field RegistryModule.ProviderName string `json:"provider"`
 field RegistryModule.Source string `json:"source,omitempty"`
 field RegistryModule.Status string `json:"status,omitempty"`
+field RegistryModule.Subdirectory string `json:"subdirectory,omitempty"`
 field RegistryModule.UpdatedAt string `json:"updated-at,omitempty"`
 field RegistryModule.VCSBranch string `json:"vcs-branch,omitempty"`
 field RegistryModule.VCSConnectionID string `json:"vcs-connection-id,omitempty"`
@@ -832,6 +837,7 @@ field UpdatePolicySetRequest.PolicyPath *string
 field UpdatePolicySetRequest.VCSBranch *string
 field UpdatePolicySetRequest.VCSRepoURL *string
 field UpdateRegistryModuleRequest.Labels *map[string]string
+field UpdateRegistryModuleRequest.Subdirectory *string
 field UpdateRegistryModuleRequest.VCSBranch *string
 field UpdateRegistryModuleRequest.VCSConnectionID *string
 field UpdateRegistryModuleRequest.VCSRepoURL *string
@@ -1217,6 +1223,7 @@ method (*Client) GetAutodiscoveryRule(ctx context.Context, id string) (*Autodisc
 method (*Client) GetCatalogInstance(ctx context.Context, wsID string) (*CatalogInstance, error)
 method (*Client) GetCatalogItem(ctx context.Context, id string) (*CatalogItem, error)
 method (*Client) GetCatalogItemForm(ctx context.Context, id string) (map[string]any, error)
+method (*Client) GetCatalogItemInterface(ctx context.Context, id string) (*CatalogItemInterface, error)
 method (*Client) GetCurrentStateVersion(ctx context.Context, workspaceID string) (*StateVersion, error)
 method (*Client) GetDeletedWorkspace(ctx context.Context, workspaceID string) (*DeletedWorkspace, error)
 method (*Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, error)
@@ -1324,6 +1331,7 @@ method (*Client) RegenerateRunCostSummary(ctx context.Context, runID string) (*C
 method (*Client) RemoveRoleFromIdentity(ctx context.Context, providerName, email, roleName string) error
 method (*Client) RestoreDeletedWorkspace(ctx context.Context, workspaceID string, opts RestoreOptions) (*RestoredWorkspace, error)
 method (*Client) RetagAPIToken(ctx context.Context, tokenID, kind string, pinnedRoles []string) (*APIToken, error)
+method (*Client) RetryRun(ctx context.Context, runID string) (*Run, error)
 method (*Client) RevokeAPIToken(ctx context.Context, tokenID string) error
 method (*Client) RevokeAllAPITokensForUser(ctx context.Context, email string) (int64, error)
 method (*Client) RevokeGPGKey(ctx context.Context, id, revocationCertificate string) (*GPGKey, error)
@@ -1381,6 +1389,7 @@ type BulkWarmRequest struct
 type BulkWarmResponse struct
 type CatalogInstance struct
 type CatalogItem struct
+type CatalogItemInterface struct
 type CatalogRunRef struct
 type Client struct
 type ComponentReplicas struct

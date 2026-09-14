@@ -13,6 +13,11 @@ import { LabelsEditor } from '@/components/labels-editor'
 import { Modal } from '@/components/modal'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
+import {
+  ModuleInterfaceTables,
+  type ModuleInterfaceInput,
+  type ModuleInterfaceOutput,
+} from '@/components/module-interface-tables'
 
 interface CatalogItem {
   id: string
@@ -45,6 +50,14 @@ interface ProvisionForm {
   fields: FormField[]
 }
 
+// The linked module version's own inputs and outputs (#1585): read-only, and
+// distinct from the curated provision form above.
+interface ItemInterface {
+  'resolved-version': string | null
+  inputs: ModuleInterfaceInput[] | null
+  outputs: ModuleInterfaceOutput[] | null
+}
+
 interface Instance {
   id: string
   attributes: {
@@ -72,12 +85,16 @@ function defaultStr(v: unknown): string {
 
 export default function CatalogItemPage() {
   const t = useTranslations('catalogDetail')
+  // The interface section reuses the module registry's wording.
+  const tr = useTranslations('registry')
   const router = useRouter()
   const params = useParams()
   const itemId = params.id as string
 
   const [item, setItem] = useState<CatalogItem | null>(null)
   const [form, setForm] = useState<ProvisionForm | null>(null)
+  const [iface, setIface] = useState<ItemInterface | null>(null)
+  const [ifaceExpanded, setIfaceExpanded] = useState(false)
   const [instances, setInstances] = useState<Instance[]>([])
   const [pools, setPools] = useState<AgentPool[]>([])
   const [loading, setLoading] = useState(true)
@@ -170,9 +187,11 @@ export default function CatalogItemPage() {
 
     async function load() {
       try {
-        const [itemRes, formRes, poolsList] = await Promise.all([
+        const [itemRes, formRes, ifaceRes, poolsList] = await Promise.all([
           apiFetch(`/api/terrapod/v1/catalog-items/${itemId}`),
           apiFetch(`/api/terrapod/v1/catalog-items/${itemId}/form`),
+          // Reference material: the page never fails on it.
+          apiFetch(`/api/terrapod/v1/catalog-items/${itemId}/interface`).catch(() => null),
           // pools are non-fatal for the page; page robustly but never fail the load on them
           fetchAllPages<AgentPool>('/api/terrapod/v1/agent-pools').catch(() => [] as AgentPool[]),
         ])
@@ -190,6 +209,11 @@ export default function CatalogItemPage() {
           const init: Record<string, string> = {}
           for (const fld of f.fields) init[fld.name] = defaultStr(fld.default)
           setProvInputs(init)
+        }
+
+        if (ifaceRes?.ok) {
+          const ifaceData = await ifaceRes.json()
+          setIface(ifaceData.data.attributes)
         }
 
         setPools(poolsList)
@@ -615,6 +639,41 @@ export default function CatalogItemPage() {
             </button>
           </form>
         </section>
+
+        {/* Module interface (#1585): the linked module version's own inputs and outputs */}
+        {iface && (
+          <section className="mb-8">
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setIfaceExpanded(!ifaceExpanded)}
+                aria-expanded={ifaceExpanded}
+                className="w-full flex items-center justify-between gap-3 px-5 py-4 text-start"
+              >
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
+                  <h2 className="text-sm font-semibold text-slate-200">{tr('moduleDetail.interface.title')}</h2>
+                  <span className="text-xs text-slate-500">
+                    {tr('moduleDetail.interface.counts', { inputs: iface.inputs?.length ?? 0, outputs: iface.outputs?.length ?? 0 })}
+                  </span>
+                  {iface['resolved-version'] && (
+                    <span className="text-xs font-mono text-slate-400">{iface['resolved-version']}</span>
+                  )}
+                </div>
+                <svg
+                  className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${ifaceExpanded ? 'rotate-180' : ''}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {ifaceExpanded && (
+                <div className="px-5 pb-5 space-y-4 border-t border-slate-700/50 pt-4">
+                  <ModuleInterfaceTables inputs={iface.inputs} outputs={iface.outputs} />
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Instances */}
         <section>

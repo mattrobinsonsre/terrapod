@@ -1886,6 +1886,8 @@ PUT  /api/v1/registry-modules/private/default/{name}/{provider}/versions/{versio
 DELETE /api/v1/registry-modules/private/default/{name}/{provider}/versions/{version}
 ```
 
+**Submodules.** Create, `PATCH …/{name}/{provider}` and `PATCH …/{name}/{provider}/vcs` accept an optional `subdirectory`: the path within the module's repository to publish it from, for a submodule (see [Submodules](registry.md#submodules-a-module-in-a-subdirectory)). It needs a `vcs-repo-url`; a path with `..`, `.` or empty segments is refused with `422`, and a repository subdirectory that is already registered with `409`. Modules report it as the `subdirectory` attribute, `""` for a module at the repository root. On `PATCH …/vcs`, omitting it leaves it unchanged; removing the repository clears it.
+
 ### Update Module
 
 ```
@@ -4139,6 +4141,14 @@ GET /api/v1/catalog-items/{id}/form
 ```
 
 Returns the resolved provision form: `resolved-version` (per the item's version policy) and `fields[]` — one field per resolved input (the module's curated variables plus every parameter from the item's provider templates), with type, description, default, sensitivity, and any enum choices. **Required permission:** catalog `read`.
+
+#### Module Interface
+
+```
+GET /api/v1/catalog-items/{id}/interface
+```
+
+The inputs and outputs of the module version the item resolves to — its `default-version-pin`, or the latest uploaded version — derived from the module registry rather than stored on the item. Returns `resolved-version`, `inputs[]` (`name`, `type`, `description`, `default`, `required`, `sensitive`) and `outputs[]` (`name`, `description`, `sensitive`): the same entries as the module registry's interface endpoint. Where `/form` is the curated provision view, this is the module's own surface, and the only place its outputs can be read. All three are `null` while the module has no uploaded version. **Required permission:** catalog `read`.
 
 #### List Item Instances
 

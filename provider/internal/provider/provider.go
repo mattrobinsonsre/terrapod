@@ -16,6 +16,7 @@ import (
 	agentPoolDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/agent_pool"
 	architectureCritiqueDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/architecture_critique"
 	catalogInstancesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_instances"
+	catalogItemInterfaceDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_item_interface"
 	roleDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/role"
 	userDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/user"
 	vcsConnectionDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/vcs_connection"
@@ -193,6 +194,7 @@ func (p *terrapodProvider) DataSources(_ context.Context) []func() datasource.Da
 		roleDS.NewDataSource,
 		agentPoolDS.NewDataSource,
 		catalogInstancesDS.NewDataSource,
+		catalogItemInterfaceDS.NewDataSource,
 		vcsConnectionDS.NewDataSource,
 		userDS.NewDataSource,
 	}
