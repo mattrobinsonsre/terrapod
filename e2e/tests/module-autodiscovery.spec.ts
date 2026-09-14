@@ -176,13 +176,17 @@ test.describe('Admin — Module autodiscovery at phone width (#1584)', () => {
 
     await page.goto('/admin/module-autodiscovery');
     // The phone layout is cards: status and repository are shown, not hidden.
-    await expect(page.getByText('a-rule-with-a-rather-long-name-that-has-to-wrap')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('enabled', { exact: true })).toBeVisible();
+    // The desktop table is still in the DOM (hidden with CSS), so every locator
+    // is scoped to the card, and no table may be visible at this width.
+    const card = page.getByRole('listitem').filter({ hasText: 'a-rule-with-a-rather-long-name-that-has-to-wrap' });
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    await expect(card.getByText('enabled', { exact: true })).toBeVisible();
+    await expect(page.locator('table:visible')).toHaveCount(0);
     await expectNoHorizontalPageScroll(page);
 
     const panel = page.getByRole('heading', { name: /^Preview: / });
     await expect(async () => {
-      if (!(await panel.isVisible())) await page.getByRole('button', { name: 'Preview' }).first().click();
+      if (!(await panel.isVisible())) await card.getByRole('button', { name: 'Preview' }).click();
       await expect(panel).toBeVisible({ timeout: 1_000 });
     }).toPass({ timeout: 15_000 });
     await expect(page.getByRole('checkbox', { name: 'Register the module in modules/create' })).toBeEnabled();
