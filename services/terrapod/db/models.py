@@ -632,6 +632,17 @@ class RegistryModule(Base):
     subdirectory: Mapped[str] = mapped_column(
         String(500), nullable=False, default="", server_default=""
     )
+    #: The module autodiscovery rule that registered this module, if any
+    #: (#1584). Deleting the rule leaves the module; the reference goes NULL.
+    module_autodiscovery_rule_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "module_autodiscovery_rules.id",
+            ondelete="SET NULL",
+            name="fk_registry_modules_module_autodiscovery_rule",
+        ),
+        nullable=True,
+    )
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     vcs_tag_pattern: Mapped[str] = mapped_column(String(255), nullable=False, default="v*")
     vcs_last_tag: Mapped[str] = mapped_column(String(255), nullable=False, default="")
@@ -1231,6 +1242,76 @@ class AutodiscoveryRule(Base):
 
     __table_args__ = (
         sa.UniqueConstraint("vcs_connection_id", "name", name="uq_autodiscovery_rule_name"),
+    )
+
+
+class ModuleAutodiscoveryRule(Base):
+    """A rule that finds modules in a repository and registers them (#1584).
+
+    The module registry's counterpart to `AutodiscoveryRule`: scoped to one
+    repository on a VCS connection, it matches Terraform files with `pattern`
+    (minus `ignore_patterns`) and treats each matching file's directory as a
+    module — the root or a submodule. A scan registers them as VCS-sourced
+    modules with their `subdirectory`; the registry poller registers new ones
+    when the tracked branch moves. It never deletes a module.
+    """
+
+    __tablename__ = "module_autodiscovery_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+
+    # Scoping
+    vcs_connection_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("vcs_connections.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    vcs_connection: Mapped["VCSConnection"] = relationship(
+        "VCSConnection", foreign_keys=[vcs_connection_id], lazy="joined"
+    )
+    repo_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+    # Match
+    pattern: Mapped[str] = mapped_column(String(1024), nullable=False)
+    ignore_patterns: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+
+    # Identity
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    # Template for the modules it registers.
+    #: `{repo}`, `{path}`, `{leaf}` and `{root}` placeholders; empty means the
+    #: repository's module name, then the submodule's directory.
+    name_template: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    #: Empty means taken from a `terraform-<provider>-<name>` repository name.
+    provider: Mapped[str] = mapped_column(String(63), nullable=False, default="")
+    vcs_tag_pattern: Mapped[str] = mapped_column(String(255), nullable=False, default="v*")
+    labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Polling. `first_scan_at` NULL means never scanned — cleared when the rule
+    # is re-enabled, so a re-enable rescans. `last_scanned_sha` is the tracked
+    # branch's head at the last full scan: a poll with the same head does nothing.
+    first_scan_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_scanned_sha: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    #: Candidate directories the rule has already seen. Automatic registration
+    #: takes only directories that are new to it, so candidates an operator
+    #: left unregistered stay that way.
+    seen_subdirectories: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint("vcs_connection_id", "name", name="uq_module_autodiscovery_rule_name"),
+        Index("ix_module_autodiscovery_rules_repo", "vcs_connection_id", "repo_url"),
     )
 
 

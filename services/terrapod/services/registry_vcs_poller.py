@@ -146,6 +146,19 @@ async def registry_vcs_poll_cycle() -> None:
     async with get_db_session() as db:
         storage = get_storage()
 
+        # Module autodiscovery first (#1584), so a module a rule registers has
+        # its tags polled in this same cycle. Best-effort: a failure here never
+        # stops tag polling for the modules already registered.
+        try:
+            from terrapod.services import module_autodiscovery_service
+
+            with vcs_rate_limit.vcs_source("module-autodiscovery"):
+                await module_autodiscovery_service.poll_rules(db)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            logger.warning("Module autodiscovery pass failed", exc_info=True)
+
         # Get all VCS-sourced modules with their connections
         result = await db.execute(
             select(RegistryModule)

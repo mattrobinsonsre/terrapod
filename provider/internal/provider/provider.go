@@ -31,6 +31,7 @@ import (
 	executionHookRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/execution_hook"
 	executionHookWsRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/execution_hook_workspace"
 	gpgKeyRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/gpg_key"
+	moduleAutodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_autodiscovery_rule"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
 	providerTemplateRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/provider_template"
@@ -175,6 +176,7 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		agentPoolRes.NewResource,
 		agentPoolTokenRes.NewResource,
 		autodiscoveryRuleRes.NewResource,
+		moduleAutodiscoveryRuleRes.NewResource,
 		providerTemplateRes.NewResource,
 		catalogItemRes.NewResource,
 		catalogInstanceRes.NewResource,

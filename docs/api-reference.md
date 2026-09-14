@@ -1824,12 +1824,7 @@ DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versi
 
 **Submodules.** Create, `PATCH …/{name}/{provider}` and `PATCH …/{name}/{provider}/vcs` accept an optional `subdirectory`: the path within the module's repository to publish it from, for a submodule (see [Submodules](registry.md#submodules-a-module-in-a-subdirectory)). It needs a `vcs-repo-url`; a path with `..`, `.` or empty segments is refused with `422`, and a repository subdirectory that is already registered with `409`. Modules report it as the `subdirectory` attribute, `""` for a module at the repository root. On `PATCH …/vcs`, omitting it leaves it unchanged; removing the repository clears it.
 
-**Discovery.** `POST /api/terrapod/v1/registry-modules/discover` (platform `admin`) takes a `registry-module-discoveries` document with `vcs-connection-id`, `vcs-repo-url`, and an optional `vcs-branch` (the repository's default branch when omitted). It creates nothing, and returns a document of the same type:
-- `vcs-repo-url`
-- `vcs-branch`: the branch it read.
-- `candidates[]`: each with `subdirectory`, `suggested-name`, `suggested-provider`, and `registered-as` (the `{name, provider}` of the module already registering that subdirectory, or `null`).
-
-It returns `422` for an unknown or malformed connection or a missing repository URL, and `413` for a repository too large to walk. See [Discovering the modules in a repository](registry.md#discovering-the-modules-in-a-repository).
+**Autodiscovery.** To find the modules in a repository — the root and any submodules — and register them in bulk, use [Module Autodiscovery Rules](#module-autodiscovery-rules).
 
 ### Update Module
 
@@ -2402,6 +2397,158 @@ Runs the same walk as Preview but actually creates the workspaces (idempotent, c
 - `execution-hook-templates` — list of [execution hook](execution-hooks.md) ids (`hook-<uuid>`) associated with every created workspace (#672).
 
 These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template).
+
+---
+
+## Module Autodiscovery Rules
+
+Rules that find the modules in one repository (the root and any submodules) and register them in the private registry. See [Module autodiscovery](registry.md#module-autodiscovery) for how a rule behaves over time.
+
+All endpoints require the platform `admin` role. Rule ids are `modrule-<uuid>`, and a raw UUID is accepted too. `vcs-connection-id` accepts `vcs-<uuid>` or a raw UUID.
+
+### List Rules
+
+```
+GET /api/terrapod/v1/module-autodiscovery-rules
+```
+
+Newest first, with the standard `meta.pagination` block.
+
+### Create Rule
+
+```
+POST /api/terrapod/v1/module-autodiscovery-rules
+```
+
+**Request body** (only `name`, `vcs-connection-id`, `repo-url` and `pattern` are required):
+
+```json
+{
+  "data": {
+    "type": "module-autodiscovery-rules",
+    "attributes": {
+      "name": "management-groups",
+      "vcs-connection-id": "vcs-019e0e7b-...",
+      "repo-url": "https://github.com/myorg/terraform-azurerm-management-groups",
+      "branch": "main",
+      "pattern": "**/*.tf",
+      "ignore-patterns": ["modules/legacy/**"],
+      "name-template": "mg-{leaf}",
+      "provider": "azurerm",
+      "vcs-tag-pattern": "v*",
+      "enabled": true,
+      "labels": {"team": "platform"},
+      "owner-email": "platform@example.com"
+    }
+  }
+}
+```
+
+| Attribute | Notes |
+|---|---|
+| `name` | Unique per VCS connection. |
+| `vcs-connection-id` | The connection whose credentials read the repository. |
+| `repo-url` | The repository to scan. |
+| `branch` | Empty means the repository's default branch. |
+| `pattern`, `ignore-patterns` | Gitignore-style globs over `.tf` / `.tf.json` file paths. Each matching file's directory is a module. A pattern ending in `/` is refused, because it can only match a directory. |
+| `name-template` | Placeholders are `{repo}`, `{path}`, `{leaf}` and `{root}`. Empty means the repository's module name plus the submodule's last segment. |
+| `provider` | Lowercase letters, digits and hyphens. Empty means taken from a `terraform-<provider>-<name>` repository name. |
+| `vcs-tag-pattern` | Copied onto each registered module. Empty means `v*`. |
+| `enabled` | Default `true`. While enabled, directories that appear on the tracked branch are registered automatically. |
+| `labels`, `owner-email` | Copied onto each registered module. |
+
+Saving registers nothing: use [Scan](#scan-register-modules) to register what's already in the repository.
+
+Returns `201` with the created rule. `409` means a rule with that name already exists for the connection.
+
+`422` covers:
+- a missing required attribute;
+- a connection id that isn't a UUID, or that doesn't exist;
+- a pattern or ignore pattern ending in `/`;
+- `ignore-patterns` that isn't a list of strings;
+- a `name-template` with any other placeholder;
+- an invalid `provider`;
+- a reserved label key.
+
+**Rule attributes** in responses:
+- `name`
+- `vcs-connection-id`, as `vcs-<uuid>`
+- `repo-url`, `branch`, `pattern`, `ignore-patterns`, `enabled`
+- `name-template`, `provider`, `vcs-tag-pattern`, `labels`
+- `owner-email`: `""` when none
+- `first-scan-at`: `null` until the rule's first poll or scan
+- `last-scanned-sha`: the tracked branch's head at the last scan
+- `created-at`, `updated-at`
+
+Each rule also has a `vcs-connection` relationship and a `links.self`.
+
+### Show Rule
+
+```
+GET /api/terrapod/v1/module-autodiscovery-rules/{id}
+```
+
+### Update Rule
+
+```
+PATCH /api/terrapod/v1/module-autodiscovery-rules/{id}
+```
+
+Same body shape as create; only the attributes you include change. Changing `repo-url`, `vcs-connection-id` or `branch` starts the rule afresh: what it had seen belonged to the old target, so the next poll records a new baseline rather than registering everything.
+
+### Delete Rule
+
+```
+DELETE /api/terrapod/v1/module-autodiscovery-rules/{id}
+```
+
+Returns `204`. The modules the rule registered stay registered.
+
+### Preview (dry-run)
+
+```
+GET  /api/terrapod/v1/module-autodiscovery-rules/{id}/preview   # a saved rule
+POST /api/terrapod/v1/module-autodiscovery-rules/preview        # an unsaved rule (same body as Create)
+```
+
+Registers nothing. Returns a `module-autodiscovery-rule-previews` document with:
+- `ref`: the branch it read;
+- `files-walked`;
+- `entries[]`: one per candidate directory, root first.
+
+Each entry has:
+- `subdirectory`: `""` for the root;
+- `name` and `provider`: as a scan would register them;
+- `registered-as`: the `{name, provider}` of the module already registered from that directory, or `null`;
+- `collision`: `true` when the name and provider belong to another module;
+- `missing-provider`: `true` when no provider could be worked out.
+
+Errors:
+- `422`: a repository URL that can't be parsed, or an unknown VCS provider.
+- `502`: the VCS provider can't be reached, or returned no default branch.
+- `413`: the provider truncated the repository's tree, so it's too large to scan in one pass.
+
+### Scan (register modules)
+
+```
+POST /api/terrapod/v1/module-autodiscovery-rules/{id}/scan
+```
+
+With no body, registers every candidate. To register a chosen subset, send:
+
+```json
+{"data": {"attributes": {"subdirectories": ["", "modules/create"]}}}
+```
+
+Registered modules are VCS-sourced, carry their `subdirectory`, and take the rule's branch, tag pattern, labels and owner. Their tags are polled on the next registry poll. A scan works whether or not the rule is enabled. Everything it saw counts as seen, so automatic registration will never later pick up a candidate you left out.
+
+Returns a `module-autodiscovery-rule-scans` document with:
+- `ref` and `files-walked`;
+- `modules-registered`: the count;
+- `modules[]`: each with `id`, `name`, `provider` and `subdirectory`;
+- `skipped[]`: each with `subdirectory` and a `reason`: `already-registered`, `name-taken` or `missing-provider`.
+
+Returns `422` when a listed subdirectory isn't one of the rule's candidates, or `subdirectories` isn't a list of strings. The repository errors are the same as for Preview.
 
 ---
 

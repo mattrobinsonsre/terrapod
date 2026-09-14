@@ -59,24 +59,33 @@ def suggest_provider(repo_name: str) -> str:
     return m.group(1) if m else ""
 
 
-def suggest_name(repo_name: str, subdirectory: str) -> str:
-    """A registry name for the module at ``subdirectory``.
-
-    The repository's module name (its ``terraform-<provider>-`` prefix
-    dropped), followed for a submodule by the last segment of its path:
-    ``terraform-azurerm-management-groups`` + ``modules/create`` gives
-    ``management-groups-create``. Fitted to the create form's rule.
-    """
+def module_base_name(repo_name: str) -> str:
+    """The repository's module name: its ``terraform-<provider>-`` prefix
+    dropped, when it follows that convention."""
     base = repo_name.lower()
     m = _CONVENTIONAL_REPO.match(base)
-    if m:
-        base = m.group(2)
-    parts = [base]
-    if subdirectory:
-        parts.append(subdirectory.rsplit("/", 1)[-1])
-    name = _NOT_NAME_CHARS.sub("-", "-".join(parts).lower()).strip("-")
+    return m.group(2) if m else base
+
+
+def fit_name(candidate: str) -> str:
+    """``candidate`` fitted to the create form's rule: lowercase letters, digits
+    and hyphens, starting with a letter, at most 64 characters."""
+    name = _NOT_NAME_CHARS.sub("-", candidate.lower()).strip("-")
     if not name:
         return "module"
     if not name[0].isalpha():
         name = f"m-{name}"
     return name[:_MAX_NAME_LENGTH].rstrip("-")
+
+
+def suggest_name(repo_name: str, subdirectory: str) -> str:
+    """A registry name for the module at ``subdirectory``.
+
+    The repository's module name, followed for a submodule by the last segment
+    of its path: ``terraform-azurerm-management-groups`` + ``modules/create``
+    gives ``management-groups-create``. Fitted to the create form's rule.
+    """
+    parts = [module_base_name(repo_name)]
+    if subdirectory:
+        parts.append(subdirectory.rsplit("/", 1)[-1])
+    return fit_name("-".join(parts))
