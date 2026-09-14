@@ -264,6 +264,25 @@ func (c *Client) CancelRun(ctx context.Context, runID string) (*Run, error) {
 	return c.runAction(ctx, runID, "cancel")
 }
 
+// RetryRun queues a new run from a finished one, with the same configuration
+// version and options, and returns the NEW run. Only a terminal run, or a
+// plan-only run left at planned, can be retried; any other returns
+// *ConflictError (409).
+//
+// Retry is a Terrapod extension, not part of the TFE surface, so unlike the
+// other run actions it is not under /api/v2.
+func (c *Client) RetryRun(ctx context.Context, runID string) (*Run, error) {
+	id, err := runIDPath(runID)
+	if err != nil {
+		return nil, err
+	}
+	data, err := c.Post(ctx, "/api/terrapod/v1/runs/"+id+"/actions/retry", nil)
+	if err != nil {
+		return nil, err
+	}
+	return parseRun(data)
+}
+
 // GetRunPlanJSON returns the structured JSON plan output for a run (the
 // `tofu show -json` document). Plan ids share the run's UUID, so this accepts a
 // run id in any form (bare, "run-<uuid>", or "plan-<uuid>"). The endpoint 302s

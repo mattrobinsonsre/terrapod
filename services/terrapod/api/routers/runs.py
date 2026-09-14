@@ -787,6 +787,9 @@ async def retry_run(
         message=f"Retry of run-{run.id}",
         source=run.source,
         plan_only=run.plan_only,
+        # Without this a retried destroy came back as an ordinary apply of the
+        # same configuration — the opposite of what was asked for.
+        is_destroy=run.is_destroy,
         configuration_version_id=cv_id_for_retry,
         created_by=user.email,
         target_addrs=run.target_addrs,

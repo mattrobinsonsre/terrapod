@@ -1568,6 +1568,43 @@ class TestRetryRun:
         assert resp.status_code == 422
         mock_create_run.assert_not_called()
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_retried_destroy_is_still_a_destroy(
+        self, mock_resolve, mock_get_run, mock_create_run, mock_queue, *mocks
+    ):
+        """#1599: retry queued a failed destroy as an ordinary apply of the same
+        configuration, because the destroy flag was never passed on. Both ways
+        round: a destroy stays a destroy, and an ordinary run stays ordinary."""
+        mock_resolve.return_value = caps_for_level("admin")
+
+        original = _mock_run(status="errored")
+        mock_get_run.return_value = original
+
+        ws = _mock_workspace(ws_id=original.workspace_id)
+        new_run = _mock_run(status="pending", ws_id=ws.id)
+        mock_create_run.return_value = new_run
+        mock_queue.return_value = new_run
+
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        for is_destroy in (True, False):
+            original.is_destroy = is_destroy
+            mock_create_run.reset_mock()
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{original.id}/actions/retry",
+                    headers=_AUTH,
+                )
+            assert resp.status_code == 201, is_destroy
+            assert mock_create_run.await_args.kwargs["is_destroy"] is is_destroy
+
 
 class TestGranularCapabilityEnforcement:
     """A capability set that matches NO preset is enforced per-gate — the
