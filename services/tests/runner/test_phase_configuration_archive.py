@@ -109,3 +109,38 @@ def test_a_bad_download_then_a_good_one_succeeds(tmp_path):
 def test_the_number_of_downloads_follows_the_retry_setting(tmp_path):
     _, n = _fails(tmp_path, b"junk", TP_DOWNLOAD_RETRIES="1")
     assert n == 1
+
+
+def _recording_downloads(monkeypatch) -> list:
+    """Record the path each download is written to."""
+    seen = []
+    real = cfg_phase.download_to_file
+
+    def recording(url, output_path, *args, **kwargs):
+        seen.append(output_path)
+        return real(url, output_path, *args, **kwargs)
+
+    monkeypatch.setattr(cfg_phase, "download_to_file", recording)
+    return seen
+
+
+def test_each_download_has_its_own_file_and_it_is_removed(tmp_path, monkeypatch):
+    # #1609: every download used to go to one fixed /tmp path, so parallel
+    # test workers overwrote and deleted each other's archives.
+    seen = _recording_downloads(monkeypatch)
+    good = _real_archive()
+    for i in range(2):
+        client, _ = _serving(good)
+        cfg_phase.download_configuration(_cfg(), work_dir=tmp_path / f"ws{i}", client=client)
+
+    assert len(seen) == 2
+    assert seen[0] != seen[1], "two downloads shared a path"
+    assert not any(p.exists() for p in seen), "a downloaded archive was left behind"
+
+
+def test_the_download_is_removed_when_the_archive_is_unreadable(tmp_path, monkeypatch):
+    seen = _recording_downloads(monkeypatch)
+    _fails(tmp_path, b"not an archive")
+
+    assert seen
+    assert not any(p.exists() for p in seen), "the unreadable archive was left behind"

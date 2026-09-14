@@ -27,8 +27,10 @@ combination is meaningful:
 
 from __future__ import annotations
 
+import os
 import stat
 import tarfile
+import tempfile
 import time
 import zlib
 from dataclasses import dataclass
@@ -205,54 +207,64 @@ def download_configuration(
     # entrypoint. The previous bug was that this site computed
     # `work_dir.parent` which resolved to `/` for the default
     # WORK_DIR of `/workspace` — not writable for uid 1000.
-    tarball = Path("/tmp") / "config.tar.gz"
+    #
+    # The file is unique to this call and removed when it returns (#1609). A
+    # pod makes one download, so a fixed name was harmless there — but parallel
+    # test workers shared it, and the retry below deletes it between attempts,
+    # so they overwrote and deleted each other's archives.
+    fd, tmp_name = tempfile.mkstemp(prefix="config-", suffix=".tar.gz", dir="/tmp")
+    os.close(fd)
+    tarball = Path(tmp_name)
     headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
 
-    # download_to_file retries transient HTTP failures itself. A download
-    # that succeeds but yields an unreadable archive is retried here: a
-    # fetch cut short is worth another try, and if the stored archive is
-    # itself damaged every attempt fails the same way and we say so.
-    attempts = max(1, cfg.download_retries)
-    for attempt in range(1, attempts + 1):
-        logger.info("downloading configuration tarball", run_id=cfg.run_id, attempt=attempt)
-        result = download_to_file(
-            f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/config",
-            tarball,
-            headers=headers,
-            api_url=cfg.api_url,
-            retries=cfg.download_retries,
-            retry_delay_seconds=cfg.download_retry_delay_seconds,
-            client=client,
-        )
-
-        if not result.ok or not tarball.exists():
-            logger.warning(
-                "configuration archive download failed — see storage error above",
-                status=result.status,
+    try:
+        # download_to_file retries transient HTTP failures itself. A download
+        # that succeeds but yields an unreadable archive is retried here: a
+        # fetch cut short is worth another try, and if the stored archive is
+        # itself damaged every attempt fails the same way and we say so.
+        attempts = max(1, cfg.download_retries)
+        for attempt in range(1, attempts + 1):
+            logger.info("downloading configuration tarball", run_id=cfg.run_id, attempt=attempt)
+            result = download_to_file(
+                f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/config",
+                tarball,
+                headers=headers,
+                api_url=cfg.api_url,
+                retries=cfg.download_retries,
+                retry_delay_seconds=cfg.download_retry_delay_seconds,
+                client=client,
             )
-            return ConfigurationResult(downloaded=False, strip_dir=work_dir)
 
-        problem = _extract(tarball, work_dir)
-        if problem is None:
-            break
-        detail = f"{problem}; {_describe(tarball)}"
-        if attempt < attempts:
-            logger.warning(
-                "configuration archive is not a readable tar.gz — downloading it again",
-                run_id=cfg.run_id,
-                attempt=attempt,
-                of=attempts,
-                detail=detail,
+            if not result.ok or not tarball.exists():
+                logger.warning(
+                    "configuration archive download failed — see storage error above",
+                    status=result.status,
+                )
+                return ConfigurationResult(downloaded=False, strip_dir=work_dir)
+
+            problem = _extract(tarball, work_dir)
+            if problem is None:
+                break
+            detail = f"{problem}; {_describe(tarball)}"
+            if attempt < attempts:
+                logger.warning(
+                    "configuration archive is not a readable tar.gz — downloading it again",
+                    run_id=cfg.run_id,
+                    attempt=attempt,
+                    of=attempts,
+                    detail=detail,
+                )
+                tarball.unlink(missing_ok=True)
+                time.sleep(cfg.download_retry_delay_seconds)
+                continue
+            raise ConfigurationArchiveError(
+                f"the configuration archive for run {cfg.run_id} is not a readable tar.gz "
+                f"after {attempts} download(s): {detail}. The archive stored for this "
+                "configuration version is damaged, so retrying this run downloads it "
+                "again; queue a new run so a new configuration version is built."
             )
-            tarball.unlink(missing_ok=True)
-            time.sleep(cfg.download_retry_delay_seconds)
-            continue
-        raise ConfigurationArchiveError(
-            f"the configuration archive for run {cfg.run_id} is not a readable tar.gz "
-            f"after {attempts} download(s): {detail}. The archive stored for this "
-            "configuration version is damaged, so retrying this run downloads it "
-            "again; queue a new run so a new configuration version is built."
-        )
+    finally:
+        tarball.unlink(missing_ok=True)
 
     # Resolve override_dir again in case the configured working_dir
     # appeared during extraction (this is the common case — the tarball
