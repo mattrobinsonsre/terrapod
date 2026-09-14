@@ -399,7 +399,7 @@ async def discover_modules_endpoint(
     )
     try:
         with vcs_rate_limit.vcs_source("module-discovery"):
-            file_paths, branch = await _walk_repo_for_rule(target)
+            file_paths, branch, _head_sha = await _walk_repo_for_rule(target)
     except HTTPException as exc:
         if exc.status_code == 413:
             raise HTTPException(
