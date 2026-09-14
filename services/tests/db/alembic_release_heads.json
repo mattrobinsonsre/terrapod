@@ -1,6 +1,7 @@
 {
   "_comment": "The newest migration on each release line, as of that line's latest release (#1594). Every one must be an ancestor of the head on every branch, so a deployment on that line upgrades by running only migrations it has not seen. A release line that adds a migration updates its entry here, and the same file is carried to main with the migration. Never remove an entry.",
   "release_heads": {
-    "1.6": "8c02c0a6b39b"
+    "1.6": "8c02c0a6b39b",
+    "1.7": "6dee2fd6e9b0"
   }
 }
