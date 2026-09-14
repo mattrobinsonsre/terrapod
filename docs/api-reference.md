@@ -2473,7 +2473,7 @@ All endpoints require the platform `admin` role. Rule ids are `modrule-<uuid>`, 
 ### List Rules
 
 ```
-GET /api/terrapod/v1/module-autodiscovery-rules
+GET /api/v1/module-autodiscovery-rules
 ```
 
 Newest first, with the standard `meta.pagination` block.
@@ -2481,7 +2481,7 @@ Newest first, with the standard `meta.pagination` block.
 ### Create Rule
 
 ```
-POST /api/terrapod/v1/module-autodiscovery-rules
+POST /api/v1/module-autodiscovery-rules
 ```
 
 **Request body** (only `name`, `vcs-connection-id`, `repo-url` and `pattern` are required):
@@ -2549,13 +2549,13 @@ Each rule also has a `vcs-connection` relationship and a `links.self`.
 ### Show Rule
 
 ```
-GET /api/terrapod/v1/module-autodiscovery-rules/{id}
+GET /api/v1/module-autodiscovery-rules/{id}
 ```
 
 ### Update Rule
 
 ```
-PATCH /api/terrapod/v1/module-autodiscovery-rules/{id}
+PATCH /api/v1/module-autodiscovery-rules/{id}
 ```
 
 Same body shape as create; only the attributes you include change. Changing `repo-url`, `vcs-connection-id` or `branch` starts the rule afresh: what it had seen belonged to the old target, so the next poll records a new baseline rather than registering everything.
@@ -2563,7 +2563,7 @@ Same body shape as create; only the attributes you include change. Changing `rep
 ### Delete Rule
 
 ```
-DELETE /api/terrapod/v1/module-autodiscovery-rules/{id}
+DELETE /api/v1/module-autodiscovery-rules/{id}
 ```
 
 Returns `204`. The modules the rule registered stay registered.
@@ -2571,8 +2571,8 @@ Returns `204`. The modules the rule registered stay registered.
 ### Preview (dry-run)
 
 ```
-GET  /api/terrapod/v1/module-autodiscovery-rules/{id}/preview   # a saved rule
-POST /api/terrapod/v1/module-autodiscovery-rules/preview        # an unsaved rule (same body as Create)
+GET  /api/v1/module-autodiscovery-rules/{id}/preview   # a saved rule
+POST /api/v1/module-autodiscovery-rules/preview        # an unsaved rule (same body as Create)
 ```
 
 Registers nothing. Returns a `module-autodiscovery-rule-previews` document with:
@@ -2595,7 +2595,7 @@ Errors:
 ### Scan (register modules)
 
 ```
-POST /api/terrapod/v1/module-autodiscovery-rules/{id}/scan
+POST /api/v1/module-autodiscovery-rules/{id}/scan
 ```
 
 With no body, registers every candidate. To register a chosen subset, send:

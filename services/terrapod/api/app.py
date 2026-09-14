@@ -1283,7 +1283,7 @@ def create_application() -> FastAPI:
         router as module_autodiscovery_rules_router,
     )
 
-    app.include_router(module_autodiscovery_rules_router, prefix=TERRAPOD_PREFIX)
+    include_terrapod(module_autodiscovery_rules_router)
 
     # Bulk workspace operations — Terrapod-native admin (#318): search +
     # all-or-nothing bulk-update of fields/run-tasks/notifications.

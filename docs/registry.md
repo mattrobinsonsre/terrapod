@@ -286,7 +286,7 @@ A template using any other placeholder is refused with `422`. Either way, the na
 Create a rule:
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/terrapod/v1/module-autodiscovery-rules \
+curl -X POST https://terrapod.example.com/api/v1/module-autodiscovery-rules \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -306,10 +306,10 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/module-autodiscovery-r
 Then preview it, and register only the submodules you want:
 
 ```zsh
-curl https://terrapod.example.com/api/terrapod/v1/module-autodiscovery-rules/<rule-id>/preview \
+curl https://terrapod.example.com/api/v1/module-autodiscovery-rules/<rule-id>/preview \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 
-curl -X POST https://terrapod.example.com/api/terrapod/v1/module-autodiscovery-rules/<rule-id>/scan \
+curl -X POST https://terrapod.example.com/api/v1/module-autodiscovery-rules/<rule-id>/scan \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{"data": {"attributes": {"subdirectories": ["", "modules/create"]}}}'
