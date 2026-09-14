@@ -74,6 +74,7 @@
   "GET /api/terrapod/v1/catalog-items/{item_id}",
   "GET /api/terrapod/v1/catalog-items/{item_id}/form",
   "GET /api/terrapod/v1/catalog-items/{item_id}/instances",
+  "GET /api/terrapod/v1/catalog-items/{item_id}/interface",
   "GET /api/terrapod/v1/catalog-items/{resource_id}/access",
   "GET /api/terrapod/v1/configuration-versions/download-by-ticket/{ticket}",
   "GET /api/terrapod/v1/configuration-versions/{cv_id}/download",

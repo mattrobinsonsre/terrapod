@@ -100,6 +100,9 @@ field CatalogItem.Attributes map[string]any
 field CatalogItem.CreatedAt string
 field CatalogItem.ID string
 field CatalogItem.UpdatedAt string
+field CatalogItemInterface.Inputs []map[string]any `json:"inputs"`
+field CatalogItemInterface.Outputs []map[string]any `json:"outputs"`
+field CatalogItemInterface.ResolvedVersion string `json:"resolved-version"`
 field CatalogRunRef.ID string
 field CatalogRunRef.IsDestroy bool
 field CatalogRunRef.Status string
@@ -1199,6 +1202,7 @@ method (*Client) GetAutodiscoveryRule(ctx context.Context, id string) (*Autodisc
 method (*Client) GetCatalogInstance(ctx context.Context, wsID string) (*CatalogInstance, error)
 method (*Client) GetCatalogItem(ctx context.Context, id string) (*CatalogItem, error)
 method (*Client) GetCatalogItemForm(ctx context.Context, id string) (map[string]any, error)
+method (*Client) GetCatalogItemInterface(ctx context.Context, id string) (*CatalogItemInterface, error)
 method (*Client) GetCurrentStateVersion(ctx context.Context, workspaceID string) (*StateVersion, error)
 method (*Client) GetDeletedWorkspace(ctx context.Context, workspaceID string) (*DeletedWorkspace, error)
 method (*Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, error)
@@ -1363,6 +1367,7 @@ type BulkWarmRequest struct
 type BulkWarmResponse struct
 type CatalogInstance struct
 type CatalogItem struct
+type CatalogItemInterface struct
 type CatalogRunRef struct
 type Client struct
 type ComponentReplicas struct

@@ -35,6 +35,7 @@ func toolCaller(t *testing.T, handler http.HandlerFunc) *mcp.ClientSession {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
 	registerObserve(srv, c)
 	registerAct(srv, c)
+	registerGround(srv, c)
 
 	ct, st := mcp.NewInMemoryTransports()
 	ctx := context.Background()

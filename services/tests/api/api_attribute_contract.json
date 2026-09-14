@@ -151,6 +151,11 @@
     "fields",
     "resolved-version"
   ],
+  "catalog.get_catalog_item_interface": [
+    "inputs",
+    "outputs",
+    "resolved-version"
+  ],
   "catalog.show_catalog_instance": [
     "input-values"
   ],

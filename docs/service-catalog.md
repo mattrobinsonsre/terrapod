@@ -266,6 +266,7 @@ GET    /api/terrapod/v1/catalog-items/{id}
 PATCH  /api/terrapod/v1/catalog-items/{id}
 DELETE /api/terrapod/v1/catalog-items/{id}          # 409 while instances exist
 GET    /api/terrapod/v1/catalog-items/{id}/form      # resolved provision form
+GET    /api/terrapod/v1/catalog-items/{id}/interface # the module version's inputs + outputs
 GET    /api/terrapod/v1/catalog-items/{id}/instances
 POST   /api/terrapod/v1/catalog-items/{id}/provision # catalog use + pool write
 

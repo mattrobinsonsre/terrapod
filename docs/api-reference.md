@@ -4059,6 +4059,14 @@ GET /api/terrapod/v1/catalog-items/{id}/form
 
 Returns the resolved provision form: `resolved-version` (per the item's version policy) and `fields[]` — one field per resolved input (the module's curated variables plus every parameter from the item's provider templates), with type, description, default, sensitivity, and any enum choices. **Required permission:** catalog `read`.
 
+#### Module Interface
+
+```
+GET /api/terrapod/v1/catalog-items/{id}/interface
+```
+
+The inputs and outputs of the module version the item resolves to — its `default-version-pin`, or the latest uploaded version — derived from the module registry rather than stored on the item. Returns `resolved-version`, `inputs[]` (`name`, `type`, `description`, `default`, `required`, `sensitive`) and `outputs[]` (`name`, `description`, `sensitive`): the same entries as the module registry's interface endpoint. Where `/form` is the curated provision view, this is the module's own surface, and the only place its outputs can be read. All three are `null` while the module has no uploaded version. **Required permission:** catalog `read`.
+
 #### List Item Instances
 
 ```

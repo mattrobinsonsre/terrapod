@@ -587,6 +587,39 @@ async def get_catalog_item_form(
     )
 
 
+@router.get("/catalog-items/{item_id}/interface")
+async def get_catalog_item_interface(
+    item_id: str = Path(...),
+    _: None = Depends(require_catalog_enabled),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """The linked module version's inputs and outputs (#1585).
+
+    Derived, not stored: the interface the module registry extracted for the
+    version this item resolves to — its pin, or the latest uploaded version —
+    in the same shape as the module interface endpoint. `/form` is the curated
+    provision view of the inputs; this is the module's own surface, and the only
+    place its outputs are readable. All three attributes are null while the
+    module has no uploaded version.
+    """
+    item = await _load_item_for_read(db, user, item_id)
+    mv = await catalog_service._resolve_module_version(db, item.module_id, item.default_version_pin)
+    return JSONResponse(
+        content={
+            "data": {
+                "type": "catalog-item-interfaces",
+                "id": str(item.id),
+                "attributes": {
+                    "resolved-version": mv.version if mv else None,
+                    "inputs": mv.inputs if mv else None,
+                    "outputs": mv.outputs if mv else None,
+                },
+            }
+        }
+    )
+
+
 @router.get("/catalog-items/{item_id}/instances")
 async def list_catalog_item_instances(
     item_id: str = Path(...),
