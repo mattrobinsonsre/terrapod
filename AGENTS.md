@@ -457,6 +457,32 @@ multi-language implementation ships in the same PR**:
   (`tests/db/migration_contractions.json`); a new one fails CI until you
   consciously acknowledge it followed this discipline (regenerate the ledger
   with `UPDATE_API_CONTRACT=1 pytest tests/db/test_migration_contract.py`).
+- **A release line's migrations are a prefix of `main`'s (hard requirement,
+  gated)** — a release branch (`release/vX.Y`) and `main` can both add
+  migrations, and a deployment on the release line must later upgrade to a
+  `main`-based release by running only the migrations it has not seen. So the
+  revision graph stays **one straight line with no merge revisions**, and every
+  release line's chain sits inside it:
+  - write the release-line migration on the release branch, on top of that
+    line's head, and keep it **expand-only** (new tables, nullable or defaulted
+    columns). It also runs before `main`'s later migrations on any upgrade
+    that skips the release, so it must be correct against the older schema,
+    and `main`'s migrations must still apply on top of it;
+  - carry it to `main` **in the same cycle**, with the same revision ID, placed
+    at the point the line branched, and **re-parent** `main`'s first later
+    migration onto it (#1452 did this for 1.6: `cddfa0bf6bfb_oci_registry`
+    descends from 1.6's head `8c02c0a6b39b`). Never "tidy" such a
+    `down_revision` back — that leaves the release head on a side branch;
+  - record the line's new head in `services/tests/db/alembic_release_heads.json`
+    on both branches. `tests/db/test_alembic_revision_graph.py` fails CI on two
+    heads, a merge revision, a dangling parent, or a recorded release head that
+    is not an ancestor of the head;
+  - once `main`'s next release has shipped, that line can take no more
+    migrations (a patch release carries none anyway).
+
+  A database already migrated past the insertion point on `main` (a local dev
+  database, never a released one) treats a newly inserted migration as applied
+  without running it. Reset it after a carry.
 - **Substantial API tempfiles go on the attached PVC, not `/tmp`** — on the
   API pod `/tmp` is RAM-backed. Anything that can hold tens of MB (provider
   archives, VCS tarballs, state snapshots, config tarballs) must be written to
