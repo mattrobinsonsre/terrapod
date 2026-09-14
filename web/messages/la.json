@@ -372,6 +372,8 @@
       "createModule": "Modulum Creare",
       "empty": "Nulli adhuc moduli. Unum crea ut incipias.",
       "providerLabel": "Praebitor: {provider}",
+      "repoModuleCount": "{count, plural, one {# modulus} other {# moduli}} in hoc repositorio",
+      "submoduleAt": "Submodulus: {path}",
       "versionCount": "{count, plural, one {# versio} other {# versiones}}",
       "loadFailed": "Moduli onerari non potuerunt",
       "createFailed": "Modulus creari non potuit",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (vacuum relinque pro praedefinito)",
         "tagPattern": "Exemplar Notarum",
         "tagPatternHint": "Solum notae huic exemplari convenientes versiones creant (e.g. v1.0.0)",
+        "subdirectoryOptional": "Subdirectorium (optionale)",
+        "subdirectoryHint": "Pro submodulo: via intra repositorium unde edatur, e.g. modules/create. Vacuum relinque pro radice repositorii.",
         "labelsOptional": "Tituli (optionales)",
         "creating": "Creatur...",
         "create": "Creare"

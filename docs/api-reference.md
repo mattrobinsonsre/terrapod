@@ -1822,6 +1822,8 @@ PUT  /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/version
 DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versions/{version}
 ```
 
+**Submodules.** Create, `PATCH …/{name}/{provider}` and `PATCH …/{name}/{provider}/vcs` accept an optional `subdirectory`: the path within the module's repository to publish it from, for a submodule (see [Submodules](registry.md#submodules-a-module-in-a-subdirectory)). It needs a `vcs-repo-url`; a path with `..`, `.` or empty segments is refused with `422`, and a repository subdirectory that is already registered with `409`. Modules report it as the `subdirectory` attribute, `""` for a module at the repository root. On `PATCH …/vcs`, omitting it leaves it unchanged; removing the repository clears it.
+
 ### Update Module
 
 ```

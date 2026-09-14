@@ -360,6 +360,7 @@
     "provider",
     "source",
     "status",
+    "subdirectory",
     "updated-at",
     "vcs-branch",
     "vcs-connection-id",

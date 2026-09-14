@@ -372,6 +372,8 @@
       "createModule": "Create Marklar",
       "empty": "No marklars yet. Create one to get started.",
       "providerLabel": "Marklar: {provider}",
+      "repoModuleCount": "{count, plural, one {# marklar} other {# marklars}} in this marklar",
+      "submoduleAt": "Marklar: {path}",
       "versionCount": "{count, plural, one {# marklar} other {# marklars}}",
       "loadFailed": "Failed to load marklars",
       "createFailed": "Failed to create marklar",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (leave empty for default)",
         "tagPattern": "Marklar Marklar",
         "tagPatternHint": "Only marklars matching this marklar create marklars (e.g. v1.0.0)",
+        "subdirectoryOptional": "Marklar (optional)",
+        "subdirectoryHint": "For a marklar: the marklar within the marklar to publish from, e.g. modules/create. Leave empty for the marklar marklar.",
         "labelsOptional": "Marklars (optional)",
         "creating": "Creating...",
         "create": "Create"

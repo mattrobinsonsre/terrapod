@@ -28,6 +28,7 @@ type registryModuleModel struct {
 	VCSRepoURL      types.String `tfsdk:"vcs_repo_url"`
 	VCSBranch       types.String `tfsdk:"vcs_branch"`
 	VCSTagPattern   types.String `tfsdk:"vcs_tag_pattern"`
+	Subdirectory    types.String `tfsdk:"subdirectory"`
 	Namespace       types.String `tfsdk:"namespace"`
 	Status          types.String `tfsdk:"status"`
 	OwnerEmail      types.String `tfsdk:"owner_email"`
@@ -64,6 +65,7 @@ func (r *registryModuleResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"vcs_repo_url":      schema.StringAttribute{Optional: true, Description: "VCS repo URL."},
 			"vcs_branch":        schema.StringAttribute{Optional: true, Description: "VCS branch."},
 			"vcs_tag_pattern":   schema.StringAttribute{Optional: true, Description: "VCS tag pattern (e.g. v*)."},
+			"subdirectory":      schema.StringAttribute{Optional: true, Description: "Path within the repository to publish the module from, for a submodule (e.g. modules/create). Requires vcs_repo_url; omit for a module at the repository root."},
 			"namespace":         schema.StringAttribute{Computed: true, Description: "Namespace (always default).", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"status":            schema.StringAttribute{Computed: true, Description: "Module status."},
 			"owner_email":       schema.StringAttribute{Computed: true, Description: "Owner email.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
@@ -120,6 +122,9 @@ func (r *registryModuleResource) Create(ctx context.Context, req resource.Create
 	}
 	if !plan.VCSTagPattern.IsNull() {
 		sdkReq.VCSTagPattern = plan.VCSTagPattern.ValueString()
+	}
+	if !plan.Subdirectory.IsNull() {
+		sdkReq.Subdirectory = plan.Subdirectory.ValueString()
 	}
 
 	m, err := r.tc.CreateRegistryModule(ctx, sdkReq)
@@ -181,6 +186,10 @@ func (r *registryModuleResource) Update(ctx context.Context, req resource.Update
 		s := plan.VCSTagPattern.ValueString()
 		sdkReq.VCSTagPattern = &s
 	}
+	if !plan.Subdirectory.IsNull() && !plan.Subdirectory.IsUnknown() {
+		s := plan.Subdirectory.ValueString()
+		sdkReq.Subdirectory = &s
+	}
 
 	m, err := r.tc.UpdateRegistryModule(ctx, plan.Name.ValueString(), plan.ProviderName.ValueString(), sdkReq)
 	if err != nil {
@@ -231,6 +240,7 @@ func readModuleFromSDK(ctx context.Context, m *terrapod.RegistryModule, mod *reg
 	setOptStr(&mod.VCSRepoURL, m.VCSRepoURL)
 	setOptStr(&mod.VCSBranch, m.VCSBranch)
 	setOptStr(&mod.VCSTagPattern, m.VCSTagPattern)
+	setOptStr(&mod.Subdirectory, m.Subdirectory)
 	if len(m.Labels) > 0 {
 		val, d := types.MapValueFrom(ctx, types.StringType, m.Labels)
 		diags.Append(d...)

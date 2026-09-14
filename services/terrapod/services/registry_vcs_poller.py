@@ -7,7 +7,9 @@ Registered as a periodic task with the distributed scheduler. Each cycle:
    and creates a new module version
 """
 
+import asyncio
 import fnmatch
+import hashlib
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,12 +18,42 @@ from sqlalchemy.orm import selectinload
 from terrapod.db.models import RegistryModule, RegistryModuleVersion
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
+from terrapod.redis.client import get_redis_client
 from terrapod.services import github_service, gitlab_service, vcs_rate_limit
 from terrapod.services.archive_utils import strip_archive_top_level_dir_async
+from terrapod.services.module_subdirectory import scope_archive_to_subdirectory
 from terrapod.storage import get_storage
 from terrapod.storage.keys import module_tarball_key
 
 logger = get_logger(__name__)
+
+# A tag with nothing under a submodule's subdirectory (#1583) — typically one
+# cut before the submodule existed — is never published, so without a note of
+# it every poll would download it again. The note is keyed on the commit, so a
+# moved tag is looked at afresh, and on the subdirectory, so changing it does
+# too. Best-effort: a lost note costs one more download.
+_NO_SUBDIR_TTL_SECONDS = 7 * 24 * 3600
+
+
+def _no_subdir_key(module_id, tag_sha: str, subdirectory: str) -> str:  # type: ignore[no-untyped-def]
+    digest = hashlib.sha256(subdirectory.encode()).hexdigest()[:16]
+    return f"tp:regmod_nosubdir:{module_id}:{tag_sha}:{digest}"
+
+
+async def _known_without_subdir(module_id, tag_sha: str, subdirectory: str) -> bool:  # type: ignore[no-untyped-def]
+    try:
+        key = _no_subdir_key(module_id, tag_sha, subdirectory)
+        return bool(await get_redis_client().exists(key))
+    except Exception:
+        return False
+
+
+async def _remember_without_subdir(module_id, tag_sha: str, subdirectory: str) -> None:  # type: ignore[no-untyped-def]
+    try:
+        key = _no_subdir_key(module_id, tag_sha, subdirectory)
+        await get_redis_client().set(key, "1", ex=_NO_SUBDIR_TTL_SECONDS)
+    except Exception:
+        logger.debug("Could not note a tag without the module's subdirectory", exc_info=True)
 
 
 def _extract_version(tag_name: str, pattern: str) -> str:
@@ -217,6 +249,13 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
         if existing and existing.vcs_commit_sha == tag_sha and tag_sha:
             continue
 
+        if (
+            module.subdirectory
+            and tag_sha
+            and await _known_without_subdir(module.id, tag_sha, module.subdirectory)
+        ):
+            continue
+
         # Download archive at this tag (new version or SHA mismatch)
         download_fn = _dispatch_download_archive(conn.provider)
         try:
@@ -233,12 +272,28 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
         # Strip top-level directory wrapper from VCS archive before storing
         archive_bytes = await strip_archive_top_level_dir_async(archive_bytes)
 
+        # A submodule (#1583) publishes only its subdirectory, re-rooted so its
+        # files sit at the root of the tarball like any other module's.
+        if module.subdirectory:
+            scoped = await asyncio.to_thread(
+                scope_archive_to_subdirectory, archive_bytes, module.subdirectory
+            )
+            if scoped is None:
+                logger.info(
+                    "Tag has nothing under the module's subdirectory; not publishing it",
+                    module_id=str(module.id),
+                    tag=tag_name,
+                    subdirectory=module.subdirectory,
+                )
+                if tag_sha:
+                    await _remember_without_subdir(module.id, tag_sha, module.subdirectory)
+                continue
+            archive_bytes = scoped
+
         from terrapod.config import settings
 
         interface = None
         if settings.registry.module_interface.enabled:
-            import asyncio
-
             from terrapod.services.module_hcl_parser import extract_module_interface
 
             try:

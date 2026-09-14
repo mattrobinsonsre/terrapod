@@ -372,6 +372,8 @@
       "createModule": "Create Module",
       "empty": "No modules yet, there are. Create one to begin, you must.",
       "providerLabel": "Provider: {provider}",
+      "repoModuleCount": "In this repository, {count, plural, one {# module} other {# modules}} there are",
+      "submoduleAt": "Submodule, it is: {path}",
       "versionCount": "{count, plural, one {# version} other {# versions}}",
       "loadFailed": "Load the modules, it did not",
       "createFailed": "Create the module, it did not",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (leave empty for default)",
         "tagPattern": "Pattern, Tag",
         "tagPatternHint": "Only tags matching this pattern, versions create they do (e.g. v1.0.0)",
+        "subdirectoryOptional": "Subdirectory (optional, it is)",
+        "subdirectoryHint": "For a submodule, the path within the repository to publish from, this is (e.g. modules/create). Empty for the repository root, leave it you must.",
         "labelsOptional": "Labels (optional)",
         "creating": "Creating, we are...",
         "create": "Create"

@@ -372,6 +372,8 @@
       "createModule": "Create Module",
       "empty": "Nay modules yet. Create one t'' get started, matey.",
       "providerLabel": "Provider: {provider}",
+      "repoModuleCount": "{count, plural, one {# module} other {# modules}} aboard this repository",
+      "submoduleAt": "Submodule, arr: {path}",
       "versionCount": "{count, plural, one {# version} other {# versions}}",
       "loadFailed": "Failed t'' load modules",
       "createFailed": "Failed t'' create module",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (leave empty fer default)",
         "tagPattern": "Tag Pattern",
         "tagPatternHint": "Only tags matchin'' this pattern create versions (e.g. v1.0.0)",
+        "subdirectoryOptional": "Subdirectory (if ye please)",
+        "subdirectoryHint": "Fer a submodule: the course within the repository to hoist from, e.g. modules/create. Leave it empty fer the repository''s root, matey.",
         "labelsOptional": "Labels (optional)",
         "creating": "Creatin''...",
         "create": "Create"

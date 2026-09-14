@@ -372,6 +372,8 @@
       "createModule": "Creyt Module",
       "empty": "No modulez yet. Creyt wun ta git startd.",
       "providerLabel": "Providr: {provider}",
+      "repoModuleCount": "{count, plural, one {# modyool} other {# modyoolz}} in dis repositoree",
+      "submoduleAt": "Submodyool: {path}",
       "versionCount": "{count, plural, one {# vershun} other {# vershunz}}",
       "loadFailed": "Failed ta lode modulez",
       "createFailed": "Failed ta creyt module",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (leev empty fer default)",
         "tagPattern": "Tag Pattrn",
         "tagPatternHint": "Only tagz matchin dis pattrn creyt vershunz (e.g. v1.0.0)",
+        "subdirectoryOptional": "Subdirektree (opshunul)",
+        "subdirectoryHint": "For a submodyool: teh paf in teh repositoree 2 publish frum, e.g. modules/create. Leev empty fer teh repositoree root.",
         "labelsOptional": "Labelz (opshunul)",
         "creating": "Creytin...",
         "create": "Creyt"

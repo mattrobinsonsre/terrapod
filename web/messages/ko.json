@@ -372,6 +372,8 @@
       "createModule": "모듈 생성",
       "empty": "아직 모듈이 없습니다. 하나를 생성하여 시작하세요.",
       "providerLabel": "프로바이더: {provider}",
+      "repoModuleCount": "이 저장소의 {count, plural, one {모듈 #개} other {모듈 #개}}",
+      "submoduleAt": "하위 모듈: {path}",
       "versionCount": "{count, plural, one {버전 #개} other {버전 #개}}",
       "loadFailed": "모듈을 불러오지 못했습니다",
       "createFailed": "모듈을 생성하지 못했습니다",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (비워두면 기본값)",
         "tagPattern": "태그 패턴",
         "tagPatternHint": "이 패턴과 일치하는 태그만 버전을 생성합니다 (예: v1.0.0)",
+        "subdirectoryOptional": "하위 디렉터리 (선택 사항)",
+        "subdirectoryHint": "하위 모듈인 경우: 게시할 저장소 내 경로입니다(예: modules/create). 저장소 루트는 비워 두세요.",
         "labelsOptional": "라벨 (선택 사항)",
         "creating": "생성 중...",
         "create": "생성"

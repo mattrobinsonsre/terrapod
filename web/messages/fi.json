@@ -372,6 +372,8 @@
       "createModule": "Luo moduuli",
       "empty": "Ei vielä moduuleja. Luo yksi aloittaaksesi.",
       "providerLabel": "Palveluntarjoaja: {provider}",
+      "repoModuleCount": "{count, plural, one {# moduuli} other {# moduulia}} tässä repositoriossa",
+      "submoduleAt": "Alimoduuli: {path}",
       "versionCount": "{count, plural, one {# versio} other {# versiota}}",
       "loadFailed": "Moduulien lataaminen epäonnistui",
       "createFailed": "Moduulin luominen epäonnistui",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (jätä tyhjäksi oletusta varten)",
         "tagPattern": "Tagimalli",
         "tagPatternHint": "Vain tätä mallia vastaavat tagit luovat versioita (esim. v1.0.0)",
+        "subdirectoryOptional": "Alihakemisto (valinnainen)",
+        "subdirectoryHint": "Alimoduulille: polku repositoriossa, josta julkaistaan, esim. modules/create. Jätä tyhjäksi repositorion juurta varten.",
         "labelsOptional": "Tunnisteet (valinnainen)",
         "creating": "Luodaan...",
         "create": "Luo"

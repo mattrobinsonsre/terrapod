@@ -372,6 +372,8 @@
       "createModule": "Utwórz moduł",
       "empty": "Brak modułów. Utwórz jeden, aby rozpocząć.",
       "providerLabel": "Dostawca: {provider}",
+      "repoModuleCount": "{count, plural, one {# moduł} few {# moduły} many {# modułów} other {# modułu}} w tym repozytorium",
+      "submoduleAt": "Podmoduł: {path}",
       "versionCount": "{count, plural, one {# wersja} few {# wersje} many {# wersji} other {# wersji}}",
       "loadFailed": "Nie udało się wczytać modułów",
       "createFailed": "Nie udało się utworzyć modułu",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (pozostaw puste dla domyślnej)",
         "tagPattern": "Wzorzec tagów",
         "tagPatternHint": "Wersje tworzą tylko tagi pasujące do tego wzorca (np. v1.0.0)",
+        "subdirectoryOptional": "Podkatalog (opcjonalnie)",
+        "subdirectoryHint": "Dla podmodułu: ścieżka w repozytorium, z której publikować, np. modules/create. Pozostaw puste dla katalogu głównego repozytorium.",
         "labelsOptional": "Etykiety (opcjonalne)",
         "creating": "Tworzenie...",
         "create": "Utwórz"

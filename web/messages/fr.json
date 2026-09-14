@@ -372,6 +372,8 @@
       "createModule": "Créer un module",
       "empty": "Aucun module pour l'instant. Créez-en un pour commencer.",
       "providerLabel": "Fournisseur : {provider}",
+      "repoModuleCount": "{count, plural, one {# module} other {# modules}} dans ce dépôt",
+      "submoduleAt": "Sous-module : {path}",
       "versionCount": "{count, plural, one {# version} other {# versions}}",
       "loadFailed": "Échec du chargement des modules",
       "createFailed": "Échec de la création du module",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (laisser vide pour la valeur par défaut)",
         "tagPattern": "Motif de tag",
         "tagPatternHint": "Seuls les tags correspondant à ce motif créent des versions (par ex. v1.0.0)",
+        "subdirectoryOptional": "Sous-répertoire (facultatif)",
+        "subdirectoryHint": "Pour un sous-module : le chemin dans le dépôt à partir duquel publier, par ex. modules/create. Laisser vide pour la racine du dépôt.",
         "labelsOptional": "Labels (facultatif)",
         "creating": "Création...",
         "create": "Créer"

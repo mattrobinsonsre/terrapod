@@ -372,6 +372,8 @@
       "createModule": "ایجاد ماژول",
       "empty": "هنوز هیچ ماژولی وجود ندارد. برای شروع یکی ایجاد کنید.",
       "providerLabel": "ارائه‌دهنده: {provider}",
+      "repoModuleCount": "{count, plural, one {# ماژول} other {# ماژول}} در این مخزن",
+      "submoduleAt": "زیرماژول: {path}",
       "versionCount": "{count, plural, one {# نسخه} other {# نسخه}}",
       "loadFailed": "بارگذاری ماژول‌ها ناموفق بود",
       "createFailed": "ایجاد ماژول ناموفق بود",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (برای پیش‌فرض خالی بگذارید)",
         "tagPattern": "الگوی برچسب",
         "tagPatternHint": "فقط برچسب‌هایی که با این الگو مطابقت دارند نسخه ایجاد می‌کنند (مثلاً v1.0.0)",
+        "subdirectoryOptional": "زیرشاخه (اختیاری)",
+        "subdirectoryHint": "برای یک زیرماژول: مسیری در مخزن که از آن منتشر می‌شود، مانند modules/create. برای ریشهٔ مخزن خالی بگذارید.",
         "labelsOptional": "برچسب‌ها (اختیاری)",
         "creating": "در حال ایجاد...",
         "create": "ایجاد"

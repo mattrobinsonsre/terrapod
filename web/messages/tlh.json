@@ -372,6 +372,8 @@
       "createModule": "Segh chenmoH",
       "empty": "Segh Hutlh. wa' chenmoH 'ej taghlaH.",
       "providerLabel": "nobwI': {provider}",
+      "repoModuleCount": "{count, plural, one {# jan} other {# janmey}} repo vamDaq",
+      "submoduleAt": "jan mach: {path}",
       "versionCount": "{count, plural, one {# mI''} other {# mI''mey}}",
       "loadFailed": "Seghmey ghelmeH lujpu'",
       "createFailed": "Segh chenmoHmeH lujpu'",
@@ -388,6 +390,8 @@
         "branchPlaceholder": "main (motlh vaj chImmoH)",
         "tagPattern": "per rur",
         "tagPatternHint": "vam rurbogh permey neH mI'mey chenmoH (Da v1.0.0)",
+        "subdirectoryOptional": "pa'' mach (DaH DIch)",
+        "subdirectoryHint": "jan mach: repo Daq He, Da modules/create. repo tIq: chImmoH.",
         "labelsOptional": "permey (DaH DIch)",
         "creating": "chenmoHtaH...",
         "create": "chenmoH"
