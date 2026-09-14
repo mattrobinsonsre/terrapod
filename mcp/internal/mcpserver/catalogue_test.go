@@ -125,7 +125,7 @@ func TestExpectedToolsPresent(t *testing.T) {
 		}
 	}
 	// The infra-changing tools must be flagged destructive so hosts confirm.
-	for _, n := range []string{"terrapod_run_create", "terrapod_run_apply"} {
+	for _, n := range []string{"terrapod_run_create", "terrapod_run_apply", "terrapod_run_retry"} {
 		e, ok := byName[n]
 		if !ok {
 			t.Errorf("missing tool %q", n)

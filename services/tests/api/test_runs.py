@@ -1515,7 +1515,9 @@ class TestRetryRun:
         latest uploaded CV rather than faithfully copying the null forward."""
         mock_resolve.return_value = caps_for_level("plan")
 
-        original = _mock_run(status="errored")
+        # Plan-only: this is about the CV fallback, and a plan-level role may
+        # retry a plan-only run (#1599).
+        original = _mock_run(status="errored", plan_only=True)
         original.configuration_version_id = None  # The bug
         mock_get_run.return_value = original
 
@@ -1554,7 +1556,9 @@ class TestRetryRun:
         uploaded, the retry is rejected with 422 (nothing the runner could do)."""
         mock_resolve.return_value = caps_for_level("plan")
 
-        original = _mock_run(status="errored")
+        # Plan-only: this is about the CV fallback, and a plan-level role may
+        # retry a plan-only run (#1599).
+        original = _mock_run(status="errored", plan_only=True)
         original.configuration_version_id = None
         mock_get_run.return_value = original
 
@@ -1574,6 +1578,120 @@ class TestRetryRun:
 
         assert resp.status_code == 422
         mock_create_run.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_a_retried_destroy_is_still_a_destroy(
+        self, mock_resolve, mock_get_run, mock_create_run, mock_queue, *mocks
+    ):
+        """#1599: retry queued a failed destroy as an ordinary apply of the same
+        configuration, because the destroy flag was never passed on. Both ways
+        round: a destroy stays a destroy, and an ordinary run stays ordinary."""
+        mock_resolve.return_value = caps_for_level("admin")
+
+        original = _mock_run(status="errored")
+        mock_get_run.return_value = original
+
+        ws = _mock_workspace(ws_id=original.workspace_id)
+        new_run = _mock_run(status="pending", ws_id=ws.id)
+        mock_create_run.return_value = new_run
+        mock_queue.return_value = new_run
+
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        for is_destroy in (True, False):
+            original.is_destroy = is_destroy
+            mock_create_run.reset_mock()
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{original.id}/actions/retry",
+                    headers=_AUTH,
+                )
+            assert resp.status_code == 201, is_destroy
+            assert mock_create_run.await_args.kwargs["is_destroy"] is is_destroy
+
+
+class TestRetryNeedsWhatCreatingTheRunNeeds:
+    """#1599: retry checked `run:cancel`, a plan-tier capability, so a
+    plan-level role could retry an apply-capable run and, on a workspace that
+    auto-applies, apply it. A retry is a new run, so it now needs exactly what
+    creating that run would."""
+
+    async def _retry(
+        self, caps: frozenset[str], *, plan_only: bool = False, is_destroy: bool = False
+    ):
+        original = _mock_run(status="errored", plan_only=plan_only)
+        original.is_destroy = is_destroy
+        ws = _mock_workspace(ws_id=original.workspace_id)
+        new_run = _mock_run(status="pending", ws_id=ws.id)
+        create = AsyncMock(return_value=new_run)
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+            patch(
+                "terrapod.api.routers.runs.run_service.get_run", AsyncMock(return_value=original)
+            ),
+            patch("terrapod.api.routers.runs.run_service.create_run", create),
+            patch(
+                "terrapod.api.routers.runs.run_service.queue_run", AsyncMock(return_value=new_run)
+            ),
+            patch(
+                "terrapod.api.routers.runs.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=caps),
+            ),
+        ):
+            app, mock_db = _make_app(_user())
+            mock_db.get.return_value = ws
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{original.id}/actions/retry", headers=_AUTH
+                )
+        return resp, create
+
+    async def test_a_plan_level_role_retries_a_plan_only_run(self):
+        """The case #1599 is about: a one-off errored speculative plan."""
+        resp, create = await self._retry(caps_for_level("plan"), plan_only=True)
+        assert resp.status_code == 201
+        create.assert_awaited_once()
+
+    async def test_a_plan_level_role_cannot_retry_an_apply_capable_run(self):
+        resp, create = await self._retry(caps_for_level("plan"))
+        assert resp.status_code == 403
+        assert "run:apply" in resp.text
+        create.assert_not_called()
+
+    async def test_a_plan_level_role_cannot_retry_a_destroy(self):
+        resp, create = await self._retry(caps_for_level("plan"), is_destroy=True)
+        assert resp.status_code == 403
+        create.assert_not_called()
+
+    async def test_a_write_level_role_retries_an_apply_capable_run(self):
+        resp, create = await self._retry(caps_for_level("write"))
+        assert resp.status_code == 201
+        create.assert_awaited_once()
+
+    async def test_apply_without_apply_destroy_cannot_retry_a_destroy(self):
+        resp, create = await self._retry(
+            frozenset({cap.RUN_APPLY, cap.RUN_READ, cap.WORKSPACE_READ}), is_destroy=True
+        )
+        assert resp.status_code == 403
+        assert "run:apply-destroy" in resp.text
+        create.assert_not_called()
+
+    async def test_run_cancel_alone_no_longer_retries_anything(self):
+        """The old gate: discard and cancel still need it, retry doesn't ride on it."""
+        resp, create = await self._retry(
+            frozenset({cap.RUN_CANCEL, cap.RUN_READ, cap.WORKSPACE_READ}), plan_only=True
+        )
+        assert resp.status_code == 403
+        create.assert_not_called()
 
 
 class TestGranularCapabilityEnforcement:

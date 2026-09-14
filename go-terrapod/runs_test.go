@@ -86,6 +86,14 @@ func newRunsFixture(t *testing.T) *Client {
 		case r.Method == http.MethodGet && strings.Contains(p, "/api/v2/runs/"):
 			_, _ = w.Write([]byte(runPayload("run-aaaa")))
 
+		// Retry is a Terrapod extension: /api/terrapod/v1, not /api/v2, and it
+		// answers with the NEW run.
+		case r.Method == http.MethodPost && p == "/api/terrapod/v1/runs/run-busy/actions/retry":
+			http.Error(w, `{"errors":[{"status":"409","title":"Conflict","detail":"Cannot retry run in non-terminal state 'planning'"}]}`, http.StatusConflict)
+			return
+		case r.Method == http.MethodPost && p == "/api/terrapod/v1/runs/run-aaaa/actions/retry":
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(runPayload("run-bbbb")))
 		case r.Method == http.MethodPost && strings.HasSuffix(p, "/actions/apply"):
 			if strings.Contains(p, "run-locked") {
 				http.Error(w, `{"errors":[{"status":"409","title":"Conflict","detail":"workspace is locked"}]}`, http.StatusConflict)
@@ -235,6 +243,38 @@ func TestApplyRunConflict(t *testing.T) {
 	}
 	if _, ok := err.(*ConflictError); !ok {
 		t.Errorf("expected *ConflictError, got %T: %v", err, err)
+	}
+}
+
+func TestRetryRunReturnsTheNewRun(t *testing.T) {
+	c := newRunsFixture(t)
+	for _, id := range []string{"run-aaaa", "aaaa"} {
+		run, err := c.RetryRun(t.Context(), id)
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+		// The retry is a new run, not the one it was retried from.
+		if run.ID != "run-bbbb" {
+			t.Errorf("%s: got %q, want the new run run-bbbb", id, run.ID)
+		}
+	}
+}
+
+func TestRetryRunOnAnUnfinishedRunIsAConflict(t *testing.T) {
+	c := newRunsFixture(t)
+	_, err := c.RetryRun(t.Context(), "run-busy")
+	if err == nil {
+		t.Fatal("expected a conflict")
+	}
+	if _, ok := err.(*ConflictError); !ok {
+		t.Errorf("expected *ConflictError, got %T: %v", err, err)
+	}
+}
+
+func TestRetryRunNeedsAnID(t *testing.T) {
+	c := newRunsFixture(t)
+	if _, err := c.RetryRun(t.Context(), ""); err == nil {
+		t.Fatal("expected an error for an empty run id")
 	}
 }
 

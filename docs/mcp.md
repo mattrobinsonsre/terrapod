@@ -118,6 +118,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_run_apply` | destructive | Confirm a planned run so it applies — changes real infrastructure. Only after explicit user approval. |
 | `terrapod_run_discard` | — | Discard a planned run without applying. |
 | `terrapod_run_cancel` | — | Cancel a non-terminal run. |
+| `terrapod_run_retry` | destructive | Queue a **new** run from a finished one, with the same configuration version and options, and return it. A plan-only run retries as plan-only; an apply-capable run follows the workspace's auto-apply setting, so treat it like an apply. Needs the same permission as queuing that kind of run. Refused on a run that hasn't finished. |
 
 ### Manage (gated) — shape the estate
 

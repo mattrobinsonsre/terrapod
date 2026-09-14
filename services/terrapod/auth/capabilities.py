@@ -64,16 +64,16 @@ NOTIFICATION_READ = "notification:read"  # list/show notification configs
 RUN_TRIGGER_READ = "run-trigger:read"  # list/show run triggers
 
 # ── Workspace / runs — plan tier ────────────────────────────────────────────
-RUN_PLAN = "run:plan"  # create a plan-only run
-RUN_CANCEL = "run:cancel"  # discard / cancel / retry a run
+RUN_PLAN = "run:plan"  # create or retry a plan-only run
+RUN_CANCEL = "run:cancel"  # discard / cancel a run (retry needs what creating it would, #1599)
 WORKSPACE_LOCK = "workspace:lock"  # lock / unlock own lock (state lock)
 STATE_READ = "state:read"  # download RAW state JSON (contains secrets)
 DRIFT_DISMISS = "drift:dismiss"  # dismiss a workspace drift flag
 WORKSPACE_ONBOARD = "workspace:onboard"  # onboard existing resources (#824): pool-cred account-wide discovery → import blocks/config
 
 # ── Workspace / runs — write tier ───────────────────────────────────────────
-RUN_APPLY = "run:apply"  # create an apply-capable run + confirm apply
-RUN_APPLY_DESTROY = "run:apply-destroy"  # create/confirm a destroy run (is_destroy)
+RUN_APPLY = "run:apply"  # create or retry an apply-capable run + confirm apply
+RUN_APPLY_DESTROY = "run:apply-destroy"  # create/retry/confirm a destroy run (is_destroy)
 VAR_WRITE = "var:write"  # create / update / delete variables
 STATE_WRITE = "state:write"  # create state version, manual upload, rollback
 CONFIG_UPLOAD = "config:upload"  # create a configuration version
