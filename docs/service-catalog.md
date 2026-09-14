@@ -266,6 +266,7 @@ GET    /api/v1/catalog-items/{id}
 PATCH  /api/v1/catalog-items/{id}
 DELETE /api/v1/catalog-items/{id}          # 409 while instances exist
 GET    /api/v1/catalog-items/{id}/form      # resolved provision form
+GET    /api/v1/catalog-items/{id}/interface # the module version's inputs + outputs
 GET    /api/v1/catalog-items/{id}/instances
 POST   /api/v1/catalog-items/{id}/provision # catalog use + pool write
 

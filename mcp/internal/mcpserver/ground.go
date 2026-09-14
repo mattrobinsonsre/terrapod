@@ -72,6 +72,27 @@ func registerGround(s *mcp.Server, c *terrapod.Client) {
 		return nil, iface, nil
 	})
 
+	// ── terrapod_catalog_item_interface ──────────────────────────────
+	type catalogItemInterfaceIn struct {
+		CatalogItemID string `json:"catalog_item_id" jsonschema:"the service-catalog item's id"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_catalog_item_interface",
+		Description: "Get a service-catalog item's module interface: the inputs and outputs of the module version the item resolves to (its version pin, or the latest uploaded version). " +
+			"Use it to see what an instance of the item takes and what it will expose; the provision form users fill in is a curated subset of these inputs. " +
+			"Needs catalog read on the item. The fields are null while the module has no uploaded version.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in catalogItemInterfaceIn) (*mcp.CallToolResult, *terrapod.CatalogItemInterface, error) {
+		if in.CatalogItemID == "" {
+			return errText("catalog_item_id is required"), nil, nil
+		}
+		iface, err := c.GetCatalogItemInterface(ctx, in.CatalogItemID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, iface, nil
+	})
+
 	// ── terrapod_registry_provider_list ──────────────────────────────
 	type providerListOut struct {
 		Count     int                         `json:"count"`

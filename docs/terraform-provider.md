@@ -34,7 +34,9 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 
 **Data sources** (`terrapod_*`): `terrapod_workspace`, `terrapod_workspaces`,
 `terrapod_workspace_cost`, `terrapod_agent_pool`, `terrapod_role`,
-`terrapod_user`, `terrapod_vcs_connection`, `terrapod_catalog_instances`.
+`terrapod_user`, `terrapod_vcs_connection`, `terrapod_catalog_instances`,
+`terrapod_catalog_item_interface` (the inputs and outputs of the module version
+a catalog item resolves to).
 
 `terrapod_workspace_cost` reports a workspace's current monthly managed-infra
 cost (from its latest state, via the native cost engine) — useful

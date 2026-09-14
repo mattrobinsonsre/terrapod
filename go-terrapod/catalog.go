@@ -186,6 +186,44 @@ func (c *Client) GetCatalogItemForm(ctx context.Context, id string) (map[string]
 	return attrsToMap(res), nil
 }
 
+// CatalogItemInterface is the input/output surface of the module version a
+// catalog item resolves to — its pin, or the latest uploaded version (#1585).
+// Derived from the module registry, never stored on the item. ResolvedVersion
+// is empty, and Inputs and Outputs nil, while the module has no uploaded
+// version.
+type CatalogItemInterface struct {
+	ResolvedVersion string           `json:"resolved-version"`
+	Inputs          []map[string]any `json:"inputs"`
+	Outputs         []map[string]any `json:"outputs"`
+}
+
+// GetCatalogItemInterface returns the inputs and outputs of the module version
+// a catalog item resolves to. Unlike GetCatalogItemForm, which is the curated
+// provision view, this is the module's own surface, and the only place its
+// outputs can be read. Requires catalog read on the item.
+func (c *Client) GetCatalogItemInterface(ctx context.Context, id string) (*CatalogItemInterface, error) {
+	data, err := c.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(id)+"/interface")
+	if err != nil {
+		return nil, err
+	}
+	res, err := ParseResource(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse catalog-item interface: %w", err)
+	}
+	iface := &CatalogItemInterface{ResolvedVersion: GetStringAttr(res, "resolved-version")}
+	if raw, ok := res.Attributes["inputs"]; ok && len(raw) > 0 && string(raw) != "null" {
+		if err := json.Unmarshal(raw, &iface.Inputs); err != nil {
+			return nil, fmt.Errorf("parse catalog-item interface inputs: %w", err)
+		}
+	}
+	if raw, ok := res.Attributes["outputs"]; ok && len(raw) > 0 && string(raw) != "null" {
+		if err := json.Unmarshal(raw, &iface.Outputs); err != nil {
+			return nil, fmt.Errorf("parse catalog-item interface outputs: %w", err)
+		}
+	}
+	return iface, nil
+}
+
 // ── Catalog instances (provision + lifecycle) ──────────────────────────
 
 // ProvisionCatalogItem provisions a new instance from a catalog item. Requires

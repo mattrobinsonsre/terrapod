@@ -139,6 +139,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_registry_module_list` | List the private registry modules published here (name, provider, VCS, status). |
 | `terrapod_registry_module_get` | One module by name + provider — source, status, owner, labels. |
 | `terrapod_registry_module_interface` | A module version's **inputs + outputs** — the exact surface to author a correct `module` block against it, instead of guessing variable names. |
+| `terrapod_catalog_item_interface` | A service-catalog item's module interface — the **inputs + outputs** of the module version the item resolves to (its pin, or the latest uploaded version). Needs catalog read on the item. |
 | `terrapod_registry_provider_list` | List the private registry providers published here. |
 | `terrapod_registry_provider_get` | One provider by name — namespace, owner, labels. |
 
