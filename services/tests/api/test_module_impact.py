@@ -287,6 +287,9 @@ class TestRetryRunCopiesOverrides:
             source="module-test",
             module_overrides=overrides,
         )
+        # Module-impact runs are speculative plans, so plan-only — which is also
+        # what lets a plan-level role retry one (#1599).
+        original.plan_only = True
         mock_get_run.return_value = original
         mock_resolve.return_value = caps_for_level("plan")
 

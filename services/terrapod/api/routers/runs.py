@@ -722,6 +722,21 @@ async def cancel_run(
     return JSONResponse(content=_run_json(run))
 
 
+def _retry_capability(run: Run) -> str:
+    """What retrying `run` requires: exactly what creating that run would.
+
+    A retry is a new run, so it must not let anyone queue what they could not
+    queue directly. It used to check `run:cancel`, which a plan-level role
+    holds, so such a role could retry an apply-capable run and, on a workspace
+    that auto-applies, apply it (#1599). This mirrors `create_run`'s gate.
+    """
+    if run.plan_only:
+        return cap.RUN_PLAN
+    if run.is_destroy:
+        return cap.RUN_APPLY_DESTROY
+    return cap.RUN_APPLY
+
+
 @extensions_router.post("/runs/{run_id}/actions/retry")
 async def retry_run(
     run_id: str = Path(...),
@@ -733,10 +748,11 @@ async def retry_run(
     Creates a new run for the same workspace using the same configuration
     version, VCS metadata, and settings as the original run. Only terminal
     runs (errored, canceled, discarded, applied, planned plan-only) can be retried.
-    Requires plan permission.
+    Requires what creating that run would: `run:plan` for a plan-only run,
+    `run:apply` for an apply-capable one, `run:apply-destroy` for a destroy.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_CANCEL, user, db)
+    await _require_run_ws_capability(run, _retry_capability(run), user, db)
 
     is_terminal = run.status in run_service.TERMINAL_STATES or (
         run.plan_only and run.status == "planned"

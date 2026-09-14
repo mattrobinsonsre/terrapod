@@ -647,6 +647,8 @@ function RunDetailPageInner() {
   // (#1340). The run's own `permissions` block is state-based (can this run be
   // applied), not "may this user queue an apply" — so it cannot answer it.
   const [wsCanApply, setWsCanApply] = useState(false)
+  // Plan-only runs need only can-queue-run; retrying one is queuing a plan (#1599).
+  const [wsCanPlan, setWsCanPlan] = useState(false)
   const [wsLocked, setWsLocked] = useState(false)
 
   const [planLog, setPlanLog] = useState<string | null>(null)
@@ -801,6 +803,7 @@ function RunDetailPageInner() {
       .then((d) => {
         if (cancelled || !d?.data?.attributes) return
         setWsCanApply(!!d.data.attributes.permissions?.['can-queue-apply'])
+        setWsCanPlan(!!d.data.attributes.permissions?.['can-queue-run'])
         setWsLocked(!!d.data.attributes.locked)
       })
       .catch(() => {})
@@ -1212,12 +1215,19 @@ function RunDetailPageInner() {
     wsCanApply &&
     !wsLocked
 
+  // A retry is a new run, so it needs what queuing that run needs: a plan for
+  // a plan-only run, an apply otherwise (#1599). The run's own `is-retryable`
+  // says only that its state allows it; offering the button to someone the
+  // API will refuse is the thing #1340 stopped doing for drift remediation.
+  const canRetry =
+    actions['is-retryable'] && (attrs['plan-only'] ? wsCanPlan : wsCanApply)
+
   const hasActions =
     showRemediateDrift ||
     actions['is-confirmable'] ||
     actions['is-discardable'] ||
     actions['is-cancelable'] ||
-    actions['is-retryable']
+    canRetry
 
   // Status pills — reused in the desktop header (top-right) and, on mobile, in
   // the combined status+actions row below the title (one row, not two).
@@ -1286,7 +1296,7 @@ function RunDetailPageInner() {
           {actionLoading === 'remediate' ? t('actions.queuing') : t('drift.remediate')}
         </button>
       )}
-      {actions['is-retryable'] && (
+      {canRetry && (
         <button
           onClick={() => requestAction('retry')}
           disabled={!!actionLoading}
