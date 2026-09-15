@@ -247,7 +247,7 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules \
 - **Published re-rooted.** On each matching tag Terrapod stores only the subdirectory, with its files at the root of the tarball. A submodule is therefore an ordinary module — `source = "<host>/default/management-groups-create/azurerm"`, its own versions and inputs/outputs, usable behind a catalog item — and no `//subdir` suffix is needed.
 - **Tags without it are skipped.** A tag cut before the subdirectory existed has nothing to publish, so it creates no version. That is remembered for a week, so the poller does not download the tag again every cycle.
 - **One registration per subdirectory.** Registering the same repository subdirectory twice is refused with `409`. A `subdirectory` needs a `vcs-repo-url`, and disconnecting VCS clears it.
-- **Module impact analysis** tests a PR against the submodule's own subdirectory, as it would be published. A PR anywhere in the repository queues the submodule's impact runs; when the PR does not touch its subdirectory, those plans show no changes.
+- **Module impact analysis** tests a PR against the submodule's own subdirectory, as it would be published. A PR anywhere in the repository queues the submodule's impact runs; when the PR does not touch its subdirectory, those plans show no changes. A PR whose branch has no such subdirectory at all (it was removed, or the branch predates it) queues none.
 - **Grouped in the UI.** The module list shows modules that share a repository together, the root module first.
 - The path is repository-relative (`modules/create`); `..`, `.` and empty segments are rejected. Leave it empty for a module at the repository root.
 
