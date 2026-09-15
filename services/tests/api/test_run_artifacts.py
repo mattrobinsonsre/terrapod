@@ -914,6 +914,110 @@ class TestResourceProfile:
 
         assert resp.status_code == 403
 
+    # ── failure_reason (#1631) ──
+
+    async def _post(self, run, body: dict):
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        app = _make_app(_runner_user(run.id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            return await client.post(
+                f"/api/terrapod/v1/runs/{run.id}/resource-profile", json=body, headers=_AUTH
+            )
+
+    def _run_in(self, status: str):
+        run = _mock_run(run_id=uuid.uuid4())
+        run.status = status
+        run.error_message = None
+        return run
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_failed_runner_says_why(self, *_mocks):
+        run = self._run_in("planning")
+        resp = await self._post(
+            run,
+            {"exit_code": 1, "failure_reason": "Error: Unsupported argument (on main.tf line 3)"},
+        )
+        assert resp.status_code == 204
+        assert run.error_message == "Error: Unsupported argument (on main.tf line 3)"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_clean_exit_stores_no_reason(self, *_mocks):
+        run = self._run_in("planning")
+        resp = await self._post(run, {"exit_code": 0, "failure_reason": "stray"})
+        assert resp.status_code == 204
+        assert run.error_message is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_errored_runs_message_is_final(self, *_mocks):
+        run = self._run_in("errored")
+        run.error_message = "Runner OOM-killed"
+        resp = await self._post(run, {"exit_code": 1, "failure_reason": "late"})
+        assert resp.status_code == 204
+        assert run.error_message == "Runner OOM-killed"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_the_reason_is_cleaned_and_bounded(self, *_mocks):
+        run = self._run_in("applying")
+        resp = await self._post(
+            run, {"exit_code": 1, "failure_reason": "\x1b[31mError:\x1b[0m bad\n" + "x" * 5000}
+        )
+        assert resp.status_code == 204
+        # Whole colour sequences go, not just the escape byte.
+        assert run.error_message.startswith("Error: bad\n")
+        assert "[31m" not in run.error_message
+        assert len(run.error_message) == 2000
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_non_string_reason_is_rejected(self, *_mocks):
+        run = self._run_in("planning")
+        resp = await self._post(run, {"exit_code": 1, "failure_reason": {"x": 1}})
+        assert resp.status_code == 400
+        assert "failure_reason" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_plan_jobs_reason_never_lands_on_the_apply(self, *_mocks):
+        """The plan Job keeps working after plan-result; with auto-apply the run
+        may already be applying when its final POST arrives."""
+        run = self._run_in("applying")
+        resp = await self._post(
+            run, {"exit_code": 1, "failure_reason": "post_plan hook failed", "phase": "plan"}
+        )
+        assert resp.status_code == 204
+        assert run.error_message is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_reason_lands_on_its_own_phase(self, *_mocks):
+        run = self._run_in("applying")
+        resp = await self._post(
+            run, {"exit_code": 1, "failure_reason": "Error: apply problem", "phase": "apply"}
+        )
+        assert resp.status_code == 204
+        assert run.error_message == "Error: apply problem"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unknown_phase_is_rejected(self, *_mocks):
+        run = self._run_in("planning")
+        resp = await self._post(run, {"exit_code": 1, "failure_reason": "x", "phase": "destroy"})
+        assert resp.status_code == 400
+        assert "phase" in resp.json()["detail"]
+
 
 # ── upload_cost_estimate (#871) ───────────────────────────────────────
 
