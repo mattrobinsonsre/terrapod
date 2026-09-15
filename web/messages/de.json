@@ -389,7 +389,8 @@
         "register": "{count, plural, one {# Modul registrieren} other {# Module registrieren}}",
         "registering": "Wird registriert…",
         "failed": "Durchsuchen fehlgeschlagen",
-        "ruleLink": "Regel erstellen, um neue Module automatisch zu registrieren"
+        "ruleLink": "Regel erstellen, um neue Module automatisch zu registrieren",
+        "orgNote": "Hier wird nur die erste Seite der Repositorys angezeigt. Erstellen Sie eine Regel, um jedes Repository abzudecken, auch später erstellte."
       },
       "versionCount": "{count, plural, one {# Version} other {# Versionen}}",
       "loadFailed": "Module konnten nicht geladen werden",
@@ -1119,7 +1120,69 @@
     "reasonNameTaken": "Name bereits belegt",
     "reasonMissingProvider": "kein Provider",
     "confirmDelete": "Regel {name} löschen? Die von ihr registrierten Module bleiben registriert.",
-    "loadFailed": "Regeln für die automatische Modulerkennung konnten nicht geladen werden"
+    "loadFailed": "Regeln für die automatische Modulerkennung konnten nicht geladen werden",
+    "repoUrlHint": "Ein Repository, eine Organisation oder Gruppe (jedes Repository darin) oder ein Muster über die Repositorys einer Organisation oder Gruppe, z. B. {example}. Glob-Zeichen stehen nur im letzten Segment. Terrapod ermittelt beim Speichern, um welchen Typ es sich handelt, und ändert dies danach nie von sich aus.",
+    "ownerPlaceholderHint": "Eine Regel, die eine Organisation oder Gruppe abdeckt, kann auch <owner></owner> verwenden: den Eigentümer oder die Gruppe des Repositorys.",
+    "targetKind": {
+      "repository": "Repository",
+      "namespace": "Organisation oder Gruppe",
+      "pattern": "Muster"
+    },
+    "attention": {
+      "badge": "Erfordert Aufmerksamkeit",
+      "title": "{name} erfordert Aufmerksamkeit",
+      "hint": "Eine Regel versucht es bei der nächsten Registry-Abfrage erneut. Wurde ihr Ziel gelöscht, bearbeiten Sie die Regel, um sie auf etwas anderes zu verweisen."
+    },
+    "repoStatus": {
+      "active": "aktiv",
+      "archived": "archiviert",
+      "empty": "leer",
+      "noBranch": "kein Branch",
+      "outOfScope": "außerhalb des Geltungsbereichs",
+      "covered": "abgedeckt",
+      "error": "Fehler"
+    },
+    "origin": {
+      "baseline": "Baseline",
+      "new": "neu"
+    },
+    "paging": {
+      "page": "Seite {page} von {pages}",
+      "previous": "Zurück",
+      "next": "Weiter"
+    },
+    "repositories": {
+      "open": "Repositorys",
+      "title": "Repositorys: {ruleName}",
+      "lastListed": "Zuletzt aufgelistet {time}",
+      "notListed": "Noch nicht aufgelistet. Die nächste Registry-Abfrage listet die Repositorys dieser Regel auf.",
+      "legend": "Baseline-Repositorys bestanden schon vor der Regel, daher wird darin nichts registriert, bis Sie es aus einer Vorschau auswählen. Neue Repositorys wurden nach der Regel erstellt, daher werden ihre Module automatisch registriert.",
+      "filterLabel": "Status",
+      "filterAll": "Alle Status",
+      "none": "Noch keine Repositorys.",
+      "noneWithStatus": "Keine Repositorys mit diesem Status.",
+      "loadFailed": "Die Repositorys der Regel konnten nicht geladen werden",
+      "repository": "Repository",
+      "status": "Status",
+      "origin": "Herkunft",
+      "candidates": "Kandidaten",
+      "lastChecked": "Zuletzt geprüft",
+      "error": "Fehler",
+      "renamed": "Umbenannt von",
+      "renamedFrom": "Umbenannt von {paths}",
+      "never": "nie",
+      "candidateCount": "{count, plural, one {# Modul} other {# Module}}"
+    },
+    "grouped": {
+      "storedNote": "Was die letzte Registry-Abfrage in jedem Repository gefunden hat. Es wird nichts vom VCS-Anbieter gelesen.",
+      "unsavedNote": "Eine ungespeicherte Regel liest jeweils eine Seite von Repositorys live. Speichern Sie sie, damit die Abfrage jedem Repository folgt.",
+      "incomplete": "Diese Organisation oder Gruppe hat mehr Repositorys, als Terrapod auf einmal auflistet, daher werden einige nicht angezeigt.",
+      "selectRepository": "Jedes Modul in {repository} auswählen",
+      "noCandidates": "Keine Module zum Registrieren hier.",
+      "repositoryError": "Dieses Repository konnte nicht gelesen werden: {error}",
+      "confirmRegisterAll": "Jedes von dieser Regel gefundene Modul registrieren? Bereits registrierte Module oder Module, deren Name bereits vergeben ist, werden übersprungen.",
+      "scanRepositories": "{count, plural, one {# Repository durchsucht.} other {# Repositorys durchsucht.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Massenaktualisierung",

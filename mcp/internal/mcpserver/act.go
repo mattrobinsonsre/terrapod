@@ -24,19 +24,45 @@ var destructive = &mcp.ToolAnnotations{DestructiveHint: ptrBool(true)}
 // what actually succeeds.
 func registerAct(s *mcp.Server, c *terrapod.Client) {
 	// ── terrapod_module_autodiscovery_rule_scan ──────────────────────
+	type moduleRuleSelectionIn struct {
+		Repository string `json:"repository" jsonschema:"the repository's path (org/repo) or URL"`
+		// Omitted means every candidate in the repository.
+		Subdirectories []string `json:"subdirectories,omitempty" jsonschema:"register only these candidate directories in it (the root is the empty string); omit for all of them"`
+	}
 	type moduleRuleScanIn struct {
 		RuleID string `json:"rule_id" jsonschema:"the rule id (modrule-...)"`
 		// Omitted means every candidate; a list registers just those.
-		Subdirectories []string `json:"subdirectories,omitempty" jsonschema:"register only these candidate directories (the repository root is the empty string); omit to register every candidate"`
+		Subdirectories []string `json:"subdirectories,omitempty" jsonschema:"for a single-repository rule: register only these candidate directories (the repository root is the empty string); omit to register every candidate"`
+		// For an org-wide rule: which repositories, and optionally which directories in each.
+		Selections []moduleRuleSelectionIn `json:"selections,omitempty" jsonschema:"for an org-wide rule (or naming a single-repository rule's one repository): the repositories to register from, each with optional subdirectories; omit to register every current candidate of every repository"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_module_autodiscovery_rule_scan",
-		Description: "Register the modules a module autodiscovery rule finds — every candidate, or just `subdirectories`. Run terrapod_module_autodiscovery_rule_preview first and confirm the choice with the user. " +
-			"Candidates already registered, or whose name is taken, are skipped and reported. It creates registry modules; it does not touch infrastructure. Platform admin only.",
+		Description: "Register the modules a module autodiscovery rule finds — every candidate, or a chosen subset: `subdirectories` for a single-repository rule, `selections` (repositories, " +
+			"each with optional subdirectories) for an org-wide rule, which registers from what the poller last found. Run terrapod_module_autodiscovery_rule_preview first and confirm the choice " +
+			"with the user; with no subset an org-wide rule registers every current candidate of every repository. Candidates already registered, or whose name is taken, are skipped and " +
+			"reported. It creates registry modules; it does not touch infrastructure. Platform admin only.",
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptrBool(false)},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in moduleRuleScanIn) (*mcp.CallToolResult, *terrapod.ModuleAutodiscoveryScan, error) {
 		if in.RuleID == "" {
 			return errText("rule_id is required"), nil, nil
+		}
+		if len(in.Selections) > 0 {
+			if in.Subdirectories != nil {
+				return errText("pass subdirectories or selections, not both"), nil, nil
+			}
+			sel := make([]terrapod.ModuleAutodiscoverySelection, 0, len(in.Selections))
+			for _, s := range in.Selections {
+				if s.Repository == "" {
+					return errText("each selection needs a repository"), nil, nil
+				}
+				sel = append(sel, terrapod.ModuleAutodiscoverySelection{Repository: s.Repository, Subdirectories: s.Subdirectories})
+			}
+			scan, err := c.ScanModuleAutodiscoveryRuleSelections(ctx, in.RuleID, sel)
+			if err != nil {
+				return errResult(err), nil, nil
+			}
+			return nil, scan, nil
 		}
 		scan, err := c.ScanModuleAutodiscoveryRule(ctx, in.RuleID, in.Subdirectories)
 		if err != nil {

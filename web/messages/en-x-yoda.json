@@ -389,7 +389,8 @@
         "register": "{count, plural, one {Register # module, you will} other {Register # modules, you will}}",
         "registering": "Registering, I am…",
         "failed": "Failed, the scan has",
-        "ruleLink": "A rule to register new modules automatically, create you should"
+        "ruleLink": "A rule to register new modules automatically, create you should",
+        "orgNote": "Only the first page of repositories, shown here is. A rule to cover every repository, including ones created later, create you should."
       },
       "versionCount": "{count, plural, one {# version} other {# versions}}",
       "loadFailed": "Load the modules, it did not",
@@ -1119,7 +1120,69 @@
     "reasonNameTaken": "taken already, the name is",
     "reasonMissingProvider": "no provider, there is",
     "confirmDelete": "Delete the rule {name}, you will? Registered, its modules stay.",
-    "loadFailed": "Load the module autodiscovery rules, I could not"
+    "loadFailed": "Load the module autodiscovery rules, I could not",
+    "repoUrlHint": "One repository, an org or group (every repository in it), or a pattern over one org or group''s repositories, such as {example} — enter it, you may. In the last segment only, glob characters go. Which it is, when you save, Terrapod works out, and on its own never changes it, hmm.",
+    "ownerPlaceholderHint": "Also use <owner></owner>, a rule that covers an org or group can: the repository''s owner or group, it is.",
+    "targetKind": {
+      "repository": "Repository",
+      "namespace": "Org or group, this is",
+      "pattern": "Pattern"
+    },
+    "attention": {
+      "badge": "Attention, it needs",
+      "title": "Attention, {name} needs",
+      "hint": "On the next registry poll, again a rule tries. If deleted its target was, edit the rule you must, and somewhere else point it."
+    },
+    "repoStatus": {
+      "active": "active, it is",
+      "archived": "archived, it is",
+      "empty": "empty, it is",
+      "noBranch": "no branch, there is",
+      "outOfScope": "out of scope, it is",
+      "covered": "covered, it is",
+      "error": "error, there is"
+    },
+    "origin": {
+      "baseline": "baseline, it is",
+      "new": "new, it is"
+    },
+    "paging": {
+      "page": "Of {pages}, page {page}",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "repositories": {
+      "open": "Repositories, these are",
+      "title": "The repositories of {ruleName}, these are",
+      "lastListed": "Listed last {time}, they were",
+      "notListed": "Listed yet, they are not. This rule''s repositories, the next registry poll lists.",
+      "legend": "Before the rule, baseline repositories existed, so registers nothing in them, until from a preview you pick it. After the rule, new repositories were created, so automatically their modules register.",
+      "filterLabel": "Status",
+      "filterAll": "All statuses, show them",
+      "none": "Repositories yet, there are none.",
+      "noneWithStatus": "With this status, no repositories there are.",
+      "loadFailed": "Load the rule''s repositories, I could not",
+      "repository": "Repository",
+      "status": "Status",
+      "origin": "Origin, hmm",
+      "candidates": "Candidates, these are",
+      "lastChecked": "Checked last",
+      "error": "Error",
+      "renamed": "From, renamed it was",
+      "renamedFrom": "From {paths}, renamed it was",
+      "never": "never",
+      "candidateCount": "{count, plural, one {# module, there is} other {# modules, there are}}"
+    },
+    "grouped": {
+      "storedNote": "In each repository, what the last registry poll found, this is. From the VCS provider, nothing is read.",
+      "unsavedNote": "One page of repositories at a time, live, an unsaved rule reads. Save it you must, and every repository the poller will follow.",
+      "incomplete": "More repositories than Terrapod lists at once, this org or group has, so shown some are not.",
+      "selectRepository": "Every module in {repository}, select",
+      "noCandidates": "Modules to register here, there are none.",
+      "repositoryError": "Read this repository, I could not: {error}",
+      "confirmRegisterAll": "Every module this rule has found, register you will? Skipped, modules already registered or whose name is taken, are.",
+      "scanRepositories": "{count, plural, one {Scanned # repository, I have.} other {Scanned # repositories, I have.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Update, Bulk",

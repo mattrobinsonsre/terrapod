@@ -25,6 +25,9 @@ data terrapod_catalog_item_interface.catalog_item_id required=true optional=fals
 data terrapod_catalog_item_interface.inputs required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["default":basetypes.StringType, "description":basetypes.StringType, "name":basetypes.StringType, "required":basetypes.BoolType, "sensitive":basetypes.BoolType, "type":basetypes.StringType]]
 data terrapod_catalog_item_interface.outputs required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["description":basetypes.StringType, "name":basetypes.StringType, "sensitive":basetypes.BoolType]]
 data terrapod_catalog_item_interface.resolved_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_module_autodiscovery_rule_repositories.repositories required=false optional=false computed=true sensitive=false type=types.ListType[types.ObjectType["candidate_subdirectories":types.ListType[basetypes.StringType], "default_branch":basetypes.StringType, "failure_count":basetypes.Int64Type, "first_seen_at":basetypes.StringType, "id":basetypes.StringType, "last_checked_at":basetypes.StringType, "last_error":basetypes.StringType, "last_scanned_sha":basetypes.StringType, "origin":basetypes.StringType, "previous_paths":types.ListType[basetypes.StringType], "repo_created_at":basetypes.StringType, "repo_url":basetypes.StringType, "repository":basetypes.StringType, "status":basetypes.StringType]]
+data terrapod_module_autodiscovery_rule_repositories.rule_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
+data terrapod_module_autodiscovery_rule_repositories.status required=false optional=true computed=false sensitive=false type=basetypes.StringType
 data terrapod_role.allow_all required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_role.allow_labels required=false optional=false computed=true sensitive=false type=types.MapType[basetypes.StringType]
 data terrapod_role.allow_names required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
@@ -215,6 +218,8 @@ resource terrapod_module_autodiscovery_rule.first_scan_at required=false optiona
 resource terrapod_module_autodiscovery_rule.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.ignore_patterns required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_module_autodiscovery_rule.labels required=false optional=true computed=true sensitive=false type=types.MapType[basetypes.StringType]
+resource terrapod_module_autodiscovery_rule.last_enumerated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_module_autodiscovery_rule.last_error required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.last_scanned_sha required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.module_provider required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
@@ -222,6 +227,7 @@ resource terrapod_module_autodiscovery_rule.name_template required=false optiona
 resource terrapod_module_autodiscovery_rule.owner_email required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.pattern required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.repo_url required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_module_autodiscovery_rule.target_kind required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.vcs_connection_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.vcs_tag_pattern required=false optional=true computed=true sensitive=false type=basetypes.StringType

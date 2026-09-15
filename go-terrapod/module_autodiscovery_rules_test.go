@@ -238,3 +238,246 @@ func TestScanModuleAutodiscoveryRuleRefusal(t *testing.T) {
 		t.Fatal("expected an error for a 422")
 	}
 }
+
+// ── Org-wide rules (#1620) ───────────────────────────────────────────
+
+const orgRuleJSON = `{"data":{"id":"modrule-33333333-3333-3333-3333-333333333333","type":"module-autodiscovery-rules","attributes":{
+  "name":"org","vcs-connection-id":"vcs-2","repo-url":"https://github.com/org/terraform-*","target-kind":"pattern",
+  "branch":"","pattern":"**/*.tf","ignore-patterns":[],"enabled":true,"name-template":"{owner}-{repo}","provider":"",
+  "vcs-tag-pattern":"v*","labels":{},"owner-email":"","first-scan-at":"2026-09-15T10:00:00Z","last-scanned-sha":"",
+  "last-enumerated-at":"2026-09-15T11:00:00Z","last-error":"the org could not be listed",
+  "created-at":"2026-09-15T10:00:00Z","updated-at":"2026-09-15T10:00:00Z"}}}`
+
+func TestModuleAutodiscoveryRuleReadsTheOrgFields(t *testing.T) {
+	c, _ := moduleRuleServer(t, http.StatusOK, orgRuleJSON)
+	r, err := c.GetModuleAutodiscoveryRule(t.Context(), "modrule-3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.TargetKind != ModuleAutodiscoveryTargetPattern || r.LastEnumeratedAt != "2026-09-15T11:00:00Z" || r.LastError == "" {
+		t.Errorf("org fields: %+v", r)
+	}
+
+	// A rule from a server that predates the fields reads them as empty.
+	c, _ = moduleRuleServer(t, http.StatusOK, moduleRuleJSON)
+	r, err = c.GetModuleAutodiscoveryRule(t.Context(), "modrule-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.TargetKind != "" || r.LastEnumeratedAt != "" || r.LastError != "" {
+		t.Errorf("absent org fields should be empty: %+v", r)
+	}
+}
+
+const orgPreviewJSON = `{"data":{"type":"module-autodiscovery-rule-previews","attributes":{
+  "ref":"","files-walked":0,"target-kind":"namespace","listing-complete":false,
+  "entries":[
+    {"repository":"org/terraform-aws-a","repo-url":"https://github.com/org/terraform-aws-a","subdirectory":"","name":"a","provider":"aws","registered-as":null,"collision":false,"missing-provider":false},
+    {"repository":"org/terraform-aws-b","repo-url":"https://github.com/org/terraform-aws-b","subdirectory":"modules/x","name":"b-x","provider":"aws","registered-as":null,"collision":false,"missing-provider":false}],
+  "repositories":[
+    {"repository":"org/terraform-aws-a","repo-url":"https://github.com/org/terraform-aws-a","ref":"main","status":"active","origin":"baseline","error":""},
+    {"repository":"org/terraform-aws-b","repo-url":"https://github.com/org/terraform-aws-b","ref":"main","status":"error","origin":"new","error":"tree listing failed"}]}},
+  "meta":{"pagination":{"current-page":2,"page-size":2,"total-count":5,"total-pages":3}}}`
+
+func TestPreviewModuleAutodiscoveryRuleGroupsByRepository(t *testing.T) {
+	c, got := moduleRuleServer(t, http.StatusOK, orgPreviewJSON)
+	p, err := c.PreviewModuleAutodiscoveryRuleWithOptions(t.Context(), "modrule-3",
+		ModuleAutodiscoveryPreviewOptions{PageNumber: 2, PageSize: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-3/preview" ||
+		got.query != "page%5Bnumber%5D=2&page%5Bsize%5D=2" {
+		t.Errorf("requested %s ?%s", got.path, got.query)
+	}
+	if p.TargetKind != ModuleAutodiscoveryTargetNamespace || p.ListingComplete {
+		t.Errorf("preview: %+v", p)
+	}
+	if len(p.Entries) != 2 || p.Entries[1].Repository != "org/terraform-aws-b" || p.Entries[1].RepoURL == "" {
+		t.Errorf("entries: %+v", p.Entries)
+	}
+	if len(p.Repositories) != 2 || p.Repositories[1].Status != "error" || p.Repositories[1].Error == "" || p.Repositories[1].Origin != "new" {
+		t.Errorf("repositories: %+v", p.Repositories)
+	}
+	if p.Pagination == nil || p.Pagination.TotalPages != 3 || p.Pagination.CurrentPage != 2 {
+		t.Errorf("pagination: %+v", p.Pagination)
+	}
+}
+
+func TestPreviewModuleAutodiscoveryRuleReadsOneRepositoryLive(t *testing.T) {
+	c, got := moduleRuleServer(t, http.StatusOK,
+		`{"data":{"type":"module-autodiscovery-rule-previews","attributes":{"ref":"main","files-walked":3,"entries":[],"target-kind":"namespace","repositories":[],"listing-complete":true}}}`)
+	p, err := c.PreviewModuleAutodiscoveryRuleWithOptions(t.Context(), "modrule-3",
+		ModuleAutodiscoveryPreviewOptions{Repository: "org/terraform-aws-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.query != "repository=org%2Fterraform-aws-a" {
+		t.Errorf("query %q", got.query)
+	}
+	if p.Pagination != nil {
+		t.Errorf("an unpaged preview should have no pagination: %+v", p.Pagination)
+	}
+}
+
+func TestPreviewModuleAutodiscoveryRuleFromAnOlderServer(t *testing.T) {
+	c, got := moduleRuleServer(t, http.StatusOK,
+		`{"data":{"type":"module-autodiscovery-rule-previews","attributes":{"ref":"main","files-walked":1,"entries":[]}}}`)
+	p, err := c.PreviewModuleAutodiscoveryRule(t.Context(), "modrule-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.query != "" {
+		t.Errorf("a plain preview should send no query, sent %q", got.query)
+	}
+	if !p.ListingComplete || p.Repositories == nil {
+		t.Errorf("an older server's preview is complete, with empty repositories: %+v", p)
+	}
+}
+
+func TestPreviewModuleAutodiscoveryRuleUnknownRepository(t *testing.T) {
+	c, _ := moduleRuleServer(t, http.StatusNotFound,
+		`{"errors":[{"status":"404","detail":"'x/y' is not one of this rule's repositories"}],"detail":"'x/y' is not one of this rule's repositories"}`)
+	_, err := c.PreviewModuleAutodiscoveryRuleWithOptions(t.Context(), "modrule-3", ModuleAutodiscoveryPreviewOptions{Repository: "x/y"})
+	var nf *NotFoundError
+	if !errors.As(err, &nf) {
+		t.Fatalf("want NotFoundError, got %v", err)
+	}
+}
+
+func TestPreviewUnsavedModuleAutodiscoveryRulePages(t *testing.T) {
+	c, got := moduleRuleServer(t, http.StatusOK, orgPreviewJSON)
+	if _, err := c.PreviewUnsavedModuleAutodiscoveryRuleWithOptions(t.Context(), ModuleAutodiscoveryRuleRequest{
+		Name: sp("try"), VCSConnectionID: sp("vcs-1"), RepoURL: sp("https://github.com/org"), Pattern: sp("**/*.tf"),
+	}, ModuleAutodiscoveryPreviewOptions{Repository: "ignored", PageNumber: 3}); err != nil {
+		t.Fatal(err)
+	}
+	if got.method != http.MethodPost || got.path != "/api/terrapod/v1/module-autodiscovery-rules/preview" {
+		t.Errorf("requested %s %s", got.method, got.path)
+	}
+	if got.query != "page%5Bnumber%5D=3" {
+		t.Errorf("an unsaved preview takes paging only, sent %q", got.query)
+	}
+}
+
+func TestScanModuleAutodiscoveryRuleSelections(t *testing.T) {
+	c, got := moduleRuleServer(t, http.StatusOK, `{"data":{"type":"module-autodiscovery-rule-scans","attributes":{
+	  "ref":"","files-walked":0,"modules-registered":1,"repositories-scanned":2,
+	  "modules":[{"id":"m-1","name":"a","provider":"aws","subdirectory":"","repository":"org/terraform-aws-a","repo-url":"https://github.com/org/terraform-aws-a"}],
+	  "skipped":[{"repository":"org/terraform-aws-b","repo-url":"https://github.com/org/terraform-aws-b","subdirectory":"modules/x","reason":"name-taken"}]}}}`)
+	s, err := c.ScanModuleAutodiscoveryRuleSelections(t.Context(), "modrule-3", []ModuleAutodiscoverySelection{
+		{Repository: "org/terraform-aws-a"},
+		{Repository: "org/terraform-aws-b", Subdirectories: []string{"modules/x"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sel, ok := got.body["selections"].([]any)
+	if !ok || len(sel) != 2 {
+		t.Fatalf("sent %#v", got.body)
+	}
+	first, second := sel[0].(map[string]any), sel[1].(map[string]any)
+	if first["repository"] != "org/terraform-aws-a" {
+		t.Errorf("first selection %#v", first)
+	}
+	if _, ok := first["subdirectories"]; ok {
+		t.Errorf("nil subdirectories means all; nothing should be sent: %#v", first)
+	}
+	if subs, ok := second["subdirectories"].([]any); !ok || len(subs) != 1 || subs[0] != "modules/x" {
+		t.Errorf("second selection %#v", second)
+	}
+	if s.RepositoriesScanned != 2 || s.Modules[0].Repository != "org/terraform-aws-a" || s.Skipped[0].Repository != "org/terraform-aws-b" {
+		t.Errorf("scan: %+v", s)
+	}
+}
+
+func TestScanModuleAutodiscoveryRuleSelectionsEmptyRegistersAll(t *testing.T) {
+	c, got := moduleRuleServer(t, http.StatusOK, scanJSON)
+	if _, err := c.ScanModuleAutodiscoveryRuleSelections(t.Context(), "modrule-3", nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.body) != 0 {
+		t.Errorf("no selections means all; sent %+v", got.body)
+	}
+}
+
+func TestScanModuleAutodiscoveryRuleSelectionsRefusal(t *testing.T) {
+	c, _ := moduleRuleServer(t, http.StatusUnprocessableEntity,
+		`{"errors":[{"status":"422","detail":"'x/y' is not one of this rule's repositories with candidates to register"}],"detail":"x"}`)
+	_, err := c.ScanModuleAutodiscoveryRuleSelections(t.Context(), "modrule-3", []ModuleAutodiscoverySelection{{Repository: "x/y"}})
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("want ValidationError, got %v", err)
+	}
+}
+
+func repoItem(path, status string) string {
+	return `{"id":"modrepo-` + path + `","type":"module-autodiscovery-rule-repositories","attributes":{
+	  "repository":"org/` + path + `","repo-url":"https://github.com/org/` + path + `","vcs-repo-id":"42","default-branch":"main",
+	  "origin":"baseline","status":"` + status + `","last-scanned-sha":"abc","seen-subdirectories":[""],
+	  "candidates":[{"subdirectory":"","name":"` + path + `","provider":"aws"}],"last-skips":[{"subdirectory":"","reason":"name-taken"}],
+	  "previous-paths":[{"path":"old/` + path + `","url":"https://github.com/old/` + path + `"}],
+	  "repo-created-at":null,"first-seen-at":"2026-09-15T10:00:00Z","last-checked-at":null,"next-check-at":null,
+	  "failure-count":0,"last-error":""},"relationships":{"rule":{"data":{"id":"modrule-3","type":"module-autodiscovery-rules"}}}}`
+}
+
+func TestListModuleAutodiscoveryRuleRepositories(t *testing.T) {
+	c, got := moduleRuleServer(t, http.StatusOK, `{"data":[`+repoItem("a", "active")+`],
+	  "meta":{"pagination":{"current-page":1,"page-size":10,"total-count":1,"total-pages":1}}}`)
+	list, err := c.ListModuleAutodiscoveryRuleRepositories(t.Context(), "modrule-3",
+		ModuleAutodiscoveryRepositoryListOptions{Status: "active", PageSize: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.path != "/api/terrapod/v1/module-autodiscovery-rules/modrule-3/repositories" ||
+		got.query != "filter%5Bstatus%5D=active&page%5Bsize%5D=10" {
+		t.Errorf("requested %s ?%s", got.path, got.query)
+	}
+	if len(list.Items) != 1 || list.Pagination.TotalCount != 1 {
+		t.Fatalf("list: %+v", list)
+	}
+	r := list.Items[0]
+	if r.ID != "modrepo-a" || r.Repository != "org/a" || r.Status != "active" || r.Origin != "baseline" || r.VCSRepoID != "42" {
+		t.Errorf("repository: %+v", r)
+	}
+	if len(r.Candidates) != 1 || r.Candidates[0].Provider != "aws" || r.LastSkips[0].Reason != "name-taken" ||
+		r.PreviousPaths[0].Path != "old/a" || r.RepoCreatedAt != "" || r.FirstSeenAt == "" {
+		t.Errorf("repository state: %+v", r)
+	}
+}
+
+func TestListAllModuleAutodiscoveryRuleRepositoriesPages(t *testing.T) {
+	var queries []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		queries = append(queries, r.URL.RawQuery)
+		page := r.URL.Query().Get("page[number]")
+		item := repoItem("p"+page, "error")
+		_, _ = w.Write([]byte(`{"data":[` + item + `],"meta":{"pagination":{"current-page":` + page +
+			`,"page-size":100,"total-count":2,"total-pages":2}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	all, err := c.ListAllModuleAutodiscoveryRuleRepositories(t.Context(), "modrule-3", "error")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 || all[0].Repository != "org/p1" || all[1].Repository != "org/p2" {
+		t.Fatalf("all: %+v", all)
+	}
+	if len(queries) != 2 || queries[0] != "filter%5Bstatus%5D=error&page%5Bnumber%5D=1&page%5Bsize%5D=100" {
+		t.Errorf("queries: %v", queries)
+	}
+}
+
+func TestListModuleAutodiscoveryRuleRepositoriesNotFound(t *testing.T) {
+	c, _ := moduleRuleServer(t, http.StatusNotFound,
+		`{"errors":[{"status":"404","detail":"module autodiscovery rule not found"}],"detail":"module autodiscovery rule not found"}`)
+	_, err := c.ListAllModuleAutodiscoveryRuleRepositories(t.Context(), "modrule-missing", "")
+	var nf *NotFoundError
+	if !errors.As(err, &nf) {
+		t.Fatalf("want NotFoundError, got %v", err)
+	}
+}

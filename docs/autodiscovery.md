@@ -216,6 +216,6 @@ JSON:API request body example:
 
 ## Related
 
-- [Module autodiscovery](registry.md#module-autodiscovery): the registry's counterpart. Rules that find the modules in a repository (the root and any submodules) and register them.
+- [Module autodiscovery](registry.md#module-autodiscovery): the registry's counterpart. Rules that find the modules (the root and any submodules) in a repository, or in every repository of an org, group or name pattern, and register them.
 - Atlantis autodiscover docs: <https://www.runatlantis.io/docs/server-side-repo-config.html#autodiscover>
 - Original feature request: <https://github.com/mattrobinsonsre/terrapod/issues/283>

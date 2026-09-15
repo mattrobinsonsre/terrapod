@@ -134,6 +134,68 @@ func TestReadIntoModelKeepsConfiguredFormsTheServerNormalises(t *testing.T) {
 	}
 }
 
+func TestReadIntoModelCarriesTheOrgFields(t *testing.T) {
+	ctx := context.Background()
+	rule := &terrapod.ModuleAutodiscoveryRule{
+		ID:               "modrule-1",
+		RepoURL:          "https://github.com/org/terraform-*",
+		TargetKind:       "pattern",
+		LastEnumeratedAt: "2026-09-15T11:00:00Z",
+		LastError:        "the org could not be listed",
+		VCSTagPattern:    "v*",
+	}
+	m := &moduleRuleModel{Labels: types.MapNull(types.StringType)}
+	if d := readIntoModel(ctx, rule, m); d.HasError() {
+		t.Fatal(d)
+	}
+	if m.TargetKind.ValueString() != "pattern" || m.LastEnumeratedAt.ValueString() != "2026-09-15T11:00:00Z" ||
+		m.LastError.ValueString() != "the org could not be listed" {
+		t.Errorf("org fields: %+v", m)
+	}
+
+	// An older server sends none of them: known empty strings, never unknown,
+	// so a refresh leaves nothing "known after apply".
+	_ = readIntoModel(ctx, &terrapod.ModuleAutodiscoveryRule{ID: "modrule-1"}, m)
+	for name, v := range map[string]types.String{"target_kind": m.TargetKind, "last_error": m.LastError, "last_enumerated_at": m.LastEnumeratedAt} {
+		if v.IsNull() || v.IsUnknown() || v.ValueString() != "" {
+			t.Errorf("%s should be a known empty string, got %v", name, v)
+		}
+	}
+}
+
+func TestRepoURLProblem(t *testing.T) {
+	ok := []string{
+		"https://github.com/org/terraform-aws-network",
+		"https://github.com/org",
+		"https://github.com/org/terraform-*",
+		"https://github.com/org/terraform-[ab]?",
+		"https://gitlab.com/group/sub/project",
+		"https://gitlab.com/group/sub/terraform-*",
+		"git@github.com:org/terraform-*.git",
+		"org/terraform-*",
+		"org",
+		"https://github.com/org/",
+	}
+	for _, v := range ok {
+		if msg := repoURLProblem(v); msg != "" {
+			t.Errorf("%q should pass, got %q", v, msg)
+		}
+	}
+	bad := []string{
+		"https://github.com/*/terraform-aws",
+		"https://gitlab.com/group/*/project",
+		"https://gitlab.com/group/**/terraform-*",
+		"git@github.com:or?/repo",
+		"org*/repo",
+		"   ",
+	}
+	for _, v := range bad {
+		if repoURLProblem(v) == "" {
+			t.Errorf("%q should be refused", v)
+		}
+	}
+}
+
 func TestReadIntoModelTakesTheServerValueWhenItDiffers(t *testing.T) {
 	ctx := context.Background()
 	rule := &terrapod.ModuleAutodiscoveryRule{

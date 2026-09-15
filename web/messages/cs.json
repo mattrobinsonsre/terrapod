@@ -389,7 +389,8 @@
         "register": "{count, plural, one {Zaregistrovat # modul} few {Zaregistrovat # moduly} many {Zaregistrovat # modulu} other {Zaregistrovat # modulů}}",
         "registering": "Registrace…",
         "failed": "Prohledání se nezdařilo",
-        "ruleLink": "Vytvořte pravidlo pro automatickou registraci nových modulů"
+        "ruleLink": "Vytvořte pravidlo pro automatickou registraci nových modulů",
+        "orgNote": "Zde je zobrazena jen první stránka repozitářů. Vytvořte pravidlo, které pokryje všechny repozitáře, včetně těch vytvořených později."
       },
       "versionCount": "{count, plural, one {# verze} few {# verze} many {# verze} other {# verzí}}",
       "loadFailed": "Nepodařilo se načíst moduly",
@@ -1119,7 +1120,69 @@
     "reasonNameTaken": "název už je obsazený",
     "reasonMissingProvider": "žádný poskytovatel",
     "confirmDelete": "Smazat pravidlo {name}? Moduly, které zaregistrovalo, zůstanou zaregistrované.",
-    "loadFailed": "Pravidla zjišťování modulů se nepodařilo načíst"
+    "loadFailed": "Pravidla zjišťování modulů se nepodařilo načíst",
+    "repoUrlHint": "Jeden repozitář, organizace nebo skupina (všechny repozitáře v ní), nebo vzor pokrývající repozitáře jedné organizace nebo skupiny, například {example}. Zástupné znaky glob se smí objevit jen v posledním segmentu. Terrapod při uložení určí, o který případ jde, a sám to už nikdy nezmění.",
+    "ownerPlaceholderHint": "Pravidlo, které pokrývá organizaci nebo skupinu, může použít i <owner></owner>: vlastníka repozitáře nebo skupinu.",
+    "targetKind": {
+      "repository": "Repozitář",
+      "namespace": "Organizace nebo skupina",
+      "pattern": "Vzor"
+    },
+    "attention": {
+      "badge": "Vyžaduje pozornost",
+      "title": "{name} vyžaduje pozornost",
+      "hint": "Pravidlo to zkusí znovu při další kontrole registru. Pokud byl jeho cíl smazán, upravte pravidlo tak, aby ukazovalo jinam."
+    },
+    "repoStatus": {
+      "active": "aktivní",
+      "archived": "archivováno",
+      "empty": "prázdné",
+      "noBranch": "žádná větev",
+      "outOfScope": "mimo rozsah",
+      "covered": "pokryto",
+      "error": "chyba"
+    },
+    "origin": {
+      "baseline": "výchozí stav",
+      "new": "nové"
+    },
+    "paging": {
+      "page": "Stránka {page} z {pages}",
+      "previous": "Předchozí",
+      "next": "Další"
+    },
+    "repositories": {
+      "open": "Repozitáře",
+      "title": "Repozitáře: {ruleName}",
+      "lastListed": "Naposledy vypsáno {time}",
+      "notListed": "Zatím nevypsáno. Další kontrola registru vypíše repozitáře tohoto pravidla.",
+      "legend": "Repozitáře ve výchozím stavu existovaly před pravidlem, takže se v nich nic neregistruje, dokud to nevyberete v náhledu. Nové repozitáře byly vytvořeny po pravidlu, takže se jejich moduly registrují automaticky.",
+      "filterLabel": "Stav",
+      "filterAll": "Všechny stavy",
+      "none": "Zatím žádné repozitáře.",
+      "noneWithStatus": "Žádné repozitáře s tímto stavem.",
+      "loadFailed": "Repozitáře pravidla se nepodařilo načíst",
+      "repository": "Repozitář",
+      "status": "Stav",
+      "origin": "Původ",
+      "candidates": "Kandidáti",
+      "lastChecked": "Naposledy zkontrolováno",
+      "error": "Chyba",
+      "renamed": "Přejmenováno z",
+      "renamedFrom": "Přejmenováno z {paths}",
+      "never": "nikdy",
+      "candidateCount": "{count, plural, one {# modul} few {# moduly} many {# modulu} other {# modulů}}"
+    },
+    "grouped": {
+      "storedNote": "Co poslední kontrola registru našla v každém repozitáři. Od poskytovatele VCS se nic nenačítá.",
+      "unsavedNote": "Neuložené pravidlo čte jednu stránku repozitářů najednou, přímo. Uložte ho, aby kontrola sledovala všechny repozitáře.",
+      "incomplete": "Tato organizace nebo skupina má více repozitářů, než Terrapod najednou vypíše, takže některé nejsou zobrazeny.",
+      "selectRepository": "Vybrat všechny moduly v {repository}",
+      "noCandidates": "Zde nejsou žádné moduly k registraci.",
+      "repositoryError": "Tento repozitář se nepodařilo načíst: {error}",
+      "confirmRegisterAll": "Zaregistrovat všechny moduly, které toto pravidlo našlo? Moduly, které jsou již zaregistrované nebo jejichž název je obsazený, se přeskočí.",
+      "scanRepositories": "{count, plural, one {Prohledán # repozitář.} few {Prohledány # repozitáře.} many {Prohledáno # repozitáře.} other {Prohledáno # repozitářů.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Hromadná aktualizace",

@@ -781,10 +781,28 @@ Module autodiscovery rules (Admin → Module autodiscovery) register registry mo
 - **Stop a rule** by disabling it (Edit → untick Enabled). Deleting a rule leaves its modules registered.
 - **Adjust what a rule matches** with its pattern and ignore paths. This re-baselines it, as described above.
 
+### A rule over an org or group
+
+A rule whose `repo-url` names an org, group or pattern (`target-kind` `namespace` or `pattern`) keeps its state per repository. Open **Repositories** on the rule (or `GET …/{id}/repositories`) and read each repository's status and origin.
+
+- **A repository that existed before the rule (`origin` `baseline`) registers nothing until you scan it.** This is by design: only repositories created after the rule's baseline (`origin` `new`) register on their own. Preview the rule and register the ones you want.
+- **`covered`**: a single-repository rule on the same connection already names it, so the org rule leaves it alone.
+- **`archived`, `empty`, `no-branch`**: not scanned, or nothing to read yet. An empty repository is retried when it changes.
+- **`out-of-scope`**: it left the org or no longer matches the pattern. Its modules stay registered; delete them in the registry if they should go.
+- **`error`**: read its `last-error`. Failed reads back off and retry.
+- **No provider**: a repository without a `terraform-<provider>-<name>` name, on a rule with no `provider`, is skipped as `missing-provider`. That is how application repositories stay out; set `provider`, or narrow `repo-url` to a pattern.
+- **The rule's own `last-error`** (a banner in the web UI) says why its last poll could not do all its work. "Skipped" or "paused" means the connection's API quota fell below a floor, and the rule catches up on later cycles. "The listing stopped at N repositories" means the org is larger than `api.config.registry.module_autodiscovery.max_repositories`, and nothing is marked out of scope until a listing completes. A deleted target needs the rule pointed somewhere else.
+- **Large orgs are covered over several cycles.** Each cycle lists at most `tree_listings_per_cycle` trees across all org-wide rules, least recently checked first, within `time_budget_seconds`. Raise those if new modules take too long to appear, and watch the connection's API quota.
+
+**"Register all" on an org rule registers every current candidate of every repository**, which can be many modules; the web UI always asks first. If it registered too much, delete the unwanted modules in the registry. Later polls do not bring them back, because the rule has already seen those directories.
+
+**A renamed or transferred repository** is followed by its provider id, and the old path is kept in `previous-paths`, so its modules are not registered a second time. The modules themselves are never edited, so they keep the old `vcs-repo-url`. GitHub and GitLab usually redirect the old URL, so they keep working meanwhile. To repoint one, set its `vcs-repo-url` with the registry module's update (`PATCH`) endpoint.
+
 ### Verification
 
 - The rule's preview shows each directory's module as `Already registered as …`, or unregistered, as you intended.
 - Registry → Modules lists the modules you expect, and no others from that repository.
+- For an org rule, **Repositories** shows each repository in the status you expect, with no unexplained `error`.
 
 ## Reverting (or recovering from) a bad bulk-update
 

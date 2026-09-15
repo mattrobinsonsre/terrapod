@@ -389,7 +389,8 @@
         "register": "{count, plural, one {Registra # modulo} other {Registra # moduli}}",
         "registering": "Registrazione in corso…",
         "failed": "Analisi non riuscita",
-        "ruleLink": "Crea una regola per registrare automaticamente i nuovi moduli"
+        "ruleLink": "Crea una regola per registrare automaticamente i nuovi moduli",
+        "orgNote": "Qui viene mostrata solo la prima pagina di repository. Crea una regola per coprire ogni repository, compresi quelli creati in seguito."
       },
       "versionCount": "{count, plural, one {# versione} other {# versioni}}",
       "loadFailed": "Impossibile caricare i moduli",
@@ -1119,7 +1120,69 @@
     "reasonNameTaken": "nome già usato",
     "reasonMissingProvider": "nessun provider",
     "confirmDelete": "Eliminare la regola {name}? I moduli che ha registrato restano registrati.",
-    "loadFailed": "Impossibile caricare le regole di rilevamento moduli"
+    "loadFailed": "Impossibile caricare le regole di rilevamento moduli",
+    "repoUrlHint": "Un repository, un''organizzazione o gruppo (tutti i suoi repository), oppure un pattern sui repository di un''organizzazione o gruppo, ad es. {example}. I caratteri glob vanno solo nell''ultimo segmento. Terrapod determina quale al salvataggio, e non lo cambia mai da solo in seguito.",
+    "ownerPlaceholderHint": "Una regola che copre un''organizzazione o gruppo può anche usare <owner></owner>: il proprietario o il gruppo del repository.",
+    "targetKind": {
+      "repository": "Repository",
+      "namespace": "Organizzazione o gruppo",
+      "pattern": "Pattern"
+    },
+    "attention": {
+      "badge": "Richiede attenzione",
+      "title": "{name} richiede attenzione",
+      "hint": "Una regola riprova al successivo polling del registry. Se la destinazione è stata eliminata, modifica la regola per farla puntare altrove."
+    },
+    "repoStatus": {
+      "active": "attivo",
+      "archived": "archiviato",
+      "empty": "vuoto",
+      "noBranch": "nessun branch",
+      "outOfScope": "fuori ambito",
+      "covered": "coperto",
+      "error": "errore"
+    },
+    "origin": {
+      "baseline": "baseline",
+      "new": "nuovo"
+    },
+    "paging": {
+      "page": "Pagina {page} di {pages}",
+      "previous": "Precedente",
+      "next": "Successiva"
+    },
+    "repositories": {
+      "open": "Repository",
+      "title": "Repository: {ruleName}",
+      "lastListed": "Elencati l''ultima volta {time}",
+      "notListed": "Non ancora elencati. Il prossimo polling del registry elencherà i repository di questa regola.",
+      "legend": "I repository baseline esistevano prima della regola, quindi nulla al loro interno viene registrato finché non lo scegli da un''anteprima. I repository nuovi sono stati creati dopo la regola, quindi i loro moduli si registrano automaticamente.",
+      "filterLabel": "Stato",
+      "filterAll": "Tutti gli stati",
+      "none": "Nessun repository ancora.",
+      "noneWithStatus": "Nessun repository con questo stato.",
+      "loadFailed": "Impossibile caricare i repository della regola",
+      "repository": "Repository",
+      "status": "Stato",
+      "origin": "Origine",
+      "candidates": "Candidati",
+      "lastChecked": "Ultimo controllo",
+      "error": "Errore",
+      "renamed": "Rinominato da",
+      "renamedFrom": "Rinominato da {paths}",
+      "never": "mai",
+      "candidateCount": "{count, plural, one {# modulo} other {# moduli}}"
+    },
+    "grouped": {
+      "storedNote": "Ciò che l''ultimo polling del registry ha trovato in ciascun repository. Non viene letto nulla dal provider VCS.",
+      "unsavedNote": "Una regola non salvata legge una pagina di repository alla volta, in tempo reale. Salvala per far seguire al polling ogni repository.",
+      "incomplete": "Questa organizzazione o gruppo ha più repository di quanti Terrapod ne elenchi alla volta, quindi alcuni non sono mostrati.",
+      "selectRepository": "Seleziona ogni modulo in {repository}",
+      "noCandidates": "Nessun modulo da registrare qui.",
+      "repositoryError": "Impossibile leggere questo repository: {error}",
+      "confirmRegisterAll": "Registrare ogni modulo trovato da questa regola? I moduli già registrati, o il cui nome è già in uso, vengono saltati.",
+      "scanRepositories": "{count, plural, one {Analizzato # repository.} other {Analizzati # repository.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Aggiornamento massivo",
