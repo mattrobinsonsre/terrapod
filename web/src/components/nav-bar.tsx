@@ -648,8 +648,7 @@ export default function NavBar() {
                   <div
                     ref={probeRef}
                     aria-hidden="true"
-                    // @ts-expect-error -- `inert` is valid HTML that React types lag on
-                    inert=""
+                    inert
                     className="flex items-center gap-1 py-2 absolute whitespace-nowrap"
                   >
                     {contents(true)}

@@ -1114,6 +1114,8 @@
     "providerHint": "Laat leeg om hem uit de repositorynaam te halen, als die de conventie terraform-PROVIDER-NAME volgt.",
     "tagPattern": "Tagpatroon",
     "labels": "Labels (worden naar geregistreerde modules gekopieerd)",
+    "ruleName": "Naam van de regel",
+    "ownerEmailHint": "Wordt gekopieerd naar elke module die deze regel registreert. De eigenaar krijgt beheerdersrechten op die modules.",
     "createTitle": "Nieuwe regel voor moduledetectie",
     "editTitle": "Regel voor moduledetectie bewerken",
     "nameTaken": "Naam al in gebruik door een andere module",

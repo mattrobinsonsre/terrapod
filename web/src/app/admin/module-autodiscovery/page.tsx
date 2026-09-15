@@ -202,10 +202,17 @@ export default function ModuleAutodiscoveryPage() {
         body: JSON.stringify({ data: { type: 'module-autodiscovery-rules', attributes: formAttributes() } }),
       })
       if (!res.ok) throw new Error(await parseApiError(res, tw('errors.save')))
+      const saved: ModuleRule | undefined = (await res.json().catch(() => null))?.data
       setSuccess(editingId ? tw('success.updated', { name }) : tw('success.created', { name }))
       setShowForm(false)
       resetForm()
       loadAll()
+      // Choosing which modules to register is the next step after creating a rule,
+      // and only a saved rule can register them — so show the saved rule's preview
+      // rather than leave an unsaved one on screen that can no longer register
+      // anything. After an edit, refresh a preview that is already open.
+      if (saved?.id && (!editingId || preview)) previewSaved(saved)
+      else if (preview && !preview.ruleId) setPreview(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : tw('errors.save'))
     } finally {
@@ -318,13 +325,17 @@ export default function ModuleAutodiscoveryPage() {
           title={t('title')}
           description={t('description')}
           actions={
-            <button
-              type="button"
-              onClick={() => { if (showForm) setShowForm(false); else { resetForm(); setShowForm(true) } }}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
-            >
-              {showForm ? tw('actions.cancel') : tw('actions.newRule')}
-            </button>
+            // While the form is open its own buttons carry Create and Cancel; a
+            // second Cancel here, styled as the page's primary action, only competes.
+            !showForm && (
+              <button
+                type="button"
+                onClick={() => { resetForm(); setShowForm(true) }}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
+              >
+                {tw('actions.newRule')}
+              </button>
+            )
           }
         />
 
@@ -344,7 +355,7 @@ export default function ModuleAutodiscoveryPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="mar-name" className="block text-sm text-slate-300 mb-1">{tw('form.name')}</label>
+                <label htmlFor="mar-name" className="block text-sm text-slate-300 mb-1">{t('ruleName')}</label>
                 <input id="mar-name" required value={name} onChange={(e) => setName(e.target.value)} className={INPUT} />
               </div>
               <div>
@@ -435,6 +446,7 @@ export default function ModuleAutodiscoveryPage() {
               <div>
                 <label htmlFor="mar-owner" className="block text-sm text-slate-300 mb-1">{tw('form.ownerEmail')}</label>
                 <input id="mar-owner" type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} className={INPUT} />
+                <p className="text-xs text-slate-500 mt-1">{t('ownerEmailHint')}</p>
               </div>
             </div>
 

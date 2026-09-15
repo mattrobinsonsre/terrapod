@@ -1114,6 +1114,8 @@
     "providerHint": "Empty leave it, and from the repository name taken it is, when the terraform-PROVIDER-NAME convention it follows.",
     "tagPattern": "Tag pattern, this is",
     "labels": "Labels, copied onto registered modules they are",
+    "ruleName": "The rule, name of",
+    "ownerEmailHint": "Onto every module this rule registers, copied it is. Admin on those modules, the owner gets.",
     "createTitle": "New module autodiscovery rule, create you will",
     "editTitle": "Edit the module autodiscovery rule, you will",
     "nameTaken": "Taken by another module, this name already is",

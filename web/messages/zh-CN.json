@@ -1114,6 +1114,8 @@
     "providerHint": "留空则在仓库名称遵循 terraform-PROVIDER-NAME 约定时从中获取。",
     "tagPattern": "Tag 模式",
     "labels": "标签（会复制到已注册的模块）",
+    "ruleName": "规则名称",
+    "ownerEmailHint": "会复制到此规则注册的每个模块。所有者对这些模块拥有管理员权限。",
     "createTitle": "新建模块自动发现规则",
     "editTitle": "编辑模块自动发现规则",
     "nameTaken": "该名称已被其他模块使用",
