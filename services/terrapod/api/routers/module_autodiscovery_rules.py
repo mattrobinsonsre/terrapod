@@ -33,7 +33,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse, Response
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -572,11 +572,13 @@ async def update_rule(
         rule.last_enumerated_at = None
         # The per-repository state goes with it (#1620): the next poll takes a
         # new baseline of every repository the rule now looks at.
-        await db.execute(
-            delete(ModuleAutodiscoveryRepository).where(
-                ModuleAutodiscoveryRepository.rule_id == rule.id
-            )
-        )
+        #
+        # Row by row through the ORM, not one Core `delete()`: these rows
+        # replicate (#1666), and a Core statement never reaches the outbox, so
+        # a follower would keep the old baseline and a promoted node would
+        # skip the re-baseline the operator asked for.
+        for row in await svc.load_repositories(db, rule):
+            await db.delete(row)
     try:
         await db.commit()
     except IntegrityError as exc:

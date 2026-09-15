@@ -138,6 +138,7 @@ class _DB:
         self.connection = _conn()
         self.registered = list(registered)
         self.added: list = []
+        self.deleted: list = []
         self.committed = 0
         self.statements: list[str] = []
 
@@ -173,6 +174,9 @@ class _DB:
 
     def add(self, obj):
         self.added.append(obj)
+
+    async def delete(self, obj):
+        self.deleted.append(obj)
 
     @asynccontextmanager
     async def _nested(self):
@@ -319,15 +323,17 @@ class TestClassificationOnWrite:
 class TestPatch:
     async def test_a_new_repo_url_is_classified_again_and_starts_afresh(self, *_):
         rule = _saved()
+        rows = list(rule.repositories)
         db = _DB(rule)
         with _serve(_gh()):
             resp = await _call(db, "PATCH", f"/{rule.id}", json=_body(**{"repo-url": A}))
         assert resp.status_code == 200, resp.text
         assert resp.json()["data"]["attributes"]["target-kind"] == "repository"
         assert rule.target_id == "11" and rule.first_scan_at is None
-        assert any(
-            s.startswith("DELETE FROM module_autodiscovery_repositories") for s in db.statements
-        )
+        # Every state row goes, and through the ORM so the delete replicates
+        # (#1666) — a Core DELETE would never reach the outbox.
+        assert db.deleted == rows
+        assert not any(s.startswith("DELETE FROM") for s in db.statements)
 
     async def test_a_change_elsewhere_asks_the_provider_nothing(self, *_):
         rule = _saved()

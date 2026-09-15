@@ -20,6 +20,8 @@ from terrapod.db.models import (
     ExecutionHook,
     ExecutionHookWorkspace,
     GPGKey,
+    ModuleAutodiscoveryRepository,
+    ModuleAutodiscoveryRule,
     ModuleWorkspaceLink,
     NotificationConfiguration,
     PlatformRoleAssignment,
@@ -154,6 +156,60 @@ VCS_CONNECTIONS = register(ReplicatedClass(name="vcs_connections", model=VCSConn
 # row does not, so the registry reports no version for a module whose bytes are
 # sitting in the store — the same lie in the other direction, and this one wastes
 # a working artifact.
+#
+# Module autodiscovery (#1584, #1620, #1666) comes first. A module it registered
+# carries `module_autodiscovery_rule_id`, an enforced foreign key, so a follower
+# without the rule cannot insert the module at all — the whole registry class
+# stalls on one discovered module. The rule's only foreign key is its connection,
+# which is above.
+#
+# Nothing is excluded from either class. What looks like node-local polling state
+# is the poller's memory, and a promoted node that loses it does real damage:
+#
+#   seen_subdirectories  What the rule has already seen. Automatic registration
+#                        takes only what is NEW, so an operator's decision to
+#                        leave a candidate unregistered lives here. Lose it and
+#                        the promoted node registers everything they declined.
+#   last_scanned_sha /   The scan cursors. Without them every repository reads
+#   change_marker        as moved, and the first poll after a failover re-lists
+#                        and re-scans a whole namespace.
+#   first_scan_at,       NULL means "never scanned". A promoted node reading NULL
+#   origin               takes a fresh baseline, and `origin` decides whether a
+#                        repository's modules register at all — `new` registers
+#                        everything, `baseline` nothing until someone scans.
+#                        Neither may be re-derived on the other side of a
+#                        failover.
+#   last_enumerated_at   When the namespace was last listed. Carrying it spares
+#                        the promoted node an immediate full listing of every
+#                        namespace-wide rule.
+#   next_check_at /      The round-robin order and the backoff. Dropping them
+#   failure_count /      makes every repository due at once, so a failover
+#   last_checked_at      becomes a thundering re-check of the whole estate
+#                        against the provider's rate limit, and a repository that
+#                        was backing off gets hammered again. These are absolute
+#                        UTC times, so they mean the same on either node, and a
+#                        follower runs no scheduled work, so nothing there moves
+#                        them before promotion.
+#   last_error           Why the last check failed. The next poll overwrites it,
+#                        and until then an operator on the promoted node can see
+#                        what was already wrong rather than a clean slate.
+#   candidates /         What the last scan found. An org-wide rule's preview is
+#   last_skips           served from these with no VCS calls, so they are what
+#                        the promoted node's UI shows.
+#
+# Excluding a column would not quieten the outbox either: a dirty row emits an
+# event whichever columns changed, and `exclude` only trims the payload. The
+# poller writes one repository row per check, bounded by its per-cycle budget.
+MODULE_AUTODISCOVERY_RULES = register(
+    ReplicatedClass(name="module_autodiscovery_rules", model=ModuleAutodiscoveryRule)
+)
+
+# Per-repository scan state (#1620), one row per repository a rule looks at.
+# After its rule, whose `id` it holds.
+MODULE_AUTODISCOVERY_REPOSITORIES = register(
+    ReplicatedClass(name="module_autodiscovery_repositories", model=ModuleAutodiscoveryRepository)
+)
+
 REGISTRY_MODULES = register(ReplicatedClass(name="registry_modules", model=RegistryModule))
 
 REGISTRY_MODULE_VERSIONS = register(

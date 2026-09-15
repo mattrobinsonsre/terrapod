@@ -7,6 +7,7 @@ scan columns, and a scan writes the repository row as well as the rule.
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
+from terrapod.db.models import ModuleAutodiscoveryRepository
 from tests.api.test_module_autodiscovery_rules import _call, _FakeDB, _github, _saved_rule
 
 
@@ -20,8 +21,17 @@ class _RecordingDB(_FakeDB):
         return await super().execute(stmt)
 
 
-def _deleted_state(db: _RecordingDB) -> bool:
-    return any(s.startswith("DELETE FROM module_autodiscovery_repositories") for s in db.statements)
+def _rule_with_state(**kw):
+    rule = _saved_rule(**kw)
+    rule.repositories = [
+        ModuleAutodiscoveryRepository(repo_path="org/a", last_scanned_sha="s1"),
+        ModuleAutodiscoveryRepository(repo_path="org/b", last_scanned_sha="s1"),
+    ]
+    return rule
+
+
+def _deleted_state(db: _RecordingDB) -> list:
+    return [o for o in db.deleted if isinstance(o, ModuleAutodiscoveryRepository)]
 
 
 @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
@@ -29,16 +39,27 @@ def _deleted_state(db: _RecordingDB) -> bool:
 @patch("terrapod.api.app.init_db")
 class TestRepositoryState:
     async def test_a_rebaseline_deletes_the_rules_repository_state(self, *_):
-        rule = _saved_rule(
+        rule = _rule_with_state(
             first_scan_at=datetime.now(UTC), last_scanned_sha="s1", seen_subdirectories=["a"]
         )
+        rows = list(rule.repositories)
         db = _RecordingDB(rule)
         body = {"data": {"attributes": {"pattern": "**"}}}
         assert (await _call(db, "PATCH", f"/{rule.id}", json=body)).status_code == 200
-        assert _deleted_state(db)
+        assert _deleted_state(db) == rows
+
+    async def test_a_rebaseline_deletes_through_the_orm_so_it_replicates(self, *_):
+        """Regression (#1666). The rows replicate, and a Core `DELETE` never
+        reaches the outbox: the follower would keep the old baseline, and a
+        promoted node would skip the re-baseline the operator asked for."""
+        rule = _rule_with_state(first_scan_at=datetime.now(UTC), last_scanned_sha="s1")
+        db = _RecordingDB(rule)
+        body = {"data": {"attributes": {"pattern": "**"}}}
+        assert (await _call(db, "PATCH", f"/{rule.id}", json=body)).status_code == 200
+        assert not any(s.startswith("DELETE FROM") for s in db.statements)
 
     async def test_a_change_that_keeps_the_baseline_keeps_the_state(self, *_):
-        rule = _saved_rule(first_scan_at=datetime.now(UTC), last_scanned_sha="s1")
+        rule = _rule_with_state(first_scan_at=datetime.now(UTC), last_scanned_sha="s1")
         db = _RecordingDB(rule)
         body = {"data": {"attributes": {"name": "renamed", "provider": "aws"}}}
         assert (await _call(db, "PATCH", f"/{rule.id}", json=body)).status_code == 200
