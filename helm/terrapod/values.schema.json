@@ -1880,6 +1880,34 @@
                 }
               }
             },
+            "module_autodiscovery": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "tree_listings_per_cycle": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "max_repositories": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "tree_quota_floor_percent": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "enumeration_quota_floor_percent": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "time_budget_seconds": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
             "package_cache": {
               "type": "object",
               "additionalProperties": false,

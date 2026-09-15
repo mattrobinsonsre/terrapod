@@ -6,8 +6,10 @@ are stored on the VCSConnection.
 """
 
 import asyncio
+import dataclasses
 import hashlib
 import hmac
+import json
 import time
 from urllib.parse import quote as url_quote
 
@@ -24,6 +26,9 @@ from terrapod.services.vcs_provider import (
     PRMergeResult,
     PRReview,
     PullRequest,
+    RepositoryListing,
+    RepositoryRef,
+    parse_timestamp,
 )
 
 logger = get_logger(__name__)
@@ -911,6 +916,164 @@ async def list_pr_reviews(
             )
         )
     return out
+
+
+# ── Repositories and the installation's listing (#1620) ──────────────────
+
+
+def repository_ref(data: dict) -> RepositoryRef:
+    """A repository from GitHub's JSON, in the provider-neutral shape."""
+    owner = data.get("owner") or {}
+    return RepositoryRef(
+        id=str(data.get("id") or ""),
+        path=data.get("full_name") or "",
+        url=data.get("html_url") or "",
+        default_branch=data.get("default_branch") or "",
+        owner=owner.get("login") or "",
+        owner_id=str(owner.get("id") or ""),
+        archived=bool(data.get("archived")),
+        fork=bool(data.get("fork")),
+        disabled=bool(data.get("disabled")),
+        # GitHub has no emptiness flag, and `size` is no substitute: it is
+        # computed asynchronously and stays 0 for a while after a repository's
+        # first push. Taking 0 as empty marked every freshly created repository
+        # empty, and an empty row is retried only when `pushed_at` moves, so a
+        # new repository pushed once never registered its modules. An empty
+        # repository has no branch head instead, which the scan reports as
+        # `no-branch` and retries on the next push.
+        empty=False,
+        change_marker=data.get("pushed_at") or "",
+        created_at=parse_timestamp(data.get("created_at")),
+    )
+
+
+async def _get_or_none(conn: VCSConnection, path: str) -> dict | None:
+    """GET an API path: the JSON, None on 404, raising on any other failure."""
+    token = await get_installation_token(conn)
+    resp = await _github_request("GET", f"{_api_url(conn)}{path}", token, conn=conn)
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def get_repository(conn: VCSConnection, owner: str, repo: str) -> dict | None:
+    """A repository by `owner/repo`; None when it does not exist or the
+    installation cannot see it."""
+    return await _get_or_none(
+        conn, f"/repos/{url_quote(owner, safe='')}/{url_quote(repo, safe='')}"
+    )
+
+
+async def get_repository_by_id(conn: VCSConnection, repo_id: str) -> dict | None:
+    """A repository by its id, which survives a rename or a transfer."""
+    return await _get_or_none(conn, f"/repositories/{url_quote(str(repo_id), safe='')}")
+
+
+async def get_account(conn: VCSConnection, login: str) -> dict | None:
+    """A user or organization account by login."""
+    return await _get_or_none(conn, f"/users/{url_quote(login, safe='')}")
+
+
+_LISTING_CACHE_TTL_SECONDS = 24 * 3600
+_LISTING_PAGE_SIZE = 100
+
+
+def _listing_cache_key(conn: VCSConnection, page: int) -> str:
+    # Hash-tagged on the connection, like the rate-limit keys.
+    return f"tp:gh_install_repos:{{{conn.id}}}:{page}"
+
+
+async def _cached_listing_page(conn: VCSConnection, page: int) -> dict | None:
+    try:
+        from terrapod.redis.client import get_redis_client
+
+        raw = await get_redis_client().get(_listing_cache_key(conn, page))
+    except Exception:
+        return None
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+async def _cache_listing_page(
+    conn: VCSConnection, page: int, etag: str, refs: list[RepositoryRef], has_next: bool
+) -> None:
+    body = {
+        "etag": etag,
+        "next": has_next,
+        "repositories": [
+            {
+                **dataclasses.asdict(r),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in refs
+        ],
+    }
+    try:
+        from terrapod.redis.client import get_redis_client
+
+        await get_redis_client().set(
+            _listing_cache_key(conn, page), json.dumps(body), ex=_LISTING_CACHE_TTL_SECONDS
+        )
+    except Exception:
+        logger.debug("Could not cache a GitHub repository listing page", exc_info=True)
+
+
+def _refs_from_cache(cached: dict) -> list[RepositoryRef]:
+    return [
+        RepositoryRef(**{**r, "created_at": parse_timestamp(r.get("created_at"))})
+        for r in cached.get("repositories") or []
+    ]
+
+
+async def list_installation_repositories(
+    conn: VCSConnection, *, max_repositories: int
+) -> RepositoryListing:
+    """Every repository the connection's App installation can see.
+
+    Respects the installation's "selected repositories". Paginated, stopping
+    at `max_repositories` (the listing is then marked incomplete). Each page
+    is fetched conditionally with the ETag of the last copy, cached in Redis:
+    GitHub does not charge a 304 against the rate limit, so an unchanged
+    listing costs nothing. The cache is best-effort; without it every page is
+    fetched in full. Raises on a provider error.
+    """
+    token = await get_installation_token(conn)
+    url = f"{_api_url(conn)}/installation/repositories"
+    refs: list[RepositoryRef] = []
+    page = 1
+    while True:
+        cached = await _cached_listing_page(conn, page)
+        headers = {"If-None-Match": cached["etag"]} if cached and cached.get("etag") else {}
+        resp = await _github_request(
+            "GET",
+            url,
+            token,
+            conn=conn,
+            params={"per_page": _LISTING_PAGE_SIZE, "page": page},
+            headers=headers,
+        )
+        if resp.status_code == 304 and cached:
+            items = _refs_from_cache(cached)
+            has_next = bool(cached.get("next"))
+        else:
+            resp.raise_for_status()
+            items = [repository_ref(r) for r in resp.json().get("repositories") or []]
+            has_next = "next" in resp.links
+            etag = resp.headers.get("etag")
+            if etag:
+                await _cache_listing_page(conn, page, etag, items, has_next)
+        for item in items:
+            if len(refs) >= max_repositories:
+                return RepositoryListing(refs, complete=False)
+            refs.append(item)
+        if not has_next:
+            return RepositoryListing(refs, complete=True)
+        page += 1
 
 
 def parse_repo_url(repo_url: str) -> tuple[str, str] | None:

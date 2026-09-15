@@ -1357,6 +1357,12 @@ jobs:
           echo "$out" | grep -q "opa_version:" || { echo "FAIL: platform_tools.opa_version not rendered — the policy gate would have no binary to fetch (#1208)"; exit 1; }
           echo "$out" | grep -q "trivy_version:" || { echo "FAIL: platform_tools.trivy_version not rendered (#1208)"; exit 1; }
           echo "$out" | grep -q "checkov_version:" || { echo "FAIL: platform_tools.checkov_version not rendered — checkov is the default scan engine (#1208)"; exit 1; }
+          # Org-wide module autodiscovery limits (#1620): without the render line
+          # an operator's caps are silently inert and the code defaults win.
+          echo "$out" | grep -q "module_autodiscovery:" || { echo "FAIL: registry.module_autodiscovery not rendered into config.yaml (#1620)"; exit 1; }
+          echo "$out" | grep -q "tree_listings_per_cycle: 50" || { echo "FAIL: module_autodiscovery.tree_listings_per_cycle not rendered (#1620)"; exit 1; }
+          echo "$out" | grep -q "enumeration_quota_floor_percent: 5" || { echo "FAIL: module_autodiscovery.enumeration_quota_floor_percent not rendered (#1620)"; exit 1; }
+          echo "$out" | grep -q "time_budget_seconds: 60" || { echo "FAIL: module_autodiscovery.time_budget_seconds not rendered (#1620)"; exit 1; }
           echo "$out" | grep -q "ha:" || { echo "FAIL: ha config not rendered into config.yaml (#960)"; exit 1; }
           echo "$out" | grep -q 'role: "leader"' || { echo "FAIL: ha.role must default to leader — an auto default takes single-node installs inert (#960)"; exit 1; }
           echo "$out" | grep -q "replication:" || { echo "FAIL: ha.replication not rendered into config.yaml (#1110)"; exit 1; }

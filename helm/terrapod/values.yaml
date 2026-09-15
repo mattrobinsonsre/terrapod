@@ -529,6 +529,26 @@ api:
         verify: checksum
       module_interface:
         enabled: true
+      # Org-wide module autodiscovery (#1620): a module autodiscovery rule may
+      # name an org, group or installation — or a pattern over one — so one rule
+      # can stand for thousands of repositories. These bound what the registry
+      # poll cycle spends on such rules. A rule naming one repository is not
+      # limited by any of them.
+      module_autodiscovery:
+        # Most repository trees listed per poll cycle, across all org-wide
+        # rules; repositories are taken least recently checked first, so a
+        # large namespace is covered over several cycles.
+        tree_listings_per_cycle: 50
+        # Most repositories listed for one rule. A listing that stops here is
+        # incomplete, and nothing is then marked out of scope for being absent.
+        max_repositories: 5000
+        # Below this share of a connection's remaining VCS API quota, no trees
+        # are listed; below the second, org-wide rules skip the cycle.
+        tree_quota_floor_percent: 20
+        enumeration_quota_floor_percent: 5
+        # Wall-clock time org-wide rules may spend per cycle, so module tag
+        # polling is never starved.
+        time_budget_seconds: 60
 
     # GPG signing key for provider registry
     # ASCII-armored GPG private key. If set, used to sign all provider SHA256SUMS.

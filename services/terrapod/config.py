@@ -1105,6 +1105,52 @@ class EnginesConfig(BaseModel):
     pulumi: EngineConfig = Field(default_factory=EngineConfig)
 
 
+class ModuleAutodiscoveryConfig(BaseModel):
+    """Limits on org-wide module autodiscovery (#1620).
+
+    A module autodiscovery rule may name an org, group or installation, or a
+    pattern over one, so one rule can stand for thousands of repositories.
+    These bound what the registry poll cycle spends on them, so a large
+    namespace cannot exhaust the VCS API budget or hold up tag polling. A rule
+    that names one repository is not limited by any of them.
+    """
+
+    tree_listings_per_cycle: int = Field(
+        default=50,
+        ge=0,
+        description="Most repository file trees listed per poll cycle, across all "
+        "org-wide rules. Repositories are taken round-robin, least recently checked "
+        "first, so a namespace larger than this is covered over several cycles. Only "
+        "a repository whose branch head moved has its tree listed.",
+    )
+    max_repositories: int = Field(
+        default=5000,
+        ge=1,
+        description="Most repositories listed for one rule. A listing that stops here "
+        "is incomplete: no repository is then marked out of scope for being absent.",
+    )
+    tree_quota_floor_percent: int = Field(
+        default=20,
+        ge=0,
+        le=100,
+        description="Below this share of the connection's remaining VCS API quota, "
+        "no repository trees are listed; the listing itself still runs.",
+    )
+    enumeration_quota_floor_percent: int = Field(
+        default=5,
+        ge=0,
+        le=100,
+        description="Below this share of the connection's remaining VCS API quota, "
+        "org-wide rules are skipped altogether for the cycle.",
+    )
+    time_budget_seconds: int = Field(
+        default=60,
+        ge=1,
+        description="Wall-clock time org-wide rules may spend in one poll cycle "
+        "before stopping, so polling module tags is not starved.",
+    )
+
+
 class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
@@ -1136,6 +1182,9 @@ class RegistryConfig(BaseModel):
     module_interface: ModuleInterfaceConfig = Field(default_factory=ModuleInterfaceConfig)
     oci: OCIRegistryConfig = Field(default_factory=OCIRegistryConfig)
     package_cache: PackageCacheConfig = Field(default_factory=PackageCacheConfig)
+    module_autodiscovery: ModuleAutodiscoveryConfig = Field(
+        default_factory=ModuleAutodiscoveryConfig
+    )
 
 
 class CatalogConfig(BaseModel):

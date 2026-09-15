@@ -280,7 +280,29 @@
   "module_autodiscovery_rules._preview_json": [
     "entries",
     "files-walked",
-    "ref"
+    "listing-complete",
+    "ref",
+    "repositories",
+    "target-kind"
+  ],
+  "module_autodiscovery_rules._repository_json": [
+    "candidates",
+    "default-branch",
+    "failure-count",
+    "first-seen-at",
+    "last-checked-at",
+    "last-error",
+    "last-scanned-sha",
+    "last-skips",
+    "next-check-at",
+    "origin",
+    "previous-paths",
+    "repo-created-at",
+    "repo-url",
+    "repository",
+    "seen-subdirectories",
+    "status",
+    "vcs-repo-id"
   ],
   "module_autodiscovery_rules._rule_json": [
     "branch",
@@ -289,6 +311,8 @@
     "first-scan-at",
     "ignore-patterns",
     "labels",
+    "last-enumerated-at",
+    "last-error",
     "last-scanned-sha",
     "name",
     "name-template",
@@ -296,15 +320,25 @@
     "pattern",
     "provider",
     "repo-url",
+    "target-kind",
     "updated-at",
     "vcs-connection-id",
     "vcs-tag-pattern"
+  ],
+  "module_autodiscovery_rules._scan_namespace_rule": [
+    "files-walked",
+    "modules",
+    "modules-registered",
+    "ref",
+    "repositories-scanned",
+    "skipped"
   ],
   "module_autodiscovery_rules.scan_rule": [
     "files-walked",
     "modules",
     "modules-registered",
     "ref",
+    "repositories-scanned",
     "skipped"
   ],
   "notification_configurations._nc_json": [

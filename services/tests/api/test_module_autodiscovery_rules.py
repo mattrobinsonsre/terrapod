@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.exc import IntegrityError
 
@@ -122,6 +123,24 @@ class _FakeDB:
 
     async def flush(self):
         pass
+
+
+@pytest.fixture(autouse=True)
+def _repository_lookup():
+    """Saving a rule classifies its `repo-url` with the provider (#1620): an
+    `owner/repo` form is looked up. Every repository exists here."""
+
+    async def get_repository(conn, owner, repo):
+        return {
+            "id": 4242,
+            "full_name": f"{owner}/{repo}",
+            "html_url": f"https://github.com/{owner}/{repo}",
+            "default_branch": "main",
+            "owner": {"login": owner, "id": 1},
+        }
+
+    with patch(f"{_GH}.get_repository", new=get_repository):
+        yield
 
 
 @contextmanager
