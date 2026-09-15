@@ -461,3 +461,66 @@ def test_risk_factor_schema_allows_optional_category():
     enum = item["properties"]["category"]["enum"]
     for dim in ("security", "reliability", "cost", "operations", "scalability", "change", "other"):
         assert dim in enum
+
+
+# ── #1622: the rating is the risk of THIS change ─────────────────────────
+
+
+def test_schema_defines_risk_level_as_the_risk_of_this_change():
+    """The field descriptions steer the model hardest; they must say it."""
+    from terrapod.services.summariser_prompt import PLAN_SUMMARY_JSON_SCHEMA
+
+    props = PLAN_SUMMARY_JSON_SCHEMA["properties"]
+    level = props["risk_level"]["description"]
+    assert "risk of applying THIS change" in level
+    assert "Pre-existing" in level
+    assert "changes nothing is 'low'" in level
+    factors = props["risk_factors"]["description"]
+    assert "never about a resource it leaves unchanged" in factors
+    category = props["risk_factors"]["items"]["properties"]["category"]["description"]
+    assert "only to resources this plan changes" in category
+
+
+def test_the_rating_is_defined_as_the_change_not_the_estate():
+    skill = PLAN_SUMMARY_SKILL_PROMPT
+    assert "CRITICAL — `risk_level` is the risk of THIS change" in skill
+    assert "ALREADY EXIST on resources the plan leaves" in skill
+    assert "You are reviewing the change, not auditing" in skill
+
+
+def test_a_plan_that_changes_nothing_is_low_whatever_else_is_present():
+    """Scanner findings, cost and observed drift must not beat the empty-plan
+    rule. That is how a no-change plan was rated medium (#1622)."""
+    skill = PLAN_SUMMARY_SKILL_PROMPT
+    assert "the plan changes nothing: `risk_level` is" in skill
+    for signal in (
+        "SECURITY_FINDINGS lists",
+        "COST_ESTIMATE shows",
+        "`drift_observed_no_apply_action` has entries",
+    ):
+        assert signal in skill, signal
+    assert "This rule overrides every" in skill
+    assert "including the grounded design" in skill
+
+
+def test_the_design_review_is_scoped_to_changed_resources():
+    skill = PLAN_SUMMARY_SKILL_PROMPT
+    assert "This review applies ONLY to resources whose `change.actions` include" in skill
+    assert "this change introduces it or makes it worse" in skill
+    assert "is pre-existing: do not list it, and it must never raise `risk_level`" in skill
+    assert "If the plan changes nothing, this review adds nothing." in skill
+    assert "problem THIS CHANGE introduces" in skill
+    # The inputs say so too: both signals cover the whole configuration.
+    assert "It covers EVERY resource in the configuration" in skill
+    assert "Its totals include resources this plan does not change" in skill
+
+
+def test_observed_only_drift_never_affects_the_rating():
+    skill = PLAN_SUMMARY_SKILL_PROMPT
+    assert "MUST NOT list them as `risk_factors`, and they never affect" in skill
+
+
+def test_the_empty_plan_rule_comes_before_the_design_review():
+    """Precedence is stated, and the text is ordered to match it."""
+    skill = PLAN_SUMMARY_SKILL_PROMPT
+    assert skill.index("This rule overrides every") < skill.index("Grounded design review")
