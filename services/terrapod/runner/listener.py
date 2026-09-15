@@ -747,7 +747,7 @@ class RunnerListener:
             )
         except ValueError as e:
             logger.error("Refusing vault files", run_id=run_id, reason=str(e))
-            await self._report_launch_failed(run_id, f"Vault file delivery refused: {e}")
+            await self._report_launch_failed(run_id, f"OpenBao/Vault file delivery refused: {e}")
             return
 
         run_short = run_id[:16]
@@ -930,7 +930,7 @@ class RunnerListener:
             if secret_key in env_keys:
                 raise ValueError(
                     f"env variable {secret_key!r} clashes with the Secret key Terrapod uses "
-                    f"for the Vault file of variable {var_key!r}; rename the env variable"
+                    f"for the OpenBao/Vault file of variable {var_key!r}; rename the env variable"
                 )
             entries.append((var_key, name))
             mounts.append({"name": name, "secret_key": secret_key})

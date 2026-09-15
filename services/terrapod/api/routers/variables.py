@@ -101,7 +101,7 @@ def _reject_vault_on_local(ws, value_source: str) -> None:
     if getattr(ws, "execution_mode", "agent") == "local":
         raise HTTPException(
             status_code=422,
-            detail="A Vault-sourced variable needs agent execution: Terrapod "
+            detail="An OpenBao/Vault-sourced variable needs agent execution: Terrapod "
             "resolves the reference server-side when a runner claims the run, "
             "and a local-execution workspace runs terraform on your own machine "
             "where that never happens. Switch the workspace to agent execution, "
@@ -125,9 +125,9 @@ def _reject_vault_on_git_auth(value_source: str, category: str | None) -> None:
         raise HTTPException(
             status_code=422,
             detail=f"category '{category}' cannot use value-source 'vault': a "
-            "git credential is a JSON object, while a Vault reference resolves "
-            "to a single field. Put the credential's own secret fields in Vault "
-            "and reference them from a static git-auth value instead.",
+            "git credential is a JSON object, while an OpenBao/Vault reference "
+            "resolves to a single field. Put the credential's own secret fields in "
+            "OpenBao/Vault and reference them from a static git-auth value instead.",
         )
 
 
@@ -152,7 +152,7 @@ async def _reject_vault_varset_on_local(db, vs, *, when: str) -> None:
     raise HTTPException(
         status_code=422,
         detail=f"{when}: this variable set reaches local-execution workspace(s) "
-        f"({names}), where a Vault reference resolves to nothing because "
+        f"({names}), where an OpenBao/Vault reference resolves to nothing because "
         "resolution happens only when a runner claims the run. Switch them to "
         "agent execution, or unassign them from this set, first.",
     )
@@ -172,8 +172,8 @@ def _file_delivery_guard(
         if looks_like_file_reference(value):
             raise HTTPException(
                 status_code=422,
-                detail="`file` delivery needs value-source 'vault': this value is a "
-                "Vault reference, and with a static source it would be delivered "
+                detail="`file` delivery needs value-source 'vault': this value is an "
+                "OpenBao/Vault reference, and with a static source it would be delivered "
                 "to the run as the literal JSON",
             )
         return
@@ -805,7 +805,9 @@ async def create_varset_var(
         structured=bool(_structured_from(attrs, default=False)),
     )
     if value_source == "vault":
-        await _reject_vault_varset_on_local(db, vs, when="Cannot add a Vault-sourced variable")
+        await _reject_vault_varset_on_local(
+            db, vs, when="Cannot add an OpenBao/Vault-sourced variable"
+        )
     if force_sensitive:
         sensitive = True
 
@@ -877,7 +879,7 @@ async def update_varset_var(
         structured=bool(vsv.structured),
     )
     if vsv.value_source == "vault":
-        await _reject_vault_varset_on_local(db, vs, when="Cannot set a Vault source")
+        await _reject_vault_varset_on_local(db, vs, when="Cannot set an OpenBao/Vault source")
     was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]
@@ -1085,7 +1087,7 @@ async def add_varset_workspaces(
             raise HTTPException(
                 status_code=422,
                 detail=f"Cannot assign this variable set to '{ws.name}': the set has "
-                f"{vault_vars} Vault-sourced variable(s), which resolve only when a "
+                f"{vault_vars} OpenBao/Vault-sourced variable(s), which resolve only when a "
                 "runner claims the run, and that workspace uses local execution — "
                 "they would silently deliver nothing. Switch it to agent execution "
                 "first.",

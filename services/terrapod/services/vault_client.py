@@ -170,8 +170,8 @@ def _as_vault_error(exc: Exception, what: str, inst_name: str) -> VaultUnavailab
     needed a secret.
     """
     return VaultUnavailable(
-        f"Vault {what} on instance {inst_name!r} failed: "
-        f"{type(exc).__name__} — {exc}. Vault may be unreachable, slow, or "
+        f"OpenBao/Vault {what} on instance {inst_name!r} failed: "
+        f"{type(exc).__name__} — {exc}. The server may be unreachable, slow, or "
         "behind a proxy returning a non-JSON error."
     )
 
@@ -311,7 +311,7 @@ async def _login(inst: VaultInstanceConfig, static_token: str | None) -> str:
         # `aud` claim looks, from here, exactly like any other refusal.
         audience = f", audience {inst.auth.audience!r}" if inst.auth.audience else ""
         detail = (
-            f"Vault login failed for instance {inst.name!r} "
+            f"OpenBao/Vault login failed for instance {inst.name!r} "
             f"({method} auth, mount {inst.auth.mount!r}, role {inst.auth.role!r}{audience}): "
             f"HTTP {resp.status_code}"
         )
@@ -324,7 +324,7 @@ async def _login(inst: VaultInstanceConfig, static_token: str | None) -> str:
         raise _as_vault_error(e, "login", inst.name) from e
     token = auth.get("client_token")
     if not token:
-        raise VaultError(f"Vault login for {inst.name!r} returned no client_token")
+        raise VaultError(f"OpenBao/Vault login for {inst.name!r} returned no client_token")
 
     ttl = float(auth.get("lease_duration") or 0)
     if ttl > _EXPIRY_MARGIN:
@@ -445,18 +445,20 @@ async def read_secret_response(
 
     if resp.status_code == 403:
         raise VaultDenied(
-            f"Vault denied {read_path!r} on instance {inst.name!r}. The policy "
+            f"OpenBao/Vault denied {read_path!r} on instance {inst.name!r}. The policy "
             f"attached to role {inst.auth.role!r} does not grant read on this path."
         )
     if resp.status_code == 404:
-        raise VaultNotFound(f"Vault has no secret at {read_path!r} on instance {inst.name!r}")
+        raise VaultNotFound(
+            f"OpenBao/Vault has no secret at {read_path!r} on instance {inst.name!r}"
+        )
     if resp.status_code != 200:
         # Deliberately NOT echoing resp.text: this message becomes the run's
         # error_message, readable by anyone with run-read, and a third party's
         # response body is not ours to forward there. The status and the path
         # are what diagnose it.
         detail = (
-            f"Vault read of {read_path!r} on instance {inst.name!r} failed with "
+            f"OpenBao/Vault read of {read_path!r} on instance {inst.name!r} failed with "
             f"HTTP {resp.status_code}"
         )
         if _is_transient_status(resp.status_code):
@@ -577,7 +579,10 @@ async def revoke_lease(
         return REVOKED
     if resp.status_code == 400:
         return GONE
-    detail = f"Vault lease revocation on instance {inst.name!r} failed with HTTP {resp.status_code}"
+    detail = (
+        f"OpenBao/Vault lease revocation on instance {inst.name!r} "
+        f"failed with HTTP {resp.status_code}"
+    )
     if resp.status_code == 403:
         raise VaultDenied(
             f"{detail}: the policy attached to role {inst.auth.role!r} does not "

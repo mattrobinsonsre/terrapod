@@ -96,7 +96,7 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 				Description: "Where the value comes from: `static` (the default — `value` is the " +
 					"literal) or `vault`, where `value` holds a JSON reference " +
 					"(`{\"mount\":…,\"path\":…,\"field\":…}`) that Terrapod resolves from " +
-					"HashiCorp Vault at run time — so a Vault-backed credential can be defined " +
+					"OpenBao (or HashiCorp Vault) at run time — so an OpenBao/Vault-backed credential can be defined " +
 					"once in a variable set and applied to many workspaces. A vault-sourced " +
 					"variable is always sensitive, and the secret is never stored in Terrapod. " +
 					"Add a `file` object to the reference (`\"file\":{\"name\":\"gcp/adc.json\"}`) " +

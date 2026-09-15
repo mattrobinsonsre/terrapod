@@ -1769,10 +1769,14 @@ DELETE /api/tfe/v2/varsets/{varset_id}/relationships/workspaces
 
 **Required permission:** Platform `admin`.
 
-### Vault Value Source
+<a id="vault-value-source"></a>
+
+### OpenBao/Vault Value Source
 
 A variable's `value-source` is `static` (the default — `value` is the literal)
-or `vault`, where `value` holds a JSON reference resolved at run time:
+or `vault`, where `value` holds a JSON reference to a secret in OpenBao (or
+HashiCorp Vault), resolved at run time. The value source is named `vault` for
+both servers:
 
 ```json
 {
@@ -1815,9 +1819,9 @@ on a `static` value source, with any unknown key (`mode` is reserved), when more
 `file.template` and `file.format` is given, for a template syntax error or an
 unknown filter, for `fields` without `format`, and for `encoding` with a
 template or format. An unknown template name, invalid base64, non-UTF-8 decoded
-bytes, two variables at one path, a rendered file over 256 KiB, or Vault files
+bytes, two variables at one path, a rendered file over 256 KiB, or OpenBao/Vault files
 totalling over 768 KiB in one run error the run. Variables naming the same
-secret share one Vault read per run, so fields of one dynamic credential always
+secret share one read per run, so fields of one dynamic credential always
 match — including every field a template uses. Details:
 [Delivering as a file](vault.md#delivering-as-a-file),
 [Templates, formats and encoding](vault.md#templates-formats-and-encoding).
@@ -1828,7 +1832,7 @@ secret it points at is resolved per run and never persisted, returned or
 logged. A malformed reference is rejected at write time with `422`; one that
 cannot be resolved **fails the run** rather than delivering nothing.
 
-Applies to variable-set variables too, so a Vault-backed credential can be
+Applies to variable-set variables too, so an OpenBao/Vault-backed credential can be
 defined once and applied to many workspaces.
 
 ```
@@ -1840,7 +1844,7 @@ client can offer it only where it will work. Returns instance **names** only —
 never addresses, namespaces or auth configuration. Any authenticated user may
 call it, since anyone who can write a variable needs to pick an instance.
 
-Full setup, including the Vault-side policy and role: [Vault](vault.md).
+Full setup, including the server-side policy and role: [OpenBao/Vault](vault.md).
 
 ### Assignment Rules
 
@@ -3442,11 +3446,11 @@ GET /api/v1/admin/audit-log
 **Response:** JSON:API list of `audit-log-entries` with pagination metadata.
 
 Besides HTTP requests, the log holds system events, whose `action` is a verb.
-Every Vault read Terrapod makes for a run is one `vault.read` row
+Every OpenBao/Vault read Terrapod makes for a run is one `vault.read` row
 (`resource-type` `runs`), whose `detail` is JSON naming the variables, instance,
 mount, path, engine, phase and outcome (`ok`, `denied`, `missing`, `transient`,
 `error`), never a value. Filter with `filter[action]=vault.read`. See
-[Vault → The audit trail](vault.md#the-audit-trail).
+[OpenBao/Vault → The audit trail](vault.md#the-audit-trail).
 
 **Example:**
 
