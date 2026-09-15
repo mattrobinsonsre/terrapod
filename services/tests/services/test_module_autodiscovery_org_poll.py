@@ -121,7 +121,8 @@ class FakeGitHub:
         bare = path.split("?")[0]
         if m := re.fullmatch(r"/repos/([^/]+)/([^/]+)/branches/(.+)", bare):
             key = f"{m[1]}/{m[2]}"
-            if key not in self.repos:
+            if key not in self.repos or not self.heads.get(key):
+                # GitHub answers 404 for a branch of an empty repository.
                 return _resp(404, {})
             return _resp(200, {"commit": {"sha": self.heads[key]}})
         if m := re.fullmatch(r"/repos/([^/]+)/([^/]+)/git/trees/(.+)", bare):
@@ -313,17 +314,33 @@ class TestBaselines:
         (m,) = db.modules()
         assert (m.subdirectory, m.vcs_repo_url) == ("modules/c", f"https://github.com/{B}")
 
+    async def test_a_new_repository_github_still_sizes_at_zero_registers_its_modules(self):
+        """Found live: GitHub reports `size` 0 for a while after the first push.
+
+        The repository has content and a branch head; reading 0 as empty left
+        it marked empty until its next push, so its modules never registered.
+        """
+        gh = FakeGitHub()
+        gh.add(A, 1)
+        rule = _rule()
+        db = _DB([rule])
+        await _poll(db, gh)
+        gh.add(C, 3, created=FUTURE, size=0, tree=TREE)
+        assert await _poll(db, gh) == 2
+        assert _rows(rule)[C].status == "active"
+        assert {m.subdirectory for m in db.modules()} == {"", "modules/a"}
+
     async def test_an_empty_new_repository_registers_its_modules_as_they_arrive(self):
         gh = FakeGitHub()
         gh.add(A, 1)
         rule = _rule()
         db = _DB([rule])
         await _poll(db, gh)
-        gh.add(C, 3, created=FUTURE, size=0, tree=[])
+        # Truly empty: no commit, so no branch head (and size 0).
+        gh.add(C, 3, created=FUTURE, size=0, head="", tree=[])
         gh.calls.clear()
         assert await _poll(db, gh) == 0
-        assert _rows(rule)[C].status == "empty" and C not in gh.branches_read()
-        gh.repos[C]["size"] = 12
+        assert _rows(rule)[C].status == "no-branch" and db.modules() == []
         gh.push(C, head="s2", pushed="p2", tree=TREE)
         assert await _poll(db, gh) == 2
         assert {m.subdirectory for m in db.modules()} == {"", "modules/a"}

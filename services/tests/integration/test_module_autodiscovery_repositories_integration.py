@@ -19,8 +19,6 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from sqlalchemy import select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
@@ -52,7 +50,12 @@ _THIS = "f9b3aac00aac"
 # ── The migration ─────────────────────────────────────────────────────────
 
 
-def _alembic(url: str) -> Config:
+def _alembic(url: str):
+    # Imported here, not at module level: ruff sorts `alembic` as third-party
+    # locally but first-party in CI's container (where the repo's alembic/
+    # directory sits beside the code), so a top-level import cannot satisfy both.
+    from alembic.config import Config
+
     cfg = Config()
     cfg.set_main_option("script_location", str(_versions_dir().parent))
     cfg.set_main_option("sqlalchemy.url", url)
@@ -113,6 +116,8 @@ async def test_the_migration_backfills_one_row_per_rule_and_downgrades_cleanly(a
     url = base.set(database=name).render_as_string(hide_password=False)
     engine = create_async_engine(url)
     cfg = _alembic(url)
+    from alembic import command  # see _alembic for why this is not at module level
+
     try:
         await asyncio.to_thread(command.upgrade, cfg, _PREVIOUS_HEAD)
 

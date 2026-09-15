@@ -373,7 +373,10 @@ class TestGitHubListing:
             "org/c",
         ]
         a, b, c = listing.repositories
-        assert b.fork and c.disabled and c.archived and c.empty and not a.empty
+        assert b.fork and c.disabled and c.archived
+        # size 0 is not emptiness: GitHub computes it asynchronously, and it
+        # stays 0 for a while after a repository's first push.
+        assert not c.empty and not a.empty
         assert a.change_marker == "2026-09-01T00:00:00Z" and a.created_at.year == 2025
         assert len(server.calls) == 2
 

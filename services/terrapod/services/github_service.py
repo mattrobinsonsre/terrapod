@@ -934,8 +934,14 @@ def repository_ref(data: dict) -> RepositoryRef:
         archived=bool(data.get("archived")),
         fork=bool(data.get("fork")),
         disabled=bool(data.get("disabled")),
-        # GitHub reports an empty repository as size 0; there is no flag.
-        empty=data.get("size") == 0,
+        # GitHub has no emptiness flag, and `size` is no substitute: it is
+        # computed asynchronously and stays 0 for a while after a repository's
+        # first push. Taking 0 as empty marked every freshly created repository
+        # empty, and an empty row is retried only when `pushed_at` moves, so a
+        # new repository pushed once never registered its modules. An empty
+        # repository has no branch head instead, which the scan reports as
+        # `no-branch` and retries on the next push.
+        empty=False,
         change_marker=data.get("pushed_at") or "",
         created_at=parse_timestamp(data.get("created_at")),
     )
