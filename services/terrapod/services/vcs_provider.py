@@ -9,12 +9,63 @@ use these rather than duplicating if/elif chains.
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 from terrapod.db.models import VCSConnection
 from terrapod.logging_config import get_logger
 
 _logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class RepositoryRef:
+    """One repository as a provider's repository listing reports it (#1620).
+
+    The common shape of a GitHub installation repository and a GitLab group
+    project, so org-wide module autodiscovery works against either. `owner`
+    is the namespace path (a GitHub account, or a GitLab group's full path)
+    and `owner_id` its provider id. `change_marker` is the provider's "this
+    repository changed" timestamp, as reported: GitHub's `pushed_at`, GitLab's
+    `last_activity_at`.
+    """
+
+    id: str
+    path: str
+    url: str
+    default_branch: str = ""
+    owner: str = ""
+    owner_id: str = ""
+    archived: bool = False
+    fork: bool = False
+    disabled: bool = False
+    empty: bool = False
+    change_marker: str = ""
+    created_at: datetime | None = None
+
+    @property
+    def name(self) -> str:
+        return self.path.rsplit("/", 1)[-1]
+
+
+@dataclass(frozen=True)
+class RepositoryListing:
+    """A namespace's repositories. `complete` is False when the listing
+    stopped short — at the repository cap, or on an error partway — so that
+    nothing may be concluded from a repository's absence."""
+
+    repositories: list[RepositoryRef]
+    complete: bool
+
+
+def parse_timestamp(value: object) -> datetime | None:
+    """A provider's ISO-8601 timestamp, or None when absent or unreadable."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 class PullRequest:

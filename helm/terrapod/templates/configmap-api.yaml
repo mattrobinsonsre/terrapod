@@ -280,6 +280,14 @@ data:
       module_interface:
         enabled: {{ .Values.api.config.registry.module_interface.enabled }}
       {{- end }}
+      {{- with .Values.api.config.registry.module_autodiscovery }}
+      module_autodiscovery:
+        tree_listings_per_cycle: {{ .tree_listings_per_cycle | default 50 }}
+        max_repositories: {{ .max_repositories | default 5000 }}
+        tree_quota_floor_percent: {{ .tree_quota_floor_percent | default 20 }}
+        enumeration_quota_floor_percent: {{ .enumeration_quota_floor_percent | default 5 }}
+        time_budget_seconds: {{ .time_budget_seconds | default 60 }}
+      {{- end }}
     {{- end }}
     {{- if .Values.api.config.catalog }}
     catalog:

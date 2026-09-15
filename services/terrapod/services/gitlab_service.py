@@ -20,6 +20,9 @@ from terrapod.services.vcs_provider import (
     PRMergeResult,
     PRReview,
     PullRequest,
+    RepositoryListing,
+    RepositoryRef,
+    parse_timestamp,
 )
 
 logger = get_logger(__name__)
@@ -820,6 +823,97 @@ async def list_pr_reviews(
             )
         )
     return out
+
+
+# ── Projects, groups and a group's listing (#1620) ───────────────────────
+
+
+def project_ref(data: dict) -> RepositoryRef:
+    """A project from GitLab's JSON, in the provider-neutral shape."""
+    path = data.get("path_with_namespace") or ""
+    namespace = data.get("namespace") or {}
+    return RepositoryRef(
+        id=str(data.get("id") or ""),
+        path=path,
+        url=data.get("web_url") or "",
+        default_branch=data.get("default_branch") or "",
+        owner=namespace.get("full_path") or path.rpartition("/")[0],
+        owner_id=str(namespace.get("id") or ""),
+        archived=bool(data.get("archived")),
+        # Present, and not null, only on a fork.
+        fork=bool(data.get("forked_from_project")),
+        empty=bool(data.get("empty_repo")),
+        change_marker=data.get("last_activity_at") or "",
+        created_at=parse_timestamp(data.get("created_at")),
+    )
+
+
+async def _get_or_none(conn: VCSConnection, path: str) -> dict | None:
+    """GET an API path: the JSON, None on 404, raising on any other failure."""
+    resp = await _gitlab_request("GET", f"{_api_url(conn)}{path}", conn)
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def get_project(conn: VCSConnection, ident: str | int) -> dict | None:
+    """A project by full path or id; None when it does not exist or is not
+    visible to the connection's token."""
+    return await _get_or_none(conn, f"/projects/{url_quote(str(ident), safe='')}")
+
+
+async def get_group(conn: VCSConnection, ident: str | int) -> dict | None:
+    """A group (or subgroup) by full path or id."""
+    return await _get_or_none(conn, f"/groups/{url_quote(str(ident), safe='')}")
+
+
+async def get_namespace(conn: VCSConnection, path: str) -> dict | None:
+    """A namespace by path — a group or a user; `kind` says which."""
+    return await _get_or_none(conn, f"/namespaces/{url_quote(path, safe='')}")
+
+
+async def list_group_projects(
+    conn: VCSConnection,
+    group_id: str | int,
+    *,
+    include_subgroups: bool,
+    max_repositories: int,
+) -> RepositoryListing | None:
+    """A group's projects, by group id, subgroups included when asked.
+
+    Keyset-paginated (ordered by id), following the `Link: rel="next"` the
+    server returns — which an instance that ignores the keyset request also
+    returns for offset pagination, so either way the walk is the same. Stops
+    at `max_repositories`, marking the listing incomplete. Projects shared
+    into the group from elsewhere are left out. Returns None when the group no
+    longer exists; raises on any other provider error.
+    """
+    url: str | None = f"{_api_url(conn)}/groups/{url_quote(str(group_id), safe='')}/projects"
+    params: dict | None = {
+        "include_subgroups": "true" if include_subgroups else "false",
+        "with_shared": "false",
+        "per_page": 100,
+        "order_by": "id",
+        "sort": "asc",
+        "pagination": "keyset",
+    }
+    refs: list[RepositoryRef] = []
+    first = True
+    while url:
+        resp = await _gitlab_request("GET", url, conn, params=params)
+        if first and resp.status_code == 404:
+            return None
+        first = False
+        resp.raise_for_status()
+        for item in resp.json() or []:
+            if len(refs) >= max_repositories:
+                return RepositoryListing(refs, complete=False)
+            refs.append(project_ref(item))
+        url = (resp.links.get("next") or {}).get("url")
+        # The next link carries every query parameter itself.
+        params = None
+    return RepositoryListing(refs, complete=True)
 
 
 def parse_repo_url(repo_url: str) -> tuple[str, str] | None:

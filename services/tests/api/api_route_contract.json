@@ -105,6 +105,7 @@
   "GET /api/terrapod/v1/module-autodiscovery-rules",
   "GET /api/terrapod/v1/module-autodiscovery-rules/{rule_id}",
   "GET /api/terrapod/v1/module-autodiscovery-rules/{rule_id}/preview",
+  "GET /api/terrapod/v1/module-autodiscovery-rules/{rule_id}/repositories",
   "GET /api/terrapod/v1/notification-configurations/{nc_id}",
   "GET /api/terrapod/v1/onboarding",
   "GET /api/terrapod/v1/onboarding-sessions/{session_id}",
