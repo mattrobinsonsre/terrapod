@@ -977,6 +977,39 @@ class TestResourceProfile:
         assert resp.status_code == 400
         assert "failure_reason" in resp.json()["detail"]
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_plan_jobs_reason_never_lands_on_the_apply(self, *_mocks):
+        """The plan Job keeps working after plan-result; with auto-apply the run
+        may already be applying when its final POST arrives."""
+        run = self._run_in("applying")
+        resp = await self._post(
+            run, {"exit_code": 1, "failure_reason": "post_plan hook failed", "phase": "plan"}
+        )
+        assert resp.status_code == 204
+        assert run.error_message is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_reason_lands_on_its_own_phase(self, *_mocks):
+        run = self._run_in("applying")
+        resp = await self._post(
+            run, {"exit_code": 1, "failure_reason": "Error: apply problem", "phase": "apply"}
+        )
+        assert resp.status_code == 204
+        assert run.error_message == "Error: apply problem"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unknown_phase_is_rejected(self, *_mocks):
+        run = self._run_in("planning")
+        resp = await self._post(run, {"exit_code": 1, "failure_reason": "x", "phase": "destroy"})
+        assert resp.status_code == 400
+        assert "phase" in resp.json()["detail"]
+
 
 # ── upload_cost_estimate (#871) ───────────────────────────────────────
 

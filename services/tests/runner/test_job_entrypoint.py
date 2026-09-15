@@ -173,7 +173,7 @@ class TestFailureReason:
         assert rc == 1
         assert kwargs["failure_reason"] == "Error: Unsupported argument (on main.tf line 3)"
 
-    def test_a_crash_sends_the_runners_own_error(self, monkeypatch, tmp_path) -> None:
+    def test_a_crash_is_reported_without_its_exception_text(self, monkeypatch, tmp_path) -> None:
         self._isolate(monkeypatch, tmp_path)
 
         def body(cfg, work_dir):
@@ -181,7 +181,21 @@ class TestFailureReason:
 
         rc, kwargs = self._main(body)
         assert rc == 1
-        assert kwargs["failure_reason"] == "orchestrator crashed: boom"
+        assert (
+            kwargs["failure_reason"] == "orchestrator crashed — see the run log for the traceback"
+        )
+
+    def test_a_known_failure_sends_the_runners_account(self, monkeypatch, tmp_path) -> None:
+        self._isolate(monkeypatch, tmp_path)
+
+        def body(cfg, work_dir):
+            raise job_entrypoint.ConfigurationArchiveError("the archive is truncated")
+
+        rc, kwargs = self._main(body)
+        assert rc == 1
+        assert (
+            kwargs["failure_reason"] == "configuration archive unusable: the archive is truncated"
+        )
 
     def test_a_clean_exit_sends_no_reason(self, monkeypatch, tmp_path) -> None:
         self._isolate(monkeypatch, tmp_path)

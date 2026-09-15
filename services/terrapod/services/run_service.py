@@ -784,6 +784,10 @@ async def transition_run(
 
     if error_message:
         run.error_message = error_message
+    elif target_status in ("planned", "applied"):
+        # A phase that completed has nothing to explain: drop a failure reason
+        # its runner reported before being retried and succeeding (#1631).
+        run.error_message = ""
 
     # Clear stale Job state when entering apply phase.
     # The plan phase's job_name and Redis job_status would otherwise cause

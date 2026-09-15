@@ -66,11 +66,23 @@ class TestCollectProfile:
             cpu_stat_path=tmp_path / "nope2",
             exit_code=1,
             failure_reason="Error: Unsupported argument (on main.tf line 3)",
+            phase="plan",
         )
         assert out == {
             "exit_code": 1,
             "failure_reason": "Error: Unsupported argument (on main.tf line 3)",
+            # The API puts the reason only on the phase that failed.
+            "phase": "plan",
         }
+
+    def test_the_phase_goes_only_with_a_reason(self, tmp_path) -> None:
+        out = resource_profile.collect_profile(
+            memory_peak_path=tmp_path / "nope",
+            cpu_stat_path=tmp_path / "nope2",
+            exit_code=0,
+            phase="apply",
+        )
+        assert out == {"exit_code": 0}
 
     def test_no_reason_no_field(self, tmp_path) -> None:
         out = resource_profile.collect_profile(

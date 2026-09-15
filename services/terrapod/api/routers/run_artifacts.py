@@ -723,6 +723,10 @@ async def _persist_runner_state(
 
 
 _MAX_FAILURE_REASON_CHARS = 2000
+# Which run status a failure reason from each phase's Job may land on (#1631).
+# A plan Job still finishing its post-plan work after an auto-apply has
+# started must not put its reason on the apply, and vice versa.
+_REASON_STATUS_BY_PHASE = {"plan": ("planning",), "apply": ("applying",)}
 _ANSI_ESCAPES = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 _CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
@@ -797,6 +801,9 @@ async def record_resource_profile(
     failure_reason = body.get("failure_reason")
     if failure_reason is not None and not isinstance(failure_reason, str):
         raise HTTPException(status_code=400, detail="failure_reason must be a string")
+    phase = body.get("phase")
+    if phase is not None and phase not in _REASON_STATUS_BY_PHASE:
+        raise HTTPException(status_code=400, detail="phase must be 'plan' or 'apply'")
 
     if peak_memory_bytes is not None:
         run.peak_memory_bytes = peak_memory_bytes
@@ -807,10 +814,13 @@ async def record_resource_profile(
 
     # The runner's own account of why it failed (#1631), kept as the run's
     # error message so the reconciler reports it instead of the bare exit
-    # code. Only with a non-zero exit, and only while the run is still in a
-    # phase: an errored run's message is final.
+    # code. Only with a non-zero exit, and only while the run is in the phase
+    # that sent it: an errored run's message is final, and a plan Job still
+    # finishing after an auto-apply started must not mark the apply. A runner
+    # that sends no phase (older image) gets either phase.
     reason = _clean_failure_reason(failure_reason or "")
-    if reason and exit_code and run.status in ("planning", "applying"):
+    allowed = _REASON_STATUS_BY_PHASE.get(phase or "", ("planning", "applying"))
+    if reason and exit_code and run.status in allowed:
         run.error_message = reason
 
     await db.commit()

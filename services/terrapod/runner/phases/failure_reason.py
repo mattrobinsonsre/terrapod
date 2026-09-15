@@ -7,12 +7,16 @@ the cause out so the end-of-run resource-profile POST can carry it:
 - a tofu/terraform init, plan or apply that failed: tofu's own ``Error:``
   summaries from that phase's log, each with its ``on <file> line <n>``
   location;
-- any other handled failure: the last error the runner itself logged (a failed
-  hook, an unusable configuration archive, a crash).
+- any other failure: the runner's own fatal error (a failed hook, an unusable
+  configuration archive, a crash), from an allowlist of the events that end a
+  run.
 
 Only diagnostic summaries are taken — never a diagnostic's detail lines, which
-can quote values — and the result is bounded. Best-effort throughout: nothing
-here raises.
+can quote values — and the result is bounded. The message lands in the run's
+error_message, readable by anyone with run-read, so free text is forwarded only
+from events that are the runner's own account of what went wrong; an
+unexpected exception's message stays in the log. Best-effort throughout:
+nothing here raises.
 """
 
 from __future__ import annotations
@@ -34,14 +38,45 @@ _ERROR = re.compile(r"^Error:\s*(\S.*)$")
 _LOCATION = re.compile(r"^on (.+? line \d+)")
 
 _ERROR_LEVELS = frozenset({"error", "exception", "critical"})
+
+# The runner's fatal errors, matched on the start of the log event, and the
+# fields of each that are safe to show. An error logged on a path that carries
+# on (a missing plan-artifacts tarball, say) is not here, so it can never be
+# reported as the cause of a failure that happened later.
+_FATAL_EVENTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("pre_init hook failed", ("hook", "rc")),
+    ("pre_plan hook failed", ("hook", "rc")),
+    ("post_plan hook failed", ("hook", "rc")),
+    ("pre_apply hook failed", ("hook", "rc")),
+    ("post_apply hook failed", ("hook", "rc")),
+    ("init failed", ("rc",)),
+    ("binary download failed", ("err",)),
+    ("configuration archive unusable", ("err",)),
+    ("failed to render terraform variables", ("error",)),
+    ("backend backstop failed", ("err",)),
+    ("policy evaluation failed", ("err",)),
+    ("state upload raised", ("err",)),
+    ("unknown phase", ("phase",)),
+    # An unexpected exception's text could be anything; the traceback is in the log.
+    ("orchestrator crashed", ()),
+)
+_CRASHED = "orchestrator crashed"
+
 _last_error: dict[str, Any] | None = None
 
 
 def remember_errors(_logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
-    """structlog processor: keep the most recent error-level event."""
+    """structlog processor: keep the most recent fatal runner error."""
     global _last_error
     if method_name in _ERROR_LEVELS:
-        _last_error = dict(event_dict)
+        event = str(event_dict.get("event", ""))
+        for label, fields in _FATAL_EVENTS:
+            if event.startswith(label):
+                _last_error = {"label": label}
+                _last_error.update(
+                    {k: event_dict[k] for k in fields if event_dict.get(k) not in (None, "")}
+                )
+                break
     return event_dict
 
 
@@ -52,19 +87,18 @@ def reset() -> None:
 
 
 def last_logged_error() -> str | None:
-    """The runner's most recent logged error as one line, or None."""
+    """The runner's most recent fatal error as one line, or None."""
     if not _last_error:
         return None
-    text = str(_last_error.get("event", "")).strip()
-    extras = ", ".join(
-        f"{k}={_last_error[k]}" for k in ("hook", "rc") if _last_error.get(k) not in (None, "")
-    )
-    if extras:
-        text += f" ({extras})"
-    err = _last_error.get("err") or _last_error.get("error")
-    if err:
-        text += f": {err}"
-    return text or None
+    label = _last_error["label"]
+    if label == _CRASHED:
+        return f"{_CRASHED} — see the run log for the traceback"
+    extras = ", ".join(f"{k}={_last_error[k]}" for k in ("hook", "rc", "phase") if k in _last_error)
+    text = f"{label} ({extras})" if extras else label
+    detail = _last_error.get("err") or _last_error.get("error")
+    if detail:
+        text += f": {detail}"
+    return text
 
 
 def _tail(path: Path) -> str:
