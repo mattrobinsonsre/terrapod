@@ -631,10 +631,16 @@ async def encrypt_secret(
     Rides Terrapod's existing envelope encryption rather than introducing a
     second scheme: the same DEK, the same rotation story, the same at-rest
     guarantees the rest of the platform already has.
+
+    The value is bytes, not text. The CLI encrypts binary values too, and
+    decoding one as UTF-8 made every `pulumi up` open with failed calls and broke
+    `change-secrets-provider` (#1573). `seal_bytes` hands the envelope base64, so
+    it only ever sees ASCII.
     """
     import base64
 
     from terrapod.crypto.service import get_encryption
+    from terrapod.services.pulumi_state_service import seal_bytes
 
     await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_READ)
     body = await read_body(request)
@@ -643,9 +649,8 @@ async def encrypt_secret(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="plaintext is required")
 
     # The CLI sends and expects base64 on this surface.
-    raw = base64.b64decode(plaintext)
-    sealed = get_encryption().encrypt(raw.decode("utf-8", errors="surrogateescape"))
-    return {"ciphertext": base64.b64encode(sealed.encode()).decode()}
+    sealed = seal_bytes(get_encryption().encrypt, base64.b64decode(plaintext))
+    return {"ciphertext": base64.b64encode(sealed.encode("ascii")).decode()}
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/decrypt")
@@ -666,6 +671,7 @@ async def decrypt_secret(
     import base64
 
     from terrapod.crypto.service import get_encryption
+    from terrapod.services.pulumi_state_service import open_sealed
 
     await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_READ)
     body = await read_body(request)
@@ -675,8 +681,9 @@ async def decrypt_secret(
             status_code=status.HTTP_400_BAD_REQUEST, detail="ciphertext is required"
         )
     sealed = base64.b64decode(ciphertext).decode()
-    plaintext = get_encryption().decrypt(sealed)
-    return {"plaintext": base64.b64encode(plaintext.encode()).decode()}
+    # Bytes back, whatever they are: a binary value is not text (#1573).
+    plaintext = open_sealed(get_encryption().decrypt, sealed)
+    return {"plaintext": base64.b64encode(plaintext).decode()}
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/batch-decrypt")
@@ -689,18 +696,20 @@ async def batch_decrypt(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Decrypt many at once — the shape `pulumi config` uses on a stack with
-    several secrets, so it is one round trip rather than N."""
+    several secrets, so it is one round trip rather than N. Byte-safe, as
+    `decrypt` is (#1573)."""
     import base64
 
     from terrapod.crypto.service import get_encryption
+    from terrapod.services.pulumi_state_service import open_sealed
 
     await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_READ)
     body = await read_body(request)
-    svc = get_encryption()
+    decrypt = get_encryption().decrypt
     out: dict[str, str] = {}
     for ciphertext in body.get("ciphertexts") or []:
         sealed = base64.b64decode(ciphertext).decode()
-        out[ciphertext] = base64.b64encode(svc.decrypt(sealed).encode()).decode()
+        out[ciphertext] = base64.b64encode(open_sealed(decrypt, sealed)).decode()
     return {"plaintexts": out}
 
 
