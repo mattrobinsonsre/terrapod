@@ -557,6 +557,54 @@ roots. Same mount as the Node helper; named distinctly so the intent is clear.
 {{- end -}}
 
 {{/*
+Vault instance helpers (#1650). Each takes ONE entry of
+api.config.vault.instances. The ConfigMap and the API Deployment both call
+them, so the path the chart projects a token or CA to and the path the config
+tells the client to read cannot drift apart.
+*/}}
+{{- define "terrapod.vault.method" -}}
+{{- (.auth).method | default "kubernetes" -}}
+{{- end -}}
+
+{{/* "true" when the instance reads a projected, audience-scoped ServiceAccount
+token: jwt always; kubernetes only when it sets an audience. */}}
+{{- define "terrapod.vault.projectsToken" -}}
+{{- $m := include "terrapod.vault.method" . -}}
+{{- if or (eq $m "jwt") (and (eq $m "kubernetes") (.auth).audience) -}}true{{- end -}}
+{{- end -}}
+
+{{/* The auth mount: `jwt` for a jwt instance that does not name one. */}}
+{{- define "terrapod.vault.mount" -}}
+{{- (.auth).mount | default (ternary "jwt" "kubernetes" (eq (include "terrapod.vault.method" .) "jwt")) -}}
+{{- end -}}
+
+{{/* The projected token's audience: `vault` by default for jwt, none otherwise. */}}
+{{- define "terrapod.vault.audience" -}}
+{{- if eq (include "terrapod.vault.method" .) "jwt" -}}
+{{- (.auth).audience | default "vault" -}}
+{{- else -}}
+{{- (.auth).audience | default "" -}}
+{{- end -}}
+{{- end -}}
+
+{{/* The token file the client reads on each login. */}}
+{{- define "terrapod.vault.tokenPath" -}}
+{{- $m := include "terrapod.vault.method" . -}}
+{{- if (.auth).token_path -}}
+{{- (.auth).token_path -}}
+{{- else if eq (include "terrapod.vault.projectsToken" .) "true" -}}
+/var/run/secrets/terrapod/vault/{{ .name }}/token
+{{- else if eq $m "kubernetes" -}}
+/var/run/secrets/kubernetes.io/serviceaccount/token
+{{- end -}}
+{{- end -}}
+
+{{/* Where the instance's custom CA is mounted, or "" when it pins none. */}}
+{{- define "terrapod.vault.caFile" -}}
+{{- if (.tls).ca_secret -}}/etc/terrapod/vault-ca/{{ .name }}/ca.crt{{- end -}}
+{{- end -}}
+
+{{/*
 Resolved priorityClassName for a control-plane component (api/listener/web,
 #751). The component's own explicit value always wins; otherwise, when
 priorityClasses.create is true, fall back to the created control-plane class.

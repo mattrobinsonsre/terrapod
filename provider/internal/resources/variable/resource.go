@@ -96,7 +96,21 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 					"literal) or `vault`, where `value` holds a JSON reference " +
 					"(`{\"mount\":…,\"path\":…,\"field\":…}`) that Terrapod resolves from " +
 					"HashiCorp Vault at run time. A vault-sourced variable is always sensitive, " +
-					"and the secret is never stored in Terrapod.",
+					"and the secret is never stored in Terrapod. Add a `file` object to the " +
+					"reference (`\"file\":{\"name\":\"gcp/adc.json\"}`) to deliver the secret as " +
+					"a file on the runner: the variable then holds the file's absolute path, " +
+					"usable as `file(var.x)` or by a tool that reads a path from an environment " +
+					"variable. `name` defaults to the variable key; a relative name lands under " +
+					"`/var/run/terrapod/files/`, and a name starting with `~/` lands in the " +
+					"runner's home directory (e.g. `~/.aws/credentials`). Not allowed with `structured` (or its alias `hcl`). " +
+					"The file holds exactly one of: the reference's `field` (with " +
+					"`\"encoding\":\"base64\"` in `file` to decode it); a `file.template` over " +
+					"the whole secret, with no `field` (logic-less `{{ name | filter }}`, filters " +
+					"`json`, `base64decode`, `trim`, `lines`, `indent N`, and `_lease.ttl` / " +
+					"`_lease.renewable` / `_lease.expires_at`), to build e.g. an AWS credentials " +
+					"file or a PEM bundle from one read; or a `file.format` of `json` or `env` " +
+					"for the whole secret, optionally narrowed by `file.fields`. `{{ }}` is not " +
+					"Terraform interpolation, so a template needs no escaping in `jsonencode`.",
 			},
 			"version_id": schema.StringAttribute{
 				Computed: true, Description: "Version identifier.",
@@ -222,6 +236,18 @@ func (r *variableResource) ImportState(ctx context.Context, req resource.ImportS
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("workspace_id"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
+}
+
+var _ resource.ResourceWithModifyPlan = &variableResource{}
+
+// ModifyPlan keeps a no-change re-plan empty. See
+// planmods.KeepComputedWhenUnchanged for why the attribute plan modifiers
+// cannot do this alone.
+func (r *variableResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	planmods.KeepComputedWhenUnchanged(ctx, req, resp,
+		[]string{"workspace_id", "key", "value", "category", "structured", "hcl", "sensitive", "description", "value_source"},
+		[]string{"version_id", "updated_at"},
+	)
 }
 
 // buildCreateVariableRequest projects the Terraform model into the

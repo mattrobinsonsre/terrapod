@@ -8,6 +8,8 @@ The live proof against a real Vault in-cluster is separate and does not replace
 these: it cannot exercise every error branch, and it does not run in CI.
 """
 
+import os
+import ssl
 from unittest.mock import patch
 
 import httpx
@@ -79,6 +81,61 @@ def _clear_cache():
     reset_token_cache()
     yield
     reset_token_cache()
+
+
+class TestNonStringFieldsAreJsonEncoded:
+    """A map or list field is delivered as JSON, not a Python repr (#1619).
+
+    Matters most for file delivery: a service-account key stored in Vault as an
+    object must land on disk as a JSON document a provider can parse.
+    """
+
+    async def _read(self, value):
+        rec = _Recorder([(200, {"data": {"data": {"f": value}}})])
+        with _patched(rec):
+            return await read_secret(_inst(), mount="kvv2", path="a", field="f", static_token="t")
+
+    @pytest.mark.asyncio
+    async def test_a_string_is_returned_unchanged(self):
+        assert await self._read("plain 'quoted' {not json}") == "plain 'quoted' {not json}"
+
+    @pytest.mark.asyncio
+    async def test_a_dict_is_json(self):
+        import json
+
+        got = await self._read({"type": "service_account", "enabled": True, "n": None})
+        assert json.loads(got) == {"type": "service_account", "enabled": True, "n": None}
+        assert "'" not in got and "True" not in got and "None" not in got
+
+    @pytest.mark.asyncio
+    async def test_a_list_is_json(self):
+        import json
+
+        got = await self._read(["a", 1, False])
+        assert json.loads(got) == ["a", 1, False]
+        assert got == '["a", 1, false]'
+
+    @pytest.mark.asyncio
+    async def test_a_nested_structure_round_trips(self):
+        import json
+
+        doc = {"outer": {"inner": [1, {"k": "v"}], "empty": {}}, "list": [[], [None]]}
+        assert json.loads(await self._read(doc)) == doc
+
+    @pytest.mark.asyncio
+    async def test_non_ascii_is_kept_as_characters_not_escapes(self):
+        import json
+
+        doc = {"name": "café ☕ 日本", "list": ["ü"]}
+        got = await self._read(doc)
+        assert json.loads(got) == doc
+        assert "café ☕ 日本" in got and "\\u" not in got
+
+    @pytest.mark.asyncio
+    async def test_scalars_other_than_str_keep_their_previous_rendering(self):
+        """Only maps and lists changed; numbers and booleans are as before."""
+        assert await self._read(5) == "5"
+        assert await self._read(True) == "True"
 
 
 class TestReadShapes:
@@ -485,3 +542,267 @@ class TestASealedVaultIsTransientNotFatal:
             pytest.raises(VaultUnavailable),
         ):
             await read_secret(inst, mount="kvv2", path="a", field="k")
+
+
+# ── #1650: jwt auth and a custom CA per instance ────────────────────────────
+
+
+def _capturing(rec, kwargs_seen: list):
+    """Like _patched, but also records the kwargs each AsyncClient was built with
+    — the only place the TLS `verify=` decision is observable."""
+
+    def factory(*_a, **kw):
+        kwargs_seen.append(kw)
+        return _REAL_ASYNC_CLIENT(transport=httpx.MockTransport(rec))
+
+    return patch.object(vault_client.httpx, "AsyncClient", factory)
+
+
+def _write_ca(path, cn: str) -> None:
+    """A real self-signed CA certificate, so ssl actually parses and loads it."""
+    import datetime
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(minutes=1))
+        .not_valid_after(now + datetime.timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+
+
+def _ca_cns(ctx) -> set[str]:
+    return {
+        value
+        for cert in ctx.get_ca_certs()
+        for rdn in cert["subject"]
+        for key, value in rdn
+        if key == "commonName"
+    }
+
+
+def _login_body(request: httpx.Request) -> dict:
+    import json
+
+    return json.loads(request.content)
+
+
+def _ok_login_then_read() -> _Recorder:
+    return _Recorder(
+        [
+            (200, {"auth": {"client_token": "s.jwt", "lease_duration": 3600}}),
+            (200, {"data": {"data": {"k": "v"}}}),
+        ]
+    )
+
+
+class TestJwtAuth:
+    """The API logs in with a projected ServiceAccount token that Vault checks
+    against the cluster's OIDC discovery / JWKS — no TokenReview reach-back."""
+
+    @pytest.mark.asyncio
+    async def test_the_login_payload_is_the_token_read_from_token_path(self, tmp_path):
+        tok = tmp_path / "token"
+        tok.write_text("hdr.payload.sig\n")  # the kubelet's trailing newline is stripped
+        rec = _ok_login_then_read()
+        inst = _inst(auth={"method": "jwt", "role": "terrapod", "token_path": str(tok)})
+        with _patched(rec):
+            assert await read_secret(inst, mount="kvv2", path="a", field="k") == "v"
+
+        assert rec.seen[0].method == "POST"
+        assert rec.seen[0].url.path == "/v1/auth/jwt/login", "jwt defaults its mount to `jwt`"
+        assert _login_body(rec.seen[0]) == {"role": "terrapod", "jwt": "hdr.payload.sig"}
+        assert rec.seen[1].headers["X-Vault-Token"] == "s.jwt"
+
+    @pytest.mark.asyncio
+    async def test_the_token_file_is_re_read_on_every_login(self, tmp_path):
+        """The kubelet rotates a projected token (ten minutes here). A token
+        read once and remembered would be expired by the second login."""
+        tok = tmp_path / "token"
+        tok.write_text("first")
+        rec = _Recorder(
+            [
+                (200, {"auth": {"client_token": "s.a", "lease_duration": 5}}),
+                (200, {"data": {"data": {"k": "v"}}}),
+                (200, {"auth": {"client_token": "s.b", "lease_duration": 5}}),
+                (200, {"data": {"data": {"k": "v"}}}),
+            ]
+        )
+        inst = _inst(auth={"method": "jwt", "token_path": str(tok)})
+        with _patched(rec):
+            await read_secret(inst, mount="kvv2", path="a", field="k")
+            tok.write_text("rotated")
+            await read_secret(inst, mount="kvv2", path="a", field="k")
+
+        logins = [r for r in rec.seen if r.url.path.endswith("/login")]
+        assert [_login_body(r)["jwt"] for r in logins] == ["first", "rotated"]
+
+    @pytest.mark.asyncio
+    async def test_an_explicit_mount_is_used(self, tmp_path):
+        tok = tmp_path / "token"
+        tok.write_text("t")
+        rec = _ok_login_then_read()
+        inst = _inst(auth={"method": "jwt", "mount": "k8s-prod", "token_path": str(tok)})
+        with _patched(rec):
+            await read_secret(inst, mount="kvv2", path="a", field="k")
+        assert rec.seen[0].url.path == "/v1/auth/k8s-prod/login"
+
+    @pytest.mark.asyncio
+    async def test_the_namespace_rides_on_the_login_too(self, tmp_path):
+        """HCP Vault Dedicated is jwt auth under `namespace: admin`; the login
+        itself must carry the namespace, not just the reads."""
+        tok = tmp_path / "token"
+        tok.write_text("t")
+        rec = _ok_login_then_read()
+        inst = _inst(namespace="admin", auth={"method": "jwt", "token_path": str(tok)})
+        with _patched(rec):
+            await read_secret(inst, mount="kvv2", path="a", field="k")
+        assert rec.seen[0].headers["X-Vault-Namespace"] == "admin"
+        assert rec.seen[1].headers["X-Vault-Namespace"] == "admin"
+
+    @pytest.mark.asyncio
+    async def test_a_missing_token_file_is_a_clear_error_not_a_crash(self, tmp_path):
+        rec = _Recorder([])
+        inst = _inst(auth={"method": "jwt", "token_path": str(tmp_path / "absent")})
+        with _patched(rec), pytest.raises(VaultError, match="projected ServiceAccount token"):
+            await read_secret(inst, mount="kvv2", path="a", field="k")
+        assert rec.seen == [], "no login may be attempted without a token"
+
+    @pytest.mark.asyncio
+    async def test_an_empty_token_file_is_refused_before_login(self, tmp_path):
+        tok = tmp_path / "token"
+        tok.write_text("\n")
+        rec = _Recorder([])
+        inst = _inst(auth={"method": "jwt", "token_path": str(tok)})
+        with _patched(rec), pytest.raises(VaultError, match="is empty"):
+            await read_secret(inst, mount="kvv2", path="a", field="k")
+        assert rec.seen == []
+
+    @pytest.mark.asyncio
+    async def test_a_refused_login_names_the_audience(self, tmp_path):
+        """A mismatched `aud` claim looks like any other refusal from here, so
+        the message has to put the audience in front of the operator."""
+        tok = tmp_path / "token"
+        tok.write_text("t")
+        rec = _Recorder([(400, {"errors": ["invalid audience (aud) claim"]})])
+        inst = _inst(auth={"method": "jwt", "role": "terrapod", "token_path": str(tok)})
+        with _patched(rec), pytest.raises(VaultError, match="audience 'vault'") as e:
+            await read_secret(inst, mount="kvv2", path="a", field="k")
+        assert "invalid audience" not in str(e.value), "Vault's body is never echoed"
+        assert not isinstance(e.value, VaultUnavailable)
+
+    @pytest.mark.asyncio
+    async def test_kubernetes_auth_honours_a_configured_token_path(self, tmp_path):
+        tok = tmp_path / "aud-token"
+        tok.write_text("projected")
+        rec = _ok_login_then_read()
+        inst = _inst(auth={"method": "kubernetes", "audience": "vault", "token_path": str(tok)})
+        with _patched(rec):
+            await read_secret(inst, mount="kvv2", path="a", field="k")
+        assert rec.seen[0].url.path == "/v1/auth/kubernetes/login"
+        assert _login_body(rec.seen[0])["jwt"] == "projected"
+
+
+class TestTlsVerification:
+    """The `verify=` every client is built with, per instance."""
+
+    @pytest.mark.asyncio
+    async def test_no_ca_file_passes_verify_true(self):
+        """True, not a context: that is the value httpx turns into "honour
+        SSL_CERT_FILE" — which is how the chart's global caBundle reaches Vault."""
+        rec = _Recorder([(200, {"data": {"data": {"k": "v"}}})])
+        seen: list = []
+        with _capturing(rec, seen):
+            await read_secret(_inst(), mount="kvv2", path="a", field="k", static_token="t")
+        assert [kw["verify"] for kw in seen] == [True]
+
+    @pytest.mark.asyncio
+    async def test_skip_verify_still_passes_false(self):
+        rec = _Recorder([(200, {"data": {"data": {"k": "v"}}})])
+        seen: list = []
+        with _capturing(rec, seen):
+            await read_secret(
+                _inst(tls_skip_verify=True), mount="kvv2", path="a", field="k", static_token="t"
+            )
+        assert [kw["verify"] for kw in seen] == [False]
+
+    @pytest.mark.asyncio
+    async def test_a_ca_file_becomes_an_ssl_context_trusting_only_it(self, tmp_path):
+        ca = tmp_path / "ca.crt"
+        _write_ca(ca, "Example Vault CA")
+        tok = tmp_path / "token"
+        tok.write_text("t")
+        rec = _ok_login_then_read()
+        seen: list = []
+        inst = _inst(ca_file=str(ca), auth={"method": "jwt", "token_path": str(tok)})
+        with _capturing(rec, seen):
+            await read_secret(inst, mount="kvv2", path="a", field="k")
+
+        assert len(seen) == 2, "the login and the read each build a client"
+        for kw in seen:
+            ctx = kw["verify"]
+            assert isinstance(ctx, ssl.SSLContext), "login and read must both verify"
+            assert ctx.verify_mode == ssl.CERT_REQUIRED
+            assert ctx.check_hostname is True
+            # Pinned: ONLY this CA, not the default roots alongside it.
+            assert _ca_cns(ctx) == {"Example Vault CA"}
+
+    @pytest.mark.asyncio
+    async def test_a_rotated_ca_file_is_picked_up(self, tmp_path):
+        """The kubelet remounts a changed Secret; the cache must not pin the old CA."""
+        ca = tmp_path / "ca.crt"
+        _write_ca(ca, "Old CA")
+        inst = _inst(ca_file=str(ca))
+        first = await vault_client._verify_for(inst)
+        assert await vault_client._verify_for(inst) is first, "an unchanged file is cached"
+
+        _write_ca(ca, "New CA")
+        st = os.stat(ca)
+        os.utime(ca, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
+        second = await vault_client._verify_for(inst)
+        assert _ca_cns(second) == {"New CA"}
+
+    @pytest.mark.asyncio
+    async def test_a_missing_ca_file_fails_before_any_request(self, tmp_path):
+        rec = _Recorder([])
+        inst = _inst(ca_file=str(tmp_path / "absent.crt"))
+        with _patched(rec), pytest.raises(VaultError, match="could not read the CA file"):
+            await read_secret(inst, mount="kvv2", path="a", field="k", static_token="t")
+        assert rec.seen == []
+
+    @pytest.mark.asyncio
+    async def test_a_garbage_ca_file_is_a_clear_error(self, tmp_path):
+        ca = tmp_path / "ca.crt"
+        ca.write_text("-----BEGIN CERTIFICATE-----\nnot a cert\n-----END CERTIFICATE-----\n")
+        rec = _Recorder([])
+        with _patched(rec), pytest.raises(VaultError, match="not a usable PEM"):
+            await read_secret(
+                _inst(ca_file=str(ca)), mount="kvv2", path="a", field="k", static_token="t"
+            )
+        assert rec.seen == []
+
+    def test_pinned_httpx_honours_ssl_cert_file_for_verify_true(self, tmp_path, monkeypatch):
+        """The documented answer in docs/vault.md, pinned against the httpx the
+        image resolves: `verify=True` + SSL_CERT_FILE loads that bundle. If an
+        httpx upgrade stops doing so, the global caBundle silently stops
+        covering Vault, and this fails first."""
+        from httpx._config import create_ssl_context
+
+        ca = tmp_path / "bundle.crt"
+        _write_ca(ca, "Global Bundle CA")
+        monkeypatch.setenv("SSL_CERT_FILE", str(ca))
+        monkeypatch.delenv("SSL_CERT_DIR", raising=False)
+        assert "Global Bundle CA" in _ca_cns(create_ssl_context(verify=True))

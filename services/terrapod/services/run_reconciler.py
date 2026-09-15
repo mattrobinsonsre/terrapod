@@ -214,20 +214,44 @@ async def reconcile_runs() -> None:
         )
         runs = list(result.all())
 
-        if not runs:
-            return
+        if runs:
+            for run, engine in runs:
+                try:
+                    await _reconcile_one(db, run, engine)
+                except Exception as e:
+                    logger.error(
+                        "Failed to reconcile run",
+                        run_id=str(run.id),
+                        error=str(e),
+                    )
 
-        for run, engine in runs:
-            try:
-                await _reconcile_one(db, run, engine)
-            except Exception as e:
-                logger.error(
-                    "Failed to reconcile run",
-                    run_id=str(run.id),
-                    error=str(e),
-                )
+            await db.commit()
 
-        await db.commit()
+        # After the commit, and outside the per-run loop: nothing in the lease
+        # watch can delay, fail or roll back a run's transition. It also runs
+        # when no run is in flight, because a phase can end after its run left
+        # the phase (a plan whose runner already posted its result).
+        await _watch_vault_leases(db)
+
+
+async def _watch_vault_leases(db: AsyncSession) -> None:
+    """Enqueue revocation of Vault leases whose phase Job has ended (#1649).
+
+    Returns before any Redis call when no instance has ``revoke_leases`` on.
+    Never raises: the revocation itself runs in a triggered task, so its
+    bounded retry never holds up this loop, and a failure here only means the
+    leases expire at their Vault TTL.
+    """
+    from terrapod.config import settings
+
+    if not settings.vault.revocation_enabled:
+        return
+    try:
+        from terrapod.services import vault_lease_service
+
+        await vault_lease_service.watch_pending(db)
+    except Exception as e:  # noqa: BLE001 - never let this reach the reconcile loop
+        logger.warning("Vault lease watch failed", error=type(e).__name__)
 
 
 async def _reconcile_one(db: AsyncSession, run: Run, engine: str) -> None:

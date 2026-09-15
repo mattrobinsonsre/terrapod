@@ -338,6 +338,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Update workspace drift status on drift run completion",
     )
 
+    # Vault lease revocation (#1649). Always registered, like the drift handler
+    # above: the handler self-gates on `vault.instances[].revoke_leases`, and
+    # registering it unconditionally means a queued item still drains after an
+    # operator turns the option off.
+    from terrapod.services.vault_lease_service import TRIGGER as VAULT_LEASE_TRIGGER
+    from terrapod.services.vault_lease_service import handle_lease_revoke
+
+    register_trigger_handler(
+        VAULT_LEASE_TRIGGER,
+        handler=handle_lease_revoke,
+        description="Revoke a run phase's dynamic Vault leases once its Job has ended",
+    )
+
     # Periodic polling is only active when explicitly enabled.
     if settings.drift_detection.enabled:
         from terrapod.services.drift_detection_service import drift_check_cycle

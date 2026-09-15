@@ -160,30 +160,45 @@ async def publish_listener_event(pool_id: str, event: dict) -> None:
     await publish_event(channel, json.dumps(event))
 
 
-async def set_job_status(run_id: str, phase: str, status: str) -> None:
+async def set_job_status(
+    run_id: str, phase: str, status: str, *, terminal: bool | None = None
+) -> None:
     """Store a Job status report in Redis for the reconciler.
 
     Keyed by {run_id}:{phase} to prevent plan-phase status from leaking
     into the apply phase (race condition where a late plan "succeeded"
     response would cause a premature "applied" transition).
+
+    ``terminal`` is the listener's reading of the Job's own Complete/Failed
+    condition (#1649), stored only when the listener sent it. A lagging
+    listener sends none, and readers then fall back to ``status``.
     """
     import json
     import time
 
     client = get_redis_client()
-    data = json.dumps({"status": status, "reported_at": time.time()})
-    await client.setex(f"{JOB_STATUS_PREFIX}{run_id}:{phase}", 120, data)
+    report: dict = {"status": status, "reported_at": time.time()}
+    if terminal is not None:
+        report["terminal"] = terminal
+    await client.setex(f"{JOB_STATUS_PREFIX}{run_id}:{phase}", 120, json.dumps(report))
 
 
-async def get_job_status_from_redis(run_id: str, phase: str) -> str | None:
-    """Get the most recent Job status report for a run phase."""
+async def get_job_report_from_redis(run_id: str, phase: str) -> dict | None:
+    """The most recent Job status report for a run phase, as stored."""
     import json
 
     client = get_redis_client()
     data = await client.get(f"{JOB_STATUS_PREFIX}{run_id}:{phase}")
     if data is None:
         return None
-    return json.loads(data).get("status")
+    report = json.loads(data)
+    return report if isinstance(report, dict) else None
+
+
+async def get_job_status_from_redis(run_id: str, phase: str) -> str | None:
+    """Get the most recent Job status report for a run phase."""
+    report = await get_job_report_from_redis(run_id, phase)
+    return report.get("status") if report else None
 
 
 async def delete_job_status(run_id: str, phase: str) -> None:

@@ -1846,6 +1846,37 @@ runs.
 
 ---
 
+## Vault leases are not being revoked
+
+**Symptom.** An instance has `revoke_leases: true`, but dynamic credentials
+stay valid after their run phase ended: `vault list sys/leases/lookup/<mount>/creds/<role>`
+still lists them.
+
+**What is happening.** Revocation is best-effort by design. Terrapod records a
+phase's leases in Redis at the claim, waits for the phase's runner Job to end,
+then revokes them in a background task with bounded retry. If any step cannot
+complete, the lease expires at its Vault TTL. The run is never affected.
+
+**Diagnose, from the API pod:**
+
+1. `kubectl -n <ns> logs deploy/<release>-api | grep -i "vault lease"` — a
+   line saying a lease could not be revoked names the instance and the HTTP
+   status (never the lease id).
+2. **`HTTP 403`**: the Vault policy does not grant `update` on
+   `sys/leases/revoke`. Add it; see [Revoking leases](vault.md#revoking-leases).
+3. **`could not record Vault leases`**: Redis was unreachable at the claim.
+   Those leases expire at their TTL; later runs are unaffected.
+4. **No lines at all**: check the phase's Job has actually ended
+   (`kubectl -n <runner-ns> get job`). A Job retrying a failed pod has not
+   ended, and revocation waits for it. Also check that the listener pool is up,
+   since Terrapod asks a listener whether the Job has ended.
+
+**Resolve.** Fix the policy or the connectivity. Leases already missed expire
+at their TTL. To end them sooner, run `vault lease revoke -prefix <mount>/creds/<role>`
+yourself.
+
+---
+
 ## Runs are failing on a Vault variable
 
 A variable whose value source is `vault` holds a reference, not a value.
@@ -1863,7 +1894,9 @@ because Vault reports two of them the same way.
 | Error | Cause |
 |---|---|
 | `Vault login failed … (kubernetes auth, mount 'X', role 'Y')` | The role does not exist, or its `bound_service_account_names` / `bound_service_account_namespaces` do not match the ServiceAccount the API pods run as. |
-| `permission denied` **on login** | Vault cannot call the Kubernetes TokenReview API. Its own ServiceAccount is missing the `system:auth-delegator` ClusterRoleBinding. |
+| `permission denied` **on login** | Vault cannot call the Kubernetes TokenReview API. Its own ServiceAccount is missing the `system:auth-delegator` ClusterRoleBinding. If Vault cannot reach the cluster at all, switch the instance to `jwt` auth — see [vault.md](vault.md#vault-outside-the-cluster-jwt-auth). |
+| `Vault login failed … (jwt auth, …, audience 'X')` | The JWT role's `bound_audiences` lacks `X`, its `bound_subject` does not match the API pods' ServiceAccount, or Vault cannot verify the token's signature against the cluster's issuer. |
+| `could not read the projected ServiceAccount token` / `could not read the CA file` | The file the config names is not mounted: `api.config.vault.enabled` is false, `auth.token_path` is wrong, or the `tls.ca_secret` Secret or key is missing. |
 | `Vault denied '<path>' … policy attached to role` | Login succeeded; the policy does not grant `read` on that path. Note kv-v2 policies include a `data/` segment that the reference omits. |
 | `Vault has no secret at '<path>'` | Wrong mount or path. |
 | `field '<x>' is not present at '<path>' (available: …)` | Right secret, wrong key — the message lists what is there. |

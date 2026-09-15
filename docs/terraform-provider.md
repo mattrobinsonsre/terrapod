@@ -114,6 +114,49 @@ resource "terrapod_variable" "region" {
   category     = "terraform"
 }
 
+# A Vault-sourced credential delivered as a file (see docs/vault.md). The
+# secret never reaches Terrapod's database, the Job spec or the environment:
+# the run sees GOOGLE_APPLICATION_CREDENTIALS=/var/run/terrapod/files/gcp/adc.json
+# and the file holds the secret. `value` is the reference, not the secret, so
+# it reads back unchanged and does not drift.
+resource "terrapod_variable" "gcp_credentials" {
+  workspace_id = terrapod_workspace.app.id
+  key          = "GOOGLE_APPLICATION_CREDENTIALS"
+  category     = "env"
+  value_source = "vault"
+  value = jsonencode({
+    mount = "secret"
+    path  = "apps/gcp"
+    field = "sa_json"
+    file  = { name = "gcp/adc.json" } # or "~/.config/gcloud/adc.json" for the runner's home
+  })
+}
+
+# A file built from several fields of ONE Vault read (see docs/vault.md,
+# "Templates, formats and encoding"): an AWS shared-credentials file from a
+# single aws/creds lease, so the key id and secret always belong together.
+# A template names no `field`. `{{ }}` is not Terraform interpolation, so it
+# needs no escaping inside jsonencode.
+resource "terrapod_variable" "aws_credentials_file" {
+  workspace_id = terrapod_workspace.app.id
+  key          = "AWS_SHARED_CREDENTIALS_FILE"
+  category     = "env"
+  value_source = "vault"
+  value = jsonencode({
+    engine = "dynamic"
+    mount  = "aws"
+    path   = "creds/deploy"
+    file = {
+      name     = "~/.aws/credentials"
+      template = <<-EOT
+        [default]
+        aws_access_key_id     = {{ access_key }}
+        aws_secret_access_key = {{ secret_key }}
+      EOT
+    }
+  })
+}
+
 # Read an existing workspace by name.
 data "terrapod_workspace" "shared" {
   name = "shared-network"
