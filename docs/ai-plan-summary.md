@@ -55,10 +55,19 @@ re-fetches without polling.
 When a workspace has [security scanning](security-scanning.md) and/or
 [cost estimation](cost-estimation.md) turned on, the plan summary does
 **more than describe the change**: it additionally performs a grounded
-**design review** of the infrastructure the run proposes — the kind of
-read an experienced platform engineer gives a change in review, calling
-out security, reliability, cost, operational, and scalability concerns
-before you apply.
+**design review** of the resources the run creates or updates — the kind
+of read an experienced platform engineer gives a change in review,
+calling out security, reliability, cost, operational, and scalability
+concerns before you apply.
+
+**The rating is the risk of applying this change, never of the estate
+around it.** Scanner findings, cost, and observed drift on resources the
+plan leaves unchanged are pre-existing: they are never listed as risk
+factors and never raise `risk_level`. For an update, a finding counts only
+if this change introduces it or makes it worse. A plan that changes
+nothing is `low` with no risk factors, however many findings the scan
+reports or whatever the configuration costs — that rule overrides every
+other input, the design review included.
 
 These design-review concerns are surfaced as **ordinary
 `risk_factors`** — the same shape as the change-risk factors above — each
@@ -82,10 +91,11 @@ per run**, delivered in the run page's AI tab through the same
 surface, endpoint, or SSE event** — the design review is simply extra
 `risk_factors` on the plan summary you already get.
 
-> A future, distinct workspace-level architecture critic — one that
-> reviews a workspace's *committed state* rather than a single run's plan
-> — is out of scope here and does not exist yet. The grounded design
-> review described above is per-run and plan-based.
+> The grounded design review described above is per-run and plan-based.
+> Reviewing a workspace's *deployed system* from its state, rather than a
+> single run's plan, is the separate
+> [architecture critique](architecture-critique.md), with its own switch
+> and model.
 
 ## Quick start
 

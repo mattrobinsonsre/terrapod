@@ -757,6 +757,7 @@
     "permissions.can-force-unlock",
     "permissions.can-lock",
     "permissions.can-queue-apply",
+    "permissions.can-queue-destroy",
     "permissions.can-queue-run",
     "permissions.can-read-settings",
     "permissions.can-read-state-versions",

@@ -40,6 +40,23 @@ use is served by — loopback and link-local — and leaves the rest to
 `block_private_addresses` for operators who do not extend that trust, with
 `allowed_hosts` / `allowed_cidrs` to carve out specifics either way. A guard
 operators must disable wholesale to get their job done protects nobody.
+
+**Through an egress proxy, the name is not resolved here (#1636).** When the
+standard proxy environment variables (`HTTPS_PROXY` / `HTTP_PROXY` /
+`ALL_PROXY`, either case — what the chart's `proxy.*` values set) name a proxy
+for the URL's scheme, and the host is not matched by `NO_PROXY`, the delivery
+clients hand the request to the proxy, which resolves and connects. The API
+pod on a restricted network may be unable to resolve external names at all, so
+resolving here would refuse every delivery; and it would judge the wrong thing,
+since the address the pod sees is not the one the proxy connects to. The proxy
+is where egress policy applies. Every check that needs no resolution still runs:
+the scheme, `allowed_hosts`, literal IP hosts (loopback and link-local always
+refused, private space per `block_private_addresses`, `allowed_cidrs` honoured),
+and `localhost` names. The `NO_PROXY` matching here is deliberately a superset
+of httpx's — any entry that could send a host direct makes the guard resolve it
+— so a host the client connects to directly is always resolved and judged. This
+relies on the delivery clients honouring the environment (`trust_env`, httpx's
+default); `test_outbound_sinks.py` pins that nobody turns it off.
 """
 
 from __future__ import annotations
@@ -47,6 +64,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import socket
+import urllib.request
 from urllib.parse import urlsplit
 
 from terrapod.logging_config import get_logger
@@ -162,18 +180,109 @@ async def _resolve(host: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Addr
     return out
 
 
+def _literal_ip(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """The address a host names without any lookup, or None for a real name.
+
+    Includes the legacy IPv4 spellings a resolver or proxy still accepts
+    (`127.1`, `2130706433`, `0x7f.0.0.1`), which `ipaddress` alone does not:
+    those skip resolution through a proxy, so they must be judged as the
+    address they are rather than passed on as a name.
+    """
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    try:
+        return ipaddress.IPv4Address(socket.inet_aton(host))
+    except (OSError, ValueError):
+        return None
+
+
+def _is_localhost_name(host: str) -> bool:
+    """`localhost` and `*.localhost` are loopback by definition (RFC 6761), so
+    they are judged as such without asking a resolver or trusting a proxy."""
+    h = host.lower().rstrip(".")
+    return h == "localhost" or h.endswith(".localhost")
+
+
+def _bypasses_proxy(host: str, no_proxy: str) -> bool:
+    """Whether any `NO_PROXY` entry could send this host direct.
+
+    Deliberately broader than httpx's own matching: the scheme and port of an
+    entry are ignored, and a bare `example.com` or `.example.com` matches the
+    domain and every subdomain. Erring this way only means resolving a host the
+    proxy would in fact have carried — the behaviour without a proxy. Erring the
+    other way would skip resolution for a host the client then connects to
+    directly, which is the hole this guard exists to close.
+    """
+    h = host.lower().rstrip(".")
+    for raw in no_proxy.split(","):
+        entry = raw.strip().lower()
+        if not entry:
+            continue
+        if entry == "*":
+            return True
+        try:
+            name = urlsplit(entry if "://" in entry else f"//{entry}").hostname or entry
+        except ValueError:
+            name = entry
+        name = name.lstrip("*").lstrip(".").rstrip(".")
+        if name and (h == name or h.endswith(f".{name}")):
+            return True
+    return False
+
+
+def _proxy_will_carry(scheme: str, host: str) -> bool:
+    """Whether the delivery clients will send this request through a proxy.
+
+    Read from the standard proxy environment variables, which is where httpx
+    (with `trust_env`, its default and what the delivery clients use) takes them
+    from on Linux. No proxy for the scheme, or a `NO_PROXY` match, means a
+    direct connection — and then the name is resolved and judged here.
+    """
+    proxies = urllib.request.getproxies_environment()
+    if not (proxies.get(scheme) or proxies.get("all")):
+        return False
+    return not _bypasses_proxy(host, proxies.get("no", ""))
+
+
+def _judge(
+    host: str,
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address,
+    cfg,
+) -> None:
+    if _ip_allowed(ip, cfg.allowed_cidrs):
+        return
+    reason = _is_forbidden(ip, block_private=cfg.block_private_addresses)
+    if reason:
+        raise BlockedURLError(
+            f"{host!r} resolves to {ip} which is {reason}. Terrapod refuses "
+            f"outbound requests to addresses a user could not otherwise reach. "
+            f"If this endpoint is meant to be reachable, add it to "
+            f"outbound_requests.allowed_hosts or outbound_requests.allowed_cidrs."
+        )
+
+
 async def validate_outbound_url(url: str) -> None:
     """Raise `BlockedURLError` unless this URL is safe to request.
 
     Called before every request to a user-supplied address. Returns None so the
     caller reads as an assertion; the exception carries the reason.
+
+    Checks that need no lookup always run: the scheme, `allowed_hosts`, and a
+    host that is a literal address or a `localhost` name. A real hostname is
+    then resolved and every answer judged — unless an egress proxy will carry
+    the request (see the module docstring), in which case the proxy resolves it
+    and applies egress policy, and resolving here would only refuse deliveries a
+    restricted network cannot resolve locally.
     """
     from terrapod.config import settings
 
     cfg = settings.outbound_requests
 
     parts = urlsplit((url or "").strip())
-    if parts.scheme.lower() not in ALLOWED_SCHEMES:
+    scheme = parts.scheme.lower()
+    if scheme not in ALLOWED_SCHEMES:
         raise BlockedURLError(
             f"scheme {parts.scheme or '(none)'!r} is not allowed — "
             f"use one of: {', '.join(sorted(ALLOWED_SCHEMES))}"
@@ -189,14 +298,19 @@ async def validate_outbound_url(url: str) -> None:
     if _host_allowed(host, cfg.allowed_hosts):
         return
 
+    # A literal address needs no lookup, so it is judged whether or not a proxy
+    # carries the request.
+    literal = _literal_ip(host)
+    if literal is not None:
+        _judge(host, literal, cfg)
+        return
+    if _is_localhost_name(host):
+        _judge(host, ipaddress.IPv4Address("127.0.0.1"), cfg)
+        return
+
+    if _proxy_will_carry(scheme, host):
+        logger.debug("outbound request goes through the egress proxy; not resolving", host=host)
+        return
+
     for ip in await _resolve(host):
-        if _ip_allowed(ip, cfg.allowed_cidrs):
-            continue
-        reason = _is_forbidden(ip, block_private=cfg.block_private_addresses)
-        if reason:
-            raise BlockedURLError(
-                f"{host!r} resolves to {ip} which is {reason}. Terrapod refuses "
-                f"outbound requests to addresses a user could not otherwise reach. "
-                f"If this endpoint is meant to be reachable, add it to "
-                f"outbound_requests.allowed_hosts or outbound_requests.allowed_cidrs."
-            )
+        _judge(host, ip, cfg)
