@@ -100,8 +100,9 @@ func registerGround(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_module_autodiscovery_rule_list",
-		Description: "List the module autodiscovery rules: each names a repository, which directories count as modules (a glob pattern and ignore paths) and how they are named. " +
-			"A rule registers new module directories as they appear on its branch. Platform admin only.",
+		Description: "List the module autodiscovery rules: each names a repository, an org or group, or a repository name pattern (`target-kind`: repository, namespace or pattern), " +
+			"which directories count as modules (a glob pattern and ignore paths) and how they are named. A rule registers new module directories as they appear, and an org-wide rule also " +
+			"registers the modules of repositories created after it. `last-error` says why a rule's last poll failed. Platform admin only.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, moduleRuleListOut, error) {
 		rules, err := c.ListAllModuleAutodiscoveryRules(ctx)
@@ -113,22 +114,59 @@ func registerGround(s *mcp.Server, c *terrapod.Client) {
 
 	// ── terrapod_module_autodiscovery_rule_preview ───────────────────
 	type moduleRulePreviewIn struct {
-		RuleID string `json:"rule_id" jsonschema:"the rule id (modrule-...)"`
+		RuleID     string `json:"rule_id" jsonschema:"the rule id (modrule-...)"`
+		Repository string `json:"repository,omitempty" jsonschema:"for an org-wide rule: read this one repository (a path such as org/terraform-aws-vpc, or its URL) live instead of the stored candidates"`
+		PageNumber int    `json:"page_number,omitempty" jsonschema:"for an org-wide rule: which page of repositories (1-based; default 1)"`
+		PageSize   int    `json:"page_size,omitempty" jsonschema:"for an org-wide rule: repositories per page (default the server's; at most 100)"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_module_autodiscovery_rule_preview",
-		Description: "What a module autodiscovery rule finds in its repository now: each module directory (the root and any submodules) with the name and provider it would be registered under, " +
-			"the module already registered from it, and whether its name is taken. Registers nothing. Platform admin only.",
+		Description: "What a module autodiscovery rule finds now: each module directory (the root and any submodules) with its `repository`, the name and provider it would be registered under, " +
+			"the module already registered from it, and whether its name is taken. A single-repository rule reads its repository live. An org-wide rule is served from what the poller last found, " +
+			"a page of repositories at a time (`repositories` gives each one's status; `pagination` the pages), or reads one `repository` live. Registers nothing. Platform admin only.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in moduleRulePreviewIn) (*mcp.CallToolResult, *terrapod.ModuleAutodiscoveryPreview, error) {
 		if in.RuleID == "" {
 			return errText("rule_id is required"), nil, nil
 		}
-		p, err := c.PreviewModuleAutodiscoveryRule(ctx, in.RuleID)
+		p, err := c.PreviewModuleAutodiscoveryRuleWithOptions(ctx, in.RuleID, terrapod.ModuleAutodiscoveryPreviewOptions{
+			Repository: in.Repository, PageNumber: in.PageNumber, PageSize: in.PageSize,
+		})
 		if err != nil {
 			return errResult(err), nil, nil
 		}
 		return nil, p, nil
+	})
+
+	// ── terrapod_module_autodiscovery_rule_repositories ──────────────
+	type moduleRuleReposIn struct {
+		RuleID     string `json:"rule_id" jsonschema:"the rule id (modrule-...)"`
+		Status     string `json:"status,omitempty" jsonschema:"only repositories in this status: active, archived, empty, no-branch, out-of-scope, covered or error"`
+		PageNumber int    `json:"page_number,omitempty" jsonschema:"which page (1-based; default 1)"`
+		PageSize   int    `json:"page_size,omitempty" jsonschema:"repositories per page (default 50, at most 100)"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_module_autodiscovery_rule_repositories",
+		Description: "The repositories a module autodiscovery rule looks at, by path, each with its state: `status` (active; archived, kept but not scanned; empty; no-branch; " +
+			"out-of-scope, left the rule's target with its modules kept; covered, named by a single-repository rule; or error, with `last-error`), `origin` (baseline: existed when the rule " +
+			"took its baseline, so nothing registers until it is scanned; new: created afterwards, so its modules register automatically), the candidates its last poll found, the last " +
+			"skips, and previous paths after a rename. Use it to see why a repository registered nothing. Platform admin only.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in moduleRuleReposIn) (*mcp.CallToolResult, *terrapod.ModuleAutodiscoveryRepositoryList, error) {
+		if in.RuleID == "" {
+			return errText("rule_id is required"), nil, nil
+		}
+		size := in.PageSize
+		if size <= 0 {
+			size = 50
+		}
+		list, err := c.ListModuleAutodiscoveryRuleRepositories(ctx, in.RuleID, terrapod.ModuleAutodiscoveryRepositoryListOptions{
+			Status: in.Status, PageNumber: in.PageNumber, PageSize: size,
+		})
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, list, nil
 	})
 
 	// ── terrapod_registry_provider_list ──────────────────────────────
