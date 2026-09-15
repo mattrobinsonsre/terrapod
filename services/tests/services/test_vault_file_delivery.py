@@ -281,7 +281,7 @@ class TestClaimTimeRefusals:
         ):
             await resolve_vault_delivery(vs, _settings())
         assert str(e.value) == (
-            "variables 'A' and 'B' both deliver a Vault file to "
+            "variables 'A' and 'B' both deliver an OpenBao/Vault file to "
             "/var/run/terrapod/files/gcp/adc.json"
         )
         # A run that is going to fail must not mint dynamic credentials first.
@@ -296,7 +296,7 @@ class TestClaimTimeRefusals:
     @pytest.mark.asyncio
     async def test_a_defaulted_name_can_collide_with_an_explicit_one(self):
         vs = [_Var("creds", _ref(file={})), _Var("OTHER", _ref(file={"name": "creds"}))]
-        with _read(), pytest.raises(VaultSourceError, match="both deliver a Vault file"):
+        with _read(), pytest.raises(VaultSourceError, match="both deliver an OpenBao/Vault file"):
             await resolve_vault_delivery(vs, _settings())
 
     @pytest.mark.asyncio
@@ -343,7 +343,7 @@ class TestSizeCap:
         with _read(value), pytest.raises(VaultSourceError) as e:
             await resolve_vault_delivery([_Var("F", _ref(file={}))], _settings())
         assert str(e.value) == (
-            "variable 'F': the Vault value is 262145 bytes, over the 256 KiB limit for a file"
+            "variable 'F': the OpenBao/Vault value is 262145 bytes, over the 256 KiB limit for a file"
         )
         assert "QQ" not in str(e.value)
 

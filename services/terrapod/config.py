@@ -1356,29 +1356,29 @@ class VaultAuthConfig(BaseModel):
         default="kubernetes",
         description="kubernetes | jwt | approle | token. `kubernetes` is the default "
         "because it stores no credential at all — Terrapod presents the API pod's "
-        "own ServiceAccount token and Vault validates it by calling TokenReview. "
-        "`jwt` presents a projected ServiceAccount token that Vault validates "
-        "against the cluster's OIDC discovery / JWKS instead, so Vault never has "
-        "to reach back into the cluster — the method for a Vault outside it.",
+        "own ServiceAccount token and the server validates it by calling TokenReview. "
+        "`jwt` presents a projected ServiceAccount token that the server validates "
+        "against the cluster's OIDC discovery / JWKS instead, so the server never "
+        "has to reach back into the cluster — the method for a server outside it.",
     )
     mount: str = Field(
         default="kubernetes",
-        description="Auth mount path as enabled in Vault (`vault auth enable "
+        description="Auth mount path as enabled on the server (`bao auth enable "
         "-path=<mount> kubernetes`). Only the path, not a full URL. Defaults to "
         "`jwt` when the method is `jwt` and no mount is given.",
     )
     role: str = Field(
         default="terrapod",
-        description="Vault role bound to Terrapod's ServiceAccount and namespace. "
+        description="OpenBao/Vault role bound to Terrapod's ServiceAccount and namespace. "
         "The policy attached to this role is the real access boundary for every "
         "secret this feature can read — see docs/vault.md.",
     )
     audience: str = Field(
         default="",
         description="The `aud` claim of the projected ServiceAccount token (#1650). "
-        "`jwt` defaults to `vault`; it must be in the Vault role's "
+        "`jwt` defaults to `vault`; it must be in the role's "
         "`bound_audiences`. For `kubernetes`, empty means the pod's standard "
-        "ServiceAccount token; set it only when the Vault role requires an "
+        "ServiceAccount token; set it only when the role requires an "
         "audience, and the chart then projects a token carrying it.",
     )
     token_path: str = Field(
@@ -1421,16 +1421,20 @@ class VaultInstanceConfig(BaseModel):
         description="Resolve references that omit `vault` to this instance. Without "
         "a default, an omitted name resolves only when exactly one instance is "
         "configured, and is otherwise an error — reading a credential from the "
-        "wrong Vault silently is the failure worth engineering against.",
+        "wrong server silently is the failure worth engineering against.",
     )
-    address: str = Field(default="", description="Vault address, e.g. https://vault:8200")
-    namespace: str = Field(default="", description="Vault namespace (Enterprise; optional)")
+    address: str = Field(default="", description="OpenBao/Vault address, e.g. https://openbao:8200")
+    namespace: str = Field(
+        default="",
+        description="Namespace, on a server that has them (Vault Enterprise / HCP, "
+        "or an OpenBao release that supports them); optional",
+    )
     auth: VaultAuthConfig = Field(default_factory=VaultAuthConfig)
     paths: list[str] = Field(
         default_factory=list,
         description="Optional allow-list of path prefixes Terrapod will read from "
         "this instance (empty = no restriction). Defence in depth *over* a scoped "
-        "Vault policy, not instead of one: anyone who can set a workspace variable "
+        "OpenBao/Vault policy, not instead of one: anyone who can set a workspace variable "
         "can ask Terrapod to read any path its role reaches, so this is the second "
         "line for an operator whose policy is slightly wider than they intended.",
     )
@@ -1441,10 +1445,10 @@ class VaultInstanceConfig(BaseModel):
     )
     ca_file: str = Field(
         default="",
-        description="PEM file of the CA(s) that sign this Vault's certificate "
+        description="PEM file of the CA(s) that sign this server's certificate "
         "(#1650). When set, TLS to this instance is verified against it ALONE — "
         "the default trust store and SSL_CERT_FILE are not consulted — so a "
-        "private CA is pinned to the one Vault it fronts. The chart renders it "
+        "private CA is pinned to the one server it fronts. The chart renders it "
         "from `tls.ca_secret` / `tls.ca_key`. Empty means the default trust store.",
     )
 
@@ -1452,9 +1456,9 @@ class VaultInstanceConfig(BaseModel):
         default=False,
         description="Revoke the leases of dynamic secrets read from this instance "
         "once the run phase's Job has ended (#1649), instead of leaving each "
-        "credential live for its whole Vault TTL. Best-effort: if revocation cannot "
+        "credential live for its whole TTL. Best-effort: if revocation cannot "
         "happen, the lease expires at its TTL exactly as it does with this off. "
-        "The Vault policy must grant `update` on `sys/leases/revoke`.",
+        "The OpenBao/Vault policy must grant `update` on `sys/leases/revoke`.",
     )
 
     @field_validator("name")
@@ -1495,12 +1499,14 @@ class VaultConfig(BaseModel):
     multi-Vault would mean carrying both spellings for ever.
     """
 
-    enabled: bool = Field(default=False, description="Enable the Vault variable value source.")
+    enabled: bool = Field(
+        default=False, description="Enable the OpenBao/Vault variable value source."
+    )
     instances: list[VaultInstanceConfig] = Field(
-        default_factory=list, description="Vault instances a variable may reference."
+        default_factory=list, description="OpenBao/Vault instances a variable may reference."
     )
     timeout_seconds: float = Field(
-        default=10.0, gt=0, description="Per-request timeout when talking to Vault."
+        default=10.0, gt=0, description="Per-request timeout when talking to the server."
     )
 
     @model_validator(mode="after")

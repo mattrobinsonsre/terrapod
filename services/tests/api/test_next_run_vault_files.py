@@ -364,7 +364,7 @@ class TestTheRunFailsOrWaits:
         )
         msg = await self._errored_with(c)
         assert msg == (
-            "variables 'A_SET_VAR' and 'B_WS_VAR' both deliver a Vault file to "
+            "variables 'A_SET_VAR' and 'B_WS_VAR' both deliver an OpenBao/Vault file to "
             "/var/run/terrapod/files/creds.json"
         )
         c.read.assert_not_awaited()
@@ -379,7 +379,7 @@ class TestTheRunFailsOrWaits:
         c = await _claim([_rv("F", _ref(file={}))], read=big)
         msg = await self._errored_with(c)
         assert msg == (
-            "variable 'F': the Vault value is 262145 bytes, over the 256 KiB limit for a file"
+            "variable 'F': the OpenBao/Vault value is 262145 bytes, over the 256 KiB limit for a file"
         )
 
     async def test_hcl_on_a_file_variable_errors_the_run(self):
