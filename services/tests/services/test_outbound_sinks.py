@@ -53,3 +53,16 @@ def test_redirects_are_not_followed(module: str) -> None:
         f"{module} follows redirects, so a permitted URL can bounce to a "
         f"forbidden one without being checked"
     )
+
+
+@pytest.mark.parametrize("module", USER_ADDRESSED_SINKS)
+def test_the_client_honours_the_proxy_environment(module: str) -> None:
+    """The guard skips resolving a name when the proxy environment says a proxy
+    will carry the request (#1636). That is only true while the client honours
+    the environment — a client with `trust_env=False` would connect directly to
+    a name nobody judged."""
+    src = (SERVICES / module).read_text()
+    assert "trust_env=False" not in src, (
+        f"{module} ignores the proxy environment, so the guard's decision not "
+        f"to resolve a proxied host no longer holds"
+    )
