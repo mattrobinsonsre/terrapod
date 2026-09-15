@@ -490,7 +490,9 @@ test.describe('Vault value source (#1439)', () => {
 
     await page.goto(`/workspaces/${wsId}?tab=variables`)
     const row = page.locator('tr').filter({ hasText: 'DB_ENV_FILE' })
-    await expect(row.getByText('env', { exact: true })).toBeVisible({ timeout: 10_000 })
+    // 'env' is both the variable's category and the file's format here, so
+    // assert on the file name, which the row shows exactly once.
+    await expect(row.getByText('db.env', { exact: true })).toBeVisible({ timeout: 10_000 })
     await row.getByRole('button', { name: 'Edit' }).click()
     await expect(page.locator('[id$="-file-content"]:visible').first()).toHaveValue('format')
     await expect(page.locator('[id$="-file-format"]:visible').first()).toHaveValue('env')
