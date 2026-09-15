@@ -445,7 +445,9 @@ test.describe('Admin — Module autodiscovery, org-wide rules (#1620)', () => {
     await page.getByLabel('Status').selectOption('error');
     await expect(table.getByText('e2e-org/terraform-aws-a')).toHaveCount(0);
     await expect(table.getByText('e2e-org/terraform-aws-c')).toBeVisible();
-    expect(queries.at(-1)).toContain('filter%5Bstatus%5D=error');
+    // Parsed, not matched as a raw string: the page sends the brackets
+    // unencoded (`filter[status]=error`), and either spelling is the same query.
+    expect(new URLSearchParams(queries.at(-1) ?? '').get('filter[status]')).toBe('error');
   });
 });
 
