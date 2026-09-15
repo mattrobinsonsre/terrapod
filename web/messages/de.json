@@ -515,7 +515,7 @@
       },
       "interface": {
         "title": "Eingaben & Ausgaben",
-        "counts": "{inputs} Eingaben, {outputs} Ausgaben",
+        "counts": "{inputs, plural, one {# Eingabe} other {# Eingaben}}, {outputs, plural, one {# Ausgabe} other {# Ausgaben}}",
         "versionLabel": "Version:",
         "noData": "Für diese Version sind keine Schnittstellendaten verfügbar.",
         "inputs": "Eingaben",

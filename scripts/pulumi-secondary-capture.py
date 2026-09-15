@@ -180,6 +180,46 @@ def _stub(method: str, path: str, body: dict) -> tuple[int, object]:
 
 # ── the handler: stub, or a logging proxy in front of a real deployment ───────
 
+#: Response headers relayed from the upstream are never echoed verbatim: a value
+#: carrying CR/LF would let the upstream inject headers into the reply the CLI
+#: reads. Each is mapped onto a constant from these allow-lists instead, so what
+#: reaches the status line and header block is always one of our own strings.
+_CONTENT_TYPES = {
+    "application/json": "application/json",
+    "application/vnd.api+json": "application/vnd.api+json",
+    "application/octet-stream": "application/octet-stream",
+    "text/plain": "text/plain; charset=utf-8",
+    "text/html": "text/html; charset=utf-8",
+}
+_CONTENT_ENCODINGS = {
+    "gzip": "gzip",
+    "deflate": "deflate",
+    "br": "br",
+    "zstd": "zstd",
+    "identity": "identity",
+}
+_DEFAULT_CONTENT_TYPE = "application/octet-stream"
+
+
+def _safe_content_type(value: str | None) -> str:
+    """Map an upstream Content-Type onto an allow-listed constant.
+
+    Parameters other than the media type are dropped (the relayed bodies are
+    JSON, whose charset is fixed as UTF-8); anything unknown, or containing a
+    control character, becomes `application/octet-stream`.
+    """
+    if not value or any(ord(c) < 0x20 or ord(c) == 0x7F for c in value):
+        return _DEFAULT_CONTENT_TYPE
+    media = value.split(";", 1)[0].strip().lower()
+    return _CONTENT_TYPES.get(media, _DEFAULT_CONTENT_TYPE)
+
+
+def _safe_content_encoding(value: str | None) -> str | None:
+    """Map an upstream Content-Encoding onto an allow-listed constant, or None."""
+    if not value:
+        return None
+    return _CONTENT_ENCODINGS.get(value.strip().lower())
+
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -195,11 +235,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, b"{}", "application/json")
             return
         try:
-            plain = (
-                gzip.decompress(raw)
-                if self.headers.get("Content-Encoding") == "gzip"
-                else raw
-            )
+            plain = gzip.decompress(raw) if self.headers.get("Content-Encoding") == "gzip" else raw
             body = json.loads(plain) if plain else {}
         except (OSError, json.JSONDecodeError, UnicodeDecodeError):
             body = {}
@@ -209,9 +245,7 @@ class Handler(BaseHTTPRequestHandler):
             or "cancel" in self.path
         ):
             with LOCK:
-                BODIES.append(
-                    (STEP[0], self.command, self.path, json.dumps(body)[:300])
-                )
+                BODIES.append((STEP[0], self.command, self.path, json.dumps(body)[:300]))
         if self.upstream is None:
             status, payload = _stub(self.command, self.path, body)
             blob, ctype = json.dumps(payload).encode(), "application/json"
@@ -247,8 +281,8 @@ class Handler(BaseHTTPRequestHandler):
         conn.request(self.command, self.path, body=raw or None, headers=headers)
         resp = conn.getresponse()
         data = resp.read()
-        ctype = resp.getheader("Content-Type", "application/json")
-        enc = resp.getheader("Content-Encoding")
+        ctype = _safe_content_type(resp.getheader("Content-Type", "application/json"))
+        enc = _safe_content_encoding(resp.getheader("Content-Encoding"))
         conn.close()
         if enc:
             # Pass the encoding through rather than decode: the CLI asked for it.
@@ -257,10 +291,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def _send(self, status: int, blob: bytes, ctype: str) -> None:
         self.send_response(status)
-        self.send_header("Content-Type", ctype)
-        if getattr(self, "_enc", None):
-            self.send_header("Content-Encoding", self._enc)
-            self._enc = None
+        self.send_header("Content-Type", _safe_content_type(ctype))
+        enc = _safe_content_encoding(getattr(self, "_enc", None))
+        self._enc = None
+        if enc:
+            self.send_header("Content-Encoding", enc)
         self.send_header("Content-Length", str(len(blob)))
         self.end_headers()
         self.wfile.write(blob)
@@ -337,9 +372,7 @@ mark done
 def _normalise(path: str) -> str:
     p = path[len(PREFIX) :] if path.startswith(PREFIX) else path
     p = re.sub(r"/api/stacks/[^/]+/[^/]+/[^/]+", "/api/stacks/{stack}", p)
-    p = re.sub(
-        r"/(update|preview|refresh|destroy|import)/[0-9a-zA-Z-]{8,}", r"/\1/{id}", p
-    )
+    p = re.sub(r"/(update|preview|refresh|destroy|import)/[0-9a-zA-Z-]{8,}", r"/\1/{id}", p)
     return re.sub(r"/api/user/organizations/[^/]+", "/api/user/organizations/{org}", p)
 
 
@@ -368,11 +401,51 @@ def _api(
         return e.code, {"error": e.read().decode("utf-8", "replace")[:300]}
 
 
+#: What an API token may look like: printable, no whitespace, no shell or
+#: env-file metacharacters. Terrapod tokens are `{id}.tpod.{secret}`.
+_TOKEN_RE = re.compile(r"[A-Za-z0-9._~+/=-]{1,512}")
+
+
+def _validate_backend(url: str) -> str:
+    """Return the backend URL without a trailing slash, or raise ValueError."""
+    parts = urllib.parse.urlsplit(url.rstrip("/"))
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise ValueError("--backend must be an http(s) URL with a host")
+    if any(ord(c) < 0x21 or ord(c) == 0x7F for c in url):
+        raise ValueError("--backend must not contain whitespace or control characters")
+    return url.rstrip("/")
+
+
+def _validate_token(token: str) -> str:
+    if not _TOKEN_RE.fullmatch(token):
+        raise ValueError("--token is not a well-formed API token")
+    return token
+
+
+def _write_env_file(env: dict[str, str]) -> pathlib.Path:
+    """Write the container's environment to a private env-file.
+
+    The values (the token among them) go to the container through
+    `--env-file` rather than `-e KEY=VALUE` arguments, so nothing
+    caller-supplied reaches the command line — where it would also be visible
+    to every local user in the process table. The format is one `KEY=VALUE`
+    per line with no quoting, so a value containing a line break or other
+    control character is refused rather than written.
+    """
+    for k, v in env.items():
+        if not re.fullmatch(r"[A-Z][A-Z0-9_]*", k) or any(
+            ord(c) < 0x20 or ord(c) == 0x7F for c in v
+        ):
+            raise ValueError(f"refusing to write env var {k!r}")
+    fd, name = tempfile.mkstemp(prefix="pulumi-secondary-", suffix=".env")
+    with open(fd, "w", encoding="utf-8") as fh:
+        fh.writelines(f"{k}={v}\n" for k, v in env.items())
+    return pathlib.Path(name)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument(
-        "--backend", default="", help="a live Terrapod base URL; omit for the stub"
-    )
+    ap.add_argument("--backend", default="", help="a live Terrapod base URL; omit for the stub")
     ap.add_argument("--token", default="", help="a Terrapod API token for --backend")
     ap.add_argument(
         "--cafile", default="", help="CA bundle for --backend (default: mkcert -CAROOT)"
@@ -384,11 +457,19 @@ def main() -> int:
         help="seconds the long update sleeps (stub: 45, live: 200)",
     )
     args = ap.parse_args()
+    live = bool(args.backend)
+    try:
+        backend = _validate_backend(args.backend) if live else ""
+        token = _validate_token(args.token) if live else "pul-capture"
+        if not 0 <= args.long <= 3600:
+            raise ValueError("--long must be between 0 and 3600 seconds")
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 2
     if shutil.which("docker") is None:
         print("docker is required", file=sys.stderr)
         return 2
 
-    live = bool(args.backend)
     ctx = None
     ws_id = None
     if live:
@@ -399,11 +480,11 @@ def main() -> int:
             ).stdout.strip()
             cafile = str(pathlib.Path(root) / "rootCA.pem")
         ctx = ssl.create_default_context(cafile=cafile or None)
-        Handler.upstream = urllib.parse.urlsplit(args.backend.rstrip("/"))
+        Handler.upstream = urllib.parse.urlsplit(backend)
         Handler.ssl_ctx = ctx
         st, doc = _api(
-            args.backend.rstrip("/"),
-            args.token,
+            backend,
+            token,
             ctx,
             "POST",
             "/api/v1/workspaces",
@@ -415,9 +496,7 @@ def main() -> int:
             },
         )
         if st != 201:
-            print(
-                f"could not create the capture workspace: {st} {doc}", file=sys.stderr
-            )
+            print(f"could not create the capture workspace: {st} {doc}", file=sys.stderr)
             return 1
         ws_id = doc["data"]["id"]
         print(f"created workspace {PROJECT}::capture ({ws_id})")
@@ -436,22 +515,38 @@ def main() -> int:
         "MODE": "live" if live else "stub",
         "BACKEND": base + PREFIX,
         "MARK": base,
-        "PULUMI_TOKEN": args.token if live else "pul-capture",
+        "PULUMI_TOKEN": token,
         "ORG": "default" if live else "spike",
         "PROJECT": PROJECT,
         "STACK": "capture",
         "LONG": str(args.long or 200),
     }
-    cmd = ["docker", "run", "--rm", "-v", f"{work}:/work", "-w", "/work"]
-    for k, v in env.items():
-        cmd += ["-e", f"{k}={v}"]
-    proc = subprocess.run(
-        cmd + [IMAGE, "bash", "/work/run.sh"],
-        capture_output=True,
-        text=True,
-        timeout=3600,
-        check=False,
-    )
+    # Everything caller-supplied travels in the env-file; the argv is fixed
+    # apart from two paths this process created itself with mkdtemp/mkstemp.
+    env_file = _write_env_file(env)
+    try:
+        proc = subprocess.run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "--env-file",
+                str(env_file),
+                "-v",
+                f"{work}:/work",
+                "-w",
+                "/work",
+                IMAGE,
+                "bash",
+                "/work/run.sh",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=3600,
+            check=False,
+        )
+    finally:
+        env_file.unlink(missing_ok=True)
     srv.shutdown()
     print(proc.stdout)
     if proc.returncode:
@@ -459,8 +554,8 @@ def main() -> int:
 
     if live and ws_id:
         st, _ = _api(
-            args.backend.rstrip("/"),
-            args.token,
+            backend,
+            token,
             ctx,
             "DELETE",
             f"/api/v1/workspaces/{ws_id}",
