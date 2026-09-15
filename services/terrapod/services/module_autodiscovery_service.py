@@ -25,6 +25,7 @@ never candidates, and only `.tf`/`.tf.json` files count — a directory of
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -49,6 +50,11 @@ from terrapod.services.workspace_autodiscovery_service import _is_ignored, _matc
 logger = get_logger(__name__)
 
 _MODULE_FILE_SUFFIXES = (".tf", ".tf.json")
+
+#: A name-template placeholder. The only ones there are.
+TEMPLATE_PLACEHOLDER_RE = re.compile(r"\{(repo|path|leaf|root)\}")
+#: A whole valid name-template: literal text (no braces) and the placeholders.
+TEMPLATE_RE = re.compile(r"^(?:[^{}]|\{(?:repo|path|leaf|root)\})*$")
 
 
 # ── Candidates ───────────────────────────────────────────────────────────
@@ -81,12 +87,15 @@ def derive_name(rule: ModuleAutodiscoveryRule, subdirectory: str) -> str:
     repo_name = repo_name_from_url(rule.repo_url)
     if not rule.name_template:
         return suggest_name(repo_name, subdirectory)
-    rendered = rule.name_template.format(
-        repo=module_base_name(repo_name),
-        path=subdirectory.replace("/", "-"),
-        leaf=subdirectory.rsplit("/", 1)[-1] if subdirectory else "",
-        root=subdirectory,
-    )
+    # Substituted with a regex, never `str.format`: the template is operator
+    # input, and format specs or attribute access have no business in a name.
+    values = {
+        "repo": module_base_name(repo_name),
+        "path": subdirectory.replace("/", "-"),
+        "leaf": subdirectory.rsplit("/", 1)[-1] if subdirectory else "",
+        "root": subdirectory,
+    }
+    rendered = TEMPLATE_PLACEHOLDER_RE.sub(lambda m: values[m.group(1)], rule.name_template)
     return fit_name(rendered)
 
 
@@ -105,7 +114,9 @@ async def preview(
 
     `registered-as` names the module already registered from that directory of
     the repository; a scan skips it. `collision` is true when the derived name
-    and provider already belong to a different module; a scan skips that too.
+    and provider already belong to a different module, or when another
+    unregistered candidate in the same set derives the same name; a scan skips
+    those too, since registering one would take the name from the other.
     `missing-provider` is true when no provider is set and the repository name
     does not imply one.
     """
@@ -116,6 +127,11 @@ async def preview(
     provider = derive_provider(rule)
     names = {d: derive_name(rule, d) for d in subdirectories}
     taken = await _taken_names(db, provider, set(names.values())) if provider else set()
+    # Names two or more unregistered candidates would both take.
+    counts: dict[str, int] = {}
+    for d in subdirectories:
+        if d not in registered:
+            counts[names[d]] = counts.get(names[d], 0) + 1
 
     entries = []
     for d in subdirectories:
@@ -126,7 +142,7 @@ async def preview(
                 "name": names[d],
                 "provider": provider,
                 "registered-as": existing,
-                "collision": existing is None and names[d] in taken,
+                "collision": existing is None and (names[d] in taken or counts[names[d]] > 1),
                 "missing-provider": not provider,
             }
         )
@@ -226,8 +242,11 @@ async def register_candidates(
             async with db.begin_nested():
                 db.add(module)
         except IntegrityError:
-            # Registered by someone else between the preview and here.
-            result.skipped.append((subdirectory, "already-registered"))
+            # Someone else got there between the preview and here: either the
+            # directory itself or, under another directory, the name.
+            now_registered = await _registered_by_subdirectory(db, rule.repo_url)
+            reason = "already-registered" if subdirectory in now_registered else "name-taken"
+            result.skipped.append((subdirectory, reason))
             continue
         result.created.append(module)
         logger.info(
@@ -301,7 +320,11 @@ async def list_files(conn: VCSConnection, head: RepositoryHead) -> list[str]:
 
     try:
         if conn.provider == "gitlab":
-            paths = await gitlab_service.list_repo_tree(conn, head.owner, head.repo, head.branch)
+            # Strict: a listing error (missing branch, revoked token) raises
+            # rather than coming back as None, which here means "truncated".
+            paths = await gitlab_service.list_repo_tree(
+                conn, head.owner, head.repo, head.branch, raise_on_error=True
+            )
         else:
             paths = await github_service.list_repo_tree(conn, head.owner, head.repo, head.branch)
     except Exception as exc:
@@ -337,9 +360,12 @@ async def poll_rules(db: AsyncSession) -> int:
     that appears on the tracked branch is registered automatically, and one the
     operator left unregistered stays that way.
 
-    A rule that fails (unreachable repository, truncated tree) is left as it was
-    so the next cycle retries it, and never stops the others. Returns how many
-    modules were registered. Flushes; the caller commits.
+    Each rule runs in its own savepoint, so one that fails — an unreachable
+    repository, a truncated tree, or a database error while registering or
+    recording the scan — is rolled back on its own and left as it was for the
+    next cycle to retry, and never takes the other rules' registrations with it.
+    A rule whose VCS connection is not active is skipped, with a warning.
+    Returns how many modules were registered. Flushes; the caller commits.
     """
     rules = list(
         (
@@ -352,31 +378,46 @@ async def poll_rules(db: AsyncSession) -> int:
     )
     registered = 0
     for rule in rules:
+        # Read before the savepoint: a rolled-back savepoint expires the rule.
+        rule_id, rule_name = str(rule.id), rule.name
         conn = rule.vcs_connection
         if conn is None or conn.status != "active":
+            logger.warning(
+                "Module autodiscovery rule skipped: its VCS connection is not active",
+                rule_id=rule_id,
+                rule_name=rule_name,
+                connection_status=conn.status if conn is not None else None,
+            )
             continue
         try:
-            with vcs_rate_limit.vcs_target(
-                consumer=f"module-rule/{rule.name}", kind="module-rule", labels=rule.labels
-            ):
-                head = await resolve_head(conn, rule.repo_url, rule.branch)
-                if rule.first_scan_at and head.sha and head.sha == rule.last_scanned_sha:
-                    continue
-                file_paths = await list_files(conn, head)
-                if rule.first_scan_at is not None:
-                    seen = set(rule.seen_subdirectories or [])
-                    new = [d for d in candidate_subdirectories(rule, file_paths) if d not in seen]
-                    if new:
-                        result = await register_candidates(db, rule, file_paths, only=new)
-                        registered += len(result.created)
+            async with db.begin_nested():
+                registered += await _poll_rule(db, rule, conn)
         except Exception:
             logger.warning(
                 "Module autodiscovery poll failed for rule",
-                rule_id=str(rule.id),
-                rule_name=rule.name,
+                rule_id=rule_id,
+                rule_name=rule_name,
                 exc_info=True,
             )
-            continue
-        record_scan(rule, file_paths, head.sha)
-        await db.flush()
     return registered
+
+
+async def _poll_rule(db: AsyncSession, rule: ModuleAutodiscoveryRule, conn: VCSConnection) -> int:
+    """One rule's poll: register what is new to it and record the scan."""
+    with vcs_rate_limit.vcs_target(
+        consumer=f"module-rule/{rule.name}", kind="module-rule", labels=rule.labels
+    ):
+        head = await resolve_head(conn, rule.repo_url, rule.branch)
+        if rule.first_scan_at and head.sha and head.sha == rule.last_scanned_sha:
+            return 0
+        file_paths = await list_files(conn, head)
+    created = 0
+    if rule.first_scan_at is not None:
+        seen = set(rule.seen_subdirectories or [])
+        new = [d for d in candidate_subdirectories(rule, file_paths) if d not in seen]
+        if new:
+            result = await register_candidates(db, rule, file_paths, only=new)
+            created = len(result.created)
+    record_scan(rule, file_paths, head.sha)
+    await db.flush()
+    return created
