@@ -649,6 +649,9 @@ function RunDetailPageInner() {
   const [wsCanApply, setWsCanApply] = useState(false)
   // Plan-only runs need only can-queue-run; retrying one is queuing a plan (#1599).
   const [wsCanPlan, setWsCanPlan] = useState(false)
+  // A destroy run is its own grant (run:apply-destroy); run:apply does not cover
+  // it, so retrying one is gated on can-queue-destroy (#1634).
+  const [wsCanDestroy, setWsCanDestroy] = useState(false)
   const [wsLocked, setWsLocked] = useState(false)
 
   const [planLog, setPlanLog] = useState<string | null>(null)
@@ -804,6 +807,7 @@ function RunDetailPageInner() {
         if (cancelled || !d?.data?.attributes) return
         setWsCanApply(!!d.data.attributes.permissions?.['can-queue-apply'])
         setWsCanPlan(!!d.data.attributes.permissions?.['can-queue-run'])
+        setWsCanDestroy(!!d.data.attributes.permissions?.['can-queue-destroy'])
         setWsLocked(!!d.data.attributes.locked)
       })
       .catch(() => {})
@@ -1216,11 +1220,13 @@ function RunDetailPageInner() {
     !wsLocked
 
   // A retry is a new run, so it needs what queuing that run needs: a plan for
-  // a plan-only run, an apply otherwise (#1599). The run's own `is-retryable`
-  // says only that its state allows it; offering the button to someone the
-  // API will refuse is the thing #1340 stopped doing for drift remediation.
+  // a plan-only run, a destroy for a destroy run, an apply otherwise (#1599,
+  // #1634). The run's own `is-retryable` says only that its state allows it;
+  // offering the button to someone the API will refuse is the thing #1340
+  // stopped doing for drift remediation.
   const canRetry =
-    actions['is-retryable'] && (attrs['plan-only'] ? wsCanPlan : wsCanApply)
+    actions['is-retryable'] &&
+    (attrs['plan-only'] ? wsCanPlan : attrs['is-destroy'] ? wsCanDestroy : wsCanApply)
 
   const hasActions =
     showRemediateDrift ||

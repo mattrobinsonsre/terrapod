@@ -261,12 +261,12 @@ resource terrapod_registry_module.owner_email required=false optional=false comp
 resource terrapod_registry_module.provider_name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_registry_module.source required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_registry_module.status required=false optional=false computed=true sensitive=false type=basetypes.StringType
-resource terrapod_registry_module.subdirectory required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_registry_module.subdirectory required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_registry_module.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_registry_module.vcs_branch required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_registry_module.vcs_connection_id required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_registry_module.vcs_repo_url required=false optional=true computed=false sensitive=false type=basetypes.StringType
-resource terrapod_registry_module.vcs_tag_pattern required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_registry_module.vcs_tag_pattern required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_registry_provider.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_registry_provider.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_registry_provider.labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]
