@@ -2687,6 +2687,7 @@
                         "type": "string",
                         "enum": [
                           "kubernetes",
+                          "jwt",
                           "approle",
                           "token"
                         ]
@@ -2695,6 +2696,12 @@
                         "type": "string"
                       },
                       "role": {
+                        "type": "string"
+                      },
+                      "audience": {
+                        "type": "string"
+                      },
+                      "token_path": {
                         "type": "string"
                       }
                     }
@@ -2707,6 +2714,19 @@
                   },
                   "tls_skip_verify": {
                     "type": "boolean"
+                  },
+                  "tls": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "ca_secret": {
+                        "type": "string"
+                      },
+                      "ca_key": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
                   },
                   "existingSecret": {
                     "type": "string"

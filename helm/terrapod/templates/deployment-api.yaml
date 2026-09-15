@@ -1,4 +1,20 @@
 {{- if ne .Values.api.enabled false }}
+{{- /* Vault instances (#1650) that read a projected ServiceAccount token (jwt,
+       or kubernetes with an audience) and those that pin a custom CA. Only
+       while the Vault value source is enabled, so a disabled block never makes
+       the pod wait on a Secret. */}}
+{{- $vaultTokens := list }}
+{{- $vaultCAs := list }}
+{{- if (.Values.api.config.vault).enabled }}
+{{- range .Values.api.config.vault.instances }}
+{{- if eq (include "terrapod.vault.projectsToken" .) "true" }}
+{{- $vaultTokens = append $vaultTokens . }}
+{{- end }}
+{{- if (.tls).ca_secret }}
+{{- $vaultCAs = append $vaultCAs . }}
+{{- end }}
+{{- end }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -228,6 +244,21 @@ spec:
               mountPath: /etc/terrapod/db-ca
               readOnly: true
             {{- end }}
+            {{- if $vaultTokens }}
+            # Audience-scoped ServiceAccount tokens for Vault jwt auth (#1650),
+            # one per instance at <name>/token. The kubelet rotates them and the
+            # client re-reads the file on every login.
+            - name: vault-tokens
+              mountPath: /var/run/secrets/terrapod/vault
+              readOnly: true
+            {{- end }}
+            {{- if $vaultCAs }}
+            # Per-instance Vault CA (#1650) at <name>/ca.crt — the ca_file the
+            # ConfigMap renders.
+            - name: vault-ca
+              mountPath: /etc/terrapod/vault-ca
+              readOnly: true
+            {{- end }}
             {{- include "terrapod.caBundle.volumeMounts" . | nindent 12 }}
             {{- with .Values.api.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
@@ -305,6 +336,32 @@ spec:
         - name: database-ca
           configMap:
             name: {{ .Values.api.databaseCA.existingConfigMap | default (printf "%s-database-ca" (include "terrapod.fullname" .)) }}
+        {{- end }}
+        {{- if $vaultTokens }}
+        # Vault validates these against the cluster's OIDC discovery / JWKS, so
+        # it never calls back into the cluster (#1650). 600s is the shortest
+        # lifetime the kubelet will issue.
+        - name: vault-tokens
+          projected:
+            sources:
+              {{- range $vaultTokens }}
+              - serviceAccountToken:
+                  audience: {{ include "terrapod.vault.audience" . | quote }}
+                  expirationSeconds: 600
+                  path: {{ printf "%s/token" .name | quote }}
+              {{- end }}
+        {{- end }}
+        {{- if $vaultCAs }}
+        - name: vault-ca
+          projected:
+            sources:
+              {{- range $vaultCAs }}
+              - secret:
+                  name: {{ .tls.ca_secret | quote }}
+                  items:
+                    - key: {{ .tls.ca_key | default "ca.crt" | quote }}
+                      path: {{ printf "%s/ca.crt" .name | quote }}
+              {{- end }}
         {{- end }}
         {{- include "terrapod.caBundle.volumes" . | nindent 8 }}
         {{- with .Values.api.extraVolumes }}

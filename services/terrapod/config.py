@@ -1335,28 +1335,58 @@ class MetricsConfig(BaseModel):
     )
 
 
-VAULT_AUTH_METHODS = {"kubernetes", "approle", "token"}
+VAULT_AUTH_METHODS = {"kubernetes", "jwt", "approle", "token"}
+
+#: Where the kubelet puts the pod's standard ServiceAccount token.
+VAULT_SA_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+#: Where the chart projects an audience-scoped ServiceAccount token for a Vault
+#: instance (#1650), as ``<dir>/<instance name>/token``. The chart renders the
+#: same path into the ConfigMap; this is the default for a config written by hand.
+VAULT_PROJECTED_TOKEN_DIR = "/var/run/secrets/terrapod/vault"
+
+#: The `aud` claim a `jwt` instance's projected token carries unless configured.
+VAULT_JWT_DEFAULT_AUDIENCE = "vault"
 
 
 class VaultAuthConfig(BaseModel):
-    """How Terrapod authenticates to one Vault instance (#1439)."""
+    """How Terrapod authenticates to one Vault instance (#1439, #1650)."""
 
     method: str = Field(
         default="kubernetes",
-        description="kubernetes | approle | token. `kubernetes` is the default "
+        description="kubernetes | jwt | approle | token. `kubernetes` is the default "
         "because it stores no credential at all — Terrapod presents the API pod's "
-        "own ServiceAccount token and Vault validates it.",
+        "own ServiceAccount token and Vault validates it by calling TokenReview. "
+        "`jwt` presents a projected ServiceAccount token that Vault validates "
+        "against the cluster's OIDC discovery / JWKS instead, so Vault never has "
+        "to reach back into the cluster — the method for a Vault outside it.",
     )
     mount: str = Field(
         default="kubernetes",
         description="Auth mount path as enabled in Vault (`vault auth enable "
-        "-path=<mount> kubernetes`). Only the path, not a full URL.",
+        "-path=<mount> kubernetes`). Only the path, not a full URL. Defaults to "
+        "`jwt` when the method is `jwt` and no mount is given.",
     )
     role: str = Field(
         default="terrapod",
         description="Vault role bound to Terrapod's ServiceAccount and namespace. "
         "The policy attached to this role is the real access boundary for every "
         "secret this feature can read — see docs/vault.md.",
+    )
+    audience: str = Field(
+        default="",
+        description="The `aud` claim of the projected ServiceAccount token (#1650). "
+        "`jwt` defaults to `vault`; it must be in the Vault role's "
+        "`bound_audiences`. For `kubernetes`, empty means the pod's standard "
+        "ServiceAccount token; set it only when the Vault role requires an "
+        "audience, and the chart then projects a token carrying it.",
+    )
+    token_path: str = Field(
+        default="",
+        description="File the ServiceAccount JWT is read from on every login "
+        "(the kubelet rotates it). Empty means the default: "
+        f"{VAULT_PROJECTED_TOKEN_DIR}/<instance>/token for `jwt` and for "
+        f"`kubernetes` with an audience, otherwise {VAULT_SA_TOKEN_PATH}.",
     )
 
     @field_validator("method")
@@ -1365,6 +1395,21 @@ class VaultAuthConfig(BaseModel):
         if v not in VAULT_AUTH_METHODS:
             raise ValueError(f"vault auth method must be one of {sorted(VAULT_AUTH_METHODS)}")
         return v
+
+    @model_validator(mode="after")
+    def _method_defaults(self):
+        if self.method == "jwt":
+            if not self.audience:
+                self.audience = VAULT_JWT_DEFAULT_AUDIENCE
+            # The mount default is `kubernetes`, which is never what a jwt
+            # instance means. Only replaced when the operator left it unset.
+            if "mount" not in self.model_fields_set:
+                self.mount = "jwt"
+        return self
+
+    def projects_token(self) -> bool:
+        """Whether this method reads a chart-projected, audience-scoped token."""
+        return self.method == "jwt" or (self.method == "kubernetes" and bool(self.audience))
 
 
 class VaultInstanceConfig(BaseModel):
@@ -1394,6 +1439,14 @@ class VaultInstanceConfig(BaseModel):
         description="Skip TLS verification for this instance. For a lab only; a "
         "credential broker that does not verify its peer is not one.",
     )
+    ca_file: str = Field(
+        default="",
+        description="PEM file of the CA(s) that sign this Vault's certificate "
+        "(#1650). When set, TLS to this instance is verified against it ALONE — "
+        "the default trust store and SSL_CERT_FILE are not consulted — so a "
+        "private CA is pinned to the one Vault it fronts. The chart renders it "
+        "from `tls.ca_secret` / `tls.ca_key`. Empty means the default trust store.",
+    )
 
     @field_validator("name")
     @classmethod
@@ -1401,6 +1454,23 @@ class VaultInstanceConfig(BaseModel):
         if not v or not v.strip():
             raise ValueError("vault instance name is required")
         return v.strip()
+
+    @model_validator(mode="after")
+    def _resolve(self):
+        if self.ca_file and self.tls_skip_verify:
+            # Contradictory: one says verify against this CA, the other says do
+            # not verify at all. Refusing is better than silently picking one.
+            raise ValueError(
+                f"vault instance {self.name!r} sets both ca_file and tls_skip_verify; "
+                "a custom CA is only meaningful when TLS is verified"
+            )
+        if not self.auth.token_path and self.auth.method in ("kubernetes", "jwt"):
+            self.auth.token_path = (
+                f"{VAULT_PROJECTED_TOKEN_DIR}/{self.name}/token"
+                if self.auth.projects_token()
+                else VAULT_SA_TOKEN_PATH
+            )
+        return self
 
 
 class VaultConfig(BaseModel):
