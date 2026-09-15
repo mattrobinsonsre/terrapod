@@ -896,7 +896,7 @@ class TestATransientVaultFailureDoesNotDestroyTheRun:
         ]
         try:
             with patch(
-                "terrapod.services.vault_source_service.read_secret_data",
+                "terrapod.services.vault_source_service.read_secret_response",
                 new=AsyncMock(side_effect=VaultUnavailable("connection refused")),
             ):
                 resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
@@ -937,7 +937,7 @@ class TestATransientVaultFailureDoesNotDestroyTheRun:
         ]
         try:
             with patch(
-                "terrapod.services.vault_source_service.read_secret_data",
+                "terrapod.services.vault_source_service.read_secret_response",
                 new=AsyncMock(side_effect=VaultUnavailable("connection refused")),
             ):
                 resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
@@ -971,7 +971,7 @@ class TestATransientVaultFailureDoesNotDestroyTheRun:
         ]
         try:
             with patch(
-                "terrapod.services.vault_source_service.read_secret_data",
+                "terrapod.services.vault_source_service.read_secret_response",
                 new=AsyncMock(side_effect=VaultError("Vault denied 'secret/apps/x'")),
             ):
                 resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
@@ -1177,6 +1177,7 @@ class TestTheVaultValueActuallyReachesTheRunner:
 
     async def test_a_resolved_secret_replaces_the_reference_in_env_vars(self, app, client):
         from terrapod.config import VaultInstanceConfig, settings
+        from terrapod.services.vault_client import VaultResponse
 
         set_auth(app, admin_user())
         tag = uuid.uuid4().hex[:8]
@@ -1191,8 +1192,8 @@ class TestTheVaultValueActuallyReachesTheRunner:
         ]
         try:
             with patch(
-                "terrapod.services.vault_source_service.read_secret_data",
-                new=AsyncMock(return_value={"token": "s3cr3t-from-vault"}),
+                "terrapod.services.vault_source_service.read_secret_response",
+                new=AsyncMock(return_value=VaultResponse({"token": "s3cr3t-from-vault"})),
             ):
                 resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
         finally:
