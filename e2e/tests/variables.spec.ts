@@ -301,4 +301,116 @@ test.describe('Vault value source (#1439)', () => {
     await expect(page.locator('tr').filter({ hasText: 'EDIT_ME' })
       .getByText('secret/apps/changed')).toBeVisible({ timeout: 10_000 })
   })
+
+  // ── File delivery (#1619) ─────────────────────────────────────────
+
+  /** The stored reference, read back through the API rather than the UI —
+   *  the point is what was saved, not what the page chose to show. */
+  async function readRef(token: string, wsId: string, key: string): Promise<Record<string, unknown>> {
+    const res = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(res.status).toBe(200)
+    const v = (await res.json()).data.find(
+      (d: { attributes: { key: string } }) => d.attributes.key === key,
+    )
+    expect(v, `variable ${key} exists`).toBeTruthy()
+    return JSON.parse(v.attributes.value)
+  }
+
+  test('file delivery is built, saved, and survives a reload (#1619)', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2evaultfile'), {
+      'execution-mode': 'agent',
+    })
+    await withVault(page)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await page.locator('#var-key').fill('GCP_CREDS')
+    await page.locator('#var-cat').selectOption('env')
+    await page.locator('#var-source').selectOption('vault')
+    await page.locator('#add-mount').fill('secret')
+    await page.locator('#add-path').fill('apps/gcp')
+    await page.locator('#add-field').fill('sa_json')
+    // The name box only exists once file delivery is on.
+    await expect(page.locator('#add-file-name')).toHaveCount(0)
+    await page.locator('#add-file').check()
+    await page.locator('#add-file-name').fill('gcp/adc.json')
+    await page.getByRole('button', { name: 'Add Variable', exact: true }).last().click()
+
+    const row = () => page.locator('tr').filter({ hasText: 'GCP_CREDS' })
+    await expect(row().getByText('gcp/adc.json')).toBeVisible({ timeout: 10_000 })
+    await page.reload()
+    await expect(row().getByText('gcp/adc.json')).toBeVisible({ timeout: 10_000 })
+    expect((await readRef(token, wsId, 'GCP_CREDS')).file).toEqual({ name: 'gcp/adc.json' })
+  })
+
+  test('an edit keeps file.name, method and data; turning file delivery off removes only file (#1619)', async ({ page }) => {
+    // The defect this guards: the UI rebuilt a reference from the fields it
+    // renders, so editing anything silently dropped `method` and `data` —
+    // and would have dropped `file` with them.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2evaultkeep'), {
+      'execution-mode': 'agent',
+    })
+    await withVault(page)
+
+    const seeded = {
+      source: 'vault', engine: 'dynamic', method: 'POST',
+      mount: 'pki', path: 'issue/example', field: 'certificate',
+      data: { common_name: 'app.example.internal', ttl: '1h' },
+      file: { name: 'tls/cert.pem' },
+    }
+    const res = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: {
+            key: 'TLS_CERT', category: 'env', 'value-source': 'vault',
+            value: JSON.stringify(seeded),
+          },
+        },
+      }),
+    })
+    expect(res.status).toBe(201)
+
+    const openEditor = async () => {
+      await page.goto(`/workspaces/${wsId}?tab=variables`)
+      const row = page.locator('tr').filter({ hasText: 'TLS_CERT' })
+      await expect(row).toBeVisible({ timeout: 10_000 })
+      await row.getByRole('button', { name: 'Edit' }).click()
+    }
+
+    // 1. Edit an unrelated field. The editor comes back with file delivery on.
+    await openEditor()
+    await expect(page.locator('[id$="-file"]:visible').first()).toBeChecked()
+    await expect(page.locator('[id$="-file-name"]:visible').first()).toHaveValue('tls/cert.pem')
+    await page.locator('[id$="-field"]:visible').first().fill('private_key')
+    await page.getByRole('button', { name: 'Save' }).click()
+
+    await page.reload()
+    await expect.poll(async () => (await readRef(token, wsId, 'TLS_CERT')).field).toBe('private_key')
+    const edited = await readRef(token, wsId, 'TLS_CERT')
+    expect(edited.method).toBe('POST')
+    expect(edited.data).toEqual(seeded.data)
+    expect(edited.engine).toBe('dynamic')
+    expect(edited.file).toEqual({ name: 'tls/cert.pem' })
+
+    // 2. Turn file delivery off: file goes, nothing else does.
+    await openEditor()
+    await page.locator('[id$="-file"]:visible').first().uncheck()
+    await expect(page.locator('[id$="-file-name"]:visible')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Save' }).click()
+
+    await page.reload()
+    await expect.poll(async () => 'file' in (await readRef(token, wsId, 'TLS_CERT'))).toBe(false)
+    const off = await readRef(token, wsId, 'TLS_CERT')
+    expect(off.method).toBe('POST')
+    expect(off.data).toEqual(seeded.data)
+    expect(off.field).toBe('private_key')
+    await expect(page.locator('tr').filter({ hasText: 'TLS_CERT' }).getByText('tls/cert.pem')).toHaveCount(0)
+  })
 })

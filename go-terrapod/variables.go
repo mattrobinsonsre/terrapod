@@ -27,6 +27,17 @@ type Variable struct {
 	// reference Terrapod resolves server-side at run time, #1439). For a vault
 	// source the API returns the reference rather than masking it — a path is
 	// not a secret, and the secret it points at is never stored or returned.
+	//
+	// The reference is an opaque JSON string to this SDK: it is sent and read
+	// back verbatim, never parsed. Its keys are mount, path and field, plus
+	// optional vault, engine, method and data. An optional "file" object
+	// (#1619), e.g. `"file":{"name":"gcp/adc.json"}`, delivers the secret as a
+	// file on the runner instead: the variable's run-time value becomes that
+	// file's absolute path. `name` defaults to the variable key; a relative
+	// name lands under /var/run/terrapod/files/, and a name starting with
+	// `~/` lands in the runner's home directory (e.g. `~/.aws/credentials`).
+	// The server validates the name and refuses `file` on an HCL or non-Vault
+	// variable.
 	ValueSource string `json:"value-source,omitempty"`
 
 	VersionID string `json:"version-id,omitempty"`
@@ -45,7 +56,9 @@ type CreateVariableRequest struct {
 	Sensitive   bool   `json:"sensitive,omitempty"`
 	Description string `json:"description,omitempty"`
 	// ValueSource defaults to "static" when empty. Set "vault" and put the
-	// JSON reference in Value; Terrapod forces Sensitive on either way.
+	// JSON reference in Value; Terrapod forces Sensitive on either way. Add a
+	// "file" object to the reference to deliver the secret as a file — see
+	// Variable.ValueSource.
 	ValueSource string `json:"value-source,omitempty"`
 }
 

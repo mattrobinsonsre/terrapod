@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "Da paff iz kept, nevr da sekrit. Terrapodz Vault polisee sez wot it can reed.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Cant reed dis Vault refrens",
-      "vaultInstanceDefaultNamed": "Defalt ({name})"
+      "vaultInstanceDefaultNamed": "Defalt ({name})",
+      "vaultDeliverAsFile": "Delivr az a fiel",
+      "vaultFileName": "Fiel naem",
+      "vaultFileNameDefault": "Iz da variabul kee if u leev it",
+      "vaultFileBadge": "Fiel",
+      "vaultFileHint": "Da variabul haz da fielz paff, not da sekrit: uze it liek {fileFn}, or wif a tul dat reedz a paff frum a enviro variabul. A relativ naem liek {relExample} gets ritten undr {base}; a naem startin wif {home}, liek {homeExample}, goez in da runnerz hoem dir."
     },
     "runs": {
       "options": "Opshunz",

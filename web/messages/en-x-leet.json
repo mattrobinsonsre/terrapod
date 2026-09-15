@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "7h3 p47h 15 570r3d, n3v3r 7h3 53cr37. 73rr4p0d'5 V4ul7 p0l1cy c0n7r0l5 wh47 17 c4n r34d.",
       "sourceVaultBadge": "V4ul7",
       "vaultReferenceUnreadable": "Unr34d4bl3 V4ul7 r3f3r3nc3",
-      "vaultInstanceDefaultNamed": "D3f4ul7 ({name})"
+      "vaultInstanceDefaultNamed": "D3f4ul7 ({name})",
+      "vaultDeliverAsFile": "D3l1v3r 45 4 f1l3",
+      "vaultFileName": "F1l3 n4m3",
+      "vaultFileNameDefault": "D3f4ul75 70 7h3 v4r14bl3 k3y",
+      "vaultFileBadge": "F1l3",
+      "vaultFileHint": "7h3 v4r14bl3 h0ld5 7h3 f1l3'5 p47h, n07 7h3 53cr37: u53 17 45 {fileFn}, 0r w17h 4 700l 7h47 r34d5 4 p47h fr0m 4n 3nv1r0nm3n7 v4r14bl3. 4 r3l471v3 n4m3 5uch 45 {relExample} 15 wr1773n und3r {base}; 4 n4m3 574r71ng w17h {home}, 5uch 45 {homeExample}, g035 1n 7h3 runn3r'5 h0m3 d1r3c70ry."
     },
     "runs": {
       "options": "0p710n5",

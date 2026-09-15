@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "He pollu', pegh pollu'be'. Terrapod Vault chut 'e' Sov.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Vault ngoQ laDlaHbe'",
-      "vaultInstanceDefaultNamed": "motlh ({name})"
+      "vaultInstanceDefaultNamed": "motlh ({name})",
+      "vaultDeliverAsFile": "ghItlh rur yInob",
+      "vaultFileName": "ghItlh pong",
+      "vaultFileNameDefault": "motlh pong: choH ngoq",
+      "vaultFileBadge": "ghItlh",
+      "vaultFileHint": "ghItlh He ngaS choH, pegh ngaSbe': {fileFn} rur yIlo', pagh He laDbogh jan yIlo'. {relExample} rur pong {base}-Daq ghItlhlu'; {home}-vo' taghbogh pong, {homeExample} rur, qaStaHvIS juHDaq lanlu'."
     },
     "runs": {
       "options": "wIvmey",

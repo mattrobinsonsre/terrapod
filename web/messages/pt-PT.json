@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "O caminho é armazenado, nunca o segredo. A política do Vault do Terrapod controla o que pode ler.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Referência do Vault ilegível",
-      "vaultInstanceDefaultNamed": "Predefinido ({name})"
+      "vaultInstanceDefaultNamed": "Predefinido ({name})",
+      "vaultDeliverAsFile": "Entregar como ficheiro",
+      "vaultFileName": "Nome do ficheiro",
+      "vaultFileNameDefault": "Por omissão, a chave da variável",
+      "vaultFileBadge": "Ficheiro",
+      "vaultFileHint": "A variável contém o caminho do ficheiro, não o segredo: use-a como {fileFn} ou com uma ferramenta que lê um caminho a partir de uma variável de ambiente. Um nome relativo como {relExample} é escrito em {base}; um nome que começa por {home}, como {homeExample}, fica no diretório pessoal do runner."
     },
     "runs": {
       "options": "Opções",

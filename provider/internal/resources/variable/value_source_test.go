@@ -31,6 +31,26 @@ func TestAVaultReferenceIsReadBackDespiteBeingSensitive(t *testing.T) {
 	}
 }
 
+// File delivery (#1619) rides inside the reference, so it must read back as
+// exactly the string that was configured — any rewrite would be plan drift.
+func TestAVaultFileReferenceReadsBackVerbatim(t *testing.T) {
+	const ref = `{"source":"vault","mount":"secret","path":"apps/gcp","field":"sa_json","file":{"name":"~/.config/gcloud/adc.json"}}`
+	m := variableModel{Value: types.StringValue(ref)}
+	readVariableIntoModel(&terrapod.Variable{
+		ID: "var-1", Key: "GOOGLE_APPLICATION_CREDENTIALS", Category: "env",
+		Sensitive: true, ValueSource: "vault", Value: ref,
+	}, &m)
+	if got := m.Value.ValueString(); got != ref {
+		t.Fatalf("read back %q, want the configured reference", got)
+	}
+	if got := buildCreateVariableRequest(&m).Value; got != ref {
+		t.Errorf("create would send %q", got)
+	}
+	if up := buildUpdateVariableRequest(&m); up.Value == nil || *up.Value != ref {
+		t.Errorf("update would send %v", up.Value)
+	}
+}
+
 func TestAnOrdinarySensitiveValueIsStillNotReadBack(t *testing.T) {
 	// The exception above must not widen: a real secret still never round-trips
 	// through Read, because the server returns nothing for it.

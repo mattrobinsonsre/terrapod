@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "مسیر ذخیره می‌شود، نه راز. سیاست Vault مربوط به Terrapod تعیین می‌کند چه چیزی خوانده شود.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "ارجاع ناخوانای Vault",
-      "vaultInstanceDefaultNamed": "پیش‌فرض ({name})"
+      "vaultInstanceDefaultNamed": "پیش‌فرض ({name})",
+      "vaultDeliverAsFile": "تحویل به‌صورت فایل",
+      "vaultFileName": "نام فایل",
+      "vaultFileNameDefault": "پیش‌فرض، کلید متغیر است",
+      "vaultFileBadge": "فایل",
+      "vaultFileHint": "متغیر مسیر فایل را نگه می‌دارد، نه راز را: آن را به‌صورت {fileFn} به کار ببرید، یا با ابزاری که مسیری را از یک متغیر محیطی می‌خواند. نام نسبی مانند {relExample} در {base} نوشته می‌شود؛ نامی که با {home} شروع شود، مانند {homeExample}، در پوشهٔ خانگی اجراکننده قرار می‌گیرد."
     },
     "runs": {
       "options": "گزینه‌ها",

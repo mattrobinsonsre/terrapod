@@ -12,7 +12,13 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { VariableEditPanel, type VariableEditState } from '@/components/variable-edit-panel'
-import { VaultReferenceFields, type VaultReferenceValue } from '@/components/vault-reference-fields'
+import {
+  VaultReferenceFields,
+  buildVaultReference,
+  emptyVaultReference,
+  parseVaultReference,
+  type VaultReferenceValue,
+} from '@/components/vault-reference-fields'
 import { VaultValueDisplay } from '@/components/vault-value-display'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
@@ -107,7 +113,7 @@ export default function VariableSetDetailPage() {
   const [varHcl, setVarHcl] = useState(false)
   const [addingVar, setAddingVar] = useState(false)
   const [varSource, setVarSource] = useState<'static' | 'vault'>('static')
-  const [varVault, setVarVault] = useState<VaultReferenceValue>({ instance: '', mount: '', path: '', field: '', engine: 'kv2' })
+  const [varVault, setVarVault] = useState<VaultReferenceValue>(emptyVaultReference)
   // A git credential is a JSON envelope; a Vault reference resolves to a single
   // field, so the pair cannot work and the API refuses it (#1439). Mirrors the
   // workspace page: don't offer the source, and don't send it.
@@ -126,7 +132,7 @@ export default function VariableSetDetailPage() {
   const [editVarHcl, setEditVarHcl] = useState(false)
   const [savingVar, setSavingVar] = useState(false)
   const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
-  const [editVarVault, setEditVarVault] = useState<VaultReferenceValue>({ instance: '', mount: '', path: '', field: '', engine: 'kv2' })
+  const [editVarVault, setEditVarVault] = useState<VaultReferenceValue>(emptyVaultReference)
   const isEditGitCat = editVarCategory === 'git_http_auth' || editVarCategory === 'git_ssh_auth'
 
   // The panel takes one object; this page keeps a field per input. Bridge the
@@ -204,33 +210,6 @@ export default function VariableSetDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- initial mount load; the loader is a hoisted function declaration recreated each render, so depending on it would re-fetch on every render
   }, [activeTab, varset])
 
-
-  function buildVaultRef(v: VaultReferenceValue): string {
-    const ref: Record<string, string> = {
-      source: 'vault',
-      mount: v.mount.trim(),
-      path: v.path.trim(),
-      field: v.field.trim(),
-    }
-    if (v.instance.trim()) ref.vault = v.instance.trim()
-    if (v.engine !== 'kv2') ref.engine = v.engine
-    return JSON.stringify(ref)
-  }
-
-  function parseVaultRef(value: string): VaultReferenceValue {
-    try {
-      const r = JSON.parse(value)
-      return {
-        instance: r.vault ?? '',
-        mount: r.mount ?? '',
-        path: r.path ?? '',
-        field: r.field ?? '',
-        engine: r.engine === 'dynamic' ? 'dynamic' : 'kv2',
-      }
-    } catch {
-      return { instance: '', mount: '', path: '', field: '', engine: 'kv2' }
-    }
-  }
 
   async function loadVariables() {
     try {
@@ -352,7 +331,7 @@ export default function VariableSetDetailPage() {
             type: 'vars',
             attributes: {
               key: varKey,
-              value: isVaultSource ? buildVaultRef(varVault) : varValue,
+              value: isVaultSource ? buildVaultReference(varVault) : varValue,
               category: varCategory,
               // Vault-sourced is always sensitive (its reference resolves to a
               // secret); otherwise honour the checkbox.
@@ -373,7 +352,7 @@ export default function VariableSetDetailPage() {
       setVarSensitive(false)
       setVarHcl(false)
       setVarSource('static')
-      setVarVault({ instance: '', mount: '', path: '', field: '', engine: 'kv2' })
+      setVarVault(emptyVaultReference())
       setShowAddVar(false)
       await loadVariables()
     } catch (err) {
@@ -389,7 +368,9 @@ export default function VariableSetDetailPage() {
     const src = v.attributes['value-source'] === 'vault' ? 'vault' : 'static'
     setEditVarSource(src)
     if (src === 'vault') {
-      setEditVarVault(parseVaultRef(v.attributes.value))
+      // Every key the form does not render (method, data, …) is carried
+      // through to the save untouched (#1619).
+      setEditVarVault(parseVaultReference(v.attributes.value))
       setEditVarValue('')
     } else {
       setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
@@ -414,7 +395,7 @@ export default function VariableSetDetailPage() {
         'value-source': isEditVault ? 'vault' : 'static',
       }
       if (isEditVault) {
-        attrs.value = buildVaultRef(editVarVault)
+        attrs.value = buildVaultReference(editVarVault)
       } else if (editVarValue !== '') {
         attrs.value = editVarValue
       }
@@ -772,7 +753,7 @@ export default function VariableSetDetailPage() {
                           <td className="px-4 py-3 text-sm text-slate-200 font-mono">{v.attributes.key}</td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
                             {v.attributes['value-source'] === 'vault'
-                              ? <VaultValueDisplay value={v.attributes.value} />
+                              ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
                               : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400">
@@ -825,7 +806,7 @@ export default function VariableSetDetailPage() {
                         </div>
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">
                           {v.attributes['value-source'] === 'vault'
-                            ? <VaultValueDisplay value={v.attributes.value} />
+                            ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
                             : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('detail.empty')}</span>)}
                         </div>
                         <div className="flex gap-2">

@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "Het pad wordt opgeslagen, nooit het geheim. Het Vault-beleid van Terrapod bepaalt wat het mag lezen.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Onleesbare Vault-verwijzing",
-      "vaultInstanceDefaultNamed": "Standaard ({name})"
+      "vaultInstanceDefaultNamed": "Standaard ({name})",
+      "vaultDeliverAsFile": "Als bestand leveren",
+      "vaultFileName": "Bestandsnaam",
+      "vaultFileNameDefault": "Standaard de sleutel van de variabele",
+      "vaultFileBadge": "Bestand",
+      "vaultFileHint": "De variabele bevat het pad van het bestand, niet het geheim: gebruik hem als {fileFn}, of met een tool die een pad uit een omgevingsvariabele leest. Een relatieve naam zoals {relExample} wordt onder {base} geschreven; een naam die met {home} begint, zoals {homeExample}, komt in de thuismap van de runner."
     },
     "runs": {
       "options": "Opties",

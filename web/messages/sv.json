@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "Sökvägen lagras, aldrig hemligheten. Terrapods Vault-policy styr vad den får läsa.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Oläslig Vault-referens",
-      "vaultInstanceDefaultNamed": "Standard ({name})"
+      "vaultInstanceDefaultNamed": "Standard ({name})",
+      "vaultDeliverAsFile": "Leverera som fil",
+      "vaultFileName": "Filnamn",
+      "vaultFileNameDefault": "Standard är variabelns nyckel",
+      "vaultFileBadge": "Fil",
+      "vaultFileHint": "Variabeln innehåller filens sökväg, inte hemligheten: använd den som {fileFn}, eller med ett verktyg som läser en sökväg från en miljövariabel. Ett relativt namn som {relExample} skrivs under {base}; ett namn som börjar med {home}, som {homeExample}, hamnar i runnerns hemkatalog."
     },
     "runs": {
       "options": "Alternativ",
