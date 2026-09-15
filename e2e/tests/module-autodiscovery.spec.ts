@@ -350,8 +350,11 @@ test.describe('Admin — Module autodiscovery, org-wide rules (#1620)', () => {
     await expect(page.getByRole('heading', { name: 'Module autodiscovery', level: 1 })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('org-rule needs attention')).toBeVisible();
     await expect(page.getByText(ORG_ERROR)).toBeVisible();
-    await expect(page.locator('table').getByText('Pattern', { exact: true })).toBeVisible();
-    await expect(page.locator('table').getByText('Needs attention', { exact: true })).toBeVisible();
+    // Scoped to the rule's row: "Pattern" is also the rules table's column
+    // header for the file glob, so a table-wide match finds two elements.
+    const orgRow = page.locator('table').getByRole('row').filter({ hasText: 'org-rule' });
+    await expect(orgRow.getByText('Pattern', { exact: true })).toBeVisible();
+    await expect(orgRow.getByText('Needs attention', { exact: true })).toBeVisible();
 
     const panel = page.getByRole('heading', { name: 'Preview: org-rule' });
     await expect(async () => {
@@ -429,7 +432,10 @@ test.describe('Admin — Module autodiscovery, org-wide rules (#1620)', () => {
       await expect(panel).toBeVisible({ timeout: 1_000 });
     }).toPass({ timeout: 15_000 });
 
-    const table = page.getByRole('table').filter({ hasText: 'e2e-org/terraform-aws-a' });
+    // Found by a column only this table has, not by a row's text: the status
+    // filter below removes that row, and a locator keyed on it would then
+    // match no table at all.
+    const table = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: 'Origin' }) });
     await expect(table.getByText('e2e-org/terraform-aws-c')).toBeVisible();
     await expect(table.getByText('tree listing failed')).toBeVisible();
     await expect(table.getByText('Renamed from e2e-org/old-name')).toBeVisible();
