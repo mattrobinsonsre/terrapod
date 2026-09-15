@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from sqlalchemy.exc import IntegrityError
 
@@ -19,6 +20,7 @@ from terrapod.db.models import ModuleAutodiscoveryRule, RegistryModule
 from terrapod.services import module_autodiscovery_service as svc
 
 _GH = "terrapod.services.github_service"
+_GL = "terrapod.services.gitlab_service"
 REPO = "https://github.com/org/terraform-azurerm-management-groups"
 PATHS = [
     "main.tf",
@@ -62,13 +64,21 @@ def _rule(**kw):
 
 
 class _FakeDB:
-    """Answers the service's three queries by what each one selects."""
+    """Answers the service's three queries by what each one selects.
 
-    def __init__(self, rules=(), registered=(), taken=(), fail_add_for=()):
+    Savepoints nest like the real thing: leaving one with an error discards
+    everything added inside it, and an insert listed in `fail_add_for` or
+    `fail_name_for` fails as it leaves its savepoint, the way a flush does.
+    """
+
+    def __init__(self, rules=(), registered=(), taken=(), fail_add_for=(), fail_name_for=()):
         self.rules = list(rules)
         self.registered = list(registered)  # (name, provider, subdirectory)
         self.taken = set(taken)  # names already used by the provider
-        self.fail_add_for = set(fail_add_for)  # subdirectories whose insert races
+        # Subdirectories someone else registers between preview and insert.
+        self.fail_add_for = set(fail_add_for)
+        # Subdirectories whose name someone else takes between preview and insert.
+        self.fail_name_for = set(fail_name_for)
         self.added: list[RegistryModule] = []
         self.flush = AsyncMock()
 
@@ -84,14 +94,26 @@ class _FakeDB:
         return result
 
     def add(self, obj):
-        self._pending = obj
+        self.added.append(obj)
 
     @asynccontextmanager
     async def _nested(self):
-        yield
-        if self._pending.subdirectory in self.fail_add_for:
-            raise IntegrityError("insert", {}, Exception("duplicate"))
-        self.added.append(self._pending)
+        mark = len(self.added)
+        try:
+            yield
+        except BaseException:
+            del self.added[mark:]
+            raise
+        for obj in self.added[mark:]:
+            if not isinstance(obj, RegistryModule):
+                continue
+            if obj.subdirectory in self.fail_add_for:
+                del self.added[mark:]
+                self.registered.append(("other", obj.provider, obj.subdirectory))
+                raise IntegrityError("insert", {}, Exception("duplicate subdirectory"))
+            if obj.subdirectory in self.fail_name_for:
+                del self.added[mark:]
+                raise IntegrityError("insert", {}, Exception("duplicate name"))
 
     def begin_nested(self):
         return self._nested()
@@ -149,6 +171,34 @@ class TestNaming:
         )
         assert svc.derive_name(_rule(name_template="{root}"), "9lives") == "m-9lives"
 
+    def test_a_template_is_substituted_not_formatted(self):
+        # Only the four placeholders are replaced; anything else is literal text
+        # (the API refuses it, but a stored template must never be evaluated).
+        assert svc.derive_name(_rule(name_template="{repo.__class__}"), "") == "repo-class"
+        rule = _rule(name_template="{leaf!r}-{leaf}")
+        assert svc.derive_name(rule, "modules/x") == "leaf-r-x"
+
+    @pytest.mark.parametrize(
+        "template,ok",
+        [
+            ("", True),
+            ("platform", True),
+            ("{repo}-{leaf}", True),
+            ("x{path}y{root}", True),
+            ("{nope}", False),
+            ("{leaf:>10}", False),
+            ("{repo.__class__}", False),
+            ("{leaf!r}", False),
+            ("{}", False),
+            ("{0}", False),
+            ("{{repo}}", False),
+            ("a{", False),
+            ("a}", False),
+        ],
+    )
+    def test_the_template_grammar(self, template, ok):
+        assert bool(svc.TEMPLATE_RE.match(template)) is ok
+
     def test_provider_explicit_else_from_the_repository_name(self):
         assert svc.derive_provider(_rule(provider="aws")) == "aws"
         assert svc.derive_provider(_rule()) == "azurerm"
@@ -170,6 +220,21 @@ class TestPreview:
         assert entries["modules/update"]["collision"] is True
         assert entries[""]["collision"] is False
         assert not any(e["missing-provider"] for e in entries.values())
+
+    async def test_candidates_deriving_the_same_name_collide_with_each_other(self):
+        # `{leaf}` gives `x` for both directories: neither is clean.
+        rule = _rule(name_template="{leaf}")
+        paths = ["a/x/main.tf", "b/x/main.tf", "c/y/main.tf"]
+        entries = {e["subdirectory"]: e for e in await svc.preview(_FakeDB(), rule, paths)}
+        assert entries["a/x"]["collision"] and entries["b/x"]["collision"]
+        assert entries["c/y"]["collision"] is False
+
+    async def test_a_registered_directory_does_not_collide_with_its_own_name(self):
+        rule = _rule(name_template="{leaf}")
+        paths = ["a/x/main.tf", "b/x/main.tf"]
+        db = _FakeDB(registered=[("x-a", "azurerm", "a/x")])
+        entries = {e["subdirectory"]: e for e in await svc.preview(db, rule, paths)}
+        assert entries["b/x"]["collision"] is False
 
     async def test_no_provider_is_reported_not_guessed(self):
         rule = _rule(repo_url="https://github.com/org/platform")
@@ -230,6 +295,19 @@ class TestRegister:
         result = await svc.register_candidates(db, _rule(), PATHS)
         assert ("modules/create", "already-registered") in result.skipped
         assert "modules/update" in {m.subdirectory for m in result.created}
+
+    async def test_a_race_on_a_name_is_reported_as_name_taken(self):
+        db = _FakeDB(fail_name_for={"modules/create"})
+        result = await svc.register_candidates(db, _rule(), PATHS)
+        assert ("modules/create", "name-taken") in result.skipped
+        assert "modules/create" not in {m.subdirectory for m in db.added}
+
+    async def test_candidates_clashing_with_each_other_are_both_skipped_as_name_taken(self):
+        rule = _rule(name_template="{leaf}")
+        db = _FakeDB()
+        result = await svc.register_candidates(db, rule, ["a/x/main.tf", "b/x/main.tf"])
+        assert result.created == [] and db.added == []
+        assert dict(result.skipped) == {"a/x": "name-taken", "b/x": "name-taken"}
 
     async def test_reserved_labels_are_dropped_not_copied(self):
         result = await svc.register_candidates(
@@ -304,13 +382,53 @@ class TestPoll:
         assert broken.first_scan_at is None
         assert good.first_scan_at is not None
 
-    async def test_an_inactive_connection_is_skipped(self):
+    async def test_an_inactive_connection_is_skipped_with_a_warning(self):
         rule = _rule()
         rule.vcs_connection.status = "suspended"
-        with _github() as tree:
+        with _github() as tree, patch.object(svc.logger, "warning") as warn:
             await svc.poll_rules(_FakeDB(rules=[rule]))
         tree.assert_not_awaited()
         assert rule.first_scan_at is None
+        warn.assert_called_once()
+        assert "not active" in warn.call_args.args[0]
+        assert warn.call_args.kwargs["rule_id"] == str(rule.id)
+        assert warn.call_args.kwargs["connection_status"] == "suspended"
+
+    async def test_a_database_error_in_one_rule_does_not_undo_another(self):
+        # Both rules find a new directory. The first rule's flush — after its
+        # registration and record_scan — fails; its work is rolled back in its
+        # own savepoint, and the second rule's registration stands.
+        def baselined(name):
+            return _rule(
+                name=name,
+                first_scan_at=datetime.now(UTC),
+                last_scanned_sha="s1",
+                seen_subdirectories=["", "modules/create", "modules/legacy", "modules/update"],
+            )
+
+        first, second = baselined("first"), baselined("second")
+        db = _FakeDB(rules=[first, second])
+        db.flush.side_effect = [RuntimeError("value too long"), None]
+        with _github([*PATHS, "modules/new/main.tf"], sha="s2"):
+            assert await svc.poll_rules(db) == 1
+        assert [m.module_autodiscovery_rule_id for m in db.added] == [second.id]
+        assert second.last_scanned_sha == "s2"
+
+    async def test_each_rule_is_polled_in_its_own_savepoint(self):
+        rules = [_rule(name="a"), _rule(name="b")]
+        db = _FakeDB(rules=rules)
+        opened = []
+        real = db.begin_nested
+
+        def counting():
+            opened.append(1)
+            return real()
+
+        db.begin_nested = counting
+        with _github(sha="s1"):
+            await svc.poll_rules(db)
+        # One per rule: a first poll registers nothing, so no inner savepoints.
+        assert len(opened) == 2
 
     async def test_the_default_branch_is_used_when_the_rule_names_none(self):
         rule = _rule()
@@ -326,6 +444,26 @@ class TestRepositoryErrors:
             await svc.resolve_head(conn, REPO, "main")
         assert e.value.status == 422
 
+    async def test_a_gitlab_listing_error_is_502_with_the_cause_not_413(self):
+        conn = SimpleNamespace(provider="gitlab", server_url="https://gitlab.example.com")
+        head = svc.RepositoryHead(owner="org", repo="r", branch="gone", sha=None)
+        req = httpx.Request("GET", "https://gitlab.example.com/api/v4/x")
+        resp = httpx.Response(404, request=req, json={"message": "404 Tree Not Found"})
+        with patch(f"{_GL}._gitlab_request", new=AsyncMock(return_value=resp)):
+            with pytest.raises(svc.RepositoryError) as e:
+                await svc.list_files(conn, head)
+        assert e.value.status == 502
+        assert "404" in e.value.detail
+
+    async def test_gitlab_still_returns_none_on_error_for_best_effort_callers(self):
+        from terrapod.services import gitlab_service
+
+        conn = SimpleNamespace(provider="gitlab", server_url="https://gitlab.example.com")
+        req = httpx.Request("GET", "https://gitlab.example.com/api/v4/x")
+        resp = httpx.Response(404, request=req)
+        with patch(f"{_GL}._gitlab_request", new=AsyncMock(return_value=resp)):
+            assert await gitlab_service.list_repo_tree(conn, "org", "r", "gone") is None
+
     async def test_a_truncated_tree_is_413(self):
         conn = SimpleNamespace(provider="github")
         head = svc.RepositoryHead(owner="org", repo="r", branch="main", sha=None)
@@ -333,3 +471,24 @@ class TestRepositoryErrors:
             with pytest.raises(svc.RepositoryError) as e:
                 await svc.list_files(conn, head)
         assert e.value.status == 413
+
+
+class TestGitHubTreeRef:
+    async def test_the_ref_is_url_encoded_in_the_tree_path(self):
+        from terrapod.services import github_service
+
+        conn = SimpleNamespace(server_url="")
+        resp = httpx.Response(
+            200,
+            request=httpx.Request("GET", "https://api.github.com/x"),
+            json={"truncated": False, "tree": [{"path": "main.tf", "type": "blob"}]},
+        )
+        request = AsyncMock(return_value=resp)
+        with (
+            patch(f"{_GH}.get_installation_token", new=AsyncMock(return_value="t")),
+            patch(f"{_GH}._github_request", new=request),
+        ):
+            paths = await github_service.list_repo_tree(conn, "org", "r", "feature/x#1?y")
+        assert paths == ["main.tf"]
+        url = request.await_args.args[1]
+        assert url.endswith("/repos/org/r/git/trees/feature%2Fx%231%3Fy?recursive=1")

@@ -13,6 +13,9 @@ combination is meaningful:
      `--no-same-permissions` equivalent: we strip the setuid/setgid
      bits because the runner Pod runs as a non-root UID. Per-member
      utime/chmod failures on non-root are tolerated — they are cosmetic.
+     A failure to WRITE a member (out of space, I/O error, quota, …) is
+     not: the run fails naming the member, rather than carrying on with a
+     partly extracted tree (#1635).
      An archive that cannot be READ is not tolerated: it is downloaded
      again, and if it is still unreadable the run fails naming the
      archive (#1600). Carrying on used to surface later as an unrelated-
@@ -27,6 +30,7 @@ combination is meaningful:
 
 from __future__ import annotations
 
+import errno
 import os
 import stat
 import tarfile
@@ -59,7 +63,13 @@ terraform {
 
 class ConfigurationArchiveError(RuntimeError):
     """The run's configuration archive is not a readable tar.gz, even after
-    downloading it again."""
+    downloading it again — or its files could not be written to disk."""
+
+
+# errnos that only mean a file's attributes (mode, mtime, owner) could not be
+# set. The data is already on disk, so these are cosmetic on a non-root
+# runner. Anything else means a member was not written, or not fully (#1635).
+_COSMETIC_ERRNOS = frozenset({errno.EPERM, errno.ENOTSUP, errno.EOPNOTSUPP})
 
 
 @dataclass
@@ -93,10 +103,23 @@ def _safe_extract(tar: tarfile.TarFile, dest: Path) -> None:
             member.mode &= ~(stat.S_ISUID | stat.S_ISGID | stat.S_ISVTX)
         try:
             tar.extract(member, dest, set_attrs=True)
-        except (PermissionError, OSError) as exc:
-            # BusyBox tar tolerated utime/chmod failures on non-root;
-            # so do we. tofu will fail later if files are missing.
-            logger.debug("tar member extract warning", member=member.name, err=str(exc))
+        except OSError as exc:
+            # tarfile already reports utime/chmod/chown failures as
+            # non-fatal ExtractErrors, so an OSError here is normally a
+            # failure to create or write the member. Only the attribute
+            # errnos are tolerated (BusyBox tar tolerated those on non-root
+            # too). Anything else — ENOSPC, EIO, EDQUOT, EROFS, … — would
+            # leave a partly written tree that fails later with an error
+            # that does not name the cause.
+            if exc.errno in _COSMETIC_ERRNOS:
+                logger.debug("tar member extract warning", member=member.name, err=str(exc))
+                continue
+            raise ConfigurationArchiveError(
+                f"could not write {member.name!r} while extracting the configuration "
+                f"archive into {dest}: {exc}. The archive was read, but its files could "
+                "not be written to the runner's disk, so the run stopped rather than "
+                "use a partly extracted configuration."
+            ) from exc
 
 
 def _extract(tarball: Path, dest: Path) -> str | None:
@@ -105,6 +128,10 @@ def _extract(tarball: Path, dest: Path) -> str | None:
     `_safe_extract` lists every member before extracting any, which reads
     the whole compressed stream — so a truncated or non-gzip archive fails
     here before a single file is laid down.
+
+    A member that cannot be written raises ConfigurationArchiveError rather
+    than returning a reason: the archive is fine, so downloading it again
+    would not help.
     """
     if tarball.stat().st_size == 0:
         return "the download was empty"
