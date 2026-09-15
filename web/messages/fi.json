@@ -515,7 +515,7 @@
       },
       "interface": {
         "title": "Syötteet ja tulosteet",
-        "counts": "{inputs} syötettä, {outputs} tulostetta",
+        "counts": "{inputs, plural, one {# syöte} other {# syötettä}}, {outputs, plural, one {# tuloste} other {# tulostetta}}",
         "versionLabel": "Versio:",
         "noData": "Rajapintatietoja ei ole saatavilla tälle versiolle.",
         "inputs": "Syötteet",

@@ -515,7 +515,7 @@
       },
       "interface": {
         "title": "Entradas e Saídas",
-        "counts": "{inputs} entradas, {outputs} saídas",
+        "counts": "{inputs, plural, one {# entrada} other {# entradas}}, {outputs, plural, one {# saída} other {# saídas}}",
         "versionLabel": "Versão:",
         "noData": "Nenhum dado de interface disponível para esta versão.",
         "inputs": "Entradas",
