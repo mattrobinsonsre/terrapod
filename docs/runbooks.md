@@ -151,6 +151,37 @@ A runner Job was killed by Kubernetes because its container exceeded its memory 
 
 ---
 
+## Why did my run fail? (reading a run's error message)
+
+From 1.7, an errored run's error message says why it failed, not just `Runner exited with code 1` (#1631). The runner sends its own account of the failure when it exits, and the API keeps it as the run's `error-message`, followed by the exit code.
+
+### Symptoms and what they mean
+
+- **`Error: <summary> (on <file> line <n>)`**, up to three of them, then `Runner exited with code 1`: tofu (or terraform) itself failed during init, plan or apply. These are tofu's own `Error:` summaries with their locations; the full diagnostic, including the detail lines, is in the run's plan or apply log.
+- **`<point> hook failed (hook=<name>, rc=<n>)`**: an [execution hook](execution-hooks.md) exited non-zero. The hook's output is in the log. A `post_apply` failure means the apply and the state upload succeeded, and only the hook failed.
+- **`configuration archive unusable: …`**: see [Configuration archive is unusable](#configuration-archive-is-unusable) below.
+- **`binary download failed: …`**: the runner could not fetch the tofu/terraform binary from the binary cache. See [Storage Errors](#storage-errors), and check the version exists.
+- **`orchestrator crashed — see the run log for the traceback`**: an unexpected error in the runner. The exception is in the log, deliberately not in the message.
+- **Just `Runner exited with code N`**: no reason was available. Either the runner image predates 1.7, or the failure happened before the runner could report. Read the plan or apply log.
+- **OOM / killed**: these keep their own messages; see [Runner OOM-Killed](#runner-oom-killed-430).
+
+### Resolution
+
+Fix what the message names, then queue a new run. The message only ever carries tofu's diagnostic summaries, never their detail lines, and is capped at 2,000 characters. If you need more, the log has it.
+
+### Configuration archive is unusable
+
+**Symptom**: the run fails with `configuration archive unusable: the configuration archive for run … is not a readable tar.gz after 3 download(s) …` (#1600). The runner downloaded the configuration three times, and it was not a usable gzipped tarball each time.
+
+**Diagnosis**: the archive stored for this configuration version is damaged or is not an archive. For example, an upload was cut short, or something that is not a tarball was uploaded in its place. The message names the size and the first bytes it saw.
+
+**Resolution**: **retrying the run does not help**. A retry uses the same configuration version, so it downloads the same damaged archive. Build a new configuration version instead:
+- **VCS workspaces**: push a commit, or queue a run from the UI. Terrapod never stores a truncated VCS archive, and a new run fetches the configuration again.
+- **CLI-driven**: run `tofu plan` / `terraform plan` again, which uploads a new configuration version.
+- **API**: create and upload a new configuration version.
+
+---
+
 ## State Diverged
 
 The runner entrypoint marks a workspace as "state diverged" when an `apply` succeeds (infrastructure changed) but the state file upload to object storage fails. This is a critical situation — real infrastructure has changed but Terrapod's state doesn't reflect it.
@@ -724,6 +755,36 @@ After fixing the rule:
 
 - `lifecycle-state` is `active` (restored) or the workspace is gone (intentionally destroyed + deleted)
 - No orphaned state versions remain for a destroyed workspace
+
+## Module autodiscovery rule registered nothing, or too much
+
+Module autodiscovery rules (Admin → Module autodiscovery) register registry modules for the directories they find in a repository. They create registry modules only. They never delete or rename one, and never touch infrastructure. See [Module autodiscovery](registry.md#module-autodiscovery) for how they work.
+
+### How a rule decides what to register
+
+- **Saving a rule registers nothing.** You register modules from its preview, all of them or a picked subset.
+- **The first poll records a baseline.** It notes the directories that already exist and registers none of them.
+- **Later polls register only new directories:** ones that appear on the tracked branch after the baseline and match the rule. A directory you left unticked in a preview stays unregistered.
+- **Changing what a rule matches re-baselines it.** This covers its connection, repository, branch, pattern or ignore paths, and re-enabling a disabled rule. The next poll records a fresh baseline and registers nothing, so widening a rule, or turning one back on after months, never bulk-registers directories you have not previewed. Preview and register them explicitly.
+
+### Diagnosis: nothing registered
+
+1. **Is the rule enabled, and is its VCS connection `active`?** A rule on an inactive connection is skipped, with a warning in the API log.
+2. **Has the rule polled yet?** Its first poll only records the baseline. `first-scan-at` on the rule shows when that happened.
+3. **Did the tracked branch change?** A rule only walks the repository when the branch head moves.
+4. **Does the directory match?** Preview the rule. Only directories holding `.tf` or `.tf.json` files count, and `examples`, `tests`, `fixtures` and hidden directories are always skipped. The ignore patterns apply after the pattern.
+5. **Was the candidate skipped?** A preview marks a candidate whose name is taken, or whose provider cannot be derived. A scan reports the reason for each skip. A skipped directory counts as seen, so the rule will not retry it on its own. Fix the name template or provider, then register it from the preview.
+
+### Resolution: too much registered, or the wrong module
+
+- **Remove a module the rule should not have registered** by deleting it in the registry (Registry → Modules). Later polls do not register it again, because the rule has already seen that directory. An explicit scan with no subset would.
+- **Stop a rule** by disabling it (Edit → untick Enabled). Deleting a rule leaves its modules registered.
+- **Adjust what a rule matches** with its pattern and ignore paths. This re-baselines it, as described above.
+
+### Verification
+
+- The rule's preview shows each directory's module as `Already registered as …`, or unregistered, as you intended.
+- Registry → Modules lists the modules you expect, and no others from that repository.
 
 ## Reverting (or recovering from) a bad bulk-update
 

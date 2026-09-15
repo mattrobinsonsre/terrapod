@@ -402,13 +402,17 @@ data:
       command: {{ .Values.api.config.slack.command | default "/terrapod" | quote }}
       label: {{ .Values.api.config.slack.label | default "" | quote }}
     {{- end }}
-    {{- if .Values.api.config.notifications }}
+    {{- with .Values.api.config.outbound_requests }}
     # Where a user-supplied webhook URL may point (#1541). Loopback and
-    # link-local are always refused; private space only when asked.
+    # link-local are always refused; private space only when asked. Rendered
+    # on its own, not under notifications: run-task callbacks use it too, and
+    # an operator who nulls out notifications must not lose it.
     outbound_requests:
-      block_private_addresses: {{ .Values.api.config.outbound_requests.block_private_addresses }}
-      allowed_hosts: {{ .Values.api.config.outbound_requests.allowed_hosts | toJson }}
-      allowed_cidrs: {{ .Values.api.config.outbound_requests.allowed_cidrs | toJson }}
+      block_private_addresses: {{ .block_private_addresses }}
+      allowed_hosts: {{ .allowed_hosts | toJson }}
+      allowed_cidrs: {{ .allowed_cidrs | toJson }}
+    {{- end }}
+    {{- if .Values.api.config.notifications }}
     notifications:
       enabled: {{ .Values.api.config.notifications.enabled }}
       delivery_timeout_seconds: {{ .Values.api.config.notifications.delivery_timeout_seconds | default 30 }}

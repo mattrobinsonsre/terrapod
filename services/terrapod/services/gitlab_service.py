@@ -429,7 +429,9 @@ async def get_pr_file_changes(
     return out
 
 
-async def list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -> list[str] | None:
+async def list_repo_tree(
+    conn: VCSConnection, owner: str, repo: str, ref: str, *, raise_on_error: bool = False
+) -> list[str] | None:
     """List every file path in the repo at `ref`.
 
     Used by the autodiscovery initial-scan path (#309). Paginates over
@@ -437,8 +439,10 @@ async def list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -
     stops returning pages (or we hit a safety cap), collecting every
     `type=blob` entry.
 
-    Returns None on a transport error so the caller can treat it the
-    same as GitHub's `truncated` flag — best-effort, no scan today.
+    Returns None when the listing hits the page cap, like GitHub's
+    `truncated` flag. By default a transport or HTTP error also returns
+    None (best-effort, no scan today); with `raise_on_error` it raises
+    instead, so a caller that reports "truncated" can tell the two apart.
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
@@ -464,6 +468,8 @@ async def list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -
             )
             resp.raise_for_status()
         except httpx.HTTPError:
+            if raise_on_error:
+                raise
             logger.warning(
                 "GitLab tree listing failed — autodiscovery initial scan will be incomplete",
                 project=f"{owner}/{repo}",
