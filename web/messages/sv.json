@@ -1114,6 +1114,8 @@
     "providerHint": "Lämna tomt för att hämta den från repositoriets namn, när det följer konventionen terraform-PROVIDER-NAME.",
     "tagPattern": "Taggmönster",
     "labels": "Etiketter (kopieras till registrerade moduler)",
+    "ruleName": "Regelnamn",
+    "ownerEmailHint": "Kopieras till varje modul som regeln registrerar. Ägaren får administratörsbehörighet för de modulerna.",
     "createTitle": "Ny regel för modulidentifiering",
     "editTitle": "Redigera regel för modulidentifiering",
     "nameTaken": "Namnet används redan av en annan modul",

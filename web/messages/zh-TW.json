@@ -1114,6 +1114,8 @@
     "providerHint": "留空則在儲存庫名稱遵循 terraform-PROVIDER-NAME 慣例時從中取得。",
     "tagPattern": "Tag 模式",
     "labels": "標籤（會複製到已註冊的模組）",
+    "ruleName": "規則名稱",
+    "ownerEmailHint": "會複製到此規則註冊的每個模組。所有者對這些模組擁有管理員權限。",
     "createTitle": "新增模組自動探索規則",
     "editTitle": "編輯模組自動探索規則",
     "nameTaken": "此名稱已被其他模組使用",

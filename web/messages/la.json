@@ -1114,6 +1114,8 @@
     "providerHint": "Relinque vacuum ut ex nomine repositorii sumatur, cum consuetudinem terraform-PROVIDER-NAME sequitur.",
     "tagPattern": "Exemplar tagorum",
     "labels": "Pittacia (in modulos inscriptos copiantur)",
+    "ruleName": "Nomen regulae",
+    "ownerEmailHint": "In omnem modulum quem haec regula inscribit transcribitur. Dominus in eos modulos iura administratoris habet.",
     "createTitle": "Nova regula modulos inveniendi",
     "editTitle": "Regulam modulos inveniendi recense",
     "nameTaken": "Nomen iam ab alio modulo tenetur",

@@ -1114,6 +1114,8 @@
     "providerHint": "Leer lassen, um ihn aus dem Repository-Namen zu übernehmen, sofern dieser der Konvention terraform-PROVIDER-NAME folgt.",
     "tagPattern": "Tag-Muster",
     "labels": "Labels (werden auf registrierte Module übertragen)",
+    "ruleName": "Name der Regel",
+    "ownerEmailHint": "Wird auf jedes Modul übertragen, das diese Regel registriert. Der Besitzer erhält Admin-Rechte für diese Module.",
     "createTitle": "Neue Regel für die automatische Modulerkennung",
     "editTitle": "Regel für die automatische Modulerkennung bearbeiten",
     "nameTaken": "Name bereits von einem anderen Modul belegt",

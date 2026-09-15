@@ -93,11 +93,28 @@ test.describe('Admin — Module autodiscovery (#1584)', () => {
       await expect(form).toBeVisible({ timeout: 1_000 });
     }).toPass({ timeout: 15_000 });
 
-    await page.getByLabel('Name', { exact: true }).fill('azure-mg');
+    // #1625: while the form is open, its own Cancel is the only one; the header
+    // does not become a second one.
+    await expect(page.getByRole('button', { name: 'Cancel' })).toHaveCount(1);
+    await expect(page.getByText(/Copied onto every module this rule registers/)).toBeVisible();
+
+    await page.getByLabel('Rule name').fill('azure-mg');
     await page.getByLabel('VCS connection').selectOption('vcs-e2e');
     await page.getByLabel('Repo URL').fill(REPO);
     await page.getByLabel('Ignore patterns (one per line)').fill('modules/legacy/**');
     await page.getByLabel('Provider (optional)').fill('azurerm');
+
+    // #1625: Enter in the labels editor adds the label and does not submit the form.
+    await page.getByPlaceholder('key').fill('team');
+    await page.getByPlaceholder('value').fill('platform');
+    await page.getByPlaceholder('value').press('Enter');
+    await expect(page.getByRole('button', { name: 'Remove team' })).toBeVisible();
+    expect(created).toBeNull();
+
+    await page.route(
+      (url) => url.pathname === `/api/terrapod/v1/module-autodiscovery-rules/${RULE_ID}/preview`,
+      (route) => route.fulfill({ json: PREVIEW }),
+    );
     await page.getByRole('button', { name: 'Create', exact: true }).click();
 
     await expect.poll(() => created).not.toBeNull();
@@ -109,9 +126,14 @@ test.describe('Admin — Module autodiscovery (#1584)', () => {
       'ignore-patterns': ['modules/legacy/**'],
       provider: 'azurerm',
       'vcs-tag-pattern': 'v*',
+      labels: { team: 'platform' },
       enabled: true,
     });
     await expect(page.getByText('Created azure-mg')).toBeVisible();
+
+    // #1625: the saved rule's preview opens straight away, ready to register.
+    await expect(page.getByRole('heading', { name: 'Preview: azure-mg' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Register the module in modules/create' })).toBeEnabled();
   });
 
   test('preview a saved rule and register only the ticked module', async ({ page }) => {

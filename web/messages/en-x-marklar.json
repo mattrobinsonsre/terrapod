@@ -1114,6 +1114,8 @@
     "providerHint": "Leave it empty to take it from the marklar marklar, when it follows the terraform-PROVIDER-NAME marklar.",
     "tagPattern": "Marklar marklar",
     "labels": "Marklars (copied onto registered marklars)",
+    "ruleName": "Marklar marklar",
+    "ownerEmailHint": "Copied onto every marklar this marklar registers. The marklar gets marklar on those marklars.",
     "createTitle": "New marklar marklar marklar",
     "editTitle": "Edit marklar marklar marklar",
     "nameTaken": "Marklar already taken by another marklar",

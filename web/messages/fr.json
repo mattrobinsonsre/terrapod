@@ -1114,6 +1114,8 @@
     "providerHint": "Laissez vide pour le déduire du nom du dépôt, s’il suit la convention terraform-PROVIDER-NAME.",
     "tagPattern": "Motif de tag",
     "labels": "Libellés (copiés sur les modules enregistrés)",
+    "ruleName": "Nom de la règle",
+    "ownerEmailHint": "Copié sur chaque module que cette règle enregistre. Le propriétaire obtient les droits d''administration sur ces modules.",
     "createTitle": "Nouvelle règle de découverte de modules",
     "editTitle": "Modifier la règle de découverte de modules",
     "nameTaken": "Nom déjà pris par un autre module",

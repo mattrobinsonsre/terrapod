@@ -1114,6 +1114,8 @@
     "providerHint": "비워 두면 저장소 이름이 terraform-PROVIDER-NAME 규칙을 따를 때 그 이름에서 가져옵니다.",
     "tagPattern": "태그 패턴",
     "labels": "레이블(등록된 모듈에 복사됨)",
+    "ruleName": "규칙 이름",
+    "ownerEmailHint": "이 규칙이 등록하는 모든 모듈에 복사됩니다. 소유자는 해당 모듈에 대한 관리자 권한을 갖습니다.",
     "createTitle": "새 모듈 자동 검색 규칙",
     "editTitle": "모듈 자동 검색 규칙 편집",
     "nameTaken": "다른 모듈이 이미 사용 중인 이름",
