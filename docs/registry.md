@@ -254,20 +254,38 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules \
 
 ### Module autodiscovery
 
-Instead of registering the modules in a repository one at a time, give Terrapod a **module autodiscovery rule** and let it find them. It is the registry's counterpart to [workspace autodiscovery](autodiscovery.md). A rule is scoped to one repository on a VCS connection, and it registers each module it finds as an ordinary VCS-sourced registry module: the root, and any submodule with its `subdirectory`.
+Instead of registering the modules in a repository one at a time, give Terrapod a **module autodiscovery rule** and let it find them. It is the registry's counterpart to [workspace autodiscovery](autodiscovery.md). A rule looks at one repository, or at every repository in an org or group, on a VCS connection. It registers each module it finds as an ordinary VCS-sourced registry module: the root, and any submodule with its `subdirectory`.
+
+**What a rule looks at.** The rule's `repo-url` takes one of three forms. Terrapod works out which when the rule is saved and reports it as the read-only `target-kind`:
+
+| `repo-url` | `target-kind` | Covers |
+|---|---|---|
+| `https://github.com/my-org/terraform-aws-network` | `repository` | That one repository. |
+| `https://github.com/my-org`, `https://gitlab.com/my-group/platform` | `namespace` | Every repository in the org or group (GitLab subgroups included). |
+| `https://github.com/my-org/terraform-*` | `pattern` | The org or group's repositories whose names match the glob. |
+
+- **Glob characters** (`*`, `?`, `[...]`) may appear in the last path segment only, and they match repository names directly inside one org or group.
+- **On GitHub**, the org must be the account the connection's App is installed on, and the App's repository selection applies. A path of three or more segments is refused.
+- **On GitLab**, a path of two or more segments is tried as a project first, so an existing single-repository rule keeps its meaning, and then as a group. Personal namespaces are not supported.
+- **The classification is fixed when the rule is saved and never changes on its own.** A rule that names one repository can never quietly widen to a whole group. It is re-checked only when `repo-url` or the connection is saved again. The rule follows its target by the provider's id, so a renamed or transferred org, group or repository keeps working.
+- **A pattern that matches nothing yet is accepted.** It exists to catch repositories created later.
+- Saving is refused with `422` when `repo-url` names nothing on the connection, and with `502` when the provider cannot be asked, so an apply can be retried.
 
 **What counts as a module.** The rule's `pattern` and `ignore-patterns` are the same gitignore-style globs as workspace autodiscovery, matched against file paths: `**` spans directories, `*` stays within one, and `?` matches one character. Only `.tf` and `.tf.json` files count; a directory of `.tfvars` files is a root configuration, not a module. Every directory holding a matching file is a candidate, the repository root (`""`) first. Directories named `examples`, `example`, `test`, `tests`, `testdata` or `fixtures`, and hidden directories, are never candidates, whatever the pattern says.
 
-**Naming.** Without a `name-template`, a module takes the repository's module name (its `terraform-<provider>-` prefix dropped), followed for a submodule by the last segment of its path. So `terraform-azurerm-management-groups` plus `modules/create` gives `management-groups-create`. A template can use four placeholders, for example `platform-{leaf}`:
+**Naming.** Without a `name-template`, a module takes the repository's module name (its `terraform-<provider>-` prefix dropped), followed for a submodule by the last segment of its path. So `terraform-azurerm-management-groups` plus `modules/create` gives `management-groups-create`. A template can use five placeholders, for example `platform-{leaf}`:
 - `{repo}`: the repository's module name;
 - `{path}`: the subdirectory, with `/` replaced by `-`;
 - `{leaf}`: the subdirectory's last segment;
-- `{root}`: the subdirectory as-is.
+- `{root}`: the subdirectory as-is;
+- `{owner}`: the repository's owner or group, useful when a rule covers more than one.
+
+For a rule that covers an org or group, the name and provider are worked out per repository. Two candidates that would take the same name are both skipped and reported, and across poll cycles the first to register keeps it.
 
 A template may hold only literal text and those placeholders; anything else in braces (another name, a format spec, attribute access) is refused with `422`. Either way, the name is then fitted to the registry's rule: lowercase letters, digits and hyphens, starting with a letter, and at most 64 characters.
 
 **Provider, tags, labels and owner.**
-- `provider` applies to every module the rule registers. Left empty, it's taken from a `terraform-<provider>-<name>` repository name. In a repository without that convention, candidates are reported as `missing-provider` and not registered.
+- `provider` applies to every module the rule registers. Left empty, it's taken from a `terraform-<provider>-<name>` repository name. In a repository without that convention, candidates are reported as `missing-provider` and not registered. For a rule over an org or group this is what keeps application repositories that merely contain `.tf` files out of the registry: leave `provider` empty, or use a pattern such as `terraform-*`.
 - `vcs-tag-pattern` (default `v*`) becomes each module's tag pattern.
 - Each module tracks the rule's `branch`.
 - `labels` and `owner-email` are copied onto every module the rule registers. Labels are validated like any other label write, so reserved keys are refused with `422`.
@@ -283,6 +301,27 @@ A template may hold only literal text and those placeholders; anything else in b
 - **New directories register themselves.** While a rule is enabled, the registry poll checks the tracked branch's head every `vcs.module_poll_interval_seconds` (default 300). When the head has moved, the poll registers any candidate directory the rule hasn't seen before, and polls those modules' tags in the same cycle. So a new submodule's first tagged version publishes without anyone touching the registry. If the repository can't be read, or the provider truncates its tree, the poll retries on the next cycle. Each rule is polled on its own, so one that fails never undoes another's registrations, and a rule whose VCS connection isn't active is skipped with a warning in the API log.
 - **Changing what the rule looks at starts it afresh.** A new repository, connection or branch, a different `pattern` or `ignore-patterns`, or re-enabling a disabled rule clears what it has seen, and the next poll records a new baseline and registers nothing. Directories the old rule never claimed are not registered behind your back: preview the rule and scan the ones you want.
 - **Nothing is ever deleted or renamed.** A directory that disappears simply stops producing versions, because tags without it are skipped. Deleting a rule leaves the modules it registered; they simply stop naming a rule.
+
+**A rule that covers an org or group** keeps the state above per repository, and adds:
+- **Repositories that already existed are baselined.** The first poll lists them and registers nothing. Preview the rule and register all of them, or pick a subset. The same applies to an older repository that comes into scope later: one added to the App's repository selection, transferred in, or pulled in by widening `repo-url`.
+- **Repositories created after the rule's baseline register their modules automatically**, including ones that are empty when they are created: their modules register as they arrive.
+- **Forks are skipped.** Archived repositories keep their state but are not scanned, and empty ones are retried when they change.
+- **A repository that leaves the rule's target** (moved out, or no longer matching the pattern) is marked `out-of-scope`, and its modules stay registered. Only a complete listing marks anything out of scope.
+- **Renamed repositories are followed, not re-registered.** The rule records the old path, and the old URL still counts when deciding what is already registered. Modules are never edited, so a module the rule registered keeps its old URL; see the [runbook](runbooks.md#module-autodiscovery-rule-registered-nothing-or-too-much) to repoint one.
+- **A repository that a single-repository rule on the same connection already names is `covered`**, and skipped by the org-wide rule.
+- **Its preview is served from what the last poll found**, with no VCS calls, a page of repositories at a time, each with its status. `?repository=<path>` reads one repository live instead. A scan takes `selections`: the repositories to register from, each with optional `subdirectories`. With no body it registers every current candidate, which in a large org can be many modules.
+- **Its per-repository state** — status, origin (`baseline` or `new`), candidates, last skips, previous paths and last error — is at `GET …/{id}/repositories`, and under **Repositories** on the rule in the web UI.
+- **`last-error` on the rule says why its last poll could not do all its work**: the target was deleted, the listing failed or stopped at the repository cap, or the connection's API quota ran low. The rule tries again on the next poll. The web UI shows it as a banner.
+
+**Limits.** A rule over an org or group can stand for thousands of repositories, so the registry poll bounds what such rules spend each cycle. A rule that names one repository is not limited by any of these. Each cycle lists every such rule's repositories, looks up the branch head only of a repository whose provider-reported change marker moved, and lists a tree only where that head moved. The limits, under `api.config.registry.module_autodiscovery` in the Helm values:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `tree_listings_per_cycle` | `50` | Most repository trees listed per cycle, across all org-wide rules, least recently checked first. A larger namespace is covered over several cycles. |
+| `max_repositories` | `5000` | Most repositories listed for one rule. A listing that stops here is incomplete, and nothing is then marked out of scope. |
+| `tree_quota_floor_percent` | `20` | Below this share of the connection's remaining API quota, no trees are listed. |
+| `enumeration_quota_floor_percent` | `5` | Below this share, org-wide rules skip the cycle altogether. |
+| `time_budget_seconds` | `60` | Wall-clock time org-wide rules may spend per cycle, so module tag polling is never starved. |
 
 Create a rule:
 
@@ -316,15 +355,27 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/module-autodiscovery-r
   -d '{"data": {"attributes": {"subdirectories": ["", "modules/create"]}}}'
 ```
 
-Leave out the body to register every candidate. Module autodiscovery requires the platform `admin` role, and every surface drives the same rules:
-- **Web UI:** **Admin → Module autodiscovery**, to create, preview and scan rules, ticking the candidates to register.
+Leave out the body to register every candidate. For a rule over an org or group, pick repositories instead:
+
+```zsh
+curl -X POST https://terrapod.example.com/api/terrapod/v1/module-autodiscovery-rules/<rule-id>/scan \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{"data": {"attributes": {"selections": [
+        {"repository": "my-org/terraform-aws-network"},
+        {"repository": "my-org/terraform-aws-dns", "subdirectories": ["modules/zone"]}]}}}'
+```
+
+Module autodiscovery requires the platform `admin` role, and every surface drives the same rules:
+- **Web UI:** **Admin → Module autodiscovery**, to create, preview and scan rules, ticking the candidates to register. A rule over an org or group shows its target kind, a preview grouped by repository, and a **Repositories** view of each repository's status.
 - **API:** [Module Autodiscovery Rules](api-reference.md#module-autodiscovery-rules).
-- **MCP:** `terrapod_module_autodiscovery_rule_list`, `terrapod_module_autodiscovery_rule_preview` and `terrapod_module_autodiscovery_rule_scan`.
-- **Terraform provider:** the `terrapod_module_autodiscovery_rule` resource.
+- **MCP:** `terrapod_module_autodiscovery_rule_list`, `terrapod_module_autodiscovery_rule_preview` (paged, or one `repository`), `terrapod_module_autodiscovery_rule_repositories` and `terrapod_module_autodiscovery_rule_scan` (with `subdirectories` or `selections`).
+- **Terraform provider:** the `terrapod_module_autodiscovery_rule` resource, with computed `target_kind`, `last_error` and `last_enumerated_at`, and the `terrapod_module_autodiscovery_rule_repositories` data source.
 - **go-terrapod:**
   - `ListModuleAutodiscoveryRules`, `CreateModuleAutodiscoveryRule`, `GetModuleAutodiscoveryRule`, `UpdateModuleAutodiscoveryRule` and `DeleteModuleAutodiscoveryRule`;
-  - `PreviewModuleAutodiscoveryRule` and `PreviewUnsavedModuleAutodiscoveryRule`;
-  - `ScanModuleAutodiscoveryRule`.
+  - `PreviewModuleAutodiscoveryRule`, `PreviewModuleAutodiscoveryRuleWithOptions`, `PreviewUnsavedModuleAutodiscoveryRule` and `PreviewUnsavedModuleAutodiscoveryRuleWithOptions`;
+  - `ScanModuleAutodiscoveryRule` and `ScanModuleAutodiscoveryRuleSelections`;
+  - `ListModuleAutodiscoveryRuleRepositories` and `ListAllModuleAutodiscoveryRuleRepositories`.
 
 ### Manual Upload Still Works
 

@@ -33,10 +33,21 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 | Service catalog | `terrapod_catalog_item`, `terrapod_catalog_instance`, `terrapod_provider_template` |
 
 **Data sources** (`terrapod_*`): `terrapod_workspace`, `terrapod_workspaces`,
-`terrapod_workspace_cost`, `terrapod_agent_pool`, `terrapod_role`,
-`terrapod_user`, `terrapod_vcs_connection`, `terrapod_catalog_instances`,
+`terrapod_workspace_cost`, `terrapod_architecture_critique`,
+`terrapod_agent_pool`, `terrapod_role`, `terrapod_user`,
+`terrapod_vcs_connection`, `terrapod_catalog_instances`,
 `terrapod_catalog_item_interface` (the inputs and outputs of the module version
-a catalog item resolves to).
+a catalog item resolves to), `terrapod_module_autodiscovery_rule_repositories`
+(the repositories a module autodiscovery rule looks at, each with its status,
+origin and candidates; kept out of the rule resource so polls never change its
+state).
+
+A `terrapod_module_autodiscovery_rule`'s `repo_url` may name one repository,
+an org or group, or a repository-name pattern such as
+`https://github.com/myorg/terraform-*`; the server classifies it on apply and
+reports the result in the computed `target_kind`. A glob outside the last path
+segment is refused at plan time. `last_error` and `last_enumerated_at` are
+computed too. See [Module autodiscovery](registry.md#module-autodiscovery).
 
 `terrapod_workspace_cost` reports a workspace's current monthly managed-infra
 cost (from its latest state, via the native cost engine) — useful
