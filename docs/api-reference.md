@@ -2515,11 +2515,11 @@ POST /api/v1/module-autodiscovery-rules
 | `repo-url` | The repository to scan. |
 | `branch` | Empty means the repository's default branch. |
 | `pattern`, `ignore-patterns` | Gitignore-style globs over `.tf` / `.tf.json` file paths. Each matching file's directory is a module. A pattern ending in `/` is refused, because it can only match a directory. |
-| `name-template` | Placeholders are `{repo}`, `{path}`, `{leaf}` and `{root}`. Empty means the repository's module name plus the submodule's last segment. |
+| `name-template` | Literal text plus the placeholders `{repo}`, `{path}`, `{leaf}` and `{root}`. Empty means the repository's module name plus the submodule's last segment. |
 | `provider` | Lowercase letters, digits and hyphens. Empty means taken from a `terraform-<provider>-<name>` repository name. |
 | `vcs-tag-pattern` | Copied onto each registered module. Empty means `v*`. |
-| `enabled` | Default `true`. While enabled, directories that appear on the tracked branch are registered automatically. |
-| `labels`, `owner-email` | Copied onto each registered module. |
+| `enabled` | A boolean; default `true`. While enabled, directories that appear on the tracked branch are registered automatically. |
+| `labels`, `owner-email` | Copied onto each registered module. `owner-email` must be an email address, or empty. |
 
 Saving registers nothing: use [Scan](#scan-register-modules) to register what's already in the repository.
 
@@ -2530,8 +2530,10 @@ Returns `201` with the created rule. `409` means a rule with that name already e
 - a connection id that isn't a UUID, or that doesn't exist;
 - a pattern or ignore pattern ending in `/`;
 - `ignore-patterns` that isn't a list of strings;
-- a `name-template` with any other placeholder;
+- a `name-template` with any other placeholder, a format spec, or any other brace;
 - an invalid `provider`;
+- `enabled` that isn't a boolean (the string `"false"` included);
+- an `owner-email` that isn't an email address;
 - a reserved label key.
 
 **Rule attributes** in responses:
@@ -2558,7 +2560,7 @@ GET /api/v1/module-autodiscovery-rules/{id}
 PATCH /api/v1/module-autodiscovery-rules/{id}
 ```
 
-Same body shape as create; only the attributes you include change. Changing `repo-url`, `vcs-connection-id` or `branch` starts the rule afresh: what it had seen belonged to the old target, so the next poll records a new baseline rather than registering everything.
+Same body shape as create; only the attributes you include change, validated the same way. Changing `repo-url`, `vcs-connection-id`, `branch`, `pattern` or `ignore-patterns`, or setting `enabled` to `true` on a disabled rule, starts the rule afresh: what it had seen no longer describes what it claims, so the next poll records a new baseline rather than registering every directory the old rule never claimed. Register those with a [scan](#scan-register-modules).
 
 ### Delete Rule
 
@@ -2584,12 +2586,12 @@ Each entry has:
 - `subdirectory`: `""` for the root;
 - `name` and `provider`: as a scan would register them;
 - `registered-as`: the `{name, provider}` of the module already registered from that directory, or `null`;
-- `collision`: `true` when the name and provider belong to another module;
+- `collision`: `true` when the name and provider belong to another module, or when another unregistered candidate derives the same name;
 - `missing-provider`: `true` when no provider could be worked out.
 
 Errors:
 - `422`: a repository URL that can't be parsed, or an unknown VCS provider.
-- `502`: the VCS provider can't be reached, or returned no default branch.
+- `502`: the VCS provider can't be reached, returned no default branch, or refused to list the tree (a missing branch, a revoked token); the detail carries the provider's error.
 - `413`: the provider truncated the repository's tree, so it's too large to scan in one pass.
 
 ### Scan (register modules)

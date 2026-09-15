@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager, contextmanager
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.exc import IntegrityError
 
@@ -22,6 +23,7 @@ from terrapod.services import vcs_rate_limit
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
 _GH = "terrapod.services.github_service"
+_GL = "terrapod.services.gitlab_service"
 _URL = "/api/terrapod/v1/module-autodiscovery-rules"
 REPO = "https://github.com/org/terraform-azurerm-management-groups"
 PATHS = ["main.tf", "modules/create/main.tf", "modules/update/main.tf", "examples/x/main.tf"]
@@ -196,10 +198,56 @@ class TestCrud:
             "reserved label": {"labels": {"owner": "x"}},
             "ignore-patterns not a list": {"ignore-patterns": "modules/**"},
             "malformed connection": {"vcs-connection-id": "nope"},
+            "template format spec": {"name-template": "{leaf:>10}"},
+            "template attribute access": {"name-template": "{repo.__class__}"},
+            "template conversion": {"name-template": "{leaf!r}"},
+            "template positional": {"name-template": "{0}"},
+            "template empty braces": {"name-template": "x-{}"},
+            "template stray brace": {"name-template": "x-{"},
+            "template not a string": {"name-template": ["{repo}"]},
+            "enabled as a string": {"enabled": "false"},
+            "enabled as a number": {"enabled": 0},
+            "enabled as null": {"enabled": None},
+            "owner-email not an email": {"owner-email": "not-an-email"},
+            "owner-email without a domain dot": {"owner-email": "a@b"},
         }
         for what, attrs in cases.items():
             resp = await _call(_FakeDB(), "POST", "", json=_body(**attrs))
             assert resp.status_code == 422, what
+
+    async def test_valid_optional_values_are_accepted(self, *_):
+        cases = [
+            {"name-template": "platform-{repo}-{leaf}"},
+            {"name-template": "literal"},
+            {"name-template": ""},
+            {"enabled": False},
+            {"owner-email": ""},
+            {"owner-email": "platform@example.com"},
+        ]
+        for attrs in cases:
+            resp = await _call(_FakeDB(), "POST", "", json=_body(**attrs))
+            assert resp.status_code == 201, (attrs, resp.text)
+
+    async def test_an_empty_owner_email_is_stored_as_none(self, *_):
+        db = _FakeDB()
+        await _call(db, "POST", "", json=_body(**{"owner-email": "  "}))
+        assert db.added[0].owner_email is None
+
+    async def test_patch_validates_the_same_way(self, *_):
+        for attrs in (
+            {"labels": {"owner": "x"}},
+            {"labels": {"status": "x"}},
+            {"enabled": "true"},
+            {"owner-email": "nope"},
+            {"name-template": "{leaf:>3}"},
+        ):
+            rule = _saved_rule(labels={"team": "t"})
+            db = _FakeDB(rule)
+            body = {"data": {"attributes": attrs}}
+            resp = await _call(db, "PATCH", f"/{rule.id}", json=body)
+            assert resp.status_code == 422, attrs
+            assert db.committed == 0
+            assert rule.labels == {"team": "t"} and rule.enabled is True
 
     async def test_an_unknown_connection_is_422(self, *_):
         resp = await _call(_FakeDB(connection=False), "POST", "", json=_body())
@@ -251,6 +299,57 @@ class TestCrud:
             "",
             None,
         )
+
+    async def test_widening_or_re_enabling_the_rule_starts_it_afresh(self, *_):
+        # What the rule has seen no longer describes what it claims; keeping it
+        # would bulk-register every newly claimed directory, none of them ticked.
+        cases = {
+            "pattern": ({}, {"pattern": "**"}),
+            "ignore-patterns dropped": (
+                {"ignore_patterns": ["modules/legacy/**"]},
+                {"ignore-patterns": []},
+            ),
+            "ignore-patterns added": ({}, {"ignore-patterns": ["modules/x/**"]}),
+            "re-enabled": ({"enabled": False}, {"enabled": True}),
+        }
+        for what, (saved, attrs) in cases.items():
+            rule = _saved_rule(
+                first_scan_at=datetime.now(UTC),
+                last_scanned_sha="s1",
+                seen_subdirectories=["a"],
+                **saved,
+            )
+            body = {"data": {"attributes": attrs}}
+            resp = await _call(_FakeDB(rule), "PATCH", f"/{rule.id}", json=body)
+            assert resp.status_code == 200, what
+            assert (rule.seen_subdirectories, rule.last_scanned_sha, rule.first_scan_at) == (
+                [],
+                "",
+                None,
+            ), what
+
+    async def test_changes_that_do_not_change_what_it_claims_keep_the_baseline(self, *_):
+        cases = {
+            "same pattern resent": {"pattern": "**/*.tf"},
+            "same ignore-patterns resent": {"ignore-patterns": []},
+            "still enabled": {"enabled": True},
+            "disabled": {"enabled": False},
+            "provider": {"provider": "aws"},
+            "name template": {"name-template": "x-{leaf}"},
+        }
+        for what, attrs in cases.items():
+            first = datetime.now(UTC)
+            rule = _saved_rule(
+                first_scan_at=first, last_scanned_sha="s1", seen_subdirectories=["a"]
+            )
+            body = {"data": {"attributes": attrs}}
+            resp = await _call(_FakeDB(rule), "PATCH", f"/{rule.id}", json=body)
+            assert resp.status_code == 200, what
+            assert (rule.seen_subdirectories, rule.last_scanned_sha, rule.first_scan_at) == (
+                ["a"],
+                "s1",
+                first,
+            ), what
 
     async def test_renaming_keeps_what_the_rule_has_seen(self, *_):
         rule = _saved_rule(seen_subdirectories=["a"], last_scanned_sha="s1")
@@ -345,6 +444,36 @@ class TestPreviewAndScan:
             resp = await _call(_FakeDB(rule), "POST", f"/{rule.id}/scan", json=body)
         assert resp.status_code == 422
         tree.assert_not_awaited()
+
+    async def test_candidates_sharing_a_name_are_flagged_and_skipped_as_name_taken(self, *_):
+        rule = _saved_rule(name_template="{leaf}")
+        paths = ["a/x/main.tf", "b/x/main.tf"]
+        with _github(paths):
+            preview = await _call(_FakeDB(rule), "GET", f"/{rule.id}/preview")
+        assert [e["collision"] for e in preview.json()["data"]["attributes"]["entries"]] == [
+            True,
+            True,
+        ]
+        db = _FakeDB(rule)
+        with _github(paths):
+            scan = await _call(db, "POST", f"/{rule.id}/scan")
+        attrs = scan.json()["data"]["attributes"]
+        assert attrs["modules-registered"] == 0
+        assert {s["reason"] for s in attrs["skipped"]} == {"name-taken"}
+
+    async def test_a_gitlab_listing_error_is_502_not_413(self, *_):
+        rule = _saved_rule(repo_url="https://gitlab.com/org/terraform-aws-x", branch="gone")
+        rule.vcs_connection.provider = "gitlab"
+        rule.vcs_connection.server_url = "https://gitlab.com"
+        req = httpx.Request("GET", "https://gitlab.com/api/v4/x")
+        refused = httpx.Response(404, request=req, json={"message": "404 Tree Not Found"})
+        with (
+            patch(f"{_GL}.get_branch_sha", new=AsyncMock(return_value=None)),
+            patch(f"{_GL}._gitlab_request", new=AsyncMock(return_value=refused)),
+        ):
+            resp = await _call(_FakeDB(rule), "GET", f"/{rule.id}/preview")
+        assert resp.status_code == 502
+        assert "404" in resp.json()["detail"]
 
     async def test_a_truncated_tree_is_413(self, *_):
         rule = _saved_rule()

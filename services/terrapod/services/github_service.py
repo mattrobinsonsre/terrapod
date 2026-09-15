@@ -9,6 +9,7 @@ import asyncio
 import hashlib
 import hmac
 import time
+from urllib.parse import quote as url_quote
 
 import httpx
 import jwt
@@ -572,7 +573,8 @@ async def list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -
     # sets `truncated: true` if it had to stop short.
     resp = await _github_request(
         "GET",
-        f"{api_url}/repos/{owner}/{repo}/git/trees/{ref}?recursive=1",
+        # The ref is encoded whole: a branch name may hold `/`, `#` or `?`.
+        f"{api_url}/repos/{owner}/{repo}/git/trees/{url_quote(ref, safe='')}?recursive=1",
         token,
         conn=conn,
     )
