@@ -2053,8 +2053,11 @@ async def next_run(
     except VaultTransient:
         # Vault is down, not misconfigured. Put the run back so the next claim
         # picks it up, rather than erroring every queued run in the estate over
-        # a restart and leaving an operator to re-queue each by hand.
-        await run_service.transition_run(db, run, "queued")
+        # a restart and leaving an operator to re-queue each by hand. Undo the
+        # claim this phase made: a plan claim came from `queued`, an apply
+        # claim from `confirmed` (#1646).
+        unclaimed = "queued" if phase == "plan" else "confirmed"
+        await run_service.transition_run(db, run, unclaimed)
         await db.commit()
         return Response(status_code=204)
     except VaultSourceError as e:

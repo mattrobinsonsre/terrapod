@@ -911,6 +911,48 @@ class TestATransientVaultFailureDoesNotDestroyTheRun:
             "it should wait for the next claim"
         )
 
+    async def test_an_unreachable_vault_at_apply_leaves_the_run_confirmed(self, app, client):
+        """The apply claim is `confirmed → applying`, so the unclaim must go back
+        to `confirmed`. Going to `queued` is not a valid transition: it 500ed
+        and left the run in `applying` with no Job (#1646)."""
+        from terrapod.config import VaultInstanceConfig, settings
+        from terrapod.services import run_service
+        from terrapod.services.vault_client import VaultUnavailable
+
+        set_auth(app, admin_user())
+        tag = uuid.uuid4().hex[:8]
+        pool_id, listener_id = await _pool_with_listener(client, tag)
+        ws_id, cv_id, run_id = await _agent_run_with_vault_var(client, tag, pool_id)
+        async with get_db_session() as db:
+            run = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one()
+            for status in ("planning", "planned", "confirmed"):
+                run = await run_service.transition_run(db, run, status)
+            await db.commit()
+        set_listener_auth(app, listener_id, pool_id.removeprefix("apool-"))
+
+        prior = (settings.vault.enabled, settings.vault.instances)
+        settings.vault.enabled = True
+        settings.vault.instances = [
+            VaultInstanceConfig(name="default", default=True, address="https://vault.test:8200")
+        ]
+        try:
+            with patch(
+                "terrapod.services.vault_source_service.read_secret",
+                new=AsyncMock(side_effect=VaultUnavailable("connection refused")),
+            ):
+                resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
+        finally:
+            settings.vault.enabled, settings.vault.instances = prior
+
+        assert resp.status_code == 204, resp.text
+        async with get_db_session() as db:
+            final = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one()
+        assert final.status == "confirmed", (
+            f"a transient Vault failure at apply left the run {final.status}; "
+            "it should wait for the next claim"
+        )
+        assert final.apply_started_at is None
+
     async def test_a_permanent_failure_still_errors_the_run(self, app, client):
         """The relaxation must not swallow a reference that will never resolve."""
         from terrapod.config import VaultInstanceConfig, settings
