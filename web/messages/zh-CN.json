@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "存储的是路径，绝不是密钥。Terrapod 的 Vault 策略决定它能读取什么。",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "无法解析的 Vault 引用",
-      "vaultInstanceDefaultNamed": "默认（{name}）"
+      "vaultInstanceDefaultNamed": "默认（{name}）",
+      "vaultDeliverAsFile": "以文件形式提供",
+      "vaultFileName": "文件名",
+      "vaultFileNameDefault": "默认为变量键",
+      "vaultFileBadge": "文件",
+      "vaultFileHint": "变量保存的是文件路径而不是密钥：可作为 {fileFn} 使用，或供从环境变量读取路径的工具使用。相对名称（如 {relExample}）写入 {base} 下；以 {home} 开头的名称（如 {homeExample}）放在运行器的主目录中。"
     },
     "runs": {
       "options": "选项",

@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "Yol saklanır, gizli değer asla. Terrapod'un Vault ilkesi neyi okuyabileceğini belirler.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Okunamayan Vault referansı",
-      "vaultInstanceDefaultNamed": "Varsayılan ({name})"
+      "vaultInstanceDefaultNamed": "Varsayılan ({name})",
+      "vaultDeliverAsFile": "Dosya olarak teslim et",
+      "vaultFileName": "Dosya adı",
+      "vaultFileNameDefault": "Varsayılan, değişken anahtarıdır",
+      "vaultFileBadge": "Dosya",
+      "vaultFileHint": "Değişken gizli değeri değil, dosyanın yolunu tutar: {fileFn} olarak ya da bir ortam değişkeninden yol okuyan bir araçla kullanın. {relExample} gibi göreli bir ad {base} altına yazılır; {homeExample} gibi {home} ile başlayan bir ad, çalıştırıcının ana dizinine konur."
     },
     "runs": {
       "options": "Seçenekler",

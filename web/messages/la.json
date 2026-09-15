@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "Semita servatur, numquam arcanum. Quid legi possit, regula Vault Terrapodis moderatur.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Vault relatio illegibilis",
-      "vaultInstanceDefaultNamed": "Praedefinitum ({name})"
+      "vaultInstanceDefaultNamed": "Praedefinitum ({name})",
+      "vaultDeliverAsFile": "Ut fasciculum trade",
+      "vaultFileName": "Nomen fasciculi",
+      "vaultFileNameDefault": "Praefinitum est clavis variabilis",
+      "vaultFileBadge": "Fasciculus",
+      "vaultFileHint": "Variabilis semitam fasciculi tenet, non arcanum: ea ut {fileFn} utere, aut cum instrumento quod semitam ex variabili ambitus legit. Nomen relativum ut {relExample} sub {base} scribitur; nomen a {home} incipiens, ut {homeExample}, in domicilio cursoris ponitur."
     },
     "runs": {
       "options": "Optiones",

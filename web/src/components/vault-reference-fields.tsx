@@ -10,22 +10,27 @@
  * The Vault selector is always shown, even with a single instance configured.
  * Hiding it means an operator cannot tell which Vault a credential will be read
  * from, which is exactly the thing worth being explicit about.
+ *
+ * Parsing and serialising live in `@/lib/vault-reference`, which carries every
+ * key this form does not render (`method`, `data`, …) through an edit
+ * untouched (#1619).
  */
 
 import { useTranslations } from 'next-intl'
+import type { VaultReferenceValue } from '@/lib/vault-reference'
+import { VaultFileDeliveryFields } from '@/components/vault-file-delivery-fields'
+
+export {
+  buildVaultReference,
+  emptyVaultReference,
+  parseVaultReference,
+  type VaultReferenceValue,
+} from '@/lib/vault-reference'
 
 const FIELD =
   'w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500'
 const SELECT =
   'w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500'
-
-export interface VaultReferenceValue {
-  instance: string
-  mount: string
-  path: string
-  field: string
-  engine: 'kv2' | 'dynamic'
-}
 
 export function VaultReferenceFields({
   idPrefix,
@@ -131,6 +136,12 @@ export function VaultReferenceFields({
           />
         </div>
       </div>
+
+      <VaultFileDeliveryFields
+        idPrefix={idPrefix}
+        value={{ file: value.file, fileName: value.fileName }}
+        onChange={set}
+      />
 
       <p className="text-xs text-slate-500">{t('vaultSecretNeverStored')}</p>
     </div>

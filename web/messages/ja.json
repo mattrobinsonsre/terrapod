@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "保存されるのはパスであり、シークレットではありません。読み取れる範囲は Terrapod の Vault ポリシーが決めます。",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "解析できない Vault 参照",
-      "vaultInstanceDefaultNamed": "既定 ({name})"
+      "vaultInstanceDefaultNamed": "既定 ({name})",
+      "vaultDeliverAsFile": "ファイルとして渡す",
+      "vaultFileName": "ファイル名",
+      "vaultFileNameDefault": "既定は変数のキー",
+      "vaultFileBadge": "ファイル",
+      "vaultFileHint": "変数にはシークレットではなくファイルのパスが入ります。{fileFn} として使うか、環境変数からパスを読むツールで使ってください。{relExample} のような相対名は {base} 配下に書き込まれ、{homeExample} のように {home} で始まる名前はランナーのホームディレクトリに置かれます。"
     },
     "runs": {
       "options": "オプション",

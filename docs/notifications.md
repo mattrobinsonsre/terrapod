@@ -190,6 +190,18 @@ api:
       allowed_cidrs: []
 ```
 
+**Through an egress proxy, the hostname is not resolved.** When the API pod
+sends outbound traffic through a forward proxy (the chart's `proxy.*` values,
+which set `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`), and the webhook's host is
+not matched by `NO_PROXY`, Terrapod hands the request to the proxy without
+resolving the name itself. The proxy resolves and connects, so it is where
+egress policy applies — and on a restricted network the API pod may not be able
+to resolve external names at all. What needs no lookup is still checked: a URL
+whose host is a literal address (loopback and link-local are still refused,
+private space per `block_private_addresses`, `allowed_cidrs` honoured), a
+`localhost` name, and `allowed_hosts`. A host that `NO_PROXY` sends direct is
+resolved and judged as above.
+
 A refused delivery is recorded like any other failure, and the reason names the
 address and which allow-list would permit it — so an endpoint that stops working
 after an upgrade tells you what to add rather than failing silently.

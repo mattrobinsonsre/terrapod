@@ -702,6 +702,7 @@ class TestPermissionsBlock:
         # not be told it may apply — the UI decides whether to offer the button
         # from this, so a wrong value here becomes a control that 403s.
         assert perms["can-queue-apply"] is False
+        assert perms["can-queue-destroy"] is False
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -727,6 +728,7 @@ class TestPermissionsBlock:
         assert perms["can-lock"] is True
         assert perms["can-force-unlock"] is True
         assert perms["can-queue-apply"] is True
+        assert perms["can-queue-destroy"] is True
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -754,6 +756,55 @@ class TestPermissionsBlock:
         perms = resp.json()["data"]["attributes"]["permissions"]
         assert perms["can-queue-run"] is True, "plan level must be able to queue a plan"
         assert perms["can-queue-apply"] is False, "plan level must NOT be offered an apply"
+        assert perms["can-queue-destroy"] is False, "plan level must NOT be offered a destroy"
+
+    async def _perms_for_caps(self, mock_resolve, caps):
+        mock_resolve.return_value = caps
+        ws = _mock_workspace()
+        app, mock_db = _make_app(_user())
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
+        return resp.json()["data"]["attributes"]["permissions"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_apply_without_destroy_is_expressible(self, mock_resolve, *mocks):
+        """A custom role with run:apply but not run:apply-destroy (#1634).
+
+        Retrying or queuing a destroy needs run:apply-destroy. With only
+        can-queue-apply to go on, the run page offered Retry on a destroy run to
+        this role and the API answered 403.
+        """
+        from terrapod.auth import capabilities as cap
+
+        perms = await self._perms_for_caps(mock_resolve, caps_for_level("plan") | {cap.RUN_APPLY})
+        assert perms["can-queue-apply"] is True
+        assert perms["can-queue-destroy"] is False
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_destroy_is_granted_by_its_own_capability(self, mock_resolve, *mocks):
+        """can-queue-destroy follows run:apply-destroy alone, not run:apply."""
+        from terrapod.auth import capabilities as cap
+
+        perms = await self._perms_for_caps(
+            mock_resolve, caps_for_level("plan") | {cap.RUN_APPLY_DESTROY}
+        )
+        assert perms["can-queue-destroy"] is True
+        assert perms["can-queue-apply"] is False
+
+        perms = await self._perms_for_caps(mock_resolve, caps_for_level("write"))
+        assert perms["can-queue-destroy"] is True, "write level holds run:apply-destroy"
 
 
 # ── Tag bindings (terraform key-value tag support probe) ───────────────

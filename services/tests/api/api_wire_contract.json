@@ -31,6 +31,7 @@
     "terragrunt-enabled",
     "terragrunt-version",
     "var-files",
+    "vault-files",
     "working-directory"
   ],
   "listener_read_keys": [
@@ -71,6 +72,7 @@
     "terragrunt-version",
     "value",
     "var-files",
+    "vault-files",
     "working-directory"
   ]
 }

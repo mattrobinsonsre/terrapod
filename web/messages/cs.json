@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "Ukládá se cesta, nikdy tajemství. Co lze číst, určuje politika Vaultu pro Terrapod.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Nečitelný odkaz na Vault",
-      "vaultInstanceDefaultNamed": "Výchozí ({name})"
+      "vaultInstanceDefaultNamed": "Výchozí ({name})",
+      "vaultDeliverAsFile": "Doručit jako soubor",
+      "vaultFileName": "Název souboru",
+      "vaultFileNameDefault": "Výchozí je klíč proměnné",
+      "vaultFileBadge": "Soubor",
+      "vaultFileHint": "Proměnná obsahuje cestu k souboru, ne tajemství: použijte ji jako {fileFn} nebo s nástrojem, který čte cestu z proměnné prostředí. Relativní název jako {relExample} se zapíše do {base}; název začínající {home}, například {homeExample}, se uloží do domovského adresáře runneru."
     },
     "runs": {
       "options": "Možnosti",

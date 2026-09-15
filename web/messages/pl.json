@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "Przechowywana jest ścieżka, nigdy sekret. Polityka Vault Terrapoda decyduje, co może odczytać.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Nieczytelne odwołanie do Vault",
-      "vaultInstanceDefaultNamed": "Domyślny ({name})"
+      "vaultInstanceDefaultNamed": "Domyślny ({name})",
+      "vaultDeliverAsFile": "Dostarcz jako plik",
+      "vaultFileName": "Nazwa pliku",
+      "vaultFileNameDefault": "Domyślnie klucz zmiennej",
+      "vaultFileBadge": "Plik",
+      "vaultFileHint": "Zmienna zawiera ścieżkę pliku, nie sekret: użyj jej jako {fileFn} albo z narzędziem, które czyta ścieżkę ze zmiennej środowiskowej. Nazwa względna, np. {relExample}, jest zapisywana w {base}; nazwa zaczynająca się od {home}, np. {homeExample}, trafia do katalogu domowego runnera."
     },
     "runs": {
       "options": "Opcje",

@@ -22,6 +22,10 @@ _HOOKS_FILENAME = "execution-hooks.json"
 # mounted alongside the tfvars file; read by runner/phases/git_auth.py.
 _GIT_AUTH_SECRET_KEY = "git-auth.json"
 _GIT_AUTH_FILENAME = "git-auth.json"
+# Vault file delivery (#1619) — more keys of the same per-run vars Secret, each
+# mounted read-only at its own path. See runner/vault_files.py.
+_VAULT_FILES_VOLUME = "vault-files"
+_VAULT_HOME_FILES_VOLUME = "vault-home-files"
 
 # Custom outbound CA trust bundle (#592). The listener ships the raw custom CA
 # into a per-run Secret under this key; an init container merges it with the
@@ -61,6 +65,108 @@ def _double_resource(value: str) -> str:
     return f"{doubled}{suffix}"
 
 
+def _vault_file_mode(runner_config: RunnerConfig) -> int:
+    """0440 when the pod has an fsGroup (the file's group), else 0444.
+
+    Kubelet projects Secret files owned by root. The runner is a non-root UID,
+    so without an fsGroup it can only read a world-readable file; with one, the
+    group bit suffices and "other" gets nothing.
+    """
+    psc = runner_config.pod_security_context
+    if isinstance(psc, dict) and psc.get("fsGroup") is not None:
+        return 0o440
+    return 0o444
+
+
+def _add_vault_file_mounts(
+    pod: dict,
+    vault_files: list[dict],
+    *,
+    vars_secret_name: str,
+    runner_config: RunnerConfig,
+    image: str,
+) -> None:
+    """Mount Vault-delivered files (#1619) from the per-run vars Secret.
+
+    ``vault_files`` is ``[{name, secret_key}]`` — names and Secret keys only.
+    This function reads nothing else from an entry, so no value can reach the
+    Job spec through it: a value exists only as a key of the Secret.
+
+    - relative names → one Secret volume, mounted read-only at
+      ``/var/run/terrapod/files``, with an item per file;
+    - ``~/`` names → a second volume of the same Secret, each key mounted
+      read-only at its path under HOME via ``subPath``. HOME is an emptyDir, so
+      the runtime can create the mount point despite readOnlyRootFilesystem; an
+      init container first creates the parent directories as the runner's UID,
+      because the runtime would otherwise create them root-owned and leave the
+      runner unable to write beside its own file (``~/.aws/cli/cache``).
+    """
+    from terrapod.runner import vault_files as vf
+
+    mode = _vault_file_mode(runner_config)
+    container = pod["containers"][0]
+    rel = [f for f in vault_files if not vf.is_home(f["name"])]
+    home = [f for f in vault_files if vf.is_home(f["name"])]
+
+    if rel:
+        pod["volumes"].append(
+            {
+                "name": _VAULT_FILES_VOLUME,
+                "secret": {
+                    "secretName": vars_secret_name,
+                    "items": [{"key": f["secret_key"], "path": f["name"]} for f in rel],
+                    "defaultMode": mode,
+                },
+            }
+        )
+        container["volumeMounts"].append(
+            {"name": _VAULT_FILES_VOLUME, "mountPath": vf.FILES_DIR, "readOnly": True}
+        )
+
+    if home:
+        pod["volumes"].append(
+            {
+                "name": _VAULT_HOME_FILES_VOLUME,
+                "secret": {
+                    "secretName": vars_secret_name,
+                    "items": [{"key": f["secret_key"], "path": f["secret_key"]} for f in home],
+                    "defaultMode": mode,
+                },
+            }
+        )
+        for f in home:
+            container["volumeMounts"].append(
+                {
+                    "name": _VAULT_HOME_FILES_VOLUME,
+                    "mountPath": vf.target_path(f["name"]),
+                    "subPath": f["secret_key"],
+                    "readOnly": True,
+                }
+            )
+        parents = vf.home_parent_dirs([f["name"] for f in home])
+        if parents:
+            pod.setdefault("initContainers", []).append(
+                {
+                    "name": "home-dirs",
+                    "image": image,
+                    "imagePullPolicy": runner_config.image.pull_policy,
+                    # Exec form, no shell: names are validated to
+                    # [A-Za-z0-9._-] segments, but nothing here depends on that.
+                    "command": ["mkdir", "-p", *parents],
+                    "securityContext": {
+                        "runAsNonRoot": True,
+                        "runAsUser": 1000,
+                        "runAsGroup": 1000,
+                        "readOnlyRootFilesystem": True,
+                        "allowPrivilegeEscalation": False,
+                        "capabilities": {"drop": ["ALL"]},
+                        "seccompProfile": {"type": "RuntimeDefault"},
+                    },
+                    "volumeMounts": [{"name": "home", "mountPath": vf.RUNNER_HOME}],
+                }
+            )
+
+
 def build_job_spec(
     run_id: str,
     phase: str,  # "plan" or "apply"
@@ -70,6 +176,7 @@ def build_job_spec(
     terraform_vars: list[dict[str, str]],
     execution_hooks: list[dict] | None = None,
     git_auth: list[dict] | None = None,
+    vault_files: list[dict] | None = None,
     vars_secret_name: str = "",
     resource_cpu: str = "1",
     resource_memory: str = "2Gi",
@@ -454,6 +561,15 @@ def build_job_spec(
         )
         pod["containers"][0]["volumeMounts"].append(
             {"name": "tfvars", "mountPath": _TFVARS_MOUNT_DIR, "readOnly": True}
+        )
+
+    if vars_secret_name and vault_files:
+        _add_vault_file_mounts(
+            job_spec["spec"]["template"]["spec"],
+            vault_files,
+            vars_secret_name=vars_secret_name,
+            runner_config=runner_config,
+            image=image,
         )
 
     # Custom CA trust bundle (#592): mount the per-run CA Secret (raw custom CA,

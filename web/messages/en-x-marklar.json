@@ -2513,7 +2513,12 @@
       "vaultSecretNeverStored": "The marklar is stored, never the marklar. Terrapod's Vault marklar controls what it can marklar.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Unreadable Vault marklar",
-      "vaultInstanceDefaultNamed": "Default ({name})"
+      "vaultInstanceDefaultNamed": "Default ({name})",
+      "vaultDeliverAsFile": "Deliver as a marklar",
+      "vaultFileName": "Marklar marklar",
+      "vaultFileNameDefault": "Defaults to the marklar marklar",
+      "vaultFileBadge": "Marklar",
+      "vaultFileHint": "The marklar holds the marklar's marklar, not the marklar: use it as {fileFn}, or with a marklar that reads a marklar from a marklar marklar. A relative marklar such as {relExample} is written under {base}; a marklar starting with {home}, such as {homeExample}, goes in the marklar's marklar marklar."
     },
     "runs": {
       "options": "Marklars",

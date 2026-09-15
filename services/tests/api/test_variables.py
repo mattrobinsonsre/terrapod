@@ -5,6 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
@@ -654,6 +655,357 @@ class TestVaultValueSource:
         from terrapod.api.routers.variables import _var_json
 
         assert _var_json(var)["attributes"]["value"] is None
+
+
+# ── Vault file delivery on write (#1619) ──────────────────────────────
+
+_COORDS = {"mount": "kvv2", "path": "apps/gcp", "field": "sa"}
+
+
+def _file_ref(**file) -> str:
+    return json.dumps({**_COORDS, "file": file})
+
+
+def _name_detail(name, reason, key="T"):
+    return f"variable {key!r}: vault file name {name!r} is invalid: {reason}"
+
+
+def _chars(seg):
+    return f"has a path segment with characters outside [A-Za-z0-9._-]: {seg!r}"
+
+
+_HCL_DETAIL = (
+    "`file` delivery cannot be combined with hcl: the variable's value becomes the "
+    "file's path, which is not an HCL expression. Turn hcl off."
+)
+_STATIC_DETAIL = (
+    "`file` delivery needs value-source 'vault': this value is a Vault reference, and "
+    "with a static source it would be delivered to the run as the literal JSON"
+)
+
+_BAD_NAMES = [
+    ("", "must not be empty"),
+    ("../x", "has a '.' or '..' path segment"),
+    ("a/./b", "has a '.' or '..' path segment"),
+    ("a//b", "has an empty path segment"),
+    (
+        "/etc/x",
+        "must be a relative path, or start with ~/ for a path in the runner's home "
+        "directory; absolute paths are not allowed",
+    ),
+    ("a\x00b", "contains a NUL character"),
+    ("a\\b", _chars("a\\b")),
+    ("café.json", _chars("café.json")),
+    ("x" * 256, "is longer than 255 characters"),
+    ("~/.ssh/id_rsa", "targets ~/.ssh, which the runner manages itself; choose another path"),
+    ("~/.gitconfig", "targets ~/.gitconfig, which the runner manages itself; choose another path"),
+    (
+        "~/.config/terrapod-git/gitconfig",
+        "targets ~/.config/terrapod-git, which the runner manages itself; choose another path",
+    ),
+    (
+        "~/.terraform.d/credentials.tfrc.json",
+        "targets ~/.terraform.d, which the runner manages itself; choose another path",
+    ),
+]
+
+
+@pytest.fixture
+def _no_boot():
+    with (
+        patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+        patch("terrapod.api.app.init_redis"),
+        patch("terrapod.api.app.init_db"),
+        patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock),
+        patch(
+            "terrapod.services.variable_service.local_workspaces_for_varset",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
+    ):
+        yield
+
+
+def _vault_var(key="T", value=None, hcl=False, category="env"):
+    var = _mock_var(key=key, sensitive=True)
+    var.value_source = "vault"
+    var.value = value if value is not None else _file_ref()
+    var.hcl = hcl
+    var.category = category
+    return var
+
+
+@pytest.mark.usefixtures("_no_boot")
+class TestVaultFileDeliveryWrites:
+    """Every write path — workspace and set variables, create and patch —
+    validates `file` against the variable as it will be after the write."""
+
+    async def _create_ws(self, attrs):
+        app, _ = _make_app(_user(roles=["admin"]))
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.execution_mode = "agent"
+        created = {}
+
+        async def fake_create(db, **kw):
+            created.update(kw)
+            return _vault_var(key=kw["key"], value=kw["value"])
+
+        with (
+            patch(
+                "terrapod.api.routers.variables._get_workspace",
+                new_callable=AsyncMock,
+                return_value=ws,
+            ),
+            patch(
+                "terrapod.api.routers.variables.resolve_workspace_capabilities_for",
+                new_callable=AsyncMock,
+                return_value=caps_for_level("admin"),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.create_variable",
+                new=fake_create,
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/v2/workspaces/ws-{ws.id}/vars",
+                    json={"data": {"attributes": attrs}},
+                    headers=_AUTH,
+                )
+        return resp, created
+
+    async def _patch_ws(self, var, attrs):
+        app, _ = _make_app(_user(roles=["admin"]))
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.execution_mode = "agent"
+        update = AsyncMock(return_value=var)
+        with (
+            patch(
+                "terrapod.api.routers.variables._get_workspace",
+                new_callable=AsyncMock,
+                return_value=ws,
+            ),
+            patch(
+                "terrapod.api.routers.variables.resolve_workspace_capabilities_for",
+                new_callable=AsyncMock,
+                return_value=caps_for_level("admin"),
+            ),
+            patch(
+                "terrapod.api.routers.variables.variable_service.get_variable",
+                new_callable=AsyncMock,
+                return_value=var,
+            ),
+            patch("terrapod.api.routers.variables.variable_service.update_variable", new=update),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.patch(
+                    f"/api/v2/workspaces/ws-{ws.id}/vars/var-{var.id}",
+                    json={"data": {"attributes": attrs}},
+                    headers=_AUTH,
+                )
+        return resp, update
+
+    async def _create_set(self, attrs):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_db.add = MagicMock()
+        mock_db.refresh = AsyncMock()
+        with patch(
+            "terrapod.api.routers.variables._get_varset",
+            new_callable=AsyncMock,
+            return_value=_mock_varset(),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/v2/varsets/varset-{uuid.uuid4()}/relationships/vars",
+                    json={"data": {"attributes": attrs}},
+                    headers=_AUTH,
+                )
+        return resp, mock_db
+
+    async def _patch_set(self, vsv, attrs):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        lookup = MagicMock()
+        lookup.scalar_one_or_none.return_value = vsv
+        mock_db.execute = AsyncMock(return_value=lookup)
+        mock_db.refresh = AsyncMock()
+        with patch(
+            "terrapod.api.routers.variables._get_varset",
+            new_callable=AsyncMock,
+            return_value=_mock_varset(),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.patch(
+                    f"/api/v2/varsets/varset-{uuid.uuid4()}/relationships/vars/var-{vsv.id}",
+                    json={"data": {"attributes": attrs}},
+                    headers=_AUTH,
+                )
+        return resp, mock_db
+
+    @staticmethod
+    def _vault(key, value, **extra):
+        return {"key": key, "value": value, "value-source": "vault", "category": "env", **extra}
+
+    # workspace create ───────────────────────────────────────────────
+
+    @pytest.mark.parametrize(
+        ("key", "file"),
+        [
+            ("GOOGLE_APPLICATION_CREDENTIALS", {"name": "gcp/adc.json"}),
+            ("creds", {}),
+            ("AWS_SHARED_CREDENTIALS_FILE", {"name": "~/.aws/credentials"}),
+        ],
+    )
+    async def test_a_valid_file_reference_is_stored_as_written(self, key, file):
+        resp, created = await self._create_ws(self._vault(key, _file_ref(**file)))
+        assert resp.status_code == 201, resp.text
+        assert json.loads(created["value"])["file"] == file
+        assert created["sensitive"] is True
+        # The API returns the reference — including the file name — never a value.
+        assert json.loads(resp.json()["data"]["attributes"]["value"])["file"] == file
+
+    async def test_a_terraform_category_file_is_accepted(self):
+        attrs = self._vault("sa_file", _file_ref(), category="terraform")
+        resp, _ = await self._create_ws(attrs)
+        assert resp.status_code == 201
+
+    @pytest.mark.parametrize(("name", "reason"), _BAD_NAMES)
+    async def test_an_invalid_name_is_422_with_the_exact_reason(self, name, reason):
+        resp, created = await self._create_ws(self._vault("T", _file_ref(name=name)))
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _name_detail(name, reason)
+        assert created == {}
+
+    async def test_an_invalid_defaulted_name_is_422(self):
+        resp, _ = await self._create_ws(self._vault("my key", _file_ref()))
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _name_detail("my key", _chars("my key"), key="my key")
+
+    async def test_a_file_that_is_not_an_object_is_422(self):
+        value = json.dumps({**_COORDS, "file": "gcp/adc.json"})
+        resp, _ = await self._create_ws(self._vault("T", value))
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == "variable 'T' has a vault `file` that is not an object"
+
+    async def test_an_unknown_file_key_is_422(self):
+        resp, _ = await self._create_ws(self._vault("T", _file_ref(colour="blue")))
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == (
+            "variable 'T' has a vault `file` with unknown keys: colour (only `name` is supported)"
+        )
+
+    async def test_a_reserved_file_key_is_422(self):
+        resp, _ = await self._create_ws(self._vault("T", _file_ref(mode="0600", template="x")))
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == (
+            "variable 'T' has a vault `file` using mode, template, which is reserved for a "
+            "later release and not supported yet (only `name` is supported)"
+        )
+
+    async def test_file_with_hcl_is_422(self):
+        attrs = self._vault("T", _file_ref(), category="terraform", hcl=True)
+        resp, _ = await self._create_ws(attrs)
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _HCL_DETAIL
+
+    @pytest.mark.parametrize("source", ["static", None])
+    async def test_file_on_a_non_vault_source_is_422(self, source):
+        attrs = {"key": "T", "value": _file_ref(), "category": "env"}
+        if source:
+            attrs["value-source"] = source
+        resp, created = await self._create_ws(attrs)
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _STATIC_DETAIL
+        assert created == {}
+
+    async def test_an_ordinary_static_json_value_with_a_file_key_is_untouched(self):
+        value = json.dumps({"file": "main.tf", "lines": 3})
+        resp, _ = await self._create_ws({"key": "T", "value": value, "category": "terraform"})
+        assert resp.status_code == 201
+
+    # workspace patch ────────────────────────────────────────────────
+
+    async def test_patching_hcl_on_for_a_file_variable_is_422(self):
+        var = _vault_var(category="terraform")
+        resp, update = await self._patch_ws(var, {"hcl": True})
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _HCL_DETAIL
+        update.assert_not_awaited()
+
+    async def test_renaming_the_key_revalidates_a_defaulted_name(self):
+        resp, update = await self._patch_ws(_vault_var(), {"key": "bad key"})
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _name_detail("bad key", _chars("bad key"), key="bad key")
+        update.assert_not_awaited()
+
+    async def test_patching_in_a_managed_home_path_is_422(self):
+        resp, _ = await self._patch_ws(_vault_var(), {"value": _file_ref(name="~/.ssh/config")})
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _name_detail(
+            "~/.ssh/config", "targets ~/.ssh, which the runner manages itself; choose another path"
+        )
+
+    async def test_an_unrelated_patch_on_a_file_variable_succeeds(self):
+        resp, update = await self._patch_ws(_vault_var(), {"description": "adc"})
+        assert resp.status_code == 200
+        update.assert_awaited_once()
+
+    async def test_patching_a_static_variable_to_a_file_reference_is_422(self):
+        var = _mock_var(key="T", value="plain")
+        resp, _ = await self._patch_ws(var, {"value": _file_ref()})
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _STATIC_DETAIL
+
+    # set variables ──────────────────────────────────────────────────
+
+    async def test_a_set_variable_with_a_valid_file_is_created(self):
+        resp, mock_db = await self._create_set(self._vault("CREDS", _file_ref(name="c.json")))
+        assert resp.status_code == 201, resp.text
+        vsv = mock_db.add.call_args.args[0]
+        assert json.loads(vsv.value)["file"] == {"name": "c.json"}
+        assert vsv.sensitive is True
+
+    @pytest.mark.parametrize(("name", "reason"), _BAD_NAMES[:4] + _BAD_NAMES[-4:])
+    async def test_a_set_variable_with_an_invalid_name_is_422(self, name, reason):
+        resp, mock_db = await self._create_set(self._vault("T", _file_ref(name=name)))
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _name_detail(name, reason)
+        mock_db.add.assert_not_called()
+
+    async def test_a_set_variable_with_file_and_hcl_is_422(self):
+        attrs = self._vault("T", _file_ref(), category="terraform", hcl=True)
+        resp, _ = await self._create_set(attrs)
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _HCL_DETAIL
+
+    async def test_a_static_set_variable_with_a_file_reference_is_422(self):
+        resp, _ = await self._create_set({"key": "T", "value": _file_ref(), "category": "env"})
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _STATIC_DETAIL
+
+    async def test_patching_hcl_on_for_a_set_file_variable_is_422(self):
+        vsv = _mock_vsvar(key="T", value=_file_ref())
+        vsv.value_source = "vault"
+        resp, _ = await self._patch_set(vsv, {"hcl": True})
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _HCL_DETAIL
+
+    async def test_patching_a_set_file_variable_to_a_bad_name_is_422(self):
+        vsv = _mock_vsvar(key="T", value=_file_ref())
+        vsv.value_source = "vault"
+        resp, _ = await self._patch_set(vsv, {"value": _file_ref(name="../../etc/shadow")})
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _name_detail(
+            "../../etc/shadow", "has a '.' or '..' path segment"
+        )
+
+    async def test_renaming_a_set_file_variable_revalidates_its_default_name(self):
+        vsv = _mock_vsvar(key="T", value=_file_ref())
+        vsv.value_source = "vault"
+        resp, _ = await self._patch_set(vsv, {"key": "a b"})
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _name_detail("a b", _chars("a b"), key="a b")
 
 
 class TestVaultAvailability:

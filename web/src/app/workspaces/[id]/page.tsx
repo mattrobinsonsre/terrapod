@@ -24,7 +24,13 @@ import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { VaultValueDisplay } from '@/components/vault-value-display'
-import { VaultReferenceFields } from '@/components/vault-reference-fields'
+import {
+  VaultReferenceFields,
+  buildVaultReference,
+  emptyVaultReference,
+  parseVaultReference,
+  type VaultReferenceValue,
+} from '@/components/vault-reference-fields'
 import { VariableEditPanel } from '@/components/variable-edit-panel'
 import { ApplicableVarsets } from '@/components/applicable-varsets'
 import { useSortable } from '@/lib/use-sortable'
@@ -37,6 +43,8 @@ interface WorkspacePermissions {
   // Plan-only vs apply are separate grants, so the UI needs both to know
   // whether to offer the apply button at all (#1340).
   'can-queue-apply'?: boolean
+  // Destroy runs are a separate grant again (run:apply-destroy, #1634).
+  'can-queue-destroy'?: boolean
   'can-read-state-versions': boolean
   'can-create-state-versions': boolean
   'can-read-variable': boolean
@@ -353,11 +361,7 @@ function WorkspaceDetailContent() {
   // Vault value source (#1439): the variable holds a *reference*, resolved
   // server-side at run time. Discrete fields, never raw JSON.
   const [varSource, setVarSource] = useState<'static' | 'vault'>('static')
-  const [vaultInstance, setVaultInstance] = useState('')
-  const [vaultMount, setVaultMount] = useState('')
-  const [vaultPath, setVaultPath] = useState('')
-  const [vaultField, setVaultField] = useState('')
-  const [vaultEngine, setVaultEngine] = useState<'kv2' | 'dynamic'>('kv2')
+  const [vaultRef, setVaultRef] = useState<VaultReferenceValue>(emptyVaultReference)
   const isVaultSource = varSource === 'vault' && !isGitCat
   // Offered only where the deployment has Vault configured — presenting a
   // source that is not set up produces a variable that fails its first run.
@@ -373,11 +377,9 @@ function WorkspaceDetailContent() {
     vaultAvailable && workspace?.attributes['execution-mode'] === 'agent'
 
   const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
-  const [editVaultInstance, setEditVaultInstance] = useState('')
-  const [editVaultMount, setEditVaultMount] = useState('')
-  const [editVaultPath, setEditVaultPath] = useState('')
-  const [editVaultField, setEditVaultField] = useState('')
-  const [editVaultEngine, setEditVaultEngine] = useState<'kv2' | 'dynamic'>('kv2')
+  // The whole stored reference, not just the fields on screen — so an edit
+  // carries `method`, `data` and anything else it does not render (#1619).
+  const [editVaultRef, setEditVaultRef] = useState<VaultReferenceValue>(emptyVaultReference)
   const [addingVar, setAddingVar] = useState(false)
 
   const isTouch = useIsTouch()
@@ -1404,18 +1406,6 @@ function WorkspaceDetailContent() {
     }
   }
 
-  function buildVaultReference(): string {
-    const ref: Record<string, string> = {
-      source: 'vault',
-      mount: vaultMount.trim(),
-      path: vaultPath.trim(),
-      field: vaultField.trim(),
-    }
-    if (vaultInstance.trim()) ref.vault = vaultInstance.trim()
-    if (vaultEngine !== 'kv2') ref.engine = vaultEngine
-    return JSON.stringify(ref)
-  }
-
   // Flat edit state, shaped for the shared edit panel.
   const editPanelState = {
     key: editVarKey,
@@ -1424,13 +1414,7 @@ function WorkspaceDetailContent() {
     sensitive: editVarSensitive,
     hcl: editVarHcl,
     source: editVarSource,
-    vault: {
-      instance: editVaultInstance,
-      mount: editVaultMount,
-      path: editVaultPath,
-      field: editVaultField,
-      engine: editVaultEngine,
-    },
+    vault: editVaultRef,
   }
 
   function patchEditPanel(patch: Partial<typeof editPanelState>) {
@@ -1440,25 +1424,7 @@ function WorkspaceDetailContent() {
     if (patch.sensitive !== undefined) setEditVarSensitive(patch.sensitive)
     if (patch.hcl !== undefined) setEditVarHcl(patch.hcl)
     if (patch.source !== undefined) setEditVarSource(patch.source)
-    if (patch.vault) {
-      setEditVaultInstance(patch.vault.instance)
-      setEditVaultMount(patch.vault.mount)
-      setEditVaultPath(patch.vault.path)
-      setEditVaultField(patch.vault.field)
-      setEditVaultEngine(patch.vault.engine)
-    }
-  }
-
-  function buildEditVaultReference(): string {
-    const ref: Record<string, string> = {
-      source: 'vault',
-      mount: editVaultMount.trim(),
-      path: editVaultPath.trim(),
-      field: editVaultField.trim(),
-    }
-    if (editVaultInstance.trim()) ref.vault = editVaultInstance.trim()
-    if (editVaultEngine !== 'kv2') ref.engine = editVaultEngine
-    return JSON.stringify(ref)
+    if (patch.vault) setEditVaultRef(patch.vault)
   }
 
   async function handleAddVariable(e: React.FormEvent) {
@@ -1477,7 +1443,7 @@ function WorkspaceDetailContent() {
               value: isGitCat
                 ? buildGitAuthValue()
                 : isVaultSource
-                  ? buildVaultReference()
+                  ? buildVaultReference(vaultRef)
                   : varValue,
               category: varCategory,
               sensitive: isGitCat || isVaultSource ? true : varSensitive,
@@ -1504,11 +1470,7 @@ function WorkspaceDetailContent() {
       setGitKnownHosts('')
       setGitRewrite('none')
       setVarSource('static')
-      setVaultInstance('')
-      setVaultMount('')
-      setVaultPath('')
-      setVaultField('')
-      setVaultEngine('kv2')
+      setVaultRef(emptyVaultReference())
       setShowAddVar(false)
       await loadVariables()
     } catch (err) {
@@ -1653,18 +1615,9 @@ function WorkspaceDetailContent() {
     if (source === 'vault') {
       // The reference is not a secret, so it is loaded back into the fields
       // rather than blanked like a sensitive value — otherwise every edit would
-      // silently rebuild it from nothing.
-      let ref: Record<string, string> = {}
-      try {
-        ref = JSON.parse(v.attributes.value || '{}')
-      } catch {
-        ref = {}
-      }
-      setEditVaultInstance(ref.vault ?? '')
-      setEditVaultMount(ref.mount ?? '')
-      setEditVaultPath(ref.path ?? '')
-      setEditVaultField(ref.field ?? '')
-      setEditVaultEngine(ref.engine === 'dynamic' ? 'dynamic' : 'kv2')
+      // silently rebuild it from nothing. The whole reference is kept, so keys
+      // the form does not render (method, data, …) survive the save (#1619).
+      setEditVaultRef(parseVaultReference(v.attributes.value))
       setEditVarValue('')
     } else {
       setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
@@ -1687,7 +1640,7 @@ function WorkspaceDetailContent() {
       if (isEditVault) {
         // Always sent: the reference is rebuilt from the fields on screen, so
         // omitting it when unchanged would drop the edit just made.
-        attrs.value = buildEditVaultReference()
+        attrs.value = buildVaultReference(editVaultRef)
       } else if (editVarValue !== '') {
         attrs.value = editVarValue
       }
@@ -2999,14 +2952,8 @@ function WorkspaceDetailContent() {
                     idPrefix="add"
                     instances={vaultInstances}
                     defaultInstance={vaultDefaultInstance}
-                    value={{ instance: vaultInstance, mount: vaultMount, path: vaultPath, field: vaultField, engine: vaultEngine }}
-                    onChange={(v) => {
-                      setVaultInstance(v.instance)
-                      setVaultMount(v.mount)
-                      setVaultPath(v.path)
-                      setVaultField(v.field)
-                      setVaultEngine(v.engine)
-                    }}
+                    value={vaultRef}
+                    onChange={setVaultRef}
                   />
                 )}
 
@@ -3144,7 +3091,7 @@ function WorkspaceDetailContent() {
                           <td className="px-4 py-3 text-sm text-slate-200 font-mono">{v.attributes.key}</td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
                             {v.attributes['value-source'] === 'vault'
-                            ? <VaultValueDisplay value={v.attributes.value} />
+                            ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
                             : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
@@ -3200,7 +3147,7 @@ function WorkspaceDetailContent() {
                         </div>
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">
                           {v.attributes['value-source'] === 'vault'
-                            ? <VaultValueDisplay value={v.attributes.value} />
+                            ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
                             : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
                         </div>
                         {perms['can-update-variable'] && (
@@ -3236,7 +3183,10 @@ function WorkspaceDetailContent() {
                   >
                     {showPlanOptions ? t('runs.hideOptions') : t('runs.options')}
                   </button>
-                  {!showDestroyConfirm ? (
+                  {/* A destroy is its own grant (run:apply-destroy): offering it
+                      on can-queue-run alone showed plan-level users a button
+                      the API refuses (#1634). */}
+                  {perms['can-queue-destroy'] && (!showDestroyConfirm ? (
                     <button
                       onClick={() => setShowDestroyConfirm(true)}
                       disabled={queueingDestroy || attrs.locked}
@@ -3262,7 +3212,7 @@ function WorkspaceDetailContent() {
                         {queueingDestroy ? t('actions.queuing') : t('runs.confirmDestroy')}
                       </button>
                     </div>
-                  )}
+                  ))}
                   {/* Two buttons, not a button plus a hidden checkbox (#1340).
                       Plan-vs-apply is the decision that matters every time, so
                       it is made by which button you press; the options panel

@@ -141,7 +141,11 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     # reconciler can resolve the terminal from observable Job outcome
     # (state-version present → applied; clean kill → canceled;
     # otherwise → errored).
-    "applying": {"applied", "canceling", "errored"},
+    # `applying → confirmed` is the apply-phase UNCLAIM, the twin of
+    # `planning → queued`: the claim is `confirmed → applying`, so a claim the
+    # API cannot serve (an unreachable Vault) is undone by going back to
+    # `confirmed`, where the next listener picks it up. No Job has launched.
+    "applying": {"applied", "canceling", "errored", "confirmed"},
     # `canceling` is the intermediate status entered when a user cancels
     # a run that may have already launched (or be in the middle of) an
     # apply Job. We send the runner a cancel_job event but the Job's
@@ -819,6 +823,10 @@ async def transition_run(
         run.plan_finished_at = now
     elif target_status == "applying":
         run.apply_started_at = now
+    elif target_status == "confirmed" and old_status == "applying":
+        # The apply-phase unclaim (#1646): no apply ran, so it has no start
+        # time — else a later error would record an apply that never happened.
+        run.apply_started_at = None
     elif (
         target_status in ("applied", "errored")
         and run.apply_started_at
