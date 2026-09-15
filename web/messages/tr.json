@@ -35,7 +35,7 @@
     "ha": "Yüksek erişilebilirlik",
     "deletedWorkspaces": "Silinmiş çalışma alanları",
     "version": "Sürüm {version}",
-    "vault": "Vault durumu"
+    "vault": "OpenBao/Vault durumu"
   },
   "switcher": {
     "language": "Dil",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Vault durumu",
-    "description": "Terrapod’un değişken okuduğu her Vault örneğinin sağlığı, oturum açma durumu ve TLS güveni. Dakikada bir örneklenir; bu sayfayı açmak Vault’a asla bağlanmaz.",
-    "disabled": "Bu kurulumda Vault değer kaynağı etkin değil.",
+    "title": "OpenBao/Vault durumu",
+    "description": "Terrapod’un değişken okuduğu her OpenBao (veya HashiCorp Vault) örneğinin sağlığı, oturum açma durumu ve TLS güveni. Dakikada bir örneklenir; bu sayfayı açmak sunucuya asla bağlanmaz.",
+    "disabled": "Bu kurulumda OpenBao/Vault değer kaynağı etkin değil.",
     "notSampled": "Henüz örneklenmedi. İlk örnek, API başladıktan sonraki bir dakika içinde alınır.",
     "cacheUnreachable": "Durum önbelleği okunamadı, bu yüzden her örneğin sağlığı bilinmiyor.",
     "sampledAt": "Örneklendi: {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "Bu başvuru bu haliyle çözümlenmez.",
     "error": "Denetim çalıştırılamadı: {message}",
     "nameParses": "Başvuru geçerli",
-    "nameInstance": "Vault örneği",
+    "nameInstance": "OpenBao/Vault örneği",
     "namePathAllowed": "Yola izin var",
     "nameReadable": "Terrapod okuyabilir",
     "nameFieldsPresent": "Alanlar mevcut",
@@ -3252,7 +3252,7 @@
     "noKeys": "Yok",
     "noteDynamic": "Bir denetim dinamik motoru asla okumaz: her okuma yeni bir kimlik bilgisi üretir.",
     "noteKeysNeedPlan": "Anahtar adları yalnızca bu çalışma alanında plan da çalıştırabilen kişilere gösterilir.",
-    "noteLocal": "Bu çalışma alanı yerelde çalışır; orada bir Vault başvurusu asla çözümlenmez.",
-    "noteDisabled": "Vault değer kaynağı etkin değil."
+    "noteLocal": "Bu çalışma alanı yerelde çalışır; orada bir OpenBao/Vault başvurusu asla çözümlenmez.",
+    "noteDisabled": "OpenBao/Vault değer kaynağı etkin değil."
   }
 }

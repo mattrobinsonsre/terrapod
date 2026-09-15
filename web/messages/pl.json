@@ -35,7 +35,7 @@
     "ha": "Wysoka dostępność",
     "deletedWorkspaces": "Usunięte przestrzenie robocze",
     "version": "Wersja {version}",
-    "vault": "Stan Vault"
+    "vault": "Stan OpenBao/Vault"
   },
   "switcher": {
     "language": "Język",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Stan Vault",
-    "description": "Dostępność, logowanie i zaufanie TLS dla każdej instancji Vault, z której Terrapod czyta zmienne. Próbkowane raz na minutę; otwarcie tej strony nigdy nie łączy się z Vault.",
-    "disabled": "Źródło wartości Vault nie jest włączone w tym wdrożeniu.",
+    "title": "Stan OpenBao/Vault",
+    "description": "Dostępność, logowanie i zaufanie TLS dla każdej instancji OpenBao (lub HashiCorp Vault), z której Terrapod czyta zmienne. Próbkowane raz na minutę; otwarcie tej strony nigdy nie łączy się z serwerem.",
+    "disabled": "Źródło wartości OpenBao/Vault nie jest włączone w tym wdrożeniu.",
     "notSampled": "Jeszcze nie spróbkowano. Pierwsza próbka jest pobierana w ciągu minuty od uruchomienia API.",
     "cacheUnreachable": "Nie udało się odczytać pamięci podręcznej stanu, więc stan każdej instancji jest nieznany.",
     "sampledAt": "Spróbkowano {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "To odwołanie w obecnej postaci się nie rozwiąże.",
     "error": "Nie udało się przeprowadzić sprawdzenia: {message}",
     "nameParses": "Odwołanie jest poprawne",
-    "nameInstance": "Instancja Vault",
+    "nameInstance": "Instancja OpenBao/Vault",
     "namePathAllowed": "Ścieżka dozwolona",
     "nameReadable": "Terrapod może je odczytać",
     "nameFieldsPresent": "Pola obecne",
@@ -3252,7 +3252,7 @@
     "noKeys": "Brak",
     "noteDynamic": "Sprawdzenie nigdy nie czyta silnika dynamicznego: każdy odczyt wydałby poświadczenie.",
     "noteKeysNeedPlan": "Nazwy kluczy widzi tylko ktoś, kto może też uruchomić plan w tej przestrzeni roboczej.",
-    "noteLocal": "Ta przestrzeń robocza działa lokalnie, gdzie odwołanie do Vault nigdy się nie rozwiązuje.",
-    "noteDisabled": "Źródło wartości Vault nie jest włączone."
+    "noteLocal": "Ta przestrzeń robocza działa lokalnie, gdzie odwołanie do OpenBao/Vault nigdy się nie rozwiązuje.",
+    "noteDisabled": "Źródło wartości OpenBao/Vault nie jest włączone."
   }
 }

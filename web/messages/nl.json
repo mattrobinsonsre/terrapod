@@ -35,7 +35,7 @@
     "ha": "Hoge beschikbaarheid",
     "deletedWorkspaces": "Verwijderde workspaces",
     "version": "Versie {version}",
-    "vault": "Vault-status"
+    "vault": "OpenBao/Vault-status"
   },
   "switcher": {
     "language": "Taal",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Vault-status",
-    "description": "Gezondheid, aanmelding en TLS-vertrouwen voor elke Vault-instantie waaruit Terrapod variabelen leest. Eén keer per minuut gemeten; deze pagina neemt nooit contact op met Vault.",
-    "disabled": "De Vault-waardebron is in deze installatie niet ingeschakeld.",
+    "title": "OpenBao/Vault-status",
+    "description": "Gezondheid, aanmelding en TLS-vertrouwen voor elke OpenBao-instantie (of HashiCorp Vault-instantie) waaruit Terrapod variabelen leest. Eén keer per minuut gemeten; deze pagina neemt nooit contact op met de server.",
+    "disabled": "De OpenBao/Vault-waardebron is in deze installatie niet ingeschakeld.",
     "notSampled": "Nog niet gemeten. De eerste meting volgt binnen een minuut na het starten van de API.",
     "cacheUnreachable": "De statuscache kon niet worden gelezen, dus de gezondheid van elke instantie is onbekend.",
     "sampledAt": "Gemeten {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "Deze verwijzing wordt zo niet opgelost.",
     "error": "De controle kon niet worden uitgevoerd: {message}",
     "nameParses": "Verwijzing is geldig",
-    "nameInstance": "Vault-instantie",
+    "nameInstance": "OpenBao/Vault-instantie",
     "namePathAllowed": "Pad toegestaan",
     "nameReadable": "Terrapod mag het lezen",
     "nameFieldsPresent": "Velden aanwezig",
@@ -3252,7 +3252,7 @@
     "noKeys": "Geen",
     "noteDynamic": "Een controle leest nooit een dynamische engine: elke lezing zou een credential aanmaken.",
     "noteKeysNeedPlan": "Sleutelnamen zijn alleen zichtbaar voor wie in deze workspace ook een plan mag uitvoeren.",
-    "noteLocal": "Deze workspace draait lokaal, waar een Vault-verwijzing nooit wordt opgelost.",
-    "noteDisabled": "De Vault-waardebron is niet ingeschakeld."
+    "noteLocal": "Deze workspace draait lokaal, waar een OpenBao/Vault-verwijzing nooit wordt opgelost.",
+    "noteDisabled": "De OpenBao/Vault-waardebron is niet ingeschakeld."
   }
 }

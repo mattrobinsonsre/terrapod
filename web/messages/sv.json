@@ -35,7 +35,7 @@
     "ha": "Hög tillgänglighet",
     "deletedWorkspaces": "Borttagna arbetsytor",
     "version": "Version {version}",
-    "vault": "Vault-status"
+    "vault": "OpenBao/Vault-status"
   },
   "switcher": {
     "language": "Språk",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Vault-status",
-    "description": "Hälsa, inloggning och TLS-förtroende för varje Vault-instans som Terrapod läser variabler från. Mäts en gång i minuten; att öppna sidan kontaktar aldrig Vault.",
-    "disabled": "Vault som värdekälla är inte aktiverad i den här installationen.",
+    "title": "OpenBao/Vault-status",
+    "description": "Hälsa, inloggning och TLS-förtroende för varje OpenBao-instans (eller HashiCorp Vault-instans) som Terrapod läser variabler från. Mäts en gång i minuten; att öppna sidan kontaktar aldrig servern.",
+    "disabled": "OpenBao/Vault som värdekälla är inte aktiverad i den här installationen.",
     "notSampled": "Inte mätt ännu. Den första mätningen görs inom en minut efter att API:et har startat.",
     "cacheUnreachable": "Statuscachen gick inte att läsa, så hälsan för varje instans är okänd.",
     "sampledAt": "Mätt {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "Den här referensen går inte att lösa upp som den är.",
     "error": "Kontrollen kunde inte köras: {message}",
     "nameParses": "Referensen är giltig",
-    "nameInstance": "Vault-instans",
+    "nameInstance": "OpenBao/Vault-instans",
     "namePathAllowed": "Sökvägen tillåten",
     "nameReadable": "Terrapod får läsa den",
     "nameFieldsPresent": "Fälten finns",
@@ -3252,7 +3252,7 @@
     "noKeys": "Inga",
     "noteDynamic": "En kontroll läser aldrig en dynamisk motor: varje läsning skulle skapa en inloggningsuppgift.",
     "noteKeysNeedPlan": "Nyckelnamn visas bara för den som även får köra en plan i den här arbetsytan.",
-    "noteLocal": "Den här arbetsytan körs lokalt, där en Vault-referens aldrig löses upp.",
-    "noteDisabled": "Vault som värdekälla är inte aktiverad."
+    "noteLocal": "Den här arbetsytan körs lokalt, där en OpenBao/Vault-referens aldrig löses upp.",
+    "noteDisabled": "OpenBao/Vault som värdekälla är inte aktiverad."
   }
 }

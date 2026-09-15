@@ -35,7 +35,7 @@
     "ha": "זמינות גבוהה",
     "deletedWorkspaces": "סביבות עבודה שנמחקו",
     "version": "גרסה {version}",
-    "vault": "מצב Vault"
+    "vault": "מצב OpenBao/Vault"
   },
   "switcher": {
     "language": "שפה",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "מצב Vault",
-    "description": "תקינות, התחברות ואמון TLS עבור כל מופע Vault שממנו Terrapod קורא משתנים. נדגם פעם בדקה; פתיחת הדף הזה לעולם אינה פונה אל Vault.",
-    "disabled": "מקור הערכים Vault אינו מופעל בפריסה הזו.",
+    "title": "מצב OpenBao/Vault",
+    "description": "תקינות, התחברות ואמון TLS עבור כל מופע OpenBao (או HashiCorp Vault) שממנו Terrapod קורא משתנים. נדגם פעם בדקה; פתיחת הדף הזה לעולם אינה פונה אל השרת.",
+    "disabled": "מקור הערכים OpenBao/Vault אינו מופעל בפריסה הזו.",
     "notSampled": "עדיין לא נדגם. הדגימה הראשונה נלקחת תוך דקה מעליית ה-API.",
     "cacheUnreachable": "לא ניתן היה לקרוא את מטמון המצב, ולכן התקינות של כל מופע אינה ידועה.",
     "sampledAt": "נדגם {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "ההפניה הזו לא תתפענח כפי שהיא.",
     "error": "לא ניתן היה להריץ את הבדיקה: {message}",
     "nameParses": "ההפניה תקינה",
-    "nameInstance": "מופע Vault",
+    "nameInstance": "מופע OpenBao/Vault",
     "namePathAllowed": "הנתיב מותר",
     "nameReadable": "Terrapod רשאי לקרוא",
     "nameFieldsPresent": "השדות קיימים",
@@ -3252,7 +3252,7 @@
     "noKeys": "אין",
     "noteDynamic": "בדיקה לעולם אינה קוראת מנוע דינמי: כל קריאה הייתה מנפיקה אישור גישה.",
     "noteKeysNeedPlan": "שמות המפתחות מוצגים רק למי שיכול גם להריץ תוכנית בסביבת העבודה הזו.",
-    "noteLocal": "סביבת העבודה הזו רצה מקומית, שם הפניה ל-Vault לעולם אינה מתפענחת.",
-    "noteDisabled": "מקור הערכים Vault אינו מופעל."
+    "noteLocal": "סביבת העבודה הזו רצה מקומית, שם הפניה ל-OpenBao/Vault לעולם אינה מתפענחת.",
+    "noteDisabled": "מקור הערכים OpenBao/Vault אינו מופעל."
   }
 }

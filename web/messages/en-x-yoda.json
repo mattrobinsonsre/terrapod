@@ -35,7 +35,7 @@
     "ha": "Availability, high",
     "deletedWorkspaces": "Workspaces deleted",
     "version": "Version {version}, this is",
-    "vault": "Status of Vault"
+    "vault": "Status of OpenBao/Vault"
   },
   "switcher": {
     "language": "Language",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Status of Vault",
-    "description": "Health, login and TLS trust for each Vault instance that Terrapod reads variables from, this is. Once a minute sampled it is; Vault, opening this page never contacts.",
-    "disabled": "Enabled on this deployment, the Vault value source is not.",
+    "title": "Status of OpenBao/Vault",
+    "description": "Health, login and TLS trust for each OpenBao (or HashiCorp Vault) instance that Terrapod reads variables from, this is. Once a minute sampled it is; the server, opening this page never contacts.",
+    "disabled": "Enabled on this deployment, the OpenBao/Vault value source is not.",
     "notSampled": "Sampled yet, it is not. Within a minute of the API starting, the first sample taken is.",
     "cacheUnreachable": "Read, the status cache could not be. Unknown, the health of each instance therefore is.",
     "sampledAt": "Sampled {time}, it was",
@@ -3240,7 +3240,7 @@
     "notOk": "Resolve as it is, this reference will not.",
     "error": "Run, the check could not: {message}",
     "nameParses": "Valid, the reference is",
-    "nameInstance": "The Vault instance, this is",
+    "nameInstance": "The OpenBao/Vault instance, this is",
     "namePathAllowed": "Allowed, the path is",
     "nameReadable": "Read it, Terrapod may",
     "nameFieldsPresent": "Present, the fields are",
@@ -3252,7 +3252,7 @@
     "noKeys": "None, there are",
     "noteDynamic": "Read by a check, a dynamic engine never is: mint a credential, each read would.",
     "noteKeysNeedPlan": "Shown only to one who also a plan on this workspace can run, key names are.",
-    "noteLocal": "Locally this workspace runs, where resolve a Vault reference never does.",
-    "noteDisabled": "Enabled, the Vault value source is not."
+    "noteLocal": "Locally this workspace runs, where resolve an OpenBao/Vault reference never does.",
+    "noteDisabled": "Enabled, the OpenBao/Vault value source is not."
   }
 }

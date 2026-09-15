@@ -35,7 +35,7 @@
     "ha": "Korkea käytettävyys",
     "deletedWorkspaces": "Poistetut työtilat",
     "version": "Versio {version}",
-    "vault": "Vaultin tila"
+    "vault": "OpenBao/Vaultin tila"
   },
   "switcher": {
     "language": "Kieli",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Vaultin tila",
-    "description": "Jokaisen Vault-instanssin, josta Terrapod lukee muuttujia, kunto, kirjautuminen ja TLS-luottamus. Mitataan kerran minuutissa; sivun avaaminen ei koskaan ota yhteyttä Vaultiin.",
-    "disabled": "Vault-arvolähde ei ole käytössä tässä asennuksessa.",
+    "title": "OpenBao/Vaultin tila",
+    "description": "Jokaisen OpenBao-instanssin (tai HashiCorp Vault -instanssin), josta Terrapod lukee muuttujia, kunto, kirjautuminen ja TLS-luottamus. Mitataan kerran minuutissa; sivun avaaminen ei koskaan ota yhteyttä palvelimeen.",
+    "disabled": "OpenBao/Vault-arvolähde ei ole käytössä tässä asennuksessa.",
     "notSampled": "Ei vielä mitattu. Ensimmäinen mittaus tehdään minuutin kuluessa API:n käynnistymisestä.",
     "cacheUnreachable": "Tilavälimuistia ei voitu lukea, joten jokaisen instanssin kunto on tuntematon.",
     "sampledAt": "Mitattu {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "Tämä viittaus ei ratkea sellaisenaan.",
     "error": "Tarkistusta ei voitu suorittaa: {message}",
     "nameParses": "Viittaus on kelvollinen",
-    "nameInstance": "Vault-instanssi",
+    "nameInstance": "OpenBao/Vault-instanssi",
     "namePathAllowed": "Polku sallittu",
     "nameReadable": "Terrapod saa lukea sen",
     "nameFieldsPresent": "Kentät löytyvät",
@@ -3252,7 +3252,7 @@
     "noKeys": "Ei yhtään",
     "noteDynamic": "Tarkistus ei koskaan lue dynaamista moottoria: jokainen luku loisi uuden tunnistetiedon.",
     "noteKeysNeedPlan": "Avainten nimet näytetään vain sille, joka voi myös ajaa suunnitelman tässä työtilassa.",
-    "noteLocal": "Tämä työtila ajetaan paikallisesti, jossa Vault-viittaus ei koskaan ratkea.",
-    "noteDisabled": "Vault-arvolähde ei ole käytössä."
+    "noteLocal": "Tämä työtila ajetaan paikallisesti, jossa OpenBao/Vault-viittaus ei koskaan ratkea.",
+    "noteDisabled": "OpenBao/Vault-arvolähde ei ole käytössä."
   }
 }

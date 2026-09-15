@@ -143,7 +143,7 @@ def _reference_attr(attrs: dict) -> object:
     if "reference" not in attrs or attrs["reference"] in (None, ""):
         raise HTTPException(
             status_code=422,
-            detail="supply `reference` (a Vault reference object) or `variable-id`",
+            detail="supply `reference` (an OpenBao/Vault reference object) or `variable-id`",
         )
     ref = attrs["reference"]
     if not isinstance(ref, (dict, str)):
@@ -165,7 +165,7 @@ async def _rate_limit(user: AuthenticatedUser) -> None:
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"at most {vault_diagnostics.CHECKS_PER_MINUTE} Vault reference "
+            detail=f"at most {vault_diagnostics.CHECKS_PER_MINUTE} OpenBao/Vault reference "
             "checks a minute; try again shortly",
             headers={"Retry-After": str(retry_after)},
         )

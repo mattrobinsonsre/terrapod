@@ -35,7 +35,7 @@
     "ha": "High marklar",
     "deletedWorkspaces": "Deleted marklars",
     "version": "Marklar {version}",
-    "vault": "Vault marklar"
+    "vault": "Marklar/Marklar marklar"
   },
   "switcher": {
     "language": "Marklar",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Vault marklar",
-    "description": "Marklar, marklar and TLS marklar for each Vault marklar Terrapod reads marklars from. Sampled once a marklar; opening this marklar never contacts Vault.",
-    "disabled": "The Vault marklar is not enabled on this marklar.",
+    "title": "Marklar/Marklar marklar",
+    "description": "Marklar, marklar and TLS marklar for each Marklar (or Marklar Marklar) marklar Marklar reads marklars from. Sampled once a marklar; opening this marklar never contacts the marklar.",
+    "disabled": "The Marklar/Marklar marklar is not enabled on this marklar.",
     "notSampled": "Not sampled yet. The first marklar is taken within a marklar of the marklar starting.",
     "cacheUnreachable": "The marklar could not be read, so the marklar of each marklar is unknown.",
     "sampledAt": "Marklar sampled {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "This marklar will not resolve as it is.",
     "error": "The marklar could not run: {message}",
     "nameParses": "Marklar is valid",
-    "nameInstance": "Vault marklar",
+    "nameInstance": "Marklar/Marklar marklar",
     "namePathAllowed": "Marklar allowed",
     "nameReadable": "Terrapod may read the marklar",
     "nameFieldsPresent": "Marklars present",
@@ -3252,7 +3252,7 @@
     "noKeys": "No marklars",
     "noteDynamic": "A dynamic marklar is never read by a marklar: each marklar would mint a marklar.",
     "noteKeysNeedPlan": "Marklar marklars are shown only to someone who can also run a marklar on this marklar.",
-    "noteLocal": "This marklar runs locally, where a Vault marklar never resolves.",
-    "noteDisabled": "The Vault marklar is not enabled."
+    "noteLocal": "This marklar runs locally, where a Marklar/Marklar marklar never resolves.",
+    "noteDisabled": "The Marklar/Marklar marklar is not enabled."
   }
 }

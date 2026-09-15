@@ -35,7 +35,7 @@
     "ha": "Ever-Afloat",
     "deletedWorkspaces": "Scuttled work-decks",
     "version": "Ship's mark {version}",
-    "vault": "State o’ the strongroom"
+    "vault": "State o’ the OpenBao/Vault strongroom"
   },
   "switcher": {
     "language": "Tongue",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "State o’ the strongroom",
-    "description": "Health, boardin’ and TLS trust fer each Vault strongroom Terrapod plunders variables from. Sounded once a minute; openin’ this chart never hails Vault.",
-    "disabled": "The Vault treasure source be not hoisted on this vessel.",
+    "title": "State o’ the OpenBao/Vault strongroom",
+    "description": "Health, boardin’ and TLS trust fer each OpenBao (or HashiCorp Vault, if ye must) strongroom Terrapod plunders variables from. Sounded once a minute; openin’ this chart never hails the strongroom.",
+    "disabled": "The OpenBao/Vault treasure source be not hoisted on this vessel.",
     "notSampled": "Not sounded yet. The first soundin’ be taken within a minute o’ the API weighin’ anchor.",
     "cacheUnreachable": "The ship’s log o’ status could not be read, so the health o’ each strongroom be unknown.",
     "sampledAt": "Sounded {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "This bearin’ will not find its treasure as it be.",
     "error": "The soundin’ could not be made: {message}",
     "nameParses": "Bearin’ be sound",
-    "nameInstance": "Vault strongroom",
+    "nameInstance": "OpenBao/Vault strongroom",
     "namePathAllowed": "Course permitted",
     "nameReadable": "Terrapod may plunder it",
     "nameFieldsPresent": "Fields aboard",
@@ -3252,7 +3252,7 @@
     "noKeys": "None aboard",
     "noteDynamic": "A soundin’ never opens a dynamic engine: every openin’ would mint fresh papers.",
     "noteKeysNeedPlan": "Key names be shown only to them as can also sail a voyage on this work-deck.",
-    "noteLocal": "This work-deck sails on yer own ship, where a Vault bearin’ never finds its treasure.",
-    "noteDisabled": "The Vault treasure source be not hoisted."
+    "noteLocal": "This work-deck sails on yer own ship, where an OpenBao/Vault bearin’ never finds its treasure.",
+    "noteDisabled": "The OpenBao/Vault treasure source be not hoisted."
   }
 }

@@ -35,7 +35,7 @@
     "ha": "High availability",
     "deletedWorkspaces": "Deleted workspaces",
     "version": "Version {version}",
-    "vault": "Vault status"
+    "vault": "OpenBao/Vault status"
   },
   "switcher": {
     "language": "Language",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Vault status",
-    "description": "Health, login and TLS trust for each Vault instance Terrapod reads variables from. Sampled once a minute; opening this page never contacts Vault.",
-    "disabled": "The Vault value source is not enabled on this deployment.",
+    "title": "OpenBao/Vault status",
+    "description": "Health, login and TLS trust for each OpenBao (or HashiCorp Vault) instance Terrapod reads variables from. Sampled once a minute; opening this page never contacts the server.",
+    "disabled": "The OpenBao/Vault value source is not enabled on this deployment.",
     "notSampled": "Not sampled yet. The first sample is taken within a minute of the API starting.",
     "cacheUnreachable": "The status cache could not be read, so the health of each instance is unknown.",
     "sampledAt": "Sampled {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "This reference will not resolve as it is.",
     "error": "The check could not run: {message}",
     "nameParses": "Reference is valid",
-    "nameInstance": "Vault instance",
+    "nameInstance": "OpenBao/Vault instance",
     "namePathAllowed": "Path allowed",
     "nameReadable": "Terrapod may read it",
     "nameFieldsPresent": "Fields present",
@@ -3252,7 +3252,7 @@
     "noKeys": "None",
     "noteDynamic": "A dynamic engine is never read by a check: each read would mint a credential.",
     "noteKeysNeedPlan": "Key names are shown only to someone who can also run a plan on this workspace.",
-    "noteLocal": "This workspace runs locally, where a Vault reference never resolves.",
-    "noteDisabled": "The Vault value source is not enabled."
+    "noteLocal": "This workspace runs locally, where an OpenBao/Vault reference never resolves.",
+    "noteDisabled": "The OpenBao/Vault value source is not enabled."
   }
 }

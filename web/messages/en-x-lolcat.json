@@ -35,7 +35,7 @@
     "ha": "Hai Availabilitee",
     "deletedWorkspaces": "Deletd Werkspacez",
     "version": "Vershun {version}",
-    "vault": "Vault stayts"
+    "vault": "OpenBao/Vault stayts"
   },
   "switcher": {
     "language": "Langwidge",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Vault stayts",
-    "description": "Helf, login an TLS trustin for evry Vault dat Terrapod reedz varz frum. Sniffd wunce a minit; openin dis paej NEVR pokez Vault.",
-    "disabled": "Da Vault valyu sorce iz not turnd on heer.",
+    "title": "OpenBao/Vault stayts",
+    "description": "Helf, login an TLS trustin for evry OpenBao (or HashiCorp Vault, u pick) dat Terrapod reedz varz frum. Sniffd wunce a minit; openin dis paej NEVR pokez da servr.",
+    "disabled": "Da OpenBao/Vault valyu sorce iz not turnd on heer.",
     "notSampled": "Not sniffd yet. Furst sniff happnz wifin a minit ov da API wakin up.",
     "cacheUnreachable": "Cud not reed da stayts stash, so nobody noes if da Vaults iz ok.",
     "sampledAt": "Sniffd {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "Dis referens no wurk liek dis.",
     "error": "Cud not chek: {message}",
     "nameParses": "Referens iz gud",
-    "nameInstance": "Vault",
+    "nameInstance": "OpenBao/Vault instanse",
     "namePathAllowed": "Paff iz allowd",
     "nameReadable": "Terrapod can reed it",
     "nameFieldsPresent": "Feeldz iz ther",
@@ -3252,7 +3252,7 @@
     "noKeys": "Nun",
     "noteDynamic": "A chek nevr reedz a dynamik injin: evry reed wud maek a nu sekrit.",
     "noteKeysNeedPlan": "Kee naymz iz only showd to kittehs hoo can also run a plan heer.",
-    "noteLocal": "Dis werkspace runz on ur own box, wer a Vault referens nevr wurkz.",
-    "noteDisabled": "Da Vault valyu sorce iz not turnd on."
+    "noteLocal": "Dis werkspace runz on ur own box, wer a OpenBao/Vault referens nevr wurkz.",
+    "noteDisabled": "Da OpenBao/Vault valyu sorce iz not turnd on."
   }
 }

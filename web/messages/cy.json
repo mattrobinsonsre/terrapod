@@ -35,7 +35,7 @@
     "ha": "Argaeledd uchel",
     "deletedWorkspaces": "Gweithfannau wedi''u dileu",
     "version": "Fersiwn {version}",
-    "vault": "Statws Vault"
+    "vault": "Statws OpenBao/Vault"
   },
   "switcher": {
     "language": "Iaith",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Statws Vault",
-    "description": "Iechyd, mewngofnodi ac ymddiriedaeth TLS ar gyfer pob enghraifft Vault y mae Terrapod yn darllen newidynnau ohoni. Samplir unwaith y funud; nid yw agor y dudalen hon byth yn cysylltu â Vault.",
-    "disabled": "Nid yw ffynhonnell gwerthoedd Vault wedi’i galluogi ar y gosodiad hwn.",
+    "title": "Statws OpenBao/Vault",
+    "description": "Iechyd, mewngofnodi ac ymddiriedaeth TLS ar gyfer pob enghraifft OpenBao (neu HashiCorp Vault) y mae Terrapod yn darllen newidynnau ohoni. Samplir unwaith y funud; nid yw agor y dudalen hon byth yn cysylltu â’r gweinydd.",
+    "disabled": "Nid yw ffynhonnell gwerthoedd OpenBao/Vault wedi’i galluogi ar y gosodiad hwn.",
     "notSampled": "Heb ei samplu eto. Cymerir y sampl gyntaf o fewn munud i’r API gychwyn.",
     "cacheUnreachable": "Ni ellid darllen y storfa statws, felly nid yw iechyd pob enghraifft yn hysbys.",
     "sampledAt": "Samplwyd {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "Ni fydd y cyfeirnod hwn yn datrys fel y mae.",
     "error": "Ni ellid rhedeg y gwiriad: {message}",
     "nameParses": "Mae’r cyfeirnod yn ddilys",
-    "nameInstance": "Enghraifft Vault",
+    "nameInstance": "Enghraifft OpenBao/Vault",
     "namePathAllowed": "Llwybr wedi’i ganiatáu",
     "nameReadable": "Caiff Terrapod ei ddarllen",
     "nameFieldsPresent": "Meysydd yn bresennol",
@@ -3252,7 +3252,7 @@
     "noKeys": "Dim",
     "noteDynamic": "Nid yw gwiriad byth yn darllen peiriant deinamig: byddai pob darlleniad yn cyhoeddi manylion mewngofnodi.",
     "noteKeysNeedPlan": "Dim ond rhywun sydd hefyd yn gallu rhedeg cynllun ar y weithfan hon sy’n gweld enwau’r allweddi.",
-    "noteLocal": "Mae’r weithfan hon yn rhedeg yn lleol, lle nad yw cyfeirnod Vault byth yn datrys.",
-    "noteDisabled": "Nid yw ffynhonnell gwerthoedd Vault wedi’i galluogi."
+    "noteLocal": "Mae’r weithfan hon yn rhedeg yn lleol, lle nad yw cyfeirnod OpenBao/Vault byth yn datrys.",
+    "noteDisabled": "Nid yw ffynhonnell gwerthoedd OpenBao/Vault wedi’i galluogi."
   }
 }

@@ -35,7 +35,7 @@
     "ha": "Hochverfügbarkeit",
     "deletedWorkspaces": "Gelöschte Workspaces",
     "version": "Version {version}",
-    "vault": "Vault-Status"
+    "vault": "OpenBao/Vault-Status"
   },
   "switcher": {
     "language": "Sprache",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Vault-Status",
-    "description": "Erreichbarkeit, Anmeldung und TLS-Vertrauen für jede Vault-Instanz, aus der Terrapod Variablen liest. Einmal pro Minute erfasst; diese Seite kontaktiert Vault nie.",
-    "disabled": "Die Vault-Wertquelle ist in dieser Installation nicht aktiviert.",
+    "title": "OpenBao/Vault-Status",
+    "description": "Erreichbarkeit, Anmeldung und TLS-Vertrauen für jede OpenBao-Instanz (oder HashiCorp-Vault-Instanz), aus der Terrapod Variablen liest. Einmal pro Minute erfasst; diese Seite kontaktiert den Server nie.",
+    "disabled": "Die OpenBao/Vault-Wertquelle ist in dieser Installation nicht aktiviert.",
     "notSampled": "Noch nicht erfasst. Die erste Erfassung erfolgt innerhalb einer Minute nach dem Start der API.",
     "cacheUnreachable": "Der Status-Cache konnte nicht gelesen werden, daher ist der Zustand jeder Instanz unbekannt.",
     "sampledAt": "Erfasst {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "Diese Referenz lässt sich so nicht auflösen.",
     "error": "Die Prüfung konnte nicht laufen: {message}",
     "nameParses": "Referenz ist gültig",
-    "nameInstance": "Vault-Instanz",
+    "nameInstance": "OpenBao/Vault-Instanz",
     "namePathAllowed": "Pfad erlaubt",
     "nameReadable": "Terrapod darf lesen",
     "nameFieldsPresent": "Felder vorhanden",
@@ -3252,7 +3252,7 @@
     "noKeys": "Keine",
     "noteDynamic": "Eine dynamische Engine wird bei einer Prüfung nie gelesen: Jeder Lesevorgang würde ein Credential erzeugen.",
     "noteKeysNeedPlan": "Schlüsselnamen sieht nur, wer in diesem Workspace auch einen Plan ausführen darf.",
-    "noteLocal": "Dieser Workspace läuft lokal, wo eine Vault-Referenz nie aufgelöst wird.",
-    "noteDisabled": "Die Vault-Wertquelle ist nicht aktiviert."
+    "noteLocal": "Dieser Workspace läuft lokal, wo eine OpenBao/Vault-Referenz nie aufgelöst wird.",
+    "noteDisabled": "Die OpenBao/Vault-Wertquelle ist nicht aktiviert."
   }
 }

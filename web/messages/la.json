@@ -35,7 +35,7 @@
     "ha": "Alta disponibilitas",
     "deletedWorkspaces": "Loca operis deleta",
     "version": "Versio {version}",
-    "vault": "Status Vault"
+    "vault": "Status OpenBao/Vault"
   },
   "switcher": {
     "language": "Lingua",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Status Vault",
-    "description": "Valetudo, ingressus et fides TLS cuiusque exemplaris Vault ex quo Terrapod variabiles legit. Semel in minuto inspicitur; haec pagina aperta numquam Vault attingit.",
-    "disabled": "Fons valorum Vault in hac institutione non est activus.",
+    "title": "Status OpenBao/Vault",
+    "description": "Valetudo, ingressus et fides TLS cuiusque exemplaris OpenBao (vel HashiCorp Vault) ex quo Terrapod variabiles legit. Semel in minuto inspicitur; haec pagina aperta numquam servitorem attingit.",
+    "disabled": "Fons valorum OpenBao/Vault in hac institutione non est activus.",
     "notSampled": "Nondum inspectum. Prima inspectio intra minutum post API incohatum fit.",
     "cacheUnreachable": "Memoria status legi non potuit; valetudo igitur cuiusque exemplaris ignota est.",
     "sampledAt": "Inspectum {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "Haec relatio, ut est, non resolvetur.",
     "error": "Probatio fieri non potuit: {message}",
     "nameParses": "Relatio valida est",
-    "nameInstance": "Exemplar Vault",
+    "nameInstance": "Exemplar OpenBao/Vault",
     "namePathAllowed": "Semita permissa",
     "nameReadable": "Terrapod legere potest",
     "nameFieldsPresent": "Campi adsunt",
@@ -3252,7 +3252,7 @@
     "noKeys": "Nullae",
     "noteDynamic": "Probatio numquam machinam dynamicam legit: quaeque lectio novas litteras fidei ederet.",
     "noteKeysNeedPlan": "Nomina clavium ei soli monstrantur qui etiam consilium in hoc loco operis exsequi potest.",
-    "noteLocal": "Hic locus operis localiter currit, ubi relatio Vault numquam resolvitur.",
-    "noteDisabled": "Fons valorum Vault non est activus."
+    "noteLocal": "Hic locus operis localiter currit, ubi relatio OpenBao/Vault numquam resolvitur.",
+    "noteDisabled": "Fons valorum OpenBao/Vault non est activus."
   }
 }

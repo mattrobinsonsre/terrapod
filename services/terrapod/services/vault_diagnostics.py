@@ -240,7 +240,7 @@ async def _login_probe(inst: VaultInstanceConfig, timeout: float) -> dict:
     elif inst.auth.method == "token":
         out["login-ok"] = False
         out["login-error"] = (
-            f"Vault rejected the static token for instance {inst.name!r} "
+            f"OpenBao/Vault rejected the static token for instance {inst.name!r} "
             f"(auth/token/lookup-self answered HTTP {resp.status_code})"
         )
     else:
@@ -607,7 +607,7 @@ async def check_reference(
             _check(
                 "instance",
                 FAIL,
-                "the Vault value source is disabled (api.config.vault.enabled)",
+                "the OpenBao/Vault value source is disabled (api.config.vault.enabled)",
             )
         )
         return out

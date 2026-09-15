@@ -35,7 +35,7 @@
     "ha": "التوافر العالي",
     "deletedWorkspaces": "مساحات العمل المحذوفة",
     "version": "الإصدار {version}",
-    "vault": "حالة Vault"
+    "vault": "حالة OpenBao/Vault"
   },
   "switcher": {
     "language": "اللغة",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "حالة Vault",
-    "description": "السلامة وتسجيل الدخول وثقة TLS لكل مثيل Vault يقرأ منه Terrapod المتغيرات. يُؤخذ عيّنة مرة كل دقيقة؛ ولا يتصل فتح هذه الصفحة بـ Vault أبداً.",
-    "disabled": "مصدر قيم Vault غير مفعّل في هذا النشر.",
+    "title": "حالة OpenBao/Vault",
+    "description": "السلامة وتسجيل الدخول وثقة TLS لكل مثيل OpenBao (أو HashiCorp Vault) يقرأ منه Terrapod المتغيرات. يُؤخذ عيّنة مرة كل دقيقة؛ ولا يتصل فتح هذه الصفحة بالخادم أبداً.",
+    "disabled": "مصدر قيم OpenBao/Vault غير مفعّل في هذا النشر.",
     "notSampled": "لم تُؤخذ عيّنة بعد. تُؤخذ أول عيّنة خلال دقيقة من بدء تشغيل واجهة API.",
     "cacheUnreachable": "تعذّرت قراءة ذاكرة الحالة المؤقتة، لذا فإن سلامة كل مثيل غير معروفة.",
     "sampledAt": "أُخذت العيّنة {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "لن يُحلّ هذا المرجع على حالته الراهنة.",
     "error": "تعذّر تشغيل الفحص: {message}",
     "nameParses": "المرجع صالح",
-    "nameInstance": "مثيل Vault",
+    "nameInstance": "مثيل OpenBao/Vault",
     "namePathAllowed": "المسار مسموح",
     "nameReadable": "يستطيع Terrapod قراءته",
     "nameFieldsPresent": "الحقول موجودة",
@@ -3252,7 +3252,7 @@
     "noKeys": "لا شيء",
     "noteDynamic": "لا يقرأ الفحص محركاً ديناميكياً أبداً: فكل قراءة ستُصدر بيانات اعتماد جديدة.",
     "noteKeysNeedPlan": "لا تُعرض أسماء المفاتيح إلا لمن يستطيع أيضاً تشغيل خطة في مساحة العمل هذه.",
-    "noteLocal": "تعمل مساحة العمل هذه محلياً، حيث لا يُحلّ مرجع Vault أبداً.",
-    "noteDisabled": "مصدر قيم Vault غير مفعّل."
+    "noteLocal": "تعمل مساحة العمل هذه محلياً، حيث لا يُحلّ مرجع OpenBao/Vault أبداً.",
+    "noteDisabled": "مصدر قيم OpenBao/Vault غير مفعّل."
   }
 }

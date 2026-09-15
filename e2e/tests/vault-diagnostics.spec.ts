@@ -82,7 +82,7 @@ test.describe('Vault diagnostics (#1663)', () => {
   test('with Vault off, the real endpoint says so', async ({ page }) => {
     await page.goto('/admin/vault')
     await expect(
-      page.getByText('The Vault value source is not enabled on this deployment.'),
+      page.getByText('The OpenBao/Vault value source is not enabled on this deployment.'),
     ).toBeVisible()
   })
 
@@ -157,7 +157,7 @@ test.describe('Vault diagnostics (#1663)', () => {
 
     const result = page.getByRole('status')
     await expect(result.getByText('Reference is valid')).toBeVisible()
-    await expect(result.getByText('The Vault value source is not enabled.')).toBeVisible()
+    await expect(result.getByText('The OpenBao/Vault value source is not enabled.')).toBeVisible()
   })
 
   test('only admin and audit may read the Vault status', async () => {

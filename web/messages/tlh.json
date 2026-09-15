@@ -35,7 +35,7 @@
     "ha": "taH laH",
     "deletedWorkspaces": "Qumwo'mey Qaw'lu'bogh",
     "version": "mI' {version}",
-    "vault": "Vault Dotlh"
+    "vault": "OpenBao/Vault Dotlh"
   },
   "switcher": {
     "language": "Hol",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Vault Dotlh",
-    "description": "Hoch Vault De'wI' Dotlh, 'el 'ej TLS voqghach — Terrapod De' laDmeH. wa' tup Hoch nuDlu'; Vault ja'be' neH ghItlhvam poSmoHlu'DI'.",
-    "disabled": "naDev Vault lo'laHghach Qapbe'.",
+    "title": "OpenBao/Vault Dotlh",
+    "description": "Hoch OpenBao De'wI' (HashiCorp Vault De'wI' joq) Dotlh, 'el 'ej TLS voqghach — Terrapod De' laDmeH. wa' tup Hoch nuDlu'; turwI' ja'be' neH ghItlhvam poSmoHlu'DI'.",
+    "disabled": "naDev OpenBao/Vault lo'laHghach Qapbe'.",
     "notSampled": "wej nuDlu'. API taghDI' wa' tup qaSpa' wa'DIch nuDlu'.",
     "cacheUnreachable": "Dotlh qawHaq laDlaHbe'lu', vaj Hoch De'wI' Dotlh Sovbe'lu'.",
     "sampledAt": "nuDlu' {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "Qapbe' ghItlhvam DaH.",
     "error": "nuDlaHbe'lu': {message}",
     "nameParses": "lugh ghItlh",
-    "nameInstance": "Vault De'wI'",
+    "nameInstance": "OpenBao/Vault De'wI'",
     "namePathAllowed": "He chaw'lu'",
     "nameReadable": "laDlaH Terrapod",
     "nameFieldsPresent": "Say'mey tu'lu'",
@@ -3252,7 +3252,7 @@
     "noKeys": "pagh",
     "noteDynamic": "nuDDI' QuQ vIHtaH laDbe'lu': Hoch laDDI' ngoq chu' chenmoHlu'.",
     "noteKeysNeedPlan": "Qumwe'vam nab qaSmoHlaHbogh ghot neH ngaQHa'moHwI' pongmey legh.",
-    "noteLocal": "Qumwe'vam naDev qaS, pa' Vault ghItlh Qapbe' reH.",
-    "noteDisabled": "Vault lo'laHghach Qapbe'."
+    "noteLocal": "Qumwe'vam naDev qaS, pa' OpenBao/Vault ghItlh Qapbe' reH.",
+    "noteDisabled": "OpenBao/Vault lo'laHghach Qapbe'."
   }
 }

@@ -708,7 +708,7 @@
         },
         "reference": {
           "additionalProperties": true,
-          "description": "a Vault reference exactly as a vault-sourced variable's value holds it, e.g. {\"mount\":\"secret\",\"path\":\"apps/x\",\"field\":\"token\"} with optional vault, engine (kv2|dynamic), method, data and file; give this or variable_id",
+          "description": "an OpenBao/Vault reference exactly as a vault-sourced variable's value holds it, e.g. {\"mount\":\"secret\",\"path\":\"apps/x\",\"field\":\"token\"} with optional vault, engine (kv2|dynamic), method, data and file; give this or variable_id",
           "type": "object"
         },
         "variable_id": {

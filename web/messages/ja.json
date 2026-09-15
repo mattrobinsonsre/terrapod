@@ -35,7 +35,7 @@
     "ha": "高可用性",
     "deletedWorkspaces": "削除されたワークスペース",
     "version": "バージョン {version}",
-    "vault": "Vault の状態"
+    "vault": "OpenBao/Vault の状態"
   },
   "switcher": {
     "language": "言語",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Vault の状態",
-    "description": "Terrapod が変数を読み取る各 Vault インスタンスの稼働状況、ログイン、TLS の信頼。1 分ごとに取得し、このページを開いても Vault には接続しません。",
-    "disabled": "このデプロイでは Vault 値ソースが有効になっていません。",
+    "title": "OpenBao/Vault の状態",
+    "description": "Terrapod が変数を読み取る各 OpenBao（または HashiCorp Vault）インスタンスの稼働状況、ログイン、TLS の信頼。1 分ごとに取得し、このページを開いてもサーバーには接続しません。",
+    "disabled": "このデプロイでは OpenBao/Vault 値ソースが有効になっていません。",
     "notSampled": "まだ取得されていません。最初の取得は API の起動後 1 分以内に行われます。",
     "cacheUnreachable": "状態キャッシュを読み取れないため、各インスタンスの稼働状況は不明です。",
     "sampledAt": "{time} に取得",
@@ -3240,7 +3240,7 @@
     "notOk": "この参照はこのままでは解決できません。",
     "error": "チェックを実行できませんでした: {message}",
     "nameParses": "参照が有効",
-    "nameInstance": "Vault インスタンス",
+    "nameInstance": "OpenBao/Vault インスタンス",
     "namePathAllowed": "パスが許可されている",
     "nameReadable": "Terrapod が読み取れる",
     "nameFieldsPresent": "フィールドが存在する",
@@ -3252,7 +3252,7 @@
     "noKeys": "なし",
     "noteDynamic": "チェックは動的エンジンを読み取りません。読み取るたびに認証情報が発行されるためです。",
     "noteKeysNeedPlan": "キー名は、このワークスペースでプランも実行できるユーザーにのみ表示されます。",
-    "noteLocal": "このワークスペースはローカルで実行されるため、Vault 参照は解決されません。",
-    "noteDisabled": "Vault 値ソースが有効になっていません。"
+    "noteLocal": "このワークスペースはローカルで実行されるため、OpenBao/Vault 参照は解決されません。",
+    "noteDisabled": "OpenBao/Vault 値ソースが有効になっていません。"
   }
 }

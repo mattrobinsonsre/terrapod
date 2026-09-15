@@ -35,7 +35,7 @@
     "ha": "Alta disponibilità",
     "deletedWorkspaces": "Workspace eliminati",
     "version": "Versione {version}",
-    "vault": "Stato di Vault"
+    "vault": "Stato di OpenBao/Vault"
   },
   "switcher": {
     "language": "Lingua",
@@ -3201,9 +3201,9 @@
     }
   },
   "adminVault": {
-    "title": "Stato di Vault",
-    "description": "Salute, accesso e fiducia TLS di ogni istanza Vault da cui Terrapod legge variabili. Campionato una volta al minuto; aprire questa pagina non contatta mai Vault.",
-    "disabled": "La sorgente di valori Vault non è abilitata in questa installazione.",
+    "title": "Stato di OpenBao/Vault",
+    "description": "Salute, accesso e fiducia TLS di ogni istanza OpenBao (o HashiCorp Vault) da cui Terrapod legge variabili. Campionato una volta al minuto; aprire questa pagina non contatta mai il server.",
+    "disabled": "La sorgente di valori OpenBao/Vault non è abilitata in questa installazione.",
     "notSampled": "Non ancora campionato. Il primo campione viene preso entro un minuto dall’avvio dell’API.",
     "cacheUnreachable": "Impossibile leggere la cache dello stato, quindi la salute di ogni istanza è sconosciuta.",
     "sampledAt": "Campionato {time}",
@@ -3240,7 +3240,7 @@
     "notOk": "Questo riferimento così com’è non si risolverà.",
     "error": "Impossibile eseguire la verifica: {message}",
     "nameParses": "Il riferimento è valido",
-    "nameInstance": "Istanza Vault",
+    "nameInstance": "Istanza OpenBao/Vault",
     "namePathAllowed": "Percorso consentito",
     "nameReadable": "Terrapod può leggerlo",
     "nameFieldsPresent": "Campi presenti",
@@ -3252,7 +3252,7 @@
     "noKeys": "Nessuna",
     "noteDynamic": "Una verifica non legge mai un motore dinamico: ogni lettura genererebbe una credenziale.",
     "noteKeysNeedPlan": "I nomi delle chiavi sono mostrati solo a chi può anche eseguire un piano su questo workspace.",
-    "noteLocal": "Questo workspace viene eseguito in locale, dove un riferimento Vault non si risolve mai.",
-    "noteDisabled": "La sorgente di valori Vault non è abilitata."
+    "noteLocal": "Questo workspace viene eseguito in locale, dove un riferimento OpenBao/Vault non si risolve mai.",
+    "noteDisabled": "La sorgente di valori OpenBao/Vault non è abilitata."
   }
 }

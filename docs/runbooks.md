@@ -1891,13 +1891,15 @@ not receive the set's variables.
 
 ---
 
-## A Vault variable won't resolve
+<a id="a-vault-variable-wont-resolve"></a>
 
-A variable sourced from Vault (see [vault.md](vault.md)) is resolved when a
-runner claims the run. When that fails, the run either **errors**, naming the
-variable, or **sits in `queued`** because Vault cannot answer right now. Two
+## An OpenBao/Vault variable won't resolve
+
+A variable sourced from OpenBao (or HashiCorp Vault), described in
+[vault.md](vault.md), is resolved when a runner claims the run. When that fails, the run either **errors**, naming the
+variable, or **sits in `queued`** because the server cannot answer right now. Two
 tools narrow down which part is at fault without queueing another run
-([Vault → Diagnostics](vault.md#diagnostics)).
+([OpenBao/Vault → Diagnostics](vault.md#diagnostics)).
 
 ### Symptoms
 
@@ -1908,17 +1910,17 @@ tools narrow down which part is at fault without queueing another run
 
 ### Diagnosis
 
-1. **Instance status.** Open **Admin → Vault status** (`/admin/vault`), or
+1. **Instance status.** Open **Admin → OpenBao/Vault status** (`/admin/vault`), or
    call `GET /api/terrapod/v1/admin/vault` or the MCP tool
    `terrapod_vault_status`. It needs admin or audit. Read the instance the
    variable uses:
 
    | What it shows | What it means |
    |---|---|
-   | **Unreachable**, with a `ConnectError`/`ConnectTimeout` | The API pods cannot reach `address`: DNS, egress policy, or the Vault service is down |
+   | **Unreachable**, with a `ConnectError`/`ConnectTimeout` | The API pods cannot reach `address`: DNS, egress policy, or the server is down |
    | **Unreachable**, with an SSL or certificate error | TLS trust. Check `tls-trust`: `default` or `global-bundle` means the private CA is not in the store Terrapod uses. Add it via `tls.ca_secret` or the global `caBundle` |
-   | **Sealed** | Vault is sealed. Runs wait in `queued` and resume on their own once it is unsealed |
-   | **Not initialized** | Vault has never been initialised. Nothing will resolve until it is |
+   | **Sealed** | The server is sealed. Runs wait in `queued` and resume on their own once it is unsealed |
+   | **Not initialized** | The server has never been initialised. Nothing will resolve until it is |
    | **Login failed** | The role, its bindings, or (for `jwt`) the audience or JWKS. The message names the method, mount, role and audience |
    | Reachable, login OK, no last error | The instance is fine; the fault is in the reference or the policy. Go to step 2 |
 
@@ -1938,9 +1940,9 @@ tools narrow down which part is at fault without queueing another run
    | `parses` | The reference itself; the detail says what is wrong. Fix the variable |
    | `instance` | The reference names an instance that is not configured, or omits `vault` where several are configured and none is `default` |
    | `path-allowed` | The instance's `paths` allow-list refuses the path. Widen the list or move the secret |
-   | `readable` | The Vault policy does not grant `read` on `read-path` (for kv-v2, note the `data/` segment). Add it to the policy attached to the role named in the detail |
+   | `readable` | The OpenBao/Vault policy does not grant `read` on `read-path` (for kv-v2, note the `data/` segment). Add it to the policy attached to the role named in the detail |
    | `fields-present` | The secret exists but lacks a field the reference names. `keys` lists what is there (kv-v2 only) |
-   | any step `unknown` | Vault could not answer. Go back to step 1 |
+   | any step `unknown` | The server could not answer. Go back to step 1 |
 
    A dynamic engine is never read by a check, because every read would mint a
    credential. For one, a `readable` pass is as far as the check goes. If the
@@ -1949,7 +1951,7 @@ tools narrow down which part is at fault without queueing another run
 ### Resolution
 
 Fix what the failing step names: the network path, CA, role bindings, policy,
-allow-list or reference. For a sealed Vault, unseal it. Runs held in `queued`
+allow-list or reference. For a sealed server, unseal it. Runs held in `queued`
 are re-claimed automatically and need nothing more.
 
 ### Verification
