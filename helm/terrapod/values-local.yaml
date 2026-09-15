@@ -52,7 +52,7 @@ api:
       instances:
         - name: default
           default: true
-          address: http://vault:8200
+          address: http://openbao:8200
           auth:
             method: kubernetes
             mount: kubernetes

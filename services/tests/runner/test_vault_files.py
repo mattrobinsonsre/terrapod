@@ -183,12 +183,14 @@ def test_two_variables_at_one_path_collide_and_both_are_named():
     with pytest.raises(vf.FilePathError) as e:
         vf.check_collisions([("A", "gcp/adc.json"), ("B", "gcp/adc.json")])
     assert str(e.value) == (
-        "variables 'A' and 'B' both deliver a Vault file to /var/run/terrapod/files/gcp/adc.json"
+        "variables 'A' and 'B' both deliver an OpenBao/Vault file to /var/run/terrapod/files/gcp/adc.json"
     )
 
 
 def test_two_home_variables_at_one_path_collide():
-    with pytest.raises(vf.FilePathError, match="both deliver a Vault file to /home/runner/.aws/c"):
+    with pytest.raises(
+        vf.FilePathError, match="both deliver an OpenBao/Vault file to /home/runner/.aws/c"
+    ):
         vf.check_collisions([("A", "~/.aws/c"), ("B", "~/.aws/c")])
 
 
@@ -197,18 +199,18 @@ def test_two_home_variables_at_one_path_collide():
     [
         (
             [("A", "a"), ("B", "a/b")],
-            "variable 'A' delivers a Vault file to /var/run/terrapod/files/a, which "
+            "variable 'A' delivers an OpenBao/Vault file to /var/run/terrapod/files/a, which "
             "variable 'B' needs as a directory for /var/run/terrapod/files/a/b",
         ),
         (
             # Order of the input does not matter.
             [("B", "a/b/c"), ("A", "a")],
-            "variable 'A' delivers a Vault file to /var/run/terrapod/files/a, which "
+            "variable 'A' delivers an OpenBao/Vault file to /var/run/terrapod/files/a, which "
             "variable 'B' needs as a directory for /var/run/terrapod/files/a/b/c",
         ),
         (
             [("A", "~/.aws"), ("B", "~/.aws/credentials")],
-            "variable 'A' delivers a Vault file to /home/runner/.aws, which "
+            "variable 'A' delivers an OpenBao/Vault file to /home/runner/.aws, which "
             "variable 'B' needs as a directory for /home/runner/.aws/credentials",
         ),
     ],

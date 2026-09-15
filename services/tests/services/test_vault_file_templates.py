@@ -418,7 +418,7 @@ class TestCaps:
         with pytest.raises(VaultSourceError) as e:
             await _resolve(variables, _mock(data))
         assert str(e.value) == (
-            f"variable 'F3': the Vault files for this run come to {MAX_TOTAL_FILE_BYTES + 1} "
+            f"variable 'F3': the OpenBao/Vault files for this run come to {MAX_TOTAL_FILE_BYTES + 1} "
             "bytes with this one, over the 768 KiB limit for all files in a run"
         )
 

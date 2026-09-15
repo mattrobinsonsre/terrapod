@@ -2097,7 +2097,7 @@ async def next_run(
         # stranding it, so this catches what the resolver did not.
         logger.exception("unexpected failure resolving vault variables")
         await run_service.transition_run(
-            db, run, "errored", error_message=f"Vault variable resolution failed: {e}"
+            db, run, "errored", error_message=f"OpenBao/Vault variable resolution failed: {e}"
         )
         _stage_vault_audit()
         await db.commit()

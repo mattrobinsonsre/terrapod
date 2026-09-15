@@ -679,8 +679,9 @@ _HCL_DETAIL = (
     "file's path, which is not an HCL expression. Turn hcl off."
 )
 _STATIC_DETAIL = (
-    "`file` delivery needs value-source 'vault': this value is a Vault reference, and "
-    "with a static source it would be delivered to the run as the literal JSON"
+    "`file` delivery needs value-source 'vault': this value is an OpenBao/Vault "
+    "reference, and with a static source it would be delivered to the run as the "
+    "literal JSON"
 )
 
 _BAD_NAMES = [

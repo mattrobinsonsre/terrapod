@@ -1667,7 +1667,7 @@ async def update_workspace(
             if n:
                 raise HTTPException(
                     status_code=422,
-                    detail=f"This workspace receives {n} Vault-sourced variable(s), from "
+                    detail=f"This workspace receives {n} OpenBao/Vault-sourced variable(s), from "
                     "its own variables or a variable set, which only resolve under agent "
                     "execution. Switching to local would leave them delivering nothing. "
                     "Remove or convert them first, or unassign the variable set.",

@@ -399,7 +399,7 @@ async def resolve_vault_delivery(
     cfg = settings.vault
     if not cfg.enabled:
         raise VaultSourceError(
-            f"{len(wanted)} variable(s) reference Vault but the Vault value source is "
+            f"{len(wanted)} variable(s) reference OpenBao/Vault but the value source is "
             "disabled (api.config.vault.enabled)"
         )
 
@@ -526,7 +526,7 @@ async def resolve_vault_delivery(
             if size > MAX_FILE_BYTES:
                 # Names and sizes only — never any part of the value.
                 raise VaultSourceError(
-                    f"variable {v.key!r}: the Vault value is {size} bytes, over the "
+                    f"variable {v.key!r}: the OpenBao/Vault value is {size} bytes, over the "
                     f"{MAX_FILE_BYTES // 1024} KiB limit for a file"
                 )
             total_file_bytes += size
@@ -535,7 +535,7 @@ async def resolve_vault_delivery(
                 # caps at 1 MiB. Failing here names the variable that tipped it
                 # over, rather than letting the Secret create fail at launch.
                 raise VaultSourceError(
-                    f"variable {v.key!r}: the Vault files for this run come to "
+                    f"variable {v.key!r}: the OpenBao/Vault files for this run come to "
                     f"{total_file_bytes} bytes with this one, over the "
                     f"{MAX_TOTAL_FILE_BYTES // 1024} KiB limit for all files in a run"
                 )

@@ -72,7 +72,7 @@ class TestPlanVaultFiles:
         assert SECRET not in str(e.value)
 
     def test_a_collision_is_refused_again_here(self):
-        with pytest.raises(ValueError, match="both deliver a Vault file"):
+        with pytest.raises(ValueError, match="both deliver an OpenBao/Vault file"):
             RunnerListener._plan_vault_files(_files("a", "a"), env_vars=[])
 
     def test_an_env_variable_using_the_derived_key_is_refused(self):
@@ -82,7 +82,7 @@ class TestPlanVaultFiles:
             )
         assert str(e.value) == (
             "env variable 'vault-file-0' clashes with the Secret key Terrapod uses for the "
-            "Vault file of variable 'V0'; rename the env variable"
+            "OpenBao/Vault file of variable 'V0'; rename the env variable"
         )
 
 
@@ -177,7 +177,9 @@ class TestLaunch:
         listener._report_launch_failed.assert_awaited_once()
         run_id, message = listener._report_launch_failed.await_args.args
         assert run_id == "r1"
-        assert message.startswith("Vault file delivery refused: env variable 'vault-file-0'")
+        assert message.startswith(
+            "OpenBao/Vault file delivery refused: env variable 'vault-file-0'"
+        )
         assert SECRET not in message
         assert SECRET not in str(log.mock_calls)
 

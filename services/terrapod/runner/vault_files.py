@@ -140,11 +140,11 @@ def check_collisions(entries: list[tuple[str, str]]) -> None:
         for t2, k2 in targets[i + 1 :]:
             if t1 == t2:
                 raise FilePathError(
-                    f"variables {k1!r} and {k2!r} both deliver a Vault file to {t1}"
+                    f"variables {k1!r} and {k2!r} both deliver an OpenBao/Vault file to {t1}"
                 )
             if t2.startswith(t1 + "/"):
                 raise FilePathError(
-                    f"variable {k1!r} delivers a Vault file to {t1}, which variable "
+                    f"variable {k1!r} delivers an OpenBao/Vault file to {t1}, which variable "
                     f"{k2!r} needs as a directory for {t2}"
                 )
 
