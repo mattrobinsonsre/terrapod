@@ -506,7 +506,7 @@
       },
       "interface": {
         "title": "Marklars & Marklars",
-        "counts": "{inputs} marklars, {outputs} marklars",
+        "counts": "{inputs, plural, one {# marklar} other {# marklars}}, {outputs, plural, one {# marklar} other {# marklars}}",
         "versionLabel": "Marklar:",
         "noData": "No marklar marklar available for this marklar.",
         "inputs": "Marklars",

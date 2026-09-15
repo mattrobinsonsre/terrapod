@@ -506,7 +506,7 @@
       },
       "interface": {
         "title": "קלטים ופלטים",
-        "counts": "{inputs} קלטים, {outputs} פלטים",
+        "counts": "{inputs, plural, one {קלט אחד} other {# קלטים}}, {outputs, plural, one {פלט אחד} other {# פלטים}}",
         "versionLabel": "גרסה:",
         "noData": "אין נתוני ממשק זמינים לגרסה זו.",
         "inputs": "קלטים",

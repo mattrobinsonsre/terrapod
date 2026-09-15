@@ -506,7 +506,7 @@
       },
       "interface": {
         "title": "Wejścia i wyjścia",
-        "counts": "{inputs} wejść, {outputs} wyjść",
+        "counts": "{inputs, plural, one {# wejście} few {# wejścia} many {# wejść} other {# wejścia}}, {outputs, plural, one {# wyjście} few {# wyjścia} many {# wyjść} other {# wyjścia}}",
         "versionLabel": "Wersja:",
         "noData": "Brak danych interfejsu dla tej wersji.",
         "inputs": "Wejścia",

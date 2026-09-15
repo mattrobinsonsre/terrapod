@@ -506,7 +506,7 @@
       },
       "interface": {
         "title": "Vstupy a výstupy",
-        "counts": "{inputs} vstupů, {outputs} výstupů",
+        "counts": "{inputs, plural, one {# vstup} few {# vstupy} many {# vstupu} other {# vstupů}}, {outputs, plural, one {# výstup} few {# výstupy} many {# výstupu} other {# výstupů}}",
         "versionLabel": "Verze:",
         "noData": "Pro tuto verzi nejsou k dispozici žádná data rozhraní.",
         "inputs": "Vstupy",

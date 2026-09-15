@@ -506,7 +506,7 @@
       },
       "interface": {
         "title": "Inputz an Outputz",
-        "counts": "{inputs} inputz, {outputs} outputz",
+        "counts": "{inputs, plural, one {# input} other {# inputz}}, {outputs, plural, one {# output} other {# outputz}}",
         "versionLabel": "Vershun:",
         "noData": "No interface data availabul fer dis vershun.",
         "inputs": "Inputz",

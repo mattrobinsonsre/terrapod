@@ -506,7 +506,7 @@
       },
       "interface": {
         "title": "1npu75 & 0u7pu75",
-        "counts": "{inputs} 1npu75, {outputs} 0u7pu75",
+        "counts": "{inputs, plural, one {# 1npu7} other {# 1npu75}}, {outputs, plural, one {# 0u7pu7} other {# 0u7pu75}}",
         "versionLabel": "V3r510n:",
         "noData": "N0 1n73rf4c3 d474 4v41l4bl3 f0r 7h15 v3r510n.",
         "inputs": "1npu75",
