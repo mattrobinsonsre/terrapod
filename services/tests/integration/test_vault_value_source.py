@@ -19,6 +19,7 @@ from sqlalchemy import select
 
 from terrapod.config import VaultInstanceConfig
 from terrapod.db.models import (
+    AuditLog,
     ConfigurationVersion,
     Run,
     Variable,
@@ -429,6 +430,26 @@ class TestFileDelivery:
         rest = {k: v for k, v in attrs.items() if k != "vault-files"}
         assert _FILE_SECRET not in json.dumps(rest)
         assert final.status == "planning"
+
+        # #1651: the one read is one committed audit row naming both variables.
+        async with get_db_session() as db:
+            rows = (
+                (
+                    await db.execute(
+                        select(AuditLog).where(
+                            AuditLog.action == "vault.read",
+                            AuditLog.resource_id == f"run-{final.id}",
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert len(rows) == 1
+        detail = json.loads(rows[0].detail)
+        assert sorted(detail["keys"]) == ["TLS_BUNDLE", "TLS_CERT"]
+        assert (detail["outcome"], detail["phase"], detail["path"]) == ("ok", "plan", "issue/web")
+        assert _FILE_SECRET not in rows[0].detail
 
     async def test_a_workspace_variable_overrides_a_set_variable_of_the_same_key(self, app, client):
         """Precedence runs first: one key, one file — the workspace's — so the

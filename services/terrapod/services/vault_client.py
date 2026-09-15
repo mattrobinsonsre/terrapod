@@ -80,6 +80,19 @@ class VaultUnavailable(VaultError):
     """
 
 
+class VaultDenied(VaultError):
+    """Vault — or Terrapod's own allow-list — refused: a 403, or a login refused.
+
+    A subclass, so every existing ``except VaultError`` still fails the run.
+    It exists so the read audit (#1651) can record *denied* from the type
+    rather than guess from a message.
+    """
+
+
+class VaultNotFound(VaultError):
+    """Vault answered 404: nothing at that path."""
+
+
 @dataclass(frozen=True)
 class VaultLease:
     """The lease a dynamic-secret response carries.
@@ -304,7 +317,7 @@ async def _login(inst: VaultInstanceConfig, static_token: str | None) -> str:
         )
         if _is_transient_status(resp.status_code):
             raise VaultUnavailable(detail)
-        raise VaultError(detail)
+        raise VaultDenied(detail)
     try:
         auth = resp.json().get("auth") or {}
     except ValueError as e:
@@ -374,7 +387,7 @@ def _check_allowed(inst: VaultInstanceConfig, read_path: str) -> None:
         want = stripped.split("/")
         if target[: len(want)] == want:
             return
-    raise VaultError(
+    raise VaultDenied(
         f"path {read_path!r} is not in the allow-list configured for vault instance {inst.name!r}"
     )
 
@@ -431,12 +444,12 @@ async def read_secret_response(
         raise _as_vault_error(e, f"read of {read_path!r}", inst.name) from e
 
     if resp.status_code == 403:
-        raise VaultError(
+        raise VaultDenied(
             f"Vault denied {read_path!r} on instance {inst.name!r}. The policy "
             f"attached to role {inst.auth.role!r} does not grant read on this path."
         )
     if resp.status_code == 404:
-        raise VaultError(f"Vault has no secret at {read_path!r} on instance {inst.name!r}")
+        raise VaultNotFound(f"Vault has no secret at {read_path!r} on instance {inst.name!r}")
     if resp.status_code != 200:
         # Deliberately NOT echoing resp.text: this message becomes the run's
         # error_message, readable by anyone with run-read, and a third party's

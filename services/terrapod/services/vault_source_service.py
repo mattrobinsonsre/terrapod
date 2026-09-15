@@ -50,7 +50,9 @@ from terrapod.runner.vault_files import (
     validate_name,
 )
 from terrapod.services.vault_client import (
+    VaultDenied,
     VaultError,
+    VaultNotFound,
     VaultUnavailable,
     extract_field,
     read_secret_response,
@@ -271,6 +273,90 @@ class VaultDelivery:
     files: list[dict] = field(default_factory=list)
 
 
+#: What a Vault read can come to, as the audit log records it (#1651).
+#: ``error`` covers anything that is none of the four named outcomes — a
+#: malformed reference refused before the request, say.
+READ_OUTCOMES: tuple[str, ...] = ("ok", "denied", "missing", "transient", "error")
+_AUDIT_STATUS = {"ok": 200, "denied": 403, "missing": 404, "transient": 503, "error": 500}
+
+
+@dataclass(frozen=True)
+class VaultReadRecord:
+    """One Vault read as the audit log records it (#1651).
+
+    Names and coordinates only. There is deliberately no attribute that could
+    carry a value, so an audit row built from a record cannot contain one — a
+    source-introspection test pins the field set.
+    """
+
+    keys: tuple[str, ...]
+    instance: str
+    mount: str
+    path: str
+    engine: str
+    outcome: str
+
+
+def _outcome_of(exc: BaseException) -> str:
+    if isinstance(exc, VaultUnavailable):
+        return "transient"
+    if isinstance(exc, VaultDenied):
+        return "denied"
+    if isinstance(exc, VaultNotFound):
+        return "missing"
+    return "error"
+
+
+def _record(reads: list | None, keys: list[str], instance: str, ref: dict, outcome: str) -> None:
+    if reads is None:
+        return
+    reads.append(
+        VaultReadRecord(
+            keys=tuple(keys),
+            instance=instance,
+            mount=str(ref["mount"]).strip("/"),
+            path=str(ref["path"]).strip("/"),
+            engine=str(ref.get("engine", "kv2")),
+            outcome=outcome,
+        )
+    )
+
+
+def vault_read_audit_entries(*, run_id: object, phase: str, reads: list) -> list[dict]:
+    """The audit rows for a claim's Vault reads: one per read, never a value.
+
+    ``reads`` is what :func:`resolve_vault_delivery` collected. A shared read
+    that served several variables is one row naming all of them. The detail
+    is compact JSON — keys, instance, mount, path, engine, phase, outcome — so
+    it can be filtered and parsed, and it is built only from the record's
+    names and coordinates.
+    """
+    return [
+        {
+            "action": "vault.read",
+            "actor_type": "system",
+            "origin": "system",
+            "resource_type": "runs",
+            "resource_id": f"run-{run_id}",
+            "status_code": _AUDIT_STATUS[r.outcome],
+            "detail": json.dumps(
+                {
+                    "keys": list(r.keys),
+                    "instance": r.instance,
+                    "mount": r.mount,
+                    "path": r.path,
+                    "engine": r.engine,
+                    "phase": phase,
+                    "outcome": r.outcome,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        }
+        for r in reads
+    ]
+
+
 async def resolve_vault_variables(resolved: list, settings: Settings) -> dict[str, str]:
     """Resolve every vault-sourced variable to the value it is delivered as.
 
@@ -281,12 +367,19 @@ async def resolve_vault_variables(resolved: list, settings: Settings) -> dict[st
     return (await resolve_vault_delivery(resolved, settings)).values
 
 
-async def resolve_vault_delivery(resolved: list, settings: Settings) -> VaultDelivery:
+async def resolve_vault_delivery(
+    resolved: list, settings: Settings, *, reads: list | None = None
+) -> VaultDelivery:
     """Resolve every vault-sourced variable for delivery.
 
     ``resolved`` is the full ``ResolvedVariable`` list from ``resolve_variables``
     — already after variable-set precedence, so two variables with one key have
     collapsed to the winner and only distinct keys can collide on a file path.
+
+    ``reads``, when given, receives a :class:`VaultReadRecord` for every Vault
+    read attempted, including the one that failed, *before* any exception is
+    raised — so the caller can audit a failed claim as well as a good one
+    (#1651). Nothing is recorded for a claim refused before any read.
     """
     wanted = [
         v for v in resolved if getattr(v, "value_source", VALUE_SOURCE_STATIC) == VALUE_SOURCE_VAULT
@@ -366,6 +459,7 @@ async def resolve_vault_delivery(resolved: list, settings: Settings) -> VaultDel
             # Transient: the reference is fine, Vault is not answering. Signal
             # it distinctly so the caller can leave the run queued rather than
             # destroy it over a restart.
+            _record(reads, keys, inst.name, ref, "transient")
             logger.warning(
                 "vault is unavailable; leaving the run for a later claim",
                 keys=keys,
@@ -380,6 +474,7 @@ async def resolve_vault_delivery(resolved: list, settings: Settings) -> VaultDel
             # failure must become a failed run carrying a cause instead.
             # Deliberately not logging any part of a response body — only the
             # variable names, the coordinates and the cause.
+            _record(reads, keys, inst.name, ref, _outcome_of(e))
             logger.error(
                 "vault variable could not be resolved",
                 keys=keys,
@@ -389,6 +484,10 @@ async def resolve_vault_delivery(resolved: list, settings: Settings) -> VaultDel
             )
             raise VaultSourceError(f"{_variables(keys)}: {e}") from e
 
+        # Vault answered. A field missing from the answer or a template that
+        # does not render still fails the run below, but the read happened and
+        # is recorded as one.
+        _record(reads, keys, inst.name, ref, "ok")
         secret = response.data
         # Lease metadata a template may read as `_lease.*` — never the lease id.
         lease = response.lease.template_metadata() if response.lease else None

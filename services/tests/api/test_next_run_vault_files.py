@@ -22,7 +22,13 @@ import pytest
 from terrapod.api.routers import runs as runs_router
 from terrapod.config import VaultConfig, settings
 from terrapod.services.variable_service import ResolvedVariable
-from terrapod.services.vault_client import VaultError, VaultResponse, VaultUnavailable
+from terrapod.services.vault_client import (
+    VaultDenied,
+    VaultError,
+    VaultNotFound,
+    VaultResponse,
+    VaultUnavailable,
+)
 
 SECRET = "S3CR3T-next-run-file-content"
 
@@ -69,7 +75,7 @@ class _Claim:
         return json.loads(self.resp.body)["data"]["attributes"]
 
 
-async def _claim(resolved, *, read=None) -> _Claim:
+async def _claim(resolved, *, read=None, phase="plan") -> _Claim:
     lid = uuid.uuid4()
     run = MagicMock()
     run.id = uuid.uuid4()
@@ -80,6 +86,8 @@ async def _claim(resolved, *, read=None) -> _Claim:
     ws.working_directory = ""
     db = AsyncMock()
     db.get = AsyncMock(return_value=ws)
+    # Audit rows are staged synchronously (add_all) and ride the claim's commit.
+    db.add_all = MagicMock()
     transition = AsyncMock()
     read = read or AsyncMock(return_value=VaultResponse({"sa": SECRET, "token": "TOKEN-V"}))
     with (
@@ -89,7 +97,7 @@ async def _claim(resolved, *, read=None) -> _Claim:
             AsyncMock(return_value={"pool_id": str(uuid.uuid4()), "name": "l"}),
         ),
         patch.object(
-            runs_router.run_service, "claim_next_run", AsyncMock(return_value=(run, "plan"))
+            runs_router.run_service, "claim_next_run", AsyncMock(return_value=(run, phase))
         ),
         patch.object(runs_router.run_service, "transition_run", transition),
         patch(
@@ -233,6 +241,111 @@ class TestDelivery:
         c = await _claim([_rv("PLAIN", "literal", value_source="static")])
         assert c.attrs["vault-files"] == []
         c.read.assert_not_awaited()
+
+
+def _audit_rows(c) -> list:
+    """The AuditLog rows the claim staged, in order."""
+    return [row for call in c.db.add_all.call_args_list for row in call.args[0]]
+
+
+class TestEveryReadIsAudited:
+    """#1651: one `vault.read` row per read, whichever way the claim ends,
+    committed with the claim in one commit, and never carrying a value."""
+
+    def _details(self, c) -> list[dict]:
+        rows = _audit_rows(c)
+        for r in rows:
+            assert r.action == "vault.read"
+            assert r.origin == "system" and r.actor_type == "system"
+            assert r.resource_type == "runs"
+            assert r.resource_id == f"run-{c.run.id}"
+            assert SECRET not in r.detail
+        return [json.loads(r.detail) for r in rows]
+
+    async def test_a_shared_read_is_one_row_naming_every_variable(self):
+        c = await _claim(
+            [
+                _rv("ENV_FILE", _ref(file={})),
+                _rv("TOKEN", _ref(field="token")),
+                _rv("PLAIN", "literal", value_source="static"),
+            ]
+        )
+        assert c.resp.status_code == 200
+        assert self._details(c) == [
+            {
+                "keys": ["ENV_FILE", "TOKEN"],
+                "instance": "default",
+                "mount": "kvv2",
+                "path": "apps/gcp",
+                "engine": "kv2",
+                "phase": "plan",
+                "outcome": "ok",
+            }
+        ]
+        assert _audit_rows(c)[0].status_code == 200
+        c.db.commit.assert_awaited_once()
+
+    async def test_the_apply_phase_is_recorded_as_apply(self):
+        c = await _claim([_rv("TOKEN", _ref(field="token"))], phase="apply")
+        assert [d["phase"] for d in self._details(c)] == ["apply"]
+
+    async def test_two_secrets_are_two_rows(self):
+        c = await _claim(
+            [_rv("A", _ref(field="token")), _rv("B", _ref(field="token", path="apps/other"))]
+        )
+        assert [(d["keys"], d["path"]) for d in self._details(c)] == [
+            (["A"], "apps/gcp"),
+            (["B"], "apps/other"),
+        ]
+
+    @pytest.mark.parametrize(
+        ("exc", "outcome", "status", "run_status"),
+        [
+            (VaultDenied("Vault denied 'kvv2/apps/gcp'"), "denied", 403, "errored"),
+            (VaultNotFound("Vault has no secret at 'kvv2/apps/gcp'"), "missing", 404, "errored"),
+            (VaultUnavailable("HTTP 503"), "transient", 503, "queued"),
+            (VaultError("illegal character"), "error", 500, "errored"),
+        ],
+    )
+    async def test_a_failed_read_is_recorded_before_the_run_is_errored_or_requeued(
+        self, exc, outcome, status, run_status
+    ):
+        c = await _claim([_rv("F", _ref(file={}))], read=AsyncMock(side_effect=exc))
+        assert c.resp.status_code == 204
+        assert c.transition.await_args.args[1:] == (c.run, run_status)
+        details = self._details(c)
+        assert [d["outcome"] for d in details] == [outcome]
+        assert _audit_rows(c)[0].status_code == status
+        c.db.commit.assert_awaited_once()
+
+    async def test_a_claim_refused_before_any_read_writes_no_row(self):
+        c = await _claim(
+            [
+                _rv("A", _ref(file={"name": "same"})),
+                _rv("B", _ref(file={"name": "same"}, path="apps/other")),
+            ]
+        )
+        assert c.resp.status_code == 204
+        c.read.assert_not_awaited()
+        assert _audit_rows(c) == []
+
+    async def test_no_vault_variables_means_no_audit_at_all(self):
+        c = await _claim([_rv("PLAIN", "literal", value_source="static")])
+        c.db.add_all.assert_not_called()
+
+    async def test_a_render_failure_after_a_good_read_still_records_the_read(self):
+        """Vault answered; the template then failed. The read happened."""
+        tpl = json.dumps(
+            {
+                "source": "vault",
+                "mount": "kvv2",
+                "path": "apps/gcp",
+                "file": {"template": "{{ x }}"},
+            }
+        )
+        c = await _claim([_rv("F", tpl)])
+        assert c.transition.await_args.args[1:] == (c.run, "errored")
+        assert [d["outcome"] for d in self._details(c)] == ["ok"]
 
 
 class TestTheRunFailsOrWaits:

@@ -410,8 +410,13 @@ Most dynamic engines are a `vault read`, so the default `GET` is right:
 { "engine": "dynamic", "mount": "database", "path": "creds/app-readonly", "field": "password" }
 ```
 
-Each run mints a fresh credential. Terrapod does not renew or revoke the
-lease — set a TTL on the Vault role that suits your run durations.
+Each run mints a fresh credential — and so does **each phase**. A run's plan
+and its apply are separate claims by a runner, and every claim resolves the
+run's Vault variables again, so plan and apply never share a credential: the
+apply gets its own, minted when the apply starts. Terrapod does not renew or
+revoke the lease, so set the Vault role's TTL to cover one phase. For how that
+interacts with Terraform variables, see
+[Env, file or Terraform variable?](#env-file-or-terraform-variable).
 
 **Fields of one secret come from one read.** Within a run, variables whose
 references name the same secret — the same instance, engine, mount, path,
@@ -476,6 +481,40 @@ With an [assignment rule](api-reference.md#assignment-rules) the set can target
 workspaces by label rather than one by one, so a single reference covers a whole
 population. Resolution happens per run, per workspace, exactly as it does for a
 workspace variable — the set is only how the reference is distributed.
+
+### Env, file or Terraform variable?
+
+**Deliver credentials as `env` variables or as files, not as `terraform`
+variables.** The difference is what Terraform itself does with an input
+variable:
+
+- **Terraform stores input-variable values in the saved plan.** A
+  `terraform`-category variable sourced from Vault is therefore written into the
+  plan file, and Terrapod keeps that plan as a run artifact in its object
+  storage. The secret is persisted at rest there for as long as the run's
+  artifacts are kept, even though Terrapod's database only ever held the
+  reference.
+- **Apply reuses the plan-time value.** Terrapod applies the saved plan
+  (`terraform apply tfplan`), and a saved plan carries its own variable values.
+  The fresh credential the apply phase mints is delivered but not used; the one
+  read at plan time is. A short-lived dynamic credential may have expired by the
+  time a plan is confirmed.
+
+`env` and file delivery avoid both:
+
+- A provider reads an `env` variable (`AWS_ACCESS_KEY_ID`, `VAULT_TOKEN`,
+  `GOOGLE_APPLICATION_CREDENTIALS`, …) from its environment in each phase, so it
+  is never an input variable and never in the plan, and apply uses the
+  credential minted for apply.
+- A [file-delivered](#delivering-as-a-file) variable's value is the file's
+  **path**, so a `terraform`-category file variable puts only the path in the
+  plan. What your configuration then does with the file's contents follows
+  Terraform's usual rules: a value you copy into a resource attribute is in the
+  plan and the state like any other.
+
+Keep `terraform`-category Vault variables for values that are not
+secret-at-rest sensitive — a hostname, an account id, or other configuration
+that happens to live in Vault — and still want to come from one place.
 
 ---
 
@@ -796,7 +835,36 @@ operator who gets it slightly wrong otherwise has no second line.
 | **In the Job spec** | Secret references and, for file delivery, file paths and Secret key names. Never a value. |
 | **Delivered as a file** | The secret is only in the per-run Secret and the read-only file it is mounted as. The variable's env value or tfvars entry is the file's path. |
 | **In Terrapod's own logs** | Variable names, instances, coordinates and file names. Never a value. |
+| **In the audit log** | One `vault.read` row per Vault read — the variables, instance, mount, path, engine, phase and outcome. Never a value. See [The audit trail](#the-audit-trail). |
+| **In the saved plan** | For a `terraform`-category variable, the resolved value, because Terraform stores input-variable values in its plan. See [Env, file or Terraform variable?](#env-file-or-terraform-variable). |
 | **On failure** | The variable name, the instance, the coordinates and the HTTP status — never Vault's response body or a partial value. |
+
+### The audit trail
+
+Every Vault read Terrapod makes writes one row to the
+[audit log](api-reference.md#audit-log), whether it succeeded or not:
+
+| Column | Value |
+|---|---|
+| `action` | `vault.read` |
+| `origin` / `actor_type` | `system` |
+| `resource_type` / `resource_id` | `runs` / `run-<id>` |
+| `status_code` | `200` ok, `403` denied, `404` missing, `503` transient, `500` error |
+| `detail` | JSON: `keys` (every variable the read served), `instance`, `mount`, `path`, `engine`, `phase` (`plan` or `apply`), `outcome` |
+
+Variables that share a read are one row naming all of them, so the row count is
+the number of requests Vault saw — and, for a dynamic engine, the number of
+credentials minted. The outcome comes from Vault's answer: `denied` is a `403`,
+a refused login, or Terrapod's own `paths` allow-list; `missing` is a `404`;
+`transient` is Vault unreachable or not answering yet (the run went back to the
+queue); `error` is anything else, such as a reference refused before the
+request. A read that succeeded is `ok` even if the run then failed on a field
+that was not in the answer. A claim that fails before reading anything — two
+variables at one file path, say — writes no row, because Vault was never asked.
+
+The rows are written in the same transaction as the claim that made the reads,
+so they commit together. List them with
+`GET /api/terrapod/v1/admin/audit-log?filter[action]=vault.read`.
 
 ---
 

@@ -3360,6 +3360,13 @@ GET /api/terrapod/v1/admin/audit-log
 
 **Response:** JSON:API list of `audit-log-entries` with pagination metadata.
 
+Besides HTTP requests, the log holds system events, whose `action` is a verb.
+Every Vault read Terrapod makes for a run is one `vault.read` row
+(`resource-type` `runs`), whose `detail` is JSON naming the variables, instance,
+mount, path, engine, phase and outcome (`ok`, `denied`, `missing`, `transient`,
+`error`), never a value. Filter with `filter[action]=vault.read`. See
+[Vault → The audit trail](vault.md#the-audit-trail).
+
 **Example:**
 
 ```zsh
