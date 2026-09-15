@@ -1105,6 +1105,8 @@
     "providerHint": "Leave it empty to take it from the repository name, when it follows the terraform-PROVIDER-NAME custom.",
     "tagPattern": "Tag pattern, arr",
     "labels": "Labels (copied onto stowed modules)",
+    "ruleName": "Name o'' the rule",
+    "ownerEmailHint": "Copied onto every module this rule hauls aboard. The owner be cap''n o'' those modules, with full admin.",
     "createTitle": "New module-huntin'' rule",
     "editTitle": "Change the module-huntin'' rule",
     "nameTaken": "That name be taken by another module",

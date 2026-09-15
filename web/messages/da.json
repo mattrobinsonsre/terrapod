@@ -1105,6 +1105,8 @@
     "providerHint": "Lad feltet stå tomt for at hente den fra repositoriets navn, når det følger konventionen terraform-PROVIDER-NAME.",
     "tagPattern": "Tagmønster",
     "labels": "Etiketter (kopieres til registrerede moduler)",
+    "ruleName": "Regelnavn",
+    "ownerEmailHint": "Kopieres til hvert modul, som reglen registrerer. Ejeren får administratoradgang til disse moduler.",
     "createTitle": "Ny regel for modulfinding",
     "editTitle": "Rediger regel for modulfinding",
     "nameTaken": "Navnet bruges allerede af et andet modul",

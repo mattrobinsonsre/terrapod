@@ -1105,6 +1105,8 @@
     "providerHint": "Jätä tyhjäksi, niin se otetaan repositorion nimestä, jos nimi noudattaa käytäntöä terraform-PROVIDER-NAME.",
     "tagPattern": "Tagien malli",
     "labels": "Tunnisteet (kopioidaan rekisteröityihin moduuleihin)",
+    "ruleName": "Säännön nimi",
+    "ownerEmailHint": "Kopioidaan jokaiseen moduuliin, jonka tämä sääntö rekisteröi. Omistaja saa näihin moduuleihin ylläpitäjän oikeudet.",
     "createTitle": "Uusi moduulien tunnistussääntö",
     "editTitle": "Muokkaa moduulien tunnistussääntöä",
     "nameTaken": "Nimi on jo toisen moduulin käytössä",

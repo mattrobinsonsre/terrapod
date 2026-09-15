@@ -1105,6 +1105,8 @@
     "providerHint": "Depo adı terraform-PROVIDER-NAME kuralına uyuyorsa oradan alınması için boş bırakın.",
     "tagPattern": "Tag deseni",
     "labels": "Etiketler (kaydedilen modüllere kopyalanır)",
+    "ruleName": "Kural adı",
+    "ownerEmailHint": "Bu kuralın kaydettiği her modüle kopyalanır. Sahip, bu modüllerde yönetici yetkisi alır.",
     "createTitle": "Yeni modül keşif kuralı",
     "editTitle": "Modül keşif kuralını düzenle",
     "nameTaken": "Ad başka bir modül tarafından kullanılıyor",

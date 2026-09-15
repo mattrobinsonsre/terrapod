@@ -1105,6 +1105,8 @@
     "providerHint": "Pozostaw puste, aby przejąć go z nazwy repozytorium, jeśli jest zgodna z konwencją terraform-PROVIDER-NAME.",
     "tagPattern": "Wzorzec tagów",
     "labels": "Etykiety (kopiowane do zarejestrowanych modułów)",
+    "ruleName": "Nazwa reguły",
+    "ownerEmailHint": "Kopiowany do każdego modułu rejestrowanego przez tę regułę. Właściciel otrzymuje uprawnienia administratora do tych modułów.",
     "createTitle": "Nowa reguła wykrywania modułów",
     "editTitle": "Edytuj regułę wykrywania modułów",
     "nameTaken": "Nazwa jest już zajęta przez inny moduł",

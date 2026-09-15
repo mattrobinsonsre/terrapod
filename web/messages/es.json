@@ -1105,6 +1105,8 @@
     "providerHint": "Déjalo vacío para tomarlo del nombre del repositorio, cuando sigue la convención terraform-PROVIDER-NAME.",
     "tagPattern": "Patrón de tags",
     "labels": "Etiquetas (se copian a los módulos registrados)",
+    "ruleName": "Nombre de la regla",
+    "ownerEmailHint": "Se copia en cada módulo que registra esta regla. El propietario obtiene permisos de administrador sobre esos módulos.",
     "createTitle": "Nueva regla de descubrimiento de módulos",
     "editTitle": "Editar regla de descubrimiento de módulos",
     "nameTaken": "Nombre ya usado por otro módulo",

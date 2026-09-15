@@ -1105,6 +1105,8 @@
     "providerHint": "Gadewch yn wag i''w gymryd o enw''r storfa, pan fo''n dilyn y confensiwn terraform-PROVIDER-NAME.",
     "tagPattern": "Patrwm tagiau",
     "labels": "Labeli (yn cael eu copïo i''r modiwlau a gofrestrwyd)",
+    "ruleName": "Enw''r rheol",
+    "ownerEmailHint": "Caiff ei gopïo i bob modiwl y mae''r rheol hon yn ei gofrestru. Mae''r perchennog yn cael hawliau gweinyddwr ar y modiwlau hynny.",
     "createTitle": "Rheol canfod modiwlau newydd",
     "editTitle": "Golygu rheol canfod modiwlau",
     "nameTaken": "Mae modiwl arall eisoes yn defnyddio''r enw",

@@ -1105,6 +1105,8 @@
     "providerHint": "Lascia vuoto per ricavarlo dal nome del repository, se segue la convenzione terraform-PROVIDER-NAME.",
     "tagPattern": "Pattern dei tag",
     "labels": "Etichette (copiate sui moduli registrati)",
+    "ruleName": "Nome della regola",
+    "ownerEmailHint": "Viene copiato su ogni modulo registrato da questa regola. Il proprietario ottiene i permessi di amministratore su quei moduli.",
     "createTitle": "Nuova regola di rilevamento moduli",
     "editTitle": "Modifica regola di rilevamento moduli",
     "nameTaken": "Nome già usato da un altro modulo",

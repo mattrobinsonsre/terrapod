@@ -1105,6 +1105,8 @@
     "providerHint": "Leev it empteh 2 taek it frum teh repositoree naym, wen it followz teh terraform-PROVIDER-NAME wai.",
     "tagPattern": "Tag patturn",
     "labels": "Labelz (copid onto registerd modyoolz)",
+    "ruleName": "Rool naym",
+    "ownerEmailHint": "Copyd onto evry modyool dis rool registurz. Teh ownr gets admin on dem modyoolz.",
     "createTitle": "Noo modyool autodiskovry rule",
     "editTitle": "Edit modyool autodiskovry rule",
     "nameTaken": "Naym alreddy takn by anuther modyool",

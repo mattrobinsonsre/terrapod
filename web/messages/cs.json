@@ -1105,6 +1105,8 @@
     "providerHint": "Ponechte prázdné, aby se převzal z názvu repozitáře, pokud odpovídá konvenci terraform-PROVIDER-NAME.",
     "tagPattern": "Vzor tagů",
     "labels": "Štítky (kopírují se do zaregistrovaných modulů)",
+    "ruleName": "Název pravidla",
+    "ownerEmailHint": "Zkopíruje se do každého modulu, který toto pravidlo zaregistruje. Vlastník získá k těmto modulům oprávnění správce.",
     "createTitle": "Nové pravidlo zjišťování modulů",
     "editTitle": "Upravit pravidlo zjišťování modulů",
     "nameTaken": "Název už používá jiný modul",

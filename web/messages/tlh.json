@@ -1105,6 +1105,8 @@
     "providerHint": "yIchImmoH; terraform-PROVIDER-NAME mIw repo pong tlha''chugh, pong vo'' tu''lu''.",
     "tagPattern": "per mIw",
     "labels": "permey (janmey ghItlhlu''bogh Daq lI''lu'')",
+    "ruleName": "chut pong",
+    "ownerEmailHint": "chutvam qonbogh Hoch janmey''Daq lughItlh. janmeyvetlh SeH ghajwI''.",
     "createTitle": "janmey tu''meH chut chu''",
     "editTitle": "janmey tu''meH chut yIchoH",
     "nameTaken": "latlh jan pong ghaj",
