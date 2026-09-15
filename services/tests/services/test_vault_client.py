@@ -72,6 +72,61 @@ def _clear_cache():
     reset_token_cache()
 
 
+class TestNonStringFieldsAreJsonEncoded:
+    """A map or list field is delivered as JSON, not a Python repr (#1619).
+
+    Matters most for file delivery: a service-account key stored in Vault as an
+    object must land on disk as a JSON document a provider can parse.
+    """
+
+    async def _read(self, value):
+        rec = _Recorder([(200, {"data": {"data": {"f": value}}})])
+        with _patched(rec):
+            return await read_secret(_inst(), mount="kvv2", path="a", field="f", static_token="t")
+
+    @pytest.mark.asyncio
+    async def test_a_string_is_returned_unchanged(self):
+        assert await self._read("plain 'quoted' {not json}") == "plain 'quoted' {not json}"
+
+    @pytest.mark.asyncio
+    async def test_a_dict_is_json(self):
+        import json
+
+        got = await self._read({"type": "service_account", "enabled": True, "n": None})
+        assert json.loads(got) == {"type": "service_account", "enabled": True, "n": None}
+        assert "'" not in got and "True" not in got and "None" not in got
+
+    @pytest.mark.asyncio
+    async def test_a_list_is_json(self):
+        import json
+
+        got = await self._read(["a", 1, False])
+        assert json.loads(got) == ["a", 1, False]
+        assert got == '["a", 1, false]'
+
+    @pytest.mark.asyncio
+    async def test_a_nested_structure_round_trips(self):
+        import json
+
+        doc = {"outer": {"inner": [1, {"k": "v"}], "empty": {}}, "list": [[], [None]]}
+        assert json.loads(await self._read(doc)) == doc
+
+    @pytest.mark.asyncio
+    async def test_non_ascii_is_kept_as_characters_not_escapes(self):
+        import json
+
+        doc = {"name": "café ☕ 日本", "list": ["ü"]}
+        got = await self._read(doc)
+        assert json.loads(got) == doc
+        assert "café ☕ 日本" in got and "\\u" not in got
+
+    @pytest.mark.asyncio
+    async def test_scalars_other_than_str_keep_their_previous_rendering(self):
+        """Only maps and lists changed; numbers and booleans are as before."""
+        assert await self._read(5) == "5"
+        assert await self._read(True) == "True"
+
+
 class TestReadShapes:
     @pytest.mark.asyncio
     async def test_kv2_unwraps_the_nested_data(self):

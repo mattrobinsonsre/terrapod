@@ -18,7 +18,15 @@ import pytest
 from sqlalchemy import select
 
 from terrapod.config import VaultInstanceConfig
-from terrapod.db.models import ConfigurationVersion, Run, Variable, Workspace
+from terrapod.db.models import (
+    ConfigurationVersion,
+    Run,
+    Variable,
+    VariableSet,
+    VariableSetVariable,
+    VariableSetWorkspace,
+    Workspace,
+)
 from terrapod.db.session import get_db_session
 from terrapod.services import pool_set, run_service, variable_service
 from terrapod.services.vault_client import VaultError
@@ -183,7 +191,7 @@ class TestAnUnresolvableReferenceErrorsTheRun:
             # patching the client module was a no-op and this test passed on an
             # unrelated instance-selection error.
             with patch(
-                "terrapod.services.vault_source_service.read_secret",
+                "terrapod.services.vault_source_service.read_secret_data",
                 new=AsyncMock(side_effect=VaultError("Vault denied 'kvv2/apps/x'")),
             ):
                 resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
@@ -231,3 +239,211 @@ class TestAnUnresolvableReferenceErrorsTheRun:
         async with get_db_session() as db:
             final = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one()
         assert final.status == "planning"
+
+
+# ── File delivery (#1619) ─────────────────────────────────────────────
+
+_FILE_SECRET = "S3CR3T-integration-file-content"
+
+
+async def _workspace_with(ws_vars: list[dict], set_vars: list[dict] | None = None):
+    """A workspace with its own variables and, optionally, an assigned set."""
+    tag = uuid.uuid4().hex[:8]
+    async with get_db_session() as db:
+        ws = Workspace(name=f"vfile-{tag}", execution_mode="agent")
+        db.add(ws)
+        await db.flush()
+        for kw in ws_vars:
+            db.add(Variable(workspace_id=ws.id, sensitive=True, **kw))
+        if set_vars:
+            vs = VariableSet(name=f"vfile-set-{tag}")
+            db.add(vs)
+            await db.flush()
+            for kw in set_vars:
+                db.add(VariableSetVariable(variable_set_id=vs.id, sensitive=True, **kw))
+            db.add(VariableSetWorkspace(variable_set_id=vs.id, workspace_id=ws.id))
+        cv = ConfigurationVersion(workspace_id=ws.id, status="uploaded", source="tfe-api")
+        db.add(cv)
+        await db.flush()
+        await db.commit()
+        return ws.id, cv.id
+
+
+def _vref(**kw) -> str:
+    base = {"source": "vault", "mount": "kvv2", "path": "apps/gcp", "field": "sa"}
+    base.update(kw)
+    return json.dumps(base)
+
+
+async def _claim_with_vault(app, client, ws_id, cv_id, read):
+    """Queue a run on the workspace and claim it through the real endpoint."""
+    from terrapod.config import settings
+    from tests.integration.conftest import admin_user, set_auth, set_listener_auth
+
+    set_auth(app, admin_user())
+    pool_id, listener_id = await _pool_with_listener(client, uuid.uuid4().hex[:8])
+    async with get_db_session() as db:
+        ws = (await db.execute(select(Workspace).where(Workspace.id == ws_id))).scalar_one()
+        pool_set.set_workspace_pools(ws, [uuid.UUID(pool_id.removeprefix("apool-"))])
+        run = await run_service.create_run(db, ws, configuration_version_id=cv_id)
+        run = await run_service.transition_run(db, run, "queued")
+        await db.commit()
+        run_id = run.id
+
+    set_listener_auth(app, listener_id, pool_id.removeprefix("apool-"))
+    prior = (settings.vault.enabled, settings.vault.instances)
+    settings.vault.enabled = True
+    settings.vault.instances = [
+        VaultInstanceConfig(name="default", default=True, address="https://vault.test:8200")
+    ]
+    try:
+        with patch("terrapod.services.vault_source_service.read_secret_data", new=read):
+            resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
+    finally:
+        settings.vault.enabled, settings.vault.instances = prior
+
+    async with get_db_session() as db:
+        final = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one()
+    return resp, final
+
+
+class TestFileDelivery:
+    """Through the real `runs/next`, real precedence, real rows."""
+
+    async def test_kv2_file_mode_for_env_and_terraform(self, app, client):
+        ws_id, cv_id = await _workspace_with(
+            [
+                {
+                    "key": "GOOGLE_APPLICATION_CREDENTIALS",
+                    "value": _vref(file={"name": "gcp/adc.json"}),
+                    "category": "env",
+                    "value_source": "vault",
+                },
+                {
+                    "key": "sa_file",
+                    "value": _vref(file={}),
+                    "category": "terraform",
+                    "value_source": "vault",
+                },
+            ]
+        )
+        read = AsyncMock(return_value={"sa": _FILE_SECRET})
+        resp, final = await _claim_with_vault(app, client, ws_id, cv_id, read)
+
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        env = {v["key"]: v["value"] for v in attrs["env-vars"]}
+        assert env["GOOGLE_APPLICATION_CREDENTIALS"] == "/var/run/terrapod/files/gcp/adc.json"
+        tf = {v["key"]: v["value"] for v in attrs["terraform-vars"]}
+        assert tf["sa_file"] == "/var/run/terrapod/files/sa_file"
+        assert sorted(f["name"] for f in attrs["vault-files"]) == ["gcp/adc.json", "sa_file"]
+        assert all(f["value"] == _FILE_SECRET for f in attrs["vault-files"])
+        # The same secret is read once, and the content is nowhere else.
+        assert read.await_count == 1
+        rest = {k: v for k, v in attrs.items() if k != "vault-files"}
+        assert _FILE_SECRET not in json.dumps(rest)
+        assert final.status == "planning"
+
+    async def test_a_dynamic_engine_in_file_mode(self, app, client):
+        ref = _vref(
+            engine="dynamic",
+            method="POST",
+            mount="pki",
+            path="issue/web",
+            field="private_key",
+            data={"common_name": "a.example.test"},
+            file={"name": "~/tls/key.pem"},
+        )
+        ws_id, cv_id = await _workspace_with(
+            [{"key": "TLS_KEY", "value": ref, "category": "env", "value_source": "vault"}]
+        )
+        read = AsyncMock(return_value={"private_key": _FILE_SECRET, "certificate": "C"})
+        resp, final = await _claim_with_vault(app, client, ws_id, cv_id, read)
+
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert {v["key"]: v["value"] for v in attrs["env-vars"]}["TLS_KEY"] == (
+            "/home/runner/tls/key.pem"
+        )
+        assert attrs["vault-files"] == [
+            {"key": "TLS_KEY", "name": "~/tls/key.pem", "value": _FILE_SECRET}
+        ]
+        kw = read.await_args.kwargs
+        assert (kw["engine"], kw["method"], kw["data"]) == (
+            "dynamic",
+            "POST",
+            {"common_name": "a.example.test"},
+        )
+        assert final.status == "planning"
+
+    async def test_a_workspace_variable_overrides_a_set_variable_of_the_same_key(self, app, client):
+        """Precedence runs first: one key, one file — the workspace's — so the
+        set's file name is not a collision."""
+        ws_id, cv_id = await _workspace_with(
+            [
+                {
+                    "key": "CREDS",
+                    "value": _vref(path="apps/ws", file={"name": "creds.json"}),
+                    "category": "env",
+                    "value_source": "vault",
+                }
+            ],
+            set_vars=[
+                {
+                    "key": "CREDS",
+                    "value": _vref(path="apps/set", file={"name": "creds.json"}),
+                    "category": "env",
+                    "value_source": "vault",
+                }
+            ],
+        )
+
+        async def read(inst, **kw):
+            return {"sa": f"from-{kw['path']}"}
+
+        resp, final = await _claim_with_vault(
+            app, client, ws_id, cv_id, AsyncMock(side_effect=read)
+        )
+        assert resp.status_code == 200, resp.text
+        files = resp.json()["data"]["attributes"]["vault-files"]
+        assert files == [{"key": "CREDS", "name": "creds.json", "value": "from-apps/ws"}]
+        assert final.status == "planning"
+
+    async def test_a_set_and_a_workspace_variable_at_one_path_error_the_run(self, app, client):
+        ws_id, cv_id = await _workspace_with(
+            [
+                {
+                    "key": "WS_CREDS",
+                    "value": _vref(file={"name": "creds.json"}),
+                    "category": "env",
+                    "value_source": "vault",
+                }
+            ],
+            set_vars=[
+                {
+                    "key": "SET_CREDS",
+                    "value": _vref(file={"name": "creds.json"}),
+                    "category": "env",
+                    "value_source": "vault",
+                }
+            ],
+        )
+        read = AsyncMock(return_value={"sa": _FILE_SECRET})
+        resp, final = await _claim_with_vault(app, client, ws_id, cv_id, read)
+        assert resp.status_code == 204
+        assert final.status == "errored"
+        assert "'SET_CREDS'" in final.error_message and "'WS_CREDS'" in final.error_message
+        assert "/var/run/terrapod/files/creds.json" in final.error_message
+        assert _FILE_SECRET not in final.error_message
+        read.assert_not_awaited()
+
+    async def test_an_unavailable_vault_puts_a_file_mode_run_back_in_the_queue(self, app, client):
+        from terrapod.services.vault_client import VaultUnavailable
+
+        ws_id, cv_id = await _workspace_with(
+            [{"key": "F", "value": _vref(file={}), "category": "env", "value_source": "vault"}]
+        )
+        read = AsyncMock(side_effect=VaultUnavailable("HTTP 503"))
+        resp, final = await _claim_with_vault(app, client, ws_id, cv_id, read)
+        assert resp.status_code == 204
+        assert final.status == "queued"

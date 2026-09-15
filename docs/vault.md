@@ -186,6 +186,7 @@ UI this is a form; through the API the value is a JSON object:
 | `engine` | `kv2` (default) or `dynamic`. |
 | `method` | `GET` (default) or `POST`, for engines that mint on write. |
 | `data` | Optional request body, when `method` is `POST`. |
+| `file` | Optional. Deliver the value as a file instead — see [Delivering as a file](#delivering-as-a-file). |
 
 ### Static secrets (kv-v2)
 
@@ -203,6 +204,20 @@ Most dynamic engines are a `vault read`, so the default `GET` is right:
 
 Each run mints a fresh credential. Terrapod does not renew or revoke the
 lease — set a TTL on the Vault role that suits your run durations.
+
+**Fields of one secret come from one read.** Within a run, variables whose
+references name the same secret — the same instance, engine, mount, path,
+method and request body — share a single Vault request, and each takes its own
+`field` from that one response. So `TLS_CERT` (`field: certificate`) and
+`TLS_KEY` (`field: private_key`) on `pki/issue/example` are a matching pair from
+one issue, and `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` on `aws/creds/deploy`
+come from one lease. Reading them separately would mint two credentials, and the
+halves would not belong together.
+
+Key order inside `data` does not matter, and for a kv-v2 read or any `GET` the
+`method` and `data` fields are ignored (Terrapod never sends a body with them),
+so they cannot split a read either. If the shared read fails, every variable
+that depends on it fails with it, and the error names them all.
 
 Some engines mint on write (`pki/issue/…`, `aws/sts/…`), which needs `POST`:
 
@@ -256,6 +271,111 @@ workspace variable — the set is only how the reference is distributed.
 
 ---
 
+## Delivering as a file
+
+Some tools take a credential only from a file: a GCP service-account key, a
+kubeconfig, a CA bundle, an AWS shared-credentials file. Add a `file` object to
+the reference and Terrapod writes the secret to a file on the runner instead:
+
+```json
+{ "mount": "secret", "path": "apps/gcp", "field": "sa_json",
+  "file": { "name": "gcp/adc.json" } }
+```
+
+**The variable's value becomes the file's absolute path.** The secret itself is
+never in an environment variable or in the generated tfvars — only the path is.
+
+- An `env` variable named `GOOGLE_APPLICATION_CREDENTIALS` with the reference
+  above runs with
+  `GOOGLE_APPLICATION_CREDENTIALS=/var/run/terrapod/files/gcp/adc.json`, which is
+  what the Google provider and SDKs look for.
+- A `terraform` variable holds the path, so read the file where you need its
+  contents:
+
+  ```hcl
+  variable "sa_json" {
+    type = string # the path, e.g. /var/run/terrapod/files/sa_json
+  }
+
+  provider "google" {
+    credentials = file(var.sa_json)
+  }
+  ```
+
+The file exists before `init`, so it is available to every phase.
+
+A field that Vault holds as a map or list (a service-account key stored as a
+JSON object rather than a string) is written as JSON.
+
+### Where the file lands
+
+| `file.name` | Written to |
+|---|---|
+| `gcp/adc.json` — a relative path | `/var/run/terrapod/files/gcp/adc.json` |
+| `~/.aws/credentials` — a path in the runner's home | `/home/runner/.aws/credentials` |
+| omitted (`"file": {}`) | `/var/run/terrapod/files/<variable key>` |
+
+A name is refused (`422` when you save it, and the run errors if one is found
+when the run is claimed) unless:
+
+- every `/`-separated segment uses only `A-Z a-z 0-9 . _ -`;
+- no segment is empty, `.` or `..`, and the name is not absolute;
+- it is at most 255 characters.
+
+A home path may not target anything the runner manages itself, or a directory
+above one: `~/.ssh`, `~/.gitconfig`, `~/.config/terrapod-git` (private-module
+git credentials), `~/.terraformrc`, `~/.terraform.rc` and `~/.terraform.d`.
+
+### Permissions
+
+The file is a key of the per-run Kubernetes Secret, mounted **read-only**. A
+Secret volume is memory-backed, so the file never touches the node's disk, and
+it sits outside `/workspace`, so it never enters the plan artifacts Terrapod
+uploads.
+
+Its mode is `0440` when `runners.podSecurityContext` sets an `fsGroup`, and
+`0444` otherwise. Kubelet projects Secret files owned by root, and the runner is
+a non-root user, so without an `fsGroup` the file has to be world-readable for
+the runner to read it. Setting an `fsGroup` narrows it to owner and group.
+
+A home path is mounted onto that single file (a `subPath` mount). Terrapod
+creates its parent directories first, as the runner's own user, so the runner
+can still write beside it — the AWS CLI's cache under `~/.aws`, for example. The
+file itself stays read-only: a tool that rewrites that exact file fails.
+
+### What is refused
+
+| Combination | Result |
+|---|---|
+| `file` together with `hcl` | `422` — the value is a path, not an HCL expression. |
+| `file` on a variable whose value source is `static` | `422` — the reference would be delivered as the literal JSON. |
+| Two variables at one path, or a file where another needs a directory (`a` and `a/b`) | The run errors, naming both variables. Checked after variable-set precedence, so a workspace variable that overrides a set variable of the **same key** is one file, not a clash. |
+| A value over 256 KiB | The run errors, giving the size. |
+| Any other key inside `file` | `422`. `template`, `format`, `encoding` and `mode` are reserved for a later release. |
+
+### Older listeners
+
+The files reach the listener in a `vault-files` attribute of the claimed run.
+A listener older than this feature ignores that attribute: the variable still
+carries the path, the file does not exist, and the run fails when the tool opens
+it. It **fails safe** — the secret is never put anywhere else. Upgrade your
+listeners before relying on file delivery.
+
+### Clashes with operator mounts
+
+Files are mounted at `/var/run/terrapod/files` and, for home paths, at each
+file's own path under `/home/runner`. If `runners.extraVolumeMounts` mounts
+something at one of those paths, Kubernetes rejects the Job as having a
+duplicate mount path and the run errors with `Failed to create K8s Job`. A mount
+at a directory above one of them can hide the file instead. Pick names that do
+not overlap your own mounts.
+
+Each file is stored under a Secret key named `vault-file-0`, `vault-file-1`, and
+so on. An `env` variable with one of those exact names is refused when the run
+launches.
+
+---
+
 ## Who can read what
 
 **Terrapod is a credential broker once this is enabled.** Anyone who can set a
@@ -292,6 +412,9 @@ operator who gets it slightly wrong otherwise has no second line.
 | **Stored in Terrapod** | The reference (mount, path, field). Never the secret. |
 | **Returned by the API** | The reference. A path is not a secret, and masking it would hide configuration while concealing nothing. |
 | **In run logs** | Nothing. The value is delivered through the per-run Kubernetes Secret, never a command line or the Job spec. |
+| **In the Job spec** | Secret references and, for file delivery, file paths and Secret key names. Never a value. |
+| **Delivered as a file** | The secret is only in the per-run Secret and the read-only file it is mounted as. The variable's env value or tfvars entry is the file's path. |
+| **In Terrapod's own logs** | Variable names, instances, coordinates and file names. Never a value. |
 | **On failure** | The variable name, the instance, the coordinates and the HTTP status — never Vault's response body or a partial value. |
 
 ---
@@ -380,9 +503,11 @@ this path.
   Vault-bearing set can reach.
 - **Leases are not renewed or revoked.** A dynamic credential is minted per run
   and left to expire. Set the Vault role's TTL to suit your run durations.
-- **No file materialization yet.** Values are delivered as environment or
-  Terraform variables. A provider that insists on reading a credential from a
-  file path still needs the sidecar.
+- **One field per file.** A file holds one field of a secret, or the whole field
+  as JSON when Vault stores it as a map. Combining several fields into one file
+  (a PEM bundle, say) is not supported yet; `template`, `format`, `encoding` and
+  `mode` are reserved in the `file` object for that. Files are text: there is no
+  binary or base64 decoding yet.
 - **`approle` and `token` auth** work but are less well trodden than
   `kubernetes`, which needs no stored credential. Supply the secret_id or token
   with `existingSecret` on the instance:
