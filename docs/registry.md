@@ -250,6 +250,7 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules \
 - **Module impact analysis** tests a PR against the submodule's own subdirectory, as it would be published. A PR anywhere in the repository queues the submodule's impact runs; when the PR does not touch its subdirectory, those plans show no changes.
 - **Grouped in the UI.** The module list shows modules that share a repository together, the root module first.
 - The path is repository-relative (`modules/create`); `..`, `.` and empty segments are rejected. Leave it empty for a module at the repository root.
+- **With the Terraform provider**, set `subdirectory` on `terrapod_registry_module`. Surrounding whitespace and leading or trailing `/` are ignored, and the form you wrote is kept in state, so `"modules/create/"` does not produce a diff. Removing the attribute (or setting `""`) moves the module back to the repository root. `vcs_tag_pattern` defaults to `"v*"` there too.
 
 ### Module autodiscovery
 

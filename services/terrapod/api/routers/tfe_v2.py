@@ -840,6 +840,11 @@ def _workspace_json(
                     # hides the capability from people who have it or shows a
                     # control that 403s on press (#1340).
                     "can-queue-apply": has_capability(caps, cap.RUN_APPLY),
+                    # A destroy run is its own grant (run:apply-destroy), which a
+                    # custom role can hold without run:apply or lack alongside it.
+                    # Without this flag a UI offers Queue destroy / Retry on a
+                    # destroy run to people the API refuses (#1634).
+                    "can-queue-destroy": has_capability(caps, cap.RUN_APPLY_DESTROY),
                     "can-read-state-versions": has_capability(caps, cap.STATE_READ_METADATA),
                     "can-create-state-versions": has_capability(caps, cap.STATE_WRITE),
                     "can-read-variable": has_capability(caps, cap.VAR_READ),

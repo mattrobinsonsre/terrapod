@@ -467,6 +467,7 @@ All workspace responses (show and list) include a `permissions` object reflectin
     "can-destroy": true,
     "can-queue-run": true,
     "can-queue-apply": true,
+    "can-queue-destroy": true,
     "can-read-state-versions": true,
     "can-create-state-versions": true,
     "can-read-variable": true,
@@ -964,9 +965,9 @@ POST /api/tfe/v2/runs/{run_id}/actions/cancel
 POST /api/v1/runs/{run_id}/actions/retry
 ```
 
-Creates a new run from a terminal run (applied, errored, canceled, discarded) using the same workspace, configuration version, VCS metadata, and settings. Returns a 409 if the run is not in a terminal state.
+Creates a new run from a terminal run (applied, errored, canceled, discarded) using the same workspace, configuration version, VCS metadata, and settings. A plan-only run left at `planned` can also be retried. The new run keeps the original's kind: a retried plan-only run is plan-only, and a retried destroy run is still a destroy. Returns a 409 if the run is not in a retryable state.
 
-**Required permission:** `plan` on the workspace (or `write` for apply runs).
+**Required permission:** what queuing that run would need — `run:plan` for a plan-only run, `run:apply` for an apply run, `run:apply-destroy` for a destroy run (the workspace permissions block reports these as `can-queue-run`, `can-queue-apply` and `can-queue-destroy`).
 
 ### Workspace Events (SSE)
 
