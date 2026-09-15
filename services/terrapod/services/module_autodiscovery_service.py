@@ -29,11 +29,18 @@ import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from terrapod.db.models import ModuleAutodiscoveryRule, RegistryModule, VCSConnection
+from terrapod.db.models import (
+    ModuleAutodiscoveryRepository,
+    ModuleAutodiscoveryRule,
+    RegistryModule,
+    VCSConnection,
+)
 from terrapod.logging_config import get_logger
 from terrapod.services import vcs_rate_limit
 from terrapod.services.label_validation import sanitize_labels
@@ -338,16 +345,142 @@ async def list_files(conn: VCSConnection, head: RepositoryHead) -> list[str]:
     return paths
 
 
+# ── Per-repository state (#1620) ─────────────────────────────────────────
+
+_GIT_SUFFIX = re.compile(r"(\.git)?/*$", re.IGNORECASE)
+
+
+def path_from_url(repo_url: str, server_url: str = "", provider: str = "") -> str:
+    """The `owner/repo` (or `group/subgroup/project`) a repository URL names.
+
+    Strips the scheme and host (or the `git@host:` prefix), a GitLab instance's
+    relative URL root, `.git` and trailing slashes. Falls back to the input, so
+    a state row always has a path.
+    """
+    from urllib.parse import urlsplit
+
+    url = (repo_url or "").strip()
+    if url.startswith("git@") and ":" in url:
+        path = url.split(":", 1)[1]
+    elif "://" in url:
+        path = url.split("://", 1)[1].partition("/")[2]
+        root = urlsplit(server_url or "").path.strip("/") if provider == "gitlab" else ""
+        if root and path.lower().startswith(root.lower() + "/"):
+            path = path[len(root) + 1 :]
+    else:
+        path = url
+    path = _GIT_SUFFIX.sub("", path.strip("/"))
+    return path or url
+
+
+def _repositories_loaded(rule: ModuleAutodiscoveryRule) -> bool:
+    """Whether `rule.repositories` can be read without a query.
+
+    True for a rule selected with its repositories, and for one not yet
+    persisted (its collection is simply empty). Reading it otherwise would
+    raise rather than load, since this runs on an async session.
+    """
+    state = sa_inspect(rule)
+    return not state.persistent or "repositories" not in state.unloaded
+
+
+async def load_repositories(
+    db: AsyncSession, rule: ModuleAutodiscoveryRule
+) -> list[ModuleAutodiscoveryRepository]:
+    """The rule's per-repository state rows, loading them if need be."""
+    if not _repositories_loaded(rule):
+        await db.execute(
+            select(ModuleAutodiscoveryRule)
+            .where(ModuleAutodiscoveryRule.id == rule.id)
+            .options(selectinload(ModuleAutodiscoveryRule.repositories))
+        )
+    return list(rule.repositories)
+
+
+def _has_scan_state(row: ModuleAutodiscoveryRepository) -> bool:
+    return bool(row.last_scanned_sha or row.seen_subdirectories)
+
+
+def repository_state(rule: ModuleAutodiscoveryRule) -> ModuleAutodiscoveryRepository:
+    """A repository-target rule's one state row, reconciled with the rule.
+
+    Created when missing — for a rule saved after the migration — from the
+    rule's own scan columns. Those columns are also what a replica on older
+    code reads and writes during a rolling upgrade, so the row is reconciled
+    with them: when the rule has no baseline but the row has state, an older
+    replica re-baselined the rule (it knows nothing of the row), and the row
+    starts afresh too. The collection must already be loaded.
+    """
+    rows = list(rule.repositories)
+    row = rows[0] if rows else None
+    now = datetime.now(UTC)
+    if row is None:
+        conn = rule.vcs_connection
+        row = ModuleAutodiscoveryRepository(
+            repo_path=path_from_url(
+                rule.repo_url,
+                getattr(conn, "server_url", "") or "",
+                getattr(conn, "provider", "") or "",
+            ),
+            repo_url=rule.repo_url,
+            vcs_repo_id=rule.target_id or "",
+            default_branch="",
+            origin="baseline",
+            status="active",
+            change_marker="",
+            last_scanned_sha=rule.last_scanned_sha or "",
+            seen_subdirectories=list(rule.seen_subdirectories or []),
+            candidates=[],
+            last_skips=[],
+            previous_paths=[],
+            first_seen_at=rule.first_scan_at or now,
+            failure_count=0,
+            last_error="",
+        )
+        rule.repositories.append(row)
+    elif rule.first_scan_at is None and _has_scan_state(row):
+        row.last_scanned_sha = ""
+        row.seen_subdirectories = []
+        row.candidates = []
+        row.last_skips = []
+    return row
+
+
+def _candidate_entries(rule: ModuleAutodiscoveryRule, subdirectories: list[str]) -> list[dict]:
+    provider = derive_provider(rule)
+    return [
+        {"subdirectory": d, "name": derive_name(rule, d), "provider": provider}
+        for d in subdirectories
+    ]
+
+
 # ── Poll ─────────────────────────────────────────────────────────────────
 
 
 def record_scan(rule: ModuleAutodiscoveryRule, file_paths: list[str], head_sha: str | None) -> None:
-    """Note what the rule has now seen, so later polls take only what is new."""
+    """Note what the rule has now seen, so later polls take only what is new.
+
+    Written to the rule's own columns and, when its state rows are loaded, to
+    its repository row as well: both are kept current (#1620).
+    """
+    candidates = candidate_subdirectories(rule, file_paths)
     seen = set(rule.seen_subdirectories or [])
-    seen.update(candidate_subdirectories(rule, file_paths))
+    seen.update(candidates)
+    rows = list(rule.repositories) if _repositories_loaded(rule) else []
+    if rows:
+        seen.update(rows[0].seen_subdirectories or [])
     rule.seen_subdirectories = sorted(seen)
     rule.last_scanned_sha = head_sha or ""
     rule.first_scan_at = rule.first_scan_at or datetime.now(UTC)
+    if rows:
+        row = rows[0]
+        row.seen_subdirectories = sorted(seen)
+        row.last_scanned_sha = head_sha or ""
+        row.candidates = _candidate_entries(rule, candidates)
+        row.last_checked_at = datetime.now(UTC)
+        row.status = "active"
+        row.failure_count = 0
+        row.last_error = ""
 
 
 async def poll_rules(db: AsyncSession) -> int:
@@ -370,7 +503,9 @@ async def poll_rules(db: AsyncSession) -> int:
     rules = list(
         (
             await db.execute(
-                select(ModuleAutodiscoveryRule).where(ModuleAutodiscoveryRule.enabled.is_(True))
+                select(ModuleAutodiscoveryRule)
+                .where(ModuleAutodiscoveryRule.enabled.is_(True))
+                .options(selectinload(ModuleAutodiscoveryRule.repositories))
             )
         )
         .scalars()
@@ -404,20 +539,26 @@ async def poll_rules(db: AsyncSession) -> int:
 
 async def _poll_rule(db: AsyncSession, rule: ModuleAutodiscoveryRule, conn: VCSConnection) -> int:
     """One rule's poll: register what is new to it and record the scan."""
+    row = repository_state(rule)
     with vcs_rate_limit.vcs_target(
         consumer=f"module-rule/{rule.name}", kind="module-rule", labels=rule.labels
     ):
         head = await resolve_head(conn, rule.repo_url, rule.branch)
-        if rule.first_scan_at and head.sha and head.sha == rule.last_scanned_sha:
+        # Either copy of the head counts: an older replica during a rolling
+        # upgrade writes only the rule's, and it recorded what it saw there.
+        scanned = {rule.last_scanned_sha, row.last_scanned_sha} - {""}
+        if rule.first_scan_at and head.sha and head.sha in scanned:
             return 0
         file_paths = await list_files(conn, head)
     created = 0
     if rule.first_scan_at is not None:
-        seen = set(rule.seen_subdirectories or [])
+        seen = set(rule.seen_subdirectories or []) | set(row.seen_subdirectories or [])
         new = [d for d in candidate_subdirectories(rule, file_paths) if d not in seen]
         if new:
             result = await register_candidates(db, rule, file_paths, only=new)
             created = len(result.created)
+            row.last_skips = [{"subdirectory": d, "reason": r} for d, r in result.skipped]
+    row.default_branch = head.branch
     record_scan(rule, file_paths, head.sha)
     await db.flush()
     return created

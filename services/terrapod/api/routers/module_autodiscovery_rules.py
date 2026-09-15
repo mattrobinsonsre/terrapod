@@ -29,7 +29,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse, Response
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,7 +38,11 @@ from terrapod.api.labels import validate_labels
 from terrapod.api.pagination import paginate
 from terrapod.api.routers.autodiscovery_rules import _reject_directory_pattern
 from terrapod.api.serialization import rfc3339
-from terrapod.db.models import ModuleAutodiscoveryRule, VCSConnection
+from terrapod.db.models import (
+    ModuleAutodiscoveryRepository,
+    ModuleAutodiscoveryRule,
+    VCSConnection,
+)
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import module_autodiscovery_service as svc
@@ -336,6 +340,13 @@ async def update_rule(
         rule.seen_subdirectories = []
         rule.last_scanned_sha = ""
         rule.first_scan_at = None
+        # The per-repository state goes with it (#1620): the next poll takes a
+        # new baseline of every repository the rule now looks at.
+        await db.execute(
+            delete(ModuleAutodiscoveryRepository).where(
+                ModuleAutodiscoveryRepository.rule_id == rule.id
+            )
+        )
     try:
         await db.commit()
     except IntegrityError as exc:
@@ -411,6 +422,11 @@ async def scan_rule(
         result = await svc.register_candidates(db, rule, file_paths, only=only)
     except svc.UnknownSubdirectoryError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # Its repository row is kept current alongside the rule (#1620).
+    await svc.load_repositories(db, rule)
+    row = svc.repository_state(rule)
+    row.default_branch = head.branch
+    row.last_skips = [{"subdirectory": d, "reason": r} for d, r in result.skipped]
     svc.record_scan(rule, file_paths, head.sha)
     await db.commit()
     logger.info(

@@ -1301,6 +1301,35 @@ class ModuleAutodiscoveryRule(Base):
     #: takes only directories that are new to it, so candidates an operator
     #: left unregistered stay that way.
     seen_subdirectories: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    # `first_scan_at`, `last_scanned_sha` and `seen_subdirectories` predate the
+    # per-repository state below (#1620). They are kept, and kept up to date
+    # for repository-target rules, so a replica on older code during a rolling
+    # upgrade reads what the new code wrote. Dropped in 1.8.
+
+    # What `repo_url` names (#1620), decided when the rule is saved and never
+    # changed by the poller: `repository`, `namespace` (an org, group or
+    # installation account) or `pattern` (a glob over one namespace's
+    # repositories). `target_id` is the provider's id for it, so the poller
+    # follows a rename; empty for rules saved before it existed.
+    target_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="repository")
+    target_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    #: When the namespace's repositories were last listed in full.
+    last_enumerated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: Why the last poll could not do its work; empty when it could.
+    last_error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    #: Per-repository scan state. Loaded on purpose (the poller selects it
+    #: eagerly); a list or show of rules never touches it.
+    repositories: Mapped[list["ModuleAutodiscoveryRepository"]] = relationship(
+        "ModuleAutodiscoveryRepository",
+        back_populates="rule",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="raise_on_sql",
+        order_by="ModuleAutodiscoveryRepository.repo_path",
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
@@ -1312,6 +1341,96 @@ class ModuleAutodiscoveryRule(Base):
     __table_args__ = (
         sa.UniqueConstraint("vcs_connection_id", "name", name="uq_module_autodiscovery_rule_name"),
         Index("ix_module_autodiscovery_rules_repo", "vcs_connection_id", "repo_url"),
+    )
+
+
+class ModuleAutodiscoveryRepository(Base):
+    """One repository a module autodiscovery rule looks at (#1620).
+
+    A repository-target rule has exactly one; a namespace or pattern rule has
+    one per repository it has enumerated. The row carries that repository's
+    scan state — what the rule has seen there, the head it last scanned, and
+    the candidates it found — so each repository is baselined, scanned and
+    backed off on its own.
+
+    `origin` records how the repository entered the rule: `baseline` for one
+    that already existed (nothing registers until someone scans it) and `new`
+    for one created after the rule's baseline (everything it holds registers).
+    Rows outlive the repository's presence: one that leaves scope is marked
+    `out-of-scope`, and the modules it produced stay registered.
+    """
+
+    __tablename__ = "module_autodiscovery_repositories"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    rule_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("module_autodiscovery_rules.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    rule: Mapped["ModuleAutodiscoveryRule"] = relationship(
+        "ModuleAutodiscoveryRule", back_populates="repositories"
+    )
+
+    #: `owner/repo`, or `group/subgroup/project`, as the provider reports it.
+    repo_path: Mapped[str] = mapped_column(String(1024), nullable=False)
+    repo_url: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
+    #: The provider's id, so a rename is followed; empty until known.
+    vcs_repo_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    default_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+    #: `baseline` or `new`.
+    origin: Mapped[str] = mapped_column(String(16), nullable=False, default="baseline")
+    #: `active`, `archived`, `empty`, `no-branch`, `out-of-scope`, `covered` or `error`.
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+
+    #: The provider's "something changed" marker (GitHub `pushed_at`, GitLab
+    #: `last_activity_at`). Unmoved means no branch lookup and no tree listing.
+    change_marker: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    last_scanned_sha: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    #: Candidate directories already seen here: automatic registration takes
+    #: only what is new, so candidates an operator left alone stay that way.
+    seen_subdirectories: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    #: The candidates the last scan found, each `{subdirectory, name, provider}`.
+    candidates: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, nullable=False)
+    #: `{subdirectory, reason}` for each candidate the last registration skipped.
+    last_skips: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, nullable=False)
+    #: Paths (and their URLs) the repository had before a rename, oldest first.
+    previous_paths: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
+
+    repo_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    #: When a branch head was last looked up here.
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Round-robin order, and the end of any backoff. NULL sorts first.
+    next_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint("rule_id", "repo_path", name="uq_module_autodiscovery_repo_path"),
+        # A rename is followed by id; two rows may not claim one repository.
+        Index(
+            "uq_module_autodiscovery_repo_id",
+            "rule_id",
+            "vcs_repo_id",
+            unique=True,
+            postgresql_where=sa.text("vcs_repo_id <> ''"),
+        ),
+        Index("ix_module_autodiscovery_repo_next_check", "rule_id", "next_check_at"),
     )
 
 
