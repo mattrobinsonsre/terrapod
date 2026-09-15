@@ -937,7 +937,7 @@ class TestATransientVaultFailureDoesNotDestroyTheRun:
         ]
         try:
             with patch(
-                "terrapod.services.vault_source_service.read_secret",
+                "terrapod.services.vault_source_service.read_secret_data",
                 new=AsyncMock(side_effect=VaultUnavailable("connection refused")),
             ):
                 resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
