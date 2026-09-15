@@ -53,6 +53,20 @@ class TestVaultConfigValidators:
         with pytest.raises(ValidationError, match="name is required"):
             VaultInstanceConfig(name="", address="https://v:8200")
 
+    def test_revoke_leases_is_off_by_default(self):
+        assert _inst().revoke_leases is False
+        assert VaultConfig(enabled=True, instances=[_inst()]).revocation_enabled is False
+
+    def test_revocation_is_enabled_by_any_one_instance(self):
+        cfg = VaultConfig(enabled=True, instances=[_inst("a"), _inst("b", revoke_leases=True)])
+        assert cfg.revocation_enabled is True
+        assert cfg.instance_named("b").revoke_leases is True
+        assert cfg.instance_named("missing") is None
+
+    def test_revocation_is_off_while_vault_is_disabled(self):
+        cfg = VaultConfig(enabled=False, instances=[_inst(revoke_leases=True)])
+        assert cfg.revocation_enabled is False
+
     def test_invalid_auth_method_is_rejected(self):
         with pytest.raises(ValidationError, match="auth method must be"):
             VaultInstanceConfig(name="a", address="https://v:8200", auth={"method": "nonsense"})

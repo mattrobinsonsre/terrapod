@@ -331,6 +331,7 @@
   "vault.instances[].name",
   "vault.instances[].namespace",
   "vault.instances[].paths",
+  "vault.instances[].revoke_leases",
   "vault.instances[].tls_skip_verify",
   "vault.timeout_seconds",
   "vcs.archive_cache_retention_days",

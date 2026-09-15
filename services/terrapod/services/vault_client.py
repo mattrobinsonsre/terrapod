@@ -525,6 +525,69 @@ async def read_secret_data(
     return resp.data
 
 
+#: Outcomes of :func:`revoke_lease`. ``gone`` is a lease Vault no longer holds
+#: (already revoked, or expired): the goal is met, so it is not an error.
+REVOKED = "revoked"
+GONE = "gone"
+
+
+async def revoke_lease(
+    inst: VaultInstanceConfig,
+    lease_id: str,
+    *,
+    timeout: float = 10.0,
+    static_token: str | None = None,
+) -> str:
+    """Revoke one lease: ``PUT /v1/sys/leases/revoke`` (#1649).
+
+    Returns :data:`REVOKED` on a 2xx and :data:`GONE` on a 400, which is how
+    Vault answers a lease it no longer holds (already revoked, or expired) —
+    Vault versions differ between answering 204 and 400 there, so both mean
+    done. A 403 raises :class:`VaultDenied` (the policy lacks ``update`` on
+    ``sys/leases/revoke``); any other 4xx raises :class:`VaultError`. Both are
+    final. A transient failure (connection error, 5xx) is retried with bounded
+    backoff by ``arequest_with_retry`` and then raises
+    :class:`VaultUnavailable`.
+
+    Neither the lease id nor Vault's response body is put in an exception
+    message: both can reach a log line.
+    """
+    if not lease_id:
+        raise VaultError("no lease id to revoke")
+    base = inst.address.rstrip("/")
+    url = f"{base}/v1/sys/leases/revoke"
+    token = await _login(inst, static_token)
+    try:
+        verify = await _verify_for(inst)
+        async with httpx.AsyncClient(timeout=timeout, verify=verify) as c:
+            resp = await arequest_with_retry(
+                c,
+                "PUT",
+                url,
+                # Revoking an already-revoked lease is a no-op, so the call is
+                # idempotent and safe to retry.
+                idempotent=True,
+                headers=_headers(inst, token),
+                json={"lease_id": lease_id},
+            )
+    except (httpx.HTTPError, OSError) as e:
+        raise _as_vault_error(e, "lease revocation", inst.name) from e
+
+    if 200 <= resp.status_code < 300:
+        return REVOKED
+    if resp.status_code == 400:
+        return GONE
+    detail = f"Vault lease revocation on instance {inst.name!r} failed with HTTP {resp.status_code}"
+    if resp.status_code == 403:
+        raise VaultDenied(
+            f"{detail}: the policy attached to role {inst.auth.role!r} does not "
+            "grant update on sys/leases/revoke"
+        )
+    if _is_transient_status(resp.status_code):
+        raise VaultUnavailable(detail)
+    raise VaultError(detail)
+
+
 def secret_path(mount: str, path: str) -> str:
     """The ``mount/path`` a reference names, as error messages show it."""
     return f"{mount.strip('/')}/{path.strip('/')}"

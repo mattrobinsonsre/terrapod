@@ -1147,6 +1147,12 @@ api:
       #   tls:
       #     ca_secret: ""          # Secret name, in the release namespace
       #     ca_key: ca.crt         # key within it holding the PEM
+      #   # Revoke each dynamic secret's lease once the run phase's Job has ended,
+      #   # rather than leaving the credential live for the role's whole TTL. Off
+      #   # by default; best-effort (a lease that cannot be revoked expires at its
+      #   # TTL, as it does with this off). Needs `update` on `sys/leases/revoke`
+      #   # in the Vault policy. See docs/vault.md, "Revoking leases".
+      #   revoke_leases: false
       #   # approle/token only — never kubernetes, which stores no credential.
       #   # Injected as TERRAPOD_VAULT_<NAME>_SECRET via secretKeyRef.
       #   existingSecret: ""
