@@ -2071,14 +2071,27 @@ async def next_run(
     # value; the content travels only in `vault-files`, into the per-run Secret.
     # An older listener that ignores `vault-files` therefore delivers the path to
     # a file that does not exist — the run fails, and the secret goes nowhere.
+    from terrapod.services import audit_service
     from terrapod.services.vault_source_service import (
         VaultSourceError,
         VaultTransient,
         resolve_vault_delivery,
+        vault_read_audit_entries,
     )
 
+    # Audit (#1651): one row per Vault read this claim makes — ok, denied,
+    # missing or transient — naming the variables, never a value. The rows are
+    # staged in this claim's transaction and commit with it, whichever way the
+    # claim ends, so a claim is still one commit however many reads it makes.
+    vault_reads: list = []
+
+    def _stage_vault_audit() -> None:
+        audit_service.add_audit_events(
+            db, vault_read_audit_entries(run_id=run.id, phase=phase, reads=vault_reads)
+        )
+
     try:
-        vault = await resolve_vault_delivery(resolved, settings)
+        vault = await resolve_vault_delivery(resolved, settings, reads=vault_reads)
     except VaultTransient:
         # Vault is down, not misconfigured. Put the run back so the next claim
         # picks it up, rather than erroring every queued run in the estate over
@@ -2087,10 +2100,12 @@ async def next_run(
         # claim from `confirmed` (#1646).
         unclaimed = "queued" if phase == "plan" else "confirmed"
         await run_service.transition_run(db, run, unclaimed)
+        _stage_vault_audit()
         await db.commit()
         return Response(status_code=204)
     except VaultSourceError as e:
         await run_service.transition_run(db, run, "errored", error_message=str(e))
+        _stage_vault_audit()
         await db.commit()
         return Response(status_code=204)
     except Exception as e:  # noqa: BLE001 - backstop, see below
@@ -2102,8 +2117,11 @@ async def next_run(
         await run_service.transition_run(
             db, run, "errored", error_message=f"Vault variable resolution failed: {e}"
         )
+        _stage_vault_audit()
         await db.commit()
         return Response(status_code=204)
+    # Committed below with the rest of the claim.
+    _stage_vault_audit()
 
     if vault.values:
         for v in resolved:

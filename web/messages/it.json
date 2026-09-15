@@ -2534,7 +2534,22 @@
       "vaultFileName": "Nome del file",
       "vaultFileNameDefault": "Predefinito: la chiave della variabile",
       "vaultFileBadge": "File",
-      "vaultFileHint": "La variabile contiene il percorso del file, non il segreto: usala come {fileFn} o con uno strumento che legge un percorso da una variabile d'ambiente. Un nome relativo come {relExample} viene scritto in {base}; un nome che inizia con {home}, come {homeExample}, finisce nella directory home del runner."
+      "vaultFileHint": "La variabile contiene il percorso del file, non il segreto: usala come {fileFn} o con uno strumento che legge un percorso da una variabile d'ambiente. Un nome relativo come {relExample} viene scritto in {base}; un nome che inizia con {home}, come {homeExample}, finisce nella directory home del runner.",
+      "vaultFileContent": "Contenuto del file",
+      "vaultFileContentField": "Un campo",
+      "vaultFileContentTemplate": "Modello sul segreto",
+      "vaultFileContentFormat": "Segreto intero",
+      "vaultFileTemplate": "Modello",
+      "vaultFileTemplateHint": "Ogni segnaposto come {example} viene sostituito con quel campo di questa unica lettura Vault; i punti accedono a una mappa. Filtri: {filters}. {lease} e gli altri campi del lease funzionano quando il segreto ha un lease. I valori inseriti non vengono mai espansi di nuovo.",
+      "vaultFileFormat": "Formato",
+      "vaultFileFormatJson": "Oggetto JSON",
+      "vaultFileFormatEnv": "File env (righe KEY=\"value\")",
+      "vaultFileFields": "Campi (facoltativo)",
+      "vaultFileFieldsHint": "Nomi dei campi separati da virgole. Lascia vuoto per scrivere l''intero segreto.",
+      "vaultFileEncoding": "Codifica",
+      "vaultFileEncodingNone": "Come memorizzato in Vault",
+      "vaultFileEncodingBase64": "Decodifica Base64",
+      "vaultFileEncodingHint": "Decodifica il campo prima di scriverlo. Il risultato deve essere testo; i file binari non sono supportati."
     },
     "runs": {
       "options": "Opzioni",

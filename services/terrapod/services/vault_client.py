@@ -38,6 +38,8 @@ import json
 import os
 import ssl
 import time
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -76,6 +78,61 @@ class VaultUnavailable(VaultError):
     brief blip into an incident. A transient failure leaves the run queued for
     the next claim instead.
     """
+
+
+class VaultDenied(VaultError):
+    """Vault — or Terrapod's own allow-list — refused: a 403, or a login refused.
+
+    A subclass, so every existing ``except VaultError`` still fails the run.
+    It exists so the read audit (#1651) can record *denied* from the type
+    rather than guess from a message.
+    """
+
+
+class VaultNotFound(VaultError):
+    """Vault answered 404: nothing at that path."""
+
+
+@dataclass(frozen=True)
+class VaultLease:
+    """The lease a dynamic-secret response carries.
+
+    ``lease_id`` is kept so a later change can revoke it (#1649), and is
+    excluded from ``repr`` so it never reaches a log line by accident. It is
+    never offered to a file template: only the TTL, renewability and the
+    computed expiry are (see :meth:`template_metadata`).
+    """
+
+    duration: int
+    renewable: bool
+    received_at: datetime
+    lease_id: str = field(default="", repr=False)
+
+    @property
+    def expires_at(self) -> datetime:
+        return self.received_at + timedelta(seconds=self.duration)
+
+    def template_metadata(self) -> dict:
+        """What a file template may read as ``_lease.*``. No lease id, ever."""
+        return {
+            "ttl": self.duration,
+            "renewable": self.renewable,
+            "expires_at": self.expires_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+
+@dataclass(frozen=True, eq=False)
+class VaultResponse:
+    """One Vault read: the secret's data, and its lease when it has one.
+
+    ``data`` is the secret — kv-v2's ``data.data``, or a dynamic engine's
+    ``data`` — and is excluded from ``repr`` so printing a response cannot print
+    a secret. ``lease`` is ``None`` for a response with no lease (kv-v2, whose
+    ``lease_duration`` is 0 and ``lease_id`` empty).
+    """
+
+    data: dict = field(repr=False)
+    lease: VaultLease | None = None
 
 
 #: HTTP statuses that mean "Vault cannot answer right now", as opposed to
@@ -260,7 +317,7 @@ async def _login(inst: VaultInstanceConfig, static_token: str | None) -> str:
         )
         if _is_transient_status(resp.status_code):
             raise VaultUnavailable(detail)
-        raise VaultError(detail)
+        raise VaultDenied(detail)
     try:
         auth = resp.json().get("auth") or {}
     except ValueError as e:
@@ -330,12 +387,12 @@ def _check_allowed(inst: VaultInstanceConfig, read_path: str) -> None:
         want = stripped.split("/")
         if target[: len(want)] == want:
             return
-    raise VaultError(
+    raise VaultDenied(
         f"path {read_path!r} is not in the allow-list configured for vault instance {inst.name!r}"
     )
 
 
-async def read_secret_data(
+async def read_secret_response(
     inst: VaultInstanceConfig,
     *,
     mount: str,
@@ -345,14 +402,17 @@ async def read_secret_data(
     data: dict | None = None,
     timeout: float = 10.0,
     static_token: str | None = None,
-) -> dict:
-    """Read one secret and return its whole data map, or raise :class:`VaultError`.
+) -> VaultResponse:
+    """Read one secret: its whole data map and its lease, or raise :class:`VaultError`.
 
     kv-v2's ``data.data`` is unwrapped; a dynamic engine's ``data`` is returned
     as it is. One call is one Vault request, and a dynamic engine mints a new
     credential on every request — so a caller that needs several fields of one
     credential (a certificate and its key, an access key and its secret) must
     read once and take each field with :func:`extract_field` (#1619).
+
+    The lease (``lease_duration``, ``renewable``, ``lease_id``) comes from the
+    top level of the response, beside ``data``.
     """
     mount_s, path_s = mount.strip("/"), path.strip("/")
     if not mount_s or not path_s:
@@ -384,12 +444,12 @@ async def read_secret_data(
         raise _as_vault_error(e, f"read of {read_path!r}", inst.name) from e
 
     if resp.status_code == 403:
-        raise VaultError(
+        raise VaultDenied(
             f"Vault denied {read_path!r} on instance {inst.name!r}. The policy "
             f"attached to role {inst.auth.role!r} does not grant read on this path."
         )
     if resp.status_code == 404:
-        raise VaultError(f"Vault has no secret at {read_path!r} on instance {inst.name!r}")
+        raise VaultNotFound(f"Vault has no secret at {read_path!r} on instance {inst.name!r}")
     if resp.status_code != 200:
         # Deliberately NOT echoing resp.text: this message becomes the run's
         # error_message, readable by anyone with run-read, and a third party's
@@ -404,12 +464,65 @@ async def read_secret_data(
         raise VaultError(detail)
 
     try:
-        body = resp.json().get("data") or {}
+        envelope = resp.json()
     except ValueError as e:
         raise _as_vault_error(e, f"read of {read_path!r}", inst.name) from e
+    if not isinstance(envelope, dict):
+        envelope = {}
+    body = envelope.get("data") or {}
     # kv-v2 nests the secret under data.data; the dynamic engines do not.
-    secret = body.get("data") if engine == "kv2" else body
-    return secret if isinstance(secret, dict) else {}
+    secret = body.get("data") if engine == "kv2" and isinstance(body, dict) else body
+    return VaultResponse(
+        data=secret if isinstance(secret, dict) else {},
+        lease=_lease_of(envelope),
+    )
+
+
+def _lease_of(envelope: dict) -> VaultLease | None:
+    """The lease a response carries, or None when it has none.
+
+    kv-v2 answers ``lease_duration: 0`` and an empty ``lease_id``: no lease.
+    A malformed duration is treated as no lease rather than failing a read that
+    otherwise succeeded — the lease is metadata, not the secret.
+    """
+    lease_id = envelope.get("lease_id") or ""
+    try:
+        duration = int(envelope.get("lease_duration") or 0)
+    except (TypeError, ValueError):
+        duration = 0
+    if duration <= 0 and not lease_id:
+        return None
+    return VaultLease(
+        duration=max(duration, 0),
+        renewable=bool(envelope.get("renewable")),
+        received_at=datetime.now(UTC),
+        lease_id=str(lease_id),
+    )
+
+
+async def read_secret_data(
+    inst: VaultInstanceConfig,
+    *,
+    mount: str,
+    path: str,
+    engine: str = "kv2",
+    method: str = "GET",
+    data: dict | None = None,
+    timeout: float = 10.0,
+    static_token: str | None = None,
+) -> dict:
+    """:func:`read_secret_response`, keeping only the secret's data map."""
+    resp = await read_secret_response(
+        inst,
+        mount=mount,
+        path=path,
+        engine=engine,
+        method=method,
+        data=data,
+        timeout=timeout,
+        static_token=static_token,
+    )
+    return resp.data
 
 
 def secret_path(mount: str, path: str) -> str:

@@ -2534,7 +2534,22 @@
       "vaultFileName": "Filnamn",
       "vaultFileNameDefault": "Standard är variabelns nyckel",
       "vaultFileBadge": "Fil",
-      "vaultFileHint": "Variabeln innehåller filens sökväg, inte hemligheten: använd den som {fileFn}, eller med ett verktyg som läser en sökväg från en miljövariabel. Ett relativt namn som {relExample} skrivs under {base}; ett namn som börjar med {home}, som {homeExample}, hamnar i runnerns hemkatalog."
+      "vaultFileHint": "Variabeln innehåller filens sökväg, inte hemligheten: använd den som {fileFn}, eller med ett verktyg som läser en sökväg från en miljövariabel. Ett relativt namn som {relExample} skrivs under {base}; ett namn som börjar med {home}, som {homeExample}, hamnar i runnerns hemkatalog.",
+      "vaultFileContent": "Filinnehåll",
+      "vaultFileContentField": "Ett fält",
+      "vaultFileContentTemplate": "Mall över hemligheten",
+      "vaultFileContentFormat": "Hela hemligheten",
+      "vaultFileTemplate": "Mall",
+      "vaultFileTemplateHint": "Varje platshållare som {example} ersätts med det fältet från denna enda läsning från Vault; punkter går in i en map. Filter: {filters}. {lease} och de andra lease-fälten fungerar när hemligheten har en lease. Infogade värden expanderas aldrig igen.",
+      "vaultFileFormat": "Format",
+      "vaultFileFormatJson": "JSON-objekt",
+      "vaultFileFormatEnv": "Env-fil (rader KEY=\"value\")",
+      "vaultFileFields": "Fält (valfritt)",
+      "vaultFileFieldsHint": "Fältnamn separerade med kommatecken. Lämna tomt för att skriva hela hemligheten.",
+      "vaultFileEncoding": "Kodning",
+      "vaultFileEncodingNone": "Som lagrad i Vault",
+      "vaultFileEncodingBase64": "Base64-avkoda",
+      "vaultFileEncodingHint": "Avkodar fältet innan det skrivs. Resultatet måste vara text; binära filer stöds inte."
     },
     "runs": {
       "options": "Alternativ",

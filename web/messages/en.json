@@ -2542,7 +2542,22 @@
       "vaultFileName": "File name",
       "vaultFileNameDefault": "Defaults to the variable key",
       "vaultFileBadge": "File",
-      "vaultFileHint": "The variable holds the file's path, not the secret: use it as {fileFn}, or with a tool that reads a path from an environment variable. A relative name such as {relExample} is written under {base}; a name starting with {home}, such as {homeExample}, goes in the runner's home directory."
+      "vaultFileHint": "The variable holds the file's path, not the secret: use it as {fileFn}, or with a tool that reads a path from an environment variable. A relative name such as {relExample} is written under {base}; a name starting with {home}, such as {homeExample}, goes in the runner's home directory.",
+      "vaultFileContent": "File content",
+      "vaultFileContentField": "One field",
+      "vaultFileContentTemplate": "Template over the secret",
+      "vaultFileContentFormat": "Whole secret",
+      "vaultFileTemplate": "Template",
+      "vaultFileTemplateHint": "Each placeholder such as {example} is replaced with that field from this one Vault read; dots reach into a map. Filters: {filters}. {lease} and the other lease fields work when the secret has a lease. Inserted values are never expanded again.",
+      "vaultFileFormat": "Format",
+      "vaultFileFormatJson": "JSON object",
+      "vaultFileFormatEnv": "Env file (KEY=\"value\" lines)",
+      "vaultFileFields": "Fields (optional)",
+      "vaultFileFieldsHint": "Field names separated by commas. Leave empty to write the whole secret.",
+      "vaultFileEncoding": "Encoding",
+      "vaultFileEncodingNone": "As stored in Vault",
+      "vaultFileEncodingBase64": "Base64-decode",
+      "vaultFileEncodingHint": "Decodes the field before it is written. The result must be text; binary files are not supported."
     },
     "runs": {
       "options": "Options",

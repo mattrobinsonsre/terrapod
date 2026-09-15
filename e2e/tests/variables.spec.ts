@@ -1,3 +1,4 @@
+import path from 'path';
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { createWorkspace, getStoredToken, uniqueName } from '../helpers/api.js';
 
@@ -412,5 +413,175 @@ test.describe('Vault value source (#1439)', () => {
     expect(off.data).toEqual(seeded.data)
     expect(off.field).toBe('private_key')
     await expect(page.locator('tr').filter({ hasText: 'TLS_CERT' }).getByText('tls/cert.pem')).toHaveCount(0)
+  })
+
+  // ── Templates, formats and encoding (#1648) ───────────────────────
+
+  test('a templated file is built in the form, saved without a field, and survives a reload (#1648)', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2evaulttpl'), {
+      'execution-mode': 'agent',
+    })
+    await withVault(page)
+    const template =
+      '[default]\naws_access_key_id = {{ access_key }}\naws_secret_access_key = {{ secret_key }}\n'
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await page.locator('#var-key').fill('AWS_SHARED_CREDENTIALS_FILE')
+    await page.locator('#var-cat').selectOption('env')
+    await page.locator('#var-source').selectOption('vault')
+    await page.locator('#add-engine').selectOption('dynamic')
+    await page.locator('#add-mount').fill('aws')
+    await page.locator('#add-path').fill('creds/deploy')
+    await page.locator('#add-file').check()
+    await page.locator('#add-file-name').fill('~/.aws/credentials')
+    // One field is the default kind; a template reads the whole secret, so
+    // the field box goes away when it is chosen.
+    await expect(page.locator('#add-file-content')).toHaveValue('field')
+    await expect(page.locator('#add-field')).toBeVisible()
+    await page.locator('#add-file-content').selectOption('template')
+    await expect(page.locator('#add-field')).toHaveCount(0)
+    await page.locator('#add-file-template').fill(template)
+    await page.getByRole('button', { name: 'Add Variable', exact: true }).last().click()
+
+    const row = () => page.locator('tr').filter({ hasText: 'AWS_SHARED_CREDENTIALS_FILE' })
+    await expect(row().getByText('~/.aws/credentials')).toBeVisible({ timeout: 10_000 })
+    await page.reload()
+    await expect(row().getByText('Template', { exact: true })).toBeVisible({ timeout: 10_000 })
+
+    const saved = await readRef(token, wsId, 'AWS_SHARED_CREDENTIALS_FILE')
+    expect('field' in saved).toBe(false)
+    expect(saved.engine).toBe('dynamic')
+    expect(saved.file).toEqual({ name: '~/.aws/credentials', template })
+
+    // The editor comes back on the template, with the text exactly as saved.
+    await row().getByRole('button', { name: 'Edit' }).click()
+    await expect(page.locator('[id$="-file-content"]:visible').first()).toHaveValue('template')
+    await expect(page.locator('[id$="-file-template"]:visible').first()).toHaveValue(template)
+    await expect(page.locator('[id$="-field"]:visible')).toHaveCount(0)
+  })
+
+  test('a whole-secret format with fields round-trips, and an edit keeps what it did not touch (#1648)', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2evaultfmt'), {
+      'execution-mode': 'agent',
+    })
+    await withVault(page)
+
+    const seeded = {
+      source: 'vault', mount: 'secret', path: 'apps/db',
+      file: { name: 'db.env', format: 'env', fields: ['DB_USER', 'DB_PASS'] },
+    }
+    const res = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: {
+            key: 'DB_ENV_FILE', category: 'env', 'value-source': 'vault',
+            value: JSON.stringify(seeded),
+          },
+        },
+      }),
+    })
+    expect(res.status).toBe(201)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    const row = page.locator('tr').filter({ hasText: 'DB_ENV_FILE' })
+    // 'env' is both the variable's category and the file's format here, so
+    // assert on the file name, which the row shows exactly once.
+    await expect(row.getByText('db.env', { exact: true })).toBeVisible({ timeout: 10_000 })
+    await row.getByRole('button', { name: 'Edit' }).click()
+    await expect(page.locator('[id$="-file-content"]:visible').first()).toHaveValue('format')
+    await expect(page.locator('[id$="-file-format"]:visible').first()).toHaveValue('env')
+    await expect(page.locator('[id$="-file-fields"]:visible').first()).toHaveValue('DB_USER, DB_PASS')
+
+    await page.locator('[id$="-file-format"]:visible').first().selectOption('json')
+    await page.getByRole('button', { name: 'Save' }).click()
+
+    await expect.poll(async () => ((await readRef(token, wsId, 'DB_ENV_FILE')).file as Record<string, unknown>).format).toBe('json')
+    const edited = await readRef(token, wsId, 'DB_ENV_FILE')
+    expect(edited.file).toEqual({ name: 'db.env', format: 'json', fields: ['DB_USER', 'DB_PASS'] })
+    expect('field' in edited).toBe(false)
+  })
+
+  test('a template with an unknown filter is refused with the server message (#1648)', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2evaulttplbad'), {
+      'execution-mode': 'agent',
+    })
+    await withVault(page)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await page.locator('#var-key').fill('BAD_TEMPLATE')
+    await page.locator('#var-cat').selectOption('env')
+    await page.locator('#var-source').selectOption('vault')
+    await page.locator('#add-mount').fill('secret')
+    await page.locator('#add-path').fill('apps/x')
+    await page.locator('#add-file').check()
+    await page.locator('#add-file-content').selectOption('template')
+    await page.locator('#add-file-template').fill('token = {{ token | upper }}')
+    await page.getByRole('button', { name: 'Add Variable', exact: true }).last().click()
+
+    // Validated when written, not when a run fails later.
+    await expect(page.getByText("uses unknown filter 'upper'", { exact: false })).toBeVisible({
+      timeout: 10_000,
+    })
+    const list = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const keys = (await list.json()).data.map((d: { attributes: { key: string } }) => d.attributes.key)
+    expect(keys).not.toContain('BAD_TEMPLATE')
+  })
+})
+
+test.describe('Vault templated files — RBAC negative (regular user, #1648)', () => {
+  const API_URL = process.env.API_URL || 'http://localhost:8000'
+  const USER_AUTH = path.join(__dirname, '..', '.auth', 'user.json')
+  test.use({ storageState: USER_AUTH })
+
+  test('a regular user cannot write a templated Vault file to a workspace they do not own', async ({ page }) => {
+    // The admin owns the workspace. A template is a request to read a secret
+    // and lay its fields out in a file; being able to store one is being able
+    // to ask Terrapod's Vault role for that secret, so the write must be
+    // refused, not just hidden in the UI.
+    const adminToken = getStoredToken()
+    const wsId = await createWorkspace(adminToken, uniqueName('e2evaultrbac'), {
+      'execution-mode': 'agent',
+    })
+    const userToken = getStoredToken('user.json')
+    expect(userToken, 'the non-admin auth state must carry a token').toBeTruthy()
+
+    const res = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${userToken}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: {
+            key: 'STOLEN', category: 'env', 'value-source': 'vault',
+            value: JSON.stringify({
+              source: 'vault', engine: 'dynamic', mount: 'aws', path: 'creds/admin',
+              file: { name: 'x', template: '{{ access_key }} {{ secret_key }}' },
+            }),
+          },
+        },
+      }),
+    })
+    expect([403, 404]).toContain(res.status)
+
+    const list = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    })
+    const keys = (await list.json()).data.map((d: { attributes: { key: string } }) => d.attributes.key)
+    expect(keys).not.toContain('STOLEN')
+
+    // And the page offers no way to add one.
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await expect(page.getByRole('button', { name: 'Add Variable' })).toHaveCount(0)
+    await expect(page.locator('#add-file-template')).toHaveCount(0)
   })
 })

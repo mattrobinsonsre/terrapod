@@ -2534,7 +2534,22 @@
       "vaultFileName": "文件名",
       "vaultFileNameDefault": "默认为变量键",
       "vaultFileBadge": "文件",
-      "vaultFileHint": "变量保存的是文件路径而不是密钥：可作为 {fileFn} 使用，或供从环境变量读取路径的工具使用。相对名称（如 {relExample}）写入 {base} 下；以 {home} 开头的名称（如 {homeExample}）放在运行器的主目录中。"
+      "vaultFileHint": "变量保存的是文件路径而不是密钥：可作为 {fileFn} 使用，或供从环境变量读取路径的工具使用。相对名称（如 {relExample}）写入 {base} 下；以 {home} 开头的名称（如 {homeExample}）放在运行器的主目录中。",
+      "vaultFileContent": "文件内容",
+      "vaultFileContentField": "单个字段",
+      "vaultFileContentTemplate": "基于密钥的模板",
+      "vaultFileContentFormat": "整个密钥",
+      "vaultFileTemplate": "模板",
+      "vaultFileTemplateHint": "每个占位符（如 {example}）都会替换为这一次 Vault 读取中的对应字段；用点号访问映射内部。过滤器：{filters}。当密钥带有租约时，可使用 {lease} 等租约字段。插入的值永远不会再次展开。",
+      "vaultFileFormat": "格式",
+      "vaultFileFormatJson": "JSON 对象",
+      "vaultFileFormatEnv": "env 文件（KEY=\"value\" 行）",
+      "vaultFileFields": "字段（可选）",
+      "vaultFileFieldsHint": "以逗号分隔的字段名。留空则写入整个密钥。",
+      "vaultFileEncoding": "编码",
+      "vaultFileEncodingNone": "按 Vault 中存储的原样",
+      "vaultFileEncodingBase64": "Base64 解码",
+      "vaultFileEncodingHint": "在写入前解码该字段。结果必须是文本；不支持二进制文件。"
     },
     "runs": {
       "options": "选项",

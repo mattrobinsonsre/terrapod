@@ -2534,7 +2534,22 @@
       "vaultFileName": "Bestandsnaam",
       "vaultFileNameDefault": "Standaard de sleutel van de variabele",
       "vaultFileBadge": "Bestand",
-      "vaultFileHint": "De variabele bevat het pad van het bestand, niet het geheim: gebruik hem als {fileFn}, of met een tool die een pad uit een omgevingsvariabele leest. Een relatieve naam zoals {relExample} wordt onder {base} geschreven; een naam die met {home} begint, zoals {homeExample}, komt in de thuismap van de runner."
+      "vaultFileHint": "De variabele bevat het pad van het bestand, niet het geheim: gebruik hem als {fileFn}, of met een tool die een pad uit een omgevingsvariabele leest. Een relatieve naam zoals {relExample} wordt onder {base} geschreven; een naam die met {home} begint, zoals {homeExample}, komt in de thuismap van de runner.",
+      "vaultFileContent": "Bestandsinhoud",
+      "vaultFileContentField": "Eén veld",
+      "vaultFileContentTemplate": "Sjabloon over het geheim",
+      "vaultFileContentFormat": "Volledig geheim",
+      "vaultFileTemplate": "Sjabloon",
+      "vaultFileTemplateHint": "Elke placeholder zoals {example} wordt vervangen door dat veld uit deze ene Vault-leesactie; punten gaan een map in. Filters: {filters}. {lease} en de andere leasevelden werken als het geheim een lease heeft. Ingevoegde waarden worden nooit opnieuw uitgevouwen.",
+      "vaultFileFormat": "Formaat",
+      "vaultFileFormatJson": "JSON-object",
+      "vaultFileFormatEnv": "Env-bestand (regels KEY=\"value\")",
+      "vaultFileFields": "Velden (optioneel)",
+      "vaultFileFieldsHint": "Veldnamen, gescheiden door komma''s. Laat leeg om het volledige geheim te schrijven.",
+      "vaultFileEncoding": "Codering",
+      "vaultFileEncodingNone": "Zoals opgeslagen in Vault",
+      "vaultFileEncodingBase64": "Base64 decoderen",
+      "vaultFileEncodingHint": "Decodeert het veld voordat het wordt geschreven. Het resultaat moet tekst zijn; binaire bestanden worden niet ondersteund."
     },
     "runs": {
       "options": "Opties",

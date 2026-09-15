@@ -1800,12 +1800,27 @@ to `/home/runner/.aws/credentials`. `name` defaults to the variable key. The
 variable's delivered value becomes the file's absolute path, for `env` and
 `terraform` variables alike. A name must be a relative path of
 `[A-Za-z0-9._-]` segments (no `.`, `..` or empty segment, at most 255
-characters), and a `~/` name may not target a path the runner manages. `file`
-is refused with `422` together with `structured` (or its alias `hcl`), on a `static` value source, and with
-any key other than `name` (`template`, `format`, `encoding` and `mode` are
-reserved). Two variables at one path, or a value over 256 KiB, error the run.
-Variables naming the same secret share one Vault read per run, so fields of one
-dynamic credential always match. Details: [Delivering as a file](vault.md#delivering-as-a-file).
+characters), and a `~/` name may not target a path the runner manages.
+
+The file's content is exactly one of:
+
+| Key | Content |
+|---|---|
+| `field` (on the reference) | That field. With `"file": {"encoding": "base64"}` it is base64-decoded first; the result must be UTF-8 text. |
+| `file.template` | A logic-less template over the secret, at most 16 KiB: `{{ name }}`, `{{ map.key }}`, filters `json`, `base64decode`, `trim`, `lines`, `indent N`, and `{{ _lease.ttl }}` / `_lease.renewable` / `_lease.expires_at` when the response has a lease. No `field`. |
+| `file.format` | `json` (the whole data map) or `env` (`KEY="value"` lines); `file.fields: [...]` selects a subset. No `field`. |
+
+`file` is refused with `422` together with `structured` (or its alias `hcl`),
+on a `static` value source, with any unknown key (`mode` is reserved), when more than one of `field`,
+`file.template` and `file.format` is given, for a template syntax error or an
+unknown filter, for `fields` without `format`, and for `encoding` with a
+template or format. An unknown template name, invalid base64, non-UTF-8 decoded
+bytes, two variables at one path, a rendered file over 256 KiB, or Vault files
+totalling over 768 KiB in one run error the run. Variables naming the same
+secret share one Vault read per run, so fields of one dynamic credential always
+match — including every field a template uses. Details:
+[Delivering as a file](vault.md#delivering-as-a-file),
+[Templates, formats and encoding](vault.md#templates-formats-and-encoding).
 
 A vault-sourced variable is **always sensitive**, but the API returns its
 `value` rather than masking it: the stored value is a path, not a secret. The
@@ -3425,6 +3440,13 @@ GET /api/v1/admin/audit-log
 | `page[size]` | integer | Page size (default: 20, max: 100) |
 
 **Response:** JSON:API list of `audit-log-entries` with pagination metadata.
+
+Besides HTTP requests, the log holds system events, whose `action` is a verb.
+Every Vault read Terrapod makes for a run is one `vault.read` row
+(`resource-type` `runs`), whose `detail` is JSON naming the variables, instance,
+mount, path, engine, phase and outcome (`ok`, `denied`, `missing`, `transient`,
+`error`), never a value. Filter with `filter[action]=vault.read`. See
+[Vault → The audit trail](vault.md#the-audit-trail).
 
 **Example:**
 

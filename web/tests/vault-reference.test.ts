@@ -12,7 +12,9 @@ import assert from 'node:assert/strict'
 import {
   buildVaultReference,
   emptyVaultReference,
+  parseFieldList,
   parseVaultReference,
+  usesField,
   type VaultReferenceValue,
 } from '../src/lib/vault-reference.ts'
 
@@ -68,6 +70,14 @@ describe('editing one field changes only that key', () => {
     })
     it(`${name}: field`, () => {
       const out = edit(stored, { field: 'other' })
+      if (!usesField(parseVaultReference(stored))) {
+        // A template or format file reads the whole secret, and the server
+        // refuses a `field` beside it (#1648): the box is hidden, and a stale
+        // value in it must not reach the reference.
+        assert.equal('field' in JSON.parse(out), false)
+        assert.equal(out, stored)
+        return
+      }
       assert.equal(JSON.parse(out).field, 'other')
       assertOnlyChanged(stored, out, ['field'])
     })
@@ -189,6 +199,149 @@ describe('file delivery', () => {
   it('a name is trimmed', () => {
     const out = edit(TABLE.minimal, { file: true, fileName: '  gcp/adc.json ' })
     assert.deepEqual(JSON.parse(out).file, { name: 'gcp/adc.json' })
+  })
+})
+
+// ── #1648: what the file holds ─────────────────────────────────────────
+
+// Stored references for each kind of file content. Kept out of TABLE because
+// the loops above edit `field`, which a template or format reference does not
+// have (the server refuses one beside them).
+const CONTENT: Record<string, string> = {
+  template:
+    '{"source":"vault","engine":"dynamic","mount":"aws","path":"creds/deploy","file":{"name":"~/.aws/credentials","template":"[default]\\naws_access_key_id = {{ access_key }}\\n","zz":1}}',
+  format:
+    '{"source":"vault","mount":"secret","path":"apps/db","file":{"name":"db.env","format":"env","fields":["DB_USER","DB_PASS"],"mode":"0400"}}',
+  base64:
+    '{"source":"vault","engine":"dynamic","mount":"gcp","path":"key/deploy","field":"private_key_data","file":{"name":"gcp/adc.json","encoding":"base64"}}',
+}
+
+describe('file content (#1648)', () => {
+  for (const [name, stored] of Object.entries(CONTENT)) {
+    it(`${name}: an unedited reference is returned verbatim`, () => {
+      assert.equal(buildVaultReference(parseVaultReference(stored)), stored)
+    })
+    it(`${name}: editing the path changes only path`, () => {
+      const out = edit(stored, { path: 'elsewhere' })
+      assertOnlyChanged(stored, out, ['path'])
+    })
+    it(`${name}: renaming the file changes only file.name`, () => {
+      const out = JSON.parse(edit(stored, { fileName: 'renamed' }))
+      const before = JSON.parse(stored).file
+      assert.equal(out.file.name, 'renamed')
+      assert.deepEqual(Object.keys(out.file), Object.keys(before))
+      for (const k of Object.keys(before).filter((k) => k !== 'name')) {
+        assert.equal(JSON.stringify(out.file[k]), JSON.stringify(before[k]), `file.${k} changed`)
+      }
+    })
+  }
+
+  it('parses each kind', () => {
+    const tpl = parseVaultReference(CONTENT.template)
+    assert.equal(tpl.fileContent, 'template')
+    assert.equal(tpl.template, '[default]\naws_access_key_id = {{ access_key }}\n')
+    assert.equal(usesField(tpl), false)
+    const fmt = parseVaultReference(CONTENT.format)
+    assert.equal(fmt.fileContent, 'format')
+    assert.equal(fmt.format, 'env')
+    assert.equal(fmt.fields, 'DB_USER, DB_PASS')
+    const b64 = parseVaultReference(CONTENT.base64)
+    assert.equal(b64.fileContent, 'field')
+    assert.equal(b64.encoding, 'base64')
+    assert.equal(usesField(b64), true)
+    assert.equal(usesField({ file: false, fileContent: 'template' }), true)
+  })
+
+  it('a template path edit never adds a field', () => {
+    assert.equal('field' in JSON.parse(edit(CONTENT.template, { path: 'x' })), false)
+  })
+
+  it('editing the template text changes only file.template, verbatim', () => {
+    const text = '  [prod]\naws_access_key_id={{access_key}}\n\n'
+    const out = JSON.parse(edit(CONTENT.template, { template: text }))
+    assert.equal(out.file.template, text, 'whitespace is kept as typed')
+    assert.equal(out.file.zz, 1, 'an unknown file key survives')
+    assertOnlyChanged(CONTENT.template, JSON.stringify(out), ['file'])
+  })
+
+  it('switching one field to a template drops field and encoding, keeps name and unknown keys', () => {
+    const stored = CONTENT.base64
+    const out = JSON.parse(
+      edit(stored, { fileContent: 'template', template: '{{ private_key_data | base64decode }}' }),
+    )
+    assert.equal('field' in out, false)
+    assert.deepEqual(out.file, {
+      name: 'gcp/adc.json',
+      template: '{{ private_key_data | base64decode }}',
+    })
+    assertOnlyChanged(stored, JSON.stringify(out), ['file', 'field'])
+  })
+
+  it('switching a template to a format writes json by default and the field list', () => {
+    const out = JSON.parse(
+      edit(CONTENT.template, { fileContent: 'format', fields: 'access_key,\nsecret_key' }),
+    )
+    assert.equal(out.file.template, undefined)
+    assert.equal(out.file.format, 'json')
+    assert.deepEqual(out.file.fields, ['access_key', 'secret_key'])
+    assert.equal(out.file.zz, 1)
+  })
+
+  it('switching a format back to one field with a field typed restores field', () => {
+    const out = JSON.parse(edit(CONTENT.format, { fileContent: 'field', field: ' DB_PASS ' }))
+    assert.equal(out.field, 'DB_PASS')
+    assert.equal(out.file.format, undefined)
+    assert.equal(out.file.fields, undefined)
+    assert.equal(out.file.mode, '0400', 'an unknown file key survives the switch')
+  })
+
+  it('switching to one field with none typed adds no empty field (the server names it)', () => {
+    const out = JSON.parse(edit(CONTENT.template, { fileContent: 'field' }))
+    assert.equal('field' in out, false)
+    assert.equal(out.file.template, undefined)
+  })
+
+  it('turning the encoding off and on touches only file.encoding', () => {
+    const off = edit(CONTENT.base64, { encoding: '' })
+    assert.equal(JSON.parse(off).file.encoding, undefined)
+    assertOnlyChanged(CONTENT.base64, off, ['file'])
+    const on = edit(TABLE.fileNamed, { encoding: 'base64' })
+    assert.deepEqual(JSON.parse(on).file, { name: 'gcp/adc.json', encoding: 'base64' })
+    assertOnlyChanged(TABLE.fileNamed, on, ['file'])
+  })
+
+  it('emptying the fields list removes file.fields', () => {
+    const out = JSON.parse(edit(CONTENT.format, { fields: ' , ' }))
+    assert.equal(out.file.fields, undefined)
+    assert.equal(out.file.format, 'env')
+  })
+
+  it('changing the format changes only file.format', () => {
+    const out = JSON.parse(edit(CONTENT.format, { format: 'json' }))
+    assert.equal(out.file.format, 'json')
+    assert.deepEqual(out.file.fields, ['DB_USER', 'DB_PASS'])
+  })
+
+  it('a new templated reference has source first and no field', () => {
+    const out = buildVaultReference({
+      ...emptyVaultReference(),
+      mount: 'pki',
+      path: 'issue/web',
+      engine: 'dynamic',
+      file: true,
+      fileName: 'tls/bundle.pem',
+      fileContent: 'template',
+      template: '{{certificate}}\n{{private_key}}\n{{ca_chain|lines}}\n',
+    })
+    assert.equal(
+      out,
+      '{"source":"vault","mount":"pki","path":"issue/web","engine":"dynamic","file":{"name":"tls/bundle.pem","template":"{{certificate}}\\n{{private_key}}\\n{{ca_chain|lines}}\\n"}}',
+    )
+  })
+
+  it('parseFieldList splits on commas and newlines and drops blanks', () => {
+    assert.deepEqual(parseFieldList(' a, b\nc,,\n '), ['a', 'b', 'c'])
+    assert.deepEqual(parseFieldList(''), [])
   })
 })
 

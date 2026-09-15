@@ -2534,7 +2534,22 @@
       "vaultFileName": "שם הקובץ",
       "vaultFileNameDefault": "ברירת המחדל היא מפתח המשתנה",
       "vaultFileBadge": "קובץ",
-      "vaultFileHint": "המשתנה מחזיק את נתיב הקובץ, לא את הסוד: השתמשו בו כ-{fileFn}, או עם כלי שקורא נתיב ממשתנה סביבה. שם יחסי כמו {relExample} נכתב תחת {base}; שם שמתחיל ב-{home}, כמו {homeExample}, נשמר בתיקיית הבית של ה-runner."
+      "vaultFileHint": "המשתנה מחזיק את נתיב הקובץ, לא את הסוד: השתמשו בו כ-{fileFn}, או עם כלי שקורא נתיב ממשתנה סביבה. שם יחסי כמו {relExample} נכתב תחת {base}; שם שמתחיל ב-{home}, כמו {homeExample}, נשמר בתיקיית הבית של ה-runner.",
+      "vaultFileContent": "תוכן הקובץ",
+      "vaultFileContentField": "שדה אחד",
+      "vaultFileContentTemplate": "תבנית על הסוד",
+      "vaultFileContentFormat": "הסוד כולו",
+      "vaultFileTemplate": "תבנית",
+      "vaultFileTemplateHint": "כל מציין מקום כמו {example} מוחלף בשדה הזה מקריאת Vault האחת הזו; נקודות נכנסות לתוך מפה. מסננים: {filters}. {lease} ושאר שדות החכירה פועלים כשלסוד יש חכירה. ערכים שהוכנסו לעולם אינם מורחבים שוב.",
+      "vaultFileFormat": "פורמט",
+      "vaultFileFormatJson": "אובייקט JSON",
+      "vaultFileFormatEnv": "קובץ env (שורות KEY=\"value\")",
+      "vaultFileFields": "שדות (אופציונלי)",
+      "vaultFileFieldsHint": "שמות שדות מופרדים בפסיקים. השאירו ריק כדי לכתוב את הסוד כולו.",
+      "vaultFileEncoding": "קידוד",
+      "vaultFileEncodingNone": "כפי שנשמר ב-Vault",
+      "vaultFileEncodingBase64": "פענוח Base64",
+      "vaultFileEncodingHint": "מפענח את השדה לפני שהוא נכתב. התוצאה חייבת להיות טקסט; קבצים בינאריים אינם נתמכים."
     },
     "runs": {
       "options": "אפשרויות",

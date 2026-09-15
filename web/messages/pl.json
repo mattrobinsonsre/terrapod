@@ -2534,7 +2534,22 @@
       "vaultFileName": "Nazwa pliku",
       "vaultFileNameDefault": "Domyślnie klucz zmiennej",
       "vaultFileBadge": "Plik",
-      "vaultFileHint": "Zmienna zawiera ścieżkę pliku, nie sekret: użyj jej jako {fileFn} albo z narzędziem, które czyta ścieżkę ze zmiennej środowiskowej. Nazwa względna, np. {relExample}, jest zapisywana w {base}; nazwa zaczynająca się od {home}, np. {homeExample}, trafia do katalogu domowego runnera."
+      "vaultFileHint": "Zmienna zawiera ścieżkę pliku, nie sekret: użyj jej jako {fileFn} albo z narzędziem, które czyta ścieżkę ze zmiennej środowiskowej. Nazwa względna, np. {relExample}, jest zapisywana w {base}; nazwa zaczynająca się od {home}, np. {homeExample}, trafia do katalogu domowego runnera.",
+      "vaultFileContent": "Zawartość pliku",
+      "vaultFileContentField": "Jedno pole",
+      "vaultFileContentTemplate": "Szablon na sekrecie",
+      "vaultFileContentFormat": "Cały sekret",
+      "vaultFileTemplate": "Szablon",
+      "vaultFileTemplateHint": "Każdy symbol zastępczy, np. {example}, jest zastępowany tym polem z tego jednego odczytu z Vault; kropki sięgają do mapy. Filtry: {filters}. {lease} i pozostałe pola dzierżawy działają, gdy sekret ma dzierżawę. Wstawione wartości nigdy nie są ponownie rozwijane.",
+      "vaultFileFormat": "Format",
+      "vaultFileFormatJson": "Obiekt JSON",
+      "vaultFileFormatEnv": "Plik env (wiersze KEY=\"value\")",
+      "vaultFileFields": "Pola (opcjonalnie)",
+      "vaultFileFieldsHint": "Nazwy pól rozdzielone przecinkami. Pozostaw puste, aby zapisać cały sekret.",
+      "vaultFileEncoding": "Kodowanie",
+      "vaultFileEncodingNone": "Jak zapisano w Vault",
+      "vaultFileEncodingBase64": "Dekoduj Base64",
+      "vaultFileEncodingHint": "Dekoduje pole przed zapisaniem. Wynik musi być tekstem; pliki binarne nie są obsługiwane."
     },
     "runs": {
       "options": "Opcje",

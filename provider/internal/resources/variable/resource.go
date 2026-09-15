@@ -102,7 +102,15 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 					"usable as `file(var.x)` or by a tool that reads a path from an environment " +
 					"variable. `name` defaults to the variable key; a relative name lands under " +
 					"`/var/run/terrapod/files/`, and a name starting with `~/` lands in the " +
-					"runner's home directory (e.g. `~/.aws/credentials`). Not allowed with `structured` (or its alias `hcl`).",
+					"runner's home directory (e.g. `~/.aws/credentials`). Not allowed with `structured` (or its alias `hcl`). " +
+					"The file holds exactly one of: the reference's `field` (with " +
+					"`\"encoding\":\"base64\"` in `file` to decode it); a `file.template` over " +
+					"the whole secret, with no `field` (logic-less `{{ name | filter }}`, filters " +
+					"`json`, `base64decode`, `trim`, `lines`, `indent N`, and `_lease.ttl` / " +
+					"`_lease.renewable` / `_lease.expires_at`), to build e.g. an AWS credentials " +
+					"file or a PEM bundle from one read; or a `file.format` of `json` or `env` " +
+					"for the whole secret, optionally narrowed by `file.fields`. `{{ }}` is not " +
+					"Terraform interpolation, so a template needs no escaping in `jsonencode`.",
 			},
 			"version_id": schema.StringAttribute{
 				Computed: true, Description: "Version identifier.",

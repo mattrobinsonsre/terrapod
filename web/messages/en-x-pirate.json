@@ -2534,7 +2534,22 @@
       "vaultFileName": "Scroll name",
       "vaultFileNameDefault": "Be the variable's key if left blank",
       "vaultFileBadge": "Scroll",
-      "vaultFileHint": "The variable carries the scroll's course, not the secret: hoist it as {fileFn}, or hand it to a tool that reads a course from an environment variable. A relative name like {relExample} be stowed under {base}; a name startin'' with {home}, like {homeExample}, goes in the runner's home quarters."
+      "vaultFileHint": "The variable carries the scroll's course, not the secret: hoist it as {fileFn}, or hand it to a tool that reads a course from an environment variable. A relative name like {relExample} be stowed under {base}; a name startin'' with {home}, like {homeExample}, goes in the runner's home quarters.",
+      "vaultFileContent": "Scroll contents",
+      "vaultFileContentField": "One field o'' plunder",
+      "vaultFileContentTemplate": "Chart o'' the treasure",
+      "vaultFileContentFormat": "The whole treasure",
+      "vaultFileTemplate": "Chart",
+      "vaultFileTemplateHint": "Every marker like {example} be swapped fer that field from this one haul out o'' the Vault; dots be reachin'' into a map. Filters: {filters}. {lease} an'' the other lease fields work when the treasure be on a lease. What goes in be never unpacked again, arr.",
+      "vaultFileFormat": "Format o'' the scroll",
+      "vaultFileFormatJson": "JSON chest",
+      "vaultFileFormatEnv": "Env scroll (KEY=\"value\" lines)",
+      "vaultFileFields": "Fields (if ye please)",
+      "vaultFileFieldsHint": "Field names split by commas. Leave it empty to write the whole treasure.",
+      "vaultFileEncoding": "Encodin''",
+      "vaultFileEncodingNone": "As it be stowed in the Vault",
+      "vaultFileEncodingBase64": "Base64-decode, arr",
+      "vaultFileEncodingHint": "Decodes the field afore it be written. What comes out must be text; binary scrolls be not supported."
     },
     "runs": {
       "options": "Options",

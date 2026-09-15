@@ -2534,7 +2534,22 @@
       "vaultFileName": "Tiedoston nimi",
       "vaultFileNameDefault": "Oletuksena muuttujan avain",
       "vaultFileBadge": "Tiedosto",
-      "vaultFileHint": "Muuttuja sisältää tiedoston polun, ei salaisuutta: käytä sitä muodossa {fileFn} tai työkalun kanssa, joka lukee polun ympäristömuuttujasta. Suhteellinen nimi, kuten {relExample}, kirjoitetaan hakemistoon {base}; merkkijonolla {home} alkava nimi, kuten {homeExample}, sijoitetaan ajajan kotihakemistoon."
+      "vaultFileHint": "Muuttuja sisältää tiedoston polun, ei salaisuutta: käytä sitä muodossa {fileFn} tai työkalun kanssa, joka lukee polun ympäristömuuttujasta. Suhteellinen nimi, kuten {relExample}, kirjoitetaan hakemistoon {base}; merkkijonolla {home} alkava nimi, kuten {homeExample}, sijoitetaan ajajan kotihakemistoon.",
+      "vaultFileContent": "Tiedoston sisältö",
+      "vaultFileContentField": "Yksi kenttä",
+      "vaultFileContentTemplate": "Malli salaisuudesta",
+      "vaultFileContentFormat": "Koko salaisuus",
+      "vaultFileTemplate": "Malli",
+      "vaultFileTemplateHint": "Jokainen paikkamerkki, kuten {example}, korvataan kyseisellä kentällä tästä yhdestä Vault-lukukerrasta; pisteillä pääsee mapin sisään. Suodattimet: {filters}. {lease} ja muut lease-kentät toimivat, kun salaisuudella on lease. Lisättyjä arvoja ei koskaan laajenneta uudelleen.",
+      "vaultFileFormat": "Muoto",
+      "vaultFileFormatJson": "JSON-objekti",
+      "vaultFileFormatEnv": "Env-tiedosto (rivit KEY=\"value\")",
+      "vaultFileFields": "Kentät (valinnainen)",
+      "vaultFileFieldsHint": "Kenttien nimet pilkuilla erotettuina. Jätä tyhjäksi kirjoittaaksesi koko salaisuuden.",
+      "vaultFileEncoding": "Koodaus",
+      "vaultFileEncodingNone": "Kuten Vaultiin tallennettu",
+      "vaultFileEncodingBase64": "Base64-dekoodaus",
+      "vaultFileEncodingHint": "Dekoodaa kentän ennen kirjoittamista. Tuloksen on oltava tekstiä; binääritiedostoja ei tueta."
     },
     "runs": {
       "options": "Vaihtoehdot",

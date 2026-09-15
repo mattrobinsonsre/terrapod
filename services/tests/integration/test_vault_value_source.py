@@ -19,6 +19,7 @@ from sqlalchemy import select
 
 from terrapod.config import VaultInstanceConfig
 from terrapod.db.models import (
+    AuditLog,
     ConfigurationVersion,
     Run,
     Variable,
@@ -29,7 +30,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db_session
 from terrapod.services import pool_set, run_service, variable_service
-from terrapod.services.vault_client import VaultError
+from terrapod.services.vault_client import VaultError, VaultResponse
 
 pytestmark = pytest.mark.integration
 
@@ -191,7 +192,7 @@ class TestAnUnresolvableReferenceErrorsTheRun:
             # patching the client module was a no-op and this test passed on an
             # unrelated instance-selection error.
             with patch(
-                "terrapod.services.vault_source_service.read_secret_data",
+                "terrapod.services.vault_source_service.read_secret_response",
                 new=AsyncMock(side_effect=VaultError("Vault denied 'kvv2/apps/x'")),
             ):
                 resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
@@ -297,7 +298,7 @@ async def _claim_with_vault(app, client, ws_id, cv_id, read):
         VaultInstanceConfig(name="default", default=True, address="https://vault.test:8200")
     ]
     try:
-        with patch("terrapod.services.vault_source_service.read_secret_data", new=read):
+        with patch("terrapod.services.vault_source_service.read_secret_response", new=read):
             resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
     finally:
         settings.vault.enabled, settings.vault.instances = prior
@@ -327,7 +328,7 @@ class TestFileDelivery:
                 },
             ]
         )
-        read = AsyncMock(return_value={"sa": _FILE_SECRET})
+        read = AsyncMock(return_value=VaultResponse({"sa": _FILE_SECRET}))
         resp, final = await _claim_with_vault(app, client, ws_id, cv_id, read)
 
         assert resp.status_code == 200, resp.text
@@ -357,7 +358,9 @@ class TestFileDelivery:
         ws_id, cv_id = await _workspace_with(
             [{"key": "TLS_KEY", "value": ref, "category": "env", "value_source": "vault"}]
         )
-        read = AsyncMock(return_value={"private_key": _FILE_SECRET, "certificate": "C"})
+        read = AsyncMock(
+            return_value=VaultResponse({"private_key": _FILE_SECRET, "certificate": "C"})
+        )
         resp, final = await _claim_with_vault(app, client, ws_id, cv_id, read)
 
         assert resp.status_code == 200, resp.text
@@ -375,6 +378,78 @@ class TestFileDelivery:
             {"common_name": "a.example.test"},
         )
         assert final.status == "planning"
+
+    async def test_a_template_and_a_set_variable_share_one_read_through_runs_next(
+        self, app, client
+    ):
+        """#1648 with real rows and real precedence: a set variable and a
+        workspace variable with a template name the same secret, so one read
+        serves both, and the file carries two fields of that one response."""
+        tpl = "{{certificate}}\n{{private_key}}\n{{ca_chain|lines}}\n"
+        pki = {"engine": "dynamic", "method": "POST", "mount": "pki", "path": "issue/web"}
+        ws_id, cv_id = await _workspace_with(
+            [
+                {
+                    "key": "TLS_BUNDLE",
+                    "value": _vref(
+                        **pki, field=None, file={"name": "tls/bundle.pem", "template": tpl}
+                    ),
+                    "category": "env",
+                    "value_source": "vault",
+                }
+            ],
+            [
+                {
+                    "key": "TLS_CERT",
+                    "value": _vref(**pki, field="certificate"),
+                    "category": "env",
+                    "value_source": "vault",
+                }
+            ],
+        )
+        read = AsyncMock(
+            return_value=VaultResponse(
+                {"certificate": "CERT", "private_key": _FILE_SECRET, "ca_chain": ["I", "R"]}
+            )
+        )
+        resp, final = await _claim_with_vault(app, client, ws_id, cv_id, read)
+
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert read.await_count == 1
+        assert attrs["vault-files"] == [
+            {
+                "key": "TLS_BUNDLE",
+                "name": "tls/bundle.pem",
+                "value": f"CERT\n{_FILE_SECRET}\nI\nR\n",
+            }
+        ]
+        env = {v["key"]: v["value"] for v in attrs["env-vars"]}
+        assert env["TLS_BUNDLE"] == "/var/run/terrapod/files/tls/bundle.pem"
+        assert env["TLS_CERT"] == "CERT"
+        rest = {k: v for k, v in attrs.items() if k != "vault-files"}
+        assert _FILE_SECRET not in json.dumps(rest)
+        assert final.status == "planning"
+
+        # #1651: the one read is one committed audit row naming both variables.
+        async with get_db_session() as db:
+            rows = (
+                (
+                    await db.execute(
+                        select(AuditLog).where(
+                            AuditLog.action == "vault.read",
+                            AuditLog.resource_id == f"run-{final.id}",
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert len(rows) == 1
+        detail = json.loads(rows[0].detail)
+        assert sorted(detail["keys"]) == ["TLS_BUNDLE", "TLS_CERT"]
+        assert (detail["outcome"], detail["phase"], detail["path"]) == ("ok", "plan", "issue/web")
+        assert _FILE_SECRET not in rows[0].detail
 
     async def test_a_workspace_variable_overrides_a_set_variable_of_the_same_key(self, app, client):
         """Precedence runs first: one key, one file — the workspace's — so the
@@ -399,7 +474,7 @@ class TestFileDelivery:
         )
 
         async def read(inst, **kw):
-            return {"sa": f"from-{kw['path']}"}
+            return VaultResponse({"sa": f"from-{kw['path']}"})
 
         resp, final = await _claim_with_vault(
             app, client, ws_id, cv_id, AsyncMock(side_effect=read)
@@ -428,7 +503,7 @@ class TestFileDelivery:
                 }
             ],
         )
-        read = AsyncMock(return_value={"sa": _FILE_SECRET})
+        read = AsyncMock(return_value=VaultResponse({"sa": _FILE_SECRET}))
         resp, final = await _claim_with_vault(app, client, ws_id, cv_id, read)
         assert resp.status_code == 204
         assert final.status == "errored"

@@ -46,6 +46,16 @@ export function VaultValueDisplay({ value, varKey }: { value: string; varKey?: s
             {t('vaultFileBadge')}
           </span>
           <span className="font-mono text-xs text-slate-300 break-all">{fileName}</span>
+          {/* What the file is built from, when it is not one field (#1648). */}
+          {typeof file.template === 'string' ? (
+            <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300">
+              {t('vaultFileTemplate')}
+            </span>
+          ) : typeof file.format === 'string' ? (
+            <span className="px-2 py-0.5 rounded text-xs font-mono bg-slate-700 text-slate-300">
+              {file.format}
+            </span>
+          ) : null}
         </span>
       ) : null}
     </span>

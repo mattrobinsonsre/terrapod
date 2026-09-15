@@ -2534,7 +2534,22 @@
       "vaultFileName": "اسم الملف",
       "vaultFileNameDefault": "الافتراضي هو مفتاح المتغير",
       "vaultFileBadge": "ملف",
-      "vaultFileHint": "يحمل المتغير مسار الملف لا السر: استخدمه بصيغة {fileFn}، أو مع أداة تقرأ مسارًا من متغير بيئة. الاسم النسبي مثل {relExample} يُكتب ضمن {base}؛ والاسم الذي يبدأ بـ {home}، مثل {homeExample}، يوضع في المجلد الرئيسي للمشغّل."
+      "vaultFileHint": "يحمل المتغير مسار الملف لا السر: استخدمه بصيغة {fileFn}، أو مع أداة تقرأ مسارًا من متغير بيئة. الاسم النسبي مثل {relExample} يُكتب ضمن {base}؛ والاسم الذي يبدأ بـ {home}، مثل {homeExample}، يوضع في المجلد الرئيسي للمشغّل.",
+      "vaultFileContent": "محتوى الملف",
+      "vaultFileContentField": "حقل واحد",
+      "vaultFileContentTemplate": "قالب على السر",
+      "vaultFileContentFormat": "السر كاملًا",
+      "vaultFileTemplate": "قالب",
+      "vaultFileTemplateHint": "يُستبدل كل عنصر نائب مثل {example} بذلك الحقل من قراءة Vault الواحدة هذه؛ وتصل النقاط إلى داخل الخريطة. المرشحات: {filters}. يعمل {lease} وحقول الإيجار الأخرى عندما يكون للسر إيجار. لا تُوسَّع القيم المُدرجة مرة أخرى أبدًا.",
+      "vaultFileFormat": "التنسيق",
+      "vaultFileFormatJson": "كائن JSON",
+      "vaultFileFormatEnv": "ملف env (أسطر KEY=\"value\")",
+      "vaultFileFields": "الحقول (اختياري)",
+      "vaultFileFieldsHint": "أسماء الحقول مفصولة بفواصل. اتركه فارغًا لكتابة السر كاملًا.",
+      "vaultFileEncoding": "الترميز",
+      "vaultFileEncodingNone": "كما هو مخزّن في Vault",
+      "vaultFileEncodingBase64": "فك ترميز Base64",
+      "vaultFileEncodingHint": "يفك ترميز الحقل قبل كتابته. يجب أن تكون النتيجة نصًا؛ الملفات الثنائية غير مدعومة."
     },
     "runs": {
       "options": "الخيارات",

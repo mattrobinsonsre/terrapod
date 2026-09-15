@@ -2534,7 +2534,22 @@
       "vaultFileName": "Filnavn",
       "vaultFileNameDefault": "Standard er variabelnøkkelen",
       "vaultFileBadge": "Fil",
-      "vaultFileHint": "Variabelen inneholder filens sti, ikke hemmeligheten: bruk den som {fileFn}, eller med et verktøy som leser en sti fra en miljøvariabel. Et relativt navn som {relExample} skrives under {base}; et navn som starter med {home}, som {homeExample}, havner i runnerens hjemmekatalog."
+      "vaultFileHint": "Variabelen inneholder filens sti, ikke hemmeligheten: bruk den som {fileFn}, eller med et verktøy som leser en sti fra en miljøvariabel. Et relativt navn som {relExample} skrives under {base}; et navn som starter med {home}, som {homeExample}, havner i runnerens hjemmekatalog.",
+      "vaultFileContent": "Filinnhold",
+      "vaultFileContentField": "Ett felt",
+      "vaultFileContentTemplate": "Mal over hemmeligheten",
+      "vaultFileContentFormat": "Hele hemmeligheten",
+      "vaultFileTemplate": "Mal",
+      "vaultFileTemplateHint": "Hver plassholder som {example} erstattes med det feltet fra denne ene lesingen fra Vault; punktum går inn i et map. Filtre: {filters}. {lease} og de andre lease-feltene fungerer når hemmeligheten har en lease. Innsatte verdier utvides aldri på nytt.",
+      "vaultFileFormat": "Format",
+      "vaultFileFormatJson": "JSON-objekt",
+      "vaultFileFormatEnv": "Env-fil (linjer KEY=\"value\")",
+      "vaultFileFields": "Felter (valgfritt)",
+      "vaultFileFieldsHint": "Feltnavn atskilt med komma. La stå tomt for å skrive hele hemmeligheten.",
+      "vaultFileEncoding": "Koding",
+      "vaultFileEncodingNone": "Slik den er lagret i Vault",
+      "vaultFileEncodingBase64": "Base64-dekod",
+      "vaultFileEncodingHint": "Dekoder feltet før det skrives. Resultatet må være tekst; binærfiler støttes ikke."
     },
     "runs": {
       "options": "Alternativer",

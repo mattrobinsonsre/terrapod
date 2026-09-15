@@ -17,7 +17,7 @@
  */
 
 import { useTranslations } from 'next-intl'
-import type { VaultReferenceValue } from '@/lib/vault-reference'
+import { usesField, type VaultReferenceValue } from '@/lib/vault-reference'
 import { VaultFileDeliveryFields } from '@/components/vault-file-delivery-fields'
 
 export {
@@ -47,6 +47,9 @@ export function VaultReferenceFields({
 }) {
   const t = useTranslations('workspaceDetail.variables')
   const set = (patch: Partial<VaultReferenceValue>) => onChange({ ...value, ...patch })
+  // A template or a whole-secret format reads every field of the secret, so
+  // the reference names no single field (#1648) and the box goes away.
+  const showField = usesField(value)
 
   return (
     <div className="space-y-3">
@@ -92,7 +95,7 @@ export function VaultReferenceFields({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className={`grid grid-cols-1 gap-3 ${showField ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <div>
           <label htmlFor={`${idPrefix}-mount`} className="block text-xs text-slate-400 mb-1">
             {t('vaultMount')}
@@ -121,25 +124,35 @@ export function VaultReferenceFields({
             onChange={(e) => set({ path: e.target.value })}
           />
         </div>
-        <div>
-          <label htmlFor={`${idPrefix}-field`} className="block text-xs text-slate-400 mb-1">
-            {t('vaultField')}
-          </label>
-          <input
-            id={`${idPrefix}-field`}
-            type="text"
-            required
-            className={FIELD}
-            placeholder="apitoken" /* i18n-ignore: example field name */
-            value={value.field}
-            onChange={(e) => set({ field: e.target.value })}
-          />
-        </div>
+        {showField && (
+          <div>
+            <label htmlFor={`${idPrefix}-field`} className="block text-xs text-slate-400 mb-1">
+              {t('vaultField')}
+            </label>
+            <input
+              id={`${idPrefix}-field`}
+              type="text"
+              required
+              className={FIELD}
+              placeholder="apitoken" /* i18n-ignore: example field name */
+              value={value.field}
+              onChange={(e) => set({ field: e.target.value })}
+            />
+          </div>
+        )}
       </div>
 
       <VaultFileDeliveryFields
         idPrefix={idPrefix}
-        value={{ file: value.file, fileName: value.fileName }}
+        value={{
+          file: value.file,
+          fileName: value.fileName,
+          fileContent: value.fileContent,
+          template: value.template,
+          format: value.format,
+          fields: value.fields,
+          encoding: value.encoding,
+        }}
         onChange={set}
       />
 

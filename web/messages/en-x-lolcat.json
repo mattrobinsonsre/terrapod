@@ -2534,7 +2534,22 @@
       "vaultFileName": "Fiel naem",
       "vaultFileNameDefault": "Iz da variabul kee if u leev it",
       "vaultFileBadge": "Fiel",
-      "vaultFileHint": "Da variabul haz da fielz paff, not da sekrit: uze it liek {fileFn}, or wif a tul dat reedz a paff frum a enviro variabul. A relativ naem liek {relExample} gets ritten undr {base}; a naem startin wif {home}, liek {homeExample}, goez in da runnerz hoem dir."
+      "vaultFileHint": "Da variabul haz da fielz paff, not da sekrit: uze it liek {fileFn}, or wif a tul dat reedz a paff frum a enviro variabul. A relativ naem liek {relExample} gets ritten undr {base}; a naem startin wif {home}, liek {homeExample}, goez in da runnerz hoem dir.",
+      "vaultFileContent": "Fiel stuffz",
+      "vaultFileContentField": "Wun feeld",
+      "vaultFileContentTemplate": "Templaet ovr da sekrit",
+      "vaultFileContentFormat": "Hole sekrit",
+      "vaultFileTemplate": "Templaet",
+      "vaultFileTemplateHint": "Evry plaecholdr liek {example} getz swapd wif dat feeld frum dis wun Vault reed; dotz go inside a map. Filturz: {filters}. {lease} an da uthr leese feeldz werk wen da sekrit haz a leese. Stuf dat goez in nevr getz xpanded agin.",
+      "vaultFileFormat": "Formatz",
+      "vaultFileFormatJson": "JSON thingy",
+      "vaultFileFormatEnv": "Env fiel (KEY=\"value\" linez)",
+      "vaultFileFields": "Feeldz (if u wantz)",
+      "vaultFileFieldsHint": "Feeld naemz wif commaz. Leev emptee 2 rite da hole sekrit.",
+      "vaultFileEncoding": "Enkodin",
+      "vaultFileEncodingNone": "Liek it waz stord in Vault",
+      "vaultFileEncodingBase64": "Base64-dekode",
+      "vaultFileEncodingHint": "Dekodez da feeld b4 ritin it. Hafta be textz; binaree fielz not supportd."
     },
     "runs": {
       "options": "Opshunz",

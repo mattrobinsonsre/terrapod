@@ -15,7 +15,7 @@ import pytest
 
 from terrapod.config import Settings, VaultConfig
 from terrapod.services import vault_source_service as vss
-from terrapod.services.vault_client import VaultError
+from terrapod.services.vault_client import VaultError, VaultResponse
 from terrapod.services.vault_source_service import (
     VaultSourceError,
     parse_reference,
@@ -81,7 +81,11 @@ class TestReferenceValidation:
 class TestInstanceSelection:
     @pytest.mark.asyncio
     async def test_a_sole_instance_needs_no_name(self):
-        with patch.object(vss, "read_secret_data", new=AsyncMock(return_value={"apitoken": "v"})):
+        with patch.object(
+            vss,
+            "read_secret_response",
+            new=AsyncMock(return_value=VaultResponse({"apitoken": "v"})),
+        ):
             out = await resolve_vault_variables([_Var("T", _ref())], _settings(_ONE))
         assert out == {"T": "v"}
 
@@ -95,9 +99,9 @@ class TestInstanceSelection:
 
         async def _read(inst, **kw):
             seen["name"] = inst.name
-            return {"apitoken": "v", "secret_key": "v"}
+            return VaultResponse({"apitoken": "v", "secret_key": "v"})
 
-        with patch.object(vss, "read_secret_data", new=_read):
+        with patch.object(vss, "read_secret_response", new=_read):
             await resolve_vault_variables([_Var("T", _ref())], _settings(insts))
         assert seen["name"] == "b"
 
@@ -119,7 +123,9 @@ class TestFailureIsFatal:
     @pytest.mark.asyncio
     async def test_a_vault_error_propagates_rather_than_dropping_the_variable(self):
         # git-auth would drop this and carry on. Here it must stop the run.
-        with patch.object(vss, "read_secret_data", new=AsyncMock(side_effect=VaultError("denied"))):
+        with patch.object(
+            vss, "read_secret_response", new=AsyncMock(side_effect=VaultError("denied"))
+        ):
             with pytest.raises(VaultSourceError, match="variable 'T'"):
                 await resolve_vault_variables([_Var("T", _ref())], _settings(_ONE))
 
@@ -132,7 +138,9 @@ class TestFailureIsFatal:
 
     @pytest.mark.asyncio
     async def test_the_error_names_the_variable_so_it_can_be_found(self):
-        with patch.object(vss, "read_secret_data", new=AsyncMock(side_effect=VaultError("boom"))):
+        with patch.object(
+            vss, "read_secret_response", new=AsyncMock(side_effect=VaultError("boom"))
+        ):
             with pytest.raises(VaultSourceError) as e:
                 await resolve_vault_variables([_Var("DB_PASSWORD", _ref())], _settings(_ONE))
         assert "DB_PASSWORD" in str(e.value)
@@ -157,7 +165,7 @@ class TestScoping:
 
         async def _read(inst, **kw):
             captured.update(kw)
-            return {"apitoken": "v", "secret_key": "v"}
+            return VaultResponse({"apitoken": "v", "secret_key": "v"})
 
         ref = _ref(
             mount="aws",
@@ -167,7 +175,7 @@ class TestScoping:
             method="POST",
             data={"ttl": "1h"},
         )
-        with patch.object(vss, "read_secret_data", new=_read):
+        with patch.object(vss, "read_secret_response", new=_read):
             await resolve_vault_variables([_Var("T", ref)], _settings(_ONE))
         assert captured["mount"] == "aws"
         assert captured["path"] == "creds/deploy"

@@ -2534,7 +2534,22 @@
       "vaultFileName": "نام فایل",
       "vaultFileNameDefault": "پیش‌فرض، کلید متغیر است",
       "vaultFileBadge": "فایل",
-      "vaultFileHint": "متغیر مسیر فایل را نگه می‌دارد، نه راز را: آن را به‌صورت {fileFn} به کار ببرید، یا با ابزاری که مسیری را از یک متغیر محیطی می‌خواند. نام نسبی مانند {relExample} در {base} نوشته می‌شود؛ نامی که با {home} شروع شود، مانند {homeExample}، در پوشهٔ خانگی اجراکننده قرار می‌گیرد."
+      "vaultFileHint": "متغیر مسیر فایل را نگه می‌دارد، نه راز را: آن را به‌صورت {fileFn} به کار ببرید، یا با ابزاری که مسیری را از یک متغیر محیطی می‌خواند. نام نسبی مانند {relExample} در {base} نوشته می‌شود؛ نامی که با {home} شروع شود، مانند {homeExample}، در پوشهٔ خانگی اجراکننده قرار می‌گیرد.",
+      "vaultFileContent": "محتوای فایل",
+      "vaultFileContentField": "یک فیلد",
+      "vaultFileContentTemplate": "الگو روی راز",
+      "vaultFileContentFormat": "کل راز",
+      "vaultFileTemplate": "الگو",
+      "vaultFileTemplateHint": "هر جای‌نگهدار مانند {example} با همان فیلد از همین یک بار خواندن Vault جایگزین می‌شود؛ نقطه‌ها به درون نگاشت دسترسی دارند. فیلترها: {filters}. {lease} و دیگر فیلدهای اجاره وقتی راز اجاره داشته باشد کار می‌کنند. مقدارهای درج‌شده هرگز دوباره گسترش داده نمی‌شوند.",
+      "vaultFileFormat": "قالب",
+      "vaultFileFormatJson": "شیء JSON",
+      "vaultFileFormatEnv": "فایل env (خط‌های KEY=\"value\")",
+      "vaultFileFields": "فیلدها (اختیاری)",
+      "vaultFileFieldsHint": "نام فیلدها را با ویرگول جدا کنید. برای نوشتن کل راز خالی بگذارید.",
+      "vaultFileEncoding": "رمزگذاری",
+      "vaultFileEncodingNone": "همان‌طور که در Vault ذخیره شده",
+      "vaultFileEncodingBase64": "رمزگشایی Base64",
+      "vaultFileEncodingHint": "فیلد را پیش از نوشتن رمزگشایی می‌کند. نتیجه باید متن باشد؛ فایل‌های دودویی پشتیبانی نمی‌شوند."
     },
     "runs": {
       "options": "گزینه‌ها",

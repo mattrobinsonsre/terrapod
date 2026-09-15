@@ -5,6 +5,7 @@ Path parsing extracts resource_type and resource_id from TFE V2 URL patterns.
 """
 
 import re
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select
@@ -120,6 +121,21 @@ async def log_audit_event(
     )
     db.add(entry)
     await db.commit()
+
+
+def add_audit_events(db: AsyncSession, entries: Iterable[dict]) -> int:
+    """Stage several audit rows in the caller's transaction, without committing.
+
+    For a batch that belongs to a larger unit of work — the Vault reads of one
+    run claim (#1651) — so the rows commit with the work they describe, in the
+    caller's one commit, rather than one commit per row the way
+    :func:`log_audit_event` does. Each entry holds ``AuditLog`` column values.
+    Returns how many rows were staged.
+    """
+    rows = [AuditLog(id=generate_uuid7(), **e) for e in entries]
+    if rows:
+        db.add_all(rows)
+    return len(rows)
 
 
 async def log_vcs_action(

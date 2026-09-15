@@ -2534,7 +2534,22 @@
       "vaultFileName": "Název souboru",
       "vaultFileNameDefault": "Výchozí je klíč proměnné",
       "vaultFileBadge": "Soubor",
-      "vaultFileHint": "Proměnná obsahuje cestu k souboru, ne tajemství: použijte ji jako {fileFn} nebo s nástrojem, který čte cestu z proměnné prostředí. Relativní název jako {relExample} se zapíše do {base}; název začínající {home}, například {homeExample}, se uloží do domovského adresáře runneru."
+      "vaultFileHint": "Proměnná obsahuje cestu k souboru, ne tajemství: použijte ji jako {fileFn} nebo s nástrojem, který čte cestu z proměnné prostředí. Relativní název jako {relExample} se zapíše do {base}; název začínající {home}, například {homeExample}, se uloží do domovského adresáře runneru.",
+      "vaultFileContent": "Obsah souboru",
+      "vaultFileContentField": "Jedno pole",
+      "vaultFileContentTemplate": "Šablona nad tajemstvím",
+      "vaultFileContentFormat": "Celé tajemství",
+      "vaultFileTemplate": "Šablona",
+      "vaultFileTemplateHint": "Každý zástupný symbol, například {example}, se nahradí tímto polem z tohoto jediného čtení z Vaultu; tečky vstupují do mapy. Filtry: {filters}. {lease} a další pole pronájmu fungují, když má tajemství pronájem. Vložené hodnoty se nikdy znovu nerozvinou.",
+      "vaultFileFormat": "Formát",
+      "vaultFileFormatJson": "Objekt JSON",
+      "vaultFileFormatEnv": "Soubor env (řádky KEY=\"value\")",
+      "vaultFileFields": "Pole (volitelné)",
+      "vaultFileFieldsHint": "Názvy polí oddělené čárkami. Nechte prázdné pro zápis celého tajemství.",
+      "vaultFileEncoding": "Kódování",
+      "vaultFileEncodingNone": "Jak je uloženo ve Vaultu",
+      "vaultFileEncodingBase64": "Dekódovat Base64",
+      "vaultFileEncodingHint": "Dekóduje pole před zápisem. Výsledek musí být text; binární soubory nejsou podporovány."
     },
     "runs": {
       "options": "Možnosti",

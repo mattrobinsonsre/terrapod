@@ -2534,7 +2534,22 @@
       "vaultFileName": "檔案名稱",
       "vaultFileNameDefault": "預設為變數鍵",
       "vaultFileBadge": "檔案",
-      "vaultFileHint": "變數保存的是檔案路徑而非密鑰：可作為 {fileFn} 使用，或供從環境變數讀取路徑的工具使用。相對名稱（如 {relExample}）寫入 {base} 下；以 {home} 開頭的名稱（如 {homeExample}）放在執行器的主目錄中。"
+      "vaultFileHint": "變數保存的是檔案路徑而非密鑰：可作為 {fileFn} 使用，或供從環境變數讀取路徑的工具使用。相對名稱（如 {relExample}）寫入 {base} 下；以 {home} 開頭的名稱（如 {homeExample}）放在執行器的主目錄中。",
+      "vaultFileContent": "檔案內容",
+      "vaultFileContentField": "單一欄位",
+      "vaultFileContentTemplate": "基於密鑰的範本",
+      "vaultFileContentFormat": "整個密鑰",
+      "vaultFileTemplate": "範本",
+      "vaultFileTemplateHint": "每個預留位置（如 {example}）都會替換為這一次 Vault 讀取中的對應欄位；以點號存取對應表內部。篩選器：{filters}。當密鑰帶有租約時，可使用 {lease} 等租約欄位。插入的值絕不會再次展開。",
+      "vaultFileFormat": "格式",
+      "vaultFileFormatJson": "JSON 物件",
+      "vaultFileFormatEnv": "env 檔案（KEY=\"value\" 行）",
+      "vaultFileFields": "欄位（選填）",
+      "vaultFileFieldsHint": "以逗號分隔的欄位名稱。留空則寫入整個密鑰。",
+      "vaultFileEncoding": "編碼",
+      "vaultFileEncodingNone": "依 Vault 中儲存的原樣",
+      "vaultFileEncodingBase64": "Base64 解碼",
+      "vaultFileEncodingHint": "在寫入前解碼該欄位。結果必須是文字；不支援二進位檔案。"
     },
     "runs": {
       "options": "選項",

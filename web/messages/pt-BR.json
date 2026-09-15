@@ -2534,7 +2534,22 @@
       "vaultFileName": "Nome do arquivo",
       "vaultFileNameDefault": "Padrão: a chave da variável",
       "vaultFileBadge": "Arquivo",
-      "vaultFileHint": "A variável contém o caminho do arquivo, não o segredo: use-a como {fileFn} ou com uma ferramenta que lê um caminho de uma variável de ambiente. Um nome relativo como {relExample} é gravado em {base}; um nome que começa com {home}, como {homeExample}, vai para o diretório home do runner."
+      "vaultFileHint": "A variável contém o caminho do arquivo, não o segredo: use-a como {fileFn} ou com uma ferramenta que lê um caminho de uma variável de ambiente. Um nome relativo como {relExample} é gravado em {base}; um nome que começa com {home}, como {homeExample}, vai para o diretório home do runner.",
+      "vaultFileContent": "Conteúdo do arquivo",
+      "vaultFileContentField": "Um campo",
+      "vaultFileContentTemplate": "Modelo sobre o segredo",
+      "vaultFileContentFormat": "Segredo inteiro",
+      "vaultFileTemplate": "Modelo",
+      "vaultFileTemplateHint": "Cada marcador como {example} é substituído por esse campo desta única leitura do Vault; pontos acessam um mapa. Filtros: {filters}. {lease} e os outros campos do lease funcionam quando o segredo tem um lease. Valores inseridos nunca são expandidos novamente.",
+      "vaultFileFormat": "Formato",
+      "vaultFileFormatJson": "Objeto JSON",
+      "vaultFileFormatEnv": "Arquivo env (linhas KEY=\"value\")",
+      "vaultFileFields": "Campos (opcional)",
+      "vaultFileFieldsHint": "Nomes de campos separados por vírgulas. Deixe vazio para gravar o segredo inteiro.",
+      "vaultFileEncoding": "Codificação",
+      "vaultFileEncodingNone": "Como armazenado no Vault",
+      "vaultFileEncodingBase64": "Decodificar Base64",
+      "vaultFileEncodingHint": "Decodifica o campo antes de gravá-lo. O resultado deve ser texto; arquivos binários não são suportados."
     },
     "runs": {
       "options": "Opções",

@@ -2534,7 +2534,22 @@
       "vaultFileName": "Dosya adı",
       "vaultFileNameDefault": "Varsayılan, değişken anahtarıdır",
       "vaultFileBadge": "Dosya",
-      "vaultFileHint": "Değişken gizli değeri değil, dosyanın yolunu tutar: {fileFn} olarak ya da bir ortam değişkeninden yol okuyan bir araçla kullanın. {relExample} gibi göreli bir ad {base} altına yazılır; {homeExample} gibi {home} ile başlayan bir ad, çalıştırıcının ana dizinine konur."
+      "vaultFileHint": "Değişken gizli değeri değil, dosyanın yolunu tutar: {fileFn} olarak ya da bir ortam değişkeninden yol okuyan bir araçla kullanın. {relExample} gibi göreli bir ad {base} altına yazılır; {homeExample} gibi {home} ile başlayan bir ad, çalıştırıcının ana dizinine konur.",
+      "vaultFileContent": "Dosya içeriği",
+      "vaultFileContentField": "Tek alan",
+      "vaultFileContentTemplate": "Gizli değer üzerinde şablon",
+      "vaultFileContentFormat": "Gizli değerin tamamı",
+      "vaultFileTemplate": "Şablon",
+      "vaultFileTemplateHint": "{example} gibi her yer tutucu, bu tek Vault okumasındaki o alanla değiştirilir; noktalar bir map içine erişir. Filtreler: {filters}. Gizli değerin bir kirası varsa {lease} ve diğer kira alanları çalışır. Eklenen değerler asla yeniden genişletilmez.",
+      "vaultFileFormat": "Biçim",
+      "vaultFileFormatJson": "JSON nesnesi",
+      "vaultFileFormatEnv": "Env dosyası (KEY=\"value\" satırları)",
+      "vaultFileFields": "Alanlar (isteğe bağlı)",
+      "vaultFileFieldsHint": "Virgülle ayrılmış alan adları. Gizli değerin tamamını yazmak için boş bırakın.",
+      "vaultFileEncoding": "Kodlama",
+      "vaultFileEncodingNone": "Vault içinde saklandığı gibi",
+      "vaultFileEncodingBase64": "Base64 çöz",
+      "vaultFileEncodingHint": "Alanı yazmadan önce çözer. Sonuç metin olmalıdır; ikili dosyalar desteklenmez."
     },
     "runs": {
       "options": "Seçenekler",

@@ -132,6 +132,31 @@ resource "terrapod_variable" "gcp_credentials" {
   })
 }
 
+# A file built from several fields of ONE Vault read (see docs/vault.md,
+# "Templates, formats and encoding"): an AWS shared-credentials file from a
+# single aws/creds lease, so the key id and secret always belong together.
+# A template names no `field`. `{{ }}` is not Terraform interpolation, so it
+# needs no escaping inside jsonencode.
+resource "terrapod_variable" "aws_credentials_file" {
+  workspace_id = terrapod_workspace.app.id
+  key          = "AWS_SHARED_CREDENTIALS_FILE"
+  category     = "env"
+  value_source = "vault"
+  value = jsonencode({
+    engine = "dynamic"
+    mount  = "aws"
+    path   = "creds/deploy"
+    file = {
+      name     = "~/.aws/credentials"
+      template = <<-EOT
+        [default]
+        aws_access_key_id     = {{ access_key }}
+        aws_secret_access_key = {{ secret_key }}
+      EOT
+    }
+  })
+}
+
 # Read an existing workspace by name.
 data "terrapod_workspace" "shared" {
   name = "shared-network"
