@@ -389,7 +389,8 @@
         "register": "{count, plural, one {# module registreren} other {# modules registreren}}",
         "registering": "Bezig met registreren…",
         "failed": "Doorzoeken mislukt",
-        "ruleLink": "Maak een regel om nieuwe modules automatisch te registreren"
+        "ruleLink": "Maak een regel om nieuwe modules automatisch te registreren",
+        "orgNote": "Hier wordt alleen de eerste pagina met repositories getoond. Maak een regel aan om elke repository te dekken, ook later aangemaakte."
       },
       "versionCount": "{count, plural, one {# versie} other {# versies}}",
       "loadFailed": "Kan modules niet laden",
@@ -1119,7 +1120,69 @@
     "reasonNameTaken": "naam al in gebruik",
     "reasonMissingProvider": "geen provider",
     "confirmDelete": "Regel {name} verwijderen? De modules die ze registreerde blijven geregistreerd.",
-    "loadFailed": "Regels voor moduledetectie konden niet worden geladen"
+    "loadFailed": "Regels voor moduledetectie konden niet worden geladen",
+    "repoUrlHint": "Eén repository, een organisatie of groep (elke repository daarin), of een patroon over de repositories van één organisatie of groep, zoals {example}. Glob-tekens komen alleen in het laatste segment voor. Terrapod bepaalt bij het opslaan om welk type het gaat, en wijzigt dit daarna nooit zelf.",
+    "ownerPlaceholderHint": "Een regel die een organisatie of groep bestrijkt, kan ook <owner></owner> gebruiken: de eigenaar of groep van de repository.",
+    "targetKind": {
+      "repository": "Repository",
+      "namespace": "Organisatie of groep",
+      "pattern": "Patroon"
+    },
+    "attention": {
+      "badge": "Vereist aandacht",
+      "title": "{name} vereist aandacht",
+      "hint": "Een regel probeert het opnieuw bij de volgende registrypolling. Als het doel is verwijderd, bewerk de regel dan zodat deze ergens anders naar verwijst."
+    },
+    "repoStatus": {
+      "active": "actief",
+      "archived": "gearchiveerd",
+      "empty": "leeg",
+      "noBranch": "geen branch",
+      "outOfScope": "buiten bereik",
+      "covered": "gedekt",
+      "error": "fout"
+    },
+    "origin": {
+      "baseline": "baseline",
+      "new": "nieuw"
+    },
+    "paging": {
+      "page": "Pagina {page} van {pages}",
+      "previous": "Vorige",
+      "next": "Volgende"
+    },
+    "repositories": {
+      "open": "Repositories",
+      "title": "Repositories: {ruleName}",
+      "lastListed": "Laatst vermeld {time}",
+      "notListed": "Nog niet vermeld. De volgende registrypolling vermeldt de repositories van deze regel.",
+      "legend": "Baseline-repositories bestonden al voordat de regel werd aangemaakt, dus daarin wordt niets geregistreerd totdat u het kiest uit een voorbeeld. Nieuwe repositories zijn na de regel aangemaakt, dus hun modules worden automatisch geregistreerd.",
+      "filterLabel": "Status",
+      "filterAll": "Alle statussen",
+      "none": "Nog geen repositories.",
+      "noneWithStatus": "Geen repositories met deze status.",
+      "loadFailed": "Kan de repositories van de regel niet laden",
+      "repository": "Repository",
+      "status": "Status",
+      "origin": "Herkomst",
+      "candidates": "Kandidaten",
+      "lastChecked": "Laatst gecontroleerd",
+      "error": "Fout",
+      "renamed": "Hernoemd van",
+      "renamedFrom": "Hernoemd van {paths}",
+      "never": "nooit",
+      "candidateCount": "{count, plural, one {# module} other {# modules}}"
+    },
+    "grouped": {
+      "storedNote": "Wat de laatste registrypolling in elke repository heeft gevonden. Er wordt niets van de VCS-provider gelezen.",
+      "unsavedNote": "Een niet-opgeslagen regel leest telkens één pagina repositories tegelijk, live. Sla de regel op zodat de poller elke repository volgt.",
+      "incomplete": "Deze organisatie of groep heeft meer repositories dan Terrapod tegelijk vermeldt, dus sommige worden niet getoond.",
+      "selectRepository": "Elke module in {repository} selecteren",
+      "noCandidates": "Geen modules om hier te registreren.",
+      "repositoryError": "Kan deze repository niet lezen: {error}",
+      "confirmRegisterAll": "Elke module registreren die deze regel heeft gevonden? Modules die al zijn geregistreerd, of waarvan de naam al in gebruik is, worden overgeslagen.",
+      "scanRepositories": "{count, plural, one {# repository gescand.} other {# repositories gescand.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Bulkupdate",

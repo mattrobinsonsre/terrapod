@@ -389,7 +389,8 @@
         "register": "{count, plural, one {Registrar # módulo} other {Registrar # módulos}}",
         "registering": "Registrando…",
         "failed": "Error al examinar",
-        "ruleLink": "Crea una regla para registrar automáticamente los módulos nuevos"
+        "ruleLink": "Crea una regla para registrar automáticamente los módulos nuevos",
+        "orgNote": "Aquí solo se muestra la primera página de repositorios. Cree una regla para cubrir todos los repositorios, incluidos los que se creen más adelante."
       },
       "versionCount": "{count, plural, one {# versión} other {# versiones}}",
       "loadFailed": "No se pudieron cargar los módulos",
@@ -1119,7 +1120,69 @@
     "reasonNameTaken": "nombre ya usado",
     "reasonMissingProvider": "sin proveedor",
     "confirmDelete": "¿Eliminar la regla {name}? Los módulos que registró siguen registrados.",
-    "loadFailed": "No se pudieron cargar las reglas de descubrimiento de módulos"
+    "loadFailed": "No se pudieron cargar las reglas de descubrimiento de módulos",
+    "repoUrlHint": "Un repositorio, una organización o grupo (todos sus repositorios), o un patrón sobre los repositorios de una organización o grupo, como {example}. Los caracteres de glob solo van en el último segmento. Terrapod determina cuál es al guardar, y nunca lo cambia por sí mismo después.",
+    "ownerPlaceholderHint": "Una regla que cubre una organización o grupo también puede usar <owner></owner>: el propietario o grupo del repositorio.",
+    "targetKind": {
+      "repository": "Repositorio",
+      "namespace": "Organización o grupo",
+      "pattern": "Patrón"
+    },
+    "attention": {
+      "badge": "Requiere atención",
+      "title": "{name} requiere atención",
+      "hint": "Una regla vuelve a intentarlo en el siguiente sondeo del registro. Si su destino se eliminó, edite la regla para que apunte a otro lugar."
+    },
+    "repoStatus": {
+      "active": "activo",
+      "archived": "archivado",
+      "empty": "vacío",
+      "noBranch": "sin rama",
+      "outOfScope": "fuera de alcance",
+      "covered": "cubierto",
+      "error": "error"
+    },
+    "origin": {
+      "baseline": "referencia",
+      "new": "nuevo"
+    },
+    "paging": {
+      "page": "Página {page} de {pages}",
+      "previous": "Anterior",
+      "next": "Siguiente"
+    },
+    "repositories": {
+      "open": "Repositorios",
+      "title": "Repositorios: {ruleName}",
+      "lastListed": "Listados por última vez {time}",
+      "notListed": "Aún no se ha listado. El próximo sondeo del registro listará los repositorios de esta regla.",
+      "legend": "Los repositorios de referencia existían antes de la regla, así que nada en ellos se registra hasta que lo elija desde una vista previa. Los repositorios nuevos se crearon después de la regla, así que sus módulos se registran automáticamente.",
+      "filterLabel": "Estado",
+      "filterAll": "Todos los estados",
+      "none": "Aún no hay repositorios.",
+      "noneWithStatus": "No hay repositorios con este estado.",
+      "loadFailed": "No se pudieron cargar los repositorios de la regla",
+      "repository": "Repositorio",
+      "status": "Estado",
+      "origin": "Origen",
+      "candidates": "Candidatos",
+      "lastChecked": "Última comprobación",
+      "error": "Error",
+      "renamed": "Renombrado desde",
+      "renamedFrom": "Renombrado desde {paths}",
+      "never": "nunca",
+      "candidateCount": "{count, plural, one {# módulo} other {# módulos}}"
+    },
+    "grouped": {
+      "storedNote": "Lo que encontró el último sondeo del registro en cada repositorio. No se lee nada del proveedor de VCS.",
+      "unsavedNote": "Una regla sin guardar lee una página de repositorios a la vez, en vivo. Guárdela para que el sondeo siga todos los repositorios.",
+      "incomplete": "Esta organización o grupo tiene más repositorios de los que Terrapod lista a la vez, así que no se muestran todos.",
+      "selectRepository": "Seleccionar todos los módulos de {repository}",
+      "noCandidates": "No hay módulos que registrar aquí.",
+      "repositoryError": "No se pudo leer este repositorio: {error}",
+      "confirmRegisterAll": "¿Registrar todos los módulos que ha encontrado esta regla? Se omiten los módulos ya registrados o cuyo nombre ya está en uso.",
+      "scanRepositories": "{count, plural, one {Se examinó # repositorio.} other {Se examinaron # repositorios.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Actualización masiva",

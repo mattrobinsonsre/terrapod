@@ -389,7 +389,8 @@
         "register": "{count, plural, one {# modulum inscribe} other {# modulos inscribe}}",
         "registering": "Inscribitur…",
         "failed": "Perscrutatio defecit",
-        "ruleLink": "Crea regulam ut novi moduli sponte inscribantur"
+        "ruleLink": "Crea regulam ut novi moduli sponte inscribantur",
+        "orgNote": "Hic sola prima pagina repositoriorum monstratur. Regulam crea ut omne repositorium comprehendas, etiam ea postea creata."
       },
       "versionCount": "{count, plural, one {# versio} other {# versiones}}",
       "loadFailed": "Moduli onerari non potuerunt",
@@ -1119,7 +1120,69 @@
     "reasonNameTaken": "nomen iam tenetur",
     "reasonMissingProvider": "nullus provisor",
     "confirmDelete": "Delere regulam {name}? Moduli quos inscripsit inscripti manent.",
-    "loadFailed": "Regulae modulos inveniendi onerari non potuerunt"
+    "loadFailed": "Regulae modulos inveniendi onerari non potuerunt",
+    "repoUrlHint": "Unum repositorium, coetus (omnia eius repositoria), aut exemplar super repositoria unius coetus, ut {example}. Signa globi in ultimo segmento tantum sunt. Terrapod cum servas dinoscit quodnam, et id sua sponte numquam mutat.",
+    "ownerPlaceholderHint": "Regula quae coetum comprehendit etiam <owner></owner> uti potest: dominum aut coetum repositorii.",
+    "targetKind": {
+      "repository": "Repositorium",
+      "namespace": "Coetus",
+      "pattern": "Exemplar"
+    },
+    "attention": {
+      "badge": "Attentionem requirit",
+      "title": "{name} attentionem requirit",
+      "hint": "Regula in proxima interrogatione registri iterum temptat. Si eius destinatum deletum est, regulam redige ut alio dirigatur."
+    },
+    "repoStatus": {
+      "active": "activum",
+      "archived": "in tabulario repositum",
+      "empty": "vacuum",
+      "noBranch": "nullus ramus",
+      "outOfScope": "extra ambitum",
+      "covered": "comprehensum",
+      "error": "error"
+    },
+    "origin": {
+      "baseline": "fundamentale",
+      "new": "novum"
+    },
+    "paging": {
+      "page": "Pagina {page} ex {pages}",
+      "previous": "Prior",
+      "next": "Proxima"
+    },
+    "repositories": {
+      "open": "Repositoria",
+      "title": "Repositoria: {ruleName}",
+      "lastListed": "Ultimo enumerata {time}",
+      "notListed": "Nondum enumerata. Proxima interrogatio registri repositoria huius regulae enumerat.",
+      "legend": "Repositoria fundamentalia ante regulam exstiterunt, ergo nihil in eis inscribitur nisi ex praevisione elegeris. Repositoria nova post regulam creata sunt, ergo eorum moduli sponte inscribuntur.",
+      "filterLabel": "Status",
+      "filterAll": "Omnes status",
+      "none": "Nulla adhuc repositoria.",
+      "noneWithStatus": "Nulla repositoria hoc statu.",
+      "loadFailed": "Repositoria regulae onerari non potuerunt",
+      "repository": "Repositorium",
+      "status": "Status",
+      "origin": "Origo",
+      "candidates": "Candidati",
+      "lastChecked": "Ultimo inspectum",
+      "error": "Error",
+      "renamed": "Renominatum ex",
+      "renamedFrom": "Renominatum ex {paths}",
+      "never": "numquam",
+      "candidateCount": "{count, plural, one {# modulus} other {# moduli}}"
+    },
+    "grouped": {
+      "storedNote": "Quod ultima interrogatio registri in quoque repositorio invenit. Nihil ex provisore VCS legitur.",
+      "unsavedNote": "Regula non servata unam paginam repositoriorum simul legit, vivo modo. Serva eam ut interrogatio omne repositorium sequatur.",
+      "incomplete": "Hic coetus plura repositoria habet quam Terrapod simul enumerat, ergo quaedam non monstrantur.",
+      "selectRepository": "Omnem modulum in {repository} elige",
+      "noCandidates": "Nulli moduli hic inscribendi.",
+      "repositoryError": "Hoc repositorium legi non potuit: {error}",
+      "confirmRegisterAll": "Omnes modulos quos haec regula invenit inscribere? Moduli iam inscripti, aut quorum nomen iam tenetur, omittuntur.",
+      "scanRepositories": "{count, plural, one {# repositorium scansum est.} other {# repositoria scansa sunt.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Renovatio Massalis",

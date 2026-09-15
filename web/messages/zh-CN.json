@@ -389,7 +389,8 @@
         "register": "{count, plural, one {注册 # 个模块} other {注册 # 个模块}}",
         "registering": "正在注册…",
         "failed": "扫描失败",
-        "ruleLink": "创建规则以自动注册新模块"
+        "ruleLink": "创建规则以自动注册新模块",
+        "orgNote": "此处仅显示第一页仓库。创建规则可覆盖每个仓库，包括之后创建的仓库。"
       },
       "versionCount": "{count, plural, one {# 个版本} other {# 个版本}}",
       "loadFailed": "加载模块失败",
@@ -1119,7 +1120,69 @@
     "reasonNameTaken": "名称已被使用",
     "reasonMissingProvider": "无提供者",
     "confirmDelete": "删除规则 {name}？它注册的模块仍保持注册状态。",
-    "loadFailed": "无法加载模块自动发现规则"
+    "loadFailed": "无法加载模块自动发现规则",
+    "repoUrlHint": "一个仓库、一个组织或群组（其中的每个仓库），或针对某个组织或群组仓库的模式，例如 {example}。通配符只能出现在最后一段。Terrapod 会在您保存时判断类型，之后不会自行更改。",
+    "ownerPlaceholderHint": "覆盖某个组织或群组的规则还可以使用 <owner></owner>：即仓库的所有者或群组。",
+    "targetKind": {
+      "repository": "仓库",
+      "namespace": "组织或群组",
+      "pattern": "模式"
+    },
+    "attention": {
+      "badge": "需要关注",
+      "title": "{name} 需要关注",
+      "hint": "规则会在下一次注册表轮询时重试。如果其目标已被删除，请编辑该规则使其指向其他位置。"
+    },
+    "repoStatus": {
+      "active": "活动",
+      "archived": "已归档",
+      "empty": "空",
+      "noBranch": "无分支",
+      "outOfScope": "不在范围内",
+      "covered": "已覆盖",
+      "error": "错误"
+    },
+    "origin": {
+      "baseline": "基线",
+      "new": "新增"
+    },
+    "paging": {
+      "page": "第 {page} 页，共 {pages} 页",
+      "previous": "上一页",
+      "next": "下一页"
+    },
+    "repositories": {
+      "open": "仓库",
+      "title": "仓库：{ruleName}",
+      "lastListed": "上次列出于 {time}",
+      "notListed": "尚未列出。下一次注册表轮询会列出此规则的仓库。",
+      "legend": "基线仓库在规则创建之前就已存在，因此其中的内容在您从预览中选择之前不会注册。新增仓库是在规则创建之后创建的，其模块会自动注册。",
+      "filterLabel": "状态",
+      "filterAll": "所有状态",
+      "none": "暂无仓库。",
+      "noneWithStatus": "没有处于此状态的仓库。",
+      "loadFailed": "加载该规则的仓库失败",
+      "repository": "仓库",
+      "status": "状态",
+      "origin": "来源",
+      "candidates": "候选项",
+      "lastChecked": "上次检查",
+      "error": "错误",
+      "renamed": "重命名自",
+      "renamedFrom": "重命名自 {paths}",
+      "never": "从不",
+      "candidateCount": "{count, plural, other {# 个模块}}"
+    },
+    "grouped": {
+      "storedNote": "上一次注册表轮询在每个仓库中发现的内容。不会从 VCS 提供程序读取任何内容。",
+      "unsavedNote": "未保存的规则每次实时读取一页仓库。保存后轮询器将跟踪每个仓库。",
+      "incomplete": "此组织或群组的仓库数量超出了 Terrapod 一次列出的上限，因此部分仓库未显示。",
+      "selectRepository": "选择 {repository} 中的所有模块",
+      "noCandidates": "此处没有可注册的模块。",
+      "repositoryError": "无法读取此仓库：{error}",
+      "confirmRegisterAll": "注册此规则找到的所有模块？已注册的模块，或名称已被占用的模块，将被跳过。",
+      "scanRepositories": "{count, plural, other {已扫描 # 个仓库。}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "批量更新",

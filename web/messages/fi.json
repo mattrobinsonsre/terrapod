@@ -389,7 +389,8 @@
         "register": "{count, plural, one {Rekisteröi # moduuli} other {Rekisteröi # moduulia}}",
         "registering": "Rekisteröidään…",
         "failed": "Haku epäonnistui",
-        "ruleLink": "Luo sääntö, joka rekisteröi uudet moduulit automaattisesti"
+        "ruleLink": "Luo sääntö, joka rekisteröi uudet moduulit automaattisesti",
+        "orgNote": "Täällä näytetään vain repositorioiden ensimmäinen sivu. Luo sääntö kattaaksesi kaikki repositoriot, myös myöhemmin luotavat."
       },
       "versionCount": "{count, plural, one {# versio} other {# versiota}}",
       "loadFailed": "Moduulien lataaminen epäonnistui",
@@ -1119,7 +1120,69 @@
     "reasonNameTaken": "nimi on jo käytössä",
     "reasonMissingProvider": "ei provideria",
     "confirmDelete": "Poistetaanko sääntö {name}? Sen rekisteröimät moduulit pysyvät rekisteröityinä.",
-    "loadFailed": "Moduulien tunnistussääntöjen lataaminen epäonnistui"
+    "loadFailed": "Moduulien tunnistussääntöjen lataaminen epäonnistui",
+    "repoUrlHint": "Yksi repositorio, organisaatio tai ryhmä (kaikki sen repositoriot) tai kuvio organisaation tai ryhmän repositorioille, esimerkiksi {example}. Glob-merkit sallitaan vain viimeisessä osassa. Terrapod päättelee kumpi tarkoitetaan tallennushetkellä, eikä muuta sitä koskaan itse.",
+    "ownerPlaceholderHint": "Sääntö, joka kattaa organisaation tai ryhmän, voi käyttää myös merkintää <owner></owner>: repositorion omistaja tai ryhmä.",
+    "targetKind": {
+      "repository": "Repositorio",
+      "namespace": "Organisaatio tai ryhmä",
+      "pattern": "Kuvio"
+    },
+    "attention": {
+      "badge": "Vaatii huomiota",
+      "title": "{name} vaatii huomiota",
+      "hint": "Sääntö yrittää uudelleen seuraavassa rekisterikyselyssä. Jos sen kohde on poistettu, muokkaa sääntöä osoittamaan johonkin muualle."
+    },
+    "repoStatus": {
+      "active": "aktiivinen",
+      "archived": "arkistoitu",
+      "empty": "tyhjä",
+      "noBranch": "ei haaraa",
+      "outOfScope": "rajauksen ulkopuolella",
+      "covered": "katettu",
+      "error": "virhe"
+    },
+    "origin": {
+      "baseline": "lähtötilanne",
+      "new": "uusi"
+    },
+    "paging": {
+      "page": "Sivu {page}/{pages}",
+      "previous": "Edellinen",
+      "next": "Seuraava"
+    },
+    "repositories": {
+      "open": "Repositoriot",
+      "title": "Repositoriot: {ruleName}",
+      "lastListed": "Listattu viimeksi {time}",
+      "notListed": "Ei vielä listattu. Seuraava rekisterikysely listaa tämän säännön repositoriot.",
+      "legend": "Lähtötilanteen repositoriot olivat olemassa ennen sääntöä, joten mikään niissä ei rekisteröidy, ennen kuin valitset sen esikatselusta. Uudet repositoriot luotiin säännön jälkeen, joten niiden moduulit rekisteröityvät automaattisesti.",
+      "filterLabel": "Tila",
+      "filterAll": "Kaikki tilat",
+      "none": "Ei vielä repositorioita.",
+      "noneWithStatus": "Ei repositorioita tällä tilalla.",
+      "loadFailed": "Säännön repositorioiden lataaminen epäonnistui",
+      "repository": "Repositorio",
+      "status": "Tila",
+      "origin": "Alkuperä",
+      "candidates": "Ehdokkaat",
+      "lastChecked": "Viimeksi tarkistettu",
+      "error": "Virhe",
+      "renamed": "Nimetty uudelleen kohteesta",
+      "renamedFrom": "Nimetty uudelleen kohteesta {paths}",
+      "never": "ei koskaan",
+      "candidateCount": "{count, plural, one {# moduuli} other {# moduulia}}"
+    },
+    "grouped": {
+      "storedNote": "Mitä viimeisin rekisterikysely löysi kustakin repositoriosta. Mitään ei lueta VCS-palveluntarjoajalta.",
+      "unsavedNote": "Tallentamaton sääntö lukee yhden sivun repositorioita kerrallaan, suoraan. Tallenna se, jotta kysely seuraa jokaista repositoriota.",
+      "incomplete": "Tässä organisaatiossa tai ryhmässä on enemmän repositorioita kuin Terrapod listaa kerralla, joten osaa ei näytetä.",
+      "selectRepository": "Valitse kaikki moduulit kohteesta {repository}",
+      "noCandidates": "Ei moduuleja rekisteröitäväksi täällä.",
+      "repositoryError": "Tätä repositoriota ei voitu lukea: {error}",
+      "confirmRegisterAll": "Rekisteröidäänkö kaikki tämän säännön löytämät moduulit? Jo rekisteröidyt moduulit tai moduulit, joiden nimi on varattu, ohitetaan.",
+      "scanRepositories": "{count, plural, one {Käytiin läpi # repositorio.} other {Käytiin läpi # repositoriota.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Massapäivitys",

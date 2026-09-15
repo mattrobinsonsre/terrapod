@@ -389,7 +389,8 @@
         "register": "{count, plural, one {# modülü kaydet} other {# modülü kaydet}}",
         "registering": "Kaydediliyor…",
         "failed": "Tarama başarısız oldu",
-        "ruleLink": "Yeni modülleri otomatik kaydetmek için bir kural oluşturun"
+        "ruleLink": "Yeni modülleri otomatik kaydetmek için bir kural oluşturun",
+        "orgNote": "Burada yalnızca depoların ilk sayfası gösterilir. Daha sonra oluşturulanlar dahil tüm depoları kapsamak için bir kural oluşturun."
       },
       "versionCount": "{count, plural, one {# sürüm} other {# sürüm}}",
       "loadFailed": "Modüller yüklenemedi",
@@ -1119,7 +1120,69 @@
     "reasonNameTaken": "ad zaten kullanılıyor",
     "reasonMissingProvider": "sağlayıcı yok",
     "confirmDelete": "{name} kuralı silinsin mi? Kaydettiği modüller kayıtlı kalır.",
-    "loadFailed": "Modül keşif kuralları yüklenemedi"
+    "loadFailed": "Modül keşif kuralları yüklenemedi",
+    "repoUrlHint": "Bir depo, bir org veya grup (içindeki tüm depolar) ya da bir org veya grubun depoları üzerinde bir desen, örneğin {example}. Glob karakterleri yalnızca son segmentte yer alabilir. Terrapod kaydettiğinizde hangisi olduğunu belirler ve bunu kendiliğinden asla değiştirmez.",
+    "ownerPlaceholderHint": "Bir org veya grubu kapsayan bir kural <owner></owner> öğesini de kullanabilir: deponun sahibi veya grubu.",
+    "targetKind": {
+      "repository": "Depo",
+      "namespace": "Org veya grup",
+      "pattern": "Desen"
+    },
+    "attention": {
+      "badge": "Dikkat gerekiyor",
+      "title": "{name} dikkat gerektiriyor",
+      "hint": "Kural bir sonraki kayıt defteri yoklamasında tekrar dener. Hedefi silinmişse, kuralı başka bir yeri gösterecek şekilde düzenleyin."
+    },
+    "repoStatus": {
+      "active": "etkin",
+      "archived": "arşivlendi",
+      "empty": "boş",
+      "noBranch": "dal yok",
+      "outOfScope": "kapsam dışı",
+      "covered": "kapsanıyor",
+      "error": "hata"
+    },
+    "origin": {
+      "baseline": "başlangıç",
+      "new": "yeni"
+    },
+    "paging": {
+      "page": "Sayfa {page} / {pages}",
+      "previous": "Önceki",
+      "next": "Sonraki"
+    },
+    "repositories": {
+      "open": "Depolar",
+      "title": "Depolar: {ruleName}",
+      "lastListed": "Son listelenme {time}",
+      "notListed": "Henüz listelenmedi. Bir sonraki kayıt defteri yoklaması bu kuralın depolarını listeler.",
+      "legend": "Başlangıç depoları kuraldan önce vardı, bu yüzden onlardan bir tanesini önizlemeden seçmedikçe hiçbiri kaydedilmez. Yeni depolar kuraldan sonra oluşturuldu, bu yüzden modülleri otomatik olarak kaydedilir.",
+      "filterLabel": "Durum",
+      "filterAll": "Tüm durumlar",
+      "none": "Henüz depo yok.",
+      "noneWithStatus": "Bu durumda depo yok.",
+      "loadFailed": "Kuralın depoları yüklenemedi",
+      "repository": "Depo",
+      "status": "Durum",
+      "origin": "Köken",
+      "candidates": "Adaylar",
+      "lastChecked": "Son kontrol",
+      "error": "Hata",
+      "renamed": "Şuradan yeniden adlandırıldı",
+      "renamedFrom": "{paths} konumundan yeniden adlandırıldı",
+      "never": "hiç",
+      "candidateCount": "{count, plural, one {# modül} other {# modül}}"
+    },
+    "grouped": {
+      "storedNote": "Son kayıt defteri yoklamasının her depoda bulduğu şey. VCS sağlayıcısından hiçbir şey okunmaz.",
+      "unsavedNote": "Kaydedilmemiş bir kural, depoları anlık olarak bir seferde bir sayfa okur. Yoklamanın tüm depoları izlemesi için kuralı kaydedin.",
+      "incomplete": "Bu org veya grubun Terrapod''un bir seferde listelediğinden daha fazla deposu var, bu yüzden bazıları gösterilmiyor.",
+      "selectRepository": "{repository} içindeki tüm modülleri seç",
+      "noCandidates": "Burada kaydedilecek modül yok.",
+      "repositoryError": "Bu depo okunamadı: {error}",
+      "confirmRegisterAll": "Bu kuralın bulduğu tüm modüller kaydedilsin mi? Zaten kayıtlı olan veya adı alınmış modüller atlanır.",
+      "scanRepositories": "{count, plural, one {# depo tarandı.} other {# depo tarandı.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Toplu Güncelleme",

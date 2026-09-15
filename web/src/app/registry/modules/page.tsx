@@ -34,9 +34,13 @@ interface Module {
   }
 }
 
-// A one-off scan of one repository (#1584), through the unsaved-rule preview of
-// module autodiscovery: proposals, nothing registered.
+// A one-off scan (#1584), through the unsaved-rule preview of module
+// autodiscovery: proposals, nothing registered. The URL may name an org, group
+// or pattern too (#1620); then the preview covers its first page of
+// repositories, and each candidate says which repository it is in.
 interface DiscoveryCandidate {
+  repository?: string
+  'repo-url'?: string
   subdirectory: string
   name: string
   provider: string
@@ -47,7 +51,13 @@ interface DiscoveryCandidate {
 
 interface Discovery {
   repoUrl: string
+  kind: string
   candidates: DiscoveryCandidate[]
+}
+
+// A candidate's identity: two repositories can both have `modules/x`.
+function discKey(c: DiscoveryCandidate): string {
+  return `${c.repository ?? ''}|${c.subdirectory}`
 }
 
 // Every Terraform file in the repository; the preview narrows to module files.
@@ -186,10 +196,14 @@ export default function ModulesPage() {
       })
       if (!res.ok) throw new Error(await parseApiError(res, t('modules.discover.failed')))
       const data = await res.json()
-      const result: Discovery = { repoUrl, candidates: data.data.attributes.entries ?? [] }
+      const result: Discovery = {
+        repoUrl,
+        kind: data.data.attributes['target-kind'] ?? 'repository',
+        candidates: data.data.attributes.entries ?? [],
+      }
       const picks: Record<string, DiscoveryPick> = {}
       for (const c of result.candidates) {
-        picks[c.subdirectory] = { selected: false, name: c.name, provider: c.provider }
+        picks[discKey(c)] = { selected: false, name: c.name, provider: c.provider }
       }
       setDiscResult(result)
       setDiscPicks(picks)
@@ -208,13 +222,14 @@ export default function ModulesPage() {
     setError('')
     const failures: string[] = []
     for (const c of discResult.candidates) {
-      const pick = discPicks[c.subdirectory]
+      const pick = discPicks[discKey(c)]
       if (!pick?.selected || c['registered-as']) continue
       const attributes: Record<string, unknown> = {
         name: pick.name.trim(),
         provider: pick.provider.trim(),
         'vcs-connection-id': discConnectionId,
-        'vcs-repo-url': discResult.repoUrl,
+        // The candidate's own repository: for an org or pattern it is not the URL typed.
+        'vcs-repo-url': c['repo-url'] || discResult.repoUrl,
         'vcs-branch': discBranch.trim(),
         'vcs-tag-pattern': 'v*',
       }
@@ -225,8 +240,7 @@ export default function ModulesPage() {
         body: JSON.stringify({ data: { type: 'registry-modules', attributes } }),
       })
       if (!res.ok) {
-        const where = c.subdirectory || t('modules.discover.root')
-        failures.push(`${where}: ${await parseApiError(res, t('modules.createFailed'))}`)
+        failures.push(`${discWhere(c)}: ${await parseApiError(res, t('modules.createFailed'))}`)
       }
     }
     setDiscRegistering(false)
@@ -235,12 +249,20 @@ export default function ModulesPage() {
     if (failures.length) setError(failures.join(' · '))
   }
 
+  // Where a candidate is: its directory, prefixed by its repository when the
+  // scan covered more than one.
+  function discWhere(c: DiscoveryCandidate): string {
+    const dir = c.subdirectory || t('modules.discover.root')
+    if (!c.repository || discResult?.kind === 'repository') return dir
+    return c.subdirectory ? `${c.repository}/${c.subdirectory}` : `${c.repository} ${dir}`
+  }
+
   const discSelected = discResult
-    ? discResult.candidates.filter((c) => discPicks[c.subdirectory]?.selected && !c['registered-as'])
+    ? discResult.candidates.filter((c) => discPicks[discKey(c)]?.selected && !c['registered-as'])
     : []
   const discReady =
     discSelected.length > 0 &&
-    discSelected.every((c) => discPicks[c.subdirectory].name.trim() && discPicks[c.subdirectory].provider.trim())
+    discSelected.every((c) => discPicks[discKey(c)].name.trim() && discPicks[discKey(c)].provider.trim())
   const canDiscover = isAdmin()
 
   // Modules that share a repository — a root module and its submodules
@@ -393,17 +415,21 @@ export default function ModulesPage() {
             {discResult && discResult.candidates.length === 0 && (
               <p className="text-sm text-slate-400">{t('modules.discover.none')}</p>
             )}
+            {discResult && discResult.kind !== 'repository' && (
+              <p className="text-xs text-amber-300">{t('modules.discover.orgNote')}</p>
+            )}
             {discResult && discResult.candidates.length > 0 && (
               <>
                 <ul className="space-y-2">
                   {discResult.candidates.map((c) => {
-                    const pick = discPicks[c.subdirectory]
+                    const key = discKey(c)
+                    const pick = discPicks[key]
                     const registered = c['registered-as']
-                    const where = c.subdirectory || t('modules.discover.root')
+                    const where = discWhere(c)
                     const setPick = (patch: Partial<DiscoveryPick>) =>
-                      setDiscPicks({ ...discPicks, [c.subdirectory]: { ...pick, ...patch } })
+                      setDiscPicks({ ...discPicks, [key]: { ...pick, ...patch } })
                     return (
-                      <li key={c.subdirectory} className="rounded-lg border border-slate-700/50 p-3 space-y-2">
+                      <li key={key} className="rounded-lg border border-slate-700/50 p-3 space-y-2">
                         <label className="flex items-center gap-3 min-h-11 cursor-pointer">
                           <input
                             type="checkbox"
@@ -428,9 +454,9 @@ export default function ModulesPage() {
                               <p className="sm:col-span-2 text-xs text-amber-300">{tRule('needsProvider')}</p>
                             )}
                             <div>
-                              <label htmlFor={`disc-name-${c.subdirectory}`} className="block text-xs text-slate-400 mb-1">{t('modules.form.name')}</label>
+                              <label htmlFor={`disc-name-${key}`} className="block text-xs text-slate-400 mb-1">{t('modules.form.name')}</label>
                               <input
-                                id={`disc-name-${c.subdirectory}`}
+                                id={`disc-name-${key}`}
                                 type="text"
                                 value={pick?.name ?? ''}
                                 onChange={(e) => setPick({ name: e.target.value })}
@@ -439,9 +465,9 @@ export default function ModulesPage() {
                               />
                             </div>
                             <div>
-                              <label htmlFor={`disc-provider-${c.subdirectory}`} className="block text-xs text-slate-400 mb-1">{t('modules.form.provider')}</label>
+                              <label htmlFor={`disc-provider-${key}`} className="block text-xs text-slate-400 mb-1">{t('modules.form.provider')}</label>
                               <input
-                                id={`disc-provider-${c.subdirectory}`}
+                                id={`disc-provider-${key}`}
                                 type="text"
                                 value={pick?.provider ?? ''}
                                 onChange={(e) => setPick({ provider: e.target.value })}
