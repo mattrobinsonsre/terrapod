@@ -30,6 +30,9 @@ const ADMIN_LINKS = [
   // materialises its state — and therefore its secrets — into a workspace
   // the caller can then read.
   '/admin/deleted-workspaces',
+  // A rule reads repositories with the platform's VCS credentials and
+  // registers modules on its own authority (#1584).
+  '/admin/module-autodiscovery',
 ];
 
 test.describe('RBAC — regular user is blocked from admin', () => {
@@ -54,6 +57,21 @@ test.describe('RBAC — regular user is blocked from admin', () => {
     await expect(page.getByRole('button', { name: /add user|create user|new user/i })).toHaveCount(
       0,
     );
+  });
+
+  test('direct navigation to module autodiscovery is turned away (#1584)', async ({ page }) => {
+    // Every rules endpoint is admin-only, and the page sends a non-admin home
+    // before it renders anything: no rules list, no create form, no scan.
+    let rulesRequested = false;
+    page.on('request', (req) => {
+      if (new URL(req.url()).pathname.startsWith('/api/terrapod/v1/module-autodiscovery-rules')) {
+        rulesRequested = true;
+      }
+    });
+    await page.goto('/admin/module-autodiscovery');
+    await expect(page).not.toHaveURL(/\/admin\/module-autodiscovery/, { timeout: 15_000 });
+    await expect(page.locator('#mar-name')).toHaveCount(0);
+    expect(rulesRequested).toBe(false);
   });
 });
 

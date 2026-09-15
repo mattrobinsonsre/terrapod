@@ -37,6 +37,8 @@ interface WorkspacePermissions {
   // Plan-only vs apply are separate grants, so the UI needs both to know
   // whether to offer the apply button at all (#1340).
   'can-queue-apply'?: boolean
+  // Destroy runs are a separate grant again (run:apply-destroy, #1634).
+  'can-queue-destroy'?: boolean
   'can-read-state-versions': boolean
   'can-create-state-versions': boolean
   'can-read-variable': boolean
@@ -3302,7 +3304,10 @@ function WorkspaceDetailContent() {
                   >
                     {showPlanOptions ? t('runs.hideOptions') : t('runs.options')}
                   </button>
-                  {!showDestroyConfirm ? (
+                  {/* A destroy is its own grant (run:apply-destroy): offering it
+                      on can-queue-run alone showed plan-level users a button
+                      the API refuses (#1634). */}
+                  {perms['can-queue-destroy'] && (!showDestroyConfirm ? (
                     <button
                       onClick={() => setShowDestroyConfirm(true)}
                       disabled={queueingDestroy || attrs.locked}
@@ -3328,7 +3333,7 @@ function WorkspaceDetailContent() {
                         {queueingDestroy ? t('actions.queuing') : t('runs.confirmDestroy')}
                       </button>
                     </div>
-                  )}
+                  ))}
                   {/* Two buttons, not a button plus a hidden checkbox (#1340).
                       Plan-vs-apply is the decision that matters every time, so
                       it is made by which button you press; the options panel

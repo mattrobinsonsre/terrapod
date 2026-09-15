@@ -339,33 +339,88 @@ func sameConnection(a, b string) bool {
 	return strings.TrimPrefix(a, "vcs-") == strings.TrimPrefix(b, "vcs-")
 }
 
-// readIntoModel copies the server's rule into the model. The VCS connection
-// keeps the form it was configured in when it names the same connection, so a
-// bare UUID in configuration does not drift against the server's prefixed id.
+// normalizeTagPattern mirrors the server: surrounding whitespace is dropped and
+// an empty tag pattern means "v*".
+func normalizeTagPattern(s string) string {
+	if t := strings.TrimSpace(s); t != "" {
+		return t
+	}
+	return "v*"
+}
+
+// normalizeIgnorePatterns mirrors the server: entries are trimmed and blank
+// ones dropped.
+func normalizeIgnorePatterns(ps []string) []string {
+	out := []string{}
+	for _, p := range ps {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// keepForm returns the value already in the model (the plan on Create/Update,
+// the prior state on Read) when it normalises to what the server returned,
+// otherwise the server's value. The server tidies several fields — trimming
+// whitespace, defaulting an empty tag pattern to "v*" — and writing its tidied
+// value over a configured one fails the apply as "Provider produced
+// inconsistent result after apply" (#1634).
+func keepForm(current types.String, server string, norm func(string) string) types.String {
+	if !current.IsNull() && !current.IsUnknown() && norm(current.ValueString()) == norm(server) {
+		return current
+	}
+	return types.StringValue(server)
+}
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// readIntoModel copies the server's rule into the model. Each field keeps the
+// form it was configured in when the server's value is that form normalised:
+// a bare UUID for the prefixed VCS connection id, padded strings the server
+// trims, an empty tag pattern it stores as "v*", blank ignore patterns it drops.
 func readIntoModel(ctx context.Context, rule *terrapod.ModuleAutodiscoveryRule, m *moduleRuleModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.ID = types.StringValue(rule.ID)
-	m.Name = types.StringValue(rule.Name)
+	m.Name = keepForm(m.Name, rule.Name, strings.TrimSpace)
 	if m.VCSConnectionID.IsNull() || m.VCSConnectionID.IsUnknown() ||
 		!sameConnection(m.VCSConnectionID.ValueString(), rule.VCSConnectionID) {
 		m.VCSConnectionID = types.StringValue(rule.VCSConnectionID)
 	}
-	m.RepoURL = types.StringValue(rule.RepoURL)
-	m.Branch = types.StringValue(rule.Branch)
-	m.Pattern = types.StringValue(rule.Pattern)
+	m.RepoURL = keepForm(m.RepoURL, rule.RepoURL, strings.TrimSpace)
+	m.Branch = keepForm(m.Branch, rule.Branch, strings.TrimSpace)
+	m.Pattern = keepForm(m.Pattern, rule.Pattern, strings.TrimSpace)
 
 	ignore := rule.IgnorePatterns
 	if ignore == nil {
 		ignore = []string{}
 	}
-	lv, d := types.ListValueFrom(ctx, types.StringType, ignore)
-	diags.Append(d...)
-	m.IgnorePatterns = lv
+	keepIgnore := false
+	if !m.IgnorePatterns.IsNull() && !m.IgnorePatterns.IsUnknown() {
+		configured := []string{}
+		diags.Append(m.IgnorePatterns.ElementsAs(ctx, &configured, false)...)
+		keepIgnore = sameStrings(normalizeIgnorePatterns(configured), normalizeIgnorePatterns(ignore))
+	}
+	if !keepIgnore {
+		lv, d := types.ListValueFrom(ctx, types.StringType, ignore)
+		diags.Append(d...)
+		m.IgnorePatterns = lv
+	}
 
 	m.Enabled = types.BoolValue(rule.Enabled)
 	m.NameTemplate = types.StringValue(rule.NameTemplate)
-	m.Provider = types.StringValue(rule.Provider)
-	m.VCSTagPattern = types.StringValue(rule.VCSTagPattern)
+	m.Provider = keepForm(m.Provider, rule.Provider, strings.TrimSpace)
+	m.VCSTagPattern = keepForm(m.VCSTagPattern, rule.VCSTagPattern, normalizeTagPattern)
 
 	labels := rule.Labels
 	if labels == nil {
@@ -375,7 +430,7 @@ func readIntoModel(ctx context.Context, rule *terrapod.ModuleAutodiscoveryRule, 
 	diags.Append(d...)
 	m.Labels = mv
 
-	m.OwnerEmail = types.StringValue(rule.OwnerEmail)
+	m.OwnerEmail = keepForm(m.OwnerEmail, rule.OwnerEmail, strings.TrimSpace)
 	m.FirstScanAt = types.StringValue(rule.FirstScanAt)
 	m.LastScannedSHA = types.StringValue(rule.LastScannedSHA)
 	m.CreatedAt = types.StringValue(rule.CreatedAt)

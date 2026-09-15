@@ -9,6 +9,8 @@ The fix reuses the workspace's latest uploaded config-version when there is no
 VCS to re-fetch.
 """
 
+import io
+import tarfile
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -129,3 +131,77 @@ class TestModuleCommentUsesTheSnapshottedResult:
         assert _UNSET is not None
         assert {"has_changes": None}.get("has_changes", _UNSET) is None
         assert {}.get("has_changes", _UNSET) is _UNSET
+
+
+def _tar_gz(files: dict[str, bytes]) -> bytes:
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+        for name, data in files.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tf.addfile(info, io.BytesIO(data))
+    return buf.getvalue()
+
+
+def _member_names(archive: bytes) -> set[str]:
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tf:
+        return {m.name for m in tf.getmembers() if m.isfile()}
+
+
+class TestSubmoduleScoping:
+    """A submodule's PR is tested as it is published (#1583): only its own
+    subdirectory, re-rooted, goes into the override tarball — not the whole
+    repository. The VCS download is patched; the archive handling is real."""
+
+    # The provider's archive wraps everything in one top-level directory.
+    ARCHIVE = _tar_gz(
+        {
+            "org-repo-abc123/main.tf": b"# root",
+            "org-repo-abc123/modules/create/main.tf": b"# create",
+            "org-repo-abc123/modules/create/variables.tf": b"# vars",
+            # Shares a string prefix with modules/create; must not leak in.
+            "org-repo-abc123/modules/create-extra/main.tf": b"# extra",
+        }
+    )
+
+    async def _run(self, subdirectory: str):
+        module = MagicMock()
+        module.namespace, module.name, module.provider = "default", "mg", "azurerm"
+        module.subdirectory = subdirectory
+        module.workspace_links = []
+        pr = MagicMock()
+        pr.number, pr.head_sha = 7, "abc123def456"
+        storage = MagicMock()
+        storage.put = AsyncMock()
+        db = AsyncMock()
+        with patch.object(
+            module_impact_service, "_download_archive", new=AsyncMock(return_value=self.ARCHIVE)
+        ):
+            await module_impact_service._create_module_test_runs(
+                db, storage, module, MagicMock(provider="github"), "org", "repo", pr
+            )
+        return storage, db
+
+    async def test_a_submodule_pr_archive_is_re_rooted_at_its_subdirectory(self):
+        from terrapod.storage.keys import module_override_key
+
+        storage, _ = await self._run("modules/create")
+        storage.put.assert_awaited_once()
+        key, archive = storage.put.await_args.args[:2]
+        assert key == module_override_key("abc123def456", "default", "mg", "azurerm")
+        assert _member_names(archive) == {"main.tf", "variables.tf"}
+
+    async def test_nothing_under_the_subdirectory_means_no_override_and_no_runs(self):
+        storage, db = await self._run("modules/gone")
+        storage.put.assert_not_awaited()
+        db.execute.assert_not_awaited()
+
+    async def test_a_root_module_takes_the_whole_repository(self):
+        storage, _ = await self._run("")
+        _, archive = storage.put.await_args.args[:2]
+        assert _member_names(archive) == {
+            "main.tf",
+            "modules/create/main.tf",
+            "modules/create/variables.tf",
+            "modules/create-extra/main.tf",
+        }
