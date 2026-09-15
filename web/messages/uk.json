@@ -515,7 +515,7 @@
       },
       "interface": {
         "title": "Входи та виходи",
-        "counts": "{inputs} входів, {outputs} виходів",
+        "counts": "{inputs, plural, one {# вхід} few {# входи} many {# входів} other {# входу}}, {outputs, plural, one {# вихід} few {# виходи} many {# виходів} other {# виходу}}",
         "versionLabel": "Версія:",
         "noData": "Дані інтерфейсу для цієї версії недоступні.",
         "inputs": "Входи",

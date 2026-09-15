@@ -515,7 +515,7 @@
       },
       "interface": {
         "title": "Inputs & Outputs",
-        "counts": "{inputs} inputs, {outputs} outputs",
+        "counts": "{inputs, plural, one {# input} other {# inputs}}, {outputs, plural, one {# output} other {# outputs}}",
         "versionLabel": "Version:",
         "noData": "No interface data available for this version.",
         "inputs": "Inputs",

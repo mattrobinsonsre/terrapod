@@ -515,7 +515,7 @@
       },
       "interface": {
         "title": "المدخلات والمخرجات",
-        "counts": "{inputs} مدخلات، {outputs} مخرجات",
+        "counts": "{inputs, plural, one {مدخل واحد} two {مدخلان} few {# مدخلات} other {# مدخل}}، {outputs, plural, one {مخرج واحد} two {مخرجان} few {# مخرجات} other {# مخرج}}",
         "versionLabel": "الإصدار:",
         "noData": "لا تتوفر بيانات واجهة لهذا الإصدار.",
         "inputs": "المدخلات",

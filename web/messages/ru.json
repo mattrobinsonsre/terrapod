@@ -515,7 +515,7 @@
       },
       "interface": {
         "title": "Входы и выходы",
-        "counts": "{inputs} входов, {outputs} выходов",
+        "counts": "{inputs, plural, one {# вход} few {# входа} many {# входов} other {# входа}}, {outputs, plural, one {# выход} few {# выхода} many {# выходов} other {# выхода}}",
         "versionLabel": "Версия:",
         "noData": "Данные об интерфейсе для этой версии недоступны.",
         "inputs": "Входы",
