@@ -35,8 +35,15 @@ def _repo(tag: str) -> str:
 
 async def _seed_rule(tag: str, **rule_fields) -> tuple[uuid.UUID, uuid.UUID]:
     async with get_db_session() as db:
+        # (provider, github_installation_id) is unique, so a test seeding two
+        # connections needs distinct installation ids; derive one from the tag.
         conn = VCSConnection(
-            provider="github", name=f"conn-{tag}", server_url="", token="x", status="active"
+            provider="github",
+            name=f"conn-{tag}",
+            server_url="",
+            token="x",
+            status="active",
+            github_installation_id=int(tag[:7], 16),
         )
         db.add(conn)
         await db.flush()
