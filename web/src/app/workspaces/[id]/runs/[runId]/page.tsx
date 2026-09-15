@@ -18,6 +18,7 @@ import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
 import { useIsTouch } from '@/lib/use-media-query'
+import { createLogFollower, type LogFollower } from '@/lib/log-follower'
 import { ArrowDownToLine, RefreshCw, Download, Copy, Check, Palette } from 'lucide-react'
 
 // WebGL (three.js) — client-only, never SSR'd. Loaded on demand (#761).
@@ -119,6 +120,11 @@ interface PlanApply {
 // the run actually has them. Details holds the metadata / timeline / run
 // options / resource usage.
 type RunView = 'overview' | 'ai' | 'opa' | 'security' | 'impact' | 'cost' | 'plan' | 'apply' | 'details'
+
+// Run statuses in which the plan phase is over — the server's
+// `_POST_PLAN_STATES` for the plan log endpoint. The plan log is then only
+// waiting for its stored copy (#1591).
+const PLAN_PHASE_DONE = ['planned', 'confirmed', 'applying', 'applied', 'errored', 'discarded', 'canceled']
 
 const ansiConverter = new Convert({
   fg: '#cbd5e1',
@@ -683,15 +689,14 @@ function RunDetailPageInner() {
     { present: boolean; status?: string; blocking?: number; engine?: string } | null
   >(null)
 
-  // Offset tracking for incremental log fetching (byte position in raw log data)
-  const planLogOffset = useRef(0)
-  const applyLogOffset = useRef(0)
   // Cached log-read-url to avoid re-fetching plan/apply object each cycle
   const planLogUrl = useRef<string | null>(null)
   const applyLogUrl = useRef<string | null>(null)
-  // Lock to prevent concurrent fetches from racing on offsets
-  const planFetchLock = useRef(false)
-  const applyFetchLock = useRef(false)
+  // One follower per phase (#1591): owns the offset, the fetch serialisation,
+  // the live poll while the phase streams, and following a finished phase's
+  // log until the server marks it complete. See web/src/lib/log-follower.ts.
+  const planFollower = useRef<LogFollower | null>(null)
+  const applyFollower = useRef<LogFollower | null>(null)
 
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
@@ -861,37 +866,43 @@ function RunDetailPageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the callback is deliberately referentially stable — adding the loader would re-create it every render and churn the SSE subscription
   }, [runId, loadRun]))
 
+  // Each phase's follower is told where its phase is on every status change.
+  // `streaming` runs the incremental poll (#722): SSE `log_updated` events are
+  // the primary trigger, but they can be missed (dropped connection, coalesced
+  // bursts), so a cheap offset-based poll guarantees the client catches up.
+  // `finished` keeps fetching with a bounded backoff until the server sends
+  // the end-of-log marker (#1591): the stored log, with its tail, is uploaded
+  // after the run has already turned terminal, so one fetch at the transition
+  // usually lands before it and would otherwise never be repeated.
   useEffect(() => {
     if (!run) return
     const status = run.attributes.status
     if (['planning', 'planned', 'confirmed', 'applying', 'canceling', 'applied', 'errored', 'canceled', 'discarded'].includes(status)) {
+      getPlanFollower().setPhase(
+        status === 'planning' ? 'streaming' : PLAN_PHASE_DONE.includes(status) ? 'finished' : 'idle',
+      )
       setPlanLogLoading(prev => planLog === null ? true : prev)
       loadPlanLog(true).finally(() => setPlanLogLoading(false))
+    } else {
+      getPlanFollower().setPhase('idle')
     }
     if (['applying', 'canceling', 'applied', 'errored'].includes(status) && !run.attributes['plan-only']) {
+      getApplyFollower().setPhase(
+        status === 'applying' ? 'streaming' : status === 'canceling' ? 'idle' : 'finished',
+      )
       setApplyLogLoading(prev => applyLog === null ? true : prev)
       loadApplyLog(true).finally(() => setApplyLogLoading(false))
+    } else {
+      getApplyFollower().setPhase('idle')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed on the run's id + status — depending on the log state or the loaders would loop, since this effect is what sets them
   }, [run?.id, run?.attributes.status])
 
-  // Poll the streaming phase's log on a short interval (#722). SSE
-  // `log_updated` events are the primary trigger, but they can be missed
-  // (dropped connection, coalesced bursts) and only fire when the server
-  // relays new bytes; a lightweight incremental poll guarantees the client
-  // catches up even if an event is lost. The fetch is offset-based and
-  // fetch-locked, so a poll with nothing new is a cheap empty read. It only
-  // runs while the relevant phase is actively streaming.
-  useEffect(() => {
-    const status = run?.attributes.status
-    if (status !== 'planning' && status !== 'applying') return
-    const handle = window.setInterval(() => {
-      if (status === 'planning') loadPlanLog()
-      else if (status === 'applying') loadApplyLog()
-    }, 2500)
-    return () => window.clearInterval(handle)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadPlanLog/loadApplyLog are stable function declarations
-  }, [run?.attributes.status])
+  // Stop the followers' timers when the page goes away.
+  useEffect(() => () => {
+    planFollower.current?.dispose()
+    applyFollower.current?.dispose()
+  }, [])
 
   async function fetchLogUrl(phase: 'plan' | 'apply'): Promise<string | null> {
     const urlRef = phase === 'plan' ? planLogUrl : applyLogUrl
@@ -906,82 +917,61 @@ function RunDetailPageInner() {
     return url
   }
 
-  async function loadPlanLog(reset = false) {
-    if (planFetchLock.current) return
-    planFetchLock.current = true
-    try {
-      if (reset) {
-        planLogOffset.current = 0
-        planLogUrl.current = null
-      }
-      const url = await fetchLogUrl('plan')
-      if (!url) return
-      const offset = planLogOffset.current
-      const logRes = await fetch(`${url}?offset=${offset}`)
-      if (!logRes.ok) return
-      const buffer = await logRes.arrayBuffer()
-      if (buffer.byteLength === 0) return
-      const bytes = new Uint8Array(buffer)
-      let dataStart = 0
-      let dataEnd = bytes.length
-      if (offset === 0 && bytes.length > 0 && bytes[0] === 0x02) dataStart = 1
-      if (bytes.length > 0 && bytes[bytes.length - 1] === 0x03) dataEnd -= 1
-      const rawDataBytes = dataEnd - dataStart
-      if (rawDataBytes <= 0) return
-      planLogOffset.current += rawDataBytes
-      const chunk = new TextDecoder().decode(bytes.slice(dataStart, dataEnd))
-      const html = ansiConverter.toHtml(chunk)
-      if (reset || offset === 0) {
-        setPlanLog(chunk || null)
-        setPlanHtml(html)
-      } else {
-        setPlanLog(prev => (prev ?? '') + chunk)
-        setPlanHtml(prev => prev + html)
-      }
-    } catch {
-      // Plan log not available yet
-    } finally {
-      planFetchLock.current = false
-    }
+  /** Read one phase's log from `offset`; null when it is not available yet. */
+  async function readLog(phase: 'plan' | 'apply', offset: number, fresh: boolean): Promise<Uint8Array | null> {
+    const urlRef = phase === 'plan' ? planLogUrl : applyLogUrl
+    if (fresh) urlRef.current = null
+    const url = await fetchLogUrl(phase)
+    if (!url) return null
+    const logRes = await fetch(`${url}?offset=${offset}`)
+    if (!logRes.ok) return null
+    return new Uint8Array(await logRes.arrayBuffer())
   }
 
-  async function loadApplyLog(reset = false) {
-    if (applyFetchLock.current) return
-    applyFetchLock.current = true
-    try {
-      if (reset) {
-        applyLogOffset.current = 0
-        applyLogUrl.current = null
-      }
-      const url = await fetchLogUrl('apply')
-      if (!url) return
-      const offset = applyLogOffset.current
-      const logRes = await fetch(`${url}?offset=${offset}`)
-      if (!logRes.ok) return
-      const buffer = await logRes.arrayBuffer()
-      if (buffer.byteLength === 0) return
-      const bytes = new Uint8Array(buffer)
-      let dataStart = 0
-      let dataEnd = bytes.length
-      if (offset === 0 && bytes.length > 0 && bytes[0] === 0x02) dataStart = 1
-      if (bytes.length > 0 && bytes[bytes.length - 1] === 0x03) dataEnd -= 1
-      const rawDataBytes = dataEnd - dataStart
-      if (rawDataBytes <= 0) return
-      applyLogOffset.current += rawDataBytes
-      const chunk = new TextDecoder().decode(bytes.slice(dataStart, dataEnd))
-      const html = ansiConverter.toHtml(chunk)
-      if (reset || offset === 0) {
-        setApplyLog(chunk || null)
-        setApplyHtml(html)
-      } else {
-        setApplyLog(prev => (prev ?? '') + chunk)
-        setApplyHtml(prev => prev + html)
-      }
-    } catch {
-      // Apply log not available yet
-    } finally {
-      applyFetchLock.current = false
+  function getPlanFollower(): LogFollower {
+    if (!planFollower.current) {
+      planFollower.current = createLogFollower({
+        read: (offset, fresh) => readLog('plan', offset, fresh),
+        onText: (chunk, mode) => {
+          const html = ansiConverter.toHtml(chunk)
+          if (mode === 'replace') {
+            setPlanLog(chunk || null)
+            setPlanHtml(html)
+          } else {
+            setPlanLog(prev => (prev ?? '') + chunk)
+            setPlanHtml(prev => prev + html)
+          }
+        },
+      })
     }
+    return planFollower.current
+  }
+
+  function getApplyFollower(): LogFollower {
+    if (!applyFollower.current) {
+      applyFollower.current = createLogFollower({
+        read: (offset, fresh) => readLog('apply', offset, fresh),
+        onText: (chunk, mode) => {
+          const html = ansiConverter.toHtml(chunk)
+          if (mode === 'replace') {
+            setApplyLog(chunk || null)
+            setApplyHtml(html)
+          } else {
+            setApplyLog(prev => (prev ?? '') + chunk)
+            setApplyHtml(prev => prev + html)
+          }
+        },
+      })
+    }
+    return applyFollower.current
+  }
+
+  function loadPlanLog(reset = false): Promise<void> {
+    return getPlanFollower().fetch(reset)
+  }
+
+  function loadApplyLog(reset = false): Promise<void> {
+    return getApplyFollower().fetch(reset)
   }
 
   async function handleAction(action: 'confirm' | 'discard' | 'cancel' | 'retry') {

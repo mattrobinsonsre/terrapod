@@ -129,6 +129,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // #1591: a finished log keeps being fetched until its end-of-log marker.
+      name: 'log-tail',
+      testMatch: 'log-tail.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'impact-graph',
       testMatch: 'impact-graph.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
