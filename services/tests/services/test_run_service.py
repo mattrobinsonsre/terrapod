@@ -148,6 +148,20 @@ class TestTransitionRun:
         with pytest.raises(ValueError, match="Invalid transition"):
             await transition_run(db, run, "applied")
 
+    async def test_a_completed_phase_drops_a_stale_failure_reason(self):
+        """#1631: a plan pod that reported a reason, was evicted and retried,
+        then succeeded, must not leave a red error on a successful run."""
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planning", error_message="Error: from the evicted pod")
+        await transition_run(db, run, "planned")
+        assert run.error_message == ""
+
+    async def test_an_error_transition_keeps_its_message(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planning", error_message="Error: the runner's reason")
+        await transition_run(db, run, "errored", error_message="Error: final message")
+        assert run.error_message == "Error: final message"
+
     async def test_planning_sets_plan_started_at(self):
         db = AsyncMock(spec=AsyncSession)
         run = _mock_run(status="queued")

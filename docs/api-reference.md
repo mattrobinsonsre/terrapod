@@ -3153,15 +3153,17 @@ Body (all fields optional — the runner sends whatever it could read):
 {
   "peak_memory_bytes": 1500000000,
   "peak_cpu_usec": 42000000,
-  "exit_code": 0
+  "exit_code": 1,
+  "failure_reason": "Error: Unsupported argument (on main.tf line 3)"
 }
 ```
 
 - `peak_memory_bytes` — from `/sys/fs/cgroup/memory.peak`
 - `peak_cpu_usec` — `usage_usec` from `/sys/fs/cgroup/cpu.stat`
 - `exit_code` — script's actual exit status
+- `failure_reason` — sent only with a non-zero `exit_code`: why the run failed, in a line or two. For a failed `init`, `plan` or `apply` it is tofu's own `Error:` summaries (at most three, each with its `on <file> line <n>` location, never a diagnostic's detail lines); for any other failure it is the runner's last logged error (a failed hook, an unusable configuration archive, a crash). The API strips ANSI and other control characters, caps it at 2,000 characters, and stores it as the run's `error-message`, which the reconciler then keeps, followed by `Runner exited with code N` (#1631). Ignored with a zero `exit_code`, and on a run that has already errored.
 
-Negative values, non-integers, or booleans return `400`. Missing fields are not clobbered (existing values preserved).
+Negative values, non-integers, or booleans return `400`, as does a non-string `failure_reason`. Missing fields are not clobbered (existing values preserved).
 
 Note: **SIGKILL is uncatchable**, so this endpoint never fires on OOM-killed runs. Those are covered by the listener's K8s-terminated-state report on the job-status path; `runner-exit-status` ends up `"oom"` either way. See [Run Response Attributes (Resource Profile / OOM)](#run-response-attributes-resource-profile--oom) for the full signal flow.
 

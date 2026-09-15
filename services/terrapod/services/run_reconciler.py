@@ -351,8 +351,14 @@ def _build_failure_message(run: Run, status: str) -> str:
             "Most likely OOM — check the workspace's resource_memory; could "
             "also be a node-level eviction."
         )
+    # The runner's own account of the failure, when it sent one (#1631):
+    # resource-profile stores it as error_message before the Job ends.
+    reason = run.error_message or ""
     if run.runner_exit_status == "error" and run.runner_exit_code is not None:
-        return f"Runner exited with code {run.runner_exit_code}"
+        exited = f"Runner exited with code {run.runner_exit_code}"
+        return f"{reason}\n\n{exited}" if reason else exited
+    if reason:
+        return reason
     # Fall back to the generic message — matches pre-#430 behaviour.
     return f"Job {status}"
 
