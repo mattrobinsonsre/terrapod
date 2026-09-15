@@ -113,6 +113,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      name: 'vault-diagnostics',
+      testMatch: 'vault-diagnostics.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'runs',
       testMatch: 'runs.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

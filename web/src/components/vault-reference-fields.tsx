@@ -17,8 +17,9 @@
  */
 
 import { useTranslations } from 'next-intl'
-import { usesField, type VaultReferenceValue } from '@/lib/vault-reference'
+import { buildVaultReference, usesField, type VaultReferenceValue } from '@/lib/vault-reference'
 import { VaultFileDeliveryFields } from '@/components/vault-file-delivery-fields'
+import { VaultReferenceCheck } from '@/components/vault-reference-check'
 
 export {
   buildVaultReference,
@@ -38,12 +39,18 @@ export function VaultReferenceFields({
   onChange,
   instances,
   defaultInstance,
+  checkUrl,
+  variableKey,
 }: {
   idPrefix: string
   value: VaultReferenceValue
   onChange: (next: VaultReferenceValue) => void
   instances: string[]
   defaultInstance: string
+  /** The `…/vault-reference-checks` endpoint; when set, a Check action is offered (#1663). */
+  checkUrl?: string
+  /** The variable key, which a file name defaults to. */
+  variableKey?: string
 }) {
   const t = useTranslations('workspaceDetail.variables')
   const set = (patch: Partial<VaultReferenceValue>) => onChange({ ...value, ...patch })
@@ -157,6 +164,17 @@ export function VaultReferenceFields({
       />
 
       <p className="text-xs text-slate-500">{t('vaultSecretNeverStored')}</p>
+
+      {checkUrl && (
+        <VaultReferenceCheck
+          idPrefix={idPrefix}
+          checkUrl={checkUrl}
+          // Checked exactly as it would be saved, so the answer is about the
+          // reference the variable will actually hold.
+          reference={() => buildVaultReference(value)}
+          variableKey={variableKey}
+        />
+      )}
     </div>
   )
 }

@@ -35,6 +35,7 @@ import {
   User,
   ChevronDown,
   ArchiveRestore,
+  KeyRound,
   type LucideIcon,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
@@ -92,6 +93,11 @@ const ADMIN_ITEMS: NavItem[] = [
 ]
 
 const AUDIT_ITEM: NavItem = { href: '/admin/audit-log', labelKey: 'auditLog', icon: FileText }
+
+// Vault status (#1663). Admin and audit, like the audit log, and only offered
+// when the deployment has the Vault value source on — a deployment without
+// Vault gets no nav entry for it.
+const VAULT_ITEM: NavItem = { href: '/admin/vault', labelKey: 'vault', icon: KeyRound }
 
 // Personal / session destinations (behind the Account menu). Logout is
 // rendered separately (it is an action, not a link).
@@ -458,6 +464,20 @@ export default function NavBar() {
       .catch(() => {})
   }, [])
 
+  // Whether to offer Vault status. Asked only of admin/audit sessions, and a
+  // failed probe just leaves the entry out — an affordance, never a gate.
+  const [vaultEnabled, setVaultEnabled] = useState(false)
+  useEffect(() => {
+    if (!adminOrAudit) return
+    const token = getAuthState()?.token
+    fetch('/api/terrapod/v1/vault/availability', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setVaultEnabled(Boolean(d?.data?.attributes?.enabled)))
+      .catch(() => {})
+  }, [adminOrAudit])
+
   // Close both mobile drawers whenever the route changes. Link taps already
   // close via onClick, but this also covers navigations that don't originate
   // from a drawer link (browser back/forward, programmatic pushes) so a
@@ -493,7 +513,11 @@ export default function NavBar() {
 
   // Admin menu contents: full admin list for admins; audit-only users see
   // just the Audit Log entry. Audit Log is appended for anyone admin-or-audit.
-  const adminMenuItems: NavItem[] = [...(admin ? ADMIN_ITEMS : []), AUDIT_ITEM]
+  const adminMenuItems: NavItem[] = [
+    ...(admin ? ADMIN_ITEMS : []),
+    ...(vaultEnabled ? [VAULT_ITEM] : []),
+    AUDIT_ITEM,
+  ]
 
   const registryActive = REGISTRY_ITEMS.some((i) => isPathActive(pathname, i.href))
   const adminActive = adminMenuItems.some((i) => isPathActive(pathname, i.href))
