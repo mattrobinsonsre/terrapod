@@ -263,7 +263,7 @@ Instead of registering the modules in a repository one at a time, give Terrapod 
 - `{leaf}`: the subdirectory's last segment;
 - `{root}`: the subdirectory as-is.
 
-A template using any other placeholder is refused with `422`. Either way, the name is then fitted to the registry's rule: lowercase letters, digits and hyphens, starting with a letter, and at most 64 characters.
+A template may hold only literal text and those placeholders; anything else in braces (another name, a format spec, attribute access) is refused with `422`. Either way, the name is then fitted to the registry's rule: lowercase letters, digits and hyphens, starting with a letter, and at most 64 characters.
 
 **Provider, tags, labels and owner.**
 - `provider` applies to every module the rule registers. Left empty, it's taken from a `terraform-<provider>-<name>` repository name. In a repository without that convention, candidates are reported as `missing-provider` and not registered.
@@ -275,12 +275,12 @@ A template using any other placeholder is refused with `422`. Either way, the na
 - **Saving a rule registers nothing.** The first poll of an enabled rule records the candidates already in the repository as seen, and registers none of them.
 - **Preview** (`GET …/{id}/preview`, or `POST …/preview` for a rule you haven't saved) lists the candidates, each with its derived `name` and `provider`. It also reports:
   - `registered-as`: the module already registered from that directory, or `null`;
-  - `collision`: `true` when the derived name and provider belong to another module;
+  - `collision`: `true` when the derived name and provider belong to another module, or when two unregistered candidates derive the same name (neither is registered, so a `name-template` can tell them apart);
   - `missing-provider`: `true` when no provider could be worked out.
 - **Scan** (`POST …/{id}/scan`) registers the candidates: all of them, or just the `subdirectories` you list. Anything already registered, taken or missing a provider is skipped, and reported with its reason. A scan works whether or not the rule is enabled.
 - **What has been seen stays seen.** Everything a scan or poll has walked counts as seen, so a candidate you left out of a scan stays unregistered until you scan it explicitly.
-- **New directories register themselves.** While a rule is enabled, the registry poll checks the tracked branch's head every `vcs.module_poll_interval_seconds` (default 300). When the head has moved, the poll registers any candidate directory the rule hasn't seen before, and polls those modules' tags in the same cycle. So a new submodule's first tagged version publishes without anyone touching the registry. If the repository can't be read, or the provider truncates its tree, the poll retries on the next cycle.
-- **Changing the repository, connection or branch starts the rule afresh.** The next poll records a new baseline.
+- **New directories register themselves.** While a rule is enabled, the registry poll checks the tracked branch's head every `vcs.module_poll_interval_seconds` (default 300). When the head has moved, the poll registers any candidate directory the rule hasn't seen before, and polls those modules' tags in the same cycle. So a new submodule's first tagged version publishes without anyone touching the registry. If the repository can't be read, or the provider truncates its tree, the poll retries on the next cycle. Each rule is polled on its own, so one that fails never undoes another's registrations, and a rule whose VCS connection isn't active is skipped with a warning in the API log.
+- **Changing what the rule looks at starts it afresh.** A new repository, connection or branch, a different `pattern` or `ignore-patterns`, or re-enabling a disabled rule clears what it has seen, and the next poll records a new baseline and registers nothing. Directories the old rule never claimed are not registered behind your back: preview the rule and scan the ones you want.
 - **Nothing is ever deleted or renamed.** A directory that disappears simply stops producing versions, because tags without it are skipped. Deleting a rule leaves the modules it registered; they simply stop naming a rule.
 
 Create a rule:

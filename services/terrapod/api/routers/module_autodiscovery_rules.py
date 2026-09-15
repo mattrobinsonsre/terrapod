@@ -51,7 +51,7 @@ _ID_PREFIX = "modrule-"
 _TYPE = "module-autodiscovery-rules"
 _NOT_FOUND = "module autodiscovery rule not found"
 _PROVIDER_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
-_TEMPLATE_PLACEHOLDERS = {"repo": "r", "path": "p", "leaf": "l", "root": "o"}
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$")
 
 
 def _rule_json(rule: ModuleAutodiscoveryRule) -> dict:
@@ -144,19 +144,22 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
             _reject_directory_pattern(p, field="ignore-patterns")
         out["ignore_patterns"] = [p.strip() for p in ip if p.strip()]
     if "enabled" in attrs:
-        out["enabled"] = bool(attrs["enabled"])
+        # A real boolean only: `bool("false")` is True.
+        if not isinstance(attrs["enabled"], bool):
+            raise HTTPException(status_code=422, detail="enabled must be a boolean")
+        out["enabled"] = attrs["enabled"]
     if "name-template" in attrs:
-        template = str(attrs["name-template"] or "")
-        try:
-            template.format(**_TEMPLATE_PLACEHOLDERS)
-        except (KeyError, IndexError, ValueError) as exc:
+        template = attrs["name-template"] or ""
+        # Literal text and the four placeholders, nothing else: no format
+        # specs, no attribute access, no other braces.
+        if not isinstance(template, str) or not svc.TEMPLATE_RE.match(template):
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    "name-template may use only {repo}, {path}, {leaf} and {root}: "
-                    f"{template!r} does not render"
+                    "name-template may use only {repo}, {path}, {leaf} and {root} "
+                    f"with literal text: {template!r} is not allowed"
                 ),
-            ) from exc
+            )
         out["name_template"] = template
     if "provider" in attrs:
         provider = str(attrs["provider"] or "").strip()
@@ -173,7 +176,10 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
         # guard runs here, where the operator can fix it (#316).
         out["labels"] = validate_labels(attrs["labels"])
     if "owner-email" in attrs:
-        out["owner_email"] = str(attrs["owner-email"] or "").strip() or None
+        email = str(attrs["owner-email"] or "").strip()
+        if email and not _EMAIL_RE.match(email):
+            raise HTTPException(status_code=422, detail="owner-email must be a valid email address")
+        out["owner_email"] = email or None
     return out
 
 
@@ -302,21 +308,31 @@ async def update_rule(
 ) -> JSONResponse:
     """Update a module autodiscovery rule. Admin only.
 
-    Pointing it at another repository or connection starts it afresh: the
-    directories it has seen belong to the old one, so the next poll records a
-    new baseline rather than registering everything in the new repository.
+    A change to what the rule looks at starts it afresh: another connection,
+    repository or branch, a different `pattern` or `ignore-patterns`, or a
+    re-enable after being disabled. What it has seen no longer describes what
+    it would claim, so the next poll records a new baseline rather than
+    registering every directory the old rule never claimed — none of them
+    previewed or ticked. Register those with a scan.
     """
     rule = await _get_rule(db, rule_id)
     fields = _coerce_attrs(body.get("data", {}).get("attributes", {}), on_create=False)
     if "vcs_connection_id" in fields:
         await _get_connection(db, fields["vcs_connection_id"])
-    moved = any(
-        k in fields and fields[k] != getattr(rule, k)
-        for k in ("vcs_connection_id", "repo_url", "branch")
+    rebaseline = (
+        any(
+            k in fields and fields[k] != getattr(rule, k)
+            for k in ("vcs_connection_id", "repo_url", "branch", "pattern")
+        )
+        or (
+            "ignore_patterns" in fields
+            and fields["ignore_patterns"] != list(rule.ignore_patterns or [])
+        )
+        or (fields.get("enabled") is True and not rule.enabled)
     )
     for key, value in fields.items():
         setattr(rule, key, value)
-    if moved:
+    if rebaseline:
         rule.seen_subdirectories = []
         rule.last_scanned_sha = ""
         rule.first_scan_at = None
