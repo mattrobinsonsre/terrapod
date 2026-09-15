@@ -20,7 +20,7 @@ import pytest
 from terrapod.config import Settings, VaultConfig
 from terrapod.services import vault_client
 from terrapod.services import vault_source_service as vss
-from terrapod.services.vault_client import VaultError, VaultUnavailable
+from terrapod.services.vault_client import VaultError, VaultResponse, VaultUnavailable
 from terrapod.services.vault_source_service import (
     RESERVED_FILE_KEYS,
     VaultSourceError,
@@ -60,7 +60,9 @@ def _settings(instances=None) -> Settings:
 
 
 def _read(value=SECRET):
-    return patch.object(vss, "read_secret_data", new=AsyncMock(return_value={"sa": value}))
+    return patch.object(
+        vss, "read_secret_response", new=AsyncMock(return_value=VaultResponse({"sa": value}))
+    )
 
 
 # ── Parsing the `file` object ─────────────────────────────────────────
@@ -90,25 +92,27 @@ class TestParseFile:
         with pytest.raises(VaultSourceError) as e:
             parse_reference(_ref(file={"name": "a", "colour": "blue"}), key="T")
         assert str(e.value) == (
-            "variable 'T' has a vault `file` with unknown keys: colour (only `name` is supported)"
+            "variable 'T' has a vault `file` with unknown keys: colour (supported: `name`, "
+            "`template`, `format`, `fields`, `encoding`)"
         )
 
     def test_the_reserved_keys_are_named_in_one_place(self):
-        assert RESERVED_FILE_KEYS == ("template", "format", "encoding", "mode")
+        # template, format and encoding shipped in #1648; mode stays reserved.
+        assert RESERVED_FILE_KEYS == ("mode",)
 
-    @pytest.mark.parametrize("reserved", ["template", "format", "encoding", "mode"])
-    def test_each_reserved_key_is_refused_as_not_yet_supported(self, reserved):
+    def test_the_reserved_mode_key_is_refused_as_not_yet_supported(self):
         """A newer client's instruction must fail loudly on this server, not be
         dropped and a different file written."""
         with pytest.raises(VaultSourceError) as e:
-            parse_reference(_ref(file={"name": "a", reserved: "x"}), key="T")
+            parse_reference(_ref(file={"name": "a", "mode": "0600"}), key="T")
         assert str(e.value) == (
-            f"variable 'T' has a vault `file` using {reserved}, which is reserved for a "
-            "later release and not supported yet (only `name` is supported)"
+            "variable 'T' has a vault `file` using mode, which is reserved for a later "
+            "release and not supported yet (supported: `name`, `template`, `format`, "
+            "`fields`, `encoding`)"
         )
 
-    def test_several_reserved_keys_are_all_named(self):
-        with pytest.raises(VaultSourceError, match="using encoding, mode, which is reserved"):
+    def test_a_reserved_key_beside_supported_ones_names_only_the_reserved_one(self):
+        with pytest.raises(VaultSourceError, match="using mode, which is reserved"):
             parse_reference(_ref(file={"mode": "0600", "encoding": "base64"}), key="T")
 
     @pytest.mark.parametrize(
@@ -238,16 +242,18 @@ class TestResolvedValueIsThePath:
     async def test_a_map_field_arrives_in_the_file_as_json(self):
         """End to end with the client's encoding: an object stored in Vault is
         a parseable JSON file, not a Python repr."""
-        mock = AsyncMock(return_value={"sa": {"type": "service_account", "ok": True}})
-        with patch.object(vss, "read_secret_data", new=mock):
+        mock = AsyncMock(
+            return_value=VaultResponse({"sa": {"type": "service_account", "ok": True}})
+        )
+        with patch.object(vss, "read_secret_response", new=mock):
             out = await resolve_vault_delivery([_Var("F", _ref(file={}))], _settings())
         assert json.loads(out.files[0]["value"]) == {"type": "service_account", "ok": True}
 
     @pytest.mark.asyncio
     async def test_a_dynamic_engine_is_passed_through_for_a_file(self):
-        mock = AsyncMock(return_value={"sa": SECRET})
+        mock = AsyncMock(return_value=VaultResponse({"sa": SECRET}))
         v = _Var("DB", _ref(engine="dynamic", mount="database", path="creds/ro", file={}))
-        with patch.object(vss, "read_secret_data", new=mock):
+        with patch.object(vss, "read_secret_response", new=mock):
             out = await resolve_vault_delivery([v], _settings())
         assert mock.await_args.kwargs["engine"] == "dynamic"
         assert out.values == {"DB": "/var/run/terrapod/files/DB"}
@@ -264,12 +270,15 @@ class TestClaimTimeRefusals:
 
     @pytest.mark.asyncio
     async def test_two_variables_at_one_path_fail_before_any_vault_read(self):
-        mock = AsyncMock(return_value={"sa": SECRET})
+        mock = AsyncMock(return_value=VaultResponse({"sa": SECRET}))
         vs = [
             _Var("A", _ref(file={"name": "gcp/adc.json"})),
             _Var("B", _ref(file={"name": "gcp/adc.json"})),
         ]
-        with patch.object(vss, "read_secret_data", new=mock), pytest.raises(VaultSourceError) as e:
+        with (
+            patch.object(vss, "read_secret_response", new=mock),
+            pytest.raises(VaultSourceError) as e,
+        ):
             await resolve_vault_delivery(vs, _settings())
         assert str(e.value) == (
             "variables 'A' and 'B' both deliver a Vault file to "
@@ -315,7 +324,7 @@ class TestClaimTimeRefusals:
 
     @pytest.mark.asyncio
     async def test_a_stored_reserved_key_fails_the_run(self):
-        v = _Var("F", _ref(file={"template": "{{ .x }}"}))
+        v = _Var("F", _ref(file={"mode": "0600"}))
         with _read(), pytest.raises(VaultSourceError, match="reserved for a later release"):
             await resolve_vault_delivery([v], _settings())
 
@@ -356,7 +365,10 @@ class TestFailureSemanticsInFileMode:
     @pytest.mark.asyncio
     async def test_a_4xx_errors_the_run(self):
         mock = AsyncMock(side_effect=VaultError("Vault denied 'kvv2/apps/gcp'"))
-        with patch.object(vss, "read_secret_data", new=mock), pytest.raises(VaultSourceError) as e:
+        with (
+            patch.object(vss, "read_secret_response", new=mock),
+            pytest.raises(VaultSourceError) as e,
+        ):
             await resolve_vault_delivery([_Var("F", _ref(file={}))], _settings())
         assert not isinstance(e.value, VaultTransient)
         assert str(e.value) == "variable 'F': Vault denied 'kvv2/apps/gcp'"
@@ -364,13 +376,16 @@ class TestFailureSemanticsInFileMode:
     @pytest.mark.asyncio
     async def test_an_unreachable_or_5xx_vault_requeues(self):
         mock = AsyncMock(side_effect=VaultUnavailable("HTTP 503"))
-        with patch.object(vss, "read_secret_data", new=mock), pytest.raises(VaultTransient):
+        with patch.object(vss, "read_secret_response", new=mock), pytest.raises(VaultTransient):
             await resolve_vault_delivery([_Var("F", _ref(file={}))], _settings())
 
     @pytest.mark.asyncio
     async def test_a_missing_field_errors_the_run_naming_what_is_there(self):
-        mock = AsyncMock(return_value={"other": SECRET})
-        with patch.object(vss, "read_secret_data", new=mock), pytest.raises(VaultSourceError) as e:
+        mock = AsyncMock(return_value=VaultResponse({"other": SECRET}))
+        with (
+            patch.object(vss, "read_secret_response", new=mock),
+            pytest.raises(VaultSourceError) as e,
+        ):
             await resolve_vault_delivery([_Var("F", _ref(file={}))], _settings())
         assert str(e.value) == (
             "variable 'F': field 'sa' is not present at 'kvv2/apps/gcp' (available: other)"
@@ -399,14 +414,16 @@ class TestOneReadPerSecret:
     async def test_two_variables_on_one_dynamic_secret_share_one_read(self):
         """The case that motivated it: a certificate and its key must come from
         one issue. The body is equal after key order is canonicalised."""
-        mock = AsyncMock(return_value={"certificate": "CERT-1", "private_key": "KEY-1"})
+        mock = AsyncMock(
+            return_value=VaultResponse({"certificate": "CERT-1", "private_key": "KEY-1"})
+        )
         vs = [
             _Var("TLS_CERT", _pki("certificate")),
             _Var(
                 "TLS_KEY", _pki("private_key", data={"ttl": "1h", "common_name": "a.example.test"})
             ),
         ]
-        with patch.object(vss, "read_secret_data", new=mock):
+        with patch.object(vss, "read_secret_response", new=mock):
             out = await resolve_vault_delivery(vs, _settings())
         assert mock.await_count == 1
         assert out.values == {"TLS_CERT": "CERT-1", "TLS_KEY": "KEY-1"}
@@ -424,21 +441,21 @@ class TestOneReadPerSecret:
         ],
     )
     async def test_different_requests_are_not_merged(self, other):
-        mock = AsyncMock(return_value={"certificate": "C", "private_key": "K"})
+        mock = AsyncMock(return_value=VaultResponse({"certificate": "C", "private_key": "K"}))
         insts = [
             {"name": "default", "address": "https://v", "default": True},
             {"name": "second", "address": "https://w"},
         ]
         vs = [_Var("A", _pki("certificate")), _Var("B", other)]
-        with patch.object(vss, "read_secret_data", new=mock):
+        with patch.object(vss, "read_secret_response", new=mock):
             await resolve_vault_delivery(vs, _settings(insts))
         assert mock.await_count == 2
 
     @pytest.mark.asyncio
     async def test_a_kv2_secret_is_read_once_for_several_fields(self):
-        mock = AsyncMock(return_value={"user": "u", "pass": "p"})
+        mock = AsyncMock(return_value=VaultResponse({"user": "u", "pass": "p"}))
         vs = [_Var("U", _ref(field="user")), _Var("P", _ref(field="pass"))]
-        with patch.object(vss, "read_secret_data", new=mock):
+        with patch.object(vss, "read_secret_response", new=mock):
             out = await resolve_vault_delivery(vs, _settings())
         assert mock.await_count == 1
         assert out.values == {"U": "u", "P": "p"}
@@ -447,46 +464,48 @@ class TestOneReadPerSecret:
     async def test_kv2_ignores_method_and_data_so_they_cannot_split_a_read(self):
         """The client sends a kv-v2 read as a plain GET whatever the reference
         says, so those differences are not different requests."""
-        mock = AsyncMock(return_value={"user": "u", "pass": "p"})
+        mock = AsyncMock(return_value=VaultResponse({"user": "u", "pass": "p"}))
         vs = [
             _Var("U", _ref(field="user")),
             _Var("P", _ref(field="pass", method="POST", data={"x": 1})),
         ]
-        with patch.object(vss, "read_secret_data", new=mock):
+        with patch.object(vss, "read_secret_response", new=mock):
             await resolve_vault_delivery(vs, _settings())
         assert mock.await_count == 1
 
     @pytest.mark.asyncio
     async def test_a_get_never_sends_data_so_data_cannot_split_it(self):
-        mock = AsyncMock(return_value={"access_key": "AK", "secret_key": "SK"})
+        mock = AsyncMock(return_value=VaultResponse({"access_key": "AK", "secret_key": "SK"}))
         base = {"engine": "dynamic", "mount": "aws", "path": "creds/deploy"}
         vs = [
             _Var("AK", _ref(**base, field="access_key")),
             _Var("SK", _ref(**base, field="secret_key", data={"ignored": True})),
         ]
-        with patch.object(vss, "read_secret_data", new=mock):
+        with patch.object(vss, "read_secret_response", new=mock):
             await resolve_vault_delivery(vs, _settings())
         assert mock.await_count == 1
 
     @pytest.mark.asyncio
     async def test_slashes_around_mount_and_path_cannot_split_a_read(self):
-        mock = AsyncMock(return_value={"user": "u", "pass": "p"})
+        mock = AsyncMock(return_value=VaultResponse({"user": "u", "pass": "p"}))
         vs = [
             _Var("U", _ref(field="user")),
             _Var("P", _ref(field="pass", mount="/kvv2/", path="/apps/gcp/")),
         ]
-        with patch.object(vss, "read_secret_data", new=mock):
+        with patch.object(vss, "read_secret_response", new=mock):
             await resolve_vault_delivery(vs, _settings())
         assert mock.await_count == 1
 
     @pytest.mark.asyncio
     async def test_a_file_variable_and_an_env_variable_share_the_read(self):
-        mock = AsyncMock(return_value={"certificate": "CERT-1", "private_key": "KEY-1"})
+        mock = AsyncMock(
+            return_value=VaultResponse({"certificate": "CERT-1", "private_key": "KEY-1"})
+        )
         vs = [
             _Var("TLS_CERT", _pki("certificate")),
             _Var("TLS_KEY_FILE", _pki("private_key", file={"name": "tls/key.pem"})),
         ]
-        with patch.object(vss, "read_secret_data", new=mock):
+        with patch.object(vss, "read_secret_response", new=mock):
             out = await resolve_vault_delivery(vs, _settings())
         assert mock.await_count == 1
         assert out.values == {
@@ -499,7 +518,10 @@ class TestOneReadPerSecret:
     async def test_a_failed_shared_read_errors_every_variable_on_it(self):
         mock = AsyncMock(side_effect=VaultError("Vault denied 'pki/issue/web'"))
         vs = [_Var("TLS_CERT", _pki("certificate")), _Var("TLS_KEY", _pki("private_key"))]
-        with patch.object(vss, "read_secret_data", new=mock), pytest.raises(VaultSourceError) as e:
+        with (
+            patch.object(vss, "read_secret_response", new=mock),
+            pytest.raises(VaultSourceError) as e,
+        ):
             await resolve_vault_delivery(vs, _settings())
         assert not isinstance(e.value, VaultTransient)
         assert str(e.value) == "variables 'TLS_CERT', 'TLS_KEY': Vault denied 'pki/issue/web'"
@@ -509,15 +531,21 @@ class TestOneReadPerSecret:
     async def test_an_unavailable_shared_read_requeues_naming_every_variable(self):
         mock = AsyncMock(side_effect=VaultUnavailable("HTTP 503"))
         vs = [_Var("TLS_CERT", _pki("certificate")), _Var("TLS_KEY", _pki("private_key"))]
-        with patch.object(vss, "read_secret_data", new=mock), pytest.raises(VaultTransient) as e:
+        with (
+            patch.object(vss, "read_secret_response", new=mock),
+            pytest.raises(VaultTransient) as e,
+        ):
             await resolve_vault_delivery(vs, _settings())
         assert str(e.value) == "variables 'TLS_CERT', 'TLS_KEY': HTTP 503"
 
     @pytest.mark.asyncio
     async def test_a_field_missing_from_the_shared_response_names_only_its_variable(self):
-        mock = AsyncMock(return_value={"certificate": "C"})
+        mock = AsyncMock(return_value=VaultResponse({"certificate": "C"}))
         vs = [_Var("TLS_CERT", _pki("certificate")), _Var("TLS_KEY", _pki("private_key"))]
-        with patch.object(vss, "read_secret_data", new=mock), pytest.raises(VaultSourceError) as e:
+        with (
+            patch.object(vss, "read_secret_response", new=mock),
+            pytest.raises(VaultSourceError) as e,
+        ):
             await resolve_vault_delivery(vs, _settings())
         assert str(e.value).startswith("variable 'TLS_KEY': field 'private_key' is not present")
 
@@ -571,9 +599,9 @@ class TestNothingLeaksIntoLogs:
         ],
     )
     async def test_the_resolver_never_logs_a_value(self, side_effect):
-        mock = AsyncMock(return_value={"sa": SECRET}, side_effect=side_effect)
+        mock = AsyncMock(return_value=VaultResponse({"sa": SECRET}), side_effect=side_effect)
         with (
-            patch.object(vss, "read_secret_data", new=mock),
+            patch.object(vss, "read_secret_response", new=mock),
             patch.object(vss, "logger") as log,
         ):
             try:

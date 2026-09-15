@@ -2518,7 +2518,22 @@
       "vaultFileName": "Nombre del archivo",
       "vaultFileNameDefault": "Por defecto, la clave de la variable",
       "vaultFileBadge": "Archivo",
-      "vaultFileHint": "La variable contiene la ruta del archivo, no el secreto: úsala como {fileFn} o con una herramienta que lea una ruta desde una variable de entorno. Un nombre relativo como {relExample} se escribe en {base}; un nombre que empieza por {home}, como {homeExample}, va al directorio personal del runner."
+      "vaultFileHint": "La variable contiene la ruta del archivo, no el secreto: úsala como {fileFn} o con una herramienta que lea una ruta desde una variable de entorno. Un nombre relativo como {relExample} se escribe en {base}; un nombre que empieza por {home}, como {homeExample}, va al directorio personal del runner.",
+      "vaultFileContent": "Contenido del archivo",
+      "vaultFileContentField": "Un campo",
+      "vaultFileContentTemplate": "Plantilla sobre el secreto",
+      "vaultFileContentFormat": "Secreto completo",
+      "vaultFileTemplate": "Plantilla",
+      "vaultFileTemplateHint": "Cada marcador como {example} se sustituye por ese campo de esta única lectura de Vault; los puntos acceden a un mapa. Filtros: {filters}. {lease} y los demás campos de la concesión funcionan cuando el secreto tiene una concesión. Los valores insertados nunca se vuelven a expandir.",
+      "vaultFileFormat": "Formato",
+      "vaultFileFormatJson": "Objeto JSON",
+      "vaultFileFormatEnv": "Archivo env (líneas KEY=\"value\")",
+      "vaultFileFields": "Campos (opcional)",
+      "vaultFileFieldsHint": "Nombres de campo separados por comas. Déjalo vacío para escribir el secreto completo.",
+      "vaultFileEncoding": "Codificación",
+      "vaultFileEncodingNone": "Tal como está guardado en Vault",
+      "vaultFileEncodingBase64": "Decodificar Base64",
+      "vaultFileEncodingHint": "Decodifica el campo antes de escribirlo. El resultado debe ser texto; no se admiten archivos binarios."
     },
     "runs": {
       "options": "Opciones",

@@ -2518,7 +2518,22 @@
       "vaultFileName": "Nomen fasciculi",
       "vaultFileNameDefault": "Praefinitum est clavis variabilis",
       "vaultFileBadge": "Fasciculus",
-      "vaultFileHint": "Variabilis semitam fasciculi tenet, non arcanum: ea ut {fileFn} utere, aut cum instrumento quod semitam ex variabili ambitus legit. Nomen relativum ut {relExample} sub {base} scribitur; nomen a {home} incipiens, ut {homeExample}, in domicilio cursoris ponitur."
+      "vaultFileHint": "Variabilis semitam fasciculi tenet, non arcanum: ea ut {fileFn} utere, aut cum instrumento quod semitam ex variabili ambitus legit. Nomen relativum ut {relExample} sub {base} scribitur; nomen a {home} incipiens, ut {homeExample}, in domicilio cursoris ponitur.",
+      "vaultFileContent": "Contentum fasciculi",
+      "vaultFileContentField": "Unus campus",
+      "vaultFileContentTemplate": "Exemplar super arcanum",
+      "vaultFileContentFormat": "Arcanum totum",
+      "vaultFileTemplate": "Exemplar",
+      "vaultFileTemplateHint": "Quisque locum tenens ut {example} eo campo ex hac una lectione Vault substituitur; puncta in mappam intrant. Colatoria: {filters}. {lease} et ceteri conductionis campi valent cum arcanum conductionem habet. Valores inserti numquam iterum explicantur.",
+      "vaultFileFormat": "Forma",
+      "vaultFileFormatJson": "Obiectum JSON",
+      "vaultFileFormatEnv": "Fasciculus env (versus KEY=\"value\")",
+      "vaultFileFields": "Campi (ad libitum)",
+      "vaultFileFieldsHint": "Nomina camporum commatibus separata. Vacuum relinque ut arcanum totum scribatur.",
+      "vaultFileEncoding": "Codificatio",
+      "vaultFileEncodingNone": "Ut in Vault servatum",
+      "vaultFileEncodingBase64": "Base64 decodere",
+      "vaultFileEncodingHint": "Campum decodit antequam scribitur. Exitus textus esse debet; fasciculi binarii non sustinentur."
     },
     "runs": {
       "options": "Optiones",

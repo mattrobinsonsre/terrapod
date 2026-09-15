@@ -2518,7 +2518,22 @@
       "vaultFileName": "ファイル名",
       "vaultFileNameDefault": "既定は変数のキー",
       "vaultFileBadge": "ファイル",
-      "vaultFileHint": "変数にはシークレットではなくファイルのパスが入ります。{fileFn} として使うか、環境変数からパスを読むツールで使ってください。{relExample} のような相対名は {base} 配下に書き込まれ、{homeExample} のように {home} で始まる名前はランナーのホームディレクトリに置かれます。"
+      "vaultFileHint": "変数にはシークレットではなくファイルのパスが入ります。{fileFn} として使うか、環境変数からパスを読むツールで使ってください。{relExample} のような相対名は {base} 配下に書き込まれ、{homeExample} のように {home} で始まる名前はランナーのホームディレクトリに置かれます。",
+      "vaultFileContent": "ファイルの内容",
+      "vaultFileContentField": "1つのフィールド",
+      "vaultFileContentTemplate": "シークレットに対するテンプレート",
+      "vaultFileContentFormat": "シークレット全体",
+      "vaultFileTemplate": "テンプレート",
+      "vaultFileTemplateHint": "{example} のようなプレースホルダーは、この1回の Vault 読み取りから得たそのフィールドに置き換えられます。ドットでマップの中を参照できます。フィルター: {filters}。シークレットにリースがある場合は {lease} などのリースフィールドを使えます。挿入された値が再展開されることはありません。",
+      "vaultFileFormat": "形式",
+      "vaultFileFormatJson": "JSON オブジェクト",
+      "vaultFileFormatEnv": "env ファイル（KEY=\"value\" の行）",
+      "vaultFileFields": "フィールド（任意）",
+      "vaultFileFieldsHint": "カンマ区切りのフィールド名。空欄にするとシークレット全体を書き込みます。",
+      "vaultFileEncoding": "エンコーディング",
+      "vaultFileEncodingNone": "Vault に保存されたまま",
+      "vaultFileEncodingBase64": "Base64 デコード",
+      "vaultFileEncodingHint": "書き込む前にフィールドをデコードします。結果はテキストである必要があります。バイナリファイルには対応していません。"
     },
     "runs": {
       "options": "オプション",

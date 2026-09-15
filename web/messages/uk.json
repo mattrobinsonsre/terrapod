@@ -2518,7 +2518,22 @@
       "vaultFileName": "Ім'я файлу",
       "vaultFileNameDefault": "Типово — ключ змінної",
       "vaultFileBadge": "Файл",
-      "vaultFileHint": "Змінна містить шлях до файлу, а не секрет: використовуйте її як {fileFn} або з інструментом, що читає шлях зі змінної середовища. Відносне ім'я на кшталт {relExample} записується в {base}; ім'я, що починається з {home}, наприклад {homeExample}, потрапляє в домашній каталог ранера."
+      "vaultFileHint": "Змінна містить шлях до файлу, а не секрет: використовуйте її як {fileFn} або з інструментом, що читає шлях зі змінної середовища. Відносне ім'я на кшталт {relExample} записується в {base}; ім'я, що починається з {home}, наприклад {homeExample}, потрапляє в домашній каталог ранера.",
+      "vaultFileContent": "Вміст файлу",
+      "vaultFileContentField": "Одне поле",
+      "vaultFileContentTemplate": "Шаблон за секретом",
+      "vaultFileContentFormat": "Увесь секрет",
+      "vaultFileTemplate": "Шаблон",
+      "vaultFileTemplateHint": "Кожен заповнювач, наприклад {example}, замінюється цим полем із цього єдиного читання Vault; крапки звертаються до полів мапи. Фільтри: {filters}. {lease} та інші поля оренди працюють, якщо секрет має оренду. Вставлені значення ніколи не розкриваються повторно.",
+      "vaultFileFormat": "Формат",
+      "vaultFileFormatJson": "Об''єкт JSON",
+      "vaultFileFormatEnv": "Env-файл (рядки KEY=\"value\")",
+      "vaultFileFields": "Поля (необов''язково)",
+      "vaultFileFieldsHint": "Імена полів через кому. Залиште порожнім, щоб записати весь секрет.",
+      "vaultFileEncoding": "Кодування",
+      "vaultFileEncodingNone": "Як збережено у Vault",
+      "vaultFileEncodingBase64": "Декодувати Base64",
+      "vaultFileEncodingHint": "Декодує поле перед записом. Результат має бути текстом; двійкові файли не підтримуються."
     },
     "runs": {
       "options": "Опції",

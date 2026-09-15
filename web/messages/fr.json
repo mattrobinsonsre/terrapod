@@ -2518,7 +2518,22 @@
       "vaultFileName": "Nom du fichier",
       "vaultFileNameDefault": "Par défaut, la clé de la variable",
       "vaultFileBadge": "Fichier",
-      "vaultFileHint": "La variable contient le chemin du fichier, pas le secret : utilisez-la comme {fileFn}, ou avec un outil qui lit un chemin depuis une variable d'environnement. Un nom relatif comme {relExample} est écrit sous {base} ; un nom commençant par {home}, comme {homeExample}, est placé dans le répertoire personnel du runner."
+      "vaultFileHint": "La variable contient le chemin du fichier, pas le secret : utilisez-la comme {fileFn}, ou avec un outil qui lit un chemin depuis une variable d'environnement. Un nom relatif comme {relExample} est écrit sous {base} ; un nom commençant par {home}, comme {homeExample}, est placé dans le répertoire personnel du runner.",
+      "vaultFileContent": "Contenu du fichier",
+      "vaultFileContentField": "Un seul champ",
+      "vaultFileContentTemplate": "Modèle sur le secret",
+      "vaultFileContentFormat": "Secret entier",
+      "vaultFileTemplate": "Modèle",
+      "vaultFileTemplateHint": "Chaque espace réservé comme {example} est remplacé par ce champ issu de cette unique lecture Vault ; les points accèdent à une map. Filtres : {filters}. {lease} et les autres champs du bail fonctionnent lorsque le secret a un bail. Les valeurs insérées ne sont jamais réinterprétées.",
+      "vaultFileFormat": "Format",
+      "vaultFileFormatJson": "Objet JSON",
+      "vaultFileFormatEnv": "Fichier env (lignes KEY=\"value\")",
+      "vaultFileFields": "Champs (facultatif)",
+      "vaultFileFieldsHint": "Noms de champs séparés par des virgules. Laissez vide pour écrire le secret entier.",
+      "vaultFileEncoding": "Encodage",
+      "vaultFileEncodingNone": "Tel que stocké dans Vault",
+      "vaultFileEncodingBase64": "Décoder le Base64",
+      "vaultFileEncodingHint": "Décode le champ avant de l''écrire. Le résultat doit être du texte ; les fichiers binaires ne sont pas pris en charge."
     },
     "runs": {
       "options": "Options",

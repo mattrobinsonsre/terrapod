@@ -2518,7 +2518,22 @@
       "vaultFileName": "Nome do ficheiro",
       "vaultFileNameDefault": "Por omissão, a chave da variável",
       "vaultFileBadge": "Ficheiro",
-      "vaultFileHint": "A variável contém o caminho do ficheiro, não o segredo: use-a como {fileFn} ou com uma ferramenta que lê um caminho a partir de uma variável de ambiente. Um nome relativo como {relExample} é escrito em {base}; um nome que começa por {home}, como {homeExample}, fica no diretório pessoal do runner."
+      "vaultFileHint": "A variável contém o caminho do ficheiro, não o segredo: use-a como {fileFn} ou com uma ferramenta que lê um caminho a partir de uma variável de ambiente. Um nome relativo como {relExample} é escrito em {base}; um nome que começa por {home}, como {homeExample}, fica no diretório pessoal do runner.",
+      "vaultFileContent": "Conteúdo do ficheiro",
+      "vaultFileContentField": "Um campo",
+      "vaultFileContentTemplate": "Modelo sobre o segredo",
+      "vaultFileContentFormat": "Segredo completo",
+      "vaultFileTemplate": "Modelo",
+      "vaultFileTemplateHint": "Cada marcador como {example} é substituído por esse campo desta única leitura do Vault; os pontos acedem a um mapa. Filtros: {filters}. {lease} e os outros campos da concessão funcionam quando o segredo tem uma concessão. Os valores inseridos nunca são expandidos novamente.",
+      "vaultFileFormat": "Formato",
+      "vaultFileFormatJson": "Objeto JSON",
+      "vaultFileFormatEnv": "Ficheiro env (linhas KEY=\"value\")",
+      "vaultFileFields": "Campos (opcional)",
+      "vaultFileFieldsHint": "Nomes de campos separados por vírgulas. Deixe vazio para escrever o segredo completo.",
+      "vaultFileEncoding": "Codificação",
+      "vaultFileEncodingNone": "Tal como guardado no Vault",
+      "vaultFileEncodingBase64": "Descodificar Base64",
+      "vaultFileEncodingHint": "Descodifica o campo antes de o escrever. O resultado tem de ser texto; ficheiros binários não são suportados."
     },
     "runs": {
       "options": "Opções",

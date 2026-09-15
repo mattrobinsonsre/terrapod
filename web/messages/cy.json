@@ -2518,7 +2518,22 @@
       "vaultFileName": "Enw'r ffeil",
       "vaultFileNameDefault": "Allwedd y newidyn yw'r rhagosodiad",
       "vaultFileBadge": "Ffeil",
-      "vaultFileHint": "Mae'r newidyn yn dal llwybr y ffeil, nid y gyfrinach: defnyddiwch ef fel {fileFn}, neu gydag offeryn sy'n darllen llwybr o newidyn amgylchedd. Mae enw cymharol fel {relExample} yn cael ei ysgrifennu o dan {base}; mae enw sy'n dechrau gyda {home}, fel {homeExample}, yn mynd i gyfeiriadur cartref y rhedwr."
+      "vaultFileHint": "Mae'r newidyn yn dal llwybr y ffeil, nid y gyfrinach: defnyddiwch ef fel {fileFn}, neu gydag offeryn sy'n darllen llwybr o newidyn amgylchedd. Mae enw cymharol fel {relExample} yn cael ei ysgrifennu o dan {base}; mae enw sy'n dechrau gyda {home}, fel {homeExample}, yn mynd i gyfeiriadur cartref y rhedwr.",
+      "vaultFileContent": "Cynnwys y ffeil",
+      "vaultFileContentField": "Un maes",
+      "vaultFileContentTemplate": "Templed dros y gyfrinach",
+      "vaultFileContentFormat": "Y gyfrinach gyfan",
+      "vaultFileTemplate": "Templed",
+      "vaultFileTemplateHint": "Mae pob dalfan fel {example} yn cael ei disodli gan y maes hwnnw o''r un darlleniad Vault hwn; mae dotiau yn cyrraedd i mewn i fap. Hidlwyr: {filters}. Mae {lease} a meysydd prydles eraill yn gweithio pan fydd gan y gyfrinach brydles. Nid yw gwerthoedd a fewnosodir byth yn cael eu hehangu eto.",
+      "vaultFileFormat": "Fformat",
+      "vaultFileFormatJson": "Gwrthrych JSON",
+      "vaultFileFormatEnv": "Ffeil env (llinellau KEY=\"value\")",
+      "vaultFileFields": "Meysydd (dewisol)",
+      "vaultFileFieldsHint": "Enwau meysydd wedi''u gwahanu gan atalnodau. Gadewch yn wag i ysgrifennu''r gyfrinach gyfan.",
+      "vaultFileEncoding": "Amgodio",
+      "vaultFileEncodingNone": "Fel y''i storiwyd yn Vault",
+      "vaultFileEncodingBase64": "Datgodio Base64",
+      "vaultFileEncodingHint": "Yn datgodio''r maes cyn ei ysgrifennu. Rhaid i''r canlyniad fod yn destun; ni chefnogir ffeiliau deuaidd."
     },
     "runs": {
       "options": "Opsiynau",

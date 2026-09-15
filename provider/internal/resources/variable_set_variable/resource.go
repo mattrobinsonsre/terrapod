@@ -90,7 +90,14 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 					"to deliver the secret as a file on the runner: the variable then holds the " +
 					"file's absolute path. `name` defaults to the variable key; a relative name " +
 					"lands under `/var/run/terrapod/files/`, and a name starting with `~/` lands " +
-					"in the runner's home directory. Not allowed with `hcl`.",
+					"in the runner's home directory. Not allowed with `hcl`. The file holds " +
+					"exactly one of: the reference's `field` (with `\"encoding\":\"base64\"` in " +
+					"`file` to decode it); a `file.template` over the whole secret, with no " +
+					"`field` (logic-less `{{ name | filter }}`, filters `json`, `base64decode`, " +
+					"`trim`, `lines`, `indent N`, and `_lease.ttl` / `_lease.renewable` / " +
+					"`_lease.expires_at`); or a `file.format` of `json` or `env` for the whole " +
+					"secret, optionally narrowed by `file.fields`. `{{ }}` is not Terraform " +
+					"interpolation, so a template needs no escaping in `jsonencode`.",
 			},
 			"version_id": schema.StringAttribute{Computed: true, Description: "Version identifier."},
 			"created_at": schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},

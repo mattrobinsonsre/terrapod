@@ -892,16 +892,78 @@ class TestVaultFileDeliveryWrites:
         resp, _ = await self._create_ws(self._vault("T", _file_ref(colour="blue")))
         assert resp.status_code == 422
         assert resp.json()["detail"] == (
-            "variable 'T' has a vault `file` with unknown keys: colour (only `name` is supported)"
+            "variable 'T' has a vault `file` with unknown keys: colour (supported: `name`, "
+            "`template`, `format`, `fields`, `encoding`)"
         )
 
     async def test_a_reserved_file_key_is_422(self):
-        resp, _ = await self._create_ws(self._vault("T", _file_ref(mode="0600", template="x")))
+        resp, _ = await self._create_ws(self._vault("T", _file_ref(mode="0600")))
         assert resp.status_code == 422
         assert resp.json()["detail"] == (
-            "variable 'T' has a vault `file` using mode, template, which is reserved for a "
-            "later release and not supported yet (only `name` is supported)"
+            "variable 'T' has a vault `file` using mode, which is reserved for a later release "
+            "and not supported yet (supported: `name`, `template`, `format`, `fields`, `encoding`)"
         )
+
+    # ── #1648: templates, formats and encoding are validated on write ──
+
+    @staticmethod
+    def _whole_secret_ref(**file) -> str:
+        """A reference whose content is built from the whole secret: no field."""
+        coords = {k: v for k, v in _COORDS.items() if k != "field"}
+        return json.dumps({**coords, "file": file})
+
+    async def test_a_template_without_a_field_is_accepted(self):
+        tpl = "[default]\naws_access_key_id = {{ access_key }}\n"
+        value = self._whole_secret_ref(name="~/.aws/credentials", template=tpl)
+        resp, created = await self._create_ws(self._vault("T", value))
+        assert resp.status_code == 201, resp.text
+        assert json.loads(created["value"])["file"]["template"] == tpl
+
+    async def test_a_format_with_fields_is_accepted(self):
+        value = self._whole_secret_ref(format="env", fields=["DB_USER", "DB_PASS"])
+        resp, _ = await self._create_ws(self._vault("T", value))
+        assert resp.status_code == 201, resp.text
+
+    async def test_a_field_with_base64_encoding_is_accepted(self):
+        resp, _ = await self._create_ws(self._vault("T", _file_ref(encoding="base64")))
+        assert resp.status_code == 201, resp.text
+
+    async def test_a_template_syntax_error_is_422_before_any_run(self):
+        value = self._whole_secret_ref(template="x = {{ access_key | upper }}")
+        resp, created = await self._create_ws(self._vault("T", value))
+        assert resp.status_code == 422
+        assert resp.json()["detail"].startswith(
+            "variable 'T': vault file template tag {{ access_key | upper }} uses unknown "
+            "filter 'upper'"
+        )
+        assert created == {}
+
+    async def test_a_template_beside_a_field_is_422(self):
+        resp, _ = await self._create_ws(self._vault("T", _file_ref(template="{{ a }}")))
+        assert resp.status_code == 422
+        assert resp.json()["detail"].startswith(
+            "variable 'T': `field` and `file.template` cannot be combined"
+        )
+
+    async def test_a_template_and_a_format_together_are_422(self):
+        value = self._whole_secret_ref(template="{{ a }}", format="json")
+        resp, _ = await self._create_ws(self._vault("T", value))
+        assert resp.status_code == 422
+        assert "`file.template` and `file.format` cannot be combined" in resp.json()["detail"]
+
+    async def test_encoding_with_a_template_is_422(self):
+        value = self._whole_secret_ref(template="{{ a }}", encoding="base64")
+        resp, _ = await self._create_ws(self._vault("T", value))
+        assert resp.status_code == 422
+        assert "`encoding` decodes the one `field`" in resp.json()["detail"]
+
+    async def test_a_template_on_a_static_source_is_422(self):
+        """`file` on a static source is refused for a field-less reference too."""
+        attrs = {"key": "T", "value": self._whole_secret_ref(template="{{ a }}"), "category": "env"}
+        resp, created = await self._create_ws(attrs)
+        assert resp.status_code == 422
+        assert resp.json()["detail"] == _STATIC_DETAIL
+        assert created == {}
 
     async def test_file_with_hcl_is_422(self):
         attrs = self._vault("T", _file_ref(), category="terraform", hcl=True)

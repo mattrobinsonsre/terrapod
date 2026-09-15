@@ -117,6 +117,51 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('Vault file templates and formats are usable at phone width (#1648)', async ({ page }) => {
+    // A template is multi-line text: the textarea must fit the phone and let
+    // a long line scroll inside itself, not push the page sideways. The
+    // format's two controls stack rather than squeeze side by side.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespvtpl'), {
+      'execution-mode': 'agent',
+    })
+    await page.route('**/api/terrapod/v1/vault/availability', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability',
+            id: 'vault',
+            attributes: { enabled: true, instances: ['default'], 'default-instance': 'default' },
+          },
+        }),
+      }),
+    )
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await page.locator('#var-source').selectOption('vault')
+    await page.locator('#add-file').check()
+    await page.locator('#add-file-content').selectOption('template')
+    const longLine =
+      'aws_secret_access_key = {{ secret_key }} # a deliberately long line that is much wider than a phone screen'
+    await page.locator('#add-file-template').fill(`[default]\n${longLine}\n`)
+    await expect(page.locator('#add-file-template')).toBeVisible()
+    await expect(page.locator('#add-field')).toHaveCount(0)
+    await expectNoHorizontalPageScroll(page)
+
+    await page.locator('#add-file-content').selectOption('format')
+    await expect(page.locator('#add-file-format')).toBeVisible()
+    await expect(page.locator('#add-file-fields')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    await page.locator('#add-file-content').selectOption('field')
+    await expect(page.locator('#add-file-encoding')).toBeVisible()
+    await expect(page.locator('#add-field')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('workspace variable sets panel adapts to mobile (#1440)', async ({ page }) => {
     // Seeded rather than asserted on an empty page: with no set applying, the
     // panel renders nothing at all and the assertion would pass however the

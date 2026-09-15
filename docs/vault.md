@@ -515,6 +515,176 @@ The file exists before `init`, so it is available to every phase.
 A field that Vault holds as a map or list (a service-account key stored as a
 JSON object rather than a string) is written as JSON.
 
+A file can also be built from **several fields of the one read**, or from the
+whole secret — see [Templates, formats and encoding](#templates-formats-and-encoding).
+
+### Templates, formats and encoding
+
+Real credential files need several fields together: an AWS credentials file
+needs a key id *and* its secret, and a TLS bundle needs a certificate *and* the
+key issued with it. Taking them from two variables would work for a static
+secret, but a dynamic engine mints a new credential on every read. So the file
+itself can say how to assemble its content from the single read that every
+variable on that secret shares.
+
+The content of a file is **exactly one** of these, and combining them is a
+`422`:
+
+| In the reference | The file holds |
+|---|---|
+| `field` | That one field (the default, as above). |
+| `field` + `"file": {"encoding": "base64"}` | That field, base64-decoded. |
+| `"file": {"template": "…"}`, no `field` | A template rendered against the whole secret. |
+| `"file": {"format": "json"}` or `"env"`, no `field` | The whole secret, or the `"fields": [...]` subset. |
+
+All of it is validated when you save the variable, except what depends on the
+secret itself (whether a named field exists, whether a value is valid base64).
+Those fail the run, naming the variable and the field — never a value.
+
+#### Templates
+
+A template is text with `{{ … }}` placeholders, at most 16 KiB:
+
+```
+{{ name }}                 a field of the secret
+{{ creds.key }}            a key inside a map field (dots reach into maps)
+{{ name | filter | … }}    filters, applied left to right
+```
+
+| Filter | Does |
+|---|---|
+| `json` | Writes the value as JSON (a string gets quotes and escapes). |
+| `base64decode` | Decodes a base64 string; the result must be UTF-8 text. |
+| `trim` | Strips leading and trailing whitespace. |
+| `lines` | Joins a list with newlines — for a certificate chain. |
+| `indent N` | Indents every line **after the first** by `N` spaces (0–64), so a multi-line value lines up under a placeholder that is already indented, as in a YAML block. |
+
+A string field is written as it is; any other value (a number, a boolean, a map,
+a list) is written as JSON.
+
+When the response carries a lease — a dynamic engine's does, kv-v2's never does —
+a template can also read `{{ _lease.ttl }}` (seconds), `{{ _lease.renewable }}`
+and `{{ _lease.expires_at }}` (RFC 3339, UTC). The lease id is never offered.
+
+It is **logic-less on purpose**: no loops, conditionals, functions, environment,
+file or network access. It is a single pass and substituted values are never
+re-scanned, so a secret that happens to contain `{{` is written literally and
+cannot pull in anything else. Every `{{` opens a placeholder, so one without a
+closing `}}` is refused rather than written as text. A name or filter that does
+not exist fails the run naming it; an unknown filter or a malformed placeholder
+is caught when you save.
+
+`{{ }}` is not Terraform interpolation (that is `${ }`), so a template needs no
+escaping inside `jsonencode` in the Terraform provider.
+
+**An AWS credentials file from one `aws/creds` read.** The key id and the secret
+come from the same lease:
+
+```json
+{ "engine": "dynamic", "mount": "aws", "path": "creds/deploy",
+  "file": { "name": "~/.aws/credentials",
+            "template": "[default]\naws_access_key_id = {{ access_key }}\naws_secret_access_key = {{ secret_key }}\n" } }
+```
+
+```ini
+[default]
+aws_access_key_id = AKIA…
+aws_secret_access_key = …
+```
+
+The AWS CLI and SDKs read `~/.aws/credentials` by default, so nothing else is
+needed. Put the reference on a variable such as `AWS_SHARED_CREDENTIALS_FILE`
+and it also tells a tool where the file is.
+
+**STS credentials, with the session token and the expiry.** `aws/sts/<role>` is
+a write, so it needs `POST`. Check your Vault's response for the token's field
+name (`vault write aws/sts/deploy ttl=1h`); recent versions return
+`security_token`:
+
+```json
+{ "engine": "dynamic", "method": "POST", "mount": "aws", "path": "sts/deploy",
+  "data": { "ttl": "1h" },
+  "file": { "name": "~/.aws/credentials",
+            "template": "[default]\naws_access_key_id = {{ access_key }}\naws_secret_access_key = {{ secret_key }}\naws_session_token = {{ security_token }}\n# expires {{ _lease.expires_at }}\n" } }
+```
+
+**A kubeconfig** from a kv-v2 secret holding `server`, `ca_data` (the CA,
+already base64-encoded, as kubeconfig expects) and `token`:
+
+```json
+{ "mount": "secret", "path": "clusters/staging",
+  "file": { "name": "~/.kube/config",
+            "template": "apiVersion: v1\nkind: Config\nclusters:\n  - name: target\n    cluster:\n      server: {{ server }}\n      certificate-authority-data: {{ ca_data }}\nusers:\n  - name: terrapod\n    user:\n      token: {{ token | trim }}\ncontexts:\n  - name: target\n    context: {cluster: target, user: terrapod}\ncurrent-context: target\n" } }
+```
+
+**A PEM bundle whose key matches its certificate**, from one `pki/issue`:
+
+```json
+{ "engine": "dynamic", "method": "POST", "mount": "pki", "path": "issue/web",
+  "data": { "common_name": "app.example.internal" },
+  "file": { "name": "tls/bundle.pem",
+            "template": "{{certificate}}\n{{private_key}}\n{{ca_chain|lines}}\n" } }
+```
+
+`ca_chain` is a list, so `lines` puts each certificate on its own lines. Other
+variables on the same `pki/issue` reference — `TLS_CERT` with
+`field: certificate`, say — read from the same issue, so they match the bundle.
+
+#### Formats
+
+`format` writes the whole secret, or the keys listed in `fields`, without a
+template:
+
+| `format` | Writes |
+|---|---|
+| `json` | The data as a JSON object, indented two spaces, with a trailing newline. Keys keep Vault's order, or the order of `fields`. |
+| `env` | One `KEY="value"` line per key, each ending in a newline. |
+
+For kv-v2 "the secret" is the secret's own data — what `vault kv get` shows —
+not the metadata envelope. For a dynamic engine it is the response's `data`.
+
+```json
+{ "mount": "secret", "path": "apps/db",
+  "file": { "name": "db.env", "format": "env", "fields": ["DB_USER", "DB_PASS"] } }
+```
+
+`env` is **POSIX-shell syntax**: sourcing the file (`set -a; . ./db.env; set +a`)
+gives each variable its exact value. Inside the double quotes, the four
+characters a shell treats specially there — `\`, `"`, `$` and a backtick — are
+each escaped with a backslash, and nothing else is: a newline stays a real
+newline inside the quotes, so a PEM key round-trips. Every key must be a valid
+environment name (`[A-Za-z_][A-Za-z0-9_]*`) and no value may contain a NUL byte;
+otherwise the run fails naming the key. Non-string values are written as JSON.
+
+Dotenv libraries do not all follow shell quoting — some leave `\$` as two
+characters, or expand `${…}`. If a tool reads the file with such a library
+rather than a shell, prefer a template that writes exactly the syntax it
+expects.
+
+#### Encoding
+
+`"encoding": "base64"` decodes the reference's `field` before writing it. This
+is for engines that return a file base64-encoded — GCP's dynamic service-account
+keys, for example, whose `private_key_data` is the key JSON in base64:
+
+```json
+{ "engine": "dynamic", "mount": "gcp", "path": "key/deploy", "field": "private_key_data",
+  "file": { "name": "gcp/adc.json", "encoding": "base64" } }
+```
+
+Wrapped (multi-line) base64 is accepted. The decoded bytes must be UTF-8 text:
+**binary files are not supported yet** and are refused with a clear error. Inside
+a template, use the `base64decode` filter instead; `encoding` with a template or
+a format is a `422`.
+
+#### Size
+
+A rendered file is capped at 256 KiB, measured after the template, format or
+decoding has produced it. All the Vault files in one run together are capped at
+768 KiB, because they share the per-run Kubernetes Secret (capped at 1 MiB) with
+every other variable. Going over either fails the run, naming the variable that
+tipped it over and the size.
+
 ### Where the file lands
 
 | `file.name` | Written to |
@@ -558,8 +728,11 @@ file itself stays read-only: a tool that rewrites that exact file fails.
 | `file` together with `hcl` | `422` — the value is a path, not an HCL expression. |
 | `file` on a variable whose value source is `static` | `422` — the reference would be delivered as the literal JSON. |
 | Two variables at one path, or a file where another needs a directory (`a` and `a/b`) | The run errors, naming both variables. Checked after variable-set precedence, so a workspace variable that overrides a set variable of the **same key** is one file, not a clash. |
-| A value over 256 KiB | The run errors, giving the size. |
-| Any other key inside `file` | `422`. `template`, `format`, `encoding` and `mode` are reserved for a later release. |
+| More than one of `field`, `file.template` and `file.format` | `422`. |
+| A template syntax error or unknown filter; `fields` without `format`; `encoding` with a template or format | `422`. |
+| A template name the secret does not have; invalid base64; decoded bytes that are not UTF-8 | The run errors, naming the variable and the field, never a value. |
+| A file over 256 KiB after rendering, or Vault files over 768 KiB in one run | The run errors, giving the size. |
+| Any other key inside `file` | `422`. `mode` is reserved for a later release. |
 
 ### Older listeners
 
@@ -716,11 +889,10 @@ this path.
   Vault-bearing set can reach.
 - **Leases are not renewed or revoked.** A dynamic credential is minted per run
   and left to expire. Set the Vault role's TTL to suit your run durations.
-- **One field per file.** A file holds one field of a secret, or the whole field
-  as JSON when Vault stores it as a map. Combining several fields into one file
-  (a PEM bundle, say) is not supported yet; `template`, `format`, `encoding` and
-  `mode` are reserved in the `file` object for that. Files are text: there is no
-  binary or base64 decoding yet.
+- **Files are text.** A file's content, after any template, format or base64
+  decoding, must be UTF-8 text; binary files need a wire change and are not
+  supported yet. A file's permissions are fixed (see
+  [Permissions](#permissions)); `mode` is reserved in the `file` object for that.
 - **`approle` and `token` auth** work but are less well trodden than
   `kubernetes` and `jwt`, which need no stored credential. See
   [Other auth methods](#other-auth-methods-and-namespaces).

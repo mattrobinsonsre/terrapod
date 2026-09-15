@@ -27,7 +27,12 @@ RUNNER_HOME = "/home/runner"
 HOME_PREFIX = "~/"
 
 MAX_NAME_LEN = 255
+#: Per file, after any template, format or decoding has produced its content.
 MAX_FILE_BYTES = 256 * 1024
+#: Across every Vault file in one run (#1648). The files share the per-run vars
+#: Secret with every other variable, and a Kubernetes Secret is capped at 1 MiB,
+#: so files may take at most three quarters of it.
+MAX_TOTAL_FILE_BYTES = 768 * 1024
 
 _SEGMENT = re.compile(r"[A-Za-z0-9._-]+")
 

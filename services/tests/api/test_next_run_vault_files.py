@@ -22,7 +22,7 @@ import pytest
 from terrapod.api.routers import runs as runs_router
 from terrapod.config import VaultConfig, settings
 from terrapod.services.variable_service import ResolvedVariable
-from terrapod.services.vault_client import VaultError, VaultUnavailable
+from terrapod.services.vault_client import VaultError, VaultResponse, VaultUnavailable
 
 SECRET = "S3CR3T-next-run-file-content"
 
@@ -81,7 +81,7 @@ async def _claim(resolved, *, read=None) -> _Claim:
     db = AsyncMock()
     db.get = AsyncMock(return_value=ws)
     transition = AsyncMock()
-    read = read or AsyncMock(return_value={"sa": SECRET, "token": "TOKEN-V"})
+    read = read or AsyncMock(return_value=VaultResponse({"sa": SECRET, "token": "TOKEN-V"}))
     with (
         patch.object(
             runs_router.agent_pool_service,
@@ -101,7 +101,7 @@ async def _claim(resolved, *, read=None) -> _Claim:
         patch.object(
             runs_router, "_run_json", return_value={"data": {"id": "run-x", "attributes": {}}}
         ),
-        patch("terrapod.services.vault_source_service.read_secret_data", read),
+        patch("terrapod.services.vault_source_service.read_secret_response", read),
         patch.object(runs_router, "logger") as api_log,
         patch("terrapod.services.vault_source_service.logger") as vss_log,
     ):
@@ -183,6 +183,52 @@ class TestDelivery:
         assert c.attrs["env-vars"] == [{"key": "TOKEN", "value": "TOKEN-V"}]
         assert c.attrs["vault-files"] == []
 
+    async def test_a_templated_file_and_two_variables_on_one_secret_are_one_read(self):
+        """#1648: a credentials file built from two fields of the same read the
+        env variables take theirs from — so all three belong to one credential."""
+        creds = {
+            "source": "vault",
+            "engine": "dynamic",
+            "mount": "aws",
+            "path": "creds/deploy",
+        }
+        tpl = "[default]\naws_access_key_id = {{ access_key }}\naws_secret_access_key = {{ secret_key }}\n"
+        read = AsyncMock(return_value=VaultResponse({"access_key": "AK", "secret_key": SECRET}))
+        c = await _claim(
+            [
+                _rv("AWS_ACCESS_KEY_ID", json.dumps({**creds, "field": "access_key"})),
+                _rv("AWS_SECRET_ACCESS_KEY", json.dumps({**creds, "field": "secret_key"})),
+                _rv(
+                    "AWS_SHARED_CREDENTIALS_FILE",
+                    json.dumps({**creds, "file": {"name": "aws/credentials", "template": tpl}}),
+                ),
+            ],
+            read=read,
+        )
+        attrs = c.attrs
+        assert read.await_count == 1
+        assert attrs["vault-files"] == [
+            {
+                "key": "AWS_SHARED_CREDENTIALS_FILE",
+                "name": "aws/credentials",
+                "value": f"[default]\naws_access_key_id = AK\naws_secret_access_key = {SECRET}\n",
+            }
+        ]
+        env = {v["key"]: v["value"] for v in attrs["env-vars"]}
+        assert env["AWS_SHARED_CREDENTIALS_FILE"] == "/var/run/terrapod/files/aws/credentials"
+        assert env["AWS_ACCESS_KEY_ID"] == "AK"
+
+    async def test_an_unknown_template_name_errors_the_run_without_a_value(self):
+        tpl_ref = _ref(field=None, file={"template": "{{ nope }}"})
+        c = await _claim([_rv("F", tpl_ref)])
+        assert c.resp.status_code == 204
+        msg = c.transition.await_args.kwargs["error_message"]
+        assert msg == (
+            "variable 'F': tag {{ nope }} names 'nope', which is not in the secret "
+            "(available: sa, token)"
+        )
+        assert SECRET not in msg and SECRET not in c.logs
+
     async def test_a_workspace_with_no_vault_variables_has_empty_vault_files(self):
         c = await _claim([_rv("PLAIN", "literal", value_source="static")])
         assert c.attrs["vault-files"] == []
@@ -216,7 +262,7 @@ class TestTheRunFailsOrWaits:
         assert "needs as a directory for /var/run/terrapod/files/a/b" in msg
 
     async def test_an_oversized_file_errors_the_run(self):
-        big = AsyncMock(return_value={"sa": "Z" * (256 * 1024 + 1)})
+        big = AsyncMock(return_value=VaultResponse({"sa": "Z" * (256 * 1024 + 1)}))
         c = await _claim([_rv("F", _ref(file={}))], read=big)
         msg = await self._errored_with(c)
         assert msg == (
@@ -242,7 +288,7 @@ class TestTheRunFailsOrWaits:
         assert c.transition.await_args.args[1:] == (c.run, "queued")
 
     async def test_no_failure_path_logs_the_content(self):
-        big = AsyncMock(return_value={"sa": SECRET * 20000})
+        big = AsyncMock(return_value=VaultResponse({"sa": SECRET * 20000}))
         c = await _claim([_rv("F", _ref(file={}))], read=big)
         assert c.resp.status_code == 204
         assert SECRET not in c.logs

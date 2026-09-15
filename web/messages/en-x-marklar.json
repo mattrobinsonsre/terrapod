@@ -2518,7 +2518,22 @@
       "vaultFileName": "Marklar marklar",
       "vaultFileNameDefault": "Defaults to the marklar marklar",
       "vaultFileBadge": "Marklar",
-      "vaultFileHint": "The marklar holds the marklar's marklar, not the marklar: use it as {fileFn}, or with a marklar that reads a marklar from a marklar marklar. A relative marklar such as {relExample} is written under {base}; a marklar starting with {home}, such as {homeExample}, goes in the marklar's marklar marklar."
+      "vaultFileHint": "The marklar holds the marklar's marklar, not the marklar: use it as {fileFn}, or with a marklar that reads a marklar from a marklar marklar. A relative marklar such as {relExample} is written under {base}; a marklar starting with {home}, such as {homeExample}, goes in the marklar's marklar marklar.",
+      "vaultFileContent": "Marklar marklar",
+      "vaultFileContentField": "One marklar",
+      "vaultFileContentTemplate": "Marklar over the marklar",
+      "vaultFileContentFormat": "Whole marklar",
+      "vaultFileTemplate": "Marklar",
+      "vaultFileTemplateHint": "Each marklar such as {example} is replaced with that marklar from this one Marklar marklar; marklars reach into a marklar. Marklars: {filters}. {lease} and the other marklar marklars work when the marklar has a marklar. Inserted marklars are never expanded again.",
+      "vaultFileFormat": "Marklar",
+      "vaultFileFormatJson": "Marklar marklar",
+      "vaultFileFormatEnv": "Marklar marklar (KEY=\"value\" marklars)",
+      "vaultFileFields": "Marklars (optional)",
+      "vaultFileFieldsHint": "Marklar marklars separated by marklars. Leave empty to write the whole marklar.",
+      "vaultFileEncoding": "Marklar",
+      "vaultFileEncodingNone": "As stored in Marklar",
+      "vaultFileEncodingBase64": "Marklar-decode",
+      "vaultFileEncodingHint": "Decodes the marklar before it is written. The marklar must be marklar; binary marklars are not supported."
     },
     "runs": {
       "options": "Marklars",

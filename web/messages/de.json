@@ -2518,7 +2518,22 @@
       "vaultFileName": "Dateiname",
       "vaultFileNameDefault": "Standard ist der Variablenschlüssel",
       "vaultFileBadge": "Datei",
-      "vaultFileHint": "Die Variable enthält den Pfad der Datei, nicht das Secret: Verwenden Sie sie als {fileFn} oder mit einem Tool, das einen Pfad aus einer Umgebungsvariable liest. Ein relativer Name wie {relExample} wird unter {base} abgelegt; ein Name, der mit {home} beginnt, etwa {homeExample}, landet im Home-Verzeichnis des Runners."
+      "vaultFileHint": "Die Variable enthält den Pfad der Datei, nicht das Secret: Verwenden Sie sie als {fileFn} oder mit einem Tool, das einen Pfad aus einer Umgebungsvariable liest. Ein relativer Name wie {relExample} wird unter {base} abgelegt; ein Name, der mit {home} beginnt, etwa {homeExample}, landet im Home-Verzeichnis des Runners.",
+      "vaultFileContent": "Dateiinhalt",
+      "vaultFileContentField": "Ein Feld",
+      "vaultFileContentTemplate": "Vorlage über das Secret",
+      "vaultFileContentFormat": "Gesamtes Secret",
+      "vaultFileTemplate": "Vorlage",
+      "vaultFileTemplateHint": "Jeder Platzhalter wie {example} wird durch dieses Feld aus diesem einen Vault-Lesevorgang ersetzt; Punkte greifen in eine Map. Filter: {filters}. {lease} und die anderen Lease-Felder funktionieren, wenn das Secret eine Lease hat. Eingesetzte Werte werden nie erneut ausgewertet.",
+      "vaultFileFormat": "Format",
+      "vaultFileFormatJson": "JSON-Objekt",
+      "vaultFileFormatEnv": "Env-Datei (Zeilen KEY=\"value\")",
+      "vaultFileFields": "Felder (optional)",
+      "vaultFileFieldsHint": "Feldnamen, durch Kommas getrennt. Leer lassen, um das gesamte Secret zu schreiben.",
+      "vaultFileEncoding": "Kodierung",
+      "vaultFileEncodingNone": "Wie in Vault gespeichert",
+      "vaultFileEncodingBase64": "Base64-dekodieren",
+      "vaultFileEncodingHint": "Dekodiert das Feld, bevor es geschrieben wird. Das Ergebnis muss Text sein; Binärdateien werden nicht unterstützt."
     },
     "runs": {
       "options": "Optionen",

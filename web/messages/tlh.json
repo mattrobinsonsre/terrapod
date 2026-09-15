@@ -2518,7 +2518,22 @@
       "vaultFileName": "ghItlh pong",
       "vaultFileNameDefault": "motlh pong: choH ngoq",
       "vaultFileBadge": "ghItlh",
-      "vaultFileHint": "ghItlh He ngaS choH, pegh ngaSbe': {fileFn} rur yIlo', pagh He laDbogh jan yIlo'. {relExample} rur pong {base}-Daq ghItlhlu'; {home}-vo' taghbogh pong, {homeExample} rur, qaStaHvIS juHDaq lanlu'."
+      "vaultFileHint": "ghItlh He ngaS choH, pegh ngaSbe': {fileFn} rur yIlo', pagh He laDbogh jan yIlo'. {relExample} rur pong {base}-Daq ghItlhlu'; {home}-vo' taghbogh pong, {homeExample} rur, qaStaHvIS juHDaq lanlu'.",
+      "vaultFileContent": "ghItlh ngaS",
+      "vaultFileContentField": "wa'' Say''",
+      "vaultFileContentTemplate": "pegh mIw",
+      "vaultFileContentFormat": "pegh naQ",
+      "vaultFileTemplate": "mIw",
+      "vaultFileTemplateHint": "{example} rur Hoch Daq Vault laDlu''bogh wa''vo'' Say''vam lIS; ''ay'' ghoS puSmey. Segh: {filters}. lease ghajbogh pegh {lease} Qap. lIS ngaSmey not nIHlu''.",
+      "vaultFileFormat": "mIw Segh",
+      "vaultFileFormatJson": "JSON Doch",
+      "vaultFileFormatEnv": "env ghItlh (KEY=\"value\" tlheghmey)",
+      "vaultFileFields": "Say''mey (DuH)",
+      "vaultFileFieldsHint": "Say'' pongmey, ''ay''mey ghobmey. pegh naQ ghItlhmeH yIchImmoH.",
+      "vaultFileEncoding": "ngoq",
+      "vaultFileEncodingNone": "Vault Daq pollu''bogh rur",
+      "vaultFileEncodingBase64": "Base64 yIpoj",
+      "vaultFileEncodingHint": "ghItlhlu''pa'' Say'' pojlu''. mu'' ghItlh moj ngaS; ghItlh cha''logh ngaSbe''."
     },
     "runs": {
       "options": "wIvmey",
