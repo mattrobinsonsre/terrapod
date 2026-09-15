@@ -44,7 +44,11 @@ PLAN_SUMMARY_JSON_SCHEMA: dict = {
             "type": "string",
             "enum": ["low", "medium", "high", "critical"],
             "description": (
-                "Overall risk. 'critical' is reserved for irreversible "
+                "The risk of applying THIS change — judged only from what "
+                "this plan creates, updates, deletes or replaces. Pre-existing "
+                "issues on resources the plan does not change (scanner "
+                "findings, cost, observed drift) never raise it, and a plan "
+                "that changes nothing is 'low'. 'critical' is reserved for irreversible "
                 "destructive changes to production-critical resources "
                 "(data stores, certificate authorities, IAM trust roots). "
                 "'high' is for any unmitigated destroy or replace. "
@@ -55,8 +59,11 @@ PLAN_SUMMARY_JSON_SCHEMA: dict = {
         "risk_factors": {
             "type": "array",
             "description": (
-                "Discrete risks identified, ordered worst first. Empty "
-                "array when risk_level == 'low' is acceptable."
+                "Discrete risks of applying this change, ordered worst first. "
+                "Every factor must be about a resource this plan creates, "
+                "updates, deletes or replaces, or a drift reversion it "
+                "performs — never about a resource it leaves unchanged. "
+                "Empty array when risk_level == 'low' is acceptable."
             ),
             "items": {
                 "type": "object",
@@ -84,8 +91,9 @@ PLAN_SUMMARY_JSON_SCHEMA: dict = {
                             "Which review dimension this factor belongs to. "
                             "'change' = a risk of the change itself (the "
                             "original plan-review lens); the others are the "
-                            "grounded design-review dimensions. Optional; omit "
-                            "for a plain change risk."
+                            "grounded design-review dimensions, which apply "
+                            "only to resources this plan changes. Optional; "
+                            "omit for a plain change risk."
                         ),
                     },
                     "resource_address": {
@@ -277,7 +285,8 @@ responsibility in mind. You are reviewing this change — not redesigning the
 wider system — but you also weigh the design quality of the resources this
 change itself creates or modifies, across security, reliability, cost, and
 operations, grounded in the deterministic signals below (see "Grounded design
-review").
+review"). Your rating is the risk of applying THIS change; problems that
+already exist on resources the plan does not change are not part of it.
 
 You will receive these inputs in the user message:
   • PLAN_JSON — `tofu show -json` output for the proposed changes.
@@ -298,8 +307,13 @@ You will receive these inputs in the user message:
   • SECURITY_FINDINGS (when present) — the deterministic Checkov/Trivy
     security scan for this plan: authoritative, already-computed findings
     (rule id, severity, resource). Ground truth for the security dimension.
+    It covers EVERY resource in the configuration, including the many this
+    plan does not change — only findings on resources the plan creates,
+    updates or replaces are relevant to this review.
   • COST_ESTIMATE (when present) — the deterministic per-resource monthly
     cost estimate for this plan. Ground truth for the cost dimension.
+    Its totals include resources this plan does not change; only the cost
+    this change adds or removes is relevant to this review.
 
 You submit your answer by calling the `submit_plan_summary` tool
 exactly once. The tool's parameters carry the schema; the provider
@@ -342,9 +356,9 @@ CRITICAL — drift is NOT the apply change set:
       these briefly in `description` as "observed out-of-band
       change to X" when notable, but you MUST NOT describe them
       as "will be destroyed" / "will be updated" / etc., and
-      MUST NOT list them as `risk_factors`. The resource is
-      already gone (or changed) in reality; this plan does not
-      touch it.
+      MUST NOT list them as `risk_factors`, and they never affect
+      `risk_level`. The resource is already gone (or changed) in
+      reality; this plan does not touch it.
 
 CRITICAL — a drift-detection run is a DETECTION report, not a proposal:
 
@@ -379,6 +393,18 @@ CRITICAL — a drift-detection run is a DETECTION report, not a proposal:
       and no PR. It is a scheduled health check that found (or did not
       find) drift.
 
+CRITICAL — `risk_level` is the risk of THIS change, and nothing else:
+
+  `risk_level` and every `risk_factor` answer one question: what could go
+  wrong by applying this plan? They are about the resources this plan
+  creates, updates, deletes or replaces, and the drift reversions it
+  performs. Problems that ALREADY EXIST on resources the plan leaves
+  unchanged — scanner findings, cost, missing backups or monitoring,
+  out-of-band drift the plan does not act on — are not risks of this
+  change. They are never `risk_factors` and never raise `risk_level`,
+  however serious they are. You are reviewing the change, not auditing
+  the estate.
+
 CRITICAL — risk is grounded in PLAN_JSON, never in CODE_DIFF:
 
   Rate `risk_level` SOLELY from the changes in PLAN_JSON — its
@@ -399,6 +425,17 @@ CRITICAL — risk is grounded in PLAN_JSON, never in CODE_DIFF:
   workspace sees that edit in CODE_DIFF but plans zero changes. Their
   risk is `low`. Do not let an edit you can see in the diff, but which
   the plan did not act on, drive the rating.
+
+  The same holds for every other input. When no entry in
+  `resource_changes` has `create`, `update` or `delete` in its
+  `change.actions` (and none is importing) and there is no
+  `resource_drift` reversion, the plan changes nothing: `risk_level` is
+  `low` and `risk_factors` is `[]` — even when SECURITY_FINDINGS lists
+  many issues, COST_ESTIMATE shows a large monthly cost, or
+  `drift_observed_no_apply_action` has entries. You may say in
+  `description` that the plan changes nothing. This rule overrides every
+  other section of these instructions, including the grounded design
+  review below.
 
 CRITICAL — `risk_level` and `risk_factors` are paired, not independent:
 
@@ -493,7 +530,17 @@ Grounded design review (in addition to change risk):
   When SECURITY_FINDINGS and/or COST_ESTIMATE are present, extend your
   review beyond the change's blast radius to the design quality of the
   resources this plan creates or modifies — as ADDITIONAL `risk_factors`,
-  each tagged with the matching `category`:
+  each tagged with the matching `category`.
+
+  This review applies ONLY to resources whose `change.actions` include
+  `create` or `update` in this plan (a replace counts; so does a resource
+  being imported). For a resource being updated, raise a finding only if
+  this change introduces it or makes it worse — the flagged attribute is
+  one the change alters. A finding on a resource the plan does not change
+  is pre-existing: do not list it, and it must never raise `risk_level`.
+  If the plan changes nothing, this review adds nothing.
+
+  The dimensions:
     • security — driven by SECURITY_FINDINGS. The scanner is ground truth:
       surface and prioritise its material findings in context (exposure,
       over-broad IAM, missing encryption, public endpoints), anchored to the
@@ -509,9 +556,10 @@ Grounded design review (in addition to change risk):
   These design factors are ADDITIVE to the change-risk factors; the change
   risks themselves keep `category: change` or omit the category. `risk_level`
   remains the single overall grade — raise it only for a genuine, consequential
-  problem, never for a scanner nit on a throwaway fixture (weigh FLEET_CONTEXT,
-  same "don't cry wolf" bar). If SECURITY_FINDINGS and COST_ESTIMATE are both
-  absent, review the change exactly as before and add nothing.
+  problem THIS CHANGE introduces, never for a scanner nit on a throwaway
+  fixture (weigh FLEET_CONTEXT, same "don't cry wolf" bar). If
+  SECURITY_FINDINGS and COST_ESTIMATE are both absent, review the change
+  exactly as before and add nothing.
 
 Style:
   • Operator-facing, terse, professional. No emojis. No first-person
