@@ -22,7 +22,8 @@
 //	"ignore-patterns"   -> ignore_patterns   (list of strings, optional)
 //	"enabled"           -> enabled           (bool, optional, default true)
 //	"name-template"     -> name_template     (string, optional)
-//	"provider"          -> provider          (string, optional, "" = from the repository name)
+//	"provider"          -> module_provider   (string, optional, "" = from the repository name;
+//	                                         "provider" is a reserved root attribute name)
 //	"vcs-tag-pattern"   -> vcs_tag_pattern   (string, optional, default "v*")
 //	"labels"            -> labels            (map[string]string, optional)
 //	"owner-email"       -> owner_email       (string, optional)
@@ -79,7 +80,7 @@ type moduleRuleModel struct {
 	IgnorePatterns  types.List   `tfsdk:"ignore_patterns"`
 	Enabled         types.Bool   `tfsdk:"enabled"`
 	NameTemplate    types.String `tfsdk:"name_template"`
-	Provider        types.String `tfsdk:"provider"`
+	Provider        types.String `tfsdk:"module_provider"`
 	VCSTagPattern   types.String `tfsdk:"vcs_tag_pattern"`
 	Labels          types.Map    `tfsdk:"labels"`
 	OwnerEmail      types.String `tfsdk:"owner_email"`
@@ -158,7 +159,7 @@ func (r *moduleRuleResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Computed: true,
 				Default:  stringdefault.StaticString(""),
 			},
-			"provider": schema.StringAttribute{
+			"module_provider": schema.StringAttribute{
 				Description: "Provider for the registered modules (e.g. aws). Empty (default) takes it from a " +
 					"terraform-<provider>-<name> repository name.",
 				Optional: true,

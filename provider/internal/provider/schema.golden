@@ -220,11 +220,11 @@ resource terrapod_module_autodiscovery_rule.id required=false optional=false com
 resource terrapod_module_autodiscovery_rule.ignore_patterns required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_module_autodiscovery_rule.labels required=false optional=true computed=true sensitive=false type=types.MapType[basetypes.StringType]
 resource terrapod_module_autodiscovery_rule.last_scanned_sha required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_module_autodiscovery_rule.module_provider required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.name_template required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.owner_email required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.pattern required=true optional=false computed=false sensitive=false type=basetypes.StringType
-resource terrapod_module_autodiscovery_rule.provider required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.repo_url required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.vcs_connection_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
