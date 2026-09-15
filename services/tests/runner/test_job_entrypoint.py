@@ -144,6 +144,69 @@ class TestConfigurationArchiveError:
         log.exception.assert_not_called()
 
 
+class TestFailureReason:
+    """#1631: a failed run tells the API why, in the end-of-run profile POST."""
+
+    def _isolate(self, monkeypatch, tmp_path):
+        _env(monkeypatch)
+        monkeypatch.setenv("WORK_DIR", str(tmp_path))
+        for name in ("_INIT_LOG", "_PLAN_LOG", "_APPLY_LOG", "_COMBINED_LOG"):
+            monkeypatch.setattr(job_entrypoint, name, tmp_path / f"{name.strip('_').lower()}.log")
+        job_entrypoint.failure_reason.reset()
+
+    def _main(self, body):
+        with (
+            patch.object(job_entrypoint, "_run_body", side_effect=body),
+            patch.object(job_entrypoint.log_capture, "upload_combined_log"),
+            patch.object(job_entrypoint.resource_profile, "post_profile") as upro,
+        ):
+            rc = job_entrypoint.main()
+        return rc, upro.call_args.kwargs
+
+    def test_a_failed_plan_sends_tofus_error(self, monkeypatch, tmp_path) -> None:
+        self._isolate(monkeypatch, tmp_path)
+
+        def body(cfg, work_dir):
+            job_entrypoint._PLAN_LOG.write_text(
+                "╷\n│ Error: Unsupported argument\n│\n│   on main.tf line 3, in resource:\n╵\n"
+            )
+            return 1
+
+        rc, kwargs = self._main(body)
+        assert rc == 1
+        assert kwargs["failure_reason"] == "Error: Unsupported argument (on main.tf line 3)"
+
+    def test_a_crash_is_reported_without_its_exception_text(self, monkeypatch, tmp_path) -> None:
+        self._isolate(monkeypatch, tmp_path)
+
+        def body(cfg, work_dir):
+            raise RuntimeError("boom")
+
+        rc, kwargs = self._main(body)
+        assert rc == 1
+        assert (
+            kwargs["failure_reason"] == "orchestrator crashed — see the run log for the traceback"
+        )
+
+    def test_a_known_failure_sends_the_runners_account(self, monkeypatch, tmp_path) -> None:
+        self._isolate(monkeypatch, tmp_path)
+
+        def body(cfg, work_dir):
+            raise job_entrypoint.ConfigurationArchiveError("the archive is truncated")
+
+        rc, kwargs = self._main(body)
+        assert rc == 1
+        assert (
+            kwargs["failure_reason"] == "configuration archive unusable: the archive is truncated"
+        )
+
+    def test_a_clean_exit_sends_no_reason(self, monkeypatch, tmp_path) -> None:
+        self._isolate(monkeypatch, tmp_path)
+        rc, kwargs = self._main(lambda cfg, work_dir: 0)
+        assert rc == 0
+        assert kwargs["failure_reason"] is None
+
+
 class TestWorkDirOverride:
     def test_honours_WORK_DIR_env(self, monkeypatch, tmp_path) -> None:
         _env(monkeypatch)

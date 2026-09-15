@@ -49,10 +49,20 @@ def collect_profile(
     memory_peak_path: Path = Path("/sys/fs/cgroup/memory.peak"),
     cpu_stat_path: Path = Path("/sys/fs/cgroup/cpu.stat"),
     exit_code: int,
-) -> dict[str, int]:
+    failure_reason: str | None = None,
+    phase: str | None = None,
+) -> dict[str, int | str]:
     """Read cgroup files. Returns a dict containing only the fields we
-    actually read — the API treats missing fields as 'unknown'."""
-    body: dict[str, int] = {"exit_code": exit_code}
+    actually read — the API treats missing fields as 'unknown'.
+
+    ``failure_reason`` is the runner's own account of a non-zero exit
+    (#1631); the API stores it as the run's error message. ``phase`` goes
+    with it, so the API puts it only on the phase that failed."""
+    body: dict[str, int | str] = {"exit_code": exit_code}
+    if failure_reason:
+        body["failure_reason"] = failure_reason
+        if phase:
+            body["phase"] = phase
     peak_mem = _read_int(memory_peak_path)
     if peak_mem is not None:
         body["peak_memory_bytes"] = peak_mem
@@ -66,6 +76,7 @@ def post_profile(
     cfg: RunnerConfig,
     exit_code: int,
     *,
+    failure_reason: str | None = None,
     memory_peak_path: Path = Path("/sys/fs/cgroup/memory.peak"),
     cpu_stat_path: Path = Path("/sys/fs/cgroup/cpu.stat"),
     client: httpx.Client | None = None,
@@ -83,6 +94,8 @@ def post_profile(
         memory_peak_path=memory_peak_path,
         cpu_stat_path=cpu_stat_path,
         exit_code=exit_code,
+        failure_reason=failure_reason,
+        phase=cfg.phase,
     )
     url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/resource-profile"
     headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
