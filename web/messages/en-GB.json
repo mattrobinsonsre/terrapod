@@ -90,5 +90,8 @@
   },
   "adminVariableSets": {
     "detail": {}
+  },
+  "adminVault": {
+    "notInitialized": "Not initialised"
   }
 }

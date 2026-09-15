@@ -697,6 +697,45 @@
     }
   },
   {
+    "name": "terrapod_vault_reference_check",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "description": "the variable key a file name defaults to; optional",
+          "type": "string"
+        },
+        "reference": {
+          "additionalProperties": true,
+          "description": "an OpenBao/Vault reference exactly as a vault-sourced variable's value holds it, e.g. {\"mount\":\"secret\",\"path\":\"apps/x\",\"field\":\"token\"} with optional vault, engine (kv2|dynamic), method, data and file; give this or variable_id",
+          "type": "object"
+        },
+        "variable_id": {
+          "description": "check the reference a stored vault-sourced variable (var-...) already holds; give this or reference",
+          "type": "string"
+        },
+        "variable_set_id": {
+          "description": "the variable set (varset-...) the variable belongs to; give this or workspace_id (platform admin only)",
+          "type": "string"
+        },
+        "workspace_id": {
+          "description": "the workspace (ws-...) the variable belongs to; give this or variable_set_id",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_vault_status",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_workspace_architecture_critique",
     "read_only": true,
     "input_schema": {

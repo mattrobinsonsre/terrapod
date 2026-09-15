@@ -1895,3 +1895,74 @@ run history for the window in which the rule was too wide.
 Re-read the association endpoint above and confirm only the intended
 workspaces are listed. The next run on a workspace that no longer matches will
 not receive the set's variables.
+
+---
+
+<a id="a-vault-variable-wont-resolve"></a>
+
+## An OpenBao/Vault variable won't resolve
+
+A variable sourced from OpenBao (or HashiCorp Vault), described in
+[vault.md](vault.md), is resolved when a runner claims the run. When that fails, the run either **errors**, naming the
+variable, or **sits in `queued`** because the server cannot answer right now. Two
+tools narrow down which part is at fault without queueing another run
+([OpenBao/Vault → Diagnostics](vault.md#diagnostics)).
+
+### Symptoms
+
+- A run errors with `variable '<KEY>': …`: a login refusal, a policy denial,
+  no secret at the path, or a missing field.
+- Runs stay `queued`, and the API log repeats
+  `vault is unavailable; leaving the run for a later claim`.
+
+### Diagnosis
+
+1. **Instance status.** Open **Admin → OpenBao/Vault status** (`/admin/vault`), or
+   call `GET /api/terrapod/v1/admin/vault` or the MCP tool
+   `terrapod_vault_status`. It needs admin or audit. Read the instance the
+   variable uses:
+
+   | What it shows | What it means |
+   |---|---|
+   | **Unreachable**, with a `ConnectError`/`ConnectTimeout` | The API pods cannot reach `address`: DNS, egress policy, or the server is down |
+   | **Unreachable**, with an SSL or certificate error | TLS trust. Check `tls-trust`: `default` or `global-bundle` means the private CA is not in the store Terrapod uses. Add it via `tls.ca_secret` or the global `caBundle` |
+   | **Sealed** | The server is sealed. Runs wait in `queued` and resume on their own once it is unsealed |
+   | **Not initialized** | The server has never been initialised. Nothing will resolve until it is |
+   | **Login failed** | The role, its bindings, or (for `jwt`) the audience or JWKS. The message names the method, mount, role and audience |
+   | Reachable, login OK, no last error | The instance is fine; the fault is in the reference or the policy. Go to step 2 |
+
+   `last-error` is the most recent resolution failure from any run, with its
+   class. `VaultUnavailable` means a transient failure, where runs wait;
+   `VaultDenied` a refused login or policy; `VaultNotFound` a wrong path. The
+   sample is refreshed every 60 seconds, so compare `checked-at` with now
+   before trusting it.
+
+2. **Check the reference.** On the variable's edit form, press **Check**. You
+   can also `POST /api/terrapod/v1/workspaces/{id}/vault-reference-checks`
+   with `{"variable-id": "var-…"}`, or use the MCP tool
+   `terrapod_vault_reference_check`. The first failing step is the cause:
+
+   | Failing step | Fix |
+   |---|---|
+   | `parses` | The reference itself; the detail says what is wrong. Fix the variable |
+   | `instance` | The reference names an instance that is not configured, or omits `vault` where several are configured and none is `default` |
+   | `path-allowed` | The instance's `paths` allow-list refuses the path. Widen the list or move the secret |
+   | `readable` | The OpenBao/Vault policy does not grant `read` on `read-path` (for kv-v2, note the `data/` segment). Add it to the policy attached to the role named in the detail |
+   | `fields-present` | The secret exists but lacks a field the reference names. `keys` lists what is there (kv-v2 only) |
+   | any step `unknown` | The server could not answer. Go back to step 1 |
+
+   A dynamic engine is never read by a check, because every read would mint a
+   credential. For one, a `readable` pass is as far as the check goes. If the
+   run still fails, the run's own error names the field.
+
+### Resolution
+
+Fix what the failing step names: the network path, CA, role bindings, policy,
+allow-list or reference. For a sealed server, unseal it. Runs held in `queued`
+are re-claimed automatically and need nothing more.
+
+### Verification
+
+Press **Check** again and confirm every step passes, then re-queue the errored
+run. On the status page, the next sample should show the instance reachable
+with a working login.

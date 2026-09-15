@@ -1780,6 +1780,88 @@ client can offer it only where it will work. Returns instance **names** only —
 never addresses, namespaces or auth configuration. Any authenticated user may
 call it, since anyone who can write a variable needs to pick an instance.
 
+<a id="vault-diagnostics"></a>
+
+#### OpenBao/Vault diagnostics
+
+```
+GET /api/terrapod/v1/admin/vault
+```
+
+The sampled status of each configured instance. It needs platform `admin` or
+`audit`. It is read from a sample the `vault_status` scheduler task takes every
+60 seconds, never by contacting the server on the request. A collection of
+`vault-instance-statuses`, one per configured instance, with `id` set to the
+instance name:
+
+```json
+{"data": [{"id": "default", "type": "vault-instance-statuses", "attributes": {
+   "name": "default", "default": true, "address": "https://openbao:8200", "namespace": "",
+   "auth-method": "kubernetes", "auth-mount": "kubernetes", "auth-role": "terrapod",
+   "tls-trust": "instance-ca", "reachable": true, "initialized": true, "sealed": false,
+   "standby": false, "version": "1.18.0", "health-error": null,
+   "login-ok": true, "login-error": null, "ttl-seconds": 1740,
+   "checked-at": "2026-09-15T10:00:00Z",
+   "last-error": {"class": "VaultDenied", "at": "2026-09-15T09:12:03Z",
+     "message": "variable 'NETBOX_TOKEN': OpenBao/Vault denied 'secret/apps/netbox' on instance 'default'. …"}}}],
+ "meta": {"pagination": {…},
+   "vault": {"enabled": true, "sampled-at": "2026-09-15T10:00:00Z", "unavailable-reason": null}}}
+```
+
+`tls-trust` is `instance-ca`, `global-bundle`, `default` or `skip-verify`.
+Every probe field is `null` when unknown (not sampled yet, or not attempted:
+a sealed server is never logged in to), which is not the same as `false`. With
+the value source off, `data` is empty and `meta.vault.enabled` is `false`.
+`unavailable-reason` is `not sampled yet` or `cache unreachable` when there is
+no usable sample.
+
+```
+POST /api/terrapod/v1/workspaces/{workspace_id}/vault-reference-checks
+POST /api/terrapod/v1/varsets/{varset_id}/vault-reference-checks
+```
+
+Checks a reference without resolving it. The workspace form needs `var:write`
+on the workspace; the variable-set form needs platform admin. Limited to 20
+checks a minute per user (`429` with `Retry-After`). The body carries
+`reference` (a reference object, or its JSON string) or `variable-id` (a
+stored vault-sourced variable), plus an optional `key`, which a file name
+defaults to:
+
+```json
+{"data": {"type": "vault-reference-checks",
+  "attributes": {"reference": {"mount": "secret", "path": "apps/netbox", "field": "apitoken"}}}}
+```
+
+A reference that does not parse is a `200` result with `parses: false`, not an
+error. `404` means an unknown workspace, variable set or variable; `422` means
+a body with neither `reference` nor `variable-id`, or a variable whose source
+is not `vault`. Nothing is stored, and the `id` only tells two answers apart:
+
+```json
+{"data": {"id": "vrc-…", "type": "vault-reference-checks", "attributes": {
+   "ok": false, "vault-enabled": true, "parses": true, "parse-error": null,
+   "instance": "default", "instance-known": true, "engine": "kv2",
+   "read-path": "secret/data/apps/netbox", "path-allowed": true,
+   "readable": true, "capabilities": ["read", "list"], "required-capabilities": ["read"],
+   "keys": ["apitoken", "url"], "fields-present": true, "missing-fields": [],
+   "notes": [],
+   "checks": [{"name": "parses", "status": "pass", "detail": ""},
+              {"name": "instance", "status": "pass", "detail": ""},
+              {"name": "path-allowed", "status": "pass", "detail": ""},
+              {"name": "readable", "status": "pass", "detail": ""},
+              {"name": "fields-present", "status": "pass", "detail": ""}]}}}
+```
+
+`checks` runs in order and stops at the first `fail`. A step's `status` is
+`pass`, `fail`, `skipped` or `unknown`, where `unknown` means the server could not
+answer. `readable` comes from `sys/capabilities-self`, which reads nothing at
+the path. `keys` holds key **names**, for kv-v2 only; it is `null` for a
+dynamic engine, which a check never reads because a read mints a credential,
+and `null` for a caller without `run:plan`. `notes` holds codes:
+`dynamic-not-read`, `keys-need-plan-permission`, `local-execution` and
+`vault-disabled`. See
+[OpenBao/Vault → Diagnostics](vault.md#diagnostics).
+
 Full setup, including the server-side policy and role: [OpenBao/Vault](vault.md).
 
 ### Assignment Rules

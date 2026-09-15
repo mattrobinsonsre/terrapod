@@ -1038,6 +1038,99 @@ this path.
 
 ---
 
+## Diagnostics
+
+Two tools answer "why won't my OpenBao/Vault variable resolve?" without queueing a run,
+and without ever minting a credential or returning a value.
+
+### Instance status
+
+`GET /api/terrapod/v1/admin/vault` reports on each configured instance. You can
+also read it on the **OpenBao/Vault status** page (`/admin/vault`, in the Admin menu),
+or through the MCP tool `terrapod_vault_status`. It needs the `admin` or
+`audit` role.
+
+| Field | Meaning |
+|---|---|
+| `reachable` | Terrapod got an HTTP answer from `sys/health`, so the address, DNS, network path and TLS all work |
+| `initialized`, `sealed`, `standby`, `version` | What `sys/health` says. A sealed server answers every read with 503, and runs wait in `queued` while it stays sealed |
+| `login-ok`, `login-error` | Whether Terrapod can log in with the instance's configured method: `kubernetes`, `jwt`, `approle` or `token` |
+| `ttl-seconds` | The remaining TTL of Terrapod's token, read from `auth/token/lookup-self` |
+| `tls-trust` | `instance-ca` (verified against `tls.ca_secret` alone), `global-bundle` (the chart's `caBundle`), `default` (the system store), or `skip-verify` |
+| `last-error` | The last failed resolution against this instance, from any run: `{class, message, at}`, with names and causes only. `VaultUnavailable` means runs are waiting, `VaultDenied` a refused login or policy, `VaultNotFound` a wrong path |
+| `checked-at` | When this instance was last sampled |
+
+**Unknown is `null`, never `false`.** An instance that has not been sampled yet
+shows every probe field as null. So does a login that was not attempted, because
+a sealed server is never logged in to.
+
+The status is **sampled, not live.** A scheduler task, `vault_status`, runs
+every 60 seconds on one API replica and writes the result to Redis, and every
+replica answers the endpoint from that sample. Opening the page never contacts
+the server. The task is registered only when `vault.enabled` is true. With the
+value source off the endpoint returns an empty list with `meta.vault.enabled: false`.
+
+For `kubernetes`, `jwt` and `approle`, the login call itself proves the login
+works. If `lookup-self` is then refused, only the TTL is lost; that happens when
+a role's policy omits the server's built-in `default` policy. For a static `token` there is no
+login call, so a refused `lookup-self` is reported as a failed login.
+
+### Checking a reference
+
+`POST /api/terrapod/v1/workspaces/{id}/vault-reference-checks` checks a
+reference without resolving it. So does the **Check** button on the OpenBao/Vault
+reference form, and the MCP tool `terrapod_vault_reference_check`. The body
+carries either a reference or a stored variable:
+
+```json
+{"data": {"type": "vault-reference-checks",
+  "attributes": {"reference": {"mount": "secret", "path": "apps/netbox", "field": "apitoken"}}}}
+```
+
+```json
+{"data": {"type": "vault-reference-checks", "attributes": {"variable-id": "var-…"}}}
+```
+
+It runs these checks in order and stops at the first failure:
+
+| Check | What it does |
+|---|---|
+| `parses` | The reference and its `file` block pass the same validation a variable write applies |
+| `instance` | The named instance exists; or, when `vault` is omitted, a default can be chosen |
+| `path-allowed` | The path is inside the instance's `paths` allow-list, and has no traversal |
+| `readable` | Asks the server with `sys/capabilities-self` whether Terrapod's token has `read` on the policy path (`update` or `create` for a dynamic `POST`). This reads nothing at the path. For kv-v2 the path checked, `read-path`, includes the `data/` segment the reference leaves out, because that is the path the policy has to grant |
+| `fields-present` | **kv-v2 only.** Reads the secret to list its key **names** in `keys`, and names each field the reference needs but is missing in `missing-fields`. Those fields are `field`, every tag in a `template`, and a format's `fields` |
+
+A check's `status` is `pass`, `fail`, `skipped` or `unknown`. `unknown` means
+the server could not answer (it is sealed or unreachable), not that the check
+failed.
+
+**A dynamic engine is never read.** Each read of `database/creds`,
+`aws/creds`, `pki/issue` and the like mints a credential, so a check that read
+one would be a resolution under another name. For those, `readable` is the
+strongest answer available: `keys` stays null and the note `dynamic-not-read`
+says so.
+
+Other notes a check can carry:
+
+| Note | Meaning |
+|---|---|
+| `keys-need-plan-permission` | The caller has `var:write` but not `run:plan` on the workspace, so key names are withheld |
+| `local-execution` | The workspace runs locally, where an OpenBao/Vault reference never resolves |
+| `vault-disabled` | The value source is off |
+
+**Who may check.** A workspace check needs `var:write` on the workspace, the
+permission it takes to create the variable. Listing a kv-v2 secret's key names
+also needs `run:plan`: someone who can create the variable and run a plan with
+it could have the secret delivered to a run anyway, so the names give them
+nothing more. A variable-set check
+(`POST /api/terrapod/v1/varsets/{id}/vault-reference-checks`) needs platform
+admin, as writing a variable-set variable does. Checks are limited to 20 a
+minute per user, answered with `429` and `Retry-After` beyond that. The request
+itself is recorded in the audit log like any other API call.
+
+---
+
 ## Limits
 
 - **Agent execution only.** The reference is resolved server-side when a runner

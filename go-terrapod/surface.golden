@@ -1051,6 +1051,56 @@ field VariableSetVariable.VersionID string `json:"version-id,omitempty"`
 field VarsetWorkspace.AssignmentSource string `json:"assignment-source"`
 field VarsetWorkspace.ID string `json:"id"`
 field VarsetWorkspace.Name string `json:"name"`
+field VaultInstanceStatus.Address string `json:"address"`
+field VaultInstanceStatus.AuthMethod string `json:"auth-method"`
+field VaultInstanceStatus.AuthMount string `json:"auth-mount"`
+field VaultInstanceStatus.AuthRole string `json:"auth-role"`
+field VaultInstanceStatus.CheckedAt string `json:"checked-at"`
+field VaultInstanceStatus.Default bool `json:"default"`
+field VaultInstanceStatus.HealthError string `json:"health-error"`
+field VaultInstanceStatus.Initialized *bool `json:"initialized"`
+field VaultInstanceStatus.LastError *VaultResolutionError `json:"last-error"`
+field VaultInstanceStatus.LoginError string `json:"login-error"`
+field VaultInstanceStatus.LoginOK *bool `json:"login-ok"`
+field VaultInstanceStatus.Name string `json:"name"`
+field VaultInstanceStatus.Namespace string `json:"namespace"`
+field VaultInstanceStatus.Reachable *bool `json:"reachable"`
+field VaultInstanceStatus.Sealed *bool `json:"sealed"`
+field VaultInstanceStatus.Standby *bool `json:"standby"`
+field VaultInstanceStatus.TLSTrust string `json:"tls-trust"`
+field VaultInstanceStatus.TTLSeconds *int64 `json:"ttl-seconds"`
+field VaultInstanceStatus.Version string `json:"version"`
+field VaultReferenceCheck.Capabilities []string `json:"capabilities"`
+field VaultReferenceCheck.Checks []VaultReferenceCheckItem `json:"checks"`
+field VaultReferenceCheck.Engine string `json:"engine"`
+field VaultReferenceCheck.FieldsPresent *bool `json:"fields-present"`
+field VaultReferenceCheck.ID string `json:"id"`
+field VaultReferenceCheck.Instance string `json:"instance"`
+field VaultReferenceCheck.InstanceKnown *bool `json:"instance-known"`
+field VaultReferenceCheck.Keys []string `json:"keys"`
+field VaultReferenceCheck.MissingFields []string `json:"missing-fields"`
+field VaultReferenceCheck.Notes []string `json:"notes"`
+field VaultReferenceCheck.OK bool `json:"ok"`
+field VaultReferenceCheck.ParseError string `json:"parse-error"`
+field VaultReferenceCheck.Parses bool `json:"parses"`
+field VaultReferenceCheck.PathAllowed *bool `json:"path-allowed"`
+field VaultReferenceCheck.ReadPath string `json:"read-path"`
+field VaultReferenceCheck.Readable *bool `json:"readable"`
+field VaultReferenceCheck.RequiredCapabilities []string `json:"required-capabilities"`
+field VaultReferenceCheck.VaultEnabled bool `json:"vault-enabled"`
+field VaultReferenceCheckItem.Detail string `json:"detail"`
+field VaultReferenceCheckItem.Name string `json:"name"`
+field VaultReferenceCheckItem.Status string `json:"status"`
+field VaultReferenceCheckOptions.Key string
+field VaultReferenceCheckOptions.Reference map[string]any
+field VaultReferenceCheckOptions.VariableID string
+field VaultResolutionError.At string `json:"at"`
+field VaultResolutionError.Class string `json:"class"`
+field VaultResolutionError.Message string `json:"message"`
+field VaultStatus.Enabled bool `json:"enabled"`
+field VaultStatus.Instances []VaultInstanceStatus `json:"instances"`
+field VaultStatus.SampledAt string `json:"sampled-at"`
+field VaultStatus.UnavailableReason string `json:"unavailable-reason"`
 field WarmBinaryEntry.Platforms []WarmPlatform `json:"platforms,omitempty"`
 field WarmBinaryEntry.Tool string `json:"tool,omitempty"`
 field WarmBinaryEntry.Version string `json:"version"`
@@ -1189,6 +1239,8 @@ method (*Client) AssignWorkspaceToExecutionHook(ctx context.Context, hookID, wor
 method (*Client) AssignWorkspaceToVarset(ctx context.Context, varsetID, workspaceID string) error
 method (*Client) BulkUpdateWorkspaces( ctx context.Context, filter WorkspaceFilter, update map[string]any, dryRun bool, ) (*BulkUpdateResult, error)
 method (*Client) CancelRun(ctx context.Context, runID string) (*Run, error)
+method (*Client) CheckVariableSetVaultReference( ctx context.Context, varsetID string, opts VaultReferenceCheckOptions, ) (*VaultReferenceCheck, error)
+method (*Client) CheckWorkspaceVaultReference( ctx context.Context, workspaceID string, opts VaultReferenceCheckOptions, ) (*VaultReferenceCheck, error)
 method (*Client) ConfirmCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error)
 method (*Client) CreateAPIToken(ctx context.Context, userID string, req CreateAPITokenRequest) (*APIToken, error)
 method (*Client) CreateAgentPool(ctx context.Context, req CreateAgentPoolRequest) (*AgentPool, error)
@@ -1297,6 +1349,7 @@ method (*Client) GetVariable(ctx context.Context, workspaceID, id string) (*Vari
 method (*Client) GetVariableByKey(ctx context.Context, workspaceID, key string) (*Variable, error)
 method (*Client) GetVariableSet(ctx context.Context, id string) (*VariableSet, error)
 method (*Client) GetVarsetVariable(ctx context.Context, varsetID, varID string) (*VariableSetVariable, error)
+method (*Client) GetVaultStatus(ctx context.Context) (*VaultStatus, error)
 method (*Client) GetWorkspace(ctx context.Context, id string) (*Workspace, error)
 method (*Client) GetWorkspaceByName(ctx context.Context, name string) (*Workspace, error)
 method (*Client) GetWorkspaceCostEstimate(ctx context.Context, workspaceID string) (*WorkspaceCostEstimate, error)
@@ -1571,6 +1624,12 @@ type Variable struct
 type VariableSet struct
 type VariableSetVariable struct
 type VarsetWorkspace struct
+type VaultInstanceStatus struct
+type VaultReferenceCheck struct
+type VaultReferenceCheckItem struct
+type VaultReferenceCheckOptions struct
+type VaultResolutionError struct
+type VaultStatus struct
 type WarmBinaryEntry struct
 type WarmPlatform struct
 type WarmProviderEntry struct

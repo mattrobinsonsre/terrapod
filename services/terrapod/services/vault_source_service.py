@@ -474,7 +474,9 @@ async def resolve_vault_delivery(
                 keys=keys,
                 instance=inst.name,
             )
-            raise VaultTransient(f"{_variables(keys)}: {e}") from e
+            err = VaultTransient(f"{_variables(keys)}: {e}")
+            await _note_failure(inst.name, e, str(err))
+            raise err from e
         except Exception as e:
             # Deliberately broad. VaultError is the expected shape, but anything
             # escaping here reaches the run dispatcher as a 500 and leaves the
@@ -491,7 +493,9 @@ async def resolve_vault_delivery(
                 mount=ref["mount"],
                 path=ref["path"],
             )
-            raise VaultSourceError(f"{_variables(keys)}: {e}") from e
+            err = VaultSourceError(f"{_variables(keys)}: {e}")
+            await _note_failure(inst.name, e, str(err))
+            raise err from e
 
         # Vault answered. A field missing from the answer or a template that
         # does not render still fails the run below, but the read happened and
@@ -517,7 +521,9 @@ async def resolve_vault_delivery(
                 else:
                     value = extract_field(secret, field_name, where=where)
             except (VaultError, RenderError) as e:
-                raise VaultSourceError(f"variable {v.key!r}: {e}") from e
+                err = VaultSourceError(f"variable {v.key!r}: {e}")
+                await _note_failure(inst.name, e, str(err))
+                raise err from e
 
             if v.key not in file_names:
                 out.values[v.key] = value
@@ -605,6 +611,22 @@ def _read_identity(instance: str, ref: dict) -> tuple:
         method,
         body,
     )
+
+
+async def _note_failure(instance: str, exc: BaseException, message: str) -> None:
+    """Record a failure for the admin Vault status page (#1663). Never raises.
+
+    Best-effort twice over: ``record_resolution_error`` swallows its own Redis
+    failures, and this guard catches anything else — an import problem, say —
+    so the claim fails (or waits) for the reason Vault gave, never for a
+    diagnostics write. Imported lazily: ``vault_diagnostics`` imports this module.
+    """
+    try:
+        from terrapod.services.vault_diagnostics import record_resolution_error
+
+        await record_resolution_error(instance, exc, message=message)
+    except Exception:  # noqa: BLE001
+        logger.debug("could not record the vault failure for diagnostics", instance=instance)
 
 
 def _variables(keys: list[str]) -> str:

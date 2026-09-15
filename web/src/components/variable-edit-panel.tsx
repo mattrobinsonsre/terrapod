@@ -40,6 +40,7 @@ export function VariableEditPanel({
   saving,
   onSave,
   onCancel,
+  vaultCheckUrl,
 }: {
   idPrefix: string
   state: VariableEditState
@@ -47,6 +48,8 @@ export function VariableEditPanel({
   vaultAvailable: boolean
   vaultInstances: string[]
   vaultDefaultInstance: string
+  /** The reference-check endpoint for this workspace or variable set (#1663). */
+  vaultCheckUrl?: string
   saving: boolean
   onSave: () => void
   onCancel: () => void
@@ -112,6 +115,8 @@ export function VariableEditPanel({
           defaultInstance={vaultDefaultInstance}
           value={state.vault}
           onChange={(vault) => onChange({ vault })}
+          checkUrl={vaultCheckUrl}
+          variableKey={state.key}
         />
       ) : (
         <div>
