@@ -967,6 +967,97 @@ jobs:
           }
           echo "vault config renders; credential is secretKeyRef-only"
 
+      - name: Vault jwt auth projects its token, and a custom CA reaches the pod
+        run: |
+          # #1650. jwt auth reads an audience-scoped projected ServiceAccount
+          # token; a per-instance CA is a Secret key mounted as a file. Both are
+          # paths the ConfigMap tells the client to read, so the Deployment must
+          # put a real file at exactly that path — or the first login fails with
+          # "no such file" and nothing in the chart explains why.
+          cat > /tmp/vault-jwt-values.yaml <<'EOF'
+          api:
+            config:
+              vault:
+                enabled: true
+                instances:
+                  - name: hcp
+                    default: true
+                    address: https://vault.example.com:8200
+                    namespace: admin
+                    auth: { method: jwt, role: terrapod }
+                    tls: { ca_secret: vault-ca, ca_key: ca.pem }
+                  - name: kube
+                    address: https://vault2.example.com:8200
+                    auth: { method: kubernetes, mount: kubernetes, role: terrapod }
+          EOF
+          render() {
+            docker run --rm -v "$PWD:/chart" -v /tmp:/tmp -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+              template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 "$@"
+          }
+          render -f /tmp/vault-jwt-values.yaml > /tmp/rendered-vault-jwt.yaml
+          cm=$(awk '/^kind: ConfigMap/,/^---/' /tmp/rendered-vault-jwt.yaml)
+          dep=$(awk '/^kind: Deployment/,/^---/' /tmp/rendered-vault-jwt.yaml)
+
+          # The ConfigMap carries the new keys, with the jwt defaults filled in.
+          for want in 'method: "jwt"' 'mount: "jwt"' 'audience: "vault"' \
+                      'token_path: "/var/run/secrets/terrapod/vault/hcp/token"' \
+                      'ca_file: "/etc/terrapod/vault-ca/hcp/ca.crt"' \
+                      'token_path: "/var/run/secrets/kubernetes.io/serviceaccount/token"'; do
+            echo "$cm" | grep -qF "$want" || {
+              echo "missing from the rendered ConfigMap: $want"
+              echo "add a render line to templates/configmap-api.yaml"
+              exit 1
+            }
+          done
+
+          # The Deployment projects exactly the token the ConfigMap points at.
+          echo "$dep" | grep -q 'serviceAccountToken:' || { echo "FAIL: no projected token for jwt"; exit 1; }
+          echo "$dep" | grep -q 'audience: "vault"' || { echo "FAIL: projected token lacks the audience"; exit 1; }
+          echo "$dep" | grep -q 'expirationSeconds: 600' || { echo "FAIL: projected token lifetime not 600s"; exit 1; }
+          echo "$dep" | grep -q 'path: "hcp/token"' || { echo "FAIL: token not projected at <name>/token"; exit 1; }
+          echo "$dep" | grep -q 'mountPath: /var/run/secrets/terrapod/vault' || { echo "FAIL: token volume not mounted"; exit 1; }
+          # The kubernetes instance without an audience uses the standard SA
+          # token, so it must add no projection of its own.
+          echo "$dep" | grep -q 'path: "kube/token"' && { echo "FAIL: kubernetes without an audience was projected"; exit 1; }
+
+          # The CA Secret key is mounted where ca_file says.
+          echo "$dep" | grep -q 'name: "vault-ca"' || { echo "FAIL: CA Secret not mounted"; exit 1; }
+          echo "$dep" | grep -q 'key: "ca.pem"' || { echo "FAIL: ca_key not honoured"; exit 1; }
+          echo "$dep" | grep -q 'path: "hcp/ca.crt"' || { echo "FAIL: CA not mounted at <name>/ca.crt"; exit 1; }
+          echo "$dep" | grep -q 'mountPath: /etc/terrapod/vault-ca' || { echo "FAIL: CA volume not mounted"; exit 1; }
+
+          # jwt stores no credential, so it mints no Vault env var at all...
+          echo "$dep" | grep -q 'TERRAPOD_VAULT_' && { echo "FAIL: jwt/kubernetes minted a Vault env var"; exit 1; }
+          # ...and adds no plain-value TERRAPOD_* env: the set of those is the
+          # same as a render with no Vault configured.
+          plain_env() {
+            awk '/^kind: Deployment/,/^---/' "$1" | grep -E -A1 -- '- name: TERRAPOD_' \
+              | grep -E -B1 '^[[:space:]]+value:' | grep -oE 'TERRAPOD_[A-Z0-9_]+' | sort -u
+          }
+          render > /tmp/rendered-novault.yaml
+          if [ "$(plain_env /tmp/rendered-vault-jwt.yaml)" != "$(plain_env /tmp/rendered-novault.yaml)" ]; then
+            echo "FAIL: Vault config added a non-secret TERRAPOD_* env var to a Deployment:"
+            diff <(plain_env /tmp/rendered-novault.yaml) <(plain_env /tmp/rendered-vault-jwt.yaml) || true
+            exit 1
+          fi
+
+          # Without jwt (or an audience) there is nothing to project: the
+          # approle/kubernetes render from the step above carries none.
+          grep -q 'serviceAccountToken:\|vault-tokens' /tmp/rendered-vault.yaml && {
+            echo "FAIL: a projected token rendered with no jwt instance"; exit 1
+          }
+          # Nor when the value source is off, even with a jwt instance listed:
+          # a disabled block must not make the pod wait on a Secret.
+          # Deployments only, and volume names only: the ConfigMap still carries
+          # the ca_file path, which is harmless while the source is off.
+          render -f /tmp/vault-jwt-values.yaml --set api.config.vault.enabled=false > /tmp/rendered-vault-off.yaml
+          awk '/^kind: Deployment/,/^---/' /tmp/rendered-vault-off.yaml | grep -qE 'name: vault-(tokens|ca)$' && {
+            echo "FAIL: Vault volumes rendered while api.config.vault.enabled is false"; exit 1
+          }
+          echo "vault jwt projects its token; the custom CA is mounted at ca_file"
+
       - name: Every retention key in values.yaml reaches the rendered ConfigMap
         run: |
           # Leg 3 of the config-channel contract. A key can be in values.yaml

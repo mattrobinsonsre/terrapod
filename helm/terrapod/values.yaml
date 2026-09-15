@@ -1122,13 +1122,31 @@ api:
       #   address: https://vault.internal:8200
       #   namespace: ""            # Vault Enterprise only
       #   auth:
-      #     method: kubernetes     # kubernetes | approle | token
-      #     mount: kubernetes      # the auth mount path you enabled in Vault
+      #     # kubernetes | jwt | approle | token. `jwt` (#1650) is for a Vault
+      #     # OUTSIDE the cluster (incl. HCP Vault Dedicated, with namespace:
+      #     # admin): the chart projects an audience-scoped ServiceAccount token
+      #     # that Vault checks against the cluster's OIDC discovery / JWKS, so
+      #     # Vault never needs to reach back in to call TokenReview.
+      #     method: kubernetes
+      #     mount: kubernetes      # the auth mount path; defaults to `jwt` for jwt
       #     role: terrapod         # role bound to Terrapod's ServiceAccount
+      #     # The projected token's `aud` claim. jwt defaults to `vault`, which
+      #     # must be in the role's bound_audiences. For kubernetes, leave empty to
+      #     # use the pod's standard token; set it only if the role requires one.
+      #     audience: ""
+      #     # Override where the token is read (re-read on every login). Empty =
+      #     # the chart's projected path, or the standard SA token for kubernetes.
+      #     token_path: ""
       #   # Optional second line behind the Vault policy: prefixes Terrapod will
       #   # refuse to read outside of, whatever the policy permits.
       #   paths: []
       #   tls_skip_verify: false
+      #   # A private CA in front of this Vault (#1650). The Secret key is mounted
+      #   # and TLS to THIS instance is verified against it alone. Without it,
+      #   # verification uses the default roots plus the global caBundle.
+      #   tls:
+      #     ca_secret: ""          # Secret name, in the release namespace
+      #     ca_key: ca.crt         # key within it holding the PEM
       #   # approle/token only — never kubernetes, which stores no credential.
       #   # Injected as TERRAPOD_VAULT_<NAME>_SECRET via secretKeyRef.
       #   existingSecret: ""

@@ -587,10 +587,15 @@ data:
           address: {{ .address | default "" | quote }}
           namespace: {{ .namespace | default "" | quote }}
           auth:
-            method: {{ (.auth).method | default "kubernetes" | quote }}
-            mount: {{ (.auth).mount | default "kubernetes" | quote }}
+            method: {{ include "terrapod.vault.method" . | quote }}
+            mount: {{ include "terrapod.vault.mount" . | quote }}
             role: {{ (.auth).role | default "terrapod" | quote }}
+            {{- /* #1650. The same helpers place the projected token on the
+                   Deployment, so these paths always point at a real file. */}}
+            audience: {{ include "terrapod.vault.audience" . | quote }}
+            token_path: {{ include "terrapod.vault.tokenPath" . | quote }}
           tls_skip_verify: {{ .tls_skip_verify | default false }}
+          ca_file: {{ include "terrapod.vault.caFile" . | quote }}
           paths: {{ if not .paths }}[]{{ end }}
           {{- range .paths }}
             - {{ . | quote }}

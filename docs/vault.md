@@ -31,6 +31,10 @@ Terrapod authenticates as its own Kubernetes ServiceAccount by default, so
 there is no credential to store anywhere. Vault validates the ServiceAccount
 token by calling the Kubernetes TokenReview API.
 
+That means Vault has to reach the cluster. If it cannot — a managed Vault, HCP
+Vault Dedicated, a Vault in another network — use [`jwt` auth](#vault-outside-the-cluster-jwt-auth)
+instead, which needs no reach-back. The policy (step 3) is the same either way.
+
 Everything below runs against your Vault with a token that can manage auth
 methods and policies.
 
@@ -126,6 +130,207 @@ kubectl -n terrapod get pod -l app.kubernetes.io/component=api \
 
 ---
 
+## Vault outside the cluster: `jwt` auth
+
+Kubernetes auth makes Vault call the cluster's TokenReview API to check each
+login. A Vault outside the cluster often cannot reach that API. `jwt` auth
+removes the call: Terrapod presents a ServiceAccount token projected with an
+audience of its own, and Vault checks the token's signature against the
+cluster's published signing keys. Nothing is stored on either side.
+
+### In Vault
+
+Find the cluster's issuer — the URL its ServiceAccount tokens are signed as:
+
+```sh
+kubectl get --raw /.well-known/openid-configuration | jq -r .issuer
+```
+
+Enable JWT auth and point it at that issuer. When Vault can reach the issuer's
+discovery document (managed Kubernetes services publish it at a public URL):
+
+```sh
+vault auth enable jwt
+vault write auth/jwt/config \
+  oidc_discovery_url="https://<issuer>" \
+  bound_issuer="https://<issuer>"
+```
+
+Add `oidc_discovery_ca_pem=@issuer-ca.pem` if the issuer's certificate is not
+publicly trusted. When Vault cannot reach the issuer at all, give it the
+cluster's ServiceAccount signing public key instead —
+`jwt_validation_pubkeys=@sa.pub` (PEM), with `bound_issuer` as above. That key
+only changes when the cluster rotates it, and Vault must be updated when it does.
+
+Write the policy as in [step 3](#3-write-a-policy--narrowly), then bind a role
+to Terrapod's ServiceAccount:
+
+```sh
+vault write auth/jwt/role/terrapod \
+  role_type=jwt \
+  bound_audiences=vault \
+  user_claim=sub \
+  bound_subject=system:serviceaccount:terrapod:terrapod \
+  policies=terrapod \
+  ttl=20m
+```
+
+`bound_subject` is `system:serviceaccount:<namespace>:<ServiceAccount>` for the
+**API** pods — see step 4 for how to confirm the ServiceAccount's name.
+`bound_audiences` must contain the audience Terrapod requests, `vault` unless
+you change it.
+
+### In Terrapod
+
+```yaml
+api:
+  config:
+    vault:
+      enabled: true
+      instances:
+        - name: hcp
+          default: true
+          address: https://vault.example.com:8200
+          namespace: admin        # HCP Vault Dedicated's top-level namespace
+          auth:
+            method: jwt
+            role: terrapod
+            # mount: jwt          # the default for jwt
+            # audience: vault     # the default; must be in bound_audiences
+```
+
+The chart projects a ServiceAccount token with that audience and a ten-minute
+lifetime (`expirationSeconds: 600`, the shortest the kubelet issues) at
+`/var/run/secrets/terrapod/vault/<instance>/token`, and tells Terrapod to read
+it there. The kubelet rotates the file; Terrapod re-reads it on every login, so
+rotation needs nothing from you. The projected volume is rendered only when an
+instance needs it and `vault.enabled` is true.
+
+With `namespace: admin` this is the HCP Vault Dedicated topology. The namespace
+is sent on the login as well as on every read, so the JWT auth mount, the role
+and the policy all live inside that namespace.
+
+### An audience on Kubernetes auth
+
+A Kubernetes auth role can require an audience too (`audience=` on the role).
+Set the same value as `auth.audience` on a `kubernetes` instance and the chart
+projects a token carrying it, instead of using the pod's standard token. Leave
+it empty otherwise.
+
+`auth.token_path` overrides where either method reads its token — for a
+projection of your own, mounted through `api.extraVolumes`.
+
+---
+
+## A private CA in front of Vault
+
+When Vault's certificate is signed by a CA of your own, put the CA in a Secret
+in the release namespace and name it on the instance:
+
+```sh
+kubectl -n terrapod create secret generic vault-ca --from-file=ca.crt=./vault-ca.pem
+```
+
+```yaml
+        - name: default
+          address: https://vault.example.com:8200
+          tls:
+            ca_secret: vault-ca
+            ca_key: ca.crt        # the default
+```
+
+The chart mounts that key at `/etc/terrapod/vault-ca/<instance>/ca.crt` and
+renders it into the config as `ca_file`. TLS to **that instance** is then
+verified against that CA **alone**: the default roots and `SSL_CERT_FILE` are
+not consulted, so a private CA is pinned to the one Vault it fronts and trusted
+for nothing else. Updating the Secret is enough to rotate it — the kubelet
+refreshes the file and Terrapod reloads it when its modification time changes,
+without a restart. Setting both `tls.ca_secret` and `tls_skip_verify` is refused
+at startup, because the two contradict each other.
+
+### Does the global `caBundle` already cover Vault?
+
+**Yes, for every instance that does not set its own CA.** Checked against the
+code and the image, not assumed:
+
+- An instance without `ca_file` passes `verify=True` to httpx.
+- The API image resolves **httpx 0.28.1**. For `verify=True` it builds its TLS
+  context from `SSL_CERT_FILE` when that variable is set, and from certifi's
+  bundle when it is not.
+- `caBundle.enabled` sets `SSL_CERT_FILE` on the API pod to a bundle that merges
+  the image's system roots with your CA.
+
+So a CA you have already added through `caBundle` is trusted for Vault too, and
+needs no per-instance setting. Use `tls.ca_secret` when you want the CA pinned
+to one Vault rather than trusted for all of Terrapod's outbound traffic.
+
+Two things follow. Without `caBundle`, httpx trusts **certifi's** bundle, not the
+operating system's store. And the behaviour belongs to httpx, so a test
+(`test_pinned_httpx_honours_ssl_cert_file_for_verify_true`) pins it: an httpx
+upgrade that changed it would fail CI rather than quietly stop trusting your CA.
+
+---
+
+## Other auth methods and namespaces
+
+### AppRole
+
+For a Vault that cannot validate Kubernetes tokens by either method. `role` is
+the AppRole **role_id**; the **secret_id** is a credential, so it comes from a
+Secret:
+
+```yaml
+        - name: prod-vault
+          address: https://vault.example.com:8200
+          auth:
+            method: approle
+            mount: approle
+            role: <role-id>        # AppRole role_id
+          existingSecret: my-vault-approle
+          existingSecretKey: secret_id    # defaults to "secret"
+```
+
+### A static token
+
+For a lab, or a Vault where nothing else is available:
+
+```yaml
+        - name: lab
+          address: https://vault.example.com:8200
+          auth:
+            method: token
+          existingSecret: my-vault-token
+          existingSecretKey: token
+```
+
+Terrapod uses the token as given and does not renew it. When it expires, reads
+fail until the Secret is replaced.
+
+For both, the chart injects the Secret as `TERRAPOD_VAULT_<NAME>_SECRET` (the
+instance name upper-cased, dashes as underscores) via `secretKeyRef`, never
+through the ConfigMap. An environment variable is fixed when the pod starts, so
+after rotating the Secret, restart the API pods. `kubernetes` and `jwt` store
+nothing and need none of this.
+
+### Namespaces
+
+Vault Enterprise and HCP namespaces work with every method. `namespace` is sent
+as `X-Vault-Namespace` on the login and on every read:
+
+```yaml
+        - name: team-a
+          address: https://vault.example.com:8200
+          namespace: team-a
+          auth:
+            method: kubernetes
+            role: terrapod
+```
+
+The auth mount, the role and the policy must all exist inside that namespace,
+and a reference's `mount` and `path` are relative to it.
+
+---
+
 ## What you configure in Terrapod
 
 ```yaml
@@ -151,11 +356,14 @@ change rather than a migration.
 | `name` | What a reference uses to pick this Vault. |
 | `default` | Used when a reference omits `vault`. At most one instance may set it. |
 | `address` | Vault's address, including scheme and port. |
-| `namespace` | Vault Enterprise namespace. Omit for OSS. |
-| `auth.method` | `kubernetes` (default), `approle`, or `token`. |
-| `auth.mount` | The auth mount path you enabled. |
-| `auth.role` | The Vault role bound to Terrapod's ServiceAccount. |
+| `namespace` | Vault Enterprise / HCP namespace. Omit for OSS. |
+| `auth.method` | `kubernetes` (default), `jwt`, `approle`, or `token`. See [`jwt`](#vault-outside-the-cluster-jwt-auth) and [other methods](#other-auth-methods-and-namespaces). |
+| `auth.mount` | The auth mount path you enabled. Defaults to `kubernetes`, or `jwt` for the `jwt` method. |
+| `auth.role` | The Vault role bound to Terrapod's ServiceAccount (the role_id, for AppRole). |
+| `auth.audience` | The projected token's audience. `jwt` defaults to `vault`; for `kubernetes`, set it only if the role requires one. |
+| `auth.token_path` | Where the token is read on each login. Defaults to the chart's projected path, or the standard ServiceAccount token. |
 | `paths` | Optional allow-list of path prefixes. See below. |
+| `tls.ca_secret` / `tls.ca_key` | A Secret key holding the CA that signs this Vault's certificate. See [A private CA](#a-private-ca-in-front-of-vault). |
 | `tls_skip_verify` | Lab use only. A credential broker that does not verify its peer is not one. |
 
 ### More than one Vault
@@ -475,6 +683,11 @@ this path.
 | `field '<x>' is not present at '<path>' (available: …)` | Right secret, wrong key. The message lists what is there. |
 | `path '<x>' is not in the allow-list configured for vault instance` | Terrapod's own `paths` allow-list refused it before contacting Vault. |
 | `could not read the ServiceAccount token` | Kubernetes auth outside a cluster. Use `approle` or `token` instead. |
+| `Vault login failed … (jwt auth, mount 'jwt', role 'terrapod', audience 'vault')` | The role does not exist; its `bound_audiences` lacks the audience shown; its `bound_subject` does not match `system:serviceaccount:<namespace>:<ServiceAccount>`; or Vault cannot verify the signature (a wrong or unreachable `oidc_discovery_url`, or stale `jwt_validation_pubkeys`). |
+| `could not read the projected ServiceAccount token` | The chart has not projected it — `vault.enabled` is false — or `auth.token_path` points somewhere with no file. |
+| `could not read the CA file` | The `tls.ca_secret` Secret, or its `tls.ca_key` key, does not exist. |
+| `not a usable PEM certificate bundle` | `tls.ca_key` names a key that does not hold a PEM certificate. |
+| Runs sit in `queued` and the log shows a TLS verification failure | Vault's certificate is not trusted. Add its CA through `tls.ca_secret`, or through the global `caBundle`. |
 | `references unknown vault instance '<name>'` | The reference names an instance that is not in `instances`. |
 | `omits 'vault' but several instances are configured` | Mark one `default: true`, or name the instance in the reference. |
 
@@ -510,19 +723,5 @@ this path.
   `mode` are reserved in the `file` object for that. Files are text: there is no
   binary or base64 decoding yet.
 - **`approle` and `token` auth** work but are less well trodden than
-  `kubernetes`, which needs no stored credential. Supply the secret_id or token
-  with `existingSecret` on the instance:
-
-  ```yaml
-        - name: prod-vault
-          address: https://vault.internal:8200
-          auth:
-            method: approle
-            mount: approle
-            role: <role-id>        # AppRole role_id
-          existingSecret: my-vault-approle
-          existingSecretKey: secret_id    # defaults to "secret"
-  ```
-
-  The chart injects it as `TERRAPOD_VAULT_<NAME>_SECRET` via `secretKeyRef`,
-  never through the ConfigMap. Kubernetes auth ignores all of this.
+  `kubernetes` and `jwt`, which need no stored credential. See
+  [Other auth methods](#other-auth-methods-and-namespaces).

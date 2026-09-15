@@ -1863,7 +1863,9 @@ because Vault reports two of them the same way.
 | Error | Cause |
 |---|---|
 | `Vault login failed … (kubernetes auth, mount 'X', role 'Y')` | The role does not exist, or its `bound_service_account_names` / `bound_service_account_namespaces` do not match the ServiceAccount the API pods run as. |
-| `permission denied` **on login** | Vault cannot call the Kubernetes TokenReview API. Its own ServiceAccount is missing the `system:auth-delegator` ClusterRoleBinding. |
+| `permission denied` **on login** | Vault cannot call the Kubernetes TokenReview API. Its own ServiceAccount is missing the `system:auth-delegator` ClusterRoleBinding. If Vault cannot reach the cluster at all, switch the instance to `jwt` auth — see [vault.md](vault.md#vault-outside-the-cluster-jwt-auth). |
+| `Vault login failed … (jwt auth, …, audience 'X')` | The JWT role's `bound_audiences` lacks `X`, its `bound_subject` does not match the API pods' ServiceAccount, or Vault cannot verify the token's signature against the cluster's issuer. |
+| `could not read the projected ServiceAccount token` / `could not read the CA file` | The file the config names is not mounted: `api.config.vault.enabled` is false, `auth.token_path` is wrong, or the `tls.ca_secret` Secret or key is missing. |
 | `Vault denied '<path>' … policy attached to role` | Login succeeded; the policy does not grant `read` on that path. Note kv-v2 policies include a `data/` segment that the reference omits. |
 | `Vault has no secret at '<path>'` | Wrong mount or path. |
 | `field '<x>' is not present at '<path>' (available: …)` | Right secret, wrong key — the message lists what is there. |
