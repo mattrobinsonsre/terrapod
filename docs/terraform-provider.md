@@ -114,7 +114,7 @@ resource "terrapod_variable" "region" {
   category     = "terraform"
 }
 
-# A Vault-sourced credential delivered as a file (see docs/vault.md). The
+# An OpenBao/Vault-sourced credential delivered as a file (see docs/vault.md). The
 # secret never reaches Terrapod's database, the Job spec or the environment:
 # the run sees GOOGLE_APPLICATION_CREDENTIALS=/var/run/terrapod/files/gcp/adc.json
 # and the file holds the secret. `value` is the reference, not the secret, so
@@ -132,7 +132,7 @@ resource "terrapod_variable" "gcp_credentials" {
   })
 }
 
-# A file built from several fields of ONE Vault read (see docs/vault.md,
+# A file built from several fields of ONE OpenBao/Vault read (see docs/vault.md,
 # "Templates, formats and encoding"): an AWS shared-credentials file from a
 # single aws/creds lease, so the key id and secret always belong together.
 # A template names no `field`. `{{ }}` is not Terraform interpolation, so it

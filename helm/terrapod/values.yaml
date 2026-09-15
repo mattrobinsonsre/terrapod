@@ -1102,15 +1102,18 @@ api:
     # KEK durability is the backend's job — and for `static` it is YOURS: losing
     # the master key makes encrypted data unrecoverable. See
     # docs/encryption-at-rest.md before enabling.
-    # Vault as a first-class variable value source (#1439). A variable may hold a
-    # *reference* instead of a literal; Terrapod resolves it server-side at run
-    # time and delivers the result through the per-run Secret, so Vault stays the
-    # source of truth and nothing is copied into Terrapod's database.
+    # OpenBao (or HashiCorp Vault) as a first-class variable value source (#1439).
+    # OpenBao is recommended and Vault is equally supported. Both speak the same
+    # API, so this block and the value source are named `vault` whichever server
+    # you run. A variable may hold a *reference* instead of a literal; Terrapod
+    # resolves it server-side at run time and delivers the result through the
+    # per-run Secret, so the server stays the source of truth and nothing is
+    # copied into Terrapod's database.
     #
     # A LIST from the outset, not a single address: config keys are a stability-
     # gated surface, so a scalar could never be removed later.
     #
-    # IMPORTANT: the policy attached to the Vault role below is the real access
+    # IMPORTANT: the policy attached to the OpenBao/Vault role below is the real access
     # boundary. Anyone who can set a workspace variable can ask Terrapod to read
     # any path that role reaches. Scope it tightly; see docs/vault.md.
     vault:
@@ -1119,14 +1122,14 @@ api:
       instances: []
       # - name: default
       #   default: true            # used when a reference omits `vault`
-      #   address: https://vault.internal:8200
-      #   namespace: ""            # Vault Enterprise only
+      #   address: https://openbao.internal:8200
+      #   namespace: ""            # only on a server with namespaces (Vault Enterprise / HCP)
       #   auth:
-      #     # kubernetes | jwt | approle | token. `jwt` (#1650) is for a Vault
+      #     # kubernetes | jwt | approle | token. `jwt` (#1650) is for a server
       #     # OUTSIDE the cluster (incl. HCP Vault Dedicated, with namespace:
       #     # admin): the chart projects an audience-scoped ServiceAccount token
-      #     # that Vault checks against the cluster's OIDC discovery / JWKS, so
-      #     # Vault never needs to reach back in to call TokenReview.
+      #     # that the server checks against the cluster's OIDC discovery / JWKS,
+      #     # so it never needs to reach back in to call TokenReview.
       #     method: kubernetes
       #     mount: kubernetes      # the auth mount path; defaults to `jwt` for jwt
       #     role: terrapod         # role bound to Terrapod's ServiceAccount
@@ -1137,11 +1140,11 @@ api:
       #     # Override where the token is read (re-read on every login). Empty =
       #     # the chart's projected path, or the standard SA token for kubernetes.
       #     token_path: ""
-      #   # Optional second line behind the Vault policy: prefixes Terrapod will
+      #   # Optional second line behind the OpenBao/Vault policy: prefixes Terrapod will
       #   # refuse to read outside of, whatever the policy permits.
       #   paths: []
       #   tls_skip_verify: false
-      #   # A private CA in front of this Vault (#1650). The Secret key is mounted
+      #   # A private CA in front of this server (#1650). The Secret key is mounted
       #   # and TLS to THIS instance is verified against it alone. Without it,
       #   # verification uses the default roots plus the global caBundle.
       #   tls:
@@ -1151,7 +1154,7 @@ api:
       #   # rather than leaving the credential live for the role's whole TTL. Off
       #   # by default; best-effort (a lease that cannot be revoked expires at its
       #   # TTL, as it does with this off). Needs `update` on `sys/leases/revoke`
-      #   # in the Vault policy. See docs/vault.md, "Revoking leases".
+      #   # in the OpenBao/Vault policy. See docs/vault.md, "Revoking leases".
       #   revoke_leases: false
       #   # approle/token only — never kubernetes, which stores no credential.
       #   # Injected as TERRAPOD_VAULT_<NAME>_SECRET via secretKeyRef.

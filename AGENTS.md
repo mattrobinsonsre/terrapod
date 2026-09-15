@@ -108,7 +108,10 @@ Per-surface verification before you push (lint alone is **not** enough):
 1. **API-first** — every UI action is backed by a public API endpoint; the
    V2 API is the contract.
 2. **OpenTofu-friendly** — support both `terraform` and `tofu` as execution
-   backends. Terrapod is the platform, not the engine.
+   backends. Terrapod is the platform, not the engine. The same stance covers
+   the secrets value source: OpenBao is recommended and HashiCorp Vault is
+   supported as fully (see *Open-source engines come first in prose* under
+   Conventions).
 3. **Postgres + native object storage** — Postgres for relational data;
    native cloud object storage (S3, Azure Blob, GCS) with a filesystem
    fallback for dev.
@@ -429,6 +432,26 @@ multi-language implementation ships in the same PR**:
   merge**. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 - **Conventional commits** — `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`,
   etc.
+- **Open-source engines come first in prose (hard preference).** Wherever
+  Terrapod names a tool that has an open-source fork or equivalent, the
+  open-source one leads: **OpenTofu before Terraform** (`tofu`/`terraform`,
+  "OpenTofu and Terraform"), and **OpenBao before Vault** — "OpenBao (or
+  HashiCorp Vault)" on first mention, "OpenBao/Vault" after it. Apply it in
+  docs, the UI (in every locale), error messages, Helm values comments,
+  release notes and examples; a CLI example leads with `tofu` or `bao` and
+  notes the `terraform` or `vault` equivalent. Where only one is named, it is
+  the open-source one, with a short "(or Terraform)" / "(or HashiCorp Vault)".
+  Both are supported equally, so this is about emphasis, not capability: no
+  feature is gated on one or the other. Where the two genuinely differ — a
+  Vault Enterprise or HCP-only feature, say — state it plainly rather than
+  implying parity.
+  **Identifiers keep their names.** The `vault` value source, the
+  `api.config.vault.*` settings, the `vault-*` API routes and attributes, the
+  `terrapod_vault_*` MCP tools, and any other code identifier, config key, API
+  attribute or wire literal that already says `vault` or `terraform` stay as
+  they are. They name the protocol both servers speak, the way
+  `terraform.tfvars` and the `TF_*` variables keep their names under OpenTofu;
+  they are not prose, and renaming them would break the contract gates.
 - **Branches** — feature branches off `main`; never push directly to `main`;
   never stack a PR on another open feature branch (always base on `main`).
 - **Merging — this repo requires branches to be up to date with `main`.** The

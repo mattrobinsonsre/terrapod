@@ -95,7 +95,7 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Description: "Where the value comes from: `static` (the default — `value` is the " +
 					"literal) or `vault`, where `value` holds a JSON reference " +
 					"(`{\"mount\":…,\"path\":…,\"field\":…}`) that Terrapod resolves from " +
-					"HashiCorp Vault at run time. A vault-sourced variable is always sensitive, " +
+					"OpenBao (or HashiCorp Vault) at run time. A vault-sourced variable is always sensitive, " +
 					"and the secret is never stored in Terrapod. Add a `file` object to the " +
 					"reference (`\"file\":{\"name\":\"gcp/adc.json\"}`) to deliver the secret as " +
 					"a file on the runner: the variable then holds the file's absolute path, " +

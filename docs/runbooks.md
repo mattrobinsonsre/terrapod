@@ -1805,9 +1805,11 @@ rotate accordingly.
 
 ---
 
-## Runs never start, and the API log says Vault is unavailable
+<a id="runs-never-start-and-the-api-log-says-vault-is-unavailable"></a>
 
-**Symptom.** Runs on workspaces with a Vault-sourced variable sit in `queued`,
+## Runs never start, and the API log says OpenBao/Vault is unavailable
+
+**Symptom.** Runs on workspaces with an OpenBao/Vault-sourced variable sit in `queued`,
 are picked up, and return to `queued`. No error appears on the run, in the UI or
 via the API. The API pod log repeats:
 
@@ -1815,13 +1817,13 @@ via the API. The API pod log repeats:
 vault is unavailable; leaving the run for a later claim
 ```
 
-**What is happening.** Terrapod distinguishes a Vault that *answered* (denied,
+**What is happening.** Terrapod distinguishes a server that *answered* (denied,
 or nothing at that path — the run is errored, with the cause) from one that
 *could not answer* (unreachable, or sealed/standby, which reply `503`/`429`).
-The second case returns the run to the queue rather than failing it, so a Vault
+The second case returns the run to the queue rather than failing it, so a server
 restart does not destroy every queued run in the estate.
 
-There is **no attempt cap**. If Vault never becomes reachable the run waits
+There is **no attempt cap**. If the server never becomes reachable the run waits
 indefinitely rather than erroring, which is why this presents as silence.
 
 **Diagnose, from the API pod:**
@@ -1831,12 +1833,13 @@ indefinitely rather than erroring, which is why this presents as silence.
 2. Check `api.config.vault.instances[].address` resolves and is reachable from
     the API pod (not from your laptop — a NetworkPolicy or egress rule is a
     common cause).
-3. `vault status` — a **sealed** Vault answers `503` to everything and produces
+3. `bao status` (`vault status` on Vault) — a **sealed** server answers `503` to
+    everything and produces
     exactly this behaviour.
 4. For Kubernetes auth, confirm the API pod's ServiceAccount is still bound to
-    the Vault role, and that the Vault auth mount still exists.
+    the OpenBao/Vault role, and that the auth mount still exists.
 
-**Resolve.** Once Vault answers again the waiting runs proceed on their next
+**Resolve.** Once the server answers again the waiting runs proceed on their next
 claim with no operator action. If the address or auth config was wrong, correct
 it and `helm upgrade`; the runs are still queued and will pick up the new
 configuration.
@@ -1846,23 +1849,25 @@ runs.
 
 ---
 
-## Vault leases are not being revoked
+<a id="vault-leases-are-not-being-revoked"></a>
+
+## OpenBao/Vault leases are not being revoked
 
 **Symptom.** An instance has `revoke_leases: true`, but dynamic credentials
-stay valid after their run phase ended: `vault list sys/leases/lookup/<mount>/creds/<role>`
+stay valid after their run phase ended: `bao list sys/leases/lookup/<mount>/creds/<role>`
 still lists them.
 
 **What is happening.** Revocation is best-effort by design. Terrapod records a
 phase's leases in Redis at the claim, waits for the phase's runner Job to end,
 then revokes them in a background task with bounded retry. If any step cannot
-complete, the lease expires at its Vault TTL. The run is never affected.
+complete, the lease expires at its TTL. The run is never affected.
 
 **Diagnose, from the API pod:**
 
 1. `kubectl -n <ns> logs deploy/<release>-api | grep -i "vault lease"` — a
    line saying a lease could not be revoked names the instance and the HTTP
    status (never the lease id).
-2. **`HTTP 403`**: the Vault policy does not grant `update` on
+2. **`HTTP 403`**: the OpenBao/Vault policy does not grant `update` on
    `sys/leases/revoke`. Add it; see [Revoking leases](vault.md#revoking-leases).
 3. **`could not record Vault leases`**: Redis was unreachable at the claim.
    Those leases expire at their TTL; later runs are unaffected.
@@ -1872,12 +1877,14 @@ complete, the lease expires at its Vault TTL. The run is never affected.
    since Terrapod asks a listener whether the Job has ended.
 
 **Resolve.** Fix the policy or the connectivity. Leases already missed expire
-at their TTL. To end them sooner, run `vault lease revoke -prefix <mount>/creds/<role>`
-yourself.
+at their TTL. To end them sooner, run `bao lease revoke -prefix <mount>/creds/<role>`
+(`vault lease revoke` on Vault) yourself.
 
 ---
 
-## Runs are failing on a Vault variable
+<a id="runs-are-failing-on-a-vault-variable"></a>
+
+## Runs are failing on an OpenBao/Vault variable
 
 A variable whose value source is `vault` holds a reference, not a value.
 Terrapod reads the secret at run time, and **if it cannot, the run fails** — it
@@ -1889,19 +1896,19 @@ to another identity and act with credentials nobody chose.
 
 The run's error names the variable and the cause. Match it against the table
 below; each row is a different thing to fix, and they are easy to confuse
-because Vault reports two of them the same way.
+because the server reports two of them the same way.
 
 | Error | Cause |
 |---|---|
-| `Vault login failed … (kubernetes auth, mount 'X', role 'Y')` | The role does not exist, or its `bound_service_account_names` / `bound_service_account_namespaces` do not match the ServiceAccount the API pods run as. |
-| `permission denied` **on login** | Vault cannot call the Kubernetes TokenReview API. Its own ServiceAccount is missing the `system:auth-delegator` ClusterRoleBinding. If Vault cannot reach the cluster at all, switch the instance to `jwt` auth — see [vault.md](vault.md#vault-outside-the-cluster-jwt-auth). |
-| `Vault login failed … (jwt auth, …, audience 'X')` | The JWT role's `bound_audiences` lacks `X`, its `bound_subject` does not match the API pods' ServiceAccount, or Vault cannot verify the token's signature against the cluster's issuer. |
+| `OpenBao/Vault login failed … (kubernetes auth, mount 'X', role 'Y')` | The role does not exist, or its `bound_service_account_names` / `bound_service_account_namespaces` do not match the ServiceAccount the API pods run as. |
+| `permission denied` **on login** | The server cannot call the Kubernetes TokenReview API. Its own ServiceAccount is missing the `system:auth-delegator` ClusterRoleBinding. If the server cannot reach the cluster at all, switch the instance to `jwt` auth — see [vault.md](vault.md#vault-outside-the-cluster-jwt-auth). |
+| `OpenBao/Vault login failed … (jwt auth, …, audience 'X')` | The JWT role's `bound_audiences` lacks `X`, its `bound_subject` does not match the API pods' ServiceAccount, or the server cannot verify the token's signature against the cluster's issuer. |
 | `could not read the projected ServiceAccount token` / `could not read the CA file` | The file the config names is not mounted: `api.config.vault.enabled` is false, `auth.token_path` is wrong, or the `tls.ca_secret` Secret or key is missing. |
-| `Vault denied '<path>' … policy attached to role` | Login succeeded; the policy does not grant `read` on that path. Note kv-v2 policies include a `data/` segment that the reference omits. |
-| `Vault has no secret at '<path>'` | Wrong mount or path. |
+| `OpenBao/Vault denied '<path>' … policy attached to role` | Login succeeded; the policy does not grant `read` on that path. Note kv-v2 policies include a `data/` segment that the reference omits. |
+| `OpenBao/Vault has no secret at '<path>'` | Wrong mount or path. |
 | `field '<x>' is not present at '<path>' (available: …)` | Right secret, wrong key — the message lists what is there. |
-| `path '<x>' is not in the allow-list configured for vault instance` | Terrapod's own `paths` allow-list refused it before contacting Vault. Widen the list or correct the reference. |
-| `variable(s) reference Vault but the Vault value source is disabled` | `api.config.vault.enabled` is `false` while variables still point at it. |
+| `path '<x>' is not in the allow-list configured for vault instance` | Terrapod's own `paths` allow-list refused it before contacting the server. Widen the list or correct the reference. |
+| `variable(s) reference OpenBao/Vault but the value source is disabled` | `api.config.vault.enabled` is `false` while variables still point at it. |
 | `omits 'vault' but several instances are configured` | Mark one instance `default: true`, or name the instance in the reference. |
 
 Confirm which ServiceAccount the API actually runs as rather than assuming:
@@ -1913,14 +1920,14 @@ kubectl -n <ns> get pod -l app.kubernetes.io/component=api \
 
 ### Resolution
 
-Fix the cause the table identifies, in Vault or in the reference — see
-[Vault](vault.md) for the full setup. No Terrapod restart is needed: the token
+Fix the cause the table identifies, in the server or in the reference — see
+[OpenBao/Vault](vault.md) for the full setup. No Terrapod restart is needed: the token
 is re-obtained per run, and configuration changes take effect on the next
 `helm upgrade`.
 
 If runs must proceed **now** and the secret can be supplied another way, change
 the variable's value source back to `static` and set a literal value. That
-stops Vault being the source of truth, so treat it as an incident measure and
+stops the server being the source of truth, so treat it as an incident measure and
 revert it.
 
 ### Verification

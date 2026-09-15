@@ -179,7 +179,7 @@ Everything below is implemented and shipped today.
 | Workspace autodiscovery | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories |
 | Module autodiscovery | Rules that find the modules in a repository — the root and any submodules — preview them, register all or a picked subset, and automatically register directories that appear later ([docs](docs/registry.md#module-autodiscovery)) |
 | Terragrunt | Per-workspace Terragrunt for agent-mode runs (a flag + pinned version, pull-through binary cache, local-backend reconciliation so Terrapod still owns state); CLI-driven runs need no extra config |
-| Variables & secrets | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets, assignable by rule (labels/globs) as well as one by one; values can be [read from HashiCorp Vault](docs/vault.md) at run time, including dynamic secrets |
+| Variables & secrets | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets, assignable by rule (labels/globs) as well as one by one; values can be [read from OpenBao (or HashiCorp Vault)](docs/vault.md) at run time, including dynamic secrets |
 | Private module source auth | First-class auth for private `git::https://` / `git::ssh://` module sources — a scoped `git_http_auth` / `git_ssh_auth` variable (static token or minted from a VCS connection), with ssh↔https protocol rewriting; credentials are log-safe and delivered only via the per-run Secret ([module-auth.md](docs/module-auth.md)) |
 | Drift detection | Scheduled plan-only runs to detect out-of-band changes, with a per-workspace ignore allowlist |
 | Notifications | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
@@ -271,6 +271,7 @@ runner protocol — is in [docs/architecture.md](docs/architecture.md).
 - **Kubernetes-native** — deployed exclusively via the Helm chart; runner Jobs are ephemeral K8s Jobs
 - **ARC-pattern execution** — the listener creates Jobs on demand (like GitHub Actions Runner Controller)
 - **OpenTofu-first** — [OpenTofu](https://opentofu.org/) is the recommended execution backend; `terraform` is also supported
+- **OpenBao-first** — [OpenBao](https://openbao.org/) is the recommended server for [secrets read at run time](docs/vault.md); HashiCorp Vault is also supported
 - **Single organization** — one org per instance (the literal name `default`), a deliberate self-hosted fit. Need separate tenants? Run an instance per tenant. See [Why a single organization](docs/architecture.md#why-a-single-organization)
 - **Native object storage** — speaks each cloud provider's native SDK (S3, Azure Blob, GCS) with filesystem fallback for dev
 
@@ -472,7 +473,7 @@ Licensing: Terrapod is **MPL-2.0** (file-level copyleft, the same license as Ope
 
 ## Trademarks
 
-Terrapod is not affiliated with, endorsed by, or a product of HashiCorp, Inc. or IBM. Terraform is a trademark of HashiCorp, Inc. OpenTofu is a project of the Linux Foundation.
+Terrapod is not affiliated with, endorsed by, or a product of HashiCorp, Inc. or IBM. Terraform and Vault are trademarks of HashiCorp, Inc. OpenTofu and OpenBao are projects of the Linux Foundation.
 
 ---
 

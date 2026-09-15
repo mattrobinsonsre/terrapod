@@ -112,8 +112,13 @@ These keep the public repository clean — please read them, they're firm:
   respected peers, not rivals to put down. Neutral, factual technical
   comparison is fine; disparagement (even passive-aggressive) is not. Describe
   what Terrapod does and let it stand on its own merits.
+- **Open-source tools lead in prose.** Name OpenTofu before Terraform, and
+  OpenBao before HashiCorp Vault, in docs, UI text, messages and examples.
+  Both of each pair are supported equally. Code identifiers, config keys and
+  API names that already say `terraform` or `vault` keep them.
 
-Full detail on both is in [`AGENTS.md`](AGENTS.md#content-hygiene-hard-requirements).
+Full detail on the first two is in [`AGENTS.md`](AGENTS.md#content-hygiene-hard-requirements),
+and on the third in [`AGENTS.md` → Conventions](AGENTS.md#conventions).
 
 ## Maintainers
 

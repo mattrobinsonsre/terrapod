@@ -133,7 +133,7 @@ class TestFailureIsFatal:
     async def test_referencing_vault_while_disabled_is_an_error(self):
         """Not a silent no-op: the operator turned the feature off with variables
         still pointing at it, and needs to know."""
-        with pytest.raises(VaultSourceError, match="Vault value source is disabled"):
+        with pytest.raises(VaultSourceError, match="the value source is disabled"):
             await resolve_vault_variables([_Var("T", _ref())], _settings(_ONE, enabled=False))
 
     @pytest.mark.asyncio

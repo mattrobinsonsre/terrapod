@@ -915,8 +915,9 @@ On Azure Cache for Redis with Microsoft Entra authentication, Terrapod mints an 
 
 ## External secret managers (Vault via ESO / Vault Agent)
 
-> **Workspace variables can now come from Vault directly.** Terrapod reads the
-> secret at run time and never stores it — see [Vault](vault.md). This section
+> **Workspace variables can now come from OpenBao (or HashiCorp Vault)
+> directly.** Terrapod reads the secret at run time and never stores it — see
+> [OpenBao/Vault](vault.md). This section
 > covers the other half: **platform** secrets (database URL, OIDC client
 > secrets, signing keys) which are read from Kubernetes Secrets and are still
 > sourced externally.
