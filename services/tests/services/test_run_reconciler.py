@@ -443,6 +443,39 @@ class TestBuildFailureMessage:
         msg = _build_failure_message(run, "failed")
         assert msg == "Job failed"
 
+    def test_a_runner_reason_leads_and_the_exit_code_follows(self):
+        """#1631: the runner said why it failed; keep that, then the exit code."""
+        from terrapod.services.run_reconciler import _build_failure_message
+
+        run = _mock_run(error_message="Error: Unsupported argument (on main.tf line 3)")
+        run.runner_exit_status = "error"
+        run.runner_exit_code = 1
+
+        msg = _build_failure_message(run, "failed")
+        assert msg == "Error: Unsupported argument (on main.tf line 3)\n\nRunner exited with code 1"
+
+    def test_a_runner_reason_without_an_exit_status(self):
+        """The listener's report may not have landed; the reason still shows."""
+        from terrapod.services.run_reconciler import _build_failure_message
+
+        run = _mock_run(error_message="pre_plan hook failed (hook=lint, rc=2)")
+        run.runner_exit_status = ""
+
+        assert _build_failure_message(run, "failed") == "pre_plan hook failed (hook=lint, rc=2)"
+
+    def test_an_oom_keeps_its_own_message(self):
+        """A killed runner cannot report; the typed OOM message still wins."""
+        from terrapod.services.run_reconciler import _build_failure_message
+
+        run = _mock_run(error_message="an earlier reason")
+        run.runner_exit_status = "oom"
+        run.peak_memory_bytes = None
+        run.resource_memory = "1Gi"
+
+        msg = _build_failure_message(run, "failed")
+        assert "OOM" in msg
+        assert "an earlier reason" not in msg
+
 
 # ── _check_stale ──────────────────────────────────────────────────────
 

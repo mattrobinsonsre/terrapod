@@ -25,6 +25,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import tempfile
 import uuid
 
@@ -721,6 +722,21 @@ async def _persist_runner_state(
     return Response(status_code=204)
 
 
+_MAX_FAILURE_REASON_CHARS = 2000
+_ANSI_ESCAPES = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+
+
+def _clean_failure_reason(text: str) -> str:
+    """A runner-sent failure reason, safe to store and show: whole ANSI
+    escape sequences and any other control characters removed (newlines
+    and tabs kept), bounded in length."""
+    text = _CONTROL_CHARS.sub("", _ANSI_ESCAPES.sub("", text)).strip()
+    if len(text) > _MAX_FAILURE_REASON_CHARS:
+        text = text[: _MAX_FAILURE_REASON_CHARS - 1] + "…"
+    return text
+
+
 @router.post("/runs/{run_id}/resource-profile")
 async def record_resource_profile(
     run_id: str,
@@ -778,6 +794,9 @@ async def record_resource_profile(
     peak_memory_bytes = _opt_nonneg_int("peak_memory_bytes")
     peak_cpu_usec = _opt_nonneg_int("peak_cpu_usec")
     exit_code = _opt_nonneg_int("exit_code")
+    failure_reason = body.get("failure_reason")
+    if failure_reason is not None and not isinstance(failure_reason, str):
+        raise HTTPException(status_code=400, detail="failure_reason must be a string")
 
     if peak_memory_bytes is not None:
         run.peak_memory_bytes = peak_memory_bytes
@@ -785,6 +804,14 @@ async def record_resource_profile(
         run.peak_cpu_usec = peak_cpu_usec
     if exit_code is not None:
         run.runner_exit_code = exit_code
+
+    # The runner's own account of why it failed (#1631), kept as the run's
+    # error message so the reconciler reports it instead of the bare exit
+    # code. Only with a non-zero exit, and only while the run is still in a
+    # phase: an errored run's message is final.
+    reason = _clean_failure_reason(failure_reason or "")
+    if reason and exit_code and run.status in ("planning", "applying"):
+        run.error_message = reason
 
     await db.commit()
 
