@@ -368,7 +368,11 @@ async def resolve_vault_variables(resolved: list, settings: Settings) -> dict[st
 
 
 async def resolve_vault_delivery(
-    resolved: list, settings: Settings, *, reads: list | None = None
+    resolved: list,
+    settings: Settings,
+    *,
+    reads: list | None = None,
+    leases: list | None = None,
 ) -> VaultDelivery:
     """Resolve every vault-sourced variable for delivery.
 
@@ -380,6 +384,11 @@ async def resolve_vault_delivery(
     read attempted, including the one that failed, *before* any exception is
     raised — so the caller can audit a failed claim as well as a good one
     (#1651). Nothing is recorded for a claim refused before any read.
+
+    ``leases``, when given, receives ``(instance_name, VaultLease)`` for every
+    successful read that returned a lease id from an instance with
+    ``revoke_leases`` on (#1649). With the option off it stays empty, so the
+    caller has nothing to record.
     """
     wanted = [
         v for v in resolved if getattr(v, "value_source", VALUE_SOURCE_STATIC) == VALUE_SOURCE_VAULT
@@ -488,6 +497,13 @@ async def resolve_vault_delivery(
         # does not render still fails the run below, but the read happened and
         # is recorded as one.
         _record(reads, keys, inst.name, ref, "ok")
+        if (
+            leases is not None
+            and inst.revoke_leases
+            and response.lease is not None
+            and response.lease.lease_id
+        ):
+            leases.append((inst.name, response.lease))
         secret = response.data
         # Lease metadata a template may read as `_lease.*` — never the lease id.
         lease = response.lease.template_metadata() if response.lease else None

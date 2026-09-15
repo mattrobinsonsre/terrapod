@@ -2728,6 +2728,9 @@
                       }
                     }
                   },
+                  "revoke_leases": {
+                    "type": "boolean"
+                  },
                   "existingSecret": {
                     "type": "string"
                   },

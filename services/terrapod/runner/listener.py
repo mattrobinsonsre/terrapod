@@ -989,6 +989,23 @@ class RunnerListener:
         #      container terminated.reason — the API's typed-bucket
         #      mapping handles `reason=""` + `exit_code=137` correctly.
         body: dict = {"status": status, "phase": phase}
+        # `terminal` (#1649): whether the Job itself has finished — its
+        # Complete or Failed condition — as opposed to having had a pod fail
+        # that Kubernetes is about to retry. The API waits for it before
+        # revoking a phase's Vault leases. Omitted when it cannot be read, and
+        # the API then falls back to the status alone.
+        if status == "deleted":
+            body["terminal"] = True
+        elif status in ("succeeded", "failed"):
+            from terrapod.runner.job_manager import job_is_finished
+
+            try:
+                finished = await job_is_finished(job_name, namespace=job_namespace)
+            except Exception as e:
+                finished = None
+                logger.debug("Failed to read Job conditions", job=job_name, error=str(e))
+            if finished is not None:
+                body["terminal"] = finished
         if status == "failed":
             try:
                 info = await get_pod_terminated_info(job_name, namespace=job_namespace)

@@ -504,6 +504,7 @@ data:
             token_path: {{ include "terrapod.vault.tokenPath" . | quote }}
           tls_skip_verify: {{ .tls_skip_verify | default false }}
           ca_file: {{ include "terrapod.vault.caFile" . | quote }}
+          revoke_leases: {{ .revoke_leases | default false }}
           paths: {{ if not .paths }}[]{{ end }}
           {{- range .paths }}
             - {{ . | quote }}

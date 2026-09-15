@@ -100,6 +100,11 @@ path "secret/data/apps/*" {
 path "database/creds/app-readonly" {
   capabilities = ["read"]
 }
+
+# Only with `revoke_leases: true` on the instance — see "Revoking leases".
+path "sys/leases/revoke" {
+  capabilities = ["update"]
+}
 EOF
 ```
 
@@ -365,6 +370,7 @@ change rather than a migration.
 | `paths` | Optional allow-list of path prefixes. See below. |
 | `tls.ca_secret` / `tls.ca_key` | A Secret key holding the CA that signs this Vault's certificate. See [A private CA](#a-private-ca-in-front-of-vault). |
 | `tls_skip_verify` | Lab use only. A credential broker that does not verify its peer is not one. |
+| `revoke_leases` | Revoke each dynamic secret's lease once the run phase's Job has ended. Off by default. See [Revoking leases](#revoking-leases). |
 
 ### More than one Vault
 
@@ -413,8 +419,10 @@ Most dynamic engines are a `vault read`, so the default `GET` is right:
 Each run mints a fresh credential — and so does **each phase**. A run's plan
 and its apply are separate claims by a runner, and every claim resolves the
 run's Vault variables again, so plan and apply never share a credential: the
-apply gets its own, minted when the apply starts. Terrapod does not renew or
-revoke the lease, so set the Vault role's TTL to cover one phase. For how that
+apply gets its own, minted when the apply starts. Terrapod does not renew the
+lease. With [`revoke_leases`](#revoking-leases) on it revokes the lease when
+the phase's Job ends; otherwise the lease is left to expire. Either way, set
+the Vault role's TTL to cover one phase. For how that
 interacts with Terraform variables, see
 [Env, file or Terraform variable?](#env-file-or-terraform-variable).
 
@@ -796,6 +804,64 @@ launches.
 
 ---
 
+## Revoking leases
+
+A dynamic secret comes with a lease, and without revocation the credential
+stays valid for the role's whole TTL, even when the plan that used it
+finished in a minute. Set `revoke_leases: true` on an instance and Terrapod
+revokes the leases a run phase read from it once that phase is over:
+
+```yaml
+      instances:
+        - name: default
+          address: https://vault.internal:8200
+          revoke_leases: true
+```
+
+The Vault policy needs one more grant (shown in
+[Write a policy](#3-write-a-policy--narrowly)):
+
+```hcl
+path "sys/leases/revoke" {
+  capabilities = ["update"]
+}
+```
+
+**One credential per phase.** Plan and apply each mint their own credential,
+and each phase's leases are revoked when that phase ends. Sharing one
+credential between them would mean keeping it alive between phases, which can
+be days apart while a plan waits for confirmation.
+
+**When it happens.** Once the phase's runner **Job has ended**: it succeeded,
+failed, or was deleted by a cancel, a discard, or the reconciler giving up on
+it. A Job whose pod failed and is being retried by Kubernetes has not ended,
+and neither has a Job whose runner has only posted its plan result, since the
+pod is still running then. Revocation happens within a few reconcile cycles of
+the end, in a background task. It never holds up a run.
+
+**Only for leases a Job received.** Terrapod records a phase's leases when a
+runner claims the phase successfully. When a claim fails (a later read was
+denied, or Vault went away and the run went back to the queue), no Job
+receives its credentials. Those leases are not recorded, and they expire at
+their TTL as before.
+
+**Best effort, and safe when it cannot happen.** Terrapod keeps the lease ids
+in Redis while the phase runs, for up to the longest lease's TTL plus an hour.
+If that record is lost, or Vault cannot be reached for the revoke (the call is
+retried a bounded number of times), the lease **expires at its Vault TTL**,
+exactly as it does with the option off. A revoke of a lease Vault no longer
+holds counts as done. None of this can fail or delay a run. With the option
+off, Terrapod records nothing and makes no extra call to Redis or Vault.
+
+**Renewal is not implemented.** A lease that expires mid-phase is not
+extended, so keep the role's TTL at or above your longest phase (the runner's
+timeout is the upper bound).
+
+Lease ids are never written to a log, the audit trail or the API. Each
+revocation logs the run, phase and counts only.
+
+---
+
 ## Who can read what
 
 **Terrapod is a credential broker once this is enabled.** Anyone who can set a
@@ -955,8 +1021,10 @@ this path.
   workspace the reference resolves to nothing while agent-mode workspaces in the
   same set are unaffected. Prefer agent execution for any workspace a
   Vault-bearing set can reach.
-- **Leases are not renewed or revoked.** A dynamic credential is minted per run
-  and left to expire. Set the Vault role's TTL to suit your run durations.
+- **Leases are not renewed.** A dynamic credential is minted per phase. It is
+  revoked when the phase's Job ends only with
+  [`revoke_leases`](#revoking-leases) on; otherwise it is left to expire. Set
+  the Vault role's TTL to cover your longest phase either way.
 - **Files are text.** A file's content, after any template, format or base64
   decoding, must be UTF-8 text; binary files need a wire change and are not
   supported yet. A file's permissions are fixed (see

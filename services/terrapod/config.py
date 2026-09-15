@@ -1448,6 +1448,15 @@ class VaultInstanceConfig(BaseModel):
         "from `tls.ca_secret` / `tls.ca_key`. Empty means the default trust store.",
     )
 
+    revoke_leases: bool = Field(
+        default=False,
+        description="Revoke the leases of dynamic secrets read from this instance "
+        "once the run phase's Job has ended (#1649), instead of leaving each "
+        "credential live for its whole Vault TTL. Best-effort: if revocation cannot "
+        "happen, the lease expires at its TTL exactly as it does with this off. "
+        "The Vault policy must grant `update` on `sys/leases/revoke`.",
+    )
+
     @field_validator("name")
     @classmethod
     def _valid_name(cls, v: str) -> str:
@@ -1510,6 +1519,20 @@ class VaultConfig(BaseModel):
             if not inst.address:
                 raise ValueError(f"vault instance {inst.name!r} requires an address")
         return self
+
+    @property
+    def revocation_enabled(self) -> bool:
+        """Whether any instance revokes leases (#1649).
+
+        The gate every lease-revocation code path checks first, so that with the
+        option off nothing is recorded, nothing is enqueued and no Redis or
+        Vault call is made for it.
+        """
+        return self.enabled and any(i.revoke_leases for i in self.instances)
+
+    def instance_named(self, name: str) -> VaultInstanceConfig | None:
+        """The instance with exactly this name — no default resolution."""
+        return next((i for i in self.instances if i.name == name), None)
 
     def resolve_instance(self, name: str | None) -> VaultInstanceConfig | None:
         """The instance a reference means, or None when it cannot be decided.

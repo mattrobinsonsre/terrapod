@@ -1755,6 +1755,37 @@ runs.
 
 ---
 
+## Vault leases are not being revoked
+
+**Symptom.** An instance has `revoke_leases: true`, but dynamic credentials
+stay valid after their run phase ended: `vault list sys/leases/lookup/<mount>/creds/<role>`
+still lists them.
+
+**What is happening.** Revocation is best-effort by design. Terrapod records a
+phase's leases in Redis at the claim, waits for the phase's runner Job to end,
+then revokes them in a background task with bounded retry. If any step cannot
+complete, the lease expires at its Vault TTL. The run is never affected.
+
+**Diagnose, from the API pod:**
+
+1. `kubectl -n <ns> logs deploy/<release>-api | grep -i "vault lease"` — a
+   line saying a lease could not be revoked names the instance and the HTTP
+   status (never the lease id).
+2. **`HTTP 403`**: the Vault policy does not grant `update` on
+   `sys/leases/revoke`. Add it; see [Revoking leases](vault.md#revoking-leases).
+3. **`could not record Vault leases`**: Redis was unreachable at the claim.
+   Those leases expire at their TTL; later runs are unaffected.
+4. **No lines at all**: check the phase's Job has actually ended
+   (`kubectl -n <runner-ns> get job`). A Job retrying a failed pod has not
+   ended, and revocation waits for it. Also check that the listener pool is up,
+   since Terrapod asks a listener whether the Job has ended.
+
+**Resolve.** Fix the policy or the connectivity. Leases already missed expire
+at their TTL. To end them sooner, run `vault lease revoke -prefix <mount>/creds/<role>`
+yourself.
+
+---
+
 ## Runs are failing on a Vault variable
 
 A variable whose value source is `vault` holds a reference, not a value.

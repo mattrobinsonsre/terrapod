@@ -2060,6 +2060,10 @@ async def next_run(
     # staged in this claim's transaction and commit with it, whichever way the
     # claim ends, so a claim is still one commit however many reads it makes.
     vault_reads: list = []
+    # Lease revocation (#1649): leases of instances with `revoke_leases` on.
+    # Recorded below only if the claim succeeds — a failed claim's leases were
+    # never delivered and expire at their Vault TTL, as they always have.
+    vault_leases: list = []
 
     def _stage_vault_audit() -> None:
         audit_service.add_audit_events(
@@ -2067,7 +2071,9 @@ async def next_run(
         )
 
     try:
-        vault = await resolve_vault_delivery(resolved, settings, reads=vault_reads)
+        vault = await resolve_vault_delivery(
+            resolved, settings, reads=vault_reads, leases=vault_leases
+        )
     except VaultTransient:
         # Vault is down, not misconfigured. Put the run back so the next claim
         # picks it up, rather than erroring every queued run in the estate over
@@ -2098,6 +2104,15 @@ async def next_run(
         return Response(status_code=204)
     # Committed below with the rest of the claim.
     _stage_vault_audit()
+
+    # Record the leases so they can be revoked once this phase's Job has ended
+    # (#1649). Best-effort: record_leases never raises, and a lost record only
+    # means the leases expire at their Vault TTL — so the claim proceeds
+    # whatever happens here. Empty (and so skipped) with the option off.
+    if vault_leases:
+        from terrapod.services import vault_lease_service
+
+        await vault_lease_service.record_leases(run.id, phase, vault_leases)
 
     if vault.values:
         for v in resolved:
@@ -2345,6 +2360,13 @@ async def report_job_launched(
     run.job_namespace = job_namespace
     await db.commit()
 
+    # Lease revocation (#1649) needs to know which Job ends this phase, and
+    # `job_name` on the run is overwritten when the apply Job launches. A no-op
+    # unless the phase has leases recorded; never raises.
+    from terrapod.services import vault_lease_service
+
+    await vault_lease_service.record_job(run, job_name, job_namespace)
+
     return JSONResponse(content={"status": "ok"})
 
 
@@ -2378,7 +2400,16 @@ async def report_job_status(
 
     from terrapod.redis.client import set_job_status
 
-    await set_job_status(str(run.id), phase, job_status)
+    # `terminal` (#1649): the Job's own Complete/Failed condition as the
+    # listener read it, so a pod being retried within the Job is not taken for
+    # the end of the phase. Absent from a lagging listener.
+    terminal = body.get("terminal")
+    await set_job_status(
+        str(run.id),
+        phase,
+        job_status,
+        terminal=terminal if isinstance(terminal, bool) else None,
+    )
 
     # When the listener reports a failed Job, it MAY also send the container
     # exit code + K8s termination reason from the terminated pod (#430). Map
