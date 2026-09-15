@@ -104,7 +104,7 @@ test.describe('Responsive harness (phone viewport)', () => {
     )
 
     await page.goto(`/workspaces/${wsId}?tab=variables`)
-    await expect(page.getByText(longName).first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText(longName).filter({ visible: true }).first()).toBeVisible({ timeout: 10_000 })
     await expectNoHorizontalPageScroll(page)
 
     await page.getByRole('button', { name: 'Add Variable' }).click()
