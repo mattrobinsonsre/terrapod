@@ -2529,7 +2529,12 @@
       "vaultSecretNeverStored": "Se guarda la ruta, nunca el secreto. La política de Vault de Terrapod controla qué puede leer.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Referencia de Vault ilegible",
-      "vaultInstanceDefaultNamed": "Predeterminado ({name})"
+      "vaultInstanceDefaultNamed": "Predeterminado ({name})",
+      "vaultDeliverAsFile": "Entregar como archivo",
+      "vaultFileName": "Nombre del archivo",
+      "vaultFileNameDefault": "Por defecto, la clave de la variable",
+      "vaultFileBadge": "Archivo",
+      "vaultFileHint": "La variable contiene la ruta del archivo, no el secreto: úsala como {fileFn} o con una herramienta que lea una ruta desde una variable de entorno. Un nombre relativo como {relExample} se escribe en {base}; un nombre que empieza por {home}, como {homeExample}, va al directorio personal del runner."
     },
     "runs": {
       "options": "Opciones",

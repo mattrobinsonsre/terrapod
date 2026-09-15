@@ -31,6 +31,26 @@ func TestVSVVaultReferenceIsReadBackDespiteBeingSensitive(t *testing.T) {
 	}
 }
 
+// File delivery (#1619) rides inside the reference, so a set variable's
+// reference must read back as exactly the configured string.
+func TestVSVVaultFileReferenceReadsBackVerbatim(t *testing.T) {
+	const ref = `{"source":"vault","mount":"secret","path":"apps/gcp","field":"sa_json","file":{"name":"gcp/adc.json"}}`
+	m := variableSetVariableModel{Value: types.StringValue(ref)}
+	readVSVFromSDK(&terrapod.VariableSetVariable{
+		ID: "var-1", Key: "GOOGLE_APPLICATION_CREDENTIALS", Category: "env",
+		Sensitive: true, ValueSource: "vault", Value: ref,
+	}, &m)
+	if got := m.Value.ValueString(); got != ref {
+		t.Fatalf("read back %q, want the configured reference", got)
+	}
+	if got := buildCreateVSVRequest(&m).Value; got != ref {
+		t.Errorf("create would send %q", got)
+	}
+	if up := buildUpdateVSVRequest(&m); up.Value == nil || *up.Value != ref {
+		t.Errorf("update would send %v", up.Value)
+	}
+}
+
 func TestVSVOrdinarySensitiveValueIsStillNotReadBack(t *testing.T) {
 	m := variableSetVariableModel{Value: types.StringValue("configured-locally")}
 	readVSVFromSDK(&terrapod.VariableSetVariable{

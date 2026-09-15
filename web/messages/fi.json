@@ -2529,7 +2529,12 @@
       "vaultSecretNeverStored": "Polku tallennetaan, ei koskaan salaisuutta. Terrapodin Vault-käytäntö määrää, mitä se voi lukea.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Lukukelvoton Vault-viittaus",
-      "vaultInstanceDefaultNamed": "Oletus ({name})"
+      "vaultInstanceDefaultNamed": "Oletus ({name})",
+      "vaultDeliverAsFile": "Toimita tiedostona",
+      "vaultFileName": "Tiedoston nimi",
+      "vaultFileNameDefault": "Oletuksena muuttujan avain",
+      "vaultFileBadge": "Tiedosto",
+      "vaultFileHint": "Muuttuja sisältää tiedoston polun, ei salaisuutta: käytä sitä muodossa {fileFn} tai työkalun kanssa, joka lukee polun ympäristömuuttujasta. Suhteellinen nimi, kuten {relExample}, kirjoitetaan hakemistoon {base}; merkkijonolla {home} alkava nimi, kuten {homeExample}, sijoitetaan ajajan kotihakemistoon."
     },
     "runs": {
       "options": "Vaihtoehdot",

@@ -75,6 +75,15 @@ SCENARIOS: dict[str, dict] = {
         ],
     },
     "ca-bundle": {"phase": "plan", "ca_secret_name": "tp-ca"},
+    # Vault file delivery (#1619): a relative file and a home file, so both
+    # Secret volumes, the subPath mount and the home-dirs init container render.
+    "vault-files": {
+        "phase": "plan",
+        "vault_files": [
+            {"name": "gcp/adc.json", "secret_key": "vault-file-0"},
+            {"name": "~/.aws/credentials", "secret_key": "vault-file-1"},
+        ],
+    },
     # The onboarding path, which #1488 folds in — it is currently four extra
     # parameters riding along on a general-purpose builder, and its spec must be
     # identical after they move behind the strategy.

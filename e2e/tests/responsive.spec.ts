@@ -62,6 +62,61 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('Vault file delivery is usable at phone width (#1619)', async ({ page }) => {
+    // The toggle, the name box and its hint all have to hold up on a phone,
+    // and a long file name in the list must wrap rather than push the page
+    // sideways — the list is where an operator checks what a run will see.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespvfile'), {
+      'execution-mode': 'agent',
+    })
+    const longName = 'deeply/nested/directory/structure/for/a/service-account-credentials.json'
+    const seed = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: {
+            key: 'GOOGLE_APPLICATION_CREDENTIALS', category: 'env', 'value-source': 'vault',
+            value: JSON.stringify({
+              source: 'vault', mount: 'secret', path: 'apps/gcp', field: 'sa_json',
+              file: { name: longName },
+            }),
+          },
+        },
+      }),
+    })
+    expect(seed.status).toBe(201)
+
+    await page.route('**/api/terrapod/v1/vault/availability', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability',
+            id: 'vault',
+            attributes: { enabled: true, instances: ['default'], 'default-instance': 'default' },
+          },
+        }),
+      }),
+    )
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await expect(page.getByText(longName).filter({ visible: true }).first()).toBeVisible({ timeout: 10_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await page.locator('#var-source').selectOption('vault')
+    await page.locator('#add-file').check()
+    await expect(page.locator('#add-file-name')).toBeVisible()
+    await page.locator('#add-file-name').fill('~/.aws/credentials')
+    await expect(page.locator('#add-file-name')).toHaveValue('~/.aws/credentials')
+    await expect(page.getByText('/var/run/terrapod/files/', { exact: false })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('workspace variable sets panel adapts to mobile (#1440)', async ({ page }) => {
     // Seeded rather than asserted on an empty page: with no set applying, the
     // panel renders nothing at all and the assertion would pass however the

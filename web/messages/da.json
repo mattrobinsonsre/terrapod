@@ -2529,7 +2529,12 @@
       "vaultSecretNeverStored": "Stien gemmes, aldrig hemmeligheden. Terrapods Vault-politik styrer, hvad der kan læses.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Ulæselig Vault-reference",
-      "vaultInstanceDefaultNamed": "Standard ({name})"
+      "vaultInstanceDefaultNamed": "Standard ({name})",
+      "vaultDeliverAsFile": "Lever som fil",
+      "vaultFileName": "Filnavn",
+      "vaultFileNameDefault": "Standard er variablens nøgle",
+      "vaultFileBadge": "Fil",
+      "vaultFileHint": "Variablen indeholder filens sti, ikke hemmeligheden: brug den som {fileFn}, eller med et værktøj, der læser en sti fra en miljøvariabel. Et relativt navn som {relExample} skrives under {base}; et navn, der starter med {home}, som {homeExample}, placeres i runnerens hjemmemappe."
     },
     "runs": {
       "options": "Indstillinger",

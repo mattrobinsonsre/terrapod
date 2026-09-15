@@ -2529,7 +2529,12 @@
       "vaultSecretNeverStored": "Cedwir y llwybr, byth y gyfrinach. Polisi Vault Terrapod sy'n rheoli beth y gall ei ddarllen.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Cyfeirnod Vault annarllenadwy",
-      "vaultInstanceDefaultNamed": "Rhagosodiad ({name})"
+      "vaultInstanceDefaultNamed": "Rhagosodiad ({name})",
+      "vaultDeliverAsFile": "Cyflwyno fel ffeil",
+      "vaultFileName": "Enw'r ffeil",
+      "vaultFileNameDefault": "Allwedd y newidyn yw'r rhagosodiad",
+      "vaultFileBadge": "Ffeil",
+      "vaultFileHint": "Mae'r newidyn yn dal llwybr y ffeil, nid y gyfrinach: defnyddiwch ef fel {fileFn}, neu gydag offeryn sy'n darllen llwybr o newidyn amgylchedd. Mae enw cymharol fel {relExample} yn cael ei ysgrifennu o dan {base}; mae enw sy'n dechrau gyda {home}, fel {homeExample}, yn mynd i gyfeiriadur cartref y rhedwr."
     },
     "runs": {
       "options": "Opsiynau",

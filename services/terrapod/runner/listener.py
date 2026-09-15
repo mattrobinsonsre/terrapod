@@ -738,6 +738,17 @@ class RunnerListener:
             }
             for g in attrs.get("git-auth", [])
         ]
+        # Vault file delivery (#1619). Each file's content becomes a key of the
+        # per-run vars Secret; the Job mounts it read-only. Only names reach the
+        # Job builder and the logs — the values go to the Secret and nowhere else.
+        try:
+            vault_file_mounts, vault_file_values = self._plan_vault_files(
+                attrs.get("vault-files", []), env_vars
+            )
+        except ValueError as e:
+            logger.error("Refusing vault files", run_id=run_id, reason=str(e))
+            await self._report_launch_failed(run_id, f"Vault file delivery refused: {e}")
+            return
 
         run_short = run_id[:16]
         # Phase is part of the Secret name to avoid a 409 AlreadyExists when
@@ -754,7 +765,7 @@ class RunnerListener:
         # mirrors the auth Secret; ownerReference GCs it with the Job.
         vars_secret_name = (
             f"tprun-{run_short}-{phase}-vars"
-            if (env_vars or terraform_vars or execution_hooks or git_auth)
+            if (env_vars or terraform_vars or execution_hooks or git_auth or vault_file_mounts)
             else ""
         )
         # Per-run CA Secret (#592): ships the custom outbound CA into the runner
@@ -795,6 +806,7 @@ class RunnerListener:
                 terraform_vars=terraform_vars,
                 execution_hooks=execution_hooks,
                 git_auth=git_auth,
+                vault_files=vault_file_mounts,
                 resource_cpu=attrs.get("resource-cpu", "1"),
                 resource_memory=attrs.get("resource-memory", "2Gi"),
                 ca_secret_name=ca_secret_name,
@@ -845,6 +857,7 @@ class RunnerListener:
                     job_uid,
                     execution_hooks=execution_hooks,
                     git_auth=git_auth,
+                    vault_file_values=vault_file_values,
                 )
             except Exception as e:
                 logger.error("Failed to create vars secret", run_id=run_id, error=str(e))
@@ -887,6 +900,46 @@ class RunnerListener:
             phase=phase,
             job=job_name,
         )
+
+    @staticmethod
+    def _plan_vault_files(raw: list, env_vars: list[dict]) -> tuple[list[dict], dict[str, str]]:
+        """Split ``vault-files`` into mounts (names only) and Secret values.
+
+        Returns ``(mounts, values)``: ``mounts`` is ``[{name, secret_key}]`` for
+        the Job builder, which never sees a value; ``values`` is
+        ``{secret_key: content}`` for the vars Secret. Re-validates every name
+        and refuses collisions (the API already did, but this is the process
+        that builds the mounts), and refuses a derived key that an env variable
+        already uses. Raises ValueError with a message naming variables and file
+        names only.
+        """
+        from terrapod.runner import vault_files as vf
+
+        mounts: list[dict] = []
+        values: dict[str, str] = {}
+        entries: list[tuple[str, str]] = []
+        env_keys = {v["key"] for v in env_vars}
+        for i, f in enumerate(raw or []):
+            var_key = f.get("key", "") or f"#{i}"
+            name = f.get("name", "")
+            try:
+                vf.validate_name(name)
+            except vf.FilePathError as e:
+                raise ValueError(f"variable {var_key!r}: file name {name!r} is invalid: {e}") from e
+            secret_key = vf.secret_key(i)
+            if secret_key in env_keys:
+                raise ValueError(
+                    f"env variable {secret_key!r} clashes with the Secret key Terrapod uses "
+                    f"for the Vault file of variable {var_key!r}; rename the env variable"
+                )
+            entries.append((var_key, name))
+            mounts.append({"name": name, "secret_key": secret_key})
+            values[secret_key] = f.get("value", "")
+        try:
+            vf.check_collisions(entries)
+        except vf.FilePathError as e:
+            raise ValueError(str(e)) from e
+        return mounts, values
 
     async def _report_launch_failed(self, run_id: str, error_message: str) -> None:
         """Mark a run errored when the listener can't launch its Job.
@@ -1138,9 +1191,13 @@ class RunnerListener:
         job_uid: str,
         execution_hooks: list[dict] | None = None,
         git_auth: list[dict] | None = None,
+        vault_file_values: dict[str, str] | None = None,
     ) -> None:
         """Create a K8s Secret holding all workspace variable values, with an
         ownerReference to the Job (cascade-GC'd with it, like the auth Secret).
+
+        ``vault_file_values`` maps a derived key (``vault-file-N``) to a Vault
+        file's content (#1619); the Job mounts each key read-only at its path.
 
         Data keys:
           - `terraform.tfvars.json`: JSON blob [{key, value, structured}] — mounted as
@@ -1198,6 +1255,10 @@ class RunnerListener:
             )
         for var in env_vars:
             string_data[var["key"]] = var["value"]
+        # _plan_vault_files already refused a clash with an env key, so this
+        # never overwrites one.
+        for secret_key, content in (vault_file_values or {}).items():
+            string_data[secret_key] = content
 
         secret = k8s_client.V1Secret(
             metadata=k8s_client.V1ObjectMeta(

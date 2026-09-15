@@ -3,6 +3,8 @@
 import json
 from unittest.mock import MagicMock
 
+import pytest
+
 
 def _runner_config():
     """Create a minimal RunnerConfig mock."""
@@ -454,6 +456,192 @@ class TestVarsSecretDelivery:
         )
         pod = spec["spec"]["template"]["spec"]
         assert not any(v["name"] == "tfvars" for v in pod["volumes"])
+
+
+class TestVaultFileMounts:
+    """Vault file delivery (#1619): each file is a key of the per-run vars
+    Secret, mounted read-only — never a value in the Job spec."""
+
+    SECRET = "S3CR3T-file-content-must-not-reach-the-job-spec"
+    VARS = "tprun-abc123def456-plan-vars"
+
+    def _spec(self, vault_files, *, psc=None, **kw):
+        from terrapod.runner.job_template import build_job_spec
+
+        cfg = _runner_config()
+        if psc is not None:
+            cfg.pod_security_context = psc
+        return build_job_spec(
+            run_id="abc123def456",
+            phase="plan",
+            runner_config=cfg,
+            auth_secret_name="tprun-abc123def456-plan-auth",
+            env_vars=kw.pop("env_vars", []),
+            terraform_vars=kw.pop("terraform_vars", []),
+            vault_files=vault_files,
+            vars_secret_name=kw.pop("vars_secret_name", self.VARS),
+            **kw,
+        )
+
+    @staticmethod
+    def _pod(spec):
+        return spec["spec"]["template"]["spec"]
+
+    def test_relative_files_are_items_of_one_read_only_volume(self):
+        spec = self._spec(
+            [
+                {"name": "gcp/adc.json", "secret_key": "vault-file-0"},
+                {"name": "ca.pem", "secret_key": "vault-file-1"},
+            ]
+        )
+        pod = self._pod(spec)
+        vol = next(v for v in pod["volumes"] if v["name"] == "vault-files")
+        assert vol["secret"] == {
+            "secretName": self.VARS,
+            "items": [
+                {"key": "vault-file-0", "path": "gcp/adc.json"},
+                {"key": "vault-file-1", "path": "ca.pem"},
+            ],
+            "defaultMode": 0o444,
+        }
+        mount = next(m for m in pod["containers"][0]["volumeMounts"] if m["name"] == "vault-files")
+        assert mount == {
+            "name": "vault-files",
+            "mountPath": "/var/run/terrapod/files",
+            "readOnly": True,
+        }
+        assert "initContainers" not in pod
+
+    @pytest.mark.parametrize(
+        ("psc", "mode"),
+        [
+            ({}, 0o444),
+            ({"runAsUser": 1000, "runAsNonRoot": True}, 0o444),
+            ({"fsGroup": 1000}, 0o440),
+            ({"fsGroup": 0}, 0o440),  # a group of 0 is still a group
+        ],
+    )
+    def test_mode_is_0440_with_an_fsgroup_and_0444_without(self, psc, mode):
+        spec = self._spec(
+            [
+                {"name": "a.json", "secret_key": "vault-file-0"},
+                {"name": "~/.aws/credentials", "secret_key": "vault-file-1"},
+            ],
+            psc=psc,
+        )
+        pod = self._pod(spec)
+        modes = {
+            v["name"]: v["secret"]["defaultMode"]
+            for v in pod["volumes"]
+            if v["name"] in ("vault-files", "vault-home-files")
+        }
+        assert modes == {"vault-files": mode, "vault-home-files": mode}
+
+    def test_home_files_are_subpath_mounts_with_parent_dirs_created_as_the_runner(self):
+        spec = self._spec(
+            [
+                {"name": "~/.aws/credentials", "secret_key": "vault-file-0"},
+                {"name": "~/.kube/config", "secret_key": "vault-file-1"},
+            ]
+        )
+        pod = self._pod(spec)
+        vol = next(v for v in pod["volumes"] if v["name"] == "vault-home-files")
+        assert vol["secret"]["secretName"] == self.VARS
+        assert vol["secret"]["items"] == [
+            {"key": "vault-file-0", "path": "vault-file-0"},
+            {"key": "vault-file-1", "path": "vault-file-1"},
+        ]
+        mounts = [
+            m for m in pod["containers"][0]["volumeMounts"] if m["name"] == "vault-home-files"
+        ]
+        assert mounts == [
+            {
+                "name": "vault-home-files",
+                "mountPath": "/home/runner/.aws/credentials",
+                "subPath": "vault-file-0",
+                "readOnly": True,
+            },
+            {
+                "name": "vault-home-files",
+                "mountPath": "/home/runner/.kube/config",
+                "subPath": "vault-file-1",
+                "readOnly": True,
+            },
+        ]
+        # The home emptyDir is still mounted, so the runtime can create the
+        # mount points despite readOnlyRootFilesystem.
+        assert {"name": "home", "mountPath": "/home/runner"} in pod["containers"][0]["volumeMounts"]
+        assert pod["containers"][0]["securityContext"]["readOnlyRootFilesystem"] is True
+        (init,) = pod["initContainers"]
+        assert init["name"] == "home-dirs"
+        assert init["command"] == ["mkdir", "-p", "/home/runner/.aws", "/home/runner/.kube"]
+        assert init["securityContext"]["runAsUser"] == 1000
+        assert init["securityContext"]["readOnlyRootFilesystem"] is True
+        assert init["volumeMounts"] == [{"name": "home", "mountPath": "/home/runner"}]
+
+    def test_a_file_directly_in_home_needs_no_init_container(self):
+        pod = self._pod(self._spec([{"name": "~/.netrc", "secret_key": "vault-file-0"}]))
+        assert "initContainers" not in pod
+
+    def test_mixed_kinds_get_both_volumes(self):
+        pod = self._pod(
+            self._spec(
+                [
+                    {"name": "a.json", "secret_key": "vault-file-0"},
+                    {"name": "~/b", "secret_key": "vault-file-1"},
+                ]
+            )
+        )
+        names = {v["name"] for v in pod["volumes"]}
+        assert {"vault-files", "vault-home-files"} <= names
+
+    def test_no_value_reaches_the_job_spec_even_if_an_entry_carries_one(self):
+        """The builder reads names and Secret keys only; a value handed to it by
+        mistake still cannot land in the spec."""
+        spec = self._spec(
+            [
+                {"name": "a.json", "secret_key": "vault-file-0", "value": self.SECRET},
+                {"name": "~/.aws/c", "secret_key": "vault-file-1", "value": self.SECRET},
+            ],
+            env_vars=[{"key": "GOOGLE_APPLICATION_CREDENTIALS", "value": "/var/run/x"}],
+        )
+        assert self.SECRET not in json.dumps(spec, default=str)
+        env_names = {e["name"] for e in self._pod(spec)["containers"][0]["env"]}
+        assert not any(n.startswith("vault-file") for n in env_names)
+
+    def test_the_tfvars_volume_does_not_carry_vault_file_keys(self):
+        pod = self._pod(
+            self._spec(
+                [{"name": "a.json", "secret_key": "vault-file-0"}],
+                terraform_vars=[{"key": "f", "value": "/var/run/terrapod/files/a.json"}],
+            )
+        )
+        tfvars = next(v for v in pod["volumes"] if v["name"] == "tfvars")
+        assert [i["key"] for i in tfvars["secret"]["items"]] == ["terraform.tfvars.json"]
+
+    @pytest.mark.parametrize("vault_files", [None, []])
+    def test_no_volumes_without_files(self, vault_files):
+        pod = self._pod(self._spec(vault_files))
+        names = {v["name"] for v in pod["volumes"]}
+        assert not names & {"vault-files", "vault-home-files"}
+
+    def test_operator_extra_volume_mounts_are_still_appended(self):
+        from terrapod.runner.job_template import build_job_spec
+
+        cfg = _runner_config()
+        cfg.extra_volume_mounts = [{"name": "extra", "mountPath": "/opt/extra"}]
+        spec = build_job_spec(
+            run_id="abc123def456",
+            phase="plan",
+            runner_config=cfg,
+            auth_secret_name="a",
+            env_vars=[],
+            terraform_vars=[],
+            vault_files=[{"name": "a", "secret_key": "vault-file-0"}],
+            vars_secret_name=self.VARS,
+        )
+        mounts = self._pod(spec)["containers"][0]["volumeMounts"]
+        assert [m["name"] for m in mounts][-2:] == ["vault-files", "extra"]
 
 
 class TestProxyInjection:

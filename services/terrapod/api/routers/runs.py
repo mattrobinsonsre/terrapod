@@ -2066,14 +2066,19 @@ async def next_run(
     # back to another identity and act with credentials nobody chose. The run is
     # errored with the cause so the operator sees what to fix, instead of the
     # listener getting a 500 and the run hanging claimed.
+    #
+    # A file-mode reference (#1619) resolves to the file's PATH as the variable's
+    # value; the content travels only in `vault-files`, into the per-run Secret.
+    # An older listener that ignores `vault-files` therefore delivers the path to
+    # a file that does not exist — the run fails, and the secret goes nowhere.
     from terrapod.services.vault_source_service import (
         VaultSourceError,
         VaultTransient,
-        resolve_vault_variables,
+        resolve_vault_delivery,
     )
 
     try:
-        vault_values = await resolve_vault_variables(resolved, settings)
+        vault = await resolve_vault_delivery(resolved, settings)
     except VaultTransient:
         # Vault is down, not misconfigured. Put the run back so the next claim
         # picks it up, rather than erroring every queued run in the estate over
@@ -2100,10 +2105,10 @@ async def next_run(
         await db.commit()
         return Response(status_code=204)
 
-    if vault_values:
+    if vault.values:
         for v in resolved:
-            if v.key in vault_values:
-                v.value = vault_values[v.key]
+            if v.key in vault.values:
+                v.value = vault.values[v.key]
 
     env_vars = [{"key": v.key, "value": v.value} for v in resolved if v.category == "env"]
     # `hcl` is forwarded so the runner renders the value correctly into the
@@ -2160,6 +2165,10 @@ async def next_run(
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
     run_data["data"]["attributes"]["execution-hooks"] = execution_hooks
     run_data["data"]["attributes"]["git-auth"] = git_auth
+    # Vault file delivery (#1619): [{key, name, value}]. The listener writes
+    # each value as a key of the per-run vars Secret and the Job mounts it
+    # read-only; the variable itself already carries the path (above).
+    run_data["data"]["attributes"]["vault-files"] = vault.files
     # Cost estimation (#871): the API instructs the runner (via the listener)
     # whether to estimate cost — the runner never self-configures. Global API
     # setting today (per-workspace override is a future refinement); the runner

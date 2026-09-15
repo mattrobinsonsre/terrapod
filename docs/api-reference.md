@@ -1793,6 +1793,20 @@ configured instance), `engine` (`kv2` default, or `dynamic`), `method` (`GET`
 default, or `POST`) and `data` (a body for `POST` engines). The `path` omits
 kv-v2's `data/` segment — Terrapod adds it.
 
+An optional `file` object delivers the value as a file instead:
+`"file": {"name": "gcp/adc.json"}` writes it to
+`/var/run/terrapod/files/gcp/adc.json`, and `"file": {"name": "~/.aws/credentials"}`
+to `/home/runner/.aws/credentials`. `name` defaults to the variable key. The
+variable's delivered value becomes the file's absolute path, for `env` and
+`terraform` variables alike. A name must be a relative path of
+`[A-Za-z0-9._-]` segments (no `.`, `..` or empty segment, at most 255
+characters), and a `~/` name may not target a path the runner manages. `file`
+is refused with `422` together with `structured` (or its alias `hcl`), on a `static` value source, and with
+any key other than `name` (`template`, `format`, `encoding` and `mode` are
+reserved). Two variables at one path, or a value over 256 KiB, error the run.
+Variables naming the same secret share one Vault read per run, so fields of one
+dynamic credential always match. Details: [Delivering as a file](vault.md#delivering-as-a-file).
+
 A vault-sourced variable is **always sensitive**, but the API returns its
 `value` rather than masking it: the stored value is a path, not a secret. The
 secret it points at is resolved per run and never persisted, returned or

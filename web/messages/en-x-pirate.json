@@ -2529,7 +2529,12 @@
       "vaultSecretNeverStored": "The course be stowed, never the secret. Terrapod's Vault articles govern what it may read.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Unreadable Vault reference",
-      "vaultInstanceDefaultNamed": "Default ({name})"
+      "vaultInstanceDefaultNamed": "Default ({name})",
+      "vaultDeliverAsFile": "Deliver as a scroll",
+      "vaultFileName": "Scroll name",
+      "vaultFileNameDefault": "Be the variable's key if left blank",
+      "vaultFileBadge": "Scroll",
+      "vaultFileHint": "The variable carries the scroll's course, not the secret: hoist it as {fileFn}, or hand it to a tool that reads a course from an environment variable. A relative name like {relExample} be stowed under {base}; a name startin'' with {home}, like {homeExample}, goes in the runner's home quarters."
     },
     "runs": {
       "options": "Options",

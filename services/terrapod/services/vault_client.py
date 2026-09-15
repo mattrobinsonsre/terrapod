@@ -26,6 +26,7 @@ Tokens are cached per instance until shortly before their lease expires.
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from pathlib import Path
 from urllib.parse import unquote
@@ -256,19 +257,25 @@ def _check_allowed(inst: VaultInstanceConfig, read_path: str) -> None:
     )
 
 
-async def read_secret(
+async def read_secret_data(
     inst: VaultInstanceConfig,
     *,
     mount: str,
     path: str,
-    field: str,
     engine: str = "kv2",
     method: str = "GET",
     data: dict | None = None,
     timeout: float = 10.0,
     static_token: str | None = None,
-) -> str:
-    """Read one field from Vault and return it, or raise :class:`VaultError`."""
+) -> dict:
+    """Read one secret and return its whole data map, or raise :class:`VaultError`.
+
+    kv-v2's ``data.data`` is unwrapped; a dynamic engine's ``data`` is returned
+    as it is. One call is one Vault request, and a dynamic engine mints a new
+    credential on every request — so a caller that needs several fields of one
+    credential (a certificate and its key, an access key and its secret) must
+    read once and take each field with :func:`extract_field` (#1619).
+    """
     mount_s, path_s = mount.strip("/"), path.strip("/")
     if not mount_s or not path_s:
         raise VaultError("a vault reference needs both a mount and a path")
@@ -322,12 +329,63 @@ async def read_secret(
     except ValueError as e:
         raise _as_vault_error(e, f"read of {read_path!r}", inst.name) from e
     # kv-v2 nests the secret under data.data; the dynamic engines do not.
-    data = body.get("data") if engine == "kv2" else body
-    if not isinstance(data, dict) or field not in data:
-        available = sorted(data) if isinstance(data, dict) else []
+    secret = body.get("data") if engine == "kv2" else body
+    return secret if isinstance(secret, dict) else {}
+
+
+def secret_path(mount: str, path: str) -> str:
+    """The ``mount/path`` a reference names, as error messages show it."""
+    return f"{mount.strip('/')}/{path.strip('/')}"
+
+
+def extract_field(secret: dict, field: str, *, where: str) -> str:
+    """One field of a secret from :func:`read_secret_data`, as delivered.
+
+    Raises :class:`VaultError` naming the fields that *are* present — names
+    only, never a value. ``where`` is the ``mount/path`` for the message.
+    """
+    if not isinstance(secret, dict) or field not in secret:
+        available = sorted(secret) if isinstance(secret, dict) else []
         raise VaultError(
-            f"field {field!r} is not present at {read_path!r} "
+            f"field {field!r} is not present at {where!r} "
             f"(available: {', '.join(available) or 'none'})"
         )
-    value = data[field]
-    return value if isinstance(value, str) else str(value)
+    value = secret[field]
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (dict, list)):
+        # A map or list field (a service-account JSON document stored as an
+        # object, say) is delivered as JSON. str() gave a Python repr —
+        # single quotes, True/None — which no consumer can parse (#1619).
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+async def read_secret(
+    inst: VaultInstanceConfig,
+    *,
+    mount: str,
+    path: str,
+    field: str,
+    engine: str = "kv2",
+    method: str = "GET",
+    data: dict | None = None,
+    timeout: float = 10.0,
+    static_token: str | None = None,
+) -> str:
+    """Read one field from Vault and return it, or raise :class:`VaultError`.
+
+    One request per call. For several fields of one secret, use
+    :func:`read_secret_data` once and :func:`extract_field` per field.
+    """
+    secret = await read_secret_data(
+        inst,
+        mount=mount,
+        path=path,
+        engine=engine,
+        method=method,
+        data=data,
+        timeout=timeout,
+        static_token=static_token,
+    )
+    return extract_field(secret, field, where=secret_path(mount, path))

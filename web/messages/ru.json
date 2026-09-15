@@ -2529,7 +2529,12 @@
       "vaultSecretNeverStored": "Сохраняется путь, но не секрет. Что можно прочитать, определяет политика Vault для Terrapod.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "Нечитаемая ссылка Vault",
-      "vaultInstanceDefaultNamed": "По умолчанию ({name})"
+      "vaultInstanceDefaultNamed": "По умолчанию ({name})",
+      "vaultDeliverAsFile": "Передать как файл",
+      "vaultFileName": "Имя файла",
+      "vaultFileNameDefault": "По умолчанию — ключ переменной",
+      "vaultFileBadge": "Файл",
+      "vaultFileHint": "Переменная содержит путь к файлу, а не секрет: используйте её как {fileFn} или с инструментом, который читает путь из переменной окружения. Относительное имя вроде {relExample} записывается в {base}; имя, начинающееся с {home}, например {homeExample}, попадает в домашний каталог раннера."
     },
     "runs": {
       "options": "Параметры",

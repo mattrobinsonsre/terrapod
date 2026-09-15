@@ -2529,7 +2529,12 @@
       "vaultSecretNeverStored": "يُخزَّن المسار وليس السر. سياسة Vault الخاصة بـ Terrapod تحدد ما يمكنه قراءته.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "مرجع Vault غير قابل للقراءة",
-      "vaultInstanceDefaultNamed": "افتراضي ({name})"
+      "vaultInstanceDefaultNamed": "افتراضي ({name})",
+      "vaultDeliverAsFile": "التسليم كملف",
+      "vaultFileName": "اسم الملف",
+      "vaultFileNameDefault": "الافتراضي هو مفتاح المتغير",
+      "vaultFileBadge": "ملف",
+      "vaultFileHint": "يحمل المتغير مسار الملف لا السر: استخدمه بصيغة {fileFn}، أو مع أداة تقرأ مسارًا من متغير بيئة. الاسم النسبي مثل {relExample} يُكتب ضمن {base}؛ والاسم الذي يبدأ بـ {home}، مثل {homeExample}، يوضع في المجلد الرئيسي للمشغّل."
     },
     "runs": {
       "options": "الخيارات",

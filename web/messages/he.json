@@ -2529,7 +2529,12 @@
       "vaultSecretNeverStored": "הנתיב נשמר, לעולם לא הסוד. מדיניות ה-Vault של Terrapod קובעת מה מותר לו לקרוא.",
       "sourceVaultBadge": "Vault",
       "vaultReferenceUnreadable": "הפניית Vault בלתי קריאה",
-      "vaultInstanceDefaultNamed": "ברירת מחדל ({name})"
+      "vaultInstanceDefaultNamed": "ברירת מחדל ({name})",
+      "vaultDeliverAsFile": "מסירה כקובץ",
+      "vaultFileName": "שם הקובץ",
+      "vaultFileNameDefault": "ברירת המחדל היא מפתח המשתנה",
+      "vaultFileBadge": "קובץ",
+      "vaultFileHint": "המשתנה מחזיק את נתיב הקובץ, לא את הסוד: השתמשו בו כ-{fileFn}, או עם כלי שקורא נתיב ממשתנה סביבה. שם יחסי כמו {relExample} נכתב תחת {base}; שם שמתחיל ב-{home}, כמו {homeExample}, נשמר בתיקיית הבית של ה-runner."
     },
     "runs": {
       "options": "אפשרויות",

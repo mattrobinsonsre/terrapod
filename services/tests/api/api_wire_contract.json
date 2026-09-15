@@ -38,6 +38,7 @@
     "terragrunt-version",
     "timeout-minutes",
     "var-files",
+    "vault-files",
     "working-directory"
   ],
   "listener_read_keys": [
@@ -86,6 +87,7 @@
     "timeout-minutes",
     "value",
     "var-files",
+    "vault-files",
     "working-directory"
   ]
 }

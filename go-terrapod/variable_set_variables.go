@@ -24,7 +24,10 @@ type VariableSetVariable struct {
 
 	// ValueSource is "static" or "vault" (#1439) — the same reference model as
 	// a workspace variable, so a Vault-backed credential can be defined once in
-	// a set and applied to many workspaces.
+	// a set and applied to many workspaces. That includes file delivery
+	// (#1619): a "file" object in the reference makes the run-time value the
+	// file's path. The reference stays an opaque string here; see
+	// Variable.ValueSource for its keys.
 	ValueSource string `json:"value-source,omitempty"`
 
 	VersionID string `json:"version-id,omitempty"`

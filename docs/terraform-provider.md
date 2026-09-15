@@ -114,6 +114,24 @@ resource "terrapod_variable" "region" {
   category     = "terraform"
 }
 
+# A Vault-sourced credential delivered as a file (see docs/vault.md). The
+# secret never reaches Terrapod's database, the Job spec or the environment:
+# the run sees GOOGLE_APPLICATION_CREDENTIALS=/var/run/terrapod/files/gcp/adc.json
+# and the file holds the secret. `value` is the reference, not the secret, so
+# it reads back unchanged and does not drift.
+resource "terrapod_variable" "gcp_credentials" {
+  workspace_id = terrapod_workspace.app.id
+  key          = "GOOGLE_APPLICATION_CREDENTIALS"
+  category     = "env"
+  value_source = "vault"
+  value = jsonencode({
+    mount = "secret"
+    path  = "apps/gcp"
+    field = "sa_json"
+    file  = { name = "gcp/adc.json" } # or "~/.config/gcloud/adc.json" for the runner's home
+  })
+}
+
 # Read an existing workspace by name.
 data "terrapod_workspace" "shared" {
   name = "shared-network"
