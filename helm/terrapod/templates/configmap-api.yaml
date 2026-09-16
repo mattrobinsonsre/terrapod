@@ -281,12 +281,18 @@ data:
         enabled: {{ .Values.api.config.registry.module_interface.enabled }}
       {{- end }}
       {{- with .Values.api.config.registry.module_autodiscovery }}
+      # Rendered straight, with no `| default`: three of these accept 0 as a
+      # meaningful value (stop listing trees, or never skip on quota), and Go
+      # templates treat 0 as falsy — so `| default` silently replaced an
+      # operator's 0 with the chart default and the value never reached the
+      # pod. values.yaml supplies all five, and Helm merges the operator's
+      # values over it, so every key is always present here.
       module_autodiscovery:
-        tree_listings_per_cycle: {{ .tree_listings_per_cycle | default 50 }}
-        max_repositories: {{ .max_repositories | default 5000 }}
-        tree_quota_floor_percent: {{ .tree_quota_floor_percent | default 20 }}
-        enumeration_quota_floor_percent: {{ .enumeration_quota_floor_percent | default 5 }}
-        time_budget_seconds: {{ .time_budget_seconds | default 60 }}
+        tree_listings_per_cycle: {{ .tree_listings_per_cycle }}
+        max_repositories: {{ .max_repositories }}
+        tree_quota_floor_percent: {{ .tree_quota_floor_percent }}
+        enumeration_quota_floor_percent: {{ .enumeration_quota_floor_percent }}
+        time_budget_seconds: {{ .time_budget_seconds }}
       {{- end }}
     {{- end }}
     {{- if .Values.api.config.catalog }}
