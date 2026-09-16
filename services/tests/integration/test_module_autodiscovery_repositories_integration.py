@@ -99,6 +99,7 @@ async def _insert_minimal(conn, table: str, values: dict) -> None:
     # Column names come from information_schema and the test's own literals.
     # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
     sql = f'INSERT INTO "{table}" ({", ".join(row)}) VALUES ({", ".join(params)})'
+    # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
     await conn.execute(text(sql), row)
 
 
@@ -112,6 +113,8 @@ async def test_the_migration_backfills_one_row_per_rule_and_downgrades_cleanly(a
     name = f"tp_mig_{uuid.uuid4().hex[:10]}"
     admin = create_async_engine(base, isolation_level="AUTOCOMMIT")
     async with admin.connect() as c:
+        # The name is this test's own generated identifier, not input.
+        # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
         await c.execute(text(f'CREATE DATABASE "{name}"'))
     url = base.set(database=name).render_as_string(hide_password=False)
     engine = create_async_engine(url)
@@ -258,6 +261,7 @@ async def test_the_migration_backfills_one_row_per_rule_and_downgrades_cleanly(a
     finally:
         await engine.dispose()
         async with admin.connect() as c:
+            # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
             await c.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
         await admin.dispose()
 

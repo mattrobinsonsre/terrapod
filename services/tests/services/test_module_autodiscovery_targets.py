@@ -184,7 +184,7 @@ class TestGlobs:
 
 class TestClassifyGitHub:
     async def test_owner_repo_is_one_repository_by_id(self):
-        server, (p1, p2) = _github(
+        _server, (p1, p2) = _github(
             {"/repos/org/terraform-aws-vpc": _resp(200, _repo_json("org/terraform-aws-vpc", 99))}
         )
         with p1, p2:
@@ -215,7 +215,7 @@ class TestClassifyGitHub:
 
     async def test_the_account_is_a_namespace(self):
         # The account is looked up by the login the connection records.
-        server, (p1, p2) = _github({"/users/Org": _resp(200, {"login": "Org", "id": 5})})
+        _server, (p1, p2) = _github({"/users/Org": _resp(200, {"login": "Org", "id": 5})})
         with p1, p2:
             target = await targets.classify(_github_conn(login="Org"), "https://github.com/org")
         assert (target.kind, target.id, target.path) == ("namespace", "5", "Org")

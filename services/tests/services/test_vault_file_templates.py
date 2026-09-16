@@ -290,6 +290,9 @@ class TestLease:
 class TestRendering:
     @pytest.mark.asyncio
     async def test_a_format_json_file_holds_the_whole_secret(self):
+        # A fixture shaped like a GCP service-account file; SECRET is a test
+        # constant, not a key.
+        # nosemgrep: generic.secrets.security.detected-google-gcm-service-account.detected-google-gcm-service-account
         data = {"type": "service_account", "project_id": "p", "private_key": SECRET}
         out = await _resolve([_Var("SA", _ref(file={"format": "json"}))], _mock(data))
         assert json.loads(out.files[0]["value"]) == data
@@ -330,6 +333,7 @@ class TestRendering:
 class TestBase64:
     @pytest.mark.asyncio
     async def test_a_base64_field_is_decoded_into_the_file(self):
+        # nosemgrep: generic.secrets.security.detected-google-gcm-service-account.detected-google-gcm-service-account
         doc = json.dumps({"type": "service_account", "private_key": SECRET})
         enc = base64.b64encode(doc.encode()).decode()
         out = await _resolve(
