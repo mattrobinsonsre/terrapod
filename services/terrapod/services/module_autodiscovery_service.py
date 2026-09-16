@@ -145,7 +145,7 @@ def candidate_subdirectories(rule: ModuleAutodiscoveryRule, file_paths: list[str
     return _candidates(rule.pattern, list(rule.ignore_patterns or []), file_paths)
 
 
-async def _candidates_off_loop(rule: ModuleAutodiscoveryRule, file_paths: list[str]) -> list[str]:
+async def candidates_off_loop(rule: ModuleAutodiscoveryRule, file_paths: list[str]) -> list[str]:
     """`candidate_subdirectories` on a worker thread: a large tree is tens of
     thousands of paths, each matched against globs, and that must not stall
     the event loop."""
@@ -309,7 +309,7 @@ async def preview(
     rule's own, for a single-repository rule. See `_entries` for the flags.
     """
     ctx = repo if repo is not None else rule_context(rule)
-    return await _entries(db, rule, [(ctx, candidate_subdirectories(rule, file_paths))])
+    return await _entries(db, rule, [(ctx, await candidates_off_loop(rule, file_paths))])
 
 
 async def stored_preview(
@@ -741,13 +741,23 @@ def _fail(row: ModuleAutodiscoveryRepository, now: datetime, failures: int, deta
 # ── Poll ─────────────────────────────────────────────────────────────────
 
 
-def record_scan(rule: ModuleAutodiscoveryRule, file_paths: list[str], head_sha: str | None) -> None:
+def record_scan(
+    rule: ModuleAutodiscoveryRule,
+    file_paths: list[str],
+    head_sha: str | None,
+    candidates: list[str] | None = None,
+) -> None:
     """Note what the rule has now seen, so later polls take only what is new.
 
     Written to the rule's own columns and, when its state rows are loaded, to
     its repository row as well: both are kept current (#1620).
+
+    An async caller that has already walked the tree passes ``candidates``:
+    the walk is glob-matching over every path in the tree, which belongs on a
+    worker thread (`candidates_off_loop`) rather than the event loop.
     """
-    candidates = candidate_subdirectories(rule, file_paths)
+    if candidates is None:
+        candidates = candidate_subdirectories(rule, file_paths)
     seen = set(rule.seen_subdirectories or [])
     seen.update(candidates)
     rows = list(rule.repositories) if _repositories_loaded(rule) else []
@@ -972,16 +982,17 @@ async def _poll_rule(db: AsyncSession, rule: ModuleAutodiscoveryRule, conn: VCSC
         rule.last_error = ""
         return 0
     created = 0
+    cands = await candidates_off_loop(rule, file_paths)
     if rule.first_scan_at is not None:
         seen = set(rule.seen_subdirectories or []) | set(row.seen_subdirectories or [])
-        new = [d for d in candidate_subdirectories(rule, file_paths) if d not in seen]
+        new = [d for d in cands if d not in seen]
         if new:
             result = await register_candidates(db, rule, file_paths, only=new, repo=ctx)
             created = len(result.created)
             row.last_skips = [{"subdirectory": d, "reason": r} for d, r in result.skipped]
     row.default_branch = head.branch
     rule.last_error = ""
-    record_scan(rule, file_paths, head.sha)
+    record_scan(rule, file_paths, head.sha, candidates=cands)
     await db.flush()
     return created
 
@@ -1186,7 +1197,7 @@ async def _check_repository(
     except Exception as exc:
         _fail(row, now, failures, str(exc))
         return None
-    return _TreeScan(row, ref, sha, await _candidates_off_loop(rule, paths))
+    return _TreeScan(row, ref, sha, await candidates_off_loop(rule, paths))
 
 
 async def _record_scans(
@@ -1383,7 +1394,7 @@ async def read_repositories(
             info["status"], info["error"] = "error", exc.detail
             continue
         walked += len(paths)
-        groups.append((RepoContext(ref.url, ref.path), await _candidates_off_loop(rule, paths)))
+        groups.append((RepoContext(ref.url, ref.path), await candidates_off_loop(rule, paths)))
     return await _entries(db, rule, groups), infos, walked
 
 

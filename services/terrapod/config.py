@@ -575,12 +575,14 @@ class OutboundRequestsConfig(BaseModel):
     store part of the response where the same user can read it back
     (GHSA-q5m2-x8wm-34q9).
 
-    Private space is refused by default, and that is a real behaviour change
-    rather than a free win: a self-hosted platform quite reasonably delivers
-    webhooks to an in-cluster service or an endpoint on RFC1918. The allow-lists
-    are how an operator says which of those are intended, which puts the
-    decision with the person who edits values rather than with any user who can
-    create a workspace.
+    Private space is **not** refused by default: a self-hosted platform quite
+    reasonably delivers webhooks to an in-cluster service or an endpoint on
+    RFC1918, so blocking that would break working deployments on upgrade for
+    no benefit an operator asked for. Loopback and link-local are refused
+    either way, which is the one behaviour change here — see
+    `outbound_url_guard`. The allow-lists are how an operator exempts an
+    address, including one of those, which puts the decision with the person
+    who edits values rather than with any user who can create a workspace.
     """
 
     #: Exact hostnames exempt from every check. The escape hatch for an operator

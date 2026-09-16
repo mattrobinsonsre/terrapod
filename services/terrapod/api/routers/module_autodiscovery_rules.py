@@ -755,7 +755,9 @@ async def scan_rule(
     # Its repository row is kept current alongside the rule (#1620).
     row.default_branch = head.branch
     row.last_skips = [{"subdirectory": d, "reason": r} for d, r in result.skipped]
-    svc.record_scan(rule, file_paths, head.sha)
+    svc.record_scan(
+        rule, file_paths, head.sha, candidates=await svc.candidates_off_loop(rule, file_paths)
+    )
     await db.commit()
     logger.info(
         "Module autodiscovery scan complete",

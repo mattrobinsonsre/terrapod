@@ -777,6 +777,20 @@ class TestReferenceCheck:
         got = await check_reference(KV_REF, cfg=_settings(enabled=False), local_execution=True)
         assert NOTE_LOCAL_EXECUTION in got["notes"]
 
+    async def test_a_local_workspace_is_not_told_the_key_names(self, static_secret):
+        """A vault-sourced variable cannot be created on a local-execution
+        workspace at all, so the caller has no path to the value — and gets no
+        path to the secret's schema either."""
+        fake = FakeVault()
+        with _patched(fake):
+            got = await check_reference(KV_REF, cfg=_settings(), local_execution=True)
+        assert "/v1/secret/data/apps/x" not in fake.paths()
+        assert got["keys"] is None
+        assert NOTE_LOCAL_EXECUTION in got["notes"]
+        # The path is still checked, so the operator still learns whether the
+        # reference would resolve — only the key names are withheld.
+        assert got["readable"] is True
+
     async def test_a_kv2_read_that_now_404s_fails_fields_present(self, static_secret):
         with _patched(FakeVault(kv=(404, {}))):
             got = await check_reference(KV_REF, cfg=_settings())

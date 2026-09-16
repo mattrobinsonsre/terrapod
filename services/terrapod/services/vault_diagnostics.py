@@ -674,8 +674,15 @@ async def check_reference(
         # check that minted one would be a resolution by another name.
         notes.append(NOTE_DYNAMIC_NOT_READ)
         checks.append(_check("fields-present", SKIPPED))
-    elif not may_list_keys:
-        notes.append(NOTE_KEYS_NEED_PLAN)
+    elif not may_list_keys or local_execution:
+        # Key names are given only to someone who could have had the value
+        # delivered to a run anyway. On a local-execution workspace that
+        # argument does not hold: a vault-sourced variable is refused there
+        # outright (`variables.py`), so the caller has no path to the value and
+        # gets no path to the schema either. `NOTE_LOCAL_EXECUTION` is already
+        # in `notes` in that case.
+        if not may_list_keys:
+            notes.append(NOTE_KEYS_NEED_PLAN)
         checks.append(_check("fields-present", SKIPPED))
     else:
         try:

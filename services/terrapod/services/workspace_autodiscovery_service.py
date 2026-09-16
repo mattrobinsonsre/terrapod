@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from functools import lru_cache
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -58,8 +59,13 @@ logger = get_logger(__name__)
 _TF_EXTENSIONS = (".tf", ".tfvars", ".tf.json", ".tfvars.json", ".hcl")
 
 
+@lru_cache(maxsize=512)
 def _glob_to_regex(pattern: str) -> re.Pattern[str]:
     """Translate a gitignore-style glob to a compiled regex.
+
+    Cached: a module autodiscovery walk tests the same handful of patterns
+    against every path in the tree, and an uncached translate-and-compile per
+    path is tens of thousands of compiles for one poll of one large repository.
 
     Semantics:
     - `**`  → match any number of path segments (including zero), with
