@@ -65,6 +65,15 @@ _PROVIDER_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$")
 #: Most repositories one scan request may select.
 _MAX_SELECTIONS = 200
+#: Most candidates one scan request registers when no selection narrows it.
+#:
+#: An org-wide rule can hold thousands of repositories, each with its own
+#: candidates, and registering the lot took one transaction and one savepoint
+#: per candidate — tens of thousands of inserts on a single commit, then that
+#: many new modules handed to the tag poller at once. A scan now stops on a
+#: repository boundary once it has attempted this many, says so, and names
+#: where to resume.
+_MAX_SCAN_CANDIDATES = 1000
 #: Repositories an unsaved org-wide preview reads live, per page.
 _LIVE_PAGE_DEFAULT = 10
 _LIVE_PAGE_MAX = 25
@@ -713,6 +722,13 @@ async def scan_rule(
     poller last found, with no VCS calls: `selections: [{repository,
     subdirectories?}]` picks repositories and, optionally, directories in them;
     an empty body registers every current candidate.
+
+    An empty-body scan of an org-wide rule stops on a repository boundary once
+    it has attempted `_MAX_SCAN_CANDIDATES`, so one request never holds a write
+    transaction open across thousands of repositories. It then reports
+    `scan-complete: false` and a `next-after` cursor; sending that back as
+    `after` resumes where it stopped, so repeated calls finish the job in
+    bounded pieces.
     """
     rule = await _get_rule(db, rule_id)
     attrs = ((body or {}).get("data") or {}).get("attributes") or {}
@@ -722,6 +738,9 @@ async def scan_rule(
         if not isinstance(only, list) or not all(isinstance(d, str) for d in only):
             raise HTTPException(status_code=422, detail="subdirectories must be a list of strings")
     selections = _parse_selections(attrs)
+    after = attrs.get("after")
+    if after is not None and not isinstance(after, str):
+        raise HTTPException(status_code=422, detail="after must be a string")
     kind = svc.target_kind(rule)
 
     if kind != targets.KIND_REPOSITORY:
@@ -731,7 +750,13 @@ async def scan_rule(
                 detail="subdirectories applies to a rule that names one repository; "
                 "use selections: [{repository, subdirectories}]",
             )
-        return await _scan_namespace_rule(db, rule, selections, user)
+        return await _scan_namespace_rule(db, rule, selections, user, after=after)
+    if after is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="after continues an org-wide scan; a rule naming one repository "
+            "registers in a single request",
+        )
 
     rows = await svc.load_repositories(db, rule)
     row = svc.repository_state(rule)
@@ -788,6 +813,10 @@ async def scan_rule(
                     ],
                     "skipped": [{"subdirectory": d, "reason": r} for d, r in result.skipped],
                     "repositories-scanned": 1,
+                    # One repository is always the whole job; the two attributes
+                    # exist on both branches so a client reads one shape.
+                    "scan-complete": True,
+                    "next-after": "",
                 },
             }
         }
@@ -799,9 +828,12 @@ async def _scan_namespace_rule(
     rule: ModuleAutodiscoveryRule,
     selections: list[tuple[str, list[str] | None]] | None,
     user: AuthenticatedUser,
+    *,
+    after: str | None = None,
 ) -> JSONResponse:
     rows = await svc.load_repositories(db, rule)
     scannable = _scannable(rows)
+    remaining = 0
     if selections:
         chosen = []
         for repository, subs in selections:
@@ -814,7 +846,25 @@ async def _scan_namespace_rule(
                 )
             chosen.append((row, subs))
     else:
-        chosen = [(row, None) for row in scannable]
+        # Bounded, and resumable. Repositories come in path order, so a cursor
+        # is just the last path taken. Always take at least one, or a
+        # repository holding more candidates than the whole budget would wedge
+        # the scan instead of merely filling it.
+        start = 0
+        if after:
+            start = next(
+                (i for i, row in enumerate(scannable) if row.repo_path.lower() > after.lower()),
+                len(scannable),
+            )
+        chosen = []
+        budget = _MAX_SCAN_CANDIDATES
+        for row in scannable[start:]:
+            count = len(svc.stored_subdirectories(row))
+            if chosen and count > budget:
+                break
+            chosen.append((row, None))
+            budget -= count
+        remaining = len(scannable) - start - len(chosen)
     try:
         result = await svc.register_stored(db, rule, chosen)
     except svc.UnknownSubdirectoryError as exc:
@@ -849,6 +899,8 @@ async def _scan_namespace_rule(
                     ],
                     "skipped": list(result.skipped_in),
                     "repositories-scanned": len(chosen),
+                    "scan-complete": remaining == 0,
+                    "next-after": chosen[-1][0].repo_path if remaining and chosen else "",
                 },
             }
         }

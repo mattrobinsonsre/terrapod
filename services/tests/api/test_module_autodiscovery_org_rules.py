@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.exc import DataError
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
@@ -26,6 +27,7 @@ from terrapod.db.session import get_db
 from tests.services.test_module_autodiscovery_org_poll import TREE, FakeGitHub, _serve
 
 _URL = "/api/terrapod/v1/module-autodiscovery-rules"
+_ROUTER = "terrapod.api.routers.module_autodiscovery_rules"
 _AUTH = {"Authorization": "Bearer dummy"}
 A, B, C = "org/terraform-aws-a", "org/terraform-aws-b", "org/terraform-aws-c"
 NOW = datetime(2026, 9, 14, tzinfo=UTC)
@@ -531,6 +533,7 @@ class TestScan:
                 "selections": [{"repository": A, "subdirectories": "modules/a"}]
             },
             "too many selections": {"selections": [{"repository": A}] * 201},
+            "a cursor that is not a string": {"after": 7},
         }
         for what, attrs in cases.items():
             rule = _saved()
@@ -541,6 +544,79 @@ class TestScan:
                 )
             assert resp.status_code == 422, what
             assert db.modules() == [] and db.committed == 0, what
+
+    async def test_a_scan_stops_on_a_repository_boundary_and_says_where(self, *_):
+        """One request must not hold a write transaction open across thousands
+        of repositories, so it stops once it has attempted the budget, reports
+        that it did not finish, and names where to resume."""
+        rule = _saved()
+        db = _DB(rule)
+        with patch(f"{_ROUTER}._MAX_SCAN_CANDIDATES", 2), _serve(_gh()):
+            resp = await _call(db, "POST", f"/{rule.id}/scan")
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["repositories-scanned"] == 1
+        assert attrs["scan-complete"] is False
+        assert attrs["next-after"] == A
+        assert {m.vcs_repo_url for m in db.modules()} == {f"https://github.com/{A}"}
+
+    async def test_the_cursor_resumes_where_the_last_scan_stopped(self, *_):
+        """Without this a bounded scan could never finish: every repeat would
+        take the same first repositories and register nothing new."""
+        rule = _saved()
+        db = _DB(rule)
+        body = {"data": {"attributes": {"after": A}}}
+        with patch(f"{_ROUTER}._MAX_SCAN_CANDIDATES", 2), _serve(_gh()):
+            resp = await _call(db, "POST", f"/{rule.id}/scan", json=body)
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["repositories-scanned"] == 1
+        assert attrs["scan-complete"] is True and attrs["next-after"] == ""
+        assert {m.vcs_repo_url for m in db.modules()} == {f"https://github.com/{B}"}
+
+    async def test_a_repository_larger_than_the_budget_still_makes_progress(self, *_):
+        """Always taking at least one repository is what stops a rule whose
+        next repository exceeds the whole budget from wedging the scan."""
+        rule = _saved()
+        db = _DB(rule)
+        with patch(f"{_ROUTER}._MAX_SCAN_CANDIDATES", 1), _serve(_gh()):
+            resp = await _call(db, "POST", f"/{rule.id}/scan")
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["repositories-scanned"] == 1 and attrs["next-after"] == A
+
+    async def test_a_scan_within_the_budget_is_complete_and_names_no_cursor(self, *_):
+        rule = _saved()
+        db = _DB(rule)
+        with _serve(_gh()):
+            resp = await _call(db, "POST", f"/{rule.id}/scan")
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["scan-complete"] is True and attrs["next-after"] == ""
+
+
+@_app
+class TestAValueTheDatabaseRefuses:
+    async def test_an_over_length_field_reads_as_422_not_500(self, *_):
+        """`DataError` is a *sibling* of `IntegrityError`, not a subclass, so it
+        slipped past every in-handler catch and the 409 net alike and surfaced
+        as a bare "Internal server error". A 300-character name is the caller's
+        mistake, and must read as one."""
+
+        class _Refusing(_DB):
+            async def commit(self):
+                raise DataError(
+                    "INSERT INTO module_autodiscovery_rules …",
+                    {},
+                    Exception("value too long for type character varying(255)"),
+                )
+
+        db = _Refusing()
+        with _serve(_gh()):
+            resp = await _call(db, "POST", "", json=_body(name="x" * 300))
+        assert resp.status_code == 422, resp.text
+        assert "too long" in resp.json()["errors"][0]["detail"]
+        # The driver echoes the offending value in `orig`; the response must not.
+        assert "xxx" not in resp.text
 
 
 @_app

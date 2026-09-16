@@ -37,20 +37,50 @@ type repositoriesModel struct {
 }
 
 type repositoryEntry struct {
-	ID             types.String `tfsdk:"id"`
-	Repository     types.String `tfsdk:"repository"`
-	RepoURL        types.String `tfsdk:"repo_url"`
-	DefaultBranch  types.String `tfsdk:"default_branch"`
-	Status         types.String `tfsdk:"status"`
-	Origin         types.String `tfsdk:"origin"`
-	CandidatePaths types.List   `tfsdk:"candidate_subdirectories"`
-	PreviousPaths  types.List   `tfsdk:"previous_paths"`
-	LastScannedSHA types.String `tfsdk:"last_scanned_sha"`
-	LastCheckedAt  types.String `tfsdk:"last_checked_at"`
-	LastError      types.String `tfsdk:"last_error"`
-	FailureCount   types.Int64  `tfsdk:"failure_count"`
-	FirstSeenAt    types.String `tfsdk:"first_seen_at"`
-	RepoCreatedAt  types.String `tfsdk:"repo_created_at"`
+	ID                 types.String       `tfsdk:"id"`
+	Repository         types.String       `tfsdk:"repository"`
+	RepoURL            types.String       `tfsdk:"repo_url"`
+	VCSRepoID          types.String       `tfsdk:"vcs_repo_id"`
+	DefaultBranch      types.String       `tfsdk:"default_branch"`
+	Status             types.String       `tfsdk:"status"`
+	Origin             types.String       `tfsdk:"origin"`
+	CandidatePaths     types.List         `tfsdk:"candidate_subdirectories"`
+	Candidates         []candidateEntry   `tfsdk:"candidates"`
+	SeenSubdirectories types.List         `tfsdk:"seen_subdirectories"`
+	LastSkips          []skipEntry        `tfsdk:"last_skips"`
+	PreviousPaths      types.List         `tfsdk:"previous_paths"`
+	PreviousLocations  []previousLocation `tfsdk:"previous_locations"`
+	LastScannedSHA     types.String       `tfsdk:"last_scanned_sha"`
+	LastCheckedAt      types.String       `tfsdk:"last_checked_at"`
+	NextCheckAt        types.String       `tfsdk:"next_check_at"`
+	LastError          types.String       `tfsdk:"last_error"`
+	FailureCount       types.Int64        `tfsdk:"failure_count"`
+	FirstSeenAt        types.String       `tfsdk:"first_seen_at"`
+	RepoCreatedAt      types.String       `tfsdk:"repo_created_at"`
+}
+
+// candidateEntry is a module the last poll found, with the name and provider it
+// would register under — the part someone deciding what to scan actually needs,
+// and which candidate_subdirectories alone cannot answer.
+type candidateEntry struct {
+	Subdirectory types.String `tfsdk:"subdirectory"`
+	Name         types.String `tfsdk:"name"`
+	Provider     types.String `tfsdk:"provider"`
+}
+
+// skipEntry is why one candidate registered nothing on the last scan. A
+// repository's stored skips carry the subdirectory and the reason only.
+type skipEntry struct {
+	Subdirectory types.String `tfsdk:"subdirectory"`
+	Reason       types.String `tfsdk:"reason"`
+}
+
+// previousLocation is a path the repository had before a rename or transfer,
+// with the URL it had then. previous_paths keeps the paths alone, so that
+// attribute's type never changed.
+type previousLocation struct {
+	Path types.String `tfsdk:"path"`
+	URL  types.String `tfsdk:"url"`
 }
 
 // NewDataSource returns the terrapod_module_autodiscovery_rule_repositories data source.
@@ -85,6 +115,7 @@ func (d *repositoriesDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 						"id":             schema.StringAttribute{Computed: true, Description: "The repository state's ID (modrepo-<uuid>)."},
 						"repository":     schema.StringAttribute{Computed: true, Description: "The path: owner/repo, or group/subgroup/project."},
 						"repo_url":       schema.StringAttribute{Computed: true, Description: "The repository's URL."},
+						"vcs_repo_id":    schema.StringAttribute{Computed: true, Description: "The provider's own ID for the repository, which survives a rename."},
 						"default_branch": schema.StringAttribute{Computed: true, Description: "The repository's default branch, or empty when not known."},
 						"status": schema.StringAttribute{
 							Computed: true,
@@ -101,13 +132,50 @@ func (d *repositoriesDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 							ElementType: types.StringType,
 							Description: "The candidate module directories the last poll found (\"\" is the repository root).",
 						},
+						"candidates": schema.ListNestedAttribute{
+							Computed:    true,
+							Description: "The candidate modules the last poll found, with the name and provider each would register under.",
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"subdirectory": schema.StringAttribute{Computed: true, Description: "The directory (\"\" is the repository root)."},
+									"name":         schema.StringAttribute{Computed: true, Description: "The module name it would register under."},
+									"provider":     schema.StringAttribute{Computed: true, Description: "The provider it would register under."},
+								},
+							},
+						},
+						"seen_subdirectories": schema.ListAttribute{
+							Computed:    true,
+							ElementType: types.StringType,
+							Description: "Directories already seen here, so automatic registration does not pick them up again.",
+						},
+						"last_skips": schema.ListNestedAttribute{
+							Computed:    true,
+							Description: "Why the last scan registered nothing for a candidate — the answer to \"why did this repository register nothing\".",
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"subdirectory": schema.StringAttribute{Computed: true, Description: "The directory that was skipped."},
+									"reason":       schema.StringAttribute{Computed: true, Description: "already-registered, name-taken, missing-provider, or another reason."},
+								},
+							},
+						},
 						"previous_paths": schema.ListAttribute{
 							Computed:    true,
 							ElementType: types.StringType,
 							Description: "Paths the repository had before a rename or transfer, oldest first.",
 						},
+						"previous_locations": schema.ListNestedAttribute{
+							Computed:    true,
+							Description: "The same renames as previous_paths, each with the URL the repository had then.",
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"path": schema.StringAttribute{Computed: true, Description: "The path it had then."},
+									"url":  schema.StringAttribute{Computed: true, Description: "The URL it had then."},
+								},
+							},
+						},
 						"last_scanned_sha": schema.StringAttribute{Computed: true, Description: "The branch head at the last scan."},
 						"last_checked_at":  schema.StringAttribute{Computed: true, Description: "When the branch head was last looked up (RFC3339), or empty."},
+						"next_check_at":    schema.StringAttribute{Computed: true, Description: "When the repository is next due to be looked at (RFC3339), or empty; failures back off."},
 						"last_error":       schema.StringAttribute{Computed: true, Description: "Why the repository could not be read, or empty."},
 						"failure_count":    schema.Int64Attribute{Computed: true, Description: "Consecutive failed reads; they back off."},
 						"first_seen_at":    schema.StringAttribute{Computed: true, Description: "When the rule first listed the repository (RFC3339)."},
@@ -173,25 +241,55 @@ func entriesFrom(ctx context.Context, repos []terrapod.ModuleAutodiscoveryReposi
 		for _, p := range r.PreviousPaths {
 			previous = append(previous, p.Path)
 		}
+		candidates := make([]candidateEntry, 0, len(r.Candidates))
+		for _, c := range r.Candidates {
+			candidates = append(candidates, candidateEntry{
+				Subdirectory: types.StringValue(c.Subdirectory),
+				Name:         types.StringValue(c.Name),
+				Provider:     types.StringValue(c.Provider),
+			})
+		}
+		skips := make([]skipEntry, 0, len(r.LastSkips))
+		for _, s := range r.LastSkips {
+			skips = append(skips, skipEntry{
+				Subdirectory: types.StringValue(s.Subdirectory),
+				Reason:       types.StringValue(s.Reason),
+			})
+		}
+		locations := make([]previousLocation, 0, len(r.PreviousPaths))
+		for _, p := range r.PreviousPaths {
+			locations = append(locations, previousLocation{
+				Path: types.StringValue(p.Path),
+				URL:  types.StringValue(p.URL),
+			})
+		}
 		subList, d := types.ListValueFrom(ctx, types.StringType, subs)
 		diags.Append(d...)
 		prevList, d := types.ListValueFrom(ctx, types.StringType, previous)
 		diags.Append(d...)
+		seenList, d := types.ListValueFrom(ctx, types.StringType, r.SeenSubdirectories)
+		diags.Append(d...)
 		out = append(out, repositoryEntry{
-			ID:             types.StringValue(r.ID),
-			Repository:     types.StringValue(r.Repository),
-			RepoURL:        types.StringValue(r.RepoURL),
-			DefaultBranch:  types.StringValue(r.DefaultBranch),
-			Status:         types.StringValue(r.Status),
-			Origin:         types.StringValue(r.Origin),
-			CandidatePaths: subList,
-			PreviousPaths:  prevList,
-			LastScannedSHA: types.StringValue(r.LastScannedSHA),
-			LastCheckedAt:  types.StringValue(r.LastCheckedAt),
-			LastError:      types.StringValue(r.LastError),
-			FailureCount:   types.Int64Value(int64(r.FailureCount)),
-			FirstSeenAt:    types.StringValue(r.FirstSeenAt),
-			RepoCreatedAt:  types.StringValue(r.RepoCreatedAt),
+			ID:                 types.StringValue(r.ID),
+			Repository:         types.StringValue(r.Repository),
+			RepoURL:            types.StringValue(r.RepoURL),
+			VCSRepoID:          types.StringValue(r.VCSRepoID),
+			DefaultBranch:      types.StringValue(r.DefaultBranch),
+			Status:             types.StringValue(r.Status),
+			Origin:             types.StringValue(r.Origin),
+			CandidatePaths:     subList,
+			Candidates:         candidates,
+			SeenSubdirectories: seenList,
+			LastSkips:          skips,
+			PreviousPaths:      prevList,
+			PreviousLocations:  locations,
+			LastScannedSHA:     types.StringValue(r.LastScannedSHA),
+			LastCheckedAt:      types.StringValue(r.LastCheckedAt),
+			NextCheckAt:        types.StringValue(r.NextCheckAt),
+			LastError:          types.StringValue(r.LastError),
+			FailureCount:       types.Int64Value(int64(r.FailureCount)),
+			FirstSeenAt:        types.StringValue(r.FirstSeenAt),
+			RepoCreatedAt:      types.StringValue(r.RepoCreatedAt),
 		})
 	}
 	return out, diags

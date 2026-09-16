@@ -72,6 +72,19 @@ class FakeRedis:
     async def smembers(self, key):
         return set(self.sets.get(key, set()))
 
+    async def sscan(self, key, cursor=0, count=100):
+        """Enough of SSCAN to iterate in bounded batches and wrap at the end.
+
+        The real cursor is opaque and may repeat a member; what the service
+        relies on is only that a batch is bounded and that successive calls
+        eventually reach every member, which an index satisfies.
+        """
+        members = sorted(self.sets.get(key, set()))
+        start = int(cursor) if int(cursor) < len(members) else 0
+        chunk = members[start : start + count]
+        nxt = start + count
+        return (0 if nxt >= len(members) else nxt), chunk
+
     async def delete(self, *keys):
         for k in keys:
             self.hashes.pop(k, None)
@@ -437,6 +450,25 @@ class TestWatchBookkeeping:
 
         (call,) = enqueue.await_args_list
         assert call.args[1] == {"record": svc.record_id(good.id, "plan")}
+
+    async def test_the_walk_is_bounded_and_the_next_cycle_carries_on(self, redis, enqueue, publish):
+        """A record lives for its longest lease plus an hour, so an estate with
+        hour-long database credentials accumulates thousands of them — and the
+        reconciler runs every two seconds. One cycle must not re-read them all;
+        across cycles every one is still reached."""
+        runs = [_run(status="planned") for _ in range(3)]
+        for r in runs:
+            await _recorded(redis, r, job=f"tprun-{str(r.id)[:8]}-plan")
+
+        watch_one = AsyncMock()
+        with patch.object(svc, "_watch_one", watch_one), patch.object(svc, "_WATCH_BATCH", 2):
+            await svc.watch_pending(_db(None))
+            first = [c.args[2] for c in watch_one.await_args_list]
+            await svc.watch_pending(_db(None))
+
+        seen = [c.args[2] for c in watch_one.await_args_list]
+        assert len(first) == 2, first
+        assert set(seen) == set(await redis.smembers(svc.PENDING_SET))
 
     async def test_an_enqueue_failure_never_raises(self, redis, publish):
         run = _run(status="errored", job_name="tprun-x-plan")

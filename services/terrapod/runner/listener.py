@@ -1277,6 +1277,31 @@ class RunnerListener:
         for secret_key, content in (vault_file_values or {}).items():
             string_data[secret_key] = content
 
+        # Kubernetes caps a Secret at 1 MiB across everything in it, not across
+        # the Vault files alone (#1691). Sizing only the files let a run pass
+        # their 768 KiB cap and then fail here with a Kubernetes message, rather
+        # than one naming what was actually too big. Sizes only, never a value.
+        limit = 1024 * 1024
+        component_sizes = {
+            "terraform vars": len(string_data.get("terraform.tfvars.json", "").encode()),
+            "execution hooks": len(string_data.get("execution-hooks.json", "").encode()),
+            "git auth": len(string_data.get("git-auth.json", "").encode()),
+            "env vars": sum(
+                len(str(v["key"]).encode()) + len(str(v["value"]).encode()) for v in env_vars
+            ),
+            "OpenBao/Vault files": sum(
+                len(k.encode()) + len(c.encode()) for k, c in (vault_file_values or {}).items()
+            ),
+        }
+        total_bytes = sum(len(k.encode()) + len(v.encode()) for k, v in string_data.items())
+        if total_bytes > limit:
+            largest = max(component_sizes, key=lambda name: component_sizes[name])
+            raise ValueError(
+                f"the run's variables come to {total_bytes} bytes, over the "
+                f"{limit // 1024} KiB Kubernetes Secret limit; the largest part is "
+                f"{largest} at {component_sizes[largest]} bytes"
+            )
+
         secret = k8s_client.V1Secret(
             metadata=k8s_client.V1ObjectMeta(
                 name=secret_name,

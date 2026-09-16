@@ -329,16 +329,20 @@
     "files-walked",
     "modules",
     "modules-registered",
+    "next-after",
     "ref",
     "repositories-scanned",
+    "scan-complete",
     "skipped"
   ],
   "module_autodiscovery_rules.scan_rule": [
     "files-walked",
     "modules",
     "modules-registered",
+    "next-after",
     "ref",
     "repositories-scanned",
+    "scan-complete",
     "skipped"
   ],
   "notification_configurations._nc_json": [

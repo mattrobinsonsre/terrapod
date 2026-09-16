@@ -60,6 +60,9 @@ def _settings(enabled=True) -> Settings:
 def _db(*results):
     """A mock session whose execute() yields each result's scalar in turn."""
     db = AsyncMock()
+    # add_all is synchronous on a real AsyncSession; as an AsyncMock it returns
+    # a coroutine nobody awaits, which only surfaces as a RuntimeWarning.
+    db.add_all = MagicMock()
     rows = []
     for r in results:
         m = MagicMock()
@@ -245,6 +248,53 @@ def _patch_caps(level):
 
 
 WS_PATH = f"/api/terrapod/v1/workspaces/ws-{WS_ID}/vault-reference-checks"
+
+
+class TestTheCheckAuditsItsReads:
+    """#1651 records every Vault read a run makes as a `vault.read` row. The
+    reference check reads a secret too — to list its key names — and recorded
+    nothing (#1688). The middleware's own row names the endpoint, not the
+    instance, mount and path, so an operator reconciling Terrapod's audit log
+    against the server's own could not attribute those reads.
+    """
+
+    async def test_a_key_listing_writes_a_vault_read_row(self, redis, vault_on):
+        db = _db(_ws())
+        _seen, patched = _fake_vault()
+        with _patch_caps("write"), patched:
+            resp = await _call(_app(_user(), db), "POST", WS_PATH, json=_body({"reference": REF}))
+
+        assert resp.status_code == 200, resp.text
+        (rows,) = db.add_all.call_args.args
+        (row,) = rows
+        assert row.action == "vault.read"
+        assert row.resource_type == "workspaces" and row.resource_id == f"ws-{WS_ID}"
+        assert row.actor_email == "dev@example.com"
+        detail = json.loads(row.detail)
+        assert detail["instance"] == "default"
+        assert detail["mount"] == "secret" and detail["path"] == "apps/x"
+        assert detail["phase"] == "check" and detail["outcome"] == "ok"
+        # Names and coordinates only, exactly as a run's read is recorded.
+        assert SECRET not in row.detail
+        db.commit.assert_awaited()
+
+    async def test_a_check_that_reads_no_secret_writes_no_row(self, redis, vault_on):
+        """Without `run:plan` the key listing is skipped, so there is no read to
+        record: the row follows the read, not the request."""
+        db = _db(_ws())
+        caps = caps_for_level("write") - {"run:plan"}
+        _seen, patched = _fake_vault()
+        with (
+            patch(
+                "terrapod.api.routers.vault_diagnostics.resolve_workspace_capabilities_for",
+                AsyncMock(return_value=caps),
+            ),
+            patched,
+        ):
+            resp = await _call(_app(_user(), db), "POST", WS_PATH, json=_body({"reference": REF}))
+
+        assert resp.status_code == 200, resp.text
+        db.add_all.assert_not_called()
 
 
 class TestWorkspaceCheckRbac:

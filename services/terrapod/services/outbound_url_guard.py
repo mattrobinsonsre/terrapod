@@ -87,6 +87,35 @@ class BlockedURLError(ValueError):
     """
 
 
+#: NAT64's well-known prefix (RFC 6052). The low 32 bits are the IPv4 address.
+_NAT64_PREFIX = ipaddress.IPv6Network("64:ff9b::/96")
+
+
+def _embedded_ipv4(
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> ipaddress.IPv4Address | None:
+    """The IPv4 address this one actually reaches, if it carries one inside it.
+
+    Three spellings all route to an IPv4 target: the mapped form
+    (`::ffff:127.0.0.1`), 6to4 (`2002:7f00:1::`) and NAT64's well-known prefix
+    (`64:ff9b::7f00:1`). Only the mapped form was unwrapped, which let the other
+    two through. NAT64 is the one that matters: every `is_*` flag on it is
+    False, so it reads as an ordinary global address, and on a network with a
+    NAT64 gateway `64:ff9b::7f00:1` reaches 127.0.0.1 unchallenged. 6to4 reads
+    as private, so it was refused only when an operator had turned private
+    blocking on — which is not what that switch is for.
+    """
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None:
+        return mapped
+    sixtofour = getattr(ip, "sixtofour", None)
+    if sixtofour is not None:
+        return sixtofour
+    if isinstance(ip, ipaddress.IPv6Address) and ip in _NAT64_PREFIX:
+        return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+    return None
+
+
 def _is_forbidden(
     ip: ipaddress.IPv4Address | ipaddress.IPv6Address, *, block_private: bool
 ) -> str | None:
@@ -119,10 +148,11 @@ def _is_forbidden(
         return "private (outbound_requests.block_private_addresses is on)"
     # An IPv4 address wearing an IPv6 costume still routes to the IPv4 target,
     # so it is judged as what it actually reaches rather than as what it looks
-    # like — ::ffff:127.0.0.1 is loopback however it is spelled.
-    mapped = getattr(ip, "ipv4_mapped", None)
-    if mapped is not None:
-        return _is_forbidden(mapped, block_private=block_private)
+    # like — ::ffff:127.0.0.1 is loopback however it is spelled, and so are its
+    # 6to4 and NAT64 spellings.
+    embedded = _embedded_ipv4(ip)
+    if embedded is not None:
+        return _is_forbidden(embedded, block_private=block_private)
     return None
 
 
