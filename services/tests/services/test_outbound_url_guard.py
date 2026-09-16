@@ -67,6 +67,10 @@ class TestTheAlwaysRefused:
             ("169.254.169.254", "link-local"),  # cloud instance metadata
             ("fe80::1", "link-local"),
             ("0.0.0.0", "unspecified"),
+            ("2002:7f00:1::", "loopback"),  # 6to4 carrying 127.0.0.1
+            ("2002:a9fe:a9fe::", "link-local"),  # 6to4 carrying the metadata address
+            ("64:ff9b::7f00:1", "loopback"),  # NAT64 carrying 127.0.0.1
+            ("64:ff9b::a9fe:a9fe", "link-local"),  # NAT64 carrying the metadata address
         ],
     )
     async def test_it_refuses(self, addr: str, why: str) -> None:
@@ -80,6 +84,23 @@ class TestTheAlwaysRefused:
         the notation rather than the destination is how these guards get bypassed."""
         with _resolves_to("::ffff:127.0.0.1"):
             with pytest.raises(BlockedURLError, match="loopback"):
+                await validate_outbound_url("https://webhook.test/hook")
+
+    async def test_a_6to4_address_is_judged_by_the_ipv4_it_reaches(self) -> None:
+        """`2002:7f00:1::` is 127.0.0.1 in a 6to4 wrapper. It reads as private
+        space rather than loopback, so until this it was refused only on a
+        deployment that had turned private blocking on — which is not what that
+        switch is for."""
+        with _resolves_to("2002:7f00:1::"):
+            with pytest.raises(BlockedURLError, match="loopback"):
+                await validate_outbound_url("https://webhook.test/hook")
+
+    async def test_a_nat64_address_is_judged_by_the_ipv4_it_reaches(self) -> None:
+        """`64:ff9b::a9fe:a9fe` reaches cloud instance metadata through a NAT64
+        gateway. Every `is_*` flag on it is False, so it reads as an ordinary
+        global address and nothing else in the guard catches it."""
+        with _resolves_to("64:ff9b::a9fe:a9fe"):
+            with pytest.raises(BlockedURLError, match="link-local"):
                 await validate_outbound_url("https://webhook.test/hook")
 
     async def test_a_hostname_that_looks_public_but_resolves_inward_is_refused(self) -> None:
@@ -258,6 +279,9 @@ class TestThroughAnEgressProxy:
             ("https://127.0.0.1/x", "loopback"),
             ("https://[::1]/x", "loopback"),
             ("https://[::ffff:127.0.0.1]/x", "loopback"),
+            ("https://[2002:7f00:1::]/x", "loopback"),
+            ("https://[64:ff9b::7f00:1]/x", "loopback"),
+            ("http://[64:ff9b::a9fe:a9fe]/latest/meta-data", "link-local"),
             ("http://169.254.169.254/latest/meta-data", "link-local"),
             ("https://0.0.0.0/x", "unspecified"),
             # Legacy spellings a proxy would still read as an address.

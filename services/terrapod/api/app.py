@@ -799,7 +799,7 @@ def create_application() -> FastAPI:
     from fastapi.exceptions import RequestValidationError
     from fastapi.responses import Response
     from fastapi.utils import is_body_allowed_for_status_code
-    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.exc import DataError, IntegrityError
     from starlette.exceptions import HTTPException as StarletteHTTPException
 
     from terrapod.api.errors import jsonapi_error_response
@@ -863,6 +863,26 @@ def create_application() -> FastAPI:
             error=str(getattr(exc, "orig", exc)),
         )
         return jsonapi_error_response("Resource already exists or violates a constraint", 409)
+
+    @app.exception_handler(DataError)
+    async def data_error_handler(request: Request, exc: DataError) -> JSONResponse:
+        """A value the database refused on its own terms — longer than its
+        column, or the wrong type for it. That is the caller's input being
+        wrong, so it reads as 422.
+
+        It arrived as a bare 500 because `DataError` is a *sibling* of
+        `IntegrityError` under `DatabaseError`, not a subclass, so neither the
+        in-handler `except IntegrityError` blocks nor the 409 net above ever saw
+        it: a 300-character rule name reached the commit and came back as
+        "Internal server error". The driver echoes the offending value in
+        `orig`, so only its type is logged and the response names no value.
+        """
+        logger.warning(
+            "Value rejected by the database",
+            path=str(request.url.path),
+            error=type(getattr(exc, "orig", exc)).__name__,
+        )
+        return jsonapi_error_response("A value is too long or not of the expected type", 422)
 
     @app.exception_handler(httpx.HTTPError)
     async def upstream_error_handler(request: Request, exc: httpx.HTTPError) -> JSONResponse:

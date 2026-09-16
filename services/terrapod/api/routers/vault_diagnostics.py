@@ -35,7 +35,8 @@ from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import VariableSet, VariableSetVariable, Workspace
 from terrapod.db.session import get_db
-from terrapod.services import variable_service, vault_diagnostics
+from terrapod.services import audit_service, variable_service, vault_diagnostics
+from terrapod.services.vault_source_service import vault_check_audit_entries
 from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
 router = APIRouter(tags=["vault"])
@@ -171,6 +172,33 @@ async def _rate_limit(user: AuthenticatedUser) -> None:
         )
 
 
+async def _audit_reads(
+    db: AsyncSession,
+    user: AuthenticatedUser,
+    resource_type: str,
+    resource_id: str,
+    reads: list,
+) -> None:
+    """Record the Vault reads a check made, if it made any (#1688).
+
+    The middleware's own row names the endpoint, not the instance, mount and
+    path that were read, so without this an operator reconciling Terrapod's
+    audit log against the server's own could not attribute those reads.
+    """
+    if not reads:
+        return
+    audit_service.add_audit_events(
+        db,
+        vault_check_audit_entries(
+            actor_email=user.email,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            reads=reads,
+        ),
+    )
+    await db.commit()
+
+
 @router.post("/workspaces/{workspace_id}/vault-reference-checks")
 async def check_workspace_reference(
     workspace_id: str = Path(...),
@@ -213,12 +241,15 @@ async def check_workspace_reference(
         reference = _reference_attr(attrs)
 
     await _rate_limit(user)
+    reads: list = []
     result = await vault_diagnostics.check_reference(
         reference,
         key=key or "check",
         may_list_keys=has_capability(caps, cap.RUN_PLAN),
         local_execution=getattr(ws, "execution_mode", "agent") == "local",
+        reads=reads,
     )
+    await _audit_reads(db, user, "workspaces", f"ws-{ws.id}", reads)
     return JSONResponse(content={"data": _check_json(result)})
 
 
@@ -262,5 +293,7 @@ async def check_varset_reference(
         reference = _reference_attr(attrs)
 
     await _rate_limit(user)
-    result = await vault_diagnostics.check_reference(reference, key=key or "check")
+    reads: list = []
+    result = await vault_diagnostics.check_reference(reference, key=key or "check", reads=reads)
+    await _audit_reads(db, user, "variable-sets", f"varset-{vs.id}", reads)
     return JSONResponse(content={"data": _check_json(result)})

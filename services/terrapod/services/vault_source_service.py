@@ -357,6 +357,48 @@ def vault_read_audit_entries(*, run_id: object, phase: str, reads: list) -> list
     ]
 
 
+def vault_check_audit_entries(
+    *, actor_email: str, resource_type: str, resource_id: str, reads: list
+) -> list[dict]:
+    """The audit rows for a reference check's Vault reads (#1688).
+
+    The same `vault.read` action and the same detail shape as a run's reads, so
+    one filter finds both, but the subject is the workspace or variable set the
+    check was made against and the actor is the person who asked — a check has
+    a human behind it and no run, which is why it cannot use
+    :func:`vault_read_audit_entries`.
+
+    The middleware already records the POST itself; that row names the endpoint,
+    not the instance, mount and path that were read, so an operator reconciling
+    Terrapod's log against the server's own could not attribute those reads.
+    """
+    return [
+        {
+            "action": "vault.read",
+            "actor_email": actor_email,
+            "actor_type": "terrapod_user",
+            "origin": "api",
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "status_code": _AUDIT_STATUS[r.outcome],
+            "detail": json.dumps(
+                {
+                    "keys": list(r.keys),
+                    "instance": r.instance,
+                    "mount": r.mount,
+                    "path": r.path,
+                    "engine": r.engine,
+                    "phase": "check",
+                    "outcome": r.outcome,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        }
+        for r in reads
+    ]
+
+
 async def resolve_vault_variables(resolved: list, settings: Settings) -> dict[str, str]:
     """Resolve every vault-sourced variable to the value it is delivered as.
 

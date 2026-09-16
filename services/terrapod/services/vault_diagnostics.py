@@ -49,6 +49,7 @@ from terrapod.services.vault_client import (
 )
 from terrapod.services.vault_render import LEASE_ROOT, RenderError, parse_template
 from terrapod.services.vault_source_service import (
+    VaultReadRecord,
     VaultSourceError,
     _secret_for,
     parse_reference,
@@ -546,6 +547,29 @@ async def _kv2_key_names(inst: VaultInstanceConfig, ref: dict, timeout: float) -
     return sorted(str(k) for k in response.data)
 
 
+def _record_check_read(
+    reads: list | None, keys: list[str], instance: str, ref: dict, outcome: str
+) -> None:
+    """Note one Vault read the check made, for the caller to audit (#1688).
+
+    The same record a run's reads produce — names and coordinates, never a
+    value. This module has no database session by design, so it collects and
+    the router writes.
+    """
+    if reads is None:
+        return
+    reads.append(
+        VaultReadRecord(
+            keys=tuple(keys),
+            instance=instance,
+            mount=str(ref["mount"]).strip("/"),
+            path=str(ref["path"]).strip("/"),
+            engine=str(ref.get("engine", "kv2")),
+            outcome=outcome,
+        )
+    )
+
+
 async def check_reference(
     reference: object,
     *,
@@ -553,6 +577,7 @@ async def check_reference(
     cfg: Settings | None = None,
     may_list_keys: bool = True,
     local_execution: bool = False,
+    reads: list | None = None,
 ) -> dict:
     """Check a Vault reference without resolving it. Returns response attributes.
 
@@ -562,6 +587,10 @@ async def check_reference(
     names is only given to someone who could have run a plan with the variable
     anyway. The result is JSON:API attributes; ``checks`` is the ordered list a
     UI renders, and the top-level fields are the same answers for automation.
+
+    ``reads`` collects a :class:`VaultReadRecord` for each Vault read the check
+    actually makes, so the caller can audit them (#1688). Only the kv-v2 key
+    listing reads a secret; ``sys/capabilities-self`` reads nothing.
     """
     cfg = cfg or settings
     vault = cfg.vault
@@ -688,11 +717,16 @@ async def check_reference(
         try:
             keys = await _kv2_key_names(inst, ref, vault.timeout_seconds)
         except VaultUnavailable as e:
+            _record_check_read(reads, [], inst.name, ref, "transient")
             checks.append(_check("fields-present", UNKNOWN, str(e)))
             return out
         except VaultError as e:
+            _record_check_read(
+                reads, [], inst.name, ref, "denied" if isinstance(e, VaultDenied) else "error"
+            )
             checks.append(_check("fields-present", FAIL, str(e)))
             return out
+        _record_check_read(reads, keys, inst.name, ref, "ok")
         out["keys"] = keys
         missing = [f for f in fields if f not in keys]
         out["missing-fields"] = missing

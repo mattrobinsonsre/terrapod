@@ -107,6 +107,33 @@ class TestVarsSecretCarriesTheFiles:
         assert SECRET not in sd["terraform.tfvars.json"]
 
 
+class TestTheSecretFitsAsAWhole:
+    async def test_the_whole_secret_is_sized_not_just_the_files(self, fresh_shutdown_event):
+        """Kubernetes caps the Secret at 1 MiB across everything in it. Sizing
+        only the Vault files let a run pass their 768 KiB cap and then fail at
+        creation with a Kubernetes message, instead of one naming the part that
+        was actually too big."""
+        listener = _make_listener(fresh_shutdown_event)
+        core_api = MagicMock()
+        with patch("terrapod.runner.job_manager._get_core_api", return_value=core_api):
+            with pytest.raises(ValueError) as exc:
+                await listener._create_vars_secret(
+                    "tprun-r1-plan-vars",
+                    "r1",
+                    terraform_vars=[],
+                    env_vars=[{"key": "BIG", "value": "x" * (700 * 1024)}],
+                    job_name="tprun-r1-plan",
+                    job_uid="uid-1",
+                    vault_file_values={"vault-file-0": "y" * (400 * 1024)},
+                )
+        message = str(exc.value)
+        assert "Kubernetes Secret limit" in message
+        assert "env vars" in message
+        core_api.create_namespaced_secret.assert_not_called()
+        # Sizes and names only — never any of the content itself.
+        assert "xxx" not in message and "yyy" not in message
+
+
 def _launch_listener(shutdown_event):
     listener = _make_listener(shutdown_event)
     listener._get_runner_token = AsyncMock(return_value="runtok:abc")

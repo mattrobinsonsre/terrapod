@@ -66,6 +66,11 @@ TRIGGER = "vault_lease_revoke"
 #: How long a record outlives its longest lease. Past that the leases have
 #: expired in Vault anyway, so there is nothing left to revoke.
 RECORD_GRACE_SECONDS = 3600
+#: Pending records examined per reconcile cycle, and where the last one stopped.
+#: Large enough that an ordinary estate is covered in a single pass, small
+#: enough that a large one cannot make the cycle walk everything (#1690).
+_WATCH_BATCH = 200
+_WATCH_CURSOR = "tp:vault:lease_watch_cursor"
 #: Listener job-status reports that mean the phase's Job has ended.
 TERMINAL_JOB_STATUSES = frozenset({"succeeded", "failed", "deleted"})
 
@@ -223,11 +228,29 @@ async def watch_pending(db) -> None:
     Called once per reconcile cycle, after the cycle's transitions have
     committed. Each record is handled in its own ``try`` so one bad record
     cannot stop the others, and the caller wraps the whole call too.
+
+    The set is walked a batch at a time rather than whole (#1690). A record
+    lives for its longest lease plus an hour, so an estate with hour-long
+    database credentials and busy run traffic accumulates thousands of them,
+    and the reconciler runs every two seconds — walking the lot meant
+    re-reading every member's hash, job report and run thirty times a minute
+    for an answer that changes when a Job ends. The cursor is kept in Redis, so
+    each cycle carries on where the last stopped and every member is still
+    reached, just not all at once.
     """
     if not settings.vault.revocation_enabled:
         return
     redis = _redis()
-    for record in await redis.smembers(PENDING_SET):
+    cursor = 0
+    stored = await redis.get(_WATCH_CURSOR)
+    if stored:
+        try:
+            cursor = int(stored)
+        except (TypeError, ValueError):
+            cursor = 0
+    cursor, records = await redis.sscan(PENDING_SET, cursor=cursor, count=_WATCH_BATCH)
+    await redis.setex(_WATCH_CURSOR, RECORD_GRACE_SECONDS, str(cursor))
+    for record in records:
         try:
             await _watch_one(db, redis, record)
         except Exception as e:  # noqa: BLE001 - one record must not stop the rest

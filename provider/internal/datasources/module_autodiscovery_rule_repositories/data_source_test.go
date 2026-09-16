@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 )
@@ -12,15 +13,26 @@ import (
 func TestEntriesFromMapsEveryField(t *testing.T) {
 	ctx := context.Background()
 	entries, diags := entriesFrom(ctx, []terrapod.ModuleAutodiscoveryRepository{{
-		ID:             "modrepo-1",
-		Repository:     "org/terraform-aws-a",
-		RepoURL:        "https://github.com/org/terraform-aws-a",
-		DefaultBranch:  "main",
-		Status:         "active",
-		Origin:         "new",
-		Candidates:     []terrapod.ModuleAutodiscoveryStoredCandidate{{Subdirectory: ""}, {Subdirectory: "modules/x"}},
-		PreviousPaths:  []terrapod.ModuleAutodiscoveryRepositoryPrevious{{Path: "old/terraform-aws-a"}},
+		ID:            "modrepo-1",
+		Repository:    "org/terraform-aws-a",
+		RepoURL:       "https://github.com/org/terraform-aws-a",
+		VCSRepoID:     "R_1",
+		DefaultBranch: "main",
+		Status:        "active",
+		Origin:        "new",
+		Candidates: []terrapod.ModuleAutodiscoveryStoredCandidate{
+			{Subdirectory: "", Name: "terraform-aws-a", Provider: "aws"},
+			{Subdirectory: "modules/x", Name: "x", Provider: "aws"},
+		},
+		SeenSubdirectories: []string{"", "modules/x"},
+		LastSkips: []terrapod.ModuleAutodiscoverySkip{
+			{Subdirectory: "", Reason: "already-registered"},
+		},
+		PreviousPaths: []terrapod.ModuleAutodiscoveryRepositoryPrevious{
+			{Path: "old/terraform-aws-a", URL: "https://github.com/old/terraform-aws-a"},
+		},
 		LastScannedSHA: "abc",
+		NextCheckAt:    "2026-09-16T10:00:00Z",
 		FailureCount:   2,
 		LastError:      "boom",
 		FirstSeenAt:    "2026-09-15T10:00:00Z",
@@ -44,6 +56,27 @@ func TestEntriesFromMapsEveryField(t *testing.T) {
 	if e.RepoCreatedAt.IsNull() || e.LastCheckedAt.ValueString() != "" {
 		t.Errorf("timestamps: %v %v", e.RepoCreatedAt, e.LastCheckedAt)
 	}
+	if e.VCSRepoID.ValueString() != "R_1" || e.NextCheckAt.ValueString() != "2026-09-16T10:00:00Z" {
+		t.Errorf("entry: %+v", e)
+	}
+	// The flattening used to discard all of these: the name and provider each
+	// candidate would register under, the URL a renamed repository had, and the
+	// reason a candidate registered nothing — which is the one that answers
+	// "why did this repository register nothing".
+	if len(e.Candidates) != 2 || e.Candidates[1].Name.ValueString() != "x" ||
+		e.Candidates[1].Provider.ValueString() != "aws" {
+		t.Errorf("candidates: %+v", e.Candidates)
+	}
+	if len(e.LastSkips) != 1 || e.LastSkips[0].Reason.ValueString() != "already-registered" {
+		t.Errorf("skips: %+v", e.LastSkips)
+	}
+	if len(e.PreviousLocations) != 1 ||
+		e.PreviousLocations[0].URL.ValueString() != "https://github.com/old/terraform-aws-a" {
+		t.Errorf("previous locations: %+v", e.PreviousLocations)
+	}
+	if len(e.SeenSubdirectories.Elements()) != 2 {
+		t.Errorf("seen subdirectories: %v", e.SeenSubdirectories)
+	}
 }
 
 func TestEntriesFromEmpty(t *testing.T) {
@@ -65,6 +98,19 @@ func TestSchemaHasNoReservedProviderAttribute(t *testing.T) {
 	for _, want := range []string{"rule_id", "status", "repositories"} {
 		if _, ok := resp.Schema.Attributes[want]; !ok {
 			t.Errorf("missing %s", want)
+		}
+	}
+	repos, ok := resp.Schema.Attributes["repositories"].(schema.ListNestedAttribute)
+	if !ok {
+		t.Fatal("repositories is not a list of nested objects")
+	}
+	// Everything the API returns for a repository is reachable from Terraform.
+	for _, want := range []string{
+		"vcs_repo_id", "candidates", "seen_subdirectories", "last_skips",
+		"previous_paths", "previous_locations", "next_check_at",
+	} {
+		if _, ok := repos.NestedObject.Attributes[want]; !ok {
+			t.Errorf("missing repositories.%s", want)
 		}
 	}
 }
