@@ -91,9 +91,13 @@ class TestReveal:
 
 class TestSeal:
     def test_round_trip(self) -> None:
+        """What is sealed opens to the same deployment. It is not byte-for-byte
+        the stored form it came from: values are re-sealed byte-safely (#1573)."""
         opened = svc.reveal_secrets(_stored(), _decrypt)
         sealed = svc.seal_secrets(opened, _encrypt, SERVICE)
-        assert sealed == _stored()
+        assert svc.reveal_secrets(sealed, _decrypt) == opened
+        for secret in (sealed["resources"][0]["outputs"]["result"],):
+            assert base64.b64decode(secret["ciphertext"]).decode().startswith(svc.BYTES_PREFIX)
 
     def test_the_uploaded_provider_block_is_replaced(self) -> None:
         opened = svc.reveal_secrets(_stored(), _decrypt)

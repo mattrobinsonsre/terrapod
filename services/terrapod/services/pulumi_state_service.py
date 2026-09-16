@@ -103,6 +103,32 @@ def provider_of(deployment: dict[str, Any] | None) -> dict[str, Any] | None:
     return provider if isinstance(provider, dict) else None
 
 
+#: Marks a value sealed byte-safely (#1573). The CLI encrypts binary values as
+#: well as text, and the envelope layer seals text, so the bytes are base64'd
+#: first and the envelope only ever sees ASCII. The marker sits OUTSIDE the
+#: envelope, so a value can be told apart without decrypting it. Anything
+#: without it was sealed before #1573 and is read the old way: as text, either
+#: envelope-sealed or, with encryption at rest off, stored as it was.
+BYTES_PREFIX = "terrapod-bytes:v1:"
+
+
+def seal_bytes(encrypt: Any, raw: bytes) -> str:
+    """Seal any value, binary included. `encrypt` is the encryption service's."""
+    return BYTES_PREFIX + encrypt(base64.b64encode(raw).decode("ascii"))
+
+
+def open_sealed(decrypt: Any, sealed: str) -> bytes:
+    """The bytes behind a sealed value, whichever way it was sealed.
+
+    Before #1573 only text could be sealed — a binary value failed on the way
+    in — so a value without the marker comes back as its UTF-8 bytes, which is
+    exactly what the CLI sent.
+    """
+    if sealed.startswith(BYTES_PREFIX):
+        return base64.b64decode(decrypt(sealed[len(BYTES_PREFIX) :]))
+    return decrypt(sealed).encode("utf-8", errors="surrogateescape")
+
+
 def reveal_secrets(deployment: dict[str, Any], decrypt: Any) -> dict[str, Any]:
     """The deployment with its secrets opened and its provider block removed.
 
@@ -121,7 +147,8 @@ def reveal_secrets(deployment: dict[str, Any], decrypt: Any) -> dict[str, Any]:
         if provider != SERVICE_PROVIDER:
             raise UnreadableSecretsError(provider or "unknown")
         sealed = base64.b64decode(secret["ciphertext"]).decode()
-        return {SECRET_SIG_KEY: SECRET_SIG, "plaintext": decrypt(sealed)}
+        # A deployment secret is JSON text, so its bytes decode cleanly.
+        return {SECRET_SIG_KEY: SECRET_SIG, "plaintext": open_sealed(decrypt, sealed).decode()}
 
     body = {k: v for k, v in deployment.items() if k != "secrets_providers"}
     result: dict[str, Any] = _map_secrets(body, _open)
@@ -143,7 +170,7 @@ def seal_secrets(
             raise SealedSecretInUploadError(
                 "the deployment carries a sealed secret; export it with --show-secrets"
             )
-        sealed = encrypt(secret["plaintext"])
+        sealed = seal_bytes(encrypt, secret["plaintext"].encode())
         return {
             SECRET_SIG_KEY: SECRET_SIG,
             "ciphertext": base64.b64encode(sealed.encode()).decode(),

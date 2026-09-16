@@ -214,7 +214,11 @@ class TestUpload:
         assert isinstance(sv, StateVersion)
         assert (sv.serial, sv.run_id) == (5, run.id)
         stored = _stored_payload(h)
-        assert stored["resources"][0]["outputs"]["pw"] == _cipher('"hunter3"')
+        # Sealed byte-safely (#1573), so the local CLI's decrypt can open it.
+        from terrapod.services.pulumi_state_service import seal_bytes
+
+        sealed_pw = base64.b64encode(seal_bytes(_Crypto.encrypt, b'"hunter3"').encode()).decode()
+        assert stored["resources"][0]["outputs"]["pw"] == {**SIG, "ciphertext": sealed_pw}
         assert "hunter3" not in h.storage.put.call_args[0][1].decode().replace("sealed(", "")
         # The provider the stack already had is kept, not the runner's passphrase.
         assert stored["secrets_providers"] == STORED["secrets_providers"]
