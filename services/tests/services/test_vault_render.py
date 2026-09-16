@@ -278,6 +278,8 @@ def test_a_non_string_template_is_refused():
 
 
 def test_base64_decodes_to_utf8_text_and_ignores_wrapping():
+    # A fixture shaped like a GCP service-account file, base64-encoded below.
+    # nosemgrep: generic.secrets.security.detected-google-gcm-service-account.detected-google-gcm-service-account
     raw = '{"type": "service_account", "name": "café"}'
     enc = base64.b64encode(raw.encode()).decode()
     wrapped = "\n".join(enc[i : i + 8] for i in range(0, len(enc), 8))
