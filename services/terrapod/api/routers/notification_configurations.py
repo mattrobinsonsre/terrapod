@@ -14,7 +14,6 @@ Endpoints:
     POST   /api/terrapod/v1/notification-configurations/{id}/actions/verify   (verify)
 """
 
-import uuid
 from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
@@ -24,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
@@ -203,7 +203,7 @@ async def list_notification_configurations(
 
 async def _get_nc(nc_id: str, db: AsyncSession) -> NotificationConfiguration:
     """Load a notification configuration by ID."""
-    nc_uuid = uuid.UUID(nc_id.removeprefix("nc-"))
+    nc_uuid = parse_id(nc_id, "nc-", detail="Notification configuration not found")
     result = await db.execute(
         select(NotificationConfiguration)
         .options(selectinload(NotificationConfiguration.workspace))

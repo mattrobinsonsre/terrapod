@@ -46,6 +46,7 @@ from terrapod.api.dependencies import (
     get_listener_identity,
 )
 from terrapod.api.errors import vcs_unavailable
+from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
@@ -341,7 +342,10 @@ def _run_json(
 
 
 async def _get_run(run_id: str, db: AsyncSession) -> Run:
-    run_uuid = uuid.UUID(run_id.removeprefix("run-"))
+    # A plan and an apply are both views of a run, so all three spellings name
+    # the same row. Parsed through the shared helper so a malformed id is a
+    # 404 rather than the 500 an uncaught ValueError used to produce (#1699).
+    run_uuid = parse_id(run_id, "run-", "plan-", "apply-", detail="Run not found")
     run = await run_service.get_run(db, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -2027,7 +2031,7 @@ async def next_run(
 
     Returns 204 No Content if no run is available.
     """
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
     if identity.listener_id != l_uuid:
         raise HTTPException(
             status_code=403,
@@ -2266,7 +2270,7 @@ async def update_run_status(
     run = await _get_run(run_id, db)
 
     # Verify this listener owns the run AND its cert matches the path
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
     if identity.listener_id != l_uuid:
         raise HTTPException(
             status_code=403,
@@ -2360,7 +2364,7 @@ async def create_runner_token(
     run = await _get_run(run_id, db)
 
     # Verify this listener owns the run
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
     if run.listener_id != l_uuid:
         raise HTTPException(status_code=403, detail="Run not assigned to this listener")
 
@@ -2394,7 +2398,7 @@ async def report_job_launched(
     """
     run = await _get_run(run_id, db)
 
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
     if identity.listener_id != l_uuid:
         raise HTTPException(
             status_code=403,
@@ -2436,7 +2440,7 @@ async def report_job_status(
     queries K8s for the Job status and POSTs the result here. The reconciler
     picks up the status from Redis on its next cycle.
     """
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
     if identity.listener_id != l_uuid:
         raise HTTPException(
             status_code=403,
@@ -2518,7 +2522,7 @@ async def upload_log_stream(
     log data from being stored under the apply phase key when the run has
     already transitioned.
     """
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
     if identity.listener_id != l_uuid:
         raise HTTPException(
             status_code=403,

@@ -17,7 +17,6 @@ Endpoints:
     PATCH  /api/terrapod/v1/task-stage-results/{id}/callback      (external callback)
 """
 
-import uuid
 from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
@@ -27,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
@@ -167,7 +167,7 @@ async def _require_ws_capability(
 
 
 async def _get_run_task(rt_id: str, db: AsyncSession) -> RunTask:
-    rt_uuid = uuid.UUID(rt_id.removeprefix("task-"))
+    rt_uuid = parse_id(rt_id, "task-", detail="Run task not found")
     result = await db.execute(
         select(RunTask).options(selectinload(RunTask.workspace)).where(RunTask.id == rt_uuid)
     )
@@ -370,7 +370,7 @@ async def list_task_stages(
     """List task stages for a run. Requires read on the workspace."""
     from terrapod.services import run_service
 
-    run_uuid = uuid.UUID(run_id.removeprefix("run-"))
+    run_uuid = parse_id(run_id, "run-", detail="Run not found")
     run = await run_service.get_run(db, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -399,7 +399,7 @@ async def show_task_stage(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Show a task stage with results. Requires read on the workspace."""
-    ts_uuid = uuid.UUID(ts_id.removeprefix("ts-"))
+    ts_uuid = parse_id(ts_id, "ts-", detail="Task stage not found")
     ts = await get_task_stage(db, ts_uuid)
     if ts is None:
         raise HTTPException(status_code=404, detail="Task stage not found")
@@ -430,7 +430,7 @@ async def override_task_stage(
     """Override a failed task stage. Requires admin on the workspace."""
     from terrapod.services.run_task_service import override_stage
 
-    ts_uuid = uuid.UUID(ts_id.removeprefix("ts-"))
+    ts_uuid = parse_id(ts_id, "ts-", detail="Task stage not found")
     ts = await get_task_stage(db, ts_uuid)
     if ts is None:
         raise HTTPException(status_code=404, detail="Task stage not found")
@@ -485,7 +485,7 @@ async def task_stage_result_callback(
         raise HTTPException(status_code=401, detail="Invalid or expired callback token")
 
     # Ensure the token matches the result ID in the path
-    tsr_uuid = uuid.UUID(tsr_id.removeprefix("tsr-"))
+    tsr_uuid = parse_id(tsr_id, "tsr-", detail="Task stage result not found")
     if verified_id != tsr_uuid:
         raise HTTPException(status_code=401, detail="Token does not match result ID")
 

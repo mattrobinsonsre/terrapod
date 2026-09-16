@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
+from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
@@ -406,7 +407,7 @@ async def update_workspace_var(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace"
         )
-    var_uuid = uuid.UUID(var_id.removeprefix("var-"))
+    var_uuid = parse_id(var_id, "var-", detail="Variable not found")
 
     var = await variable_service.get_variable(db, ws.id, var_uuid)
     if var is None:
@@ -462,7 +463,7 @@ async def delete_workspace_var(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace"
         )
-    var_uuid = uuid.UUID(var_id.removeprefix("var-"))
+    var_uuid = parse_id(var_id, "var-", detail="Variable not found")
 
     var = await variable_service.get_variable(db, ws.id, var_uuid)
     if var is None:
@@ -653,7 +654,7 @@ async def create_varset(
 
 
 async def _get_varset(varset_id: str, db: AsyncSession) -> VariableSet:
-    vs_uuid = uuid.UUID(varset_id.removeprefix("varset-"))
+    vs_uuid = parse_id(varset_id, "varset-", detail="Variable set not found")
     result = await db.execute(
         select(VariableSet)
         .where(VariableSet.id == vs_uuid)
@@ -839,7 +840,7 @@ async def update_varset_var(
 ) -> JSONResponse:
     """Update a variable in a variable set. Requires admin."""
     vs = await _get_varset(varset_id, db)
-    var_uuid = uuid.UUID(var_id.removeprefix("var-"))
+    var_uuid = parse_id(var_id, "var-", detail="Variable not found")
 
     result = await db.execute(
         select(VariableSetVariable).where(
@@ -918,7 +919,7 @@ async def delete_varset_var(
 ) -> None:
     """Delete a variable from a variable set. Requires admin."""
     vs = await _get_varset(varset_id, db)
-    var_uuid = uuid.UUID(var_id.removeprefix("var-"))
+    var_uuid = parse_id(var_id, "var-", detail="Variable not found")
 
     result = await db.execute(
         select(VariableSetVariable).where(

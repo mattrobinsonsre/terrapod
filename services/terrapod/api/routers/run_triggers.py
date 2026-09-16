@@ -12,7 +12,6 @@ Endpoints:
     DELETE /api/terrapod/v1/run-triggers/{id}                   (delete trigger)
 """
 
-import uuid
 from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, status
@@ -22,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
@@ -215,7 +215,7 @@ async def show_run_trigger(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Show a run trigger. Requires read on the destination workspace."""
-    rt_uuid = uuid.UUID(run_trigger_id.removeprefix("rt-"))
+    rt_uuid = parse_id(run_trigger_id, "rt-", detail="Run trigger not found")
     result = await db.execute(
         select(RunTrigger)
         .options(selectinload(RunTrigger.workspace), selectinload(RunTrigger.source_workspace))
@@ -238,7 +238,7 @@ async def delete_run_trigger(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a run trigger. Requires admin on the destination workspace."""
-    rt_uuid = uuid.UUID(run_trigger_id.removeprefix("rt-"))
+    rt_uuid = parse_id(run_trigger_id, "rt-", detail="Run trigger not found")
     result = await db.execute(
         select(RunTrigger)
         .options(selectinload(RunTrigger.workspace))
