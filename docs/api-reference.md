@@ -467,6 +467,7 @@ All workspace responses (show and list) include a `permissions` object reflectin
     "can-destroy": true,
     "can-queue-run": true,
     "can-queue-apply": true,
+    "can-queue-destroy": true,
     "can-read-state-versions": true,
     "can-create-state-versions": true,
     "can-read-variable": true,
@@ -964,9 +965,9 @@ POST /api/tfe/v2/runs/{run_id}/actions/cancel
 POST /api/v1/runs/{run_id}/actions/retry
 ```
 
-Creates a new run from a terminal run (applied, errored, canceled, discarded) using the same workspace, configuration version, VCS metadata, and settings. Returns a 409 if the run is not in a terminal state.
+Creates a new run from a terminal run (applied, errored, canceled, discarded) using the same workspace, configuration version, VCS metadata, and settings. A plan-only run left at `planned` can also be retried. The new run keeps the original's kind: a retried plan-only run is plan-only, and a retried destroy run is still a destroy. Returns a 409 if the run is not in a retryable state.
 
-**Required permission:** `plan` on the workspace (or `write` for apply runs).
+**Required permission:** what queuing that run would need — `run:plan` for a plan-only run, `run:apply` for an apply run, `run:apply-destroy` for a destroy run (the workspace permissions block reports these as `can-queue-run`, `can-queue-apply` and `can-queue-destroy`).
 
 ### Workspace Events (SSE)
 
@@ -1768,10 +1769,14 @@ DELETE /api/tfe/v2/varsets/{varset_id}/relationships/workspaces
 
 **Required permission:** Platform `admin`.
 
-### Vault Value Source
+<a id="vault-value-source"></a>
+
+### OpenBao/Vault Value Source
 
 A variable's `value-source` is `static` (the default — `value` is the literal)
-or `vault`, where `value` holds a JSON reference resolved at run time:
+or `vault`, where `value` holds a JSON reference to a secret in OpenBao (or
+HashiCorp Vault), resolved at run time. The value source is named `vault` for
+both servers:
 
 ```json
 {
@@ -1792,13 +1797,42 @@ configured instance), `engine` (`kv2` default, or `dynamic`), `method` (`GET`
 default, or `POST`) and `data` (a body for `POST` engines). The `path` omits
 kv-v2's `data/` segment — Terrapod adds it.
 
+An optional `file` object delivers the value as a file instead:
+`"file": {"name": "gcp/adc.json"}` writes it to
+`/var/run/terrapod/files/gcp/adc.json`, and `"file": {"name": "~/.aws/credentials"}`
+to `/home/runner/.aws/credentials`. `name` defaults to the variable key. The
+variable's delivered value becomes the file's absolute path, for `env` and
+`terraform` variables alike. A name must be a relative path of
+`[A-Za-z0-9._-]` segments (no `.`, `..` or empty segment, at most 255
+characters), and a `~/` name may not target a path the runner manages.
+
+The file's content is exactly one of:
+
+| Key | Content |
+|---|---|
+| `field` (on the reference) | That field. With `"file": {"encoding": "base64"}` it is base64-decoded first; the result must be UTF-8 text. |
+| `file.template` | A logic-less template over the secret, at most 16 KiB: `{{ name }}`, `{{ map.key }}`, filters `json`, `base64decode`, `trim`, `lines`, `indent N`, and `{{ _lease.ttl }}` / `_lease.renewable` / `_lease.expires_at` when the response has a lease. No `field`. |
+| `file.format` | `json` (the whole data map) or `env` (`KEY="value"` lines); `file.fields: [...]` selects a subset. No `field`. |
+
+`file` is refused with `422` together with `structured` (or its alias `hcl`),
+on a `static` value source, with any unknown key (`mode` is reserved), when more than one of `field`,
+`file.template` and `file.format` is given, for a template syntax error or an
+unknown filter, for `fields` without `format`, and for `encoding` with a
+template or format. An unknown template name, invalid base64, non-UTF-8 decoded
+bytes, two variables at one path, a rendered file over 256 KiB, or OpenBao/Vault files
+totalling over 768 KiB in one run error the run. Variables naming the same
+secret share one read per run, so fields of one dynamic credential always
+match — including every field a template uses. Details:
+[Delivering as a file](vault.md#delivering-as-a-file),
+[Templates, formats and encoding](vault.md#templates-formats-and-encoding).
+
 A vault-sourced variable is **always sensitive**, but the API returns its
 `value` rather than masking it: the stored value is a path, not a secret. The
 secret it points at is resolved per run and never persisted, returned or
 logged. A malformed reference is rejected at write time with `422`; one that
 cannot be resolved **fails the run** rather than delivering nothing.
 
-Applies to variable-set variables too, so a Vault-backed credential can be
+Applies to variable-set variables too, so an OpenBao/Vault-backed credential can be
 defined once and applied to many workspaces.
 
 ```
@@ -1810,7 +1844,7 @@ client can offer it only where it will work. Returns instance **names** only —
 never addresses, namespaces or auth configuration. Any authenticated user may
 call it, since anyone who can write a variable needs to pick an instance.
 
-Full setup, including the Vault-side policy and role: [Vault](vault.md).
+Full setup, including the server-side policy and role: [OpenBao/Vault](vault.md).
 
 ### Assignment Rules
 
@@ -1885,6 +1919,10 @@ DELETE /api/v1/registry-modules/private/default/{name}/{provider}
 PUT  /api/v1/registry-modules/private/default/{name}/{provider}/versions/{version}/upload
 DELETE /api/v1/registry-modules/private/default/{name}/{provider}/versions/{version}
 ```
+
+**Submodules.** Create, `PATCH …/{name}/{provider}` and `PATCH …/{name}/{provider}/vcs` accept an optional `subdirectory`: the path within the module's repository to publish it from, for a submodule (see [Submodules](registry.md#submodules-a-module-in-a-subdirectory)). It needs a `vcs-repo-url`; a path with `..`, `.` or empty segments is refused with `422`, and a repository subdirectory that is already registered with `409`. Modules report it as the `subdirectory` attribute, `""` for a module at the repository root. On `PATCH …/vcs`, omitting it leaves it unchanged; removing the repository clears it.
+
+**Autodiscovery.** To find the modules in a repository — the root and any submodules — and register them in bulk, use [Module Autodiscovery Rules](#module-autodiscovery-rules).
 
 ### Update Module
 
@@ -2460,6 +2498,160 @@ These use the **identical spec shape** as the bulk-update endpoint, so a run tas
 
 ---
 
+## Module Autodiscovery Rules
+
+Rules that find the modules in one repository (the root and any submodules) and register them in the private registry. See [Module autodiscovery](registry.md#module-autodiscovery) for how a rule behaves over time.
+
+All endpoints require the platform `admin` role. Rule ids are `modrule-<uuid>`, and a raw UUID is accepted too. `vcs-connection-id` accepts `vcs-<uuid>` or a raw UUID.
+
+### List Rules
+
+```
+GET /api/v1/module-autodiscovery-rules
+```
+
+Newest first, with the standard `meta.pagination` block.
+
+### Create Rule
+
+```
+POST /api/v1/module-autodiscovery-rules
+```
+
+**Request body** (only `name`, `vcs-connection-id`, `repo-url` and `pattern` are required):
+
+```json
+{
+  "data": {
+    "type": "module-autodiscovery-rules",
+    "attributes": {
+      "name": "management-groups",
+      "vcs-connection-id": "vcs-019e0e7b-...",
+      "repo-url": "https://github.com/myorg/terraform-azurerm-management-groups",
+      "branch": "main",
+      "pattern": "**/*.tf",
+      "ignore-patterns": ["modules/legacy/**"],
+      "name-template": "mg-{leaf}",
+      "provider": "azurerm",
+      "vcs-tag-pattern": "v*",
+      "enabled": true,
+      "labels": {"team": "platform"},
+      "owner-email": "platform@example.com"
+    }
+  }
+}
+```
+
+| Attribute | Notes |
+|---|---|
+| `name` | Unique per VCS connection. |
+| `vcs-connection-id` | The connection whose credentials read the repository. |
+| `repo-url` | The repository to scan. |
+| `branch` | Empty means the repository's default branch. |
+| `pattern`, `ignore-patterns` | Gitignore-style globs over `.tf` / `.tf.json` file paths. Each matching file's directory is a module. A pattern ending in `/` is refused, because it can only match a directory. |
+| `name-template` | Literal text plus the placeholders `{repo}`, `{path}`, `{leaf}` and `{root}`. Empty means the repository's module name plus the submodule's last segment. |
+| `provider` | Lowercase letters, digits and hyphens. Empty means taken from a `terraform-<provider>-<name>` repository name. |
+| `vcs-tag-pattern` | Copied onto each registered module. Empty means `v*`. |
+| `enabled` | A boolean; default `true`. While enabled, directories that appear on the tracked branch are registered automatically. |
+| `labels`, `owner-email` | Copied onto each registered module. `owner-email` must be an email address, or empty. |
+
+Saving registers nothing: use [Scan](#scan-register-modules) to register what's already in the repository.
+
+Returns `201` with the created rule. `409` means a rule with that name already exists for the connection.
+
+`422` covers:
+- a missing required attribute;
+- a connection id that isn't a UUID, or that doesn't exist;
+- a pattern or ignore pattern ending in `/`;
+- `ignore-patterns` that isn't a list of strings;
+- a `name-template` with any other placeholder, a format spec, or any other brace;
+- an invalid `provider`;
+- `enabled` that isn't a boolean (the string `"false"` included);
+- an `owner-email` that isn't an email address;
+- a reserved label key.
+
+**Rule attributes** in responses:
+- `name`
+- `vcs-connection-id`, as `vcs-<uuid>`
+- `repo-url`, `branch`, `pattern`, `ignore-patterns`, `enabled`
+- `name-template`, `provider`, `vcs-tag-pattern`, `labels`
+- `owner-email`: `""` when none
+- `first-scan-at`: `null` until the rule's first poll or scan
+- `last-scanned-sha`: the tracked branch's head at the last scan
+- `created-at`, `updated-at`
+
+Each rule also has a `vcs-connection` relationship and a `links.self`.
+
+### Show Rule
+
+```
+GET /api/v1/module-autodiscovery-rules/{id}
+```
+
+### Update Rule
+
+```
+PATCH /api/v1/module-autodiscovery-rules/{id}
+```
+
+Same body shape as create; only the attributes you include change, validated the same way. Changing `repo-url`, `vcs-connection-id`, `branch`, `pattern` or `ignore-patterns`, or setting `enabled` to `true` on a disabled rule, starts the rule afresh: what it had seen no longer describes what it claims, so the next poll records a new baseline rather than registering every directory the old rule never claimed. Register those with a [scan](#scan-register-modules).
+
+### Delete Rule
+
+```
+DELETE /api/v1/module-autodiscovery-rules/{id}
+```
+
+Returns `204`. The modules the rule registered stay registered.
+
+### Preview (dry-run)
+
+```
+GET  /api/v1/module-autodiscovery-rules/{id}/preview   # a saved rule
+POST /api/v1/module-autodiscovery-rules/preview        # an unsaved rule (same body as Create)
+```
+
+Registers nothing. Returns a `module-autodiscovery-rule-previews` document with:
+- `ref`: the branch it read;
+- `files-walked`;
+- `entries[]`: one per candidate directory, root first.
+
+Each entry has:
+- `subdirectory`: `""` for the root;
+- `name` and `provider`: as a scan would register them;
+- `registered-as`: the `{name, provider}` of the module already registered from that directory, or `null`;
+- `collision`: `true` when the name and provider belong to another module, or when another unregistered candidate derives the same name;
+- `missing-provider`: `true` when no provider could be worked out.
+
+Errors:
+- `422`: a repository URL that can't be parsed, or an unknown VCS provider.
+- `502`: the VCS provider can't be reached, returned no default branch, or refused to list the tree (a missing branch, a revoked token); the detail carries the provider's error.
+- `413`: the provider truncated the repository's tree, so it's too large to scan in one pass.
+
+### Scan (register modules)
+
+```
+POST /api/v1/module-autodiscovery-rules/{id}/scan
+```
+
+With no body, registers every candidate. To register a chosen subset, send:
+
+```json
+{"data": {"attributes": {"subdirectories": ["", "modules/create"]}}}
+```
+
+Registered modules are VCS-sourced, carry their `subdirectory`, and take the rule's branch, tag pattern, labels and owner. Their tags are polled on the next registry poll. A scan works whether or not the rule is enabled. Everything it saw counts as seen, so automatic registration will never later pick up a candidate you left out.
+
+Returns a `module-autodiscovery-rule-scans` document with:
+- `ref` and `files-walked`;
+- `modules-registered`: the count;
+- `modules[]`: each with `id`, `name`, `provider` and `subdirectory`;
+- `skipped[]`: each with `subdirectory` and a `reason`: `already-registered`, `name-taken` or `missing-provider`.
+
+Returns `422` when a listed subdirectory isn't one of the rule's candidates, or `subdirectories` isn't a list of strings. The repository errors are the same as for Preview.
+
+---
+
 ## Bulk Workspace Operations
 
 Terrapod-native, **admin only**. Server-side selection + atomic fleet updates (#318).
@@ -2997,15 +3189,17 @@ Body (all fields optional — the runner sends whatever it could read):
 {
   "peak_memory_bytes": 1500000000,
   "peak_cpu_usec": 42000000,
-  "exit_code": 0
+  "exit_code": 1,
+  "failure_reason": "Error: Unsupported argument (on main.tf line 3)"
 }
 ```
 
 - `peak_memory_bytes` — from `/sys/fs/cgroup/memory.peak`
 - `peak_cpu_usec` — `usage_usec` from `/sys/fs/cgroup/cpu.stat`
 - `exit_code` — script's actual exit status
+- `failure_reason` — sent only with a non-zero `exit_code`: why the run failed, in a line or two. For a failed `init`, `plan` or `apply` it is tofu's own `Error:` summaries (at most three, each with its `on <file> line <n>` location, never a diagnostic's detail lines); for any other failure it is the runner's last logged error (a failed hook, an unusable configuration archive, a crash). The API strips ANSI and other control characters, caps it at 2,000 characters, and stores it as the run's `error-message`, which the reconciler then keeps, followed by `Runner exited with code N` (#1631). Ignored with a zero `exit_code`, and on a run that has already errored.
 
-Negative values, non-integers, or booleans return `400`. Missing fields are not clobbered (existing values preserved).
+Negative values, non-integers, or booleans return `400`, as does a non-string `failure_reason`. Missing fields are not clobbered (existing values preserved).
 
 Note: **SIGKILL is uncatchable**, so this endpoint never fires on OOM-killed runs. Those are covered by the listener's K8s-terminated-state report on the job-status path; `runner-exit-status` ends up `"oom"` either way. See [Run Response Attributes (Resource Profile / OOM)](#run-response-attributes-resource-profile--oom) for the full signal flow.
 
@@ -3250,6 +3444,13 @@ GET /api/v1/admin/audit-log
 | `page[size]` | integer | Page size (default: 20, max: 100) |
 
 **Response:** JSON:API list of `audit-log-entries` with pagination metadata.
+
+Besides HTTP requests, the log holds system events, whose `action` is a verb.
+Every OpenBao/Vault read Terrapod makes for a run is one `vault.read` row
+(`resource-type` `runs`), whose `detail` is JSON naming the variables, instance,
+mount, path, engine, phase and outcome (`ok`, `denied`, `missing`, `transient`,
+`error`), never a value. Filter with `filter[action]=vault.read`. See
+[OpenBao/Vault → The audit trail](vault.md#the-audit-trail).
 
 **Example:**
 
@@ -4139,6 +4340,14 @@ GET /api/v1/catalog-items/{id}/form
 ```
 
 Returns the resolved provision form: `resolved-version` (per the item's version policy) and `fields[]` — one field per resolved input (the module's curated variables plus every parameter from the item's provider templates), with type, description, default, sensitivity, and any enum choices. **Required permission:** catalog `read`.
+
+#### Module Interface
+
+```
+GET /api/v1/catalog-items/{id}/interface
+```
+
+The inputs and outputs of the module version the item resolves to — its `default-version-pin`, or the latest uploaded version — derived from the module registry rather than stored on the item. Returns `resolved-version`, `inputs[]` (`name`, `type`, `description`, `default`, `required`, `sensitive`) and `outputs[]` (`name`, `description`, `sensitive`): the same entries as the module registry's interface endpoint. Where `/form` is the curated provision view, this is the module's own surface, and the only place its outputs can be read. All three are `null` while the module has no uploaded version. **Required permission:** catalog `read`.
 
 #### List Item Instances
 

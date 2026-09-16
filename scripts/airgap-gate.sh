@@ -287,6 +287,15 @@ surface "npm" node:22-alpine "
 #                            exactly the hole this gate exists to find.
 # So GOPROXY names the proxy and nothing else, and GOPRIVATE stays unset.
 
+# `--no-cache` is load-bearing (#1637). Each leg is a fresh container, so no
+# galaxy response cache carries from warm to blocked; the flake is inside one
+# run. ansible-galaxy writes a placeholder cache entry ({'expires', 'paginated'})
+# *before* each request and fills in 'results' only on success. When a request
+# fails with a retryable error, its own retry finds that valid-looking
+# placeholder and dies with "Missing expected 'results' in ansible-galaxy cache"
+# instead of asking Terrapod again. Without the cache every attempt, retries
+# included, is a real request to Terrapod, and a collection that can only come
+# from upstream still fails here.
 surface "Ansible Galaxy" tp-airgap-ansible:local "
   mkdir -p /tmp/w && cd /tmp/w
   printf '%s\n' '[galaxy]' 'server_list = terrapod' '' \
@@ -294,7 +303,7 @@ surface "Ansible Galaxy" tp-airgap-ansible:local "
     'url = http://web:3000$PREFIX/galaxy/' \
     'token = $TOKEN' > ansible.cfg
   ANSIBLE_CONFIG=/tmp/w/ansible.cfg ansible-galaxy collection install ansible.posix \
-    -p /tmp/w/collections --force
+    -p /tmp/w/collections --force --no-cache
   test -d /tmp/w/collections/ansible_collections/ansible/posix
 "
 

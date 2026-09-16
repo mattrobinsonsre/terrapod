@@ -16,6 +16,7 @@ import (
 	agentPoolDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/agent_pool"
 	architectureCritiqueDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/architecture_critique"
 	catalogInstancesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_instances"
+	catalogItemInterfaceDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_item_interface"
 	roleDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/role"
 	userDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/user"
 	vcsConnectionDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/vcs_connection"
@@ -30,6 +31,7 @@ import (
 	executionHookRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/execution_hook"
 	executionHookWsRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/execution_hook_workspace"
 	gpgKeyRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/gpg_key"
+	moduleAutodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_autodiscovery_rule"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
 	providerTemplateRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/provider_template"
@@ -174,6 +176,7 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		agentPoolRes.NewResource,
 		agentPoolTokenRes.NewResource,
 		autodiscoveryRuleRes.NewResource,
+		moduleAutodiscoveryRuleRes.NewResource,
 		providerTemplateRes.NewResource,
 		catalogItemRes.NewResource,
 		catalogInstanceRes.NewResource,
@@ -193,6 +196,7 @@ func (p *terrapodProvider) DataSources(_ context.Context) []func() datasource.Da
 		roleDS.NewDataSource,
 		agentPoolDS.NewDataSource,
 		catalogInstancesDS.NewDataSource,
+		catalogItemInterfaceDS.NewDataSource,
 		vcsConnectionDS.NewDataSource,
 		userDS.NewDataSource,
 	}

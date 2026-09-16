@@ -73,6 +73,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      name: 'module-autodiscovery',
+      testMatch: 'module-autodiscovery.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'tokens',
       testMatch: 'tokens.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
@@ -126,6 +131,12 @@ export default defineConfig({
       // #1547: the run log pane is full height from first paint while streaming.
       name: 'log-reserve',
       testMatch: 'log-reserve.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
+      // #1591: a finished log keeps being fetched until its end-of-log marker.
+      name: 'log-tail',
+      testMatch: 'log-tail.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {

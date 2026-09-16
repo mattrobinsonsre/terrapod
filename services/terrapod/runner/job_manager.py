@@ -332,6 +332,38 @@ async def get_job_status(job_name: str, namespace: str = "") -> str | None:
         raise
 
 
+async def job_is_finished(job_name: str, namespace: str = "") -> bool:
+    """Whether the Job itself has finished: a Complete or Failed condition (#1649).
+
+    Stricter than :func:`get_job_status`, which reads the pod counters: a pod
+    failure that Kubernetes will retry (``backoffLimit``) increments
+    ``status.failed`` while the Job carries on with a new pod. Only the Job
+    controller's Complete/Failed condition says no pod will run again — and on
+    Kubernetes 1.31+ it is set only once the pods have terminated. A Job that
+    no longer exists has finished.
+    """
+    if not namespace:
+        namespace = _default_namespace()
+
+    batch_api = _get_batch_api()
+    try:
+        loop = asyncio.get_event_loop()
+        job = await loop.run_in_executor(
+            _executor,
+            lambda: batch_api.read_namespaced_job(name=job_name, namespace=namespace),
+        )
+        batch_api.api_client.last_response = None
+    except ApiException as e:
+        if e.status == 404:
+            return True
+        raise
+    conditions = getattr(getattr(job, "status", None), "conditions", None) or []
+    return any(
+        getattr(c, "type", None) in ("Complete", "Failed") and getattr(c, "status", None) == "True"
+        for c in conditions
+    )
+
+
 async def count_active_runner_jobs(
     namespace: str = "", *, retries: int = 3, backoff_base: float = 0.2
 ) -> int | None:

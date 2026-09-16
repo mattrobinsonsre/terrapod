@@ -44,6 +44,7 @@ from terrapod.runner.phases import (
     cost,
     discovery,
     execution_hooks,
+    failure_reason,
     git_auth,
     init_phase,
     log_capture,
@@ -59,7 +60,10 @@ from terrapod.runner.phases import (
     working_dir,
 )
 from terrapod.runner.phases.binary import BinaryDownloadError, download_binary
-from terrapod.runner.phases.configuration import download_configuration
+from terrapod.runner.phases.configuration import (
+    ConfigurationArchiveError,
+    download_configuration,
+)
 from terrapod.runner.phases.state import (
     download_plan_artifacts,
     download_state,
@@ -119,6 +123,8 @@ def _configure_logging() -> None:
         processors=[
             structlog.contextvars.merge_contextvars,
             structlog.processors.add_log_level,
+            # Remembers the last error so a failed run can say why (#1631).
+            failure_reason.remember_errors,
             structlog.processors.TimeStamper(fmt="iso", utc=True),
             structlog.dev.ConsoleRenderer(colors=False),
         ],
@@ -1027,6 +1033,11 @@ def main(argv: list[str] | None = None) -> int:
         except BinaryDownloadError as exc:
             log.error("binary download failed", err=str(exc))
             exit_code = 1
+        except ConfigurationArchiveError as exc:
+            # A known failure that explains itself (#1600): log it as one, not
+            # as a crash whose traceback buries the cause.
+            log.error("configuration archive unusable", err=str(exc))
+            exit_code = 1
         except SystemExit as exc:
             exit_code = int(exc.code) if isinstance(exc.code, int) else 1
         except Exception as exc:  # noqa: BLE001
@@ -1047,8 +1058,14 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:  # noqa: BLE001
         log.warning("combined log upload raised", err=str(exc))
 
+    # Why it failed, for the run's error message (#1631): tofu's Error:
+    # summaries from the latest phase that has them, else the last error the
+    # runner logged. Latest phase first, so a plan that failed after a clean
+    # init reports the plan.
+    reason = failure_reason.failure_reason(exit_code, [_APPLY_LOG, _PLAN_LOG, _INIT_LOG])
+
     try:
-        resource_profile.post_profile(cfg, exit_code=exit_code)
+        resource_profile.post_profile(cfg, exit_code=exit_code, failure_reason=reason)
     except Exception as exc:  # noqa: BLE001
         log.warning("resource profile post raised", err=str(exc))
 

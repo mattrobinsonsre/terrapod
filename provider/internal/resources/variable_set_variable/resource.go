@@ -44,7 +44,18 @@ type variableSetVariableModel struct {
 var (
 	_ resource.Resource                = &variableSetVariableResource{}
 	_ resource.ResourceWithImportState = &variableSetVariableResource{}
+	_ resource.ResourceWithModifyPlan  = &variableSetVariableResource{}
 )
+
+// ModifyPlan keeps a no-change re-plan empty. See
+// planmods.KeepComputedWhenUnchanged for why the attribute plan modifiers
+// cannot do this alone.
+func (r *variableSetVariableResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	planmods.KeepComputedWhenUnchanged(ctx, req, resp,
+		[]string{"varset_id", "key", "value", "category", "structured", "hcl", "sensitive", "description", "value_source"},
+		[]string{"version_id", "updated_at"},
+	)
+}
 
 type variableSetVariableResource struct {
 	client *client.Client
@@ -85,9 +96,21 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 				Description: "Where the value comes from: `static` (the default — `value` is the " +
 					"literal) or `vault`, where `value` holds a JSON reference " +
 					"(`{\"mount\":…,\"path\":…,\"field\":…}`) that Terrapod resolves from " +
-					"HashiCorp Vault at run time — so a Vault-backed credential can be defined " +
+					"OpenBao (or HashiCorp Vault) at run time — so an OpenBao/Vault-backed credential can be defined " +
 					"once in a variable set and applied to many workspaces. A vault-sourced " +
-					"variable is always sensitive, and the secret is never stored in Terrapod.",
+					"variable is always sensitive, and the secret is never stored in Terrapod. " +
+					"Add a `file` object to the reference (`\"file\":{\"name\":\"gcp/adc.json\"}`) " +
+					"to deliver the secret as a file on the runner: the variable then holds the " +
+					"file's absolute path. `name` defaults to the variable key; a relative name " +
+					"lands under `/var/run/terrapod/files/`, and a name starting with `~/` lands " +
+					"in the runner's home directory. Not allowed with `structured` (or its alias `hcl`). The file holds " +
+					"exactly one of: the reference's `field` (with `\"encoding\":\"base64\"` in " +
+					"`file` to decode it); a `file.template` over the whole secret, with no " +
+					"`field` (logic-less `{{ name | filter }}`, filters `json`, `base64decode`, " +
+					"`trim`, `lines`, `indent N`, and `_lease.ttl` / `_lease.renewable` / " +
+					"`_lease.expires_at`); or a `file.format` of `json` or `env` for the whole " +
+					"secret, optionally narrowed by `file.fields`. `{{ }}` is not Terraform " +
+					"interpolation, so a template needs no escaping in `jsonencode`.",
 			},
 			"version_id": schema.StringAttribute{Computed: true, Description: "Version identifier."},
 			"created_at": schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},

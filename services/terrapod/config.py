@@ -1105,6 +1105,52 @@ class EnginesConfig(BaseModel):
     pulumi: EngineConfig = Field(default_factory=EngineConfig)
 
 
+class ModuleAutodiscoveryConfig(BaseModel):
+    """Limits on org-wide module autodiscovery (#1620).
+
+    A module autodiscovery rule may name an org, group or installation, or a
+    pattern over one, so one rule can stand for thousands of repositories.
+    These bound what the registry poll cycle spends on them, so a large
+    namespace cannot exhaust the VCS API budget or hold up tag polling. A rule
+    that names one repository is not limited by any of them.
+    """
+
+    tree_listings_per_cycle: int = Field(
+        default=50,
+        ge=0,
+        description="Most repository file trees listed per poll cycle, across all "
+        "org-wide rules. Repositories are taken round-robin, least recently checked "
+        "first, so a namespace larger than this is covered over several cycles. Only "
+        "a repository whose branch head moved has its tree listed.",
+    )
+    max_repositories: int = Field(
+        default=5000,
+        ge=1,
+        description="Most repositories listed for one rule. A listing that stops here "
+        "is incomplete: no repository is then marked out of scope for being absent.",
+    )
+    tree_quota_floor_percent: int = Field(
+        default=20,
+        ge=0,
+        le=100,
+        description="Below this share of the connection's remaining VCS API quota, "
+        "no repository trees are listed; the listing itself still runs.",
+    )
+    enumeration_quota_floor_percent: int = Field(
+        default=5,
+        ge=0,
+        le=100,
+        description="Below this share of the connection's remaining VCS API quota, "
+        "org-wide rules are skipped altogether for the cycle.",
+    )
+    time_budget_seconds: int = Field(
+        default=60,
+        ge=1,
+        description="Wall-clock time org-wide rules may spend in one poll cycle "
+        "before stopping, so polling module tags is not starved.",
+    )
+
+
 class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
@@ -1136,6 +1182,9 @@ class RegistryConfig(BaseModel):
     module_interface: ModuleInterfaceConfig = Field(default_factory=ModuleInterfaceConfig)
     oci: OCIRegistryConfig = Field(default_factory=OCIRegistryConfig)
     package_cache: PackageCacheConfig = Field(default_factory=PackageCacheConfig)
+    module_autodiscovery: ModuleAutodiscoveryConfig = Field(
+        default_factory=ModuleAutodiscoveryConfig
+    )
 
 
 class CatalogConfig(BaseModel):
@@ -1601,28 +1650,58 @@ class MetricsConfig(BaseModel):
     )
 
 
-VAULT_AUTH_METHODS = {"kubernetes", "approle", "token"}
+VAULT_AUTH_METHODS = {"kubernetes", "jwt", "approle", "token"}
+
+#: Where the kubelet puts the pod's standard ServiceAccount token.
+VAULT_SA_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+#: Where the chart projects an audience-scoped ServiceAccount token for a Vault
+#: instance (#1650), as ``<dir>/<instance name>/token``. The chart renders the
+#: same path into the ConfigMap; this is the default for a config written by hand.
+VAULT_PROJECTED_TOKEN_DIR = "/var/run/secrets/terrapod/vault"
+
+#: The `aud` claim a `jwt` instance's projected token carries unless configured.
+VAULT_JWT_DEFAULT_AUDIENCE = "vault"
 
 
 class VaultAuthConfig(BaseModel):
-    """How Terrapod authenticates to one Vault instance (#1439)."""
+    """How Terrapod authenticates to one Vault instance (#1439, #1650)."""
 
     method: str = Field(
         default="kubernetes",
-        description="kubernetes | approle | token. `kubernetes` is the default "
+        description="kubernetes | jwt | approle | token. `kubernetes` is the default "
         "because it stores no credential at all — Terrapod presents the API pod's "
-        "own ServiceAccount token and Vault validates it.",
+        "own ServiceAccount token and the server validates it by calling TokenReview. "
+        "`jwt` presents a projected ServiceAccount token that the server validates "
+        "against the cluster's OIDC discovery / JWKS instead, so the server never "
+        "has to reach back into the cluster — the method for a server outside it.",
     )
     mount: str = Field(
         default="kubernetes",
-        description="Auth mount path as enabled in Vault (`vault auth enable "
-        "-path=<mount> kubernetes`). Only the path, not a full URL.",
+        description="Auth mount path as enabled on the server (`bao auth enable "
+        "-path=<mount> kubernetes`). Only the path, not a full URL. Defaults to "
+        "`jwt` when the method is `jwt` and no mount is given.",
     )
     role: str = Field(
         default="terrapod",
-        description="Vault role bound to Terrapod's ServiceAccount and namespace. "
+        description="OpenBao/Vault role bound to Terrapod's ServiceAccount and namespace. "
         "The policy attached to this role is the real access boundary for every "
         "secret this feature can read — see docs/vault.md.",
+    )
+    audience: str = Field(
+        default="",
+        description="The `aud` claim of the projected ServiceAccount token (#1650). "
+        "`jwt` defaults to `vault`; it must be in the role's "
+        "`bound_audiences`. For `kubernetes`, empty means the pod's standard "
+        "ServiceAccount token; set it only when the role requires an "
+        "audience, and the chart then projects a token carrying it.",
+    )
+    token_path: str = Field(
+        default="",
+        description="File the ServiceAccount JWT is read from on every login "
+        "(the kubelet rotates it). Empty means the default: "
+        f"{VAULT_PROJECTED_TOKEN_DIR}/<instance>/token for `jwt` and for "
+        f"`kubernetes` with an audience, otherwise {VAULT_SA_TOKEN_PATH}.",
     )
 
     @field_validator("method")
@@ -1631,6 +1710,21 @@ class VaultAuthConfig(BaseModel):
         if v not in VAULT_AUTH_METHODS:
             raise ValueError(f"vault auth method must be one of {sorted(VAULT_AUTH_METHODS)}")
         return v
+
+    @model_validator(mode="after")
+    def _method_defaults(self):
+        if self.method == "jwt":
+            if not self.audience:
+                self.audience = VAULT_JWT_DEFAULT_AUDIENCE
+            # The mount default is `kubernetes`, which is never what a jwt
+            # instance means. Only replaced when the operator left it unset.
+            if "mount" not in self.model_fields_set:
+                self.mount = "jwt"
+        return self
+
+    def projects_token(self) -> bool:
+        """Whether this method reads a chart-projected, audience-scoped token."""
+        return self.method == "jwt" or (self.method == "kubernetes" and bool(self.audience))
 
 
 class VaultInstanceConfig(BaseModel):
@@ -1642,16 +1736,20 @@ class VaultInstanceConfig(BaseModel):
         description="Resolve references that omit `vault` to this instance. Without "
         "a default, an omitted name resolves only when exactly one instance is "
         "configured, and is otherwise an error — reading a credential from the "
-        "wrong Vault silently is the failure worth engineering against.",
+        "wrong server silently is the failure worth engineering against.",
     )
-    address: str = Field(default="", description="Vault address, e.g. https://vault:8200")
-    namespace: str = Field(default="", description="Vault namespace (Enterprise; optional)")
+    address: str = Field(default="", description="OpenBao/Vault address, e.g. https://openbao:8200")
+    namespace: str = Field(
+        default="",
+        description="Namespace, on a server that has them (Vault Enterprise / HCP, "
+        "or an OpenBao release that supports them); optional",
+    )
     auth: VaultAuthConfig = Field(default_factory=VaultAuthConfig)
     paths: list[str] = Field(
         default_factory=list,
         description="Optional allow-list of path prefixes Terrapod will read from "
         "this instance (empty = no restriction). Defence in depth *over* a scoped "
-        "Vault policy, not instead of one: anyone who can set a workspace variable "
+        "OpenBao/Vault policy, not instead of one: anyone who can set a workspace variable "
         "can ask Terrapod to read any path its role reaches, so this is the second "
         "line for an operator whose policy is slightly wider than they intended.",
     )
@@ -1660,6 +1758,23 @@ class VaultInstanceConfig(BaseModel):
         description="Skip TLS verification for this instance. For a lab only; a "
         "credential broker that does not verify its peer is not one.",
     )
+    ca_file: str = Field(
+        default="",
+        description="PEM file of the CA(s) that sign this server's certificate "
+        "(#1650). When set, TLS to this instance is verified against it ALONE — "
+        "the default trust store and SSL_CERT_FILE are not consulted — so a "
+        "private CA is pinned to the one server it fronts. The chart renders it "
+        "from `tls.ca_secret` / `tls.ca_key`. Empty means the default trust store.",
+    )
+
+    revoke_leases: bool = Field(
+        default=False,
+        description="Revoke the leases of dynamic secrets read from this instance "
+        "once the run phase's Job has ended (#1649), instead of leaving each "
+        "credential live for its whole TTL. Best-effort: if revocation cannot "
+        "happen, the lease expires at its TTL exactly as it does with this off. "
+        "The OpenBao/Vault policy must grant `update` on `sys/leases/revoke`.",
+    )
 
     @field_validator("name")
     @classmethod
@@ -1667,6 +1782,23 @@ class VaultInstanceConfig(BaseModel):
         if not v or not v.strip():
             raise ValueError("vault instance name is required")
         return v.strip()
+
+    @model_validator(mode="after")
+    def _resolve(self):
+        if self.ca_file and self.tls_skip_verify:
+            # Contradictory: one says verify against this CA, the other says do
+            # not verify at all. Refusing is better than silently picking one.
+            raise ValueError(
+                f"vault instance {self.name!r} sets both ca_file and tls_skip_verify; "
+                "a custom CA is only meaningful when TLS is verified"
+            )
+        if not self.auth.token_path and self.auth.method in ("kubernetes", "jwt"):
+            self.auth.token_path = (
+                f"{VAULT_PROJECTED_TOKEN_DIR}/{self.name}/token"
+                if self.auth.projects_token()
+                else VAULT_SA_TOKEN_PATH
+            )
+        return self
 
 
 class VaultConfig(BaseModel):
@@ -1682,12 +1814,14 @@ class VaultConfig(BaseModel):
     multi-Vault would mean carrying both spellings for ever.
     """
 
-    enabled: bool = Field(default=False, description="Enable the Vault variable value source.")
+    enabled: bool = Field(
+        default=False, description="Enable the OpenBao/Vault variable value source."
+    )
     instances: list[VaultInstanceConfig] = Field(
-        default_factory=list, description="Vault instances a variable may reference."
+        default_factory=list, description="OpenBao/Vault instances a variable may reference."
     )
     timeout_seconds: float = Field(
-        default=10.0, gt=0, description="Per-request timeout when talking to Vault."
+        default=10.0, gt=0, description="Per-request timeout when talking to the server."
     )
 
     @model_validator(mode="after")
@@ -1706,6 +1840,20 @@ class VaultConfig(BaseModel):
             if not inst.address:
                 raise ValueError(f"vault instance {inst.name!r} requires an address")
         return self
+
+    @property
+    def revocation_enabled(self) -> bool:
+        """Whether any instance revokes leases (#1649).
+
+        The gate every lease-revocation code path checks first, so that with the
+        option off nothing is recorded, nothing is enqueued and no Redis or
+        Vault call is made for it.
+        """
+        return self.enabled and any(i.revoke_leases for i in self.instances)
+
+    def instance_named(self, name: str) -> VaultInstanceConfig | None:
+        """The instance with exactly this name — no default resolution."""
+        return next((i for i in self.instances if i.name == name), None)
 
     def resolve_instance(self, name: str | None) -> VaultInstanceConfig | None:
         """The instance a reference means, or None when it cannot be decided.

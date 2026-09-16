@@ -482,7 +482,7 @@ async def _apply(
                 status_code=422,
                 detail=(
                     "Refusing to switch these workspaces to local execution — they "
-                    "receive Vault-sourced variables, from their own variables or a "
+                    "receive OpenBao/Vault-sourced variables, from their own variables or a "
                     "variable set, that only resolve under agent execution and would "
                     f"silently deliver nothing: {', '.join(sorted(blocked))}. "
                     "Remove or convert those variables first, or unassign the set."

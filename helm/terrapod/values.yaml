@@ -502,9 +502,9 @@ api:
       # They are fetched lazily and only when needed: opa when a policy set
       # applies to a run, trivy only when it is the selected scan engine.
       platform_tools:
-        opa_version: "1.20.1"
+        opa_version: "1.20.2"
         trivy_version: "0.74.0"
-        checkov_version: "3.3.16"
+        checkov_version: "3.3.17"
         # Pulumi CLI for engine=pulumi runs (#1523). Fetched on demand like the
         # tools above rather than baked in, so a Terraform-only deployment does
         # not carry another engine's binary.
@@ -529,6 +529,26 @@ api:
         verify: checksum
       module_interface:
         enabled: true
+      # Org-wide module autodiscovery (#1620): a module autodiscovery rule may
+      # name an org, group or installation — or a pattern over one — so one rule
+      # can stand for thousands of repositories. These bound what the registry
+      # poll cycle spends on such rules. A rule naming one repository is not
+      # limited by any of them.
+      module_autodiscovery:
+        # Most repository trees listed per poll cycle, across all org-wide
+        # rules; repositories are taken least recently checked first, so a
+        # large namespace is covered over several cycles.
+        tree_listings_per_cycle: 50
+        # Most repositories listed for one rule. A listing that stops here is
+        # incomplete, and nothing is then marked out of scope for being absent.
+        max_repositories: 5000
+        # Below this share of a connection's remaining VCS API quota, no trees
+        # are listed; below the second, org-wide rules skip the cycle.
+        tree_quota_floor_percent: 20
+        enumeration_quota_floor_percent: 5
+        # Wall-clock time org-wide rules may spend per cycle, so module tag
+        # polling is never starved.
+        time_budget_seconds: 60
 
     # GPG signing key for provider registry
     # ASCII-armored GPG private key. If set, used to sign all provider SHA256SUMS.
@@ -1102,15 +1122,18 @@ api:
     # KEK durability is the backend's job — and for `static` it is YOURS: losing
     # the master key makes encrypted data unrecoverable. See
     # docs/encryption-at-rest.md before enabling.
-    # Vault as a first-class variable value source (#1439). A variable may hold a
-    # *reference* instead of a literal; Terrapod resolves it server-side at run
-    # time and delivers the result through the per-run Secret, so Vault stays the
-    # source of truth and nothing is copied into Terrapod's database.
+    # OpenBao (or HashiCorp Vault) as a first-class variable value source (#1439).
+    # OpenBao is recommended and Vault is equally supported. Both speak the same
+    # API, so this block and the value source are named `vault` whichever server
+    # you run. A variable may hold a *reference* instead of a literal; Terrapod
+    # resolves it server-side at run time and delivers the result through the
+    # per-run Secret, so the server stays the source of truth and nothing is
+    # copied into Terrapod's database.
     #
     # A LIST from the outset, not a single address: config keys are a stability-
     # gated surface, so a scalar could never be removed later.
     #
-    # IMPORTANT: the policy attached to the Vault role below is the real access
+    # IMPORTANT: the policy attached to the OpenBao/Vault role below is the real access
     # boundary. Anyone who can set a workspace variable can ask Terrapod to read
     # any path that role reaches. Scope it tightly; see docs/vault.md.
     vault:
@@ -1119,16 +1142,40 @@ api:
       instances: []
       # - name: default
       #   default: true            # used when a reference omits `vault`
-      #   address: https://vault.internal:8200
-      #   namespace: ""            # Vault Enterprise only
+      #   address: https://openbao.internal:8200
+      #   namespace: ""            # only on a server with namespaces (Vault Enterprise / HCP)
       #   auth:
-      #     method: kubernetes     # kubernetes | approle | token
-      #     mount: kubernetes      # the auth mount path you enabled in Vault
+      #     # kubernetes | jwt | approle | token. `jwt` (#1650) is for a server
+      #     # OUTSIDE the cluster (incl. HCP Vault Dedicated, with namespace:
+      #     # admin): the chart projects an audience-scoped ServiceAccount token
+      #     # that the server checks against the cluster's OIDC discovery / JWKS,
+      #     # so it never needs to reach back in to call TokenReview.
+      #     method: kubernetes
+      #     mount: kubernetes      # the auth mount path; defaults to `jwt` for jwt
       #     role: terrapod         # role bound to Terrapod's ServiceAccount
-      #   # Optional second line behind the Vault policy: prefixes Terrapod will
+      #     # The projected token's `aud` claim. jwt defaults to `vault`, which
+      #     # must be in the role's bound_audiences. For kubernetes, leave empty to
+      #     # use the pod's standard token; set it only if the role requires one.
+      #     audience: ""
+      #     # Override where the token is read (re-read on every login). Empty =
+      #     # the chart's projected path, or the standard SA token for kubernetes.
+      #     token_path: ""
+      #   # Optional second line behind the OpenBao/Vault policy: prefixes Terrapod will
       #   # refuse to read outside of, whatever the policy permits.
       #   paths: []
       #   tls_skip_verify: false
+      #   # A private CA in front of this server (#1650). The Secret key is mounted
+      #   # and TLS to THIS instance is verified against it alone. Without it,
+      #   # verification uses the default roots plus the global caBundle.
+      #   tls:
+      #     ca_secret: ""          # Secret name, in the release namespace
+      #     ca_key: ca.crt         # key within it holding the PEM
+      #   # Revoke each dynamic secret's lease once the run phase's Job has ended,
+      #   # rather than leaving the credential live for the role's whole TTL. Off
+      #   # by default; best-effort (a lease that cannot be revoked expires at its
+      #   # TTL, as it does with this off). Needs `update` on `sys/leases/revoke`
+      #   # in the OpenBao/Vault policy. See docs/vault.md, "Revoking leases".
+      #   revoke_leases: false
       #   # approle/token only — never kubernetes, which stores no credential.
       #   # Injected as TERRAPOD_VAULT_<NAME>_SECRET via secretKeyRef.
       #   existingSecret: ""

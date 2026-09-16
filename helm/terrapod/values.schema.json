@@ -1880,6 +1880,34 @@
                 }
               }
             },
+            "module_autodiscovery": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "tree_listings_per_cycle": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "max_repositories": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "tree_quota_floor_percent": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "enumeration_quota_floor_percent": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "time_budget_seconds": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
             "package_cache": {
               "type": "object",
               "additionalProperties": false,
@@ -2869,6 +2897,7 @@
                         "type": "string",
                         "enum": [
                           "kubernetes",
+                          "jwt",
                           "approle",
                           "token"
                         ]
@@ -2877,6 +2906,12 @@
                         "type": "string"
                       },
                       "role": {
+                        "type": "string"
+                      },
+                      "audience": {
+                        "type": "string"
+                      },
+                      "token_path": {
                         "type": "string"
                       }
                     }
@@ -2888,6 +2923,22 @@
                     }
                   },
                   "tls_skip_verify": {
+                    "type": "boolean"
+                  },
+                  "tls": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "ca_secret": {
+                        "type": "string"
+                      },
+                      "ca_key": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "revoke_leases": {
                     "type": "boolean"
                   },
                   "existingSecret": {

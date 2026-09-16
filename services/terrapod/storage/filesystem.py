@@ -34,6 +34,11 @@ from terrapod.storage.protocol import (
 
 logger = get_logger(__name__)
 
+# Suffix of the temporary file `_write_atomically` writes before renaming it
+# into place. Listings skip dot-files carrying it: they are writes in flight,
+# or left by a crash, not objects.
+_TMP_SUFFIX = ".tmp"
+
 
 class FilesystemStore:
     """Object store backed by the local filesystem."""
@@ -88,7 +93,7 @@ class FilesystemStore:
         previous object or the complete new one. The temporary file is created
         beside the destination so the rename cannot cross a device boundary.
         """
-        tmp_path = path.parent / f".{path.name}.{uuid.uuid4().hex}.tmp"
+        tmp_path = path.parent / f".{path.name}.{uuid.uuid4().hex}{_TMP_SUFFIX}"
         try:
             async with aiofiles.open(tmp_path, "wb") as handle:
                 await write(handle)
@@ -147,7 +152,13 @@ class FilesystemStore:
         content_type: str = "application/octet-stream",
         metadata: dict[str, str] | None = None,
     ) -> ObjectMeta:
-        """Store an object by streaming chunks directly to file."""
+        """Store an object by streaming chunks through `_write_atomically`.
+
+        The object appears at `key` only once every chunk is written: a stream
+        that fails part-way leaves nothing there and any previous object
+        untouched, so a truncated upload is never read back as a whole one
+        (#1600).
+        """
         path = self._full_path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         md5_hasher = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
@@ -277,10 +288,14 @@ class FilesystemStore:
         # shape stat'd every file in the tree before any filtering, so a bounded
         # page still paid for the whole walk. Sorted on the KEY rather than the
         # Path so the order matches what the object-store backends produce.
+        # `_write_atomically`'s temp files are writes in flight (or left by a
+        # crash), not objects.
         keys = sorted(
             self._key_from_path(path)
             for path in search_dir.rglob("*")
-            if path.is_file() and not path.name.endswith(".meta")
+            if path.is_file()
+            and not path.name.endswith(".meta")
+            and not (path.name.startswith(".") and path.name.endswith(_TMP_SUFFIX))
         )
 
         for key in keys:

@@ -15,6 +15,7 @@ import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 import { LabelsEditor } from '@/components/labels-editor'
+import { ModuleInterfaceTables } from '@/components/module-interface-tables'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface VersionStatus {
@@ -53,6 +54,7 @@ interface ModuleDetail {
     'vcs-branch': string
     'vcs-tag-pattern': string
     'vcs-last-tag': string
+    subdirectory?: string
     'version-statuses': VersionStatus[]
     'created-at': string | null
     'updated-at': string | null
@@ -168,6 +170,7 @@ export default function ModuleDetailPage() {
   const [vcsRepoUrl, setVcsRepoUrl] = useState('')
   const [vcsBranch, setVcsBranch] = useState('')
   const [vcsTagPattern, setVcsTagPattern] = useState('v*')
+  const [vcsSubdirectory, setVcsSubdirectory] = useState('')
   const [savingVcs, setSavingVcs] = useState(false)
 
   // Module interface (inputs/outputs)
@@ -231,6 +234,7 @@ export default function ModuleDetailPage() {
         setVcsRepoUrl(attrs['vcs-repo-url'] || '')
         setVcsBranch(attrs['vcs-branch'] || '')
         setVcsTagPattern(attrs['vcs-tag-pattern'] || 'v*')
+        setVcsSubdirectory(attrs.subdirectory || '')
 
         // Load interface for latest uploaded version
         const versions = (attrs['version-statuses'] || []) as VersionStatus[]
@@ -394,6 +398,7 @@ export default function ModuleDetailPage() {
                 vcs_repo_url: vcsRepoUrl,
                 vcs_branch: vcsBranch,
                 vcs_tag_pattern: vcsTagPattern,
+                subdirectory: vcsSubdirectory.trim(),
               },
             },
           }),
@@ -676,6 +681,18 @@ export default function ModuleDetailPage() {
                     />
                     <p className="mt-1 text-xs text-slate-500">{t('moduleDetail.vcs.tagPatternHint')}</p>
                   </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="vcs-subdir" className="block text-sm font-medium text-slate-300 mb-1">{t('modules.form.subdirectoryOptional')}</label>
+                    <input
+                      id="vcs-subdir"
+                      type="text"
+                      value={vcsSubdirectory}
+                      onChange={(e) => setVcsSubdirectory(e.target.value)}
+                      placeholder="modules/create" // i18n-ignore — an example path, not copy
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    />
+                    <p className="mt-1 text-xs text-slate-500">{t('modules.form.subdirectoryHint')}</p>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
@@ -707,6 +724,9 @@ export default function ModuleDetailPage() {
                   <div className="text-sm">
                     <span className="text-green-300">{t('moduleDetail.vcsStatus.connected')}</span>{' '}
                     <span className="text-slate-300 font-mono text-xs">{module.attributes['vcs-repo-url']}</span>
+                    {module.attributes.subdirectory && (
+                      <span className="text-slate-400 font-mono text-xs ms-2">{t('modules.submoduleAt', { path: module.attributes.subdirectory })}</span>
+                    )}
                     {module.attributes['vcs-last-tag'] && (
                       <span className="text-slate-400 ms-2">{t('moduleDetail.vcsStatus.lastTag', { tag: module.attributes['vcs-last-tag'] })}</span>
                     )}
@@ -875,82 +895,11 @@ export default function ModuleDetailPage() {
 
                   {interfaceLoading ? (
                     <LoadingSpinner />
-                  ) : !interfaceData || (interfaceData.inputs === null && interfaceData.outputs === null) ? (
-                    <p className="text-sm text-slate-500">{t('moduleDetail.interface.noData')}</p>
                   ) : (
-                    <>
-                      {/* Inputs table */}
-                      {interfaceData.inputs && interfaceData.inputs.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('moduleDetail.interface.inputs')}</h4>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="text-xs text-slate-500 border-b border-slate-700/50">
-                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.name')}</th>
-                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.type')}</th>
-                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.description')}</th>
-                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.default')}</th>
-                                  <th className="text-start py-2">{t('moduleDetail.interface.required')}</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {interfaceData.inputs.map((inp) => (
-                                  <tr key={inp.name} className="border-b border-slate-700/30">
-                                    <td className="py-2 pe-4 font-mono text-xs text-slate-200">{inp.name}</td>
-                                    <td className="py-2 pe-4 font-mono text-xs text-slate-400">{inp.type}</td>
-                                    <td className="py-2 pe-4 text-slate-300">{inp.description}</td>
-                                    <td className="py-2 pe-4 font-mono text-xs text-slate-400">{inp.default ?? '—'}</td>
-                                    <td className="py-2">
-                                      {inp.required ? (
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('moduleDetail.interface.requiredBadge')}</span>
-                                      ) : (
-                                        <span className="text-xs text-slate-500">{t('moduleDetail.interface.optionalBadge')}</span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Outputs table */}
-                      {interfaceData.outputs && interfaceData.outputs.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('moduleDetail.interface.outputs')}</h4>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="text-xs text-slate-500 border-b border-slate-700/50">
-                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.name')}</th>
-                                  <th className="text-start py-2 pe-4">{t('moduleDetail.interface.description')}</th>
-                                  <th className="text-start py-2">{t('moduleDetail.interface.sensitive')}</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {interfaceData.outputs.map((out) => (
-                                  <tr key={out.name} className="border-b border-slate-700/30">
-                                    <td className="py-2 pe-4 font-mono text-xs text-slate-200">{out.name}</td>
-                                    <td className="py-2 pe-4 text-slate-300">{out.description}</td>
-                                    <td className="py-2">
-                                      {out.sensitive && (
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">{t('moduleDetail.interface.sensitiveBadge')}</span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-
-                      {interfaceData.inputs?.length === 0 && interfaceData.outputs?.length === 0 && (
-                        <p className="text-sm text-slate-500">{t('moduleDetail.interface.noneDeclared')}</p>
-                      )}
-                    </>
+                    <ModuleInterfaceTables
+                      inputs={interfaceData?.inputs ?? null}
+                      outputs={interfaceData?.outputs ?? null}
+                    />
                   )}
                 </div>
               )}

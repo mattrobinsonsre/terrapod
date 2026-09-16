@@ -104,11 +104,16 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_workspace_get` | One workspace by id or name — full config + status. |
 | `terrapod_run_list` | Recent runs for a workspace (status, plan-only/destroy, has-changes). |
 | `terrapod_run_get` | One run's full status incl. Terrapod-native detail (has-changes, drift, resource profile, permitted actions). |
-| `terrapod_run_plan_json` | The structured JSON plan output (`tofu show -json`) — reason precisely about resource changes. |
+| `terrapod_run_plan_json` | What a plan will do, from its structured JSON plan (`tofu show -json`). The default `view: changes` is compact, usually a few KB: tofu's add/change/destroy counts plus each resource the plan acts on, with only the attributes that change, sensitive values redacted. Narrow it with `address` (prefix or glob) and `actions`; page with `start`/`limit`. `view: full` returns the raw document, paged by `offset` once it is larger than `max_bytes` — often megabytes, and unredacted. |
 | `terrapod_run_logs` | The plan or apply LOG — the terraform/tofu output, i.e. *why* a run failed rather than merely that it did. Returns the end of the log by default (a failure is reported last, and an apply log can be megabytes), ANSI stripped; `offset` pages further back. |
 | `terrapod_run_cost` | A run's monthly cost estimate — the plan's cost *delta* (projected total, this-run delta, previous, per-resource, unpriced). Data only, no AI. |
 | `terrapod_workspace_cost` | A workspace's *current* monthly cost from its latest state — total, per-resource, unpriced, and which state version was priced. Data only, no AI. |
 | `terrapod_deleted_workspace_list` | Deleted workspaces whose state is still recoverable — name, when and by whom, how many state versions survive, when the window closes, and whether it has already been restored. Platform admin only. |
+| `terrapod_run_security_scan` | A run's IaC security-scan result (Checkov/Trivy): engine, enforcement level, threshold, outcome, the normalised findings (rule, severity, resource, file:line), and any override. Null when the workspace does not scan. |
+| `terrapod_workspace_architecture_critique` | The AI architecture critique of a workspace's *deployed* system, from its latest state (the optional `ai_architecture` feature) — unlike a plan summary, which reviews a change. Every finding is grounded in the scanner, the cost engine or the resource graph. |
+| `terrapod_role_reach` | Which workspaces a custom RBAC role actually grants on, and why — each match with the label or name rule responsible. Use it before changing a role. |
+| `terrapod_resource_access` | The inverse: which roles can reach one resource, with the rule responsible and the capabilities each resolves to. |
+| `terrapod_ha_status` | This deployment's HA posture: the leader/follower pair (in sync, seconds since the last sync, classes still backfilling — read these before a failover) and the in-cluster component health. |
 
 ### Act (gated) — the normal run lifecycle
 
@@ -118,6 +123,9 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_run_apply` | destructive | Confirm a planned run so it applies — changes real infrastructure. Only after explicit user approval. |
 | `terrapod_run_discard` | — | Discard a planned run without applying. |
 | `terrapod_run_cancel` | — | Cancel a non-terminal run. |
+| `terrapod_run_retry` | destructive | Queue a **new** run from a finished one, with the same configuration version and options, and return it. A plan-only run retries as plan-only; an apply-capable run follows the workspace's auto-apply setting, so treat it like an apply. Needs the same permission as queuing that kind of run. Refused on a run that hasn't finished. |
+| `terrapod_module_autodiscovery_rule_scan` | — | Register the modules a module autodiscovery rule finds — every candidate, or just the `subdirectories` you pass (preview first). Skips candidates already registered or whose name is taken, and reports them. Creates registry modules; touches no infrastructure. Platform admin only. |
+| `terrapod_run_security_scan_override` | gated | Override a run's blocking IaC security scan so it can proceed despite failed or errored findings; a run held in planning by an enforced scan is re-driven at once. Workspace admin only. This bypasses a security gate — prefer fixing the finding or adding a skip rule. |
 
 ### Manage (gated) — shape the estate
 
@@ -128,6 +136,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_workspace_delete` | destructive | Delete a workspace + its Terrapod records. Does **not** destroy the tracked infra — queue a destroy run first. Catalog-managed workspaces are refused. Its **state survives** and stays recoverable for the deployment's retention window (default 30 days) via `terrapod_deleted_workspace_restore`, but recovery yields a NEW workspace with a NEW id and is admin-only — so this is reversible-with-effort, not undoable. |
 | `terrapod_deleted_workspace_restore` | destructive | Recover a deleted workspace's state into a **new** workspace. Platform admin only. A salvage operation, not an undo: new id, comes back inert (auto-apply and drift off, VCS not re-attached), variables and run history do not return. Refuses a second restore of the same deletion. |
 | `terrapod_variable_list` | read-only | List a workspace's variables (sensitive values masked). |
+| `terrapod_workspace_varsets` | read-only | The variable sets that apply to a workspace, and how each one came to apply: explicit assignment, `global`, or an assignment rule. |
 | `terrapod_variable_set` | — | Upsert a variable by key (terraform or env; `hcl` for non-string values). |
 | `terrapod_variable_delete` | destructive | Delete a variable by key. |
 
@@ -138,6 +147,9 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_registry_module_list` | List the private registry modules published here (name, provider, VCS, status). |
 | `terrapod_registry_module_get` | One module by name + provider — source, status, owner, labels. |
 | `terrapod_registry_module_interface` | A module version's **inputs + outputs** — the exact surface to author a correct `module` block against it, instead of guessing variable names. |
+| `terrapod_module_autodiscovery_rule_list` | The module autodiscovery rules — each names a repository, which directories count as modules (a glob pattern and ignore paths) and how they are named. Platform admin only. |
+| `terrapod_module_autodiscovery_rule_preview` | What a rule finds in its repository now: each module directory (root and submodules) with the name and provider it would get, the module already registered from it, and whether its name is taken. Registers nothing. Platform admin only. |
+| `terrapod_catalog_item_interface` | A service-catalog item's module interface — the **inputs + outputs** of the module version the item resolves to (its pin, or the latest uploaded version). Needs catalog read on the item. |
 | `terrapod_registry_provider_list` | List the private registry providers published here. |
 | `terrapod_registry_provider_get` | One provider by name — namespace, owner, labels. |
 

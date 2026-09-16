@@ -124,7 +124,9 @@ class GCSStore:
         the async side feeds chunks to the queue.
         """
         blob_name = self._full_key(key)
-        chunk_queue: queue.Queue[bytes | None] = queue.Queue(maxsize=4)
+        # Carries bytes, then None for end of stream — or _ABORT, below.
+        chunk_queue: queue.Queue[object] = queue.Queue(maxsize=4)
+        abort = object()
         md5_hasher = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
         total_size = 0
 
@@ -143,7 +145,10 @@ class GCSStore:
                     if item is None:
                         self._done = True
                         break
-                    self._buffer += item
+                    if item is abort:
+                        # Fail the upload so it is never finalized.
+                        raise OSError("upload abandoned: the source stream failed")
+                    self._buffer += item  # type: ignore[operator]
                 if n < 0:
                     result = self._buffer
                     self._buffer = b""
@@ -193,12 +198,21 @@ class GCSStore:
                 total_size += len(chunk)
                 await asyncio.to_thread(chunk_queue.put, chunk)
             await asyncio.to_thread(chunk_queue.put, None)  # signal EOF
-        except Exception:
-            # Signal EOF on error so thread exits
-            try:
-                chunk_queue.put_nowait(None)
-            except queue.Full:
-                pass
+        except BaseException:
+            # Abandon the upload — do not end it. Ending it (None) let the
+            # thread complete the resumable upload with whatever had been
+            # queued, storing a truncated object (#1600); a cancelled upload
+            # did the same, hence BaseException. The abort marker makes the
+            # reader raise, so the upload is never finalized. It has to reach
+            # the thread — dropped on a full queue, the thread would wait
+            # forever — so keep offering it while the thread is alive.
+            while thread.is_alive():
+                try:
+                    await asyncio.to_thread(chunk_queue.put, abort, True, 1.0)
+                    break
+                except queue.Full:
+                    continue
+            await asyncio.to_thread(thread.join)
             raise
 
         await asyncio.to_thread(thread.join)

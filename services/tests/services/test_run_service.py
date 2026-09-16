@@ -86,6 +86,13 @@ class TestCanTransition:
     def test_applying_to_applied(self):
         assert can_transition("applying", "applied") is True
 
+    def test_each_phase_can_undo_its_claim(self):
+        # A claim the API cannot serve goes back to where the claim took it
+        # from, and only there (#1646).
+        assert can_transition("planning", "queued") is True
+        assert can_transition("applying", "confirmed") is True
+        assert can_transition("applying", "queued") is False
+
     def test_any_non_terminal_to_canceled(self):
         # `applying` is intentionally excluded: cancel-while-applying
         # routes through `canceling` and the reconciler picks the
@@ -147,6 +154,28 @@ class TestTransitionRun:
         run = _mock_run(status="pending")
         with pytest.raises(ValueError, match="Invalid transition"):
             await transition_run(db, run, "applied")
+
+    async def test_a_completed_phase_drops_a_stale_failure_reason(self):
+        """#1631: a plan pod that reported a reason, was evicted and retried,
+        then succeeded, must not leave a red error on a successful run."""
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planning", error_message="Error: from the evicted pod")
+        await transition_run(db, run, "planned")
+        assert run.error_message == ""
+
+    async def test_an_error_transition_keeps_its_message(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planning", error_message="Error: the runner's reason")
+        await transition_run(db, run, "errored", error_message="Error: final message")
+        assert run.error_message == "Error: final message"
+
+    async def test_the_apply_unclaim_clears_the_apply_start(self):
+        """#1646: no apply ran, so a later error must not record one."""
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="applying", apply_started_at=datetime.now(UTC))
+        await transition_run(db, run, "confirmed")
+        assert run.status == "confirmed"
+        assert run.apply_started_at is None
 
     async def test_planning_sets_plan_started_at(self):
         db = AsyncMock(spec=AsyncSession)

@@ -565,14 +565,15 @@ async def preview_unsaved_rule(
     )
 
 
-async def _walk_repo_for_rule(rule: AutodiscoveryRule) -> tuple[list[str], str]:
+async def _walk_repo_for_rule(rule: AutodiscoveryRule) -> tuple[list[str], str, str | None]:
     """Resolve the rule's target branch and return every file path in the
     repo at that branch.
 
     Lifted out so /preview and /scan share one provider-touching call.
     Raises HTTPException on any user-facing failure (bad repo URL, can't
     reach the provider, provider truncated the tree). Returns
-    (file_paths, resolved_branch) on success.
+    (file_paths, resolved_branch, head_sha) on success; head_sha is None
+    when the branch head could not be resolved.
     """
     # Imports local to keep the router's import surface narrow.
     from terrapod.services import github_service, gitlab_service

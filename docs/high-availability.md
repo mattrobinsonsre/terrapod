@@ -286,6 +286,7 @@ semantics would only be needed in an active-active design, which this is not.
 | Users, roles, role assignments, platform role assignments, API tokens | Replicated |
 | VCS connections | Replicated |
 | Registry modules, provider templates, catalog items, autodiscovery rules | Replicated |
+| Module autodiscovery rules and their per-repository scan state | Replicated |
 | Workspaces, their agent-pool set, their module links | Replicated |
 | Variables and variable sets | Replicated |
 | Policy sets, notifications, run tasks, execution hooks, run triggers, remote-state consumers | Replicated |

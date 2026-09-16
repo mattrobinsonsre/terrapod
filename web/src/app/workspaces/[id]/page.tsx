@@ -22,9 +22,15 @@ import { ResourceAccessPanel } from '@/components/resource-access-panel'
 import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
-import { apiFetch, fetchAllPages } from '@/lib/api'
+import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
 import { VaultValueDisplay } from '@/components/vault-value-display'
-import { VaultReferenceFields } from '@/components/vault-reference-fields'
+import {
+  VaultReferenceFields,
+  buildVaultReference,
+  emptyVaultReference,
+  parseVaultReference,
+  type VaultReferenceValue,
+} from '@/components/vault-reference-fields'
 import { VariableEditPanel } from '@/components/variable-edit-panel'
 import { ApplicableVarsets } from '@/components/applicable-varsets'
 import { useSortable } from '@/lib/use-sortable'
@@ -37,6 +43,8 @@ interface WorkspacePermissions {
   // Plan-only vs apply are separate grants, so the UI needs both to know
   // whether to offer the apply button at all (#1340).
   'can-queue-apply'?: boolean
+  // Destroy runs are a separate grant again (run:apply-destroy, #1634).
+  'can-queue-destroy'?: boolean
   'can-read-state-versions': boolean
   'can-create-state-versions': boolean
   'can-read-variable': boolean
@@ -360,11 +368,7 @@ function WorkspaceDetailContent() {
   // Vault value source (#1439): the variable holds a *reference*, resolved
   // server-side at run time. Discrete fields, never raw JSON.
   const [varSource, setVarSource] = useState<'static' | 'vault'>('static')
-  const [vaultInstance, setVaultInstance] = useState('')
-  const [vaultMount, setVaultMount] = useState('')
-  const [vaultPath, setVaultPath] = useState('')
-  const [vaultField, setVaultField] = useState('')
-  const [vaultEngine, setVaultEngine] = useState<'kv2' | 'dynamic'>('kv2')
+  const [vaultRef, setVaultRef] = useState<VaultReferenceValue>(emptyVaultReference)
   const isVaultSource = varSource === 'vault' && !isGitCat
   // Offered only where the deployment has Vault configured — presenting a
   // source that is not set up produces a variable that fails its first run.
@@ -380,11 +384,9 @@ function WorkspaceDetailContent() {
     vaultAvailable && workspace?.attributes['execution-mode'] === 'agent'
 
   const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
-  const [editVaultInstance, setEditVaultInstance] = useState('')
-  const [editVaultMount, setEditVaultMount] = useState('')
-  const [editVaultPath, setEditVaultPath] = useState('')
-  const [editVaultField, setEditVaultField] = useState('')
-  const [editVaultEngine, setEditVaultEngine] = useState<'kv2' | 'dynamic'>('kv2')
+  // The whole stored reference, not just the fields on screen — so an edit
+  // carries `method`, `data` and anything else it does not render (#1619).
+  const [editVaultRef, setEditVaultRef] = useState<VaultReferenceValue>(emptyVaultReference)
   const [addingVar, setAddingVar] = useState(false)
 
   const isTouch = useIsTouch()
@@ -568,7 +570,7 @@ function WorkspaceDetailContent() {
   const loadWorkspace = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`)
-      if (!res.ok) throw new Error(t('errors.loadWorkspace'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.loadWorkspace')))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
@@ -586,7 +588,7 @@ function WorkspaceDetailContent() {
   const loadRuns = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/runs`)
-      if (!res.ok) throw new Error(t('errors.loadRuns'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.loadRuns')))
       const data = await res.json()
       setRuns(data.data || [])
     } catch (err) {
@@ -725,7 +727,7 @@ function WorkspaceDetailContent() {
       const res = await apiFetch(
         `/api/v2/workspaces/${workspaceId}/configuration-versions?page%5Bsize%5D=100`,
       )
-      if (!res.ok) throw new Error(t('errors.loadConfigurations'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.loadConfigurations')))
       const data = await res.json()
       setCvs(data.data || [])
       setCvCurrentId(data.meta?.['current-id'] ?? null)
@@ -1026,7 +1028,7 @@ function WorkspaceDetailContent() {
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'run-tasks', attributes: { enabled: !rt.attributes.enabled } } }),
       })
-      if (!res.ok) throw new Error(t('errors.update'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.update')))
       await loadRunTasks()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.toggleRunTask'))
@@ -1038,7 +1040,7 @@ function WorkspaceDetailContent() {
     if (!confirmDelete(t('runTasks.deleteConfirm', { name: runTasks.find(r => r.id === rtId)?.attributes.name ?? '' }))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/run-tasks/${rtId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(t('errors.delete'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.delete')))
       await loadRunTasks()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.deleteRunTask'))
@@ -1155,7 +1157,7 @@ function WorkspaceDetailContent() {
         setLockoutWarning(detail)
         return
       }
-      if (!res.ok) throw new Error(t('errors.updateWorkspace'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.updateWorkspace')))
       const data = await res.json()
       const wasRenamed = workspace && data.data.attributes.name !== workspace.attributes.name
       setWorkspace(data.data)
@@ -1177,7 +1179,11 @@ function WorkspaceDetailContent() {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/actions/${action}`, {
         method: 'POST',
       })
-      if (!res.ok) throw new Error(action === 'unlock' ? t('errors.unlockWorkspace') : t('errors.lockWorkspace'))
+      if (!res.ok) {
+        throw new Error(
+          await parseApiError(res, action === 'unlock' ? t('errors.unlockWorkspace') : t('errors.lockWorkspace'))
+        )
+      }
       await loadWorkspace()
     } catch (err) {
       setError(err instanceof Error ? err.message : action === 'unlock' ? t('errors.unlockWorkspace') : t('errors.lockWorkspace'))
@@ -1195,8 +1201,7 @@ function WorkspaceDetailContent() {
         body: JSON.stringify({ data: { type: 'workspaces', attributes: patch } }),
       })
       if (!res.ok) {
-        const body = await res.text()
-        throw new Error(body || t('errors.updateAiSummary'))
+        throw new Error(await parseApiError(res, t('errors.updateAiSummary')))
       }
       const data = await res.json()
       setWorkspace(data.data)
@@ -1221,8 +1226,7 @@ function WorkspaceDetailContent() {
         }),
       })
       if (!res.ok) {
-        const body = await res.text()
-        throw new Error(body || t('errors.updateSlackChannel'))
+        throw new Error(await parseApiError(res, t('errors.updateSlackChannel')))
       }
       const data = await res.json()
       setWorkspace(data.data)
@@ -1246,7 +1250,7 @@ function WorkspaceDetailContent() {
           data: { type: 'workspaces', attributes: { 'drift-detection-enabled': newEnabled } },
         }),
       })
-      if (!res.ok) throw new Error(t('errors.updateDriftSettings'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.updateDriftSettings')))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
@@ -1266,7 +1270,7 @@ function WorkspaceDetailContent() {
           data: { type: 'workspaces', attributes: { 'drift-detection-interval-seconds': seconds } },
         }),
       })
-      if (!res.ok) throw new Error(t('errors.updateDriftInterval'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.updateDriftInterval')))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
@@ -1290,7 +1294,7 @@ function WorkspaceDetailContent() {
           },
         }),
       })
-      if (!res.ok) throw new Error(t('errors.updatePlanExpiry'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.updatePlanExpiry')))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
@@ -1362,7 +1366,7 @@ function WorkspaceDetailContent() {
     setDeleting(true)
     try {
       const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(t('errors.deleteWorkspace'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.deleteWorkspace')))
       router.push('/workspaces')
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.deleteWorkspace'))
@@ -1414,18 +1418,6 @@ function WorkspaceDetailContent() {
     }
   }
 
-  function buildVaultReference(): string {
-    const ref: Record<string, string> = {
-      source: 'vault',
-      mount: vaultMount.trim(),
-      path: vaultPath.trim(),
-      field: vaultField.trim(),
-    }
-    if (vaultInstance.trim()) ref.vault = vaultInstance.trim()
-    if (vaultEngine !== 'kv2') ref.engine = vaultEngine
-    return JSON.stringify(ref)
-  }
-
   // Flat edit state, shaped for the shared edit panel.
   const editPanelState = {
     key: editVarKey,
@@ -1434,13 +1426,7 @@ function WorkspaceDetailContent() {
     sensitive: editVarSensitive,
     hcl: editVarHcl,
     source: editVarSource,
-    vault: {
-      instance: editVaultInstance,
-      mount: editVaultMount,
-      path: editVaultPath,
-      field: editVaultField,
-      engine: editVaultEngine,
-    },
+    vault: editVaultRef,
   }
 
   function patchEditPanel(patch: Partial<typeof editPanelState>) {
@@ -1450,25 +1436,7 @@ function WorkspaceDetailContent() {
     if (patch.sensitive !== undefined) setEditVarSensitive(patch.sensitive)
     if (patch.hcl !== undefined) setEditVarHcl(patch.hcl)
     if (patch.source !== undefined) setEditVarSource(patch.source)
-    if (patch.vault) {
-      setEditVaultInstance(patch.vault.instance)
-      setEditVaultMount(patch.vault.mount)
-      setEditVaultPath(patch.vault.path)
-      setEditVaultField(patch.vault.field)
-      setEditVaultEngine(patch.vault.engine)
-    }
-  }
-
-  function buildEditVaultReference(): string {
-    const ref: Record<string, string> = {
-      source: 'vault',
-      mount: editVaultMount.trim(),
-      path: editVaultPath.trim(),
-      field: editVaultField.trim(),
-    }
-    if (editVaultInstance.trim()) ref.vault = editVaultInstance.trim()
-    if (editVaultEngine !== 'kv2') ref.engine = editVaultEngine
-    return JSON.stringify(ref)
+    if (patch.vault) setEditVaultRef(patch.vault)
   }
 
   async function handleAddVariable(e: React.FormEvent) {
@@ -1487,7 +1455,7 @@ function WorkspaceDetailContent() {
               value: isGitCat
                 ? buildGitAuthValue()
                 : isVaultSource
-                  ? buildVaultReference()
+                  ? buildVaultReference(vaultRef)
                   : varValue,
               category: varCategory,
               sensitive: isGitCat || isVaultSource ? true : varSensitive,
@@ -1514,11 +1482,7 @@ function WorkspaceDetailContent() {
       setGitKnownHosts('')
       setGitRewrite('none')
       setVarSource('static')
-      setVaultInstance('')
-      setVaultMount('')
-      setVaultPath('')
-      setVaultField('')
-      setVaultEngine('kv2')
+      setVaultRef(emptyVaultReference())
       setShowAddVar(false)
       await loadVariables()
     } catch (err) {
@@ -1533,7 +1497,7 @@ function WorkspaceDetailContent() {
     if (!confirmDelete(t('variables.deleteConfirm', { key: variables.find(v => v.id === varId)?.attributes.key ?? '' }))) return
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vars/${varId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(t('errors.deleteVariable'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.deleteVariable')))
       await loadVariables()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.deleteVariable'))
@@ -1663,18 +1627,9 @@ function WorkspaceDetailContent() {
     if (source === 'vault') {
       // The reference is not a secret, so it is loaded back into the fields
       // rather than blanked like a sensitive value — otherwise every edit would
-      // silently rebuild it from nothing.
-      let ref: Record<string, string> = {}
-      try {
-        ref = JSON.parse(v.attributes.value || '{}')
-      } catch {
-        ref = {}
-      }
-      setEditVaultInstance(ref.vault ?? '')
-      setEditVaultMount(ref.mount ?? '')
-      setEditVaultPath(ref.path ?? '')
-      setEditVaultField(ref.field ?? '')
-      setEditVaultEngine(ref.engine === 'dynamic' ? 'dynamic' : 'kv2')
+      // silently rebuild it from nothing. The whole reference is kept, so keys
+      // the form does not render (method, data, …) survive the save (#1619).
+      setEditVaultRef(parseVaultReference(v.attributes.value))
       setEditVarValue('')
     } else {
       setEditVarValue(v.attributes.sensitive ? '' : v.attributes.value)
@@ -1697,7 +1652,7 @@ function WorkspaceDetailContent() {
       if (isEditVault) {
         // Always sent: the reference is rebuilt from the fields on screen, so
         // omitting it when unchanged would drop the edit just made.
-        attrs.value = buildEditVaultReference()
+        attrs.value = buildVaultReference(editVaultRef)
       } else if (editVarValue !== '') {
         attrs.value = editVarValue
       }
@@ -1766,7 +1721,7 @@ function WorkspaceDetailContent() {
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'notification-configurations', attributes: { enabled: !nc.attributes.enabled } } }),
       })
-      if (!res.ok) throw new Error(t('errors.update'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.update')))
       await loadNotifications()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.toggleNotification'))
@@ -1778,7 +1733,7 @@ function WorkspaceDetailContent() {
     if (!confirmDelete(t('notifications.deleteConfirm', { name: notifications.find(n => n.id === ncId)?.attributes.name ?? '' }))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${ncId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(t('errors.delete'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.delete')))
       await loadNotifications()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.deleteNotification'))
@@ -1790,7 +1745,7 @@ function WorkspaceDetailContent() {
     setError('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${ncId}/actions/verify`, { method: 'POST' })
-      if (!res.ok) throw new Error(t('errors.verificationFailed'))
+      if (!res.ok) throw new Error(await parseApiError(res, t('errors.verificationFailed')))
       const data = await res.json()
       const success = data?.data?.attributes?.success
       if (success) {
@@ -3058,14 +3013,8 @@ function WorkspaceDetailContent() {
                     idPrefix="add"
                     instances={vaultInstances}
                     defaultInstance={vaultDefaultInstance}
-                    value={{ instance: vaultInstance, mount: vaultMount, path: vaultPath, field: vaultField, engine: vaultEngine }}
-                    onChange={(v) => {
-                      setVaultInstance(v.instance)
-                      setVaultMount(v.mount)
-                      setVaultPath(v.path)
-                      setVaultField(v.field)
-                      setVaultEngine(v.engine)
-                    }}
+                    value={vaultRef}
+                    onChange={setVaultRef}
                   />
                 )}
 
@@ -3208,7 +3157,7 @@ function WorkspaceDetailContent() {
                           <td className="px-4 py-3 text-sm text-slate-200 font-mono">{v.attributes.key}</td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
                             {v.attributes['value-source'] === 'vault'
-                            ? <VaultValueDisplay value={v.attributes.value} />
+                            ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
                             : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
@@ -3264,7 +3213,7 @@ function WorkspaceDetailContent() {
                         </div>
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">
                           {v.attributes['value-source'] === 'vault'
-                            ? <VaultValueDisplay value={v.attributes.value} />
+                            ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />
                             : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
                         </div>
                         {perms['can-update-variable'] && (
@@ -3300,7 +3249,10 @@ function WorkspaceDetailContent() {
                   >
                     {showPlanOptions ? t('runs.hideOptions') : t('runs.options')}
                   </button>
-                  {!showDestroyConfirm ? (
+                  {/* A destroy is its own grant (run:apply-destroy): offering it
+                      on can-queue-run alone showed plan-level users a button
+                      the API refuses (#1634). */}
+                  {perms['can-queue-destroy'] && (!showDestroyConfirm ? (
                     <button
                       onClick={() => setShowDestroyConfirm(true)}
                       disabled={queueingDestroy || attrs.locked}
@@ -3326,7 +3278,7 @@ function WorkspaceDetailContent() {
                         {queueingDestroy ? t('actions.queuing') : t('runs.confirmDestroy')}
                       </button>
                     </div>
-                  )}
+                  ))}
                   {/* Two buttons, not a button plus a hidden checkbox (#1340).
                       Plan-vs-apply is the decision that matters every time, so
                       it is made by which button you press; the options panel

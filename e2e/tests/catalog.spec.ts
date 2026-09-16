@@ -62,6 +62,18 @@ test.describe('Service Catalog — admin + browse (admin session)', () => {
     await expect(page.locator('h2:has-text("Provision")')).toBeVisible({ timeout: 10_000 });
     // Selection-first: the agent-pool select is present (not a free-text field).
     await expect(page.locator('select').first()).toBeVisible();
+
+    // Module interface (#1585): read from /catalog-items/{id}/interface through
+    // the BFF. This module has no uploaded version yet, so the interface is
+    // empty — the section still renders, and says so when opened.
+    const iface = page.getByRole('button', { name: /Inputs & Outputs/ });
+    await expect(iface).toBeVisible({ timeout: 10_000 });
+    await expect(iface).toContainText('0 inputs, 0 outputs');
+    const noData = page.getByText('No interface data available for this version.');
+    await expect(async () => {
+      if (!(await noData.isVisible())) await iface.click();
+      await expect(noData).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
   });
 });
 

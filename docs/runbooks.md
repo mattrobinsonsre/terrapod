@@ -151,6 +151,37 @@ A runner Job was killed by Kubernetes because its container exceeded its memory 
 
 ---
 
+## Why did my run fail? (reading a run's error message)
+
+From 1.7, an errored run's error message says why it failed, not just `Runner exited with code 1` (#1631). The runner sends its own account of the failure when it exits, and the API keeps it as the run's `error-message`, followed by the exit code.
+
+### Symptoms and what they mean
+
+- **`Error: <summary> (on <file> line <n>)`**, up to three of them, then `Runner exited with code 1`: tofu (or terraform) itself failed during init, plan or apply. These are tofu's own `Error:` summaries with their locations; the full diagnostic, including the detail lines, is in the run's plan or apply log.
+- **`<point> hook failed (hook=<name>, rc=<n>)`**: an [execution hook](execution-hooks.md) exited non-zero. The hook's output is in the log. A `post_apply` failure means the apply and the state upload succeeded, and only the hook failed.
+- **`configuration archive unusable: …`**: see [Configuration archive is unusable](#configuration-archive-is-unusable) below.
+- **`binary download failed: …`**: the runner could not fetch the tofu/terraform binary from the binary cache. See [Storage Errors](#storage-errors), and check the version exists.
+- **`orchestrator crashed — see the run log for the traceback`**: an unexpected error in the runner. The exception is in the log, deliberately not in the message.
+- **Just `Runner exited with code N`**: no reason was available. Either the runner image predates 1.7, or the failure happened before the runner could report. Read the plan or apply log.
+- **OOM / killed**: these keep their own messages; see [Runner OOM-Killed](#runner-oom-killed-430).
+
+### Resolution
+
+Fix what the message names, then queue a new run. The message only ever carries tofu's diagnostic summaries, never their detail lines, and is capped at 2,000 characters. If you need more, the log has it.
+
+### Configuration archive is unusable
+
+**Symptom**: the run fails with `configuration archive unusable: the configuration archive for run … is not a readable tar.gz after 3 download(s) …` (#1600). The runner downloaded the configuration three times, and it was not a usable gzipped tarball each time.
+
+**Diagnosis**: the archive stored for this configuration version is damaged or is not an archive. For example, an upload was cut short, or something that is not a tarball was uploaded in its place. The message names the size and the first bytes it saw.
+
+**Resolution**: **retrying the run does not help**. A retry uses the same configuration version, so it downloads the same damaged archive. Build a new configuration version instead:
+- **VCS workspaces**: push a commit, or queue a run from the UI. Terrapod never stores a truncated VCS archive, and a new run fetches the configuration again.
+- **CLI-driven**: run `tofu plan` / `terraform plan` again, which uploads a new configuration version.
+- **API**: create and upload a new configuration version.
+
+---
+
 ## State Diverged
 
 The runner entrypoint marks a workspace as "state diverged" when an `apply` succeeds (infrastructure changed) but the state file upload to object storage fails. This is a critical situation — real infrastructure has changed but Terrapod's state doesn't reflect it.
@@ -769,6 +800,36 @@ After fixing the rule:
 
 - `lifecycle-state` is `active` (restored) or the workspace is gone (intentionally destroyed + deleted)
 - No orphaned state versions remain for a destroyed workspace
+
+## Module autodiscovery rule registered nothing, or too much
+
+Module autodiscovery rules (Admin → Module autodiscovery) register registry modules for the directories they find in a repository. They create registry modules only. They never delete or rename one, and never touch infrastructure. See [Module autodiscovery](registry.md#module-autodiscovery) for how they work.
+
+### How a rule decides what to register
+
+- **Saving a rule registers nothing.** You register modules from its preview, all of them or a picked subset.
+- **The first poll records a baseline.** It notes the directories that already exist and registers none of them.
+- **Later polls register only new directories:** ones that appear on the tracked branch after the baseline and match the rule. A directory you left unticked in a preview stays unregistered.
+- **Changing what a rule matches re-baselines it.** This covers its connection, repository, branch, pattern or ignore paths, and re-enabling a disabled rule. The next poll records a fresh baseline and registers nothing, so widening a rule, or turning one back on after months, never bulk-registers directories you have not previewed. Preview and register them explicitly.
+
+### Diagnosis: nothing registered
+
+1. **Is the rule enabled, and is its VCS connection `active`?** A rule on an inactive connection is skipped, with a warning in the API log.
+2. **Has the rule polled yet?** Its first poll only records the baseline. `first-scan-at` on the rule shows when that happened.
+3. **Did the tracked branch change?** A rule only walks the repository when the branch head moves.
+4. **Does the directory match?** Preview the rule. Only directories holding `.tf` or `.tf.json` files count, and `examples`, `tests`, `fixtures` and hidden directories are always skipped. The ignore patterns apply after the pattern.
+5. **Was the candidate skipped?** A preview marks a candidate whose name is taken, or whose provider cannot be derived. A scan reports the reason for each skip. A skipped directory counts as seen, so the rule will not retry it on its own. Fix the name template or provider, then register it from the preview.
+
+### Resolution: too much registered, or the wrong module
+
+- **Remove a module the rule should not have registered** by deleting it in the registry (Registry → Modules). Later polls do not register it again, because the rule has already seen that directory. An explicit scan with no subset would.
+- **Stop a rule** by disabling it (Edit → untick Enabled). Deleting a rule leaves its modules registered.
+- **Adjust what a rule matches** with its pattern and ignore paths. This re-baselines it, as described above.
+
+### Verification
+
+- The rule's preview shows each directory's module as `Already registered as …`, or unregistered, as you intended.
+- Registry → Modules lists the modules you expect, and no others from that repository.
 
 ## Reverting (or recovering from) a bad bulk-update
 
@@ -1744,9 +1805,11 @@ rotate accordingly.
 
 ---
 
-## Runs never start, and the API log says Vault is unavailable
+<a id="runs-never-start-and-the-api-log-says-vault-is-unavailable"></a>
 
-**Symptom.** Runs on workspaces with a Vault-sourced variable sit in `queued`,
+## Runs never start, and the API log says OpenBao/Vault is unavailable
+
+**Symptom.** Runs on workspaces with an OpenBao/Vault-sourced variable sit in `queued`,
 are picked up, and return to `queued`. No error appears on the run, in the UI or
 via the API. The API pod log repeats:
 
@@ -1754,13 +1817,13 @@ via the API. The API pod log repeats:
 vault is unavailable; leaving the run for a later claim
 ```
 
-**What is happening.** Terrapod distinguishes a Vault that *answered* (denied,
+**What is happening.** Terrapod distinguishes a server that *answered* (denied,
 or nothing at that path — the run is errored, with the cause) from one that
 *could not answer* (unreachable, or sealed/standby, which reply `503`/`429`).
-The second case returns the run to the queue rather than failing it, so a Vault
+The second case returns the run to the queue rather than failing it, so a server
 restart does not destroy every queued run in the estate.
 
-There is **no attempt cap**. If Vault never becomes reachable the run waits
+There is **no attempt cap**. If the server never becomes reachable the run waits
 indefinitely rather than erroring, which is why this presents as silence.
 
 **Diagnose, from the API pod:**
@@ -1770,12 +1833,13 @@ indefinitely rather than erroring, which is why this presents as silence.
 2. Check `api.config.vault.instances[].address` resolves and is reachable from
     the API pod (not from your laptop — a NetworkPolicy or egress rule is a
     common cause).
-3. `vault status` — a **sealed** Vault answers `503` to everything and produces
+3. `bao status` (`vault status` on Vault) — a **sealed** server answers `503` to
+    everything and produces
     exactly this behaviour.
 4. For Kubernetes auth, confirm the API pod's ServiceAccount is still bound to
-    the Vault role, and that the Vault auth mount still exists.
+    the OpenBao/Vault role, and that the auth mount still exists.
 
-**Resolve.** Once Vault answers again the waiting runs proceed on their next
+**Resolve.** Once the server answers again the waiting runs proceed on their next
 claim with no operator action. If the address or auth config was wrong, correct
 it and `helm upgrade`; the runs are still queued and will pick up the new
 configuration.
@@ -1785,7 +1849,42 @@ runs.
 
 ---
 
-## Runs are failing on a Vault variable
+<a id="vault-leases-are-not-being-revoked"></a>
+
+## OpenBao/Vault leases are not being revoked
+
+**Symptom.** An instance has `revoke_leases: true`, but dynamic credentials
+stay valid after their run phase ended: `bao list sys/leases/lookup/<mount>/creds/<role>`
+still lists them.
+
+**What is happening.** Revocation is best-effort by design. Terrapod records a
+phase's leases in Redis at the claim, waits for the phase's runner Job to end,
+then revokes them in a background task with bounded retry. If any step cannot
+complete, the lease expires at its TTL. The run is never affected.
+
+**Diagnose, from the API pod:**
+
+1. `kubectl -n <ns> logs deploy/<release>-api | grep -i "vault lease"` — a
+   line saying a lease could not be revoked names the instance and the HTTP
+   status (never the lease id).
+2. **`HTTP 403`**: the OpenBao/Vault policy does not grant `update` on
+   `sys/leases/revoke`. Add it; see [Revoking leases](vault.md#revoking-leases).
+3. **`could not record Vault leases`**: Redis was unreachable at the claim.
+   Those leases expire at their TTL; later runs are unaffected.
+4. **No lines at all**: check the phase's Job has actually ended
+   (`kubectl -n <runner-ns> get job`). A Job retrying a failed pod has not
+   ended, and revocation waits for it. Also check that the listener pool is up,
+   since Terrapod asks a listener whether the Job has ended.
+
+**Resolve.** Fix the policy or the connectivity. Leases already missed expire
+at their TTL. To end them sooner, run `bao lease revoke -prefix <mount>/creds/<role>`
+(`vault lease revoke` on Vault) yourself.
+
+---
+
+<a id="runs-are-failing-on-a-vault-variable"></a>
+
+## Runs are failing on an OpenBao/Vault variable
 
 A variable whose value source is `vault` holds a reference, not a value.
 Terrapod reads the secret at run time, and **if it cannot, the run fails** — it
@@ -1797,17 +1896,19 @@ to another identity and act with credentials nobody chose.
 
 The run's error names the variable and the cause. Match it against the table
 below; each row is a different thing to fix, and they are easy to confuse
-because Vault reports two of them the same way.
+because the server reports two of them the same way.
 
 | Error | Cause |
 |---|---|
-| `Vault login failed … (kubernetes auth, mount 'X', role 'Y')` | The role does not exist, or its `bound_service_account_names` / `bound_service_account_namespaces` do not match the ServiceAccount the API pods run as. |
-| `permission denied` **on login** | Vault cannot call the Kubernetes TokenReview API. Its own ServiceAccount is missing the `system:auth-delegator` ClusterRoleBinding. |
-| `Vault denied '<path>' … policy attached to role` | Login succeeded; the policy does not grant `read` on that path. Note kv-v2 policies include a `data/` segment that the reference omits. |
-| `Vault has no secret at '<path>'` | Wrong mount or path. |
+| `OpenBao/Vault login failed … (kubernetes auth, mount 'X', role 'Y')` | The role does not exist, or its `bound_service_account_names` / `bound_service_account_namespaces` do not match the ServiceAccount the API pods run as. |
+| `permission denied` **on login** | The server cannot call the Kubernetes TokenReview API. Its own ServiceAccount is missing the `system:auth-delegator` ClusterRoleBinding. If the server cannot reach the cluster at all, switch the instance to `jwt` auth — see [vault.md](vault.md#vault-outside-the-cluster-jwt-auth). |
+| `OpenBao/Vault login failed … (jwt auth, …, audience 'X')` | The JWT role's `bound_audiences` lacks `X`, its `bound_subject` does not match the API pods' ServiceAccount, or the server cannot verify the token's signature against the cluster's issuer. |
+| `could not read the projected ServiceAccount token` / `could not read the CA file` | The file the config names is not mounted: `api.config.vault.enabled` is false, `auth.token_path` is wrong, or the `tls.ca_secret` Secret or key is missing. |
+| `OpenBao/Vault denied '<path>' … policy attached to role` | Login succeeded; the policy does not grant `read` on that path. Note kv-v2 policies include a `data/` segment that the reference omits. |
+| `OpenBao/Vault has no secret at '<path>'` | Wrong mount or path. |
 | `field '<x>' is not present at '<path>' (available: …)` | Right secret, wrong key — the message lists what is there. |
-| `path '<x>' is not in the allow-list configured for vault instance` | Terrapod's own `paths` allow-list refused it before contacting Vault. Widen the list or correct the reference. |
-| `variable(s) reference Vault but the Vault value source is disabled` | `api.config.vault.enabled` is `false` while variables still point at it. |
+| `path '<x>' is not in the allow-list configured for vault instance` | Terrapod's own `paths` allow-list refused it before contacting the server. Widen the list or correct the reference. |
+| `variable(s) reference OpenBao/Vault but the value source is disabled` | `api.config.vault.enabled` is `false` while variables still point at it. |
 | `omits 'vault' but several instances are configured` | Mark one instance `default: true`, or name the instance in the reference. |
 
 Confirm which ServiceAccount the API actually runs as rather than assuming:
@@ -1819,14 +1920,14 @@ kubectl -n <ns> get pod -l app.kubernetes.io/component=api \
 
 ### Resolution
 
-Fix the cause the table identifies, in Vault or in the reference — see
-[Vault](vault.md) for the full setup. No Terrapod restart is needed: the token
+Fix the cause the table identifies, in the server or in the reference — see
+[OpenBao/Vault](vault.md) for the full setup. No Terrapod restart is needed: the token
 is re-obtained per run, and configuration changes take effect on the next
 `helm upgrade`.
 
 If runs must proceed **now** and the secret can be supplied another way, change
 the variable's value source back to `static` and set a literal value. That
-stops Vault being the source of truth, so treat it as an incident measure and
+stops the server being the source of truth, so treat it as an incident measure and
 revert it.
 
 ### Verification

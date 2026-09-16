@@ -62,6 +62,106 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('Vault file delivery is usable at phone width (#1619)', async ({ page }) => {
+    // The toggle, the name box and its hint all have to hold up on a phone,
+    // and a long file name in the list must wrap rather than push the page
+    // sideways — the list is where an operator checks what a run will see.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespvfile'), {
+      'execution-mode': 'agent',
+    })
+    const longName = 'deeply/nested/directory/structure/for/a/service-account-credentials.json'
+    const seed = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: {
+            key: 'GOOGLE_APPLICATION_CREDENTIALS', category: 'env', 'value-source': 'vault',
+            value: JSON.stringify({
+              source: 'vault', mount: 'secret', path: 'apps/gcp', field: 'sa_json',
+              file: { name: longName },
+            }),
+          },
+        },
+      }),
+    })
+    expect(seed.status).toBe(201)
+
+    await page.route('**/api/terrapod/v1/vault/availability', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability',
+            id: 'vault',
+            attributes: { enabled: true, instances: ['default'], 'default-instance': 'default' },
+          },
+        }),
+      }),
+    )
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await expect(page.getByText(longName).filter({ visible: true }).first()).toBeVisible({ timeout: 10_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await page.locator('#var-source').selectOption('vault')
+    await page.locator('#add-file').check()
+    await expect(page.locator('#add-file-name')).toBeVisible()
+    await page.locator('#add-file-name').fill('~/.aws/credentials')
+    await expect(page.locator('#add-file-name')).toHaveValue('~/.aws/credentials')
+    await expect(page.getByText('/var/run/terrapod/files/', { exact: false })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('Vault file templates and formats are usable at phone width (#1648)', async ({ page }) => {
+    // A template is multi-line text: the textarea must fit the phone and let
+    // a long line scroll inside itself, not push the page sideways. The
+    // format's two controls stack rather than squeeze side by side.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespvtpl'), {
+      'execution-mode': 'agent',
+    })
+    await page.route('**/api/terrapod/v1/vault/availability', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability',
+            id: 'vault',
+            attributes: { enabled: true, instances: ['default'], 'default-instance': 'default' },
+          },
+        }),
+      }),
+    )
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).click()
+    await page.locator('#var-source').selectOption('vault')
+    await page.locator('#add-file').check()
+    await page.locator('#add-file-content').selectOption('template')
+    const longLine =
+      'aws_secret_access_key = {{ secret_key }} # a deliberately long line that is much wider than a phone screen'
+    await page.locator('#add-file-template').fill(`[default]\n${longLine}\n`)
+    await expect(page.locator('#add-file-template')).toBeVisible()
+    await expect(page.locator('#add-field')).toHaveCount(0)
+    await expectNoHorizontalPageScroll(page)
+
+    await page.locator('#add-file-content').selectOption('format')
+    await expect(page.locator('#add-file-format')).toBeVisible()
+    await expect(page.locator('#add-file-fields')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    await page.locator('#add-file-content').selectOption('field')
+    await expect(page.locator('#add-file-encoding')).toBeVisible()
+    await expect(page.locator('#add-field')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('workspace variable sets panel adapts to mobile (#1440)', async ({ page }) => {
     // Seeded rather than asserted on an empty page: with no set applying, the
     // panel renders nothing at all and the assertion would pass however the
@@ -699,6 +799,85 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('a catalog item page fits a phone: provision form, interface and instances', async ({ page }) => {
+    // The item, its form, interface and instances are stubbed so the page has
+    // every section populated — including an instances table, which must
+    // scroll inside its own container rather than widen the page.
+    const itemId = 'cat-0198e2e0-0000-7000-8000-00000000c001';
+    const base = `/api/terrapod/v1/catalog-items/${itemId}`;
+    const meta = { pagination: { 'current-page': 1, 'page-size': 1, 'total-count': 1, 'total-pages': 1 } };
+    const stubs: Record<string, unknown> = {
+      [base]: {
+        data: {
+          id: itemId,
+          type: 'catalog-items',
+          attributes: {
+            name: 'e2e-network',
+            'display-name': 'A network with a rather long display name to wrap on a phone',
+            description: 'Provisions a network with subnets, route tables and a NAT gateway per zone.',
+            enabled: true,
+            'module-id': 'mod-e2e',
+            'module-name': 'network-with-a-long-module-name',
+            'module-provider': 'aws',
+            'default-version-pin': '1.2.3',
+            'allowed-agent-pool-ids': null,
+          },
+        },
+      },
+      [`${base}/form`]: {
+        data: {
+          type: 'catalog-item-forms',
+          attributes: {
+            'resolved-version': '1.2.3',
+            fields: [
+              { name: 'cidr_block_for_the_primary_network', type: 'string', description: 'The CIDR block.', required: true, sensitive: false, default: '10.0.0.0/16', options: null, source: 'module' },
+              { name: 'environment', type: 'string', description: '', required: false, sensitive: false, default: 'dev', options: ['dev', 'staging', 'prod'], source: 'catalog' },
+            ],
+          },
+        },
+      },
+      [`${base}/interface`]: {
+        data: {
+          type: 'catalog-item-interfaces',
+          attributes: {
+            'resolved-version': '1.2.3',
+            inputs: [{ name: 'cidr_block_for_the_primary_network', type: 'string', description: 'The CIDR block.', default: null, required: true, sensitive: false }],
+            outputs: [{ name: 'vpc_id', description: 'The network id.', sensitive: false }],
+          },
+        },
+      },
+      [`${base}/instances`]: {
+        data: [
+          {
+            id: 'ws-0198e2e0-0000-7000-8000-00000000c002',
+            type: 'workspaces',
+            attributes: {
+              name: 'e2e-network-instance-with-a-long-name',
+              'catalog-item-id': itemId,
+              'catalog-version-pin': '1.2.3',
+              'agent-pool-id': null,
+              'owner-email': 'admin@example.com',
+              labels: {},
+            },
+          },
+        ],
+        meta,
+      },
+    };
+    await page.route(
+      (url) => url.pathname in stubs,
+      (route) => route.fulfill({ json: stubs[new URL(route.request().url()).pathname] }),
+    );
+
+    await page.goto(`/catalog/${itemId}`);
+    await expect(
+      page.getByRole('heading', { name: 'A network with a rather long display name to wrap on a phone' }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('#prov-name')).toBeVisible();
+    await expect(page.getByText('e2e-network-instance-with-a-long-name')).toBeVisible();
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('registry module list renders as a card grid at phone width', async ({ page }) => {
     // The registry list pages are responsive card grids (grid-cols-1 at phone),
     // so a seeded module shows as a full-width card with no horizontal scroll.
@@ -708,6 +887,88 @@ test.describe('Responsive harness (phone viewport)', () => {
 
     await page.goto('/registry/modules');
     await expect(page.getByText(modName).first()).toBeVisible({ timeout: 15_000 });
+
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('a repository group of modules does not scroll sideways at phone width (#1583)', async ({
+    page,
+  }) => {
+    // Modules sharing a repository are headed by its URL, which can be long;
+    // it has to wrap rather than push the page wider than the phone.
+    const token = getStoredToken();
+    const stamp = Date.now().toString(36);
+    const repo = `https://github.com/e2e-org/a-rather-long-repository-name-to-wrap-${stamp}`;
+    await createRegistryModule(token, `respmgroot${stamp}`, 'aws', { 'vcs-repo-url': repo });
+    await createRegistryModule(token, `respmgsub${stamp}`, 'aws', {
+      'vcs-repo-url': repo,
+      subdirectory: 'modules/create',
+    });
+
+    await page.goto('/registry/modules');
+    await expect(page.getByRole('heading', { name: repo })).toBeVisible({ timeout: 15_000 });
+
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('the module discovery panel fits a phone, with real checkboxes (#1584)', async ({ page }) => {
+    // The scan is stubbed (the e2e stack has no repository to read). The panel's
+    // inputs stack to one column, the long path wraps, and each candidate's
+    // checkbox label is a full-width tap target.
+    await page.route(
+      (url) => url.pathname === '/api/terrapod/v1/vcs-connections',
+      (route) =>
+        route.fulfill({
+          json: {
+            data: [
+              { id: 'vcs-e2e', type: 'vcs-connections', attributes: { name: 'e2e-github', provider: 'github' } },
+            ],
+            meta: { pagination: { 'current-page': 1, 'page-size': 1, 'total-count': 1, 'total-pages': 1 } },
+          },
+        }),
+    );
+    await page.route(
+      (url) => url.pathname === '/api/terrapod/v1/module-autodiscovery-rules/preview',
+      (route) =>
+        route.fulfill({
+          json: {
+            data: {
+              type: 'module-autodiscovery-rule-previews',
+              attributes: {
+                ref: 'main',
+                'files-walked': 2,
+                entries: [
+                  {
+                    subdirectory: 'modules/a-rather-long-directory-name/that-has-to-wrap-on-a-phone',
+                    name: 'network-that-has-to-wrap-on-a-phone',
+                    provider: 'aws',
+                    'registered-as': null,
+                    collision: false,
+                    'missing-provider': false,
+                  },
+                ],
+              },
+            },
+          },
+        }),
+    );
+
+    await page.goto('/registry/modules');
+    const panel = page.getByRole('heading', { name: 'Discover modules in a repository' });
+    await expect(async () => {
+      if (!(await panel.isVisible())) await page.getByRole('button', { name: 'Discover modules' }).click();
+      await expect(panel).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await page.getByLabel('VCS connection').selectOption('vcs-e2e');
+    await page.getByLabel('Repository URL').fill('https://github.com/e2e-org/terraform-aws-network');
+    await page.getByRole('button', { name: 'Scan repository' }).click();
+
+    const box = page.getByRole('checkbox', {
+      name: 'Register the module in modules/a-rather-long-directory-name/that-has-to-wrap-on-a-phone',
+    });
+    await expect(box).toBeVisible();
+    await box.check();
+    await expect(page.getByRole('button', { name: 'Register 1 module' })).toBeEnabled();
 
     await expectNoHorizontalPageScroll(page);
   });

@@ -43,6 +43,7 @@ from terrapod.services import variable_service, workspace_search_service
 from terrapod.services.vault_source_service import (
     VALUE_SOURCES,
     VaultSourceError,
+    looks_like_file_reference,
     parse_reference,
 )
 from terrapod.services.workspace_rbac_service import (
@@ -100,7 +101,7 @@ def _reject_vault_on_local(ws, value_source: str) -> None:
     if getattr(ws, "execution_mode", "agent") == "local":
         raise HTTPException(
             status_code=422,
-            detail="A Vault-sourced variable needs agent execution: Terrapod "
+            detail="An OpenBao/Vault-sourced variable needs agent execution: Terrapod "
             "resolves the reference server-side when a runner claims the run, "
             "and a local-execution workspace runs terraform on your own machine "
             "where that never happens. Switch the workspace to agent execution, "
@@ -124,9 +125,9 @@ def _reject_vault_on_git_auth(value_source: str, category: str | None) -> None:
         raise HTTPException(
             status_code=422,
             detail=f"category '{category}' cannot use value-source 'vault': a "
-            "git credential is a JSON object, while a Vault reference resolves "
-            "to a single field. Put the credential's own secret fields in Vault "
-            "and reference them from a static git-auth value instead.",
+            "git credential is a JSON object, while an OpenBao/Vault reference "
+            "resolves to a single field. Put the credential's own secret fields in "
+            "OpenBao/Vault and reference them from a static git-auth value instead.",
         )
 
 
@@ -151,20 +152,56 @@ async def _reject_vault_varset_on_local(db, vs, *, when: str) -> None:
     raise HTTPException(
         status_code=422,
         detail=f"{when}: this variable set reaches local-execution workspace(s) "
-        f"({names}), where a Vault reference resolves to nothing because "
+        f"({names}), where an OpenBao/Vault reference resolves to nothing because "
         "resolution happens only when a runner claims the run. Switch them to "
         "agent execution, or unassign them from this set, first.",
     )
 
 
+def _file_delivery_guard(
+    *, value_source: str, value: str | None, key: str, structured: bool
+) -> None:
+    """Refuse what Vault file delivery (#1619) cannot serve, on the written state.
+
+    Checked against the variable as it will be *after* the write — its
+    effective key, value and structured flag (``hcl`` on the wire is the same
+    flag, #1435) — so a PATCH that only renames the key (moving a defaulted
+    file name) or only turns structured on is caught too.
+    """
+    if value_source != "vault":
+        if looks_like_file_reference(value):
+            raise HTTPException(
+                status_code=422,
+                detail="`file` delivery needs value-source 'vault': this value is an "
+                "OpenBao/Vault reference, and with a static source it would be delivered "
+                "to the run as the literal JSON",
+            )
+        return
+    try:
+        ref = parse_reference(value or "", key=key)
+    except VaultSourceError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    if ref.get("file") is not None and structured:
+        raise HTTPException(
+            status_code=422,
+            detail="`file` delivery cannot be combined with structured (hcl): the "
+            "variable's value becomes the file's path, which is not a typed "
+            "expression. Turn structured off.",
+        )
+
+
 def _apply_value_source(
-    attrs: dict, current: str = "static", category: str | None = None
+    attrs: dict,
+    current: str = "static",
+    category: str | None = None,
+    key: str | None = None,
 ) -> tuple[str, bool]:
     """Resolve `value-source` for a write and validate its reference.
 
     Returns ``(value_source, force_sensitive)``. A vault-sourced variable is
     always sensitive: what it resolves to is a secret, even though the reference
-    itself is not.
+    itself is not. ``key`` is the variable's effective key, which a reference's
+    ``file`` name defaults to.
     """
     src = _validated_value_source(attrs, current)
     _reject_vault_on_git_auth(src, category)
@@ -185,7 +222,7 @@ def _apply_value_source(
         # valid reference — including on an existing one, or a PATCH could
         # replace a good reference with anything.
         try:
-            parse_reference(attrs.get("value") or "", key=attrs.get("key", "<variable>"))
+            parse_reference(attrs.get("value") or "", key=key or attrs.get("key") or "<variable>")
         except VaultSourceError as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
     elif current != "vault":
@@ -321,9 +358,15 @@ async def create_workspace_var(
         raise HTTPException(status_code=422, detail="Variable key is required")
 
     value_source, force_sensitive = _apply_value_source(
-        attrs, category=attrs.get("category", "terraform")
+        attrs, category=attrs.get("category", "terraform"), key=key
     )
     _reject_vault_on_local(ws, value_source)
+    _file_delivery_guard(
+        value_source=value_source,
+        value=attrs.get("value", ""),
+        key=key,
+        structured=bool(_structured_from(attrs, default=False)),
+    )
 
     try:
         var = await variable_service.create_variable(
@@ -372,10 +415,17 @@ async def update_workspace_var(
     attrs = body.get("data", {}).get("attributes", {})
 
     try:
+        eff_key = attrs.get("key") or var.key
         value_source, _force = _apply_value_source(
-            attrs, var.value_source, category=attrs.get("category", var.category)
+            attrs, var.value_source, category=attrs.get("category", var.category), key=eff_key
         )
         _reject_vault_on_local(ws, value_source)
+        _file_delivery_guard(
+            value_source=value_source,
+            value=attrs["value"] if "value" in attrs else var.value,
+            key=eff_key,
+            structured=bool(_structured_from(attrs, default=bool(var.structured))),
+        )
         var = await variable_service.update_variable(
             db,
             var,
@@ -747,9 +797,17 @@ async def create_varset_var(
     if category in variable_service.GIT_AUTH_CATEGORIES:
         sensitive = True  # git-auth values are always secret
 
-    value_source, force_sensitive = _apply_value_source(attrs, category=category)
+    value_source, force_sensitive = _apply_value_source(attrs, category=category, key=key)
+    _file_delivery_guard(
+        value_source=value_source,
+        value=value,
+        key=key,
+        structured=bool(_structured_from(attrs, default=False)),
+    )
     if value_source == "vault":
-        await _reject_vault_varset_on_local(db, vs, when="Cannot add a Vault-sourced variable")
+        await _reject_vault_varset_on_local(
+            db, vs, when="Cannot add an OpenBao/Vault-sourced variable"
+        )
     if force_sensitive:
         sensitive = True
 
@@ -812,10 +870,16 @@ async def update_varset_var(
     # The sensitive-forcing half is recomputed below from the stored row, so
     # only the resolved source is wanted here.
     vsv.value_source, _ = _apply_value_source(
-        attrs, vsv.value_source, category=attrs.get("category", vsv.category)
+        attrs, vsv.value_source, category=attrs.get("category", vsv.category), key=vsv.key
+    )
+    _file_delivery_guard(
+        value_source=vsv.value_source,
+        value=attrs["value"] if "value" in attrs else vsv.value,
+        key=vsv.key,
+        structured=bool(vsv.structured),
     )
     if vsv.value_source == "vault":
-        await _reject_vault_varset_on_local(db, vs, when="Cannot set a Vault source")
+        await _reject_vault_varset_on_local(db, vs, when="Cannot set an OpenBao/Vault source")
     was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]
@@ -1023,7 +1087,7 @@ async def add_varset_workspaces(
             raise HTTPException(
                 status_code=422,
                 detail=f"Cannot assign this variable set to '{ws.name}': the set has "
-                f"{vault_vars} Vault-sourced variable(s), which resolve only when a "
+                f"{vault_vars} OpenBao/Vault-sourced variable(s), which resolve only when a "
                 "runner claims the run, and that workspace uses local execution — "
                 "they would silently deliver nothing. Switch it to agent execution "
                 "first.",

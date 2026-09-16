@@ -23,6 +23,28 @@ var destructive = &mcp.ToolAnnotations{DestructiveHint: ptrBool(true)}
 // plan-only, policy, VCS-apply rules, or RBAC. The token's capabilities decide
 // what actually succeeds.
 func registerAct(s *mcp.Server, c *terrapod.Client) {
+	// ── terrapod_module_autodiscovery_rule_scan ──────────────────────
+	type moduleRuleScanIn struct {
+		RuleID string `json:"rule_id" jsonschema:"the rule id (modrule-...)"`
+		// Omitted means every candidate; a list registers just those.
+		Subdirectories []string `json:"subdirectories,omitempty" jsonschema:"register only these candidate directories (the repository root is the empty string); omit to register every candidate"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_module_autodiscovery_rule_scan",
+		Description: "Register the modules a module autodiscovery rule finds — every candidate, or just `subdirectories`. Run terrapod_module_autodiscovery_rule_preview first and confirm the choice with the user. " +
+			"Candidates already registered, or whose name is taken, are skipped and reported. It creates registry modules; it does not touch infrastructure. Platform admin only.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptrBool(false)},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in moduleRuleScanIn) (*mcp.CallToolResult, *terrapod.ModuleAutodiscoveryScan, error) {
+		if in.RuleID == "" {
+			return errText("rule_id is required"), nil, nil
+		}
+		scan, err := c.ScanModuleAutodiscoveryRule(ctx, in.RuleID, in.Subdirectories)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, scan, nil
+	})
+
 	// ── terrapod_run_create ──────────────────────────────────────────
 	type runCreateIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...) to queue the run against"`
@@ -106,6 +128,25 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 			return errText("run_id is required"), nil, nil
 		}
 		run, err := c.CancelRun(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, run, nil
+	})
+
+	// ── terrapod_run_retry ───────────────────────────────────────────
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_run_retry",
+		Description: "Retry a finished run: queue a NEW run with the same configuration version and options (targets, replace, refresh, destroy) as the original, and return the new run — follow it with terrapod_run_get / terrapod_run_logs using the returned id. " +
+			"Only a terminal run (errored, canceled, discarded, applied) or a plan-only run left at planned can be retried; anything else returns the server's error unchanged. " +
+			"A plan-only or speculative PR plan retries as plan-only. An apply-capable run retries as apply-capable and follows the workspace's own auto-apply setting, so on a workspace that auto-applies the new run WILL apply: treat that like terrapod_run_create with plan_only=false, and only with the user's explicit approval. " +
+			"Needs the same permission as queuing that kind of run: run:plan for a plan-only run, run:apply for an apply-capable one, run:apply-destroy for a destroy.",
+		Annotations: destructive,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runIDIn) (*mcp.CallToolResult, *terrapod.Run, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		run, err := c.RetryRun(ctx, in.RunID)
 		if err != nil {
 			return errResult(err), nil, nil
 		}

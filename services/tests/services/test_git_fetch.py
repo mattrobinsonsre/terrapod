@@ -441,8 +441,9 @@ class TestProducerThreadPipeSemantics:
         chunks: list[bytes] = []
 
         async def consume():
-            async for c in git_fetch._consumer_chunks(read_fd):
-                chunks.append(c)
+            with os.fdopen(read_fd, "rb") as reader:
+                async for c in git_fetch._consumer_chunks(reader):
+                    chunks.append(c)
 
         await asyncio.gather(producer, consume())
         # The chunks form a valid gzipped tar containing a.tf
@@ -469,8 +470,9 @@ class TestProducerThreadPipeSemantics:
         producer = asyncio.to_thread(git_fetch._producer_thread, write_fd, str(tmp_path))
 
         async def consume():
-            async for _c in git_fetch._consumer_chunks(read_fd):
-                pass
+            with os.fdopen(read_fd, "rb") as reader:
+                async for _c in git_fetch._consumer_chunks(reader):
+                    pass
 
         results = await asyncio.gather(producer, consume(), return_exceptions=True)
         assert isinstance(results[0], RuntimeError)

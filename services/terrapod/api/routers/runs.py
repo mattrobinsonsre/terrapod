@@ -746,6 +746,21 @@ async def cancel_run(
     return JSONResponse(content=_run_json(run, engine=await _engine_of(run, db)))
 
 
+def _retry_capability(run: Run) -> str:
+    """What retrying `run` requires: exactly what creating that run would.
+
+    A retry is a new run, so it must not let anyone queue what they could not
+    queue directly. It used to check `run:cancel`, which a plan-level role
+    holds, so such a role could retry an apply-capable run and, on a workspace
+    that auto-applies, apply it (#1599). This mirrors `create_run`'s gate.
+    """
+    if run.plan_only:
+        return cap.RUN_PLAN
+    if run.is_destroy:
+        return cap.RUN_APPLY_DESTROY
+    return cap.RUN_APPLY
+
+
 @extensions_router.post("/runs/{run_id}/actions/retry")
 async def retry_run(
     run_id: str = Path(...),
@@ -757,10 +772,11 @@ async def retry_run(
     Creates a new run for the same workspace using the same configuration
     version, VCS metadata, and settings as the original run. Only terminal
     runs (errored, canceled, discarded, applied, planned plan-only) can be retried.
-    Requires plan permission.
+    Requires what creating that run would: `run:plan` for a plan-only run,
+    `run:apply` for an apply-capable one, `run:apply-destroy` for a destroy.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_CANCEL, user, db)
+    await _require_run_ws_capability(run, _retry_capability(run), user, db)
 
     is_terminal = run.status in run_service.TERMINAL_STATES or (
         run.plan_only and run.status == "planned"
@@ -811,6 +827,9 @@ async def retry_run(
         message=f"Retry of run-{run.id}",
         source=run.source,
         plan_only=run.plan_only,
+        # Without this a retried destroy came back as an ordinary apply of the
+        # same configuration — the opposite of what was asked for.
+        is_destroy=run.is_destroy,
         configuration_version_id=cv_id_for_retry,
         created_by=user.email,
         target_addrs=run.target_addrs,
@@ -2047,23 +2066,52 @@ async def next_run(
     # back to another identity and act with credentials nobody chose. The run is
     # errored with the cause so the operator sees what to fix, instead of the
     # listener getting a 500 and the run hanging claimed.
+    #
+    # A file-mode reference (#1619) resolves to the file's PATH as the variable's
+    # value; the content travels only in `vault-files`, into the per-run Secret.
+    # An older listener that ignores `vault-files` therefore delivers the path to
+    # a file that does not exist — the run fails, and the secret goes nowhere.
+    from terrapod.services import audit_service
     from terrapod.services.vault_source_service import (
         VaultSourceError,
         VaultTransient,
-        resolve_vault_variables,
+        resolve_vault_delivery,
+        vault_read_audit_entries,
     )
 
+    # Audit (#1651): one row per Vault read this claim makes — ok, denied,
+    # missing or transient — naming the variables, never a value. The rows are
+    # staged in this claim's transaction and commit with it, whichever way the
+    # claim ends, so a claim is still one commit however many reads it makes.
+    vault_reads: list = []
+    # Lease revocation (#1649): leases of instances with `revoke_leases` on.
+    # Recorded below only if the claim succeeds — a failed claim's leases were
+    # never delivered and expire at their Vault TTL, as they always have.
+    vault_leases: list = []
+
+    def _stage_vault_audit() -> None:
+        audit_service.add_audit_events(
+            db, vault_read_audit_entries(run_id=run.id, phase=phase, reads=vault_reads)
+        )
+
     try:
-        vault_values = await resolve_vault_variables(resolved, settings)
+        vault = await resolve_vault_delivery(
+            resolved, settings, reads=vault_reads, leases=vault_leases
+        )
     except VaultTransient:
         # Vault is down, not misconfigured. Put the run back so the next claim
         # picks it up, rather than erroring every queued run in the estate over
-        # a restart and leaving an operator to re-queue each by hand.
-        await run_service.transition_run(db, run, "queued")
+        # a restart and leaving an operator to re-queue each by hand. Undo the
+        # claim this phase made: a plan claim came from `queued`, an apply
+        # claim from `confirmed` (#1646).
+        unclaimed = "queued" if phase == "plan" else "confirmed"
+        await run_service.transition_run(db, run, unclaimed)
+        _stage_vault_audit()
         await db.commit()
         return Response(status_code=204)
     except VaultSourceError as e:
         await run_service.transition_run(db, run, "errored", error_message=str(e))
+        _stage_vault_audit()
         await db.commit()
         return Response(status_code=204)
     except Exception as e:  # noqa: BLE001 - backstop, see below
@@ -2073,15 +2121,27 @@ async def next_run(
         # stranding it, so this catches what the resolver did not.
         logger.exception("unexpected failure resolving vault variables")
         await run_service.transition_run(
-            db, run, "errored", error_message=f"Vault variable resolution failed: {e}"
+            db, run, "errored", error_message=f"OpenBao/Vault variable resolution failed: {e}"
         )
+        _stage_vault_audit()
         await db.commit()
         return Response(status_code=204)
+    # Committed below with the rest of the claim.
+    _stage_vault_audit()
 
-    if vault_values:
+    # Record the leases so they can be revoked once this phase's Job has ended
+    # (#1649). Best-effort: record_leases never raises, and a lost record only
+    # means the leases expire at their Vault TTL — so the claim proceeds
+    # whatever happens here. Empty (and so skipped) with the option off.
+    if vault_leases:
+        from terrapod.services import vault_lease_service
+
+        await vault_lease_service.record_leases(run.id, phase, vault_leases)
+
+    if vault.values:
         for v in resolved:
-            if v.key in vault_values:
-                v.value = vault_values[v.key]
+            if v.key in vault.values:
+                v.value = vault.values[v.key]
 
     env_vars = [{"key": v.key, "value": v.value} for v in resolved if v.category == "env"]
     # `hcl` is forwarded so the runner renders the value correctly into the
@@ -2138,6 +2198,10 @@ async def next_run(
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
     run_data["data"]["attributes"]["execution-hooks"] = execution_hooks
     run_data["data"]["attributes"]["git-auth"] = git_auth
+    # Vault file delivery (#1619): [{key, name, value}]. The listener writes
+    # each value as a key of the per-run vars Secret and the Job mounts it
+    # read-only; the variable itself already carries the path (above).
+    run_data["data"]["attributes"]["vault-files"] = vault.files
     # Cost estimation (#871): the API instructs the runner (via the listener)
     # whether to estimate cost — the runner never self-configures. Global API
     # setting today (per-workspace override is a future refinement); the runner
@@ -2348,6 +2412,13 @@ async def report_job_launched(
     run.job_namespace = job_namespace
     await db.commit()
 
+    # Lease revocation (#1649) needs to know which Job ends this phase, and
+    # `job_name` on the run is overwritten when the apply Job launches. A no-op
+    # unless the phase has leases recorded; never raises.
+    from terrapod.services import vault_lease_service
+
+    await vault_lease_service.record_job(run, job_name, job_namespace)
+
     return JSONResponse(content={"status": "ok"})
 
 
@@ -2381,7 +2452,16 @@ async def report_job_status(
 
     from terrapod.redis.client import set_job_status
 
-    await set_job_status(str(run.id), phase, job_status)
+    # `terminal` (#1649): the Job's own Complete/Failed condition as the
+    # listener read it, so a pod being retried within the Job is not taken for
+    # the end of the phase. Absent from a lagging listener.
+    terminal = body.get("terminal")
+    await set_job_status(
+        str(run.id),
+        phase,
+        job_status,
+        terminal=terminal if isinstance(terminal, bool) else None,
+    )
 
     # When the listener reports a failed Job, it MAY also send the container
     # exit code + K8s termination reason from the terminated pod (#430). Map

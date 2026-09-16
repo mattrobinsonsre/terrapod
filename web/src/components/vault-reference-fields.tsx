@@ -10,22 +10,27 @@
  * The Vault selector is always shown, even with a single instance configured.
  * Hiding it means an operator cannot tell which Vault a credential will be read
  * from, which is exactly the thing worth being explicit about.
+ *
+ * Parsing and serialising live in `@/lib/vault-reference`, which carries every
+ * key this form does not render (`method`, `data`, …) through an edit
+ * untouched (#1619).
  */
 
 import { useTranslations } from 'next-intl'
+import { usesField, type VaultReferenceValue } from '@/lib/vault-reference'
+import { VaultFileDeliveryFields } from '@/components/vault-file-delivery-fields'
+
+export {
+  buildVaultReference,
+  emptyVaultReference,
+  parseVaultReference,
+  type VaultReferenceValue,
+} from '@/lib/vault-reference'
 
 const FIELD =
   'w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500'
 const SELECT =
   'w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500'
-
-export interface VaultReferenceValue {
-  instance: string
-  mount: string
-  path: string
-  field: string
-  engine: 'kv2' | 'dynamic'
-}
 
 export function VaultReferenceFields({
   idPrefix,
@@ -42,6 +47,9 @@ export function VaultReferenceFields({
 }) {
   const t = useTranslations('workspaceDetail.variables')
   const set = (patch: Partial<VaultReferenceValue>) => onChange({ ...value, ...patch })
+  // A template or a whole-secret format reads every field of the secret, so
+  // the reference names no single field (#1648) and the box goes away.
+  const showField = usesField(value)
 
   return (
     <div className="space-y-3">
@@ -87,7 +95,7 @@ export function VaultReferenceFields({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className={`grid grid-cols-1 gap-3 ${showField ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <div>
           <label htmlFor={`${idPrefix}-mount`} className="block text-xs text-slate-400 mb-1">
             {t('vaultMount')}
@@ -116,21 +124,37 @@ export function VaultReferenceFields({
             onChange={(e) => set({ path: e.target.value })}
           />
         </div>
-        <div>
-          <label htmlFor={`${idPrefix}-field`} className="block text-xs text-slate-400 mb-1">
-            {t('vaultField')}
-          </label>
-          <input
-            id={`${idPrefix}-field`}
-            type="text"
-            required
-            className={FIELD}
-            placeholder="apitoken" /* i18n-ignore: example field name */
-            value={value.field}
-            onChange={(e) => set({ field: e.target.value })}
-          />
-        </div>
+        {showField && (
+          <div>
+            <label htmlFor={`${idPrefix}-field`} className="block text-xs text-slate-400 mb-1">
+              {t('vaultField')}
+            </label>
+            <input
+              id={`${idPrefix}-field`}
+              type="text"
+              required
+              className={FIELD}
+              placeholder="apitoken" /* i18n-ignore: example field name */
+              value={value.field}
+              onChange={(e) => set({ field: e.target.value })}
+            />
+          </div>
+        )}
       </div>
+
+      <VaultFileDeliveryFields
+        idPrefix={idPrefix}
+        value={{
+          file: value.file,
+          fileName: value.fileName,
+          fileContent: value.fileContent,
+          template: value.template,
+          format: value.format,
+          fields: value.fields,
+          encoding: value.encoding,
+        }}
+        onChange={set}
+      />
 
       <p className="text-xs text-slate-500">{t('vaultSecretNeverStored')}</p>
     </div>
