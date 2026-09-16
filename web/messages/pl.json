@@ -2166,7 +2166,23 @@
       "end": "Koniec",
       "endTitle": "Przejdź na koniec dziennika",
       "planEmpty": "Brak dostępnego wyjścia planu.",
-      "applyEmpty": "Brak dostępnego wyjścia zastosowania."
+      "applyEmpty": "Brak dostępnego wyjścia zastosowania.",
+      "index": {
+        "label": "Przejdź do",
+        "title": "Przejdź do zmiany zasobu lub do podsumowania planu",
+        "summary": "Podsumowanie planu",
+        "action": {
+          "create": "utworzyć",
+          "update": "zaktualizować",
+          "replace": "zastąpić",
+          "destroy": "usunąć",
+          "read": "odczytać",
+          "move": "przenieść",
+          "import": "zaimportować",
+          "error": "błąd",
+          "warning": "ostrzeżenie"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Sprawdzenia zasad",

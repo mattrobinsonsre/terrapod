@@ -142,6 +142,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      name: 'log-index',
+      testMatch: 'log-index.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'impact-graph',
       testMatch: 'impact-graph.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

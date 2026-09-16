@@ -2166,7 +2166,23 @@
       "end": "끝",
       "endTitle": "로그 끝으로 이동",
       "planEmpty": "아직 사용 가능한 계획 출력이 없습니다.",
-      "applyEmpty": "아직 사용 가능한 적용 출력이 없습니다."
+      "applyEmpty": "아직 사용 가능한 적용 출력이 없습니다.",
+      "index": {
+        "label": "이동",
+        "title": "리소스 변경 또는 플랜 요약으로 이동합니다",
+        "summary": "플랜 요약",
+        "action": {
+          "create": "생성",
+          "update": "업데이트",
+          "replace": "교체",
+          "destroy": "삭제",
+          "read": "읽기",
+          "move": "이동",
+          "import": "가져오기",
+          "error": "오류",
+          "warning": "경고"
+        }
+      }
     },
     "policyPanel": {
       "heading": "정책 검사",

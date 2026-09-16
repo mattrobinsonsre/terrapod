@@ -2166,7 +2166,23 @@
       "end": "Fine",
       "endTitle": "Salta alla fine del log",
       "planEmpty": "Nessun output del plan ancora disponibile.",
-      "applyEmpty": "Nessun output dell''apply ancora disponibile."
+      "applyEmpty": "Nessun output dell''apply ancora disponibile.",
+      "index": {
+        "label": "Vai a",
+        "title": "Vai a una modifica di risorsa o al riepilogo del piano",
+        "summary": "Riepilogo del piano",
+        "action": {
+          "create": "creare",
+          "update": "aggiornare",
+          "replace": "sostituire",
+          "destroy": "distruggere",
+          "read": "leggere",
+          "move": "spostare",
+          "import": "importare",
+          "error": "errore",
+          "warning": "avviso"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Controlli dei criteri",

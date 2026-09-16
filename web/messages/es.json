@@ -2166,7 +2166,23 @@
       "end": "Fin",
       "endTitle": "Ir al final del registro",
       "planEmpty": "Aún no hay salida del plan disponible.",
-      "applyEmpty": "Aún no hay salida del apply disponible."
+      "applyEmpty": "Aún no hay salida del apply disponible.",
+      "index": {
+        "label": "Ir a",
+        "title": "Ir a un cambio de recurso o al resumen del plan",
+        "summary": "Resumen del plan",
+        "action": {
+          "create": "crear",
+          "update": "actualizar",
+          "replace": "reemplazar",
+          "destroy": "destruir",
+          "read": "leer",
+          "move": "mover",
+          "import": "importar",
+          "error": "error",
+          "warning": "advertencia"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Comprobaciones de políticas",

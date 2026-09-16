@@ -2166,7 +2166,23 @@
       "end": "Fim",
       "endTitle": "Ir para o fim do log",
       "planEmpty": "Ainda não há saída de plan disponível.",
-      "applyEmpty": "Ainda não há saída de apply disponível."
+      "applyEmpty": "Ainda não há saída de apply disponível.",
+      "index": {
+        "label": "Ir para",
+        "title": "Ir para uma alteração de recurso ou para o resumo do plano",
+        "summary": "Resumo do plano",
+        "action": {
+          "create": "criar",
+          "update": "atualizar",
+          "replace": "substituir",
+          "destroy": "destruir",
+          "read": "ler",
+          "move": "mover",
+          "import": "importar",
+          "error": "erro",
+          "warning": "aviso"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Verificações de Política",

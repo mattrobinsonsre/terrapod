@@ -2166,7 +2166,23 @@
       "end": "Finis",
       "endTitle": "Ad finem diarii salire",
       "planEmpty": "Nullus egressus consilii adhuc praesto.",
-      "applyEmpty": "Nullus egressus applicationis adhuc praesto."
+      "applyEmpty": "Nullus egressus applicationis adhuc praesto.",
+      "index": {
+        "label": "Salire ad",
+        "title": "Salire ad mutationem rei aut ad summarium consilii",
+        "summary": "Summarium consilii",
+        "action": {
+          "create": "creare",
+          "update": "renovare",
+          "replace": "substituere",
+          "destroy": "delere",
+          "read": "legere",
+          "move": "movere",
+          "import": "importare",
+          "error": "erratum",
+          "warning": "monitum"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Probationes Regularum",

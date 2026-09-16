@@ -2166,7 +2166,23 @@
       "end": "Einde",
       "endTitle": "Naar het einde van het logboek springen",
       "planEmpty": "Nog geen planuitvoer beschikbaar.",
-      "applyEmpty": "Nog geen applyuitvoer beschikbaar."
+      "applyEmpty": "Nog geen applyuitvoer beschikbaar.",
+      "index": {
+        "label": "Ga naar",
+        "title": "Ga naar een resourcewijziging of naar de plansamenvatting",
+        "summary": "Plansamenvatting",
+        "action": {
+          "create": "aanmaken",
+          "update": "bijwerken",
+          "replace": "vervangen",
+          "destroy": "verwijderen",
+          "read": "lezen",
+          "move": "verplaatsen",
+          "import": "importeren",
+          "error": "fout",
+          "warning": "waarschuwing"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Beleidscontroles",

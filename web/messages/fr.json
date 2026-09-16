@@ -2166,7 +2166,23 @@
       "end": "Fin",
       "endTitle": "Aller à la fin du journal",
       "planEmpty": "Aucune sortie de plan disponible pour l'instant.",
-      "applyEmpty": "Aucune sortie d'application disponible pour l'instant."
+      "applyEmpty": "Aucune sortie d'application disponible pour l'instant.",
+      "index": {
+        "label": "Aller à",
+        "title": "Aller à une modification de ressource ou au résumé du plan",
+        "summary": "Résumé du plan",
+        "action": {
+          "create": "créer",
+          "update": "mettre à jour",
+          "replace": "remplacer",
+          "destroy": "détruire",
+          "read": "lire",
+          "move": "déplacer",
+          "import": "importer",
+          "error": "erreur",
+          "warning": "avertissement"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Vérifications de politiques",

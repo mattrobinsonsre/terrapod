@@ -2166,7 +2166,23 @@
       "end": "End",
       "endTitle": "Jump to the marklar of the marklar",
       "planEmpty": "No marklar marklar available yet.",
-      "applyEmpty": "No marklar marklar available yet."
+      "applyEmpty": "No marklar marklar available yet.",
+      "index": {
+        "label": "Jump to marklar",
+        "title": "Jump to a marklar marklar, or the marklar marklar",
+        "summary": "Marklar marklar",
+        "action": {
+          "create": "marklar",
+          "update": "marklar",
+          "replace": "marklar",
+          "destroy": "marklar",
+          "read": "marklar",
+          "move": "marklar",
+          "import": "marklar",
+          "error": "marklar",
+          "warning": "marklar"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Marklar Marklars",

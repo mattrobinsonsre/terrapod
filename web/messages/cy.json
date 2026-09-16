@@ -2166,7 +2166,23 @@
       "end": "Diwedd",
       "endTitle": "Neidio i ddiwedd y log",
       "planEmpty": "Dim allbwn cynllun ar gael eto.",
-      "applyEmpty": "Dim allbwn gweithredu ar gael eto."
+      "applyEmpty": "Dim allbwn gweithredu ar gael eto.",
+      "index": {
+        "label": "Neidio i",
+        "title": "Neidio i newid adnodd, neu grynodeb y cynllun",
+        "summary": "Crynodeb y cynllun",
+        "action": {
+          "create": "creu",
+          "update": "diweddaru",
+          "replace": "amnewid",
+          "destroy": "dinistrio",
+          "read": "darllen",
+          "move": "symud",
+          "import": "mewnforio",
+          "error": "gwall",
+          "warning": "rhybudd"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Gwiriadau Polisi",

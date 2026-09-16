@@ -2166,7 +2166,23 @@
       "end": "Konec",
       "endTitle": "Přejít na konec logu",
       "planEmpty": "Zatím není k dispozici žádný výstup plánu.",
-      "applyEmpty": "Zatím není k dispozici žádný výstup apply."
+      "applyEmpty": "Zatím není k dispozici žádný výstup apply.",
+      "index": {
+        "label": "Přejít na",
+        "title": "Přejít na změnu zdroje nebo na souhrn plánu",
+        "summary": "Souhrn plánu",
+        "action": {
+          "create": "vytvořit",
+          "update": "aktualizovat",
+          "replace": "nahradit",
+          "destroy": "odstranit",
+          "read": "přečíst",
+          "move": "přesunout",
+          "import": "importovat",
+          "error": "chyba",
+          "warning": "varování"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Kontroly zásad",

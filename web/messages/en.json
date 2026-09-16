@@ -2172,7 +2172,23 @@
       "end": "End",
       "endTitle": "Jump to the end of the log",
       "planEmpty": "No plan output available yet.",
-      "applyEmpty": "No apply output available yet."
+      "applyEmpty": "No apply output available yet.",
+      "index": {
+        "label": "Jump to",
+        "title": "Jump to a resource change, or the plan summary",
+        "summary": "Plan summary",
+        "action": {
+          "create": "create",
+          "update": "update",
+          "replace": "replace",
+          "destroy": "destroy",
+          "read": "read",
+          "move": "move",
+          "import": "import",
+          "error": "error",
+          "warning": "warning"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Policy Checks",

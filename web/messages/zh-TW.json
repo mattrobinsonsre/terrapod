@@ -2166,7 +2166,23 @@
       "end": "末尾",
       "endTitle": "跳轉到日誌末尾",
       "planEmpty": "暫無可用的計畫輸出。",
-      "applyEmpty": "暫無可用的應用輸出。"
+      "applyEmpty": "暫無可用的應用輸出。",
+      "index": {
+        "label": "跳至",
+        "title": "跳至資源變更或計畫摘要",
+        "summary": "計畫摘要",
+        "action": {
+          "create": "建立",
+          "update": "更新",
+          "replace": "取代",
+          "destroy": "銷毀",
+          "read": "讀取",
+          "move": "移動",
+          "import": "匯入",
+          "error": "錯誤",
+          "warning": "警告"
+        }
+      }
     },
     "policyPanel": {
       "heading": "策略檢查",

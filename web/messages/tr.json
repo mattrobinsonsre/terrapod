@@ -2166,7 +2166,23 @@
       "end": "Son",
       "endTitle": "Günlüğün sonuna atla",
       "planEmpty": "Henüz plan çıktısı mevcut değil.",
-      "applyEmpty": "Henüz uygulama çıktısı mevcut değil."
+      "applyEmpty": "Henüz uygulama çıktısı mevcut değil.",
+      "index": {
+        "label": "Şuraya git",
+        "title": "Bir kaynak değişikliğine veya plan özetine git",
+        "summary": "Plan özeti",
+        "action": {
+          "create": "oluştur",
+          "update": "güncelle",
+          "replace": "değiştir",
+          "destroy": "yok et",
+          "read": "oku",
+          "move": "taşı",
+          "import": "içe aktar",
+          "error": "hata",
+          "warning": "uyarı"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Politika Denetimleri",

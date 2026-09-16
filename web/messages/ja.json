@@ -2166,7 +2166,23 @@
       "end": "末尾",
       "endTitle": "ログの末尾へ移動",
       "planEmpty": "まだプラン出力がありません。",
-      "applyEmpty": "まだ適用出力がありません。"
+      "applyEmpty": "まだ適用出力がありません。",
+      "index": {
+        "label": "移動先",
+        "title": "リソースの変更またはプラン概要に移動します",
+        "summary": "プラン概要",
+        "action": {
+          "create": "作成",
+          "update": "更新",
+          "replace": "置換",
+          "destroy": "破棄",
+          "read": "読み取り",
+          "move": "移動",
+          "import": "インポート",
+          "error": "エラー",
+          "warning": "警告"
+        }
+      }
     },
     "policyPanel": {
       "heading": "ポリシーチェック",

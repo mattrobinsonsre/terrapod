@@ -2166,7 +2166,23 @@
       "end": "Slut",
       "endTitle": "Hoppa till slutet av loggen",
       "planEmpty": "Ingen planutdata tillgänglig ännu.",
-      "applyEmpty": "Ingen applicerings-utdata tillgänglig ännu."
+      "applyEmpty": "Ingen applicerings-utdata tillgänglig ännu.",
+      "index": {
+        "label": "Gå till",
+        "title": "Gå till en resursändring eller till planöversikten",
+        "summary": "Planöversikt",
+        "action": {
+          "create": "skapa",
+          "update": "uppdatera",
+          "replace": "ersätta",
+          "destroy": "förstöra",
+          "read": "läsa",
+          "move": "flytta",
+          "import": "importera",
+          "error": "fel",
+          "warning": "varning"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Policykontroller",

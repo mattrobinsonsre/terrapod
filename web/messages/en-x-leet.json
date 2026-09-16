@@ -2166,7 +2166,23 @@
       "end": "3nd",
       "endTitle": "Jump 70 7h3 3nd 0f 7h3 l0g",
       "planEmpty": "N0 pl4n 0u7pu7 4v41l4bl3 y37.",
-      "applyEmpty": "N0 4pply 0u7pu7 4v41l4bl3 y37."
+      "applyEmpty": "N0 4pply 0u7pu7 4v41l4bl3 y37.",
+      "index": {
+        "label": "Jump 70",
+        "title": "Jump 70 4 r350urc3 ch4ng3, 0r 7h3 pl4n 5umm4ry",
+        "summary": "Pl4n 5umm4ry",
+        "action": {
+          "create": "cr3473",
+          "update": "upd473",
+          "replace": "r3pl4c3",
+          "destroy": "d357r0y",
+          "read": "r34d",
+          "move": "m0v3",
+          "import": "1mp0r7",
+          "error": "3rr0r",
+          "warning": "w4rn1ng"
+        }
+      }
     },
     "policyPanel": {
       "heading": "P0l1cy Ch3ck5",

@@ -2166,7 +2166,23 @@
       "end": "Loppu",
       "endTitle": "Siirry lokin loppuun",
       "planEmpty": "Suunnitelman tulostetta ei ole vielä saatavilla.",
-      "applyEmpty": "Käyttöönoton tulostetta ei ole vielä saatavilla."
+      "applyEmpty": "Käyttöönoton tulostetta ei ole vielä saatavilla.",
+      "index": {
+        "label": "Siirry",
+        "title": "Siirry resurssimuutokseen tai suunnitelman yhteenvetoon",
+        "summary": "Suunnitelman yhteenveto",
+        "action": {
+          "create": "luo",
+          "update": "päivitä",
+          "replace": "korvaa",
+          "destroy": "tuhoa",
+          "read": "lue",
+          "move": "siirrä",
+          "import": "tuo",
+          "error": "virhe",
+          "warning": "varoitus"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Käytäntötarkistukset",

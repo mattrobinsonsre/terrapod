@@ -2166,7 +2166,23 @@
       "end": "End",
       "endTitle": "Jump t'' th'' end o'' th'' ship''s log",
       "planEmpty": "Nay plan output available yet.",
-      "applyEmpty": "Nay apply output available yet."
+      "applyEmpty": "Nay apply output available yet.",
+      "index": {
+        "label": "Set sail fer",
+        "title": "Set sail fer a change in the cargo, or fer the charted tally",
+        "summary": "Charted tally",
+        "action": {
+          "create": "build",
+          "update": "mend",
+          "replace": "swap out",
+          "destroy": "scuttle",
+          "read": "spy out",
+          "move": "shift",
+          "import": "haul aboard",
+          "error": "scuttled",
+          "warning": "squall ahead"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Policy Checks",

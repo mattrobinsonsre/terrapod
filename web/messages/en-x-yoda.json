@@ -2166,7 +2166,23 @@
       "end": "End",
       "endTitle": "To the end of the log, jump",
       "planEmpty": "No plan output available yet, there is.",
-      "applyEmpty": "No apply output available yet, there is."
+      "applyEmpty": "No apply output available yet, there is.",
+      "index": {
+        "label": "Jump, you will",
+        "title": "To a resource change, or to the plan summary, jump you will",
+        "summary": "Summary of the plan, the",
+        "action": {
+          "create": "create, you will",
+          "update": "update, you will",
+          "replace": "replace, you will",
+          "destroy": "destroy, you will",
+          "read": "read, you will",
+          "move": "move, you will",
+          "import": "import, you will",
+          "error": "failed, it has",
+          "warning": "careful, you must be"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Checks, Policy",

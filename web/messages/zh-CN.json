@@ -2166,7 +2166,23 @@
       "end": "末尾",
       "endTitle": "跳转到日志末尾",
       "planEmpty": "暂无可用的计划输出。",
-      "applyEmpty": "暂无可用的应用输出。"
+      "applyEmpty": "暂无可用的应用输出。",
+      "index": {
+        "label": "跳转到",
+        "title": "跳转到资源变更或计划摘要",
+        "summary": "计划摘要",
+        "action": {
+          "create": "创建",
+          "update": "更新",
+          "replace": "替换",
+          "destroy": "销毁",
+          "read": "读取",
+          "move": "移动",
+          "import": "导入",
+          "error": "错误",
+          "warning": "警告"
+        }
+      }
     },
     "policyPanel": {
       "heading": "策略检查",

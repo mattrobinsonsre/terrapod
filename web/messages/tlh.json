@@ -2166,7 +2166,23 @@
       "end": "Qav",
       "endTitle": "teywI' Qav Sup",
       "planEmpty": "nab chel tu'be'lu' DaH.",
-      "applyEmpty": "lo' chel tu'be'lu' DaH."
+      "applyEmpty": "lo' chel tu'be'lu' DaH.",
+      "index": {
+        "label": "ghoSmeH",
+        "title": "Doch choHlu''bogh ghoS, ghap nab De'' ghoS",
+        "summary": "nab De''",
+        "action": {
+          "create": "chenmoH",
+          "update": "choH",
+          "replace": "nIHmoH",
+          "destroy": "Qaw''",
+          "read": "laD",
+          "move": "vIH",
+          "import": "nobHa",
+          "error": "Qagh",
+          "warning": "ghuHmoHwI''"
+        }
+      }
     },
     "policyPanel": {
       "heading": "chut toblu'mey",

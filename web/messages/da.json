@@ -2166,7 +2166,23 @@
       "end": "Slut",
       "endTitle": "Hop til slutningen af loggen",
       "planEmpty": "Ingen plan-output tilgængelig endnu.",
-      "applyEmpty": "Ingen apply-output tilgængelig endnu."
+      "applyEmpty": "Ingen apply-output tilgængelig endnu.",
+      "index": {
+        "label": "Gå til",
+        "title": "Gå til en ressourceændring eller til planoversigten",
+        "summary": "Planoversigt",
+        "action": {
+          "create": "opret",
+          "update": "opdater",
+          "replace": "erstat",
+          "destroy": "slet",
+          "read": "læs",
+          "move": "flyt",
+          "import": "importer",
+          "error": "fejl",
+          "warning": "advarsel"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Politiktjek",

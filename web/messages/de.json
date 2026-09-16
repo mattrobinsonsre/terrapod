@@ -2166,7 +2166,23 @@
       "end": "Ende",
       "endTitle": "Zum Ende des Protokolls springen",
       "planEmpty": "Noch keine Plan-Ausgabe verfügbar.",
-      "applyEmpty": "Noch keine Anwendungs-Ausgabe verfügbar."
+      "applyEmpty": "Noch keine Anwendungs-Ausgabe verfügbar.",
+      "index": {
+        "label": "Springe zu",
+        "title": "Zu einer Ressourcenänderung oder zur Planübersicht springen",
+        "summary": "Planübersicht",
+        "action": {
+          "create": "erstellen",
+          "update": "aktualisieren",
+          "replace": "ersetzen",
+          "destroy": "zerstören",
+          "read": "lesen",
+          "move": "verschieben",
+          "import": "importieren",
+          "error": "Fehler",
+          "warning": "Warnung"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Richtlinienprüfungen",

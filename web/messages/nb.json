@@ -2166,7 +2166,23 @@
       "end": "Slutt",
       "endTitle": "Hopp til slutten av loggen",
       "planEmpty": "Ingen planutdata tilgjengelig ennå.",
-      "applyEmpty": "Ingen anvendelsesutdata tilgjengelig ennå."
+      "applyEmpty": "Ingen anvendelsesutdata tilgjengelig ennå.",
+      "index": {
+        "label": "Gå til",
+        "title": "Gå til en ressursendring eller til plansammendraget",
+        "summary": "Plansammendrag",
+        "action": {
+          "create": "opprett",
+          "update": "oppdater",
+          "replace": "erstatt",
+          "destroy": "slett",
+          "read": "les",
+          "move": "flytt",
+          "import": "importer",
+          "error": "feil",
+          "warning": "advarsel"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Regelkontroller",
