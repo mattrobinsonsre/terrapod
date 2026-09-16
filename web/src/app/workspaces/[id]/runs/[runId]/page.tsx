@@ -467,7 +467,20 @@ function LogPanel({
       const top = node.getBoundingClientRect().top + window.scrollY
       window.scrollTo({ top: Math.max(0, top - 96), behavior: 'smooth' })
     } else {
-      pre.scrollTo({ top: Math.max(0, node.offsetTop - pre.clientHeight / 3), behavior: 'smooth' })
+      // Measure the line against the pane, not via offsetTop. offsetTop is
+      // relative to the nearest *positioned* ancestor, and the <pre> is not
+      // positioned — so it carried the distance from somewhere further up the
+      // page, the pane scrolled too far, and the chosen line ended up above the
+      // top edge. Rect-difference plus the current scroll is independent of
+      // where the offsetParent happens to be.
+      const offsetWithinPane =
+        node.getBoundingClientRect().top - pre.getBoundingClientRect().top + pre.scrollTop
+      pre.scrollTo({
+        // A third of the way down, so the line has context above it rather
+        // than sitting flush against the top edge.
+        top: Math.max(0, offsetWithinPane - pre.clientHeight / 3),
+        behavior: 'smooth',
+      })
     }
     const handle = setTimeout(() => setHighlighted(null), 2000)
     return () => clearTimeout(handle)

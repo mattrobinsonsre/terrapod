@@ -162,6 +162,25 @@ test.describe('the plan-log index', () => {
       .poll(async () => pane.evaluate(el => el.scrollTop), { timeout: 5000 })
       .toBeGreaterThan(before)
 
+    // And it lands on the line — not merely somewhere further down. Asserting
+    // only that scrollTop grew is satisfied just as well by overshooting, which
+    // is precisely what `offsetTop` did: it measures from the nearest
+    // positioned ancestor, so the pane scrolled past the target and left it
+    // above the top edge. The line must end up inside the pane's visible box.
+    await expect
+      .poll(
+        async () =>
+          pane.evaluate(el => {
+            const node = el.querySelector('[data-log-line].bg-amber-400\\/20')
+            if (!node) return null
+            const p = el.getBoundingClientRect()
+            const n = node.getBoundingClientRect()
+            return n.top >= p.top && n.bottom <= p.bottom
+          }),
+        { timeout: 5000 },
+      )
+      .toBe(true)
+
     // The chosen line is marked so the eye lands on it.
     await expect(page.locator('[data-log-line].bg-amber-400\\/20')).toHaveCount(1)
   })
