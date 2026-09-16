@@ -106,6 +106,14 @@ capabilities).
 | `drift:dismiss` | POST workspaces/{id}/actions/dismiss-drift |
 | `workspace:onboard` | Onboard existing resources (#824): discover with the workspace's pool identity → import blocks / config (endpoints land with the discovery run type). Plan tier because it's read-only discovery run with the same pool creds a plan already uses; a dedicated token, so it's independently revocable. |
 
+> **Changed in v1.7.0.** Retrying a run used to need `run:cancel`, which is in
+> the `plan` preset. It now needs what *creating* that run needs — `run:plan`
+> for a plan-only run, `run:apply` (and `run:apply-destroy` for a destroy) for
+> an apply-capable one. On an auto-applying workspace a retry is an apply, so
+> the old gate let a `plan`-tier role cause one. A role holding `run:cancel`
+> without `run:apply` now gets a 403 retrying an apply-capable run; grant the
+> capability the run's kind requires, or retry from a `write`-tier role.
+
 ### `write` preset (adds)
 
 | Capability | Gates |

@@ -358,6 +358,26 @@ curl -X POST https://terrapod.local/api/terrapod/v1/workspaces/ws-ID/run-tasks \
 
 ---
 
+## Where a callback may point
+
+A run task's URL is supplied by a user, and the API server can reach the
+cluster's internals — so the same outbound guard that bounds notification
+webhooks bounds these callbacks. **New in 1.7:** loopback and link-local
+addresses are always refused, whatever the configuration, so a callback
+pointing at `127.0.0.1`, a `localhost` name, or `169.254.x` stops being
+delivered on upgrade. Private space (RFC1918) is *not* refused by default.
+
+Name the host in `api.config.outbound_requests.allowed_hosts`, or its network
+in `allowed_cidrs`, to exempt it — the allow-lists override even the
+always-refused ranges. A refused callback is recorded like any other failed
+delivery, with the result marked `unreachable` and a message naming the
+address and which allow-list would permit it.
+
+The rules, and how they behave behind an egress proxy, are set out once in
+[Notifications → Where a webhook may point](notifications.md#where-a-webhook-may-point).
+
+---
+
 ## See Also
 
 - [Notifications](notifications.md) — run lifecycle notifications

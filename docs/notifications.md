@@ -160,6 +160,12 @@ Sends a test notification with a verification payload. Useful for confirming web
 
 ## Where a webhook may point
 
+> **Changed in v1.7.0.** Loopback and link-local were delivered to before this
+> release. A webhook or [run-task](run-tasks.md) callback pointing at one stops
+> being delivered on upgrade — name it in `allowed_hosts` to keep it. Private
+> space is unaffected by default. See
+> [the runbook](runbooks.md#a-webhook-or-run-task-callback-stopped-being-delivered).
+
 Terrapod refuses to deliver to two address ranges, whatever the URL says:
 
 - **loopback** (127.0.0.0/8, ::1) — the API server's own surfaces

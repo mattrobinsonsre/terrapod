@@ -2246,6 +2246,18 @@ GET /api/terrapod/v1/listeners/{id}/runs/next
 
 Returns the next queued run for this listener.
 
+**`vault-files`** (added in v1.7.0) carries the [OpenBao/Vault](vault.md)
+secrets a variable asked to be delivered as files: a list of
+`{name, path, secret_key, value}`, which the listener writes into the run's
+existing per-run Secret and mounts read-only. The variable's own value is the
+file's path, so the secret itself never travels in `terraform-vars` or
+`env-vars`. A listener older than 1.7 ignores the attribute, and the run then
+fails with a variable naming a file that was never written — so upgrade
+listeners before using file delivery, as
+[Vault → Older listeners](vault.md#older-listeners) sets out. Like every other
+attribute on this endpoint, it is part of the frozen runner/listener wire
+contract.
+
 ### Listener Runner Token
 
 ```

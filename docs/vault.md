@@ -853,7 +853,7 @@ revokes the leases a run phase read from it once that phase is over:
 ```yaml
       instances:
         - name: default
-          address: https://vault.internal:8200
+          address: https://openbao.internal:8200
           revoke_leases: true
 ```
 
@@ -920,7 +920,7 @@ URL Terrapod checks and the one the server receives would differ:
 
 ```yaml
         - name: default
-          address: https://vault.internal:8200
+          address: https://openbao.internal:8200
           paths:
             - secret/apps
             - database/creds
