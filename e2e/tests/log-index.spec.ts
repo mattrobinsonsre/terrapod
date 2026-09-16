@@ -122,7 +122,15 @@ test.describe('the plan-log index', () => {
 
     const before = await pane.evaluate(el => el.scrollTop)
     // The last announced change is far enough down to require a scroll.
-    await page.getByTestId('log-index-plan').selectOption({ label: /aws_iam_role\.legacy/ })
+    // Resolve the option's value (its line number) first: selectOption's
+    // `label` takes a string, not a pattern, and a pattern is rejected
+    // outright rather than simply not matching.
+    const index = page.getByTestId('log-index-plan')
+    const value = await index
+      .locator('option', { hasText: 'aws_iam_role.legacy' })
+      .getAttribute('value')
+    expect(value).toBeTruthy()
+    await index.selectOption(value as string)
 
     await expect
       .poll(async () => pane.evaluate(el => el.scrollTop), { timeout: 5000 })
