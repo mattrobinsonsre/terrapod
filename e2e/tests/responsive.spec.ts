@@ -1084,3 +1084,100 @@ test.describe('Role reach panel (#1456)', () => {
     await expect(panel).toBeVisible();
   });
 });
+
+test.describe('Vault diagnostics (#1663)', () => {
+  // Stubbed: the E2E stack has no Vault. What is under test is the layout of
+  // every state at phone width, with the primary signal never hidden.
+  const status = {
+    data: [
+      {
+        id: 'primary',
+        type: 'vault-instance-statuses',
+        attributes: {
+          name: 'primary', default: true,
+          address: 'https://vault-with-a-very-long-hostname.internal.example.test:8200',
+          namespace: 'admin/team-with-a-long-namespace-name', 'auth-method': 'jwt',
+          'auth-mount': 'jwt', 'auth-role': 'terrapod', 'tls-trust': 'global-bundle',
+          reachable: false, initialized: null, sealed: null, standby: null, version: '',
+          'health-error': 'ConnectError: [Errno 111] Connection refused while contacting the Vault health endpoint',
+          'login-ok': false, 'login-error': 'Vault login failed for instance \'primary\' (jwt auth)',
+          'ttl-seconds': null, 'checked-at': '2026-09-15T10:00:00Z',
+          'last-error': {
+            class: 'VaultUnavailable', at: '2026-09-15T09:59:00Z',
+            message: "variables 'DB_PASSWORD', 'DB_USERNAME': Vault read of 'secret/apps/a/very/deep/path' failed",
+          },
+        },
+      },
+    ],
+    meta: {
+      pagination: { 'current-page': 1, 'page-size': 1, 'total-count': 1, 'total-pages': 1 },
+      vault: { enabled: true, 'sampled-at': '2026-09-15T10:00:00Z', 'unavailable-reason': null },
+    },
+  }
+
+  test('the Vault status page fits a phone and keeps its primary signal', async ({ page }) => {
+    await page.route('**/api/terrapod/v1/admin/vault', (route: Route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(status) }),
+    )
+    await page.goto('/admin/vault')
+    const card = page.getByTestId('vault-instance-primary').filter({ visible: true })
+    await expect(card).toBeVisible()
+    // Reachable and login are the two answers an operator opens this for;
+    // neither may be dropped to make the card fit.
+    await expect(card.getByText('Unreachable', { exact: true }).filter({ visible: true })).toBeVisible()
+    await expect(card.getByText('Login failed', { exact: true }).filter({ visible: true })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('the reference Check action and its result fit a phone', async ({ page }) => {
+    const wsId = await createWorkspace(getStoredToken(), uniqueName('e2erespvcheck'), {
+      'execution-mode': 'agent',
+    })
+    await page.route('**/api/terrapod/v1/vault/availability', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            type: 'vault-availability', id: 'vault',
+            attributes: { enabled: true, instances: ['primary'], 'default-instance': 'primary' },
+          },
+        }),
+      }),
+    )
+    await page.route('**/vault-reference-checks', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            id: 'vrc-1', type: 'vault-reference-checks',
+            attributes: {
+              ok: false, keys: ['a_rather_long_key_name_one', 'another_quite_long_key_name_two', 'three'],
+              notes: [],
+              checks: [
+                { name: 'parses', status: 'pass', detail: '' },
+                { name: 'readable', status: 'fail', detail: "the policy attached to role 'terrapod' grants [list] on 'secret/data/apps/a/very/deep/path'; the read needs read" },
+              ],
+            },
+          },
+        }),
+      }),
+    )
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    await page.getByRole('button', { name: 'Add Variable' }).filter({ visible: true }).first().click()
+    await page.locator('#var-source').selectOption('vault')
+    await page.locator('#add-mount').fill('secret')
+    await page.locator('#add-path').fill('apps/a/very/deep/path')
+    await page.locator('#add-field').fill('password')
+    const check = page.getByRole('button', { name: 'Check', exact: true }).filter({ visible: true })
+    await expect(check).toBeVisible()
+    await check.click()
+
+    const result = page.getByRole('status').filter({ visible: true })
+    await expect(result.getByText('This reference will not resolve as it is.')).toBeVisible()
+    await expect(result.getByText('Terrapod may read it')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+})

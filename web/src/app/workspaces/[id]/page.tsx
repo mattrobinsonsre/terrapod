@@ -276,6 +276,8 @@ function WorkspaceDetailContent() {
   const params = useParams()
   const searchParams = useSearchParams()
   const workspaceId = params.id as string
+  // The Vault reference "Check" action (#1663) posts here.
+  const vaultCheckUrl = `/api/terrapod/v1/workspaces/${workspaceId}/vault-reference-checks`
 
   const tabParam = searchParams.get('tab') || 'configuration'
   const activeTab: Tab = VALID_TABS.has(tabParam) ? (tabParam as Tab) : 'configuration'
@@ -3015,6 +3017,8 @@ function WorkspaceDetailContent() {
                     defaultInstance={vaultDefaultInstance}
                     value={vaultRef}
                     onChange={setVaultRef}
+                    checkUrl={vaultCheckUrl}
+                    variableKey={varKey}
                   />
                 )}
 
@@ -3141,6 +3145,7 @@ function WorkspaceDetailContent() {
                           <td colSpan={4} className="px-4 py-4">
                             <VariableEditPanel
                               idPrefix={`edit-${v.id}`}
+                              vaultCheckUrl={vaultCheckUrl}
                               state={editPanelState}
                               onChange={patchEditPanel}
                               vaultAvailable={vaultOfferable}
@@ -3192,6 +3197,7 @@ function WorkspaceDetailContent() {
                     {editingVarId === v.id ? (
                       <VariableEditPanel
                           idPrefix={`medit-${v.id}`}
+                          vaultCheckUrl={vaultCheckUrl}
                           state={editPanelState}
                           onChange={patchEditPanel}
                           vaultAvailable={vaultOfferable}

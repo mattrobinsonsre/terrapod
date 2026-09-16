@@ -34,7 +34,8 @@
     "closeMenu": "メニューを閉じる",
     "ha": "高可用性",
     "deletedWorkspaces": "削除されたワークスペース",
-    "version": "バージョン {version}"
+    "version": "バージョン {version}",
+    "vault": "OpenBao/Vault の状態"
   },
   "switcher": {
     "language": "言語",
@@ -755,7 +756,8 @@
       "deleteRole": "ロールの削除に失敗しました",
       "setAssignment": "割り当ての設定に失敗しました",
       "setAssignmentStatus": "割り当ての設定に失敗しました（{status}）",
-      "deleteAssignment": "割り当ての削除に失敗しました"
+      "deleteAssignment": "割り当ての削除に失敗しました",
+      "conflictingLabelKeys": "{keys} に複数の値が指定されています。ラベルルールはキーごとに 1 つの値しか保持しないため、最後の値が以前の値を暗黙的に置き換えます。1 つのキーに複数の値を指定することは API では可能ですが、ここではまだ設定できません。"
     }
   },
   "adminVcs": {
@@ -3248,5 +3250,60 @@
         "applying": "適用中"
       }
     }
+  },
+  "adminVault": {
+    "title": "OpenBao/Vault の状態",
+    "description": "Terrapod が変数を読み取る各 OpenBao（または HashiCorp Vault）インスタンスの稼働状況、ログイン、TLS の信頼。1 分ごとに取得し、このページを開いてもサーバーには接続しません。",
+    "disabled": "このデプロイでは OpenBao/Vault 値ソースが有効になっていません。",
+    "notSampled": "まだ取得されていません。最初の取得は API の起動後 1 分以内に行われます。",
+    "cacheUnreachable": "状態キャッシュを読み取れないため、各インスタンスの稼働状況は不明です。",
+    "sampledAt": "{time} に取得",
+    "refresh": "更新",
+    "default": "デフォルト",
+    "reachable": "到達可能",
+    "unreachable": "到達不能",
+    "sealed": "シール済み",
+    "unsealed": "アンシール済み",
+    "notInitialized": "未初期化",
+    "standby": "スタンバイ",
+    "loginOk": "ログイン OK",
+    "loginFailed": "ログイン失敗",
+    "unknown": "不明",
+    "address": "アドレス",
+    "namespace": "ネームスペース",
+    "authMethod": "認証方式",
+    "tlsTrust": "TLS の信頼",
+    "version": "バージョン",
+    "tokenTtl": "トークン TTL",
+    "checkedAt": "確認日時",
+    "lastError": "直近の解決エラー",
+    "noLastError": "記録なし",
+    "lastErrorLine": "{time} に {kind}",
+    "tlsInstanceCa": "インスタンスの CA のみ",
+    "tlsGlobalBundle": "グローバル CA バンドル",
+    "tlsDefault": "システムの信頼ストア",
+    "tlsSkipVerify": "検証なし"
+  },
+  "vaultCheck": {
+    "check": "チェック",
+    "checking": "チェック中…",
+    "ok": "この参照は解決できるはずです。",
+    "notOk": "この参照はこのままでは解決できません。",
+    "error": "チェックを実行できませんでした: {message}",
+    "nameParses": "参照が有効",
+    "nameInstance": "OpenBao/Vault インスタンス",
+    "namePathAllowed": "パスが許可されている",
+    "nameReadable": "Terrapod が読み取れる",
+    "nameFieldsPresent": "フィールドが存在する",
+    "statusPass": "合格",
+    "statusFail": "失敗",
+    "statusSkipped": "スキップ",
+    "statusUnknown": "不明",
+    "keys": "このシークレットのキー",
+    "noKeys": "なし",
+    "noteDynamic": "チェックは動的エンジンを読み取りません。読み取るたびに認証情報が発行されるためです。",
+    "noteKeysNeedPlan": "キー名は、このワークスペースでプランも実行できるユーザーにのみ表示されます。",
+    "noteLocal": "このワークスペースはローカルで実行されるため、OpenBao/Vault 参照は解決されません。",
+    "noteDisabled": "OpenBao/Vault 値ソースが有効になっていません。"
   }
 }

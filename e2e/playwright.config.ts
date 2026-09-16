@@ -115,6 +115,8 @@ export default defineConfig({
     {
       name: 'pulumi-workspace',
       testMatch: 'pulumi-workspace.spec.ts',
+      name: 'vault-diagnostics',
+      testMatch: 'vault-diagnostics.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {

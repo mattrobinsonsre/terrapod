@@ -34,7 +34,8 @@
     "closeMenu": "Zavřít nabídku",
     "ha": "Vysoká dostupnost",
     "deletedWorkspaces": "Smazané pracovní prostory",
-    "version": "Verze {version}"
+    "version": "Verze {version}",
+    "vault": "Stav OpenBao/Vault"
   },
   "switcher": {
     "language": "Jazyk",
@@ -755,7 +756,8 @@
       "deleteRole": "Nepodařilo se smazat roli",
       "setAssignment": "Nepodařilo se nastavit přiřazení",
       "setAssignmentStatus": "Nepodařilo se nastavit přiřazení ({status})",
-      "deleteAssignment": "Nepodařilo se smazat přiřazení"
+      "deleteAssignment": "Nepodařilo se smazat přiřazení",
+      "conflictingLabelKeys": "{keys} má více než jednu hodnotu. Pravidlo štítku drží jednu hodnotu na klíč, takže poslední by tiše nahradila předchozí. Více hodnot pro jeden klíč API podporuje, ale zde je zatím nastavit nelze."
     }
   },
   "adminVcs": {
@@ -3248,5 +3250,60 @@
         "applying": "Aplikování"
       }
     }
+  },
+  "adminVault": {
+    "title": "Stav OpenBao/Vault",
+    "description": "Dostupnost, přihlášení a důvěra TLS pro každou instanci OpenBao (nebo HashiCorp Vault), ze které Terrapod čte proměnné. Vzorkuje se jednou za minutu; otevření této stránky server nikdy nekontaktuje.",
+    "disabled": "Zdroj hodnot OpenBao/Vault není v tomto nasazení zapnutý.",
+    "notSampled": "Zatím nevzorkováno. První vzorek se odebere do minuty od spuštění API.",
+    "cacheUnreachable": "Mezipaměť stavu nelze přečíst, stav každé instance je proto neznámý.",
+    "sampledAt": "Vzorkováno {time}",
+    "refresh": "Obnovit",
+    "default": "Výchozí",
+    "reachable": "Dostupný",
+    "unreachable": "Nedostupný",
+    "sealed": "Zapečetěný",
+    "unsealed": "Odpečetěný",
+    "notInitialized": "Neinicializovaný",
+    "standby": "Pohotovost",
+    "loginOk": "Přihlášení OK",
+    "loginFailed": "Přihlášení selhalo",
+    "unknown": "Neznámý",
+    "address": "Adresa",
+    "namespace": "Jmenný prostor",
+    "authMethod": "Metoda ověření",
+    "tlsTrust": "Důvěra TLS",
+    "version": "Verze",
+    "tokenTtl": "TTL tokenu",
+    "checkedAt": "Zkontrolováno",
+    "lastError": "Poslední chyba rozlišení",
+    "noLastError": "Nic nezaznamenáno",
+    "lastErrorLine": "{kind} v {time}",
+    "tlsInstanceCa": "Pouze CA instance",
+    "tlsGlobalBundle": "Globální balík CA",
+    "tlsDefault": "Systémové úložiště důvěry",
+    "tlsSkipVerify": "Neověřeno"
+  },
+  "vaultCheck": {
+    "check": "Zkontrolovat",
+    "checking": "Probíhá kontrola…",
+    "ok": "Tento odkaz by se měl rozlišit.",
+    "notOk": "Tento odkaz se v současné podobě nerozliší.",
+    "error": "Kontrolu nelze spustit: {message}",
+    "nameParses": "Odkaz je platný",
+    "nameInstance": "Instance OpenBao/Vault",
+    "namePathAllowed": "Cesta povolena",
+    "nameReadable": "Terrapod ji smí číst",
+    "nameFieldsPresent": "Pole jsou přítomna",
+    "statusPass": "Vyhovuje",
+    "statusFail": "Nevyhovuje",
+    "statusSkipped": "Přeskočeno",
+    "statusUnknown": "Neznámé",
+    "keys": "Klíče v tomto tajemství",
+    "noKeys": "Žádné",
+    "noteDynamic": "Kontrola nikdy nečte dynamický engine: každé čtení by vydalo přihlašovací údaje.",
+    "noteKeysNeedPlan": "Názvy klíčů vidí jen ten, kdo v tomto pracovním prostoru smí také spustit plán.",
+    "noteLocal": "Tento pracovní prostor běží lokálně, kde se odkaz na OpenBao/Vault nikdy nerozliší.",
+    "noteDisabled": "Zdroj hodnot OpenBao/Vault není zapnutý."
   }
 }

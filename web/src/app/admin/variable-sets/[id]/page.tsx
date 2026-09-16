@@ -71,6 +71,8 @@ export default function VariableSetDetailPage() {
   const router = useRouter()
   const params = useParams()
   const varsetId = params.id as string
+  // The Vault reference "Check" action (#1663) posts here.
+  const vaultCheckUrl = `/api/terrapod/v1/varsets/${varsetId}/vault-reference-checks`
   const t = useTranslations('adminVariableSets')
   const { confirmDelete } = useConfirm()
 
@@ -672,6 +674,7 @@ export default function VariableSetDetailPage() {
                     <div>
                       <p className="text-xs text-slate-500 mb-2">{t('detail.vaultHint')}</p>
                       <VaultReferenceFields idPrefix="add" value={varVault} onChange={setVarVault}
+                        checkUrl={vaultCheckUrl} variableKey={varKey}
                         instances={vaultInstances} defaultInstance={vaultDefaultInstance} />
                     </div>
                   ) : (
@@ -737,6 +740,7 @@ export default function VariableSetDetailPage() {
                           <td colSpan={4} className="px-4 py-4">
                             <VariableEditPanel
                               idPrefix={`edit-${v.id}`}
+                              vaultCheckUrl={vaultCheckUrl}
                               state={editPanelState}
                               onChange={patchEditPanel}
                               vaultAvailable={vaultAvailable}
@@ -785,6 +789,7 @@ export default function VariableSetDetailPage() {
                     {editingVarId === v.id ? (
                             <VariableEditPanel
                               idPrefix={`medit-${v.id}`}
+                              vaultCheckUrl={vaultCheckUrl}
                               state={editPanelState}
                               onChange={patchEditPanel}
                               vaultAvailable={vaultAvailable}

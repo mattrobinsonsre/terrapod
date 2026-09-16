@@ -405,6 +405,57 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, st, nil
 	})
 
+	// ── terrapod_vault_status ────────────────────────────────────────
+	type vaultStatusIn struct{}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_vault_status",
+		Description: "Report the sampled status of every configured OpenBao (or HashiCorp Vault) instance Terrapod reads variable values from (#1663) — the first thing to read when an OpenBao/Vault-sourced variable will not resolve. Per instance: `reachable` plus sys/health (`initialized`, `sealed`, `standby`, `version`); `login-ok` with the configured auth method (kubernetes, jwt, approle or token) and `ttl-seconds` of Terrapod's token; `tls-trust` (instance-ca = verified against that instance's own CA only, global-bundle = the chart's caBundle, default = the system store, skip-verify); and `last-error`, the last failed resolution from any run ({class, message, at} — class VaultUnavailable means runs are waiting in queued, VaultDenied means a policy or login refusal, VaultNotFound a wrong path). Every probe field is NULL when unknown — not yet sampled, or not attempted (a sealed server is never logged in to) — which is NOT the same as false. The status is sampled once a minute on the server, never by this call, so `checked-at` says how fresh it is. `enabled` false means the value source is off. Never returns a secret value. Read-only; requires platform admin or audit.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ vaultStatusIn) (*mcp.CallToolResult, *terrapod.VaultStatus, error) {
+		st, err := c.GetVaultStatus(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, st, nil
+	})
+
+	// ── terrapod_vault_reference_check ───────────────────────────────
+	type vaultRefCheckIn struct {
+		WorkspaceID   string         `json:"workspace_id,omitempty" jsonschema:"the workspace (ws-...) the variable belongs to; give this or variable_set_id"`
+		VariableSetID string         `json:"variable_set_id,omitempty" jsonschema:"the variable set (varset-...) the variable belongs to; give this or workspace_id (platform admin only)"`
+		Reference     map[string]any `json:"reference,omitempty" jsonschema:"an OpenBao/Vault reference exactly as a vault-sourced variable's value holds it, e.g. {\"mount\":\"secret\",\"path\":\"apps/x\",\"field\":\"token\"} with optional vault, engine (kv2|dynamic), method, data and file; give this or variable_id"`
+		VariableID    string         `json:"variable_id,omitempty" jsonschema:"check the reference a stored vault-sourced variable (var-...) already holds; give this or reference"`
+		Key           string         `json:"key,omitempty" jsonschema:"the variable key a file name defaults to; optional"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_vault_reference_check",
+		Description: "Check an OpenBao/Vault variable reference WITHOUT resolving it (#1663): use it before creating an OpenBao/Vault-sourced variable, or to diagnose one that fails. Reports, in order, in `checks` (each pass/fail/skipped/unknown with a detail): `parses` (the reference and its file block are valid — the same validation a variable write applies); `instance` (the named or default instance exists); `path-allowed` (inside the instance's paths allow-list); `readable` (Terrapod's token may read the path, asked with sys/capabilities-self on `read-path` — the policy path, which for kv-v2 includes the data/ segment the reference omits — so it reads NOTHING and mints nothing); `fields-present` (kv-v2 only: the secret is read to list its key NAMES in `keys`, and `missing-fields` names any field, template tag or format field the reference needs that is absent). A DYNAMIC engine (database/creds, aws/creds, pki/issue) is NEVER read — each read would mint a credential — so `keys` stays null with note `dynamic-not-read`; `readable` is the strongest answer available for one. `unknown` means the server could not answer (sealed, unreachable), not that the check failed. Other notes: `keys-need-plan-permission` (you have var:write but not run:plan here, so key names are withheld), `local-execution` (the workspace runs locally, where an OpenBao/Vault reference never resolves), `vault-disabled`. Never returns a secret value. Needs var:write on the workspace (or platform admin for a variable set); rate-limited to 20 checks a minute per user.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in vaultRefCheckIn) (*mcp.CallToolResult, *terrapod.VaultReferenceCheck, error) {
+		if (in.WorkspaceID == "") == (in.VariableSetID == "") {
+			return errText("give exactly one of workspace_id and variable_set_id"), nil, nil
+		}
+		if (in.Reference == nil) == (in.VariableID == "") {
+			return errText("give exactly one of reference and variable_id"), nil, nil
+		}
+		opts := terrapod.VaultReferenceCheckOptions{
+			Reference: in.Reference, VariableID: in.VariableID, Key: in.Key,
+		}
+		var (
+			res *terrapod.VaultReferenceCheck
+			err error
+		)
+		if in.WorkspaceID != "" {
+			res, err = c.CheckWorkspaceVaultReference(ctx, in.WorkspaceID, opts)
+		} else {
+			res, err = c.CheckVariableSetVaultReference(ctx, in.VariableSetID, opts)
+		}
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, res, nil
+	})
+
 	// ── terrapod_role_reach ──────────────────────────────────────────
 	type roleReachIn struct {
 		Role     string `json:"role" jsonschema:"the custom role name whose reach to resolve"`

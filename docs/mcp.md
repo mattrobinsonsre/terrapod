@@ -113,6 +113,8 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_workspace_architecture_critique` | The AI architecture critique of a workspace's *deployed* system, from its latest state (the optional `ai_architecture` feature) — unlike a plan summary, which reviews a change. Every finding is grounded in the scanner, the cost engine or the resource graph. |
 | `terrapod_role_reach` | Which workspaces a custom RBAC role actually grants on, and why — each match with the label or name rule responsible. Use it before changing a role. |
 | `terrapod_resource_access` | The inverse: which roles can reach one resource, with the rule responsible and the capabilities each resolves to. |
+| `terrapod_vault_status` | Each configured OpenBao (or HashiCorp Vault) instance's sampled status: reachable, sealed, standby and version from `sys/health`; whether Terrapod can log in, and its token's TTL; which trust store TLS used; and the last resolution failure from any run. Unknown is `null`, never `false`. Never a secret value. Admin or audit. |
+| `terrapod_vault_reference_check` | Check an OpenBao/Vault reference, or a stored variable's, without resolving it. It asks the server whether Terrapod may read the path, reading nothing there; for kv-v2 only, it lists key **names** and says which fields the reference needs but are missing. A dynamic engine is never read, because a read mints a credential. Needs `var:write` on the workspace, or admin for a variable set. |
 | `terrapod_ha_status` | This deployment's HA posture: the leader/follower pair (in sync, seconds since the last sync, classes still backfilling — read these before a failover) and the in-cluster component health. |
 
 ### Act (gated) — the normal run lifecycle

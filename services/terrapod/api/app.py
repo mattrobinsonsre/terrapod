@@ -351,6 +351,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Revoke a run phase's dynamic Vault leases once its Job has ended",
     )
 
+    # Vault instance status (#1663): health, login and TLS trust per instance,
+    # sampled into Redis so the admin page never logs in to Vault itself. Only
+    # registered when the Vault value source is on — a deployment without Vault
+    # runs no task for it.
+    if settings.vault.enabled:
+        from terrapod.services.vault_diagnostics import (
+            SAMPLE_INTERVAL_SECONDS as VAULT_STATUS_INTERVAL,
+        )
+        from terrapod.services.vault_diagnostics import sample_cycle as vault_status_cycle
+
+        register_periodic_task(
+            "vault_status",
+            interval_seconds=VAULT_STATUS_INTERVAL,
+            handler=vault_status_cycle,
+            description="Sample each Vault instance's health, login and TLS trust",
+        )
+
     # Periodic polling is only active when explicitly enabled.
     if settings.drift_detection.enabled:
         from terrapod.services.drift_detection_service import drift_check_cycle
@@ -1223,6 +1240,13 @@ def create_application() -> FastAPI:
 
     include_tfe(variables_router)
     include_terrapod(variables_native_router)
+
+    # Vault diagnostics (#1663): admin instance status + reference checks.
+    # Mounted unconditionally so the route surface never depends on config;
+    # with Vault off the handlers answer "disabled".
+    from terrapod.api.routers.vault_diagnostics import router as vault_diagnostics_router
+
+    include_terrapod(vault_diagnostics_router)
 
     # Agent pool endpoints — Terrapod-native management (pool CRUD,
     # token CRUD, listener-protocol). The CLI never manages pools, so
