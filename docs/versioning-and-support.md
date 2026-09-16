@@ -41,9 +41,17 @@ for every public surface below.
 > itself the harm and a deprecation window would mean shipping a known hole for
 > two more minors. This is narrow — it covers removing access that should never
 > have been granted, never removing a route, an attribute, or a config key. It
-> has been used once, in **v1.4.0**, when GPG signing-key registration went from
-> "any authenticated caller" to requiring `registry:admin`; an unprivileged
-> account could otherwise add a trust anchor for the whole provider registry.
+> has been used three times. In **v1.4.0**, when GPG signing-key registration
+> went from "any authenticated caller" to requiring `registry:admin`; an
+> unprivileged account could otherwise add a trust anchor for the whole provider
+> registry. Twice in **v1.7.0**: retrying a run went from `run:cancel` to
+> requiring what creating that run requires (`run:plan`, `run:apply` or
+> `run:apply-destroy`), because on an auto-applying workspace a retry *is* an
+> apply and `run:cancel` is a `plan`-tier capability; and notification webhooks
+> and run-task callbacks stopped being delivered to loopback and link-local
+> addresses, which are a request-forgery primitive rather than a destination
+> anyone intends — an operator who does intend one names it in
+> `outbound_requests.allowed_hosts`.
 > When it is used, the release notes say so plainly and the affected doc pages
 > carry the migration step, so an operator meets it before their next apply
 > fails rather than after — see

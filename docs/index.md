@@ -44,6 +44,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Stale-plan Guards** | Auto-discard a plan that no longer reflects reality: state-version drift (always on) + optional per-workspace time-based plan expiry |
 | **Audit Logging** | Immutable event log with configurable retention |
 | **Notifications** | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
+| **Outbound URL guard** | Bounds where a user-supplied [webhook or run-task callback](notifications.md#where-a-webhook-may-point) may point: loopback and link-local always refused, private space optional, with per-host and per-CIDR allow-lists |
 | **Interactive Slack app** | Outbound Socket Mode app: `/terrapod` account linking (explicit confirm step) + opt-in per-workspace run notifications with RBAC-checked Approve/Discard buttons; multiple deployments can share one Slack workspace via per-deployment `slack.command`/`slack.label` ([Slack integration](slack-integration.md)) |
 | **Run Tasks** | Pre/post-plan webhook hooks for external validation |
 | **Execution Hooks** | **Custom execution steps** — admin-managed shell run in the runner Job at five run-lifecycle points, associated with workspaces (`pre_init` is the setup/tooling/auth slot; custom runner images cover heavier needs) |
@@ -57,6 +58,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Terragrunt** | Per-workspace Terragrunt for agent-mode runs (flag + version, pull-through binary cache, local-backend reconciliation); CLI-driven runs work with zero config |
 | **Workspace Autodiscovery** | Atlantis-style monorepo autodiscovery with rule templating; safe-by-default rename/delete/orphan lifecycle (opt-in destroy) |
 | **Module Autodiscovery** | [Rules](registry.md#module-autodiscovery) that find the modules (root and submodules) in a repository, or across an org, group or name pattern: preview, register all or a picked subset, and register new directories and new repositories automatically; never deletes a module |
+| **Registry Submodules** | Publish a module from a [subdirectory](registry.md#submodules-a-module-in-a-subdirectory) of its repository — `subdirectory` on a VCS-sourced module, re-rooted so consumers need no `//subdir` suffix; one repository can hold many modules |
 | **Bulk Workspace Operations** | Server-side workspace search + all-or-nothing bulk settings update (dry-run by default; never triggers runs) |
 | **Cross-Workspace Remote State** | `terraform_remote_state` composition with a producer-controlled consumer allowlist (secure by default; secret-bearing state stays with its owner) |
 | **Internationalization** | Web UI translated into 27 languages (next-intl), right-to-left included; AI plan summaries translated at view time; completeness-gated so a partial language is never shipped. See [i18n](internationalization.md) |

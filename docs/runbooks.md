@@ -182,6 +182,61 @@ Fix what the message names, then queue a new run. The message only ever carries 
 
 ---
 
+## A Webhook or Run-Task Callback Stopped Being Delivered
+
+**New in 1.7**, and the one upgrade that can break a working configuration
+without anyone changing it.
+
+### Symptoms
+
+- A notification webhook that delivered fine on 1.6 stops after the upgrade.
+- A run task's stage sits at `unreachable`, or a notification's delivery log
+  shows a refusal naming an address.
+- The endpoint is on `127.0.0.1`, a `localhost` name, or `169.254.x`.
+
+### Diagnosis
+
+Terrapod now bounds where a user-supplied URL may point
+([Notifications → Where a webhook may point](notifications.md#where-a-webhook-may-point)).
+**Loopback and link-local are always refused**, whatever the configuration:
+loopback addresses the API server's own surfaces from inside its trust
+boundary, and link-local holds the cloud instance-metadata endpoint. Private
+space (RFC1918) is **not** refused unless
+`api.config.outbound_requests.block_private_addresses` is `true`, so an
+in-cluster or corporate-network endpoint keeps working.
+
+The refusal is recorded as an ordinary failed delivery, and the message names
+the address and which allow-list would permit it — so the log tells you what
+to add rather than failing silently.
+
+### Resolution
+
+If the endpoint is intended, exempt it in values and upgrade:
+
+```yaml
+api:
+  config:
+    outbound_requests:
+      allowed_hosts: ["metrics.internal"]   # exact hostnames, no wildcards
+      allowed_cidrs: ["10.42.0.0/16"]       # or a whole network
+```
+
+The allow-lists override even the always-refused ranges, so a deliberate
+loopback or link-local receiver can be named here. If the endpoint is *not*
+intended, this is the guard doing its job: repoint the webhook.
+
+Behind an egress proxy, a URL whose host is a name is handed to the proxy
+without being resolved, so the proxy is where egress policy applies; a literal
+address is still judged here.
+
+### Verification
+
+Send a test delivery from the workspace's notification configuration, or
+re-run the run task. A successful delivery, or a stage that leaves
+`unreachable`, confirms it.
+
+---
+
 ## State Diverged
 
 The runner entrypoint marks a workspace as "state diverged" when an `apply` succeeds (infrastructure changed) but the state file upload to object storage fails. This is a critical situation — real infrastructure has changed but Terrapod's state doesn't reflect it.
