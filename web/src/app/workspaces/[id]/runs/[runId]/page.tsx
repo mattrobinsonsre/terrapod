@@ -19,6 +19,7 @@ import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
 import { useIsTouch } from '@/lib/use-media-query'
 import { createLogFollower, type LogFollower } from '@/lib/log-follower'
+import { parsePlanLogIndex, type PlanEntryAction } from '@/lib/plan-log-index'
 import { ArrowDownToLine, RefreshCw, Download, Copy, Check, Palette } from 'lucide-react'
 
 // WebGL (three.js) — client-only, never SSR'd. Loaded on demand (#761).
@@ -310,6 +311,34 @@ function SummaryCard({
  *  - at-bottom is measured against the **window**, so scrolling up to read
  *    disengages follow and a floating "Jump to latest" affordance snaps back.
  */
+/**
+ * One plan-index entry's action, as a label (#1590).
+ *
+ * A switch of literal keys rather than `t(`log.index.action.${action}`)`: the
+ * i18n resolve gate deliberately skips dynamically-built keys, so the template
+ * form would pass CI and then throw MISSING_MESSAGE in front of an operator.
+ */
+function planActionLabel(t: ReturnType<typeof useTranslations>, action: PlanEntryAction): string {
+  switch (action) {
+    case 'create':
+      return t('log.index.action.create')
+    case 'update':
+      return t('log.index.action.update')
+    case 'replace':
+      return t('log.index.action.replace')
+    case 'destroy':
+      return t('log.index.action.destroy')
+    case 'read':
+      return t('log.index.action.read')
+    case 'move':
+      return t('log.index.action.move')
+    case 'import':
+      return t('log.index.action.import')
+    default:
+      return t('log.index.summary')
+  }
+}
+
 function LogPanel({
   log,
   precomputedHtml,
@@ -318,6 +347,7 @@ function LogPanel({
   phase,
   runId,
   isStreaming,
+  logComplete = false,
   onRefresh,
 }: {
   log: string | null
@@ -327,6 +357,13 @@ function LogPanel({
   phase: 'plan' | 'apply'
   runId: string
   isStreaming: boolean
+  /**
+   * True once the server has marked this phase's log complete (#1590). The
+   * plan index appears only then: a settled log parses in one pass, so the
+   * streaming path keeps exactly the rendering it has today and the entries
+   * never shift under the operator as more text arrives.
+   */
+  logComplete?: boolean
   onRefresh?: () => void
 }) {
   // Scroll model is viewport-driven (#722, #719): on desktop the log is a
@@ -377,6 +414,56 @@ function LogPanel({
     if (!cleanLog) return ''
     return stripAnsi(cleanLog)
   }, [cleanLog])
+
+  // The plan index (#1590), built only from a log the server has marked
+  // complete. A still-arriving log would shift its own entries under the
+  // operator, and the `Plan: N to add…` line only lands with the final read —
+  // so waiting costs nothing and keeps the streaming path exactly as it was.
+  const planIndex = useMemo(
+    () => (phase === 'plan' && logComplete ? parsePlanLogIndex(cleanLog) : []),
+    [phase, logComplete, cleanLog],
+  )
+
+  // One node per line, so an entry has something to scroll to and highlight —
+  // the single blob the viewer normally renders has nothing to anchor to. A
+  // fresh Convert per pass: ansi-to-html carries SGR state between calls, so
+  // the shared module-level instance would drift colour from line to line.
+  const indexedLines = useMemo(() => {
+    if (planIndex.length === 0 || !cleanLog) return []
+    const convert = new Convert({ fg: '#cbd5e1', bg: 'transparent', escapeXML: true })
+    // A blank line still needs a box, or the log's spacing collapses.
+    return cleanLog.split('\n').map(text => ({ text, html: convert.toHtml(text) || '&nbsp;' }))
+  }, [planIndex.length, cleanLog])
+
+  const [highlighted, setHighlighted] = useState<number | null>(null)
+  const [highlightedNode, setHighlightedNode] = useState<HTMLElement | null>(null)
+  // Bumped on every jump so choosing the same entry twice scrolls again: the
+  // line number alone would be unchanged and React would not re-run the effect.
+  const [jump, setJump] = useState(0)
+
+  const scrollToLine = useCallback((line: number) => {
+    setHighlighted(line)
+    setJump(n => n + 1)
+  }, [])
+
+  // Move the active scroller to the chosen line, then let the highlight fade.
+  // Two branches, the same split as scrollToBottom — with a mouse the pane
+  // scrolls, on touch the page does, and doing only one silently does nothing
+  // on the other platform.
+  useEffect(() => {
+    if (highlighted === null || !highlightedNode) return
+    if (isTouch) {
+      const top = highlightedNode.getBoundingClientRect().top + window.scrollY
+      window.scrollTo({ top: Math.max(0, top - 96), behavior: 'smooth' })
+    } else if (pre) {
+      pre.scrollTo({
+        top: Math.max(0, highlightedNode.offsetTop - pre.clientHeight / 3),
+        behavior: 'smooth',
+      })
+    }
+    const handle = setTimeout(() => setHighlighted(null), 2000)
+    return () => clearTimeout(handle)
+  }, [highlighted, highlightedNode, jump, isTouch, pre])
 
   const isAtBottom = useCallback(() => {
     if (isTouch) {
@@ -552,6 +639,40 @@ function LogPanel({
                 {t('log.follow')}
               </button>
             )}
+            {/* The plan index (#1590): jump to any resource change, or to the
+                summary. Plan logs only, and only once the log is whole — a
+                still-arriving log would shift its own entries, and the
+                `Plan: N to add…` line only lands with the final read. */}
+            {planIndex.length > 0 && (
+              <>
+                <label htmlFor={`log-index-${phase}`} className="sr-only">
+                  {t('log.index.label')}
+                </label>
+                <select
+                  id={`log-index-${phase}`}
+                  data-testid={`log-index-${phase}`}
+                  value=""
+                  onChange={e => {
+                    const at = Number(e.target.value)
+                    if (Number.isInteger(at)) scrollToLine(at)
+                    // Reset to the placeholder so choosing the same entry twice
+                    // fires again — this is a jump control, not a state field.
+                    e.target.value = ''
+                  }}
+                  className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors max-w-[12rem] focus:border-brand-500 focus:outline-none"
+                  title={t('log.index.title')}
+                >
+                  <option value="">{t('log.index.label')}</option>
+                  {planIndex.map(entry => (
+                    <option key={`${entry.line}-${entry.address}`} value={entry.line}>
+                      {entry.action === 'summary'
+                        ? t('log.index.summary')
+                        : `${planActionLabel(t, entry.action)} · ${entry.address}`}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
             {/* "End" jumps to the tail (one-shot). Distinct from Follow: End is a
                 single scroll-to-bottom, always available; Follow is the streaming
                 auto-tail mode. Phones have a built-in scroll-to-top, so no Top. */}
@@ -595,6 +716,30 @@ function LogPanel({
           ) : (
             <div className="p-6 text-sm text-slate-500">{emptyMessage}</div>
           )
+        ) : planIndex.length > 0 ? (
+          /* Only an indexed plan log renders a node per line (#1590): jumping
+             to a line and highlighting it needs something to anchor to, and the
+             single blob below has nothing. Confined to a log the server has
+             marked complete, so the streaming path — and everything #722,
+             #1271, #1547 and #1591 settled about it — is untouched, and this
+             text is parsed and laid out exactly once. */
+          <pre
+            ref={setPre}
+            data-testid={`log-pre-${phase}`}
+            className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
+          >
+            {indexedLines.map((line, i) => (
+              <div
+                key={i}
+                data-log-line={i}
+                ref={i === highlighted ? setHighlightedNode : undefined}
+                className={i === highlighted ? 'bg-amber-400/20 rounded-sm' : undefined}
+                dangerouslySetInnerHTML={colorMode ? { __html: line.html } : undefined}
+              >
+                {colorMode ? undefined : line.text}
+              </div>
+            ))}
+          </pre>
         ) : colorMode ? (
           <pre
             ref={setPre}
@@ -664,6 +809,11 @@ function RunDetailPageInner() {
   const [applyLog, setApplyLog] = useState<string | null>(null)
   const [planHtml, setPlanHtml] = useState('')
   const [applyHtml, setApplyHtml] = useState('')
+  // True once a plan-log response has carried ETX: the log is whole (#1590).
+  // The index is built only then — a terminal run status is not the same
+  // moment, because the follower keeps re-reading a finished phase until the
+  // server marks it complete, and the `Plan: N to add…` line arrives with it.
+  const [planLogComplete, setPlanLogComplete] = useState(false)
   const [planLogLoading, setPlanLogLoading] = useState(false)
   const [applyLogLoading, setApplyLogLoading] = useState(false)
   // Bumped when the SSE `plan_summary_ready` event arrives so the
@@ -941,6 +1091,11 @@ function RunDetailPageInner() {
             setPlanLog(prev => (prev ?? '') + chunk)
             setPlanHtml(prev => prev + html)
           }
+          // Read after the text is applied, so "complete" can never be true for
+          // a log the viewer has not been given yet (#1590). A reset clears it
+          // in the follower, so a refetched log stops being complete until its
+          // ETX arrives again.
+          setPlanLogComplete(planFollower.current?.isComplete() ?? false)
         },
       })
     }
@@ -1783,6 +1938,7 @@ function RunDetailPageInner() {
             phase="plan"
             runId={runId}
             isStreaming={attrs.status === 'planning'}
+            logComplete={planLogComplete}
             onRefresh={() => loadPlanLog(true)}
           />
         )}

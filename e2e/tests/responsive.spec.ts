@@ -528,6 +528,54 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('the plan-log index is usable at phone width (#1590)', async ({ page }) => {
+    // A native <select> is the right control on touch: the platform renders it
+    // as its own picker, so a long list of resource addresses never needs a
+    // custom menu that could overflow the viewport. The index only exists once
+    // the log is whole, so the stub ends the body with ETX.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('resp-idx'));
+    const runId = await seedRun(token, wsId);
+    const body =
+      '\x02Terraform will perform the following actions:\n\n' +
+      '  # aws_instance.web will be updated in-place\n' +
+      '  ~ resource "aws_instance" "web" {\n    }\n\n' +
+      '  # aws_s3_bucket.assets will be created\n' +
+      '  + resource "aws_s3_bucket" "assets" {\n    }\n\n' +
+      'Plan: 1 to add, 1 to change, 0 to destroy.\n\x03';
+
+    await page.route(`**/api/v2/runs/${runId}`, async (route: Route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.data.attributes.status = 'planned';
+      await route.fulfill({ response: res, body: JSON.stringify(json) });
+    });
+    await page.route(`**/api/terrapod/v1/runs/${runId}/plan`, (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.api+json',
+        body: JSON.stringify({
+          data: { id: 'p', type: 'plans', attributes: { 'log-read-url': '/__e2e_idx_log' } },
+        }),
+      }));
+    await page.route('**/__e2e_idx_log*', (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/plain',
+        body: new URL(route.request().url()).searchParams.get('offset') === '0' ? body : '',
+      }));
+
+    await page.goto(`/workspaces/${wsId}/runs/${runId}?view=plan`);
+
+    const index = page.getByTestId('log-index-plan');
+    await expect(index).toBeVisible();
+    // A real tap target, not a sliver of text.
+    const box = await index.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
+    // The whole point: a long resource address must not widen the page.
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('the run log pane reserves no height on touch (#1547, #722)', async ({ page }) => {
     // #1547 reserves the pane's full height while a phase streams — with a
     // precise pointer only. On touch the page is the scroll container (#722):

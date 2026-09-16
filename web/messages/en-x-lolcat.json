@@ -2156,7 +2156,21 @@
       "end": "End",
       "endTitle": "Jump ta teh end ov teh log",
       "planEmpty": "No plan output availabul yet.",
-      "applyEmpty": "No apply output availabul yet."
+      "applyEmpty": "No apply output availabul yet.",
+      "index": {
+        "label": "Jumpz to",
+        "title": "Jumpz to a rezorce chanj, or teh plan summry",
+        "summary": "Plan Summry",
+        "action": {
+          "create": "makez",
+          "update": "updatez",
+          "replace": "swapz",
+          "destroy": "destroyz",
+          "read": "reedz",
+          "move": "movez",
+          "import": "importz"
+        }
+      }
     },
     "policyPanel": {
       "heading": "Policy Checkz",
