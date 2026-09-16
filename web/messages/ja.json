@@ -2168,7 +2168,9 @@
           "destroy": "破棄",
           "read": "読み取り",
           "move": "移動",
-          "import": "インポート"
+          "import": "インポート",
+          "error": "エラー",
+          "warning": "警告"
         }
       }
     },

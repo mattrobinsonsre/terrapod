@@ -2168,7 +2168,9 @@
           "destroy": "destroyz",
           "read": "reedz",
           "move": "movez",
-          "import": "importz"
+          "import": "importz",
+          "error": "oh noes",
+          "warning": "warnin"
         }
       }
     },

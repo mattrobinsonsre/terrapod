@@ -2168,7 +2168,9 @@
           "destroy": "dinistrio",
           "read": "darllen",
           "move": "symud",
-          "import": "mewnforio"
+          "import": "mewnforio",
+          "error": "gwall",
+          "warning": "rhybudd"
         }
       }
     },

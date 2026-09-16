@@ -2174,7 +2174,9 @@
           "destroy": "destroy",
           "read": "read",
           "move": "move",
-          "import": "import"
+          "import": "import",
+          "error": "error",
+          "warning": "warning"
         }
       }
     },

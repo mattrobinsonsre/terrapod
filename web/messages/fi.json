@@ -2168,7 +2168,9 @@
           "destroy": "tuhoa",
           "read": "lue",
           "move": "siirrä",
-          "import": "tuo"
+          "import": "tuo",
+          "error": "virhe",
+          "warning": "varoitus"
         }
       }
     },

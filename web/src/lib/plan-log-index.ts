@@ -19,7 +19,7 @@
  * A line that does not parse is simply left out. Nothing here throws.
  */
 
-/** What the plan says will happen to one resource. */
+/** What the plan says will happen to one resource, or what went wrong. */
 export type PlanEntryAction =
   | 'create'
   | 'update'
@@ -28,6 +28,8 @@ export type PlanEntryAction =
   | 'read'
   | 'move'
   | 'import'
+  | 'error'
+  | 'warning'
   | 'summary'
 
 /** One entry in the index: a line to jump to, and what it announces. */
@@ -72,6 +74,20 @@ const PATTERNS: ReadonlyArray<readonly [RegExp, PlanEntryAction]> = [
 ]
 
 /**
+ * A diagnostic, which is the other thing worth jumping to: a plan that failed
+ * is exactly when the log is long and the reason is buried.
+ *
+ * Both engines print these inside a box-drawing frame, so once ANSI is gone the
+ * line reads `│ Error: <title>`. The gutter is optional because `-no-color`
+ * output omits the frame entirely, and the runner's log carries it — so both
+ * spellings are accepted rather than assuming whichever was to hand.
+ *
+ * The title alone is captured. The detail beneath it is several lines of prose
+ * and source excerpt, which belongs in the log, not in a picker.
+ */
+const DIAGNOSTIC = /^\s*(?:[│|]\s*)?(Error|Warning):\s+(.+?)\s*$/
+
+/**
  * The closing tally, or its no-op equivalent. Both engines print one of these
  * once, near the end — and only after the run finishes, so the index gains this
  * entry a moment after the others.
@@ -108,6 +124,19 @@ export function parsePlanLogIndex(text: string | null | undefined): PlanLogEntry
       }
     }
     if (matched) continue
+
+    // A diagnostic. Checked before the summary because a failed plan prints no
+    // tally at all, and after the resource patterns because a resource line
+    // never contains one.
+    const diag = DIAGNOSTIC.exec(clean)
+    if (diag) {
+      entries.push({
+        line,
+        action: diag[1] === 'Error' ? 'error' : 'warning',
+        address: diag[2].trim(),
+      })
+      continue
+    }
 
     // Only the first summary line counts: a destroy plan prints the tally
     // again in the apply phase, and the two logs can share a viewer.

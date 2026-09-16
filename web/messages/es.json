@@ -2168,7 +2168,9 @@
           "destroy": "destruir",
           "read": "leer",
           "move": "mover",
-          "import": "importar"
+          "import": "importar",
+          "error": "error",
+          "warning": "advertencia"
         }
       }
     },

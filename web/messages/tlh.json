@@ -2168,7 +2168,9 @@
           "destroy": "Qaw''",
           "read": "laD",
           "move": "vIH",
-          "import": "nobHa"
+          "import": "nobHa",
+          "error": "Qagh",
+          "warning": "ghuHmoHwI''"
         }
       }
     },

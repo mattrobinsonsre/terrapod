@@ -2168,7 +2168,9 @@
           "destroy": "d357r0y",
           "read": "r34d",
           "move": "m0v3",
-          "import": "1mp0r7"
+          "import": "1mp0r7",
+          "error": "3rr0r",
+          "warning": "w4rn1ng"
         }
       }
     },

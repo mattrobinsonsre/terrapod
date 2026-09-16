@@ -2168,7 +2168,9 @@
           "destroy": "odstranit",
           "read": "přečíst",
           "move": "přesunout",
-          "import": "importovat"
+          "import": "importovat",
+          "error": "chyba",
+          "warning": "varování"
         }
       }
     },

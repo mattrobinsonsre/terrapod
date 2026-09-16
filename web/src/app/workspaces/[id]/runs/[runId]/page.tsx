@@ -334,6 +334,10 @@ function planActionLabel(t: ReturnType<typeof useTranslations>, action: PlanEntr
       return t('log.index.action.move')
     case 'import':
       return t('log.index.action.import')
+    case 'error':
+      return t('log.index.action.error')
+    case 'warning':
+      return t('log.index.action.warning')
     default:
       return t('log.index.summary')
   }
@@ -436,7 +440,6 @@ function LogPanel({
   }, [planIndex.length, cleanLog])
 
   const [highlighted, setHighlighted] = useState<number | null>(null)
-  const [highlightedNode, setHighlightedNode] = useState<HTMLElement | null>(null)
   // Bumped on every jump so choosing the same entry twice scrolls again: the
   // line number alone would be unchanged and React would not re-run the effect.
   const [jump, setJump] = useState(0)
@@ -451,19 +454,24 @@ function LogPanel({
   // scrolls, on touch the page does, and doing only one silently does nothing
   // on the other platform.
   useEffect(() => {
-    if (highlighted === null || !highlightedNode) return
+    if (highlighted === null || !pre) return
+    // Query the node rather than capturing it through a ref callback. A ref
+    // spelled `i === highlighted ? setNode : undefined` only attaches on the
+    // render *after* the selection, and React does not re-run a ref for a node
+    // it already mounted with undefined — so the node stayed null, the effect
+    // returned here, and nothing scrolled at all. By this point the line is in
+    // the DOM, so asking for it directly is both simpler and reliable.
+    const node = pre.querySelector<HTMLElement>(`[data-log-line="${highlighted}"]`)
+    if (!node) return
     if (isTouch) {
-      const top = highlightedNode.getBoundingClientRect().top + window.scrollY
+      const top = node.getBoundingClientRect().top + window.scrollY
       window.scrollTo({ top: Math.max(0, top - 96), behavior: 'smooth' })
-    } else if (pre) {
-      pre.scrollTo({
-        top: Math.max(0, highlightedNode.offsetTop - pre.clientHeight / 3),
-        behavior: 'smooth',
-      })
+    } else {
+      pre.scrollTo({ top: Math.max(0, node.offsetTop - pre.clientHeight / 3), behavior: 'smooth' })
     }
     const handle = setTimeout(() => setHighlighted(null), 2000)
     return () => clearTimeout(handle)
-  }, [highlighted, highlightedNode, jump, isTouch, pre])
+  }, [highlighted, jump, isTouch, pre])
 
   const isAtBottom = useCallback(() => {
     if (isTouch) {
@@ -732,7 +740,6 @@ function LogPanel({
               <div
                 key={i}
                 data-log-line={i}
-                ref={i === highlighted ? setHighlightedNode : undefined}
                 className={i === highlighted ? 'bg-amber-400/20 rounded-sm' : undefined}
                 dangerouslySetInnerHTML={colorMode ? { __html: line.html } : undefined}
               >

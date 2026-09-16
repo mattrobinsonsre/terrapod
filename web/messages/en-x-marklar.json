@@ -2168,7 +2168,9 @@
           "destroy": "marklar",
           "read": "marklar",
           "move": "marklar",
-          "import": "marklar"
+          "import": "marklar",
+          "error": "marklar",
+          "warning": "marklar"
         }
       }
     },

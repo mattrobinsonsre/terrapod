@@ -2168,7 +2168,9 @@
           "destroy": "slet",
           "read": "læs",
           "move": "flyt",
-          "import": "importer"
+          "import": "importer",
+          "error": "fejl",
+          "warning": "advarsel"
         }
       }
     },

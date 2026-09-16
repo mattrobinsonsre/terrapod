@@ -217,6 +217,82 @@ Plan: 0 to add, 0 to change, 1 to destroy.
   })
 })
 
+/**
+ * Diagnostics. A failed plan is when the log is longest and the reason hardest
+ * to find, so these are the entries that earn the picker its keep.
+ *
+ * Both fixtures are real `tofu` output: the first as `-no-color` prints it (no
+ * frame at all), the second as the runner logs it (box-drawing gutter, ANSI
+ * intact). Only the second is what the viewer actually receives, and an earlier
+ * pattern built against the first alone would have matched nothing in it.
+ */
+const PLAIN_ERRORS = `
+Error: Invalid function argument
+
+  on main.tf line 2, in locals:
+   2:   missing_file = file("does-not-exist.txt")
+
+Invalid value for "path" parameter: no file exists at "does-not-exist.txt".
+
+Error: Reference to undeclared input variable
+
+  on main.tf line 8, in resource "terraform_data" "uses_missing_var":
+   8:   input = var.never_declared
+
+An input variable with the name "never_declared" has not been declared.
+`
+
+// The gutter is U+2502, wrapped in the colour codes the engine emits.
+const FRAMED_ERRORS =
+  '\x1b[31m╷\x1b[0m\n' +
+  '\x1b[31m│\x1b[0m \x1b[1m\x1b[31mError: \x1b[0m\x1b[1mInvalid index\x1b[0m\n' +
+  '\x1b[31m│\x1b[0m \n' +
+  '\x1b[31m│\x1b[0m   on main.tf line 3, in locals:\n' +
+  '\x1b[31m╵\x1b[0m\n' +
+  '\x1b[33m│\x1b[0m \x1b[1m\x1b[33mWarning: \x1b[0m\x1b[1mDeprecated attribute\x1b[0m\n'
+
+describe('parsePlanLogIndex — diagnostics', () => {
+  it('indexes each error in an unframed log', () => {
+    assert.deepEqual(actions(PLAIN_ERRORS), ['error', 'error'])
+    assert.deepEqual(addresses(PLAIN_ERRORS), [
+      'Invalid function argument',
+      'Reference to undeclared input variable',
+    ])
+  })
+
+  it('indexes errors and warnings through the frame the runner logs', () => {
+    assert.deepEqual(actions(FRAMED_ERRORS), ['error', 'warning'])
+    assert.deepEqual(addresses(FRAMED_ERRORS), ['Invalid index', 'Deprecated attribute'])
+  })
+
+  it('takes the title only, not the prose beneath it', () => {
+    const [entry] = parsePlanLogIndex(PLAIN_ERRORS)
+    assert.equal(entry.address, 'Invalid function argument')
+    assert.ok(!entry.address.includes('no file exists'))
+  })
+
+  it('points at the line the diagnostic starts on', () => {
+    const lines = FRAMED_ERRORS.split('\n')
+    for (const entry of parsePlanLogIndex(FRAMED_ERRORS)) {
+      assert.ok(
+        stripAnsi(lines[entry.line]).includes(entry.address),
+        `entry ${JSON.stringify(entry)} does not point at its own line`,
+      )
+    }
+  })
+
+  it('indexes changes and errors together, in log order', () => {
+    const mixed = `  # aws_s3_bucket.a will be created\n\nError: Invalid index\n\n  # aws_s3_bucket.b will be destroyed\n`
+    assert.deepEqual(actions(mixed), ['create', 'error', 'destroy'])
+  })
+
+  it('does not mistake ordinary prose for a diagnostic', () => {
+    // A plan body can contain the word, and an attribute can be named for it.
+    assert.deepEqual(parsePlanLogIndex('      + error_message = "boom"'), [])
+    assert.deepEqual(parsePlanLogIndex('Errors are reported at the end.'), [])
+  })
+})
+
 describe('stripAnsi', () => {
   it('removes the escapes the viewer renders but the parser must not see', () => {
     assert.equal(stripAnsi('\x1b[1mbold\x1b[0m plain'), 'bold plain')

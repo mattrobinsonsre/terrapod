@@ -2168,7 +2168,9 @@
           "destroy": "삭제",
           "read": "읽기",
           "move": "이동",
-          "import": "가져오기"
+          "import": "가져오기",
+          "error": "오류",
+          "warning": "경고"
         }
       }
     },

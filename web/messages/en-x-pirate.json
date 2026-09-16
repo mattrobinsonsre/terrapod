@@ -2168,7 +2168,9 @@
           "destroy": "scuttle",
           "read": "spy out",
           "move": "shift",
-          "import": "haul aboard"
+          "import": "haul aboard",
+          "error": "scuttled",
+          "warning": "squall ahead"
         }
       }
     },

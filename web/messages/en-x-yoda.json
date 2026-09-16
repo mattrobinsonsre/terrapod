@@ -2168,7 +2168,9 @@
           "destroy": "destroy, you will",
           "read": "read, you will",
           "move": "move, you will",
-          "import": "import, you will"
+          "import": "import, you will",
+          "error": "failed, it has",
+          "warning": "careful, you must be"
         }
       }
     },

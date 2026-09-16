@@ -2168,7 +2168,9 @@
           "destroy": "förstöra",
           "read": "läsa",
           "move": "flytta",
-          "import": "importera"
+          "import": "importera",
+          "error": "fel",
+          "warning": "varning"
         }
       }
     },

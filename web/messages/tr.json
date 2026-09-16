@@ -2168,7 +2168,9 @@
           "destroy": "yok et",
           "read": "oku",
           "move": "taşı",
-          "import": "içe aktar"
+          "import": "içe aktar",
+          "error": "hata",
+          "warning": "uyarı"
         }
       }
     },

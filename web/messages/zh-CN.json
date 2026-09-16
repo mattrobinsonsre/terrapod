@@ -2168,7 +2168,9 @@
           "destroy": "销毁",
           "read": "读取",
           "move": "移动",
-          "import": "导入"
+          "import": "导入",
+          "error": "错误",
+          "warning": "警告"
         }
       }
     },
