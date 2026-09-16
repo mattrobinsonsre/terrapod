@@ -55,9 +55,15 @@ const ETX = '\x03'
  * initial value, and a jump assertion can never pass however correct the jump
  * is. `log-follow` pads its fixture for the same reason.
  */
-const PADDING = Array.from(
-  { length: 120 },
-  (_, i) => `  # padding line ${i}: refreshing state...`,
+const PADDING = Array.from({ length: 120 }, (_, i) =>
+  // Every tenth line is long enough to wrap several times. The pane wraps
+  // (`whitespace-pre-wrap break-words`), so real plan output does too, and a
+  // fixture of uniformly short lines would let a position calculated from line
+  // index alone pass — the exact mistake the jump must not make. With these in
+  // the way, only a measurement of real laid-out geometry lands correctly.
+  i % 10 === 0
+    ? `  # padding line ${i}: ${'refreshing state for a resource with a very long address '.repeat(4)}`
+    : `  # padding line ${i}: refreshing state...`,
 ).join('\n')
 
 /** Serve the run, its plan object, and the log — framed, or still arriving. */
@@ -175,7 +181,12 @@ test.describe('the plan-log index', () => {
             if (!node) return null
             const p = el.getBoundingClientRect()
             const n = node.getBoundingClientRect()
-            return n.top >= p.top && n.bottom <= p.bottom
+            // The line's TOP must be visible — not the whole line. The pane
+            // wraps (`whitespace-pre-wrap break-words`, which is what keeps the
+            // page from scrolling sideways on a phone), so a long resource
+            // address can render taller than the pane itself; demanding the
+            // whole line fit would fail a jump that worked.
+            return n.top >= p.top - 1 && n.top < p.bottom
           }),
         { timeout: 5000 },
       )
