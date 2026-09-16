@@ -399,7 +399,8 @@
         "register": "{count, plural, one {Cofrestru # modiwl} other {Cofrestru # modiwl}}",
         "registering": "Wrthi''n cofrestru…",
         "failed": "Methodd y chwilio",
-        "ruleLink": "Crëwch reol i gofrestru modiwlau newydd yn awtomatig"
+        "ruleLink": "Crëwch reol i gofrestru modiwlau newydd yn awtomatig",
+        "orgNote": "Dim ond y dudalen gyntaf o storfeydd a ddangosir yma. Crëwch reol i gwmpasu pob storfa, gan gynnwys rhai a grëwyd yn ddiweddarach."
       },
       "versionCount": "{count, plural, one {# fersiwn} other {# fersiwn}}",
       "loadFailed": "Methwyd llwytho'r modiwlau",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "enw eisoes yn cael ei ddefnyddio",
     "reasonMissingProvider": "dim darparwr",
     "confirmDelete": "Dileu''r rheol {name}? Bydd y modiwlau a gofrestrodd yn aros wedi''u cofrestru.",
-    "loadFailed": "Methwyd llwytho''r rheolau canfod modiwlau"
+    "loadFailed": "Methwyd llwytho''r rheolau canfod modiwlau",
+    "repoUrlHint": "Un storfa, sefydliad neu grŵp (pob storfa ynddo), neu batrwm dros storfeydd un sefydliad neu grŵp, megis {example}. Dim ond yn yr segment olaf y mae nodau glob yn mynd. Mae Terrapod yn gweithio allan pa un pan gadwch, a byth yn ei newid ohono''i hun.",
+    "ownerPlaceholderHint": "Gall rheol sy''n cwmpasu sefydliad neu grŵp hefyd ddefnyddio <owner></owner>: perchennog neu grŵp y storfa.",
+    "targetKind": {
+      "repository": "Storfa",
+      "namespace": "Sefydliad neu grŵp",
+      "pattern": "Patrwm"
+    },
+    "attention": {
+      "badge": "Angen sylw",
+      "title": "Mae angen sylw ar {name}",
+      "hint": "Ceisia rheol eto ar y pôl cofrestrfa nesaf. Os dilëwyd ei tharged, golygwch y rheol i''w chyfeirio i rywle arall."
+    },
+    "repoStatus": {
+      "active": "gweithredol",
+      "archived": "wedi''i harchifo",
+      "empty": "gwag",
+      "noBranch": "dim cangen",
+      "outOfScope": "y tu allan i''r cwmpas",
+      "covered": "wedi''i chwmpasu",
+      "error": "gwall"
+    },
+    "origin": {
+      "baseline": "sylfaenol",
+      "new": "newydd"
+    },
+    "paging": {
+      "page": "Tudalen {page} o {pages}",
+      "previous": "Blaenorol",
+      "next": "Nesaf"
+    },
+    "repositories": {
+      "open": "Storfeydd",
+      "title": "Storfeydd: {ruleName}",
+      "lastListed": "Rhestrwyd diwethaf {time}",
+      "notListed": "Heb ei rhestru eto. Mae''r pôl cofrestrfa nesaf yn rhestru storfeydd y rheol hon.",
+      "legend": "Roedd storfeydd sylfaenol yn bodoli cyn y rheol, felly nid oes dim ynddynt yn cofrestru nes i chi ei ddewis o ragolwg. Crëwyd storfeydd newydd ar ôl y rheol, felly mae eu modiwlau'n cofrestru'n awtomatig.",
+      "filterLabel": "Statws",
+      "filterAll": "Pob statws",
+      "none": "Dim storfeydd eto.",
+      "noneWithStatus": "Dim storfeydd â'r statws hwn.",
+      "loadFailed": "Methwyd llwytho storfeydd y rheol",
+      "repository": "Storfa",
+      "status": "Statws",
+      "origin": "Tarddiad",
+      "candidates": "Ymgeiswyr",
+      "lastChecked": "Gwiriwyd diwethaf",
+      "error": "Gwall",
+      "renamed": "Ailenwyd o",
+      "renamedFrom": "Ailenwyd o {paths}",
+      "never": "byth",
+      "candidateCount": "{count, plural, one {# modiwl} other {# modiwlau}}"
+    },
+    "grouped": {
+      "storedNote": "Yr hyn a ganfu''r pôl cofrestrfa diwethaf ym mhob storfa. Ni ddarllenir dim o''r darparwr VCS.",
+      "unsavedNote": "Mae rheol heb ei chadw yn darllen un dudalen o storfeydd ar y tro, yn fyw. Cadwch hi er mwyn i''r pôl ddilyn pob storfa.",
+      "incomplete": "Mae gan y sefydliad neu grŵp hwn fwy o storfeydd nag y mae Terrapod yn eu rhestru ar unwaith, felly ni ddangosir rhai.",
+      "selectRepository": "Dewiswch bob modiwl yn {repository}",
+      "noCandidates": "Dim modiwlau i''w cofrestru yma.",
+      "repositoryError": "Methwyd darllen y storfa hon: {error}",
+      "confirmRegisterAll": "Cofrestru pob modiwl y mae''r rheol hon wedi dod o hyd iddo? Caiff modiwlau sydd eisoes wedi''u cofrestru, neu y mae eu henw wedi''i gymryd, eu hepgor.",
+      "scanRepositories": "{count, plural, one {Sganiwyd # storfa.} other {Sganiwyd # storfeydd.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Diweddaru Swmp",

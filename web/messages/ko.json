@@ -399,7 +399,8 @@
         "register": "{count, plural, one {모듈 #개 등록} other {모듈 #개 등록}}",
         "registering": "등록 중…",
         "failed": "검색 실패",
-        "ruleLink": "새 모듈을 자동으로 등록하는 규칙 만들기"
+        "ruleLink": "새 모듈을 자동으로 등록하는 규칙 만들기",
+        "orgNote": "여기에는 저장소의 첫 페이지만 표시됩니다. 이후에 생성되는 것을 포함해 모든 저장소를 포괄하려면 규칙을 생성하세요."
       },
       "versionCount": "{count, plural, one {버전 #개} other {버전 #개}}",
       "loadFailed": "모듈을 불러오지 못했습니다",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "이름이 이미 사용 중",
     "reasonMissingProvider": "공급자 없음",
     "confirmDelete": "규칙 {name}을(를) 삭제하시겠습니까? 이 규칙이 등록한 모듈은 계속 등록된 상태로 유지됩니다.",
-    "loadFailed": "모듈 자동 검색 규칙을 불러오지 못했습니다"
+    "loadFailed": "모듈 자동 검색 규칙을 불러오지 못했습니다",
+    "repoUrlHint": "저장소 하나, 조직 또는 그룹(그 안의 모든 저장소), 혹은 한 조직이나 그룹의 저장소에 대한 패턴 — 예: {example}. 글롭 문자는 마지막 세그먼트에서만 사용할 수 있습니다. 저장할 때 Terrapod가 어느 쪽인지 판단하며, 이후에는 스스로 바꾸지 않습니다.",
+    "ownerPlaceholderHint": "조직이나 그룹을 대상으로 하는 규칙은 <owner></owner>도 사용할 수 있습니다: 저장소의 소유자 또는 그룹입니다.",
+    "targetKind": {
+      "repository": "저장소",
+      "namespace": "조직 또는 그룹",
+      "pattern": "패턴"
+    },
+    "attention": {
+      "badge": "확인 필요",
+      "title": "{name}에 확인이 필요합니다",
+      "hint": "규칙은 다음 레지스트리 폴링에서 다시 시도합니다. 대상이 삭제되었다면 규칙을 편집하여 다른 곳을 가리키도록 하세요."
+    },
+    "repoStatus": {
+      "active": "활성",
+      "archived": "보관됨",
+      "empty": "비어 있음",
+      "noBranch": "브랜치 없음",
+      "outOfScope": "범위 밖",
+      "covered": "적용됨",
+      "error": "오류"
+    },
+    "origin": {
+      "baseline": "기준",
+      "new": "신규"
+    },
+    "paging": {
+      "page": "{pages}페이지 중 {page}페이지",
+      "previous": "이전",
+      "next": "다음"
+    },
+    "repositories": {
+      "open": "저장소",
+      "title": "저장소: {ruleName}",
+      "lastListed": "마지막 조회 {time}",
+      "notListed": "아직 조회되지 않았습니다. 다음 레지스트리 폴링에서 이 규칙의 저장소를 조회합니다.",
+      "legend": "기준 저장소는 규칙이 생성되기 전부터 존재했으므로, 미리 보기에서 선택하기 전까지는 아무것도 등록되지 않습니다. 신규 저장소는 규칙 생성 후 만들어졌으므로 해당 모듈이 자동으로 등록됩니다.",
+      "filterLabel": "상태",
+      "filterAll": "모든 상태",
+      "none": "아직 저장소가 없습니다.",
+      "noneWithStatus": "이 상태의 저장소가 없습니다.",
+      "loadFailed": "규칙의 저장소를 불러오지 못했습니다",
+      "repository": "저장소",
+      "status": "상태",
+      "origin": "출처",
+      "candidates": "후보",
+      "lastChecked": "마지막 확인",
+      "error": "오류",
+      "renamed": "이전 이름",
+      "renamedFrom": "{paths}에서 이름 변경됨",
+      "never": "없음",
+      "candidateCount": "{count, plural, other {모듈 #개}}"
+    },
+    "grouped": {
+      "storedNote": "마지막 레지스트리 폴링에서 각 저장소에서 발견한 내용입니다. VCS 프로바이더에서는 아무것도 읽지 않습니다.",
+      "unsavedNote": "저장되지 않은 규칙은 한 번에 한 페이지의 저장소를 실시간으로 읽습니다. 저장하면 폴러가 모든 저장소를 추적합니다.",
+      "incomplete": "이 조직 또는 그룹에는 Terrapod가 한 번에 나열하는 것보다 더 많은 저장소가 있어 일부는 표시되지 않습니다.",
+      "selectRepository": "{repository}의 모든 모듈 선택",
+      "noCandidates": "여기에 등록할 모듈이 없습니다.",
+      "repositoryError": "이 저장소를 읽을 수 없습니다: {error}",
+      "confirmRegisterAll": "이 규칙이 찾은 모든 모듈을 등록하시겠습니까? 이미 등록된 모듈이나 이름이 사용 중인 모듈은 건너뜁니다.",
+      "scanRepositories": "{count, plural, other {저장소 #개를 검색했습니다.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "일괄 업데이트",

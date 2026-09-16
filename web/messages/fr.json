@@ -399,7 +399,8 @@
         "register": "{count, plural, one {Enregistrer # module} other {Enregistrer # modules}}",
         "registering": "Enregistrement…",
         "failed": "Échec de l’analyse",
-        "ruleLink": "Créer une règle pour enregistrer automatiquement les nouveaux modules"
+        "ruleLink": "Créer une règle pour enregistrer automatiquement les nouveaux modules",
+        "orgNote": "Seule la première page de dépôts est affichée ici. Créez une règle pour couvrir tous les dépôts, y compris ceux créés ultérieurement."
       },
       "versionCount": "{count, plural, one {# version} other {# versions}}",
       "loadFailed": "Échec du chargement des modules",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "nom déjà pris",
     "reasonMissingProvider": "aucun fournisseur",
     "confirmDelete": "Supprimer la règle {name} ? Les modules qu’elle a enregistrés restent enregistrés.",
-    "loadFailed": "Impossible de charger les règles de découverte de modules"
+    "loadFailed": "Impossible de charger les règles de découverte de modules",
+    "repoUrlHint": "Un dépôt, une organisation ou un groupe (tous ses dépôts), ou un motif sur les dépôts d''une organisation ou d''un groupe, par exemple {example}. Les caractères glob ne s''utilisent que dans le dernier segment. Terrapod détermine lequel à l''enregistrement, et ne le modifie jamais de lui-même par la suite.",
+    "ownerPlaceholderHint": "Une règle qui couvre une organisation ou un groupe peut aussi utiliser <owner></owner> : le propriétaire ou le groupe du dépôt.",
+    "targetKind": {
+      "repository": "Dépôt",
+      "namespace": "Organisation ou groupe",
+      "pattern": "Motif"
+    },
+    "attention": {
+      "badge": "Nécessite une attention",
+      "title": "{name} nécessite une attention",
+      "hint": "Une règle réessaie à la prochaine interrogation du registre. Si sa cible a été supprimée, modifiez la règle pour la faire pointer ailleurs."
+    },
+    "repoStatus": {
+      "active": "actif",
+      "archived": "archivé",
+      "empty": "vide",
+      "noBranch": "aucune branche",
+      "outOfScope": "hors périmètre",
+      "covered": "couvert",
+      "error": "erreur"
+    },
+    "origin": {
+      "baseline": "référence",
+      "new": "nouveau"
+    },
+    "paging": {
+      "page": "Page {page} sur {pages}",
+      "previous": "Précédent",
+      "next": "Suivant"
+    },
+    "repositories": {
+      "open": "Dépôts",
+      "title": "Dépôts : {ruleName}",
+      "lastListed": "Dernière liste établie {time}",
+      "notListed": "Pas encore listés. La prochaine interrogation du registre listera les dépôts de cette règle.",
+      "legend": "Les dépôts de référence existaient avant la règle, donc rien n''y est enregistré tant que vous ne le sélectionnez pas depuis un aperçu. Les nouveaux dépôts ont été créés après la règle, donc leurs modules s''enregistrent automatiquement.",
+      "filterLabel": "Statut",
+      "filterAll": "Tous les statuts",
+      "none": "Aucun dépôt pour l''instant.",
+      "noneWithStatus": "Aucun dépôt avec ce statut.",
+      "loadFailed": "Échec du chargement des dépôts de la règle",
+      "repository": "Dépôt",
+      "status": "Statut",
+      "origin": "Origine",
+      "candidates": "Candidats",
+      "lastChecked": "Dernière vérification",
+      "error": "Erreur",
+      "renamed": "Renommé depuis",
+      "renamedFrom": "Renommé depuis {paths}",
+      "never": "jamais",
+      "candidateCount": "{count, plural, one {# module} other {# modules}}"
+    },
+    "grouped": {
+      "storedNote": "Ce que la dernière interrogation du registre a trouvé dans chaque dépôt. Rien n''est lu depuis le fournisseur VCS.",
+      "unsavedNote": "Une règle non enregistrée lit une page de dépôts à la fois, en direct. Enregistrez-la pour que le service d''interrogation suive tous les dépôts.",
+      "incomplete": "Cette organisation ou ce groupe compte plus de dépôts que Terrapod n''en liste à la fois, certains ne sont donc pas affichés.",
+      "selectRepository": "Sélectionner tous les modules de {repository}",
+      "noCandidates": "Aucun module à enregistrer ici.",
+      "repositoryError": "Impossible de lire ce dépôt : {error}",
+      "confirmRegisterAll": "Enregistrer tous les modules trouvés par cette règle ? Les modules déjà enregistrés, ou dont le nom est déjà pris, sont ignorés.",
+      "scanRepositories": "{count, plural, one {# dépôt analysé.} other {# dépôts analysés.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Mise à jour groupée",

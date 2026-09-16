@@ -399,7 +399,8 @@
         "register": "{count, plural, one {Register # modyool} other {Register # modyoolz}}",
         "registering": "Registerin…",
         "failed": "Scan faild",
-        "ruleLink": "Mek a rule 2 register noo modyoolz automagikly"
+        "ruleLink": "Mek a rule 2 register noo modyoolz automagikly",
+        "orgNote": "Onlee teh furst paig ov repositoreez iz showd heer. Mek a rule 2 cuvr evry repositoree, includin wunz maed latr."
       },
       "versionCount": "{count, plural, one {# vershun} other {# vershunz}}",
       "loadFailed": "Failed ta lode modulez",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "naym alreddy takn",
     "reasonMissingProvider": "no provydur",
     "confirmDelete": "Deleet teh rule {name}? Teh modyoolz it registerd stay registerd.",
-    "loadFailed": "Cant load modyool autodiskovry rulez"
+    "loadFailed": "Cant load modyool autodiskovry rulez",
+    "repoUrlHint": "Wun repositoree, a org or groop (evry repositoree in it), or a pattrn ovr wun org or groop''s repositoreez, liek {example}. Glob karakterz go in teh last segmint onlee. Terrapod werkz out wich wen u saev, an nevr chaynjez it on itz own.",
+    "ownerPlaceholderHint": "A rule dat coverz a org or groop can also uze <owner></owner>: teh repositoree''s ownr or groop.",
+    "targetKind": {
+      "repository": "Repositoree",
+      "namespace": "Org or groop",
+      "pattern": "Pattrn"
+    },
+    "attention": {
+      "badge": "Needz attenshun",
+      "title": "{name} needz attenshun",
+      "hint": "A rule triez agen on teh nekst registree poll. If itz targit wuz deleetd, edit teh rule 2 point it sumwher else."
+    },
+    "repoStatus": {
+      "active": "aktiv",
+      "archived": "arkived",
+      "empty": "empteh",
+      "noBranch": "noe branch",
+      "outOfScope": "out ov scoep",
+      "covered": "coverd",
+      "error": "errur"
+    },
+    "origin": {
+      "baseline": "bayslien",
+      "new": "noo"
+    },
+    "paging": {
+      "page": "Paig {page} ov {pages}",
+      "previous": "Previus",
+      "next": "Nekst"
+    },
+    "repositories": {
+      "open": "Repositoreez",
+      "title": "Repositoreez: {ruleName}",
+      "lastListed": "Last listd {time}",
+      "notListed": "Not listd yet. Teh nekst registree poll listz dis rule''s repositoreez.",
+      "legend": "Bayslien repositoreez wuz dere befor teh rule, so nuthin in dem registerz til u pick it frum a preveew. Noo repositoreez wuz maed aftr teh rule, so dere modyoolz register automagikly.",
+      "filterLabel": "Statuz",
+      "filterAll": "All statusez",
+      "none": "No repositoreez yet.",
+      "noneWithStatus": "No repositoreez wif dis statuz.",
+      "loadFailed": "Cant load teh rule''s repositoreez",
+      "repository": "Repositoree",
+      "status": "Statuz",
+      "origin": "Origen",
+      "candidates": "Kandidaets",
+      "lastChecked": "Last checkd",
+      "error": "Errur",
+      "renamed": "Renaymd frum",
+      "renamedFrom": "Renaymd frum {paths}",
+      "never": "nevr",
+      "candidateCount": "{count, plural, one {# modyool} other {# modyoolz}}"
+    },
+    "grouped": {
+      "storedNote": "Wut teh last registree poll findz in each repositoree. Nuthin iz red frum teh VCS providr.",
+      "unsavedNote": "A unsavd rule reedz wun paig ov repositoreez at a tiem, liev. Saev it so teh pollr followz evry repositoree.",
+      "incomplete": "Dis org or groop haz moar repositoreez than Terrapod listz at wunce, so sum r not showd.",
+      "selectRepository": "Pick evry modyool in {repository}",
+      "noCandidates": "No modyoolz 2 register heer.",
+      "repositoryError": "Cud not reed dis repositoree: {error}",
+      "confirmRegisterAll": "Register evry modyool dis rule haz findz? Modyoolz alreddy registerd, or wif naym alreddy takn, get skippd.",
+      "scanRepositories": "{count, plural, one {Scannd # repositoree.} other {Scannd # repositoreez.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Bulk Updayt",

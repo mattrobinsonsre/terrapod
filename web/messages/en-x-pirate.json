@@ -399,7 +399,8 @@
         "register": "{count, plural, one {Stow # module in the hold} other {Stow # modules in the hold}}",
         "registering": "Registerin''…",
         "failed": "The search ran aground",
-        "ruleLink": "Make a rule to stow new modules automatically"
+        "ruleLink": "Make a rule to stow new modules automatically",
+        "orgNote": "Only the first page o'' repositories be shown here. Make a rule to sail over every repository, includin'' ones built later."
       },
       "versionCount": "{count, plural, one {# version} other {# versions}}",
       "loadFailed": "Failed t'' load modules",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "name be taken",
     "reasonMissingProvider": "no provider, arr",
     "confirmDelete": "Scuttle the rule {name}? The modules it stowed stay stowed.",
-    "loadFailed": "Couldn''t haul in the module-huntin'' rules"
+    "loadFailed": "Couldn''t haul in the module-huntin'' rules",
+    "repoUrlHint": "One repository, an org or fleet (every repository aboard it), or a pattern over one org or fleet''s repositories, such as {example}. Glob characters go in the last segment only. Terrapod reckons which when ye save, an'' never changes course on its own, arr.",
+    "ownerPlaceholderHint": "A rule that sails over an org or fleet can also use <owner></owner>: the repository''s owner or fleet.",
+    "targetKind": {
+      "repository": "Cargo hold",
+      "namespace": "Org or fleet",
+      "pattern": "Charted pattern"
+    },
+    "attention": {
+      "badge": "All hands on deck",
+      "title": "{name} needs all hands on deck",
+      "hint": "A rule tries again on the next registry watch. If its target were scuttled, edit the rule to set it a new heading."
+    },
+    "repoStatus": {
+      "active": "shipshape",
+      "archived": "archived in th'' hold",
+      "empty": "empty as a rum barrel",
+      "noBranch": "no branch aboard",
+      "outOfScope": "beyond the horizon",
+      "covered": "under our colours",
+      "error": "squall"
+    },
+    "origin": {
+      "baseline": "old salt",
+      "new": "fresh aboard"
+    },
+    "paging": {
+      "page": "Page {page} o'' {pages}",
+      "previous": "Back astern",
+      "next": "Onward"
+    },
+    "repositories": {
+      "open": "Cargo holds",
+      "title": "Cargo holds: {ruleName}",
+      "lastListed": "Last mustered {time}",
+      "notListed": "Not mustered yet. The next registry watch will muster this rule''s repositories.",
+      "legend": "Old-salt repositories were afloat afore the rule, so nothin'' in ''em be stowed ''til ye pick it from a preview. Fresh repositories were built after the rule, so their modules be stowed automatically.",
+      "filterLabel": "Ship''s status",
+      "filterAll": "Every status on the seas",
+      "none": "No repositories aboard yet.",
+      "noneWithStatus": "No repositories wi'' this status, matey.",
+      "loadFailed": "Couldn''t haul in the rule''s repositories",
+      "repository": "Cargo hold",
+      "status": "Ship''s status",
+      "origin": "Home port",
+      "candidates": "Plunder to stow",
+      "lastChecked": "Last sighted",
+      "error": "Squall",
+      "renamed": "Sailed afore as",
+      "renamedFrom": "Sailed afore as {paths}",
+      "never": "nary",
+      "candidateCount": "{count, plural, one {# module, arr} other {# modules, arr}}"
+    },
+    "grouped": {
+      "storedNote": "What the last registry watch spied in each repository. Nothin'' be read from the VCS provider.",
+      "unsavedNote": "An unsaved rule reads one page o'' repositories at a time, live. Save it so the lookout keeps an eye on every repository.",
+      "incomplete": "This org or fleet has more repositories than Terrapod can muster at once, so some be hidden below decks.",
+      "selectRepository": "Pick every module in {repository}",
+      "noCandidates": "No modules to stow here, matey.",
+      "repositoryError": "Couldn''t read this repository: {error}",
+      "confirmRegisterAll": "Stow every module this rule has found? Modules already stowed, or whose name be claimed, get passed over.",
+      "scanRepositories": "{count, plural, one {Searched # repository, arr.} other {Searched # repositories, arr.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Bulk Update",

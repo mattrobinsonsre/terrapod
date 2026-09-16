@@ -399,7 +399,8 @@
         "register": "{count, plural, one {註冊 # 個模組} other {註冊 # 個模組}}",
         "registering": "正在註冊…",
         "failed": "掃描失敗",
-        "ruleLink": "建立規則以自動註冊新模組"
+        "ruleLink": "建立規則以自動註冊新模組",
+        "orgNote": "此處僅顯示第一頁儲存庫。建立規則即可涵蓋每個儲存庫，包括之後建立的儲存庫。"
       },
       "versionCount": "{count, plural, one {# 個版本} other {# 個版本}}",
       "loadFailed": "載入模組失敗",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "名稱已被使用",
     "reasonMissingProvider": "無提供者",
     "confirmDelete": "刪除規則 {name}？它註冊的模組仍維持註冊狀態。",
-    "loadFailed": "無法載入模組自動探索規則"
+    "loadFailed": "無法載入模組自動探索規則",
+    "repoUrlHint": "一個儲存庫、一個組織或群組（其中的每個儲存庫），或針對某個組織或群組儲存庫的樣式，例如 {example}。萬用字元只能出現在最後一段。Terrapod 會在您儲存時判斷類型，之後不會自行更改。",
+    "ownerPlaceholderHint": "涵蓋某個組織或群組的規則也可以使用 <owner></owner>：即儲存庫的擁有者或群組。",
+    "targetKind": {
+      "repository": "儲存庫",
+      "namespace": "組織或群組",
+      "pattern": "樣式"
+    },
+    "attention": {
+      "badge": "需要注意",
+      "title": "{name} 需要注意",
+      "hint": "規則會在下一次登錄庫輪詢時重試。若其目標已遭刪除，請編輯規則使其指向其他位置。"
+    },
+    "repoStatus": {
+      "active": "使用中",
+      "archived": "已封存",
+      "empty": "空白",
+      "noBranch": "無分支",
+      "outOfScope": "不在範圍內",
+      "covered": "已涵蓋",
+      "error": "錯誤"
+    },
+    "origin": {
+      "baseline": "基準",
+      "new": "新增"
+    },
+    "paging": {
+      "page": "第 {page} 頁，共 {pages} 頁",
+      "previous": "上一頁",
+      "next": "下一頁"
+    },
+    "repositories": {
+      "open": "儲存庫",
+      "title": "儲存庫：{ruleName}",
+      "lastListed": "上次列出於 {time}",
+      "notListed": "尚未列出。下一次登錄庫輪詢會列出此規則的儲存庫。",
+      "legend": "基準儲存庫在規則建立之前就已存在，因此其中的內容在您於預覽中選取之前不會註冊。新增儲存庫是在規則建立之後建立的，其模組會自動註冊。",
+      "filterLabel": "狀態",
+      "filterAll": "所有狀態",
+      "none": "尚無儲存庫。",
+      "noneWithStatus": "沒有處於此狀態的儲存庫。",
+      "loadFailed": "載入此規則的儲存庫失敗",
+      "repository": "儲存庫",
+      "status": "狀態",
+      "origin": "來源",
+      "candidates": "候選項目",
+      "lastChecked": "上次檢查",
+      "error": "錯誤",
+      "renamed": "重新命名自",
+      "renamedFrom": "重新命名自 {paths}",
+      "never": "從不",
+      "candidateCount": "{count, plural, other {# 個模組}}"
+    },
+    "grouped": {
+      "storedNote": "上一次登錄庫輪詢在每個儲存庫中發現的內容。不會從 VCS 提供者讀取任何內容。",
+      "unsavedNote": "尚未儲存的規則每次即時讀取一頁儲存庫。儲存後輪詢器將追蹤每個儲存庫。",
+      "incomplete": "此組織或群組的儲存庫數量超出 Terrapod 一次列出的上限，因此部分儲存庫未顯示。",
+      "selectRepository": "選取 {repository} 中的所有模組",
+      "noCandidates": "此處沒有可註冊的模組。",
+      "repositoryError": "無法讀取此儲存庫：{error}",
+      "confirmRegisterAll": "註冊此規則找到的所有模組？已註冊的模組，或名稱已被使用的模組，將會略過。",
+      "scanRepositories": "{count, plural, other {已掃描 # 個儲存庫。}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "批次更新",

@@ -30,10 +30,18 @@
 //
 // Read-only:
 //
-//	"first-scan-at"     -> first_scan_at     (string, computed)
-//	"last-scanned-sha"  -> last_scanned_sha  (string, computed)
-//	"created-at"        -> created_at        (string, computed)
-//	"updated-at"        -> updated_at        (string, computed)
+//	"target-kind"        -> target_kind        (string, computed: repository | namespace | pattern)
+//	"first-scan-at"      -> first_scan_at      (string, computed)
+//	"last-scanned-sha"   -> last_scanned_sha   (string, computed)
+//	"last-enumerated-at" -> last_enumerated_at (string, computed)
+//	"last-error"         -> last_error         (string, computed)
+//	"created-at"         -> created_at         (string, computed)
+//	"updated-at"         -> updated_at         (string, computed)
+//
+// repo_url names one repository, an org or group, or a pattern over one
+// namespace's repositories (#1620); the server classifies it on save. The
+// plan-time check here only catches what can never be valid: a glob outside
+// the last path segment.
 //
 // Creating the rule registers nothing: the registry poller records what is in
 // the repository and registers only directories that appear afterwards. Modules
@@ -59,6 +67,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
@@ -71,23 +80,26 @@ var (
 )
 
 type moduleRuleModel struct {
-	ID              types.String `tfsdk:"id"`
-	Name            types.String `tfsdk:"name"`
-	VCSConnectionID types.String `tfsdk:"vcs_connection_id"`
-	RepoURL         types.String `tfsdk:"repo_url"`
-	Branch          types.String `tfsdk:"branch"`
-	Pattern         types.String `tfsdk:"pattern"`
-	IgnorePatterns  types.List   `tfsdk:"ignore_patterns"`
-	Enabled         types.Bool   `tfsdk:"enabled"`
-	NameTemplate    types.String `tfsdk:"name_template"`
-	Provider        types.String `tfsdk:"module_provider"`
-	VCSTagPattern   types.String `tfsdk:"vcs_tag_pattern"`
-	Labels          types.Map    `tfsdk:"labels"`
-	OwnerEmail      types.String `tfsdk:"owner_email"`
-	FirstScanAt     types.String `tfsdk:"first_scan_at"`
-	LastScannedSHA  types.String `tfsdk:"last_scanned_sha"`
-	CreatedAt       types.String `tfsdk:"created_at"`
-	UpdatedAt       types.String `tfsdk:"updated_at"`
+	ID               types.String `tfsdk:"id"`
+	Name             types.String `tfsdk:"name"`
+	VCSConnectionID  types.String `tfsdk:"vcs_connection_id"`
+	RepoURL          types.String `tfsdk:"repo_url"`
+	Branch           types.String `tfsdk:"branch"`
+	Pattern          types.String `tfsdk:"pattern"`
+	IgnorePatterns   types.List   `tfsdk:"ignore_patterns"`
+	Enabled          types.Bool   `tfsdk:"enabled"`
+	NameTemplate     types.String `tfsdk:"name_template"`
+	Provider         types.String `tfsdk:"module_provider"`
+	VCSTagPattern    types.String `tfsdk:"vcs_tag_pattern"`
+	Labels           types.Map    `tfsdk:"labels"`
+	OwnerEmail       types.String `tfsdk:"owner_email"`
+	TargetKind       types.String `tfsdk:"target_kind"`
+	FirstScanAt      types.String `tfsdk:"first_scan_at"`
+	LastScannedSHA   types.String `tfsdk:"last_scanned_sha"`
+	LastEnumeratedAt types.String `tfsdk:"last_enumerated_at"`
+	LastError        types.String `tfsdk:"last_error"`
+	CreatedAt        types.String `tfsdk:"created_at"`
+	UpdatedAt        types.String `tfsdk:"updated_at"`
 }
 
 type moduleRuleResource struct {
@@ -105,10 +117,11 @@ func (r *moduleRuleResource) Metadata(_ context.Context, req resource.MetadataRe
 
 func (r *moduleRuleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Terrapod module autodiscovery rule: it finds the modules in a repository — the root " +
-			"and any submodules, each a directory of Terraform files matching `pattern` — and registers them in the " +
-			"private registry. Creating the rule registers nothing; directories that appear on the tracked branch " +
-			"afterwards are registered automatically. " +
+		Description: "Manages a Terrapod module autodiscovery rule: it finds the modules in a repository, or in every " +
+			"repository of an org, group or name pattern — the root and any submodules, each a directory of Terraform " +
+			"files matching `pattern` — and registers them in the private registry. Creating the rule registers " +
+			"nothing; directories that appear on the tracked branch afterwards, and repositories created after the " +
+			"rule, are registered automatically. " +
 			"See https://github.com/mattrobinsonsre/terrapod/blob/main/docs/registry.md.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -125,8 +138,14 @@ func (r *moduleRuleResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Required:    true,
 			},
 			"repo_url": schema.StringAttribute{
-				Description: "The repository to scan (e.g. https://github.com/myorg/terraform-aws-network).",
-				Required:    true,
+				Description: "What to scan, in one of three forms: one repository " +
+					"(https://github.com/myorg/terraform-aws-network); an org or group (https://github.com/myorg, " +
+					"https://gitlab.com/mygroup/platform), covering every repository in it; or a pattern over one " +
+					"namespace's repositories (https://github.com/myorg/terraform-*), with glob characters in the last " +
+					"segment only. The server decides which when the rule is saved, reports it as target_kind, and " +
+					"never changes it on its own. Forks are skipped.",
+				Required:   true,
+				Validators: []validator.String{repoURLValidator{}},
 			},
 			"pattern": schema.StringAttribute{
 				Description: "Glob matched against the repository's .tf/.tf.json file paths (gitignore-style with ** support). " +
@@ -153,8 +172,9 @@ func (r *moduleRuleResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Default:     booldefault.StaticBool(true),
 			},
 			"name_template": schema.StringAttribute{
-				Description: "Template for the registered modules' names, using {repo}, {path}, {leaf} and {root}. " +
-					"Empty (default) is the repository's module name, then the submodule's directory.",
+				Description: "Template for the registered modules' names, using {repo}, {path}, {leaf}, {root} and " +
+					"{owner} (the repository's owner or group). Empty (default) is the repository's module name, then " +
+					"the submodule's directory.",
 				Optional: true,
 				Computed: true,
 				Default:  stringdefault.StaticString(""),
@@ -188,13 +208,29 @@ func (r *moduleRuleResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			// Server-maintained scan bookkeeping: changes out of band (the poller)
 			// and resets when the rule moves to another repository, so no
 			// UseStateForUnknown — a planned value could then be wrong.
+			"target_kind": schema.StringAttribute{
+				Description: "What repo_url names, as the server classified it: \"repository\", \"namespace\" (an org " +
+					"or group) or \"pattern\". Changes only when repo_url or vcs_connection_id does.",
+				Computed: true,
+			},
 			"first_scan_at": schema.StringAttribute{
 				Description: "When the rule first read its repository (RFC3339); empty if it has not yet.",
 				Computed:    true,
 			},
 			"last_scanned_sha": schema.StringAttribute{
-				Description: "The tracked branch's head commit at the rule's last scan.",
-				Computed:    true,
+				Description: "The tracked branch's head commit at the rule's last scan. Empty for an org-wide rule, " +
+					"whose heads are per repository.",
+				Computed: true,
+			},
+			"last_enumerated_at": schema.StringAttribute{
+				Description: "When an org-wide rule last listed its repositories (RFC3339); empty if it has not yet, " +
+					"and always for a single-repository rule.",
+				Computed: true,
+			},
+			"last_error": schema.StringAttribute{
+				Description: "Why the rule's last poll failed — for example its target was deleted, or could not be " +
+					"listed — or empty. A rule in error registers nothing until repo_url is saved again.",
+				Computed: true,
 			},
 			"created_at": schema.StringAttribute{
 				Description:   "Creation timestamp.",
@@ -432,9 +468,64 @@ func readIntoModel(ctx context.Context, rule *terrapod.ModuleAutodiscoveryRule, 
 	m.Labels = mv
 
 	m.OwnerEmail = keepForm(m.OwnerEmail, rule.OwnerEmail, strings.TrimSpace)
+	m.TargetKind = types.StringValue(rule.TargetKind)
 	m.FirstScanAt = types.StringValue(rule.FirstScanAt)
 	m.LastScannedSHA = types.StringValue(rule.LastScannedSHA)
+	m.LastEnumeratedAt = types.StringValue(rule.LastEnumeratedAt)
+	m.LastError = types.StringValue(rule.LastError)
 	m.CreatedAt = types.StringValue(rule.CreatedAt)
 	m.UpdatedAt = types.StringValue(rule.UpdatedAt)
 	return diags
+}
+
+// repoURLValidator catches, at plan time, the one repo_url shape no provider
+// accepts: glob characters (*, ? or [...]) outside the last path segment. It
+// does not decide repository vs org vs pattern — that needs the provider's API,
+// and the server does it on apply.
+type repoURLValidator struct{}
+
+func (repoURLValidator) Description(context.Context) string {
+	return "glob characters (*, ?, [ ]) may appear only in the last path segment"
+}
+
+func (v repoURLValidator) MarkdownDescription(ctx context.Context) string { return v.Description(ctx) }
+
+func (repoURLValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	if msg := repoURLProblem(req.ConfigValue.ValueString()); msg != "" {
+		resp.Diagnostics.AddAttributeError(req.Path, "Invalid repo_url", msg)
+	}
+}
+
+// repoURLProblem returns why value can never be a valid repo_url, or "".
+func repoURLProblem(value string) string {
+	s := strings.TrimSpace(value)
+	if s == "" {
+		return "repo_url must not be empty"
+	}
+	// Drop the scheme and host (https://host/…) or the scp-style prefix
+	// (git@host:…), leaving the path.
+	if i := strings.Index(s, "://"); i >= 0 {
+		s = s[i+3:]
+		if j := strings.Index(s, "/"); j >= 0 {
+			s = s[j+1:]
+		} else {
+			s = ""
+		}
+	} else if at := strings.Index(s, "@"); at >= 0 {
+		if colon := strings.Index(s[at:], ":"); colon >= 0 {
+			s = s[at+colon+1:]
+		}
+	}
+	s = strings.TrimSuffix(strings.Trim(s, "/"), ".git")
+	segments := strings.Split(s, "/")
+	for _, seg := range segments[:len(segments)-1] {
+		if strings.ContainsAny(seg, "*?[]") {
+			return fmt.Sprintf("glob characters (*, ?, [ ]) may appear only in the last path segment of %q; "+
+				"a pattern matches repositories directly inside one org or group", value)
+		}
+	}
+	return ""
 }

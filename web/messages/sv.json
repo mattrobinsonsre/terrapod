@@ -399,7 +399,8 @@
         "register": "{count, plural, one {Registrera # modul} other {Registrera # moduler}}",
         "registering": "Registrerar…",
         "failed": "Sökningen misslyckades",
-        "ruleLink": "Skapa en regel för att registrera nya moduler automatiskt"
+        "ruleLink": "Skapa en regel för att registrera nya moduler automatiskt",
+        "orgNote": "Endast den första sidan med repositorier visas här. Skapa en regel för att täcka alla repositorier, inklusive de som skapas senare."
       },
       "versionCount": "{count, plural, one {# version} other {# versioner}}",
       "loadFailed": "Det gick inte att läsa in moduler",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "namnet används redan",
     "reasonMissingProvider": "ingen provider",
     "confirmDelete": "Ta bort regeln {name}? Modulerna den registrerade förblir registrerade.",
-    "loadFailed": "Det gick inte att läsa in reglerna för modulidentifiering"
+    "loadFailed": "Det gick inte att läsa in reglerna för modulidentifiering",
+    "repoUrlHint": "Ett repositorie, en org eller grupp (alla repositorier i den), eller ett mönster över en org eller grupps repositorier, till exempel {example}. Glob-tecken förekommer bara i det sista segmentet. Terrapod avgör vilket när du sparar, och ändrar det aldrig på egen hand.",
+    "ownerPlaceholderHint": "En regel som täcker en org eller grupp kan också använda <owner></owner>: repositoriets ägare eller grupp.",
+    "targetKind": {
+      "repository": "Repositorie",
+      "namespace": "Org eller grupp",
+      "pattern": "Mönster"
+    },
+    "attention": {
+      "badge": "Behöver uppmärksamhet",
+      "title": "{name} behöver uppmärksamhet",
+      "hint": "En regel försöker igen vid nästa registerpoll. Om målet har tagits bort, redigera regeln så att den pekar någon annanstans."
+    },
+    "repoStatus": {
+      "active": "aktiv",
+      "archived": "arkiverad",
+      "empty": "tom",
+      "noBranch": "ingen gren",
+      "outOfScope": "utanför omfattningen",
+      "covered": "täckt",
+      "error": "fel"
+    },
+    "origin": {
+      "baseline": "baslinje",
+      "new": "ny"
+    },
+    "paging": {
+      "page": "Sida {page} av {pages}",
+      "previous": "Föregående",
+      "next": "Nästa"
+    },
+    "repositories": {
+      "open": "Repositorier",
+      "title": "Repositorier: {ruleName}",
+      "lastListed": "Senast listad {time}",
+      "notListed": "Inte listad ännu. Nästa registerpoll listar den här regelns repositorier.",
+      "legend": "Baslinjerepositorier fanns innan regeln skapades, så inget i dem registreras förrän du väljer det i en förhandsgranskning. Nya repositorier skapades efter regeln, så deras moduler registreras automatiskt.",
+      "filterLabel": "Status",
+      "filterAll": "Alla statusar",
+      "none": "Inga repositorier ännu.",
+      "noneWithStatus": "Inga repositorier med denna status.",
+      "loadFailed": "Det gick inte att läsa in regelns repositorier",
+      "repository": "Repositorie",
+      "status": "Status",
+      "origin": "Ursprung",
+      "candidates": "Kandidater",
+      "lastChecked": "Senast kontrollerad",
+      "error": "Fel",
+      "renamed": "Omdöpt från",
+      "renamedFrom": "Omdöpt från {paths}",
+      "never": "aldrig",
+      "candidateCount": "{count, plural, one {# modul} other {# moduler}}"
+    },
+    "grouped": {
+      "storedNote": "Vad den senaste registerpollen hittade i varje repositorie. Inget läses från VCS-providern.",
+      "unsavedNote": "En osparad regel läser en sida repositorier i taget, direkt. Spara den för att pollningen ska följa alla repositorier.",
+      "incomplete": "Den här org eller grupp har fler repositorier än vad Terrapod listar samtidigt, så vissa visas inte.",
+      "selectRepository": "Välj alla moduler i {repository}",
+      "noCandidates": "Inga moduler att registrera här.",
+      "repositoryError": "Det gick inte att läsa det här repositoriet: {error}",
+      "confirmRegisterAll": "Registrera alla moduler den här regeln har hittat? Moduler som redan är registrerade, eller vars namn är upptaget, hoppas över.",
+      "scanRepositories": "{count, plural, one {Genomsökte # repositorie.} other {Genomsökte # repositorier.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Massuppdatering",

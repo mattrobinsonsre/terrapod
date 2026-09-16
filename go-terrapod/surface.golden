@@ -2,6 +2,9 @@ const AssignmentExplicit
 const AssignmentGlobal
 const AssignmentRuleBased
 const DiscoveryPath
+const ModuleAutodiscoveryTargetNamespace
+const ModuleAutodiscoveryTargetPattern
+const ModuleAutodiscoveryTargetRepository
 const RoleReachAllowed
 const RoleReachDenied
 const RoleReachNone
@@ -463,14 +466,56 @@ field ModuleAutodiscoveryCandidate.MissingProvider bool `json:"missing-provider"
 field ModuleAutodiscoveryCandidate.Name string `json:"name"`
 field ModuleAutodiscoveryCandidate.Provider string `json:"provider"`
 field ModuleAutodiscoveryCandidate.RegisteredAs *RegisteredModuleRef `json:"registered-as,omitempty"`
+field ModuleAutodiscoveryCandidate.RepoURL string `json:"repo-url"`
+field ModuleAutodiscoveryCandidate.Repository string `json:"repository"`
 field ModuleAutodiscoveryCandidate.Subdirectory string `json:"subdirectory"`
 field ModuleAutodiscoveryModule.ID string `json:"id"`
 field ModuleAutodiscoveryModule.Name string `json:"name"`
 field ModuleAutodiscoveryModule.Provider string `json:"provider"`
+field ModuleAutodiscoveryModule.RepoURL string `json:"repo-url"`
+field ModuleAutodiscoveryModule.Repository string `json:"repository"`
 field ModuleAutodiscoveryModule.Subdirectory string `json:"subdirectory"`
 field ModuleAutodiscoveryPreview.Entries []ModuleAutodiscoveryCandidate `json:"entries"`
 field ModuleAutodiscoveryPreview.FilesWalked int `json:"files-walked"`
+field ModuleAutodiscoveryPreview.ListingComplete bool `json:"listing-complete"`
+field ModuleAutodiscoveryPreview.Pagination *ListMeta `json:"pagination,omitempty"`
 field ModuleAutodiscoveryPreview.Ref string `json:"ref"`
+field ModuleAutodiscoveryPreview.Repositories []ModuleAutodiscoveryPreviewRepository `json:"repositories"`
+field ModuleAutodiscoveryPreview.TargetKind string `json:"target-kind"`
+field ModuleAutodiscoveryPreviewOptions.PageNumber int
+field ModuleAutodiscoveryPreviewOptions.PageSize int
+field ModuleAutodiscoveryPreviewOptions.Repository string
+field ModuleAutodiscoveryPreviewRepository.Error string `json:"error"`
+field ModuleAutodiscoveryPreviewRepository.Origin string `json:"origin"`
+field ModuleAutodiscoveryPreviewRepository.Ref string `json:"ref"`
+field ModuleAutodiscoveryPreviewRepository.RepoURL string `json:"repo-url"`
+field ModuleAutodiscoveryPreviewRepository.Repository string `json:"repository"`
+field ModuleAutodiscoveryPreviewRepository.Status string `json:"status"`
+field ModuleAutodiscoveryRepository.Candidates []ModuleAutodiscoveryStoredCandidate `json:"candidates"`
+field ModuleAutodiscoveryRepository.DefaultBranch string `json:"default-branch"`
+field ModuleAutodiscoveryRepository.FailureCount int `json:"failure-count"`
+field ModuleAutodiscoveryRepository.FirstSeenAt string `json:"first-seen-at"`
+field ModuleAutodiscoveryRepository.ID string `json:"id"`
+field ModuleAutodiscoveryRepository.LastCheckedAt string `json:"last-checked-at"`
+field ModuleAutodiscoveryRepository.LastError string `json:"last-error"`
+field ModuleAutodiscoveryRepository.LastScannedSHA string `json:"last-scanned-sha"`
+field ModuleAutodiscoveryRepository.LastSkips []ModuleAutodiscoverySkip `json:"last-skips"`
+field ModuleAutodiscoveryRepository.NextCheckAt string `json:"next-check-at"`
+field ModuleAutodiscoveryRepository.Origin string `json:"origin"`
+field ModuleAutodiscoveryRepository.PreviousPaths []ModuleAutodiscoveryRepositoryPrevious `json:"previous-paths"`
+field ModuleAutodiscoveryRepository.RepoCreatedAt string `json:"repo-created-at"`
+field ModuleAutodiscoveryRepository.RepoURL string `json:"repo-url"`
+field ModuleAutodiscoveryRepository.Repository string `json:"repository"`
+field ModuleAutodiscoveryRepository.SeenSubdirectories []string `json:"seen-subdirectories"`
+field ModuleAutodiscoveryRepository.Status string `json:"status"`
+field ModuleAutodiscoveryRepository.VCSRepoID string `json:"vcs-repo-id"`
+field ModuleAutodiscoveryRepositoryList.Items []ModuleAutodiscoveryRepository `json:"items"`
+field ModuleAutodiscoveryRepositoryList.Pagination ListMeta `json:"pagination"`
+field ModuleAutodiscoveryRepositoryListOptions.PageNumber int
+field ModuleAutodiscoveryRepositoryListOptions.PageSize int
+field ModuleAutodiscoveryRepositoryListOptions.Status string
+field ModuleAutodiscoveryRepositoryPrevious.Path string `json:"path"`
+field ModuleAutodiscoveryRepositoryPrevious.URL string `json:"url"`
 field ModuleAutodiscoveryRule.Branch string `json:"branch"`
 field ModuleAutodiscoveryRule.CreatedAt string `json:"created-at"`
 field ModuleAutodiscoveryRule.Enabled bool `json:"enabled"`
@@ -478,6 +523,8 @@ field ModuleAutodiscoveryRule.FirstScanAt string `json:"first-scan-at"`
 field ModuleAutodiscoveryRule.ID string `json:"id"`
 field ModuleAutodiscoveryRule.IgnorePatterns []string `json:"ignore-patterns"`
 field ModuleAutodiscoveryRule.Labels map[string]string `json:"labels"`
+field ModuleAutodiscoveryRule.LastEnumeratedAt string `json:"last-enumerated-at"`
+field ModuleAutodiscoveryRule.LastError string `json:"last-error"`
 field ModuleAutodiscoveryRule.LastScannedSHA string `json:"last-scanned-sha"`
 field ModuleAutodiscoveryRule.Name string `json:"name"`
 field ModuleAutodiscoveryRule.NameTemplate string `json:"name-template"`
@@ -485,6 +532,7 @@ field ModuleAutodiscoveryRule.OwnerEmail string `json:"owner-email"`
 field ModuleAutodiscoveryRule.Pattern string `json:"pattern"`
 field ModuleAutodiscoveryRule.Provider string `json:"provider"`
 field ModuleAutodiscoveryRule.RepoURL string `json:"repo-url"`
+field ModuleAutodiscoveryRule.TargetKind string `json:"target-kind"`
 field ModuleAutodiscoveryRule.UpdatedAt string `json:"updated-at"`
 field ModuleAutodiscoveryRule.VCSConnectionID string `json:"vcs-connection-id"`
 field ModuleAutodiscoveryRule.VCSTagPattern string `json:"vcs-tag-pattern"`
@@ -504,9 +552,17 @@ field ModuleAutodiscoveryScan.FilesWalked int `json:"files-walked"`
 field ModuleAutodiscoveryScan.Modules []ModuleAutodiscoveryModule `json:"modules"`
 field ModuleAutodiscoveryScan.ModulesRegistered int `json:"modules-registered"`
 field ModuleAutodiscoveryScan.Ref string `json:"ref"`
+field ModuleAutodiscoveryScan.RepositoriesScanned int `json:"repositories-scanned"`
 field ModuleAutodiscoveryScan.Skipped []ModuleAutodiscoverySkip `json:"skipped"`
+field ModuleAutodiscoverySelection.Repository string
+field ModuleAutodiscoverySelection.Subdirectories []string
 field ModuleAutodiscoverySkip.Reason string `json:"reason"`
+field ModuleAutodiscoverySkip.RepoURL string `json:"repo-url,omitempty"`
+field ModuleAutodiscoverySkip.Repository string `json:"repository,omitempty"`
 field ModuleAutodiscoverySkip.Subdirectory string `json:"subdirectory"`
+field ModuleAutodiscoveryStoredCandidate.Name string `json:"name"`
+field ModuleAutodiscoveryStoredCandidate.Provider string `json:"provider"`
+field ModuleAutodiscoveryStoredCandidate.Subdirectory string `json:"subdirectory"`
 field ModuleInterface.Inputs []map[string]any `json:"inputs"`
 field ModuleInterface.Outputs []map[string]any `json:"outputs"`
 field ModuleInterface.Version string `json:"version"`
@@ -1379,6 +1435,7 @@ method (*Client) ListAllAPITokens(ctx context.Context, kind string) ([]APIToken,
 method (*Client) ListAllAgentPools(ctx context.Context) ([]AgentPool, error)
 method (*Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListAllDeletedWorkspaces(ctx context.Context) ([]DeletedWorkspace, error)
+method (*Client) ListAllModuleAutodiscoveryRuleRepositories(ctx context.Context, id, status string) ([]ModuleAutodiscoveryRepository, error)
 method (*Client) ListAllModuleAutodiscoveryRules(ctx context.Context) ([]ModuleAutodiscoveryRule, error)
 method (*Client) ListAllVCSConnections(ctx context.Context) ([]VCSConnection, error)
 method (*Client) ListAllVariables(ctx context.Context, workspaceID string) ([]Variable, error)
@@ -1395,6 +1452,7 @@ method (*Client) ListInboundRunTriggers(ctx context.Context, workspaceID string)
 method (*Client) ListLabelEntities(ctx context.Context, key, value string) (map[string][]LabelEntity, error)
 method (*Client) ListLabelKeys(ctx context.Context) ([]LabelKey, error)
 method (*Client) ListLabelValues(ctx context.Context, key string) ([]LabelValue, error)
+method (*Client) ListModuleAutodiscoveryRuleRepositories(ctx context.Context, id string, opts ModuleAutodiscoveryRepositoryListOptions) (*ModuleAutodiscoveryRepositoryList, error)
 method (*Client) ListModuleAutodiscoveryRules(ctx context.Context) ([]ModuleAutodiscoveryRule, error)
 method (*Client) ListModuleWorkspaceLinks(ctx context.Context, moduleName, moduleProvider string) ([]ModuleWorkspaceLink, error)
 method (*Client) ListNotificationConfigurations(ctx context.Context, workspaceID string) ([]NotificationConfiguration, error)
@@ -1429,8 +1487,10 @@ method (*Client) PostArchitectureCritiqueMessage( ctx context.Context, workspace
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
 method (*Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error)
 method (*Client) PreviewModuleAutodiscoveryRule(ctx context.Context, id string) (*ModuleAutodiscoveryPreview, error)
+method (*Client) PreviewModuleAutodiscoveryRuleWithOptions(ctx context.Context, id string, opts ModuleAutodiscoveryPreviewOptions) (*ModuleAutodiscoveryPreview, error)
 method (*Client) PreviewRoleReach(ctx context.Context, name string, opts *RoleReachOptions) (*RoleReach, error)
 method (*Client) PreviewUnsavedModuleAutodiscoveryRule(ctx context.Context, req ModuleAutodiscoveryRuleRequest) (*ModuleAutodiscoveryPreview, error)
+method (*Client) PreviewUnsavedModuleAutodiscoveryRuleWithOptions(ctx context.Context, req ModuleAutodiscoveryRuleRequest, opts ModuleAutodiscoveryPreviewOptions) (*ModuleAutodiscoveryPreview, error)
 method (*Client) PreviewUnsavedRoleReach(ctx context.Context, req CreateRoleRequest, opts *RoleReachOptions) (*RoleReach, error)
 method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs map[string]any) (*CatalogInstance, error)
 method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
@@ -1449,6 +1509,7 @@ method (*Client) RevokeGPGKey(ctx context.Context, id, revocationCertificate str
 method (*Client) RotateAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
 method (*Client) RotateDEK(ctx context.Context) (*EncryptionStatus, error)
 method (*Client) ScanModuleAutodiscoveryRule(ctx context.Context, id string, subdirectories []string) (*ModuleAutodiscoveryScan, error)
+method (*Client) ScanModuleAutodiscoveryRuleSelections(ctx context.Context, id string, selections []ModuleAutodiscoverySelection) (*ModuleAutodiscoveryScan, error)
 method (*Client) SearchWorkspaces(ctx context.Context, filter WorkspaceFilter) (*SearchWorkspacesResult, error)
 method (*Client) SetRolesForIdentity(ctx context.Context, providerName, email string, roles []string) error
 method (*Client) StartOnboardingDiscovery(ctx context.Context, sessionID string, selectedTypes []string) (*OnboardingSession, error)
@@ -1568,10 +1629,18 @@ type LogOptions struct
 type ModuleAutodiscoveryCandidate struct
 type ModuleAutodiscoveryModule struct
 type ModuleAutodiscoveryPreview struct
+type ModuleAutodiscoveryPreviewOptions struct
+type ModuleAutodiscoveryPreviewRepository struct
+type ModuleAutodiscoveryRepository struct
+type ModuleAutodiscoveryRepositoryList struct
+type ModuleAutodiscoveryRepositoryListOptions struct
+type ModuleAutodiscoveryRepositoryPrevious struct
 type ModuleAutodiscoveryRule struct
 type ModuleAutodiscoveryRuleRequest struct
 type ModuleAutodiscoveryScan struct
+type ModuleAutodiscoverySelection struct
 type ModuleAutodiscoverySkip struct
+type ModuleAutodiscoveryStoredCandidate struct
 type ModuleInterface struct
 type ModuleWorkspaceLink struct
 type NotFoundError struct

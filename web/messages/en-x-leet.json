@@ -399,7 +399,8 @@
         "register": "{count, plural, one {Register # module} other {Register # modules}}",
         "registering": "R3g1573r1ng…",
         "failed": "5c4n f41l3d",
-        "ruleLink": "Cr3473 4 rul3 70 r3g1573r n3w m0dul35 4u70m471c4lly"
+        "ruleLink": "Cr3473 4 rul3 70 r3g1573r n3w m0dul35 4u70m471c4lly",
+        "orgNote": "0nly 7h3 f1r57 p4g3 0f r3p05170r135 15 5h0wn h3r3. Cr3473 4 rul3 70 c0v3r 3v3ry r3p05170ry, 1nclud1ng 0n35 cr3473d l473r."
       },
       "versionCount": "{count, plural, one {# version} other {# versions}}",
       "loadFailed": "F41l3d 70 l04d m0dul35",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "n4m3 4lr34dy 74k3n",
     "reasonMissingProvider": "n0 pr0v1d3r",
     "confirmDelete": "D3l373 7h3 rul3 {name}? 7h3 m0dul35 17 r3g1573r3d 574y r3g1573r3d.",
-    "loadFailed": "F41l3d 70 l04d m0dul3 4u70d15c0v3ry rul35"
+    "loadFailed": "F41l3d 70 l04d m0dul3 4u70d15c0v3ry rul35",
+    "repoUrlHint": "0n3 r3p05170ry, 4n 0rg 0r gr0up (3v3ry r3p05170ry 1n 17), 0r 4 p4773rn 0v3r 0n3 0rg 0r gr0up''5 r3p05170r135, 5uch 45 {example}. Gl0b ch4r4c73r5 g0 1n 7h3 l457 53gm3n7 0nly. 73rr4p0d w0rk5 0u7 wh1ch wh3n y0u 54v3, 4nd n3v3r ch4ng35 17 0n 175 0wn.",
+    "ownerPlaceholderHint": "4 rul3 7h47 c0v3r5 4n 0rg 0r gr0up c4n 4l50 u53 <owner></owner>: 7h3 r3p05170ry''5 0wn3r 0r gr0up.",
+    "targetKind": {
+      "repository": "R3p05170ry",
+      "namespace": "0rg 0r gr0up",
+      "pattern": "P4773rn"
+    },
+    "attention": {
+      "badge": "N33d5 4773n710n",
+      "title": "{name} n33d5 4773n710n",
+      "hint": "4 rul3 7r135 4g41n 0n 7h3 n3x7 r3g157ry p0ll. 1f 175 74rg37 w45 d3l373d, 3d17 7h3 rul3 70 p01n7 17 50m3wh3r3 3l53."
+    },
+    "repoStatus": {
+      "active": "4c71v3",
+      "archived": "4rch1v3d",
+      "empty": "3mp7y",
+      "noBranch": "n0 br4nch",
+      "outOfScope": "0u7 0f 5c0p3",
+      "covered": "c0v3r3d",
+      "error": "3rr0r"
+    },
+    "origin": {
+      "baseline": "b453l1n3",
+      "new": "n3w"
+    },
+    "paging": {
+      "page": "P4g3 {page} 0f {pages}",
+      "previous": "Pr3v10u5",
+      "next": "N3x7"
+    },
+    "repositories": {
+      "open": "R3p05170r135",
+      "title": "R3p05170r135: {ruleName}",
+      "lastListed": "L457 l1573d {time}",
+      "notListed": "N07 l1573d y37. 7h3 n3x7 r3g157ry p0ll l1575 7h15 rul3''5 r3p05170r135.",
+      "legend": "B453l1n3 r3p05170r135 3x1573d b3f0r3 7h3 rul3, 50 n07h1ng 1n 7h3m r3g1573r5 un71l y0u p1ck 17 fr0m 4 pr3v13w. N3w r3p05170r135 w3r3 cr3473d 4f73r 7h3 rul3, 50 7h31r m0dul35 r3g1573r 4u70m471c4lly.",
+      "filterLabel": "5747u5",
+      "filterAll": "4ll 5747u535",
+      "none": "N0 r3p05170r135 y37.",
+      "noneWithStatus": "N0 r3p05170r135 w17h 7h15 5747u5.",
+      "loadFailed": "F41l3d 70 l04d 7h3 rul3''5 r3p05170r135",
+      "repository": "R3p05170ry",
+      "status": "5747u5",
+      "origin": "0r1g1n",
+      "candidates": "C4nd1d4735",
+      "lastChecked": "L457 ch3ck3d",
+      "error": "3rr0r",
+      "renamed": "R3n4m3d fr0m",
+      "renamedFrom": "R3n4m3d fr0m {paths}",
+      "never": "n3v3r",
+      "candidateCount": "{count, plural, one {# m0dul3} other {# m0dul35}}"
+    },
+    "grouped": {
+      "storedNote": "Wh47 7h3 l457 r3g157ry p0ll f0und 1n 34ch r3p05170ry. N07h1ng 15 r34d fr0m 7h3 VC5 pr0v1d3r.",
+      "unsavedNote": "4n un54v3d rul3 r34d5 0n3 p4g3 0f r3p05170r135 47 4 71m3, l1v3. 54v3 17 70 h4v3 7h3 p0ll3r f0ll0w 3v3ry r3p05170ry.",
+      "incomplete": "7h15 0rg 0r gr0up h45 m0r3 r3p05170r135 7h4n 73rr4p0d l1575 47 0nc3, 50 50m3 4r3 n07 5h0wn.",
+      "selectRepository": "53l3c7 3v3ry m0dul3 1n {repository}",
+      "noCandidates": "N0 m0dul35 70 r3g1573r h3r3.",
+      "repositoryError": "C0uld n07 r34d 7h15 r3p05170ry: {error}",
+      "confirmRegisterAll": "R3g1573r 3v3ry m0dul3 7h15 rul3 h45 f0und? M0dul35 4lr34dy r3g1573r3d, 0r wh053 n4m3 15 74k3n, 4r3 5k1pp3d.",
+      "scanRepositories": "{count, plural, one {5c4nn3d # r3p05170ry.} other {5c4nn3d # r3p05170r135.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Bulk Upd473",

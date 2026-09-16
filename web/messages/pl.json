@@ -399,7 +399,8 @@
         "register": "{count, plural, one {Zarejestruj # moduł} few {Zarejestruj # moduły} many {Zarejestruj # modułów} other {Zarejestruj # modułu}}",
         "registering": "Rejestrowanie…",
         "failed": "Przeszukiwanie nie powiodło się",
-        "ruleLink": "Utwórz regułę, aby automatycznie rejestrować nowe moduły"
+        "ruleLink": "Utwórz regułę, aby automatycznie rejestrować nowe moduły",
+        "orgNote": "Tutaj widoczna jest tylko pierwsza strona repozytoriów. Utwórz regułę, aby objąć wszystkie repozytoria, w tym te utworzone później."
       },
       "versionCount": "{count, plural, one {# wersja} few {# wersje} many {# wersji} other {# wersji}}",
       "loadFailed": "Nie udało się wczytać modułów",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "nazwa już zajęta",
     "reasonMissingProvider": "brak dostawcy",
     "confirmDelete": "Usunąć regułę {name}? Zarejestrowane przez nią moduły pozostaną zarejestrowane.",
-    "loadFailed": "Nie udało się wczytać reguł wykrywania modułów"
+    "loadFailed": "Nie udało się wczytać reguł wykrywania modułów",
+    "repoUrlHint": "Jedno repozytorium, organizacja lub grupa (wszystkie repozytoria w niej) albo wzorzec obejmujący repozytoria jednej organizacji lub grupy, na przykład {example}. Znaki globu mogą występować tylko w ostatnim segmencie. Terrapod ustala, o co chodzi, w momencie zapisu, i nigdy nie zmienia tego samodzielnie.",
+    "ownerPlaceholderHint": "Reguła obejmująca organizację lub grupę może też używać <owner></owner>: właściciela repozytorium lub grupy.",
+    "targetKind": {
+      "repository": "Repozytorium",
+      "namespace": "Organizacja lub grupa",
+      "pattern": "Wzorzec"
+    },
+    "attention": {
+      "badge": "Wymaga uwagi",
+      "title": "{name} wymaga uwagi",
+      "hint": "Reguła spróbuje ponownie przy następnym odpytywaniu rejestru. Jeśli jej cel został usunięty, edytuj regułę, aby wskazywała gdzie indziej."
+    },
+    "repoStatus": {
+      "active": "aktywne",
+      "archived": "zarchiwizowane",
+      "empty": "puste",
+      "noBranch": "brak gałęzi",
+      "outOfScope": "poza zakresem",
+      "covered": "objęte",
+      "error": "błąd"
+    },
+    "origin": {
+      "baseline": "bazowe",
+      "new": "nowe"
+    },
+    "paging": {
+      "page": "Strona {page} z {pages}",
+      "previous": "Poprzednia",
+      "next": "Następna"
+    },
+    "repositories": {
+      "open": "Repozytoria",
+      "title": "Repozytoria: {ruleName}",
+      "lastListed": "Ostatnio wylistowano {time}",
+      "notListed": "Jeszcze nie wylistowano. Następne odpytywanie rejestru wylistuje repozytoria tej reguły.",
+      "legend": "Repozytoria bazowe istniały przed regułą, więc nic w nich nie zostanie zarejestrowane, dopóki nie wybierzesz tego z podglądu. Nowe repozytoria zostały utworzone po regule, więc ich moduły rejestrują się automatycznie.",
+      "filterLabel": "Status",
+      "filterAll": "Wszystkie statusy",
+      "none": "Brak repozytoriów.",
+      "noneWithStatus": "Brak repozytoriów z tym statusem.",
+      "loadFailed": "Nie udało się wczytać repozytoriów reguły",
+      "repository": "Repozytorium",
+      "status": "Status",
+      "origin": "Pochodzenie",
+      "candidates": "Kandydaci",
+      "lastChecked": "Ostatnio sprawdzono",
+      "error": "Błąd",
+      "renamed": "Zmieniono nazwę z",
+      "renamedFrom": "Zmieniono nazwę z {paths}",
+      "never": "nigdy",
+      "candidateCount": "{count, plural, one {# moduł} few {# moduły} many {# modułów} other {# modułu}}"
+    },
+    "grouped": {
+      "storedNote": "To, co ostatnie odpytywanie rejestru znalazło w każdym repozytorium. Nic nie jest odczytywane od dostawcy VCS.",
+      "unsavedNote": "Niezapisana reguła odczytuje jedną stronę repozytoriów naraz, na żywo. Zapisz ją, aby odpytywanie śledziło każde repozytorium.",
+      "incomplete": "Ta organizacja lub grupa ma więcej repozytoriów, niż Terrapod wyświetla naraz, więc część z nich nie jest pokazana.",
+      "selectRepository": "Wybierz wszystkie moduły w {repository}",
+      "noCandidates": "Nie ma tu modułów do zarejestrowania.",
+      "repositoryError": "Nie udało się odczytać tego repozytorium: {error}",
+      "confirmRegisterAll": "Zarejestrować wszystkie moduły znalezione przez tę regułę? Moduły już zarejestrowane lub takie, których nazwa jest zajęta, zostaną pominięte.",
+      "scanRepositories": "{count, plural, one {Przeskanowano # repozytorium.} few {Przeskanowano # repozytoria.} many {Przeskanowano # repozytoriów.} other {Przeskanowano # repozytorium.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Aktualizacja zbiorcza",

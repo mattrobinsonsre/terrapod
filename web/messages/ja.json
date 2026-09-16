@@ -399,7 +399,8 @@
         "register": "{count, plural, one {# 個のモジュールを登録} other {# 個のモジュールを登録}}",
         "registering": "登録中…",
         "failed": "スキャンに失敗しました",
-        "ruleLink": "新しいモジュールを自動登録するルールを作成"
+        "ruleLink": "新しいモジュールを自動登録するルールを作成",
+        "orgNote": "ここには最初のページのリポジトリのみが表示されます。以降に作成されるものを含め、すべてのリポジトリを対象にするにはルールを作成してください。"
       },
       "versionCount": "{count, plural, one {# 個のバージョン} other {# 個のバージョン}}",
       "loadFailed": "モジュールの読み込みに失敗しました",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "名前が使用済み",
     "reasonMissingProvider": "プロバイダーなし",
     "confirmDelete": "ルール {name} を削除しますか？登録済みのモジュールはそのまま残ります。",
-    "loadFailed": "モジュール自動検出ルールを読み込めませんでした"
+    "loadFailed": "モジュール自動検出ルールを読み込めませんでした",
+    "repoUrlHint": "1つのリポジトリ、組織またはグループ（その中のすべてのリポジトリ）、あるいは1つの組織またはグループのリポジトリに対するパターン（{example} など）を指定できます。globの文字が使えるのは最後のセグメントのみです。保存時にTerrapodがどちらであるかを判定し、以降は自分で変更することはありません。",
+    "ownerPlaceholderHint": "組織またはグループを対象とするルールでは、<owner></owner>（リポジトリの所有者または組織）も使用できます。",
+    "targetKind": {
+      "repository": "リポジトリ",
+      "namespace": "組織またはグループ",
+      "pattern": "パターン"
+    },
+    "attention": {
+      "badge": "要確認",
+      "title": "{name} は確認が必要です",
+      "hint": "ルールは次回のレジストリポーリングで再試行します。対象が削除された場合は、ルールを編集して別の対象を指定してください。"
+    },
+    "repoStatus": {
+      "active": "有効",
+      "archived": "アーカイブ済み",
+      "empty": "空",
+      "noBranch": "ブランチなし",
+      "outOfScope": "対象外",
+      "covered": "カバー済み",
+      "error": "エラー"
+    },
+    "origin": {
+      "baseline": "ベースライン",
+      "new": "新規"
+    },
+    "paging": {
+      "page": "{pages} ページ中 {page} ページ目",
+      "previous": "前へ",
+      "next": "次へ"
+    },
+    "repositories": {
+      "open": "リポジトリ",
+      "title": "リポジトリ: {ruleName}",
+      "lastListed": "最終取得: {time}",
+      "notListed": "まだ取得されていません。次回のレジストリポーリングでこのルールのリポジトリを取得します。",
+      "legend": "ベースラインのリポジトリはルール作成前から存在していたため、プレビューで選択するまで何も登録されません。新規リポジトリはルール作成後に作られたため、そのモジュールは自動的に登録されます。",
+      "filterLabel": "ステータス",
+      "filterAll": "すべてのステータス",
+      "none": "リポジトリがまだありません。",
+      "noneWithStatus": "このステータスのリポジトリはありません。",
+      "loadFailed": "ルールのリポジトリの読み込みに失敗しました",
+      "repository": "リポジトリ",
+      "status": "ステータス",
+      "origin": "由来",
+      "candidates": "候補",
+      "lastChecked": "最終確認",
+      "error": "エラー",
+      "renamed": "変更前の名前",
+      "renamedFrom": "{paths} から名前変更",
+      "never": "なし",
+      "candidateCount": "{count, plural, other {モジュール # 個}}"
+    },
+    "grouped": {
+      "storedNote": "前回のレジストリポーリングで各リポジトリから検出された内容です。VCSプロバイダーからは何も読み取りません。",
+      "unsavedNote": "未保存のルールは、一度に1ページ分のリポジトリをライブで読み取ります。保存すると、ポーラーがすべてのリポジトリを追跡するようになります。",
+      "incomplete": "この組織またはグループには、Terrapodが一度に表示できる数を超えるリポジトリがあるため、一部は表示されていません。",
+      "selectRepository": "{repository} 内のすべてのモジュールを選択",
+      "noCandidates": "ここに登録できるモジュールはありません。",
+      "repositoryError": "このリポジトリを読み取れませんでした: {error}",
+      "confirmRegisterAll": "このルールが見つけたすべてのモジュールを登録しますか？ すでに登録済みのモジュールや、名前が既に使用されているモジュールはスキップされます。",
+      "scanRepositories": "{count, plural, other {# 個のリポジトリをスキャンしました。}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "一括更新",

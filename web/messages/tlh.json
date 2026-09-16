@@ -399,7 +399,8 @@
         "register": "{count, plural, one {# jan yIghItlh} other {# janmey yIghItlh}}",
         "registering": "ghItlhtaH…",
         "failed": "nuD luj",
-        "ruleLink": "janmey chu'' ghItlhmeH chut yIchenmoH"
+        "ruleLink": "janmey chu'' ghItlhmeH chut yIchenmoH",
+        "orgNote": "naDev repomey nav wa''DIch neH cha''lu''. repo Hoch — chenlu''pu''bogh tlha''bogh je — ngaSmeH chut yIchenmoH."
       },
       "versionCount": "{count, plural, one {# mI''} other {# mI''mey}}",
       "loadFailed": "Seghmey ghelmeH lujpu'",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "pong ghajlu''",
     "reasonMissingProvider": "Qap ngan tu''lu''be''",
     "confirmDelete": "chut {name} DaQaw''? janmey ghItlhta''bogh ghItlhlu''taH.",
-    "loadFailed": "janmey tu''meH chutmey lI''laHbe''"
+    "loadFailed": "janmey tu''meH chutmey lI''laHbe''",
+    "repoUrlHint": "wa'' repo, org pagh ghom (repomey Hoch ngaSbogh), pagh wa'' org pagh ghom repomey Daq mIw, {example} rur. Qav ''ay''Daq neH Glob ngutlhmey yIlan. bIpolDI'' nuq ''oH ''e'' tu'' Terrapod, ''ej nIteb choHbe'' reH.",
+    "ownerPlaceholderHint": "org pagh ghom qonbogh chut <owner></owner> lo''laH je: repo ghajwI'' pagh ghom.",
+    "targetKind": {
+      "repository": "repo",
+      "namespace": "org pagh ghom",
+      "pattern": "mIw"
+    },
+    "attention": {
+      "badge": "qImnIS",
+      "title": "{name} qImnIS",
+      "hint": "nughmey teywI'' ghelqa'' vebDaq nIDqa'' chut. DoSDaj Qaw''lu''pu''chugh, latlh Daq DoSmeH chut yIchoH."
+    },
+    "repoStatus": {
+      "active": "QaptaH",
+      "archived": "polpu''",
+      "empty": "chIm",
+      "noBranch": "paQ Hutlh",
+      "outOfScope": "tlhoy'' Hur",
+      "covered": "ngaSlu''",
+      "error": "Qagh"
+    },
+    "origin": {
+      "baseline": "ngo''",
+      "new": "chu''"
+    },
+    "paging": {
+      "page": "nav {page}, {pages} ghom",
+      "previous": "wa''Hu''",
+      "next": "veb"
+    },
+    "repositories": {
+      "open": "repomey",
+      "title": "repomey: {ruleName}",
+      "lastListed": "Qav tetlhlu'' {time}",
+      "notListed": "tetlhlu''be'' DaH. nughmey teywI'' ghelqa'' vebDaq chut vam repomey tetlhlu''.",
+      "legend": "chut ghoSpa'' ngo'' repomey tu''lu''pu'', vaj tI''angvo'' DawIvpa'' pagh ghItlhlu''. chut ghoSDI'' chu'' repomey chenmoHlu''pu'', vaj janmeychaj ghItlhlu'' nIteb.",
+      "filterLabel": "Dotlh",
+      "filterAll": "Dotlh Hoch",
+      "none": "repomey tu''lu''be'' DaH.",
+      "noneWithStatus": "Dotlh vam ghajbogh repomey tu''lu''be''.",
+      "loadFailed": "chut repomey ghelmeH lujpu''",
+      "repository": "repo",
+      "status": "Dotlh",
+      "origin": "mung",
+      "candidates": "wIvmey",
+      "lastChecked": "Qav ghelqa''",
+      "error": "Qagh",
+      "renamed": "pong ngo''",
+      "renamedFrom": "pong ngo'': {paths}",
+      "never": "not",
+      "candidateCount": "{count, plural, one {# jan} other {# janmey}}"
+    },
+    "grouped": {
+      "storedNote": "nughmey teywI'' ghelqa'' Qav repo Hoch Daq tu''bogh. VCS nobwI''vo'' pagh laDlu''.",
+      "unsavedNote": "chut polbe''lu''bogh repomey nav wa'' neH laD, DaH. yIpol, vaj repo Hoch tlha'' ghelwI''.",
+      "incomplete": "Terrapod tetlhlaHbogh law'' repomey ghaj org pagh ghom vam, vaj ''op cha''lu''be''.",
+      "selectRepository": "{repository} Daq jan Hoch yIwIv",
+      "noCandidates": "naDev ghItlhmeH janmey tu''lu''be''.",
+      "repositoryError": "repo vam laDlaHbe''lu'': {error}",
+      "confirmRegisterAll": "chut vam tu''bogh jan Hoch DaghItlh''a''? janmey ghItlhlu''pu''bogh, pongchaj ghajlu''bogh je buSbe''lu''.",
+      "scanRepositories": "{count, plural, one {# repo nuDlu''pu''.} other {# repomey nuDlu''pu''.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "tlhoy' choH",

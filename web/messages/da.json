@@ -399,7 +399,8 @@
         "register": "{count, plural, one {Registrer # modul} other {Registrer # moduler}}",
         "registering": "Registrerer…",
         "failed": "Søgningen mislykkedes",
-        "ruleLink": "Opret en regel for at registrere nye moduler automatisk"
+        "ruleLink": "Opret en regel for at registrere nye moduler automatisk",
+        "orgNote": "Kun den første side af repositorier vises her. Opret en regel for at dække alle repositorier, inklusive dem, der oprettes senere."
       },
       "versionCount": "{count, plural, one {# version} other {# versioner}}",
       "loadFailed": "Kunne ikke indlæse moduler",
@@ -1130,7 +1131,69 @@
     "reasonNameTaken": "navnet er optaget",
     "reasonMissingProvider": "ingen provider",
     "confirmDelete": "Slet reglen {name}? Modulerne, den registrerede, forbliver registrerede.",
-    "loadFailed": "Reglerne for modulfinding kunne ikke indlæses"
+    "loadFailed": "Reglerne for modulfinding kunne ikke indlæses",
+    "repoUrlHint": "Et repositorie, en org eller gruppe (alle repositorier i den), eller et mønster over en org eller gruppes repositorier, f.eks. {example}. Glob-tegn optræder kun i det sidste segment. Terrapod afgør hvilket, når du gemmer, og ændrer det aldrig på egen hånd.",
+    "ownerPlaceholderHint": "En regel, der dækker en org eller gruppe, kan også bruge <owner></owner>: repositoriets ejer eller gruppe.",
+    "targetKind": {
+      "repository": "Repositorie",
+      "namespace": "Org eller gruppe",
+      "pattern": "Mønster"
+    },
+    "attention": {
+      "badge": "Kræver opmærksomhed",
+      "title": "{name} kræver opmærksomhed",
+      "hint": "En regel forsøger igen ved næste registerpolling. Hvis dens mål er blevet slettet, så rediger reglen, så den peger et andet sted hen."
+    },
+    "repoStatus": {
+      "active": "aktiv",
+      "archived": "arkiveret",
+      "empty": "tom",
+      "noBranch": "ingen branch",
+      "outOfScope": "uden for omfang",
+      "covered": "dækket",
+      "error": "fejl"
+    },
+    "origin": {
+      "baseline": "baseline",
+      "new": "ny"
+    },
+    "paging": {
+      "page": "Side {page} af {pages}",
+      "previous": "Forrige",
+      "next": "Næste"
+    },
+    "repositories": {
+      "open": "Repositorier",
+      "title": "Repositorier: {ruleName}",
+      "lastListed": "Sidst listet {time}",
+      "notListed": "Ikke listet endnu. Næste registerpolling lister denne regels repositorier.",
+      "legend": "Baseline-repositorier fandtes før reglen, så intet i dem registreres, før du vælger det i en forhåndsvisning. Nye repositorier blev oprettet efter reglen, så deres moduler registreres automatisk.",
+      "filterLabel": "Status",
+      "filterAll": "Alle statusser",
+      "none": "Ingen repositorier endnu.",
+      "noneWithStatus": "Ingen repositorier med denne status.",
+      "loadFailed": "Reglens repositorier kunne ikke indlæses",
+      "repository": "Repositorie",
+      "status": "Status",
+      "origin": "Oprindelse",
+      "candidates": "Kandidater",
+      "lastChecked": "Sidst kontrolleret",
+      "error": "Fejl",
+      "renamed": "Omdøbt fra",
+      "renamedFrom": "Omdøbt fra {paths}",
+      "never": "aldrig",
+      "candidateCount": "{count, plural, one {# modul} other {# moduler}}"
+    },
+    "grouped": {
+      "storedNote": "Hvad den seneste registerpolling fandt i hvert repositorie. Intet læses fra VCS-udbyderen.",
+      "unsavedNote": "En ugemt regel læser én side repositorier ad gangen, direkte. Gem den, for at pollingen skal følge alle repositorier.",
+      "incomplete": "Denne org eller gruppe har flere repositorier, end Terrapod lister ad gangen, så nogle vises ikke.",
+      "selectRepository": "Vælg alle moduler i {repository}",
+      "noCandidates": "Ingen moduler at registrere her.",
+      "repositoryError": "Kunne ikke læse dette repositorie: {error}",
+      "confirmRegisterAll": "Registrer alle moduler, denne regel har fundet? Moduler, der allerede er registreret, eller hvis navn er optaget, springes over.",
+      "scanRepositories": "{count, plural, one {Gennemsøgte # repositorie.} other {Gennemsøgte # repositorier.}}"
+    }
   },
   "adminBulkUpdate": {
     "title": "Masseopdatering",

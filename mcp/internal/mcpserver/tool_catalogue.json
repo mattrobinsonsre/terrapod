@@ -70,8 +70,49 @@
     "input_schema": {
       "additionalProperties": false,
       "properties": {
+        "page_number": {
+          "description": "for an org-wide rule: which page of repositories (1-based; default 1)",
+          "type": "integer"
+        },
+        "page_size": {
+          "description": "for an org-wide rule: repositories per page (default the server's; at most 100)",
+          "type": "integer"
+        },
+        "repository": {
+          "description": "for an org-wide rule: read this one repository (a path such as org/terraform-aws-vpc, or its URL) live instead of the stored candidates",
+          "type": "string"
+        },
         "rule_id": {
           "description": "the rule id (modrule-...)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_module_autodiscovery_rule_repositories",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "page_number": {
+          "description": "which page (1-based; default 1)",
+          "type": "integer"
+        },
+        "page_size": {
+          "description": "repositories per page (default 50, at most 100)",
+          "type": "integer"
+        },
+        "rule_id": {
+          "description": "the rule id (modrule-...)",
+          "type": "string"
+        },
+        "status": {
+          "description": "only repositories in this status: active, archived, empty, no-branch, out-of-scope, covered or error",
           "type": "string"
         }
       },
@@ -90,8 +131,38 @@
           "description": "the rule id (modrule-...)",
           "type": "string"
         },
+        "selections": {
+          "description": "for an org-wide rule (or naming a single-repository rule's one repository): the repositories to register from, each with optional subdirectories; omit to register every current candidate of every repository",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "repository": {
+                "description": "the repository's path (org/repo) or URL",
+                "type": "string"
+              },
+              "subdirectories": {
+                "description": "register only these candidate directories in it (the root is the empty string); omit for all of them",
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              }
+            },
+            "required": [
+              "repository"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
         "subdirectories": {
-          "description": "register only these candidate directories (the repository root is the empty string); omit to register every candidate",
+          "description": "for a single-repository rule: register only these candidate directories (the repository root is the empty string); omit to register every candidate",
           "items": {
             "type": "string"
           },
