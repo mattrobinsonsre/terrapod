@@ -38,12 +38,27 @@ Terraform will perform the following actions:
   - resource "aws_iam_role" "legacy" {
       - name = "legacy" -> null
     }
-
-Plan: 1 to add, 1 to change, 1 to destroy.
 `
+// The tally deliberately lives AFTER the padding (see stubRun), not here: only
+// the first one counts, so a copy in this body would put the summary entry
+// above the padding and quietly undo the distance the jump is meant to cover.
 
 const STX = '\x02'
 const ETX = '\x03'
+
+/**
+ * Padding, so the pane actually overflows and there is something to scroll.
+ *
+ * The pane is `fine:max-h-[70vh]`, and Desktop Chrome is 720px tall, so it
+ * caps at roughly 503px — about 25 lines. The plan body alone is 25 lines, so
+ * without this the pane does not overflow, `scrollTop` is pinned at its
+ * initial value, and a jump assertion can never pass however correct the jump
+ * is. `log-follow` pads its fixture for the same reason.
+ */
+const PADDING = Array.from(
+  { length: 120 },
+  (_, i) => `  # padding line ${i}: refreshing state...`,
+).join('\n')
 
 /** Serve the run, its plan object, and the log — framed, or still arriving. */
 async function stubRun(page: import('@playwright/test').Page, { complete }: { complete: boolean }) {
@@ -88,8 +103,12 @@ async function stubRun(page: import('@playwright/test').Page, { complete }: { co
   })
 
   await page.route(`**/stub-logs/${RUN_ID}/plan*`, async route => {
-    // STX at offset 0; ETX only when the log is whole.
-    const body = `${STX}${PLAN_BODY}${complete ? ETX : ''}`
+    // STX at offset 0; ETX only when the log is whole. The padding sits
+    // between the announced changes and the summary so the pane overflows and
+    // the entries are genuinely far apart — a jump over nothing proves nothing.
+    const body = `${STX}${PLAN_BODY}\n${PADDING}\n\nPlan: 1 to add, 1 to change, 1 to destroy.\n${
+      complete ? ETX : ''
+    }`
     await route.fulfill({ status: 200, contentType: 'text/plain', body })
   })
 }
@@ -119,6 +138,13 @@ test.describe('the plan-log index', () => {
 
     const pane = page.getByTestId('log-pre-plan')
     await expect(pane).toBeVisible()
+
+    // Assert the premise first. A pane that does not overflow has an immovable
+    // scrollTop, and the jump assertion below would then fail identically
+    // whether the feature works or not — which is exactly how a too-short
+    // fixture once read as a broken jump for three CI runs.
+    const overflow = await pane.evaluate(el => el.scrollHeight - el.clientHeight)
+    expect(overflow, 'the pane must overflow or there is nothing to scroll').toBeGreaterThan(100)
 
     const before = await pane.evaluate(el => el.scrollTop)
     // The last announced change is far enough down to require a scroll.
