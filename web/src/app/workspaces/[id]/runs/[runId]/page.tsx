@@ -127,6 +127,13 @@ type RunView = 'overview' | 'ai' | 'opa' | 'security' | 'impact' | 'cost' | 'pla
 // waiting for its stored copy (#1591).
 const PLAN_PHASE_DONE = ['planned', 'confirmed', 'applying', 'applied', 'errored', 'discarded', 'canceled']
 
+// How far below the pane's top edge a jumped-to line lands, in pixels — about
+// two lines of the log's monospace type. Deliberately a fixed gap rather than a
+// fraction of the pane: what you want to read extends downward from the line,
+// so anything proportional pushes the line towards the middle and spends the
+// space above it on output you have already scrolled past.
+const LINE_LEAD_IN = 36
+
 const ansiConverter = new Convert({
   fg: '#cbd5e1',
   bg: 'transparent',
@@ -476,9 +483,14 @@ function LogPanel({
       const offsetWithinPane =
         node.getBoundingClientRect().top - pre.getBoundingClientRect().top + pre.scrollTop
       pre.scrollTo({
-        // A third of the way down, so the line has context above it rather
-        // than sitting flush against the top edge.
-        top: Math.max(0, offsetWithinPane - pre.clientHeight / 3),
+        // Near the top, not the middle. A resource change extends *downward*
+        // from the line that announces it — the diff beneath is the part worth
+        // reading — so placing the announcement near the top leaves the most
+        // room for the rest of it. A fraction of the pane (a third, say) puts
+        // the line mid-pane and wastes the half above it on what came before.
+        // The small gap is a couple of lines, enough that the line does not
+        // sit flush against the edge and look cut off.
+        top: Math.max(0, offsetWithinPane - LINE_LEAD_IN),
         behavior: 'smooth',
       })
     }
