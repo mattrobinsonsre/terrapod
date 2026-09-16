@@ -233,6 +233,9 @@ class TestResolvedValueIsThePath:
 
     @pytest.mark.asyncio
     async def test_a_json_document_is_delivered_verbatim_as_the_file(self):
+        # A fixture shaped like a GCP service-account file, which is what this
+        # delivery path is for. No credential.
+        # nosemgrep: generic.secrets.security.detected-google-gcm-service-account.detected-google-gcm-service-account
         doc = json.dumps({"type": "service_account", "private_key": "-----BEGIN"})
         with _read(doc):
             out = await resolve_vault_delivery([_Var("F", _ref(file={}))], _settings())
@@ -243,10 +246,12 @@ class TestResolvedValueIsThePath:
         """End to end with the client's encoding: an object stored in Vault is
         a parseable JSON file, not a Python repr."""
         mock = AsyncMock(
+            # nosemgrep: generic.secrets.security.detected-google-gcm-service-account.detected-google-gcm-service-account
             return_value=VaultResponse({"sa": {"type": "service_account", "ok": True}})
         )
         with patch.object(vss, "read_secret_response", new=mock):
             out = await resolve_vault_delivery([_Var("F", _ref(file={}))], _settings())
+        # nosemgrep: generic.secrets.security.detected-google-gcm-service-account.detected-google-gcm-service-account
         assert json.loads(out.files[0]["value"]) == {"type": "service_account", "ok": True}
 
     @pytest.mark.asyncio

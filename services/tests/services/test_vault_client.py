@@ -94,7 +94,11 @@ class TestNonStringFieldsAreJsonEncoded:
     async def test_a_dict_is_json(self):
         import json
 
+        # A GCP service-account document is the case this encoding exists for,
+        # so the fixture has to look like one. There is no key here.
+        # nosemgrep: generic.secrets.security.detected-google-gcm-service-account.detected-google-gcm-service-account
         got = await self._read({"type": "service_account", "enabled": True, "n": None})
+        # nosemgrep: generic.secrets.security.detected-google-gcm-service-account.detected-google-gcm-service-account
         assert json.loads(got) == {"type": "service_account", "enabled": True, "n": None}
         assert "'" not in got and "True" not in got and "None" not in got
 
