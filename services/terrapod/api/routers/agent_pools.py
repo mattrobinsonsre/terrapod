@@ -39,6 +39,7 @@ from terrapod.api.dependencies import (
     get_listener_identity,
     require_admin,
 )
+from terrapod.api.ids import parse_id
 from terrapod.api.labels import validate_labels as _validate_labels
 from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
@@ -280,7 +281,7 @@ def _listener_json(listener: dict, replica_count: int | None = None) -> dict:
 
 
 async def _get_pool(pool_id: str, db: AsyncSession):
-    pool_uuid = uuid.UUID(pool_id.removeprefix("apool-"))
+    pool_uuid = parse_id(pool_id, "apool-", detail="Agent pool not found")
     pool = await agent_pool_service.get_pool(db, pool_uuid)
     if pool is None:
         raise HTTPException(status_code=404, detail="Agent pool not found")
@@ -595,7 +596,7 @@ async def delete_pool_token(
     """Delete/revoke a join token (requires admin on pool)."""
     pool = await _get_pool(pool_id, db)
     await _require_pool_capability(pool, user, db, cap.POOL_MANAGE)
-    token_uuid = uuid.UUID(token_id.removeprefix("at-"))
+    token_uuid = parse_id(token_id, "at-", detail="Token not found")
 
     from sqlalchemy import select
 
@@ -805,7 +806,7 @@ async def delete_listener(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a listener (requires admin permission on pool)."""
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
     listener = await agent_pool_service.get_listener(l_uuid)
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
@@ -890,7 +891,7 @@ async def listener_heartbeat(
     failure that took it offline. The cert's listener-id must also match the
     path id (a listener can only heartbeat itself).
     """
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
     if identity.listener_id != l_uuid:
         raise HTTPException(
             status_code=403,
@@ -954,7 +955,7 @@ async def renew_listener_cert(
     cert's listener id must also match the path id — a listener can
     only renew its own cert, not another listener's.
     """
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    l_uuid = parse_id(listener_id, "listener-", detail="Listener not found")
 
     if identity.listener_id != l_uuid:
         raise HTTPException(

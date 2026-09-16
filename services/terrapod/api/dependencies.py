@@ -21,6 +21,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.ids import strip_id_prefix
 from terrapod.api.metrics import AUTH_FAILURES
 from terrapod.auth.api_tokens import validate_api_token
 from terrapod.auth.sessions import (
@@ -469,7 +470,14 @@ def require_runner_for_run(user: AuthenticatedUser, run_id: str) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Runner token required",
         )
-    if user.run_id != run_id:
+    # Compare the two ids in the same spelling. The token carries a bare uuid
+    # (`runner_tokens.generate_runner_token` stores `str(run_id)`), while the
+    # path may carry `run-{uuid}` -- every other run endpoint accepts both, so
+    # a prefixed id reaching here used to be rejected as "not scoped to this
+    # run", which reads as a security failure rather than a spelling one
+    # (#1699). Normalising both sides only widens what is accepted: the token
+    # must still name the same run.
+    if strip_id_prefix(user.run_id or "", "run-") != strip_id_prefix(run_id, "run-"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Token not scoped to this run",

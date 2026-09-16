@@ -52,6 +52,7 @@ from terrapod.api.dependencies import (
     get_current_user,
     require_non_runner,
 )
+from terrapod.api.ids import parse_id
 from terrapod.api.labels import validate_labels
 from terrapod.api.pagination import MAX_PAGE_SIZE, build_meta, paginate, parse_page_params
 from terrapod.auth import capabilities as cap
@@ -1969,7 +1970,9 @@ async def update_workspace(
             import uuid as _uuid
 
             vcs_id = vcs_conn_data.get("id", "")
-            ws.vcs_connection_id = _uuid.UUID(vcs_id.removeprefix("vcs-")) if vcs_id else None
+            ws.vcs_connection_id = (
+                parse_id(vcs_id, "vcs-", detail="VCS connection not found") if vcs_id else None
+            )
             # Auto-enable drift detection when VCS is connected (unless explicitly set in this request)
             if "drift-detection-enabled" not in attrs and ws.vcs_connection_id:
                 ws.drift_detection_enabled = True

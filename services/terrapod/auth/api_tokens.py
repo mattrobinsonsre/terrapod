@@ -39,9 +39,15 @@ _USER_BOUND_KINDS = ("interactive", "service_bound")
 _SERVICE_KINDS = ("service_bound", "service_detached")
 
 
+#: The `at-` prefix is part of the stored primary key here, not something a
+#: serializer adds -- so it appears both when minting an id and when looking
+#: one up, and the two must not drift.
+_ID_PREFIX = "at-"
+
+
 def _generate_token_id() -> str:
     """Generate a token ID in the format 'at-{random}'."""
-    return f"at-{secrets.token_hex(8)}"
+    return f"{_ID_PREFIX}{secrets.token_hex(8)}"
 
 
 def _generate_raw_token() -> str:
@@ -254,7 +260,15 @@ async def list_expiring_service_tokens(
 
 
 async def get_token_by_id(db: AsyncSession, token_id: str) -> APIToken | None:
-    """Get a token by its public ID."""
+    """Get a token by its public ID, prefixed or bare.
+
+    The `at-` prefix is part of the stored primary key here rather than added
+    at serialization, so tolerance means normalising *up* -- adding the prefix
+    when it is missing, not stripping it. A bare uuid previously matched no
+    row and read as "no such token" (#1699).
+    """
+    if not token_id.startswith(_ID_PREFIX):
+        token_id = f"{_ID_PREFIX}{token_id}"
     result = await db.execute(select(APIToken).where(APIToken.id == token_id))
     return result.scalar_one_or_none()
 

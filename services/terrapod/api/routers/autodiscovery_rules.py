@@ -111,7 +111,14 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
 
 
 def _strip_uuid_prefix(s: str, prefix: str) -> uuid.UUID:
-    """Parse `<prefix>{uuid}` or a bare uuid; raises on invalid."""
+    """Parse `<prefix>{uuid}` or a bare uuid; raises ValueError on invalid.
+
+    Deliberately still raises `ValueError` rather than an HTTPException: both
+    call sites wrap it in `except ValueError -> 422` with a field-specific
+    message ("vcs-connection-id is not a UUID"). Converting it to raise 404
+    here would silently turn those two body-field validations into 404s --
+    a behaviour change, not the 500 fix this was part of (#1699).
+    """
     raw = s.removeprefix(prefix)
     return uuid.UUID(raw)
 

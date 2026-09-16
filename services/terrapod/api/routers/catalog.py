@@ -41,6 +41,7 @@ from terrapod.api.dependencies import (
     require_admin,
     require_admin_or_audit,
 )
+from terrapod.api.ids import parse_id
 from terrapod.api.labels import validate_labels
 from terrapod.api.pagination import paginate
 from terrapod.auth import capabilities as cap
@@ -266,7 +267,9 @@ async def show_provider_template(
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    t = await catalog_service.get_provider_template(db, uuid.UUID(template_id))
+    t = await catalog_service.get_provider_template(
+        db, parse_id(template_id, detail="provider template not found")
+    )
     if t is None:
         raise HTTPException(status_code=404, detail="provider template not found")
     return JSONResponse(content={"data": _template_json(t)})
@@ -280,7 +283,9 @@ async def update_provider_template(
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    t = await catalog_service.get_provider_template(db, uuid.UUID(template_id))
+    t = await catalog_service.get_provider_template(
+        db, parse_id(template_id, detail="provider template not found")
+    )
     if t is None:
         raise HTTPException(status_code=404, detail="provider template not found")
     attrs = body.get("data", {}).get("attributes", {})
@@ -303,7 +308,9 @@ async def delete_provider_template(
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    t = await catalog_service.get_provider_template(db, uuid.UUID(template_id))
+    t = await catalog_service.get_provider_template(
+        db, parse_id(template_id, detail="provider template not found")
+    )
     if t is None:
         raise HTTPException(status_code=404, detail="provider template not found")
     # Refuse to delete a template still referenced by a catalog item.
@@ -483,7 +490,9 @@ async def _load_item_for_read(
     db: AsyncSession, user: AuthenticatedUser, item_id: str
 ) -> CatalogItem:
     try:
-        item = await catalog_service.get_catalog_item(db, uuid.UUID(item_id))
+        item = await catalog_service.get_catalog_item(
+            db, parse_id(item_id, detail="catalog item not found")
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail="catalog item not found") from e
     if item is None:
@@ -515,7 +524,9 @@ async def update_catalog_item(
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    item = await catalog_service.get_catalog_item(db, uuid.UUID(item_id))
+    item = await catalog_service.get_catalog_item(
+        db, parse_id(item_id, detail="catalog item not found")
+    )
     if item is None:
         raise HTTPException(status_code=404, detail="catalog item not found")
     attrs = body.get("data", {}).get("attributes", {})
@@ -538,7 +549,9 @@ async def delete_catalog_item(
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    item = await catalog_service.get_catalog_item(db, uuid.UUID(item_id))
+    item = await catalog_service.get_catalog_item(
+        db, parse_id(item_id, detail="catalog item not found")
+    )
     if item is None:
         raise HTTPException(status_code=404, detail="catalog item not found")
     instances = await catalog_service.list_instances(db, item.id, active_only=True)
@@ -646,7 +659,9 @@ async def provision_catalog_item(
     """Provision a workspace from a catalog item. Requires catalog 'use' on the
     item AND 'write' on the chosen agent pool (which must be in the item's
     allowed pools, when restricted)."""
-    item = await catalog_service.get_catalog_item(db, uuid.UUID(item_id))
+    item = await catalog_service.get_catalog_item(
+        db, parse_id(item_id, detail="catalog item not found")
+    )
     if item is None:
         raise HTTPException(status_code=404, detail="catalog item not found")
     if not item.enabled:

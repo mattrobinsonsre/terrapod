@@ -29,6 +29,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta
 from terrapod.auth import capabilities as cap
 from terrapod.auth import download_tickets
@@ -154,7 +155,7 @@ async def show_configuration_version(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Show a configuration version."""
-    cv_uuid = uuid.UUID(cv_id.removeprefix("cv-"))
+    cv_uuid = parse_id(cv_id, "cv-", detail="Configuration version not found")
     cv = await run_service.get_configuration_version(db, cv_uuid)
     if cv is None:
         raise HTTPException(status_code=404, detail="Configuration version not found")
@@ -235,7 +236,7 @@ async def download_configuration_version(
     409 if it hasn't been uploaded yet; 410 if retention has swept the
     bytes (the row stays after retention, the bytes don't).
     """
-    cv_uuid = uuid.UUID(cv_id.removeprefix("cv-"))
+    cv_uuid = parse_id(cv_id, "cv-", detail="Configuration version not found")
     cv = await run_service.get_configuration_version(db, cv_uuid)
     if cv is None:
         raise HTTPException(status_code=404, detail="Configuration version not found")
@@ -294,7 +295,7 @@ async def mint_download_ticket(
     the workspace), TTL-bounded, single-resource. See `download_tickets`
     module docstring for the cap-token design.
     """
-    cv_uuid = uuid.UUID(cv_id.removeprefix("cv-"))
+    cv_uuid = parse_id(cv_id, "cv-", detail="Configuration version not found")
     cv = await run_service.get_configuration_version(db, cv_uuid)
     if cv is None:
         raise HTTPException(status_code=404, detail="Configuration version not found")
@@ -504,7 +505,7 @@ async def upload_configuration(
     No auth required — the CV UUID acts as a capability token (same pattern
     as state version upload). go-tfe sends no Authorization header.
     """
-    cv_uuid = uuid.UUID(cv_id.removeprefix("cv-"))
+    cv_uuid = parse_id(cv_id, "cv-", detail="Configuration version not found")
     cv = await run_service.get_configuration_version(db, cv_uuid)
     if cv is None:
         raise HTTPException(status_code=404, detail="Configuration version not found")

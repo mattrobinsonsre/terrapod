@@ -27,7 +27,6 @@ import json
 import os
 import re
 import tempfile
-import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
@@ -36,6 +35,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_runner_for_run
+from terrapod.api.ids import parse_id
 from terrapod.api.upload_stream import file_chunks, read_file_bytes, stream_to_tempfile
 from terrapod.config import settings
 from terrapod.db.models import Run, StateVersion, Workspace
@@ -60,8 +60,8 @@ logger = get_logger(__name__)
 
 
 async def _get_run(run_id: str, db: AsyncSession) -> Run:
-    """Get a run by UUID string."""
-    run = await db.get(Run, uuid.UUID(run_id))
+    """Get a run by id, in either spelling."""
+    run = await db.get(Run, parse_id(run_id, "run-", detail="Run not found"))
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
     return run
@@ -1015,7 +1015,10 @@ async def _get_onboarding_session_for_run(run_id: str, db: AsyncSession):
     from terrapod.db.models import OnboardingSession
 
     result = await db.execute(
-        select(OnboardingSession).where(OnboardingSession.discovery_run_id == uuid.UUID(run_id))
+        select(OnboardingSession).where(
+            OnboardingSession.discovery_run_id
+            == parse_id(run_id, "run-", detail="No onboarding session for this run")
+        )
     )
     session = result.scalar_one_or_none()
     if session is None:

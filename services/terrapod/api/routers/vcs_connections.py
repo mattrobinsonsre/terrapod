@@ -25,6 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
+from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
 from terrapod.db.models import VCSConnection, generate_uuid7
 from terrapod.db.session import get_db
@@ -279,7 +280,7 @@ async def show_connection(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Show a VCS connection (admin only)."""
-    conn_uuid = uuid.UUID(connection_id.removeprefix("vcs-"))
+    conn_uuid = parse_id(connection_id, "vcs-", detail="VCS connection not found")
     conn = await _get_connection(db, conn_uuid)
     if conn is None:
         raise HTTPException(status_code=404, detail="VCS connection not found")
@@ -310,7 +311,7 @@ async def update_connection(
     rotate; omit them to leave the stored credential untouched. Editable
     fields: name, server-url, status, and the GitHub App identifiers.
     """
-    conn_uuid = uuid.UUID(connection_id.removeprefix("vcs-"))
+    conn_uuid = parse_id(connection_id, "vcs-", detail="VCS connection not found")
     conn = await _get_connection(db, conn_uuid)
     if conn is None:
         raise HTTPException(status_code=404, detail="VCS connection not found")
@@ -401,7 +402,7 @@ async def delete_connection(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a VCS connection (admin only)."""
-    conn_uuid = uuid.UUID(connection_id.removeprefix("vcs-"))
+    conn_uuid = parse_id(connection_id, "vcs-", detail="VCS connection not found")
     conn = await _get_connection(db, conn_uuid)
     if conn is None:
         raise HTTPException(status_code=404, detail="VCS connection not found")
