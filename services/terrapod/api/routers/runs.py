@@ -928,9 +928,16 @@ async def list_run_events(
 # ── Plan & Apply Details ─────────────────────────────────────────────────
 
 
-def _plan_json(run: Run) -> dict:
-    """Build plan JSON:API response for a run."""
-    base = settings.auth.callback_base_url.rstrip("/")
+def _plan_json(run: Run, request: Request | None = None) -> dict:
+    """Build plan JSON:API response for a run.
+
+    The URLs are absolute, so they are built from the host the caller used
+    rather than from `auth.callback_base_url` -- an SSO setting whose localhost
+    default made `log-read-url` unreachable on an install without SSO (#1703).
+    """
+    from terrapod.api.routers.tfe_v2 import _request_base_url
+
+    base = _request_base_url(request)
     attrs: dict = {
         "status": _plan_status(run),
         "log-read-url": f"{base}/api/v2/plans/{run.id}/log",
@@ -968,6 +975,7 @@ def _plan_json(run: Run) -> dict:
 
 @router.get("/plans/{plan_id}")
 async def show_plan_by_id(
+    request: Request,
     plan_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -979,7 +987,7 @@ async def show_plan_by_id(
     """
     run = await _get_run(plan_id.replace("plan-", "run-"), db)
     await _require_run_ws_capability(run, cap.RUN_READ, user, db)
-    return JSONResponse(content=_plan_json(run))
+    return JSONResponse(content=_plan_json(run, request))
 
 
 @extensions_router.get("/runs/{run_id}/plan-summary")
@@ -1872,6 +1880,7 @@ async def post_plan_summary_message(
 
 @extensions_router.get("/runs/{run_id}/plan")
 async def show_plan(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1879,14 +1888,14 @@ async def show_plan(
     """Show plan details including log URL."""
     run = await _get_run(run_id, db)
     await _require_run_ws_capability(run, cap.RUN_READ, user, db)
-    return JSONResponse(content=_plan_json(run))
+    return JSONResponse(content=_plan_json(run, request))
 
 
-def _apply_json(run: Run) -> dict:
-    """Build apply JSON:API response for a run."""
-    from terrapod.config import settings
+def _apply_json(run: Run, request: Request | None = None) -> dict:
+    """Build apply JSON:API response for a run (URL base: see `_plan_json`)."""
+    from terrapod.api.routers.tfe_v2 import _request_base_url
 
-    base = settings.auth.callback_base_url.rstrip("/")
+    base = _request_base_url(request)
     return {
         "data": {
             "id": f"apply-{run.id}",
@@ -1904,6 +1913,7 @@ def _apply_json(run: Run) -> dict:
 
 @router.get("/applies/{apply_id}")
 async def show_apply_by_id(
+    request: Request,
     apply_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1915,11 +1925,12 @@ async def show_apply_by_id(
     """
     run = await _get_run(apply_id.replace("apply-", "run-"), db)
     await _require_run_ws_capability(run, cap.RUN_READ, user, db)
-    return JSONResponse(content=_apply_json(run))
+    return JSONResponse(content=_apply_json(run, request))
 
 
 @extensions_router.get("/runs/{run_id}/apply")
 async def show_apply(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1927,7 +1938,7 @@ async def show_apply(
     """Show apply details including log URL."""
     run = await _get_run(run_id, db)
     await _require_run_ws_capability(run, cap.RUN_READ, user, db)
-    return JSONResponse(content=_apply_json(run))
+    return JSONResponse(content=_apply_json(run, request))
 
 
 # ── SSE (Server-Sent Events) ─────────────────────────────────────────────
