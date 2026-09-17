@@ -657,9 +657,9 @@ class TestDiscardRun:
         run = _mock_run(status="planned")
         result = await discard_run(db, run)
         assert result.status == "discarded"
-        # Workspace should be unlocked
-        assert ws.locked is False
-        assert ws.lock_id is None
+        # Discarding a run leaves a manual lock held: runs never take it (#1705).
+        assert ws.locked is True
+        assert ws.lock_id == "lock-123"
 
     async def test_rejects_non_planned(self):
         db = AsyncMock(spec=AsyncSession)
@@ -677,7 +677,7 @@ class TestCancelRun:
         run = _mock_run(status="planning")
         result = await cancel_run(db, run)
         assert result.status == "canceled"
-        assert ws.locked is False
+        assert ws.locked is True  # not the run's lock to release (#1705)
 
     async def test_rejects_terminal_state(self):
         db = AsyncMock(spec=AsyncSession)
@@ -1150,8 +1150,8 @@ class TestCancelWhileApplying:
             result = await run_service.cancel_run(db, run)
 
         assert result.status == "canceled"
-        assert ws.locked is False
-        assert ws.lock_id is None
+        assert ws.locked is True  # not the run's lock to release (#1705)
+        assert ws.lock_id == "lock-1"
 
 
 class TestResolveCancelingRun:
@@ -1193,8 +1193,8 @@ class TestResolveCancelingRun:
             result = await run_service.resolve_canceling_run(db, run, job_status="deleted")
 
         assert result.status == "applied"
-        # Workspace lock released; state_diverged NOT set (state is fine).
-        assert ws.locked is False
+        # A manual lock stays held (#1705); state_diverged NOT set (state is fine).
+        assert ws.locked is True
         assert ws.state_diverged is False
 
     @pytest.mark.asyncio
@@ -1229,7 +1229,7 @@ class TestResolveCancelingRun:
             result = await run_service.resolve_canceling_run(db, run, job_status="deleted")
 
         assert result.status == "canceled"
-        assert ws.locked is False
+        assert ws.locked is True  # not the run's lock to release (#1705)
         # The whole point: signal the operator that real infra may have
         # moved without a state record. Without this flag the
         # "canceled" outcome would silently hide possible drift.

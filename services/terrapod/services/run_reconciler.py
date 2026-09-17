@@ -443,12 +443,6 @@ async def _handle_failed(db: AsyncSession, run: Run, error_message: str) -> None
 
         await onboarding_service.complete_discovery(db, run.id, success=False, error=error_message)
 
-    # Unlock workspace
-    ws = await db.get(Workspace, run.workspace_id)
-    if ws and ws.locked:
-        ws.locked = False
-        ws.lock_id = None
-
     logger.info("Run errored", run_id=str(run.id), reason=error_message)
 
 
