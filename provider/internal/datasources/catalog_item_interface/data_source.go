@@ -29,6 +29,7 @@ type catalogItemInterfaceModel struct {
 	ResolvedVersion types.String  `tfsdk:"resolved_version"`
 	Inputs          []inputEntry  `tfsdk:"inputs"`
 	Outputs         []outputEntry `tfsdk:"outputs"`
+	InterfaceError  types.String  `tfsdk:"interface_error"`
 }
 
 type inputEntry struct {
@@ -67,6 +68,11 @@ func (d *catalogItemInterfaceDataSource) Schema(_ context.Context, _ datasource.
 			"resolved_version": schema.StringAttribute{
 				Computed:    true,
 				Description: "The module version the interface was read from.",
+			},
+			"interface_error": schema.StringAttribute{
+				Computed: true,
+				Description: "Why the module version's interface could not be read; null when it was. " +
+					"When set, empty or partial inputs and outputs do not mean the module declares none.",
 			},
 			"inputs": schema.ListNestedAttribute{
 				Computed:    true,
@@ -131,6 +137,7 @@ func (d *catalogItemInterfaceDataSource) Read(ctx context.Context, req datasourc
 	if iface.ResolvedVersion != "" {
 		config.ResolvedVersion = types.StringValue(iface.ResolvedVersion)
 	}
+	config.InterfaceError = interfaceError(iface.InterfaceError)
 
 	config.Inputs = nil
 	if iface.Inputs != nil {
@@ -160,6 +167,15 @@ func (d *catalogItemInterfaceDataSource) Read(ctx context.Context, req datasourc
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
+}
+
+// interfaceError maps the API's null-when-fine reason (#1707) to a null
+// attribute, so a clean interface never reads as an empty-string error.
+func interfaceError(reason string) types.String {
+	if reason == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(reason)
 }
 
 func str(m map[string]any, key string) string {

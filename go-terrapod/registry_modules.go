@@ -38,6 +38,10 @@ type ModuleInterface struct {
 	Version string           `json:"version"`
 	Inputs  []map[string]any `json:"inputs"`
 	Outputs []map[string]any `json:"outputs"`
+	// InterfaceError says why the interface could not be read, or is empty
+	// when it was (#1707). When set, Inputs and Outputs may be empty or
+	// partial: they do not mean the module declares nothing.
+	InterfaceError string `json:"interface-error,omitempty"`
 }
 
 // CreateRegistryModuleRequest registers a new module.
@@ -124,7 +128,10 @@ func (c *Client) GetModuleInterface(ctx context.Context, name, provider, version
 	if err != nil {
 		return nil, fmt.Errorf("parse module-interface response: %w", err)
 	}
-	iface := &ModuleInterface{Version: GetStringAttr(res, "version")}
+	iface := &ModuleInterface{
+		Version:        GetStringAttr(res, "version"),
+		InterfaceError: GetStringAttr(res, "interface-error"),
+	}
 	if raw, ok := res.Attributes["inputs"]; ok && len(raw) > 0 && string(raw) != "null" {
 		if err := json.Unmarshal(raw, &iface.Inputs); err != nil {
 			return nil, fmt.Errorf("parse module-interface inputs: %w", err)

@@ -59,6 +59,48 @@ func TestCatalogItemInterfaceToolReturnsTheInterface(t *testing.T) {
 	}
 }
 
+func TestCatalogItemInterfaceToolCarriesTheParseError(t *testing.T) {
+	// #1707: the reason reaches the agent, so an empty input list is not read
+	// as an item that takes no variables.
+	res, _ := callCatalogItemInterface(t, http.StatusOK,
+		`{"data":{"id":"ci-1","type":"catalog-item-interfaces","attributes":{
+		  "resolved-version":"1.2.0","inputs":[],"outputs":[],"interface-error":"main.tf: invalid HCL"}}}`,
+		map[string]any{"catalog_item_id": "ci-1"})
+	if res.IsError {
+		t.Fatalf("tool error: %s", resultText(t, res))
+	}
+	var out struct {
+		InterfaceError string `json:"interface-error"`
+	}
+	if err := json.Unmarshal([]byte(resultText(t, res)), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.InterfaceError != "main.tf: invalid HCL" {
+		t.Errorf("interface-error = %q", out.InterfaceError)
+	}
+}
+
+func TestRegistryModuleInterfaceToolCarriesTheParseError(t *testing.T) {
+	sess := toolCaller(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"type":"module-interface","id":"modver-1","attributes":{
+		  "version":"1.0.0","inputs":[],"outputs":[],"interface-error":"variables.tf: invalid HCL at line 2, column 10"}}}`))
+	})
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "terrapod_registry_module_interface",
+		Arguments: map[string]any{"name": "vpc", "provider": "aws", "version": "1.0.0"},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %.500v", err)
+	}
+	if res.IsError {
+		t.Fatalf("tool error: %s", resultText(t, res))
+	}
+	if !strings.Contains(resultText(t, res), `"interface-error":"variables.tf: invalid HCL at line 2, column 10"`) {
+		t.Errorf("result: %s", resultText(t, res))
+	}
+}
+
 func TestCatalogItemInterfaceToolBeforeAnyVersion(t *testing.T) {
 	// Nulls must validate too, not only a populated interface.
 	res, _ := callCatalogItemInterface(t, http.StatusOK,

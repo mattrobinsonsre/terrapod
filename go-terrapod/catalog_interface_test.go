@@ -68,6 +68,32 @@ func TestGetCatalogItemInterfaceBeforeAnyVersionIsUploaded(t *testing.T) {
 	}
 }
 
+func TestGetCatalogItemInterfaceCarriesTheParseError(t *testing.T) {
+	c, _ := catalogInterfaceClient(t, http.StatusOK, `{"data":{"id":"ci-1","type":"catalog-item-interfaces",
+	  "attributes":{"resolved-version":"1.2.0","inputs":[],"outputs":[],"interface-error":"variables.tf: invalid HCL"}}}`)
+
+	iface, err := c.GetCatalogItemInterface(t.Context(), "ci-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iface.InterfaceError != "variables.tf: invalid HCL" {
+		t.Errorf("interface error = %q", iface.InterfaceError)
+	}
+}
+
+func TestGetCatalogItemInterfaceNullErrorReadsAsEmpty(t *testing.T) {
+	c, _ := catalogInterfaceClient(t, http.StatusOK, `{"data":{"id":"ci-1","type":"catalog-item-interfaces",
+	  "attributes":{"resolved-version":"1.2.0","inputs":[],"outputs":[],"interface-error":null}}}`)
+
+	iface, err := c.GetCatalogItemInterface(t.Context(), "ci-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iface.InterfaceError != "" {
+		t.Errorf("interface error = %q", iface.InterfaceError)
+	}
+}
+
 func TestGetCatalogItemInterfaceNotFound(t *testing.T) {
 	c, _ := catalogInterfaceClient(t, http.StatusNotFound,
 		`{"errors":[{"status":"404","detail":"catalog item not found"}],"detail":"catalog item not found"}`)

@@ -173,7 +173,10 @@ func (c *Client) DeleteCatalogItem(ctx context.Context, id string) error {
 
 // GetCatalogItemForm returns the provision form (the fields a user fills in)
 // for a catalog item, along with the resolved module version. The returned map
-// is the raw `attributes` object: {"resolved-version": ..., "fields": [...]}.
+// is the raw `attributes` object: {"resolved-version": ..., "fields": [...],
+// "interface-error": ...}. A non-null "interface-error" (#1707) means the
+// module's interface could not be read, so an empty "fields" is not a module
+// that takes no variables.
 func (c *Client) GetCatalogItemForm(ctx context.Context, id string) (map[string]any, error) {
 	data, err := c.Get(ctx, "/api/terrapod/v1/catalog-items/"+url.PathEscape(id)+"/form")
 	if err != nil {
@@ -195,6 +198,10 @@ type CatalogItemInterface struct {
 	ResolvedVersion string           `json:"resolved-version"`
 	Inputs          []map[string]any `json:"inputs"`
 	Outputs         []map[string]any `json:"outputs"`
+	// InterfaceError says why the resolved version's interface could not be
+	// read, or is empty when it was (#1707). When set, empty Inputs do not
+	// mean the module takes no variables.
+	InterfaceError string `json:"interface-error,omitempty"`
 }
 
 // GetCatalogItemInterface returns the inputs and outputs of the module version
@@ -210,7 +217,10 @@ func (c *Client) GetCatalogItemInterface(ctx context.Context, id string) (*Catal
 	if err != nil {
 		return nil, fmt.Errorf("parse catalog-item interface: %w", err)
 	}
-	iface := &CatalogItemInterface{ResolvedVersion: GetStringAttr(res, "resolved-version")}
+	iface := &CatalogItemInterface{
+		ResolvedVersion: GetStringAttr(res, "resolved-version"),
+		InterfaceError:  GetStringAttr(res, "interface-error"),
+	}
 	if raw, ok := res.Attributes["inputs"]; ok && len(raw) > 0 && string(raw) != "null" {
 		if err := json.Unmarshal(raw, &iface.Inputs); err != nil {
 			return nil, fmt.Errorf("parse catalog-item interface inputs: %w", err)

@@ -43,6 +43,17 @@ func TestDefaultValueSeparatesNoDefaultFromAnEmptyOne(t *testing.T) {
 	}
 }
 
+// A clean interface is null, not "" (#1707), so `interface_error != null` is
+// the check a configuration can rely on.
+func TestInterfaceErrorIsNullWhenTheInterfaceWasRead(t *testing.T) {
+	if got := interfaceError(""); !got.IsNull() {
+		t.Errorf("no reason should be null, got %v", got)
+	}
+	if got := interfaceError("main.tf: invalid HCL"); got.ValueString() != "main.tf: invalid HCL" {
+		t.Errorf("reason: %v", got)
+	}
+}
+
 func TestSchemaHasNoReservedProviderAttribute(t *testing.T) {
 	resp := &datasource.SchemaResponse{}
 	NewDataSource().Schema(context.Background(), datasource.SchemaRequest{}, resp)
@@ -52,7 +63,7 @@ func TestSchemaHasNoReservedProviderAttribute(t *testing.T) {
 	if _, ok := resp.Schema.Attributes["provider"]; ok {
 		t.Error(`"provider" is a reserved root attribute name`)
 	}
-	for _, want := range []string{"catalog_item_id", "resolved_version", "inputs", "outputs"} {
+	for _, want := range []string{"catalog_item_id", "resolved_version", "inputs", "outputs", "interface_error"} {
 		if _, ok := resp.Schema.Attributes[want]; !ok {
 			t.Errorf("missing %s", want)
 		}

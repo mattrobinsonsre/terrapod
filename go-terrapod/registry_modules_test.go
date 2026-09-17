@@ -122,6 +122,32 @@ func TestListRegistryModules(t *testing.T) {
 	}
 }
 
+// A failed parse (#1707) carries its reason, so empty inputs are not read as
+// a module that declares no variables.
+func TestGetModuleInterfaceCarriesTheParseError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"type":"module-interface","id":"modver-xyz","attributes":{
+		  "version":"1.2.3","inputs":[],"outputs":[],
+		  "interface-error":"main.tf: invalid HCL at line 3, column 1"}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	iface, err := c.GetModuleInterface(t.Context(), "vpc", "aws", "1.2.3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iface.InterfaceError != "main.tf: invalid HCL at line 3, column 1" {
+		t.Errorf("interface error: %q", iface.InterfaceError)
+	}
+	if len(iface.Inputs) != 0 {
+		t.Errorf("inputs: %+v", iface.Inputs)
+	}
+}
+
 func TestGetModuleInterface(t *testing.T) {
 	const ifacePath = "/api/terrapod/v1/registry-modules/private/default/vpc/aws/1.2.3/interface"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -159,6 +185,9 @@ func TestGetModuleInterface(t *testing.T) {
 	}
 	if iface.Inputs[0]["name"] != "cidr" {
 		t.Errorf("input[0] name: %v", iface.Inputs[0]["name"])
+	}
+	if iface.InterfaceError != "" {
+		t.Errorf("no interface-error attribute should read as empty, got %q", iface.InterfaceError)
 	}
 
 	// A missing/extraction-disabled version surfaces as *NotFoundError.

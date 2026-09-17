@@ -104,6 +104,7 @@ field CatalogItem.CreatedAt string
 field CatalogItem.ID string
 field CatalogItem.UpdatedAt string
 field CatalogItemInterface.Inputs []map[string]any `json:"inputs"`
+field CatalogItemInterface.InterfaceError string `json:"interface-error,omitempty"`
 field CatalogItemInterface.Outputs []map[string]any `json:"outputs"`
 field CatalogItemInterface.ResolvedVersion string `json:"resolved-version"`
 field CatalogRunRef.ID string
@@ -564,6 +565,7 @@ field ModuleAutodiscoveryStoredCandidate.Name string `json:"name"`
 field ModuleAutodiscoveryStoredCandidate.Provider string `json:"provider"`
 field ModuleAutodiscoveryStoredCandidate.Subdirectory string `json:"subdirectory"`
 field ModuleInterface.Inputs []map[string]any `json:"inputs"`
+field ModuleInterface.InterfaceError string `json:"interface-error,omitempty"`
 field ModuleInterface.Outputs []map[string]any `json:"outputs"`
 field ModuleInterface.Version string `json:"version"`
 field ModuleWorkspaceLink.CreatedAt string `json:"created-at,omitempty"`

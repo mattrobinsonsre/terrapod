@@ -59,7 +59,8 @@ func registerGround(s *mcp.Server, c *terrapod.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_registry_module_interface",
 		Description: "Get a module version's input variables and outputs — the exact surface to author a correct `module` block against it (variable names, types, whether required, defaults; and what it returns). " +
-			"Prefer this over guessing a module's inputs. Returns 404 if interface extraction is disabled on this instance or the version doesn't exist.",
+			"Prefer this over guessing a module's inputs. Returns 404 if interface extraction is disabled on this instance or the version doesn't exist. " +
+			"If `interface-error` is present the module's files could not be parsed: empty or partial inputs then do not mean the module takes no variables.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in moduleInterfaceIn) (*mcp.CallToolResult, *terrapod.ModuleInterface, error) {
 		if in.Name == "" || in.Provider == "" || in.Version == "" {
@@ -80,7 +81,8 @@ func registerGround(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_catalog_item_interface",
 		Description: "Get a service-catalog item's module interface: the inputs and outputs of the module version the item resolves to (its version pin, or the latest uploaded version). " +
 			"Use it to see what an instance of the item takes and what it will expose; the provision form users fill in is a curated subset of these inputs. " +
-			"Needs catalog read on the item. The fields are null while the module has no uploaded version.",
+			"Needs catalog read on the item. The fields are null while the module has no uploaded version. " +
+			"If `interface-error` is present the module's files could not be parsed, so empty inputs do not mean the item takes none.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in catalogItemInterfaceIn) (*mcp.CallToolResult, *terrapod.CatalogItemInterface, error) {
 		if in.CatalogItemID == "" {
