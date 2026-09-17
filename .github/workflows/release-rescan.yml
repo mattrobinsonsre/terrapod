@@ -283,6 +283,22 @@ jobs:
       # audience. This is also why Semgrep emits SARIF above and is never
       # uploaded as a workflow artifact: on a public repository, artifacts and
       # job logs are world-readable.
+      # Drop findings Semgrep reports as suppressed by a reviewed `nosemgrep`
+      # comment. Code scanning honours a SARIF suppression only when it first
+      # creates an alert: a finding suppressed AFTER its alert was opened stays
+      # open for good, however often it is re-uploaded suppressed. Leaving the
+      # suppressed results out closes such an alert as fixed.
+      - name: Drop suppressed Semgrep findings
+        if: always()
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          f=semgrep.sarif
+          [ -s "$f" ] || exit 0
+          jq '.runs |= map(.results |= map(select((.suppressions // []) | length == 0)))' "$f" > "$f.tmp"
+          echo "suppressed findings dropped: $(( $(jq '[.runs[].results[]] | length' "$f") - $(jq '[.runs[].results[]] | length' "$f.tmp") ))"
+          mv "$f.tmp" "$f"
+
       - name: Upload code findings to code scanning (private)
         id: sarif
         if: always()

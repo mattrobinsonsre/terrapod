@@ -1927,6 +1927,21 @@ jobs:
               --sarif \
               --output "/src/semgrep-results.sarif"
 
+      # Drop findings Semgrep reports as suppressed by a reviewed `nosemgrep`
+      # comment. Code scanning honours a SARIF suppression only when it first
+      # creates an alert: a finding suppressed AFTER its alert was opened stays
+      # open for good, however often it is re-uploaded suppressed. Leaving the
+      # suppressed results out closes such an alert as fixed.
+      - name: Drop suppressed Semgrep findings
+        if: always()
+        run: |
+          set -euo pipefail
+          f=semgrep-results.sarif
+          [ -s "$f" ] || exit 0
+          jq '.runs |= map(.results |= map(select((.suppressions // []) | length == 0)))' "$f" > "$f.tmp"
+          echo "suppressed findings dropped: $(( $(jq '[.runs[].results[]] | length' "$f") - $(jq '[.runs[].results[]] | length' "$f.tmp") ))"
+          mv "$f.tmp" "$f"
+
       - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4

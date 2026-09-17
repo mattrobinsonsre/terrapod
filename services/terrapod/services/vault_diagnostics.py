@@ -745,6 +745,7 @@ async def check_reference(
 
 __all__ = [
     "CHECKS_PER_MINUTE",
+    "SAMPLE_INTERVAL_SECONDS",
     "acl_path",
     "capabilities_self",
     "check_rate_allowed",
