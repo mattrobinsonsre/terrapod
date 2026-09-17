@@ -116,6 +116,52 @@ class TestFinalizePresignedUploads:
         # As the direct upload endpoint does for a new version.
         trigger.assert_awaited_once_with(db, module, "1.0.0")
 
+    async def _finalize(self, mv, body: bytes):
+        module = _module(mv)
+        key = svc.module_tarball_key("default", "vpc", "aws", "1.0.0")
+        with (
+            _leader(),
+            patch("terrapod.config.settings.registry.module_interface.enabled", True),
+            patch(
+                "terrapod.services.module_impact_service.trigger_linked_workspace_runs",
+                new_callable=AsyncMock,
+            ),
+        ):
+            await svc.finalize_presigned_uploads(_for(_db(), mv), module, _storage({key}, body))
+
+    async def test_a_landed_upload_that_parses_clears_the_interface_error(self):
+        mv = _version("1.0.0", "pending")
+        mv.interface_error = "main.tf: invalid HCL"
+        await self._finalize(mv, _tarball())
+        assert [i["name"] for i in mv.inputs] == ["region"]
+        assert mv.interface_error is None
+
+    async def test_a_landed_upload_that_does_not_parse_records_why(self):
+        """#1707: a failed parse on the finalize path is recorded like every
+        other writer's, not stored as an interface with no inputs."""
+        mv = _version("1.0.0", "pending")
+        mv.interface_error = None
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            data = b'variable "region" {\n  type = \n}\n'
+            info = tarfile.TarInfo(name="./variables.tf")
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+
+        await self._finalize(mv, buf.getvalue())
+
+        assert mv.upload_status == "uploaded"
+        assert mv.inputs == []
+        assert mv.interface_error == "variables.tf: invalid HCL at line 2, column 10"
+
+    async def test_a_corrupt_landed_upload_records_why(self):
+        mv = _version("1.0.0", "pending")
+        mv.interface_error = None
+        await self._finalize(mv, b"not a tarball at all")
+        assert mv.interface_error == (
+            "The module archive could not be read as a gzip-compressed tar file."
+        )
+
     async def test_an_upload_that_has_not_arrived_stays_pending(self):
         mv = _version("1.0.0", "pending")
         module = _module(mv)

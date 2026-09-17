@@ -148,12 +148,13 @@ def _read_root_tf_files(tar: tarfile.TarFile) -> tuple[list[tuple[str, str]], li
                 file=member.name,
                 size=member.size,
             )
-            problems.append(f"{_safe_file_name(member.name)}: skipped, larger than 5 MB")
+            problems.append(f"{_safe_file_name(name)}: skipped, larger than 5 MB")
             continue
         f = tar.extractfile(member)
         if f is None:
             continue
-        contents.append((member.name, f.read().decode("utf-8", errors="replace")))
+        # The normalised name, so a reason reads `main.tf`, not `__main.tf`.
+        contents.append((name, f.read().decode("utf-8", errors="replace")))
     return contents, problems
 
 

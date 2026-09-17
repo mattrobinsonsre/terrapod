@@ -272,6 +272,11 @@ class TestInterfaceFailureIsReported:
         assert "hunter2" not in result["error"]
         assert "Token" not in result["error"]
 
+    def test_a_dot_slash_entry_is_named_without_the_prefix(self):
+        # `tar -czf m.tgz -C dir .` names entries `./main.tf`.
+        result = extract_module_interface_result(_make_tarball({"./main.tf": "}}}"}))
+        assert result["error"].startswith("main.tf: invalid HCL")
+
     def test_every_broken_file_is_reported(self):
         tarball = _make_tarball({"a.tf": "}}}", "b.tf": "{{{"})
         result = extract_module_interface_result(tarball)

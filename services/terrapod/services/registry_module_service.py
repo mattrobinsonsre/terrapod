@@ -235,7 +235,7 @@ async def _parse_interface_from_storage(
     import os
     import tempfile
 
-    from terrapod.services.module_hcl_parser import extract_module_interface_from_file
+    from terrapod.services.module_hcl_parser import extract_module_interface_result_from_file
 
     configured = settings.vcs.tmpdir
     tmpdir = configured if configured and os.path.isdir(configured) else None
@@ -244,11 +244,14 @@ async def _parse_interface_from_storage(
         with os.fdopen(fd, "wb") as fh:
             async for chunk in storage.get_stream(key):
                 await asyncio.to_thread(fh.write, chunk)
-        interface = await asyncio.to_thread(extract_module_interface_from_file, path)
+        interface = await asyncio.to_thread(extract_module_interface_result_from_file, path)
         mod_version.inputs = interface["inputs"]
         mod_version.outputs = interface["outputs"]
+        # Set on failure, cleared on success, as every other writer does (#1707).
+        mod_version.interface_error = interface["error"]
     except Exception:
         logger.warning("Failed to extract module interface after upload", key=key, exc_info=True)
+        mod_version.interface_error = "The module interface could not be read."
     finally:
         try:
             os.unlink(path)
