@@ -301,7 +301,9 @@ AUTODISCOVERY_RULES = register(ReplicatedClass(name="autodiscovery_rules", model
 #                        fleet-wide event triggered by the failover itself.
 #   locked / lock_id     The CLI state lock. Dropping a held lock at promotion
 #                        lets two writers collide on state; carrying a stale one
-#                        costs a manual unlock. Fail closed.
+#                        costs a manual unlock. Fail closed. `lock_reason` and
+#                        `locked_by` (#1705) carry with it, so an operator on the
+#                        promoted node can still see why and by whom.
 #   state_diverged       An apply succeeded but its state upload did not. A node
 #                        that loses this believes state is good when it is not.
 #   lifecycle_state      `pending_deletion` is a workspace awaiting a human

@@ -2507,7 +2507,9 @@
       "lock": "Lukitse",
       "unlock": "Poista lukitus",
       "lockConfirm": "Lukitaanko tämä työtila?",
-      "unlockConfirm": "Poistetaanko tämän työtilan lukitus?"
+      "unlockConfirm": "Poistetaanko tämän työtilan lukitus?",
+      "lockedBy": "Lukitsija: {holder}",
+      "reason": "Syy: {reason}"
     },
     "drift": {
       "title": "Ajautuman tunnistus",

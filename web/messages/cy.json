@@ -2507,7 +2507,9 @@
       "lock": "Cloi",
       "unlock": "Datgloi",
       "lockConfirm": "Cloi'r weithfan hon?",
-      "unlockConfirm": "Datgloi'r weithfan hon?"
+      "unlockConfirm": "Datgloi'r weithfan hon?",
+      "lockedBy": "Wedi'i gloi gan {holder}",
+      "reason": "Rheswm: {reason}"
     },
     "drift": {
       "title": "Canfod Drifft",

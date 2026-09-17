@@ -2507,7 +2507,9 @@
       "lock": "Lock",
       "unlock": "Unlock",
       "lockConfirm": "Lock this work-deck?",
-      "unlockConfirm": "Unlock this work-deck?"
+      "unlockConfirm": "Unlock this work-deck?",
+      "lockedBy": "Battened down by {holder}",
+      "reason": "The cause o'' it: {reason}"
     },
     "drift": {
       "title": "Drift Detection",

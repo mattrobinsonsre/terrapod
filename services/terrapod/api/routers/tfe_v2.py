@@ -754,6 +754,11 @@ def _workspace_json(
                 "terragrunt-version": ws.terragrunt_version or "",
                 "working-directory": ws.working_directory,
                 "locked": ws.locked,
+                # Why the workspace is locked and who locked it (#1705). Only
+                # reported while the lock is held, so a lock released by a path
+                # that does not clear the columns never shows a stale reason.
+                "lock-reason": ws.lock_reason if ws.locked else None,
+                "locked-by": ws.locked_by if ws.locked else None,
                 "resource-cpu": ws.resource_cpu,
                 "parallelism": ws.parallelism,
                 "resource-memory": ws.resource_memory,
@@ -2613,6 +2618,34 @@ async def upload_json_state_content(
     return Response(status_code=200)
 
 
+# Longest lock reason stored (#1705). A reason is a short note for an operator;
+# the terraform/tofu CLI's lock-info `Info` is free text a caller controls, so it
+# is bounded rather than stored whole.
+LOCK_REASON_MAX_LENGTH = 1000
+
+
+def _lock_reason_from_body(lock_info: dict) -> str | None:
+    """The human reason for a lock, from either lock request body shape (#1705).
+
+    Two clients call the lock endpoint with different bodies:
+
+    * go-tfe's ``WorkspaceLockOptions`` sends ``{"reason": "..."}`` — the UI,
+      the API, and `tfe`-style automation.
+    * the terraform/tofu ``cloud``/``remote`` backend sends its state lock-info
+      object (``ID``, ``Operation``, ``Info``, ``Who``, ...). ``Info`` is the
+      caller's free-text note when there is one; otherwise ``Operation``
+      (e.g. ``OperationTypePlan``) says what took the lock.
+
+    Non-string or blank values are ignored. The result is capped at
+    ``LOCK_REASON_MAX_LENGTH`` characters; ``None`` when there is no reason.
+    """
+    for key in ("reason", "Info", "Operation"):
+        value = lock_info.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()[:LOCK_REASON_MAX_LENGTH]
+    return None
+
+
 @router.post("/workspaces/{workspace_id}/actions/lock")
 async def lock_workspace(
     request: Request,
@@ -2633,6 +2666,9 @@ async def lock_workspace(
     except (json_mod.JSONDecodeError, ValueError):
         lock_info = {}
 
+    if not isinstance(lock_info, dict):
+        lock_info = {}
+
     lock_id = lock_info.get("ID", f"lock-{user.email}")
 
     if ws.locked:
@@ -2645,6 +2681,8 @@ async def lock_workspace(
 
     ws.locked = True
     ws.lock_id = lock_id
+    ws.lock_reason = _lock_reason_from_body(lock_info)
+    ws.locked_by = user.email
     await db.commit()
     await db.refresh(ws)
 
@@ -2683,6 +2721,8 @@ async def unlock_workspace(
 
     ws.locked = False
     ws.lock_id = None
+    ws.lock_reason = None
+    ws.locked_by = None
     await db.commit()
     await db.refresh(ws)
 
@@ -2720,6 +2760,8 @@ async def force_unlock_workspace(
     # Idempotent: force-unlocking an already-unlocked workspace is a no-op 200.
     ws.locked = False
     ws.lock_id = None
+    ws.lock_reason = None
+    ws.locked_by = None
     await db.commit()
     await db.refresh(ws)
 

@@ -1207,7 +1207,9 @@ field Workspace.ID string `json:"id"`
 field Workspace.Labels map[string]string `json:"labels,omitempty"`
 field Workspace.LifecycleReason string `json:"lifecycle-reason,omitempty"`
 field Workspace.LifecycleState string `json:"lifecycle-state,omitempty"`
+field Workspace.LockReason string `json:"lock-reason,omitempty"`
 field Workspace.Locked bool `json:"locked"`
+field Workspace.LockedBy string `json:"locked-by,omitempty"`
 field Workspace.Name string `json:"name"`
 field Workspace.OwnerEmail string `json:"owner-email,omitempty"`
 field Workspace.Parallelism int64 `json:"parallelism,omitempty"`

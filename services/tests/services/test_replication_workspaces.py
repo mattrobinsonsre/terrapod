@@ -123,6 +123,42 @@ class TestStateSafetyFlags:
         assert existing.locked is True
         assert existing.lock_id == "lock-123"
 
+    def test_a_held_lock_carries_its_reason_and_holder(self):
+        """A maintenance lock without its note is a lock nobody on the promoted
+        node can explain (#1705)."""
+        payload = replication.serialize_row(
+            WORKSPACES,
+            _ws(
+                locked=True,
+                lock_id="lock-ops@example.com",
+                lock_reason="maintenance window",
+                locked_by="ops@example.com",
+            ),
+        )
+
+        assert payload["lock_reason"] == "maintenance window"
+        assert payload["locked_by"] == "ops@example.com"
+
+    async def test_a_lock_reason_and_holder_apply_on_the_peer(self):
+        db = AsyncMock()
+        existing = _ws(locked=False, lock_id=None)
+        db.scalar.return_value = existing
+
+        await replication.apply_upsert(
+            db,
+            WORKSPACES,
+            {
+                "id": WS_ID,
+                "locked": True,
+                "lock_id": "lock-ops@example.com",
+                "lock_reason": "maintenance window",
+                "locked_by": "ops@example.com",
+            },
+        )
+
+        assert existing.lock_reason == "maintenance window"
+        assert existing.locked_by == "ops@example.com"
+
     async def test_state_divergence_survives(self):
         """Set when an apply succeeded but its state upload did not. A node that
         loses it believes state is good when it is not."""

@@ -507,7 +507,30 @@ POST /api/tfe/v2/workspaces/{id}/actions/lock
 
 **Required permission:** `plan` on the workspace.
 
-A manual lock is the CLI/UI state lock **and** an operator gate on applies: while a workspace is locked, apply-capable (plan+apply) runs **will not start** and a confirm (`POST /api/tfe/v2/runs/{id}/actions/apply`) returns **409 Conflict**. Auto-apply runs settle in `planned` and wait for an unlock rather than applying. **Plan-only runs (speculative plans, drift checks) are not blocked** — they never mutate state. Returns 409 if the workspace is already locked.
+A manual lock is the CLI/UI state lock **and** an operator gate on applies: while a workspace is locked, apply-capable (plan+apply) runs **will not start** and a confirm (`POST /api/tfe/v2/runs/{id}/actions/apply`) returns **409 Conflict**. Auto-apply runs settle in `planned` and wait for an unlock rather than applying. **Plan-only runs (speculative plans, drift checks) are not blocked** — they never mutate state. Returns 409 if the workspace is already locked; the existing lock, its reason and its holder are left untouched.
+
+The body is optional. A reason given in it is stored with the lock, together with the caller's identity (the user's email), so an operator can see why the workspace is locked and who locked it. Two body shapes are accepted:
+
+```json
+{ "reason": "maintenance window — network cutover" }
+```
+
+The `WorkspaceLockOptions` shape go-tfe sends. The UI and API clients use it.
+
+```json
+{ "ID": "3f0c6a2e-…", "Operation": "OperationTypeApply", "Info": "", "Who": "ops@laptop", "Version": "1.9.0" }
+```
+
+The state lock-info object the `terraform`/`tofu` `cloud`/`remote` backend sends. The reason is `Info` when it is non-empty, otherwise `Operation`. `ID`, when present, becomes the lock ID as before.
+
+Blank or non-string values are ignored, and a reason is truncated to 1000 characters. The response is the workspace, with the read-only attributes set:
+
+| Attribute | Type | Description |
+|---|---|---|
+| `lock-reason` | string \| null | Why the workspace is locked, as given when the lock was taken. `null` when unlocked or when no reason was given. |
+| `locked-by` | string \| null | The identity that took the lock (a user's email). `null` when unlocked, or when the lock was taken by something with no user identity (a Pulumi update's lock carries the reason `pulumi update` and no holder). |
+
+Both attributes appear on every workspace response, and are `null` whenever `locked` is `false`.
 
 ### Unlock Workspace
 
@@ -517,6 +540,8 @@ POST /api/tfe/v2/workspaces/{id}/actions/unlock
 
 **Required permission:** `plan` on the workspace (own locks only).
 
+Unlocking clears `lock-reason` and `locked-by` along with the lock.
+
 ### Force-Unlock Workspace
 
 ```
@@ -525,7 +550,7 @@ POST /api/tfe/v2/workspaces/{id}/actions/force-unlock
 
 **Required permission:** `admin` on the workspace (the `workspace:force-unlock` capability).
 
-Clears the state lock **regardless of the lock ID** — the endpoint `terraform`/`tofu force-unlock` calls. Use it to release a lock held by another user or a lock stranded when a CLI operation crashed mid-run. Idempotent: force-unlocking an already-unlocked workspace returns 200.
+Clears the state lock **regardless of the lock ID** — the endpoint `terraform`/`tofu force-unlock` calls. Use it to release a lock held by another user or a lock stranded when a CLI operation crashed mid-run. Idempotent: force-unlocking an already-unlocked workspace returns 200. The lock's reason and holder are cleared with it.
 
 ### Drift Detection Attributes
 

@@ -85,7 +85,9 @@ data terrapod_workspace.id required=false optional=false computed=true sensitive
 data terrapod_workspace.labels required=false optional=false computed=true sensitive=false type=types.MapType[basetypes.StringType]
 data terrapod_workspace.lifecycle_reason required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.lifecycle_state required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.lock_reason required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.locked required=false optional=false computed=true sensitive=false type=basetypes.BoolType
+data terrapod_workspace.locked_by required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 data terrapod_workspace.owner_email required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.parallelism required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
@@ -417,7 +419,9 @@ resource terrapod_workspace.id required=false optional=false computed=true sensi
 resource terrapod_workspace.labels required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]
 resource terrapod_workspace.lifecycle_reason required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.lifecycle_state required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.lock_reason required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.locked required=false optional=false computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_workspace.locked_by required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_workspace.owner_email required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.parallelism required=false optional=true computed=true sensitive=false type=basetypes.Int64Type

@@ -135,6 +135,9 @@ async def take_workspace_lock(db: AsyncSession, workspace_id: uuid.UUID, update_
         )
     ws.locked = True
     ws.lock_id = lock_id_for(update_id)
+    # A previous lock's note must not be reported as this one's (#1705).
+    ws.lock_reason = "pulumi update"
+    ws.locked_by = None
     await db.commit()
     await _publish(workspace_id, locked=True)
     logger.info(
@@ -156,6 +159,8 @@ async def release_workspace_lock(db: AsyncSession, workspace_id: uuid.UUID, upda
         return False
     ws.locked = False
     ws.lock_id = None
+    ws.lock_reason = None
+    ws.locked_by = None
     await db.commit()
     await _publish(workspace_id, locked=False)
     logger.info(

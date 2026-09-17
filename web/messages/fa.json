@@ -2507,7 +2507,9 @@
       "lock": "قفل کردن",
       "unlock": "باز کردن قفل",
       "lockConfirm": "این فضای کاری قفل شود؟",
-      "unlockConfirm": "قفل این فضای کاری باز شود؟"
+      "unlockConfirm": "قفل این فضای کاری باز شود؟",
+      "lockedBy": "قفل‌شده توسط {holder}",
+      "reason": "دلیل: {reason}"
     },
     "drift": {
       "title": "تشخیص انحراف",

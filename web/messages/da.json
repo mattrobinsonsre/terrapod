@@ -2507,7 +2507,9 @@
       "lock": "Lås",
       "unlock": "Lås op",
       "lockConfirm": "Lås dette arbejdsområde?",
-      "unlockConfirm": "Lås dette arbejdsområde op?"
+      "unlockConfirm": "Lås dette arbejdsområde op?",
+      "lockedBy": "Låst af {holder}",
+      "reason": "Årsag: {reason}"
     },
     "drift": {
       "title": "Afdriftsregistrering",

@@ -32,6 +32,8 @@ def _mock_workspace(
     labels=None,
     locked=False,
     lock_id=None,
+    lock_reason=None,
+    locked_by=None,
     auto_apply=False,
     execution_mode="local",
     terraform_version="1.11",
@@ -54,6 +56,8 @@ def _mock_workspace(
     ws.working_directory = ""
     ws.locked = locked
     ws.lock_id = lock_id
+    ws.lock_reason = lock_reason
+    ws.locked_by = locked_by
     ws.resource_cpu = resource_cpu
     ws.parallelism = 10
     ws.execution_backend = "tofu"
@@ -673,6 +677,159 @@ class TestForceUnlockWorkspace:
                 headers=_AUTH,
             )
         assert resp.status_code == 403
+
+
+# ── Lock reason + holder (#1705) ───────────────────────────────────────
+
+
+_APP_PATCHES = (
+    patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+    patch("terrapod.api.app.init_redis"),
+    patch("terrapod.api.app.init_db"),
+)
+
+
+async def _post_action(ws, action, caps_level, *, body=None, user=None):
+    """POST a workspace lock action against a mocked workspace row."""
+    with (
+        _APP_PATCHES[0],
+        _APP_PATCHES[1],
+        _APP_PATCHES[2],
+        patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for") as mock_resolve,
+    ):
+        mock_resolve.return_value = caps_for_level(caps_level)
+        app, mock_db = _make_app(user or _user(email="ops@example.com"))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            kwargs = {"headers": _AUTH}
+            if body is not None:
+                kwargs["json"] = body
+            return await c.post(f"/api/v2/workspaces/ws-{ws.id}/actions/{action}", **kwargs)
+
+
+class TestLockReasonAndHolder:
+    """An operator must be able to see why a workspace is locked and who holds
+    the lock — the reason was previously accepted and discarded (#1705)."""
+
+    async def test_go_tfe_reason_is_stored_with_the_holder(self):
+        ws = _mock_workspace(locked=False)
+        resp = await _post_action(ws, "lock", "plan", body={"reason": "maintenance window"})
+
+        assert resp.status_code == 200
+        assert ws.lock_reason == "maintenance window"
+        assert ws.locked_by == "ops@example.com"
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["lock-reason"] == "maintenance window"
+        assert attrs["locked-by"] == "ops@example.com"
+        # lock_id behaviour is unchanged: no ID in the body → per-user lock ID.
+        assert ws.lock_id == "lock-ops@example.com"
+
+    async def test_cli_lock_info_uses_info_when_present(self):
+        ws = _mock_workspace(locked=False)
+        body = {
+            "ID": "3f0c6a2e-0000-0000-0000-000000000000",
+            "Operation": "OperationTypeApply",
+            "Info": "rotating certificates",
+            "Who": "ops@laptop",
+        }
+        resp = await _post_action(ws, "lock", "plan", body=body)
+
+        assert resp.status_code == 200
+        assert ws.lock_reason == "rotating certificates"
+        assert ws.locked_by == "ops@example.com"
+        assert ws.lock_id == "3f0c6a2e-0000-0000-0000-000000000000"
+
+    async def test_cli_lock_info_falls_back_to_operation(self):
+        ws = _mock_workspace(locked=False)
+        body = {"ID": "abc", "Operation": "OperationTypePlan", "Info": "", "Who": "ops@laptop"}
+        resp = await _post_action(ws, "lock", "plan", body=body)
+
+        assert resp.status_code == 200
+        assert ws.lock_reason == "OperationTypePlan"
+
+    async def test_no_body_stores_no_reason_but_records_the_holder(self):
+        ws = _mock_workspace(locked=False)
+        resp = await _post_action(ws, "lock", "plan")
+
+        assert resp.status_code == 200
+        assert ws.lock_reason is None
+        assert ws.locked_by == "ops@example.com"
+        assert resp.json()["data"]["attributes"]["lock-reason"] is None
+
+    async def test_non_string_reason_is_ignored(self):
+        ws = _mock_workspace(locked=False)
+        resp = await _post_action(ws, "lock", "plan", body={"reason": {"nested": True}})
+
+        assert resp.status_code == 200
+        assert ws.lock_reason is None
+
+    async def test_reason_is_bounded(self):
+        from terrapod.api.routers.tfe_v2 import LOCK_REASON_MAX_LENGTH
+
+        ws = _mock_workspace(locked=False)
+        resp = await _post_action(
+            ws, "lock", "plan", body={"reason": "x" * (LOCK_REASON_MAX_LENGTH + 500)}
+        )
+
+        assert resp.status_code == 200
+        assert len(ws.lock_reason) == LOCK_REASON_MAX_LENGTH
+
+    async def test_second_lock_409s_without_overwriting_the_first_reason(self):
+        ws = _mock_workspace(
+            locked=True,
+            lock_id="lock-first@example.com",
+            lock_reason="first holder's window",
+            locked_by="first@example.com",
+        )
+        resp = await _post_action(ws, "lock", "plan", body={"reason": "second attempt"})
+
+        assert resp.status_code == 409
+        assert ws.lock_id == "lock-first@example.com"
+        assert ws.lock_reason == "first holder's window"
+        assert ws.locked_by == "first@example.com"
+
+    async def test_unlock_clears_reason_and_holder(self):
+        ws = _mock_workspace(
+            locked=True,
+            lock_id="lock-ops@example.com",
+            lock_reason="maintenance window",
+            locked_by="ops@example.com",
+        )
+        resp = await _post_action(ws, "unlock", "plan")
+
+        assert resp.status_code == 200
+        assert ws.lock_reason is None
+        assert ws.locked_by is None
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["lock-reason"] is None
+        assert attrs["locked-by"] is None
+
+    async def test_force_unlock_clears_reason_and_holder(self):
+        ws = _mock_workspace(
+            locked=True,
+            lock_id="default/some-workspace",
+            lock_reason="OperationTypeApply",
+            locked_by="someone@example.com",
+        )
+        resp = await _post_action(ws, "force-unlock", "admin", user=_user(roles=["admin"]))
+
+        assert resp.status_code == 200
+        assert ws.lock_reason is None
+        assert ws.locked_by is None
+
+    def test_serializer_hides_a_stale_reason_on_an_unlocked_workspace(self):
+        """A lock released by a path that does not clear the columns (e.g. a
+        run reaching a terminal state) must not report the old reason."""
+        from terrapod.api.routers.tfe_v2 import _workspace_json
+
+        ws = _mock_workspace(locked=False, lock_reason="stale", locked_by="old@example.com")
+        attrs = _workspace_json(ws)["data"]["attributes"]
+
+        assert attrs["lock-reason"] is None
+        assert attrs["locked-by"] is None
 
 
 # ── Permissions block ─────────────────────────────────────────────────

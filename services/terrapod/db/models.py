@@ -315,6 +315,12 @@ class Workspace(Base):
     working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     lock_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Why the workspace is locked and who locked it (#1705). Set when a lock is
+    # taken, cleared when it is released, and only reported while `locked` is
+    # true — a lock released by a path that does not clear them never shows a
+    # stale reason.
+    lock_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    locked_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # The agent pools this workspace's runs may execute on (#1085, #1087).
     # A FLAT set: every pool in it is equally eligible to claim a run — there is
     # no primary and no dispatch preference. `ordinal` is display order only.

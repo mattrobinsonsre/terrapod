@@ -2507,7 +2507,9 @@
       "lock": "Vergrendelen",
       "unlock": "Ontgrendelen",
       "lockConfirm": "Deze workspace vergrendelen?",
-      "unlockConfirm": "Deze workspace ontgrendelen?"
+      "unlockConfirm": "Deze workspace ontgrendelen?",
+      "lockedBy": "Vergrendeld door {holder}",
+      "reason": "Reden: {reason}"
     },
     "drift": {
       "title": "Driftdetectie",

@@ -50,7 +50,7 @@ A run is marked "stale" by the reconciler when it has been in `planning` or `app
 
 ### Resolution
 
-1. **Unlock the workspace** (if still locked after the run errored):
+1. **Unlock the workspace** (if still locked after the run errored). Before you do, check `lock-reason` and `locked-by` on the workspace (`GET /api/v1/workspaces/<ws-id>`, or the Lock Status card in the UI). A lock with an operator's reason, such as a maintenance window, was taken on purpose: ask its holder before you release it.
    ```bash
    curl -X POST -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/vnd.api+json" \

@@ -2507,7 +2507,9 @@
       "lock": "Uzamknout",
       "unlock": "Odemknout",
       "lockConfirm": "Uzamknout tento pracovní prostor?",
-      "unlockConfirm": "Odemknout tento pracovní prostor?"
+      "unlockConfirm": "Odemknout tento pracovní prostor?",
+      "lockedBy": "Zamčeno uživatelem {holder}",
+      "reason": "Důvod: {reason}"
     },
     "drift": {
       "title": "Detekce odchýlení",

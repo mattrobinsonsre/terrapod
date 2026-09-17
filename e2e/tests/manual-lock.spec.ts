@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
-import { createWorkspace, getStoredToken, uniqueName } from '../helpers/api.js';
+import { createWorkspace, getStoredToken, lockWorkspace, uniqueName } from '../helpers/api.js';
 
 /**
  * Manual workspace lock (UI) — part of the v0.39.0 locking work. Drives the
@@ -28,10 +28,33 @@ test.describe('Manual workspace lock (UI)', () => {
     await page.getByRole('button', { name: 'Lock', exact: true }).click();
     await expect(page.getByText(/this workspace is locked/i)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: 'Unlock', exact: true })).toBeVisible();
+    // The holder is reported while the lock is held (#1705). A UI lock gives
+    // no reason, so none is shown.
+    await expect(page.getByTestId('lock-holder')).toContainText('Locked by');
+    await expect(page.getByTestId('lock-reason')).toHaveCount(0);
 
     // Unlock restores the unlocked state.
     await page.getByRole('button', { name: 'Unlock', exact: true }).click();
     await expect(page.getByText(/unlocked and ready for runs/i)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible();
+    await expect(page.getByTestId('lock-holder')).toHaveCount(0);
+  });
+
+  test('a lock taken with a reason shows why and by whom, until it is released (#1705)', async ({ page }) => {
+    const token = getStoredToken('admin.json');
+    const wsId = await createWorkspace(token, uniqueName('e2e-lock-reason'));
+    const reason = `maintenance window ${uniqueName('note')}`;
+    await lockWorkspace(token, wsId, reason);
+
+    await page.goto(`/workspaces/${wsId}`);
+
+    await expect(page.getByText(/this workspace is locked/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('lock-reason')).toHaveText(`Reason: ${reason}`);
+    await expect(page.getByTestId('lock-holder')).toContainText('Locked by');
+
+    await page.getByRole('button', { name: 'Unlock', exact: true }).click();
+    await expect(page.getByText(/unlocked and ready for runs/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('lock-reason')).toHaveCount(0);
+    await expect(page.getByTestId('lock-holder')).toHaveCount(0);
   });
 });

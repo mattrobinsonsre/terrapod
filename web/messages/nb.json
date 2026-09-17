@@ -2507,7 +2507,9 @@
       "lock": "Lås",
       "unlock": "Lås opp",
       "lockConfirm": "Låse dette arbeidsområdet?",
-      "unlockConfirm": "Låse opp dette arbeidsområdet?"
+      "unlockConfirm": "Låse opp dette arbeidsområdet?",
+      "lockedBy": "Låst av {holder}",
+      "reason": "Årsak: {reason}"
     },
     "drift": {
       "title": "Avdriftsdeteksjon",

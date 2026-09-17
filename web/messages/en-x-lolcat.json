@@ -2507,7 +2507,9 @@
       "lock": "Lock",
       "unlock": "Unlock",
       "lockConfirm": "Lock dis workspace?",
-      "unlockConfirm": "Unlock dis workspace?"
+      "unlockConfirm": "Unlock dis workspace?",
+      "lockedBy": "Lockd by {holder}",
+      "reason": "Reezun: {reason}"
     },
     "drift": {
       "title": "Drift Deteckshun",

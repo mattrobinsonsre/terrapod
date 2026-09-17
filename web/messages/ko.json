@@ -2507,7 +2507,9 @@
       "lock": "잠금",
       "unlock": "잠금 해제",
       "lockConfirm": "이 워크스페이스를 잠그시겠습니까?",
-      "unlockConfirm": "이 워크스페이스의 잠금을 해제하시겠습니까?"
+      "unlockConfirm": "이 워크스페이스의 잠금을 해제하시겠습니까?",
+      "lockedBy": "잠근 사용자: {holder}",
+      "reason": "사유: {reason}"
     },
     "drift": {
       "title": "드리프트 감지",

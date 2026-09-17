@@ -2507,7 +2507,9 @@
       "lock": "Sperren",
       "unlock": "Entsperren",
       "lockConfirm": "Diesen Arbeitsbereich sperren?",
-      "unlockConfirm": "Diesen Arbeitsbereich entsperren?"
+      "unlockConfirm": "Diesen Arbeitsbereich entsperren?",
+      "lockedBy": "Gesperrt von {holder}",
+      "reason": "Grund: {reason}"
     },
     "drift": {
       "title": "Drift-Erkennung",

@@ -2507,7 +2507,9 @@
       "lock": "Bloquear",
       "unlock": "Desbloquear",
       "lockConfirm": "¿Bloquear este espacio de trabajo?",
-      "unlockConfirm": "¿Desbloquear este espacio de trabajo?"
+      "unlockConfirm": "¿Desbloquear este espacio de trabajo?",
+      "lockedBy": "Bloqueado por {holder}",
+      "reason": "Motivo: {reason}"
     },
     "drift": {
       "title": "Detección de desviación",

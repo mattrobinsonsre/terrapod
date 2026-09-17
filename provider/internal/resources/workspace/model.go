@@ -40,6 +40,8 @@
 //	"drift-status"                      → drift_status        (string, computed)
 //	"drift-last-checked-at"             → drift_last_checked_at (string, computed)
 //	"locked"                            → locked              (bool,   computed)
+//	"lock-reason"                       → lock_reason         (string, computed)
+//	"locked-by"                         → locked_by           (string, computed)
 //	"created-at"                        → created_at          (string, computed)
 //	"updated-at"                        → updated_at          (string, computed)
 //
@@ -120,6 +122,8 @@ type workspaceModel struct {
 	AgentPoolName      types.String `tfsdk:"agent_pool_name"`
 	VCSConnectionName  types.String `tfsdk:"vcs_connection_name"`
 	Locked             types.Bool   `tfsdk:"locked"`
+	LockReason         types.String `tfsdk:"lock_reason"`
+	LockedBy           types.String `tfsdk:"locked_by"`
 	CreatedAt          types.String `tfsdk:"created_at"`
 	UpdatedAt          types.String `tfsdk:"updated_at"`
 }

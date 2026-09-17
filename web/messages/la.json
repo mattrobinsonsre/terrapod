@@ -2507,7 +2507,9 @@
       "lock": "Occludere",
       "unlock": "Reserare",
       "lockConfirm": "Hoc locus operis occludere?",
-      "unlockConfirm": "Hoc locus operis reserare?"
+      "unlockConfirm": "Hoc locus operis reserare?",
+      "lockedBy": "Occlusum ab {holder}",
+      "reason": "Causa: {reason}"
     },
     "drift": {
       "title": "Inventio Aberrationis",

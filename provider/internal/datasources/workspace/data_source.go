@@ -74,6 +74,8 @@ type workspaceDataSourceModel struct {
 	AgentPoolName                 types.String `tfsdk:"agent_pool_name"`
 	VCSConnectionName             types.String `tfsdk:"vcs_connection_name"`
 	Locked                        types.Bool   `tfsdk:"locked"`
+	LockReason                    types.String `tfsdk:"lock_reason"`
+	LockedBy                      types.String `tfsdk:"locked_by"`
 	CreatedAt                     types.String `tfsdk:"created_at"`
 	UpdatedAt                     types.String `tfsdk:"updated_at"`
 }
@@ -140,6 +142,8 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"agent_pool_name":                  computedString("Human-readable name of the assigned agent pool, server-derived from `agent_pool_id`."),
 			"vcs_connection_name":              computedString("Human-readable name of the assigned VCS connection, server-derived from `vcs_connection_id`."),
 			"locked":                           computedBool("Lock status."),
+			"lock_reason":                      computedString("Why the workspace is locked, as given when the lock was taken. Null when unlocked or when no reason was given."),
+			"locked_by":                        computedString("Identity that took the workspace lock. Null when unlocked."),
 			"created_at":                       computedString("Creation timestamp."),
 			"updated_at":                       computedString("Update timestamp."),
 		},
@@ -244,6 +248,8 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	setOptionalString(&m.DriftLatestRunID, terrapod.GetStringAttr(res, "drift-latest-run-id"))
 	setOptionalString(&m.LifecycleState, terrapod.GetStringAttr(res, "lifecycle-state"))
 	setOptionalString(&m.LifecycleReason, terrapod.GetStringAttr(res, "lifecycle-reason"))
+	setOptionalString(&m.LockReason, terrapod.GetStringAttr(res, "lock-reason"))
+	setOptionalString(&m.LockedBy, terrapod.GetStringAttr(res, "locked-by"))
 	setOptionalString(&m.VCSLastPolledAt, terrapod.GetStringAttr(res, "vcs-last-polled-at"))
 	setOptionalString(&m.VCSLastAttemptedAt, terrapod.GetStringAttr(res, "vcs-last-attempted-at"))
 	setOptionalString(&m.VCSLastError, terrapod.GetStringAttr(res, "vcs-last-error"))

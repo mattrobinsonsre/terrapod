@@ -70,6 +70,10 @@ interface WorkspaceAttrs {
   'terragrunt-version': string
   'working-directory': string
   locked: boolean
+  // Why the workspace is locked and who locked it (#1705). Null when unlocked,
+  // and absent from an older API.
+  'lock-reason'?: string | null
+  'locked-by'?: string | null
   'resource-cpu': string
   parallelism: number
   'resource-memory': string
@@ -2675,17 +2679,27 @@ function WorkspaceDetailContent() {
 
             {/* Lock / Unlock */}
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
                   <h3 className="text-sm font-medium text-slate-300">{t('lock.title')}</h3>
                   <p className="text-sm text-slate-400 mt-1">
                     {attrs.locked ? t('lock.lockedDesc') : t('lock.unlockedDesc')}
                   </p>
+                  {attrs.locked && attrs['locked-by'] && (
+                    <p className="text-sm text-slate-400 mt-1 break-words" data-testid="lock-holder">
+                      {t('lock.lockedBy', { holder: attrs['locked-by'] })}
+                    </p>
+                  )}
+                  {attrs.locked && attrs['lock-reason'] && (
+                    <p className="text-sm text-slate-300 mt-1 break-words whitespace-pre-wrap" data-testid="lock-reason">
+                      {t('lock.reason', { reason: attrs['lock-reason'] })}
+                    </p>
+                  )}
                 </div>
                 {perms['can-lock'] && (
                   <button
                     onClick={handleLockToggle}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       attrs.locked
                         ? 'bg-amber-600 hover:bg-amber-500 text-white'
                         : 'bg-slate-600 hover:bg-slate-500 text-slate-200'

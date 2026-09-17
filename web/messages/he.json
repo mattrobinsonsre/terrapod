@@ -2507,7 +2507,9 @@
       "lock": "נעילה",
       "unlock": "שחרור נעילה",
       "lockConfirm": "לנעול סביבת עבודה זו?",
-      "unlockConfirm": "לשחרר את נעילת סביבת העבודה?"
+      "unlockConfirm": "לשחרר את נעילת סביבת העבודה?",
+      "lockedBy": "ננעל על ידי {holder}",
+      "reason": "סיבה: {reason}"
     },
     "drift": {
       "title": "זיהוי סטייה",

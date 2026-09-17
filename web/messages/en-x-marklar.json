@@ -2507,7 +2507,9 @@
       "lock": "Marklar",
       "unlock": "Unlock",
       "lockConfirm": "Lock this marklar?",
-      "unlockConfirm": "Unlock this marklar?"
+      "unlockConfirm": "Unlock this marklar?",
+      "lockedBy": "Marklar locked by {holder}",
+      "reason": "Marklar: {reason}"
     },
     "drift": {
       "title": "Marklar Marklar",

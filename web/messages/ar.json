@@ -2507,7 +2507,9 @@
       "lock": "قفل",
       "unlock": "إلغاء القفل",
       "lockConfirm": "هل تريد قفل مساحة العمل هذه؟",
-      "unlockConfirm": "هل تريد إلغاء قفل مساحة العمل هذه؟"
+      "unlockConfirm": "هل تريد إلغاء قفل مساحة العمل هذه؟",
+      "lockedBy": "قفلها {holder}",
+      "reason": "السبب: {reason}"
     },
     "drift": {
       "title": "كشف الانحراف",

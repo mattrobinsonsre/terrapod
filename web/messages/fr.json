@@ -2507,7 +2507,9 @@
       "lock": "Verrouiller",
       "unlock": "Déverrouiller",
       "lockConfirm": "Verrouiller cet espace de travail ?",
-      "unlockConfirm": "Déverrouiller cet espace de travail ?"
+      "unlockConfirm": "Déverrouiller cet espace de travail ?",
+      "lockedBy": "Verrouillé par {holder}",
+      "reason": "Motif : {reason}"
     },
     "drift": {
       "title": "Détection de dérive",

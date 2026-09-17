@@ -2,7 +2,7 @@ import { test, expect, type Page, type Route } from '@playwright/test';
 // Lives in helpers/, not here: Playwright forbids a spec importing a spec, and
 // any suite adding a surface should be able to reuse the mobile guard.
 import { expectNoHorizontalPageScroll } from '../helpers/responsive';
-import { getStoredToken, createWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, lockWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, uniqueName } from '../helpers/api';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 
@@ -377,6 +377,21 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByRole('button', { name: 'Plan + apply', exact: true })).toBeVisible()
 
     // Four buttons on one row is where a phone starts scrolling sideways.
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('a long lock reason wraps inside the lock card at phone width (#1705)', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2eresp-lockreason'))
+    // One unbroken token is the case that pushes a card sideways.
+    await lockWorkspace(token, wsId, `change-freeze-${'x'.repeat(120)} until the release is out`)
+
+    await page.goto(`/workspaces/${wsId}`)
+
+    await expect(page.getByTestId('lock-reason')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('lock-holder')).toBeVisible()
+    // The Unlock action stays reachable beside a long reason.
+    await expect(page.getByRole('button', { name: 'Unlock', exact: true })).toBeVisible()
     await expectNoHorizontalPageScroll(page)
   })
 

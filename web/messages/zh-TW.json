@@ -2507,7 +2507,9 @@
       "lock": "鎖定",
       "unlock": "解鎖",
       "lockConfirm": "鎖定此工作區？",
-      "unlockConfirm": "解鎖此工作區？"
+      "unlockConfirm": "解鎖此工作區？",
+      "lockedBy": "鎖定者：{holder}",
+      "reason": "原因：{reason}"
     },
     "drift": {
       "title": "漂移檢測",

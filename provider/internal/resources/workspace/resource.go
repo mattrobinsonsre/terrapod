@@ -588,7 +588,7 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			//   updated_at, vcs_last_polled_at, vcs_last_error,
 			//   vcs_last_error_at, drift_status, drift_last_checked_at,
 			//   drift_latest_run_id, lifecycle_state, lifecycle_reason,
-			//   locked
+			//   locked, lock_reason, locked_by
 			"drift_status": schema.StringAttribute{
 				Description: "Current drift status: \"\" (never checked), \"no_drift\", \"drifted\", or \"errored\". Server-volatile — updates when a drift run completes.",
 				Computed:    true,
@@ -648,6 +648,14 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"locked": schema.BoolAttribute{
 				Description: "Whether the workspace is locked. Server-volatile — operators can lock/unlock via the API outside of Terraform.",
+				Computed:    true,
+			},
+			"lock_reason": schema.StringAttribute{
+				Description: "Why the workspace is locked, as given when the lock was taken. Null when unlocked or when no reason was given. Server-volatile.",
+				Computed:    true,
+			},
+			"locked_by": schema.StringAttribute{
+				Description: "Identity that took the workspace lock. Null when unlocked. Server-volatile.",
 				Computed:    true,
 			},
 			"created_at": schema.StringAttribute{
@@ -1244,6 +1252,16 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.LifecycleState = types.StringValue(ws.LifecycleState)
 	} else {
 		m.LifecycleState = types.StringNull()
+	}
+	if ws.LockReason != "" {
+		m.LockReason = types.StringValue(ws.LockReason)
+	} else {
+		m.LockReason = types.StringNull()
+	}
+	if ws.LockedBy != "" {
+		m.LockedBy = types.StringValue(ws.LockedBy)
+	} else {
+		m.LockedBy = types.StringNull()
 	}
 	if ws.LifecycleReason != "" {
 		m.LifecycleReason = types.StringValue(ws.LifecycleReason)

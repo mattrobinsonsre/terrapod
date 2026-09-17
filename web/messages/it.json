@@ -2507,7 +2507,9 @@
       "lock": "Blocca",
       "unlock": "Sblocca",
       "lockConfirm": "Bloccare questo workspace?",
-      "unlockConfirm": "Sbloccare questo workspace?"
+      "unlockConfirm": "Sbloccare questo workspace?",
+      "lockedBy": "Bloccato da {holder}",
+      "reason": "Motivo: {reason}"
     },
     "drift": {
       "title": "Rilevamento della deriva",

@@ -2507,7 +2507,9 @@
       "lock": "L0ck",
       "unlock": "Unl0ck",
       "lockConfirm": "L0ck 7h15 w0rk5p4c3?",
-      "unlockConfirm": "Unl0ck 7h15 w0rk5p4c3?"
+      "unlockConfirm": "Unl0ck 7h15 w0rk5p4c3?",
+      "lockedBy": "L0ck3d by {holder}",
+      "reason": "R3450n: {reason}"
     },
     "drift": {
       "title": "Dr1f7 D373c710n",

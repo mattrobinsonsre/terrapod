@@ -343,6 +343,8 @@ async def _route_unlock(
         if ws.locked:
             ws.locked = False
             ws.lock_id = None
+            ws.lock_reason = None
+            ws.locked_by = None
             logger.info(
                 "unlock: released workspace lock",
                 workspace=ws.name,
