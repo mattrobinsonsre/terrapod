@@ -2510,7 +2510,9 @@
       "lock": "ngaQmoH",
       "unlock": "poSmoH",
       "lockConfirm": "Qumwo'vam ngaQmoH'a'?",
-      "unlockConfirm": "Qumwo'vam poSmoH'a'?"
+      "unlockConfirm": "Qumwo'vam poSmoH'a'?",
+      "lockedBy": "ngaQmoHpu' {holder}",
+      "reason": "meq: {reason}"
     },
     "drift": {
       "title": "tlhotlh tu'",

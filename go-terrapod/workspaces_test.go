@@ -262,6 +262,42 @@ func TestGetWorkspace_Happy(t *testing.T) {
 	}
 }
 
+func TestGetWorkspace_LockReasonAndHolder(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	f.readHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "api-prod", map[string]any{
+			"locked":      true,
+			"lock-reason": "maintenance window",
+			"locked-by":   "ops@example.com",
+		})))
+	}
+	ws, err := f.client().GetWorkspace(t.Context(), "ws-aaa")
+	if err != nil {
+		t.Fatalf("GetWorkspace: %v", err)
+	}
+	if !ws.Locked || ws.LockReason != "maintenance window" || ws.LockedBy != "ops@example.com" {
+		t.Errorf("lock fields: locked=%v reason=%q by=%q", ws.Locked, ws.LockReason, ws.LockedBy)
+	}
+}
+
+func TestGetWorkspace_UnlockedHasNullLockReason(t *testing.T) {
+	f := newWorkspaceFixtureServer(t)
+	f.readHandler = func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "api-prod", map[string]any{
+			"locked":      false,
+			"lock-reason": nil,
+			"locked-by":   nil,
+		})))
+	}
+	ws, err := f.client().GetWorkspace(t.Context(), "ws-aaa")
+	if err != nil {
+		t.Fatalf("GetWorkspace: %v", err)
+	}
+	if ws.Locked || ws.LockReason != "" || ws.LockedBy != "" {
+		t.Errorf("lock fields: locked=%v reason=%q by=%q", ws.Locked, ws.LockReason, ws.LockedBy)
+	}
+}
+
 func TestGetWorkspace_NotFound(t *testing.T) {
 	f := newWorkspaceFixtureServer(t)
 	f.readHandler = func(w http.ResponseWriter, r *http.Request) {

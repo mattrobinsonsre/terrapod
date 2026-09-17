@@ -258,6 +258,24 @@ export async function createWorkspace(
 }
 
 /**
+ * Lock a workspace through the go-tfe lock endpoint, optionally with a reason
+ * (#1705). The lock is held by the identity behind `token`.
+ */
+export async function lockWorkspace(token: string, wsId: string, reason?: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/actions/lock`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(reason === undefined ? {} : { reason }),
+  });
+  if (!res.ok) {
+    throw new Error(`Lock workspace failed: ${res.status} ${await res.text()}`);
+  }
+}
+
+/**
  * Create a Pulumi workspace through the native route (#1554). The TFE-compatible
  * route pins Terraform, so it cannot. `name` must be `project::stack`.
  */

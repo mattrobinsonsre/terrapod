@@ -59,6 +59,16 @@ class TestTakingTheLock:
         db.commit.assert_awaited_once()
         _no_events.assert_awaited_once()
 
+    async def test_a_previous_locks_reason_is_not_reported_as_this_ones(self) -> None:
+        """#1705: the reason and holder describe the current lock only."""
+        ws = SimpleNamespace(
+            id=WS, locked=False, lock_id=None, lock_reason="old note", locked_by="a@example.test"
+        )
+        db = _db(_result(first=None), _result(scalar=ws))
+        await locks.take_workspace_lock(db, WS, "u-1")
+        assert ws.lock_reason == "pulumi update"
+        assert ws.locked_by is None
+
     async def test_an_agent_apply_in_flight_refuses_it(self) -> None:
         db = _db(_result(first=(uuid.uuid4(),)))
         with pytest.raises(locks.LockRefused, match="agent run is applying"):
@@ -98,6 +108,8 @@ class TestReleasingIt:
         assert await locks.release_workspace_lock(db, WS, "u-1") is True
         assert ws.locked is False
         assert ws.lock_id is None
+        assert ws.lock_reason is None
+        assert ws.locked_by is None
         db.commit.assert_awaited_once()
         _no_events.assert_awaited_once()
 

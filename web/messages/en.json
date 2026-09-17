@@ -2518,7 +2518,9 @@
       "lock": "Lock",
       "unlock": "Unlock",
       "lockConfirm": "Lock this workspace?",
-      "unlockConfirm": "Unlock this workspace?"
+      "unlockConfirm": "Unlock this workspace?",
+      "lockedBy": "Locked by {holder}",
+      "reason": "Reason: {reason}"
     },
     "drift": {
       "title": "Drift Detection",

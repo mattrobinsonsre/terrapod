@@ -243,6 +243,7 @@ class TestMarkerContents:
             "locked",
             "lock_id",
             "lock_reason",
+            "locked_by",
             "last_state_at",
             "state_stale_at",
             "state_diverged",

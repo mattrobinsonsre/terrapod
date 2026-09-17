@@ -2510,7 +2510,9 @@
       "lock": "Kilitle",
       "unlock": "Kilidi Aç",
       "lockConfirm": "Bu çalışma alanı kilitlensin mi?",
-      "unlockConfirm": "Bu çalışma alanının kilidi açılsın mı?"
+      "unlockConfirm": "Bu çalışma alanının kilidi açılsın mı?",
+      "lockedBy": "Kilitleyen: {holder}",
+      "reason": "Neden: {reason}"
     },
     "drift": {
       "title": "Sürüklenme Tespiti",

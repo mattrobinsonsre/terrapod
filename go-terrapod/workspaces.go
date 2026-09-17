@@ -64,14 +64,19 @@ type Workspace struct {
 	// AgentPoolNames is read-only: the pools' names, positionally matching
 	// AgentPoolIDs. Served so a consumer can render a pool without fetching the
 	// whole pool list purely to turn ids into labels.
-	AgentPoolNames    []string          `json:"agent-pool-names,omitempty"`
-	AutoMerge         bool              `json:"auto-merge"`
-	AutoMergeStrategy string            `json:"auto-merge-strategy,omitempty"`
-	OwnerEmail        string            `json:"owner-email,omitempty"`
-	Locked            bool              `json:"locked"`
-	Labels            map[string]string `json:"labels,omitempty"`
-	VarFiles          []string          `json:"var-files,omitempty"`
-	TriggerPrefixes   []string          `json:"trigger-prefixes,omitempty"`
+	AgentPoolNames    []string `json:"agent-pool-names,omitempty"`
+	AutoMerge         bool     `json:"auto-merge"`
+	AutoMergeStrategy string   `json:"auto-merge-strategy,omitempty"`
+	OwnerEmail        string   `json:"owner-email,omitempty"`
+	Locked            bool     `json:"locked"`
+	// LockReason and LockedBy are read-only (#1705): why the workspace is
+	// locked and who took the lock. Empty when unlocked, or when the lock was
+	// taken without a reason (or by a server that predates them).
+	LockReason      string            `json:"lock-reason,omitempty"`
+	LockedBy        string            `json:"locked-by,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
+	VarFiles        []string          `json:"var-files,omitempty"`
+	TriggerPrefixes []string          `json:"trigger-prefixes,omitempty"`
 	// DriftIgnoreRules is a list of resource-address-plus-attribute-path
 	// glob patterns suppressed by the drift-result classifier (#482).
 	// Empty list (default) means classic behaviour: every plan diff
@@ -768,6 +773,8 @@ func workspaceFromResource(res *Resource) *Workspace {
 		AutoMergeStrategy:             GetStringAttr(res, "auto-merge-strategy"),
 		OwnerEmail:                    GetStringAttr(res, "owner-email"),
 		Locked:                        GetBoolAttr(res, "locked"),
+		LockReason:                    GetStringAttr(res, "lock-reason"),
+		LockedBy:                      GetStringAttr(res, "locked-by"),
 		Labels:                        GetMapAttr(res, "labels"),
 		VarFiles:                      GetListAttr(res, "var-files"),
 		TriggerPrefixes:               GetListAttr(res, "trigger-prefixes"),
