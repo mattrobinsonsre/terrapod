@@ -65,9 +65,15 @@ def _read_root_tf_files(tar: tarfile.TarFile) -> list[str]:
     for member in tar.getmembers():
         if not member.isfile():
             continue
-        if "/" in member.name:
+        # `tar -czf m.tgz -C dir .` -- the documented invocation -- names every
+        # entry `./main.tf`. Without normalising, the root check below read
+        # those as nested and the interface parsed as empty (#1707).
+        name = member.name
+        while name.startswith("./"):
+            name = name[2:]
+        if "/" in name:
             continue
-        if not member.name.endswith(".tf"):
+        if not name.endswith(".tf"):
             continue
         if member.size > _MAX_TF_FILE_BYTES:
             logger.warning(
