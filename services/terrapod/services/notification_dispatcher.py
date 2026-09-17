@@ -17,6 +17,7 @@ from terrapod.services.notification_service import (
     build_run_payload,
     deliver_notification,
     record_delivery_response,
+    run_ui_url,
 )
 
 logger = get_logger(__name__)
@@ -77,6 +78,9 @@ async def handle_notification_delivery(payload: dict) -> None:
             # Build payload
             from terrapod.services.notification_service import _rfc3339
 
+            # `run_url` and `run_created_by` were never passed, so every generic
+            # and email notification said neither where to look nor who ran it
+            # (#1706).
             notif_payload = build_run_payload(
                 nc_name=nc.name,
                 run_id=f"run-{run.id}",
@@ -86,6 +90,8 @@ async def handle_notification_delivery(payload: dict) -> None:
                 workspace_name=ws.name,
                 trigger=trigger,
                 run_message=run.message,
+                run_url=run_ui_url(f"ws-{ws.id}", f"run-{run.id}"),
+                run_created_by=run.created_by or "",
             )
 
             # Deliver

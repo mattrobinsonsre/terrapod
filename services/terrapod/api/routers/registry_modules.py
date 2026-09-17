@@ -59,6 +59,7 @@ from terrapod.services.registry_module_service import (
     create_module_version,
     delete_module,
     delete_module_version,
+    finalize_presigned_uploads,
     get_module,
     get_module_download_url,
     list_modules,
@@ -226,6 +227,10 @@ async def list_module_versions_cli(
     )
     if not has_capability(caps, cap.REGISTRY_READ):
         raise HTTPException(status_code=404, detail="Module not found")
+
+    # A version published through its presigned URL is only known to have
+    # arrived once someone looks (#1707).
+    await finalize_presigned_uploads(db, module)
 
     versions = sorted(
         [{"version": v.version} for v in module.versions if v.upload_status == "uploaded"],
@@ -430,6 +435,8 @@ async def show_module_endpoint(
     )
     if not has_capability(caps, cap.REGISTRY_READ):
         raise HTTPException(status_code=404, detail="Module not found")
+
+    await finalize_presigned_uploads(db, module)
 
     return JSONResponse(content={"data": _module_to_jsonapi(module, caps)})
 
