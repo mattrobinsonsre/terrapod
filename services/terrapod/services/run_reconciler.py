@@ -256,6 +256,19 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
     # resolution is the apply Job — `phase` follows the same mapping.
     phase = "plan" if run.status == "planning" else "apply"
 
+    # A run HELD at a post-plan gate (#1725) has a finished plan; only its
+    # decision is outstanding, so its Job is irrelevant. That Job is cleaned up
+    # `ttlSecondsAfterFinished` after it completes, and the listener then
+    # reports `deleted` -- which, for a Job still expected to be running, means
+    # failure. So a held run is handled before any Job is asked about: asking
+    # would also send every held run's pool a status query and a log-stream
+    # request for a deleted Job on every tick, for as long as it waits.
+    from terrapod.services import run_service
+
+    if run_service.is_held_at_gate(run):
+        await _reconcile_held(db, run)
+        return
+
     # If no Job has been launched yet (listener never POSTed job-launched),
     # there's nothing for listeners to query — skip the SSE round-trip and
     # rely on the launch_timeout in _check_stale.
@@ -293,20 +306,6 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
     # Check for recently reported status in Redis (phase-keyed to prevent
     # stale plan "succeeded" from causing premature apply transitions)
     status = await get_job_status_from_redis(str(run.id), phase)
-
-    # A run HELD at a post-plan gate (#1725) has a finished plan; only its
-    # decision is outstanding. Its Job is cleaned up
-    # `ttlSecondsAfterFinished` after it completes, and the listener then
-    # reports `deleted` -- which, for a Job still expected to be running,
-    # means failure. For a held run it means nothing: re-drive the gates
-    # (complete_plan is idempotent, and is how a passing run task releases the
-    # run) instead of erroring it. Likewise a Job status that has simply
-    # expired from Redis must not age the run into the stale timeout.
-    from terrapod.services import run_service
-
-    if run_service.is_held_at_gate(run) and status in (None, "deleted"):
-        await run_service.complete_plan(db, run)
-        return
 
     if status is None:
         # No status yet — check for stale runs
@@ -521,6 +520,32 @@ async def _check_unschedulable(db: AsyncSession, run: Run) -> None:
         resource_cpu=run.resource_cpu,
         resource_memory=run.resource_memory,
     )
+
+
+async def _reconcile_held(db: AsyncSession, run: Run) -> None:
+    """Move a run held at a post-plan gate on, if anything has changed (#1725).
+
+    - A newer apply-capable run has been queued: the held run is superseded, as
+      a `planned` one would be. The queue-time supersede cannot catch a run that
+      was still planning when the newer run queued, and the dispatcher will not
+      start the newer run while this one holds the workspace -- so without this
+      the queue would wait on a person indefinitely.
+    - Otherwise the gates are re-evaluated. `complete_plan` is idempotent, and
+      this is how a passing run task, or an override, releases the run.
+    - A plan-only run (a speculative plan, a drift check) has nothing to apply,
+      so there is no decision to wait for: it keeps the drift cap and the stale
+      timeout, which 1.7.1 enforced by erroring it once its Job was gone.
+    """
+    from terrapod.services import run_service
+
+    if run_service._is_supersedeable_kind(run) and await run_service._has_newer_live_run(db, run):
+        await run_service.discard_run(db, run, reason="Superseded by a newer run")
+        logger.info("Held run superseded by a newer run — discarded", run_id=str(run.id))
+        return
+
+    await run_service.complete_plan(db, run)
+    if run.plan_only and run.status == "planning":
+        await _check_stale(db, run)
 
 
 async def _check_stale(db: AsyncSession, run: Run) -> None:

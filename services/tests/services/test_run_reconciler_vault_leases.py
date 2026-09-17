@@ -54,6 +54,9 @@ def _run(status="planning"):
     run.job_name = "tprun-x-plan"
     run.job_namespace = "runners"
     run.apply_started_at = None
+    # A plan whose Job failed mid-plan: a run with a finished plan is held at a
+    # post-plan gate instead, and its Job is never consulted (#1725).
+    run.plan_finished_at = None
     run.runner_exit_status = ""
     run.source = "tfe-api"
     return run
