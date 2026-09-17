@@ -66,6 +66,42 @@ def _read_state_lineage_md5(path: str) -> tuple[str, str]:
     return state_data.get("lineage", ""), h.hexdigest()
 
 
+def _state_with_serial(state_bytes: bytes, serial: int) -> bytes:
+    """The state file with its internal `serial` set to `serial`.
+
+    A state version has two serials: the row's, which the upload handler checks
+    for collisions, and the one inside the file, which terraform/tofu read to
+    compute the NEXT serial. They must be equal (#1702). A path that assigns a
+    fresh row serial and stores the file verbatim breaks that: the engine counts
+    on from the file's older serial, lands on a row that already exists, and the
+    upload is refused with 409 -- after the apply has changed infrastructure,
+    and again on every later run.
+
+    Runs in a worker thread (CLAUDE.md #13): it parses the whole state.
+    """
+    state = json.loads(state_bytes)
+    if not isinstance(state, dict):
+        raise ValueError("state is not a JSON object")
+    state["serial"] = serial
+    # terraform/tofu write state indented by two with a trailing newline; keep
+    # the stored file readable in the same shape.
+    return (json.dumps(state, indent=2) + "\n").encode()
+
+
+def _rewrite_state_file_serial(path: str, serial: int) -> tuple[str, int]:
+    """Set the `serial` inside a state file on disk; return (md5, size).
+
+    The upload streams to a PVC tempfile (#14), so the rewrite happens there
+    and the md5/size recorded on the row describe the bytes actually stored.
+    """
+    with open(path, "rb") as fh:
+        rewritten = _state_with_serial(fh.read(), serial)
+    with open(path, "wb") as fh:
+        fh.write(rewritten)
+    md5 = hashlib.md5(rewritten).hexdigest()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+    return md5, len(rewritten)
+
+
 async def _require_sv_workspace_capability(
     sv: StateVersion,
     required: str,
@@ -191,6 +227,19 @@ async def rollback_state_version(
     max_serial = max_serial_result.scalar_one() or 0
     new_serial = max_serial + 1
 
+    # The copy must carry the serial of the row it is stored under, not the
+    # serial of the version it was copied from -- otherwise the next apply
+    # computes a serial that already exists and its state upload is refused
+    # after the infrastructure has changed (#1702). Rolling back to the current
+    # version is also how a workspace already in that condition recovers.
+    try:
+        state_bytes = await asyncio.to_thread(_state_with_serial, state_bytes, new_serial)
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Stored state is not valid state JSON; it cannot be rolled back to",
+        ) from exc
+
     # Hash off the event loop — state files are multi-MB and hashlib blocks
     md5_digest = await asyncio.to_thread(lambda: hashlib.md5(state_bytes).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
 
@@ -286,6 +335,11 @@ async def upload_state_manual(
         )
         max_serial = max_serial_result.scalar_one() or 0
         new_serial = max_serial + 1
+
+        # Store the file under its row's serial, so the two agree (#1702). The
+        # uploaded file's own serial is whatever the operator's copy said,
+        # and left as-is it sends the next apply to a serial already taken.
+        md5, state_size = await asyncio.to_thread(_rewrite_state_file_serial, tmp_path, new_serial)
 
         sv = StateVersion(
             workspace_id=ws.id,
