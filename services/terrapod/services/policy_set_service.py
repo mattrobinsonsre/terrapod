@@ -101,6 +101,24 @@ async def applicable_policy_sets(db: AsyncSession, ws: Workspace) -> list[Policy
     return [ps for ps in rows if policy_set_applies(ps, ws.name, ws.labels or {})]
 
 
+def policy_sets_not_evaluated_reason(ws: Workspace) -> str | None:
+    """Why no policy set is evaluated for runs of this workspace, or None.
+
+    A workspace whose engine's runner does not evaluate OPA (Pulumi, until
+    #1560) is outside every policy set's scope. It is reported rather than left
+    silent, so an operator who scoped a mandatory set to it can see the set is
+    not being applied.
+    """
+    from terrapod.engines import evaluates_policy_sets
+
+    if evaluates_policy_sets(ws.engine):
+        return None
+    return (
+        f"Policy sets are not evaluated for {ws.engine} runs yet: the runner "
+        "produces no plan JSON for OPA to read."
+    )
+
+
 # ── OPA input context ─────────────────────────────────────────────────
 
 
@@ -175,6 +193,10 @@ async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
 
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
+        return GATE_PASSED
+    if policy_sets_not_evaluated_reason(ws):
+        # Its runner never evaluates, so a mandatory set in scope would be
+        # recorded as a synthetic failure and hold every apply (#1567).
         return GATE_PASSED
 
     sets = await applicable_policy_sets(db, ws)

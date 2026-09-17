@@ -44,6 +44,14 @@ Each workspace picks one enforcement level (default **advisory**):
 There is **no platform-wide off switch** — scanning is a per-workspace choice.
 Speculative (plan-only) runs are always recorded but never gated.
 
+**Pulumi workspaces are not scanned yet.** Checkov and Trivy read Terraform plan
+JSON, and a Pulumi run produces none (#1569). A Pulumi workspace defaults to
+`off` and refuses `advisory` or `enforced` with `422`. A Pulumi workspace that
+already carries another value (from before this check, or restored from a
+deleted workspace) is treated as `off`, so no apply waits for a scan that never
+runs. The run's `GET /api/v1/runs/{run_id}/security-scan` says so in
+`meta.not-evaluated-reason`.
+
 ## Configuration
 
 Set these per workspace (via the API, the `terraform_workspace` provider

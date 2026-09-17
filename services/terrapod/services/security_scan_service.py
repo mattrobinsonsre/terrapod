@@ -52,9 +52,32 @@ VALID_OUTCOME = frozenset({"passed", "failed", "errored"})
 # ── Config resolution (what the runner pulls) ─────────────────────────────
 
 
+def scan_not_available_reason(ws: Workspace) -> str | None:
+    """Why a workspace's runs are never security-scanned, or None (#1567)."""
+    from terrapod.engines import evaluates_security_scans
+
+    if evaluates_security_scans(ws.engine):
+        return None
+    return (
+        f"Security scanning is not available for {ws.engine} runs yet: Checkov "
+        "and Trivy read Terraform plan JSON."
+    )
+
+
+def effective_enforcement(ws: Workspace) -> str:
+    """The enforcement that actually applies: ``off`` where scanning cannot run.
+
+    A workspace can still carry another value, from before this check existed or
+    restored from a deleted workspace; it is honoured nowhere.
+    """
+    if scan_not_available_reason(ws):
+        return "off"
+    return ws.security_scan_enforcement or "off"
+
+
 def scan_enabled(ws: Workspace) -> bool:
     """True when the workspace has the scan stage turned on (not ``off``)."""
-    return (ws.security_scan_enforcement or "off") != "off"
+    return effective_enforcement(ws) != "off"
 
 
 def resolve_scan_config(ws: Workspace) -> dict[str, Any]:
@@ -62,7 +85,7 @@ def resolve_scan_config(ws: Workspace) -> dict[str, Any]:
 
     ``enabled=False`` tells the runner to skip the stage outright.
     """
-    enforcement = ws.security_scan_enforcement or "off"
+    enforcement = effective_enforcement(ws)
     return {
         "enabled": enforcement != "off",
         "enforcement_level": enforcement,
@@ -134,7 +157,7 @@ async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         return GATE_PASSED
-    if (ws.security_scan_enforcement or "off") != "enforced":
+    if effective_enforcement(ws) != "enforced":
         # off / advisory never block; nothing to gate.
         return GATE_PASSED
 

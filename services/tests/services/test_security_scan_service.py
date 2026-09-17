@@ -17,6 +17,7 @@ from terrapod.services import security_scan_service as svc
 def _ws(**kw):
     base = {
         "id": uuid.uuid4(),
+        "engine": "terraform",
         "security_scan_enforcement": "off",
         "security_scan_engine": "checkov",
         "security_scan_severity_threshold": "high",

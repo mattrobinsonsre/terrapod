@@ -106,6 +106,11 @@ async def get_run_security_scan(
     scan = await security_scan_service.get_run_scan(db, run.id)
     summary = await security_scan_service.run_scan_summary(db, run.id)
     meta: dict = {"summary": summary}
+    ws = await db.get(Workspace, run.workspace_id)
+    reason = security_scan_service.scan_not_available_reason(ws) if ws else None
+    if reason:
+        # Why there is no result, rather than an unexplained null (#1567).
+        meta["not-evaluated-reason"] = reason
     return JSONResponse(
         content={
             "data": _scan_json(scan) if scan is not None else None,
@@ -217,7 +222,7 @@ async def post_security_scan_results(
         raise HTTPException(status_code=422, detail="summary must be an object")
 
     # Authoritative enforcement/threshold from the workspace, NOT the runner.
-    enforcement = ws.security_scan_enforcement or "off"
+    enforcement = security_scan_service.effective_enforcement(ws)
     threshold = ws.security_scan_severity_threshold or "high"
 
     await security_scan_service.record_scan_result(

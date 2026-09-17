@@ -176,6 +176,8 @@ class TestHandleSucceeded:
         self, mock_transition, mock_stage, mock_persist
     ):
         db = AsyncMock()
+        # A Terraform workspace, which the post-plan gates consult (#1567).
+        db.get.return_value = MagicMock(engine="terraform", security_scan_enforcement="off")
         run = _mock_run(status="planning")
         mock_stage.return_value = None
         mock_transition.return_value = run

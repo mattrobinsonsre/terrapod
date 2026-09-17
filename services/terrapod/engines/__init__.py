@@ -63,6 +63,15 @@ class EngineStrategy(Protocol):
     #: smoothed over, and a key namespace is how it survives translation.
     vocabulary: str
 
+    #: Whether this engine's runner evaluates OPA policy sets against its plan.
+    #: The post-plan policy gate fails closed on a missing evaluation, so an
+    #: engine that never evaluates must say so, or every apply is held (#1567).
+    evaluates_policy_sets: bool
+
+    #: Whether this engine's runner performs the IaC security scan (Checkov and
+    #: Trivy read Terraform plan JSON). Same reason as above.
+    evaluates_security_scans: bool
+
     def build_job_spec(self, **kwargs: Any) -> dict:
         """Build the Kubernetes Job spec for one phase of a run."""
         ...
@@ -115,6 +124,23 @@ def strategy_for(engine: str | None) -> EngineStrategy:
             f"unknown engine {engine!r} — known engines: {', '.join(sorted(_REGISTRY))}"
         )
     return strategy
+
+
+def evaluates_policy_sets(engine: str | None) -> bool:
+    """Whether a run of this engine is evaluated against OPA policy sets (#1567).
+
+    Deliberately not gated: a Pulumi workspace still exists, and still reaches
+    the post-plan gate, after `engines.pulumi` is switched off. An unknown engine
+    answers True, so the gate keeps failing closed for a row nobody can vouch for.
+    """
+    strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
+    return True if strategy is None else strategy.evaluates_policy_sets
+
+
+def evaluates_security_scans(engine: str | None) -> bool:
+    """Whether a run of this engine is security-scanned (#1567). As above."""
+    strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
+    return True if strategy is None else strategy.evaluates_security_scans
 
 
 def known_engines() -> tuple[str, ...]:

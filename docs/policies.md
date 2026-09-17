@@ -38,6 +38,13 @@ that key is among the rule's accepted values. This is the same model
 roles use, so "policy set for production" is just a set scoped to
 `env: prod`.
 
+**Policy sets are not evaluated for Pulumi runs yet.** OPA evaluates the
+Terraform plan JSON, and a Pulumi run produces none until OPA over preview JSON
+lands (#1560). A Pulumi workspace is outside every policy set's scope, even a
+global mandatory one, so its applies are never held waiting for an evaluation
+that cannot happen. The run's `GET /api/v1/runs/{run_id}/policy-evaluations`
+says so in `meta.not-evaluated-reason`.
+
 ## Writing a policy
 
 A Terrapod policy is a Rego v1 document. It **must**:

@@ -86,6 +86,10 @@ class TerraformStrategy:
     #: what they say.
     vocabulary = "terraform"
 
+    #: The runner evaluates both against the plan JSON (#343, #1036).
+    evaluates_policy_sets = True
+    evaluates_security_scans = True
+
     def container_env(
         self, options: TerraformRunOptions, runner_config: RunnerConfig
     ) -> list[dict[str, Any]]:

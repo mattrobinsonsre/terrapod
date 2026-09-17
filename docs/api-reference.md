@@ -1081,7 +1081,7 @@ GET  /api/v1/runs/{run_id}/security-scan                     # read the result (
 POST /api/v1/runs/{run_id}/actions/override-security-scan    # override a blocking scan (workspace admin)
 ```
 
-**GET** returns `{"data": <resource>|null, "meta": {"summary": {...}}}`. `data` is `null` when the workspace has scanning off or the run wasn't scanned. The resource `attributes` are: `engine`, `enforcement-level`, `severity-threshold`, `outcome` (`passed`/`failed`/`errored`), `findings` (list of `{engine, rule_id, severity, title, resource, file, line, guideline}`), `summary` (`{total, blocking, by_severity, …}`), `error`, `overridden-by`, `overridden-at`, `created-at`. `meta.summary` carries a compact `{status, outcome, engine, total, blocking}` for the badge (`status` = `blocked` | `advisory-failed` | `passed`). Requires `read` on the workspace.
+**GET** returns `{"data": <resource>|null, "meta": {"summary": {...}}}`. `data` is `null` when the workspace has scanning off or the run wasn't scanned; for a run whose engine is never scanned (Pulumi, until #1569), `meta.not-evaluated-reason` says why. The resource `attributes` are: `engine`, `enforcement-level`, `severity-threshold`, `outcome` (`passed`/`failed`/`errored`), `findings` (list of `{engine, rule_id, severity, title, resource, file, line, guideline}`), `summary` (`{total, blocking, by_severity, …}`), `error`, `overridden-by`, `overridden-at`, `created-at`. `meta.summary` carries a compact `{status, outcome, engine, total, blocking}` for the badge (`status` = `blocked` | `advisory-failed` | `passed`). Requires `read` on the workspace.
 
 **POST override** marks a failed/errored result overridden and, when the run is still held in `planning` by an enforced scan, re-drives it immediately (mirrors the policy override). Requires **admin** on the workspace; audit-logged. Prefer fixing the finding or adding a skip rule.
 
@@ -4027,7 +4027,7 @@ The Rego is validated with `opa check` on create/update — broken Rego, or Rego
 GET /api/v1/runs/{run_id}/policy-evaluations
 ```
 
-Returns the policy evaluations recorded for a run, plus a `meta.summary` (`status`: `passed` / `advisory-failed` / `blocked`, and counts). Each evaluation's `result` carries the per-policy violations/warnings. This is the endpoint behind the run's `policy-checks` relationship link. **Required permission:** `read` on the run's workspace.
+Returns the policy evaluations recorded for a run, plus a `meta.summary` (`status`: `passed` / `advisory-failed` / `blocked`, and counts). Each evaluation's `result` carries the per-policy violations/warnings. This is the endpoint behind the run's `policy-checks` relationship link. For a run whose engine does not evaluate policy sets (Pulumi, until #1560), `meta.not-evaluated-reason` says why there are no evaluations. **Required permission:** `read` on the run's workspace.
 
 ### Override Run Policy
 

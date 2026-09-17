@@ -315,6 +315,33 @@ def _validate_workspace_name(name: str, engine: str = TERRAFORM) -> str:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+def _scan_enforcement_for(raw: object, engine: str, default: str) -> str:
+    """`security-scan-enforcement`, refused where the engine is never scanned (#1567).
+
+    Checkov and Trivy read Terraform plan JSON, so a Pulumi run has nothing to
+    scan. `enforced` there held every apply for a result that never came, and
+    `advisory` would record a setting that does nothing while saying it did
+    something. Such a workspace defaults to, and accepts only, `off`.
+    """
+    from terrapod.engines import evaluates_security_scans
+
+    if not evaluates_security_scans(engine):
+        default = "off"
+    value = _scan_enum(
+        raw, frozenset({"off", "advisory", "enforced"}), "security-scan-enforcement", default
+    )
+    if value != "off" and not evaluates_security_scans(engine):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"security-scan-enforcement must be off for a {engine} workspace: "
+                "security scanning reads Terraform plan JSON and is not available "
+                f"for {engine} runs yet"
+            ),
+        )
+    return value
+
+
 def _validate_pulumi_bind_plan(raw: object, engine: str) -> bool:
     """`pulumi-bind-plan` (#1553): a boolean, meaningful only on a Pulumi workspace.
 
@@ -1336,11 +1363,8 @@ async def _create_workspace_impl(
         var_files=_validate_var_files(attrs.get("var-files", [])),
         trigger_prefixes=_validate_trigger_prefixes(attrs.get("trigger-prefixes", [])),
         drift_ignore_rules=_validate_drift_ignore_rules(attrs.get("drift-ignore-rules", [])),
-        security_scan_enforcement=_scan_enum(
-            attrs.get("security-scan-enforcement"),
-            frozenset({"off", "advisory", "enforced"}),
-            "security-scan-enforcement",
-            "advisory",
+        security_scan_enforcement=_scan_enforcement_for(
+            attrs.get("security-scan-enforcement"), engine, "advisory"
         ),
         security_scan_engine=_scan_enum(
             attrs.get("security-scan-engine"),
@@ -1949,11 +1973,8 @@ async def update_workspace(
         )
     # Security scanning (#1036)
     if "security-scan-enforcement" in attrs:
-        ws.security_scan_enforcement = _scan_enum(
-            attrs["security-scan-enforcement"],
-            frozenset({"off", "advisory", "enforced"}),
-            "security-scan-enforcement",
-            "advisory",
+        ws.security_scan_enforcement = _scan_enforcement_for(
+            attrs["security-scan-enforcement"], ws.engine, "advisory"
         )
     if "security-scan-engine" in attrs:
         ws.security_scan_engine = _scan_enum(

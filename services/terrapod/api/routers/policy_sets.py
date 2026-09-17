@@ -588,12 +588,13 @@ async def list_run_policy_evaluations(
     run = await _get_run_for_read(db, run_id, user)
     evals = await policy_set_service.get_run_evaluations(db, run.id)
     summary = await policy_set_service.run_policy_summary(db, run.id)
-    return JSONResponse(
-        content={
-            "data": [_evaluation_json(e) for e in evals],
-            "meta": {"summary": summary},
-        }
-    )
+    meta: dict = {"summary": summary}
+    ws = await db.get(Workspace, run.workspace_id)
+    reason = policy_set_service.policy_sets_not_evaluated_reason(ws) if ws else None
+    if reason:
+        # Why a run in a mandatory set's scope has no evaluation (#1567).
+        meta["not-evaluated-reason"] = reason
+    return JSONResponse(content={"data": [_evaluation_json(e) for e in evals], "meta": meta})
 
 
 @router.post("/runs/{run_id}/actions/override-policy")
@@ -686,7 +687,13 @@ async def get_policy_bundle(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    sets = await policy_set_service.applicable_policy_sets(db, ws)
+    # A runner for an engine that does not evaluate OPA is given nothing to
+    # evaluate, matching the gate, which does not wait for it (#1567).
+    sets = (
+        []
+        if policy_set_service.policy_sets_not_evaluated_reason(ws)
+        else await policy_set_service.applicable_policy_sets(db, ws)
+    )
     context = policy_set_service.build_run_context(ws, run)
 
     return JSONResponse(
