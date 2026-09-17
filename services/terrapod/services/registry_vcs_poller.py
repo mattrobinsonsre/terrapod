@@ -307,12 +307,16 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
 
         interface = None
         if settings.registry.module_interface.enabled:
-            from terrapod.services.module_hcl_parser import extract_module_interface
+            from terrapod.services.module_hcl_parser import extract_module_interface_result
 
             try:
-                interface = await asyncio.to_thread(extract_module_interface, archive_bytes)
+                interface = await asyncio.to_thread(extract_module_interface_result, archive_bytes)
             except Exception:
-                interface = {"inputs": [], "outputs": []}
+                interface = {
+                    "inputs": [],
+                    "outputs": [],
+                    "error": "The module interface could not be read.",
+                }
 
         # Store tarball (overwrites existing if tag was moved)
         key = module_tarball_key(module.namespace, module.name, module.provider, version_str)
@@ -325,6 +329,8 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
             if interface:
                 existing.inputs = interface["inputs"]
                 existing.outputs = interface["outputs"]
+                # Cleared when the moved tag parses, set when it does not (#1707).
+                existing.interface_error = interface["error"]
             logger.info(
                 "Module version updated (tag moved)",
                 module_name=module.name,
@@ -343,6 +349,7 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
                 vcs_tag=tag_name,
                 inputs=interface["inputs"] if interface else None,
                 outputs=interface["outputs"] if interface else None,
+                interface_error=interface["error"] if interface else None,
             )
             db.add(mod_version)
             existing_versions[version_str] = mod_version

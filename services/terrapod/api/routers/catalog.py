@@ -594,6 +594,10 @@ async def get_catalog_item_form(
                 "attributes": {
                     "resolved-version": mv.version if mv else None,
                     "fields": fields,
+                    # Why the module's interface could not be read (#1707). A
+                    # form with no fields is otherwise indistinguishable from a
+                    # module that genuinely declares no variables.
+                    "interface-error": mv.interface_error if mv else None,
                 },
             }
         }
@@ -627,6 +631,7 @@ async def get_catalog_item_interface(
                     "resolved-version": mv.version if mv else None,
                     "inputs": mv.inputs if mv else None,
                     "outputs": mv.outputs if mv else None,
+                    "interface-error": mv.interface_error if mv else None,
                 },
             }
         }

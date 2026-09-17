@@ -415,6 +415,15 @@ class TestRegistryModuleVersions:
         assert payload["inputs"] == [{"name": "region"}]
         assert payload["outputs"] == [{"name": "id"}]
 
+    def test_the_interface_error_travels(self):
+        """#1707: a promoted node must still say why a version's interface is
+        empty, or its catalog items silently offer no inputs again."""
+        payload = replication.serialize_row(
+            MODULE_VERSIONS, self._version(inputs=[], interface_error="main.tf: invalid HCL")
+        )
+
+        assert payload["interface_error"] == "main.tf: invalid HCL"
+
 
 class TestOrdering:
     """Backfill walks the registry in order, so a child cannot land before the

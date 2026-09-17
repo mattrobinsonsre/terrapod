@@ -189,14 +189,22 @@ async def upload_module_tarball(
     if settings.registry.module_interface.enabled:
         import asyncio
 
-        from terrapod.services.module_hcl_parser import extract_module_interface_from_file
+        from terrapod.services.module_hcl_parser import (
+            extract_module_interface_result_from_file,
+        )
 
         try:
-            interface = await asyncio.to_thread(extract_module_interface_from_file, tarball_path)
+            interface = await asyncio.to_thread(
+                extract_module_interface_result_from_file, tarball_path
+            )
             mod_version.inputs = interface["inputs"]
             mod_version.outputs = interface["outputs"]
+            # Set on failure and cleared on success (#1707), so a re-upload
+            # that fixes the module also clears the warning.
+            mod_version.interface_error = interface["error"]
         except Exception:
             logger.warning("Failed to extract module interface on upload", exc_info=True)
+            mod_version.interface_error = "The module interface could not be read."
 
     module.status = "setup_complete"
     await db.flush()

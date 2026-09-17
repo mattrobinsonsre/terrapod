@@ -164,10 +164,12 @@
   ],
   "catalog.get_catalog_item_form": [
     "fields",
+    "interface-error",
     "resolved-version"
   ],
   "catalog.get_catalog_item_interface": [
     "inputs",
+    "interface-error",
     "outputs",
     "resolved-version"
   ],
@@ -479,11 +481,13 @@
   ],
   "registry_modules.module_interface_endpoint": [
     "inputs",
+    "interface-error",
     "outputs",
     "version"
   ],
   "registry_modules.upload_module_version_endpoint": [
     "created-at",
+    "interface-error",
     "status",
     "version"
   ],

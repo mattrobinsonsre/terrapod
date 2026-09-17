@@ -3,7 +3,13 @@
 import io
 import tarfile
 
-from terrapod.services.module_hcl_parser import extract_module_interface
+from terrapod.services.module_hcl_parser import (
+    MAX_INTERFACE_ERROR_LENGTH,
+    extract_module_interface,
+    extract_module_interface_from_file,
+    extract_module_interface_result,
+    extract_module_interface_result_from_file,
+)
 
 
 def _make_tarball(files: dict[str, str]) -> bytes:
@@ -189,3 +195,84 @@ variable "items" {
         assert simple["type_schema"] == {"type": "string"}
         assert items["type_schema"] == {"type": "array", "items": {"type": "number"}}
         assert items["type"] == "list(number)"
+
+
+class TestInterfaceFailureIsReported:
+    """#1707: a failed parse must be distinguishable from a module with no
+    variables. The catalog builds its form from the interface, so a swallowed
+    failure became an item with no inputs and no error anywhere."""
+
+    def test_a_clean_parse_reports_no_error(self):
+        tarball = _make_tarball({"variables.tf": 'variable "region" {}'})
+        result = extract_module_interface_result(tarball)
+        assert result["error"] is None
+        assert [i["name"] for i in result["inputs"]] == ["region"]
+
+    def test_a_module_with_no_variables_reports_no_error(self):
+        result = extract_module_interface_result(_make_tarball({"main.tf": ""}))
+        assert result == {"inputs": [], "outputs": [], "error": None}
+
+    def test_a_corrupt_archive_reports_a_reason(self):
+        result = extract_module_interface_result(b"this is not a gzip tarball")
+        assert result["inputs"] == [] and result["outputs"] == []
+        assert result["error"] == (
+            "The module archive could not be read as a gzip-compressed tar file."
+        )
+
+    def test_a_truncated_archive_reports_a_reason(self):
+        tarball = _make_tarball({"variables.tf": 'variable "region" {}\n' * 2000})
+        result = extract_module_interface_result(tarball[: len(tarball) // 2])
+        assert result["error"] is not None
+
+    def test_a_corrupt_archive_on_disk_reports_a_reason(self, tmp_path):
+        path = tmp_path / "module.tar.gz"
+        path.write_bytes(b"\x1f\x8bnot really gzip")
+        result = extract_module_interface_result_from_file(str(path))
+        assert result["error"] == (
+            "The module archive could not be read as a gzip-compressed tar file."
+        )
+        assert str(tmp_path) not in result["error"]
+
+    def test_a_missing_file_does_not_leak_its_path(self, tmp_path):
+        missing = tmp_path / "secret-dir" / "gone.tar.gz"
+        result = extract_module_interface_result_from_file(str(missing))
+        assert result["error"] is not None
+        assert "secret-dir" not in result["error"]
+
+    def test_an_unparseable_tf_file_is_named_with_its_position(self):
+        tarball = _make_tarball(
+            {
+                "good.tf": 'variable "region" {}',
+                "broken.tf": 'variable "x" {\n  type = \n}',
+            }
+        )
+        result = extract_module_interface_result(tarball)
+        assert result["error"] == "broken.tf: invalid HCL at line 2, column 10"
+        # The files that did parse still contribute their declarations.
+        assert [i["name"] for i in result["inputs"]] == ["region"]
+
+    def test_the_reason_never_carries_the_source_text(self):
+        tarball = _make_tarball({"main.tf": 'variable "x" { default = "hunter2-secret" ['})
+        result = extract_module_interface_result(tarball)
+        assert result["error"] is not None
+        assert "hunter2" not in result["error"]
+        assert "Token" not in result["error"]
+
+    def test_every_broken_file_is_reported(self):
+        tarball = _make_tarball({"a.tf": "}}}", "b.tf": "{{{"})
+        result = extract_module_interface_result(tarball)
+        assert "a.tf:" in result["error"]
+        assert "b.tf:" in result["error"]
+
+    def test_the_reason_is_bounded(self):
+        files = {f"file_{n:03d}_with_a_long_name.tf": "}}}" for n in range(60)}
+        result = extract_module_interface_result(_make_tarball(files))
+        assert len(result["error"]) <= MAX_INTERFACE_ERROR_LENGTH
+        assert result["error"].endswith("...")
+
+    def test_the_existing_functions_keep_their_shape(self, tmp_path):
+        tarball = _make_tarball({"broken.tf": "}}}"})
+        path = tmp_path / "m.tar.gz"
+        path.write_bytes(tarball)
+        assert extract_module_interface(tarball) == {"inputs": [], "outputs": []}
+        assert extract_module_interface_from_file(str(path)) == {"inputs": [], "outputs": []}

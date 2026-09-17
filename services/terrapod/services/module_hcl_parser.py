@@ -2,6 +2,7 @@
 
 import io
 import json
+import re
 import tarfile
 
 import hcl2
@@ -9,6 +10,13 @@ import hcl2
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# The longest reason stored on a module version (#1707). It is shown in the UI
+# next to the version, so it is a short summary, never a dump.
+MAX_INTERFACE_ERROR_LENGTH = 500
+
+_ARCHIVE_UNREADABLE = "The module archive could not be read as a gzip-compressed tar file."
+_INTERFACE_UNREADABLE = "The module interface could not be read."
 
 
 def extract_module_interface(tarball_bytes: bytes) -> dict:
@@ -19,13 +27,11 @@ def extract_module_interface(tarball_bytes: bytes) -> dict:
 
     Prefer `extract_module_interface_from_file` for uploads — it streams the
     tarball from disk rather than holding the whole archive in the heap.
+    Callers that store the interface use `extract_module_interface_result`,
+    which also says whether parsing failed.
     """
-    try:
-        with tarfile.open(fileobj=io.BytesIO(tarball_bytes), mode="r:gz") as tar:
-            return _interface_from_tar(tar)
-    except Exception:
-        logger.warning("Failed to extract module interface", exc_info=True)
-        return {"inputs": [], "outputs": []}
+    result = extract_module_interface_result(tarball_bytes)
+    return {"inputs": result["inputs"], "outputs": result["outputs"]}
 
 
 def extract_module_interface_from_file(tarball_path: str) -> dict:
@@ -35,33 +41,94 @@ def extract_module_interface_from_file(tarball_path: str) -> dict:
     whole archive is never loaded into the worker heap (CLAUDE.md #14).
     Returns {"inputs": [...], "outputs": [...]}; {} halves on parse failure.
     """
+    result = extract_module_interface_result_from_file(tarball_path)
+    return {"inputs": result["inputs"], "outputs": result["outputs"]}
+
+
+def extract_module_interface_result(tarball_bytes: bytes) -> dict:
+    """Like `extract_module_interface`, and also report failure (#1707).
+
+    Returns {"inputs": [...], "outputs": [...], "error": str | None}. `error`
+    is None when every root `.tf` file was read and parsed. Otherwise it is a
+    short reason, safe to show a user: no traceback, no file-system path,
+    bounded length. Declarations from the files that did parse are still
+    returned, so the interface may be partial when `error` is set.
+    """
+    try:
+        with tarfile.open(fileobj=io.BytesIO(tarball_bytes), mode="r:gz") as tar:
+            return _interface_from_tar(tar)
+    except (tarfile.TarError, OSError, EOFError):
+        logger.warning("Failed to open module tarball for interface extraction", exc_info=True)
+        return _failed(_ARCHIVE_UNREADABLE)
+    except Exception:
+        logger.warning("Failed to extract module interface", exc_info=True)
+        return _failed(_INTERFACE_UNREADABLE)
+
+
+def extract_module_interface_result_from_file(tarball_path: str) -> dict:
+    """Like `extract_module_interface_from_file`, and also report failure.
+
+    Same return shape as `extract_module_interface_result`.
+    """
     try:
         with tarfile.open(tarball_path, mode="r:gz") as tar:
             return _interface_from_tar(tar)
+    except (tarfile.TarError, OSError, EOFError):
+        logger.warning("Failed to open module tarball for interface extraction", exc_info=True)
+        return _failed(_ARCHIVE_UNREADABLE)
     except Exception:
         logger.warning("Failed to extract module interface", exc_info=True)
-        return {"inputs": [], "outputs": []}
+        return _failed(_INTERFACE_UNREADABLE)
+
+
+def _failed(reason: str) -> dict:
+    return {"inputs": [], "outputs": [], "error": reason}
 
 
 def _interface_from_tar(tar: tarfile.TarFile) -> dict:
     """Extract inputs/outputs from an open module tarball."""
     inputs: list[dict] = []
     outputs: list[dict] = []
-    for content in _read_root_tf_files(tar):
-        parsed = _parse_hcl(content)
+    files, problems = _read_root_tf_files(tar)
+    for file_name, content in files:
+        parsed, problem = _parse_hcl(content)
         if parsed is None:
+            problems.append(f"{_safe_file_name(file_name)}: {problem}")
             continue
         inputs.extend(_extract_variables(parsed))
         outputs.extend(_extract_outputs(parsed))
-    return {"inputs": inputs, "outputs": outputs}
+    return {"inputs": inputs, "outputs": outputs, "error": _summarise(problems)}
+
+
+def _summarise(problems: list[str]) -> str | None:
+    if not problems:
+        return None
+    reason = "; ".join(problems)
+    if len(reason) > MAX_INTERFACE_ERROR_LENGTH:
+        reason = reason[: MAX_INTERFACE_ERROR_LENGTH - 3].rstrip() + "..."
+    return reason
+
+
+_UNSAFE_NAME_CHARS = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def _safe_file_name(name: str) -> str:
+    """A root-level member name, reduced to characters safe to display."""
+    cleaned = _UNSAFE_NAME_CHARS.sub("_", name)
+    return cleaned[:100] or "(unnamed)"
 
 
 _MAX_TF_FILE_BYTES = 5 * 1024 * 1024  # 5 MB per file
 
 
-def _read_root_tf_files(tar: tarfile.TarFile) -> list[str]:
-    """Read all .tf files at the root level of an open tarball."""
-    contents = []
+def _read_root_tf_files(tar: tarfile.TarFile) -> tuple[list[tuple[str, str]], list[str]]:
+    """Read all .tf files at the root level of an open tarball.
+
+    Returns ([(member name, content)], [problem]). A root `.tf` file skipped
+    because it cannot be read is reported as a problem, not silently dropped.
+    """
+    contents: list[tuple[str, str]] = []
+    problems: list[str] = []
     for member in tar.getmembers():
         if not member.isfile():
             continue
@@ -75,20 +142,29 @@ def _read_root_tf_files(tar: tarfile.TarFile) -> list[str]:
                 file=member.name,
                 size=member.size,
             )
+            problems.append(f"{_safe_file_name(member.name)}: skipped, larger than 5 MB")
             continue
         f = tar.extractfile(member)
         if f is None:
             continue
-        contents.append(f.read().decode("utf-8", errors="replace"))
-    return contents
+        contents.append((member.name, f.read().decode("utf-8", errors="replace")))
+    return contents, problems
 
 
-def _parse_hcl(content: str) -> dict | None:
-    """Parse HCL content, returning None on failure."""
+def _parse_hcl(content: str) -> tuple[dict | None, str]:
+    """Parse HCL content. Returns (parsed, "") or (None, a short reason).
+
+    The reason carries a position only: the parser's own message embeds its
+    grammar and the offending source text, neither of which belongs in the UI.
+    """
     try:
-        return hcl2.loads(content)
-    except Exception:
-        return None
+        return hcl2.loads(content), ""
+    except Exception as exc:
+        line = getattr(exc, "line", None)
+        column = getattr(exc, "column", None)
+        if isinstance(line, int) and isinstance(column, int) and line > 0:
+            return None, f"invalid HCL at line {line}, column {column}"
+        return None, "invalid HCL"
 
 
 def _serialize_default(value) -> str | None:

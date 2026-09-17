@@ -725,6 +725,11 @@ class RegistryModuleVersion(Base):
 
     inputs: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     outputs: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Why the interface above could not be read, or None when it was (#1707).
+    # Without it a failed parse stored `[]`, which reads as a module that
+    # genuinely declares nothing. Set on failure, cleared on success, by every
+    # writer of `inputs`/`outputs`.
+    interface_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False

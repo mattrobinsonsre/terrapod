@@ -148,6 +148,8 @@ def _module_to_jsonapi(module, caps: frozenset[str] | None = None) -> dict:  # t
             "status": v.upload_status,
             "vcs-commit-sha": v.vcs_commit_sha or "",
             "vcs-tag": v.vcs_tag or "",
+            # Why this version's inputs/outputs could not be read, or null (#1707).
+            "interface-error": v.interface_error,
         }
         for v in sorted_versions
     ]
@@ -479,6 +481,9 @@ async def module_interface_endpoint(
                     "version": mod_version.version,
                     "inputs": mod_version.inputs,
                     "outputs": mod_version.outputs,
+                    # Null when the interface was read; otherwise why it was not
+                    # (#1707), so empty lists are not mistaken for "no variables".
+                    "interface-error": mod_version.interface_error,
                 },
             }
         }
@@ -821,6 +826,7 @@ async def upload_module_version_endpoint(
                     "version": mod_version.version,
                     "status": mod_version.upload_status,
                     "created-at": rfc3339(mod_version.created_at),
+                    "interface-error": mod_version.interface_error,
                 },
             }
         },

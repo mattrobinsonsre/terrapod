@@ -76,11 +76,12 @@ def _item(pin=None):
     return item
 
 
-def _version(v="1.2.0"):
+def _version(v="1.2.0", interface_error=None):
     mv = MagicMock()
     mv.version = v
     mv.inputs = INPUTS
     mv.outputs = OUTPUTS
+    mv.interface_error = interface_error
     return mv
 
 
@@ -115,6 +116,7 @@ class TestCatalogItemInterface:
             "resolved-version": "1.2.0",
             "inputs": INPUTS,
             "outputs": OUTPUTS,
+            "interface-error": None,
         }
         # Resolved the same way /form does: this module, at the item's pin.
         assert resolve.await_args.args[1:] == (item.module_id, "1.2.0")
@@ -145,7 +147,43 @@ class TestCatalogItemInterface:
             "resolved-version": None,
             "inputs": None,
             "outputs": None,
+            "interface-error": None,
         }
+
+    async def test_a_failed_parse_carries_its_reason(
+        self, _db, _redis, _storage, get_item, caps, resolve
+    ):
+        """#1707: the reason travels with the interface, so an item whose
+        module could not be parsed is not mistaken for one with no inputs."""
+        item = _item()
+        get_item.return_value, caps.return_value = item, CAN_READ
+        resolve.return_value = _version(interface_error="main.tf: invalid HCL")
+
+        resp = await _get(item.id)
+
+        assert resp.json()["data"]["attributes"]["interface-error"] == "main.tf: invalid HCL"
+
+    async def test_the_provision_form_carries_the_reason_too(
+        self, _db, _redis, _storage, get_item, caps, resolve
+    ):
+        """The provision form is built from the parsed inputs; with none it has
+        no fields, so it must say why rather than render an empty form."""
+        item = _item()
+        item.provider_template_ids = []
+        item.variable_options = {}
+        get_item.return_value, caps.return_value = item, CAN_READ
+        resolve.return_value = _version(interface_error="variables.tf: invalid HCL")
+
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.get(f"/api/terrapod/v1/catalog-items/{item.id}/form", headers=_AUTH)
+
+        assert resp.status_code == 200
+        assert resp.json()["data"]["attributes"]["interface-error"] == "variables.tf: invalid HCL"
+
+        resolve.return_value = _version()
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.get(f"/api/terrapod/v1/catalog-items/{item.id}/form", headers=_AUTH)
+        assert resp.json()["data"]["attributes"]["interface-error"] is None
 
     async def test_without_catalog_read_it_is_refused(
         self, _db, _redis, _storage, get_item, caps, resolve

@@ -43,12 +43,13 @@ def _mock_module(name="vpc", provider="aws"):
     return m
 
 
-def _mock_version(inputs=None, outputs=None):
+def _mock_version(inputs=None, outputs=None, interface_error=None):
     v = MagicMock()
     v.id = uuid.uuid4()
     v.version = "1.0.0"
     v.inputs = inputs
     v.outputs = outputs
+    v.interface_error = interface_error
     return v
 
 
@@ -90,6 +91,31 @@ class TestModuleInterfaceEndpoint:
         data = resp.json()["data"]
         assert data["attributes"]["inputs"][0]["name"] == "cidr"
         assert data["attributes"]["outputs"][0]["name"] == "id"
+        assert data["attributes"]["interface-error"] is None
+
+    @pytest.mark.asyncio
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_failed_parse_carries_its_reason(self, *_mocks):
+        """#1707: empty lists from a failed parse are told apart from a module
+        that genuinely declares nothing."""
+        app, db = _make_app()
+        version = _mock_version(
+            inputs=[], outputs=[], interface_error="main.tf: invalid HCL at line 3, column 1"
+        )
+        db.execute = AsyncMock(
+            side_effect=[_scalar_result(_mock_module()), _scalar_result(version)]
+        )
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                "/api/terrapod/v1/registry-modules/private/default/vpc/aws/1.0.0/interface"
+            )
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["inputs"] == []
+        assert attrs["interface-error"] == "main.tf: invalid HCL at line 3, column 1"
 
     @pytest.mark.asyncio
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
@@ -119,6 +145,33 @@ class TestModuleInterfaceEndpoint:
                 "/api/terrapod/v1/registry-modules/private/default/vpc/aws/9.9.9/interface"
             )
         assert resp.status_code == 404
+
+
+class TestVersionStatusesCarryTheReason:
+    def test_each_version_status_carries_its_interface_error(self):
+        from types import SimpleNamespace
+
+        from terrapod.api.routers.registry_modules import _module_to_jsonapi
+
+        def _v(version, err):
+            return SimpleNamespace(
+                version=version,
+                upload_status="uploaded",
+                vcs_commit_sha="",
+                vcs_tag="",
+                interface_error=err,
+            )
+
+        module = _mock_module()
+        module.versions = [_v("1.0.0", None), _v("1.1.0", "main.tf: invalid HCL")]
+        module.vcs_connection_id = None
+        module.subdirectory = ""
+        module.created_at = module.updated_at = None
+        statuses = _module_to_jsonapi(module)["attributes"]["version-statuses"]
+        assert {s["version"]: s["interface-error"] for s in statuses} == {
+            "1.1.0": "main.tf: invalid HCL",
+            "1.0.0": None,
+        }
 
 
 class TestCreateModuleVersionDuplicate:
