@@ -2366,6 +2366,15 @@
             }
           }
         },
+        "runs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tfe_post_plan_decisions": {
+              "type": "boolean"
+            }
+          }
+        },
         "drift_detection": {
           "type": "object",
           "additionalProperties": false,

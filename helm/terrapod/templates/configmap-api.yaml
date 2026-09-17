@@ -497,6 +497,10 @@ data:
       poll_interval_seconds: {{ .Values.api.config.drift_detection.poll_interval_seconds | default 300 | int64 }}
       min_workspace_interval_seconds: {{ .Values.api.config.drift_detection.min_workspace_interval_seconds | default 3600 | int64 }}
     {{- end }}
+    {{- if .Values.api.config.runs }}
+    runs:
+      tfe_post_plan_decisions: {{ .Values.api.config.runs.tfe_post_plan_decisions | default false }}
+    {{- end }}
     {{- if .Values.api.config.slack }}
     slack:
       # Non-secret Slack settings only. The bot/app/signing tokens are secrets

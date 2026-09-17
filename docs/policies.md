@@ -127,10 +127,12 @@ skipping the gate.
 A workspace **admin** can override a run blocked by a mandatory policy
 failure from the run's Policy Checks panel ("Override & Continue"). The
 override is recorded against each failed evaluation (`overridden_by`),
-and the run is released to continue immediately. Alternatively, the run
-can be cancelled — a policy-blocked run sits in `planning`, so `cancel`
-(not `discard`, which is for `planned` runs awaiting confirmation) is
-the right action.
+and the run is released to continue immediately. Alternatively, discard
+the run, or queue a newer one, which supersedes it.
+
+The `tofu`/`terraform` CLI can show a failed policy and override it too, when the
+deployment reports runs in the Terraform Enterprise vocabulary — see
+[post-plan-decisions.md](post-plan-decisions.md).
 
 ## Managing policy sets
 

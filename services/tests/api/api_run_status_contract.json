@@ -1,0 +1,43 @@
+{
+  "policy_check": [
+    "overridden",
+    "passed",
+    "soft_failed"
+  ],
+  "run.reported_for_a_hold": [
+    "policy_override",
+    "post_plan_awaiting_decision",
+    "post_plan_running"
+  ],
+  "run.stored": [
+    "applied",
+    "applying",
+    "canceled",
+    "canceling",
+    "confirmed",
+    "discarded",
+    "errored",
+    "pending",
+    "planned",
+    "planning",
+    "queued"
+  ],
+  "task_stage.reported_to_the_cli": [
+    "awaiting_override",
+    "canceled",
+    "errored",
+    "failed",
+    "passed",
+    "pending",
+    "running"
+  ],
+  "task_stage.stored": [
+    "canceled",
+    "errored",
+    "failed",
+    "overridden",
+    "passed",
+    "pending",
+    "running"
+  ]
+}

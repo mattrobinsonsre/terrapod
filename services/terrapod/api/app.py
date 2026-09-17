@@ -1497,6 +1497,12 @@ def create_application() -> FastAPI:
     )
 
     include_tfe(run_tasks_router)
+
+    # Policy checks (#1704): the TFE shape of the OPA and security-scan gates,
+    # which the CLI reads after a plan and can override.
+    from terrapod.api.routers.policy_checks import router as policy_checks_router
+
+    include_tfe(policy_checks_router)
     include_terrapod(run_tasks_extensions_router)
 
     return app

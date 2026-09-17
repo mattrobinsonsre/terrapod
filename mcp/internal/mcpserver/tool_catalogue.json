@@ -273,6 +273,22 @@
     }
   },
   {
+    "name": "terrapod_policy_check_override",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "check_id": {
+          "description": "the policy check id (polchk-...), from terrapod_run_policy_checks",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_registry_module_get",
     "read_only": true,
     "input_schema": {
@@ -618,6 +634,23 @@
         },
         "view": {
           "description": "changes (default): the resources the plan acts on, each with only the attributes that change. full: the raw tofu show -json document",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_run_policy_checks",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "description": "the run id (run-... or a bare uuid) whose policy checks to fetch",
           "type": "string"
         }
       },

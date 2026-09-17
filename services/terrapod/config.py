@@ -1354,6 +1354,25 @@ class DriftDetectionConfig(BaseModel):
     )
 
 
+class RunsConfig(BaseModel):
+    """How runs are reported (#1704)."""
+
+    tfe_post_plan_decisions: bool = Field(
+        default=False,
+        description=(
+            "Report a run that a post-plan gate stops the way Terraform "
+            "Enterprise does: the statuses post_plan_running, "
+            "post_plan_awaiting_decision and policy_override instead of "
+            "planning, with the run's policy checks and task stages visible to "
+            "the tofu/terraform CLI so it can show them and offer an override. "
+            "A failed mandatory run task then holds the run for a decision "
+            "instead of erroring it. A client can ask for either behaviour per "
+            "request with the X-Terrapod-Post-Plan-Decisions header (tfe or "
+            "legacy); the hold applies to every run. The default flips in 2.0.0."
+        ),
+    )
+
+
 # --- Slack Integration ---
 
 
@@ -3024,6 +3043,9 @@ class Settings(BaseSettings):
 
     # Drift Detection
     drift_detection: DriftDetectionConfig = Field(default_factory=DriftDetectionConfig)
+
+    # How runs stopped after their plan are reported (#1704)
+    runs: RunsConfig = Field(default_factory=RunsConfig)
 
     # Slack integration (#556)
     slack: SlackConfig = Field(default_factory=SlackConfig)

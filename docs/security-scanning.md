@@ -100,6 +100,10 @@ The MCP server exposes both the read and the override as tools
 (`terrapod_run_security_scan`, `terrapod_run_security_scan_override`), bounded by
 the caller's RBAC.
 
+The scan is also served to the `tofu`/`terraform` CLI as a policy check, so
+`tofu apply` can show the findings and offer the override — see
+[post-plan-decisions.md](post-plan-decisions.md).
+
 ## Reading results
 
 - **API:** `GET /api/v1/runs/{run_id}/security-scan` returns the result

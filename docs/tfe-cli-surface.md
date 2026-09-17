@@ -108,12 +108,19 @@ Terrapod-only management on the configuration-versions surface (list, download, 
 
 ## Cost Estimates / Policy Checks / Task Stages
 
-These are CLI-aware (run progress display branches on relationships) but only exercised when the relationship is present on the run. Terrapod intentionally does not implement cost estimates or Sentinel policy checks (see CLAUDE.md "Out of Scope"). Run tasks ARE supported, with task stages on the CLI surface:
+These are CLI-aware (run progress display branches on relationships) but only exercised when the relationship is present on the run. Terrapod does not implement cost estimates in this shape, or Sentinel. Its OPA policy sets and security scan are served as **policy checks**, and run tasks as **task stages** (#1704).
+
+The run lists both in its relationships only in the Terraform Enterprise post-plan vocabulary (`api.config.runs.tfe_post_plan_decisions`, the default from 2.0), because that is what makes the CLI act on them; the same setting makes a held run report `policy_override` / `post_plan_awaiting_decision`, the statuses on which the CLI's confirm loop offers an override. See [post-plan-decisions.md](post-plan-decisions.md).
 
 | Method | Path | go-tfe method | Caller |
 |---|---|---|---|
+| GET | `/api/tfe/v2/runs/{id}?include=task_stages` | `Runs.ReadWithOptions` | `cloud/backend_taskStages.go:42` |
 | GET | `/api/tfe/v2/task-stages/{id}` | `TaskStages.Read` | `cloud/backend_taskStages.go:66, 96` |
 | POST | `/api/tfe/v2/task-stages/{id}/actions/override` | `TaskStages.Override` | `cloud/backend_taskStages.go:186` |
+| GET | `/api/tfe/v2/policy-checks/{id}` | `PolicyChecks.Read` | `cloud/backend_common.go:326` |
+| GET | `/api/tfe/v2/policy-checks/{id}/output` | `PolicyChecks.Logs` | `cloud/backend_common.go:319` |
+| POST | `/api/tfe/v2/policy-checks/{id}/actions/override` | `PolicyChecks.Override` | `cloud/backend_common.go:394, 411` |
+| GET | `/api/tfe/v2/runs/{id}/policy-checks` | `PolicyChecks.List` | not called by the CLI; served for go-tfe clients |
 
 The run-task management surface (`/run-tasks/*`, `/workspaces/{id}/run-tasks`, callback endpoints) is Terrapod-native and lives at `/api/v1/`.
 
@@ -142,7 +149,7 @@ We extend the "stays at `/api/tfe/v2/`" set to cover those calls. The rule is un
 
 **Verification:** When updating this section, check the `tfci` source at https://github.com/hashicorp/tfc-workflows-tooling — the `internal/cloud/` package exposes the call sites.
 
-**Out of scope for tfci compat:** teams, projects, policy checks, run tasks (TFE-shape), notifications, OAuth client management, the `hashicorp/tfe` Terraform provider's full surface. Those have structural divergence in Terrapod (single-org, label-RBAC instead of teams) that compatibility cannot bridge.
+**Out of scope for tfci compat:** teams, projects, run tasks (TFE-shape), notifications, OAuth client management, the `hashicorp/tfe` Terraform provider's full surface. Those have structural divergence in Terrapod (single-org, label-RBAC instead of teams) that compatibility cannot bridge.
 
 ## Module Registry (CLI Download Protocol)
 

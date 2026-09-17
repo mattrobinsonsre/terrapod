@@ -28,6 +28,10 @@ logger = get_logger(__name__)
 VALID_STAGES = frozenset({"pre_plan", "post_plan", "pre_apply"})
 VALID_ENFORCEMENT_LEVELS = frozenset({"mandatory", "advisory"})
 RESULT_TERMINAL_STATES = frozenset({"passed", "failed", "errored", "unreachable"})
+# Every status a task stage is stored with.
+STAGE_STATUSES = frozenset(
+    {"pending", "running", "passed", "failed", "errored", "canceled", "overridden"}
+)
 
 # Callback token validity: 1 hour
 _CALLBACK_TOKEN_TTL = 3600
@@ -97,6 +101,127 @@ async def _existing_stage(db: AsyncSession, run_id: uuid.UUID, stage_name: str) 
     return res.scalars().first()
 
 
+async def _enqueue_deliveries(result_ids: list[uuid.UUID]) -> None:
+    """Enqueue the webhook call for each result. Call only after committing them."""
+    from terrapod.services.scheduler import enqueue_trigger
+
+    for tsr_id in result_ids:
+        try:
+            await enqueue_trigger(
+                "run_task_call",
+                {"task_stage_result_id": str(tsr_id)},
+                dedup_key=f"run_task:{tsr_id}",
+                dedup_ttl=300,
+            )
+        except Exception as e:
+            logger.warning("Failed to enqueue run task call", error=str(e))
+
+
+async def reserve_task_stage(
+    db: AsyncSession,
+    run_id: uuid.UUID,
+    workspace_id: uuid.UUID,
+    stage_name: str,
+) -> TaskStage | None:
+    """Create a run's task stage when the run is created, calling nothing yet (#1704).
+
+    Terraform Enterprise creates a run's task stages with the run, and the
+    `tofu`/`terraform` CLI reads them once, straight after creating the run: a
+    stage that first appears when the plan finishes is never waited on, never
+    shown, and never offered for override. So in the Terraform Enterprise
+    vocabulary the stage is reserved here, `pending`, with a `pending` result
+    per enabled task. `create_task_stage` starts it when its boundary is
+    reached; `cancel_pending_stages` closes it if the run ends first.
+
+    Flushes only: the caller commits with the run. Returns None when the
+    workspace has no enabled task at this boundary.
+    """
+    if stage_name not in VALID_STAGES:
+        raise ValueError(f"Invalid stage: {stage_name}")
+    prior = await _existing_stage(db, run_id, stage_name)
+    if prior is not None:
+        return prior
+
+    tasks = list(
+        (
+            await db.execute(
+                select(RunTask).where(
+                    RunTask.workspace_id == workspace_id,
+                    RunTask.stage == stage_name,
+                    RunTask.enabled.is_(True),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not tasks:
+        return None
+
+    ts = TaskStage(run_id=run_id, stage=stage_name, status="pending")
+    db.add(ts)
+    await db.flush()
+    for task in tasks:
+        tsr = TaskStageResult(task_stage_id=ts.id, run_task_id=task.id, status="pending")
+        db.add(tsr)
+        await db.flush()
+        tsr.callback_token = generate_callback_token(tsr.id)
+    await db.flush()
+    logger.info(
+        "Task stage reserved", task_stage_id=str(ts.id), run_id=str(run_id), stage=stage_name
+    )
+    return ts
+
+
+async def _start_reserved_stage(db: AsyncSession, ts: TaskStage) -> None:
+    """Start a stage `reserve_task_stage` created: mark it running, call its tasks.
+
+    Two replicas can start the same stage; the per-result dedup key on the
+    delivery trigger keeps each task to one call.
+    """
+    results = list(
+        (
+            await db.execute(
+                select(TaskStageResult.id).where(
+                    TaskStageResult.task_stage_id == ts.id,
+                    TaskStageResult.status == "pending",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    ts.status = "running"
+    # Commit before enqueueing, for the reason `create_task_stage` gives (#739).
+    await db.commit()
+    await _enqueue_deliveries(results)
+    logger.info("Task stage started", task_stage_id=str(ts.id), task_count=len(results))
+
+
+async def cancel_pending_stages(db: AsyncSession, run_id: uuid.UUID) -> int:
+    """Cancel a run's reserved stages that never started, because the run ended.
+
+    Without this a plan that errors leaves its post-plan stage `pending`
+    forever, and the CLI polls a pending stage indefinitely. `canceled` is the
+    status Terraform Enterprise gives such a stage. Returns how many changed;
+    the caller commits.
+    """
+    stages = list(
+        (
+            await db.execute(
+                select(TaskStage).where(TaskStage.run_id == run_id, TaskStage.status == "pending")
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for ts in stages:
+        ts.status = "canceled"
+    if stages:
+        await db.flush()
+    return len(stages)
+
+
 async def create_task_stage(
     db: AsyncSession,
     run_id: uuid.UUID,
@@ -133,6 +258,8 @@ async def create_task_stage(
     # insert that slips past this check is caught below via IntegrityError.
     prior = await _existing_stage(db, run_id, stage_name)
     if prior is not None:
+        if prior.status == "pending":
+            await _start_reserved_stage(db, prior)
         return prior
 
     # Find applicable run tasks
@@ -198,18 +325,7 @@ async def create_task_stage(
             return winner
         raise
 
-    from terrapod.services.scheduler import enqueue_trigger
-
-    for tsr_id in result_ids:
-        try:
-            await enqueue_trigger(
-                "run_task_call",
-                {"task_stage_result_id": str(tsr_id)},
-                dedup_key=f"run_task:{tsr_id}",
-                dedup_ttl=300,
-            )
-        except Exception as e:
-            logger.warning("Failed to enqueue run task call", error=str(e))
+    await _enqueue_deliveries(result_ids)
 
     logger.info(
         "Task stage created",

@@ -978,6 +978,22 @@ api:
       poll_interval_seconds: 300
       min_workspace_interval_seconds: 3600
 
+    # How a run stopped after its plan is reported (#1704).
+    runs:
+      # When a mandatory policy set, an enforced security scan or a mandatory
+      # run task stops a run, report it the way Terraform Enterprise does:
+      # status post_plan_running / post_plan_awaiting_decision / policy_override
+      # instead of planning, with its policy checks and task stages visible to
+      # the tofu/terraform CLI. `tofu apply` then shows the failing checks and
+      # asks whether to override, and `-auto-approve` overrides a policy check
+      # for a caller allowed to. A failed mandatory run task holds the run for
+      # a decision instead of erroring it.
+      #
+      # false keeps the 1.x behaviour: the run stays `planning` and says what
+      # holds it in `blocked-by`. The default flips to true in 2.0.0 — see
+      # docs/upgrading-to-2.0.md.
+      tfe_post_plan_decisions: false
+
     # Interactive Slack integration (#556). OFF by default. Transport is Socket
     # Mode — an OUTBOUND WebSocket to Slack, so no public URL / ingress change is
     # needed (matches the restricted-network execution model). The bot/app/signing

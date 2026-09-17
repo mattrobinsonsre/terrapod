@@ -141,6 +141,13 @@ time" as a stuck run, key it on `blocked-by` instead. A run with a non-null
 `blocked-by` is waiting for a decision, not stuck. Code that reads `blocked-by`
 keeps working unchanged in 2.0.
 
+**Opting in early:** releases that carry `api.config.runs.tfe_post_plan_decisions`
+can report the new statuses now, for the whole deployment (set it to `true`) or
+for one client (send `X-Terrapod-Post-Plan-Decisions: tfe`). The same setting
+makes a failed mandatory run task hold the run instead of erroring it. See
+[post-plan-decisions.md](post-plan-decisions.md) and
+[upgrading-to-2.0.md](upgrading-to-2.0.md).
+
 ## For maintainers
 
 Mark an endpoint deprecated by injecting the FastAPI `Response` into the handler and

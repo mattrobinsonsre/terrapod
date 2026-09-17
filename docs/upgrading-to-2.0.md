@@ -175,6 +175,46 @@ is an addition, not a break.
   instead of refusing it, and the policy-set form already supported several values
   per key.
 
+### A run held after its plan reports Terraform Enterprise's statuses
+
+**Affects:** anything that reads a run's `status` and treats `planning` as "not
+finished yet", and anything that expects a failed mandatory run task to error a
+run. The `tofu`/`terraform` CLI is not affected, except that it now does the
+right thing.
+
+In 2.0.0 `api.config.runs.tfe_post_plan_decisions` defaults to `true`. A run that
+a post-plan gate holds reports:
+
+| before | after |
+|---|---|
+| `planning` + `blocked-by: run-task` (tasks running) | `post_plan_running` |
+| `errored` (a mandatory task failed) | `post_plan_awaiting_decision`, held for an override or a discard |
+| `planning` + `blocked-by: policy` | `policy_override` |
+| `planning` + `blocked-by: security-scan` | `policy_override` |
+
+`blocked-by` is reported exactly as before, so code that keys on it needs
+nothing. The run also lists its policy checks and task stages, which is how
+`tofu apply` now shows a failed policy and asks whether to override it, and how
+`-auto-approve` overrides one for a caller allowed to. A speculative `tofu plan`
+that a policy fails now exits non-zero, as it does on Terraform Enterprise.
+
+Nothing in the database changes: the new statuses are only reported, and the
+run is still stored as `planning`.
+
+**What you must do before upgrading:**
+
+1. Find automation that branches on `status == "planning"` or waits for
+   `errored` after a run-task failure, and key it on `blocked-by` (unchanged)
+   or accept the new statuses.
+2. Try it ahead of time: send `X-Terrapod-Post-Plan-Decisions: tfe` from a
+   script to see the new answer, or set `runs.tfe_post_plan_decisions: true`
+   on a 1.x release to move the whole deployment, CLI included.
+3. To keep the old answer for a while after upgrading, set
+   `runs.tfe_post_plan_decisions: false`, or send
+   `X-Terrapod-Post-Plan-Decisions: legacy` from the client that needs it.
+
+See [post-plan-decisions.md](post-plan-decisions.md).
+
 ### The Python floor moves to 3.14
 
 **Affects:** anyone who builds Terrapod's images themselves, overrides `BASE_IMAGE`,

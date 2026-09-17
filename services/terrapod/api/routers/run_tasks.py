@@ -28,6 +28,7 @@ from sqlalchemy.orm import selectinload
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
+from terrapod.api.post_plan_decisions import reports_tfe_post_plan
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import Run, RunTask, TaskStage, TaskStageResult, Workspace
@@ -140,6 +141,86 @@ def _task_stage_json(ts: TaskStage) -> dict:
             _task_stage_result_json(r)
             for r in (ts.results if hasattr(ts, "results") and ts.results else [])
         ],
+    }
+
+
+def tfe_task_stage_status(ts: TaskStage, run: Run | None) -> str:
+    """A stage's status in the Terraform Enterprise vocabulary (#1704).
+
+    TFE has no `overridden` stage: an overridden stage has passed as far as the
+    run is concerned. A failed stage on a run held for a decision is
+    `awaiting_override`, the status on which the CLI offers the override.
+    """
+    from terrapod.services import run_service
+
+    if ts.status == "overridden":
+        return "passed"
+    if ts.status == "failed" and run is not None and run_service.is_held_at_gate(run):
+        return "awaiting_override"
+    return ts.status
+
+
+def tfe_task_result_json(tsr: TaskStageResult) -> dict:
+    """A task stage result as the CLI reads it: a TFE `task-results` resource.
+
+    `workspace-task-enforcement-level` is never empty: the CLI capitalises its
+    first letter when it prints a result that did not pass.
+    """
+    rt = tsr.run_task
+    timestamps = {}
+    if tsr.started_at:
+        timestamps["running-at"] = _rfc3339(tsr.started_at)
+    if tsr.finished_at and tsr.status in ("passed", "failed", "errored"):
+        timestamps[f"{tsr.status}-at"] = _rfc3339(tsr.finished_at)
+    return {
+        "id": f"tsr-{tsr.id}",
+        "type": "task-results",
+        "attributes": {
+            "status": tsr.status,
+            "message": tsr.message or "",
+            "url": "",
+            "task-id": f"task-{tsr.run_task_id}" if tsr.run_task_id else "",
+            "task-name": rt.name if rt else "deleted run task",
+            "task-url": rt.url if rt else "",
+            "workspace-task-id": f"task-{tsr.run_task_id}" if tsr.run_task_id else "",
+            "workspace-task-enforcement-level": (rt.enforcement_level if rt else "advisory"),
+            "status-timestamps": timestamps,
+            "created-at": _rfc3339(tsr.created_at),
+            "updated-at": _rfc3339(tsr.finished_at or tsr.started_at or tsr.created_at),
+        },
+        # No relationship back to the stage. go-tfe decodes `included` by
+        # following relationships into it, so a result pointing at its stage,
+        # which lists the result, recurses until the CLI dies of stack overflow.
+    }
+
+
+def tfe_task_stage_json(ts: TaskStage, run: Run | None, *, can_override: bool) -> dict:
+    """A task stage as the CLI reads it (#1704). Its results go in `included`."""
+    status = tfe_task_stage_status(ts, run)
+    results = list(ts.results) if getattr(ts, "results", None) else []
+    return {
+        "id": f"ts-{ts.id}",
+        "type": "task-stages",
+        "attributes": {
+            "stage": ts.stage,
+            "status": status,
+            "status-timestamps": {},
+            "created-at": _rfc3339(ts.created_at),
+            "updated-at": _rfc3339(ts.updated_at),
+            "actions": {"is-overridable": status == "awaiting_override"},
+            "permissions": {
+                "can-override": can_override,
+                "can-override-tasks": can_override,
+                "can-override-policy": False,
+            },
+        },
+        "relationships": {
+            "run": {"data": {"id": f"run-{ts.run_id}", "type": "runs"}},
+            "task-results": {
+                "data": [{"id": f"tsr-{r.id}", "type": "task-results"} for r in results]
+            },
+            "policy-evaluations": {"data": []},
+        },
     }
 
 
@@ -361,6 +442,16 @@ async def delete_run_task(
 # ── Task Stages ───────────────────────────────────────────────────────
 
 
+def _tfe_stage_document(ts: TaskStage, run: Run, caps) -> dict:
+    """A TFE task-stage document: the stage, with its results in `included`."""
+    can_override = has_capability(caps, cap.RUN_TASK_MANAGE)
+    results = list(ts.results) if getattr(ts, "results", None) else []
+    return {
+        "data": tfe_task_stage_json(ts, run, can_override=can_override),
+        "included": [tfe_task_result_json(r) for r in results],
+    }
+
+
 @extensions_router.get("/runs/{run_id}/task-stages")
 async def list_task_stages(
     run_id: str = Path(...),
@@ -394,6 +485,7 @@ async def list_task_stages(
 
 @router.get("/task-stages/{ts_id}")
 async def show_task_stage(
+    request: Request,
     ts_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -418,11 +510,14 @@ async def show_task_stage(
             status_code=403, detail="Requires run-task:read capability on workspace"
         )
 
+    if reports_tfe_post_plan(request):
+        return JSONResponse(content=_tfe_stage_document(ts, run, caps))
     return JSONResponse(content={"data": _task_stage_json(ts)})
 
 
 @router.post("/task-stages/{ts_id}/actions/override")
 async def override_task_stage(
+    request: Request,
     ts_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -455,8 +550,19 @@ async def override_task_stage(
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
 
+    # Move a run the stage was holding on at once, as the policy and scan
+    # overrides do, rather than at the next reconciler tick: straight after
+    # overriding, the CLI reads the run and applies only if it is confirmable.
+    if run.status == "planning":
+        from terrapod.services import run_service
+
+        run = await run_service.complete_plan(db, run)
+        await db.commit()
+
     # Re-fetch with results (intentional re-assignment after mutation)
     ts = await get_task_stage(db, ts_uuid)
+    if reports_tfe_post_plan(request):
+        return JSONResponse(content=_tfe_stage_document(ts, run, caps))
     return JSONResponse(content={"data": _task_stage_json(ts)})
 
 

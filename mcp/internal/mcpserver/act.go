@@ -194,6 +194,27 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 		return nil, sc, nil
 	})
 
+	// ── terrapod_policy_check_override ───────────────────────────────
+	type policyCheckIDIn struct {
+		CheckID string `json:"check_id" jsonschema:"the policy check id (polchk-...), from terrapod_run_policy_checks"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_policy_check_override",
+		Description: "Override a soft_failed policy check so the run it holds can proceed: the OPA check overrides every failed " +
+			"policy set on the run, the scan check overrides the security scan. Requires workspace admin. The run is moved on " +
+			"at once; it applies only if it would have without the gate (auto-apply, or a later confirm). Use deliberately — " +
+			"this bypasses a governance gate; read the check's output first and prefer fixing the configuration.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in policyCheckIDIn) (*mcp.CallToolResult, *terrapod.PolicyCheck, error) {
+		if in.CheckID == "" {
+			return errText("check_id is required"), nil, nil
+		}
+		pc, err := c.OverridePolicyCheck(ctx, in.CheckID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, pc, nil
+	})
+
 	// ── terrapod_deleted_workspace_restore ───────────────────────────
 	type restoreIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the id of the DELETED workspace to recover, from terrapod_deleted_workspace_list; either the bare uuid or the ws- prefixed form"`

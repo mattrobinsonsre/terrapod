@@ -559,6 +559,44 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, sc, nil
 	})
 
+	// ── terrapod_run_policy_checks ───────────────────────────────────
+	type runPolicyChecksIn struct {
+		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose policy checks to fetch"`
+	}
+	type policyCheckWithOutput struct {
+		terrapod.PolicyCheck
+		Output string `json:"output"`
+	}
+	type runPolicyChecksOut struct {
+		Checks []policyCheckWithOutput `json:"policy_checks"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_run_policy_checks",
+		Description: "Get a run's policy checks as the tofu/terraform CLI sees them: one for its OPA policy sets and one for its " +
+			"IaC security scan, each present only if that gate ran. Each has a status (passed, soft_failed, overridden), " +
+			"whether it can be overridden and whether you may, and its output (the failing policies' deny messages, or the " +
+			"scan findings, worst first). A soft_failed check is what holds a run in policy_override (or, in the 1.x " +
+			"vocabulary, planning with blocked-by policy or security-scan).",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runPolicyChecksIn) (*mcp.CallToolResult, *runPolicyChecksOut, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		checks, err := c.ListRunPolicyChecks(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		out := &runPolicyChecksOut{Checks: make([]policyCheckWithOutput, 0, len(checks))}
+		for _, pc := range checks {
+			text, err := c.GetPolicyCheckOutput(ctx, pc.ID)
+			if err != nil {
+				return errResult(err), nil, nil
+			}
+			out.Checks = append(out.Checks, policyCheckWithOutput{PolicyCheck: pc, Output: text})
+		}
+		return nil, out, nil
+	})
+
 	// ── terrapod_deleted_workspace_list ──────────────────────────────
 	type deletedWSIn struct{}
 	type deletedWSOut struct {

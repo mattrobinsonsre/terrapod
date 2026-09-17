@@ -2,6 +2,7 @@
 
 import json
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import and_, func, not_, or_, select
@@ -428,13 +429,36 @@ def is_discardable_hold(run: Run) -> bool:
     return is_held_at_gate(run) and not run.plan_only
 
 
-async def blocked_by(db: AsyncSession, run: Run) -> str | None:
-    """Which post-plan gate holds a run: `run-task`, `policy`, `security-scan`.
+# Terraform Enterprise's statuses for a run stopped after its plan (#1704).
+# Terrapod stores such a run as `planning`; these are only ever reported, to a
+# client that asked for them, never written to the database.
+POST_PLAN_RUNNING = "post_plan_running"
+POST_PLAN_AWAITING_DECISION = "post_plan_awaiting_decision"
+POLICY_OVERRIDE = "policy_override"
+TFE_POST_PLAN_STATUSES = frozenset(
+    {POST_PLAN_RUNNING, POST_PLAN_AWAITING_DECISION, POLICY_OVERRIDE}
+)
 
-    None when the run is not held. Read-only -- checked in the order
-    `complete_plan` evaluates the gates, so it names the one actually holding
-    the run. Returns None for a held run if no gate still blocks it (it is
-    about to move on at the next re-drive).
+
+@dataclass(frozen=True)
+class PostPlanHold:
+    """What holds a run whose plan has finished.
+
+    `gate` is the read-only `blocked-by` attribute (#1725): `run-task`, `policy`
+    or `security-scan`. `tfe_status` is the status Terraform Enterprise reports
+    for the same situation, which the `tofu`/`terraform` CLI acts on.
+    """
+
+    gate: str
+    tfe_status: str
+
+
+async def post_plan_hold(db: AsyncSession, run: Run) -> PostPlanHold | None:
+    """What holds a run whose plan has finished, or None if nothing does.
+
+    Read-only, and checked in the order `complete_plan` evaluates the gates, so
+    it names the gate actually holding the run. None for a run that is not held,
+    and for a held run no gate still blocks (it moves on at the next re-drive).
     """
     if not is_held_at_gate(run):
         return None
@@ -443,12 +467,21 @@ async def blocked_by(db: AsyncSession, run: Run) -> str | None:
 
     stage = await run_task_service._existing_stage(db, run.id, "post_plan")
     if stage is not None and stage.status not in ("passed", "overridden"):
-        return "run-task"
+        waiting = stage.status in ("pending", "running")
+        return PostPlanHold(
+            "run-task", POST_PLAN_RUNNING if waiting else POST_PLAN_AWAITING_DECISION
+        )
     if await policy_set_service.run_is_policy_blocked(db, run.id):
-        return "policy"
+        return PostPlanHold("policy", POLICY_OVERRIDE)
     if await security_scan_service.run_is_scan_blocked(db, run.id):
-        return "security-scan"
+        return PostPlanHold("security-scan", POLICY_OVERRIDE)
     return None
+
+
+async def blocked_by(db: AsyncSession, run: Run) -> str | None:
+    """Which post-plan gate holds a run: `run-task`, `policy`, `security-scan`."""
+    hold = await post_plan_hold(db, run)
+    return hold.gate if hold else None
 
 
 def _is_supersedeable_kind(run: Run) -> bool:
@@ -807,6 +840,16 @@ async def create_run(
     db.add(run)
     await db.flush()
 
+    # In the Terraform Enterprise vocabulary the run's post-plan task stage
+    # exists from the start, as it does there: the CLI reads a run's stages
+    # once, right after creating it, and never sees one added later (#1704).
+    from terrapod.config import settings
+
+    if settings.runs.tfe_post_plan_decisions:
+        from terrapod.services import run_task_service
+
+        await run_task_service.reserve_task_stage(db, run.id, workspace.id, "post_plan")
+
     RUNS_CREATED.labels(source=source, plan_only=str(plan_only)).inc()
 
     logger.info(
@@ -887,6 +930,16 @@ async def transition_run(
         and not run.apply_finished_at
     ):
         run.apply_finished_at = now
+
+    # A run that ends before its reserved post-plan stage started never will
+    # start it. Only the Terraform Enterprise vocabulary reserves stages, and
+    # only it shows them to the CLI, which would otherwise poll one forever.
+    from terrapod.config import settings
+
+    if target_status in TERMINAL_STATES and settings.runs.tfe_post_plan_decisions:
+        from terrapod.services import run_task_service
+
+        await run_task_service.cancel_pending_stages(db, run.id)
 
     await db.flush()
 
@@ -1094,6 +1147,18 @@ async def evaluate_conditional_auto_apply(db: AsyncSession, run: Run) -> Run:
     return await _auto_apply_if_permitted(db, run)
 
 
+def _holds_failed_run_tasks(run: Run) -> bool:
+    """Whether a failed mandatory post-plan run task holds the run (#1704).
+
+    Terraform Enterprise holds such a run for a decision, which is what the CLI
+    expects; 1.x errors it. A plan-only run has nothing to apply, so there is no
+    decision to wait for and it still errors.
+    """
+    from terrapod.config import settings
+
+    return settings.runs.tfe_post_plan_decisions and not run.plan_only
+
+
 async def complete_plan(
     db: AsyncSession,
     run: Run,
@@ -1145,10 +1210,13 @@ async def complete_plan(
     if ts is not None:
         stage_status = await run_task_service.resolve_stage(db, ts.id)
         if stage_status not in ("passed", "overridden"):
-            if stage_status == "failed":
+            if stage_status == "failed" and not _holds_failed_run_tasks(run):
                 await transition_run(
                     db, run, "errored", error_message="Post-plan task stage failed"
                 )
+            # Otherwise the run stays in `planning`: its tasks are still running,
+            # or a failed mandatory task holds it for an override or a discard
+            # (#1704), exactly as a failed mandatory policy set does.
             return run
 
     # Post-plan OPA policy gate (#343). The runner has already evaluated

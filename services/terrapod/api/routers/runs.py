@@ -141,6 +141,9 @@ def _run_json(
     workspace_has_vcs: bool = False,
     state_version_id: str | None = None,
     blocked_by: str | None = None,
+    reported_status: str | None = None,
+    policy_check_ids: list[str] | None = None,
+    task_stage_ids: list[str] | None = None,
 ) -> dict:
     """Serialize a Run to TFE V2 JSON:API format.
 
@@ -148,6 +151,13 @@ def _run_json(
     ``run_service.blocked_by`` -- computed by the caller because it needs the
     database. Callers serializing a run that cannot be held (just created,
     claimed, confirmed, discarded or canceled) leave it None.
+
+    The last three describe a held run in the Terraform Enterprise vocabulary
+    (#1704), and are set only when the response uses it -- see
+    ``_post_plan_view``. ``reported_status`` replaces ``planning`` in
+    ``status``; the id lists fill the ``policy-checks`` and ``task-stages``
+    relationships, which is what makes the CLI read and act on them. Left None,
+    the response is exactly the 1.x one.
     """
     run_id = f"run-{run.id}"
 
@@ -156,7 +166,7 @@ def _run_json(
             "id": run_id,
             "type": "runs",
             "attributes": {
-                "status": run.status,
+                "status": reported_status or run.status,
                 # Which post-plan gate holds the run (#1725): `run-task`,
                 # `policy`, `security-scan`, or null. A held run reports status
                 # `planning` although its plan has finished; this is how a client
@@ -341,9 +351,19 @@ def _run_json(
                 },
                 "task-stages": {
                     "links": {"related": f"/api/v1/runs/{run_id}/task-stages"},
+                    **(
+                        {"data": [{"id": i, "type": "task-stages"} for i in task_stage_ids]}
+                        if task_stage_ids is not None
+                        else {}
+                    ),
                 },
                 "policy-checks": {
                     "links": {"related": f"/api/v1/runs/{run_id}/policy-evaluations"},
+                    **(
+                        {"data": [{"id": i, "type": "policy-checks"} for i in policy_check_ids]}
+                        if policy_check_ids is not None
+                        else {}
+                    ),
                 },
                 "created-state-version": {
                     "data": (
@@ -592,8 +612,50 @@ async def create_run(
     )
 
 
+async def _post_plan_view(db: AsyncSession, request: Request, run: Run) -> dict:
+    """The `_run_json` arguments that describe a run stopped after its plan.
+
+    Always `blocked_by` (#1725). In the Terraform Enterprise vocabulary (#1704)
+    also the TFE status of a held run and the ids of its policy checks and task
+    stages -- lists that are present, possibly empty, for every run, as TFE's
+    are, so a client can tell "none" from "not reported".
+    """
+    from terrapod.api.post_plan_decisions import reports_tfe_post_plan
+    from terrapod.services import policy_check_service, run_task_service
+
+    hold = await run_service.post_plan_hold(db, run)
+    view: dict = {"blocked_by": hold.gate if hold else None}
+    if reports_tfe_post_plan(request):
+        view["reported_status"] = hold.tfe_status if hold else None
+        view["policy_check_ids"] = [c.id for c in await policy_check_service.list_checks(db, run)]
+        view["task_stage_ids"] = [
+            f"ts-{ts.id}" for ts in await run_task_service.list_run_task_stages(db, run.id)
+        ]
+    return view
+
+
+async def _tfe_task_stages_included(
+    db: AsyncSession, run: Run, user: AuthenticatedUser
+) -> list[dict]:
+    """A run's task stages and their results, for a TFE `included` block."""
+    from terrapod.api.routers.run_tasks import tfe_task_result_json, tfe_task_stage_json
+    from terrapod.services import run_task_service
+
+    ws = await db.get(Workspace, run.workspace_id)
+    caps = await resolve_workspace_capabilities_for(db, user, ws) if ws else set()
+    if not has_capability(caps, cap.RUN_TASK_READ):
+        return []
+    can_override = has_capability(caps, cap.RUN_TASK_MANAGE)
+    included: list[dict] = []
+    for ts in await run_task_service.list_run_task_stages(db, run.id):
+        included.append(tfe_task_stage_json(ts, run, can_override=can_override))
+        included.extend(tfe_task_result_json(r) for r in ts.results)
+    return included
+
+
 @router.get("/runs/{run_id}")
 async def show_run(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -610,20 +672,26 @@ async def show_run(
     sv_uuid = sv_result.scalar_one_or_none()
     sv_id = f"sv-{sv_uuid}" if sv_uuid else None
 
-    return JSONResponse(
-        content=_run_json(
-            run,
-            engine=ws.engine,
-            workspace_name=ws.name if ws else "",
-            workspace_has_vcs=bool(ws and ws.vcs_connection_id),
-            state_version_id=sv_id,
-            blocked_by=await run_service.blocked_by(db, run),
-        ),
+    view = await _post_plan_view(db, request, run)
+    document = _run_json(
+        run,
+        engine=ws.engine,
+        workspace_name=ws.name if ws else "",
+        workspace_has_vcs=bool(ws and ws.vcs_connection_id),
+        state_version_id=sv_id,
+        **view,
     )
+    # The CLI reads a run's task stages with `include=task_stages` and needs
+    # each stage's `stage` attribute from `included` (#1704).
+    includes = {i.strip() for i in request.query_params.get("include", "").split(",")}
+    if "task_stages" in includes and view.get("task_stage_ids") is not None:
+        document["included"] = await _tfe_task_stages_included(db, run, user)
+    return JSONResponse(content=document)
 
 
 @router.get("/workspaces/{workspace_id}/runs")
 async def list_workspace_runs(
+    request: Request,
     workspace_id: str = Path(...),
     page_number: int = Query(1, alias="page[number]"),
     page_size: int = Query(20, alias="page[size]"),
@@ -660,7 +728,7 @@ async def list_workspace_runs(
                     engine=ws.engine,
                     workspace_name=ws.name,
                     workspace_has_vcs=has_vcs,
-                    blocked_by=await run_service.blocked_by(db, r),
+                    **await _post_plan_view(db, request, r),
                 )["data"]
                 for r in runs
             ],

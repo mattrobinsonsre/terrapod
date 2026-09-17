@@ -5,12 +5,20 @@ const DiscoveryPath
 const ModuleAutodiscoveryTargetNamespace
 const ModuleAutodiscoveryTargetPattern
 const ModuleAutodiscoveryTargetRepository
+const PolicyCheckOverridden
+const PolicyCheckPassed
+const PolicyCheckSoftFailed
+const PostPlanDecisionsHeader
 const RoleReachAllowed
 const RoleReachDenied
 const RoleReachNone
 const RoleReachNoteCatalogClamped
 const RoleReachNoteEveryoneFloor
 const RoleReachNoteHasOwner
+const RunStatusPlanning
+const RunStatusPolicyOverride
+const RunStatusPostPlanAwaitingDecision
+const RunStatusPostPlanRunning
 const VersionField
 field APIError.Body string
 field APIError.StatusCode int
@@ -659,6 +667,15 @@ field Policy.Name string `json:"name"`
 field Policy.PolicySetID string `json:"policy-set-id"`
 field Policy.Rego string `json:"rego"`
 field Policy.UpdatedAt string `json:"updated-at,omitempty"`
+field PolicyCheck.AdvisoryFailed int `json:"advisory-failed"`
+field PolicyCheck.CanOverride bool `json:"can-override"`
+field PolicyCheck.ID string `json:"id"`
+field PolicyCheck.IsOverridable bool `json:"is-overridable"`
+field PolicyCheck.Passed int `json:"passed"`
+field PolicyCheck.RunID string `json:"run-id"`
+field PolicyCheck.Scope string `json:"scope"`
+field PolicyCheck.SoftFailed int `json:"soft-failed"`
+field PolicyCheck.Status string `json:"status"`
 field PolicySet.AllowLabels map[string][]string `json:"allow-labels,omitempty"`
 field PolicySet.CreatedAt string `json:"created-at,omitempty"`
 field PolicySet.DenyLabels map[string][]string `json:"deny-labels,omitempty"`
@@ -1405,6 +1422,8 @@ method (*Client) GetOnboardingAvailability(ctx context.Context) (*OnboardingAvai
 method (*Client) GetOnboardingSession(ctx context.Context, sessionID string) (*OnboardingSession, error)
 method (*Client) GetPlanLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error)
 method (*Client) GetPlanSummary(ctx context.Context, planID string) (*PlanSummary, error)
+method (*Client) GetPolicyCheck(ctx context.Context, checkID string) (*PolicyCheck, error)
+method (*Client) GetPolicyCheckOutput(ctx context.Context, checkID string) (string, error)
 method (*Client) GetPolicySet(ctx context.Context, id string) (*PolicySet, error)
 method (*Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderTemplate, error)
 method (*Client) GetRegistryModule(ctx context.Context, name, providerName string) (*RegistryModule, error)
@@ -1473,6 +1492,7 @@ method (*Client) ListRoleAssignments(ctx context.Context) ([]RoleAssignment, err
 method (*Client) ListRoleAssignmentsForIdentity(ctx context.Context, providerName, email string) ([]RoleAssignment, error)
 method (*Client) ListRoles(ctx context.Context) ([]Role, error)
 method (*Client) ListRunCostSummaryMessages(ctx context.Context, runID string) ([]*CostSummaryMessage, error)
+method (*Client) ListRunPolicyChecks(ctx context.Context, runID string) ([]PolicyCheck, error)
 method (*Client) ListRunTasks(ctx context.Context, workspaceID string) ([]RunTask, error)
 method (*Client) ListUserAPITokens(ctx context.Context, userID string) ([]APIToken, error)
 method (*Client) ListUsers(ctx context.Context) ([]User, error)
@@ -1485,6 +1505,7 @@ method (*Client) ListWorkspaceRuns(ctx context.Context, workspaceID string, page
 method (*Client) ListWorkspaceVarsets(ctx context.Context, workspaceID string) ([]WorkspaceVarset, error)
 method (*Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) (*WorkspaceList, error)
 method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
+method (*Client) OverridePolicyCheck(ctx context.Context, checkID string) (*PolicyCheck, error)
 method (*Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
@@ -1658,6 +1679,7 @@ type PlanSummary struct
 type PlanSummaryMessage struct
 type PlanSummaryRiskFactor struct
 type Policy struct
+type PolicyCheck struct
 type PolicySet struct
 type ProviderTemplate struct
 type RegisteredModuleRef struct

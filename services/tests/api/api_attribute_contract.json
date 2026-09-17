@@ -407,6 +407,23 @@
     "ai-available",
     "ai-model-configured"
   ],
+  "policy_checks._check_json": [
+    "actions",
+    "actions.is-overridable",
+    "permissions",
+    "permissions.can-override",
+    "result",
+    "result.advisory-failed",
+    "result.duration",
+    "result.hard-failed",
+    "result.passed",
+    "result.result",
+    "result.soft-failed",
+    "result.total-failed",
+    "scope",
+    "status",
+    "status-timestamps"
+  ],
   "policy_sets._evaluation_json": [
     "created-at",
     "enforcement-level",
@@ -589,6 +606,32 @@
     "message",
     "started-at",
     "status"
+  ],
+  "run_tasks.tfe_task_result_json": [
+    "created-at",
+    "message",
+    "status",
+    "status-timestamps",
+    "task-id",
+    "task-name",
+    "task-url",
+    "updated-at",
+    "url",
+    "workspace-task-enforcement-level",
+    "workspace-task-id"
+  ],
+  "run_tasks.tfe_task_stage_json": [
+    "actions",
+    "actions.is-overridable",
+    "created-at",
+    "permissions",
+    "permissions.can-override",
+    "permissions.can-override-policy",
+    "permissions.can-override-tasks",
+    "stage",
+    "status",
+    "status-timestamps",
+    "updated-at"
   ],
   "run_triggers._trigger_json": [
     "created-at",

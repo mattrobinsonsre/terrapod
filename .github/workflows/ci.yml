@@ -1327,6 +1327,10 @@ jobs:
           # own allow-list, an operator who set it to false would keep sending the
           # old URL and never learn the value was dropped.
           echo "$out" | grep -q "legacy_callback_url:" || { echo "FAIL: auth.legacy_callback_url not rendered into config.yaml (#1529)"; exit 1; }
+          # Post-plan decisions (#1704): the switch whose default flips at 2.0. A
+          # missing render line would leave an operator who set it true on the
+          # 1.x behaviour, with the CLI never offered an override.
+          echo "$out" | grep -q "tfe_post_plan_decisions:" || { echo "FAIL: runs.tfe_post_plan_decisions not rendered into config.yaml (#1704)"; exit 1; }
           # Split webhook Ingress (#1529): its `paths` is an ALLOW-LIST, and
           # run-task callback URLs are generated on the canonical prefix. If the
           # default stops covering both, an operator on the default silently loses

@@ -865,7 +865,7 @@ A mandatory policy set, an enforced security scan, or a mandatory post-plan run 
 - the run is **discardable** (`actions.is-discardable: true`) unless it is plan-only, and a newer apply-capable run supersedes it as it would a `planned` run;
 - it is released by an override (policy or security scan) or a passing run task, which the reconciler picks up on its next tick. Kubernetes cleaning up the finished plan Job does not error it.
 
-In 2.0 a held run reports `policy_override` or `post_plan_awaiting_decision` instead of `planning`; see [deprecations.md](deprecations.md#announced-behaviour-changes-for-20).
+In the Terraform Enterprise vocabulary (#1704) — `api.config.runs.tfe_post_plan_decisions: true`, the default from 2.0, or the request header `X-Terrapod-Post-Plan-Decisions: tfe` — a held run instead reports `status` as `post_plan_running` (post-plan tasks still running), `post_plan_awaiting_decision` (a mandatory task failed) or `policy_override` (a mandatory policy set or an enforced scan failed); `blocked-by` is unchanged. The `policy-checks` and `task-stages` relationships then carry `data` (the run's [policy checks](#policy-checks) and task stages), and `GET /api/tfe/v2/runs/{id}?include=task_stages` returns the stages and their `task-results` in `included`. `X-Terrapod-Post-Plan-Decisions: legacy` asks for the 1.x answer. See [post-plan-decisions.md](post-plan-decisions.md).
 
 #### Stale-plan guards: state drift (#647) & expiry (#646)
 
@@ -4036,6 +4036,40 @@ POST /api/v1/runs/{run_id}/actions/override-policy
 ```
 
 Overrides every failed/errored policy evaluation of a run and immediately re-drives a run held at the post-plan policy gate. **Required permission:** `admin` on the run's workspace.
+
+### Policy checks
+
+```
+GET  /api/tfe/v2/runs/{run_id}/policy-checks
+GET  /api/tfe/v2/policy-checks/{id}
+GET  /api/tfe/v2/policy-checks/{id}/output
+POST /api/tfe/v2/policy-checks/{id}/actions/override
+```
+
+The run's post-plan gates in the Terraform Enterprise `policy-checks` shape that the `tofu`/`terraform` CLI reads (#1704). A run has up to two checks, each present only when its gate recorded something: `polchk-opa-<run uuid>` for its OPA policy sets (`scope: organization`) and `polchk-scan-<run uuid>` for its security scan (`scope: workspace`).
+
+```json
+{
+  "data": {
+    "id": "polchk-opa-01a0af8c-79a0-759c-86e3-3607f5b419e6",
+    "type": "policy-checks",
+    "attributes": {
+      "status": "soft_failed",
+      "scope": "organization",
+      "result": {"result": false, "passed": 1, "total-failed": 1, "hard-failed": 0,
+                 "soft-failed": 1, "advisory-failed": 0, "duration": 0},
+      "actions": {"is-overridable": true},
+      "permissions": {"can-override": true},
+      "status-timestamps": {"queued-at": "2026-09-17T12:30:00Z", "soft-failed-at": "2026-09-17T12:30:00Z"}
+    },
+    "relationships": {"run": {"data": {"id": "run-01a0af8c-79a0-759c-86e3-3607f5b419e6", "type": "runs"}}}
+  }
+}
+```
+
+`status` is `soft_failed` while a mandatory policy set's (or an enforced scan's) failure is not overridden, `overridden` once it is, and `passed` otherwise — an advisory failure passes, counted in `advisory-failed`. `/output` returns `text/plain`: each policy set with its denies and warnings, or the scan's findings, worst first. The override overrides everything the check covers (every failed policy set, or the scan) and moves a held run on at once; it answers **409** for a check that is not `soft_failed`. The run advertises these checks in its `policy-checks` relationship only in the Terraform Enterprise vocabulary, but the endpoints are always served.
+
+**Required permission:** `read` on the run's workspace to list or read (a caller without it gets **404**); `admin` to override, which is also what `permissions.can-override` reports.
 
 ### Runner protocol — Policy Bundle
 
