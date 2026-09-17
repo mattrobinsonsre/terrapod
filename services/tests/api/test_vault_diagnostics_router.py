@@ -440,7 +440,16 @@ class TestRateLimit:
         )
         app = _app(_user())
         codes = []
-        with _patch_caps("write"), patch.object(vault_diagnostics, "check_reference", check):
+        # The limiter counts in fixed one-minute windows. Pin the clock mid-window
+        # so all the requests land in one: on a slow runner, real time let them
+        # straddle a boundary, the count started again, and the last was allowed
+        # (#1716).
+        pinned = 1_700_000_010.0
+        with (
+            _patch_caps("write"),
+            patch.object(vault_diagnostics, "check_reference", check),
+            patch("time.time", return_value=pinned),
+        ):
             for _ in range(vault_diagnostics.CHECKS_PER_MINUTE + 1):
                 app.dependency_overrides[get_db] = lambda: _db(_ws())
                 resp = await _call(app, "POST", WS_PATH, json=_body({"reference": REF}))
