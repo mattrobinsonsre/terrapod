@@ -15,7 +15,7 @@ Reproduced end to end on a live stack before the fix.
 
 import uuid
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -232,3 +232,82 @@ class TestWhatTheApiReports:
         assert attrs["blocked-by"] == "security-scan"
         assert attrs["actions"]["is-discardable"] is True
         assert attrs["actions"]["is-confirmable"] is False
+
+
+class TestWhatAHeldRunCostsAndWhatStillFreesIt:
+    """Found by the v1.7.2 pre-release review."""
+
+    def _held(self, **kw):
+        run = _run(**kw)
+        run.vcs_pull_request_number = kw.get("pr")
+        run.is_drift_detection = kw.get("drift", False)
+        return run
+
+    @patch("terrapod.services.run_service.complete_plan", new_callable=AsyncMock)
+    @patch("terrapod.redis.client.get_job_status_from_redis", new_callable=AsyncMock)
+    @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
+    async def test_listeners_are_not_asked_about_a_held_runs_job(
+        self, publish, get_status, complete_plan
+    ):
+        # Every held run used to send its pool a status query and a log-stream
+        # request for a long-deleted Job every tick, for as long as it waited.
+        with patch.object(run_service, "_has_newer_live_run", AsyncMock(return_value=False)):
+            await _reconcile_one(AsyncMock(), self._held(), "terraform")
+        publish.assert_not_awaited()
+        get_status.assert_not_awaited()
+        complete_plan.assert_awaited_once()
+
+    @patch("terrapod.services.run_reconciler._check_stale", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service.complete_plan", new_callable=AsyncMock)
+    async def test_a_newer_run_queued_behind_a_held_one_supersedes_it(
+        self, complete_plan, check_stale
+    ):
+        # The queue-time supersede skipped this run while it was still
+        # planning; once held, it would block the newer run indefinitely.
+        run = self._held()
+        with (
+            patch.object(run_service, "_has_newer_live_run", AsyncMock(return_value=True)),
+            patch.object(run_service, "discard_run", new_callable=AsyncMock) as discard,
+        ):
+            await _reconcile_one(AsyncMock(), run, "terraform")
+        discard.assert_awaited_once()
+        assert discard.await_args.args[1] is run
+        complete_plan.assert_not_awaited()
+
+    @patch("terrapod.services.run_reconciler._check_stale", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service.complete_plan", new_callable=AsyncMock)
+    async def test_an_apply_run_waits_for_a_decision_without_a_timeout(
+        self, complete_plan, check_stale
+    ):
+        with patch.object(run_service, "_has_newer_live_run", AsyncMock(return_value=False)):
+            await _reconcile_one(AsyncMock(), self._held(), "terraform")
+        check_stale.assert_not_awaited()
+
+    @pytest.mark.parametrize(
+        "kw",
+        [{"drift": True}, {"pr": 12}, {}],
+        ids=["drift check", "speculative PR plan", "CLI plan"],
+    )
+    @patch("terrapod.services.run_reconciler._check_stale", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service.complete_plan", new_callable=AsyncMock)
+    async def test_a_plan_only_run_keeps_its_timeouts(self, complete_plan, check_stale, kw):
+        # Nothing to decide for a run that cannot apply: a run task that never
+        # calls back must not keep it, or a drift check, forever.
+        run = self._held(plan_only=True, **kw)
+        with patch.object(run_service, "_has_newer_live_run", AsyncMock()) as newer:
+            await _reconcile_one(AsyncMock(), run, "terraform")
+        newer.assert_not_awaited()
+        complete_plan.assert_awaited_once()
+        check_stale.assert_awaited_once_with(ANY, run)
+
+    @patch("terrapod.services.run_reconciler._check_stale", new_callable=AsyncMock)
+    async def test_a_plan_only_run_released_by_its_gate_is_not_checked(self, check_stale):
+        run = self._held(plan_only=True)
+
+        async def release(db, r):
+            r.status = "planned"
+            return r
+
+        with patch.object(run_service, "complete_plan", AsyncMock(side_effect=release)):
+            await _reconcile_one(AsyncMock(), run, "terraform")
+        check_stale.assert_not_awaited()
