@@ -1128,13 +1128,6 @@ async def complete_plan(
 
     run = await transition_run(db, run, "planned")
 
-    # Unlock workspace for plan-only runs — they make no further state moves.
-    if run.plan_only:
-        ws = await db.get(Workspace, run.workspace_id)
-        if ws and ws.locked:
-            ws.locked = False
-            ws.lock_id = None
-
     # Zero-change non-speculative plans short-circuit straight to `applied`.
     # No apply Job is launched — the runner couldn't change anything anyway,
     # and an empty apply triggers the duplicate-serial 500 on state upload.
@@ -1207,9 +1200,6 @@ async def complete_apply(db: AsyncSession, run: Run) -> Run:
     run = await transition_run(db, run, "applied")
 
     ws = await db.get(Workspace, run.workspace_id)
-    if ws and ws.locked:
-        ws.locked = False
-        ws.lock_id = None
 
     logger.info("Apply succeeded", run_id=str(run.id))
 
@@ -1295,10 +1285,6 @@ async def complete_planned_as_noop(db: AsyncSession, run: Run) -> Run:
     """
     run.apply_started_at = now_utc()
     run = await transition_run(db, run, "applied")
-    ws = await db.get(Workspace, run.workspace_id)
-    if ws and ws.locked:
-        ws.locked = False
-        ws.lock_id = None
     return run
 
 
@@ -1532,7 +1518,7 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
         )
     # Staleness guards (#646 expiry, #647 state drift): a plan that no longer
     # reflects the current state, or has aged past the workspace TTL, must not be
-    # applied. Auto-discard it (unlocking the workspace) and surface a 409 so the
+    # applied. Auto-discard it and surface a 409 so the
     # caller re-plans. State drift is the always-on correctness guard.
     # Second line of defence for the speculative invariant. `create_run` forces
     # plan-only for a speculative CV, so a run reaching here with one should not
@@ -1569,11 +1555,6 @@ async def discard_run(db: AsyncSession, run: Run, *, reason: str | None = None) 
         raise ValueError(f"Can only discard runs in 'planned' status, got '{run.status}'")
     if reason:
         run.discard_reason = reason
-    # Unlock workspace
-    workspace = await db.get(Workspace, run.workspace_id)
-    if workspace and workspace.locked:
-        workspace.locked = False
-        workspace.lock_id = None
     return await transition_run(db, run, "discarded")
 
 
@@ -1603,7 +1584,7 @@ async def cancel_run(
     Behaviour by source state:
 
       - `applying` → `canceling`. The Job may already be mid-apply.
-        Workspace stays locked. We publish `cancel_job` so the listener
+        We publish `cancel_job` so the listener
         deletes the K8s Job, but we DO NOT prejudge the terminal status
         — the reconciler resolves canceling → applied / canceled /
         errored based on whether a state-version was uploaded for this
@@ -1612,7 +1593,7 @@ async def cancel_run(
 
       - Anything else in CANCELABLE_STATES → `canceled` directly. No
         apply Job has launched, so there is no possible mid-apply
-        outcome to honour. Workspace is unlocked immediately and a
+        outcome to honour. A
         `cancel_job` event is still published (the listener may have a
         plan-phase Job running; killing it is cheap and correct).
     """
@@ -1630,15 +1611,6 @@ async def cancel_run(
         target = "canceling"
     else:
         target = "canceled"
-
-    # Workspace lock only releases on terminal transition. Holding it
-    # through `canceling` prevents a fresh run from racing the still-
-    # running apply Job and stomping its state upload.
-    if target == "canceled":
-        workspace = await db.get(Workspace, run.workspace_id)
-        if workspace and workspace.locked:
-            workspace.locked = False
-            workspace.lock_id = None
 
     # Tell the listener to delete the K8s Job, best-effort. Publish
     # before transitioning so a same-tick run_status_change observer
@@ -1710,9 +1682,6 @@ async def resolve_canceling_run(db: AsyncSession, run: Run, *, job_status: str) 
     # of its planned mutations before the kill signal landed.
     ws = await db.get(Workspace, run.workspace_id)
     if ws:
-        if ws.locked:
-            ws.locked = False
-            ws.lock_id = None
         if target != "applied":
             ws.state_diverged = True
 
