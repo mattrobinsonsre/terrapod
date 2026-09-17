@@ -209,6 +209,10 @@ api:
       # Must be the externally-reachable URL of your Terrapod instance.
       # The IDP callback lands at {callback_base_url}{prefix}/auth/callback,
       # where {prefix} is set by legacy_callback_url below.
+      # Also the last-resort base for the absolute URLs the CLI follows (state,
+      # configuration-version upload, plan and apply logs). Those are normally
+      # built from the host the caller used, so it is only consulted for a
+      # request that reached the API without passing through an ingress.
       callback_base_url: ""
 
       # Build the SSO callback and SAML ACS URLs on the deprecated

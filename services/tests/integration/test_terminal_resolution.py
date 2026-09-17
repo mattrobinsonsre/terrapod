@@ -139,19 +139,19 @@ class TestWhatTheRunActuallyBecomes:
             # finished Job stops the run being "planning" forever.
             assert got.status != "planning"
 
-    async def test_failed_errors_the_run_and_unlocks_the_workspace(self, app):
-        """A failed Job must not leave the workspace locked.
+    async def test_failed_errors_the_run_and_leaves_a_manual_lock_alone(self, app):
+        """A failed Job errors its run, and does not touch the workspace lock.
 
-        A lock outlives the run that took it, so a missed unlock blocks every
-        later run on that workspace — the failure is silent until someone asks
-        why nothing is queueing.
+        Runs never acquire the workspace lock -- it is the manual/CLI state lock
+        -- so a failing run has no lock of its own to release. Releasing
+        whatever lock it found undid an operator's maintenance lock (#1705).
         """
         from terrapod.db.session import get_db_session
         from terrapod.services import run_reconciler
 
         async with get_db_session() as session:
             ws, run = await _mk(session, status="applying", locked=True)
-            ws.lock_id = "held-by-this-run"
+            ws.lock_id = "lock-ops@example.com"
             await session.commit()
             run_id, ws_id = run.id, ws.id
 
@@ -165,8 +165,8 @@ class TestWhatTheRunActuallyBecomes:
             ).scalar_one()
             assert got.status == "errored"
             assert got.error_message
-            assert got_ws.locked is False
-            assert got_ws.lock_id is None
+            assert got_ws.locked is True
+            assert got_ws.lock_id == "lock-ops@example.com"
 
     async def test_a_failure_without_a_captured_error_still_errors(self, app):
         """No runner-side detail is not a reason to leave the run running."""

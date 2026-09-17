@@ -222,7 +222,12 @@ class TestRollbackStateVersion:
 
         mock_resolve.return_value = caps_for_level("write")
 
-        state_bytes = b'{"version": 4, "serial": 1, "lineage": "test"}'
+        # Written the way the engine writes it: Go escapes <, > and &, and writes
+        # UTF-8 as-is. Every byte but the serial must survive the rollback (#1702).
+        state_bytes = (
+            b'{\n  "version": 4,\n  "serial": 1,\n  "lineage": "test",\n'
+            b'  "outputs": {"o": {"value": "\\u003cb\\u003e \\u0026 caf\xc3\xa9"}}\n}\n'
+        )
         mock_storage = AsyncMock()
         mock_storage.get.return_value = state_bytes
         mock_get_storage.return_value = mock_storage
@@ -262,6 +267,119 @@ class TestRollbackStateVersion:
         mock_db.add.assert_called_once()
         mock_storage.put.assert_called_once()
         mock_counter.inc.assert_called_once()
+
+        # #1702: the copy is stored under row serial 4 (max 3 + 1), so the file
+        # inside must say 4 too -- not the 1 of the version it was copied from.
+        # A mismatch makes the next apply compute a serial that already exists.
+        new_sv = mock_db.add.call_args.args[0]
+        stored = json.loads(mock_storage.put.call_args.args[1])
+        assert new_sv.serial == 4
+        assert stored["serial"] == new_sv.serial
+        # Everything else about the state is carried over unchanged.
+        assert stored["lineage"] == "test"
+        assert stored["version"] == 4
+        # The recorded md5/size describe the bytes actually stored.
+        stored_bytes = mock_storage.put.call_args.args[1]
+        assert new_sv.state_size == len(stored_bytes)
+        import hashlib
+
+        assert new_sv.md5 == hashlib.md5(stored_bytes).hexdigest()  # noqa: S324
+        assert new_sv.sha256 == hashlib.sha256(stored_bytes).hexdigest()
+
+        # Only the serial's digits changed. A later apply that changes nothing
+        # re-uploads the engine's own bytes at this serial, and the runner treats
+        # that as a no-op only if they are identical -- re-encoding the state
+        # here turned it into a 409 and a diverged workspace.
+        assert stored_bytes == state_bytes.replace(b'"serial": 1,', b'"serial": 4,')
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.state_management.get_storage")
+    @patch("terrapod.api.routers.state_management.resolve_workspace_capabilities_for")
+    async def test_rollback_of_unparseable_state_is_a_client_error(
+        self,
+        mock_resolve,
+        mock_get_storage,
+        mock_init_db,
+        mock_init_redis,
+        mock_init_storage,
+    ):
+        """The serial rewrite parses the state; garbage must not become a 500."""
+        ws_id = uuid.uuid4()
+        ws = _mock_workspace(ws_id=ws_id, owner_email="test@example.com")
+        sv = _mock_state_version(ws_id, serial=1)
+        mock_resolve.return_value = caps_for_level("write")
+
+        mock_storage = AsyncMock()
+        mock_storage.get.return_value = b"not json"
+        mock_get_storage.return_value = mock_storage
+
+        mock_db = AsyncMock()
+        mock_db.execute.side_effect = [_scalar_result(sv), _scalar_result(3)]
+        mock_db.get.return_value = ws
+
+        app, _ = _make_app(_user(email="test@example.com"), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.post(
+                f"/api/terrapod/v1/state-versions/sv-{sv.id}/actions/rollback", headers=_AUTH
+            )
+
+        assert resp.status_code == 422
+        mock_db.add.assert_not_called()
+        mock_storage.put.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    @patch("terrapod.api.metrics.STATE_VERSIONS_CREATED")
+    @patch("terrapod.api.routers.tfe_v2._state_version_json")
+    @patch("terrapod.api.routers.state_management.get_storage")
+    @patch("terrapod.api.routers.state_management.resolve_workspace_capabilities_for")
+    async def test_rollback_of_a_pulumi_deployment_is_copied_unchanged(
+        self,
+        mock_resolve,
+        mock_get_storage,
+        mock_sv_json,
+        mock_counter,
+        mock_publish,
+        mock_init_db,
+        mock_init_redis,
+        mock_init_storage,
+    ):
+        """The #1702 serial rewrite is for Terraform/OpenTofu state. A Pulumi
+        deployment has no such serial, and gaining one would corrupt it."""
+        ws_id = uuid.uuid4()
+        ws = _mock_workspace(ws_id=ws_id, owner_email="test@example.com")
+        ws.engine = "pulumi"
+        sv = _mock_state_version(ws_id, serial=1)
+        mock_resolve.return_value = caps_for_level("write")
+
+        deployment = b'{"manifest": {"version": "v3"}, "resources": []}'
+        mock_storage = AsyncMock()
+        mock_storage.get.return_value = deployment
+        mock_get_storage.return_value = mock_storage
+        mock_sv_json.return_value = {
+            "data": {"id": "sv-new", "type": "state-versions", "attributes": {}}
+        }
+
+        mock_db = AsyncMock()
+        _no_runs = MagicMock()
+        _no_runs.scalars.return_value.all.return_value = []
+        mock_db.execute.side_effect = [_scalar_result(sv), _scalar_result(3), _no_runs]
+        mock_db.get.return_value = ws
+
+        app, _ = _make_app(_user(email="test@example.com"), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.post(
+                f"/api/terrapod/v1/state-versions/sv-{sv.id}/actions/rollback", headers=_AUTH
+            )
+
+        assert resp.status_code == 201
+        stored = json.loads(mock_storage.put.call_args.args[1])
+        assert "serial" not in stored
+        assert stored == json.loads(deployment)
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -337,6 +455,15 @@ class TestUploadState:
         }
 
         mock_storage = AsyncMock()
+        streamed: list[bytes] = []
+
+        async def _consume(key, chunks, content_type=None):
+            # Drain the stream while the tempfile still exists, so the test sees
+            # the bytes that were actually stored.
+            async for chunk in chunks:
+                streamed.append(chunk)
+
+        mock_storage.put_stream.side_effect = _consume
         mock_get_storage.return_value = mock_storage
 
         mock_db = AsyncMock()
@@ -345,7 +472,7 @@ class TestUploadState:
         user = _user(email="test@example.com")
         app, _ = _make_app(user, mock_db)
 
-        state_json = json.dumps({"version": 4, "serial": 1, "lineage": "test-lineage"})
+        state_json = '{\n  "version": 4,\n  "serial": 1,\n  "lineage": "test-lineage",\n  "note": "\\u003c\\u0026"\n}\n'
         ws_id_str = f"ws-{ws_id}"
         with patch(
             "terrapod.services.state_index_service.record_latest_state", new_callable=AsyncMock
@@ -368,6 +495,23 @@ class TestUploadState:
         mock_storage.put_stream.assert_called_once()
         mock_storage.put.assert_not_called()
         mock_counter.inc.assert_called_once()
+
+        # #1702: the uploaded file said serial 1 but is stored under row serial 6
+        # (max 5 + 1). The stored file must say 6, and the row's md5/size must
+        # describe the rewritten bytes rather than the uploaded ones.
+        new_sv = mock_db.add.call_args.args[0]
+        stored_bytes = b"".join(streamed)
+        assert new_sv.serial == 6
+        assert json.loads(stored_bytes)["serial"] == 6
+        assert json.loads(stored_bytes)["lineage"] == "test-lineage"
+        assert new_sv.lineage == "test-lineage"
+        assert new_sv.state_size == len(stored_bytes)
+        import hashlib
+
+        assert new_sv.md5 == hashlib.md5(stored_bytes).hexdigest()  # noqa: S324
+        assert new_sv.sha256 == hashlib.sha256(stored_bytes).hexdigest()
+        # Every byte but the serial is the operator's upload, unchanged.
+        assert stored_bytes == state_json.encode().replace(b'"serial": 1,', b'"serial": 6,')
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

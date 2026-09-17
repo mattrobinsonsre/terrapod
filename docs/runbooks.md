@@ -50,7 +50,7 @@ A run is marked "stale" by the reconciler when it has been in `planning` or `app
 
 ### Resolution
 
-1. **Unlock the workspace** (if still locked after the run errored). Before you do, check `lock-reason` and `locked-by` on the workspace (`GET /api/v1/workspaces/<ws-id>`, or the Lock Status card in the UI). A lock with an operator's reason, such as a maintenance window, was taken on purpose: ask its holder before you release it.
+1. **Unlock the workspace, if it is locked.** Runs never take the workspace lock, so a lock here was set by a person or a CLI and a run ending does not release it. Check `lock-reason` and `locked-by` on the workspace (`GET /api/v1/workspaces/<ws-id>`, or the Lock Status card in the UI) and confirm whoever holds it is done before forcing it:
    ```bash
    curl -X POST -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/vnd.api+json" \
@@ -299,6 +299,24 @@ The runner entrypoint marks a workspace as "state diverged" when an `apply` succ
 3. **Clear the diverged flag** — uploading a new state version automatically clears `state_diverged`.
 
 For detailed state recovery procedures, see [disaster-recovery.md](disaster-recovery.md).
+
+### Every apply's state upload is refused with 409 after a rollback
+
+Before v1.7.1 and v1.6.5, rolling back a state version, or uploading state manually, stored the file under a new serial without changing the `serial` recorded inside it. The engine computes its next serial from the file, so a later apply could land on a serial that already existed. The upload was then refused with `409 State version serial already exists`, the apply had already changed infrastructure, and the same thing happened on every following run.
+
+The fix stops new occurrences. A workspace already in that condition recovers with one rollback, on a release with the fix:
+
+1. **Confirm the mismatch.** For the workspace's newest state version, compare the serial on the row with the serial inside the file:
+   ```bash
+   curl -s -H "Authorization: Bearer $TOKEN" \
+     "https://<terrapod>/api/v2/workspaces/<ws-id>/current-state-version" | jq '.data.attributes.serial'
+   curl -sL -H "Authorization: Bearer $TOKEN" \
+     "$(curl -s -H "Authorization: Bearer $TOKEN" https://<terrapod>/api/v2/workspaces/<ws-id>/current-state-version \
+        | jq -r '.data.attributes["hosted-state-download-url"]')" | jq '.serial'
+   ```
+   A row serial higher than the file's serial is this condition.
+2. **Roll back to the current version.** `POST /api/terrapod/v1/state-versions/<current-sv-id>/actions/rollback`. The new version has the same content with matching serials. No resources change.
+3. **Reconcile what the failed applies did.** Resources those applies created or destroyed are not in state. Run a plan and read it before applying: import resources that exist but are missing from state (`import {}` blocks), and let resources state still lists but that were destroyed be removed by the next apply.
 
 ### Verification
 
