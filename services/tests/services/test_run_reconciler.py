@@ -267,7 +267,8 @@ class TestHandleSucceeded:
         assert mock_transition.call_count == 2
         assert mock_transition.call_args_list[0].args[2] == "planned"
         assert mock_transition.call_args_list[1].args[2] == "applied"
-        assert ws.locked is False
+        # Runs never take the manual lock, so finishing one leaves it held (#1705).
+        assert ws.locked is True
 
     @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
@@ -302,7 +303,13 @@ class TestHandleSucceeded:
     @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
     @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
-    async def test_plan_only_unlocks_workspace(self, mock_transition, mock_stage, mock_persist):
+    async def test_plan_only_run_leaves_a_manual_lock_held(
+        self, mock_transition, mock_stage, mock_persist
+    ):
+        """A plan-only run is exempt from the manual lock, so it may run while an
+        operator holds one -- and must not release it on reaching `planned`.
+        A scheduled drift check used to clear a maintenance lock this way (#1705).
+        """
         db = AsyncMock()
         run = _mock_run(status="planning", plan_only=True)
         mock_stage.return_value = None
@@ -316,8 +323,8 @@ class TestHandleSucceeded:
 
         await _handle_succeeded(db, run, _outcome_for(run))
 
-        assert ws.locked is False
-        assert ws.lock_id is None
+        assert ws.locked is True
+        assert ws.lock_id == "lock-123"
 
     @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
@@ -333,7 +340,7 @@ class TestHandleSucceeded:
         await _handle_succeeded(db, run, _outcome_for(run))
 
         mock_transition.assert_called_once_with(db, run, "applied")
-        assert ws.locked is False
+        assert ws.locked is True  # not the run's lock to release (#1705)
         mock_persist.assert_called_once_with(run, "apply")
 
     @patch(_PERSIST_PATCH, new_callable=AsyncMock)
@@ -376,7 +383,7 @@ class TestHandleFailed:
         await _handle_failed(db, run, "Job failed")
 
         mock_transition.assert_called_once_with(db, run, "errored", error_message="Job failed")
-        assert ws.locked is False
+        assert ws.locked is True  # not the run's lock to release (#1705)
         mock_persist.assert_called_once_with(run, "plan")
 
 
