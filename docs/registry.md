@@ -48,7 +48,24 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules \
   }'
 ```
 
-### Creating a Version
+### Publishing a Version
+
+The simplest way to publish is one request that creates the version and uploads its tarball together:
+
+```zsh
+# Create tarball from module directory
+tar -czf module.tar.gz -C /path/to/module .
+
+curl -X PUT https://terrapod.example.com/api/terrapod/v1/registry-modules/private/default/vpc/aws/versions/1.0.0/upload \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  --data-binary @module.tar.gz
+```
+
+The body is the raw tarball, not a multipart form. The version is installable as soon as this returns, and its inputs and outputs are parsed from the tarball. Repeating the request replaces the tarball, so it is safe to retry. `terrapod-publish module` uses this endpoint.
+
+### Creating a Version, Then Uploading
+
+Alternatively, create the version first and upload its tarball to the presigned URL it returns:
 
 ```zsh
 curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules/private/default/vpc/aws/versions \
@@ -64,17 +81,20 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules/priva
   }'
 ```
 
-The response includes a presigned `upload-url`. Upload the module tarball:
+The response's `links.upload` is a presigned URL. Upload the module tarball to it:
 
 ```zsh
 # Create tarball from module directory
 tar -czf module.tar.gz -C /path/to/module .
 
-# Upload to presigned URL
-curl -X PUT "<upload-url>" \
-  -H "Content-Type: application/octet-stream" \
+# Upload to the presigned URL. The content type must be application/gzip:
+# on S3 the URL is signed for it, and any other value is refused.
+curl -X PUT "<links.upload>" \
+  -H "Content-Type: application/gzip" \
   --data-binary @module.tar.gz
 ```
+
+This upload goes straight to object storage, so Terrapod learns it has arrived the next time the module is read: the CLI's version listing, or showing the module. At that point the version is marked uploaded, its interface is parsed, and runs are queued on linked workspaces. Until then the version is `pending` and the CLI does not list it. Before v1.7.1 nothing completed this step, and a version published this way stayed `pending` indefinitely.
 
 ### Using a Private Module
 
