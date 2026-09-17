@@ -430,6 +430,7 @@ Each version exposes VCS metadata in the API response:
 |---|---|
 | `vcs-commit-sha` | The git commit SHA this version was built from (empty for manual uploads) |
 | `vcs-tag` | The tag name that matched (e.g. `v1.2.3`; empty for manual uploads) |
+| `interface-error` | Why the version's inputs and outputs could not be read; `null` when they were (see [When the interface cannot be read](#when-the-interface-cannot-be-read)) |
 
 ### Module Interface (Inputs & Outputs)
 
@@ -459,7 +460,23 @@ When a module version is published (via upload or VCS tag), Terrapod parses the 
 GET /api/v1/registry-modules/private/default/{name}/{provider}/{version}/interface
 ```
 
-Returns `inputs` and `outputs` arrays. Returns `null` for versions published before this feature was enabled or when the feature is disabled.
+Returns `inputs` and `outputs` arrays, and `interface-error`. Returns `null` for versions published before this feature was enabled or when the feature is disabled.
+
+#### When the interface cannot be read
+
+Empty `inputs` and `outputs` normally mean the module declares no variables or outputs. They can also mean the module could not be parsed, and the two must not be confused: the [Service Catalog](service-catalog.md) builds its provision form from the inputs, so a module that failed to parse would otherwise produce an item with no fields and no error anywhere.
+
+So every time a version's interface is extracted — on upload, and each time the VCS poller publishes a tag or sees it move — Terrapod records the outcome in `interface-error`:
+
+- `null` — the interface was read. A later successful parse clears an earlier error, so re-publishing a fixed module removes the warning.
+- a short reason — the interface could not be read, or could only be read in part:
+  - `The module archive could not be read as a gzip-compressed tar file.` — the uploaded or fetched archive is corrupt or not a `.tar.gz`.
+  - `<file>.tf: invalid HCL at line L, column C` — a root `.tf` file failed to parse. Each such file is listed, separated by `; `. Declarations from the files that did parse are still returned, so `inputs` may be partial.
+  - `<file>.tf: skipped, larger than 5 MB` — a root `.tf` file was too large to parse.
+
+The reason is safe to show to anyone who can read the module: it names a file and a position, never the file's contents, a server path or a stack trace, and it is at most 500 characters.
+
+It appears as `interface-error` on the interface endpoint above, on each entry of the module's `version-statuses`, on the upload response, and on the catalog item's `/form` and `/interface`. The web UI shows it as a warning on the module page's **Inputs & Outputs** card and above the catalog item's provision form.
 
 **Configuration:**
 

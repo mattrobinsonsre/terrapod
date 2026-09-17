@@ -2006,6 +2006,14 @@ DELETE /api/v1/registry-modules/private/default/{name}/{provider}/versions/{vers
 
 **Autodiscovery.** To find the modules in a repository — the root and any submodules — and register them in bulk, use [Module Autodiscovery Rules](#module-autodiscovery-rules).
 
+### Module Version Interface
+
+```
+GET /api/v1/registry-modules/private/default/{name}/{provider}/{version}/interface
+```
+
+Returns the version's extracted `inputs[]` and `outputs[]`, and `interface-error`: `null` when the interface was read, otherwise a short, display-safe reason it could not be (a corrupt archive, or each root `.tf` file that failed to parse). When it is set, empty or partial `inputs` do **not** mean the module declares no variables. Each entry of a module's `version-statuses` carries the same `interface-error`. See [When the interface cannot be read](registry.md#when-the-interface-cannot-be-read). **Required permission:** `read` on the module. `404` when interface extraction is disabled or the version does not exist.
+
 ### Update Module
 
 ```
@@ -2039,7 +2047,8 @@ PUT /api/v1/registry-modules/private/default/{name}/{provider}/versions/{version
 A single streamed `PUT` of the gzipped module source tarball. The version
 is created **implicitly on upload** — there is no separate create step and
 no presigned URL. The server extracts the module interface (inputs and
-outputs) and triggers impact runs on any linked workspaces (see
+outputs) — the response's `interface-error` attribute is `null` when that
+succeeded and a short reason when it did not — and triggers impact runs on any linked workspaces (see
 [Module Impact Analysis](#registry----modules) and the workspace-links
 section below).
 
@@ -4477,7 +4486,7 @@ Delete returns `409` while the item has any instances — destroy or migrate the
 GET /api/v1/catalog-items/{id}/form
 ```
 
-Returns the resolved provision form: `resolved-version` (per the item's version policy) and `fields[]` — one field per resolved input (the module's curated variables plus every parameter from the item's provider templates), with type, description, default, sensitivity, and any enum choices. **Required permission:** catalog `read`.
+Returns the resolved provision form: `resolved-version` (per the item's version policy) and `fields[]` — one field per resolved input (the module's curated variables plus every parameter from the item's provider templates), with type, description, default, sensitivity, and any enum choices. It also returns `interface-error`, `null` unless the module version's interface could not be read — in which case the form may be missing variables the module needs, and the reason says why. **Required permission:** catalog `read`.
 
 #### Module Interface
 
@@ -4485,7 +4494,7 @@ Returns the resolved provision form: `resolved-version` (per the item's version 
 GET /api/v1/catalog-items/{id}/interface
 ```
 
-The inputs and outputs of the module version the item resolves to — its `default-version-pin`, or the latest uploaded version — derived from the module registry rather than stored on the item. Returns `resolved-version`, `inputs[]` (`name`, `type`, `description`, `default`, `required`, `sensitive`) and `outputs[]` (`name`, `description`, `sensitive`): the same entries as the module registry's interface endpoint. Where `/form` is the curated provision view, this is the module's own surface, and the only place its outputs can be read. All three are `null` while the module has no uploaded version. **Required permission:** catalog `read`.
+The inputs and outputs of the module version the item resolves to — its `default-version-pin`, or the latest uploaded version — derived from the module registry rather than stored on the item. Returns `resolved-version`, `inputs[]` (`name`, `type`, `description`, `default`, `required`, `sensitive`) and `outputs[]` (`name`, `description`, `sensitive`): the same entries as the module registry's interface endpoint. Where `/form` is the curated provision view, this is the module's own surface, and the only place its outputs can be read. All three are `null` while the module has no uploaded version. `interface-error` is `null` unless the version's interface could not be read, when it carries the reason. **Required permission:** catalog `read`.
 
 #### List Item Instances
 

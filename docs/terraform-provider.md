@@ -37,7 +37,8 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 `terrapod_agent_pool`, `terrapod_role`, `terrapod_user`,
 `terrapod_vcs_connection`, `terrapod_catalog_instances`,
 `terrapod_catalog_item_interface` (the inputs and outputs of the module version
-a catalog item resolves to), `terrapod_module_autodiscovery_rule_repositories`
+a catalog item resolves to, with a computed `interface_error` that is non-null
+when the module could not be parsed), `terrapod_module_autodiscovery_rule_repositories`
 (the repositories a module autodiscovery rule looks at, each with its status,
 origin and candidates; kept out of the rule resource so polls never change its
 state).
