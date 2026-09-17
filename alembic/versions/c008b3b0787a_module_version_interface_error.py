@@ -6,14 +6,14 @@ older replica mid-rolling-upgrade neither reads nor writes it, so a version it
 publishes simply has no reason recorded until the next parse.
 
 Revision ID: c008b3b0787a
-Revises: 0bf0f9292aa8
+Revises: b2bece766dc2
 """
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "c008b3b0787a"
-down_revision = "0bf0f9292aa8"
+down_revision = "b2bece766dc2"
 branch_labels = None
 depends_on = None
 
