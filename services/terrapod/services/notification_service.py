@@ -61,6 +61,7 @@ def build_run_payload(
     trigger: str,
     run_message: str = "",
     run_url: str = "",
+    run_created_by: str = "",
 ) -> dict:
     """Build a TFE V2-compatible notification payload."""
     return {
@@ -70,7 +71,7 @@ def build_run_payload(
         "run_id": run_id,
         "run_message": run_message,
         "run_created_at": run_created_at,
-        "run_created_by": "",
+        "run_created_by": run_created_by,
         "workspace_id": workspace_id,
         "workspace_name": workspace_name,
         "organization_name": "default",
@@ -80,10 +81,29 @@ def build_run_payload(
                 "trigger": trigger,
                 "run_status": run_status,
                 "run_updated_at": run_created_at,
+                # Who caused this status change isn't recorded -- a confirm or a
+                # cancel may come from someone other than the creator -- so it
+                # stays empty rather than naming the wrong person.
                 "run_updated_by": "",
             }
         ],
     }
+
+
+def run_ui_url(workspace_id: str, run_id: str) -> str:
+    """The run's page in the web UI, or "" when no external URL is configured.
+
+    Notifications are read outside Terrapod, so the link has to use the host
+    people reach the UI on -- `external_url` -- and nothing else. Without it
+    there is no honest link to give, and an empty `run_url` is what a receiver
+    already handles (#1706).
+    """
+    from terrapod.config import settings
+
+    base = (settings.external_url or "").rstrip("/")
+    if not base:
+        return ""
+    return f"{base}/workspaces/{workspace_id}/runs/{run_id}"
 
 
 def build_verification_payload(nc_name: str) -> dict:
@@ -240,6 +260,12 @@ async def deliver_email(
         f"Status: {run_status or 'N/A'}",
         f"Trigger: {trigger}",
     ]
+    # The link and who started the run are what make an alert actionable
+    # (#1706); each appears only when known.
+    if payload.get("run_created_by"):
+        body_lines.append(f"Started by: {payload['run_created_by']}")
+    if payload.get("run_url"):
+        body_lines.extend(["", f"View the run: {payload['run_url']}"])
 
     msg = EmailMessage()
     msg["From"] = smtp_cfg.from_address
