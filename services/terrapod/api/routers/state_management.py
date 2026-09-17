@@ -66,8 +66,75 @@ def _read_state_lineage_md5(path: str) -> tuple[str, str]:
     return state_data.get("lineage", ""), h.hexdigest()
 
 
+def _top_level_serial_span(buf: bytes) -> tuple[int, int] | None:
+    """Byte offsets of the top-level `"serial"` value in a JSON object, or None.
+
+    A small JSON scanner rather than a parse. It tracks string and nesting state
+    so that a `serial` key inside a resource's attributes, or the text "serial"
+    inside a string, is never mistaken for the state's own. It stops as soon as
+    it finds the value, which terraform and tofu write in the first few lines.
+
+    None means the value was not found in `buf`: either the object has no
+    top-level serial, or `buf` is a prefix that ends before it.
+    """
+    depth = 0
+    in_string = False
+    string_is_key = False
+    escaped = False
+    key_start = -1
+    last_key: bytes | None = None
+    expecting_value = False
+    i, n = 0, len(buf)
+    while i < n:
+        c = buf[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif c == 0x5C:  # backslash
+                escaped = True
+            elif c == 0x22:  # closing quote
+                in_string = False
+                if string_is_key:
+                    last_key = buf[key_start:i]
+            i += 1
+            continue
+        if c == 0x22:  # opening quote
+            in_string = True
+            key_start = i + 1
+            # At the top level a string is a key unless a colon came first.
+            string_is_key = depth == 1 and not expecting_value
+            if depth == 1:
+                expecting_value = False
+        elif c in (0x7B, 0x5B):  # { [
+            depth += 1
+            expecting_value = False
+        elif c in (0x7D, 0x5D):  # } ]
+            depth -= 1
+            if depth <= 0:
+                return None
+        elif depth == 1 and c == 0x3A:  # colon after a top-level key
+            if last_key == b"serial":
+                j = i + 1
+                while j < n and buf[j] in (0x20, 0x09, 0x0A, 0x0D):
+                    j += 1
+                k = j
+                while k < n and (0x30 <= buf[k] <= 0x39 or buf[k] == 0x2D):
+                    k += 1
+                if k == n:
+                    return None  # the value may continue past this prefix
+                if k == j:
+                    raise ValueError("state serial is not a number")
+                return j, k
+            expecting_value = True
+        elif depth == 1 and c == 0x2C:  # comma between top-level members
+            expecting_value = False
+            last_key = None
+        i += 1
+    return None
+
+
 def _state_with_serial(state_bytes: bytes, serial: int) -> bytes:
-    """The state file with its internal `serial` set to `serial`.
+    """The state file with its top-level `serial` set to `serial`.
 
     A state version has two serials: the row's, which the upload handler checks
     for collisions, and the one inside the file, which terraform/tofu read to
@@ -77,29 +144,77 @@ def _state_with_serial(state_bytes: bytes, serial: int) -> bytes:
     upload is refused with 409 -- after the apply has changed infrastructure,
     and again on every later run.
 
-    Runs in a worker thread (CLAUDE.md #13): it parses the whole state.
+    Only the digits of that one value change; every other byte is kept. That is
+    required, not tidiness. The engine serializes state its own way (Go escapes
+    `<`, `>` and `&`, and writes UTF-8 unescaped), and a later apply that
+    changes nothing re-uploads the engine's bytes at this serial. The runner
+    upload treats that as a no-op only if the bytes are identical; re-encoding
+    the state here would make it a 409 and mark the workspace diverged.
     """
-    state = json.loads(state_bytes)
-    if not isinstance(state, dict):
+    stripped = state_bytes.lstrip()
+    if not stripped.startswith(b"{"):
         raise ValueError("state is not a JSON object")
-    state["serial"] = serial
-    # terraform/tofu write state indented by two with a trailing newline; keep
-    # the stored file readable in the same shape.
-    return (json.dumps(state, indent=2) + "\n").encode()
+    span = _top_level_serial_span(state_bytes)
+    if span is None:
+        # No top-level serial. Nothing to align, and inventing one would mean
+        # re-encoding the state; store it as it came.
+        return state_bytes
+    a, b = span
+    return state_bytes[:a] + str(serial).encode() + state_bytes[b:]
 
 
-def _rewrite_state_file_serial(path: str, serial: int) -> tuple[str, int]:
-    """Set the `serial` inside a state file on disk; return (md5, size).
+def _rewrite_state_file_serial(path: str, serial: int) -> tuple[str, str, int]:
+    """Set the top-level `serial` in a state file on disk; return (md5, sha256, size).
 
-    The upload streams to a PVC tempfile (#14), so the rewrite happens there
-    and the md5/size recorded on the row describe the bytes actually stored.
+    The upload streams to a PVC tempfile (#14). Only the head of the file is read
+    to find the serial -- terraform and tofu write it in the first few lines --
+    and the rest is copied through, so the state is never held in memory.
     """
+    import shutil
+
+    window = 64 * 1024
     with open(path, "rb") as fh:
-        rewritten = _state_with_serial(fh.read(), serial)
-    with open(path, "wb") as fh:
-        fh.write(rewritten)
-    md5 = hashlib.md5(rewritten).hexdigest()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
-    return md5, len(rewritten)
+        head = fh.read(window)
+        if not head.lstrip().startswith(b"{"):
+            raise ValueError("state is not a JSON object")
+        span = _top_level_serial_span(head)
+        while span is None:
+            more = fh.read(window)
+            if not more:
+                break
+            head += more
+            span = _top_level_serial_span(head)
+            window *= 2
+
+    md5 = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+    sha = hashlib.sha256()
+
+    if span is None:
+        size = 0
+        with open(path, "rb") as fh:
+            while chunk := fh.read(1024 * 1024):
+                md5.update(chunk)
+                sha.update(chunk)
+                size += len(chunk)
+        return md5.hexdigest(), sha.hexdigest(), size
+
+    a, b = span
+    prefix = head[:a] + str(serial).encode()
+    tmp = path + ".serial"
+    size = 0
+    with open(path, "rb") as src, open(tmp, "wb") as dst:
+        dst.write(prefix)
+        md5.update(prefix)
+        sha.update(prefix)
+        size += len(prefix)
+        src.seek(b)
+        while chunk := src.read(1024 * 1024):
+            dst.write(chunk)
+            md5.update(chunk)
+            sha.update(chunk)
+            size += len(chunk)
+    shutil.move(tmp, path)
+    return md5.hexdigest(), sha.hexdigest(), size
 
 
 async def _require_sv_workspace_capability(
@@ -242,6 +357,9 @@ async def rollback_state_version(
 
     # Hash off the event loop — state files are multi-MB and hashlib blocks
     md5_digest = await asyncio.to_thread(lambda: hashlib.md5(state_bytes).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+    # sha256 too: the runner's same-serial no-op check prefers it, and a row
+    # without one falls back to md5 (#1702).
+    sha256_digest = await asyncio.to_thread(lambda: hashlib.sha256(state_bytes).hexdigest())
 
     # Create new state version record
     new_sv = StateVersion(
@@ -249,6 +367,7 @@ async def rollback_state_version(
         serial=new_serial,
         lineage=sv.lineage,
         md5=md5_digest,
+        sha256=sha256_digest,
         state_size=len(state_bytes),
         created_by=user.email,
     )
@@ -339,13 +458,19 @@ async def upload_state_manual(
         # Store the file under its row's serial, so the two agree (#1702). The
         # uploaded file's own serial is whatever the operator's copy said,
         # and left as-is it sends the next apply to a serial already taken.
-        md5, state_size = await asyncio.to_thread(_rewrite_state_file_serial, tmp_path, new_serial)
+        try:
+            md5, sha256, state_size = await asyncio.to_thread(
+                _rewrite_state_file_serial, tmp_path, new_serial
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid state JSON") from exc
 
         sv = StateVersion(
             workspace_id=ws.id,
             serial=new_serial,
             lineage=lineage,
             md5=md5,
+            sha256=sha256,
             state_size=state_size,
             created_by=user.email,
         )
