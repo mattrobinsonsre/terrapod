@@ -222,7 +222,12 @@ class TestRollbackStateVersion:
 
         mock_resolve.return_value = caps_for_level("write")
 
-        state_bytes = b'{"version": 4, "serial": 1, "lineage": "test"}'
+        # Written the way the engine writes it: Go escapes <, > and &, and writes
+        # UTF-8 as-is. Every byte but the serial must survive the rollback (#1702).
+        state_bytes = (
+            b'{\n  "version": 4,\n  "serial": 1,\n  "lineage": "test",\n'
+            b'  "outputs": {"o": {"value": "\\u003cb\\u003e \\u0026 caf\xc3\xa9"}}\n}\n'
+        )
         mock_storage = AsyncMock()
         mock_storage.get.return_value = state_bytes
         mock_get_storage.return_value = mock_storage
@@ -272,6 +277,13 @@ class TestRollbackStateVersion:
         import hashlib
 
         assert new_sv.md5 == hashlib.md5(stored_bytes).hexdigest()  # noqa: S324
+        assert new_sv.sha256 == hashlib.sha256(stored_bytes).hexdigest()
+
+        # Only the serial's digits changed. A later apply that changes nothing
+        # re-uploads the engine's own bytes at this serial, and the runner treats
+        # that as a no-op only if they are identical -- re-encoding the state
+        # here turned it into a 409 and a diverged workspace.
+        assert stored_bytes == state_bytes.replace(b'"serial": 1,', b'"serial": 4,')
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -401,7 +413,7 @@ class TestUploadState:
         user = _user(email="test@example.com")
         app, _ = _make_app(user, mock_db)
 
-        state_json = json.dumps({"version": 4, "serial": 1, "lineage": "test-lineage"})
+        state_json = '{\n  "version": 4,\n  "serial": 1,\n  "lineage": "test-lineage",\n  "note": "\\u003c\\u0026"\n}\n'
         ws_id_str = f"ws-{ws_id}"
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.post(
@@ -431,6 +443,9 @@ class TestUploadState:
         import hashlib
 
         assert new_sv.md5 == hashlib.md5(stored_bytes).hexdigest()  # noqa: S324
+        assert new_sv.sha256 == hashlib.sha256(stored_bytes).hexdigest()
+        # Every byte but the serial is the operator's upload, unchanged.
+        assert stored_bytes == state_json.encode().replace(b'"serial": 1,', b'"serial": 6,')
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
