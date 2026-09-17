@@ -126,8 +126,15 @@ def _run_json(
     workspace_name: str = "",
     workspace_has_vcs: bool = False,
     state_version_id: str | None = None,
+    blocked_by: str | None = None,
 ) -> dict:
-    """Serialize a Run to TFE V2 JSON:API format."""
+    """Serialize a Run to TFE V2 JSON:API format.
+
+    ``blocked_by`` is the post-plan gate holding the run, from
+    ``run_service.blocked_by`` -- computed by the caller because it needs the
+    database. Callers serializing a run that cannot be held (just created,
+    claimed, confirmed, discarded or canceled) leave it None.
+    """
     run_id = f"run-{run.id}"
 
     return {
@@ -136,6 +143,12 @@ def _run_json(
             "type": "runs",
             "attributes": {
                 "status": run.status,
+                # Which post-plan gate holds the run (#1725): `run-task`,
+                # `policy`, `security-scan`, or null. A held run reports status
+                # `planning` although its plan has finished; this is how a client
+                # tells the two apart until 2.0 gives held runs their own
+                # statuses (#1704).
+                "blocked-by": blocked_by,
                 "message": run.message,
                 # Why a run was discarded (state changed / plan expired /
                 # superseded), null otherwise (#646/#647).
@@ -246,9 +259,12 @@ def _run_json(
                     and run_service.resolve_auto_apply_mode(run) != "always"
                     and not run.plan_only
                     and run.has_changes is not False,
-                    "is-discardable": run.status == "planned"
-                    and not run.plan_only
-                    and run.has_changes is not False,
+                    "is-discardable": (
+                        run.status == "planned"
+                        and not run.plan_only
+                        and run.has_changes is not False
+                    )
+                    or run_service.is_discardable_hold(run),
                     # Cancel only applies to in-progress states. In particular
                     # `planned` (awaiting confirmation) is NOT cancelable —
                     # the user should confirm or discard. Terminal states
@@ -262,9 +278,12 @@ def _run_json(
                     and not run.plan_only
                     and run.has_changes is not False,
                     "can-cancel": run.status in _CANCELABLE_STATES,
-                    "can-discard": run.status == "planned"
-                    and not run.plan_only
-                    and run.has_changes is not False,
+                    "can-discard": (
+                        run.status == "planned"
+                        and not run.plan_only
+                        and run.has_changes is not False
+                    )
+                    or run_service.is_discardable_hold(run),
                     "can-retry": run.status in run_service.TERMINAL_STATES
                     or (run.plan_only and run.status == "planned"),
                     "can-force-execute": False,
@@ -576,6 +595,7 @@ async def show_run(
             workspace_name=ws.name if ws else "",
             workspace_has_vcs=bool(ws and ws.vcs_connection_id),
             state_version_id=sv_id,
+            blocked_by=await run_service.blocked_by(db, run),
         ),
     )
 
@@ -613,7 +633,12 @@ async def list_workspace_runs(
     return JSONResponse(
         content={
             "data": [
-                _run_json(r, workspace_name=ws.name, workspace_has_vcs=has_vcs)["data"]
+                _run_json(
+                    r,
+                    workspace_name=ws.name,
+                    workspace_has_vcs=has_vcs,
+                    blocked_by=await run_service.blocked_by(db, r),
+                )["data"]
                 for r in runs
             ],
             "meta": build_meta(total, page_number, page_size),
@@ -840,7 +865,10 @@ def _plan_status(run: Run) -> str:
     if s in ("pending", "queued"):
         return "pending"
     if s == "planning":
-        return "running"
+        # A run held at a post-plan gate has a finished plan (#1725). Reporting
+        # it `running` kept go-tfe's plan log reader polling, so `tofu apply`
+        # hung on a held run until something else ended it.
+        return "finished" if run_service.is_held_at_gate(run) else "running"
     if s in ("planned", "confirmed", "applying", "canceling", "applied"):
         # `canceling` only arises from `applying`, by which point the
         # plan phase is finished — report it accordingly.
@@ -2288,7 +2316,7 @@ async def update_run_status(
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
 
-    return JSONResponse(content=_run_json(run))
+    return JSONResponse(content=_run_json(run, blocked_by=await run_service.blocked_by(db, run)))
 
 
 # ── Runner Token ──────────────────────────────────────────────────────
