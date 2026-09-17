@@ -67,11 +67,19 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _cv_json(cv: ConfigurationVersion) -> dict:
-    """Serialize a ConfigurationVersion to TFE V2 JSON:API format."""
-    from terrapod.config import settings
+def _cv_json(cv: ConfigurationVersion, request: Request | None = None) -> dict:
+    """Serialize a ConfigurationVersion to TFE V2 JSON:API format.
 
-    base = settings.auth.callback_base_url.rstrip("/")
+    `upload-url` must be absolute (go-tfe does not resolve a relative one), and
+    must name a host the caller can reach. It is derived from the request, as
+    state upload URLs already are. It used to come straight from
+    `auth.callback_base_url` -- an SSO setting that defaults to
+    `http://localhost:8000` -- so on an install without SSO every CLI config
+    upload was handed an unreachable URL (#1703).
+    """
+    from terrapod.api.routers.tfe_v2 import _request_base_url
+
+    base = _request_base_url(request)
     cv_id = f"cv-{cv.id}"
 
     return {
@@ -109,6 +117,7 @@ async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
 
 @router.post("/workspaces/{workspace_id}/configuration-versions", status_code=201)
 async def create_configuration_version(
+    request: Request,
     workspace_id: str = Path(...),
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -145,11 +154,12 @@ async def create_configuration_version(
     await db.commit()
     await db.refresh(cv)
 
-    return JSONResponse(content=_cv_json(cv), status_code=201)
+    return JSONResponse(content=_cv_json(cv, request), status_code=201)
 
 
 @router.get("/configuration-versions/{cv_id}")
 async def show_configuration_version(
+    request: Request,
     cv_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -159,11 +169,12 @@ async def show_configuration_version(
     cv = await run_service.get_configuration_version(db, cv_uuid)
     if cv is None:
         raise HTTPException(status_code=404, detail="Configuration version not found")
-    return JSONResponse(content=_cv_json(cv))
+    return JSONResponse(content=_cv_json(cv, request))
 
 
 @router.get("/workspaces/{workspace_id}/configuration-versions")
 async def list_configuration_versions(
+    request: Request,
     workspace_id: str = Path(...),
     page_size: int = Query(_DEFAULT_PAGE_SIZE, alias="page[size]", ge=1, le=_MAX_PAGE_SIZE),
     page_number: int = Query(1, alias="page[number]", ge=1),
@@ -215,7 +226,7 @@ async def list_configuration_versions(
 
     return JSONResponse(
         content={
-            "data": [_cv_json(cv)["data"] for cv in cvs],
+            "data": [_cv_json(cv, request)["data"] for cv in cvs],
             "meta": {
                 **build_meta(total, page_number, page_size),
                 "current-id": f"cv-{current_cv_uuid}" if current_cv_uuid else None,
