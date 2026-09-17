@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import select
 
-from terrapod.db.models import Run
+from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.services import security_scan_service
 from terrapod.services.run_reconciler import _reconcile_one
@@ -28,6 +28,10 @@ async def _hold_at_scan_gate(run_id: str) -> uuid.UUID:
     rid = uuid.UUID(run_id.removeprefix("run-"))
     async with get_db_session() as db, db.begin():
         run = (await db.execute(select(Run).where(Run.id == rid))).scalar_one()
+        # The gate only holds a run on a workspace set to `enforced`; with
+        # `off` or `advisory`, `complete_plan` would rightly release it.
+        ws = await db.get(Workspace, run.workspace_id)
+        ws.security_scan_enforcement = "enforced"
         run.status = "planning"
         run.plan_started_at = datetime.now(UTC)
         run.plan_finished_at = datetime.now(UTC)
