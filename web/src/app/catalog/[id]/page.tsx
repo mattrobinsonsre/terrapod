@@ -14,6 +14,7 @@ import { Modal } from '@/components/modal'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 import {
+  ModuleInterfaceError,
   ModuleInterfaceTables,
   type ModuleInterfaceInput,
   type ModuleInterfaceOutput,
@@ -48,6 +49,9 @@ interface FormField {
 interface ProvisionForm {
   'resolved-version': string | null
   fields: FormField[]
+  // Why the module's interface could not be read (#1707); null when it was.
+  // Without it a form with no fields looks like a module with no variables.
+  'interface-error'?: string | null
 }
 
 // The linked module version's own inputs and outputs (#1585): read-only, and
@@ -56,6 +60,7 @@ interface ItemInterface {
   'resolved-version': string | null
   inputs: ModuleInterfaceInput[] | null
   outputs: ModuleInterfaceOutput[] | null
+  'interface-error'?: string | null
 }
 
 interface Instance {
@@ -601,6 +606,13 @@ export default function CatalogItemPage() {
               </div>
             </div>
 
+            {form?.['interface-error'] && (
+              <ModuleInterfaceError
+                reason={form['interface-error']}
+                hint={t('provision.interfaceErrorHint')}
+              />
+            )}
+
             {/* Dynamic form fields from /form */}
             {form && form.fields.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-700/50">
@@ -668,7 +680,17 @@ export default function CatalogItemPage() {
               </button>
               {ifaceExpanded && (
                 <div className="px-5 pb-5 space-y-4 border-t border-slate-700/50 pt-4">
-                  <ModuleInterfaceTables inputs={iface.inputs} outputs={iface.outputs} />
+                  {iface['interface-error'] && (
+                    <ModuleInterfaceError
+                      reason={iface['interface-error']}
+                      hint={tr('moduleDetail.interface.errorHint')}
+                    />
+                  )}
+                  <ModuleInterfaceTables
+                    inputs={iface.inputs}
+                    outputs={iface.outputs}
+                    interfaceError={iface['interface-error'] ?? null}
+                  />
                 </div>
               )}
             </div>
@@ -759,6 +781,12 @@ export default function CatalogItemPage() {
                   )}
                 </select>
               </div>
+              {form?.['interface-error'] && (
+                <ModuleInterfaceError
+                  reason={form['interface-error']}
+                  hint={t('provision.interfaceErrorHint')}
+                />
+              )}
               {form && form.fields.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {form.fields.map((field) =>

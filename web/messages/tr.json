@@ -531,7 +531,9 @@
         "requiredBadge": "gerekli",
         "optionalBadge": "isteğe bağlı",
         "sensitiveBadge": "hassas",
-        "noneDeclared": "Bu modül sürümü herhangi bir girdi veya çıktı bildirmiyor."
+        "noneDeclared": "Bu modül sürümü herhangi bir girdi veya çıktı bildirmiyor.",
+        "errorTitle": "Bu sürümün girdileri ve çıktıları okunamadı",
+        "errorHint": "Burada gösterilenler boş veya eksik olabilir. Modülü düzeltip yeniden yayımlayın."
       },
       "versions": {
         "title": "Sürümler",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (varsayılan sabitleme)",
       "labelsOptional": "Etiketler (isteğe bağlı)",
       "autoApplyHint": "Otomatik uygula, değişiklikleri elle inceleme adımı olmadan uygular.",
+      "interfaceErrorHint": "Bu formda modülün ihtiyaç duyduğu değişkenler eksik olabilir. Modülün sahibinden modülü düzeltip yeni bir sürüm yayımlamasını isteyin.",
       "provisioning": "Hazırlanıyor…",
       "submit": "Hazırla"
     },

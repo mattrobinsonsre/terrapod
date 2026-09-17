@@ -531,7 +531,9 @@
         "requiredBadge": "gofynnol",
         "optionalBadge": "dewisol",
         "sensitiveBadge": "sensitif",
-        "noneDeclared": "Nid yw'r fersiwn modiwl hon yn datgan unrhyw fewnbynnau nac allbynnau."
+        "noneDeclared": "Nid yw'r fersiwn modiwl hon yn datgan unrhyw fewnbynnau nac allbynnau.",
+        "errorTitle": "Nid oedd modd darllen mewnbynnau ac allbynnau''r fersiwn hon",
+        "errorHint": "Gall yr hyn a ddangosir yma fod yn wag neu''n anghyflawn. Trwsiwch y modiwl a''i gyhoeddi eto."
       },
       "versions": {
         "title": "Fersiynau",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (pin rhagosodedig)",
       "labelsOptional": "Labeli (dewisol)",
       "autoApplyHint": "Mae gweithredu awtomatig yn gweithredu newidiadau heb gam adolygu â llaw.",
+      "interfaceErrorHint": "Efallai bod y ffurflen hon yn brin o newidynnau sydd eu hangen ar y modiwl. Gofynnwch i berchennog y modiwl ei drwsio a chyhoeddi fersiwn newydd.",
       "provisioning": "Wrthi'n darparu…",
       "submit": "Darparu"
     },

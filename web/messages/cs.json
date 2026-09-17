@@ -531,7 +531,9 @@
         "requiredBadge": "povinné",
         "optionalBadge": "volitelné",
         "sensitiveBadge": "citlivé",
-        "noneDeclared": "Tato verze modulu nedeklaruje žádné vstupy ani výstupy."
+        "noneDeclared": "Tato verze modulu nedeklaruje žádné vstupy ani výstupy.",
+        "errorTitle": "Vstupy a výstupy této verze nebylo možné načíst",
+        "errorHint": "Zde zobrazený obsah může být prázdný nebo neúplný. Opravte modul a publikujte jej znovu."
       },
       "versions": {
         "title": "Verze",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (výchozí připnutí)",
       "labelsOptional": "Štítky (volitelné)",
       "autoApplyHint": "Automatické použití aplikuje změny bez kroku ruční kontroly.",
+      "interfaceErrorHint": "V tomto formuláři mohou chybět proměnné, které modul potřebuje. Požádejte vlastníka modulu, aby jej opravil a publikoval novou verzi.",
       "provisioning": "Zřizování…",
       "submit": "Zřídit"
     },

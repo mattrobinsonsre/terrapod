@@ -531,7 +531,9 @@
         "requiredBadge": "erforderlich",
         "optionalBadge": "optional",
         "sensitiveBadge": "vertraulich",
-        "noneDeclared": "Diese Modulversion deklariert keine Eingaben oder Ausgaben."
+        "noneDeclared": "Diese Modulversion deklariert keine Eingaben oder Ausgaben.",
+        "errorTitle": "Die Eingaben und Ausgaben dieser Version konnten nicht gelesen werden",
+        "errorHint": "Die Anzeige hier kann leer oder unvollständig sein. Korrigieren Sie das Modul und veröffentlichen Sie es erneut."
       },
       "versions": {
         "title": "Versionen",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (Standard-Anheftung)",
       "labelsOptional": "Beschriftungen (optional)",
       "autoApplyHint": "Auto-Apply wendet Änderungen ohne manuellen Überprüfungsschritt an.",
+      "interfaceErrorHint": "Diesem Formular fehlen möglicherweise Variablen, die das Modul benötigt. Bitten Sie den Besitzer des Moduls, es zu korrigieren und eine neue Version zu veröffentlichen.",
       "provisioning": "Wird bereitgestellt…",
       "submit": "Bereitstellen"
     },

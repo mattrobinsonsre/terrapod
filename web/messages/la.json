@@ -531,7 +531,9 @@
         "requiredBadge": "requisitum",
         "optionalBadge": "optionale",
         "sensitiveBadge": "sensibile",
-        "noneDeclared": "Haec versio moduli nullos ingressus nec egressus declarat."
+        "noneDeclared": "Haec versio moduli nullos ingressus nec egressus declarat.",
+        "errorTitle": "Ingressus et egressus huius versionis legi non potuerunt",
+        "errorHint": "Quae hic ostenduntur vacua aut imperfecta esse possunt. Modulum corrige et iterum publica."
       },
       "versions": {
         "title": "Versiones",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (fixatio praedefinita)",
       "labelsOptional": "Tituli (optionales)",
       "autoApplyHint": "Applicatio automatica mutationes sine gradu recognitionis manualis applicat.",
+      "interfaceErrorHint": "Huic formulae variabiles quas modulus requirit fortasse desunt. Roga possessorem moduli ut eum corrigat et novam versionem publicet.",
       "provisioning": "Providetur…",
       "submit": "Providere"
     },

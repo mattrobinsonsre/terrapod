@@ -531,7 +531,9 @@
         "requiredBadge": "obligatorio",
         "optionalBadge": "opcional",
         "sensitiveBadge": "sensible",
-        "noneDeclared": "Esta versión del módulo no declara entradas ni salidas."
+        "noneDeclared": "Esta versión del módulo no declara entradas ni salidas.",
+        "errorTitle": "No se pudieron leer las entradas y salidas de esta versión",
+        "errorHint": "Lo que se muestra aquí puede estar vacío o incompleto. Corrija el módulo y vuelva a publicarlo."
       },
       "versions": {
         "title": "Versiones",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (fijación predeterminada)",
       "labelsOptional": "Etiquetas (opcional)",
       "autoApplyHint": "La aplicación automática aplica los cambios sin un paso de revisión manual.",
+      "interfaceErrorHint": "Es posible que a este formulario le falten variables que el módulo necesita. Pida al propietario del módulo que lo corrija y publique una nueva versión.",
       "provisioning": "Aprovisionando…",
       "submit": "Aprovisionar"
     },

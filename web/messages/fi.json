@@ -531,7 +531,9 @@
         "requiredBadge": "pakollinen",
         "optionalBadge": "valinnainen",
         "sensitiveBadge": "arkaluonteinen",
-        "noneDeclared": "Tämä moduuliversio ei määrittele syötteitä eikä tulosteita."
+        "noneDeclared": "Tämä moduuliversio ei määrittele syötteitä eikä tulosteita.",
+        "errorTitle": "Tämän version syötteitä ja tulosteita ei voitu lukea",
+        "errorHint": "Tässä näytettävä voi olla tyhjä tai puutteellinen. Korjaa moduuli ja julkaise se uudelleen."
       },
       "versions": {
         "title": "Versiot",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (oletuskiinnitys)",
       "labelsOptional": "Tunnisteet (valinnainen)",
       "autoApplyHint": "Automaattinen käyttöönotto ottaa muutokset käyttöön ilman manuaalista tarkasteluvaihetta.",
+      "interfaceErrorHint": "Tästä lomakkeesta saattaa puuttua moduulin tarvitsemia muuttujia. Pyydä moduulin omistajaa korjaamaan se ja julkaisemaan uusi versio.",
       "provisioning": "Valmistellaan…",
       "submit": "Valmistele"
     },

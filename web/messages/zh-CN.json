@@ -531,7 +531,9 @@
         "requiredBadge": "必填",
         "optionalBadge": "可选",
         "sensitiveBadge": "敏感",
-        "noneDeclared": "此模块版本未声明任何输入或输出。"
+        "noneDeclared": "此模块版本未声明任何输入或输出。",
+        "errorTitle": "无法读取此版本的输入和输出",
+        "errorHint": "此处显示的内容可能为空或不完整。请修复该模块并重新发布。"
       },
       "versions": {
         "title": "版本",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version}（默认固定）",
       "labelsOptional": "标签（可选）",
       "autoApplyHint": "自动应用会在没有手动审查步骤的情况下应用更改。",
+      "interfaceErrorHint": "此表单可能缺少模块所需的变量。请让模块所有者修复并发布新版本。",
       "provisioning": "正在预配…",
       "submit": "预配"
     },

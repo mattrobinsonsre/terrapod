@@ -531,7 +531,9 @@
         "requiredBadge": "required",
         "optionalBadge": "optional",
         "sensitiveBadge": "sensitive",
-        "noneDeclared": "This module version declares no inputs or outputs."
+        "noneDeclared": "This module version declares no inputs or outputs.",
+        "errorTitle": "The inputs and outputs of this version could not be read",
+        "errorHint": "What is shown here may be empty or incomplete. Fix the module and publish it again."
       },
       "versions": {
         "title": "Versions",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (default pin)",
       "labelsOptional": "Labels (optional)",
       "autoApplyHint": "Auto-apply applies changes without a manual review step.",
+      "interfaceErrorHint": "This form may be missing variables the module needs. Ask the owner of the module to fix it and publish a new version.",
       "provisioning": "Provisioning…",
       "submit": "Provision"
     },

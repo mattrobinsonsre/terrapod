@@ -531,7 +531,9 @@
         "requiredBadge": "poQlu'",
         "optionalBadge": "DIch",
         "sensitiveBadge": "pegh",
-        "noneDeclared": "Segh mI'vam 'elmey chelmey je maQbe'."
+        "noneDeclared": "Segh mI'vam 'elmey chelmey je maQbe'.",
+        "errorTitle": "mI'vam 'elmey chelmey je laDlaHbe'lu'",
+        "errorHint": "naDev Dochmey cha'lu'bogh chIm pagh naQbe' chaq. Segh yItI' 'ej yImuchqa'."
       },
       "versions": {
         "title": "mI'mey",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (motlh ngaQmoH)",
       "labelsOptional": "permey (DaH DIch)",
       "autoApplyHint": "laDmeH ghopHa' vangbe'DI', tlhoS lo' choHmey lo'.",
+      "interfaceErrorHint": "chaq ghItlhvam Hutlh Segh poQbogh choHmey. Segh ghajwI' yItlhob: Segh tI' 'ej mI' chu' much.",
       "provisioning": "cha'moHtaH…",
       "submit": "cha'moH"
     },

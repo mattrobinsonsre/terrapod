@@ -531,7 +531,9 @@
         "requiredBadge": "obligatorisk",
         "optionalBadge": "valfri",
         "sensitiveBadge": "känslig",
-        "noneDeclared": "Denna modulversion deklarerar inga indata eller utdata."
+        "noneDeclared": "Denna modulversion deklarerar inga indata eller utdata.",
+        "errorTitle": "Indata och utdata för den här versionen kunde inte läsas",
+        "errorHint": "Det som visas här kan vara tomt eller ofullständigt. Rätta modulen och publicera den igen."
       },
       "versions": {
         "title": "Versioner",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (standardfixering)",
       "labelsOptional": "Etiketter (valfritt)",
       "autoApplyHint": "Auto-applicera tillämpar ändringar utan ett manuellt granskningssteg.",
+      "interfaceErrorHint": "Det här formuläret kan sakna variabler som modulen behöver. Be ägaren av modulen att rätta den och publicera en ny version.",
       "provisioning": "Provisionerar…",
       "submit": "Provisionera"
     },

@@ -17,15 +17,38 @@ export interface ModuleInterfaceOutput {
   sensitive: boolean
 }
 
+// Why a module version's interface could not be read (#1707). The reason is
+// the server's short summary (a file name and position, never source text), so
+// it is shown as-is; the hint says what the empty or partial surface means on
+// the page showing it.
+export function ModuleInterfaceError({ reason, hint }: { reason: string; hint: string }) {
+  const t = useTranslations('registry')
+  return (
+    <div
+      role="alert"
+      data-testid="module-interface-error"
+      className="rounded-lg border border-amber-700/60 bg-amber-900/20 px-4 py-3 text-sm text-amber-200"
+    >
+      <p className="font-medium">{t('moduleDetail.interface.errorTitle')}</p>
+      <p className="mt-1 font-mono text-xs break-words text-amber-100">{reason}</p>
+      <p className="mt-1 text-xs text-amber-300">{hint}</p>
+    </div>
+  )
+}
+
 // The inputs and outputs of a module version, shared by the module registry
 // page and the catalog item page (#1585) so both show a module's surface the
-// same way. Null for both means the interface was never extracted.
+// same way. Null for both means the interface was never extracted. When
+// `interfaceError` is set (#1707) empty lists are a failed parse, not a module
+// that declares nothing, so "declares no inputs or outputs" is not claimed.
 export function ModuleInterfaceTables({
   inputs,
   outputs,
+  interfaceError = null,
 }: {
   inputs: ModuleInterfaceInput[] | null
   outputs: ModuleInterfaceOutput[] | null
+  interfaceError?: string | null
 }) {
   const t = useTranslations('registry')
 
@@ -101,7 +124,7 @@ export function ModuleInterfaceTables({
         </div>
       )}
 
-      {inputs?.length === 0 && outputs?.length === 0 && (
+      {!interfaceError && inputs?.length === 0 && outputs?.length === 0 && (
         <p className="text-sm text-slate-500">{t('moduleDetail.interface.noneDeclared')}</p>
       )}
     </>

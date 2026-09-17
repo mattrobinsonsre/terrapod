@@ -531,7 +531,9 @@
         "requiredBadge": "påkrevd",
         "optionalBadge": "valgfri",
         "sensitiveBadge": "sensitiv",
-        "noneDeclared": "Denne modulversjonen deklarerer ingen inndata eller utdata."
+        "noneDeclared": "Denne modulversjonen deklarerer ingen inndata eller utdata.",
+        "errorTitle": "Inndata og utdata for denne versjonen kunne ikke leses",
+        "errorHint": "Det som vises her, kan være tomt eller ufullstendig. Rett modulen og publiser den på nytt."
       },
       "versions": {
         "title": "Versjoner",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (standardfesting)",
       "labelsOptional": "Etiketter (valgfritt)",
       "autoApplyHint": "Auto-anvend anvender endringer uten et manuelt gjennomgangstrinn.",
+      "interfaceErrorHint": "Dette skjemaet kan mangle variabler som modulen trenger. Be eieren av modulen om å rette den og publisere en ny versjon.",
       "provisioning": "Klargjør …",
       "submit": "Klargjør"
     },

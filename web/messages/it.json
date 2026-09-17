@@ -531,7 +531,9 @@
         "requiredBadge": "obbligatorio",
         "optionalBadge": "opzionale",
         "sensitiveBadge": "sensibile",
-        "noneDeclared": "Questa versione del modulo non dichiara input o output."
+        "noneDeclared": "Questa versione del modulo non dichiara input o output.",
+        "errorTitle": "Non è stato possibile leggere gli input e gli output di questa versione",
+        "errorHint": "Quanto mostrato qui potrebbe essere vuoto o incompleto. Correggi il modulo e pubblicalo di nuovo."
       },
       "versions": {
         "title": "Versioni",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (fissata predefinita)",
       "labelsOptional": "Etichette (opzionale)",
       "autoApplyHint": "L''applicazione automatica applica le modifiche senza un passaggio di revisione manuale.",
+      "interfaceErrorHint": "In questo form potrebbero mancare variabili richieste dal modulo. Chiedi al proprietario del modulo di correggerlo e pubblicare una nuova versione.",
       "provisioning": "Provisioning in corso…",
       "submit": "Provisiona"
     },

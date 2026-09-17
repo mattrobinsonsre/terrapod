@@ -531,7 +531,9 @@
         "requiredBadge": "필수",
         "optionalBadge": "선택",
         "sensitiveBadge": "민감",
-        "noneDeclared": "이 모듈 버전은 입력이나 출력을 선언하지 않습니다."
+        "noneDeclared": "이 모듈 버전은 입력이나 출력을 선언하지 않습니다.",
+        "errorTitle": "이 버전의 입력과 출력을 읽을 수 없습니다",
+        "errorHint": "여기에 표시된 내용이 비어 있거나 불완전할 수 있습니다. 모듈을 수정한 후 다시 게시하세요."
       },
       "versions": {
         "title": "버전",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (기본 고정)",
       "labelsOptional": "라벨 (선택 사항)",
       "autoApplyHint": "자동 적용은 수동 검토 단계 없이 변경 사항을 적용합니다.",
+      "interfaceErrorHint": "이 양식에 모듈에 필요한 변수가 누락되었을 수 있습니다. 모듈 소유자에게 수정 후 새 버전을 게시하도록 요청하세요.",
       "provisioning": "프로비저닝 중…",
       "submit": "프로비저닝"
     },

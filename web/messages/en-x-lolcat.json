@@ -531,7 +531,9 @@
         "requiredBadge": "requird",
         "optionalBadge": "opshunul",
         "sensitiveBadge": "sensitiv",
-        "noneDeclared": "Dis module vershun declarez noes inputz or outputz."
+        "noneDeclared": "Dis module vershun declarez noes inputz or outputz.",
+        "errorTitle": "Teh inputz an outputz of dis vershun cud not be red",
+        "errorHint": "Wut iz shown heer may be empteh or incomplit. Fix teh module an publish it agin."
       },
       "versions": {
         "title": "Vershunz",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (default pin)",
       "labelsOptional": "Labelz (opshunul)",
       "autoApplyHint": "Auto-apply appliez changez wifout a manual review step.",
+      "interfaceErrorHint": "Dis form may be missin variablez teh module needz. Ask teh ownr of teh module 2 fix it an publish a noo vershun.",
       "provisioning": "Provishunin…",
       "submit": "Provishun"
     },

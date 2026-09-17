@@ -531,7 +531,9 @@
         "requiredBadge": "påkrævet",
         "optionalBadge": "valgfri",
         "sensitiveBadge": "følsom",
-        "noneDeclared": "Denne modulversion erklærer ingen input eller output."
+        "noneDeclared": "Denne modulversion erklærer ingen input eller output.",
+        "errorTitle": "Input og output for denne version kunne ikke læses",
+        "errorHint": "Det, der vises her, kan være tomt eller ufuldstændigt. Ret modulet, og udgiv det igen."
       },
       "versions": {
         "title": "Versioner",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (standardfastlåsning)",
       "labelsOptional": "Labels (valgfri)",
       "autoApplyHint": "Automatisk anvendelse anvender ændringer uden et manuelt gennemgangstrin.",
+      "interfaceErrorHint": "Denne formular mangler muligvis variabler, som modulet har brug for. Bed ejeren af modulet om at rette det og udgive en ny version.",
       "provisioning": "Klargør…",
       "submit": "Klargør"
     },

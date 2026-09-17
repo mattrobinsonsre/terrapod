@@ -926,6 +926,64 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('a catalog item whose module could not be parsed shows why, and still fits a phone (#1707)', async ({
+    page,
+  }) => {
+    // The form comes back with no fields because the module failed to parse;
+    // the warning carrying the reason must be visible, and a long reason must
+    // wrap rather than widen the page.
+    const itemId = 'cat-0198e2e0-0000-7000-8000-00000000c707';
+    const base = `/api/terrapod/v1/catalog-items/${itemId}`;
+    const reason =
+      'variables_with_a_rather_long_file_name_for_a_phone.tf: invalid HCL at line 12, column 7; main.tf: invalid HCL at line 3, column 1';
+    const stubs: Record<string, unknown> = {
+      [base]: {
+        data: {
+          id: itemId,
+          type: 'catalog-items',
+          attributes: {
+            name: 'e2e-broken',
+            'display-name': 'A broken module',
+            description: '',
+            enabled: true,
+            'module-id': 'mod-e2e',
+            'module-name': 'broken',
+            'module-provider': 'aws',
+            'default-version-pin': null,
+            'allowed-agent-pool-ids': null,
+          },
+        },
+      },
+      [`${base}/form`]: {
+        data: {
+          type: 'catalog-item-forms',
+          attributes: { 'resolved-version': '1.0.0', fields: [], 'interface-error': reason },
+        },
+      },
+      [`${base}/interface`]: {
+        data: {
+          type: 'catalog-item-interfaces',
+          attributes: { 'resolved-version': '1.0.0', inputs: [], outputs: [], 'interface-error': reason },
+        },
+      },
+      [`${base}/instances`]: {
+        data: [],
+        meta: { pagination: { 'current-page': 1, 'page-size': 0, 'total-count': 0, 'total-pages': 0 } },
+      },
+    };
+    await page.route(
+      (url) => url.pathname in stubs,
+      (route) => route.fulfill({ json: stubs[new URL(route.request().url()).pathname] }),
+    );
+
+    await page.goto(`/catalog/${itemId}`);
+    const warning = page.getByTestId('module-interface-error').first();
+    await expect(warning).toBeVisible({ timeout: 15_000 });
+    await expect(warning).toContainText(reason);
+    await expect(warning).toContainText('This form may be missing variables the module needs.');
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('registry module list renders as a card grid at phone width', async ({ page }) => {
     // The registry list pages are responsive card grids (grid-cols-1 at phone),
     // so a seeded module shows as a full-width card with no horizontal scroll.

@@ -531,7 +531,9 @@
         "requiredBadge": "wymagane",
         "optionalBadge": "opcjonalne",
         "sensitiveBadge": "wrażliwe",
-        "noneDeclared": "Ta wersja modułu nie deklaruje żadnych wejść ani wyjść."
+        "noneDeclared": "Ta wersja modułu nie deklaruje żadnych wejść ani wyjść.",
+        "errorTitle": "Nie udało się odczytać wejść i wyjść tej wersji",
+        "errorHint": "To, co tu widać, może być puste lub niekompletne. Popraw moduł i opublikuj go ponownie."
       },
       "versions": {
         "title": "Wersje",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (domyślne przypięcie)",
       "labelsOptional": "Etykiety (opcjonalne)",
       "autoApplyHint": "Automatyczne zastosowanie stosuje zmiany bez etapu ręcznego przeglądu.",
+      "interfaceErrorHint": "W tym formularzu może brakować zmiennych potrzebnych modułowi. Poproś właściciela modułu o poprawienie go i opublikowanie nowej wersji.",
       "provisioning": "Udostępnianie…",
       "submit": "Udostępnij"
     },

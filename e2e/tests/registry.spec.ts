@@ -1,7 +1,33 @@
 import { test, expect } from '@playwright/test';
-import { getStoredToken, createRegistryModule } from '../helpers/api';
+import { API_URL, getStoredToken, createRegistryModule } from '../helpers/api';
 
 test.describe('Registry — Modules', () => {
+  test('a version whose interface could not be read says why, instead of showing no inputs (#1707)', async ({
+    page,
+  }) => {
+    // A real upload through the API of bytes that are not a tarball: the
+    // parse fails server-side and the page must surface the reason rather
+    // than claim the module declares nothing.
+    const token = getStoredToken();
+    const name = `e2eifaceerr${Date.now().toString(36)}`;
+    await createRegistryModule(token, name, 'aws');
+    const up = await fetch(
+      `${API_URL}/api/terrapod/v1/registry-modules/private/default/${name}/aws/versions/1.0.0/upload`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream' },
+        body: 'this is not a gzip tarball',
+      },
+    );
+    expect(up.ok).toBeTruthy();
+
+    await page.goto(`/registry/modules/${name}/aws`);
+    const warning = page.getByTestId('module-interface-error');
+    await expect(warning).toBeVisible({ timeout: 15_000 });
+    await expect(warning).toContainText('The inputs and outputs of this version could not be read');
+    await expect(warning).toContainText('The module archive could not be read as a gzip-compressed tar file.');
+  });
+
   test('modules sharing a repository are grouped, with the submodule path shown (#1583)', async ({
     page,
   }) => {

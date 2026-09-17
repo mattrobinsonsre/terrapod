@@ -15,7 +15,7 @@ import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 import { LabelsEditor } from '@/components/labels-editor'
-import { ModuleInterfaceTables } from '@/components/module-interface-tables'
+import { ModuleInterfaceError, ModuleInterfaceTables } from '@/components/module-interface-tables'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface VersionStatus {
@@ -177,6 +177,8 @@ export default function ModuleDetailPage() {
   const [interfaceData, setInterfaceData] = useState<{
     inputs: { name: string; type: string; type_schema: object; description: string; default: string | null; required: boolean; sensitive: boolean }[] | null
     outputs: { name: string; description: string; sensitive: boolean }[] | null
+    // Why the interface could not be read (#1707); null when it was.
+    'interface-error'?: string | null
   } | null>(null)
   const [interfaceLoading, setInterfaceLoading] = useState(false)
   const [interfaceExpanded, setInterfaceExpanded] = useState(false)
@@ -875,6 +877,17 @@ export default function ModuleDetailPage() {
                 </svg>
               </button>
 
+              {/* Shown whether or not the section is open: an unreadable interface
+                  is what explains a catalog item offering no inputs (#1707). */}
+              {interfaceData?.['interface-error'] && (
+                <div className="px-5 pb-4">
+                  <ModuleInterfaceError
+                    reason={interfaceData['interface-error']}
+                    hint={t('moduleDetail.interface.errorHint')}
+                  />
+                </div>
+              )}
+
               {interfaceExpanded && (
                 <div className="px-5 pb-5 space-y-4 border-t border-slate-700/50 pt-4">
                   {/* Version selector */}
@@ -899,6 +912,7 @@ export default function ModuleDetailPage() {
                     <ModuleInterfaceTables
                       inputs={interfaceData?.inputs ?? null}
                       outputs={interfaceData?.outputs ?? null}
+                      interfaceError={interfaceData?.['interface-error'] ?? null}
                     />
                   )}
                 </div>

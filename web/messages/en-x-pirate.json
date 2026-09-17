@@ -531,7 +531,9 @@
         "requiredBadge": "required",
         "optionalBadge": "optional",
         "sensitiveBadge": "sensitive",
-        "noneDeclared": "This here module version declares nay inputs nor outputs."
+        "noneDeclared": "This here module version declares nay inputs nor outputs.",
+        "errorTitle": "Th'' inputs an'' outputs o'' this version couldn''t be read, arr",
+        "errorHint": "What be shown here may be empty or wantin''. Mend th'' module an'' hoist it again."
       },
       "versions": {
         "title": "Versions",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (default pin)",
       "labelsOptional": "Labels (optional)",
       "autoApplyHint": "Auto-apply applies changes without a manual review step.",
+      "interfaceErrorHint": "This form may be missin'' variables th'' module be needin''. Ask th'' captain o'' th'' module t'' mend it an'' hoist a new version.",
       "provisioning": "Provisionin''…",
       "submit": "Provision"
     },

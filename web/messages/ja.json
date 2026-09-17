@@ -531,7 +531,9 @@
         "requiredBadge": "必須",
         "optionalBadge": "任意",
         "sensitiveBadge": "機密",
-        "noneDeclared": "このモジュールバージョンには入力も出力も宣言されていません。"
+        "noneDeclared": "このモジュールバージョンには入力も出力も宣言されていません。",
+        "errorTitle": "このバージョンの入力と出力を読み取れませんでした",
+        "errorHint": "ここに表示される内容は空または不完全な可能性があります。モジュールを修正して、もう一度公開してください。"
       },
       "versions": {
         "title": "バージョン",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version}（デフォルト固定）",
       "labelsOptional": "ラベル（任意）",
       "autoApplyHint": "自動適用は手動のレビューステップなしに変更を適用します。",
+      "interfaceErrorHint": "このフォームには、モジュールに必要な変数が不足している可能性があります。モジュールの所有者に修正と新しいバージョンの公開を依頼してください。",
       "provisioning": "プロビジョニング中…",
       "submit": "プロビジョニング"
     },

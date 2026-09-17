@@ -531,7 +531,9 @@
         "requiredBadge": "vereist",
         "optionalBadge": "optioneel",
         "sensitiveBadge": "gevoelig",
-        "noneDeclared": "Deze moduleversie declareert geen inputs of outputs."
+        "noneDeclared": "Deze moduleversie declareert geen inputs of outputs.",
+        "errorTitle": "De invoer en uitvoer van deze versie konden niet worden gelezen",
+        "errorHint": "Wat hier wordt getoond kan leeg of onvolledig zijn. Herstel de module en publiceer deze opnieuw."
       },
       "versions": {
         "title": "Versies",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (standaard vastpinning)",
       "labelsOptional": "Labels (optioneel)",
       "autoApplyHint": "Automatisch toepassen past wijzigingen toe zonder een handmatige beoordelingsstap.",
+      "interfaceErrorHint": "Dit formulier mist mogelijk variabelen die de module nodig heeft. Vraag de eigenaar van de module deze te herstellen en een nieuwe versie te publiceren.",
       "provisioning": "Bezig met provisioneren…",
       "submit": "Provisioneren"
     },

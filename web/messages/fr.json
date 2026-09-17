@@ -531,7 +531,9 @@
         "requiredBadge": "requis",
         "optionalBadge": "facultatif",
         "sensitiveBadge": "sensible",
-        "noneDeclared": "Cette version du module ne déclare aucune entrée ni sortie."
+        "noneDeclared": "Cette version du module ne déclare aucune entrée ni sortie.",
+        "errorTitle": "Les entrées et sorties de cette version n''ont pas pu être lues",
+        "errorHint": "Ce qui est affiché ici peut être vide ou incomplet. Corrigez le module et publiez-le à nouveau."
       },
       "versions": {
         "title": "Versions",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (épinglage par défaut)",
       "labelsOptional": "Labels (facultatif)",
       "autoApplyHint": "L'application automatique applique les modifications sans étape de revue manuelle.",
+      "interfaceErrorHint": "Il se peut que ce formulaire ne contienne pas toutes les variables dont le module a besoin. Demandez au propriétaire du module de le corriger et de publier une nouvelle version.",
       "provisioning": "Provisionnement…",
       "submit": "Provisionner"
     },

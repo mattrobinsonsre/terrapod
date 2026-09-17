@@ -531,7 +531,9 @@
         "requiredBadge": "required",
         "optionalBadge": "optional",
         "sensitiveBadge": "sensitive",
-        "noneDeclared": "This marklar marklar declares no marklars or marklars."
+        "noneDeclared": "This marklar marklar declares no marklars or marklars.",
+        "errorTitle": "The marklars and marklars of this marklar could not be read",
+        "errorHint": "What is shown here may be empty or incomplete. Fix the marklar and publish it again."
       },
       "versions": {
         "title": "Marklars",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (default marklar)",
       "labelsOptional": "Marklars (optional)",
       "autoApplyHint": "Auto-apply applies marklars without a manual marklar marklar.",
+      "interfaceErrorHint": "This marklar may be missing marklars the marklar needs. Ask the marklar of the marklar to fix it and publish a new marklar.",
       "provisioning": "Provisioning…",
       "submit": "Provision"
     },

@@ -531,7 +531,9 @@
         "requiredBadge": "必填",
         "optionalBadge": "可選",
         "sensitiveBadge": "敏感",
-        "noneDeclared": "此模組版本未宣告任何輸入或輸出。"
+        "noneDeclared": "此模組版本未宣告任何輸入或輸出。",
+        "errorTitle": "無法讀取此版本的輸入與輸出",
+        "errorHint": "此處顯示的內容可能為空或不完整。請修正該模組並重新發布。"
       },
       "versions": {
         "title": "版本",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version}（預設固定）",
       "labelsOptional": "標籤（可選）",
       "autoApplyHint": "自動應用會在沒有手動審查步驟的情況下應用更改。",
+      "interfaceErrorHint": "此表單可能缺少模組所需的變數。請要求模組擁有者修正並發布新版本。",
       "provisioning": "正在預配…",
       "submit": "預配"
     },

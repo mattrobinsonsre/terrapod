@@ -531,7 +531,9 @@
         "requiredBadge": "r3qu1r3d",
         "optionalBadge": "0p710n4l",
         "sensitiveBadge": "53n5171v3",
-        "noneDeclared": "7h15 m0dul3 v3r510n d3cl4r35 n0 1npu75 0r 0u7pu75."
+        "noneDeclared": "7h15 m0dul3 v3r510n d3cl4r35 n0 1npu75 0r 0u7pu75.",
+        "errorTitle": "7h3 1npu75 4nd 0u7pu75 0f 7h15 v3r510n c0uld n07 b3 r34d",
+        "errorHint": "Wh47 15 5h0wn h3r3 m4y b3 3mp7y 0r 1nc0mpl373. F1x 7h3 m0dul3 4nd publ15h 17 4g41n."
       },
       "versions": {
         "title": "V3r510n5",
@@ -1762,6 +1764,7 @@
       "defaultPinOption": "{version} (d3f4ul7 p1n)",
       "labelsOptional": "L4b3l5 (0p710n4l)",
       "autoApplyHint": "4u70-4pply 4ppl135 ch4ng35 w17h0u7 4 m4nu4l r3v13w 573p.",
+      "interfaceErrorHint": "7h15 f0rm m4y b3 m1551ng v4r14bl35 7h3 m0dul3 n33d5. 45k 7h3 0wn3r 0f 7h3 m0dul3 70 f1x 17 4nd publ15h 4 n3w v3r510n.",
       "provisioning": "Pr0v1510n1ng…",
       "submit": "Pr0v1510n"
     },
