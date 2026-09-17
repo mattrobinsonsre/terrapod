@@ -2268,20 +2268,10 @@ async def update_run_status(
                 db, run, target_status, error_message=error_message
             )
 
-        # Unlock workspace when plan-only run reaches planned
-        # (plan-only runs don't mutate state, so no need to hold the lock)
-        if target_status == "planned" and run.plan_only:
-            ws = await db.get(Workspace, run.workspace_id)
-            if ws and ws.locked:
-                ws.locked = False
-                ws.lock_id = None
-
-        # Unlock workspace on terminal state
-        if target_status in run_service.TERMINAL_STATES:
-            ws = await db.get(Workspace, run.workspace_id)
-            if ws and ws.locked:
-                ws.locked = False
-                ws.lock_id = None
+        # No workspace unlock here. The lock is the manual/CLI state lock only;
+        # runs never acquire it, so neither reaching `planned` nor a terminal
+        # state releases it. Doing so cleared an operator's maintenance lock the
+        # moment any run finished -- including a scheduled drift check (#1705).
 
         await db.commit()
     except ValueError as e:
