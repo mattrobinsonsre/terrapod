@@ -760,7 +760,7 @@ Returns 204 on success, 409 if attempting to delete the current version.
 POST /api/v1/state-versions/{id}/actions/rollback
 ```
 
-Creates a new state version with the content of the specified older version. The new version gets serial = max existing + 1. This is a "copy forward" rollback — no versions are deleted, history is preserved.
+Creates a new state version with the content of the specified older version. The new version gets serial = max existing + 1. This is a "copy forward" rollback — no versions are deleted, history is preserved. The `serial` inside the copied state file is set to the new version's serial, so the next apply counts on from it rather than from the old version and does not collide with an existing serial.
 
 **Required permission:** `write` on the workspace.
 
