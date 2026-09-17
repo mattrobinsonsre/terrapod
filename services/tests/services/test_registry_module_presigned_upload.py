@@ -56,14 +56,30 @@ def _storage(existing: set[str], body: bytes = b""):
     return storage
 
 
+def _db(claimed: int = 1):
+    """A session whose conditional UPDATE reports `claimed` rows changed."""
+    db = AsyncMock()
+    db.execute.return_value = MagicMock(rowcount=claimed)
+    savepoint = MagicMock()
+    savepoint.__aenter__ = AsyncMock(return_value=None)
+    savepoint.__aexit__ = AsyncMock(return_value=False)
+    db.begin_nested = MagicMock(return_value=savepoint)
+    return db
+
+
+def _leader(is_leader: bool = True):
+    return patch("terrapod.services.ha_role.is_leader", AsyncMock(return_value=is_leader))
+
+
 class TestFinalizePresignedUploads:
     async def test_a_landed_upload_becomes_installable(self):
         mv = _version("1.0.0", "pending")
         module = _module(mv)
         key = svc.module_tarball_key("default", "vpc", "aws", "1.0.0")
-        db = AsyncMock()
+        db = _db()
 
         with (
+            _leader(),
             patch("terrapod.config.settings.registry.module_interface.enabled", True),
             patch(
                 "terrapod.services.module_impact_service.trigger_linked_workspace_runs",
@@ -83,11 +99,14 @@ class TestFinalizePresignedUploads:
     async def test_an_upload_that_has_not_arrived_stays_pending(self):
         mv = _version("1.0.0", "pending")
         module = _module(mv)
-        with patch(
-            "terrapod.services.module_impact_service.trigger_linked_workspace_runs",
-            new_callable=AsyncMock,
-        ) as trigger:
-            await svc.finalize_presigned_uploads(AsyncMock(), module, _storage(set()))
+        with (
+            _leader(),
+            patch(
+                "terrapod.services.module_impact_service.trigger_linked_workspace_runs",
+                new_callable=AsyncMock,
+            ) as trigger,
+        ):
+            await svc.finalize_presigned_uploads(_db(), module, _storage(set()))
         assert mv.upload_status == "pending"
         assert module.status == "pending"
         trigger.assert_not_awaited()
@@ -103,8 +122,56 @@ class TestFinalizePresignedUploads:
         mv = _version("1.0.0", "pending")
         storage = MagicMock()
         storage.exists = AsyncMock(side_effect=RuntimeError("storage down"))
-        await svc.finalize_presigned_uploads(AsyncMock(), _module(mv), storage)
+        with _leader():
+            await svc.finalize_presigned_uploads(_db(), _module(mv), storage)
         assert mv.upload_status == "pending"
+
+    async def test_a_concurrent_finalizer_that_lost_the_claim_queues_nothing(self):
+        """Two reads see `pending` together; only the one whose conditional
+        UPDATE changed the row queues linked-workspace runs."""
+        mv = _version("1.0.0", "pending")
+        module = _module(mv)
+        key = svc.module_tarball_key("default", "vpc", "aws", "1.0.0")
+        with (
+            _leader(),
+            patch(
+                "terrapod.services.module_impact_service.trigger_linked_workspace_runs",
+                new_callable=AsyncMock,
+            ) as trigger,
+        ):
+            await svc.finalize_presigned_uploads(
+                _db(claimed=0), module, _storage({key}, _tarball())
+            )
+        trigger.assert_not_awaited()
+
+    async def test_a_follower_does_not_write_on_a_read(self):
+        mv = _version("1.0.0", "pending")
+        module = _module(mv)
+        storage = _storage({svc.module_tarball_key("default", "vpc", "aws", "1.0.0")})
+        db = _db()
+        with _leader(False):
+            await svc.finalize_presigned_uploads(db, module, storage)
+        assert mv.upload_status == "pending"
+        db.execute.assert_not_awaited()
+        storage.exists.assert_not_awaited()
+
+    async def test_a_failure_creating_runs_does_not_fail_the_read(self):
+        """Run creation happens in a savepoint, so the caller's session stays
+        usable and the CLI listing that triggered it still commits."""
+        mv = _version("1.0.0", "pending")
+        module = _module(mv)
+        key = svc.module_tarball_key("default", "vpc", "aws", "1.0.0")
+        db = _db()
+        with (
+            _leader(),
+            patch(
+                "terrapod.services.module_impact_service.trigger_linked_workspace_runs",
+                AsyncMock(side_effect=RuntimeError("db error")),
+            ),
+        ):
+            await svc.finalize_presigned_uploads(db, module, _storage({key}, _tarball()))
+        assert mv.upload_status == "uploaded"
+        db.begin_nested.assert_called_once()
 
 
 class TestCreatingAVersionDoesNotClaimSuccess:
@@ -155,8 +222,9 @@ class TestTheCliListingServesALandedUpload:
             provider_name="local",
             auth_method="session",
         )
-        app.dependency_overrides[get_db] = lambda: AsyncMock()
+        app.dependency_overrides[get_db] = lambda: _db()
         with (
+            _leader(),
             patch("terrapod.storage.get_storage", return_value=_storage({key}, _tarball())),
             patch("terrapod.config.settings.registry.module_interface.enabled", False),
             patch(

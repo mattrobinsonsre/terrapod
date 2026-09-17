@@ -6,7 +6,7 @@ generation for tarball upload/download via object storage.
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -143,6 +143,14 @@ async def finalize_presigned_uploads(
     pending = [v for v in module.versions if v.upload_status == "pending"]
     if not pending:
         return
+
+    # A read path must not write on an HA follower: its database is a replica,
+    # and it cannot create runs anyway. The leader finalizes on its next read.
+    from terrapod.services import ha_role
+
+    if not await ha_role.is_leader():
+        return
+
     if storage is None:
         # Resolved only when there is something to check, so the common read
         # of a fully-published module touches nothing new.
@@ -161,6 +169,22 @@ async def finalize_presigned_uploads(
             logger.warning("Could not check a pending module upload", key=key, exc_info=True)
             continue
 
+        # Claim the transition atomically. Two reads arriving together -- two
+        # `tofu init`s, or an init and a UI view, on one replica or two -- both
+        # see `pending`; only the one whose UPDATE changes the row goes on, so
+        # linked-workspace runs are queued once.
+        claimed = await db.execute(
+            update(RegistryModuleVersion)
+            .where(
+                RegistryModuleVersion.id == mod_version.id,
+                RegistryModuleVersion.upload_status == "pending",
+            )
+            .values(upload_status="uploaded")
+            .execution_options(synchronize_session=False)
+        )
+        if claimed.rowcount != 1:
+            continue
+
         mod_version.upload_status = "uploaded"
         module.status = "setup_complete"
         await _parse_interface_from_storage(storage, key, mod_version)
@@ -172,10 +196,14 @@ async def finalize_presigned_uploads(
             version=mod_version.version,
         )
 
+        # In a savepoint: a database error while creating runs must not leave the
+        # session failed, or the read that triggered this -- the CLI's version
+        # listing -- would fail at commit.
         try:
             from terrapod.services.module_impact_service import trigger_linked_workspace_runs
 
-            await trigger_linked_workspace_runs(db, module, mod_version.version)
+            async with db.begin_nested():
+                await trigger_linked_workspace_runs(db, module, mod_version.version)
         except Exception:
             logger.warning(
                 "Failed to trigger linked workspace runs after a presigned upload",
