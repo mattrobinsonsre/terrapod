@@ -115,6 +115,32 @@ To move it: add `{callback_base_url}/api/v1/auth/callback` — and
 then set `legacy_callback_url: false`. The default flips in 2.0.0; see
 [upgrading-to-2.0.md](upgrading-to-2.0.md).
 
+## Announced behaviour changes for 2.0
+
+These are not deprecated surfaces. They are changes to what an existing field
+reports, so there is no `Deprecation` header to watch. Each keeps its current
+behaviour through every 1.x release.
+
+### A run held at a post-plan gate stops reporting `planning` (v1.7.2)
+
+**Today:** when a mandatory policy set, an enforced security scan, or a
+mandatory post-plan run task stops a run, the run stays at `status: planning`
+after its plan has finished. Since v1.7.2 it also reports what holds it, in the
+read-only `blocked-by` attribute (`policy`, `security-scan` or `run-task`; null
+otherwise).
+
+**In 2.0:** the run reports the status Terraform Enterprise uses for the same
+situation: `policy_override` when a mandatory policy set or an enforced security
+scan holds it, and `post_plan_awaiting_decision` when a mandatory run task does.
+The `tofu`/`terraform` CLI understands those statuses: it shows the failing
+checks and asks whether to override, and `-auto-approve` overrides them for a
+caller allowed to.
+
+**What to do now:** if you have automation that treats "`planning` for a long
+time" as a stuck run, key it on `blocked-by` instead. A run with a non-null
+`blocked-by` is waiting for a decision, not stuck. Code that reads `blocked-by`
+keeps working unchanged in 2.0.
+
 ## For maintainers
 
 Mark an endpoint deprecated by injecting the FastAPI `Response` into the handler and

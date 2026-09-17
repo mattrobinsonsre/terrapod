@@ -123,7 +123,11 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     # unreachable rather than misconfigured. Erroring instead would destroy
     # every queued run in the estate over a restart and leave an operator to
     # re-queue each by hand. The run goes back to the pool for the next claim.
-    "planning": {"planned", "errored", "canceled", "queued"},
+    # `planning → discarded` is for a run HELD at a post-plan gate (#1725): its
+    # plan has finished, but a run task, mandatory policy set or enforced scan
+    # stopped it short of `planned`. It is a finished plan awaiting a decision,
+    # so it can be discarded like a `planned` run -- see `is_held_at_gate`.
+    "planning": {"planned", "errored", "canceled", "queued", "discarded"},
     # `planned → applied` is the no-op apply: when the plan reports
     # has_changes=False there is nothing for an apply Job to do and
     # no new state version to upload (tofu doesn't bump serial on a
@@ -401,7 +405,50 @@ def can_transition(current: str, target: str) -> bool:
 # `canceling`): those are either actively running a Job or carry a committed
 # apply intent and must finish on their own terms — never auto-discarded out
 # from under a running plan/apply.
-_SUPERSEDEABLE_STATES = frozenset({"pending", "queued", "planned"})
+_SUPERSEDEABLE_STATES = frozenset({"pending", "queued", "planned", "planning"})
+# `planning` is listed only so a run HELD at a post-plan gate can be found;
+# `supersede_stale_runs` skips any `planning` run whose plan is still running.
+
+
+def is_held_at_gate(run: Run) -> bool:
+    """True for a run whose plan has finished but a post-plan gate holds it.
+
+    `complete_plan` stamps `plan_finished_at` and then evaluates the post-plan
+    run task, policy and security-scan gates; a gate that blocks returns early
+    and leaves the run in `planning`. So `planning` with `plan_finished_at` set
+    means "a finished plan waiting for a decision", not "a plan still running"
+    -- and the run must be treated that way (#1725): its Job may be long gone,
+    it can be discarded, and the CLI must not wait on it.
+    """
+    return run.status == "planning" and run.plan_finished_at is not None
+
+
+def is_discardable_hold(run: Run) -> bool:
+    """A held run that can be discarded: apply-capable, as `planned` requires."""
+    return is_held_at_gate(run) and not run.plan_only
+
+
+async def blocked_by(db: AsyncSession, run: Run) -> str | None:
+    """Which post-plan gate holds a run: `run-task`, `policy`, `security-scan`.
+
+    None when the run is not held. Read-only -- checked in the order
+    `complete_plan` evaluates the gates, so it names the one actually holding
+    the run. Returns None for a held run if no gate still blocks it (it is
+    about to move on at the next re-drive).
+    """
+    if not is_held_at_gate(run):
+        return None
+
+    from terrapod.services import policy_set_service, run_task_service, security_scan_service
+
+    stage = await run_task_service._existing_stage(db, run.id, "post_plan")
+    if stage is not None and stage.status not in ("passed", "overridden"):
+        return "run-task"
+    if await policy_set_service.run_is_policy_blocked(db, run.id):
+        return "policy"
+    if await security_scan_service.run_is_scan_blocked(db, run.id):
+        return "security-scan"
+    return None
 
 
 def _is_supersedeable_kind(run: Run) -> bool:
@@ -464,10 +511,13 @@ async def supersede_stale_runs(db: AsyncSession, newer: Run) -> int:
     )
     superseded = 0
     for old in result.scalars().all():
+        if old.status == "planning" and not is_held_at_gate(old):
+            # Still planning: its Job is running. Only a HELD run is stale.
+            continue
         reason = f"Superseded by run {str(newer.id)[:8]}"
         old.message = reason
         try:
-            if old.status == "planned":
+            if old.status in ("planned", "planning"):
                 await discard_run(db, old, reason=reason)
             else:  # pending / queued
                 await cancel_run(db, old, force=True, reason=reason)
@@ -1551,7 +1601,7 @@ async def discard_run(db: AsyncSession, run: Run, *, reason: str | None = None) 
     """Discard a planned run. ``reason`` (state changed / plan expired /
     superseded) is recorded on the run and surfaced to the UI/SDK."""
     await ha_role.ensure_leader("discard runs")
-    if run.status != "planned":
+    if run.status != "planned" and not is_discardable_hold(run):
         raise ValueError(f"Can only discard runs in 'planned' status, got '{run.status}'")
     if reason:
         run.discard_reason = reason

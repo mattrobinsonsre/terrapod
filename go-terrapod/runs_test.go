@@ -19,7 +19,7 @@ const runAttrs = `{
   "target-addrs":["aws_vpc.main"],"replace-addrs":[],
   "refresh-only":false,"refresh":true,"allow-empty-apply":false,
   "is-drift-detection":false,"has-changes":true,"has-json-output":true,
-  "state-diverged":false,
+  "state-diverged":false,"blocked-by":"security-scan",
   "has-cost-estimate":true,"cost-currency":"USD","cost-monthly-min":12.5,"cost-monthly-max":40.0,
   "peak-memory-bytes":536870912,"peak-cpu-usec":null,"runner-exit-code":0,
   "runner-exit-reason":"","workspace-name":"app",
@@ -191,6 +191,10 @@ func TestGetRunParsesNativeFields(t *testing.T) {
 	}
 	if run.PeakCPUUsec != nil || run.VCSPullRequestNumber != nil {
 		t.Errorf("expected nil for null nullables: cpu=%+v pr=%+v", run.PeakCPUUsec, run.VCSPullRequestNumber)
+	}
+	// A run held at a post-plan gate says which gate (#1725).
+	if run.BlockedBy != "security-scan" {
+		t.Errorf("blocked-by: %q", run.BlockedBy)
 	}
 	// Nested blocks.
 	if !run.Actions.IsConfirmable || !run.Actions.IsCancelable || run.Actions.IsRetryable {

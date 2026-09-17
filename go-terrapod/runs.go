@@ -48,8 +48,12 @@ type Run struct {
 	Status        string `json:"status"`
 	Message       string `json:"message,omitempty"`
 	DiscardReason string `json:"discard-reason,omitempty"`
-	IsDestroy     bool   `json:"is-destroy"`
-	AutoApply     bool   `json:"auto-apply"`
+	// BlockedBy names the post-plan gate holding a run whose plan has
+	// finished: "run-task", "policy" or "security-scan". Empty otherwise.
+	// Such a run still reports Status "planning" until 2.0 (#1725).
+	BlockedBy string `json:"blocked-by,omitempty"`
+	IsDestroy bool   `json:"is-destroy"`
+	AutoApply bool   `json:"auto-apply"`
 	// AutoApplyMode is the mode snapshotted at run creation (#1274), and
 	// AutoApplyDeclinedReason says why a conditional mode refused to apply
 	// this plan — empty unless the run is parked for a human.
@@ -343,6 +347,7 @@ func runFromResource(res *Resource) *Run {
 		Status:                  GetStringAttr(res, "status"),
 		Message:                 GetStringAttr(res, "message"),
 		DiscardReason:           GetStringAttr(res, "discard-reason"),
+		BlockedBy:               GetStringAttr(res, "blocked-by"),
 		IsDestroy:               GetBoolAttr(res, "is-destroy"),
 		AutoApply:               GetBoolAttr(res, "auto-apply"),
 		AutoApplyMode:           GetStringAttr(res, "auto-apply-mode"),

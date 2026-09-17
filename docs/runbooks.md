@@ -989,6 +989,7 @@ Pick the least-disruptive option that fits:
 - **Set is too broadly scoped** — narrow its allow-labels, or set `enabled: false` on the set (`PATCH /api/v1/policy-sets/{id}`) to stop it being evaluated. Disabling does not delete it.
 - **Demote to advisory** — `PATCH` the set's `enforcement-level` to `advisory`; runs then proceed with a warning instead of a block. Note the enforcement level is *snapshotted per evaluation*, so already-recorded blocks are cleared by re-evaluation, not by the edit alone — held runs re-evaluate on the next tick.
 - **Single urgent run** — a workspace admin can override one run from its Policy Checks panel ("Override & Continue").
+- **Abandon a held run** — discard it (`POST /api/v2/runs/{id}/actions/discard`), or queue a newer run, which supersedes it. Since v1.7.2 a held run stays held until one of these happens; before that it errored with `Job deleted` about ten minutes after its plan finished. Its `blocked-by` attribute says which gate holds it.
 
 ### Verification
 

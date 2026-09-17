@@ -857,6 +857,16 @@ Apply-capable (plan+apply) runs are **serialized per workspace** — only one ex
 
 This is enforced server-side regardless of run source (VCS, CLI/API, UI), so the same guarantees hold for `terraform`/`tofu` CLI-driven runs as for VCS-driven runs.
 
+#### Runs held at a post-plan gate: `blocked-by`
+
+A mandatory policy set, an enforced security scan, or a mandatory post-plan run task can stop a run after its plan has finished. The run stays at `status: planning`, and the read-only **`blocked-by`** attribute names the gate holding it: `run-task`, `policy` or `security-scan` (checked in that order), or `null` for any run not held. While held:
+
+- the run's plan reports `status: finished`, so a CLI waiting on the plan log returns;
+- the run is **discardable** (`actions.is-discardable: true`) unless it is plan-only, and a newer apply-capable run supersedes it as it would a `planned` run;
+- it is released by an override (policy or security scan) or a passing run task, which the reconciler picks up on its next tick. Kubernetes cleaning up the finished plan Job does not error it.
+
+In 2.0 a held run reports `policy_override` or `post_plan_awaiting_decision` instead of `planning`; see [deprecations.md](deprecations.md#announced-behaviour-changes-for-20).
+
 #### Stale-plan guards: state drift (#647) & expiry (#646)
 
 Beyond supersede (a *newer run* case), two guards protect against applying a plan that no longer reflects reality. Both resolve an apply-capable `planned` run to `discarded` and surface the reason in the run's **`discard-reason`** attribute; confirming a stale plan returns **409** (re-plan required). Plan-only / drift / speculative runs are exempt.
