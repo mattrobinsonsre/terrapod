@@ -56,14 +56,34 @@ def _storage(existing: set[str], body: bytes = b""):
     return storage
 
 
-def _db(claimed: int = 1):
-    """A session whose conditional UPDATE reports `claimed` rows changed."""
+def _db(claimed: bool = True):
+    """A session whose row-lock claim returns the version it was asked for,
+    or nothing when another read already holds it."""
     db = AsyncMock()
-    db.execute.return_value = MagicMock(rowcount=claimed)
+
+    async def _execute(stmt, *_, **__):
+        result = MagicMock()
+        wanted = None
+        if claimed:
+            # The claim selects the version by id; hand back the same object the
+            # caller already holds, as populate_existing would.
+            wanted = _execute.version
+        result.scalar_one_or_none.return_value = wanted
+        return result
+
+    _execute.version = None
+    db.execute = AsyncMock(side_effect=_execute)
+    db._execute = _execute
     savepoint = MagicMock()
     savepoint.__aenter__ = AsyncMock(return_value=None)
     savepoint.__aexit__ = AsyncMock(return_value=False)
     db.begin_nested = MagicMock(return_value=savepoint)
+    return db
+
+
+def _for(db, version):
+    """Point the session's claim at `version`."""
+    db._execute.version = version
     return db
 
 
@@ -76,7 +96,7 @@ class TestFinalizePresignedUploads:
         mv = _version("1.0.0", "pending")
         module = _module(mv)
         key = svc.module_tarball_key("default", "vpc", "aws", "1.0.0")
-        db = _db()
+        db = _for(_db(), mv)
 
         with (
             _leader(),
@@ -106,7 +126,7 @@ class TestFinalizePresignedUploads:
                 new_callable=AsyncMock,
             ) as trigger,
         ):
-            await svc.finalize_presigned_uploads(_db(), module, _storage(set()))
+            await svc.finalize_presigned_uploads(_for(_db(), mv), module, _storage(set()))
         assert mv.upload_status == "pending"
         assert module.status == "pending"
         trigger.assert_not_awaited()
@@ -123,7 +143,7 @@ class TestFinalizePresignedUploads:
         storage = MagicMock()
         storage.exists = AsyncMock(side_effect=RuntimeError("storage down"))
         with _leader():
-            await svc.finalize_presigned_uploads(_db(), _module(mv), storage)
+            await svc.finalize_presigned_uploads(_for(_db(), mv), _module(mv), storage)
         assert mv.upload_status == "pending"
 
     async def test_a_concurrent_finalizer_that_lost_the_claim_queues_nothing(self):
@@ -140,7 +160,7 @@ class TestFinalizePresignedUploads:
             ) as trigger,
         ):
             await svc.finalize_presigned_uploads(
-                _db(claimed=0), module, _storage({key}, _tarball())
+                _for(_db(claimed=False), mv), module, _storage({key}, _tarball())
             )
         trigger.assert_not_awaited()
 
@@ -148,7 +168,7 @@ class TestFinalizePresignedUploads:
         mv = _version("1.0.0", "pending")
         module = _module(mv)
         storage = _storage({svc.module_tarball_key("default", "vpc", "aws", "1.0.0")})
-        db = _db()
+        db = _for(_db(), mv)
         with _leader(False):
             await svc.finalize_presigned_uploads(db, module, storage)
         assert mv.upload_status == "pending"
@@ -161,7 +181,7 @@ class TestFinalizePresignedUploads:
         mv = _version("1.0.0", "pending")
         module = _module(mv)
         key = svc.module_tarball_key("default", "vpc", "aws", "1.0.0")
-        db = _db()
+        db = _for(_db(), mv)
         with (
             _leader(),
             patch(
@@ -222,7 +242,7 @@ class TestTheCliListingServesALandedUpload:
             provider_name="local",
             auth_method="session",
         )
-        app.dependency_overrides[get_db] = lambda: _db()
+        app.dependency_overrides[get_db] = lambda: _for(_db(), mv)
         with (
             _leader(),
             patch("terrapod.storage.get_storage", return_value=_storage({key}, _tarball())),

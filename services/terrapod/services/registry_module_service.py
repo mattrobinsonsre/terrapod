@@ -6,7 +6,7 @@ generation for tarball upload/download via object storage.
 
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -169,21 +169,26 @@ async def finalize_presigned_uploads(
             logger.warning("Could not check a pending module upload", key=key, exc_info=True)
             continue
 
-        # Claim the transition atomically. Two reads arriving together -- two
-        # `tofu init`s, or an init and a UI view, on one replica or two -- both
-        # see `pending`; only the one whose UPDATE changes the row goes on, so
-        # linked-workspace runs are queued once.
-        claimed = await db.execute(
-            update(RegistryModuleVersion)
-            .where(
-                RegistryModuleVersion.id == mod_version.id,
-                RegistryModuleVersion.upload_status == "pending",
+        # Claim the transition. Two reads arriving together -- two `tofu init`s,
+        # or an init and a UI view, on one replica or two -- both see `pending`.
+        # Lock the row, skipping it if another read already holds the lock, and
+        # re-check it is still pending: only one read goes on, so linked-workspace
+        # runs are queued once. Through the ORM rather than a bulk UPDATE, so the
+        # change reaches the replication outbox.
+        claimed = (
+            await db.execute(
+                select(RegistryModuleVersion)
+                .where(
+                    RegistryModuleVersion.id == mod_version.id,
+                    RegistryModuleVersion.upload_status == "pending",
+                )
+                .with_for_update(skip_locked=True)
+                .execution_options(populate_existing=True)
             )
-            .values(upload_status="uploaded")
-            .execution_options(synchronize_session=False)
-        )
-        if claimed.rowcount != 1:
+        ).scalar_one_or_none()
+        if claimed is None:
             continue
+        mod_version = claimed
 
         mod_version.upload_status = "uploaded"
         module.status = "setup_complete"
