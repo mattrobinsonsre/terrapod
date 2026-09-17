@@ -2001,7 +2001,8 @@
       "applied": "已應用",
       "errored": "已出錯",
       "canceled": "已取消",
-      "discarded": "已丟棄"
+      "discarded": "已丟棄",
+      "awaitingDecision": "等待決定"
     },
     "activity": {
       "pending": "正在準備執行",
@@ -2017,7 +2018,11 @@
       "errored": "執行失敗",
       "canceled": "執行已取消",
       "discarded": "計畫已丟棄",
-      "elapsedTitle": "此階段已用時"
+      "elapsedTitle": "此階段已用時",
+      "heldByRunTask": "必要的執行任務失敗 — 覆蓋它或丟棄此執行",
+      "runTasksRunning": "正在等待計畫後的執行任務",
+      "heldByPolicy": "必要的策略集失敗 — 覆蓋它或丟棄此執行",
+      "heldBySecurityScan": "安全掃描發現阻斷性問題 — 覆蓋它或丟棄此執行"
     },
     "badge": {
       "destroy": "銷毀",
@@ -2185,7 +2190,8 @@
           "error": "錯誤",
           "warning": "警告"
         }
-      }
+      },
+      "applySkippedNoChanges": "未執行套用：計畫中沒有變更，因此無需套用。"
     },
     "policyPanel": {
       "heading": "策略檢查",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "模組測試",
       "sourceModulePublish": "模組釋出",
       "queueApplyTitle": "將計畫 + 套用執行加入佇列",
-      "queueApplyRefBlocked": "選取分支、標籤或提交時無法套用——這些執行一律僅為計畫"
+      "queueApplyRefBlocked": "選取分支、標籤或提交時無法套用——這些執行一律僅為計畫",
+      "awaitingDecision": "等待決定"
     },
     "state": {
       "deleteConfirm": "刪除狀態版本 #{serial}？此操作無法撤銷。",

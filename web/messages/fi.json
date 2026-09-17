@@ -2001,7 +2001,8 @@
       "applied": "Otettu käyttöön",
       "errored": "Virhe",
       "canceled": "Peruttu",
-      "discarded": "Hylätty"
+      "discarded": "Hylätty",
+      "awaitingDecision": "Odottaa päätöstä"
     },
     "activity": {
       "pending": "Valmistellaan ajoa",
@@ -2017,7 +2018,11 @@
       "errored": "Ajo epäonnistui",
       "canceled": "Ajo peruttu",
       "discarded": "Suunnitelma hylätty",
-      "elapsedTitle": "Kulunut tässä vaiheessa"
+      "elapsedTitle": "Kulunut tässä vaiheessa",
+      "heldByRunTask": "Pakollinen ajotehtävä epäonnistui – ohita se tai hylkää ajo",
+      "runTasksRunning": "Odotetaan suunnitelman jälkeisiä ajotehtäviä",
+      "heldByPolicy": "Pakollinen käytäntöjoukko epäonnistui – ohita se tai hylkää ajo",
+      "heldBySecurityScan": "Turvatarkistus löysi estäviä havaintoja – ohita se tai hylkää ajo"
     },
     "badge": {
       "destroy": "tuhoa",
@@ -2185,7 +2190,8 @@
           "error": "virhe",
           "warning": "varoitus"
         }
-      }
+      },
+      "applySkippedNoChanges": "Käyttöönottoa ei ajettu: suunnitelmassa ei ollut muutoksia, joten mitään ei ollut otettavana käyttöön."
     },
     "policyPanel": {
       "heading": "Käytäntötarkistukset",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "moduulitesti",
       "sourceModulePublish": "moduulijulkaisu",
       "queueApplyTitle": "Lisää plan + apply -ajo jonoon",
-      "queueApplyRefBlocked": "Apply ei ole käytettävissä, kun haara, tunniste tai commit on valittuna — nämä ajot ovat aina vain plan"
+      "queueApplyRefBlocked": "Apply ei ole käytettävissä, kun haara, tunniste tai commit on valittuna — nämä ajot ovat aina vain plan",
+      "awaitingDecision": "odottaa päätöstä"
     },
     "state": {
       "deleteConfirm": "Poistetaanko tilaversio #{serial}? Tätä ei voi kumota.",

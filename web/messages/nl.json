@@ -2001,7 +2001,8 @@
       "applied": "Toegepast",
       "errored": "Mislukt",
       "canceled": "Geannuleerd",
-      "discarded": "Verworpen"
+      "discarded": "Verworpen",
+      "awaitingDecision": "Wacht op beslissing"
     },
     "activity": {
       "pending": "Uitvoering voorbereiden",
@@ -2017,7 +2018,11 @@
       "errored": "Uitvoering mislukt",
       "canceled": "Uitvoering geannuleerd",
       "discarded": "Plan verworpen",
-      "elapsedTitle": "Verstreken in deze fase"
+      "elapsedTitle": "Verstreken in deze fase",
+      "heldByRunTask": "Een verplichte run-task is mislukt — overschrijf deze of verwerp de uitvoering",
+      "runTasksRunning": "Wachten op run-tasks na het plan",
+      "heldByPolicy": "Een verplichte beleidsset is mislukt — overschrijf deze of verwerp de uitvoering",
+      "heldBySecurityScan": "De beveiligingsscan vond blokkerende bevindingen — overschrijf deze of verwerp de uitvoering"
     },
     "badge": {
       "destroy": "vernietigen",
@@ -2185,7 +2190,8 @@
           "error": "fout",
           "warning": "waarschuwing"
         }
-      }
+      },
+      "applySkippedNoChanges": "Er is niets toegepast: het plan bevatte geen wijzigingen, dus er was niets toe te passen."
     },
     "policyPanel": {
       "heading": "Beleidscontroles",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "moduletest",
       "sourceModulePublish": "modulepublicatie",
       "queueApplyTitle": "Een plan + apply-run in de wachtrij zetten",
-      "queueApplyRefBlocked": "Apply is niet beschikbaar zolang een branch, tag of commit is geselecteerd — die runs zijn altijd alleen plan"
+      "queueApplyRefBlocked": "Apply is niet beschikbaar zolang een branch, tag of commit is geselecteerd — die runs zijn altijd alleen plan",
+      "awaitingDecision": "wacht op beslissing"
     },
     "state": {
       "deleteConfirm": "State-versie #{serial} verwijderen? Dit kan niet ongedaan worden gemaakt.",

@@ -2001,7 +2001,8 @@
       "applied": "Applied",
       "errored": "Errored",
       "canceled": "Canceled",
-      "discarded": "Discarded"
+      "discarded": "Discarded",
+      "awaitingDecision": "Awaiting marklar"
     },
     "activity": {
       "pending": "Preparing the marklar",
@@ -2017,7 +2018,11 @@
       "errored": "Marklar failed",
       "canceled": "Marklar canceled",
       "discarded": "Marklar discarded",
-      "elapsedTitle": "Elapsed in this marklar"
+      "elapsedTitle": "Elapsed in this marklar",
+      "heldByRunTask": "A mandatory marklar failed — override it or discard the marklar",
+      "runTasksRunning": "Waiting for post-plan marklars",
+      "heldByPolicy": "A mandatory marklar failed — override it or discard the marklar",
+      "heldBySecurityScan": "The marklar found blocking marklars — override it or discard the marklar"
     },
     "badge": {
       "destroy": "destroy",
@@ -2185,7 +2190,8 @@
           "error": "marklar",
           "warning": "marklar"
         }
-      }
+      },
+      "applySkippedNoChanges": "No marklar ran: the marklar had no marklars, so there was nothing to apply."
     },
     "policyPanel": {
       "heading": "Marklar Marklars",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "marklar marklar",
       "sourceModulePublish": "marklar marklar",
       "queueApplyTitle": "Queue a marklar + marklar marklar",
-      "queueApplyRefBlocked": "Marklar is unavailable while a marklar, marklar or marklar is selected — those marklars are always marklar-only"
+      "queueApplyRefBlocked": "Marklar is unavailable while a marklar, marklar or marklar is selected — those marklars are always marklar-only",
+      "awaitingDecision": "awaiting marklar"
     },
     "state": {
       "deleteConfirm": "Delete marklar marklar #{serial}? This cannot be undone.",

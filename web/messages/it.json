@@ -2001,7 +2001,8 @@
       "applied": "Applicato",
       "errored": "In errore",
       "canceled": "Annullato",
-      "discarded": "Scartato"
+      "discarded": "Scartato",
+      "awaitingDecision": "In attesa di decisione"
     },
     "activity": {
       "pending": "Preparazione dell''esecuzione",
@@ -2017,7 +2018,11 @@
       "errored": "Esecuzione non riuscita",
       "canceled": "Esecuzione annullata",
       "discarded": "Plan scartato",
-      "elapsedTitle": "Tempo trascorso in questa fase"
+      "elapsedTitle": "Tempo trascorso in questa fase",
+      "heldByRunTask": "Un run task obbligatorio non è riuscito: sovrascrivilo o scarta l'esecuzione",
+      "runTasksRunning": "In attesa dei run task successivi al piano",
+      "heldByPolicy": "Un set di criteri obbligatorio non è riuscito: sovrascrivilo o scarta l'esecuzione",
+      "heldBySecurityScan": "L'analisi di sicurezza ha trovato risultati bloccanti: sovrascrivila o scarta l'esecuzione"
     },
     "badge": {
       "destroy": "distruggi",
@@ -2185,7 +2190,8 @@
           "error": "errore",
           "warning": "avviso"
         }
-      }
+      },
+      "applySkippedNoChanges": "Nessuna applicazione eseguita: il piano non conteneva modifiche, quindi non c''era nulla da applicare."
     },
     "policyPanel": {
       "heading": "Controlli dei criteri",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "test del modulo",
       "sourceModulePublish": "pubblicazione del modulo",
       "queueApplyTitle": "Accoda una esecuzione plan + apply",
-      "queueApplyRefBlocked": "Apply non è disponibile mentre è selezionato un branch, tag o commit: quelle esecuzioni sono sempre solo plan"
+      "queueApplyRefBlocked": "Apply non è disponibile mentre è selezionato un branch, tag o commit: quelle esecuzioni sono sempre solo plan",
+      "awaitingDecision": "in attesa di decisione"
     },
     "state": {
       "deleteConfirm": "Eliminare la versione dello stato #{serial}? Questa azione non può essere annullata.",

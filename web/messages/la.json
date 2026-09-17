@@ -2001,7 +2001,8 @@
       "applied": "Applicatum",
       "errored": "Erratum",
       "canceled": "Abrogatum",
-      "discarded": "Reiectum"
+      "discarded": "Reiectum",
+      "awaitingDecision": "Decretum exspectat"
     },
     "activity": {
       "pending": "Exsecutio praeparatur",
@@ -2017,7 +2018,11 @@
       "errored": "Exsecutio defecit",
       "canceled": "Exsecutio abrogata",
       "discarded": "Consilium reiectum",
-      "elapsedTitle": "Elapsum in hac phasi"
+      "elapsedTitle": "Elapsum in hac phasi",
+      "heldByRunTask": "Munus exsecutionis necessarium defecit — supersede aut exsecutionem reice",
+      "runTasksRunning": "Munera exsecutionis post consilium exspectantur",
+      "heldByPolicy": "Copia regularum necessaria defecit — supersede aut exsecutionem reice",
+      "heldBySecurityScan": "Perscrutatio securitatis inventa impedientia repperit — supersede aut exsecutionem reice"
     },
     "badge": {
       "destroy": "destructio",
@@ -2185,7 +2190,8 @@
           "error": "erratum",
           "warning": "monitum"
         }
-      }
+      },
+      "applySkippedNoChanges": "Nulla applicatio acta est: consilium nullas mutationes habuit, itaque nihil applicandum erat."
     },
     "policyPanel": {
       "heading": "Probationes Regularum",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "probatio moduli",
       "sourceModulePublish": "editio moduli",
       "queueApplyTitle": "Cursum consilii + exsecutionis in ordinem mittere",
-      "queueApplyRefBlocked": "Exsecutio non praesto est dum ramus, nota vel commissio electa est — ii cursus semper consilium solum sunt"
+      "queueApplyRefBlocked": "Exsecutio non praesto est dum ramus, nota vel commissio electa est — ii cursus semper consilium solum sunt",
+      "awaitingDecision": "decretum exspectat"
     },
     "state": {
       "deleteConfirm": "Versionem status #{serial} delere? Hoc revocari non potest.",

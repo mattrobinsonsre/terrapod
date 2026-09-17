@@ -2001,7 +2001,8 @@
       "applied": "Uygulandı",
       "errored": "Hata Verdi",
       "canceled": "İptal Edildi",
-      "discarded": "İptal Edildi"
+      "discarded": "İptal Edildi",
+      "awaitingDecision": "Karar bekleniyor"
     },
     "activity": {
       "pending": "Çalıştırma hazırlanıyor",
@@ -2017,7 +2018,11 @@
       "errored": "Çalıştırma başarısız oldu",
       "canceled": "Çalıştırma iptal edildi",
       "discarded": "Plan iptal edildi",
-      "elapsedTitle": "Bu aşamada geçen süre"
+      "elapsedTitle": "Bu aşamada geçen süre",
+      "heldByRunTask": "Zorunlu bir çalıştırma görevi başarısız oldu — geçersiz kılın veya çalıştırmayı iptal edin",
+      "runTasksRunning": "Plan sonrası çalıştırma görevleri bekleniyor",
+      "heldByPolicy": "Zorunlu bir politika seti başarısız oldu — geçersiz kılın veya çalıştırmayı iptal edin",
+      "heldBySecurityScan": "Güvenlik taraması engelleyen bulgular buldu — geçersiz kılın veya çalıştırmayı iptal edin"
     },
     "badge": {
       "destroy": "yok et",
@@ -2185,7 +2190,8 @@
           "error": "hata",
           "warning": "uyarı"
         }
-      }
+      },
+      "applySkippedNoChanges": "Uygulama çalıştırılmadı: planda değişiklik yoktu, bu yüzden uygulanacak bir şey yoktu."
     },
     "policyPanel": {
       "heading": "Politika Denetimleri",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "modül testi",
       "sourceModulePublish": "modül yayımlama",
       "queueApplyTitle": "Plan + apply çalıştırması kuyruğa al",
-      "queueApplyRefBlocked": "Bir dal, etiket veya commit seçiliyken apply kullanılamaz — bu çalıştırmalar her zaman yalnızca plan olur"
+      "queueApplyRefBlocked": "Bir dal, etiket veya commit seçiliyken apply kullanılamaz — bu çalıştırmalar her zaman yalnızca plan olur",
+      "awaitingDecision": "karar bekleniyor"
     },
     "state": {
       "deleteConfirm": "#{serial} durum sürümü silinsin mi? Bu geri alınamaz.",

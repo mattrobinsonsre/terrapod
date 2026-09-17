@@ -23,6 +23,7 @@ import { parsePlanLogIndex, type PlanEntryAction } from '@/lib/plan-log-index'
 import { ArrowDownToLine, RefreshCw, Download, Copy, Check, Palette } from 'lucide-react'
 
 import { phaseKey } from '@/lib/phase-vocabulary'
+import { gateOf, holdActivityKey, phaseOf, type Gate } from '@/lib/run-hold'
 
 // WebGL (three.js) — client-only, never SSR'd. Loaded on demand (#761).
 const ImpactGraph = dynamic(() => import('@/components/impact-graph').then((m) => m.ImpactGraph), {
@@ -49,6 +50,8 @@ interface RunActions {
 
 interface RunAttrs {
   status: string
+  // The post-plan gate holding the run, if any (#1725).
+  'blocked-by'?: string | null
   source: string
   message: string
   'discard-reason': string | null
@@ -194,8 +197,15 @@ function RunActivityHeader({
   planOnly,
   isConfirmable,
   engine,
+  gate = null,
+  reportedStatus,
+  onOpenGate,
 }: {
   status: string
+  gate?: Gate | null
+  reportedStatus?: string
+  // Opens the tab that shows what holds the run. Absent when no tab does.
+  onOpenGate?: () => void
   timestamps: Record<string, string>
   planOnly: boolean
   isConfirmable: boolean
@@ -209,7 +219,9 @@ function RunActivityHeader({
   const tPhase = useTranslations()
   const phase = (group: 'runStatus' | 'activity', state: string) =>
     tPhase(phaseKey(engine, group, state))
-  const live = ['pending', 'queued', 'planning', 'confirmed', 'applying', 'canceling'].includes(status)
+  // A run held after its plan is waiting for a person, not doing anything: no
+  // pulse, no ticking timer (#1725).
+  const live = !gate && ['pending', 'queued', 'planning', 'confirmed', 'applying', 'canceling'].includes(status)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (!live) return
@@ -237,13 +249,28 @@ function RunActivityHeader({
     canceled: { label: t('status.canceled'), activity: t('activity.canceled'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'canceled-at' },
     discarded: { label: t('status.discarded'), activity: t('activity.discarded'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'discarded-at' },
   }
-  const info = map[status] ?? { label: status, activity: '', dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40' }
+  const held: Info | null = gate
+    ? {
+        label: t('status.awaitingDecision'),
+        activity: t(`activity.${holdActivityKey(gate, reportedStatus ?? status)}`),
+        dot: 'bg-amber-400',
+        card: 'border-amber-800/40 bg-amber-900/10',
+        sinceKey: 'planned-at',
+      }
+    : null
+  const info = held ?? map[status] ?? { label: status, activity: '', dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40' }
   const sinceTs = info.sinceKey ? timestamps[info.sinceKey] : undefined
   const sinceMs = sinceTs ? Date.parse(sinceTs) : NaN
   const elapsed = !Number.isNaN(sinceMs) ? now - sinceMs : undefined
 
+  // A held run's banner is the way to what holds it: the whole strip opens
+  // the tab with the failing checks (#1704).
+  const Strip = onOpenGate ? 'button' : 'div'
   return (
-    <div className={`mb-6 rounded-lg border p-4 flex items-center gap-3 ${info.card}`}>
+    <Strip
+      {...(onOpenGate ? { type: 'button' as const, onClick: onOpenGate } : {})}
+      className={`mb-6 w-full text-left rounded-lg border p-4 flex items-center gap-3 ${info.card} ${onOpenGate ? 'cursor-pointer hover:brightness-125 transition' : ''}`}
+    >
       <span className="relative flex h-3 w-3 flex-shrink-0">
         {live && (
           <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${info.dot}`} />
@@ -262,7 +289,8 @@ function RunActivityHeader({
       {!live && sinceTs && (
         <span className="text-xs text-slate-500 flex-shrink-0">{relTime(sinceTs, now, t)}</span>
       )}
-    </div>
+      {onOpenGate && <span className="text-slate-500 flex-shrink-0" aria-hidden="true">›</span>}
+    </Strip>
   )
 }
 
@@ -1070,10 +1098,14 @@ function RunDetailPageInner() {
   // usually lands before it and would otherwise never be repeated.
   useEffect(() => {
     if (!run) return
-    const status = run.attributes.status
+    // Read the phase, not the raw status: in the Terraform Enterprise vocabulary
+    // a held run reports `policy_override` and the like, which is still the plan
+    // phase (#1704). A held run's plan has finished, so its log is complete.
+    const status = phaseOf(run.attributes.status)
+    const held = gateOf(run.attributes) !== null
     if (['planning', 'planned', 'confirmed', 'applying', 'canceling', 'applied', 'errored', 'canceled', 'discarded'].includes(status)) {
       getPlanFollower().setPhase(
-        status === 'planning' ? 'streaming' : PLAN_PHASE_DONE.includes(status) ? 'finished' : 'idle',
+        status === 'planning' && !held ? 'streaming' : status === 'planning' || PLAN_PHASE_DONE.includes(status) ? 'finished' : 'idle',
       )
       setPlanLogLoading(prev => planLog === null ? true : prev)
       loadPlanLog(true).finally(() => setPlanLogLoading(false))
@@ -1090,7 +1122,7 @@ function RunDetailPageInner() {
       getApplyFollower().setPhase('idle')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed on the run's id + status — depending on the log state or the loaders would loop, since this effect is what sets them
-  }, [run?.id, run?.attributes.status])
+  }, [run?.id, run?.attributes.status, run?.attributes['blocked-by']])
 
   // Stop the followers' timers when the page goes away.
   useEffect(() => () => {
@@ -1247,7 +1279,11 @@ function RunDetailPageInner() {
   if (loading) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>
   if (!run) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><ErrorBanner message={t('notFound')} /></main></>
 
-  const attrs = run.attributes
+  // Logic keys on the phase, whichever vocabulary the API used; the display
+  // keys on what holds the run (#1704).
+  const reportedStatus: string = run.attributes.status
+  const attrs = { ...run.attributes, status: phaseOf(reportedStatus) }
+  const gate = gateOf(run.attributes)
   const actions = attrs.actions
   const timestamps = attrs['status-timestamps'] || {}
 
@@ -1341,7 +1377,7 @@ function RunDetailPageInner() {
         tone: 'neutral',
       }
     }
-    if (['pending', 'queued', 'planning'].includes(attrs.status)) return { value: t('changes.planning'), tone: 'neutral' }
+    if (!gate && ['pending', 'queued', 'planning'].includes(attrs.status)) return { value: t('changes.planning'), tone: 'neutral' }
     return { value: '—', tone: 'neutral' }
   })()
 
@@ -1438,9 +1474,15 @@ function RunDetailPageInner() {
           {t('badge.planOnly')}
         </span>
       )}
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColor(attrs.status)}`}>
-        {t.has(`status.${attrs.status}`) ? t(`status.${attrs.status}`) : attrs.status}
-      </span>
+      {gate ? (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-900/50 text-amber-300">
+          {t('status.awaitingDecision')}
+        </span>
+      ) : (
+        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColor(attrs.status)}`}>
+          {t.has(`status.${attrs.status}`) ? t(`status.${attrs.status}`) : attrs.status}
+        </span>
+      )}
     </>
   )
 
@@ -1645,6 +1687,15 @@ function RunDetailPageInner() {
         {/* Run status + live activity at a glance (#721). */}
         <RunActivityHeader
           status={attrs.status}
+          gate={gate}
+          reportedStatus={reportedStatus}
+          onOpenGate={
+            gate === 'policy' && policyInfo?.present
+              ? () => switchView('opa')
+              : gate === 'security-scan' && tabs.some(([v]) => v === 'security')
+                ? () => switchView('security')
+                : undefined
+          }
           engine={attrs.engine}
           timestamps={timestamps}
           planOnly={attrs['plan-only']}
@@ -1982,7 +2033,7 @@ function RunDetailPageInner() {
             emptyMessage={t('log.planEmpty')}
             phase="plan"
             runId={runId}
-            isStreaming={attrs.status === 'planning'}
+            isStreaming={attrs.status === 'planning' && !gate}
             logComplete={planLogComplete}
             onRefresh={() => loadPlanLog(true)}
           />
@@ -1994,7 +2045,13 @@ function RunDetailPageInner() {
             log={applyLog}
             precomputedHtml={applyHtml}
             loading={applyLogLoading}
-            emptyMessage={t('log.applyEmpty')}
+            emptyMessage={
+              // A plan with no changes is marked applied without running an apply
+              // at all, so there is no log to wait for.
+              attrs.status === 'applied' && attrs['has-changes'] === false && !attrs['plan-only']
+                ? t('log.applySkippedNoChanges')
+                : t('log.applyEmpty')
+            }
             phase="apply"
             runId={runId}
             isStreaming={attrs.status === 'applying'}

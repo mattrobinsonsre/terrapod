@@ -2001,7 +2001,8 @@
       "applied": "Appliqué",
       "errored": "En erreur",
       "canceled": "Annulé",
-      "discarded": "Abandonné"
+      "discarded": "Abandonné",
+      "awaitingDecision": "En attente de décision"
     },
     "activity": {
       "pending": "Préparation de l'exécution",
@@ -2017,7 +2018,11 @@
       "errored": "L'exécution a échoué",
       "canceled": "Exécution annulée",
       "discarded": "Plan abandonné",
-      "elapsedTitle": "Temps écoulé dans cette phase"
+      "elapsedTitle": "Temps écoulé dans cette phase",
+      "heldByRunTask": "Une tâche d'exécution obligatoire a échoué — contournez-la ou abandonnez l'exécution",
+      "runTasksRunning": "En attente des tâches d'exécution post-plan",
+      "heldByPolicy": "Un ensemble de politiques obligatoire a échoué — contournez-le ou abandonnez l'exécution",
+      "heldBySecurityScan": "L'analyse de sécurité a trouvé des résultats bloquants — contournez-la ou abandonnez l'exécution"
     },
     "badge": {
       "destroy": "destruction",
@@ -2185,7 +2190,8 @@
           "error": "erreur",
           "warning": "avertissement"
         }
-      }
+      },
+      "applySkippedNoChanges": "Aucune application n''a été exécutée : le plan ne contenait aucun changement, il n''y avait donc rien à appliquer."
     },
     "policyPanel": {
       "heading": "Vérifications de politiques",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "test de module",
       "sourceModulePublish": "publication de module",
       "queueApplyTitle": "Mettre en file un run plan + apply",
-      "queueApplyRefBlocked": "Apply est indisponible tant quune branche, une étiquette ou un commit est sélectionné — ces runs sont toujours plan-only"
+      "queueApplyRefBlocked": "Apply est indisponible tant quune branche, une étiquette ou un commit est sélectionné — ces runs sont toujours plan-only",
+      "awaitingDecision": "en attente de décision"
     },
     "state": {
       "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",

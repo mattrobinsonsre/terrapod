@@ -153,6 +153,8 @@ interface RunItem {
     'created-by': string
     'plan-started-at': string | null
     'apply-finished-at': string | null
+    // The post-plan gate holding the run, if any (#1725).
+    'blocked-by'?: string | null
     'plan-summary': {
       add: number
       change: number
@@ -3476,9 +3478,15 @@ function WorkspaceDetailContent() {
                               {t('runs.needsConfirm')}
                             </span>
                           ) : (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
-                              {run.attributes.status}
-                            </span>
+                            run.attributes['blocked-by'] ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">
+                                {t('runs.awaitingDecision')}
+                              </span>
+                            ) : (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
+                                {run.attributes.status}
+                              </span>
+                            )
                           )}
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
@@ -3538,9 +3546,15 @@ function WorkspaceDetailContent() {
                             {t('runs.needsConfirm')}
                           </span>
                         ) : (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
-                            {run.attributes.status}
-                          </span>
+                          run.attributes['blocked-by'] ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">
+                              {t('runs.awaitingDecision')}
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
+                              {run.attributes.status}
+                            </span>
+                          )
                         )
                       }
                       fields={[

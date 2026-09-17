@@ -2001,7 +2001,8 @@
       "applied": "Angewendet",
       "errored": "Fehlgeschlagen",
       "canceled": "Abgebrochen",
-      "discarded": "Verworfen"
+      "discarded": "Verworfen",
+      "awaitingDecision": "Wartet auf Entscheidung"
     },
     "activity": {
       "pending": "Ausführung wird vorbereitet",
@@ -2017,7 +2018,11 @@
       "errored": "Ausführung fehlgeschlagen",
       "canceled": "Ausführung abgebrochen",
       "discarded": "Plan verworfen",
-      "elapsedTitle": "Verstrichene Zeit in dieser Phase"
+      "elapsedTitle": "Verstrichene Zeit in dieser Phase",
+      "heldByRunTask": "Eine verpflichtende Ausführungsaufgabe ist fehlgeschlagen – überschreiben oder die Ausführung verwerfen",
+      "runTasksRunning": "Wartet auf Ausführungsaufgaben nach dem Plan",
+      "heldByPolicy": "Ein verpflichtender Richtliniensatz ist fehlgeschlagen – überschreiben oder die Ausführung verwerfen",
+      "heldBySecurityScan": "Der Sicherheits-Scan hat blockierende Funde – überschreiben oder die Ausführung verwerfen"
     },
     "badge": {
       "destroy": "Zerstören",
@@ -2185,7 +2190,8 @@
           "error": "Fehler",
           "warning": "Warnung"
         }
-      }
+      },
+      "applySkippedNoChanges": "Es wurde nichts angewendet: Der Plan enthielt keine Änderungen, daher gab es nichts anzuwenden."
     },
     "policyPanel": {
       "heading": "Richtlinienprüfungen",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "Modul-Test",
       "sourceModulePublish": "Modul-Veröffentlichung",
       "queueApplyTitle": "Einen Plan-+-Apply-Lauf einreihen",
-      "queueApplyRefBlocked": "Apply ist nicht verfügbar, solange ein Branch, Tag oder Commit ausgewählt ist – solche Läufe sind immer Plan-only"
+      "queueApplyRefBlocked": "Apply ist nicht verfügbar, solange ein Branch, Tag oder Commit ausgewählt ist – solche Läufe sind immer Plan-only",
+      "awaitingDecision": "wartet auf Entscheidung"
     },
     "state": {
       "deleteConfirm": "Zustandsversion #{serial} löschen? Dies kann nicht rückgängig gemacht werden.",

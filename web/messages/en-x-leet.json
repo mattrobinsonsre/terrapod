@@ -2001,7 +2001,8 @@
       "applied": "4ppl13d",
       "errored": "3rr0r3d",
       "canceled": "C4nc3l3d",
-      "discarded": "D15c4rd3d"
+      "discarded": "D15c4rd3d",
+      "awaitingDecision": "4w4171ng d3c1510n"
     },
     "activity": {
       "pending": "Pr3p4r1ng 7h3 run",
@@ -2017,7 +2018,11 @@
       "errored": "Run f41l3d",
       "canceled": "Run c4nc3l3d",
       "discarded": "Pl4n d15c4rd3d",
-      "elapsedTitle": "3l4p53d 1n 7h15 ph453"
+      "elapsedTitle": "3l4p53d 1n 7h15 ph453",
+      "heldByRunTask": "4 m4nd470ry run 745k f41l3d — 0v3rr1d3 17 0r d15c4rd 7h3 run",
+      "runTasksRunning": "W4171ng f0r p057-pl4n run 745k5",
+      "heldByPolicy": "4 m4nd470ry p0l1cy 537 f41l3d — 0v3rr1d3 17 0r d15c4rd 7h3 run",
+      "heldBySecurityScan": "7h3 53cur17y 5c4n f0und bl0ck1ng 155u35 — 0v3rr1d3 17 0r d15c4rd 7h3 run"
     },
     "badge": {
       "destroy": "d357r0y",
@@ -2185,7 +2190,8 @@
           "error": "3rr0r",
           "warning": "w4rn1ng"
         }
-      }
+      },
+      "applySkippedNoChanges": "N0 4pply r4n: 7h3 pl4n h4d n0 ch4ng35, 50 7h3r3 w45 n07h1ng 70 4pply."
     },
     "policyPanel": {
       "heading": "P0l1cy Ch3ck5",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "m0dul3 7357",
       "sourceModulePublish": "m0dul3 publ15h",
       "queueApplyTitle": "Qu3u3 4 pl4n + 4pply run",
-      "queueApplyRefBlocked": "4pply 15 un4v41l4bl3 wh1l3 4 br4nch, 74g 0r c0mm17 15 53l3c73d — 7h053 run5 4r3 4lw4y5 pl4n-0nly"
+      "queueApplyRefBlocked": "4pply 15 un4v41l4bl3 wh1l3 4 br4nch, 74g 0r c0mm17 15 53l3c73d — 7h053 run5 4r3 4lw4y5 pl4n-0nly",
+      "awaitingDecision": "4w4171ng d3c1510n"
     },
     "state": {
       "deleteConfirm": "D3l373 57473 v3r510n #{serial}? 7h15 c4nn07 b3 und0n3.",

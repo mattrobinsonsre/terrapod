@@ -2001,7 +2001,8 @@
       "applied": "適用済み",
       "errored": "エラー",
       "canceled": "キャンセル済み",
-      "discarded": "破棄済み"
+      "discarded": "破棄済み",
+      "awaitingDecision": "判断待ち"
     },
     "activity": {
       "pending": "実行を準備中",
@@ -2017,7 +2018,11 @@
       "errored": "実行が失敗しました",
       "canceled": "実行がキャンセルされました",
       "discarded": "プランが破棄されました",
-      "elapsedTitle": "このフェーズの経過時間"
+      "elapsedTitle": "このフェーズの経過時間",
+      "heldByRunTask": "必須の実行タスクが失敗しました — オーバーライドするか実行を破棄してください",
+      "runTasksRunning": "プラン後の実行タスクを待機中",
+      "heldByPolicy": "必須のポリシーセットが失敗しました — オーバーライドするか実行を破棄してください",
+      "heldBySecurityScan": "セキュリティスキャンでブロック検出がありました — オーバーライドするか実行を破棄してください"
     },
     "badge": {
       "destroy": "破棄",
@@ -2185,7 +2190,8 @@
           "error": "エラー",
           "warning": "警告"
         }
-      }
+      },
+      "applySkippedNoChanges": "適用は実行されませんでした: プランに変更がなかったため、適用するものはありませんでした。"
     },
     "policyPanel": {
       "heading": "ポリシーチェック",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "モジュールテスト",
       "sourceModulePublish": "モジュール公開",
       "queueApplyTitle": "プラン + 適用の実行をキューに追加",
-      "queueApplyRefBlocked": "ブランチ・タグ・コミットを選択している間は適用できません。これらの実行は常にプランのみです"
+      "queueApplyRefBlocked": "ブランチ・タグ・コミットを選択している間は適用できません。これらの実行は常にプランのみです",
+      "awaitingDecision": "判断待ち"
     },
     "state": {
       "deleteConfirm": "状態バージョン #{serial} を削除しますか？この操作は元に戻せません。",

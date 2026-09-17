@@ -2001,7 +2001,8 @@
       "applied": "Applyd",
       "errored": "Errurd",
       "canceled": "Canceld",
-      "discarded": "Discardd"
+      "discarded": "Discardd",
+      "awaitingDecision": "Waitin fer decizun"
     },
     "activity": {
       "pending": "Preparin teh run",
@@ -2017,7 +2018,11 @@
       "errored": "Run failed",
       "canceled": "Run cancelled",
       "discarded": "Plan discardid",
-      "elapsedTitle": "Elapsd in dis phase"
+      "elapsedTitle": "Elapsd in dis phase",
+      "heldByRunTask": "A mandatoree run task faild — overryd it or discard teh run",
+      "runTasksRunning": "Waitin fer post-plan run taskz",
+      "heldByPolicy": "A mandatoree polisee set faild — overryd it or discard teh run",
+      "heldBySecurityScan": "Teh sekurity scan findz blockin problemz — overryd it or discard teh run"
     },
     "badge": {
       "destroy": "destroy",
@@ -2185,7 +2190,8 @@
           "error": "oh noes",
           "warning": "warnin"
         }
-      }
+      },
+      "applySkippedNoChanges": "No apply happend: teh plan haz no changez, so nuthin to apply."
     },
     "policyPanel": {
       "heading": "Policy Checkz",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "module test",
       "sourceModulePublish": "module publish",
       "queueApplyTitle": "Queue a plan + do-it runz",
-      "queueApplyRefBlocked": "No do-it while u picked a branch, tag or commit — dose runz iz alwayz plan only, srsly"
+      "queueApplyRefBlocked": "No do-it while u picked a branch, tag or commit — dose runz iz alwayz plan only, srsly",
+      "awaitingDecision": "waitin fer decizun"
     },
     "state": {
       "deleteConfirm": "Delete state vershun #{serial}? Dis cannot be undun.",

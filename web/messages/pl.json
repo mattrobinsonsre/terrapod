@@ -2001,7 +2001,8 @@
       "applied": "Zastosowane",
       "errored": "Błąd",
       "canceled": "Anulowane",
-      "discarded": "Odrzucone"
+      "discarded": "Odrzucone",
+      "awaitingDecision": "Oczekuje na decyzję"
     },
     "activity": {
       "pending": "Przygotowywanie przebiegu",
@@ -2017,7 +2018,11 @@
       "errored": "Przebieg nie powiódł się",
       "canceled": "Przebieg anulowany",
       "discarded": "Plan odrzucony",
-      "elapsedTitle": "Czas, jaki upłynął w tej fazie"
+      "elapsedTitle": "Czas, jaki upłynął w tej fazie",
+      "heldByRunTask": "Obowiązkowe zadanie przebiegu nie powiodło się — nadpisz je lub odrzuć przebieg",
+      "runTasksRunning": "Oczekiwanie na zadania przebiegu po planie",
+      "heldByPolicy": "Obowiązkowy zestaw zasad nie powiódł się — nadpisz go lub odrzuć przebieg",
+      "heldBySecurityScan": "Skan bezpieczeństwa wykrył blokujące problemy — nadpisz go lub odrzuć przebieg"
     },
     "badge": {
       "destroy": "niszczenie",
@@ -2185,7 +2190,8 @@
           "error": "błąd",
           "warning": "ostrzeżenie"
         }
-      }
+      },
+      "applySkippedNoChanges": "Nie uruchomiono zastosowania: plan nie zawierał zmian, więc nie było czego zastosować."
     },
     "policyPanel": {
       "heading": "Sprawdzenia zasad",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "test modułu",
       "sourceModulePublish": "publikacja modułu",
       "queueApplyTitle": "Dodaj do kolejki uruchomienie plan + apply",
-      "queueApplyRefBlocked": "Apply jest niedostępne, gdy wybrano gałąź, tag lub commit — takie uruchomienia są zawsze tylko plan"
+      "queueApplyRefBlocked": "Apply jest niedostępne, gdy wybrano gałąź, tag lub commit — takie uruchomienia są zawsze tylko plan",
+      "awaitingDecision": "oczekuje na decyzję"
     },
     "state": {
       "deleteConfirm": "Usunąć wersję stanu #{serial}? Tej operacji nie można cofnąć.",

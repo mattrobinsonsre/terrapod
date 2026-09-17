@@ -2001,7 +2001,8 @@
       "applied": "Applied",
       "errored": "Errored",
       "canceled": "Canceled",
-      "discarded": "Discarded"
+      "discarded": "Discarded",
+      "awaitingDecision": "A decision, awaiting"
     },
     "activity": {
       "pending": "The run, preparing it",
@@ -2017,7 +2018,11 @@
       "errored": "Failed, the run did",
       "canceled": "Canceled, the run was",
       "discarded": "Discarded, the plan was",
-      "elapsedTitle": "In this phase, elapsed"
+      "elapsedTitle": "In this phase, elapsed",
+      "heldByRunTask": "Failed, a mandatory run task has — override it or discard the run, you must",
+      "runTasksRunning": "For post-plan run tasks, waiting",
+      "heldByPolicy": "Failed, a mandatory policy set has — override it or discard the run, you must",
+      "heldBySecurityScan": "Blocking issues, the security scan found — override it or discard the run, you must"
     },
     "badge": {
       "destroy": "destroy",
@@ -2185,7 +2190,8 @@
           "error": "failed, it has",
           "warning": "careful, you must be"
         }
-      }
+      },
+      "applySkippedNoChanges": "Run, no apply did: no changes, the plan had, so to apply, nothing there was."
     },
     "policyPanel": {
       "heading": "Checks, Policy",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "module test",
       "sourceModulePublish": "module publish",
       "queueApplyTitle": "A plan + apply run, queue",
-      "queueApplyRefBlocked": "Unavailable apply is, while selected a branch, tag or commit is — plan-only always, those runs are"
+      "queueApplyRefBlocked": "Unavailable apply is, while selected a branch, tag or commit is — plan-only always, those runs are",
+      "awaitingDecision": "a decision, awaiting"
     },
     "state": {
       "deleteConfirm": "State version #{serial}, delete? Undone, this cannot be.",

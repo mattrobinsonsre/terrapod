@@ -2001,7 +2001,8 @@
       "applied": "Gweithredwyd",
       "errored": "Gwallodd",
       "canceled": "Canslwyd",
-      "discarded": "Taflwyd"
+      "discarded": "Taflwyd",
+      "awaitingDecision": "Yn aros am benderfyniad"
     },
     "activity": {
       "pending": "Wrthi'n paratoi'r rhediad",
@@ -2017,7 +2018,11 @@
       "errored": "Methodd y rhediad",
       "canceled": "Canslwyd y rhediad",
       "discarded": "Taflwyd y cynllun",
-      "elapsedTitle": "Amser a aeth heibio yn y cam hwn"
+      "elapsedTitle": "Amser a aeth heibio yn y cam hwn",
+      "heldByRunTask": "Methodd tasg rhediad orfodol — diystyrwch hi neu taflwch y rhediad",
+      "runTasksRunning": "Yn aros am dasgau rhediad ar ôl y cynllun",
+      "heldByPolicy": "Methodd set polisi orfodol — diystyrwch hi neu taflwch y rhediad",
+      "heldBySecurityScan": "Canfu'r sgan diogelwch broblemau rhwystro — diystyrwch ef neu taflwch y rhediad"
     },
     "badge": {
       "destroy": "dinistrio",
@@ -2185,7 +2190,8 @@
           "error": "gwall",
           "warning": "rhybudd"
         }
-      }
+      },
+      "applySkippedNoChanges": "Ni redodd unrhyw weithredu: nid oedd newidiadau yn y cynllun, felly nid oedd dim i''w weithredu."
     },
     "policyPanel": {
       "heading": "Gwiriadau Polisi",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "prawf modiwl",
       "sourceModulePublish": "cyhoeddi modiwl",
       "queueApplyTitle": "Ciwio rhediad cynllun + gweithredu",
-      "queueApplyRefBlocked": "Nid yw gweithredu ar gael tra bo cangen, tag neu ymrwymiad wedii ddewis — maer rhediadau hynny bob amser yn gynllun yn unig"
+      "queueApplyRefBlocked": "Nid yw gweithredu ar gael tra bo cangen, tag neu ymrwymiad wedii ddewis — maer rhediadau hynny bob amser yn gynllun yn unig",
+      "awaitingDecision": "yn aros am benderfyniad"
     },
     "state": {
       "deleteConfirm": "Dileu fersiwn cyflwr #{serial}? Ni ellir dadwneud hyn.",

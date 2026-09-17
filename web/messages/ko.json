@@ -2001,7 +2001,8 @@
       "applied": "적용됨",
       "errored": "오류",
       "canceled": "취소됨",
-      "discarded": "폐기됨"
+      "discarded": "폐기됨",
+      "awaitingDecision": "결정 대기 중"
     },
     "activity": {
       "pending": "실행 준비 중",
@@ -2017,7 +2018,11 @@
       "errored": "실행 실패",
       "canceled": "실행 취소됨",
       "discarded": "계획 폐기됨",
-      "elapsedTitle": "이 단계의 경과 시간"
+      "elapsedTitle": "이 단계의 경과 시간",
+      "heldByRunTask": "필수 실행 작업이 실패했습니다 — 재정의하거나 실행을 폐기하세요",
+      "runTasksRunning": "계획 후 실행 작업을 기다리는 중",
+      "heldByPolicy": "필수 정책 집합이 실패했습니다 — 재정의하거나 실행을 폐기하세요",
+      "heldBySecurityScan": "보안 스캔에서 차단 발견이 나왔습니다 — 재정의하거나 실행을 폐기하세요"
     },
     "badge": {
       "destroy": "삭제",
@@ -2185,7 +2190,8 @@
           "error": "오류",
           "warning": "경고"
         }
-      }
+      },
+      "applySkippedNoChanges": "적용이 실행되지 않았습니다: 계획에 변경 사항이 없어 적용할 것이 없었습니다."
     },
     "policyPanel": {
       "heading": "정책 검사",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "모듈 테스트",
       "sourceModulePublish": "모듈 게시",
       "queueApplyTitle": "플랜 + 적용 실행을 대기열에 추가",
-      "queueApplyRefBlocked": "브랜치, 태그 또는 커밋이 선택된 동안에는 적용할 수 없습니다. 해당 실행은 항상 플랜 전용입니다"
+      "queueApplyRefBlocked": "브랜치, 태그 또는 커밋이 선택된 동안에는 적용할 수 없습니다. 해당 실행은 항상 플랜 전용입니다",
+      "awaitingDecision": "결정 대기 중"
     },
     "state": {
       "deleteConfirm": "상태 버전 #{serial}을(를) 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",

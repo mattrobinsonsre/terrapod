@@ -2001,7 +2001,8 @@
       "applied": "Aplicado",
       "errored": "Con error",
       "canceled": "Cancelado",
-      "discarded": "Descartado"
+      "discarded": "Descartado",
+      "awaitingDecision": "Esperando una decisión"
     },
     "activity": {
       "pending": "Preparando la ejecución",
@@ -2017,7 +2018,11 @@
       "errored": "La ejecución falló",
       "canceled": "Ejecución cancelada",
       "discarded": "Plan descartado",
-      "elapsedTitle": "Tiempo transcurrido en esta fase"
+      "elapsedTitle": "Tiempo transcurrido en esta fase",
+      "heldByRunTask": "Falló una tarea de ejecución obligatoria: anúlela o descarte la ejecución",
+      "runTasksRunning": "Esperando las tareas de ejecución posteriores al plan",
+      "heldByPolicy": "Falló un conjunto de políticas obligatorio: anúlelo o descarte la ejecución",
+      "heldBySecurityScan": "El análisis de seguridad encontró hallazgos bloqueantes: anúlelo o descarte la ejecución"
     },
     "badge": {
       "destroy": "destruir",
@@ -2185,7 +2190,8 @@
           "error": "error",
           "warning": "advertencia"
         }
-      }
+      },
+      "applySkippedNoChanges": "No se ejecutó ninguna aplicación: el plan no tenía cambios, así que no había nada que aplicar."
     },
     "policyPanel": {
       "heading": "Comprobaciones de políticas",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "prueba de módulo",
       "sourceModulePublish": "publicación de módulo",
       "queueApplyTitle": "Poner en cola una ejecución de plan + apply",
-      "queueApplyRefBlocked": "Apply no está disponible mientras haya una rama, etiqueta o commit seleccionado: esas ejecuciones son siempre solo de plan"
+      "queueApplyRefBlocked": "Apply no está disponible mientras haya una rama, etiqueta o commit seleccionado: esas ejecuciones son siempre solo de plan",
+      "awaitingDecision": "esperando una decisión"
     },
     "state": {
       "deleteConfirm": "¿Eliminar la versión de estado n.º {serial}? Esto no se puede deshacer.",

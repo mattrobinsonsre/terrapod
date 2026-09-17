@@ -2001,7 +2001,8 @@
       "applied": "יושם",
       "errored": "נכשל",
       "canceled": "בוטל",
-      "discarded": "נדחה"
+      "discarded": "נדחה",
+      "awaitingDecision": "ממתין להחלטה"
     },
     "activity": {
       "pending": "מכין את ההרצה",
@@ -2017,7 +2018,11 @@
       "errored": "ההרצה נכשלה",
       "canceled": "ההרצה בוטלה",
       "discarded": "התכנון נדחה",
-      "elapsedTitle": "זמן שחלף בשלב זה"
+      "elapsedTitle": "זמן שחלף בשלב זה",
+      "heldByRunTask": "משימת ריצה חובה נכשלה — עקוף אותה או דחה את ההרצה",
+      "runTasksRunning": "ממתין למשימות ריצה שלאחר התוכנית",
+      "heldByPolicy": "מערך מדיניות חובה נכשל — עקוף אותו או דחה את ההרצה",
+      "heldBySecurityScan": "סריקת האבטחה מצאה ממצאים חוסמים — עקוף אותה או דחה את ההרצה"
     },
     "badge": {
       "destroy": "השמדה",
@@ -2185,7 +2190,8 @@
           "error": "שגיאה",
           "warning": "אזהרה"
         }
-      }
+      },
+      "applySkippedNoChanges": "לא בוצעה החלה: בתוכנית לא היו שינויים, כך שלא היה מה להחיל."
     },
     "policyPanel": {
       "heading": "בדיקות מדיניות",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "בדיקת מודול",
       "sourceModulePublish": "פרסום מודול",
       "queueApplyTitle": "הוספת הרצת תכנון + החלה לתור",
-      "queueApplyRefBlocked": "החלה אינה זמינה כאשר נבחרו ענף, תגית או קומיט — הרצות אלה הן תמיד תכנון בלבד"
+      "queueApplyRefBlocked": "החלה אינה זמינה כאשר נבחרו ענף, תגית או קומיט — הרצות אלה הן תמיד תכנון בלבד",
+      "awaitingDecision": "ממתין להחלטה"
     },
     "state": {
       "deleteConfirm": "למחוק את גרסת המצב #{serial}? לא ניתן לבטל זאת.",

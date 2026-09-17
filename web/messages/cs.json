@@ -2001,7 +2001,8 @@
       "applied": "Aplikováno",
       "errored": "Chyba",
       "canceled": "Zrušeno",
-      "discarded": "Zahozeno"
+      "discarded": "Zahozeno",
+      "awaitingDecision": "Čeká na rozhodnutí"
     },
     "activity": {
       "pending": "Příprava běhu",
@@ -2017,7 +2018,11 @@
       "errored": "Běh selhal",
       "canceled": "Běh zrušen",
       "discarded": "Plán zahozen",
-      "elapsedTitle": "Uplynulý čas v této fázi"
+      "elapsedTitle": "Uplynulý čas v této fázi",
+      "heldByRunTask": "Povinný run task selhal — přepište ho, nebo běh zahoďte",
+      "runTasksRunning": "Čeká na run tasky po plánu",
+      "heldByPolicy": "Povinná sada zásad selhala — přepište ji, nebo běh zahoďte",
+      "heldBySecurityScan": "Bezpečnostní kontrola našla blokující nálezy — přepište ji, nebo běh zahoďte"
     },
     "badge": {
       "destroy": "zničit",
@@ -2185,7 +2190,8 @@
           "error": "chyba",
           "warning": "varování"
         }
-      }
+      },
+      "applySkippedNoChanges": "Žádná aplikace neproběhla: plán neobsahoval žádné změny, takže nebylo co aplikovat."
     },
     "policyPanel": {
       "heading": "Kontroly zásad",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "test modulu",
       "sourceModulePublish": "publikace modulu",
       "queueApplyTitle": "Zařadit běh plan + apply",
-      "queueApplyRefBlocked": "Apply není dostupné, pokud je vybrána větev, značka nebo commit — takové běhy jsou vždy pouze plan"
+      "queueApplyRefBlocked": "Apply není dostupné, pokud je vybrána větev, značka nebo commit — takové běhy jsou vždy pouze plan",
+      "awaitingDecision": "čeká na rozhodnutí"
     },
     "state": {
       "deleteConfirm": "Smazat verzi stavu #{serial}? Toto nelze vrátit zpět.",

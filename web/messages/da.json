@@ -2001,7 +2001,8 @@
       "applied": "Anvendt",
       "errored": "Fejlet",
       "canceled": "Annulleret",
-      "discarded": "Kasseret"
+      "discarded": "Kasseret",
+      "awaitingDecision": "Afventer beslutning"
     },
     "activity": {
       "pending": "Forbereder kørslen",
@@ -2017,7 +2018,11 @@
       "errored": "Kørsel mislykkedes",
       "canceled": "Kørsel annulleret",
       "discarded": "Plan kasseret",
-      "elapsedTitle": "Forløbet i denne fase"
+      "elapsedTitle": "Forløbet i denne fase",
+      "heldByRunTask": "En obligatorisk kørselsopgave mislykkedes — tilsidesæt den eller kassér kørslen",
+      "runTasksRunning": "Venter på kørselsopgaver efter planen",
+      "heldByPolicy": "Et obligatorisk politiksæt mislykkedes — tilsidesæt det eller kassér kørslen",
+      "heldBySecurityScan": "Sikkerhedsscanningen fandt blokerende fund — tilsidesæt den eller kassér kørslen"
     },
     "badge": {
       "destroy": "nedriv",
@@ -2185,7 +2190,8 @@
           "error": "fejl",
           "warning": "advarsel"
         }
-      }
+      },
+      "applySkippedNoChanges": "Ingen anvendelse blev kørt: planen havde ingen ændringer, så der var intet at anvende."
     },
     "policyPanel": {
       "heading": "Politiktjek",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "modultest",
       "sourceModulePublish": "modulpublicering",
       "queueApplyTitle": "Sæt en plan + apply-kørsel i kø",
-      "queueApplyRefBlocked": "Apply er utilgængelig, mens en branch, et tag eller et commit er valgt — de kørsler er altid kun plan"
+      "queueApplyRefBlocked": "Apply er utilgængelig, mens en branch, et tag eller et commit er valgt — de kørsler er altid kun plan",
+      "awaitingDecision": "afventer beslutning"
     },
     "state": {
       "deleteConfirm": "Slet tilstandsversion #{serial}? Dette kan ikke fortrydes.",

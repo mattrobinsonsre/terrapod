@@ -2001,7 +2001,8 @@
       "applied": "Applicerad",
       "errored": "Fel",
       "canceled": "Avbruten",
-      "discarded": "Kasserad"
+      "discarded": "Kasserad",
+      "awaitingDecision": "Väntar på beslut"
     },
     "activity": {
       "pending": "Förbereder körningen",
@@ -2017,7 +2018,11 @@
       "errored": "Körningen misslyckades",
       "canceled": "Körning avbruten",
       "discarded": "Plan kasserad",
-      "elapsedTitle": "Förfluten tid i denna fas"
+      "elapsedTitle": "Förfluten tid i denna fas",
+      "heldByRunTask": "En obligatorisk körningsuppgift misslyckades — åsidosätt den eller kassera körningen",
+      "runTasksRunning": "Väntar på körningsuppgifter efter planen",
+      "heldByPolicy": "En obligatorisk policyuppsättning misslyckades — åsidosätt den eller kassera körningen",
+      "heldBySecurityScan": "Säkerhetsskanningen hittade blockerande fynd — åsidosätt den eller kassera körningen"
     },
     "badge": {
       "destroy": "förstör",
@@ -2185,7 +2190,8 @@
           "error": "fel",
           "warning": "varning"
         }
-      }
+      },
+      "applySkippedNoChanges": "Ingen applicering kördes: planen hade inga ändringar, så det fanns inget att applicera."
     },
     "policyPanel": {
       "heading": "Policykontroller",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "modultest",
       "sourceModulePublish": "modulpublicering",
       "queueApplyTitle": "Köa en plan + apply-körning",
-      "queueApplyRefBlocked": "Apply är otillgängligt medan en gren, tagg eller commit är vald — de körningarna är alltid endast plan"
+      "queueApplyRefBlocked": "Apply är otillgängligt medan en gren, tagg eller commit är vald — de körningarna är alltid endast plan",
+      "awaitingDecision": "väntar på beslut"
     },
     "state": {
       "deleteConfirm": "Ta bort tillståndsversion #{serial}? Detta kan inte ångras.",

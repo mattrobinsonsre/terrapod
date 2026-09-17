@@ -2001,7 +2001,8 @@
       "applied": "Anvendt",
       "errored": "Feilet",
       "canceled": "Avbrutt",
-      "discarded": "Forkastet"
+      "discarded": "Forkastet",
+      "awaitingDecision": "Venter på beslutning"
     },
     "activity": {
       "pending": "Forbereder kjøringen",
@@ -2017,7 +2018,11 @@
       "errored": "Kjøring feilet",
       "canceled": "Kjøring avbrutt",
       "discarded": "Plan forkastet",
-      "elapsedTitle": "Forløpt i denne fasen"
+      "elapsedTitle": "Forløpt i denne fasen",
+      "heldByRunTask": "En obligatorisk kjøringsoppgave feilet — overstyr den eller forkast kjøringen",
+      "runTasksRunning": "Venter på kjøringsoppgaver etter planen",
+      "heldByPolicy": "Et obligatorisk regelsett feilet — overstyr det eller forkast kjøringen",
+      "heldBySecurityScan": "Sikkerhetsskanningen fant blokkerende funn — overstyr den eller forkast kjøringen"
     },
     "badge": {
       "destroy": "riv ned",
@@ -2185,7 +2190,8 @@
           "error": "feil",
           "warning": "advarsel"
         }
-      }
+      },
+      "applySkippedNoChanges": "Ingen anvendelse ble kjørt: planen hadde ingen endringer, så det var ingenting å anvende."
     },
     "policyPanel": {
       "heading": "Regelkontroller",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "modultest",
       "sourceModulePublish": "modulpublisering",
       "queueApplyTitle": "Legg en plan + apply-kjøring i kø",
-      "queueApplyRefBlocked": "Apply er utilgjengelig mens en branch, tag eller commit er valgt — slike kjøringer er alltid kun plan"
+      "queueApplyRefBlocked": "Apply er utilgjengelig mens en branch, tag eller commit er valgt — slike kjøringer er alltid kun plan",
+      "awaitingDecision": "venter på beslutning"
     },
     "state": {
       "deleteConfirm": "Slett tilstandsversjon #{serial}? Dette kan ikke angres.",

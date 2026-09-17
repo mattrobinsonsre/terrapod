@@ -2001,7 +2001,8 @@
       "applied": "lo'pu'",
       "errored": "Qaghpu'",
       "canceled": "qIlpu'",
-      "discarded": "woDlu'pu'"
+      "discarded": "woDlu'pu'",
+      "awaitingDecision": "wuq loS"
     },
     "activity": {
       "pending": "Sar ghuHmoHtaH",
@@ -2017,7 +2018,11 @@
       "errored": "Sar lujpu'",
       "canceled": "Sar qIlpu'",
       "discarded": "nab woDlu'pu'",
-      "elapsedTitle": "'ay' vamDaq poH ret"
+      "elapsedTitle": "'ay' vamDaq poH ret",
+      "heldByRunTask": "Sar Qu' ramtaHbe'bogh luj — DIvI'moH pagh Sar woD",
+      "runTasksRunning": "nab pIq Sar Qu'mey loS",
+      "heldByPolicy": "chut Segh ramtaHbe'bogh luj — DIvI'moH pagh Sar woD",
+      "heldBySecurityScan": "Hurgh QaD wanI' QaD botlh tu' — DIvI'moH pagh Sar woD"
     },
     "badge": {
       "destroy": "Qaw'",
@@ -2185,7 +2190,8 @@
           "error": "Qagh",
           "warning": "ghuHmoHwI''"
         }
-      }
+      },
+      "applySkippedNoChanges": "lo''lu''be'': nab choHmey tu''lu''be'', vaj lo''meH pagh tu''lu''."
     },
     "policyPanel": {
       "heading": "chut toblu'mey",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "Segh toblu'",
       "sourceModulePublish": "Segh chum",
       "queueApplyTitle": "nab + ta qaStaHvIS lI",
-      "queueApplyRefBlocked": "wIv ramus, per ghap commit qaStaHvIS talaHbe — nab neH bIH"
+      "queueApplyRefBlocked": "wIv ramus, per ghap commit qaStaHvIS talaHbe — nab neH bIH",
+      "awaitingDecision": "wuq loS"
     },
     "state": {
       "deleteConfirm": "Dotlh mI' #{serial} Qaw''a'? choHlaHbe'lu'.",

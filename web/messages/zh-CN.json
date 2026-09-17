@@ -2001,7 +2001,8 @@
       "applied": "已应用",
       "errored": "已出错",
       "canceled": "已取消",
-      "discarded": "已丢弃"
+      "discarded": "已丢弃",
+      "awaitingDecision": "等待决定"
     },
     "activity": {
       "pending": "正在准备运行",
@@ -2017,7 +2018,11 @@
       "errored": "运行失败",
       "canceled": "运行已取消",
       "discarded": "计划已丢弃",
-      "elapsedTitle": "此阶段已用时"
+      "elapsedTitle": "此阶段已用时",
+      "heldByRunTask": "必需的运行任务失败 — 覆盖它或丢弃此运行",
+      "runTasksRunning": "正在等待计划后的运行任务",
+      "heldByPolicy": "必需的策略集失败 — 覆盖它或丢弃此运行",
+      "heldBySecurityScan": "安全扫描发现阻断性问题 — 覆盖它或丢弃此运行"
     },
     "badge": {
       "destroy": "销毁",
@@ -2185,7 +2190,8 @@
           "error": "错误",
           "warning": "警告"
         }
-      }
+      },
+      "applySkippedNoChanges": "未执行应用：计划中没有变更，因此无需应用。"
     },
     "policyPanel": {
       "heading": "策略检查",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "模块测试",
       "sourceModulePublish": "模块发布",
       "queueApplyTitle": "将计划 + 应用运行加入队列",
-      "queueApplyRefBlocked": "选择分支、标签或提交时无法应用——这些运行始终仅为计划"
+      "queueApplyRefBlocked": "选择分支、标签或提交时无法应用——这些运行始终仅为计划",
+      "awaitingDecision": "等待决定"
     },
     "state": {
       "deleteConfirm": "删除状态版本 #{serial}？此操作无法撤销。",

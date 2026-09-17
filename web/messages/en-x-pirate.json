@@ -2001,7 +2001,8 @@
       "applied": "Applied",
       "errored": "Squalled",
       "canceled": "Canceled",
-      "discarded": "Discarded"
+      "discarded": "Discarded",
+      "awaitingDecision": "Awaitin'' the cap''n''s word"
     },
     "activity": {
       "pending": "Preparin'' th'' run",
@@ -2017,7 +2018,11 @@
       "errored": "Run be foundered",
       "canceled": "Run canceled",
       "discarded": "Plan discarded",
-      "elapsedTitle": "Elapsed in this phase"
+      "elapsedTitle": "Elapsed in this phase",
+      "heldByRunTask": "A mandatory run task be sunk — override it or scuttle the run",
+      "runTasksRunning": "Waitin'' on the run tasks after the plan",
+      "heldByPolicy": "A mandatory policy set be sunk — override it or scuttle the run",
+      "heldBySecurityScan": "The lookout spied blockin'' reefs — override it or scuttle the run"
     },
     "badge": {
       "destroy": "send t'' Davy Jones",
@@ -2185,7 +2190,8 @@
           "error": "scuttled",
           "warning": "squall ahead"
         }
-      }
+      },
+      "applySkippedNoChanges": "No apply were run: the chart had no changes, so there be nothin'' to apply."
     },
     "policyPanel": {
       "heading": "Policy Checks",
@@ -2675,7 +2681,8 @@
       "sourceModuleTest": "module test",
       "sourceModulePublish": "module publish",
       "queueApplyTitle": "Queue a chart + commit voyage",
-      "queueApplyRefBlocked": "No committin while a branch, tag or commit be chosen — them voyages be chartin only"
+      "queueApplyRefBlocked": "No committin while a branch, tag or commit be chosen — them voyages be chartin only",
+      "awaitingDecision": "awaitin'' the cap''n''s word"
     },
     "state": {
       "deleteConfirm": "Send state version #{serial} t'' Davy Jones? This cannot be undone.",
