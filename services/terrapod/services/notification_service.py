@@ -81,7 +81,10 @@ def build_run_payload(
                 "trigger": trigger,
                 "run_status": run_status,
                 "run_updated_at": run_created_at,
-                "run_updated_by": run_created_by,
+                # Who caused this status change isn't recorded -- a confirm or a
+                # cancel may come from someone other than the creator -- so it
+                # stays empty rather than naming the wrong person.
+                "run_updated_by": "",
             }
         ],
     }
@@ -257,6 +260,12 @@ async def deliver_email(
         f"Status: {run_status or 'N/A'}",
         f"Trigger: {trigger}",
     ]
+    # The link and who started the run are what make an alert actionable
+    # (#1706); each appears only when known.
+    if payload.get("run_created_by"):
+        body_lines.append(f"Started by: {payload['run_created_by']}")
+    if payload.get("run_url"):
+        body_lines.extend(["", f"View the run: {payload['run_url']}"])
 
     msg = EmailMessage()
     msg["From"] = smtp_cfg.from_address

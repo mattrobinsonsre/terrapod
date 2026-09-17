@@ -245,10 +245,58 @@ class TestThePayloadSaysWhereAndWho:
             created_by="ops@example.com", external_url="https://tp.example.com"
         )
         assert out["payload"]["run_created_by"] == "ops@example.com"
-        assert out["payload"]["notifications"][0]["run_updated_by"] == "ops@example.com"
+        # Who changed the status isn't recorded, so it is left empty rather than
+        # attributing a confirm or cancel to the creator.
+        assert out["payload"]["notifications"][0]["run_updated_by"] == ""
 
     async def test_no_external_url_leaves_run_url_empty(self):
         # There is no honest link without the host people reach the UI on, and
         # an empty `run_url` is what receivers already handle.
         out = await self._deliver(created_by="ops@example.com", external_url="")
         assert out["payload"]["run_url"] == ""
+
+
+class TestEmailCarriesTheLinkAndActor:
+    """#1706: email notifications showed neither the run link nor who started it."""
+
+    async def _send(self, payload: dict) -> str:
+        from terrapod.services import notification_service
+
+        sent = {}
+
+        async def _capture(msg, **_):
+            sent["body"] = msg.get_content()
+
+        with (
+            patch.object(
+                notification_service.settings.notifications.smtp, "host", "smtp.example.com"
+            ),
+            patch("aiosmtplib.send", side_effect=_capture),
+        ):
+            await notification_service.deliver_email(["ops@example.com"], payload)
+        return sent["body"]
+
+    def _payload(self, **extra) -> dict:
+        return {
+            "run_id": "run-1",
+            "workspace_name": "prod",
+            "notifications": [
+                {"message": "Run applied", "trigger": "run:completed", "run_status": "applied"}
+            ],
+            **extra,
+        }
+
+    async def test_the_body_links_to_the_run_and_names_who_started_it(self):
+        body = await self._send(
+            self._payload(
+                run_url="https://tp.example.com/workspaces/ws-1/runs/run-1",
+                run_created_by="ops@example.com",
+            )
+        )
+        assert "View the run: https://tp.example.com/workspaces/ws-1/runs/run-1" in body
+        assert "Started by: ops@example.com" in body
+
+    async def test_unknown_values_are_left_out_rather_than_shown_empty(self):
+        body = await self._send(self._payload(run_url="", run_created_by=""))
+        assert "View the run" not in body
+        assert "Started by" not in body
