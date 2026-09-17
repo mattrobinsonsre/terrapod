@@ -141,6 +141,20 @@ resource "aws_instance" "main" {
         assert len(result["inputs"]) == 1
         assert result["inputs"][0]["name"] == "top"
 
+    def test_reads_dot_slash_prefixed_entries_as_root(self):
+        """`tar -czf m.tgz -C dir .` -- the documented command -- prefixes every
+        entry with `./`. Those are root files, not nested ones (#1707)."""
+        tarball = _make_tarball(
+            {
+                "./variables.tf": 'variable "region" { type = string }',
+                "./outputs.tf": 'output "id" { value = "x" }',
+                "./modules/sub/variables.tf": 'variable "nested" { type = string }',
+            }
+        )
+        result = extract_module_interface(tarball)
+        assert [i["name"] for i in result["inputs"]] == ["region"]
+        assert [o["name"] for o in result["outputs"]] == ["id"]
+
     def test_returns_empty_on_no_tf_files(self):
         tarball = _make_tarball({"README.md": "# Module"})
         result = extract_module_interface(tarball)

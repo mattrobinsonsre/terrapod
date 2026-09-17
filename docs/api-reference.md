@@ -780,7 +780,7 @@ This is enforced server-side regardless of run source (VCS, CLI/API, UI), so the
 
 #### Stale-plan guards: state drift (#647) & expiry (#646)
 
-Beyond supersede (a *newer run* case), two guards protect against applying a plan that no longer reflects reality. Both resolve an apply-capable `planned` run to `discarded`, unlock the workspace, and surface the reason in the run's **`discard-reason`** attribute; confirming a stale plan returns **409** (re-plan required). Plan-only / drift / speculative runs are exempt.
+Beyond supersede (a *newer run* case), two guards protect against applying a plan that no longer reflects reality. Both resolve an apply-capable `planned` run to `discarded` and surface the reason in the run's **`discard-reason`** attribute; confirming a stale plan returns **409** (re-plan required). Plan-only / drift / speculative runs are exempt.
 
 - **State-version drift (#647, always on)** — a plan is snapshotted against the workspace's state serial when it starts. If the current state serial advances before the plan is applied — another apply, a CLI `state push`, a rollback, a manual upload — the plan is stale and is auto-discarded (`discard-reason: state changed since plan (serial N -> M)`). This runs even in agent mode, where the server drives the apply and there is no client to catch it. A first apply (no prior state) has no baseline and is never stale.
 - **Time-based expiry (#646, per-workspace, off by default)** — when a workspace sets `plan-expiry-seconds`, a plan older than that TTL (from completion) is auto-discarded by a periodic sweep and at confirm time (`discard-reason: plan expired after {ttl}s`).

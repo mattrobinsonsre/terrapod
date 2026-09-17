@@ -60,7 +60,7 @@ Payloads are TFE V2-compatible:
   "run_id": "run-uuid",
   "run_message": "",
   "run_created_at": "2025-03-05T12:00:00Z",
-  "run_created_by": "",
+  "run_created_by": "user@example.com",
   "workspace_id": "ws-uuid",
   "workspace_name": "my-workspace",
   "organization_name": "default",
