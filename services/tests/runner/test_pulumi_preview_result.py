@@ -123,8 +123,13 @@ class TestThePreviewIsAskedForIt:
         assert "--save-plan=/workspace/plan.json" in argv
         assert "--event-log=/w/e.json" in argv
 
-    def test_asking_for_neither_is_the_previous_command(self):
-        assert pulumi_exec.preview_argv("", None) == ["preview", "--non-interactive"]
+    def test_asking_for_neither_leaves_a_plain_preview(self):
+        # `--refresh` is always explicit (#1559); everything else is opt-in.
+        assert pulumi_exec.preview_argv("", None) == [
+            "preview",
+            "--non-interactive",
+            "--refresh=true",
+        ]
 
 
 class TestReportingIt:

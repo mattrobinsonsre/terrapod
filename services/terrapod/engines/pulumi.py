@@ -53,6 +53,12 @@ class PulumiRunOptions:
     refresh: bool = True
     #: `--target` equivalents; Pulumi spells them URNs.
     target_urns: list[str] | None = None
+    #: Resources to replace, as URNs (`--replace`).
+    replace_urns: list[str] | None = None
+    #: Reconcile the stack's state with reality and stop there: `pulumi refresh`
+    #: rather than `preview`/`up`, the same operation Terraform's `-refresh-only`
+    #: performs (#1559).
+    refresh_only: bool = False
     resource_cpu: str = ""
     resource_memory: str = ""
     parallelism: int = 0
@@ -122,10 +128,16 @@ class PulumiStrategy:
             env.append({"name": "TP_DESTROY", "value": "true"})
         if not options.refresh:
             env.append({"name": "TP_REFRESH", "value": "false"})
+        if options.refresh_only:
+            env.append({"name": "TP_REFRESH_ONLY", "value": "true"})
         if options.target_urns:
             import json
 
             env.append({"name": "TP_TARGET_URNS", "value": json.dumps(options.target_urns)})
+        if options.replace_urns:
+            import json
+
+            env.append({"name": "TP_REPLACE_URNS", "value": json.dumps(options.replace_urns)})
         if options.parallelism:
             env.append({"name": "TP_PARALLELISM", "value": str(options.parallelism)})
         if options.bind_plan:
@@ -149,7 +161,14 @@ class PulumiStrategy:
             working_directory=attrs.get("working-directory", ""),
             is_destroy=attrs.get("is-destroy", False),
             refresh=attrs.get("refresh", True),
-            target_urns=attrs.get("target-urns"),
+            refresh_only=attrs.get("refresh-only", False),
+            # One wire spelling, whatever the engine calls the things in it
+            # (#1559). The platform sends `target-addrs` and `replace-addrs`
+            # for every engine; a Terraform address and a Pulumi URN are both
+            # "the resources this run is limited to". Reading a second spelling
+            # is how targeting came to be dropped silently on every Pulumi run.
+            target_urns=attrs.get("target-addrs"),
+            replace_urns=attrs.get("replace-addrs"),
             resource_cpu=attrs.get("resource-cpu", ""),
             resource_memory=attrs.get("resource-memory", ""),
             parallelism=attrs.get("parallelism", 0),

@@ -396,19 +396,45 @@ def export_local_stack(
 
 
 def _common_argv(cfg) -> list[str]:  # type: ignore[no-untyped-def]
-    """Flags both phases share."""
+    """Flags every phase shares.
+
+    `--refresh` is passed either way rather than only when false (#1559). The
+    platform's default is `refresh: true`, and Pulumi's own default differs by
+    command and by stack option, so saying nothing meant the run did whatever
+    the stack happened to be configured for -- which is not what the person who
+    left the setting alone asked for.
+    """
     argv: list[str] = ["--non-interactive"]
     stack = os.environ.get("TP_PULUMI_STACK", "")
     if stack:
         argv += ["--stack", local_stack_ref(stack)]
-    if os.environ.get("TP_REFRESH", "").lower() == "false":
-        argv.append("--refresh=false")
+    refresh = os.environ.get("TP_REFRESH", "").lower() != "false"
+    argv.append(f"--refresh={'true' if refresh else 'false'}")
     parallelism = os.environ.get("TP_PARALLELISM", "")
     if parallelism:
         argv += ["--parallel", parallelism]
-    for urn in json.loads(os.environ.get("TP_TARGET_URNS", "[]") or "[]"):
+    for urn in _urns("TP_TARGET_URNS"):
         argv += ["--target", urn]
     return argv
+
+
+def _urns(var: str) -> list[str]:
+    """A run option's resource list, or an empty one if it is absent or junk."""
+    try:
+        value = json.loads(os.environ.get(var, "[]") or "[]")
+    except ValueError:
+        return []
+    return [str(u) for u in value] if isinstance(value, list) else []
+
+
+def refresh_only_enabled() -> bool:
+    """Whether this run reconciles state and stops (`pulumi refresh`)."""
+    return os.environ.get("TP_REFRESH_ONLY", "").lower() == "true"
+
+
+def is_destroy() -> bool:
+    """Whether this run destroys what the stack manages."""
+    return os.environ.get("TP_DESTROY", "").lower() == "true"
 
 
 def bind_plan_enabled() -> bool:
@@ -451,9 +477,22 @@ def preview_argv(plan_file: str, cfg=None, event_log: str = "") -> list[str]:  #
     not `--json`: that would replace the output a person reads with the same
     JSON, and the preview log is the thing the run page shows.
     """
-    argv = ["preview"]
-    if plan_file:
-        argv.append(f"--save-plan={plan_file}")
+    # What is previewed has to be what will run (#1559). `pulumi preview` shows
+    # an ordinary update however the run was created, so a destroy run used to
+    # show the approver an update and then destroy the stack, and a refresh-only
+    # run showed changes it would never make. Each operation previews itself.
+    if is_destroy():
+        argv = ["destroy", "--preview-only"]
+    elif refresh_only_enabled():
+        argv = ["refresh", "--preview-only"]
+    else:
+        argv = ["preview"]
+        # A saved plan constrains an update. `destroy` and `refresh` take no
+        # plan and reject the flag, so binding does not apply to them.
+        if plan_file:
+            argv.append(f"--save-plan={plan_file}")
+        for urn in _urns("TP_REPLACE_URNS"):
+            argv += ["--replace", urn]
     if event_log:
         argv.append(f"--event-log={event_log}")
     return [*argv, *_common_argv(cfg)]
@@ -472,8 +511,18 @@ def update_argv(plan_file: str, cfg=None) -> list[str]:  # type: ignore[no-untyp
     applies the same configuration — where refusing would strand a run whose
     preview succeeded. The caller logs when it takes this path.
     """
-    if os.environ.get("TP_DESTROY", "").lower() == "true":
+    if is_destroy():
         return ["destroy", "--yes", *_common_argv(cfg)]
+    if refresh_only_enabled():
+        # The whole operation, mirroring Terraform's refresh-only run: the
+        # preview showed what reconciling state would adopt, and this performs
+        # exactly that. No plan file -- `refresh` takes none.
+        return ["refresh", "--yes", *_common_argv(cfg)]
+    replace: list[str] = []
+    for urn in _urns("TP_REPLACE_URNS"):
+        replace += ["--replace", urn]
     if not plan_file:
-        return ["up", "--yes", *_common_argv(cfg)]
+        return ["up", "--yes", *replace, *_common_argv(cfg)]
+    # A plan already names the operations, replacements included; passing
+    # --replace alongside it would be asking for something the plan does not say.
     return ["up", "--yes", f"--plan={plan_file}", *_common_argv(cfg)]

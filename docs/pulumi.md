@@ -1,0 +1,106 @@
+# Pulumi workspaces and runs
+
+Terrapod is a Terraform and OpenTofu orchestrator that also runs Pulumi. A
+Pulumi workspace is coerced into the same flow as every other workspace — one
+workspace per stack, a run with a phase you review and a phase that executes
+what you reviewed, under the same RBAC, notifications, run triggers and audit
+trail. Where Pulumi genuinely differs, this page says so rather than implying
+parity.
+
+Pulumi is off until an operator turns it on:
+
+```yaml
+api:
+  config:
+    engines:
+      pulumi:
+        enabled: true
+```
+
+With it off, nothing Pulumi-related is registered, and Terraform and OpenTofu
+are untouched either way.
+
+## A workspace is a stack
+
+A Pulumi workspace is named `{project}::{stack}`, which is how Terrapod
+recovers Pulumi's `{org}/{project}/{stack}` without growing a "project" concept
+of its own. The organization is always `default`, as everywhere else in
+Terrapod.
+
+## What a run does
+
+| Phase | Terraform | Pulumi |
+|---|---|---|
+| The phase you review | `terraform plan` | `pulumi preview` |
+| The phase that executes it | `terraform apply` | `pulumi up` |
+
+The run's status names are the platform's and do not change — a run is
+`planning` whatever engine it belongs to — but the words shown to a person are
+the engine's, so a Pulumi run previews and updates.
+
+### Run options
+
+Every option means on a Pulumi run what it means on a Terraform run (#1559).
+The phase you review always previews **the operation that will run**, never a
+different one:
+
+| Option | Pulumi |
+|---|---|
+| Destroy | `pulumi destroy --preview-only`, then `pulumi destroy --yes` |
+| Refresh-only | `pulumi refresh --preview-only`, then `pulumi refresh --yes` |
+| Target addresses | `--target <urn>`, once per resource |
+| Replace addresses | `--replace <urn>` |
+| Refresh | `--refresh=true` / `--refresh=false`, always explicit |
+| Parallelism | `--parallel` |
+
+A Pulumi resource is addressed by its URN, so that is what a targeted or
+replaced Pulumi run takes; the API attribute is `target-addrs` either way.
+
+### Execution hooks
+
+A workspace's `pre_plan`, `post_plan`, `pre_apply` and `post_apply` hooks run
+for a Pulumi run at the same four points, around the preview and the update. A
+hook that exits non-zero fails the run, so a `pre_apply` hook that refuses means
+nothing is applied.
+
+### Binding an update to its preview
+
+`pulumi-bind-plan` on the workspace makes the update perform exactly the
+operations the preview showed, which is what `plan -out` / `apply <file>` gives
+a Terraform run. It is **off by default**, because Pulumi's update plans are
+still experimental upstream. Unbound, the update works out its own changes from
+the same configuration — the same degradation Terrapod accepts when a Terraform
+plan artifact is unavailable. The run reports which it is, in
+`pulumi-bind-plan`, so it is visible at the moment of approval. A destroy or
+refresh-only run is never bound: neither command takes a plan.
+
+### What the preview reports
+
+The preview writes its engine events, which Terrapod reduces to a digest
+uploaded as the run's plan artifact (#1560): the change summary, and each step's
+operation, URN and type. That is what fills the change badges, decides a
+zero-change run, and lets conditional auto-apply judge a preview. The digest
+deliberately carries no resource state — Pulumi's events include every
+resource's old and new values, which is where a stack's secrets are.
+
+## Where Pulumi is not coerced, and why
+
+- **State never lives in Terrapod's Pulumi service during an agent run.** The
+  stack is imported into the Job, worked on against a file backend, and handed
+  back once at the end — exactly as a Terraform run downloads and uploads its
+  state. The service surface (`pulumi login`) is for local-mode use.
+- **OPA policy sets and security scanning do not apply yet.** Both read
+  Terraform plan JSON, which a Pulumi preview does not produce. Rather than
+  holding every apply for an evaluation that cannot happen, policy sets are not
+  evaluated for Pulumi runs and scanning is refused on a Pulumi workspace
+  (#1567). The run says so in `meta.not-evaluated-reason`.
+- **The Pulumi CLI version is a deployment-wide setting** at the time of
+  writing, not per workspace as `terraform-version` is.
+
+## See also
+
+- [`docs/pulumi-cli-surface.md`](pulumi-cli-surface.md) — the slice of Pulumi's
+  service protocol Terrapod implements, for `pulumi login` against it.
+- [`docs/policies.md`](policies.md) and
+  [`docs/security-scanning.md`](security-scanning.md) — the gates, and what they
+  currently do on a Pulumi workspace.

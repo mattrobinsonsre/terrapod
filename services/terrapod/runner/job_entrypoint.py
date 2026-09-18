@@ -913,6 +913,14 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         log.error("could not prepare the run's stack", error=str(exc))
         return 1
 
+    # The same execution hooks a Terraform run gets, at the same points (#1559).
+    # A workspace's hooks are a property of the workspace, not of the engine it
+    # happens to use: before this, a Pulumi run silently ran none of them.
+    before, after = ("pre_plan", "post_plan") if not is_update else ("pre_apply", "post_apply")
+    rc = _run_pulumi_hook(before)
+    if rc:
+        return rc
+
     log.info("running pulumi", phase=phase, argv=argv)
     result = exec_subprocess.run(
         [binary, *argv],
@@ -923,6 +931,11 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
 
     if not is_update and result.exit_code == 0:
         _report_pulumi_preview(cfg, Path(event_log))
+        # After the preview is reported, so its result is visible whatever the
+        # hook does — the same order the Terraform path uses.
+        rc = _run_pulumi_hook("post_plan")
+        if rc:
+            return rc
 
     # Hand the saved plan to the update phase, which runs in another pod. Skipped
     # for plan-only runs (nothing will consume it) and when the preview failed
@@ -945,10 +958,34 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
             log.warning("pulumi plan-file upload raised (non-fatal)", err=str(exc))
 
     if is_update:
-        return _hand_back_pulumi_state(
+        rc = _hand_back_pulumi_state(
             cfg, binary, stack, exit_code=result.exit_code, child_grace=float(child_grace)
         )
+        # Only after a successful update and a successful hand-back: a hook that
+        # runs after a failed update would be reporting on something that did
+        # not happen, and one that runs before the state is stored could see a
+        # stack Terrapod has not recorded yet.
+        return _run_pulumi_hook("post_apply") if rc == 0 else rc
     return result.exit_code
+
+
+def _run_pulumi_hook(point: str) -> int:
+    """Run a hook point, returning its exit code (0 when it passes or has none).
+
+    A failing hook fails the run, exactly as it does on the Terraform path: the
+    point of a `pre_apply` hook that exits non-zero is that nothing is applied.
+    """
+    import structlog
+
+    from terrapod.runner.phases import execution_hooks
+
+    log = structlog.get_logger("runner.job_entrypoint")
+    try:
+        execution_hooks.run_point(point, env=os.environ.copy())
+    except execution_hooks.HookError as exc:
+        log.error(f"{point} hook failed", hook=exc.name, rc=exc.exit_code)
+        return exc.exit_code
+    return 0
 
 
 def _report_pulumi_preview(cfg, event_log: Path) -> None:  # type: ignore[no-untyped-def]
