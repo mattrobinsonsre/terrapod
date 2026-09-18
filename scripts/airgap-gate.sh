@@ -278,6 +278,56 @@ surface "npm" node:22-alpine "
   node -e \"require('/tmp/proj/node_modules/left-pad')\"
 "
 
+# #1566's acceptance in one row: a TypeScript program that *installs and
+# previews* with no route to the internet. It is the only row that runs a whole
+# program rather than one client, and that is the point -- the two halves are
+# served by different surfaces (npm for the SDK tree, the Pulumi proxy for the
+# provider plugin), and a program needs both in the same place at the same time.
+#
+# Distinct from the npm row above, which proves one tarball. left-pad has no
+# dependencies; @pulumi/random pulls a tree of scoped packages, and a proxy can
+# serve the first and fail the second -- on a scoped name's path encoding, on the
+# packument of a package with many versions, or on any single tarball in a tree
+# where one miss fails the install.
+#
+# The .npmrc is written exactly as the runner writes it
+# (`pulumi_deps.write_npmrc`): registry, an `_authToken` keyed by the registry
+# URL without its scheme, a cache directory. A row that authenticated some other
+# way would pass while the shape the runner actually uses was broken.
+#
+# The plugin version matches the one the plugins row installs, so the warm phase
+# leaves exactly the artifact the blocked phase needs, and the override pattern
+# is '.*' for the reason given there: an anchored pattern that matches nothing
+# falls back to get.pulumi.com silently.
+#
+# `pulumi login --local` because an agent-mode run keeps its state in a file
+# backend for the whole run; reaching a Terrapod backend here would be testing
+# something the runner deliberately does not do.
+surface "Pulumi TypeScript program" pulumi/pulumi-nodejs:latest "
+  export PULUMI_HOME=/tmp/ph PULUMI_SKIP_UPDATE_CHECK=true
+  export PULUMI_CONFIG_PASSPHRASE=airgap
+  export PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES='.*=http://x:$TOKEN@web:3000$PREFIX/pulumi'
+  mkdir -p /tmp/tsprog && cd /tmp/tsprog
+  printf '%s\n' \
+    'registry=http://web:3000$PREFIX/npm/' \
+    '//web:3000$PREFIX/npm/:_authToken=$TOKEN' \
+    'cache=/tmp/tscache' > .npmrc
+  printf '%s\n' 'name: airgap-ts' 'runtime: nodejs' 'description: air-gap row' > Pulumi.yaml
+  printf '%s\n' 'import * as random from \"@pulumi/random\";' \
+    'export const pet = new random.RandomPet(\"p\").id;' > index.ts
+  # No lockfile, so this takes the runner's \`npm install\` branch, not \`npm ci\`.
+  printf '%s\n' '{' '  \"name\": \"airgap-ts\",' \
+    '  \"dependencies\": { \"@pulumi/pulumi\": \"^3.0.0\", \"@pulumi/random\": \"4.16.3\" }' \
+    '}' > package.json
+  npm install --silent --no-audit --no-fund
+  pulumi login --local
+  pulumi stack init airgap
+  # The assertion. It compiles the TypeScript, loads the SDK tree npm just
+  # wrote, fetches the provider plugin through Terrapod and runs the program --
+  # so it fails if any one of those needed upstream.
+  pulumi preview --non-interactive
+"
+
 # Two Go settings will silently defeat this row, and one of them passed the warm
 # phase while proving nothing:
 #   GOPRIVATE / GONOPROXY  — make the toolchain bypass the proxy and resolve the
