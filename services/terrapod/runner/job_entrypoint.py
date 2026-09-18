@@ -856,6 +856,9 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         # Read back below into the run's plan result and plan artifact (#1560).
         event_log = os.environ.get("TP_PULUMI_EVENT_LOG", "/workspace/preview-events.json")
         argv = pulumi_exec.preview_argv(plan_file, cfg, event_log=event_log)
+        # The flag only exists with this set; without it the preview does not
+        # run at all (#1560).
+        os.environ.update(pulumi_exec.event_log_env(event_log))
         log_file = str(_PLAN_LOG)
     elif phase in ("update", "apply"):
         is_update = True

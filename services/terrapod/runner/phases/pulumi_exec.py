@@ -421,6 +421,21 @@ def bind_plan_enabled() -> bool:
     return os.environ.get("TP_PULUMI_BIND_PLAN", "").lower() == "true"
 
 
+def event_log_env(event_log: str) -> dict[str, str]:
+    """What the CLI needs before it will accept `--event-log` (#1560).
+
+    The flag is registered only when `PULUMI_DEBUG_COMMANDS` is set --
+    `pkg/cmd/pulumi/operations/preview.go` guards it behind `env.DebugCommands` --
+    so passing it without this env is not a no-op: the CLI exits with "unknown
+    flag" and the preview never runs. Pulumi's own Automation API sets the same
+    variable for the same reason (`sdk/go/auto/local_workspace.go`).
+
+    Returned by the same function that builds the flag's argv, so the two cannot
+    drift apart.
+    """
+    return {"PULUMI_DEBUG_COMMANDS": "true"} if event_log else {}
+
+
 def preview_argv(plan_file: str, cfg=None, event_log: str = "") -> list[str]:  # type: ignore[no-untyped-def]
     """`pulumi preview`, saving its plan only when the workspace binds updates to it.
 

@@ -11,6 +11,7 @@ last.
 """
 
 import json
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -271,3 +272,49 @@ class TestWhetherTheUpdateIsBoundToThePreview:
         # read as "unbound", which is not a state it can be in.
         assert self._json(MagicMock(engine="terraform", pulumi_bind_plan=False)) is None
         assert self._json(None) is None
+
+
+class TestTheEventLogFlagIsUsable:
+    """`--event-log` is registered only when PULUMI_DEBUG_COMMANDS is set.
+
+    Pulumi guards the flag behind `env.DebugCommands`
+    (`pkg/cmd/pulumi/operations/preview.go`), so passing it without that
+    variable is not a no-op: the CLI exits with "unknown flag" before running
+    anything, which would have failed every Pulumi preview.
+    """
+
+    def test_asking_for_the_log_asks_for_the_env_that_allows_it(self):
+        argv = pulumi_exec.preview_argv("", None, event_log="/w/e.json")
+        assert "--event-log=/w/e.json" in argv
+        assert pulumi_exec.event_log_env("/w/e.json") == {"PULUMI_DEBUG_COMMANDS": "true"}
+
+    def test_no_log_asks_for_nothing(self):
+        assert pulumi_exec.event_log_env("") == {}
+
+    def test_the_phase_sets_it_before_running_the_preview(self, tmp_path, monkeypatch):
+        from terrapod.runner import job_entrypoint
+
+        monkeypatch.delenv("PULUMI_DEBUG_COMMANDS", raising=False)
+        monkeypatch.setenv("TP_PULUMI_PHASE", "preview")
+        monkeypatch.setenv("TP_PULUMI_EVENT_LOG", str(tmp_path / "events.json"))
+        seen = {}
+
+        def _run(argv, **kwargs):
+            seen["argv"] = argv
+            seen["debug_commands"] = os.environ.get("PULUMI_DEBUG_COMMANDS")
+            return MagicMock(exit_code=1)  # stop before the reporting path
+
+        with (
+            patch("terrapod.runner.phases.platform_tool.ensure_tool", return_value="/bin/pulumi"),
+            patch(
+                "terrapod.runner.phases.pulumi_exec.prepare_local_stack", return_value=MagicMock()
+            ),
+            patch("terrapod.runner.phases.pulumi_exec.bind_plan_enabled", return_value=False),
+            patch("terrapod.runner.exec_subprocess.run", side_effect=_run),
+        ):
+            job_entrypoint._run_pulumi_phase(
+                MagicMock(phase="plan", has_api=False, api_url="", auth_token=""), child_grace=30
+            )
+
+        assert any(a.startswith("--event-log=") for a in seen["argv"])
+        assert seen["debug_commands"] == "true"
