@@ -97,7 +97,13 @@ async def _download(version: str, dest: Path) -> None:
             # Fail closed on the artifact even though the *feature* degrades:
             # "we could not get OPA" is a fine outcome, "we ran an unverified
             # binary" is not.
-            await verify_platform_tool(client, "opa", version, "linux", arch, digest.hexdigest())
+            # A mapping, not a bare hex string: since #1566 a tool states its
+            # checksum in whichever algorithm its publisher uses (.NET states
+            # SHA-512 and no SHA-256), so the caller hands over everything it
+            # computed and verification picks the one that tool is checked by.
+            await verify_platform_tool(
+                client, "opa", version, "linux", arch, {"sha256": digest.hexdigest()}
+            )
 
         tmp.chmod(tmp.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         # Last writer wins, and every writer wrote a checksum-verified binary,
