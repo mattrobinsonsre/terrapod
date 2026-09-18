@@ -217,6 +217,22 @@ class TestEvaluateConditionalAutoApply:
         # nobody configured to auto-apply (#1560).
         assert "not reported" in (run.auto_apply_declined_reason or "")
 
+    async def test_the_provisional_reason_clears_once_the_counts_arrive(self):
+        # This runs twice: from complete_plan, before the plan artifact with
+        # the counts lands, and again when it does. A run that then applies
+        # must not still say its changes were never reported (#1560).
+        run = _decider_run(
+            auto_apply_declined_reason=(
+                "The plan's changes were not reported, so a conditional "
+                "auto-apply could not judge them. Confirm the run to apply it."
+            )
+        )
+        db = AsyncMock()
+        with patch.object(run_service, "_auto_apply_if_permitted", AsyncMock()) as gate:
+            await run_service.evaluate_conditional_auto_apply(db, run)
+        gate.assert_awaited_once()
+        assert not run.auto_apply_declined_reason
+
     async def test_a_run_that_is_not_planned_is_left_alone(self):
         # Without this guard a run already applying/errored/discarded would be
         # driven to `confirmed` a second time.

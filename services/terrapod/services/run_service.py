@@ -1127,8 +1127,13 @@ async def evaluate_conditional_auto_apply(db: AsyncSession, run: Run) -> Run:
     permitted = plan_shape_permits_auto_apply(run, mode)
     if permitted is None:
         # Recorded, not just logged (#1560): a run parked here looks identical
-        # to one nobody configured to auto-apply, and the operator has no way
-        # to tell which without the reason on the run.
+        # to one nobody configured to auto-apply, and an operator has no way to
+        # tell which without the reason on the run.
+        #
+        # This runs twice on the normal path — once from `complete_plan`, before
+        # the plan artifact carrying the counts has arrived, and again when it
+        # does — so the reason is provisional and the second pass clears it. It
+        # is what the run is left with only if the counts never come.
         run.auto_apply_declined_reason = (
             "The plan's changes were not reported, so a conditional auto-apply "
             "could not judge them. Confirm the run to apply it."
@@ -1140,6 +1145,11 @@ async def evaluate_conditional_auto_apply(db: AsyncSession, run: Run) -> Run:
             mode=mode,
         )
         return run
+
+    # The counts are here, so whatever an earlier pass said about not having
+    # them is now wrong: a run that auto-applies must not carry a declined
+    # reason, and one held below gets the real one.
+    run.auto_apply_declined_reason = ""
     if not permitted:
         run.auto_apply_declined_reason = describe_plan_shape(run)
         await db.commit()
