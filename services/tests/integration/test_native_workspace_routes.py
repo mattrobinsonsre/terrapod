@@ -118,3 +118,66 @@ class TestGatingAnEngineOffHidesItsWorkspaces:
         back = await client.get(f"{NATIVE}/{pid}", headers=AUTH)
         assert back.status_code == 200
         assert back.json()["data"]["attributes"]["pulumi-bind-plan"] is True
+
+
+class TestDeletingAWorkspaceOfAnyEngine:
+    """The delete half of the same boundary (#1574).
+
+    `DELETE /api/v1/workspaces/{id}` resolved through the TFE surface's
+    Terraform-only lookup, so a Pulumi workspace answered 404 and could not be
+    deleted at all — not from the UI's delete button, nor through go-terrapod,
+    the provider or MCP. It is the one route that had no native counterpart.
+    """
+
+    async def _marker(self, client, name: str) -> dict | None:
+        r = await client.get("/api/v1/deleted-workspaces", headers=AUTH)
+        assert r.status_code == 200, r.text
+        for d in r.json()["data"]:
+            if d["attributes"].get("workspace-name") == name:
+                return d
+        return None
+
+    async def test_a_pulumi_workspace_deletes_and_leaves_a_marker(self, app, client):
+        set_auth(app, admin_user())
+        pid = await _create(client, "proj::doomed", "pulumi")
+
+        gone = await client.delete(f"{NATIVE}/{pid}", headers=AUTH)
+        assert gone.status_code == 204, gone.text
+
+        assert (await client.get(f"{NATIVE}/{pid}", headers=AUTH)).status_code == 404
+        assert "proj::doomed" not in _names(await client.get(NATIVE, headers=AUTH))
+        # The marker is what makes the deletion recoverable; a delete that
+        # skipped it would look identical until someone needed it back.
+        assert await self._marker(client, "proj::doomed") is not None
+
+    async def test_a_terraform_workspace_still_deletes(self, app, client):
+        # The boundary moved for Pulumi; it must not have moved for Terraform.
+        set_auth(app, admin_user())
+        tid = await _create(client, "tf-doomed", "terraform")
+
+        assert (await client.delete(f"{NATIVE}/{tid}", headers=AUTH)).status_code == 204
+        assert (await client.get(f"{NATIVE}/{tid}", headers=AUTH)).status_code == 404
+
+    async def test_it_deletes_by_name_too(self, app, client):
+        # A Pulumi workspace is addressed by its project::stack name everywhere
+        # a person meets it, so the delete has to accept one.
+        set_auth(app, admin_user())
+        await _create(client, "proj::by-name", "pulumi")
+
+        assert (await client.delete(f"{NATIVE}/proj::by-name", headers=AUTH)).status_code == 204
+        assert "proj::by-name" not in _names(await client.get(NATIVE, headers=AUTH))
+
+    async def test_gating_the_engine_off_makes_it_undeletable_not_deleted(self, app, client):
+        """Gating hides and halts; it never destroys (#1429)."""
+        set_auth(app, admin_user())
+        pid = await _create(client, "proj::protected", "pulumi")
+
+        with patch("terrapod.engines.engine_enabled", side_effect=lambda e: e != "pulumi"):
+            refused = await client.delete(f"{NATIVE}/{pid}", headers=AUTH)
+            assert refused.status_code == 404
+
+        # Untouched: still there, and no marker was written for it.
+        back = await client.get(f"{NATIVE}/{pid}", headers=AUTH)
+        assert back.status_code == 200
+        assert back.json()["data"]["attributes"]["name"] == "proj::protected"
+        assert await self._marker(client, "proj::protected") is None

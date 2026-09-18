@@ -465,7 +465,9 @@ class TestDeleteWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    # The native delete resolves in workspace_extensions since #1574, so that it
+    # finds a workspace of any enabled engine rather than Terraform's only.
+    @patch("terrapod.api.routers.workspace_extensions.resolve_workspace_capabilities_for")
     async def test_delete_without_admin_returns_403(self, mock_resolve, *mocks):
         mock_resolve.return_value = caps_for_level("write")
         ws = _mock_workspace()

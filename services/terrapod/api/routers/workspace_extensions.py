@@ -13,7 +13,7 @@ import asyncio
 import json
 
 import httpx
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
@@ -704,3 +704,39 @@ async def update_workspace(
             detail=f"Requires '{cap.WORKSPACE_SETTINGS}' capability on workspace",
         )
     return await tfe_v2.update_workspace(ws, caps, body, user, db)
+
+
+@router.delete("/workspaces/{workspace_id}")
+async def delete_workspace(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Delete a workspace, for any enabled engine. Requires admin.
+
+    This route used to resolve through the TFE surface's Terraform-only lookup,
+    so a Pulumi workspace answered 404 and could not be deleted at all -- not
+    from the UI's delete button, not through go-terrapod, the provider or MCP
+    (#1574). It is the delete half of #1554, and it resolves the way its
+    siblings above do.
+
+    A workspace whose engine is switched off stays undeletable, because
+    `_native_workspace` does not find it (#1429): gating hides and halts, and
+    deleting what an operator can no longer see would be exactly the destruction
+    the rule forbids. Turn the engine back on to delete it.
+    """
+    from terrapod.api.routers import tfe_v2
+
+    ws = await _native_workspace(workspace_id, db)
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    # 404 rather than 403 for a caller who cannot read it, matching the lookup
+    # above: a name lookup that distinguished "exists" from "absent" would leak
+    # the names of workspaces the caller has no access to.
+    if not has_capability(caps, cap.WORKSPACE_READ):
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    if not has_capability(caps, cap.WORKSPACE_DELETE):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Requires '{cap.WORKSPACE_DELETE}' capability on workspace",
+        )
+    return await tfe_v2.delete_workspace(ws, user, db)

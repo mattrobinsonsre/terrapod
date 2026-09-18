@@ -167,3 +167,68 @@ class TestList:
         r = await _call("GET", "/api/v1/workspaces", _db(_pulumi()), frozenset())
         assert r.status_code == 200
         assert r.json()["data"] == []
+
+
+class TestDelete:
+    """The delete half of the same boundary (#1574).
+
+    It was the one native workspace route still resolving through the TFE
+    surface's Terraform-only lookup, so a Pulumi workspace answered 404 and
+    could not be deleted from anywhere — the UI's button, go-terrapod, the
+    provider or MCP.
+    """
+
+    async def _delete(self, db, caps, **kw):
+        with patch(
+            "terrapod.services.deleted_workspace_service.delete_workspace", AsyncMock()
+        ) as removed:
+            r = await _call(
+                "DELETE", f"/api/v1/workspaces/{kw.pop('ref', 'proj::dev')}", db, caps, **kw
+            )
+        return r, removed
+
+    async def test_a_pulumi_workspace_can_be_deleted(self):
+        ws = _pulumi()
+        r, removed = await self._delete(_db(ws), caps_for_level("admin"), ref=f"ws-{ws.id}")
+        assert r.status_code == 204, r.text
+        # Through the one delete path, so the marker and index cleanup happen.
+        assert removed.await_count == 1
+        assert removed.await_args.args[1] is ws
+
+    async def test_and_by_its_project_stack_name(self):
+        db = _db(_pulumi())
+        r, removed = await self._delete(db, caps_for_level("admin"))
+        assert r.status_code == 204, r.text
+        assert "proj::dev" in _params(db).values()
+        assert removed.await_count == 1
+
+    async def test_a_gated_off_engine_is_undeletable_not_deleted(self):
+        """Gating hides and halts; it never destroys (#1429)."""
+        db = _db(None)
+        r, removed = await self._delete(db, caps_for_level("admin"), engines=("terraform",))
+        assert r.status_code == 404
+        assert removed.await_count == 0
+        assert ["terraform"] in [
+            list(v) for v in _params(db).values() if isinstance(v, (list, tuple))
+        ]
+
+    async def test_no_read_access_is_404_not_403(self):
+        r, removed = await self._delete(_db(_pulumi()), frozenset())
+        assert r.status_code == 404
+        assert removed.await_count == 0
+
+    async def test_read_without_delete_is_403(self):
+        r, removed = await self._delete(_db(_pulumi()), caps_for_level("write"))
+        assert r.status_code == 403
+        assert removed.await_count == 0
+
+    async def test_a_catalog_managed_workspace_is_still_refused(self):
+        """Deleting one here would orphan its infrastructure; that guard is in
+        the shared half and must survive the move."""
+        import uuid
+
+        ws = _pulumi()
+        ws.catalog_item_id = uuid.uuid4()
+        r, removed = await self._delete(_db(ws), caps_for_level("admin"))
+        assert r.status_code == 409
+        assert removed.await_count == 0

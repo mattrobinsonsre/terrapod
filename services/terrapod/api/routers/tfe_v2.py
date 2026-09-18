@@ -2106,21 +2106,25 @@ async def update_workspace(
     )
 
 
-@extensions_router.delete("/workspaces/{workspace_id}")
 async def delete_workspace(
-    workspace_id: str = Path(...),
-    user: AuthenticatedUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    ws: Workspace,
+    user: AuthenticatedUser,
+    db: AsyncSession,
 ) -> Response:
-    """Delete a workspace and all associated resources. Requires admin.
+    """Delete a workspace and all associated resources.
+
+    The caller resolves the workspace and checks the capability; this is the
+    shared half. The route is the native `DELETE /api/v1/workspaces/{id}` in
+    `workspace_extensions`, which serves every enabled engine (#1574) -- there
+    is deliberately no TFE-surface delete, because a `terraform` CLI never
+    deletes a workspace.
 
     Catalog-managed workspaces are exempt: deleting one here would silently
     orphan its provisioned infrastructure. Tear a catalog instance down via the
-    catalog surface instead — ``POST /catalog-instances/{id}/destroy`` to reclaim
+    catalog surface instead -- ``POST /catalog-instances/{id}/destroy`` to reclaim
     the infrastructure (the recommended path), or the explicit, discouraged
     ``DELETE /catalog-instances/{id}?orphan=true`` to abandon it.
     """
-    ws, _ = await _require_ws_capability(workspace_id, cap.WORKSPACE_DELETE, user, db)
     if ws.catalog_item_id is not None:
         raise HTTPException(
             status_code=409,
