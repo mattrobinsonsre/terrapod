@@ -130,7 +130,13 @@ class TestRegularUserAccess:
 
         set_auth(app, regular_user("dave@test.com"))
         resp = await client.delete(f"/api/terrapod/v1/workspaces/{ws_id}", headers=AUTH)
-        assert resp.status_code == 403
+        # 404, not 403: since #1574 this route accepts a workspace *name* as well
+        # as an id, so answering differently for "exists but forbidden" and
+        # "no such workspace" would let anyone enumerate the names of workspaces
+        # they cannot see. The enforcement is unchanged -- Dave still cannot
+        # delete it -- and it matches the GET and PATCH beside it on this
+        # surface. A caller who CAN read but not delete still gets 403.
+        assert resp.status_code == 404
 
 
 # ---------------------------------------------------------------------------

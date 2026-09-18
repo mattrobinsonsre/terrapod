@@ -862,7 +862,10 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         log_file = str(_PLAN_LOG)
     elif phase in ("update", "apply"):
         is_update = True
-        event_log = ""
+        # No event log here: it belongs to the preview, which is the only phase
+        # that reports a digest, and the only reader below is guarded on
+        # `not is_update`. Binding it to "" merely to have the name on both
+        # paths was a value nothing could ever read.
         # The preview ran in a *different pod*, so its `--save-plan` file is not
         # on this filesystem. Fetch it back the way the Terraform apply fetches
         # `tfplan`, or `up` fails outright with "open /workspace/plan.json: no

@@ -155,7 +155,8 @@ class TestDeletingAWorkspaceOfAnyEngine:
         set_auth(app, admin_user())
         tid = await _create(client, "tf-doomed", "terraform")
 
-        assert (await client.delete(f"{NATIVE}/{tid}", headers=AUTH)).status_code == 204
+        gone = await client.delete(f"{NATIVE}/{tid}", headers=AUTH)
+        assert gone.status_code == 204, gone.text
         assert (await client.get(f"{NATIVE}/{tid}", headers=AUTH)).status_code == 404
 
     async def test_it_deletes_by_name_too(self, app, client):
@@ -164,7 +165,8 @@ class TestDeletingAWorkspaceOfAnyEngine:
         set_auth(app, admin_user())
         await _create(client, "proj::by-name", "pulumi")
 
-        assert (await client.delete(f"{NATIVE}/proj::by-name", headers=AUTH)).status_code == 204
+        gone = await client.delete(f"{NATIVE}/proj::by-name", headers=AUTH)
+        assert gone.status_code == 204, gone.text
         assert "proj::by-name" not in _names(await client.get(NATIVE, headers=AUTH))
 
     async def test_gating_the_engine_off_makes_it_undeletable_not_deleted(self, app, client):
