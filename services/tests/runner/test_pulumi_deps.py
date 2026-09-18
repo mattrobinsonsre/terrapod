@@ -523,6 +523,16 @@ class TestDotnet:
         pulumi_deps.write_nuget_config(tmp_path, "http://a", "t")
         assert "<clear/>" in (tmp_path / "nuget.config").read_text()
 
+    def test_a_plain_http_source_is_marked_insecure(self, tmp_path):
+        # NuGet refuses an HTTP source outright unless the config says otherwise,
+        # and the runner reaches the API on an in-cluster HTTP URL.
+        pulumi_deps.write_nuget_config(tmp_path, "http://terrapod-api:8000", "t")
+        assert 'allowInsecureConnections="true"' in (tmp_path / "nuget.config").read_text()
+
+    def test_an_https_source_is_left_strict(self, tmp_path):
+        pulumi_deps.write_nuget_config(tmp_path, "https://terrapod.example.com", "t")
+        assert "allowInsecureConnections" not in (tmp_path / "nuget.config").read_text()
+
     def test_the_credential_is_in_the_config_not_the_source(self, tmp_path):
         # `dotnet restore` echoes its sources, and the runner streams its logs.
         path = pulumi_deps.write_nuget_config(tmp_path, "http://a", self.SECRET)

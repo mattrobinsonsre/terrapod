@@ -483,11 +483,17 @@ def write_nuget_config(program_dir: Path, api_url: str, token: str) -> Path:
     list and a sealed deployment hangs on it before ever reaching ours.
     """
     source = nuget_source_url(api_url)
+    # NuGet refuses an HTTP source outright -- "NuGet requires HTTPS sources" --
+    # unless the config says otherwise, and the runner reaches the API on an
+    # in-cluster HTTP URL in many deployments. Named only when the URL actually
+    # is http; an https API is left strict. The same trade as pip's trusted-host:
+    # the hop is inside the cluster, to Terrapod's own API, with the run's token.
+    insecure = ' allowInsecureConnections="true"' if api_url.startswith("http://") else ""
     body = f"""<?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <packageSources>
     <clear/>
-    <add key="terrapod" value="{source}" />
+    <add key="terrapod" value="{source}"{insecure} />
   </packageSources>
   <packageSourceCredentials>
     <terrapod>
