@@ -351,7 +351,7 @@ def _install_python(cfg, program_dir: Path, *, child_grace: float, log_file: str
 
 def pip_env(api_url: str) -> dict[str, str]:
     """pip settings the read-only root filesystem and the log stream require."""
-    return {
+    env = {
         "PIP_INDEX_URL": pip_index_url(api_url),
         # /tmp, because pip's default cache is under $HOME and the wheels are
         # the biggest thing it writes.
@@ -360,6 +360,19 @@ def pip_env(api_url: str) -> dict[str, str]:
         # The check reaches upstream, which a sealed deployment cannot do.
         "PIP_NO_INPUT": "1",
     }
+    # pip refuses a plain-HTTP index unless the host is named as trusted -- it
+    # does not fail, it *ignores the index*, and the install then dies with
+    # "No matching distribution found" for a package the proxy was serving
+    # perfectly well. The runner reaches the API on the in-cluster URL, which is
+    # http by default, so without this Python support does not work at all.
+    #
+    # Only for http, and only for that one host: an https API is left strict.
+    # The hop is inside the cluster, to Terrapod's own API, with the run's own
+    # token -- the same trade the air-gap gate makes with `--trusted-host`.
+    parsed = urllib.parse.urlparse(api_url)
+    if parsed.scheme == "http" and parsed.hostname:
+        env["PIP_TRUSTED_HOST"] = parsed.hostname
+    return env
 
 
 def _npm_cli(bin_dir: Path) -> Path:

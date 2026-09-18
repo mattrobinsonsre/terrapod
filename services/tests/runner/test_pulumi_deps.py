@@ -259,6 +259,18 @@ class TestPython:
     def test_pip_writes_only_where_it_may(self, tmp_path):
         assert pulumi_deps.pip_env("https://x")["PIP_CACHE_DIR"].startswith("/tmp/")
 
+    def test_a_plain_http_index_host_is_named_as_trusted(self):
+        # pip does not fail on an untrusted HTTP index -- it silently IGNORES
+        # it, and the install then dies with "No matching distribution found"
+        # for a package the proxy was serving perfectly well. The runner reaches
+        # the API on the in-cluster URL, which is http by default.
+        assert pulumi_deps.pip_env("http://terrapod-api:8000")["PIP_TRUSTED_HOST"] == (
+            "terrapod-api"
+        )
+
+    def test_an_https_api_is_left_strict(self):
+        assert "PIP_TRUSTED_HOST" not in pulumi_deps.pip_env("https://terrapod.example.com")
+
     def _run_python(self, tmp_path, monkeypatch, *, declared=False, reqs=True, rc=(0, 0)):
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
         (tmp_path / "home").mkdir()
