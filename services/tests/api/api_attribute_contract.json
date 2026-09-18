@@ -708,6 +708,7 @@
     "permissions.can-retry",
     "plan-only",
     "plan-summary",
+    "pulumi-bind-plan",
     "refresh",
     "refresh-only",
     "replace-addrs",

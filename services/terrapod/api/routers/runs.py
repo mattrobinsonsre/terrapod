@@ -139,6 +139,7 @@ def _run_json(
     engine: str,
     workspace_name: str = "",
     workspace_has_vcs: bool = False,
+    pulumi_bind_plan: bool | None = None,
     state_version_id: str | None = None,
     blocked_by: str | None = None,
     reported_status: str | None = None,
@@ -146,6 +147,11 @@ def _run_json(
     task_stage_ids: list[str] | None = None,
 ) -> dict:
     """Serialize a Run to TFE V2 JSON:API format.
+
+    ``pulumi_bind_plan`` says whether this run's update is bound to the
+    operations its preview showed (#1553), which is a property of the decision
+    a person is about to confirm rather than of the workspace they cannot see
+    from here (#1560). None for a run of any other engine.
 
     ``blocked_by`` is the post-plan gate holding the run, from
     ``run_service.blocked_by`` -- computed by the caller because it needs the
@@ -167,6 +173,9 @@ def _run_json(
             "type": "runs",
             "attributes": {
                 "status": reported_status or run.status,
+                # Whether the update is bound to the preview (#1553, #1560).
+                # Null for an engine with no such distinction.
+                "pulumi-bind-plan": pulumi_bind_plan,
                 # Which post-plan gate holds the run (#1725): `run-task`,
                 # `policy`, `security-scan`, or null. A held run reports status
                 # `planning` although its plan has finished; this is how a client
@@ -607,9 +616,18 @@ async def create_run(
             engine=ws.engine,
             workspace_name=ws.name,
             workspace_has_vcs=ws.vcs_connection_id is not None,
+            pulumi_bind_plan=_bind_plan_of(ws),
         ),
         status_code=201,
     )
+
+
+def _bind_plan_of(ws) -> bool | None:
+    """Whether this workspace binds an update to its preview, or None if the
+    question does not apply to its engine (#1553)."""
+    if ws is None or ws.engine != "pulumi":
+        return None
+    return bool(ws.pulumi_bind_plan)
 
 
 async def _post_plan_view(db: AsyncSession, request: Request, run: Run) -> dict:
@@ -678,6 +696,7 @@ async def show_run(
         engine=ws.engine,
         workspace_name=ws.name if ws else "",
         workspace_has_vcs=bool(ws and ws.vcs_connection_id),
+        pulumi_bind_plan=_bind_plan_of(ws),
         state_version_id=sv_id,
         **view,
     )
@@ -720,6 +739,7 @@ async def list_workspace_runs(
     runs = await run_service.list_workspace_runs(db, ws.id, page_number, page_size)
     total = await run_service.count_workspace_runs(db, ws.id)
     has_vcs = ws.vcs_connection_id is not None
+    bind_plan = _bind_plan_of(ws)
     return JSONResponse(
         content={
             "data": [
@@ -728,6 +748,7 @@ async def list_workspace_runs(
                     engine=ws.engine,
                     workspace_name=ws.name,
                     workspace_has_vcs=has_vcs,
+                    pulumi_bind_plan=bind_plan,
                     **await _post_plan_view(db, request, r),
                 )["data"]
                 for r in runs

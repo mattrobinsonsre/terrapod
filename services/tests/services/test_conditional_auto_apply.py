@@ -213,6 +213,9 @@ class TestEvaluateConditionalAutoApply:
             await run_service.evaluate_conditional_auto_apply(db, run)
         gate.assert_not_awaited()
         assert run.status == "planned"
+        # And it says so: parked here, a run is indistinguishable from one
+        # nobody configured to auto-apply (#1560).
+        assert "not reported" in (run.auto_apply_declined_reason or "")
 
     async def test_a_run_that_is_not_planned_is_left_alone(self):
         # Without this guard a run already applying/errored/discarded would be

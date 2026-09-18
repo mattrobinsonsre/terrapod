@@ -906,6 +906,7 @@ Run objects include the following drift detection attributes in responses:
 |---|---|---|
 | `is-drift-detection` | boolean | `true` if the run was created by the drift detection scheduler |
 | `has-changes` | boolean or null | Whether the plan detected infrastructure changes. `null` if the plan has not completed yet |
+| `pulumi-bind-plan` | boolean or null | Whether this run's update performs exactly the operations its preview showed (#1553). `null` for any engine but Pulumi, which has no such distinction |
 
 Drift detection runs are always plan-only and are not counted in the workspace's normal run queue.
 
@@ -1047,6 +1048,21 @@ GET /api/v1/runs/{run_id}/plan
 ```
 
 Returns plan metadata and log download URL. When the runner has uploaded a structured plan (`-out=tfplan` → `terraform show -json tfplan`), the response also carries a `json-output` attribute pointing at `/api/tfe/v2/plans/{run_id}/json-output`.
+
+A **Pulumi** run uploads a preview digest to the same place (#1560), built from the engine events its preview writes:
+
+```json
+{
+  "engine": "pulumi",
+  "change_summary": {"create": 2, "update": 1, "same": 9},
+  "has_changes": true,
+  "steps": [{"op": "create", "urn": "urn:pulumi:dev::shop::aws:s3/bucket:Bucket::assets",
+             "type": "aws:s3/bucket:Bucket"}],
+  "steps_truncated": false
+}
+```
+
+The digest deliberately carries each step's operation, URN and type and nothing else — the engine's events also hold every resource's old and new state, which is where a stack's secrets are. `steps` is capped (`steps_truncated` says when), while `change_summary` is exact however large the preview. Both shapes fill the same `resource-additions` / `resource-changes` / `resource-destructions` / `resource-replacements` / `resource-imports` attributes, so the change badges, conditional auto-apply and the AI summary read one shape whatever produced it. Pulumi's `replace` fills `resource-replacements`; its paired `create-replacement` and `delete-replaced` are not counted again.
 
 ### Plan JSON Output
 

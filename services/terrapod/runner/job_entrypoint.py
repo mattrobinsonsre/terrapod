@@ -853,10 +853,13 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     keys = None
     if phase in ("preview", "plan"):
         is_update = False
-        argv = pulumi_exec.preview_argv(plan_file, cfg)
+        # Read back below into the run's plan result and plan artifact (#1560).
+        event_log = os.environ.get("TP_PULUMI_EVENT_LOG", "/workspace/preview-events.json")
+        argv = pulumi_exec.preview_argv(plan_file, cfg, event_log=event_log)
         log_file = str(_PLAN_LOG)
     elif phase in ("update", "apply"):
         is_update = True
+        event_log = ""
         # The preview ran in a *different pod*, so its `--save-plan` file is not
         # on this filesystem. Fetch it back the way the Terraform apply fetches
         # `tfplan`, or `up` fails outright with "open /workspace/plan.json: no
@@ -915,6 +918,9 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         tee_to_stdout=True,
     )
 
+    if not is_update and result.exit_code == 0:
+        _report_pulumi_preview(cfg, Path(event_log))
+
     # Hand the saved plan to the update phase, which runs in another pod. Skipped
     # for plan-only runs (nothing will consume it) and when the preview failed
     # (there is no plan worth keeping). Best-effort, like Terraform's: a failure
@@ -940,6 +946,54 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
             cfg, binary, stack, exit_code=result.exit_code, child_grace=float(child_grace)
         )
     return result.exit_code
+
+
+def _report_pulumi_preview(cfg, event_log: Path) -> None:  # type: ignore[no-untyped-def]
+    """Report what the preview found: `has_changes`, the counts, the artifact.
+
+    The same two things the Terraform path posts after a plan, which is what
+    the no-op short-circuit, the change badges, drift and conditional auto-apply
+    all read (#1560). Best-effort in the same way: a run whose report does not
+    arrive is resolved by the reconciler from its Job's outcome, with
+    `has_changes` left unknown, exactly as before this existed.
+
+    The digest is uploaded before the result is posted, because posting the
+    result is what drives the run out of `planning` — and a conditional
+    auto-apply decides on the counts, which come from the digest.
+    """
+    import structlog
+
+    from terrapod.runner.phases import pulumi_preview, uploads
+
+    log = structlog.get_logger("runner.job_entrypoint")
+    if not cfg.has_api:
+        return
+    try:
+        digest = pulumi_preview.parse_event_log(event_log)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("could not read the preview's event log (non-fatal)", err=str(exc))
+        return
+    if digest is None:
+        # No summary event: the preview did not finish one. Saying nothing is
+        # right — `has_changes` stays unknown rather than being guessed at.
+        log.warning("preview reported no summary; has_changes stays unknown")
+        return
+
+    try:
+        digest_path = pulumi_preview.write_digest(digest, event_log.with_name("preview.json"))
+        uploads.upload_plan_json(cfg, digest_path)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("preview digest upload raised (non-fatal)", err=str(exc))
+
+    try:
+        uploads.post_plan_result(cfg, has_changes=bool(digest["has_changes"]))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("plan-result raised (non-fatal)", err=str(exc))
+    log.info(
+        "preview reported",
+        has_changes=digest["has_changes"],
+        changes=digest["change_summary"],
+    )
 
 
 def _hand_back_pulumi_state(  # type: ignore[no-untyped-def]

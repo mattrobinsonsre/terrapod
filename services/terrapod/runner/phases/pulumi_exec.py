@@ -421,7 +421,7 @@ def bind_plan_enabled() -> bool:
     return os.environ.get("TP_PULUMI_BIND_PLAN", "").lower() == "true"
 
 
-def preview_argv(plan_file: str, cfg=None) -> list[str]:  # type: ignore[no-untyped-def]
+def preview_argv(plan_file: str, cfg=None, event_log: str = "") -> list[str]:  # type: ignore[no-untyped-def]
     """`pulumi preview`, saving its plan only when the workspace binds updates to it.
 
     An empty `plan_file` — the default, since binding is an opt-in (#1553) —
@@ -430,10 +430,18 @@ def preview_argv(plan_file: str, cfg=None) -> list[str]:  # type: ignore[no-unty
     on, the saved plan is what the update consumes, so the two phases agree on
     one file path — a mismatch surfaces as "no plan file" on the update, a
     long way from the preview that should have written it.
+
+    `event_log` asks the engine to also write its events to a file (#1560),
+    which is where `has_changes` and the change counts come from. Deliberately
+    not `--json`: that would replace the output a person reads with the same
+    JSON, and the preview log is the thing the run page shows.
     """
-    if not plan_file:
-        return ["preview", *_common_argv(cfg)]
-    return ["preview", f"--save-plan={plan_file}", *_common_argv(cfg)]
+    argv = ["preview"]
+    if plan_file:
+        argv.append(f"--save-plan={plan_file}")
+    if event_log:
+        argv.append(f"--event-log={event_log}")
+    return [*argv, *_common_argv(cfg)]
 
 
 def update_argv(plan_file: str, cfg=None) -> list[str]:  # type: ignore[no-untyped-def]

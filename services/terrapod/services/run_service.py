@@ -1126,6 +1126,14 @@ async def evaluate_conditional_auto_apply(db: AsyncSession, run: Run) -> Run:
 
     permitted = plan_shape_permits_auto_apply(run, mode)
     if permitted is None:
+        # Recorded, not just logged (#1560): a run parked here looks identical
+        # to one nobody configured to auto-apply, and the operator has no way
+        # to tell which without the reason on the run.
+        run.auto_apply_declined_reason = (
+            "The plan's changes were not reported, so a conditional auto-apply "
+            "could not judge them. Confirm the run to apply it."
+        )
+        await db.commit()
         logger.info(
             "Conditional auto-apply skipped — plan shape unknown",
             run_id=str(run.id),
