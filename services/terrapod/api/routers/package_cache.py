@@ -260,7 +260,9 @@ async def pypi_file(
 # packument — so this half does need to know its own external URL.
 
 
-def _rewrite_base(request: Request, user: AuthenticatedUser | None = None) -> str:
+def _rewrite_base(
+    request: Request, user: AuthenticatedUser | None = None, ecosystem: str = "npm"
+) -> str:
     """The absolute base to hand a client for its follow-up tarball fetches.
 
     npm does not resolve `dist.tarball` relative to the packument, so unlike the
@@ -295,7 +297,7 @@ def _rewrite_base(request: Request, user: AuthenticatedUser | None = None) -> st
     """
     if user is not None and user.auth_method == "runner_token":
         base = str(request.base_url).rstrip("/")
-        return f"{base}{prefix_of(request.url.path)}/package-cache/npm"
+        return f"{base}{prefix_of(request.url.path)}/package-cache/{ecosystem}"
 
     configured = (settings.external_url or "").strip().rstrip("/")
     if configured:
@@ -311,7 +313,7 @@ def _rewrite_base(request: Request, user: AuthenticatedUser | None = None) -> st
     # `_authToken` by request path and NuGet matches credentials by
     # source URI, so rewriting this to canonical would strip the
     # client's own auth from every follow-up fetch.
-    return f"{base.rstrip('/')}{prefix_of(request.url.path)}/package-cache/npm"
+    return f"{base.rstrip('/')}{prefix_of(request.url.path)}/package-cache/{ecosystem}"
 
 
 @npm_router.get("/npm/{package:path}/-/{filename}")
@@ -1026,31 +1028,18 @@ async def go_module_file(
 # ── NuGet ───────────────────────────────────────────────────────────────────
 
 
-def _nuget_base(request: Request) -> str:
+def _nuget_base(request: Request, user: AuthenticatedUser | None = None) -> str:
     """This proxy's own absolute base, resolved per request.
 
-    Same sources and precedence as `_rewrite_base` and `_galaxy_base`. It
-    matters more here than anywhere else: the service index advertises absolute
-    URLs the client follows verbatim, so a base that is wrong — or that drops
-    the path prefix this proxy is mounted under — sends `dotnet restore` to
-    somewhere it cannot reach. That is not hypothetical; it is what the protocol
-    capture showed happening.
+    The same function as npm's, for the same reasons -- including the runner
+    rule. It matters more here than anywhere else: the service index advertises
+    absolute URLs the client follows verbatim, so a base that is wrong sends
+    `dotnet restore` somewhere it cannot reach. That is not hypothetical twice
+    over -- the protocol capture showed it once, and a runner following an
+    `external_url` index showed it again with "Connection refused
+    (terrapod.local:443)" (#1566).
     """
-    configured = (settings.external_url or "").strip().rstrip("/")
-    if configured:
-        base = configured
-    else:
-        host = request.headers.get("x-forwarded-host")
-        if host:
-            proto = request.headers.get("x-forwarded-proto", request.url.scheme)
-            base = f"{proto}://{host}"
-        else:
-            base = str(request.base_url).rstrip("/")
-    # Mirrors the prefix the caller used (#1529) — npm resolves
-    # `_authToken` by request path and NuGet matches credentials by
-    # source URI, so rewriting this to canonical would strip the
-    # client's own auth from every follow-up fetch.
-    return f"{base.rstrip('/')}{prefix_of(request.url.path)}/package-cache/nuget"
+    return _rewrite_base(request, user, ecosystem="nuget")
 
 
 @nuget_router.get("/nuget/index.json")
@@ -1063,7 +1052,7 @@ async def nuget_service_index(
     A stored index would pin whatever host fetched it first and hand that to
     everyone afterwards.
     """
-    return JSONResponse(content=nuget.service_index(_nuget_base(request)))
+    return JSONResponse(content=nuget.service_index(_nuget_base(request, user)))
 
 
 @nuget_router.get("/nuget/flat/{package_id}/index.json")

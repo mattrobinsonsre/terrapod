@@ -672,6 +672,30 @@ class TestARunnerIsAnsweredWithTheAddressItAskedOn:
             got = _rewrite_base(self._request(), None)
         assert got.startswith("https://terrapod.example.com/")
 
+    def test_nuget_gets_the_same_treatment(self):
+        # The NuGet service index advertises absolute URLs the client follows
+        # verbatim, and it was missed when npm's was fixed: a runner following an
+        # external_url index got "Connection refused (terrapod.local:443)".
+        from terrapod.api.routers.package_cache import _nuget_base
+
+        with patch("terrapod.api.routers.package_cache.settings") as st:
+            st.external_url = "https://terrapod.example.com"
+            got = _nuget_base(
+                self._request("/api/v1/package-cache/nuget/index.json"), self._runner()
+            )
+        assert got.startswith("http://terrapod-api:8000/")
+        assert got.endswith("/package-cache/nuget")
+
+    def test_nuget_still_gives_everyone_else_external_url(self):
+        from terrapod.api.routers.package_cache import _nuget_base
+
+        with patch("terrapod.api.routers.package_cache.settings") as st:
+            st.external_url = "https://terrapod.example.com"
+            got = _nuget_base(
+                self._request("/api/v1/package-cache/nuget/index.json"), self._person()
+            )
+        assert got.startswith("https://terrapod.example.com/")
+
     def test_the_runner_answer_keeps_the_prefix_the_caller_used(self):
         # npm resolves `_authToken` by request path, so an answer on a different
         # prefix would strip the runner's own credential from every fetch.
