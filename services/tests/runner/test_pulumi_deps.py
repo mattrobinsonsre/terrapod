@@ -536,6 +536,12 @@ class TestDotnet:
         for key in ("NUGET_PACKAGES", "DOTNET_CLI_HOME"):
             assert env[key].startswith("/tmp/"), key
 
+    def test_globalization_is_invariant(self):
+        # .NET refuses to start without ICU, and the runner image is Debian slim
+        # which carries none. Installing libicu would put ~30MB in every runner
+        # image including the Terraform-only ones.
+        assert pulumi_deps.dotnet_env()["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"] == "1"
+
     def test_telemetry_is_off(self):
         # It reaches upstream, which a sealed deployment cannot do.
         assert pulumi_deps.dotnet_env()["DOTNET_CLI_TELEMETRY_OPTOUT"] == "1"

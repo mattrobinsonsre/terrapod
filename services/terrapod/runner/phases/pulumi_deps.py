@@ -516,6 +516,18 @@ def dotnet_env() -> dict[str, str]:
         "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1",
         # Telemetry reaches upstream, which a sealed deployment cannot do.
         "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+        # .NET refuses to start at all without ICU -- "Couldn't find a valid ICU
+        # package installed on the system" -- and the runner image is Debian
+        # slim, which carries none. The alternative is installing libicu, which
+        # would put roughly 30MB of it in EVERY runner image including the
+        # Terraform-only ones, and #1407 §2 is explicit that another engine's
+        # ambitions must cost them nothing.
+        #
+        # What invariant mode gives up is culture-specific collation and
+        # formatting. A Pulumi program describes infrastructure; if one ever
+        # needs a locale, the answer is a custom runner image with libicu, which
+        # `docs/runners.md` already documents as the way to add to the image.
+        "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1",
     }
 
 
