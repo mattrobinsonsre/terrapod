@@ -82,7 +82,7 @@ class TestClassifying:
         got = pulumi_deps.classify(_program(tmp_path, "runtime: yaml\n"))
         assert got.supported is True
 
-    @pytest.mark.parametrize("runtime", ["go", "dotnet"])
+    @pytest.mark.parametrize("runtime", ["dotnet"])
     def test_the_others_are_not_supported_yet(self, tmp_path, runtime):
         got = pulumi_deps.classify(_program(tmp_path, f"runtime: {runtime}\n"))
         assert got == pulumi_deps.Runtime(name=runtime, supported=False)
@@ -147,8 +147,8 @@ class TestInstalling:
         assert node.call_count == 0
 
     def test_an_unsupported_runtime_is_refused_by_name(self, tmp_path):
-        d = _program(tmp_path, "runtime: go\n")
-        with pytest.raises(pulumi_deps.DependencyError, match="'go'"):
+        d = _program(tmp_path, "runtime: dotnet\n")
+        with pytest.raises(pulumi_deps.DependencyError, match="'dotnet'"):
             pulumi_deps.install(self._cfg(), d, child_grace=5, log_file="/dev/null")
 
     def test_the_refusal_says_what_does_work(self, tmp_path):
@@ -328,3 +328,137 @@ class TestPython:
         with pytest.raises(pulumi_deps.DependencyError) as e:
             self._run_python(tmp_path, monkeypatch, rc=(0, 5))
         assert e.value.exit_code == 5
+
+
+class TestGo:
+    """The go command will not carry a credential over HTTP, by any route (#1566).
+
+    Tried against a real proxy before this was written: credentials in the
+    GOPROXY URL are refused outright ("refusing to pass credentials to insecure
+    URL"), and a `GOAUTH` helper's header is dropped in silence, leaving a 401.
+    Go *will* talk plain HTTP to a proxy — it just will not authenticate to one.
+    A loopback shim holds the token so Go has nothing to refuse.
+    """
+
+    SECRET = "runtok-go-77b1"
+
+    def _cfg(self):
+        return SimpleNamespace(api_url="http://terrapod-api:8000", auth_token=self.SECRET)
+
+    def test_go_is_supported(self, tmp_path):
+        assert pulumi_deps.classify(_program(tmp_path, "runtime: go\n")).supported is True
+
+    def test_goproxy_points_at_the_shim_and_carries_no_credential(self):
+        env = pulumi_deps.go_env(45123)
+        assert env["GOPROXY"] == "http://127.0.0.1:45123"
+        assert self.SECRET not in env["GOPROXY"]
+        assert "@" not in env["GOPROXY"]
+
+    def test_everything_go_writes_lands_where_it_may(self):
+        env = pulumi_deps.go_env(1)
+        for key in ("GOMODCACHE", "GOCACHE", "GOPATH"):
+            assert env[key].startswith("/tmp/"), key
+
+    def test_the_toolchain_is_pinned_local(self):
+        # Otherwise a go.mod naming a newer toolchain fetches one from upstream,
+        # outside the proxy — which a sealed deployment cannot do.
+        assert pulumi_deps.go_env(1)["GOTOOLCHAIN"] == "local"
+
+    def test_the_checksum_database_is_off(self):
+        # A second upstream a sealed deployment cannot reach. go.sum still
+        # verifies the module hashes; that is not what this turns off.
+        assert pulumi_deps.go_env(1)["GOSUMDB"] == "off"
+
+    def test_the_shim_forwards_with_the_token_and_serves_the_body(self):
+        import urllib.request
+
+        seen = {}
+
+        class _Resp:
+            status_code = 200
+
+            def iter_bytes(self):
+                yield b"module-bytes"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def fake_stream(method, url, headers=None, timeout=None):
+            seen["url"] = url
+            seen["auth"] = (headers or {}).get("Authorization")
+            return _Resp()
+
+        with patch.object(pulumi_deps.httpx, "stream", fake_stream):
+            proxy = pulumi_deps._ModuleProxy("http://terrapod-api:8000", self.SECRET)
+            proxy.start()
+            try:
+                got = urllib.request.urlopen(
+                    f"http://127.0.0.1:{proxy.port}/rsc.io/quote/@v/list", timeout=10
+                ).read()
+            finally:
+                proxy.stop()
+
+        assert got == b"module-bytes"
+        assert seen["auth"] == f"Bearer {self.SECRET}"
+        assert seen["url"].endswith("/package-cache/go/rsc.io/quote/@v/list")
+
+    def test_the_shim_binds_loopback_only(self):
+        proxy = pulumi_deps._ModuleProxy("http://x", "t")
+        try:
+            assert proxy._server.server_address[0] == "127.0.0.1"
+        finally:
+            proxy.stop()
+
+    def test_stopping_one_that_never_started_does_not_hang(self):
+        # `shutdown()` waits for a serve loop to acknowledge it, so on a server
+        # that never served it blocks for ever — and `stop()` is called from the
+        # `finally` that is supposed to guarantee cleanup.
+        proxy = pulumi_deps._ModuleProxy("http://x", "t")
+        proxy.stop()
+
+    def test_an_upstream_failure_becomes_a_502_not_a_crash(self):
+        import urllib.error
+        import urllib.request
+
+        def boom(*a, **k):
+            raise RuntimeError("upstream is down")
+
+        with patch.object(pulumi_deps.httpx, "stream", boom):
+            proxy = pulumi_deps._ModuleProxy("http://terrapod-api:8000", "t")
+            proxy.start()
+            try:
+                with pytest.raises(urllib.error.HTTPError) as e:
+                    urllib.request.urlopen(f"http://127.0.0.1:{proxy.port}/x", timeout=10)
+            finally:
+                proxy.stop()
+        assert e.value.code == 502
+
+    def test_a_failed_download_carries_its_exit_code(self, tmp_path, monkeypatch):
+        d = _program(tmp_path, "runtime: go\n")
+        monkeypatch.setattr(pulumi_deps.platform_tool, "ensure_tool", lambda *a, **k: Path("/go"))
+        monkeypatch.setattr(
+            pulumi_deps.exec_subprocess, "run", lambda *a, **k: MagicMock(exit_code=4)
+        )
+        with pytest.raises(pulumi_deps.DependencyError) as e:
+            pulumi_deps.install(self._cfg(), d, child_grace=5, log_file="/dev/null")
+        assert e.value.exit_code == 4
+
+    def test_the_shim_is_stopped_even_when_the_download_fails(self, tmp_path, monkeypatch):
+        d = _program(tmp_path, "runtime: go\n")
+        stopped = []
+        monkeypatch.setattr(pulumi_deps.platform_tool, "ensure_tool", lambda *a, **k: Path("/go"))
+        monkeypatch.setattr(
+            pulumi_deps.exec_subprocess, "run", lambda *a, **k: MagicMock(exit_code=1)
+        )
+        real_stop = pulumi_deps._ModuleProxy.stop
+        monkeypatch.setattr(
+            pulumi_deps._ModuleProxy,
+            "stop",
+            lambda self: (stopped.append(1), real_stop(self))[1],
+        )
+        with pytest.raises(pulumi_deps.DependencyError):
+            pulumi_deps.install(self._cfg(), d, child_grace=5, log_file="/dev/null")
+        assert stopped == [1]

@@ -170,6 +170,8 @@ api:
     # The Node version a Pulumi TypeScript/JavaScript program gets. Partial, like
     # the others; 22 is the active LTS line.
     default_node_version: "22"
+    # The Go toolchain version for a Pulumi Go program. Partial, like the others.
+    default_go_version: "1.25"
 
     # Storage configuration — exactly one backend must be configured.
     # IMPORTANT: Filesystem storage is for dev/single-instance only.
@@ -488,6 +490,11 @@ api:
         # ones it carries no rate limit.
         node_mirror_url: "https://nodejs.org/dist"
         node_version_index_url: "https://nodejs.org/dist/index.json"
+        # The Go toolchain a Pulumi Go program is compiled with (#1566). One
+        # index serves both version resolution and artifact checksums, because
+        # Go publishes no separate checksum manifest.
+        go_mirror_url: "https://go.dev/dl"
+        go_version_index_url: "https://go.dev/dl/?mode=json&include=all"
         # Lowest pre-release tier to accept for terraform/tofu CLI version
         # resolution + caching. One of: none, rc, beta, alpha, dev.
         # 'none' (default) permits only GA releases. 'rc' allows release

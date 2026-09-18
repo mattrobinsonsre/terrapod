@@ -107,6 +107,7 @@
   ],
   "binary_cache.platform_tool_versions": [
     "checkov-version",
+    "go-version",
     "node-version",
     "opa-version",
     "pulumi-version",

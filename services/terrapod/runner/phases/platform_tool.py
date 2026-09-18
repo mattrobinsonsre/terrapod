@@ -46,7 +46,7 @@ logger = structlog.get_logger("runner.phase.platform_tool")
 #: import this module — and they drifted once in exactly the way that invites:
 #: `pulumi` was added here and not there, so a Pulumi run asked the cache for
 #: version "" and no test on either side noticed (#1523).
-TOOLS = ("opa", "trivy", "checkov", "pulumi", "node")
+TOOLS = ("opa", "trivy", "checkov", "pulumi", "node", "go")
 
 
 class PlatformToolsUnsupported(Exception):
@@ -115,6 +115,10 @@ UNPACK: dict[str, _Unpack] = {
     # cannot be written down here -- hence strip_root. The tree is kept because
     # `npm` is a sibling script under `lib/node_modules`, not a second binary.
     "node": _Unpack(kind="targz", member="bin/node", tree=True, strip_root=True),
+    # The Go toolchain (#1566). Its root is a plain `go/`, but the tree is kept
+    # and the root stripped like the others: `go` needs `pkg/` and `src/` beside
+    # it, not just the one binary.
+    "go": _Unpack(kind="targz", member="bin/go", tree=True, strip_root=True),
 }
 
 

@@ -76,6 +76,7 @@ class TestFetchVersions:
                         "checkov-version": "3.3.8",
                         "pulumi-version": "3.208.0",
                         "node-version": "22.20.0",
+                        "go-version": "1.25.1",
                     }
                 }
             },
@@ -86,6 +87,7 @@ class TestFetchVersions:
             "checkov": "3.3.8",
             "pulumi": "3.208.0",
             "node": "22.20.0",
+            "go": "1.25.1",
         }
 
     def test_raises_on_a_non_200(self):

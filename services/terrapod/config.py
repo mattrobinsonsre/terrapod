@@ -762,6 +762,18 @@ class BinaryCacheConfig(BaseModel):
         "it carries no rate limit. Used for version listing and partial-version "
         "resolution.",
     )
+    go_mirror_url: str = Field(
+        default="https://go.dev/dl",
+        description="Download base for Go toolchain archives, used when a Pulumi "
+        "Go program needs one (#1566). Assets are `go{version}.{platform}.tar.gz`.",
+    )
+    go_version_index_url: str = Field(
+        default="https://go.dev/dl/?mode=json&include=all",
+        description="Release index for go. Must return Go's own shape: a JSON "
+        'array of releases, each with `version` (e.g. "go1.25.1") and a `files` '
+        "list carrying `filename` and `sha256`. Serves both version resolution "
+        "and artifact verification, because Go publishes no checksum manifest.",
+    )
     node_mirror_url: str = Field(
         default="https://nodejs.org/dist",
         description="Download base for Node runtime archives, used when a Pulumi "
@@ -3110,6 +3122,11 @@ class Settings(BaseSettings):
     default_terraform_version: str = Field(
         default="1.12",
         description="Default terraform/tofu version for new workspaces",
+    )
+    default_go_version: str = Field(
+        default="1.25",
+        description="Default Go toolchain version for a Pulumi Go program (#1566). "
+        "Partial, resolved to the newest matching release through the binary cache.",
     )
     default_node_version: str = Field(
         default="22",

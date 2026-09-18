@@ -30,9 +30,13 @@ import os
 import re
 import shutil
 import sys
+import threading
 import urllib.parse
 from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+import httpx
 
 from terrapod.runner import exec_subprocess
 from terrapod.runner.phases import platform_tool
@@ -80,7 +84,7 @@ _NO_INSTALL = {"yaml", ""}
 
 #: What this release can install. The rest are named in the refusal rather than
 #: failing later inside Pulumi with something less legible.
-_SUPPORTED = {"nodejs", "python"}
+_SUPPORTED = {"nodejs", "python", "go"}
 
 
 def read_runtime(program_dir: Path) -> str:
@@ -209,6 +213,10 @@ def install(cfg, program_dir: Path, *, child_grace: float, log_file: str) -> Non
             f"{runtime.name!r} yet: only {', '.join(sorted(_SUPPORTED))} and yaml "
             f"are supported. Track #1566."
         )
+
+    if runtime.name == "go":
+        _install_go(cfg, program_dir, child_grace=child_grace, log_file=log_file, log=log)
+        return
 
     if runtime.name == "python":
         _install_python(cfg, program_dir, child_grace=child_grace, log_file=log_file, log=log)
@@ -373,6 +381,125 @@ def pip_env(api_url: str) -> dict[str, str]:
     if parsed.scheme == "http" and parsed.hostname:
         env["PIP_TRUSTED_HOST"] = parsed.hostname
     return env
+
+
+class _ModuleProxy(threading.Thread):
+    """A loopback shim that holds the run's token so the go command need not.
+
+    The go command will talk plain HTTP to a module proxy quite happily -- but it
+    will **never** carry a credential over one. Not in the URL ("refusing to pass
+    credentials to insecure URL"), not from a netrc, and not from a `GOAUTH`
+    helper either: the header is dropped in silence and the fetch comes back 401.
+    All three were tried against a real proxy before this was written.
+
+    The runner reaches the API over an in-cluster HTTP URL in many deployments,
+    and every Terrapod package-cache route requires authentication -- so on that
+    path Go can reach the proxy and can never use it.
+
+    This closes the gap without weakening anything. It listens on 127.0.0.1,
+    forwards to the API with the run's own token, and `GOPROXY` points at it: Go
+    carries no credential, so it has nothing to refuse. The token travels exactly
+    the hop it already travels for this run's artifacts, its state and its
+    binaries -- Go's blanket rule is simply stricter than the one the rest of the
+    Job lives by.
+
+    It exists only for the length of the install and serves GET alone.
+    """
+
+    def __init__(self, api_url: str, token: str) -> None:
+        super().__init__(daemon=True)
+        self._upstream = f"{api_url.rstrip('/')}{_API_PREFIX}/package-cache/go"
+        self._token = token
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
+        self.port = self._server.server_address[1]
+
+    def _handler(self):  # type: ignore[no-untyped-def]
+        upstream, token = self._upstream, self._token
+
+        class Handler(BaseHTTPRequestHandler):
+            # The runner's log is the run's log; the proxy's own chatter would
+            # bury the go command's output in it.
+            def log_message(self, *args: object) -> None:  # noqa: A003
+                return
+
+            def do_GET(self) -> None:  # noqa: N802
+                headers = {"Authorization": f"Bearer {token}"}
+                try:
+                    with httpx.stream(
+                        "GET", upstream + self.path, headers=headers, timeout=120.0
+                    ) as r:
+                        self.send_response(r.status_code)
+                        self.end_headers()
+                        # Streamed, not buffered: a module zip runs to tens of
+                        # megabytes and this is in the runner's own process.
+                        for chunk in r.iter_bytes():
+                            self.wfile.write(chunk)
+                except Exception as exc:  # noqa: BLE001 - reported to the client
+                    self.send_response(502)
+                    self.end_headers()
+                    self.wfile.write(str(exc).encode())
+
+        return Handler
+
+    def run(self) -> None:
+        self._server.serve_forever(poll_interval=0.2)
+
+    def stop(self) -> None:
+        """Stop serving. Safe to call whether or not the thread ever started.
+
+        `shutdown()` waits for the serve loop to acknowledge it, so on a server
+        that never began serving it blocks for ever -- which, called from the
+        `finally` that guarantees cleanup, would hang the run instead of ending
+        it. The liveness check is what makes the guarantee safe to make.
+        """
+        if self.is_alive():
+            self._server.shutdown()
+        self._server.server_close()
+
+
+def go_env(port: int) -> dict[str, str]:
+    """Go settings the read-only filesystem, the shim and a sealed cache need."""
+    return {
+        # No credentials here, and none needed: the shim carries them.
+        "GOPROXY": f"http://127.0.0.1:{port}",
+        # Everything Go writes has to land on one of the three writable mounts.
+        "GOMODCACHE": "/tmp/go/pkg/mod",
+        "GOCACHE": "/tmp/go/cache",
+        "GOPATH": "/tmp/go",
+        # The checksum database is a second upstream, which a sealed deployment
+        # cannot reach. The module hashes in the program's own go.sum are still
+        # verified -- that check is not what this turns off.
+        "GOSUMDB": "off",
+        # Otherwise a go.mod naming a newer toolchain makes the go command fetch
+        # one, from upstream, outside the proxy.
+        "GOTOOLCHAIN": "local",
+    }
+
+
+def _install_go(cfg, program_dir: Path, *, child_grace: float, log_file: str, log) -> None:  # type: ignore[no-untyped-def]
+    """Download the program's modules through the shim."""
+    go = platform_tool.ensure_tool(cfg, "go")
+
+    proxy = _ModuleProxy(cfg.api_url, cfg.auth_token)
+    proxy.start()
+    log.info("module proxy listening", port=proxy.port)
+    try:
+        os.environ.update(go_env(proxy.port))
+        result = exec_subprocess.run(
+            [str(go), "mod", "download"],
+            log_file=log_file,
+            child_grace_seconds=child_grace,
+            tee_to_stdout=True,
+        )
+    finally:
+        proxy.stop()
+
+    if result.exit_code != 0:
+        raise DependencyError(
+            "downloading the program's go modules failed; the log above is the go "
+            "command's own output",
+            exit_code=result.exit_code,
+        )
 
 
 def _npm_cli(bin_dir: Path) -> Path:

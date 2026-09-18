@@ -53,13 +53,13 @@ logger = get_logger(__name__)
 # subject to `allow_prerelease`, listed per version -- and differs only in where
 # its upstream facts live (services/platform_tools.py still owns its asset
 # layout) and in having no signature to check. See CHECKSUM_ONLY_TOOLS.
-CLI_TOOLS = {"terraform", "tofu", "terragrunt", "pulumi", "node"}
+CLI_TOOLS = {"terraform", "tofu", "terragrunt", "pulumi", "node", "go"}
 
 #: Tools that exist only to serve the Pulumi engine, and are refused when it is
 #: off (#1429). `node` is here because `pulumi-language-nodejs` shells out to it:
 #: it is the runtime a TypeScript program needs, not something Terrapod offers
 #: in its own right (#1566).
-_PULUMI_ONLY_TOOLS = {"pulumi", "node"}
+_PULUMI_ONLY_TOOLS = {"pulumi", "node", "go"}
 
 #: Tools whose publisher signs nothing, so the strongest check available is the
 #: artifact's SHA-256 against a checksum the publisher published. Verification
@@ -544,6 +544,8 @@ async def list_available_versions(tool: str) -> list[str]:
         versions = await _fetch_pulumi_versions()
     elif tool == "node":
         versions = await _fetch_node_versions()
+    elif tool == "go":
+        versions = await _fetch_go_versions()
     elif tool == "terragrunt":
         versions = await _fetch_terragrunt_versions()
     else:
@@ -730,6 +732,8 @@ async def resolve_version(tool: str, partial_version: str) -> str:
         resolved = await _resolve_pulumi_version(partial_version)
     elif tool == "node":
         resolved = await _resolve_node_version(partial_version)
+    elif tool == "go":
+        resolved = await _resolve_go_version(partial_version)
     else:
         return partial_version
 
@@ -900,6 +904,45 @@ async def _fetch_node_versions() -> list[str]:
         if len(version.split("-")[0].split(".")) >= 3:
             versions.append(version)
     return versions
+
+
+async def _go_versions() -> list[str]:
+    """Every Go release version from the index, newest first, without the `go`."""
+    from terrapod.services.platform_tools import _go_index
+
+    return [str(r.get("version", "")).removeprefix("go") for r in await _go_index()]
+
+
+async def _fetch_go_versions() -> list[str]:
+    """Go versions this deployment will offer."""
+    policy = settings.registry.binary_cache.allow_prerelease
+    out = []
+    for v in await _go_versions():
+        if not v or not _is_version_allowed(v, policy):
+            continue
+        # Go ships `1.25` as a real release, not only `1.25.0`, so the
+        # three-component filter the other tools use would hide every `.0`.
+        if len(v.split("-")[0].split(".")) >= 2:
+            out.append(v)
+    return out
+
+
+async def _resolve_go_version(partial: str) -> str:
+    """Resolve a partial Go version (`1.25` -> the newest 1.25.x).
+
+    An exact `1.25` is also a real Go release, so a partial that matches nothing
+    more specific falls back to itself rather than failing.
+    """
+    policy = settings.registry.binary_cache.allow_prerelease
+    prefix = f"{partial}."
+    matching = [
+        v for v in await _go_versions() if v.startswith(prefix) and _is_version_allowed(v, policy)
+    ]
+    if not matching:
+        logger.warning("No matching go version found", partial=partial, policy=policy)
+        return partial
+    matching.sort(key=_version_sort_key)
+    return matching[-1]
 
 
 async def _resolve_node_version(partial: str) -> str:

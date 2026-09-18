@@ -1468,6 +1468,9 @@
         "default_node_version": {
           "type": "string"
         },
+        "default_go_version": {
+          "type": "string"
+        },
         "storage": {
           "type": "object",
           "additionalProperties": false,
@@ -1824,6 +1827,12 @@
                   "type": "string"
                 },
                 "node_version_index_url": {
+                  "type": "string"
+                },
+                "go_mirror_url": {
+                  "type": "string"
+                },
+                "go_version_index_url": {
                   "type": "string"
                 },
                 "allow_prerelease": {

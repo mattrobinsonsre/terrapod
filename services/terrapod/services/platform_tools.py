@@ -58,7 +58,7 @@ PLATFORM_TOOLS = frozenset({"opa", "trivy", "checkov"})
 #: tar.gz holding the language plugins, the checksum manifest with the version
 #: spelled two ways in one URL. None of that is any less true for a per-workspace
 #: tool, and moving it would have bought nothing but churn.
-_NON_PLATFORM_TOOLS = frozenset({"pulumi", "node"})
+_NON_PLATFORM_TOOLS = frozenset({"pulumi", "node", "go"})
 
 #: Every tool this module describes, however it is scoped.
 DESCRIBED_TOOLS = PLATFORM_TOOLS | _NON_PLATFORM_TOOLS
@@ -71,6 +71,17 @@ _NODE_PLATFORM = {
     ("linux", "amd64"): "linux-x64",
     ("linux", "arm64"): "linux-arm64",
     ("darwin", "amd64"): "darwin-x64",
+    ("darwin", "arm64"): "darwin-arm64",
+}
+
+#: Go's own platform naming -- the one publisher that needs no translation,
+#: because Terrapod already speaks Go-style os/arch. Its archive root is a plain
+#: `go/`, so the member could be named through it; the runner strips the root
+#: anyway, for one rule across all three runtimes (#1566).
+_GO_PLATFORM = {
+    ("linux", "amd64"): "linux-amd64",
+    ("linux", "arm64"): "linux-arm64",
+    ("darwin", "amd64"): "darwin-amd64",
     ("darwin", "arm64"): "darwin-arm64",
 }
 
@@ -133,6 +144,9 @@ SPECS: dict[str, PlatformToolSpec] = {
     # member is the path INSIDE the archive's root, because that root is
     # `node-v<version>-<platform>/` and this table knows neither.
     "node": PlatformToolSpec(archive="targz", member="bin/node", content_type="application/gzip"),
+    # The Go toolchain a Pulumi Go program needs (#1566). Pulumi compiles the
+    # program, so this is the whole toolchain rather than a runtime.
+    "go": PlatformToolSpec(archive="targz", member="bin/go", content_type="application/gzip"),
 }
 
 
@@ -145,6 +159,7 @@ def _mirror(tool: str) -> str:
         # Pulumi's mirror moved with it to the binary cache (#1559).
         "pulumi": settings.registry.binary_cache.pulumi_mirror_url,
         "node": settings.registry.binary_cache.node_mirror_url,
+        "go": settings.registry.binary_cache.go_mirror_url,
     }[tool].rstrip("/")
 
 
@@ -156,6 +171,16 @@ def configured_version(tool: str) -> str:
         "trivy": cfg.trivy_version,
         "checkov": cfg.checkov_version,
     }[tool]
+
+
+async def _go_index() -> list[dict]:
+    """Go's release index: every release, with its files and their sha256."""
+    url = settings.registry.binary_cache.go_version_index_url
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await arequest_with_retry(client, "GET", url)
+        resp.raise_for_status()
+        data = resp.json()
+    return data if isinstance(data, list) else []
 
 
 def download_url(tool: str, version: str, os_: str, arch: str) -> str:
@@ -187,6 +212,11 @@ def download_url(tool: str, version: str, os_: str, arch: str) -> str:
         if plat is None:
             raise UnsupportedPlatformError(f"pulumi publishes no asset for {os_}/{arch}")
         return f"{base}/v{version}/pulumi-v{version}-{plat}.tar.gz"
+    if tool == "go":
+        plat = _GO_PLATFORM.get((os_, arch))
+        if plat is None:
+            raise UnsupportedPlatformError(f"go publishes no asset for {os_}/{arch}")
+        return f"{base}/go{version}.{plat}.tar.gz"
     if tool == "node":
         plat = _NODE_PLATFORM.get((os_, arch))
         if plat is None:
@@ -239,6 +269,16 @@ async def _expected_sha256(
             if len(parts) >= 2 and parts[1].lstrip("*") == asset:
                 return parts[0].lower()
         raise VerificationError(f"{asset} is not listed in the trivy checksums manifest")
+
+    if tool == "go":
+        # Go publishes no checksum manifest: the sha256 sits beside each file in
+        # the same release index used to resolve a version. One document, both
+        # jobs, over TLS from the same host as the artifact.
+        for release in await _go_index():
+            for f in release.get("files", []):
+                if f.get("filename") == asset and f.get("sha256"):
+                    return str(f["sha256"]).lower()
+        raise VerificationError(f"{asset} is not listed in the go release index")
 
     if tool == "node":
         # One SHASUMS256.txt per release, the same "<hex>  <filename>" shape as

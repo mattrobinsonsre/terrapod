@@ -100,7 +100,8 @@ toolchain, and the program's dependencies.
 | `yaml` | Works. The CLI interprets it; there is no toolchain and nothing to install. |
 | `nodejs` (TypeScript and JavaScript) | Works. Node is fetched through the binary cache and `npm ci` (or `npm install`) runs against Terrapod's npm proxy before the preview. |
 | `python` | Works. A virtualenv is built and `requirements.txt` installed into it from Terrapod's PyPI proxy. |
-| `go`, `dotnet` | Refused, by name, with a message saying so. Tracked on #1566. |
+| `go` | Works. The Go toolchain is fetched through the binary cache and `go mod download` runs against Terrapod's Go module proxy. |
+| `dotnet` | Refused, by name, with a message saying so. Tracked on #1566. |
 
 The refusal is deliberate: a program Terrapod cannot run fails at the start with
 a sentence naming its runtime, rather than part-way through Pulumi with an error
@@ -132,6 +133,27 @@ Where that venv goes is the program's choice. Declare `options.virtualenv` in
 `Pulumi.yaml` and it is built exactly there, because Pulumi runs that interpreter
 and ignores anything else; declare none and Terrapod builds one under `/tmp` and
 points Pulumi at it.
+
+**Go is fetched its modules by a shim, and this is worth knowing.** The `go`
+command will talk plain HTTP to a module proxy, but it will never carry a
+credential over one -- not in the `GOPROXY` URL, not from a `.netrc`, and not
+from a `GOAUTH` helper, whose header it drops in silence. Since the runner
+reaches the API over an in-cluster HTTP URL in many deployments, and every
+package-cache route requires authentication, Go could otherwise reach the proxy
+and never use it.
+
+So Terrapod runs a small listener on `127.0.0.1` inside the Job for the length of
+the install, points `GOPROXY` at it, and lets it add the run's token on Go's
+behalf. Go carries no credential and so has nothing to refuse. The token travels
+exactly the hop it already travels for that run's artifacts, its state and its
+binaries -- Go's rule is simply stricter than the one the rest of the Job lives
+by. Nothing is exposed outside the pod: the listener is loopback-only and serves
+GET alone.
+
+Two further Go settings are forced, both because a sealed deployment has no
+second upstream: `GOTOOLCHAIN=local`, so a `go.mod` naming a newer toolchain does
+not fetch one, and `GOSUMDB=off`. The module hashes in the program's own `go.sum`
+are still verified; it is the transparency-log lookup that is turned off.
 
 ### Binding an update to its preview
 

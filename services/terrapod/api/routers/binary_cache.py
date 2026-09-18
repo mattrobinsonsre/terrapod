@@ -101,6 +101,7 @@ async def platform_tool_versions(
                     # The Node a Pulumi TypeScript/JavaScript program runs on
                     # (#1566). Partial, resolved by the cache like the rest.
                     "node-version": settings.default_node_version,
+                    "go-version": settings.default_go_version,
                 },
             }
         }
