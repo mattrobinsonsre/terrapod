@@ -24,6 +24,28 @@ collaboration, governance (label-based RBAC **and OPA/Rego policy-as-code**),
 state management, and UI layer that wraps around
 `terraform` or `tofu` as pluggable execution backends.
 
+**Terraform and OpenTofu come first, and the flow is theirs.** Terrapod is a
+Terraform/OpenTofu orchestrator that also runs Pulumi and Ansible, not an
+engine-neutral platform that happens to start with Terraform. Those two are
+supported by coercing them into the same flow — one workspace per unit of state,
+a run with a phase you review and a phase that executes what you reviewed,
+against the same RBAC, policy, run tasks, notifications and audit trail — as far
+as each engine allows.
+
+Two things follow, and they decide arguments rather than start them:
+
+- **A Terraform-shaped answer wins.** Where an engine offers a choice, take the
+  one that lands in the existing flow: a per-workspace engine version resolved
+  through the binary cache, because that is how `terraform_version` works, not a
+  deployment-wide pin; the same execution hooks at the same four points; run
+  options that mean what they mean on a Terraform run.
+- **Where an engine cannot be coerced, say so plainly.** Ansible has no
+  separable plan; Pulumi's update plans are experimental upstream and its
+  previews carry no Terraform plan JSON for OPA or the scanners to read. Those
+  differences stay visible in the API and the UI (#1407 §3) and are stated
+  honestly in the docs — never smoothed over into implied parity, and never
+  hidden by pretending a gap is a design choice.
+
 Terrapod targets **TFE V2 API compatibility for the surface that
 `terraform`, `tofu`, and `tfci` consume** — service discovery, the
 cloud-block run lifecycle, variable + variable-set management, and the module

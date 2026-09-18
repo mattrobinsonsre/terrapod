@@ -91,6 +91,12 @@ are the parts worth knowing about before you read that far:
 
 - **A reversible, dry-run-first migration** off TFE / HCP Terraform / Atlantis with [`terrapod-migrate`](docs/migration.md) — preview everything, apply, verify parity, and roll back cleanly.
 
+Terrapod is a Terraform and OpenTofu orchestrator that also runs Pulumi and
+Ansible. Those two are coerced into the same flow — a workspace per unit of
+state, a run you review then apply, one set of permissions, policies and
+history — as far as each engine allows, and where one cannot be, Terrapod says
+so rather than implying parity.
+
 **Only interested in Terraform and OpenTofu?** Then say so, and none of the rest is
 deployed. The container registry and the PyPI and npm proxies are there to serve
 Ansible and Pulumi work; two Helm switches —
