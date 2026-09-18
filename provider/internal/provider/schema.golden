@@ -80,6 +80,7 @@ data terrapod_workspace.drift_last_checked_at required=false optional=false comp
 data terrapod_workspace.drift_latest_run_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.drift_status required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.engine required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_workspace.engine_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.execution_backend required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.execution_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -155,6 +156,7 @@ resource terrapod_autodiscovery_rule.auto_apply_mode required=false optional=tru
 resource terrapod_autodiscovery_rule.branch required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_autodiscovery_rule.engine_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.execution_backend required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.execution_hook_templates required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_autodiscovery_rule.execution_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -354,7 +356,7 @@ resource terrapod_variable.value required=false optional=true computed=false sen
 resource terrapod_variable.value_source required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.version_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable.workspace_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
-resource terrapod_variable_set.assignment_rule required=false optional=true computed=false sensitive=false type=types.ObjectType["agent_pool_id":basetypes.StringType, "drift_status":basetypes.StringType, "execution_backend":basetypes.StringType, "execution_mode":basetypes.StringType, "has_vcs":basetypes.BoolType, "labels":types.MapType[basetypes.StringType], "locked":basetypes.BoolType, "name_glob":basetypes.StringType, "name_prefix":basetypes.StringType, "owner_email":basetypes.StringType, "terraform_version":basetypes.StringType, "vcs_connection_id":basetypes.StringType]
+resource terrapod_variable_set.assignment_rule required=false optional=true computed=false sensitive=false type=types.ObjectType["agent_pool_id":basetypes.StringType, "drift_status":basetypes.StringType, "engine_version":basetypes.StringType, "execution_backend":basetypes.StringType, "execution_mode":basetypes.StringType, "has_vcs":basetypes.BoolType, "labels":types.MapType[basetypes.StringType], "locked":basetypes.BoolType, "name_glob":basetypes.StringType, "name_prefix":basetypes.StringType, "owner_email":basetypes.StringType, "terraform_version":basetypes.StringType, "vcs_connection_id":basetypes.StringType]
 resource terrapod_variable_set.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.description required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set.global required=false optional=true computed=true sensitive=false type=basetypes.BoolType
@@ -414,6 +416,7 @@ resource terrapod_workspace.drift_last_checked_at required=false optional=false 
 resource terrapod_workspace.drift_latest_run_id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.drift_status required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.engine required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_workspace.engine_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.execution_backend required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.execution_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType

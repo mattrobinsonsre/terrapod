@@ -55,7 +55,7 @@ SCENARIOS: dict[str, dict] = {
     "terraform-backend": {
         "phase": "plan",
         "execution_backend": "terraform",
-        "terraform_version": "1.9.8",
+        "engine_version": "1.9.8",
     },
     "var-files": {"phase": "plan", "var_files": ["common.tfvars", "prod.tfvars"]},
     "resources-and-parallelism": {

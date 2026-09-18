@@ -112,7 +112,7 @@ def _mock_run(
     run.auto_apply_declined_reason = None
     run.plan_only = False
     run.execution_backend = "tofu"
-    run.terraform_version = "1.11"
+    run.engine_version = "1.11"
     run.terragrunt_enabled = False
     run.terragrunt_version = ""
     run.error_message = ""

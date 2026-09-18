@@ -13,7 +13,7 @@ import (
 // Field tags mirror the JSON:API attribute names so callers can also
 // (de)serialise directly when convenient.
 //
-// Nullable string fields (TerraformVersion, VCSRepoURL, VCSBranch,
+// Nullable string fields (EngineVersion, VCSRepoURL, VCSBranch,
 // AgentPoolID, etc.) are returned as empty strings rather than nil
 // pointers — Terrapod treats empty and null equivalently here, and the
 // pointer-vs-empty distinction adds friction without information.
@@ -44,7 +44,14 @@ type Workspace struct {
 	// "never", "always", "create" or "create_update". AutoApply stays the
 	// boolean projection — true whenever the workspace applies unattended
 	// at all — so code that only reads it keeps working unchanged.
-	AutoApplyMode    string `json:"auto-apply-mode"`
+	AutoApplyMode string `json:"auto-apply-mode"`
+	// EngineVersion pins the version of whichever engine this workspace runs.
+	// TerraformVersion is the same version under its original name — the API
+	// returns both, always equal, because go-tfe reads "terraform-version" and
+	// so tofu/terraform/tfci depend on it (#1559). That name is permanent, not
+	// a deprecation window; only the spelling a new caller should reach for has
+	// changed. Same shape as Variable's Structured/HCL pair.
+	EngineVersion    string `json:"engine-version,omitempty"`
 	TerraformVersion string `json:"terraform-version,omitempty"`
 	// TerragruntEnabled wraps tofu/terraform with terragrunt for agent-mode
 	// runs; TerragruntVersion pins the terragrunt CLI version (partial like
@@ -171,7 +178,13 @@ type CreateWorkspaceRequest struct {
 	AutoApply        *bool  `json:"auto-apply,omitempty"`
 	// Set AutoApplyMode OR AutoApply, never both — the API rejects the
 	// pair with 422 rather than guessing which the caller meant.
-	AutoApplyMode                 *string           `json:"auto-apply-mode,omitempty"`
+	AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
+	// Set either; EngineVersion is preferred. TerraformVersion is the same
+	// version under the name go-tfe uses, so the API accepts it indefinitely
+	// (#1559) — it is not deprecated on the wire. This SDK sends whichever is
+	// set under the canonical key, so the two can never disagree in one
+	// request; the server rejects a request that sends both and disagrees.
+	EngineVersion                 string            `json:"engine-version,omitempty"`
 	TerraformVersion              string            `json:"terraform-version,omitempty"`
 	TerragruntEnabled             *bool             `json:"terragrunt-enabled,omitempty"`
 	TerragruntVersion             string            `json:"terragrunt-version,omitempty"`
@@ -229,7 +242,13 @@ type UpdateWorkspaceRequest struct {
 	AutoApply        *bool  `json:"auto-apply,omitempty"`
 	// Set AutoApplyMode OR AutoApply, never both — the API rejects the
 	// pair with 422 rather than guessing which the caller meant.
-	AutoApplyMode                 *string           `json:"auto-apply-mode,omitempty"`
+	AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
+	// Set either; EngineVersion is preferred. TerraformVersion is the same
+	// version under the name go-tfe uses, so the API accepts it indefinitely
+	// (#1559) — it is not deprecated on the wire. This SDK sends whichever is
+	// set under the canonical key, so the two can never disagree in one
+	// request; the server rejects a request that sends both and disagrees.
+	EngineVersion                 string            `json:"engine-version,omitempty"`
 	TerraformVersion              string            `json:"terraform-version,omitempty"`
 	TerragruntEnabled             *bool             `json:"terragrunt-enabled,omitempty"`
 	TerragruntVersion             string            `json:"terragrunt-version,omitempty"`
@@ -512,8 +531,12 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.AutoApplyMode != nil {
 		attrs["auto-apply-mode"] = *req.AutoApplyMode
 	}
-	if req.TerraformVersion != "" {
-		attrs["terraform-version"] = req.TerraformVersion
+	// Sent under the canonical key only, whichever field carried it: two keys
+	// could disagree, and the server refuses a request that does (#1559).
+	if req.EngineVersion != "" {
+		attrs["engine-version"] = req.EngineVersion
+	} else if req.TerraformVersion != "" {
+		attrs["engine-version"] = req.TerraformVersion
 	}
 	if req.TerragruntEnabled != nil {
 		attrs["terragrunt-enabled"] = *req.TerragruntEnabled
@@ -627,8 +650,12 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.AutoApplyMode != nil {
 		attrs["auto-apply-mode"] = *req.AutoApplyMode
 	}
-	if req.TerraformVersion != "" {
-		attrs["terraform-version"] = req.TerraformVersion
+	// Sent under the canonical key only, whichever field carried it: two keys
+	// could disagree, and the server refuses a request that does (#1559).
+	if req.EngineVersion != "" {
+		attrs["engine-version"] = req.EngineVersion
+	} else if req.TerraformVersion != "" {
+		attrs["engine-version"] = req.TerraformVersion
 	}
 	if req.TerragruntEnabled != nil {
 		attrs["terragrunt-enabled"] = *req.TerragruntEnabled
@@ -745,17 +772,34 @@ func parseWorkspace(body []byte) (*Workspace, error) {
 // workspaceFromResource projects the raw Resource into a typed Workspace.
 // Centralised so the list-decoding path uses the same projection as
 // the single-resource path.
+// engineVersionAttr reads the engine version under whichever name the server
+// sent (#1559).
+//
+// A current server sends both, always equal, so the canonical key answers.
+// Falling back to "terraform-version" is what lets this SDK keep working
+// against a server from before the rename, where only that key exists.
+func engineVersionAttr(res *Resource) string {
+	if v := GetStringAttr(res, "engine-version"); v != "" {
+		return v
+	}
+	return GetStringAttr(res, "terraform-version")
+}
+
 func workspaceFromResource(res *Resource) *Workspace {
+	version := engineVersionAttr(res)
 	ws := &Workspace{
-		ID:                            res.ID,
-		Name:                          GetStringAttr(res, "name"),
-		ExecutionMode:                 GetStringAttr(res, "execution-mode"),
-		Engine:                        GetStringAttr(res, "engine"),
-		PulumiBindPlan:                GetBoolAttr(res, "pulumi-bind-plan"),
-		ExecutionBackend:              GetStringAttr(res, "execution-backend"),
-		AutoApply:                     GetBoolAttr(res, "auto-apply"),
-		AutoApplyMode:                 GetStringAttr(res, "auto-apply-mode"),
-		TerraformVersion:              GetStringAttr(res, "terraform-version"),
+		ID:               res.ID,
+		Name:             GetStringAttr(res, "name"),
+		ExecutionMode:    GetStringAttr(res, "execution-mode"),
+		Engine:           GetStringAttr(res, "engine"),
+		PulumiBindPlan:   GetBoolAttr(res, "pulumi-bind-plan"),
+		ExecutionBackend: GetStringAttr(res, "execution-backend"),
+		AutoApply:        GetBoolAttr(res, "auto-apply"),
+		AutoApplyMode:    GetStringAttr(res, "auto-apply-mode"),
+		// Both fields carry the resolved value, so a caller reading either one
+		// gets the right answer whichever name the server used (#1559).
+		EngineVersion:                 version,
+		TerraformVersion:              version,
 		TerragruntEnabled:             GetBoolAttr(res, "terragrunt-enabled"),
 		TerragruntVersion:             GetStringAttr(res, "terragrunt-version"),
 		WorkingDirectory:              GetStringAttr(res, "working-directory"),

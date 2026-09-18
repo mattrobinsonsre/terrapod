@@ -1311,7 +1311,7 @@ This is **by design** — sealed mode guarantees no upstream fetch ever happens,
 - Confirm sealed mode is on: `registry.cache_only` in the API ConfigMap (`helm get values` / the rendered `config.yaml`).
 - Identify the missing artifact from the 404 detail (tool+version+os/arch, or provider `host/ns/type@version`).
 - List what IS cached: `GET /api/v1/admin/binary-cache` and `GET /api/v1/admin/provider-cache` (admin), or the `/admin/binary-cache` UI.
-- Remember partial versions resolve **only against the cache** when sealed — a workspace pinned to `terraform_version = "1.12"` needs a cached `1.12.x`; if none is cached the resolve itself 404s.
+- Remember partial versions resolve **only against the cache** when sealed — a workspace pinned to `engine_version = "1.12"` needs a cached `1.12.x`; if none is cached the resolve itself 404s.
 - The **platform Terrapod provider** (`<host>/default/terrapod`) and the **SHA256SUMS** used for runner re-verification are subject to the same gate — they must be cached too (SHA256SUMS are persisted when the binary is warmed under `verify=signature`).
 
 ### Resolution
@@ -1455,7 +1455,7 @@ Fires from `TerrapodHighBinaryCacheMissRate` (info): the terraform/tofu binary c
 
 ### Diagnosis
 
-1. **Version spread** — many distinct tool versions in use means each is a legitimate first-time miss. Check the workspace `terraform_version` distribution.
+1. **Version spread** — many distinct tool versions in use means each is a legitimate first-time miss. Check the workspace `engine_version` distribution.
 2. **Eviction too aggressive** — `api.config.artifact_retention.binary_cache_retention_days` (default 30, counted from last access) may be reclaiming entries between uses on a low-traffic instance.
 3. **Sealed mode** — if `registry.cache_only` is on, a miss is a hard 404, not a slow fall-through; see [Sealed (cache-only) mode](#sealed-cache-only-mode--runs-failing-with-cache-miss-404) instead.
 

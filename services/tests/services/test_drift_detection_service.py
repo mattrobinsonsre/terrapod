@@ -20,7 +20,7 @@ def _mock_workspace(**overrides):
     ws.vcs_connection_id = overrides.get("vcs_connection_id", None)
     ws.vcs_repo_url = overrides.get("vcs_repo_url", "")
     ws.auto_apply = False
-    ws.terraform_version = "1.11"
+    ws.engine_version = "1.11"
     ws.resource_cpu = "1"
     ws.parallelism = 10
     ws.resource_memory = "2Gi"

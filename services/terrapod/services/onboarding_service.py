@@ -470,7 +470,7 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
         if workspace.execution_backend in ("tofu", "terraform")
         else "tofu"
     )
-    version = workspace.terraform_version or "latest"
+    version = workspace.engine_version or "latest"
     provider = session.provider
     provider_version = session.provider_version or ""
 

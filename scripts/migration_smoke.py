@@ -71,7 +71,7 @@ async def _main() -> int:
             assert got.owner_email == user.email, (
                 "workspace owner_email round-trip mismatch"
             )
-            assert got.terraform_version, "expected a defaulted terraform_version"
+            assert got.engine_version, "expected a defaulted engine_version"
             n_users = (
                 await db.execute(select(func.count()).select_from(m.User))
             ).scalar_one()

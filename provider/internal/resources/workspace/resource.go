@@ -50,11 +50,12 @@ func (r *workspaceResource) Metadata(_ context.Context, req resource.MetadataReq
 	resp.TypeName = req.ProviderTypeName + "_workspace"
 }
 
-// ValidateConfig rejects a config that sets both agent-pool attributes.
+// ValidateConfig rejects a config that sets both agent-pool attributes, or that
+// disagrees with itself about the engine version.
 //
-// The server returns 422 for the same combination (#1085); catching it at plan
-// time turns an apply-time failure into an error the operator sees before
-// anything is sent.
+// The server returns 422 for the same combinations (#1085, #1559); catching them
+// at plan time turns an apply-time failure into an error the operator sees
+// before anything is sent.
 func (r *workspaceResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var m workspaceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
@@ -66,6 +67,31 @@ func (r *workspaceResource) ValidateConfig(ctx context.Context, req resource.Val
 			"Conflicting agent pool attributes",
 			"Set either agent_pool_id or agent_pool_ids, not both. agent_pool_id assigns a "+
 				"single pool (replacing any set); agent_pool_ids assigns the whole set.",
+		)
+	}
+	validateEngineVersionPair(m.EngineVersion, m.TerraformVersion, resp)
+}
+
+// validateEngineVersionPair errors when a config sets `engine_version` and
+// `terraform_version` to different values (#1559).
+//
+// They are one version under two names, so a config that disagrees with itself
+// has a bug. The server refuses the pair too, but that is apply-time; catching
+// it at plan is the difference between an error before Terraform decides
+// anything and one after it has already planned.
+func validateEngineVersionPair(engine, terraform types.String, resp *resource.ValidateConfigResponse) {
+	if engine.IsNull() || engine.IsUnknown() {
+		return
+	}
+	if terraform.IsNull() || terraform.IsUnknown() {
+		return
+	}
+	if engine.ValueString() != terraform.ValueString() {
+		resp.Diagnostics.AddError(
+			"engine_version and terraform_version disagree",
+			"`engine_version` and `terraform_version` are the same version under two "+
+				"names, and this configuration sets them to different values. Set only "+
+				"`engine_version` — `terraform_version` is its deprecated alias.",
 		)
 	}
 }
@@ -299,10 +325,25 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"engine_version": schema.StringAttribute{
+				Description: "The version of the engine this workspace runs — OpenTofu or " +
+					"Terraform, or Pulumi. A partial version like `1.12` means the latest " +
+					"`1.12.*`; no HCL constraint operators.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"terraform_version": schema.StringAttribute{
-				Description: "The Terraform/OpenTofu version to use.",
-				Optional:    true,
-				Computed:    true,
+				Description: "The Terraform/OpenTofu version to use. Superseded by " +
+					"`engine_version`, which is the same version named for the fact that a " +
+					"workspace may run an engine other than Terraform.",
+				DeprecationMessage: "Use `engine_version` instead. `terraform_version` continues " +
+					"to work and the API will accept it indefinitely, since the terraform CLI " +
+					"tooling sends that name; only the provider attribute is deprecated.",
+				Optional: true,
+				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -873,8 +914,13 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ExecutionBackend.IsNull() && !m.ExecutionBackend.IsUnknown() {
 		req.ExecutionBackend = m.ExecutionBackend.ValueString()
 	}
-	if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
-		req.TerraformVersion = m.TerraformVersion.ValueString()
+	// `engine_version` wins when set; `terraform_version` is the same version
+	// under its old name and keeps working for a config written before the
+	// rename (#1559).
+	if !m.EngineVersion.IsNull() && !m.EngineVersion.IsUnknown() {
+		req.EngineVersion = m.EngineVersion.ValueString()
+	} else if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
+		req.EngineVersion = m.TerraformVersion.ValueString()
 	}
 	if !m.TerragruntEnabled.IsNull() && !m.TerragruntEnabled.IsUnknown() {
 		v := m.TerragruntEnabled.ValueBool()
@@ -1018,8 +1064,13 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.ExecutionBackend.IsNull() && !m.ExecutionBackend.IsUnknown() {
 		req.ExecutionBackend = m.ExecutionBackend.ValueString()
 	}
-	if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
-		req.TerraformVersion = m.TerraformVersion.ValueString()
+	// `engine_version` wins when set; `terraform_version` is the same version
+	// under its old name and keeps working for a config written before the
+	// rename (#1559).
+	if !m.EngineVersion.IsNull() && !m.EngineVersion.IsUnknown() {
+		req.EngineVersion = m.EngineVersion.ValueString()
+	} else if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
+		req.EngineVersion = m.TerraformVersion.ValueString()
 	}
 	if !m.TerragruntEnabled.IsNull() && !m.TerragruntEnabled.IsUnknown() {
 		v := m.TerragruntEnabled.ValueBool()
@@ -1161,9 +1212,13 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 
 	// Nullable string fields — empty string from the SDK means absent
 	// on the server; Terraform null preserves "computed-default" UX.
-	if ws.TerraformVersion != "" {
-		m.TerraformVersion = types.StringValue(ws.TerraformVersion)
+	// Both attributes take the server's one value, so a config using either
+	// name reads back consistent and neither shows perpetual drift (#1559).
+	if ws.EngineVersion != "" {
+		m.EngineVersion = types.StringValue(ws.EngineVersion)
+		m.TerraformVersion = types.StringValue(ws.EngineVersion)
 	} else {
+		m.EngineVersion = types.StringNull()
 		m.TerraformVersion = types.StringNull()
 	}
 	m.TerragruntEnabled = types.BoolValue(ws.TerragruntEnabled)

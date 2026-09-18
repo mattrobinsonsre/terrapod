@@ -41,7 +41,10 @@ class TerraformRunOptions:
     its own inputs halfway through is a bug waiting for a second caller.
     """
 
-    terraform_version: str = ""
+    #: The version of the engine this run executes with (#1559). Named for
+    #: what it is rather than for Terraform, because the column behind it now
+    #: pins whichever engine the workspace runs.
+    engine_version: str = ""
     execution_backend: str = ""
     terragrunt_enabled: bool = False
     terragrunt_version: str = ""
@@ -100,7 +103,7 @@ class TerraformStrategy:
         which the golden spec matrix pins.
         """
         env: list[dict[str, Any]] = []
-        terraform_version = options.terraform_version
+        engine_version = options.engine_version
         execution_backend = options.execution_backend
         terragrunt_enabled = options.terragrunt_enabled
         terragrunt_version = options.terragrunt_version
@@ -122,7 +125,7 @@ class TerraformStrategy:
         onboard_types = options.onboard_types
 
         # Terraform version + backend
-        version = terraform_version or runner_config.default_terraform_version
+        version = engine_version or runner_config.default_terraform_version
         backend = execution_backend or runner_config.default_execution_backend
         env.append({"name": "TP_VERSION", "value": version})
         env.append({"name": "TP_BACKEND", "value": backend})
@@ -235,7 +238,10 @@ class TerraformStrategy:
         the same reasoning that moved terminal resolution here in #1489.
         """
         return TerraformRunOptions(
-            terraform_version=attrs.get("terraform-version", ""),
+            # Canonical first, then the name the attribute had before #1559.
+            # The fallback is what lets this runner claim a run from an API
+            # that predates the rename; the API sends both either way.
+            engine_version=attrs.get("engine-version", attrs.get("terraform-version", "")),
             execution_backend=attrs.get("execution-backend", "tofu"),
             terragrunt_enabled=attrs.get("terragrunt-enabled", False),
             terragrunt_version=attrs.get("terragrunt-version", ""),

@@ -38,6 +38,7 @@ from terrapod.api.routers.workspace_bulk import (
     validate_notification_specs,
     validate_run_task_specs,
 )
+from terrapod.api.serialization import engine_version_attr
 from terrapod.db.models import AgentPool, AutodiscoveryRule, VCSConnection
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -74,7 +75,8 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "execution-mode": rule.execution_mode,
             "execution-backend": rule.execution_backend,
             "agent-pool-id": str(rule.agent_pool_id) if rule.agent_pool_id else None,
-            "terraform-version": rule.terraform_version,
+            "engine-version": rule.engine_version,
+            "terraform-version": rule.engine_version,
             "resource-cpu": rule.resource_cpu,
             "parallelism": rule.parallelism,
             "resource-memory": rule.resource_memory,
@@ -239,8 +241,8 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
                 out["agent_pool_id"] = _strip_uuid_prefix(str(v), "apool-")
             except ValueError as e:
                 raise HTTPException(status_code=422, detail="agent-pool-id is not a UUID") from e
-    if "terraform-version" in attrs:
-        out["terraform_version"] = str(attrs["terraform-version"])
+    if "engine-version" in attrs or "terraform-version" in attrs:
+        out["engine_version"] = engine_version_attr(attrs, "")
     if "parallelism" in attrs:
         try:
             out["parallelism"] = validate_parallelism(attrs["parallelism"])
@@ -515,7 +517,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         # defaults to satisfy the in-memory construction.
         execution_mode=fields.get("execution_mode", "agent"),
         execution_backend=fields.get("execution_backend", "tofu"),
-        terraform_version=fields.get("terraform_version", "1.12"),
+        engine_version=fields.get("engine_version", "1.12"),
         resource_cpu=fields.get("resource_cpu", "1"),
         parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
         resource_memory=fields.get("resource_memory", "2Gi"),

@@ -215,6 +215,40 @@ run is still stored as `planning`.
 
 See [post-plan-decisions.md](post-plan-decisions.md).
 
+### A column is renamed, so the API rollout has a brief window of errors
+
+**Affects:** every deployment, but only for the length of one rolling upgrade, and
+only if you run more than one API replica. Nothing you configure changes, and no
+API, wire, config or Helm surface is removed.
+
+The `terraform_version` column on `workspaces`, `runs` and `autodiscovery_rules`
+becomes `engine_version` — it pins the version of whichever engine the workspace
+runs, and two of the three engines Terrapod now supports are not Terraform. The
+migration renames it in place.
+
+**What that costs you.** Migrations run as a pre-upgrade hook, and the API rolls
+with `maxSurge: 1, maxUnavailable: 0`, so between the hook finishing and the last
+old pod being replaced there are replicas running code that selects a column no
+longer there. Requests those pods serve in that window fail. It is seconds to a
+couple of minutes, and it self-heals — no data is at risk and nothing needs
+re-running.
+
+**If you cannot take even that**, scale the API to one replica for the upgrade and
+back up afterwards; a single replica is replaced rather than overlapped, so there
+is no window at all.
+
+Terrapod's normal rule is expand/contract — add the new column, dual-write, drop
+the old one a release later — precisely so this window does not exist. It is
+deliberately not followed here: three tables would each carry two columns, every
+write path would have to set both, and the dual-write would have to stay correct
+across a release boundary for a column nothing reads. Nothing outside the API
+touches the database, and the API and the schema ship together, so the exposure is
+that one rollout and nothing else.
+
+**The API is not renamed.** `terraform-version` keeps being accepted and returned
+alongside the canonical `engine-version`, permanently — go-tfe reads it by that
+name. See [api-reference.md](api-reference.md#engine-version-and-its-older-name-terraform-version).
+
 ### The Python floor moves to 3.14
 
 **Affects:** anyone who builds Terrapod's images themselves, overrides `BASE_IMAGE`,

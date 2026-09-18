@@ -56,6 +56,7 @@ from terrapod.api.ids import parse_id
 from terrapod.api.labels import validate_labels
 from terrapod.api.pagination import MAX_PAGE_SIZE, build_meta, paginate, parse_page_params
 from terrapod.api.prefixes import TFE_PREFIX
+from terrapod.api.serialization import engine_version_attr as _engine_version_attr
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
@@ -776,7 +777,14 @@ def _workspace_json(
                 "engine": ws.engine,
                 # Pulumi only (#1553); always false elsewhere.
                 "pulumi-bind-plan": ws.pulumi_bind_plan,
-                "terraform-version": ws.terraform_version or "",
+                # One version, two spellings (#1559). `engine-version` is the
+                # canonical one now that the column pins whichever engine the
+                # workspace runs. `terraform-version` is not deprecated and is
+                # not going away: go-tfe reads it by that name, so this surface
+                # keeps both for good -- the same arrangement as
+                # `structured`/`hcl` on variables.
+                "engine-version": ws.engine_version or "",
+                "terraform-version": ws.engine_version or "",
                 "terragrunt-enabled": ws.terragrunt_enabled,
                 "terragrunt-version": ws.terragrunt_version or "",
                 "working-directory": ws.working_directory,
@@ -1347,7 +1355,7 @@ async def _create_workspace_impl(
         auto_apply=auto_apply_mode != "never",
         auto_apply_mode=auto_apply_mode,
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
-        terraform_version=attrs.get("terraform-version", settings.default_terraform_version),
+        engine_version=_engine_version_attr(attrs, settings.default_terraform_version),
         terragrunt_enabled=bool(attrs.get("terragrunt-enabled", False)),
         terragrunt_version=(attrs.get("terragrunt-version") or "1.0"),
         working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),
@@ -1872,8 +1880,8 @@ async def update_workspace(
                 detail="execution-backend must be 'terraform' or 'tofu'",
             )
         ws.execution_backend = backend
-    if "terraform-version" in attrs:
-        ws.terraform_version = attrs["terraform-version"]
+    if "engine-version" in attrs or "terraform-version" in attrs:
+        ws.engine_version = _engine_version_attr(attrs, ws.engine_version)
     if "slack-channel" in attrs:
         # Slack opt-in channel (#556): empty clears it (workspace goes silent).
         ws.slack_channel = (attrs["slack-channel"] or "").strip()[:128]

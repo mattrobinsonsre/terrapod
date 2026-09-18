@@ -42,6 +42,10 @@ func TestAssignmentRuleRoundTrips(t *testing.T) {
 		NameGlob:         types.StringValue("*-api"),
 		ExecutionBackend: types.StringValue("tofu"),
 		ExecutionMode:    types.StringValue("agent"),
+		// Deliberately different values: these are two independent stored
+		// selector keys, not one cross-filled setting, so each must survive
+		// the round trip on its own (#1559).
+		EngineVersion:    types.StringValue("1.12.0"),
 		TerraformVersion: types.StringValue("1.9.0"),
 		AgentPoolID:      types.StringValue("apool-1"),
 		VCSConnectionID:  types.StringValue("vcs-1"),
@@ -71,6 +75,7 @@ func TestEveryRuleDimensionSurvivesTheRoundTrip(t *testing.T) {
 		NameGlob:         types.StringValue("g"),
 		ExecutionBackend: types.StringValue("tofu"),
 		ExecutionMode:    types.StringValue("agent"),
+		EngineVersion:    types.StringValue("1.12.0"),
 		TerraformVersion: types.StringValue("1.9.0"),
 		AgentPoolID:      types.StringValue("apool-1"),
 		VCSConnectionID:  types.StringValue("vcs-1"),

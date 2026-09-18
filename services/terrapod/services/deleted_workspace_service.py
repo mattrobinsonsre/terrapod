@@ -95,7 +95,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         # How a Pulumi update is executed, not something that can start one (#1553).
         "pulumi_bind_plan": ws.pulumi_bind_plan,
         "execution_backend": ws.execution_backend,
-        "terraform_version": ws.terraform_version,
+        "engine_version": ws.engine_version,
         "terragrunt_enabled": ws.terragrunt_enabled,
         "terragrunt_version": ws.terragrunt_version,
         "working_directory": ws.working_directory,
@@ -551,7 +551,12 @@ async def restore_workspace(
         owner_email=settings.get("owner_email") or restored_by,
         execution_mode=settings.get("execution_mode") or "local",
         execution_backend=settings.get("execution_backend") or "tofu",
-        terraform_version=settings.get("terraform_version") or "1.12",
+        # A marker written before the column was renamed (#1559) carries the
+        # old key, and a restore must not silently reset such a workspace to
+        # the default version.
+        engine_version=settings.get("engine_version")
+        or settings.get("terraform_version")
+        or "1.12",
         terragrunt_enabled=bool(settings.get("terragrunt_enabled")),
         terragrunt_version=settings.get("terragrunt_version") or "1.0",
         working_directory=settings.get("working_directory") or "",

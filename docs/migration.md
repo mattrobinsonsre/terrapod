@@ -268,7 +268,7 @@ for ad-hoc rewriting without a migration record.
 - **Projects in `atlantis.yaml`** → Terrapod workspaces, or (when the
   pattern fits) a single autodiscovery rule covering them all.
 - **Per-project settings** — `dir`, `workspace`, `terraform_version`,
-  `autoplan` map to workspace `working-directory`, `terraform-version`,
+  `autoplan` map to workspace `working-directory`, `engine-version`,
   and autodiscovery rule fields.
 - **VCS connection** — one Terrapod connection covering the source repos.
 

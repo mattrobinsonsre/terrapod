@@ -256,6 +256,7 @@ field CreateRoleRequest.WorkspacePermission string
 field CreateRunRequest.AllowEmptyApply bool
 field CreateRunRequest.AutoApply *bool
 field CreateRunRequest.ConfigurationVersionID string
+field CreateRunRequest.EngineVersion string
 field CreateRunRequest.IsDestroy bool
 field CreateRunRequest.Message string
 field CreateRunRequest.PlanOnly bool
@@ -323,6 +324,7 @@ field CreateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-
 field CreateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field CreateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
 field CreateWorkspaceRequest.Engine string `json:"engine,omitempty"`
+field CreateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field CreateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field CreateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
 field CreateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
@@ -815,6 +817,7 @@ field Run.CostMonthlyMin *float64 `json:"cost-monthly-min,omitempty"`
 field Run.CreatedAt string `json:"created-at,omitempty"`
 field Run.CreatedBy string `json:"created-by,omitempty"`
 field Run.DiscardReason string `json:"discard-reason,omitempty"`
+field Run.EngineVersion string `json:"engine-version,omitempty"`
 field Run.ErrorMessage string `json:"error-message,omitempty"`
 field Run.ExecutionBackend string `json:"execution-backend,omitempty"`
 field Run.HasChanges *bool `json:"has-changes,omitempty"`
@@ -1029,6 +1032,7 @@ field UpdateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy
 field UpdateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field UpdateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
+field UpdateWorkspaceRequest.EngineVersion string `json:"engine-version,omitempty"`
 field UpdateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
 field UpdateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
 field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
@@ -1221,6 +1225,7 @@ field Workspace.DriftLastCheckedAt string `json:"drift-last-checked-at,omitempty
 field Workspace.DriftLatestRunID string `json:"drift-latest-run-id,omitempty"`
 field Workspace.DriftStatus string `json:"drift-status,omitempty"`
 field Workspace.Engine string `json:"engine,omitempty"`
+field Workspace.EngineVersion string `json:"engine-version,omitempty"`
 field Workspace.ExecutionBackend string `json:"execution-backend,omitempty"`
 field Workspace.ExecutionMode string `json:"execution-mode"`
 field Workspace.ID string `json:"id"`
@@ -1273,6 +1278,7 @@ field WorkspaceCostEstimate.WorkspaceID string `json:"-"`
 field WorkspaceFilter.AgentPoolID string `json:"agent_pool_id,omitempty"`
 field WorkspaceFilter.All bool `json:"all,omitempty"`
 field WorkspaceFilter.DriftStatus string `json:"drift_status,omitempty"`
+field WorkspaceFilter.EngineVersion string `json:"engine_version,omitempty"`
 field WorkspaceFilter.ExecutionBackend string `json:"execution_backend,omitempty"`
 field WorkspaceFilter.ExecutionMode string `json:"execution_mode,omitempty"`
 field WorkspaceFilter.HasVCS *bool `json:"has_vcs,omitempty"`
@@ -1294,6 +1300,7 @@ field WorkspaceListOptions.PageNumber int
 field WorkspaceListOptions.PageSize int
 field WorkspaceListOptions.Search string
 field WorkspaceSummary.AgentPoolID *string `json:"agent-pool-id"`
+field WorkspaceSummary.EngineVersion string `json:"engine-version"`
 field WorkspaceSummary.ExecutionBackend string `json:"execution-backend"`
 field WorkspaceSummary.ExecutionMode string `json:"execution-mode"`
 field WorkspaceSummary.ID string `json:"id"`
@@ -1572,6 +1579,7 @@ method (*Client) WhoAmI(ctx context.Context) (*HANode, error)
 method (*ConflictError) Error() string
 method (*NotFoundError) Error() string
 method (*ValidationError) Error() string
+method (*WorkspaceSummary) UnmarshalJSON(data []byte) error
 type APIError struct
 type APIToken struct
 type AddPolicyRequest struct

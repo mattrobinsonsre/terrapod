@@ -365,7 +365,7 @@ either/or rule.
       "auto-apply-mode": "create_update",
       "execution-mode": "agent",
       "engine": "terraform",
-      "terraform-version": "1.9.8",
+      "engine-version": "1.9.8",
       "resource-cpu": "1",
       "resource-memory": "2Gi",
       "labels": {
@@ -391,6 +391,31 @@ either/or rule.
 ```
 
 **Required permission:** Any authenticated user can create workspaces (creator becomes owner).
+
+### `engine-version`, and its older name `terraform-version`
+
+A workspace pins the version of whichever engine it runs — OpenTofu, Terraform
+or Pulumi — in one attribute, **`engine-version`**. That is the canonical name.
+
+**`terraform-version` is the same attribute under its original name, and it is
+permanent.** It is not deprecated and there is no sunset date: it is go-tfe's own
+attribute name, so `tofu`, `terraform` and `tfci` send and read it on the TFE
+compatibility surface. Terrapod therefore keeps both names for good, exactly as
+it does for [`structured` / `hcl`](#variables) on variables.
+
+| | |
+|---|---|
+| **On input** | Send either. `engine-version` wins if you send both. Sending both with **different values is a 422** rather than a silent precedence rule — a client disagreeing with itself about which version to run has a bug, and picking a winner would hide it. |
+| **On output** | Both are returned, always with the same value. Read whichever your client already knows about. |
+| **Where** | Workspaces, runs, autodiscovery rules, the bulk-update `update` body, and the workspace-search `filter` (which is snake_case: `engine_version`, with `terraform_version` accepted). |
+
+An empty string is a value, not an absence: it means "whatever this deployment's
+default is for that engine", resolved when the run starts. Omitting the
+attribute on create takes the deployment default instead.
+
+Partial versions are supported and resolve to the newest matching release —
+`"1.12"` means `1.12.*`. Do not use HCL constraint operators (`~>`, `>=`); those
+belong in a `required_version` block inside your configuration.
 
 ### Agent pool set
 
@@ -2582,7 +2607,7 @@ POST /api/v1/autodiscovery-rules
       "execution-mode": "agent",
       "execution-backend": "tofu",
       "agent-pool-id": "apool-019e01db-...",
-      "terraform-version": "1.12",
+      "engine-version": "1.12",
       "resource-cpu": "1",
       "resource-memory": "2Gi",
       "auto-apply": false,
@@ -2886,7 +2911,7 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
 ```json
 { "filter": { "labels": {"team": "foundations"} },
   "update": {
-    "terraform-version": "1.12",
+    "engine-version": "1.12",
     "execution-backend": "tofu",
     "auto-apply": false,
     "agent-pool-id": "apool-...",

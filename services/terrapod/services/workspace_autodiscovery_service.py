@@ -278,7 +278,7 @@ async def find_or_autocreate_workspace(
         name=name,
         execution_mode=rule.execution_mode,
         execution_backend=rule.execution_backend,
-        terraform_version=rule.terraform_version,
+        engine_version=rule.engine_version,
         resource_cpu=rule.resource_cpu,
         parallelism=rule.parallelism,
         resource_memory=rule.resource_memory,

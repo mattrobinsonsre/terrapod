@@ -18,26 +18,53 @@ type WorkspaceFilter struct {
 	NameGlob         string            `json:"name_glob,omitempty"`
 	ExecutionBackend string            `json:"execution_backend,omitempty"`
 	ExecutionMode    string            `json:"execution_mode,omitempty"`
-	TerraformVersion string            `json:"terraform_version,omitempty"`
-	AgentPoolID      string            `json:"agent_pool_id,omitempty"`
-	VCSConnectionID  string            `json:"vcs_connection_id,omitempty"`
-	OwnerEmail       string            `json:"owner_email,omitempty"`
-	DriftStatus      string            `json:"drift_status,omitempty"`
-	Locked           *bool             `json:"locked,omitempty"`
-	HasVCS           *bool             `json:"has_vcs,omitempty"`
-	All              bool              `json:"all,omitempty"`
+	// EngineVersion selects on the engine-version column. TerraformVersion is
+	// the selector's original name; the server still accepts it and normalises
+	// it, so a stored rule written before the rename keeps matching (#1559).
+	// Set one: both are sent when both are set, and the server takes the
+	// canonical one. This selector's keys are snake_case, unlike the
+	// hyphenated JSON:API attributes elsewhere.
+	EngineVersion    string `json:"engine_version,omitempty"`
+	TerraformVersion string `json:"terraform_version,omitempty"`
+	AgentPoolID      string `json:"agent_pool_id,omitempty"`
+	VCSConnectionID  string `json:"vcs_connection_id,omitempty"`
+	OwnerEmail       string `json:"owner_email,omitempty"`
+	DriftStatus      string `json:"drift_status,omitempty"`
+	Locked           *bool  `json:"locked,omitempty"`
+	HasVCS           *bool  `json:"has_vcs,omitempty"`
+	All              bool   `json:"all,omitempty"`
 }
 
 // WorkspaceSummary is the trimmed workspace shape returned by the bulk
 // search/preview endpoints (not a full JSON:API workspace resource).
 type WorkspaceSummary struct {
-	ID               string            `json:"id"`
-	Name             string            `json:"name"`
-	ExecutionMode    string            `json:"execution-mode"`
-	ExecutionBackend string            `json:"execution-backend"`
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	ExecutionMode    string `json:"execution-mode"`
+	ExecutionBackend string `json:"execution-backend"`
+	// Both names, always the same value — see Workspace.EngineVersion (#1559).
+	EngineVersion    string            `json:"engine-version"`
 	TerraformVersion string            `json:"terraform-version"`
 	AgentPoolID      *string           `json:"agent-pool-id"`
 	Labels           map[string]string `json:"labels"`
+}
+
+// UnmarshalJSON fills both version fields from whichever name the server sent
+// (#1559), so a caller reading either gets the right answer — including
+// against a server from before the rename, which sends only the old name.
+func (s *WorkspaceSummary) UnmarshalJSON(data []byte) error {
+	// A distinct type, so the nested decode does not re-enter this method.
+	type alias WorkspaceSummary
+	var raw alias
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if raw.EngineVersion == "" {
+		raw.EngineVersion = raw.TerraformVersion
+	}
+	raw.TerraformVersion = raw.EngineVersion
+	*s = WorkspaceSummary(raw)
+	return nil
 }
 
 // SearchWorkspacesResult is the response from SearchWorkspaces.
@@ -87,7 +114,8 @@ type BulkUpdateResult struct {
 // BulkUpdateWorkspaces applies `update` to every workspace matching
 // `filter` in a single all-or-nothing transaction. `update` is the
 // homogeneous settings/run-task/notification change set (hyphenated JSON:API
-// attribute keys, e.g. "execution-mode", "terraform-version", "labels",
+// attribute keys, e.g. "execution-mode", "engine-version" (or its accepted
+// original name "terraform-version"), "labels",
 // "run-tasks", "notification-configurations"); it is validated once up
 // front (422 on an invalid update). When dryRun is true the identical code
 // path runs and rolls back, so the preview is exactly what an apply would

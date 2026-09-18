@@ -269,7 +269,7 @@ def create_workspace(api: Api, name: str, labels: dict, opts: dict, pool_id: str
             {
                 "execution-mode": "agent",
                 "agent-pool-id": pool_id,
-                "terraform-version": "1.12.5",
+                "engine-version": "1.12.5",
                 "execution-backend": "tofu",
             }
         )

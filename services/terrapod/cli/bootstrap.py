@@ -347,7 +347,7 @@ async def _bootstrap_sample_workspace(
         name=sample_name,
         execution_mode="agent",
         execution_backend="tofu",
-        terraform_version="1.12",
+        engine_version="1.12",
         owner_email=owner_email,
         labels={"env": "demo", "team": "platform"},
     )
@@ -375,7 +375,7 @@ async def _bootstrap_sample_workspace(
         created_by=owner_email,
         message="Example plan — welcome to Terrapod",
         execution_backend="tofu",
-        terraform_version="1.12",
+        engine_version="1.12",
         has_changes=True,
         resource_additions=3,
         resource_changes=1,

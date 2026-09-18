@@ -305,11 +305,14 @@ class Workspace(Base):
     execution_backend: Mapped[str] = mapped_column(
         String(20), nullable=False, default="tofu"
     )  # tofu, terraform
-    terraform_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.12")
+    #: The version of whichever engine `execution_backend` names (#1559).
+    #: Partial versions resolve to the newest matching release; empty means the
+    #: deployment's default for that engine.
+    engine_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.12")
     # Terragrunt single-unit support (#534): when enabled the runner invokes
     # `terragrunt` wrapping the tofu/terraform binary (via TG_TF_PATH). Version
     # is partial (e.g. "0.67"), resolved via the binary cache like
-    # terraform_version; empty → latest stable.
+    # engine_version; empty → latest stable.
     terragrunt_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     terragrunt_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.0")
     working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
@@ -1366,7 +1369,7 @@ class AutodiscoveryRule(Base):
         nullable=True,
     )
     execution_backend: Mapped[str] = mapped_column(String(20), nullable=False, default="tofu")
-    terraform_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.12")
+    engine_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.12")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
     #: Templated onto workspaces this rule materialises (#1431), alongside the
@@ -2036,7 +2039,7 @@ class Run(Base):
     execution_backend: Mapped[str] = mapped_column(
         String(20), nullable=False, default="tofu"
     )  # tofu, terraform
-    terraform_version: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    engine_version: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     # Terragrunt snapshot (#534) — frozen from the workspace at run creation so
     # later workspace edits don't change an in-flight run's execution tool.
     terragrunt_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

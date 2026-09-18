@@ -206,7 +206,7 @@ def build_job_spec(
         parallelism: How many operations the engine runs at once (#1431).
         resource_memory: Memory request (e.g. "2Gi", "256Mi").
         timeout_minutes: Job timeout in minutes.
-        terraform_version: Terraform/tofu version to use.
+        engine_version: Engine version to use (terraform/tofu, or pulumi).
         execution_backend: Execution backend (terraform or tofu).
         namespace: Target namespace for the Job.
     """

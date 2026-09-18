@@ -555,7 +555,7 @@ async def provision_instance(
         auto_apply=auto_apply,
         auto_apply_mode="always" if auto_apply else "never",
         execution_backend=settings.default_execution_backend,
-        terraform_version=settings.default_terraform_version,
+        engine_version=settings.default_terraform_version,
         labels=labels or {},
         owner_email=user_email,
         catalog_item_id=item.id,

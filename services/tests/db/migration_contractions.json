@@ -38,6 +38,9 @@
   "bb5e7f11d575_unify_working_directory": [
     "drop_column(workspaces, vcs_working_directory)"
   ],
+  "e6f8c4c1d698_engine_version": [
+    "alter_column(terraform_version)"
+  ],
   "f3e984cc98cf_drop_runner_listeners": [
     "drop_constraint(runs_listener_id_fkey, runs)",
     "drop_table(runner_listeners)"

@@ -62,7 +62,12 @@ type Run struct {
 	PlanOnly                bool   `json:"plan-only"`
 	Source                  string `json:"source,omitempty"`
 	ExecutionBackend        string `json:"execution-backend,omitempty"`
-	TerraformVersion        string `json:"terraform-version,omitempty"`
+	// EngineVersion is the version of whichever engine this run used.
+	// TerraformVersion is the same version under its original name — the API
+	// returns both, always equal, because go-tfe reads "terraform-version"
+	// (#1559). Both names are permanent; see Workspace.EngineVersion.
+	EngineVersion    string `json:"engine-version,omitempty"`
+	TerraformVersion string `json:"terraform-version,omitempty"`
 	// Terragrunt* echo the workspace's terragrunt wrapping for this run.
 	TerragruntEnabled bool   `json:"terragrunt-enabled"`
 	TerragruntVersion string `json:"terragrunt-version,omitempty"`
@@ -135,12 +140,17 @@ type CreateRunRequest struct {
 	PlanOnly               bool
 	IsDestroy              bool
 	AutoApply              *bool
-	TerraformVersion       string
-	TargetAddrs            []string
-	ReplaceAddrs           []string
-	RefreshOnly            bool
-	Refresh                *bool
-	AllowEmptyApply        bool
+	// Set either; EngineVersion is preferred. TerraformVersion is the name
+	// go-tfe uses and the API accepts it indefinitely (#1559) — not deprecated,
+	// just superseded for new callers. Whichever is set is sent under the
+	// canonical key, so a single request can never carry a disagreeing pair.
+	EngineVersion    string
+	TerraformVersion string
+	TargetAddrs      []string
+	ReplaceAddrs     []string
+	RefreshOnly      bool
+	Refresh          *bool
+	AllowEmptyApply  bool
 	// VCSRef plans against an arbitrary branch/tag/SHA. The server forces such a
 	// run plan-only regardless of PlanOnly.
 	VCSRef string
@@ -163,8 +173,12 @@ func (c *Client) CreateRun(ctx context.Context, req CreateRunRequest) (*Run, err
 	if req.AutoApply != nil {
 		attrs["auto-apply"] = *req.AutoApply
 	}
-	if req.TerraformVersion != "" {
-		attrs["terraform-version"] = req.TerraformVersion
+	// Canonical key only, whichever field carried it — two keys could disagree
+	// and the server refuses a request that does (#1559).
+	if req.EngineVersion != "" {
+		attrs["engine-version"] = req.EngineVersion
+	} else if req.TerraformVersion != "" {
+		attrs["engine-version"] = req.TerraformVersion
 	}
 	if len(req.TargetAddrs) > 0 {
 		attrs["target-addrs"] = req.TargetAddrs
@@ -355,26 +369,28 @@ func runFromResource(res *Resource) *Run {
 		PlanOnly:                GetBoolAttr(res, "plan-only"),
 		Source:                  GetStringAttr(res, "source"),
 		ExecutionBackend:        GetStringAttr(res, "execution-backend"),
-		TerraformVersion:        GetStringAttr(res, "terraform-version"),
-		TerragruntEnabled:       GetBoolAttr(res, "terragrunt-enabled"),
-		TerragruntVersion:       GetStringAttr(res, "terragrunt-version"),
-		ResourceCPU:             GetStringAttr(res, "resource-cpu"),
-		Parallelism:             GetIntAttr(res, "parallelism"),
-		ResourceMemory:          GetStringAttr(res, "resource-memory"),
-		RunnerExitReason:        GetStringAttr(res, "runner-exit-reason"),
-		RunnerExitStatus:        GetStringAttr(res, "runner-exit-status"),
-		ErrorMessage:            GetStringAttr(res, "error-message"),
-		TargetAddrs:             GetListAttr(res, "target-addrs"),
-		ReplaceAddrs:            GetListAttr(res, "replace-addrs"),
-		RefreshOnly:             GetBoolAttr(res, "refresh-only"),
-		Refresh:                 GetBoolAttr(res, "refresh"),
-		AllowEmptyApply:         GetBoolAttr(res, "allow-empty-apply"),
-		IsDriftDetection:        GetBoolAttr(res, "is-drift-detection"),
-		HasJSONOutput:           GetBoolAttr(res, "has-json-output"),
-		StateDiverged:           GetBoolAttr(res, "state-diverged"),
-		HasCostEstimate:         GetBoolAttr(res, "has-cost-estimate"),
-		CostCurrency:            GetStringAttr(res, "cost-currency"),
-		WorkspaceName:           GetStringAttr(res, "workspace-name"),
+		// Both carry the resolved value, whichever name the server used (#1559).
+		EngineVersion:     engineVersionAttr(res),
+		TerraformVersion:  engineVersionAttr(res),
+		TerragruntEnabled: GetBoolAttr(res, "terragrunt-enabled"),
+		TerragruntVersion: GetStringAttr(res, "terragrunt-version"),
+		ResourceCPU:       GetStringAttr(res, "resource-cpu"),
+		Parallelism:       GetIntAttr(res, "parallelism"),
+		ResourceMemory:    GetStringAttr(res, "resource-memory"),
+		RunnerExitReason:  GetStringAttr(res, "runner-exit-reason"),
+		RunnerExitStatus:  GetStringAttr(res, "runner-exit-status"),
+		ErrorMessage:      GetStringAttr(res, "error-message"),
+		TargetAddrs:       GetListAttr(res, "target-addrs"),
+		ReplaceAddrs:      GetListAttr(res, "replace-addrs"),
+		RefreshOnly:       GetBoolAttr(res, "refresh-only"),
+		Refresh:           GetBoolAttr(res, "refresh"),
+		AllowEmptyApply:   GetBoolAttr(res, "allow-empty-apply"),
+		IsDriftDetection:  GetBoolAttr(res, "is-drift-detection"),
+		HasJSONOutput:     GetBoolAttr(res, "has-json-output"),
+		StateDiverged:     GetBoolAttr(res, "state-diverged"),
+		HasCostEstimate:   GetBoolAttr(res, "has-cost-estimate"),
+		CostCurrency:      GetStringAttr(res, "cost-currency"),
+		WorkspaceName:     GetStringAttr(res, "workspace-name"),
 		// #1231. The relationship below wins when present; the attribute is
 		// the fallback for a server that only emits the flat form.
 		AgentPoolID:           GetStringAttr(res, "agent-pool-id"),

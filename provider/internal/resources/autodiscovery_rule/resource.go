@@ -23,7 +23,8 @@
 //	"execution-mode"     -> execution_mode      (string, optional, default "agent")
 //	"execution-backend"  -> execution_backend   (string, optional, default "tofu")
 //	"agent-pool-id"      -> agent_pool_id       (string, optional)
-//	"terraform-version"  -> terraform_version   (string, optional, default "1.11")
+//	"engine-version"     -> engine_version      (string, optional+computed; `terraform_version` is its deprecated alias)
+//	"terraform-version"  -> terraform_version   (string, optional+computed, deprecated)
 //	"parallelism"        -> parallelism
 //	"resource-cpu"       -> resource_cpu        (string, optional, default "1")
 //	"resource-memory"    -> resource_memory     (string, optional, default "2Gi")
@@ -78,8 +79,9 @@ import (
 )
 
 var (
-	_ resource.Resource                = &autodiscoveryRuleResource{}
-	_ resource.ResourceWithImportState = &autodiscoveryRuleResource{}
+	_ resource.Resource                   = &autodiscoveryRuleResource{}
+	_ resource.ResourceWithImportState    = &autodiscoveryRuleResource{}
+	_ resource.ResourceWithValidateConfig = &autodiscoveryRuleResource{}
 )
 
 type autodiscoveryRuleModel struct {
@@ -96,6 +98,7 @@ type autodiscoveryRuleModel struct {
 	ExecutionMode     types.String `tfsdk:"execution_mode"`
 	ExecutionBackend  types.String `tfsdk:"execution_backend"`
 	AgentPoolID       types.String `tfsdk:"agent_pool_id"`
+	EngineVersion     types.String `tfsdk:"engine_version"`
 	TerraformVersion  types.String `tfsdk:"terraform_version"`
 	ResourceCPU       types.String `tfsdk:"resource_cpu"`
 	Parallelism       types.Int64  `tfsdk:"parallelism"`
@@ -149,6 +152,45 @@ func NewResource() resource.Resource {
 
 func (r *autodiscoveryRuleResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_autodiscovery_rule"
+}
+
+// ValidateConfig errors when a config sets `engine_version` and
+// `terraform_version` to different values (#1559).
+//
+// They are one version under two names, so a config that disagrees with itself
+// has a bug. The server refuses the pair too, but that is apply-time; catching
+// it at plan is the difference between an error before Terraform decides
+// anything and one after it has already planned.
+func (r *autodiscoveryRuleResource) ValidateConfig(
+	ctx context.Context,
+	req resource.ValidateConfigRequest,
+	resp *resource.ValidateConfigResponse,
+) {
+	var m autodiscoveryRuleModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	validateRuleEngineVersionPair(&m, resp)
+}
+
+// validateRuleEngineVersionPair holds the comparison, apart from reading the
+// config, so a test can drive it without a framework config object.
+func validateRuleEngineVersionPair(m *autodiscoveryRuleModel, resp *resource.ValidateConfigResponse) {
+	if m.EngineVersion.IsNull() || m.EngineVersion.IsUnknown() {
+		return
+	}
+	if m.TerraformVersion.IsNull() || m.TerraformVersion.IsUnknown() {
+		return
+	}
+	if m.EngineVersion.ValueString() != m.TerraformVersion.ValueString() {
+		resp.Diagnostics.AddError(
+			"engine_version and terraform_version disagree",
+			"`engine_version` and `terraform_version` are the same version under two "+
+				"names, and this configuration sets them to different values. Set only "+
+				"`engine_version` — `terraform_version` is its deprecated alias.",
+		)
+	}
 }
 
 func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -232,11 +274,33 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"engine_version": schema.StringAttribute{
+				Description: "Default engine version for created workspaces — OpenTofu or " +
+					"Terraform, or Pulumi. Unset, the server's default (\"1.12\") applies.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"terraform_version": schema.StringAttribute{
-				Description: "Default terraform/tofu version for created workspaces. Defaults to \"1.11\".",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("1.11"),
+				Description: "Default terraform/tofu version for created workspaces. " +
+					"Superseded by `engine_version`, which is the same version named for the " +
+					"fact that a workspace may run an engine other than Terraform.",
+				DeprecationMessage: "Use `engine_version` instead. `terraform_version` continues " +
+					"to work and the API will accept it indefinitely, since the terraform CLI " +
+					"tooling sends that name; only the provider attribute is deprecated.",
+				Optional: true,
+				Computed: true,
+				// Neither attribute carries a client-side Default: the two are one
+				// version, so a default on either would fill it in while the operator
+				// set the other, and the value read back after apply would not match
+				// the plan. The server's column default ("1.12") supplies it instead
+				// — which also fixes this attribute having defaulted to "1.11",
+				// contradicting the server, since the rule resource shipped (#1559).
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"parallelism": schema.Int64Attribute{
 				Description: "How many operations the engine performs at once on " +
@@ -580,8 +644,12 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 			attrs["agent-pool-id"] = v
 		}
 	}
-	if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
-		attrs["terraform-version"] = m.TerraformVersion.ValueString()
+	// Canonical key only, whichever attribute carried it — sending both risks a
+	// pair that disagrees, which the server refuses with a 422 (#1559).
+	if !m.EngineVersion.IsNull() && !m.EngineVersion.IsUnknown() {
+		attrs["engine-version"] = m.EngineVersion.ValueString()
+	} else if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
+		attrs["engine-version"] = m.TerraformVersion.ValueString()
 	}
 	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
 		attrs["parallelism"] = m.Parallelism.ValueInt64()
@@ -744,7 +812,14 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.ExecutionMode = types.StringValue(terrapod.GetStringAttr(res, "execution-mode"))
 	m.ExecutionBackend = types.StringValue(terrapod.GetStringAttr(res, "execution-backend"))
 	m.AgentPoolID = types.StringValue(terrapod.GetStringAttr(res, "agent-pool-id"))
-	m.TerraformVersion = types.StringValue(terrapod.GetStringAttr(res, "terraform-version"))
+	// One version, both names — read whichever the server sent, and fill both
+	// so a config using either name reads back consistent (#1559).
+	engineVersion := terrapod.GetStringAttr(res, "engine-version")
+	if engineVersion == "" {
+		engineVersion = terrapod.GetStringAttr(res, "terraform-version")
+	}
+	m.EngineVersion = types.StringValue(engineVersion)
+	m.TerraformVersion = types.StringValue(engineVersion)
 	m.Parallelism = types.Int64Value(terrapod.GetIntAttr(res, "parallelism"))
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
 	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))

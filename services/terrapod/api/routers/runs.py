@@ -48,6 +48,7 @@ from terrapod.api.dependencies import (
 from terrapod.api.errors import vcs_unavailable
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta
+from terrapod.api.serialization import engine_version_attr
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
@@ -202,7 +203,10 @@ def _run_json(
                 # engine it is, but what a person is shown differs. Derived from
                 # the workspace and passed in; runs store no copy (#1536).
                 "engine": engine,
-                "terraform-version": run.terraform_version,
+                # The one version under both its names (#1559); `terraform-version`
+                # is permanent, because go-tfe reads it by that name.
+                "engine-version": run.engine_version,
+                "terraform-version": run.engine_version,
                 "terragrunt-enabled": run.terragrunt_enabled,
                 "terragrunt-version": run.terragrunt_version,
                 "resource-cpu": run.resource_cpu,
@@ -581,7 +585,7 @@ async def create_run(
         auto_apply=attrs.get("auto-apply"),
         plan_only=plan_only,
         source="tfe-api",
-        terraform_version=attrs.get("terraform-version", ""),
+        engine_version=engine_version_attr(attrs, ""),
         configuration_version_id=cv_uuid,
         created_by=user.email,
         is_drift_detection=attrs.get("is-drift-detection", False),

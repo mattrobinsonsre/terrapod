@@ -15,6 +15,26 @@ import (
 // it. Mutating tools that remove config or infrastructure carry the
 // `destructive` hint so an MCP host prompts for confirmation, mirroring the
 // UI's confirm-on-destructive-action policy.
+// engineVersionIn resolves the two names an agent may use for the engine
+// version (#1559), returning the version to send and an error message when the
+// call disagrees with itself.
+//
+// `engine_version` is canonical; `terraform_version` is the name the terraform
+// CLI tooling uses, which the API accepts indefinitely. Because only one key
+// reaches the server, a disagreeing pair would otherwise be resolved silently —
+// so it is refused here, matching the 422 the server gives a client that sends
+// both.
+func engineVersionIn(engine, terraform string) (version, errMsg string) {
+	if engine != "" && terraform != "" && engine != terraform {
+		return "", "engine_version and terraform_version are the same version under two " +
+			"names and disagree; pass either one, or both with the same value"
+	}
+	if engine != "" {
+		return engine, ""
+	}
+	return terraform, ""
+}
+
 func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 	// ── terrapod_workspace_create ────────────────────────────────────
 	type workspaceCreateIn struct {
@@ -22,7 +42,8 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Engine           string            `json:"engine,omitempty" jsonschema:"the execution engine family: terraform (default) or another engine this deployment enables, such as pulumi. NOT execution_backend, which picks tofu vs terraform within the Terraform engine. Workspaces are created here, in the UI or with the Terraform provider — never by an engine's own CLI"`
 		ExecutionMode    string            `json:"execution_mode,omitempty" jsonschema:"local or agent (default: server default)"`
 		ExecutionBackend string            `json:"execution_backend,omitempty" jsonschema:"tofu or terraform (default: server default)"`
-		TerraformVersion string            `json:"terraform_version,omitempty" jsonschema:"partial version like 1.15 (means 1.15.*); no HCL operators"`
+		EngineVersion    string            `json:"engine_version,omitempty" jsonschema:"version of the engine this workspace runs; partial like 1.15 (means 1.15.*), no HCL operators"`
+		TerraformVersion string            `json:"terraform_version,omitempty" jsonschema:"the same version under its original name; prefer engine_version. Setting both to different values is rejected"`
 		AutoApply        *bool             `json:"auto_apply,omitempty" jsonschema:"auto-apply successful plans (default false)"`
 		AutoApplyMode    *string           `json:"auto_apply_mode,omitempty" jsonschema:"conditional auto-apply: never, always, create (only plans that add resources), create_update (also in-place updates). create and create_update never auto-apply a destroy or replace. Set this OR auto_apply, not both."`
 		AgentPoolID      string            `json:"agent_pool_id,omitempty" jsonschema:"agent pool id (apool-...) for agent execution mode; assigns exactly one pool. Mutually exclusive with agent_pool_ids"`
@@ -42,12 +63,16 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		if in.Name == "" {
 			return errText("name is required"), nil, nil
 		}
+		version, verr := engineVersionIn(in.EngineVersion, in.TerraformVersion)
+		if verr != "" {
+			return errText(verr), nil, nil
+		}
 		ws, err := c.CreateWorkspace(ctx, terrapod.CreateWorkspaceRequest{
 			Name:             in.Name,
 			Engine:           in.Engine,
 			ExecutionMode:    in.ExecutionMode,
 			ExecutionBackend: in.ExecutionBackend,
-			TerraformVersion: in.TerraformVersion,
+			EngineVersion:    version,
 			AutoApply:        in.AutoApply,
 			AutoApplyMode:    in.AutoApplyMode,
 			AgentPoolID:      in.AgentPoolID,
@@ -71,7 +96,8 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Name             string            `json:"name,omitempty" jsonschema:"rename the workspace (empty = leave)"`
 		ExecutionMode    string            `json:"execution_mode,omitempty" jsonschema:"local or agent"`
 		ExecutionBackend string            `json:"execution_backend,omitempty" jsonschema:"tofu or terraform"`
-		TerraformVersion string            `json:"terraform_version,omitempty" jsonschema:"partial version like 1.15"`
+		EngineVersion    string            `json:"engine_version,omitempty" jsonschema:"version of the engine this workspace runs; partial like 1.15 (means 1.15.*)"`
+		TerraformVersion string            `json:"terraform_version,omitempty" jsonschema:"the same version under its original name; prefer engine_version. Setting both to different values is rejected"`
 		AutoApply        *bool             `json:"auto_apply,omitempty" jsonschema:"auto-apply successful plans"`
 		AutoApplyMode    *string           `json:"auto_apply_mode,omitempty" jsonschema:"conditional auto-apply: never, always, create, create_update. Set this OR auto_apply, not both."`
 		AgentPoolID      string            `json:"agent_pool_id,omitempty" jsonschema:"agent pool id (apool-...); assigns exactly one pool, REPLACING any existing set. Mutually exclusive with agent_pool_ids"`
@@ -88,11 +114,15 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		if in.WorkspaceID == "" {
 			return errText("workspace_id is required"), nil, nil
 		}
+		version, verr := engineVersionIn(in.EngineVersion, in.TerraformVersion)
+		if verr != "" {
+			return errText(verr), nil, nil
+		}
 		ws, err := c.UpdateWorkspace(ctx, in.WorkspaceID, terrapod.UpdateWorkspaceRequest{
 			Name:             in.Name,
 			ExecutionMode:    in.ExecutionMode,
 			ExecutionBackend: in.ExecutionBackend,
-			TerraformVersion: in.TerraformVersion,
+			EngineVersion:    version,
 			AutoApply:        in.AutoApply,
 			AutoApplyMode:    in.AutoApplyMode,
 			AgentPoolID:      in.AgentPoolID,

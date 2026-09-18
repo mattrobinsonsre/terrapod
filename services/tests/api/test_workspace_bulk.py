@@ -59,7 +59,7 @@ def _mock_ws(
     name="prod-net",
     execution_mode="agent",
     execution_backend="tofu",
-    terraform_version="1.12",
+    engine_version="1.12",
     agent_pool_id=None,
     labels=None,
     auto_apply=False,
@@ -70,7 +70,7 @@ def _mock_ws(
     w.name = name
     w.execution_mode = execution_mode
     w.execution_backend = execution_backend
-    w.terraform_version = terraform_version
+    w.engine_version = engine_version
     # The pool set is a relationship (#1087) — a MagicMock here would never
     # read back as a list of links.
     w.agent_pool_links = [
@@ -379,7 +379,7 @@ class TestBulkUpdateDryRun:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     async def test_dry_run_true_explicit(self, _db, _redis, _storage):
-        ws = _mock_ws(name="w1", terraform_version="1.10")
+        ws = _mock_ws(name="w1", engine_version="1.10")
         app, db = _make_app(_admin())
         db.execute = AsyncMock(return_value=_list_result([ws]))
         db.commit = AsyncMock()

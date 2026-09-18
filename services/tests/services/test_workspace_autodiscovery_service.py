@@ -382,7 +382,7 @@ def _materialise_rule(**overrides):
     defaults = {
         "execution_mode": "agent",
         "execution_backend": "tofu",
-        "terraform_version": "1.12",
+        "engine_version": "1.12",
         "resource_cpu": "1",
         "parallelism": 10,
         "resource_memory": "2Gi",

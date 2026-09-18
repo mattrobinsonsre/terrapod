@@ -72,7 +72,9 @@ class WorkspaceFilter(BaseModel):
     name_glob: str | None = None
     execution_backend: str | None = None
     execution_mode: str | None = None
-    terraform_version: str | None = None
+    #: Named for the column it filters (#1559). `terraform_version` is still
+    #: accepted on the wire and normalised to this by the router.
+    engine_version: str | None = None
     agent_pool_id: str | None = None
     vcs_connection_id: str | None = None
     owner_email: str | None = None
@@ -91,7 +93,7 @@ class WorkspaceFilter(BaseModel):
                 "name_glob",
                 "execution_backend",
                 "execution_mode",
-                "terraform_version",
+                "engine_version",
                 "agent_pool_id",
                 "vcs_connection_id",
                 "owner_email",
@@ -149,8 +151,8 @@ def build_workspace_query(f: WorkspaceFilter) -> Select[tuple[Workspace]]:
         q = q.where(Workspace.execution_backend == f.execution_backend)
     if f.execution_mode is not None:
         q = q.where(Workspace.execution_mode == f.execution_mode)
-    if f.terraform_version is not None:
-        q = q.where(Workspace.terraform_version == f.terraform_version)
+    if f.engine_version is not None:
+        q = q.where(Workspace.engine_version == f.engine_version)
     if f.agent_pool_id is not None:
         # Matches a workspace that names this pool ANYWHERE in its pool set
         # (#1085) — "which workspaces would this pool have to run?" is the
@@ -192,6 +194,14 @@ def parse_filter(raw: dict[str, Any] | None) -> WorkspaceFilter:
             "a non-empty 'filter' is required (use 'all': true to match all)"
         )
     norm = {k.replace("-", "_"): v for k, v in raw.items()}
+    # `terraform-version` was this selector's name before the column became
+    # `engine_version` (#1559). A stored rule -- a dynamic variable-set
+    # assignment, a saved bulk-update selector -- keeps the old spelling, and
+    # unknown keys are rejected, so dropping it would turn those rules into
+    # errors. The canonical spelling wins where a caller sends both.
+    legacy_version = norm.pop("terraform_version", None)
+    if legacy_version is not None:
+        norm.setdefault("engine_version", legacy_version)
     allowed = set(WorkspaceFilter.model_fields)
     unknown = set(norm) - allowed
     if unknown:

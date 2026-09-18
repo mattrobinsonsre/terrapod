@@ -207,6 +207,25 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
+#: Columns that have been renamed, mapped to the names they used to have.
+#:
+#: A rolling upgrade runs skewed nodes, and replication peers keep *separate*
+#: databases, so a payload crosses between a sender and a receiver that may
+#: disagree about what a column is called. `_coerce` takes only the keys the
+#: receiver's own mapper knows, so without this a renamed column arrives
+#: unrecognised and the row lands with the column's default instead of the
+#: peer's value -- and it never self-heals, because a row is only re-sent when
+#: it next changes. Emitting both names, and accepting either, closes it in both
+#: directions: a new sender's payload is legible to an old receiver, and a new
+#: receiver understands an old sender.
+#:
+#: An entry stays until every supported release knows the new name.
+RENAMED_COLUMNS: dict[str, tuple[str, ...]] = {
+    # #1559: the column pins whichever engine the workspace runs, not Terraform.
+    "engine_version": ("terraform_version",),
+}
+
+
 def serialize_row(spec: ReplicatedClass, obj: Any) -> dict:
     """Dump a row to a JSON-safe dict of column values."""
     if spec.serialize is not None:
@@ -214,11 +233,15 @@ def serialize_row(spec: ReplicatedClass, obj: Any) -> dict:
     from sqlalchemy import inspect as sa_inspect
 
     mapper = sa_inspect(spec.model)
-    return {
-        col.key: _json_safe(getattr(obj, col.key))
-        for col in mapper.column_attrs
-        if col.key not in spec.exclude
-    }
+    out: dict[str, Any] = {}
+    for col in mapper.column_attrs:
+        if col.key in spec.exclude:
+            continue
+        value = _json_safe(getattr(obj, col.key))
+        out[col.key] = value
+        for old_name in RENAMED_COLUMNS.get(col.key, ()):
+            out[old_name] = value
+    return out
 
 
 def _column_python_type(column_type: Any) -> type | None:
@@ -250,9 +273,16 @@ def _coerce(spec: ReplicatedClass, payload: dict) -> dict:
     mapper = sa_inspect(spec.model)
     out: dict[str, Any] = {}
     for col in mapper.column_attrs:
-        if col.key in spec.exclude or col.key not in payload:
+        if col.key in spec.exclude:
             continue
-        raw = payload[col.key]
+        key = col.key
+        if key not in payload:
+            # A peer that predates a rename sends the old name (see
+            # RENAMED_COLUMNS); anything else genuinely is not in the payload.
+            key = next((n for n in RENAMED_COLUMNS.get(col.key, ()) if n in payload), "")
+            if not key:
+                continue
+        raw = payload[key]
         target = _column_python_type(col.expression.type) if raw is not None else None
         if raw is not None and target is uuid.UUID and isinstance(raw, str):
             raw = uuid.UUID(raw)

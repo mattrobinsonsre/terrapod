@@ -33,6 +33,7 @@ type workspaceDataSourceModel struct {
 	ExecutionBackend              types.String `tfsdk:"execution_backend"`
 	Engine                        types.String `tfsdk:"engine"`
 	PulumiBindPlan                types.Bool   `tfsdk:"pulumi_bind_plan"`
+	EngineVersion                 types.String `tfsdk:"engine_version"`
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
@@ -101,7 +102,8 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"execution_backend":                computedString("Execution backend."),
 			"engine":                           computedString("The execution engine family (\"terraform\")."),
 			"pulumi_bind_plan":                 computedBool("Pulumi only: whether the update is bound to the approved preview."),
-			"terraform_version":                computedString("Terraform/tofu version."),
+			"engine_version":                   computedString("Version of the engine this workspace runs (OpenTofu/Terraform, or Pulumi)."),
+			"terraform_version":                computedString("The same version under its original name; `engine_version` is the current one."),
 			"terragrunt_enabled":               computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
 			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
 			"working_directory":                computedString("Working directory."),
@@ -222,7 +224,14 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.AISummaryContext = types.StringValue(terrapod.GetStringAttr(res, "ai-summary-context"))
 	m.SlackChannel = types.StringValue(terrapod.GetStringAttr(res, "slack-channel"))
 
-	setOptionalString(&m.TerraformVersion, terrapod.GetStringAttr(res, "terraform-version"))
+	// One version, both names — read whichever the server sent so this keeps
+	// working against a server from before the rename (#1559).
+	engineVersion := terrapod.GetStringAttr(res, "engine-version")
+	if engineVersion == "" {
+		engineVersion = terrapod.GetStringAttr(res, "terraform-version")
+	}
+	setOptionalString(&m.EngineVersion, engineVersion)
+	setOptionalString(&m.TerraformVersion, engineVersion)
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
 	setOptionalString(&m.TerragruntVersion, terrapod.GetStringAttr(res, "terragrunt-version"))
 	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))

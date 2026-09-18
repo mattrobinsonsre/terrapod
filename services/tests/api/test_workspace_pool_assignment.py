@@ -37,7 +37,7 @@ def _mock_workspace(ws_id=None, pool_id=None, extra_pool_ids=None):
     ws.execution_mode = "agent"
     ws.auto_apply = False
     ws.execution_backend = "tofu"
-    ws.terraform_version = "1.11"
+    ws.engine_version = "1.11"
     ws.terragrunt_enabled = False
     ws.terragrunt_version = "1.0"
     ws.working_directory = ""

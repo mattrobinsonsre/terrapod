@@ -52,7 +52,7 @@ def _mock_run(
     run.auto_apply_declined_reason = None
     run.plan_only = plan_only
     run.source = "tfe-api"
-    run.terraform_version = "1.11"
+    run.engine_version = "1.11"
     # The engine the run belongs to (#1521). Set explicitly because a
     # MagicMock attribute is not JSON-serialisable, and the serializer
     # now reports it.

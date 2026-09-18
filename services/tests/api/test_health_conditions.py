@@ -12,7 +12,7 @@ def _mock_workspace(**overrides):
     ws.execution_mode = overrides.get("execution_mode", "local")
     ws.auto_apply = False
     ws.execution_backend = "tofu"
-    ws.terraform_version = "1.11"
+    ws.engine_version = "1.11"
     ws.working_directory = ""
     ws.locked = False
     ws.lock_id = None

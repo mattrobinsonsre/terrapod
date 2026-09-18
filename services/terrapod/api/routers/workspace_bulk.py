@@ -63,7 +63,7 @@ _VALID_DEST_TYPES = frozenset({"generic", "slack", "email"})
 
 # Workspace column fields the bulk update may set, mapped to their ORM attr.
 _FIELD_MAP: dict[str, str] = {
-    "terraform-version": "terraform_version",
+    "engine-version": "engine_version",
     "execution-backend": "execution_backend",
     "execution-mode": "execution_mode",
     "auto-apply": "auto_apply",
@@ -78,13 +78,30 @@ _FIELD_MAP: dict[str, str] = {
 }
 
 
+def _normalise_version_key(update: dict[str, Any]) -> dict[str, Any]:
+    """Accept `terraform-version` as a synonym for `engine-version` (#1559).
+
+    Normalising once, up front, rather than putting both spellings in
+    `_FIELD_MAP`: the map is iterated in insertion order and each key assigns
+    the same column, so two entries would make "which one wins" a property of
+    how the dict happens to be written. The canonical spelling wins here
+    explicitly, and a caller sending only the older one is unaffected.
+    """
+    if "terraform-version" not in update:
+        return update
+    normalised = {k: v for k, v in update.items() if k != "terraform-version"}
+    normalised.setdefault("engine-version", update["terraform-version"])
+    return normalised
+
+
 def _ws_summary(ws: Workspace) -> dict[str, Any]:
     return {
         "id": f"ws-{ws.id}",
         "name": ws.name,
         "execution-mode": ws.execution_mode,
         "execution-backend": ws.execution_backend,
-        "terraform-version": ws.terraform_version,
+        "engine-version": ws.engine_version,
+        "terraform-version": ws.engine_version,
         "agent-pool-id": (
             f"apool-{_pools[0]}" if (_pools := pool_set.workspace_pool_ids(ws)) else None
         ),
@@ -287,6 +304,7 @@ def _validate_update_fields_for_test(update: dict) -> dict[str, Any]:
     which is irrelevant to the scalar field rules — so tests drive this rather
     than re-implementing the loop and drifting from it.
     """
+    update = _normalise_version_key(update)
     fields: dict[str, Any] = {}
     for key, attr in _FIELD_MAP.items():
         if key not in update:
@@ -350,6 +368,7 @@ async def _validate_update(
     if not isinstance(update, dict) or not update:
         raise HTTPException(status_code=422, detail="'update' must be a non-empty object")
 
+    update = _normalise_version_key(update)
     fields: dict[str, Any] = {}
     for key, attr in _FIELD_MAP.items():
         if key not in update:
@@ -361,8 +380,8 @@ async def _validate_update(
             )
         if key == "execution-mode" and val not in _VALID_MODES:
             raise HTTPException(status_code=422, detail="execution-mode must be 'local' or 'agent'")
-        if key == "terraform-version" and not str(val).strip():
-            raise HTTPException(status_code=422, detail="terraform-version cannot be empty")
+        if key == "engine-version" and not str(val).strip():
+            raise HTTPException(status_code=422, detail="engine-version cannot be empty")
         if key == "labels":
             val = validate_labels(val)  # reserved-key chokepoint (#316) → 422
         if key == "auto-apply":

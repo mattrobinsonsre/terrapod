@@ -16,7 +16,7 @@ from terrapod.services import onboarding_service as svc
 
 
 def _workspace(engine="tofu", version="1.12"):
-    return SimpleNamespace(id=uuid.uuid4(), execution_backend=engine, terraform_version=version)
+    return SimpleNamespace(id=uuid.uuid4(), execution_backend=engine, engine_version=version)
 
 
 def _fake_db(session, workspace):
@@ -158,7 +158,7 @@ def _agent_ws():
     return SimpleNamespace(
         id=uuid.uuid4(),
         execution_backend="tofu",
-        terraform_version="1.12",
+        engine_version="1.12",
         execution_mode="agent",
         agent_pool_links=[SimpleNamespace(agent_pool_id=uuid.uuid4(), ordinal=0, agent_pool=None)],
         auto_apply=False,

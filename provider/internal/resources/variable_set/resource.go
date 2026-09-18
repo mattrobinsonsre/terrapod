@@ -49,13 +49,19 @@ type assignmentRuleModel struct {
 	NameGlob         types.String      `tfsdk:"name_glob"`
 	ExecutionBackend types.String      `tfsdk:"execution_backend"`
 	ExecutionMode    types.String      `tfsdk:"execution_mode"`
-	TerraformVersion types.String      `tfsdk:"terraform_version"`
-	AgentPoolID      types.String      `tfsdk:"agent_pool_id"`
-	VCSConnectionID  types.String      `tfsdk:"vcs_connection_id"`
-	OwnerEmail       types.String      `tfsdk:"owner_email"`
-	DriftStatus      types.String      `tfsdk:"drift_status"`
-	Locked           types.Bool        `tfsdk:"locked"`
-	HasVCS           types.Bool        `tfsdk:"has_vcs"`
+	// One selector, two names (#1559). Unlike the settings attributes
+	// elsewhere, these are NOT cross-filled: a stored rule must round-trip
+	// byte-identical or every Read produces drift, so each field maps to its
+	// own stored key. The server normalises them when it evaluates the rule,
+	// taking the canonical one where a rule carries both.
+	EngineVersion    types.String `tfsdk:"engine_version"`
+	TerraformVersion types.String `tfsdk:"terraform_version"`
+	AgentPoolID      types.String `tfsdk:"agent_pool_id"`
+	VCSConnectionID  types.String `tfsdk:"vcs_connection_id"`
+	OwnerEmail       types.String `tfsdk:"owner_email"`
+	DriftStatus      types.String `tfsdk:"drift_status"`
+	Locked           types.Bool   `tfsdk:"locked"`
+	HasVCS           types.Bool   `tfsdk:"has_vcs"`
 }
 
 var (
@@ -97,7 +103,8 @@ func (r *variableSetResource) Schema(_ context.Context, _ resource.SchemaRequest
 					"name_glob":         schema.StringAttribute{Optional: true, Description: "Match workspace names against a `*`/`?` glob."},
 					"execution_backend": schema.StringAttribute{Optional: true, Description: "Match the execution backend (terraform or tofu)."},
 					"execution_mode":    schema.StringAttribute{Optional: true, Description: "Match the execution mode (local or agent)."},
-					"terraform_version": schema.StringAttribute{Optional: true, Description: "Match the configured Terraform/OpenTofu version."},
+					"engine_version":    schema.StringAttribute{Optional: true, Description: "Match the configured engine version."},
+					"terraform_version": schema.StringAttribute{Optional: true, Description: "Match the configured engine version under its original name; `engine_version` is the current one."},
 					"agent_pool_id":     schema.StringAttribute{Optional: true, Description: "Match workspaces using this agent pool."},
 					"vcs_connection_id": schema.StringAttribute{Optional: true, Description: "Match workspaces using this VCS connection."},
 					"owner_email":       schema.StringAttribute{Optional: true, Description: "Match workspaces with this owner."},
@@ -233,6 +240,7 @@ func assignmentRuleToAPI(m *assignmentRuleModel) map[string]any {
 	putStr("name_glob", m.NameGlob)
 	putStr("execution_backend", m.ExecutionBackend)
 	putStr("execution_mode", m.ExecutionMode)
+	putStr("engine_version", m.EngineVersion)
 	putStr("terraform_version", m.TerraformVersion)
 	putStr("agent_pool_id", m.AgentPoolID)
 	putStr("vcs_connection_id", m.VCSConnectionID)
@@ -280,6 +288,7 @@ func assignmentRuleFromAPI(raw map[string]any) *assignmentRuleModel {
 	m.NameGlob = getStr("name_glob")
 	m.ExecutionBackend = getStr("execution_backend")
 	m.ExecutionMode = getStr("execution_mode")
+	m.EngineVersion = getStr("engine_version")
 	m.TerraformVersion = getStr("terraform_version")
 	m.AgentPoolID = getStr("agent_pool_id")
 	m.VCSConnectionID = getStr("vcs_connection_id")

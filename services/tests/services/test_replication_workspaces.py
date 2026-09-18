@@ -63,7 +63,7 @@ def _ws(ws_id=WS_ID, **kw):
         "name": "prod-network",
         "execution_mode": "agent",
         "execution_backend": "tofu",
-        "terraform_version": "1.12",
+        "engine_version": "1.12",
         "vcs_connection_id": CONN_ID,
         "vcs_repo_url": "https://github.com/example/infra",
         "vcs_branch": "main",
@@ -440,3 +440,55 @@ class TestOrdering:
         assert order.index("agent_pools") < order.index("workspace_agent_pools")
         assert order.index("workspaces") < order.index("module_workspace_links")
         assert order.index("registry_modules") < order.index("module_workspace_links")
+
+
+class TestAPeerThatDisagreesAboutAColumnName:
+    """A rolling upgrade replicates between nodes on either side of a rename.
+
+    Replication peers keep separate databases, and `_coerce` takes only the keys
+    the *receiver's* mapper knows. So a renamed column would arrive unrecognised
+    and the row would land with the column's default -- and it would never
+    self-heal, because a row is only re-sent when it next changes. `engine_version`
+    (#1559, formerly `terraform_version`) is the first column this has applied to.
+    """
+
+    def test_the_payload_carries_both_names(self):
+        # So a peer still running the older code finds the name it knows.
+        payload = replication.serialize_row(WORKSPACES, _ws(engine_version="1.13"))
+        assert payload["engine_version"] == "1.13"
+        assert payload["terraform_version"] == "1.13"
+
+    async def test_an_older_peers_payload_is_understood(self):
+        # The reverse direction: this node reads what an older node sends.
+        db = AsyncMock()
+        existing = _ws(engine_version="1.9")
+        db.scalar.return_value = existing
+        payload = replication.serialize_row(WORKSPACES, _ws(engine_version="1.13"))
+        del payload["engine_version"]
+
+        await replication.apply_upsert(db, WORKSPACES, payload)
+
+        assert existing.engine_version == "1.13"
+
+    async def test_the_current_name_wins_when_both_are_present(self):
+        db = AsyncMock()
+        existing = _ws(engine_version="1.9")
+        db.scalar.return_value = existing
+        payload = replication.serialize_row(WORKSPACES, _ws(engine_version="1.13"))
+        payload["terraform_version"] = "1.0"
+
+        await replication.apply_upsert(db, WORKSPACES, payload)
+
+        assert existing.engine_version == "1.13"
+
+    async def test_a_column_with_no_alias_is_unaffected(self):
+        # The alias map must not make every absent key hunt for a fallback.
+        db = AsyncMock()
+        existing = _ws(name="prod-network")
+        db.scalar.return_value = existing
+        payload = replication.serialize_row(WORKSPACES, _ws(name="renamed"))
+        del payload["name"]
+
+        await replication.apply_upsert(db, WORKSPACES, payload)
+
+        assert existing.name == "prod-network"

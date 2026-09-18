@@ -19,7 +19,8 @@
 //	"execution-backend"                 → execution_backend   (string, optional, default "terraform")
 //	"engine"                            → engine              (string, read-only)
 //	"pulumi-bind-plan"                  → pulumi_bind_plan    (bool,   optional+computed)
-//	"terraform-version"                 → terraform_version   (string, optional)
+//	"engine-version"                    → engine_version      (string, optional; `terraform_version` is its deprecated alias)
+//	"terraform-version"                 → terraform_version   (string, optional, deprecated)
 //	"working-directory"                 → working_directory   (string, optional)
 //	"parallelism"                       → parallelism
 //	"resource-cpu"                      → resource_cpu        (string, optional, default "1")
@@ -68,6 +69,7 @@ type workspaceModel struct {
 	ExecutionBackend              types.String `tfsdk:"execution_backend"`
 	Engine                        types.String `tfsdk:"engine"`
 	PulumiBindPlan                types.Bool   `tfsdk:"pulumi_bind_plan"`
+	EngineVersion                 types.String `tfsdk:"engine_version"`
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`

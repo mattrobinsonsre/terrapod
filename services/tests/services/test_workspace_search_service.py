@@ -117,9 +117,9 @@ class TestBuildQueryDimensions:
         q = build_workspace_query(WorkspaceFilter(execution_mode="agent"))
         assert "workspaces.execution_mode" in str(q)
 
-    def test_terraform_version_adds_where(self):
-        q = build_workspace_query(WorkspaceFilter(terraform_version="1.12"))
-        assert "workspaces.terraform_version" in str(q)
+    def test_engine_version_adds_where(self):
+        q = build_workspace_query(WorkspaceFilter(engine_version="1.12"))
+        assert "workspaces.engine_version" in str(q)
 
     def test_owner_email_adds_where(self):
         q = build_workspace_query(WorkspaceFilter(owner_email="a@example.com"))

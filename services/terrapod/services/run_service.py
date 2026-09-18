@@ -727,7 +727,7 @@ async def create_run(
     auto_apply: bool | None = None,
     plan_only: bool = False,
     source: str = "tfe-api",
-    terraform_version: str = "",
+    engine_version: str = "",
     configuration_version_id: uuid.UUID | None = None,
     created_by: str = "",
     is_drift_detection: bool = False,
@@ -793,7 +793,7 @@ async def create_run(
     # URL that requires x.y.z and 404s otherwise (#338). resolve_version
     # is Redis-cached and returns its input unchanged if it can't reach
     # the upstream index, so this never blocks run creation.
-    requested_version = terraform_version or workspace.terraform_version
+    requested_version = engine_version or workspace.engine_version
     from terrapod.services.binary_cache_service import resolve_version
 
     try:
@@ -821,7 +821,7 @@ async def create_run(
         # with its workspace's. Storing a copy is what let #1523 happen — a copy
         # that defaulted to terraform sent Pulumi runs down the Terraform path.
         execution_backend=workspace.execution_backend,
-        terraform_version=pinned_version,
+        engine_version=pinned_version,
         terragrunt_enabled=workspace.terragrunt_enabled,
         terragrunt_version=workspace.terragrunt_version,
         resource_cpu=workspace.resource_cpu,

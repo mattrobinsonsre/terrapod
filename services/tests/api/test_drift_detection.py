@@ -36,7 +36,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.name = name
     ws.auto_apply = False
     ws.execution_mode = "agent"
-    ws.terraform_version = "1.11"
+    ws.engine_version = "1.11"
     ws.terragrunt_enabled = False
     ws.terragrunt_version = "1.0"
     ws.working_directory = ""
@@ -218,7 +218,7 @@ class TestRunDriftAttributes:
         # The engine this run belongs to (#1521) — explicit because a MagicMock
         # attribute is not JSON-serialisable and the serializer now reports it.
         run.engine = "terraform"
-        run.terraform_version = "1.11"
+        run.engine_version = "1.11"
         run.terragrunt_enabled = False
         run.terragrunt_version = ""
         run.error_message = ""

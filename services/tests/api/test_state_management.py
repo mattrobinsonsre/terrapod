@@ -704,7 +704,7 @@ def _mock_run(run_id=None, status="pending", ws_id=None):
     run.auto_apply = False
     run.plan_only = False
     run.source = "tfe-api"
-    run.terraform_version = "1.11"
+    run.engine_version = "1.11"
     run.error_message = ""
     run.is_drift_detection = False
     run.has_changes = None

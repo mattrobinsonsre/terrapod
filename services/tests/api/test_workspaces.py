@@ -36,7 +36,7 @@ def _mock_workspace(
     locked_by=None,
     auto_apply=False,
     execution_mode="local",
-    terraform_version="1.11",
+    engine_version="1.11",
     resource_cpu="1",
     parallelism=10,
     resource_memory="2Gi",
@@ -50,7 +50,7 @@ def _mock_workspace(
     ws.name = name
     ws.auto_apply = auto_apply
     ws.execution_mode = execution_mode
-    ws.terraform_version = terraform_version
+    ws.engine_version = engine_version
     ws.terragrunt_enabled = False
     ws.terragrunt_version = "1.0"
     ws.working_directory = ""
