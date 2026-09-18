@@ -467,3 +467,31 @@ class TestGo:
         with pytest.raises(pulumi_deps.DependencyError):
             pulumi_deps.install(self._cfg(), d, child_grace=5, log_file="/dev/null")
         assert stopped == [1]
+
+
+class TestTheToolchainIsOnPath:
+    """Pulumi's language hosts look their toolchain up by name (#1566).
+
+    `go mod download` can succeed and the preview still fail with "couldn't find
+    go binary", because the modules land on disk long before Pulumi runs the
+    program. The same is true of node.
+    """
+
+    def test_go_is_added_to_path(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("PATH", "/usr/bin")
+        d = _program(tmp_path, "runtime: go\n")
+        monkeypatch.setattr(
+            pulumi_deps.platform_tool, "ensure_tool", lambda *a, **k: tmp_path / "go/bin/go"
+        )
+        monkeypatch.setattr(
+            pulumi_deps.exec_subprocess, "run", lambda *a, **k: MagicMock(exit_code=0)
+        )
+        pulumi_deps.install(
+            SimpleNamespace(api_url="http://a", auth_token="t"),
+            d,
+            child_grace=5,
+            log_file="/dev/null",
+        )
+        import os
+
+        assert str(tmp_path / "go/bin") in os.environ["PATH"]

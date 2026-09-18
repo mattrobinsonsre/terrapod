@@ -489,6 +489,12 @@ def _install_go(cfg, program_dir: Path, *, child_grace: float, log_file: str, lo
     """Download the program's modules through the shim."""
     go = platform_tool.ensure_tool(cfg, "go")
 
+    # On PATH, and for the whole phase rather than just the download: Pulumi's
+    # Go language host looks the toolchain up by name when it runs the program,
+    # and without it the preview fails with "couldn't find go binary" long after
+    # the modules are safely on disk.
+    os.environ["PATH"] = f"{go.parent}{os.pathsep}{os.environ.get('PATH', '')}"
+
     proxy = _ModuleProxy(cfg.api_url, cfg.auth_token)
     proxy.start()
     log.info("module proxy listening", port=proxy.port)
