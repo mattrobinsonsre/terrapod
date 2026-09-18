@@ -53,7 +53,13 @@ logger = get_logger(__name__)
 # subject to `allow_prerelease`, listed per version -- and differs only in where
 # its upstream facts live (services/platform_tools.py still owns its asset
 # layout) and in having no signature to check. See CHECKSUM_ONLY_TOOLS.
-CLI_TOOLS = {"terraform", "tofu", "terragrunt", "pulumi"}
+CLI_TOOLS = {"terraform", "tofu", "terragrunt", "pulumi", "node"}
+
+#: Tools that exist only to serve the Pulumi engine, and are refused when it is
+#: off (#1429). `node` is here because `pulumi-language-nodejs` shells out to it:
+#: it is the runtime a TypeScript program needs, not something Terrapod offers
+#: in its own right (#1566).
+_PULUMI_ONLY_TOOLS = {"pulumi", "node"}
 
 #: Tools whose publisher signs nothing, so the strongest check available is the
 #: artifact's SHA-256 against a checksum the publisher published. Verification
@@ -502,8 +508,8 @@ async def list_available_versions(tool: str) -> list[str]:
     # engine. Deliberately NOT applied to get_or_cache_binary or purge_binary:
     # gating hides and halts, never destroys, and an operator must still be able
     # to purge a Pulumi binary cached before the engine was switched off.
-    if tool == "pulumi" and not engine_enabled("pulumi"):
-        raise ValueError("the pulumi engine is not enabled on this deployment")
+    if tool in _PULUMI_ONLY_TOOLS and not engine_enabled("pulumi"):
+        raise ValueError(f"{tool} is only served for the pulumi engine, which is not enabled")
 
     # A platform tool has exactly one version: the one this deployment pins
     # (#1208). There is no menu to offer and no upstream index to consult.
@@ -536,6 +542,8 @@ async def list_available_versions(tool: str) -> list[str]:
         versions = await _fetch_terraform_versions()
     elif tool == "pulumi":
         versions = await _fetch_pulumi_versions()
+    elif tool == "node":
+        versions = await _fetch_node_versions()
     elif tool == "terragrunt":
         versions = await _fetch_terragrunt_versions()
     else:
@@ -720,6 +728,8 @@ async def resolve_version(tool: str, partial_version: str) -> str:
         resolved = await _resolve_terragrunt_version(partial_version)
     elif tool == "pulumi":
         resolved = await _resolve_pulumi_version(partial_version)
+    elif tool == "node":
+        resolved = await _resolve_node_version(partial_version)
     else:
         return partial_version
 
@@ -863,6 +873,47 @@ async def _fetch_pulumi_versions() -> list[str]:
         if len(parts) >= 3:
             versions.append(version)
     return versions
+
+
+async def _node_index() -> list[str]:
+    """Every Node release version from the configured index, newest first.
+
+    Node publishes a static, CDN-backed `index.json` -- no rate limit and the
+    whole history, which is better material than the GitHub releases API pulumi
+    and terragrunt have to use. Entries carry a leading "v".
+    """
+    url = settings.registry.binary_cache.node_version_index_url
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # trust_env (httpx default) routes via the configured proxy/CA (#592).
+        resp = await arequest_with_retry(client, "GET", url)
+        resp.raise_for_status()
+        return [str(r.get("version", "")).lstrip("v") for r in resp.json()]
+
+
+async def _fetch_node_versions() -> list[str]:
+    """Node versions this deployment will offer."""
+    policy = settings.registry.binary_cache.allow_prerelease
+    versions = []
+    for version in await _node_index():
+        if not version or not _is_version_allowed(version, policy):
+            continue
+        if len(version.split("-")[0].split(".")) >= 3:
+            versions.append(version)
+    return versions
+
+
+async def _resolve_node_version(partial: str) -> str:
+    """Resolve a partial Node version (`22` -> the newest 22.x)."""
+    policy = settings.registry.binary_cache.allow_prerelease
+    prefix = f"{partial}."
+    matching = [
+        v for v in await _node_index() if v.startswith(prefix) and _is_version_allowed(v, policy)
+    ]
+    if not matching:
+        logger.warning("No matching node version found", partial=partial, policy=policy)
+        return partial
+    matching.sort(key=_version_sort_key)
+    return matching[-1]
 
 
 async def _resolve_pulumi_version(partial: str) -> str:

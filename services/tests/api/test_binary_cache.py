@@ -417,6 +417,9 @@ class TestPlatformToolVersions:
             # Pulumi version, still answered here for a listener too old to
             # send the per-run one.
             "pulumi-version": settings.default_pulumi_version,
+            # The Node a Pulumi TypeScript program runs on (#1566), answered
+            # here because this is the list the runner asks for.
+            "node-version": settings.default_node_version,
         }
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)

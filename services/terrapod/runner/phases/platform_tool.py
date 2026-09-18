@@ -46,7 +46,7 @@ logger = structlog.get_logger("runner.phase.platform_tool")
 #: import this module — and they drifted once in exactly the way that invites:
 #: `pulumi` was added here and not there, so a Pulumi run asked the cache for
 #: version "" and no test on either side noticed (#1523).
-TOOLS = ("opa", "trivy", "checkov", "pulumi")
+TOOLS = ("opa", "trivy", "checkov", "pulumi", "node")
 
 
 class PlatformToolsUnsupported(Exception):
@@ -83,6 +83,26 @@ class _Unpack:
     #: its version happily, and then fails on the first real program with "no
     #: language plugin". Verified against the v3.208.0 tarball (#1523).
     tree: bool = False
+    #: Drop the archive's single top-level directory before resolving `member`.
+    #:
+    #: The language runtimes package themselves three different ways, and only
+    #: one of them can be named by a static string (#1566):
+    #:
+    #:     go        go/bin/go                           a fixed root
+    #:     node      node-v22.20.0-linux-x64/bin/node    version AND platform
+    #:     dotnet    dotnet                              no root at all
+    #:
+    #: Node's root cannot be written down here, because this table has neither
+    #: the version nor the platform spelling. Stripping whatever single root the
+    #: archive has lets `member` be the path *inside* it -- `bin/node` -- which
+    #: is stable and survives Node renaming its directories. An archive with no
+    #: single root (dotnet) is left alone, so `member` is relative to the
+    #: extraction root either way.
+    #:
+    #: Off for the existing tools: pulumi's `pulumi/pulumi` works as written and
+    #: is proven, and rewriting a working spec to prove a point is how the thing
+    #: that works stops working.
+    strip_root: bool = False
 
 
 UNPACK: dict[str, _Unpack] = {
@@ -90,7 +110,29 @@ UNPACK: dict[str, _Unpack] = {
     "trivy": _Unpack(kind="targz", member="trivy"),
     "checkov": _Unpack(kind="zip", member="dist/checkov"),
     "pulumi": _Unpack(kind="targz", member="pulumi/pulumi", tree=True),
+    # The Node a Pulumi TypeScript program runs on (#1566). `member` is the path
+    # inside the archive's root, which is `node-v<version>-<platform>/` and so
+    # cannot be written down here -- hence strip_root. The tree is kept because
+    # `npm` is a sibling script under `lib/node_modules`, not a second binary.
+    "node": _Unpack(kind="targz", member="bin/node", tree=True, strip_root=True),
 }
+
+
+def _tree_member(root: Path, spec: _Unpack) -> Path:
+    """Where `spec.member` lives under an extracted tree.
+
+    With `strip_root`, the archive's single top-level directory is transparent:
+    `member` is the path inside it. A tool whose archive has no single root, or
+    more than one entry at the top, is treated as already unwrapped -- so the
+    same spec works for `dotnet`, which extracts flat, as for `node`, which does
+    not (#1566).
+    """
+    base = root
+    if spec.strip_root and root.is_dir():
+        entries = list(root.iterdir())
+        if len(entries) == 1 and entries[0].is_dir():
+            base = entries[0]
+    return base / spec.member
 
 
 def _versions_url(cfg: RunnerConfig) -> str:
@@ -168,6 +210,7 @@ def _extract(archive: Path, spec: _Unpack, dest: Path, root: Path | None = None)
                     # cache, but it originates upstream and is extracted as a
                     # tree rather than a single read.
                     tf.extractall(root, filter="data")
+                    dest = _tree_member(root, spec)
                     if not dest.exists():
                         raise PlatformToolError(f"{spec.member} not found in {archive.name}")
                     # The siblings are executables too, and the data filter
@@ -215,7 +258,7 @@ def ensure_tool(
     # A tree tool keeps its own directory so the siblings the CLI needs stay
     # beside the entrypoint; everything else is one file directly in bin_dir.
     tree_root = bin_dir / f"{tool}.d" if spec_for_dest.tree else None
-    dest = (tree_root / spec_for_dest.member) if tree_root else (bin_dir / tool)
+    dest = _tree_member(tree_root, spec_for_dest) if tree_root is not None else (bin_dir / tool)
     if dest.exists():
         return dest
 
@@ -264,6 +307,11 @@ def ensure_tool(
         )
 
     _extract(archive, spec, dest, root=tree_root)
+    if tree_root is not None:
+        # A stripped root only exists once the archive is open, so the path
+        # computed before the fetch was a guess. Re-resolve against what is
+        # actually on disk (#1566).
+        dest = _tree_member(tree_root, spec)
     dest.chmod(0o755)
     try:
         archive.unlink()

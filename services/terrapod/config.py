@@ -754,6 +754,21 @@ class BinaryCacheConfig(BaseModel):
         "`v{version}/pulumi-v{version}-{platform}.tar.gz`, where the platform is "
         "Pulumi's own spelling (`linux-x64`, not `linux_amd64`).",
     )
+    node_version_index_url: str = Field(
+        default="https://nodejs.org/dist/index.json",
+        description="Version-index source for node. Must return Node's own index "
+        'shape: a JSON array of objects with `version` (e.g. "v22.20.0"). Static '
+        "and CDN-backed rather than an API, so unlike the GitHub-hosted indexes "
+        "it carries no rate limit. Used for version listing and partial-version "
+        "resolution.",
+    )
+    node_mirror_url: str = Field(
+        default="https://nodejs.org/dist",
+        description="Download base for Node runtime archives, used when a Pulumi "
+        "TypeScript or JavaScript program needs a Node to run (#1566). Assets are "
+        "`v{version}/node-v{version}-{platform}.tar.gz`, checksummed against the "
+        "release's SHASUMS256.txt.",
+    )
     pulumi_version_index_url: str = Field(
         default="https://api.github.com/repos/pulumi/pulumi/releases",
         description="Version-index source for pulumi. Must return the GitHub "
@@ -3095,6 +3110,13 @@ class Settings(BaseSettings):
     default_terraform_version: str = Field(
         default="1.12",
         description="Default terraform/tofu version for new workspaces",
+    )
+    default_node_version: str = Field(
+        default="22",
+        description="Default Node version for a Pulumi TypeScript or JavaScript "
+        "program (#1566). Partial, resolved to the newest matching release through "
+        "the binary cache. 22 is the active LTS line; a program needing another "
+        "sets `engines.node` in its package.json and an operator moves this.",
     )
     default_pulumi_version: str = Field(
         default="3.208",

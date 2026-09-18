@@ -98,6 +98,9 @@ async def platform_tool_versions(
                     # Not a pin any more (#1559) — the deployment default, for a
                     # runner whose listener predates the per-run env var.
                     "pulumi-version": settings.default_pulumi_version,
+                    # The Node a Pulumi TypeScript/JavaScript program runs on
+                    # (#1566). Partial, resolved by the cache like the rest.
+                    "node-version": settings.default_node_version,
                 },
             }
         }

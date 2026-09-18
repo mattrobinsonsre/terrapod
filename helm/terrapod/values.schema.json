@@ -1465,6 +1465,9 @@
         "default_pulumi_version": {
           "type": "string"
         },
+        "default_node_version": {
+          "type": "string"
+        },
         "storage": {
           "type": "object",
           "additionalProperties": false,
@@ -1815,6 +1818,12 @@
                   "type": "string"
                 },
                 "pulumi_version_index_url": {
+                  "type": "string"
+                },
+                "node_mirror_url": {
+                  "type": "string"
+                },
+                "node_version_index_url": {
                   "type": "string"
                 },
                 "allow_prerelease": {

@@ -75,6 +75,7 @@ class TestFetchVersions:
                         "trivy-version": "0.72.0",
                         "checkov-version": "3.3.8",
                         "pulumi-version": "3.208.0",
+                        "node-version": "22.20.0",
                     }
                 }
             },
@@ -84,6 +85,7 @@ class TestFetchVersions:
             "trivy": "0.72.0",
             "checkov": "3.3.8",
             "pulumi": "3.208.0",
+            "node": "22.20.0",
         }
 
     def test_raises_on_a_non_200(self):
@@ -387,3 +389,57 @@ class TestPulumiKeepsItsSiblings:
         spec = UNPACK["pulumi"]
         assert spec.tree, "pulumi ships plugins beside the CLI; a single member is not enough"
         assert spec.member == "pulumi/pulumi"
+
+
+class TestAStrippedArchiveRoot:
+    """The language runtimes package themselves three different ways (#1566).
+
+    Verified against the real tarballs: `go/bin/go` has a fixed root, node's is
+    `node-v22.20.0-linux-x64/` — version *and* platform, which a static table
+    cannot name — and the .NET SDK extracts flat with no root at all. One spec
+    shape has to cover all three.
+    """
+
+    def _root(self, tmp_path, layout: dict[str, str]):
+        for rel in layout:
+            f = tmp_path / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text("x")
+        return tmp_path
+
+    def test_a_versioned_root_is_transparent(self, tmp_path):
+        from terrapod.runner.phases.platform_tool import _tree_member, _Unpack
+
+        root = self._root(tmp_path, {"node-v22.20.0-linux-x64/bin/node": ""})
+        spec = _Unpack(kind="targz", member="bin/node", tree=True, strip_root=True)
+        assert _tree_member(root, spec).exists()
+
+    def test_a_flat_archive_needs_no_stripping(self, tmp_path):
+        from terrapod.runner.phases.platform_tool import _tree_member, _Unpack
+
+        # More than one entry at the top, so there is no single root to strip.
+        root = self._root(tmp_path, {"dotnet": "", "shared/x": ""})
+        spec = _Unpack(kind="targz", member="dotnet", tree=True, strip_root=True)
+        assert _tree_member(root, spec) == root / "dotnet"
+
+    def test_a_fixed_root_still_works_named_from_inside(self, tmp_path):
+        from terrapod.runner.phases.platform_tool import _tree_member, _Unpack
+
+        root = self._root(tmp_path, {"go/bin/go": ""})
+        spec = _Unpack(kind="targz", member="bin/go", tree=True, strip_root=True)
+        assert _tree_member(root, spec).exists()
+
+    def test_the_existing_tools_are_left_alone(self, tmp_path):
+        """pulumi names its member through the root, and must keep working."""
+        from terrapod.runner.phases.platform_tool import UNPACK, _tree_member
+
+        root = self._root(tmp_path, {"pulumi/pulumi": ""})
+        assert UNPACK["pulumi"].strip_root is False
+        assert _tree_member(root, UNPACK["pulumi"]) == root / "pulumi/pulumi"
+
+    def test_a_single_file_at_the_top_is_not_mistaken_for_a_root(self, tmp_path):
+        from terrapod.runner.phases.platform_tool import _tree_member, _Unpack
+
+        root = self._root(tmp_path, {"dotnet": ""})
+        spec = _Unpack(kind="targz", member="dotnet", tree=True, strip_root=True)
+        assert _tree_member(root, spec) == root / "dotnet"

@@ -830,7 +830,7 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     import structlog
 
     from terrapod.runner import exec_subprocess
-    from terrapod.runner.phases import platform_tool, pulumi_exec
+    from terrapod.runner.phases import platform_tool, pulumi_deps, pulumi_exec
 
     log = structlog.get_logger("runner.job_entrypoint")
     plan_file = os.environ.get("TP_PULUMI_PLAN_FILE", "/workspace/plan.json")
@@ -911,6 +911,24 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     except Exception as exc:
         log.error("could not obtain the pulumi binary", error=str(exc))
         return 1
+
+    # The program's own dependencies, before anything asks Pulumi to understand
+    # it (#1566). A TypeScript program is `@pulumi/pulumi` and whatever else its
+    # package.json names, and `pulumi-language-nodejs` -- which ships inside the
+    # CLI tarball -- is a shim that shells out to a `node` the image does not
+    # carry. Both are fetched here.
+    #
+    # Before `prepare_local_stack`, not after: that runs the CLI against the
+    # program, and a stack command on a program whose language host cannot start
+    # fails with something far less legible than "npm install failed".
+    #
+    # This runs in BOTH phases because preview and update are different pods, so
+    # `node_modules/` does not survive between them.
+    try:
+        pulumi_deps.install(cfg, Path.cwd(), child_grace=float(child_grace), log_file=log_file)
+    except pulumi_deps.DependencyError as exc:
+        log.error("could not install the program's dependencies", error=str(exc))
+        return exc.exit_code
 
     try:
         stack = pulumi_exec.prepare_local_stack(

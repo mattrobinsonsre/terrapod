@@ -89,6 +89,38 @@ cache to list Pulumi versions is refused rather than answered, so a
 Terraform-only deployment makes no requests on Pulumi's behalf and warms no
 Pulumi binary.
 
+### What language a program can be written in
+
+A Pulumi program is written in a real language, and the runner has to be able to
+run it. That means two things Terraform never needs: the language's own
+toolchain, and the program's dependencies.
+
+| Runtime | Status |
+|---|---|
+| `yaml` | Works. The CLI interprets it; there is no toolchain and nothing to install. |
+| `nodejs` (TypeScript and JavaScript) | Works. Node is fetched through the binary cache and `npm ci` (or `npm install`) runs against Terrapod's npm proxy before the preview. |
+| `python`, `go`, `dotnet` | Refused, by name, with a message saying so. Tracked on #1566. |
+
+The refusal is deliberate: a program Terrapod cannot run fails at the start with
+a sentence naming its runtime, rather than part-way through Pulumi with an error
+about a missing language host.
+
+**Node is not baked into the runner image.** It is pulled through the same cache
+that serves `pulumi`, `tofu` and `terraform`, so a Terraform-only deployment
+carries none of it and a sealed one serves it from its own cache. The version is
+`default_node_version` in your values — partial, like the others, so `22` means
+the newest 22.x. A program's own `engines.node` range is not honoured: the
+runtime is a property of the platform, not of the repository.
+
+**Dependencies are installed in both phases.** The preview and the update run in
+different pods, so `node_modules/` cannot carry over from one to the other. The
+install therefore happens twice, inside each Job's own timeout — and `npm ci` is
+used whenever there is a `package-lock.json`, so both phases resolve to exactly
+the same tree.
+
+The npm credential is written to a `.npmrc`, never passed on a command line: the
+runner streams its logs to the API and the UI.
+
 ### Binding an update to its preview
 
 `pulumi-bind-plan` on the workspace makes the update perform exactly the

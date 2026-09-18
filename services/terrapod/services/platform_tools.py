@@ -58,10 +58,21 @@ PLATFORM_TOOLS = frozenset({"opa", "trivy", "checkov"})
 #: tar.gz holding the language plugins, the checksum manifest with the version
 #: spelled two ways in one URL. None of that is any less true for a per-workspace
 #: tool, and moving it would have bought nothing but churn.
-_NON_PLATFORM_TOOLS = frozenset({"pulumi"})
+_NON_PLATFORM_TOOLS = frozenset({"pulumi", "node"})
 
 #: Every tool this module describes, however it is scoped.
 DESCRIBED_TOOLS = PLATFORM_TOOLS | _NON_PLATFORM_TOOLS
+
+#: Node's platform naming. Like Pulumi it says x64 where Go says amd64, and its
+#: archive root carries both the version and this spelling --
+#: `node-v22.20.0-linux-x64/` -- which is why the runner strips the root rather
+#: than trying to name it (#1566).
+_NODE_PLATFORM = {
+    ("linux", "amd64"): "linux-x64",
+    ("linux", "arm64"): "linux-arm64",
+    ("darwin", "amd64"): "darwin-x64",
+    ("darwin", "arm64"): "darwin-arm64",
+}
 
 #: Pulumi's own platform naming, which differs from Go's for amd64.
 _PULUMI_PLATFORM = {
@@ -116,6 +127,12 @@ SPECS: dict[str, PlatformToolSpec] = {
     "checkov": PlatformToolSpec(
         archive="zip", member="dist/checkov", content_type="application/zip"
     ),
+    # The Node runtime a Pulumi TypeScript/JavaScript program needs (#1566).
+    # `pulumi-language-nodejs` ships inside the Pulumi tarball and is a shim: it
+    # shells out to `node`, which is not in the runner image and never was. The
+    # member is the path INSIDE the archive's root, because that root is
+    # `node-v<version>-<platform>/` and this table knows neither.
+    "node": PlatformToolSpec(archive="targz", member="bin/node", content_type="application/gzip"),
 }
 
 
@@ -127,6 +144,7 @@ def _mirror(tool: str) -> str:
         "checkov": cfg.checkov_mirror_url,
         # Pulumi's mirror moved with it to the binary cache (#1559).
         "pulumi": settings.registry.binary_cache.pulumi_mirror_url,
+        "node": settings.registry.binary_cache.node_mirror_url,
     }[tool].rstrip("/")
 
 
@@ -169,6 +187,13 @@ def download_url(tool: str, version: str, os_: str, arch: str) -> str:
         if plat is None:
             raise UnsupportedPlatformError(f"pulumi publishes no asset for {os_}/{arch}")
         return f"{base}/v{version}/pulumi-v{version}-{plat}.tar.gz"
+    if tool == "node":
+        plat = _NODE_PLATFORM.get((os_, arch))
+        if plat is None:
+            raise UnsupportedPlatformError(f"node publishes no asset for {os_}/{arch}")
+        # The .tar.gz rather than the smaller .tar.xz: the runner unpacks with
+        # the stdlib's tarfile, and gzip is what every other cached tool uses.
+        return f"{base}/v{version}/node-v{version}-{plat}.tar.gz"
     raise ValueError(f"not a platform tool: {tool!r}")
 
 
@@ -214,6 +239,24 @@ async def _expected_sha256(
             if len(parts) >= 2 and parts[1].lstrip("*") == asset:
                 return parts[0].lower()
         raise VerificationError(f"{asset} is not listed in the trivy checksums manifest")
+
+    if tool == "node":
+        # One SHASUMS256.txt per release, the same "<hex>  <filename>" shape as
+        # Trivy's and Pulumi's. Node signs this file with its release keys, but
+        # verifying that would mean pinning and rotating a keyring for a fourth
+        # publisher; the checksum is what the other cached tools get and it is
+        # fetched over TLS from the same host as the artifact.
+        resp = await arequest_with_retry(client, "GET", f"{base}/v{version}/SHASUMS256.txt")
+        if resp.status_code != 200:
+            raise VerificationError(
+                f"could not fetch the node checksums manifest for {version} "
+                f"(HTTP {resp.status_code})"
+            )
+        for line in resp.text.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[1].lstrip("*") == asset:
+                return parts[0].lower()
+        raise VerificationError(f"{asset} is not listed in the node checksums manifest")
 
     if tool == "pulumi":
         # One manifest for the whole release, same "<hex>  <filename>" shape as

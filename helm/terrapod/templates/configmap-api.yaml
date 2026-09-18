@@ -329,6 +329,12 @@ data:
         {{- if .Values.api.config.registry.binary_cache.pulumi_version_index_url }}
         pulumi_version_index_url: {{ .Values.api.config.registry.binary_cache.pulumi_version_index_url | quote }}
         {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.node_mirror_url }}
+        node_mirror_url: {{ .Values.api.config.registry.binary_cache.node_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.node_version_index_url }}
+        node_version_index_url: {{ .Values.api.config.registry.binary_cache.node_version_index_url | quote }}
+        {{- end }}
         {{- if .Values.api.config.registry.binary_cache.allow_prerelease }}
         allow_prerelease: {{ .Values.api.config.registry.binary_cache.allow_prerelease | quote }}
         {{- end }}
@@ -726,6 +732,7 @@ data:
     default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
     default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.12" | quote }}
     default_pulumi_version: {{ .Values.api.config.default_pulumi_version | default "3.208" | quote }}
+    default_node_version: {{ .Values.api.config.default_node_version | default "22" | quote }}
     {{- with .Values.api.config.cors }}
     {{- /* Only emit `cors:` when at least one child renders — a bare `cors:`
            serialises to null, which Settings (CORSConfig) rejects. The common

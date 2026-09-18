@@ -167,6 +167,9 @@ api:
     # What a new Pulumi workspace gets when it pins no engine-version. Partial,
     # like its Terraform counterpart: resolved to the newest matching release.
     default_pulumi_version: "3.208"
+    # The Node version a Pulumi TypeScript/JavaScript program gets. Partial, like
+    # the others; 22 is the active LTS line.
+    default_node_version: "22"
 
     # Storage configuration — exactly one backend must be configured.
     # IMPORTANT: Filesystem storage is for dev/single-instance only.
@@ -479,6 +482,12 @@ api:
         # that bites.
         pulumi_mirror_url: "https://github.com/pulumi/pulumi/releases/download"
         pulumi_version_index_url: "https://api.github.com/repos/pulumi/pulumi/releases"
+        # The Node a Pulumi TypeScript or JavaScript program runs on (#1566).
+        # `pulumi-language-nodejs` ships inside the Pulumi CLI and shells out to
+        # it. Node's index is static and CDN-backed, so unlike the GitHub-hosted
+        # ones it carries no rate limit.
+        node_mirror_url: "https://nodejs.org/dist"
+        node_version_index_url: "https://nodejs.org/dist/index.json"
         # Lowest pre-release tier to accept for terraform/tofu CLI version
         # resolution + caching. One of: none, rc, beta, alpha, dev.
         # 'none' (default) permits only GA releases. 'rc' allows release
