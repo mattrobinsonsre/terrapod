@@ -239,3 +239,39 @@ class TestFilesystemRoutes:
 
             resp = await client.get(path)
             assert resp.status_code == 404
+
+
+class TestThePresignedKeyIsNotPercentEncoded:
+    """A client that re-encodes the URL must still be able to fetch it (#1566).
+
+    The key used to be emitted with `safe=""`, so every `/` became `%2F`. The
+    route is `{key:path}` and the signature is over the *decoded* key, so that
+    bought nothing — and it cost: npm re-encodes the `%2F` when it follows the
+    redirect, the key arrives as a literal `cache%2Fpackages%2F…`, and the
+    signature check fails with a 403 that reads like a permissions problem.
+    Reproduced against the running stack: the double-encoded URL 403s where both
+    the encoded and the decoded form return 200.
+    """
+
+    async def test_separators_stay_separators(self, fs_store):
+        url = (await fs_store.presigned_get_url("cache/packages/npm/left-pad.tgz")).url
+        assert "cache/packages/npm/left-pad.tgz" in url
+        assert "%2F" not in url
+
+    async def test_the_same_holds_for_uploads(self, fs_store):
+        url = (await fs_store.presigned_put_url("cache/packages/npm/left-pad.tgz")).url
+        assert "%2F" not in url
+
+    async def test_a_key_still_round_trips_through_verification(self, fs_store):
+        # The signature is over the decoded key either way, so the change must
+        # not move what verifies.
+        import urllib.parse as up
+
+        key = "cache/packages/npm/left-pad.tgz"
+        url = (await fs_store.presigned_get_url(key)).url
+        q = up.parse_qs(up.urlparse(url).query)
+        assert fs_store.verify_signature("GET", key, q["expires"][0], q["sig"][0])
+
+    async def test_a_character_that_genuinely_needs_encoding_still_is(self, fs_store):
+        url = (await fs_store.presigned_get_url("cache/a b/c?d.tgz")).url
+        assert "%20" in url and "%3F" in url

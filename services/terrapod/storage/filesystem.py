@@ -340,7 +340,14 @@ class FilesystemStore:
         expires = int(time.time()) + expiry
         sig = self._sign("GET", key, expires)
 
-        encoded_key = urllib.parse.quote(key, safe="")
+        # `safe="/"`, not `safe=""` (#1566). The route is `{key:path}` and the
+        # signature is over the decoded key, so a percent-encoded separator buys
+        # nothing -- and it costs: npm re-encodes the `%2F` when it follows the
+        # redirect, the key arrives as a literal `cache%2Fpackages%2F...`, and
+        # the signature check fails with a 403 that reads like a permissions
+        # problem. Reproduced exactly: the double-encoded URL 403s where both
+        # the encoded and decoded forms return 200.
+        encoded_key = urllib.parse.quote(key, safe="/")
         # Deliberately the LEGACY prefix (#1529). This URL is consumed by a
         # runner Job, which matches it against a literal in the image it was
         # built with (runner/download.py) to decide whether to rewrite the host
@@ -368,7 +375,14 @@ class FilesystemStore:
         expires = int(time.time()) + expiry
         sig = self._sign("PUT", key, expires)
 
-        encoded_key = urllib.parse.quote(key, safe="")
+        # `safe="/"`, not `safe=""` (#1566). The route is `{key:path}` and the
+        # signature is over the decoded key, so a percent-encoded separator buys
+        # nothing -- and it costs: npm re-encodes the `%2F` when it follows the
+        # redirect, the key arrives as a literal `cache%2Fpackages%2F...`, and
+        # the signature check fails with a 403 that reads like a permissions
+        # problem. Reproduced exactly: the double-encoded URL 403s where both
+        # the encoded and decoded forms return 200.
+        encoded_key = urllib.parse.quote(key, safe="/")
         url = (
             f"{self._base_url}{LAGGING_CONSUMER_PREFIX}/storage/put/{encoded_key}"
             f"?expires={expires}&sig={sig}&content_type={urllib.parse.quote(content_type)}"
