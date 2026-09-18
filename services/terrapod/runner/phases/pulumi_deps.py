@@ -29,6 +29,8 @@ import json
 import os
 import re
 import shutil
+import sys
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,6 +46,11 @@ _NPM_CACHE = "/tmp/npm-cache"
 #: `pulumi_exec` does: a runner image lags the API by design (the N-2 skew
 #: guarantee) and only the alias is served by both.
 _API_PREFIX = "/api/terrapod/v1"
+
+#: Where a virtualenv goes when the program does not say. Under /tmp because the
+#: root filesystem is read-only and the ambient site-packages cannot be written
+#: to at all -- there is no "just pip install" on this image.
+_DEFAULT_VENV = "/tmp/pulumi-venv"
 
 
 class DependencyError(RuntimeError):
@@ -73,7 +80,7 @@ _NO_INSTALL = {"yaml", ""}
 
 #: What this release can install. The rest are named in the refusal rather than
 #: failing later inside Pulumi with something less legible.
-_SUPPORTED = {"nodejs"}
+_SUPPORTED = {"nodejs", "python"}
 
 
 def read_runtime(program_dir: Path) -> str:
@@ -118,6 +125,28 @@ def read_runtime(program_dir: Path) -> str:
             if n:
                 return n.group(1).strip().split("#", 1)[0].strip().strip("\"'").lower()
         break
+    return ""
+
+
+def read_virtualenv(program_dir: Path) -> str:
+    """The `virtualenv` option a python program declares, or "".
+
+    Read for the same reason and with the same restraint as `read_runtime`. When
+    a program sets it, Pulumi runs that interpreter and ignores
+    `PULUMI_PYTHON_CMD` -- so the venv has to be built exactly where the program
+    says, not somewhere convenient.
+    """
+    path = program_dir / "Pulumi.yaml"
+    if not path.is_file():
+        return ""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+    for line in lines:
+        m = re.match(r"^\s+virtualenv:\s*(.*)$", line)
+        if m:
+            return m.group(1).strip().split("#", 1)[0].strip().strip("\"'")
     return ""
 
 
@@ -181,6 +210,10 @@ def install(cfg, program_dir: Path, *, child_grace: float, log_file: str) -> Non
             f"are supported. Track #1566."
         )
 
+    if runtime.name == "python":
+        _install_python(cfg, program_dir, child_grace=child_grace, log_file=log_file, log=log)
+        return
+
     _install_nodejs(cfg, program_dir, child_grace=child_grace, log_file=log_file, log=log)
 
 
@@ -232,6 +265,100 @@ def npm_env() -> dict[str, str]:
         "npm_config_update_notifier": "false",
         "npm_config_fund": "false",
         "npm_config_audit": "false",
+    }
+
+
+def pip_index_url(api_url: str) -> str:
+    """Terrapod's PyPI proxy, without credentials in it.
+
+    pip accepts a token in the index URL's userinfo, and every other document
+    shows it that way -- but the runner streams its logs to the API and the UI,
+    and pip prints its index URL. The credential goes in a `.netrc` instead.
+    """
+    return f"{api_url.rstrip('/')}{_API_PREFIX}/package-cache/pypi/simple"
+
+
+def write_netrc(api_url: str, token: str) -> Path:
+    """The pip credential, in $HOME rather than in a URL or an argv.
+
+    $HOME is one of the three writable mounts, and pip reads `.netrc` for an
+    index it is about to fetch from. The machine is the host alone -- netrc has
+    no notion of a path -- which is why this is written for the API's host and
+    nothing else.
+    """
+    host = urllib.parse.urlparse(api_url).hostname or ""
+    path = Path(os.environ.get("HOME", "/home/runner")) / ".netrc"
+    path.write_text(f"machine {host}\n  login x\n  password {token}\n", encoding="utf-8")
+    path.chmod(0o600)
+    return path
+
+
+def _install_python(cfg, program_dir: Path, *, child_grace: float, log_file: str, log) -> None:  # type: ignore[no-untyped-def]
+    """Build the program a virtualenv and install its requirements into it.
+
+    A virtualenv rather than the ambient interpreter, because there is no
+    ambient option: the root filesystem is read-only, so `site-packages` cannot
+    be written to, and pip was removed from the image deliberately (its vendored
+    bundle is what scanners report). `python -m venv` restores a working pip
+    from the untouched stdlib `ensurepip`.
+
+    Where the venv goes is the program's choice when it makes one. A program
+    declaring `options.virtualenv` gets it exactly there, because Pulumi runs
+    that interpreter and ignores `PULUMI_PYTHON_CMD`. A program that declares
+    none gets one under /tmp, and Pulumi is pointed at it.
+    """
+    declared = read_virtualenv(program_dir)
+    venv = (program_dir / declared) if declared else Path(_DEFAULT_VENV)
+
+    log.info("creating virtualenv", path=str(venv), declared=bool(declared))
+    made = exec_subprocess.run(
+        [sys.executable, "-m", "venv", str(venv)],
+        log_file=log_file,
+        child_grace_seconds=child_grace,
+        tee_to_stdout=True,
+    )
+    if made.exit_code != 0:
+        raise DependencyError(
+            "could not create a virtualenv for the program", exit_code=made.exit_code
+        )
+
+    write_netrc(cfg.api_url, cfg.auth_token)
+    os.environ.update(pip_env(cfg.api_url))
+    if not declared:
+        # Pulumi honours this only when the program declares no virtualenv of
+        # its own; when it does, the option wins and this is inert.
+        os.environ["PULUMI_PYTHON_CMD"] = str(venv / "bin" / "python")
+
+    requirements = program_dir / "requirements.txt"
+    if not requirements.is_file():
+        log.info("no requirements.txt; the venv has pulumi's own dependencies only")
+        return
+
+    log.info("installing python dependencies", requirements=str(requirements))
+    result = exec_subprocess.run(
+        [str(venv / "bin" / "python"), "-m", "pip", "install", "-r", str(requirements)],
+        log_file=log_file,
+        child_grace_seconds=child_grace,
+        tee_to_stdout=True,
+    )
+    if result.exit_code != 0:
+        raise DependencyError(
+            "installing the program's python dependencies failed; the log above is "
+            "pip's own output",
+            exit_code=result.exit_code,
+        )
+
+
+def pip_env(api_url: str) -> dict[str, str]:
+    """pip settings the read-only root filesystem and the log stream require."""
+    return {
+        "PIP_INDEX_URL": pip_index_url(api_url),
+        # /tmp, because pip's default cache is under $HOME and the wheels are
+        # the biggest thing it writes.
+        "PIP_CACHE_DIR": "/tmp/pip-cache",
+        "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+        # The check reaches upstream, which a sealed deployment cannot do.
+        "PIP_NO_INPUT": "1",
     }
 
 

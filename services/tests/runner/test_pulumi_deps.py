@@ -82,7 +82,7 @@ class TestClassifying:
         got = pulumi_deps.classify(_program(tmp_path, "runtime: yaml\n"))
         assert got.supported is True
 
-    @pytest.mark.parametrize("runtime", ["python", "go", "dotnet"])
+    @pytest.mark.parametrize("runtime", ["go", "dotnet"])
     def test_the_others_are_not_supported_yet(self, tmp_path, runtime):
         got = pulumi_deps.classify(_program(tmp_path, f"runtime: {runtime}\n"))
         assert got == pulumi_deps.Runtime(name=runtime, supported=False)
@@ -215,3 +215,104 @@ class TestTheProgramsOwnNodeRange:
     def test_unparseable_is_empty_not_an_error(self, tmp_path):
         d = _program(tmp_path, "runtime: nodejs\n", package__json="{not json")
         assert pulumi_deps.package_json_engines(d) == ""
+
+
+class TestPython:
+    """A venv, because there is no ambient option (#1566).
+
+    The root filesystem is read-only so `site-packages` cannot be written, and
+    pip was removed from the image deliberately. `python -m venv` restores a
+    working pip from the untouched stdlib `ensurepip`.
+    """
+
+    SECRET = "runtok-py-4c8e"
+
+    def _cfg(self):
+        return SimpleNamespace(api_url="https://terrapod.test", auth_token=self.SECRET)
+
+    def test_python_is_supported(self, tmp_path):
+        got = pulumi_deps.classify(_program(tmp_path, "runtime: python\n"))
+        assert got.supported is True
+
+    def test_a_declared_virtualenv_is_read(self, tmp_path):
+        d = _program(
+            tmp_path,
+            "runtime:\n  name: python\n  options:\n    virtualenv: venv\n",
+        )
+        assert pulumi_deps.read_virtualenv(d) == "venv"
+
+    def test_no_declaration_reads_empty(self, tmp_path):
+        assert pulumi_deps.read_virtualenv(_program(tmp_path, "runtime: python\n")) == ""
+
+    def test_the_index_url_carries_no_credential(self, tmp_path):
+        # pip prints its index URL, and the runner streams its logs.
+        assert "@" not in pulumi_deps.pip_index_url("https://terrapod.test")
+
+    def test_the_credential_goes_in_a_netrc(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        path = pulumi_deps.write_netrc("https://terrapod.test", self.SECRET)
+        body = path.read_text()
+        assert "machine terrapod.test" in body
+        assert self.SECRET in body
+        assert path.stat().st_mode & 0o077 == 0
+
+    def test_pip_writes_only_where_it_may(self, tmp_path):
+        assert pulumi_deps.pip_env("https://x")["PIP_CACHE_DIR"].startswith("/tmp/")
+
+    def _run_python(self, tmp_path, monkeypatch, *, declared=False, reqs=True, rc=(0, 0)):
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        (tmp_path / "home").mkdir()
+        yaml = (
+            "runtime:\n  name: python\n  options:\n    virtualenv: venv\n"
+            if declared
+            else "runtime: python\n"
+        )
+        d = _program(tmp_path, yaml)
+        if reqs:
+            (d / "requirements.txt").write_text("pulumi>=3\n")
+        calls = []
+
+        def fake_run(argv, **kw):
+            calls.append(argv)
+            return MagicMock(exit_code=rc[len(calls) - 1] if len(calls) <= len(rc) else 0)
+
+        monkeypatch.setattr(pulumi_deps.exec_subprocess, "run", fake_run)
+        pulumi_deps.install(self._cfg(), d, child_grace=5, log_file="/dev/null")
+        return calls
+
+    def test_it_creates_a_venv_then_installs(self, tmp_path, monkeypatch):
+        calls = self._run_python(tmp_path, monkeypatch)
+        assert calls[0][1:3] == ["-m", "venv"]
+        assert calls[1][1:5] == ["-m", "pip", "install", "-r"]
+
+    def test_a_declared_virtualenv_is_built_where_the_program_says(self, tmp_path, monkeypatch):
+        # Pulumi runs that interpreter and ignores PULUMI_PYTHON_CMD, so putting
+        # the venv somewhere convenient would leave the program without one.
+        calls = self._run_python(tmp_path, monkeypatch, declared=True)
+        assert calls[0][3] == str(tmp_path / "venv")
+
+    def test_without_one_pulumi_is_pointed_at_ours(self, tmp_path, monkeypatch):
+        self._run_python(tmp_path, monkeypatch)
+        import os
+
+        assert os.environ["PULUMI_PYTHON_CMD"].endswith("/bin/python")
+
+    def test_a_declared_virtualenv_is_not_overridden(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("PULUMI_PYTHON_CMD", raising=False)
+        self._run_python(tmp_path, monkeypatch, declared=True)
+        import os
+
+        assert "PULUMI_PYTHON_CMD" not in os.environ
+
+    def test_no_requirements_is_not_an_error(self, tmp_path, monkeypatch):
+        calls = self._run_python(tmp_path, monkeypatch, reqs=False)
+        assert len(calls) == 1  # the venv, and nothing else
+
+    def test_a_failed_venv_stops_before_installing(self, tmp_path, monkeypatch):
+        with pytest.raises(pulumi_deps.DependencyError, match="virtualenv"):
+            self._run_python(tmp_path, monkeypatch, rc=(3,))
+
+    def test_a_failed_install_carries_its_exit_code(self, tmp_path, monkeypatch):
+        with pytest.raises(pulumi_deps.DependencyError) as e:
+            self._run_python(tmp_path, monkeypatch, rc=(0, 5))
+        assert e.value.exit_code == 5

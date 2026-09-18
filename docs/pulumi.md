@@ -99,7 +99,8 @@ toolchain, and the program's dependencies.
 |---|---|
 | `yaml` | Works. The CLI interprets it; there is no toolchain and nothing to install. |
 | `nodejs` (TypeScript and JavaScript) | Works. Node is fetched through the binary cache and `npm ci` (or `npm install`) runs against Terrapod's npm proxy before the preview. |
-| `python`, `go`, `dotnet` | Refused, by name, with a message saying so. Tracked on #1566. |
+| `python` | Works. A virtualenv is built and `requirements.txt` installed into it from Terrapod's PyPI proxy. |
+| `go`, `dotnet` | Refused, by name, with a message saying so. Tracked on #1566. |
 
 The refusal is deliberate: a program Terrapod cannot run fails at the start with
 a sentence naming its runtime, rather than part-way through Pulumi with an error
@@ -118,8 +119,19 @@ install therefore happens twice, inside each Job's own timeout — and `npm ci` 
 used whenever there is a `package-lock.json`, so both phases resolve to exactly
 the same tree.
 
-The npm credential is written to a `.npmrc`, never passed on a command line: the
-runner streams its logs to the API and the UI.
+The npm credential is written to a `.npmrc` and pip's to a `.netrc`, never passed
+on a command line or in an index URL: the runner streams its logs to the API and
+the UI, and pip prints the index it is fetching from.
+
+**Python always gets a virtualenv**, because there is no ambient alternative: the
+root filesystem is read-only, so `site-packages` cannot be written to, and pip is
+removed from the image deliberately — its vendored bundle is what image scanners
+report. `python -m venv` restores a working pip from the stdlib.
+
+Where that venv goes is the program's choice. Declare `options.virtualenv` in
+`Pulumi.yaml` and it is built exactly there, because Pulumi runs that interpreter
+and ignores anything else; declare none and Terrapod builds one under `/tmp` and
+points Pulumi at it.
 
 ### Binding an update to its preview
 
