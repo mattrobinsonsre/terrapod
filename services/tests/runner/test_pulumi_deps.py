@@ -386,9 +386,10 @@ class TestGo:
             def __exit__(self, *a):
                 return False
 
-        def fake_stream(method, url, headers=None, timeout=None):
+        def fake_stream(method, url, headers=None, timeout=None, follow_redirects=False):
             seen["url"] = url
             seen["auth"] = (headers or {}).get("Authorization")
+            seen["follow"] = follow_redirects
             return _Resp()
 
         with patch.object(pulumi_deps.httpx, "stream", fake_stream):
@@ -404,6 +405,10 @@ class TestGo:
         assert got == b"module-bytes"
         assert seen["auth"] == f"Bearer {self.SECRET}"
         assert seen["url"].endswith("/package-cache/go/rsc.io/quote/@v/list")
+        # The proxy answers a module download with a 302 to presigned storage,
+        # and the go command does not follow one — it reports the 302 as the
+        # error. The shim follows it so Go only ever sees bytes.
+        assert seen["follow"] is True
 
     def test_the_shim_binds_loopback_only(self):
         proxy = pulumi_deps._ModuleProxy("http://x", "t")

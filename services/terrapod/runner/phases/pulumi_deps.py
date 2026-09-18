@@ -425,8 +425,17 @@ class _ModuleProxy(threading.Thread):
             def do_GET(self) -> None:  # noqa: N802
                 headers = {"Authorization": f"Bearer {token}"}
                 try:
+                    # Redirects are followed HERE, not handed to Go. The proxy
+                    # answers a module download with a 302 to presigned storage,
+                    # and the go command does not follow one -- it reports the
+                    # 302 as the error. The target needs no credential, so
+                    # following it costs nothing and keeps Go out of it.
                     with httpx.stream(
-                        "GET", upstream + self.path, headers=headers, timeout=120.0
+                        "GET",
+                        upstream + self.path,
+                        headers=headers,
+                        timeout=120.0,
+                        follow_redirects=True,
                     ) as r:
                         self.send_response(r.status_code)
                         self.end_headers()
