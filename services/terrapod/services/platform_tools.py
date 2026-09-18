@@ -47,7 +47,21 @@ from terrapod.services.artifact_verification import VerificationError
 
 logger = structlog.get_logger(__name__)
 
-PLATFORM_TOOLS = frozenset({"opa", "trivy", "checkov", "pulumi"})
+PLATFORM_TOOLS = frozenset({"opa", "trivy", "checkov"})
+
+#: Tools whose upstream facts live here but which are NOT platform-scoped.
+#:
+#: Pulumi was a platform tool until #1559, when its version became a property of
+#: the workspace rather than of the deployment. It is a CLI tool now, resolved
+#: and cached by `binary_cache_service` like terraform and tofu. What kept it
+#: here is the asset layout below -- the `linux-x64` platform spelling, the
+#: tar.gz holding the language plugins, the checksum manifest with the version
+#: spelled two ways in one URL. None of that is any less true for a per-workspace
+#: tool, and moving it would have bought nothing but churn.
+_NON_PLATFORM_TOOLS = frozenset({"pulumi"})
+
+#: Every tool this module describes, however it is scoped.
+DESCRIBED_TOOLS = PLATFORM_TOOLS | _NON_PLATFORM_TOOLS
 
 #: Pulumi's own platform naming, which differs from Go's for amd64.
 _PULUMI_PLATFORM = {
@@ -111,7 +125,8 @@ def _mirror(tool: str) -> str:
         "opa": cfg.opa_mirror_url,
         "trivy": cfg.trivy_mirror_url,
         "checkov": cfg.checkov_mirror_url,
-        "pulumi": cfg.pulumi_mirror_url,
+        # Pulumi's mirror moved with it to the binary cache (#1559).
+        "pulumi": settings.registry.binary_cache.pulumi_mirror_url,
     }[tool].rstrip("/")
 
 
@@ -122,7 +137,6 @@ def configured_version(tool: str) -> str:
         "opa": cfg.opa_version,
         "trivy": cfg.trivy_version,
         "checkov": cfg.checkov_version,
-        "pulumi": cfg.pulumi_version,
     }[tool]
 
 
@@ -257,13 +271,21 @@ async def verify_platform_tool(
     os_: str,
     arch: str,
     artifact_sha256_hex: str,
+    level: str | None = None,
 ) -> None:
-    """Check a downloaded platform tool against the publisher's checksum.
+    """Check a downloaded artifact against the publisher's checksum.
 
-    No-op when `verify` is off. Raises VerificationError on any mismatch or
+    No-op when the level is off. Raises VerificationError on any mismatch or
     unobtainable material — the caller must cache nothing and serve nothing.
+
+    `level` is the caller's, because since #1559 not every tool verified this way
+    is a *platform* tool: pulumi is a per-workspace CLI tool that simply has no
+    signature to check, and its switch is `binary_cache.verify`, not
+    `platform_tools.verify`. Defaulting to the platform-tools switch keeps every
+    existing caller unchanged.
     """
-    level = settings.registry.platform_tools.verify
+    if level is None:
+        level = settings.registry.platform_tools.verify
     if level == "off":
         logger.warning(
             "platform-tool verification disabled (verify=off) — trusting upstream bytes",

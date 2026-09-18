@@ -96,6 +96,7 @@ class RunnerConfig(BaseSettings):
         "Env override: TERRAPOD_SERVER_URL.",
     )
     default_terraform_version: str = Field(default="1.12")
+    default_pulumi_version: str = Field(default="3.208")
     default_execution_backend: str = Field(default="tofu")
     # --- Listener operational settings (non-sensitive; from runners.yaml) ---
     # Previously read by the listener directly from os.environ; now layered
@@ -747,6 +748,22 @@ class BinaryCacheConfig(BaseModel):
         '"v0.58.0") and `prerelease`. Used for version listing and '
         "partial-version resolution.",
     )
+    pulumi_mirror_url: str = Field(
+        default="https://github.com/pulumi/pulumi/releases/download",
+        description="Download base for Pulumi CLI archives. Assets are named "
+        "`v{version}/pulumi-v{version}-{platform}.tar.gz`, where the platform is "
+        "Pulumi's own spelling (`linux-x64`, not `linux_amd64`).",
+    )
+    pulumi_version_index_url: str = Field(
+        default="https://api.github.com/repos/pulumi/pulumi/releases",
+        description="Version-index source for pulumi. Must return the GitHub "
+        "releases API shape: a JSON array of objects with `tag_name` (e.g. "
+        '"v3.208.0") and `prerelease` — the same shape terragrunt uses. Used for '
+        "version listing and partial-version resolution. Pulumi publishes no "
+        "static index of its own (only a plain-text latest-version endpoint), so "
+        "this inherits the GitHub API's rate limit; point it at an internal "
+        "mirror serving the same shape if that bites.",
+    )
     allow_prerelease: Literal["none", "rc", "beta", "alpha", "dev"] = Field(
         default="none",
         description="Lowest pre-release tier to accept for terraform/tofu/terragrunt CLI version "
@@ -833,17 +850,6 @@ class PlatformToolsConfig(BaseModel):
         default="https://github.com/bridgecrewio/checkov/releases/download",
         description="Upstream download base for Checkov. Assets are per-platform "
         "zips containing a single self-contained dist/checkov executable.",
-    )
-    pulumi_version: str = Field(
-        default="3.208.0",
-        description="Pulumi CLI version fetched for engine=pulumi runs (#1523). Not "
-        "baked into the runner image: a Terraform-only deployment should not carry "
-        "another engine's binary, and an upstream fix reaches an operator through a "
-        "values change rather than a Terrapod release.",
-    )
-    pulumi_mirror_url: str = Field(
-        default="https://github.com/pulumi/pulumi/releases/download",
-        description="Where Pulumi CLI archives are fetched from before caching.",
     )
     checkov_checksum_api_url: str = Field(
         default="https://api.github.com/repos/bridgecrewio/checkov/releases/tags",
@@ -3089,6 +3095,13 @@ class Settings(BaseSettings):
     default_terraform_version: str = Field(
         default="1.12",
         description="Default terraform/tofu version for new workspaces",
+    )
+    default_pulumi_version: str = Field(
+        default="3.208",
+        description="Default Pulumi CLI version for new Pulumi workspaces (#1559). "
+        "Partial, like its Terraform counterpart: resolved to the newest matching "
+        "release through the binary cache. A workspace pins its own in "
+        "`engine-version`; this is what it gets when it does not.",
     )
 
     # API

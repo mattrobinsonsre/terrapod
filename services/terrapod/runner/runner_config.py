@@ -50,6 +50,14 @@ class RunnerConfig:
     backend: Literal["terraform", "tofu"]
     version: str
 
+    # The Pulumi CLI version for an engine=pulumi run (#1559). Partial, resolved
+    # against the binary cache like `version`; empty means the API sent none.
+    # Separate from `version` because a Pulumi run has no tofu/terraform version
+    # and vice versa -- one field carrying both would make "which engine is
+    # this?" load-bearing in every reader. Declared without a default because
+    # every field above it has none and a dataclass cannot go back.
+    pulumi_version: str
+
     # Terragrunt (#534): when enabled, the runner invokes `terragrunt` wrapping
     # the cached tofu/terraform binary (via --tf-path). version is partial,
     # resolved against the binary cache like `version`.
@@ -147,6 +155,7 @@ class RunnerConfig:
             onboard_types=_json_list("TP_ONBOARD_TYPES"),
             backend=e.get("TP_BACKEND", "tofu"),  # type: ignore[arg-type]
             version=e.get("TP_VERSION", ""),
+            pulumi_version=e.get("TP_PULUMI_VERSION", ""),
             terragrunt_enabled=_bool("TP_TERRAGRUNT_ENABLED"),
             terragrunt_version=e.get("TP_TERRAGRUNT_VERSION", ""),
             workspace_id=e.get("TP_WORKSPACE_ID", ""),

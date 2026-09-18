@@ -32,6 +32,7 @@ import {
   toggleStatusTerm,
 } from '@/lib/workspace-filter'
 import { WORKSPACE_STATUSES, resolveStatus } from '@/lib/workspace-status'
+import { defaultEngineVersion, versionToolFor } from '@/lib/engine-version'
 import {
   type GroupMode,
   type WorkspaceGroup,
@@ -475,7 +476,7 @@ function WorkspacesPageInner() {
   // could only be reached by creating the workspace and then editing it.
   const [newAutoApplyMode, setNewAutoApplyMode] = useState('never')
   const [newBackend, setNewBackend] = useState('tofu')
-  const [newVersion, setNewVersion] = useState('1.11')
+  const [newVersion, setNewVersion] = useState(defaultEngineVersion('terraform'))
   const [newCpu, setNewCpu] = useState('1')
   const [newMemory, setNewMemory] = useState('2Gi')
   const [newWorkingDir, setNewWorkingDir] = useState('')
@@ -485,9 +486,11 @@ function WorkspacesPageInner() {
   const [newAgentPoolId, setNewAgentPoolId] = useState('')
   const [creating, setCreating] = useState(false)
 
-  // Version suggestions
+  // Version suggestions. Keyed on the *tool* the version pins, which the engine
+  // decides — not on the execution backend, which only means anything within the
+  // Terraform engine (#1559).
   const [versionSuggestions, setVersionSuggestions] = useState<string[]>([])
-  const [versionsBackend, setVersionsBackend] = useState('')
+  const [versionsTool, setVersionsTool] = useState('')
 
   // VCS connections
   const [vcsConnections, setVcsConnections] = useState<{ id: string; attributes: { name: string; provider: string } }[]>([])
@@ -732,17 +735,27 @@ function WorkspacesPageInner() {
     }
   }, [showCreate, vcsConnectionsLoaded, agentPoolsLoaded])
 
-  // Fetch version suggestions when backend changes and form is open
+  // Fetch version suggestions when the tool the version pins changes and the
+  // form is open. A Pulumi workspace pins the Pulumi CLI; every other engine
+  // pins whichever Terraform-family binary its execution backend names.
+  const versionTool = versionToolFor(newEngine, newBackend)
   useEffect(() => {
-    if (!showCreate || newBackend === versionsBackend) return
-    apiFetch(`/api/terrapod/v1/binary-cache/versions?tool=${newBackend}`)
+    if (!showCreate || versionTool === versionsTool) return
+    apiFetch(`/api/terrapod/v1/binary-cache/versions?tool=${versionTool}`)
       .then(res => res.ok ? res.json() : { data: [] })
       .then(data => {
         setVersionSuggestions(data.data || [])
-        setVersionsBackend(newBackend)
+        setVersionsTool(versionTool)
       })
       .catch(() => {})
-  }, [showCreate, newBackend, versionsBackend])
+  }, [showCreate, versionTool, versionsTool])
+
+  // Switching engine invalidates whatever version is in the box: Pulumi's
+  // releases are 3.x and Terraform's are 1.x, so carrying one across would
+  // submit a version that does not exist on the engine now selected.
+  useEffect(() => {
+    setNewVersion(defaultEngineVersion(newEngine))
+  }, [newEngine])
 
   async function loadWorkspaces() {
     try {
@@ -807,7 +820,7 @@ function WorkspacesPageInner() {
       setNewEngine('terraform')
       setNewExecMode('local')
       setNewBackend('tofu')
-      setNewVersion('1.11')
+      setNewVersion(defaultEngineVersion('terraform'))
       setNewAutoApplyMode('never')
       setNewCpu('1')
       setNewMemory('2Gi')
@@ -903,8 +916,11 @@ function WorkspacesPageInner() {
                   <option value="agent">{t('form.agent')}</option>
                 </select>
               </div>
+              {/* Terraform-only: the execution backend picks the binary *within*
+                  the Terraform engine, so it has no meaning on Pulumi. The
+                  version below is not in here — every engine pins a version, and
+                  since #1559 a Pulumi workspace's is the Pulumi CLI it runs. */}
               {newEngine !== 'pulumi' && (
-                <>
               <div>
                 <label htmlFor="ws-backend" className="block text-sm font-medium text-slate-300 mb-1">{t('form.executionBackend')}</label>
                 <select
@@ -917,6 +933,7 @@ function WorkspacesPageInner() {
                   <option value="terraform">Terraform</option>
                 </select>
               </div>
+              )}
               <div>
                 <label htmlFor="ws-version" className="block text-sm font-medium text-slate-300 mb-1">{t('form.version')}</label>
                 <input
@@ -936,8 +953,6 @@ function WorkspacesPageInner() {
                   ))}
                 </datalist>
               </div>
-                </>
-              )}
               <div>
                 <label htmlFor="ws-cpu" className="block text-sm font-medium text-slate-300 mb-1">{t('form.cpuRequest')}</label>
                 <input

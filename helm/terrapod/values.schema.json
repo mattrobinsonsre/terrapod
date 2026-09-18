@@ -397,6 +397,9 @@
         "defaultTerraformVersion": {
           "type": "string"
         },
+        "defaultPulumiVersion": {
+          "type": "string"
+        },
         "defaultExecutionBackend": {
           "type": "string",
           "enum": [
@@ -1459,6 +1462,9 @@
         "default_terraform_version": {
           "type": "string"
         },
+        "default_pulumi_version": {
+          "type": "string"
+        },
         "storage": {
           "type": "object",
           "additionalProperties": false,
@@ -1805,6 +1811,12 @@
                 "terragrunt_version_index_url": {
                   "type": "string"
                 },
+                "pulumi_mirror_url": {
+                  "type": "string"
+                },
+                "pulumi_version_index_url": {
+                  "type": "string"
+                },
                 "allow_prerelease": {
                   "type": "string",
                   "enum": [
@@ -1862,12 +1874,6 @@
                     "off",
                     "checksum"
                   ]
-                },
-                "pulumi_version": {
-                  "type": "string"
-                },
-                "pulumi_mirror_url": {
-                  "type": "string"
                 }
               }
             },

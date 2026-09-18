@@ -23,6 +23,7 @@ import { ArchitectureCritiquePanel } from '@/components/architecture-critique-pa
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
+import { versionToolFor } from '@/lib/engine-version'
 import { VaultValueDisplay } from '@/components/vault-value-display'
 import {
   VaultReferenceFields,
@@ -348,9 +349,11 @@ function WorkspaceDetailContent() {
   const [vcsConnections, setVcsConnections] = useState<{ id: string; attributes: { name: string; provider: string } }[]>([])
   const [vcsConnectionsLoaded, setVcsConnectionsLoaded] = useState(false)
 
-  // Version suggestions
+  // Version suggestions. Keyed on the *tool* the version pins, which the engine
+  // decides — not on the execution backend, which only means anything within the
+  // Terraform engine (#1559).
   const [versionSuggestions, setVersionSuggestions] = useState<string[]>([])
-  const [versionsBackend, setVersionsBackend] = useState('')
+  const [versionsTool, setVersionsTool] = useState('')
 
   // Variables
   const [variables, setVariables] = useState<Variable[]>([])
@@ -1099,13 +1102,16 @@ function WorkspaceDetailContent() {
         setVcsConnectionsLoaded(true)
       }).catch(() => {})
     }
-    const backend = workspace.attributes['execution-backend'] || 'tofu'
-    if (versionsBackend !== backend) {
-      apiFetch(`/api/terrapod/v1/binary-cache/versions?tool=${backend}`)
+    // From the engine, not the execution backend: a Pulumi workspace carries a
+    // backend of `tofu` that nothing reads, so keying on it would offer OpenTofu
+    // releases for a field that picks the Pulumi CLI (#1559).
+    const tool = versionToolFor(workspace.attributes.engine, workspace.attributes['execution-backend'])
+    if (versionsTool !== tool) {
+      apiFetch(`/api/terrapod/v1/binary-cache/versions?tool=${tool}`)
         .then(res => res.ok ? res.json() : { data: [] })
         .then(data => {
           setVersionSuggestions(data.data || [])
-          setVersionsBackend(backend)
+          setVersionsTool(tool)
         })
         .catch(() => {})
     }
@@ -2165,8 +2171,10 @@ function WorkspaceDetailContent() {
                     <dd className="mt-1 text-sm text-slate-200">{attrs.parallelism ?? 10}</dd>
                   )}
                 </div>
+                {/* Terraform-only: the execution backend picks the binary
+                    *within* the Terraform engine, so it has no meaning on
+                    Pulumi. */}
                 {!isPulumi && (
-                  <>
                 <div>
                   <dt className="text-xs text-slate-500">{t('fields.executionBackend')}</dt>
                   {editing ? (
@@ -2178,6 +2186,10 @@ function WorkspaceDetailContent() {
                     <dd className="mt-1 text-sm text-slate-200">{attrs['execution-backend'] === 'terraform' ? 'Terraform' : 'OpenTofu'}</dd>
                   )}
                 </div>
+                )}
+                {/* Every engine pins a version — since #1559 a Pulumi
+                    workspace's is the Pulumi CLI its runs use — so this is shown
+                    on all of them, with suggestions keyed on the engine. */}
                 <div>
                   <dt className="text-xs text-slate-500">{t('fields.version')}</dt>
                   {editing ? (
@@ -2196,6 +2208,7 @@ function WorkspaceDetailContent() {
                     <dd className="mt-1 text-sm text-slate-200">{attrs['terraform-version'] || t('common.default')}</dd>
                   )}
                 </div>
+                {!isPulumi && (
                 <div>
                   <dt className="text-xs text-slate-500">Terragrunt</dt>
                   {editing ? (
@@ -2215,7 +2228,6 @@ function WorkspaceDetailContent() {
                     <dd className="mt-1 text-sm text-slate-200">{attrs['terragrunt-enabled'] ? t('fields.terragruntEnabledVersion', { version: attrs['terragrunt-version'] || '1.0' }) : t('common.disabled')}</dd>
                   )}
                 </div>
-                  </>
                 )}
                 {isPulumi && (
                   <div className="sm:col-span-2">

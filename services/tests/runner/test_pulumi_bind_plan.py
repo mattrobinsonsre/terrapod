@@ -89,7 +89,9 @@ class TestThePhaseRunner:
             monkeypatch.setenv("TP_PULUMI_BIND_PLAN", "true")
         else:
             monkeypatch.delenv("TP_PULUMI_BIND_PLAN", raising=False)
-        monkeypatch.setattr(platform_tool, "ensure_tool", lambda cfg, tool: Path("/bin/pulumi"))
+        monkeypatch.setattr(
+            platform_tool, "ensure_tool", lambda cfg, tool, **kw: Path("/bin/pulumi")
+        )
 
         def fake_run(argv, **_):
             seen["argv"] = argv

@@ -891,16 +891,20 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         return 1
 
     # The binary is pulled through the same cache that serves tofu/terraform,
-    # not baked into the image — so the version is an operator-set Helm value
-    # (`registry.platform_tools.pulumi_version`). Unlike opa and trivy there is
-    # no path past here that does not execute it, so it is fetched eagerly once
-    # the phase is known to be real.
+    # not baked into the image. Since #1559 the version comes from the run --
+    # the workspace's `engine-version`, carried as TP_PULUMI_VERSION -- rather
+    # than from one Helm value for the whole deployment, so two workspaces can
+    # sit on different Pulumi versions exactly as two Terraform workspaces can.
+    # Empty falls back to asking the API what it would pick.
     #
-    # Fails closed: without the binary there is nothing to run, and a bare
-    # "pulumi" to fall back on would either miss entirely or silently pick up
-    # some other install in a future image.
+    # Unlike opa and trivy there is no path past here that does not execute it,
+    # so it is fetched eagerly once the phase is known to be real. Fails closed:
+    # without the binary there is nothing to run, and a bare "pulumi" to fall
+    # back on would either miss entirely or silently pick up some other install
+    # in a future image.
+    versions = {"pulumi": cfg.pulumi_version} if cfg.pulumi_version else None
     try:
-        binary = str(platform_tool.ensure_tool(cfg, "pulumi"))
+        binary = str(platform_tool.ensure_tool(cfg, "pulumi", versions=versions))
     except Exception as exc:
         log.error("could not obtain the pulumi binary", error=str(exc))
         return 1

@@ -56,6 +56,7 @@ from terrapod.api.ids import parse_id
 from terrapod.api.labels import validate_labels
 from terrapod.api.pagination import MAX_PAGE_SIZE, build_meta, paginate, parse_page_params
 from terrapod.api.prefixes import TFE_PREFIX
+from terrapod.api.serialization import default_engine_version
 from terrapod.api.serialization import engine_version_attr as _engine_version_attr
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
@@ -1355,7 +1356,7 @@ async def _create_workspace_impl(
         auto_apply=auto_apply_mode != "never",
         auto_apply_mode=auto_apply_mode,
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
-        engine_version=_engine_version_attr(attrs, settings.default_terraform_version),
+        engine_version=_engine_version_attr(attrs, default_engine_version(engine)),
         terragrunt_enabled=bool(attrs.get("terragrunt-enabled", False)),
         terragrunt_version=(attrs.get("terragrunt-version") or "1.0"),
         working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),

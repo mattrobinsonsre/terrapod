@@ -164,6 +164,9 @@ api:
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform
     default_terraform_version: "1.12"
+    # What a new Pulumi workspace gets when it pins no engine-version. Partial,
+    # like its Terraform counterpart: resolved to the newest matching release.
+    default_pulumi_version: "3.208"
 
     # Storage configuration — exactly one backend must be configured.
     # IMPORTANT: Filesystem storage is for dev/single-instance only.
@@ -468,6 +471,14 @@ api:
         terraform_version_index_url: "https://releases.hashicorp.com/terraform/index.json"
         tofu_version_index_url: "https://get.opentofu.org/tofu/api.json"
         terragrunt_version_index_url: "https://api.github.com/repos/gruntwork-io/terragrunt/releases"
+        # Pulumi joined the per-workspace CLI tools in #1559: a workspace pins
+        # its Pulumi version in engine-version, exactly as it pins its
+        # OpenTofu/Terraform one. Pulumi publishes no static version index of
+        # its own, so partial resolution reads the GitHub releases API and
+        # inherits its rate limit — point this at a mirror of the same shape if
+        # that bites.
+        pulumi_mirror_url: "https://github.com/pulumi/pulumi/releases/download"
+        pulumi_version_index_url: "https://api.github.com/repos/pulumi/pulumi/releases"
         # Lowest pre-release tier to accept for terraform/tofu CLI version
         # resolution + caching. One of: none, rc, beta, alpha, dev.
         # 'none' (default) permits only GA releases. 'rc' allows release
@@ -509,14 +520,9 @@ api:
         opa_version: "1.20.2"
         trivy_version: "0.74.0"
         checkov_version: "3.3.17"
-        # Pulumi CLI for engine=pulumi runs (#1523). Fetched on demand like the
-        # tools above rather than baked in, so a Terraform-only deployment does
-        # not carry another engine's binary.
-        pulumi_version: "3.208.0"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
         checkov_mirror_url: "https://github.com/bridgecrewio/checkov/releases/download"
-        pulumi_mirror_url: "https://github.com/pulumi/pulumi/releases/download"
         # Checkov publishes NO checksum file next to its release assets, so the
         # only verification material available is the digest the GitHub release
         # API reports — registry-computed, not a publisher attestation, and
@@ -1595,6 +1601,8 @@ runners:
   # Default terraform/tofu version + backend for runner Jobs when a workspace
   # doesn't pin one. Runs snapshot the resolved version at creation time.
   defaultTerraformVersion: "1.12"
+  # The same for a Pulumi run whose workspace pins no version.
+  defaultPulumiVersion: "3.208"
   defaultExecutionBackend: "tofu"  # tofu | terraform
   # Maximum wall-clock seconds a drift-detection run may spend in `planning`
   # before the reconciler errors it out. Independent of staleTimeoutSeconds:

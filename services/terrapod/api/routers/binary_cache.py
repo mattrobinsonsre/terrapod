@@ -68,13 +68,18 @@ class WarmBinaryRequest(BaseModel):
 async def platform_tool_versions(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> JSONResponse:
-    """The opa/trivy/checkov/pulumi versions this deployment pins (#1208, #1523).
+    """The opa/trivy/checkov versions this deployment pins, plus Pulumi's default.
 
-    The runner reads this to know what to ask the binary cache for. It is a
-    platform-scoped setting, so there is one answer for the whole deployment and
-    it does not vary by workspace or run — which is why this is a plain read
-    rather than another field on the per-run payload, and why the runner/listener
-    wire protocol did not have to move to carry it.
+    The runner reads this to know what to ask the binary cache for. A platform
+    tool is a platform-scoped setting, so there is one answer for the whole
+    deployment and it does not vary by workspace or run — which is why this is a
+    plain read rather than another field on the per-run payload.
+
+    Pulumi stopped being one of those in #1559: its version is the workspace's
+    `engine-version` now, and it reaches the runner in the run's own env. The key
+    stays here, answering with the deployment *default*, because a listener up to
+    N-2 minors behind does not emit that env var and this is the only thing it
+    knows to ask. Dropping the key would strand exactly those runs.
 
     Available to any authenticated caller, runner tokens included: the pinned
     version of a third-party tool is not sensitive, and the runner has to be able
@@ -90,11 +95,9 @@ async def platform_tool_versions(
                     "opa-version": cfg.opa_version,
                     "trivy-version": cfg.trivy_version,
                     "checkov-version": cfg.checkov_version,
-                    # The runner has always read this key here; until #1523 the
-                    # response never carried it, so it resolved to "" and a
-                    # Pulumi run asked the cache for no version at all. One side
-                    # asking and the other not answering is the whole bug.
-                    "pulumi-version": cfg.pulumi_version,
+                    # Not a pin any more (#1559) — the deployment default, for a
+                    # runner whose listener predates the per-run env var.
+                    "pulumi-version": settings.default_pulumi_version,
                 },
             }
         }

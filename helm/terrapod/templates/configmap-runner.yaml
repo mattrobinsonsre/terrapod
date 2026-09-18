@@ -24,6 +24,7 @@ data:
     lifecycle_destroy_retries: {{ .Values.runners.lifecycleDestroyRetries | default 2 }}
     lifecycle_destroy_retry_backoff_seconds: {{ .Values.runners.lifecycleDestroyRetryBackoffSeconds | default 45 }}
     default_terraform_version: {{ .Values.runners.defaultTerraformVersion | default "1.12" | quote }}
+    default_pulumi_version: {{ .Values.runners.defaultPulumiVersion | default "3.208" | quote }}
     default_execution_backend: {{ .Values.runners.defaultExecutionBackend | default "tofu" | quote }}
     launch_timeout_seconds: {{ .Values.runners.launchTimeoutSeconds | default 300 }}
     {{- /* Execution-hooks kill-switch (#619). `dig` gives a correct default-true

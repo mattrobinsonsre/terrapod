@@ -16,12 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.metrics import BINARY_CACHE_REQUESTS
 from terrapod.config import settings
 from terrapod.db.models import CachedBinary
+from terrapod.engines import engine_enabled
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.services.artifact_verification import VerificationError, verify_binary
 from terrapod.services.cache_errors import CacheOnlyError
 from terrapod.services.hashing_stream import HashingStream
 from terrapod.services.platform_tools import (
+    DESCRIBED_TOOLS,
     PLATFORM_TOOLS,
     configured_version,
     verify_platform_tool,
@@ -42,8 +44,24 @@ from terrapod.storage.protocol import ObjectStore
 logger = get_logger(__name__)
 
 # The per-workspace CLI tools: partial-version resolution, prerelease tiering,
-# GPG-signed publisher manifests.
-CLI_TOOLS = {"terraform", "tofu", "terragrunt"}
+# and -- for the three whose publisher signs one -- GPG-signed manifests.
+#
+# `pulumi` joined them in #1559, when the Pulumi CLI version stopped being one
+# operator-pinned value per deployment and became a property of the workspace,
+# like the Terraform/OpenTofu version it sits beside in `engine_version`. It is
+# a CLI tool in every sense this module cares about -- resolved from a partial,
+# subject to `allow_prerelease`, listed per version -- and differs only in where
+# its upstream facts live (services/platform_tools.py still owns its asset
+# layout) and in having no signature to check. See CHECKSUM_ONLY_TOOLS.
+CLI_TOOLS = {"terraform", "tofu", "terragrunt", "pulumi"}
+
+#: Tools whose publisher signs nothing, so the strongest check available is the
+#: artifact's SHA-256 against a checksum the publisher published. Verification
+#: is still fail-closed; `verify: signature` degrades to a checksum for these
+#: rather than refusing to cache them at all. Exactly the set whose upstream
+#: facts services/platform_tools.py describes -- signing nothing is why their
+#: asset layout had to be written down there in the first place.
+CHECKSUM_ONLY_TOOLS = DESCRIBED_TOOLS
 # The platform-scoped tools (#1208): one operator-pinned version per deployment,
 # no partial resolution, checksum-only verification. They share this cache's
 # storage, route and warm path — see services/platform_tools.py for why they are
@@ -106,10 +124,17 @@ def _version_sort_key(v: str) -> tuple:
             base = v[:idx]
             suffix = v[idx + len(marker) :]
             tier_rank = _STABILITY_RANK[tag]
-            try:
-                tier_num = int(suffix) if suffix else 0
-            except ValueError:
-                tier_num = 0
+            # Publishers disagree about the separator: HashiCorp writes `-rc2`,
+            # Pulumi `-rc.1`, and Pulumi's alphas carry a `+<sha>` build tag
+            # after the number. Take the leading digits of whatever follows, so
+            # every spelling orders within its tier instead of collapsing to 0
+            # and making "newest" arbitrary (#1559).
+            digits = ""
+            for ch in suffix.lstrip("."):
+                if not ch.isdigit():
+                    break
+                digits += ch
+            tier_num = int(digits) if digits else 0
             break
     try:
         base_parts = tuple(int(x) for x in base.split("."))
@@ -241,8 +266,7 @@ async def get_or_cache_binary(
         arch=arch,
     )
 
-    is_platform_tool = tool in PLATFORM_TOOLS
-    if is_platform_tool:
+    if tool in DESCRIBED_TOOLS:
         # Raises UnsupportedPlatformError for an os/arch the publisher does not
         # build — clearer than letting it 404 downstream.
         download_url = _platform_download_url(tool, version, os_, arch)
@@ -277,10 +301,18 @@ async def get_or_cache_binary(
     # publisher's own published sum. Same fail-closed behaviour.
     manifest: bytes = b""
     sig: bytes | None = None
-    if is_platform_tool:
+    if tool in CHECKSUM_ONLY_TOOLS:
+        # No signature exists to check. A platform tool reads its own switch; a
+        # CLI tool reads the binary cache's, where `signature` means "the
+        # strongest available", which for these is the publisher's checksum.
+        level = (
+            settings.registry.platform_tools.verify
+            if tool in PLATFORM_TOOLS
+            else settings.registry.binary_cache.verify
+        )
         try:
             async with httpx.AsyncClient(follow_redirects=True) as vclient:
-                await verify_platform_tool(vclient, tool, version, os_, arch, shasum)
+                await verify_platform_tool(vclient, tool, version, os_, arch, shasum, level=level)
         except VerificationError:
             await storage.delete(key)
             BINARY_CACHE_REQUESTS.labels(tool=tool, result="verify_failed").inc()
@@ -363,13 +395,13 @@ async def get_or_cache_sums(storage: ObjectStore, tool: str, version: str) -> tu
     """
     if tool not in VALID_TOOLS:
         raise ValueError(f"Invalid tool: {tool}. Must be one of {VALID_TOOLS}")
-    if tool in PLATFORM_TOOLS:
-        # No signed manifest exists for any of the three (#1208), so there is
+    if tool in CHECKSUM_ONLY_TOOLS:
+        # No signed manifest exists for any of these publishers, so there is
         # nothing to serve and nothing for a runner to re-verify against. Say so
         # rather than 404-ing as if the cache were merely cold.
         raise ValueError(
-            f"{tool} publishes no GPG-signed SHA256SUMS — platform tools are "
-            f"verified by checksum at fetch time, not by a served signature."
+            f"{tool} publishes no GPG-signed SHA256SUMS — it is verified by "
+            f"checksum at fetch time, not by a served signature."
         )
 
     sums_key = binary_cache_sums_key(tool, version)
@@ -462,6 +494,16 @@ async def list_available_versions(tool: str) -> list[str]:
     """
     if tool not in VALID_TOOLS:
         raise ValueError(f"Invalid tool: {tool}. Must be one of {VALID_TOOLS}")
+    # Engine gating (#1429). Listing reaches an upstream index, and a deployment
+    # that has not switched Pulumi on should neither make requests on its behalf
+    # nor offer its versions in a picker. The route stays mounted -- it is the
+    # binary cache, which is what Terrapod is and is never gateable -- so this
+    # refuses the tool value, exactly as `strategy_for` refuses a disabled
+    # engine. Deliberately NOT applied to get_or_cache_binary or purge_binary:
+    # gating hides and halts, never destroys, and an operator must still be able
+    # to purge a Pulumi binary cached before the engine was switched off.
+    if tool == "pulumi" and not engine_enabled("pulumi"):
+        raise ValueError("the pulumi engine is not enabled on this deployment")
 
     # A platform tool has exactly one version: the one this deployment pins
     # (#1208). There is no menu to offer and no upstream index to consult.
@@ -492,6 +534,8 @@ async def list_available_versions(tool: str) -> list[str]:
 
     if tool == "terraform":
         versions = await _fetch_terraform_versions()
+    elif tool == "pulumi":
+        versions = await _fetch_pulumi_versions()
     elif tool == "terragrunt":
         versions = await _fetch_terragrunt_versions()
     else:
@@ -674,6 +718,8 @@ async def resolve_version(tool: str, partial_version: str) -> str:
         resolved = await _resolve_tofu_version(partial_version)
     elif tool == "terragrunt":
         resolved = await _resolve_terragrunt_version(partial_version)
+    elif tool == "pulumi":
+        resolved = await _resolve_pulumi_version(partial_version)
     else:
         return partial_version
 
@@ -782,6 +828,70 @@ async def _resolve_terragrunt_version(partial: str) -> str:
 
     if not matching:
         logger.warning("No matching terragrunt version found", partial=partial, policy=policy)
+        return partial
+
+    matching.sort(key=_version_sort_key)
+    return matching[-1]
+
+
+async def _fetch_pulumi_versions() -> list[str]:
+    """Fetch Pulumi CLI versions from GitHub releases (pulumi/pulumi).
+
+    The same shape and the same caveat as terragrunt's: Pulumi publishes no
+    static version index of its own -- only a plain-text "latest version"
+    endpoint, which cannot answer "what is the newest 3.208.x" -- so this reads
+    the GitHub releases API and inherits its rate limit. One page covers well
+    over a year of releases; an operator who needs to resolve a partial older
+    than that, or who is being rate-limited, points
+    `binary_cache.pulumi_version_index_url` at a mirror serving the same shape.
+    """
+    url = settings.registry.binary_cache.pulumi_version_index_url
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # trust_env (httpx default) routes via the configured proxy/CA (#592).
+        resp = await arequest_with_retry(client, "GET", url, params={"per_page": 100})
+        resp.raise_for_status()
+        releases = resp.json()
+
+    policy = settings.registry.binary_cache.allow_prerelease
+    versions = []
+    for release in releases:
+        tag = release.get("tag_name", "")
+        version = tag.lstrip("v")
+        if not _is_version_allowed(version, policy):
+            continue
+        parts = version.split("-")[0].split(".")
+        if len(parts) >= 3:
+            versions.append(version)
+    return versions
+
+
+async def _resolve_pulumi_version(partial: str) -> str:
+    """Resolve a partial Pulumi version via GitHub releases (pulumi/pulumi).
+
+    Mirrors `_resolve_terragrunt_version`; honours the allow_prerelease policy.
+    """
+    url = settings.registry.binary_cache.pulumi_version_index_url
+    prefix = f"v{partial}."
+    policy = settings.registry.binary_cache.allow_prerelease
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # trust_env (httpx default) routes via the configured proxy/CA (#592).
+        resp = await arequest_with_retry(client, "GET", url, params={"per_page": 100})
+        resp.raise_for_status()
+        releases = resp.json()
+
+    matching = []
+    for release in releases:
+        tag = release.get("tag_name", "")
+        if not tag.startswith(prefix):
+            continue
+        version = tag.lstrip("v")
+        if not _is_version_allowed(version, policy):
+            continue
+        matching.append(version)
+
+    if not matching:
+        logger.warning("No matching pulumi version found", partial=partial, policy=policy)
         return partial
 
     matching.sort(key=_version_sort_key)

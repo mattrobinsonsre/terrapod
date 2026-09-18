@@ -8,6 +8,20 @@ from typing import Any
 from fastapi import HTTPException
 
 
+def default_engine_version(engine: str) -> str:
+    """The version a new workspace of this engine gets when it pins none (#1559).
+
+    One default per engine, because "1.12" is a Terraform version and Pulumi is
+    on 3.x -- handing a Pulumi workspace the Terraform default produces a run
+    that asks the cache for a release that has never existed.
+    """
+    from terrapod.config import settings
+
+    if engine == "pulumi":
+        return settings.default_pulumi_version
+    return settings.default_terraform_version
+
+
 def engine_version_attr(attrs: dict[str, Any], default: str) -> str:
     """Read the engine version under either name, preferring `engine-version`.
 

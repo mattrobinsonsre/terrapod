@@ -43,7 +43,11 @@ class PulumiRunOptions:
     phase: str = "preview"
     #: The stack this run targets, as `{project}/{stack}`.
     stack: str = ""
-    #: Pinned CLI version; empty means the image's own.
+    #: The Pulumi CLI version this run executes with (#1559). Named
+    #: `pulumi_version` rather than `engine_version` because a run option is the
+    #: engine's own vocabulary, and this is the one place the engine is named.
+    #: Empty means the deployment's `default_pulumi_version`; a partial like
+    #: "3.208" is resolved by the binary cache to the newest matching release.
     pulumi_version: str = ""
     #: Working directory within the fetched configuration.
     working_directory: str = ""
@@ -120,8 +124,17 @@ class PulumiStrategy:
         ]
         if options.stack:
             env.append({"name": "TP_PULUMI_STACK", "value": options.stack})
-        if options.pulumi_version:
-            env.append({"name": "TP_PULUMI_VERSION", "value": options.pulumi_version})
+        # Always emitted, the way Terraform's TP_VERSION is (#1559). Before
+        # this it was conditional and nothing ever read it, so every Pulumi run
+        # silently used whatever version the deployment had pinned in Helm.
+        env.append(
+            {
+                "name": "TP_PULUMI_VERSION",
+                "value": options.pulumi_version
+                or getattr(runner_config, "default_pulumi_version", "")
+                or "",
+            }
+        )
         if options.working_directory:
             env.append({"name": "TP_WORKING_DIR", "value": options.working_directory})
         if options.is_destroy:
@@ -157,7 +170,11 @@ class PulumiStrategy:
         return PulumiRunOptions(
             phase="preview" if phase == "plan" else "update",
             stack=attrs.get("pulumi-stack", ""),
-            pulumi_version=attrs.get("pulumi-version", ""),
+            # The workspace pins one version for whichever engine it runs, and
+            # it travels as `engine-version` (#1559). `pulumi-version` is read
+            # after it only so that removing nothing from the wire contract
+            # stays true; no API revision has ever sent it.
+            pulumi_version=attrs.get("engine-version", attrs.get("pulumi-version", "")),
             working_directory=attrs.get("working-directory", ""),
             is_destroy=attrs.get("is-destroy", False),
             refresh=attrs.get("refresh", True),

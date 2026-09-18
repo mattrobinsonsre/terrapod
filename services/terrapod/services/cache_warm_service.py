@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import WarmBinaryEntry, WarmPlatform, WarmProviderEntry, settings
+from terrapod.engines import engine_enabled
 from terrapod.logging_config import get_logger
 from terrapod.services import binary_cache_service, platform_tools, provider_cache_service
 from terrapod.storage.protocol import ObjectStore
@@ -71,11 +72,24 @@ def platform_tool_entries() -> list[WarmBinaryEntry]:
     remember to add opa/trivy/checkov to its warm manifest: forgetting would seal
     an install whose policy gate cannot run, which is the failure this derivation
     exists to make impossible.
+
+    Pulumi is still derived even though #1559 made its version per-workspace,
+    because the same argument holds for the *default*: a sealed install that
+    forgets it has no Pulumi binary at all, and the first Pulumi run fails
+    fetching one with no way to recover behind the seal. A workspace pinning
+    something other than the default must still be listed by hand, exactly as a
+    Terraform workspace on a non-default version must be — that part is the
+    operator's to know and is called out in the air-gap guidance.
     """
-    return [
+    entries = [
         WarmBinaryEntry(tool=tool, version=platform_tools.configured_version(tool))
         for tool in sorted(platform_tools.PLATFORM_TOOLS)
     ]
+    # Only when the engine is on: sealing a Terraform-only deployment should
+    # not pull down a Pulumi binary it will never run (#1429).
+    if settings.default_pulumi_version and engine_enabled("pulumi"):
+        entries.append(WarmBinaryEntry(tool="pulumi", version=settings.default_pulumi_version))
+    return sorted(entries, key=lambda e: e.tool)
 
 
 async def warm_from_manifest(

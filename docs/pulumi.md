@@ -63,6 +63,32 @@ for a Pulumi run at the same four points, around the preview and the update. A
 hook that exits non-zero fails the run, so a `pre_apply` hook that refuses means
 nothing is applied.
 
+### Which Pulumi version a run uses
+
+The workspace pins it, in the same `engine-version` attribute a Terraform
+workspace uses for its own version (#1559) — so two Pulumi workspaces can sit on
+different CLI versions, and upgrading one does not move the others.
+
+| | |
+|---|---|
+| **Partial versions** | `3.208` means the newest `3.208.*`. An exact `3.208.2` is taken as written. |
+| **Unset** | The deployment's `default_pulumi_version`. |
+| **Where it comes from** | The same pull-through binary cache that serves `tofu` and `terraform`, so a runner needs no reach to Pulumi's releases. |
+| **Verification** | The artifact's SHA-256 against the checksum Pulumi publishes for that release, fail-closed. There is no signature to check — Pulumi signs nothing — so `binary_cache.verify: signature` means "the strongest available", which here is that checksum. |
+
+Pulumi publishes no static version index, only a plain-text "latest version"
+endpoint, so resolving a partial reads the GitHub releases API and inherits its
+rate limit. Point `binary_cache.pulumi_version_index_url` at a mirror of the same
+shape if that bites. A **sealed** deployment resolves only against what is
+already cached: the default version is warmed for you, but a workspace pinned to
+anything else must be listed in the warm manifest, exactly as a Terraform
+workspace on a non-default version must be.
+
+With the Pulumi engine switched off, none of this is reachable — asking the
+cache to list Pulumi versions is refused rather than answered, so a
+Terraform-only deployment makes no requests on Pulumi's behalf and warms no
+Pulumi binary.
+
 ### Binding an update to its preview
 
 `pulumi-bind-plan` on the workspace makes the update perform exactly the
@@ -94,8 +120,6 @@ resource's old and new values, which is where a stack's secrets are.
   holding every apply for an evaluation that cannot happen, policy sets are not
   evaluated for Pulumi runs and scanning is refused on a Pulumi workspace
   (#1567). The run says so in `meta.not-evaluated-reason`.
-- **The Pulumi CLI version is a deployment-wide setting** at the time of
-  writing, not per workspace as `terraform-version` is.
 
 ## See also
 

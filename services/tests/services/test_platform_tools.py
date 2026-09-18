@@ -116,8 +116,13 @@ class TestDownloadURL:
         with pytest.raises(UnsupportedPlatformError):
             download_url(tool, "1.0.0", os_, arch)
 
-    def test_every_platform_tool_has_a_spec(self) -> None:
-        assert set(SPECS) == set(PLATFORM_TOOLS)
+    def test_every_described_tool_has_a_spec(self) -> None:
+        # DESCRIBED_TOOLS, not PLATFORM_TOOLS: pulumi's version became
+        # per-workspace in #1559 but its asset layout is still written down
+        # here, and the runner's unpack table is pinned equal to this one.
+        from terrapod.services.platform_tools import DESCRIBED_TOOLS
+
+        assert set(SPECS) == set(DESCRIBED_TOOLS)
 
 
 class TestExpectedSha256:

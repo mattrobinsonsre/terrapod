@@ -249,6 +249,40 @@ that one rollout and nothing else.
 alongside the canonical `engine-version`, permanently — go-tfe reads it by that
 name. See [api-reference.md](api-reference.md#engine-version-and-its-older-name-terraform-version).
 
+### `registry.platform_tools.pulumi_version` is removed — the version is per workspace
+
+**Affects:** deployments running Pulumi workspaces. Terraform and OpenTofu are
+untouched.
+
+The Pulumi CLI version used to be one value for the whole deployment, pinned in
+Helm. It is the workspace's now, in the same `engine-version` attribute a
+Terraform workspace uses — so two Pulumi workspaces can sit on different CLI
+versions, which is what every other per-workspace setting already allowed.
+
+**What to do before upgrading:** delete
+`api.config.registry.platform_tools.pulumi_version` and
+`api.config.registry.platform_tools.pulumi_mirror_url` from your values. The
+chart's schema rejects unknown keys, so leaving them in place fails the upgrade
+rather than being ignored. If you were pinning a version, set
+`api.config.default_pulumi_version` to it instead — that is what a workspace
+gets when it pins none. The mirror moved rather than vanished: it is
+`api.config.registry.binary_cache.pulumi_mirror_url` now, beside the other CLI
+tools, with `pulumi_version_index_url` alongside it for partial-version
+resolution.
+
+**What happens to your existing Pulumi workspaces.** They carry a Terraform
+version in that column — typically `1.12` — because the workspace-creation path
+filled it in from `default_terraform_version` and nothing read it. Read as a
+Pulumi version it is nonsense, and the first run would ask for a Pulumi 1.12
+that has never existed. A migration clears it, so those workspaces take the
+deployment default: the same behaviour they have had all along. Pin a version on
+any workspace that wants a specific one.
+
+**Air-gapped deployments:** the default version is still warmed for you, but a
+workspace pinned to anything else now needs an explicit entry in the warm
+manifest — the same rule that has always applied to a Terraform workspace on a
+non-default version.
+
 ### The Python floor moves to 3.14
 
 **Affects:** anyone who builds Terrapod's images themselves, overrides `BASE_IMAGE`,

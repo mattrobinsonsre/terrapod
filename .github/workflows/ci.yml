@@ -1351,7 +1351,8 @@ jobs:
           # Terraform-only deployment should not carry another engine's binary, and
           # a missing render line leaves the version inert with the code default
           # silently winning.
-          echo "$out" | grep -q "pulumi_version:" || { echo "FAIL: platform_tools.pulumi_version not rendered (#1523)"; exit 1; }
+          echo "$out" | grep -q "default_pulumi_version:" || { echo "FAIL: default_pulumi_version not rendered — a Pulumi workspace that pins no version would get none (#1559)"; exit 1; }
+          echo "$out" | grep -q "pulumi_version_index_url:" || { echo "FAIL: binary_cache.pulumi_version_index_url not rendered — partial Pulumi versions would not resolve (#1559)"; exit 1; }
           # Platform tools (#1208): opa/trivy/checkov are no longer baked into the
           # images, so these versions are the ONLY thing telling a runner what to
           # fetch. A missing render line leaves the value inert and the code default

@@ -424,11 +424,12 @@ What this means for a program:
   Terraform's.
 
 **The binary is fetched, not baked in.** `pulumi` is pulled through the same
-cache that serves `tofu`/`terraform`, so the version is
-`registry.platform_tools.pulumi_version` in your values (default `3.208.0`) and
-an upstream fix reaches a deployment with a `helm upgrade` rather than a Terrapod
-release. If the cache cannot supply it the run fails rather than falling back to
-whatever `pulumi` might be on the image.
+cache that serves `tofu`/`terraform`, and the version is the workspace's
+`engine-version` — per workspace, exactly as a Terraform version is. Partial
+versions work: `3.208` means the newest `3.208.*`. A workspace that pins none
+gets `default_pulumi_version` from your values. If the cache cannot supply the
+binary the run fails rather than falling back to whatever `pulumi` might be on
+the image.
 
 **Nothing reaches for Pulumi Cloud.** The backend is a directory in the Job, set
 through `PULUMI_BACKEND_URL`, so there is no `pulumi login` to perform. Plugin

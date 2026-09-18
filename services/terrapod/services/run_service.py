@@ -796,13 +796,20 @@ async def create_run(
     requested_version = engine_version or workspace.engine_version
     from terrapod.services.binary_cache_service import resolve_version
 
+    # Which tool's release list this resolves against. A Pulumi workspace's
+    # `engine_version` is a Pulumi version, and `execution_backend` still says
+    # "tofu" on one -- it names the Terraform-family binary and is not consulted
+    # for Pulumi at all -- so resolving against it would look up "3.208" in
+    # OpenTofu's index, find nothing, and pin the partial verbatim for the
+    # runner to 404 on (#1559).
+    version_tool = "pulumi" if workspace.engine == "pulumi" else workspace.execution_backend
     try:
-        pinned_version = await resolve_version(workspace.execution_backend, requested_version)
+        pinned_version = await resolve_version(version_tool, requested_version)
     except Exception:  # never block run creation on version resolution
         logger.warning(
             "Execution version resolution failed; pinning requested version as-is",
             requested=requested_version,
-            backend=workspace.execution_backend,
+            backend=version_tool,
             exc_info=True,
         )
         pinned_version = requested_version
