@@ -602,3 +602,86 @@ class TestSealed:
 
         assert r.status_code == 404
         assert "cache_only" in r.json()["detail"]
+
+
+class TestARunnerIsAnsweredWithTheAddressItAskedOn:
+    """Tarball links have to be reachable by the client that will fetch them (#1566).
+
+    `external_url` is the operator's answer for a browser or a developer's CLI.
+    A runner Job is neither: it runs inside the cluster and talks to the API on
+    an in-cluster URL precisely because it may have no route to the external one.
+    Handed an `external_url` link it follows it and fails — in local development
+    the external host resolves to loopback and the pod gets
+    `ECONNREFUSED 127.0.0.1:443`, which is exactly how this was found.
+    """
+
+    def _request(self, path="/api/terrapod/v1/package-cache/npm/left-pad"):
+        from starlette.datastructures import Headers
+
+        req = MagicMock()
+        req.url = MagicMock(path=path, scheme="http")
+        req.base_url = "http://terrapod-api:8000/"
+        req.headers = Headers({})
+        return req
+
+    def _runner(self):
+        from terrapod.api.dependencies import AuthenticatedUser
+
+        return AuthenticatedUser(
+            email="runner",
+            display_name="Runner Job",
+            roles=["everyone"],
+            provider_name="runner_token",
+            auth_method="runner_token",
+            run_id="run-1",
+        )
+
+    def _person(self):
+        from terrapod.api.dependencies import AuthenticatedUser
+
+        return AuthenticatedUser(
+            email="a@b.c",
+            display_name="A",
+            roles=["admin"],
+            provider_name="local",
+            auth_method="session",
+        )
+
+    def test_a_runner_gets_the_in_cluster_base(self):
+        from terrapod.api.routers.package_cache import _rewrite_base
+
+        with patch("terrapod.api.routers.package_cache.settings") as st:
+            st.external_url = "https://terrapod.example.com"
+            got = _rewrite_base(self._request(), self._runner())
+        assert got.startswith("http://terrapod-api:8000/")
+
+    def test_everyone_else_still_gets_external_url(self):
+        # The change must not move the answer for the callers it was written for.
+        from terrapod.api.routers.package_cache import _rewrite_base
+
+        with patch("terrapod.api.routers.package_cache.settings") as st:
+            st.external_url = "https://terrapod.example.com"
+            got = _rewrite_base(self._request(), self._person())
+        assert got.startswith("https://terrapod.example.com/")
+
+    def test_no_user_is_treated_as_not_a_runner(self):
+        from terrapod.api.routers.package_cache import _rewrite_base
+
+        with patch("terrapod.api.routers.package_cache.settings") as st:
+            st.external_url = "https://terrapod.example.com"
+            got = _rewrite_base(self._request(), None)
+        assert got.startswith("https://terrapod.example.com/")
+
+    def test_the_runner_answer_keeps_the_prefix_the_caller_used(self):
+        # npm resolves `_authToken` by request path, so an answer on a different
+        # prefix would strip the runner's own credential from every fetch.
+        from terrapod.api.routers.package_cache import _rewrite_base
+
+        with patch("terrapod.api.routers.package_cache.settings") as st:
+            st.external_url = "https://terrapod.example.com"
+            legacy = _rewrite_base(self._request(), self._runner())
+            canonical = _rewrite_base(
+                self._request("/api/v1/package-cache/npm/left-pad"), self._runner()
+            )
+        assert "/api/terrapod/v1/package-cache/npm" in legacy
+        assert "/api/v1/package-cache/npm" in canonical

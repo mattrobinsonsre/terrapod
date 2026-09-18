@@ -260,12 +260,24 @@ async def pypi_file(
 # packument — so this half does need to know its own external URL.
 
 
-def _npm_base(request: Request) -> str:
-    """The absolute base URL for rewritten tarball links.
+def _rewrite_base(request: Request, user: AuthenticatedUser | None = None) -> str:
+    """The absolute base to hand a client for its follow-up tarball fetches.
 
     npm does not resolve `dist.tarball` relative to the packument, so unlike the
-    PyPI half this one has to know its own external address. Three sources, in
-    descending order of how much they can be trusted:
+    PyPI half this one has to know its own address.
+
+    **A runner is answered with the address it asked on, ahead of everything
+    else.** It runs inside the cluster and reaches the API on an in-cluster URL
+    precisely because it may have no route to the external one -- the normal case
+    behind a private ingress, and literally true in local development, where the
+    external host resolves to loopback and a pod following such a link gets
+    `ECONNREFUSED 127.0.0.1:443`. `external_url` is the right answer for a
+    browser or a developer's CLI and the wrong one for a Job; the caller's own
+    identity is what tells them apart (#1566). A runner token is authenticated
+    and scoped to a single run, so this is not something a stranger can ask for.
+
+    For every other caller, three sources in descending order of how much they
+    can be trusted:
 
     1. **`external_url`** — the operator's explicit answer, correct however many
        proxies sit in front. Set it; everything else is a fallback.
@@ -281,6 +293,10 @@ def _npm_base(request: Request) -> str:
     mislead themselves and no one else — and because (1) takes precedence, so a
     deployment that sets `external_url` is not exposed to it at all.
     """
+    if user is not None and user.auth_method == "runner_token":
+        base = str(request.base_url).rstrip("/")
+        return f"{base}{prefix_of(request.url.path)}/package-cache/npm"
+
     configured = (settings.external_url or "").strip().rstrip("/")
     if configured:
         base = configured
@@ -358,7 +374,7 @@ async def npm_packument(
             )
         held = set(await cached_filenames(db, npm.ECOSYSTEM, name))
         packument = npm.restrict_to_cached(json.loads(raw), held)
-        return JSONResponse(content=npm.rewrite(packument, _npm_base(request)))
+        return JSONResponse(content=npm.rewrite(packument, _rewrite_base(request, user)))
 
     # Pass the client's own Accept through, so an install stays on the small
     # abbreviated document rather than pulling megabytes it will not read.
@@ -380,7 +396,7 @@ async def npm_packument(
     except Exception:
         logger.warning("Could not cache packument", package=name, exc_info=True)
 
-    return JSONResponse(content=npm.rewrite(packument, _npm_base(request)))
+    return JSONResponse(content=npm.rewrite(packument, _rewrite_base(request, user)))
 
 
 # ── Ansible Galaxy ──────────────────────────────────────────────────────────
@@ -389,7 +405,7 @@ async def npm_packument(
 def _galaxy_base(request: Request) -> str:
     """The absolute base URL for rewritten Galaxy links.
 
-    Same three sources, same precedence and same caveat as :func:`_npm_base` —
+    Same sources, same precedence and same caveat as :func:`_rewrite_base` —
     `external_url` first, then the forwarded headers, then the request's own base
     — because ansible-galaxy resolves nothing relative to the document either.
 
@@ -1013,7 +1029,7 @@ async def go_module_file(
 def _nuget_base(request: Request) -> str:
     """This proxy's own absolute base, resolved per request.
 
-    Same three sources and precedence as `_npm_base` and `_galaxy_base`. It
+    Same sources and precedence as `_rewrite_base` and `_galaxy_base`. It
     matters more here than anywhere else: the service index advertises absolute
     URLs the client follows verbatim, so a base that is wrong — or that drops
     the path prefix this proxy is mounted under — sends `dotnet restore` to
