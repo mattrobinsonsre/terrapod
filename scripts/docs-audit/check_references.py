@@ -39,6 +39,16 @@ REPO_PATH = re.compile(r"`((?:services|web|helm|docs|scripts|provider|go-terrapo
 # Dotted names that collide with a chart root but are something else entirely.
 NOT_CHART_KEYS = {"redis.asyncio"}  # the Python client library
 
+# Docs whose subject IS change over time, so naming a key that no longer exists
+# is the point rather than a mistake. An upgrade note that cannot say which
+# setting was removed is useless, and a deprecation page names things precisely
+# because they are going away. Only the Helm check is relaxed for these — a
+# broken `make` target or repo path in them is still a broken reference.
+HISTORICAL_DOCS = {
+    "docs/upgrading-to-2.0.md",
+    "docs/deprecations.md",
+}
+
 FREEFORM = {
     "annotations", "labels", "podAnnotations", "podLabels", "selectorLabels",
     "nodeSelector", "tolerations", "affinity", "topologySpreadConstraints",
@@ -144,6 +154,8 @@ def main() -> int:
                 if t not in targets:
                     problems.append(f"{f}:{lineno}: `make {t}` — no such Makefile target")
             for k in HELM.findall(line):
+                if f in HISTORICAL_DOCS:
+                    continue
                 counts["helm"] += 1
                 # A leaf under a free-form map (annotations, labels, nodeSelector)
                 # is operator data, not a chart key.
