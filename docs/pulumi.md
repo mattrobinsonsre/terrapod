@@ -101,7 +101,10 @@ toolchain, and the program's dependencies.
 | `nodejs` (TypeScript and JavaScript) | Works. Node is fetched through the binary cache and `npm ci` (or `npm install`) runs against Terrapod's npm proxy before the preview. |
 | `python` | Works. A virtualenv is built and `requirements.txt` installed into it from Terrapod's PyPI proxy. |
 | `go` | Works. The Go toolchain is fetched through the binary cache and `go mod download` runs against Terrapod's Go module proxy. |
-| `dotnet` | Refused, by name, with a message saying so. Tracked on #1566. |
+| `dotnet` (C#, F#, VB) | Works. The .NET SDK is fetched through the binary cache and `dotnet restore` runs against Terrapod's NuGet proxy. |
+
+A runtime Pulumi does not have — or a typo — is still refused by name, rather
+than guessing at an install.
 
 The refusal is deliberate: a program Terrapod cannot run fails at the start with
 a sentence naming its runtime, rather than part-way through Pulumi with an error

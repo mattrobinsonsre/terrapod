@@ -102,6 +102,7 @@ async def platform_tool_versions(
                     # (#1566). Partial, resolved by the cache like the rest.
                     "node-version": settings.default_node_version,
                     "go-version": settings.default_go_version,
+                    "dotnet-version": settings.default_dotnet_version,
                 },
             }
         }

@@ -58,7 +58,7 @@ PLATFORM_TOOLS = frozenset({"opa", "trivy", "checkov"})
 #: tar.gz holding the language plugins, the checksum manifest with the version
 #: spelled two ways in one URL. None of that is any less true for a per-workspace
 #: tool, and moving it would have bought nothing but churn.
-_NON_PLATFORM_TOOLS = frozenset({"pulumi", "node", "go"})
+_NON_PLATFORM_TOOLS = frozenset({"pulumi", "node", "go", "dotnet"})
 
 #: Every tool this module describes, however it is scoped.
 DESCRIBED_TOOLS = PLATFORM_TOOLS | _NON_PLATFORM_TOOLS
@@ -73,6 +73,20 @@ _NODE_PLATFORM = {
     ("darwin", "amd64"): "darwin-x64",
     ("darwin", "arm64"): "darwin-arm64",
 }
+
+#: .NET's own platform naming (its "RID"). Its archive is the odd one of the
+#: four: it extracts FLAT, with `dotnet` at the top and no directory to strip.
+_DOTNET_PLATFORM = {
+    ("linux", "amd64"): "linux-x64",
+    ("linux", "arm64"): "linux-arm64",
+    ("darwin", "amd64"): "osx-x64",
+    ("darwin", "arm64"): "osx-arm64",
+}
+
+#: The digest each publisher states. SHA-256 unless named here -- .NET publishes
+#: only a SHA-512, which is why the cache computes both as an artifact streams
+#: past (#1566).
+_CHECKSUM_ALGO = {"dotnet": "sha512"}
 
 #: Go's own platform naming -- the one publisher that needs no translation,
 #: because Terrapod already speaks Go-style os/arch. Its archive root is a plain
@@ -147,6 +161,9 @@ SPECS: dict[str, PlatformToolSpec] = {
     # The Go toolchain a Pulumi Go program needs (#1566). Pulumi compiles the
     # program, so this is the whole toolchain rather than a runtime.
     "go": PlatformToolSpec(archive="targz", member="bin/go", content_type="application/gzip"),
+    # The .NET SDK a Pulumi C# program is built with (#1566). Its tarball has no
+    # top-level directory at all, so `member` is resolved at the extraction root.
+    "dotnet": PlatformToolSpec(archive="targz", member="dotnet", content_type="application/gzip"),
 }
 
 
@@ -160,6 +177,7 @@ def _mirror(tool: str) -> str:
         "pulumi": settings.registry.binary_cache.pulumi_mirror_url,
         "node": settings.registry.binary_cache.node_mirror_url,
         "go": settings.registry.binary_cache.go_mirror_url,
+        "dotnet": settings.registry.binary_cache.dotnet_mirror_url,
     }[tool].rstrip("/")
 
 
@@ -171,6 +189,39 @@ def configured_version(tool: str) -> str:
         "trivy": cfg.trivy_version,
         "checkov": cfg.checkov_version,
     }[tool]
+
+
+def checksum_algorithm(tool: str) -> str:
+    """Which digest this publisher states for its artifacts."""
+    return _CHECKSUM_ALGO.get(tool, "sha256")
+
+
+async def _dotnet_channel_index() -> list[dict]:
+    """.NET's channel index: one entry per release line, each naming its own
+    releases.json."""
+    url = settings.registry.binary_cache.dotnet_version_index_url
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await arequest_with_retry(client, "GET", url)
+        resp.raise_for_status()
+        return list(resp.json().get("releases-index", []))
+
+
+async def _dotnet_releases(version: str) -> list[dict]:
+    """Every release in the channel that owns `version`.
+
+    .NET splits its metadata per release line, so the channel has to be found
+    first -- from the version itself, whose first two components are the channel
+    ("9.0.318" lives in "9.0").
+    """
+    channel = ".".join(version.split(".")[:2])
+    for entry in await _dotnet_channel_index():
+        if str(entry.get("channel-version")) != channel:
+            continue
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await arequest_with_retry(client, "GET", entry["releases.json"])
+            resp.raise_for_status()
+            return list(resp.json().get("releases", []))
+    return []
 
 
 async def _go_index() -> list[dict]:
@@ -212,6 +263,11 @@ def download_url(tool: str, version: str, os_: str, arch: str) -> str:
         if plat is None:
             raise UnsupportedPlatformError(f"pulumi publishes no asset for {os_}/{arch}")
         return f"{base}/v{version}/pulumi-v{version}-{plat}.tar.gz"
+    if tool == "dotnet":
+        plat = _DOTNET_PLATFORM.get((os_, arch))
+        if plat is None:
+            raise UnsupportedPlatformError(f"dotnet publishes no asset for {os_}/{arch}")
+        return f"{base}/Sdk/{version}/dotnet-sdk-{version}-{plat}.tar.gz"
     if tool == "go":
         plat = _GO_PLATFORM.get((os_, arch))
         if plat is None:
@@ -269,6 +325,16 @@ async def _expected_sha256(
             if len(parts) >= 2 and parts[1].lstrip("*") == asset:
                 return parts[0].lower()
         raise VerificationError(f"{asset} is not listed in the trivy checksums manifest")
+
+    if tool == "dotnet":
+        # .NET states a SHA-512 and no SHA-256, which is why the cache computes
+        # both. The digest lives in the channel's release metadata beside the
+        # file, so the same document answers "which version" and "which bytes".
+        for release in await _dotnet_releases(version):
+            for f in release.get("sdk", {}).get("files", []):
+                if f.get("url", "").rsplit("/", 1)[-1] == asset and f.get("hash"):
+                    return str(f["hash"]).lower()
+        raise VerificationError(f"{asset} is not listed in the dotnet release metadata")
 
     if tool == "go":
         # Go publishes no checksum manifest: the sha256 sits beside each file in
@@ -353,7 +419,7 @@ async def verify_platform_tool(
     version: str,
     os_: str,
     arch: str,
-    artifact_sha256_hex: str,
+    digests: dict[str, str],
     level: str | None = None,
 ) -> None:
     """Check a downloaded artifact against the publisher's checksum.
@@ -377,10 +443,11 @@ async def verify_platform_tool(
         )
         return
 
+    algo = checksum_algorithm(tool)
     expected = await _expected_sha256(client, tool, version, os_, arch)
-    if expected != artifact_sha256_hex.lower():
+    if expected != digests.get(algo, "").lower():
         raise VerificationError(
-            f"checksum mismatch for {tool} {version} {os_}/{arch}: downloaded "
-            f"{artifact_sha256_hex}, publisher says {expected} — refusing to cache "
+            f"{algo} mismatch for {tool} {version} {os_}/{arch}: downloaded "
+            f"{digests.get(algo, '')}, publisher says {expected} — refusing to cache "
             f"(possible tampering)"
         )

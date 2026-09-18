@@ -172,6 +172,9 @@ api:
     default_node_version: "22"
     # The Go toolchain version for a Pulumi Go program. Partial, like the others.
     default_go_version: "1.25"
+    # The .NET channel for a Pulumi C# program; resolved to that channel's
+    # latest SDK.
+    default_dotnet_version: "9.0"
 
     # Storage configuration — exactly one backend must be configured.
     # IMPORTANT: Filesystem storage is for dev/single-instance only.
@@ -495,6 +498,10 @@ api:
         # Go publishes no separate checksum manifest.
         go_mirror_url: "https://go.dev/dl"
         go_version_index_url: "https://go.dev/dl/?mode=json&include=all"
+        # The .NET SDK a Pulumi C# program is built with (#1566). .NET states a
+        # SHA-512 and no SHA-256, which is why the cache computes both.
+        dotnet_mirror_url: "https://builds.dotnet.microsoft.com/dotnet"
+        dotnet_version_index_url: "https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json"
         # Lowest pre-release tier to accept for terraform/tofu CLI version
         # resolution + caching. One of: none, rc, beta, alpha, dev.
         # 'none' (default) permits only GA releases. 'rc' allows release

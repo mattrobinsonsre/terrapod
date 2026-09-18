@@ -1471,6 +1471,9 @@
         "default_go_version": {
           "type": "string"
         },
+        "default_dotnet_version": {
+          "type": "string"
+        },
         "storage": {
           "type": "object",
           "additionalProperties": false,
@@ -1833,6 +1836,12 @@
                   "type": "string"
                 },
                 "go_version_index_url": {
+                  "type": "string"
+                },
+                "dotnet_mirror_url": {
+                  "type": "string"
+                },
+                "dotnet_version_index_url": {
                   "type": "string"
                 },
                 "allow_prerelease": {

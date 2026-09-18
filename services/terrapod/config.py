@@ -762,6 +762,20 @@ class BinaryCacheConfig(BaseModel):
         "it carries no rate limit. Used for version listing and partial-version "
         "resolution.",
     )
+    dotnet_mirror_url: str = Field(
+        default="https://builds.dotnet.microsoft.com/dotnet",
+        description="Download base for .NET SDK archives, used when a Pulumi C# "
+        "program needs one (#1566). Assets are "
+        "`Sdk/{version}/dotnet-sdk-{version}-{rid}.tar.gz`.",
+    )
+    dotnet_version_index_url: str = Field(
+        default="https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json",
+        description="Channel index for dotnet. Must return .NET's own shape: an "
+        "object with `releases-index`, each entry naming a `channel-version`, a "
+        "`latest-sdk` and its own `releases.json`. That per-channel document "
+        "carries the SHA-512 of each file -- .NET states no SHA-256, which is why "
+        "the cache computes both.",
+    )
     go_mirror_url: str = Field(
         default="https://go.dev/dl",
         description="Download base for Go toolchain archives, used when a Pulumi "
@@ -3122,6 +3136,11 @@ class Settings(BaseSettings):
     default_terraform_version: str = Field(
         default="1.12",
         description="Default terraform/tofu version for new workspaces",
+    )
+    default_dotnet_version: str = Field(
+        default="9.0",
+        description="Default .NET SDK version for a Pulumi C# program (#1566). "
+        "Partial, resolved to that channel's latest SDK through the binary cache.",
     )
     default_go_version: str = Field(
         default="1.25",

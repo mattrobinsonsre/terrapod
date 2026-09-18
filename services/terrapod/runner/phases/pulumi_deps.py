@@ -84,7 +84,7 @@ _NO_INSTALL = {"yaml", ""}
 
 #: What this release can install. The rest are named in the refusal rather than
 #: failing later inside Pulumi with something less legible.
-_SUPPORTED = {"nodejs", "python", "go"}
+_SUPPORTED = {"nodejs", "python", "go", "dotnet"}
 
 
 def read_runtime(program_dir: Path) -> str:
@@ -213,6 +213,10 @@ def install(cfg, program_dir: Path, *, child_grace: float, log_file: str) -> Non
             f"{runtime.name!r} yet: only {', '.join(sorted(_SUPPORTED))} and yaml "
             f"are supported. Track #1566."
         )
+
+    if runtime.name == "dotnet":
+        _install_dotnet(cfg, program_dir, child_grace=child_grace, log_file=log_file, log=log)
+        return
 
     if runtime.name == "go":
         _install_go(cfg, program_dir, child_grace=child_grace, log_file=log_file, log=log)
@@ -464,6 +468,82 @@ class _ModuleProxy(threading.Thread):
         if self.is_alive():
             self._server.shutdown()
         self._server.server_close()
+
+
+def nuget_source_url(api_url: str) -> str:
+    """Terrapod's NuGet service index."""
+    return f"{api_url.rstrip('/')}{_API_PREFIX}/package-cache/nuget/index.json"
+
+
+def write_nuget_config(program_dir: Path, api_url: str, token: str) -> Path:
+    """Point NuGet at Terrapod's proxy, with the run's own token.
+
+    A file again, not a URL: `dotnet restore` echoes its sources. `<clear/>`
+    matters as much as the source itself -- without it nuget.org stays in the
+    list and a sealed deployment hangs on it before ever reaching ours.
+    """
+    source = nuget_source_url(api_url)
+    body = f"""<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear/>
+    <add key="terrapod" value="{source}" />
+  </packageSources>
+  <packageSourceCredentials>
+    <terrapod>
+      <add key="Username" value="x" />
+      <add key="ClearTextPassword" value="{token}" />
+    </terrapod>
+  </packageSourceCredentials>
+</configuration>
+"""
+    path = program_dir / "nuget.config"
+    path.write_text(body, encoding="utf-8")
+    path.chmod(0o600)
+    return path
+
+
+def dotnet_env() -> dict[str, str]:
+    """.NET settings the read-only root filesystem and a sealed cache require."""
+    return {
+        # All of these default under $HOME or the install dir; only the three
+        # writable mounts exist.
+        "NUGET_PACKAGES": "/tmp/nuget/packages",
+        "DOTNET_CLI_HOME": "/tmp/dotnet-home",
+        # First-run writes an extraction cache and prints a banner; both are
+        # noise in a run's log and one of them writes where it may not.
+        "DOTNET_NOLOGO": "1",
+        "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1",
+        # Telemetry reaches upstream, which a sealed deployment cannot do.
+        "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    }
+
+
+def _install_dotnet(cfg, program_dir: Path, *, child_grace: float, log_file: str, log) -> None:  # type: ignore[no-untyped-def]
+    """`dotnet restore` against Terrapod's NuGet proxy."""
+    dotnet = platform_tool.ensure_tool(cfg, "dotnet")
+    # On PATH for the same reason Go is: Pulumi's language host runs the program
+    # itself, after the restore has long finished.
+    os.environ["PATH"] = f"{dotnet.parent}{os.pathsep}{os.environ.get('PATH', '')}"
+    os.environ.update(dotnet_env())
+    for d in ("/tmp/nuget/packages", "/tmp/dotnet-home"):
+        Path(d).mkdir(parents=True, exist_ok=True)
+
+    write_nuget_config(program_dir, cfg.api_url, cfg.auth_token)
+
+    log.info("restoring dotnet dependencies", dir=str(program_dir))
+    result = exec_subprocess.run(
+        [str(dotnet), "restore"],
+        log_file=log_file,
+        child_grace_seconds=child_grace,
+        tee_to_stdout=True,
+    )
+    if result.exit_code != 0:
+        raise DependencyError(
+            "restoring the program's NuGet packages failed; the log above is the "
+            "dotnet CLI's own output",
+            exit_code=result.exit_code,
+        )
 
 
 def go_env(port: int) -> dict[str, str]:

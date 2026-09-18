@@ -53,13 +53,13 @@ logger = get_logger(__name__)
 # subject to `allow_prerelease`, listed per version -- and differs only in where
 # its upstream facts live (services/platform_tools.py still owns its asset
 # layout) and in having no signature to check. See CHECKSUM_ONLY_TOOLS.
-CLI_TOOLS = {"terraform", "tofu", "terragrunt", "pulumi", "node", "go"}
+CLI_TOOLS = {"terraform", "tofu", "terragrunt", "pulumi", "node", "go", "dotnet"}
 
 #: Tools that exist only to serve the Pulumi engine, and are refused when it is
 #: off (#1429). `node` is here because `pulumi-language-nodejs` shells out to it:
 #: it is the runtime a TypeScript program needs, not something Terrapod offers
 #: in its own right (#1566).
-_PULUMI_ONLY_TOOLS = {"pulumi", "node", "go"}
+_PULUMI_ONLY_TOOLS = {"pulumi", "node", "go", "dotnet"}
 
 #: Tools whose publisher signs nothing, so the strongest check available is the
 #: artifact's SHA-256 against a checksum the publisher published. Verification
@@ -291,7 +291,7 @@ async def get_or_cache_binary(
     # Stream directly to object storage — never buffer the artifact in memory
     # (the checkov bundle alone is ~60MB).
     key = binary_cache_key(tool, version, os_, arch)
-    shasum, size_bytes = await _fetch_and_store_binary(
+    shasum, sha512, size_bytes = await _fetch_and_store_binary(
         storage, key, download_url, content_type=content_type
     )
 
@@ -318,7 +318,15 @@ async def get_or_cache_binary(
         )
         try:
             async with httpx.AsyncClient(follow_redirects=True) as vclient:
-                await verify_platform_tool(vclient, tool, version, os_, arch, shasum, level=level)
+                await verify_platform_tool(
+                    vclient,
+                    tool,
+                    version,
+                    os_,
+                    arch,
+                    {"sha256": shasum, "sha512": sha512},
+                    level=level,
+                )
         except VerificationError:
             await storage.delete(key)
             BINARY_CACHE_REQUESTS.labels(tool=tool, result="verify_failed").inc()
@@ -546,6 +554,8 @@ async def list_available_versions(tool: str) -> list[str]:
         versions = await _fetch_node_versions()
     elif tool == "go":
         versions = await _fetch_go_versions()
+    elif tool == "dotnet":
+        versions = await _fetch_dotnet_versions()
     elif tool == "terragrunt":
         versions = await _fetch_terragrunt_versions()
     else:
@@ -734,6 +744,8 @@ async def resolve_version(tool: str, partial_version: str) -> str:
         resolved = await _resolve_node_version(partial_version)
     elif tool == "go":
         resolved = await _resolve_go_version(partial_version)
+    elif tool == "dotnet":
+        resolved = await _resolve_dotnet_version(partial_version)
     else:
         return partial_version
 
@@ -906,6 +918,40 @@ async def _fetch_node_versions() -> list[str]:
     return versions
 
 
+async def _fetch_dotnet_versions() -> list[str]:
+    """The latest SDK of every .NET channel this deployment will offer.
+
+    Channels, not every patch: .NET publishes its per-release detail in a
+    separate document per channel, and listing every SDK ever shipped would mean
+    fetching all of them to answer one question nobody asks.
+    """
+    from terrapod.services.platform_tools import _dotnet_channel_index
+
+    policy = settings.registry.binary_cache.allow_prerelease
+    out = []
+    for entry in await _dotnet_channel_index():
+        sdk = str(entry.get("latest-sdk", ""))
+        if sdk and _is_version_allowed(sdk, policy):
+            out.append(sdk)
+    return out
+
+
+async def _resolve_dotnet_version(partial: str) -> str:
+    """Resolve a .NET version. A channel (`9.0`) becomes that channel's latest SDK.
+
+    Unlike the others this is not "the newest with that prefix": .NET's channel
+    metadata states which SDK is current, and that is the answer it intends.
+    """
+    from terrapod.services.platform_tools import _dotnet_channel_index
+
+    for entry in await _dotnet_channel_index():
+        if str(entry.get("channel-version")) == partial:
+            sdk = str(entry.get("latest-sdk", ""))
+            if sdk:
+                return sdk
+    return partial
+
+
 async def _go_versions() -> list[str]:
     """Every Go release version from the index, newest first, without the `go`."""
     from terrapod.services.platform_tools import _go_index
@@ -1044,7 +1090,7 @@ async def _fetch_and_store_binary(
     key: str,
     url: str,
     content_type: str = "application/zip",
-) -> tuple[str, int]:
+) -> tuple[str, str, int]:
     """Stream a binary from upstream directly into object storage.
 
     Returns (sha256_hex, size_bytes).
@@ -1054,4 +1100,4 @@ async def _fetch_and_store_binary(
             resp.raise_for_status()
             stream = HashingStream(resp)
             await storage.put_stream(key, stream, content_type=content_type)
-            return stream.sha256_hex, stream.size
+            return stream.sha256_hex, stream.sha512_hex, stream.size

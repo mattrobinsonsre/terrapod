@@ -216,7 +216,7 @@ class TestConcurrentCacheMissRace:
         # below doesn't re-call _get_cached — the IntegrityError handler
         # falls straight through to presigning the row the winner wrote.
         mock_get_cached.return_value = None
-        mock_fetch.return_value = ("deadbeef" * 8, 30_000_000)
+        mock_fetch.return_value = ("deadbeef" * 8, "d" * 128, 30_000_000)
 
         db = AsyncMock()
         # Simulate the unique-constraint violation when flushing the INSERT.
@@ -269,7 +269,7 @@ class TestTerragruntBinary:
             "https://github.com/gruntwork-io/terragrunt/releases/download"
         )
         mock_get_cached.return_value = None  # cache miss → fetch path
-        mock_fetch.return_value = ("cafef00d" * 8, 45_000_000)
+        mock_fetch.return_value = ("cafef00d" * 8, "c" * 128, 45_000_000)
 
         db = AsyncMock()
         storage = AsyncMock()
@@ -519,7 +519,9 @@ class TestPlatformToolsShareTheCache:
         with (
             patch.object(svc, "_get_cached", AsyncMock(return_value=None)),
             patch.object(svc, "_sealed", return_value=False),
-            patch.object(svc, "_fetch_and_store_binary", AsyncMock(return_value=("abc123", 10))),
+            patch.object(
+                svc, "_fetch_and_store_binary", AsyncMock(return_value=("abc123", "abc123-512", 10))
+            ),
             patch.object(svc, "verify_platform_tool", AsyncMock()),
         ):
             storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://x/y"))
@@ -536,7 +538,9 @@ class TestPlatformToolsShareTheCache:
         with (
             patch.object(svc, "_get_cached", AsyncMock(return_value=None)),
             patch.object(svc, "_sealed", return_value=False),
-            patch.object(svc, "_fetch_and_store_binary", AsyncMock(return_value=("bad", 10))),
+            patch.object(
+                svc, "_fetch_and_store_binary", AsyncMock(return_value=("bad", "bad-512", 10))
+            ),
             patch.object(
                 svc,
                 "verify_platform_tool",

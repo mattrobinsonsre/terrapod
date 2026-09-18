@@ -77,6 +77,7 @@ class TestFetchVersions:
                         "pulumi-version": "3.208.0",
                         "node-version": "22.20.0",
                         "go-version": "1.25.1",
+                        "dotnet-version": "9.0.318",
                     }
                 }
             },
@@ -88,6 +89,7 @@ class TestFetchVersions:
             "pulumi": "3.208.0",
             "node": "22.20.0",
             "go": "1.25.1",
+            "dotnet": "9.0.318",
         }
 
     def test_raises_on_a_non_200(self):

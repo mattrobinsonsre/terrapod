@@ -421,6 +421,7 @@ class TestPlatformToolVersions:
             # here because this is the list the runner asks for.
             "node-version": settings.default_node_version,
             "go-version": settings.default_go_version,
+            "dotnet-version": settings.default_dotnet_version,
         }
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)

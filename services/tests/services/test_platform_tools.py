@@ -267,7 +267,9 @@ class TestVerifyPlatformTool:
             "terrapod.services.platform_tools._expected_sha256",
             AsyncMock(return_value="deadbeef"),
         ):
-            await verify_platform_tool(None, "opa", "1.19.0", "linux", "amd64", "DEADBEEF")
+            await verify_platform_tool(
+                None, "opa", "1.19.0", "linux", "amd64", {"sha256": "DEADBEEF"}
+            )
 
     @pytest.mark.asyncio
     async def test_rejects_a_mismatch(self) -> None:
@@ -275,8 +277,10 @@ class TestVerifyPlatformTool:
             "terrapod.services.platform_tools._expected_sha256",
             AsyncMock(return_value="deadbeef"),
         ):
-            with pytest.raises(VerificationError, match="checksum mismatch"):
-                await verify_platform_tool(None, "opa", "1.19.0", "linux", "amd64", "0badc0de")
+            with pytest.raises(VerificationError, match="(checksum|sha256|sha512) mismatch"):
+                await verify_platform_tool(
+                    None, "opa", "1.19.0", "linux", "amd64", {"sha256": "0badc0de"}
+                )
 
     @pytest.mark.asyncio
     async def test_verify_off_skips_the_check_entirely(self, monkeypatch) -> None:
@@ -287,7 +291,9 @@ class TestVerifyPlatformTool:
         monkeypatch.setattr(settings.registry.platform_tools, "verify", "off")
         fetch = AsyncMock()
         with patch("terrapod.services.platform_tools._expected_sha256", fetch):
-            await verify_platform_tool(None, "opa", "1.19.0", "linux", "amd64", "whatever")
+            await verify_platform_tool(
+                None, "opa", "1.19.0", "linux", "amd64", {"sha256": "whatever"}
+            )
         fetch.assert_not_awaited()
 
 

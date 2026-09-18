@@ -82,10 +82,9 @@ class TestClassifying:
         got = pulumi_deps.classify(_program(tmp_path, "runtime: yaml\n"))
         assert got.supported is True
 
-    @pytest.mark.parametrize("runtime", ["dotnet"])
-    def test_the_others_are_not_supported_yet(self, tmp_path, runtime):
-        got = pulumi_deps.classify(_program(tmp_path, f"runtime: {runtime}\n"))
-        assert got == pulumi_deps.Runtime(name=runtime, supported=False)
+    def test_a_runtime_pulumi_does_not_have_is_refused(self, tmp_path):
+        got = pulumi_deps.classify(_program(tmp_path, "runtime: haskell\n"))
+        assert got == pulumi_deps.Runtime(name="haskell", supported=False)
 
 
 class TestTheNpmrc:
@@ -147,12 +146,12 @@ class TestInstalling:
         assert node.call_count == 0
 
     def test_an_unsupported_runtime_is_refused_by_name(self, tmp_path):
-        d = _program(tmp_path, "runtime: dotnet\n")
-        with pytest.raises(pulumi_deps.DependencyError, match="'dotnet'"):
+        d = _program(tmp_path, "runtime: haskell\n")
+        with pytest.raises(pulumi_deps.DependencyError, match="'haskell'"):
             pulumi_deps.install(self._cfg(), d, child_grace=5, log_file="/dev/null")
 
     def test_the_refusal_says_what_does_work(self, tmp_path):
-        d = _program(tmp_path, "runtime: dotnet\n")
+        d = _program(tmp_path, "runtime: haskell\n")
         with pytest.raises(pulumi_deps.DependencyError, match="nodejs"):
             pulumi_deps.install(self._cfg(), d, child_grace=5, log_file="/dev/null")
 
@@ -495,3 +494,87 @@ class TestTheToolchainIsOnPath:
         import os
 
         assert str(tmp_path / "go/bin") in os.environ["PATH"]
+
+
+class TestDotnet:
+    """The fourth runtime, and the odd one in two ways (#1566).
+
+    Its archive extracts flat, with no directory to strip; and it states a
+    SHA-512 and no SHA-256, which is why the cache computes both as an artifact
+    streams past.
+    """
+
+    SECRET = "runtok-net-3a90"
+
+    def _cfg(self):
+        return SimpleNamespace(api_url="http://terrapod-api:8000", auth_token=self.SECRET)
+
+    def test_dotnet_is_supported(self, tmp_path):
+        assert pulumi_deps.classify(_program(tmp_path, "runtime: dotnet\n")).supported is True
+
+    def test_the_source_is_terrapods_service_index(self):
+        assert pulumi_deps.nuget_source_url("http://a").endswith(
+            "/api/terrapod/v1/package-cache/nuget/index.json"
+        )
+
+    def test_the_config_clears_the_default_sources(self, tmp_path):
+        # Without <clear/>, nuget.org stays in the list and a sealed deployment
+        # hangs on it before ever reaching ours.
+        pulumi_deps.write_nuget_config(tmp_path, "http://a", "t")
+        assert "<clear/>" in (tmp_path / "nuget.config").read_text()
+
+    def test_the_credential_is_in_the_config_not_the_source(self, tmp_path):
+        # `dotnet restore` echoes its sources, and the runner streams its logs.
+        path = pulumi_deps.write_nuget_config(tmp_path, "http://a", self.SECRET)
+        body = path.read_text()
+        assert self.SECRET in body
+        assert self.SECRET not in pulumi_deps.nuget_source_url("http://a")
+        assert path.stat().st_mode & 0o077 == 0
+
+    def test_everything_dotnet_writes_lands_where_it_may(self):
+        env = pulumi_deps.dotnet_env()
+        for key in ("NUGET_PACKAGES", "DOTNET_CLI_HOME"):
+            assert env[key].startswith("/tmp/"), key
+
+    def test_telemetry_is_off(self):
+        # It reaches upstream, which a sealed deployment cannot do.
+        assert pulumi_deps.dotnet_env()["DOTNET_CLI_TELEMETRY_OPTOUT"] == "1"
+
+    def test_the_sdk_reaches_path(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("PATH", "/usr/bin")
+        d = _program(tmp_path, "runtime: dotnet\n")
+        monkeypatch.setattr(
+            pulumi_deps.platform_tool, "ensure_tool", lambda *a, **k: tmp_path / "sdk/dotnet"
+        )
+        monkeypatch.setattr(
+            pulumi_deps.exec_subprocess, "run", lambda *a, **k: MagicMock(exit_code=0)
+        )
+        pulumi_deps.install(self._cfg(), d, child_grace=5, log_file="/dev/null")
+        import os
+
+        assert str(tmp_path / "sdk") in os.environ["PATH"]
+
+    def test_a_failed_restore_carries_its_exit_code(self, tmp_path, monkeypatch):
+        d = _program(tmp_path, "runtime: dotnet\n")
+        monkeypatch.setattr(
+            pulumi_deps.platform_tool, "ensure_tool", lambda *a, **k: tmp_path / "dotnet"
+        )
+        monkeypatch.setattr(
+            pulumi_deps.exec_subprocess, "run", lambda *a, **k: MagicMock(exit_code=6)
+        )
+        with pytest.raises(pulumi_deps.DependencyError) as e:
+            pulumi_deps.install(self._cfg(), d, child_grace=5, log_file="/dev/null")
+        assert e.value.exit_code == 6
+
+
+class TestEveryRuntimeIsNowSupported:
+    def test_nothing_is_refused_any_more(self, tmp_path):
+        for runtime in ("yaml", "nodejs", "python", "go", "dotnet"):
+            got = pulumi_deps.classify(_program(tmp_path, f"runtime: {runtime}\n"))
+            assert got.supported is True, runtime
+
+    def test_an_unknown_runtime_is_still_refused_by_name(self, tmp_path):
+        # A runtime Pulumi does not have, or a typo: better a refusal naming it
+        # than an install that guesses.
+        got = pulumi_deps.classify(_program(tmp_path, "runtime: haskell\n"))
+        assert got == pulumi_deps.Runtime(name="haskell", supported=False)

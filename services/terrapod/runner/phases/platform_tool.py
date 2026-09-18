@@ -46,7 +46,7 @@ logger = structlog.get_logger("runner.phase.platform_tool")
 #: import this module — and they drifted once in exactly the way that invites:
 #: `pulumi` was added here and not there, so a Pulumi run asked the cache for
 #: version "" and no test on either side noticed (#1523).
-TOOLS = ("opa", "trivy", "checkov", "pulumi", "node", "go")
+TOOLS = ("opa", "trivy", "checkov", "pulumi", "node", "go", "dotnet")
 
 
 class PlatformToolsUnsupported(Exception):
@@ -119,6 +119,11 @@ UNPACK: dict[str, _Unpack] = {
     # and the root stripped like the others: `go` needs `pkg/` and `src/` beside
     # it, not just the one binary.
     "go": _Unpack(kind="targz", member="bin/go", tree=True, strip_root=True),
+    # The .NET SDK (#1566). Its tarball has no top-level directory -- it extracts
+    # flat -- so there is nothing to strip and `member` sits at the root. The
+    # tree is kept: `dotnet` is useless without the `sdk/` and `shared/` beside
+    # it.
+    "dotnet": _Unpack(kind="targz", member="dotnet", tree=True, strip_root=True),
 }
 
 
