@@ -97,6 +97,14 @@ def _make_app(
     async def login():
         return {"token": "test"}
 
+    @app.get("/api/terrapod/v1/package-cache/nuget/flat/{name}/index.json")
+    async def package_cache(name: str):
+        return {"versions": []}
+
+    @app.get("/storage/get/{key:path}")
+    async def storage_get(key: str):
+        return {"key": key}
+
     app.add_middleware(
         RateLimitMiddleware,
         requests_per_minute=rpm,
@@ -468,3 +476,116 @@ class TestCapabilityBucketing:
         client = TestClient(app)
         resp = client.get("/api/v2/applies/run-XYZ/log")
         assert resp.headers.get("x-ratelimit-limit") == "1000"
+
+
+class TestPackageCacheChallenges:
+    """An unauthenticated package-cache request is a 401 challenge, and that is
+    how the npm/pip/NuGet clients authenticate -- one probe per package, which
+    NuGet cannot be configured out of. Charged to the public per-IP bucket, a
+    restore exhausts it, the probes start answering 429 instead of 401, and the
+    client never reaches the authenticated retry: every package fails (#1566).
+    """
+
+    def test_challenge_path_pure(self):
+        from terrapod.api.rate_limit import _is_challenge_path
+
+        assert _is_challenge_path("/api/v1/package-cache/nuget/index.json") is True
+        # The deprecated alias is the one our own runners still call, so it must
+        # normalise to the same answer rather than falling to the public bucket.
+        assert _is_challenge_path("/api/terrapod/v1/package-cache/npm/left-pad") is True
+        assert _is_challenge_path("/api/v1/workspaces") is False
+
+    def test_an_anonymous_probe_gets_the_authenticated_limit(self):
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, rpm=100, authenticated_rpm=1000)
+        resp = TestClient(app).get("/api/terrapod/v1/package-cache/nuget/flat/pulumi/index.json")
+        assert resp.headers.get("x-ratelimit-limit") == "1000"
+        keys = [c.args[0] for c in mock_redis.pipeline.return_value.incr.call_args_list]
+        assert keys[0].startswith("tp:ratelimit:api_challenge:")
+
+    def test_a_restore_sized_burst_is_not_throttled(self):
+        # The regression in one line: more probes than the public limit, which
+        # is what a real dependency tree costs, and none of them 429.
+        mock_redis = MagicMock()
+        pipe = MagicMock()
+        counter = {"n": 0}
+
+        def _execute():
+            counter["n"] += 1
+            return [counter["n"], True]
+
+        pipe.execute = AsyncMock(side_effect=_execute)
+        mock_redis.pipeline.return_value = pipe
+        app = _make_app(get_redis=lambda: mock_redis, rpm=100, authenticated_rpm=1000)
+        client = TestClient(app)
+        for i in range(150):
+            r = client.get(f"/api/terrapod/v1/package-cache/nuget/flat/pkg{i}/index.json")
+            assert r.status_code == 200, f"throttled at probe {i}"
+
+    def test_everything_else_still_gets_the_public_limit(self):
+        # The carve-out is scoped to package-cache; it must not raise the
+        # ceiling on the rest of the unauthenticated surface.
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, rpm=100, authenticated_rpm=1000)
+        resp = TestClient(app).get("/api/terrapod/v1/workspaces")
+        assert resp.headers.get("x-ratelimit-limit") == "100"
+
+    def test_an_authenticated_request_is_still_charged_to_its_credential(self):
+        # The challenge tier is for requests with NO credential. Once the client
+        # retries with one, it goes back to being charged to the principal.
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, authenticated_rpm=1000)
+        TestClient(app).get(
+            "/api/terrapod/v1/package-cache/nuget/flat/pulumi/index.json",
+            headers={"Authorization": "Basic eDp0b2tlbg=="},
+        )
+        keys = [
+            c.args[0]
+            for c in mock_redis.pipeline.return_value.incr.call_args_list
+            if ":churn:" not in c.args[0]
+        ]
+        assert keys[0].startswith("tp:ratelimit:api_authn:cred:")
+
+
+class TestPresignedBucketing:
+    """A presigned URL's HMAC signature is a credential carried in the query
+    string. It is fetched anonymously by design and in bursts, so keying it on
+    the source IP throttles a filesystem-backed deployment's own runners.
+    """
+
+    def test_presigned_bucket_pure(self):
+        from terrapod.api.rate_limit import _presigned_bucket
+
+        a = _presigned_bucket("/storage/get/cache/x.tgz", "expires=1&sig=AAA")
+        b = _presigned_bucket("/storage/get/cache/y.tgz", "expires=1&sig=BBB")
+        assert a is not None and b is not None and a != b
+        # Same signature, same bucket -- a retried download is the same thing.
+        assert a == _presigned_bucket("/storage/get/cache/x.tgz", "sig=AAA&expires=1")
+        # The signature is the credential, so it is hashed, never echoed.
+        assert "AAA" not in a
+        # No signature and no storage path both fall back to IP keying.
+        assert _presigned_bucket("/storage/get/cache/x.tgz", "expires=1") is None
+        assert _presigned_bucket("/api/v1/workspaces", "sig=AAA") is None
+
+    def test_two_presigned_downloads_do_not_share_a_bucket(self):
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, rpm=100, authenticated_rpm=1000)
+        client = TestClient(app)
+        client.get("/storage/get/cache/a.tgz?expires=9&sig=SIGA")
+        client.get("/storage/get/cache/b.tgz?expires=9&sig=SIGB")
+        keys = [
+            c.args[0]
+            for c in mock_redis.pipeline.return_value.incr.call_args_list
+            if ":churn:" not in c.args[0]
+        ]
+        assert len(keys) == 2
+        assert keys[0] != keys[1]
+        assert all(k.startswith("tp:ratelimit:api_capability:sig:") for k in keys)
+
+    def test_an_unsigned_storage_request_stays_on_the_public_bucket(self):
+        # Only a signature Terrapod minted earns the generous bucket; a request
+        # without one is ordinary anonymous traffic and is refused downstream.
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, rpm=100, authenticated_rpm=1000)
+        resp = TestClient(app).get("/storage/get/cache/a.tgz")
+        assert resp.headers.get("x-ratelimit-limit") == "100"

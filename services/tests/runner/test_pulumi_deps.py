@@ -533,6 +533,30 @@ class TestDotnet:
         pulumi_deps.write_nuget_config(tmp_path, "https://terrapod.example.com", "t")
         assert "allowInsecureConnections" not in (tmp_path / "nuget.config").read_text()
 
+    def test_the_config_is_valid_xml(self, tmp_path):
+        # NuGet parses this file before it does anything else, so a malformed
+        # one fails the restore outright with no mention of packages at all.
+        # It is hand-written as a format string, and the trap is not the
+        # markup but the prose: an XML comment may not contain a double
+        # hyphen, which any explanatory comment reaches for naturally.
+        import xml.etree.ElementTree as ET
+
+        for url in ("http://terrapod-api:8000", "https://terrapod.example.com"):
+            body = pulumi_deps.write_nuget_config(tmp_path, url, self.SECRET).read_text()
+            ET.fromstring(body)
+
+    def test_the_credential_goes_on_the_first_request(self, tmp_path):
+        # Left to negotiate, NuGet probes anonymously once per package before
+        # supplying the credential, and those probes are charged to the API's
+        # unauthenticated per-IP bucket -- which a restore exhausts, so the
+        # probes answer 429 and the client never reaches the authenticated
+        # retry at all. Naming the scheme is what makes it send Basic first.
+        pulumi_deps.write_nuget_config(tmp_path, "http://a", "t")
+        assert (
+            '<add key="ValidAuthenticationTypes" value="basic" />'
+            in (tmp_path / "nuget.config").read_text()
+        )
+
     def test_the_credential_is_in_the_config_not_the_source(self, tmp_path):
         # `dotnet restore` echoes its sources, and the runner streams its logs.
         path = pulumi_deps.write_nuget_config(tmp_path, "http://a", self.SECRET)

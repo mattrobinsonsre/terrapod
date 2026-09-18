@@ -8,6 +8,7 @@ import hashlib
 import re
 import time
 from collections.abc import Callable
+from urllib.parse import parse_qs
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -89,6 +90,49 @@ def _capability_bucket(path: str) -> str | None:
     return "cap:" + m.group(1)
 
 
+# A package-cache request that arrives WITHOUT a credential is a challenge, not
+# a request for service: the standard clients for these ecosystems authenticate
+# by probing, taking the 401 and retrying with the credential, and NuGet does it
+# once per package with no config that will stop it (`ValidAuthenticationTypes`
+# only narrows which schemes it will negotiate). So a restore of N packages
+# spends N requests on the unauthenticated per-IP bucket before it spends one on
+# its own. That bucket is sized for public traffic — 100/min — and a restore
+# exhausts it, at which point the probes answer 429 instead of 401 and the
+# client never reaches the authenticated retry at all: every package fails. The
+# paired authenticated request is charged to the caller as usual, and a probe
+# with no credential is the cheapest response the API has (rejected before any
+# lookup), so giving these their own IP-keyed bucket at the authenticated limit
+# costs an attacker's-eye-view almost nothing and is what makes the four
+# language ecosystems usable at realistic dependency counts (#1566).
+_CHALLENGE_PREFIXES = (f"{NATIVE_PREFIX}/package-cache/",)
+
+
+def _is_challenge_path(path: str) -> bool:
+    path = canonical_path(path)
+    return any(path.startswith(p) for p in _CHALLENGE_PREFIXES)
+
+
+# A presigned storage URL carries an HMAC signature in the query string, which
+# Terrapod itself minted and verifies on the way in — a credential, just not in
+# a header, exactly as the run UUID above is a credential carried in the path.
+# It is fetched anonymously by design (the whole point of a presigned URL) and
+# in bursts: one per package, per provider, per artifact. Keyed on the source IP
+# those collapse into the one anonymous bucket with everything else from that
+# address, which is how a filesystem-backed deployment throttles its own
+# runners. Bucket on the signature instead — it cannot be forged, so a bucket
+# per signature is a bucket per thing we handed out.
+_PRESIGNED_PATH_RE = re.compile(r"/storage/(?:get|put)/")
+
+
+def _presigned_bucket(path: str, query_string: str) -> str | None:
+    if _PRESIGNED_PATH_RE.search(path) is None:
+        return None
+    sig = parse_qs(query_string).get("sig", [""])[0]
+    if not sig:
+        return None
+    return "sig:" + hashlib.sha256(sig.encode("utf-8")).hexdigest()[:20]
+
+
 def _credential_bucket(auth_header: str, listener_cert: str) -> str | None:
     """A stable, non-reversible per-principal bucket id from the credential.
 
@@ -129,6 +173,15 @@ class RateLimitMiddleware:
       the whole tier into one bucket, #1075).
       Interactive users and API-token automation rarely approach this, but
       it stops one noisy client taking the pool.
+    - Presigned storage reads/writes (`/storage/{get,put}/…?sig=…`):
+      `authenticated_requests_per_minute`, bucketed on the HMAC signature.
+      Anonymous by design and fetched in bursts, so IP-keying throttles a
+      filesystem-backed deployment's own runners (#1566).
+    - Package-cache requests with NO credential:
+      `authenticated_requests_per_minute`, IP-keyed. These are 401 challenges,
+      which is how npm/pip/NuGet clients authenticate — one per package, and
+      NuGet cannot be configured out of it — so the public bucket is the wrong
+      size for them and a restore exhausts it (#1566).
     - Unauthenticated: base limit (`requests_per_minute`), IP-keyed.
     - Auth endpoints (`/api/v1/auth/*` and its deprecated alias, `/oauth/*`):
       always `auth_requests_per_minute`
@@ -199,6 +252,8 @@ class RateLimitMiddleware:
         # authenticated limit — the capability is a real principal, just carried
         # in the path rather than a header (#1075).
         capability = _capability_bucket(path)
+        if capability is None:
+            capability = _presigned_bucket(path, scope.get("query_string", b"").decode("latin-1"))
 
         if capability is not None:
             limit = self.authenticated_requests_per_minute
@@ -212,6 +267,9 @@ class RateLimitMiddleware:
         elif is_authenticated:
             limit = self.authenticated_requests_per_minute
             prefix = "api_authn"
+        elif _is_challenge_path(path):
+            limit = self.authenticated_requests_per_minute
+            prefix = "api_challenge"
         else:
             limit = self.requests_per_minute
             prefix = "api"

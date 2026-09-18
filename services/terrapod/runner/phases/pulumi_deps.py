@@ -499,6 +499,16 @@ def write_nuget_config(program_dir: Path, api_url: str, token: str) -> Path:
     <terrapod>
       <add key="Username" value="x" />
       <add key="ClearTextPassword" value="{token}" />
+      <!-- Without this NuGet negotiates: it sends every request anonymously
+           first and only supplies the credential after the 401. That doubles
+           the request count and, worse, the anonymous half lands in the API's
+           UNAUTHENTICATED rate-limit bucket, which is one bucket per source
+           IP sized for public traffic, not for one probe per package. A
+           restore exhausts it, the probes start answering 429 instead of 401,
+           and the client never gets as far as authenticating: NU1301 on every
+           package. Naming the scheme makes NuGet send Basic on the first
+           request, so the run's own token is on it from the start. -->
+      <add key="ValidAuthenticationTypes" value="basic" />
     </terrapod>
   </packageSourceCredentials>
 </configuration>
