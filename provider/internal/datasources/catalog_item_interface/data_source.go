@@ -82,9 +82,15 @@ func (d *catalogItemInterfaceDataSource) Schema(_ context.Context, _ datasource.
 						"name":        schema.StringAttribute{Computed: true, Description: "Variable name."},
 						"type":        schema.StringAttribute{Computed: true, Description: "Declared type, as written in the module."},
 						"description": schema.StringAttribute{Computed: true, Description: "Variable description."},
-						"default":     schema.StringAttribute{Computed: true, Description: "Default value, JSON-encoded; null when the variable has none."},
-						"required":    schema.BoolAttribute{Computed: true, Description: "Whether a value must be supplied."},
-						"sensitive":   schema.BoolAttribute{Computed: true, Description: "Whether the variable is marked sensitive."},
+						// Marked statically: the data source faithfully records, per
+						// input, whether the module declared it sensitive — and then
+						// stored that input's default in a non-sensitive attribute
+						// immediately beside it. Per-element marking is unavailable
+						// in a ListNestedAttribute, so the flag applies to every
+						// element's default (GHSA-9646-883f-wjjm).
+						"default":   schema.StringAttribute{Computed: true, Sensitive: true, Description: "Default value, JSON-encoded; null when the variable has none."},
+						"required":  schema.BoolAttribute{Computed: true, Description: "Whether a value must be supplied."},
+						"sensitive": schema.BoolAttribute{Computed: true, Description: "Whether the variable is marked sensitive."},
 					},
 				},
 			},

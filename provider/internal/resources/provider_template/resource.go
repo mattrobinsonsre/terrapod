@@ -103,12 +103,21 @@ func (r *providerTemplateResource) Schema(_ context.Context, _ resource.SchemaRe
 			"body": schema.StringAttribute{
 				Description: "HCL body rendered into the generated provider block.",
 				Required:    true,
+				// The canonical place for cloud credentials — this renders a
+				// `provider {}` block, so `secret_key` / `token` live here — and
+				// the server's copy is read back into state on every refresh
+				// (GHSA-9646-883f-wjjm).
+				Sensitive: true,
 			},
 			"parameters_json": schema.StringAttribute{
 				Description: "Optional JSON array of parameter objects (each like " +
 					"{name,type,description,required,sensitive,default,options}). " +
 					"Supplied as a JSON string to track the open-ended server contract.",
 				Optional: true,
+				// A parameter declared `sensitive: true` WITH a `default` puts
+				// that default here in the clear. A schema cannot mark sub-fields
+				// of an opaque JSON string, so the whole attribute takes the flag.
+				Sensitive: true,
 			},
 			"labels": schema.MapAttribute{
 				Description: "Labels feeding Terrapod's label-based RBAC and filtering.",

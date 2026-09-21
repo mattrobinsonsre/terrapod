@@ -141,6 +141,10 @@ func (r *catalogItemResource) Schema(_ context.Context, _ resource.SchemaRequest
 					"provision form is rendered. Supplied as a JSON string to track the " +
 					"open-ended server contract.",
 				Optional: true,
+				// Same shape as provider_template.parameters_json: an opaque JSON
+				// string whose objects may carry a sensitive default, and a schema
+				// cannot mark sub-fields of one.
+				Sensitive: true,
 			},
 			"labels": schema.MapAttribute{
 				Description: "Labels feeding Terrapod's label-based RBAC and filtering.",
