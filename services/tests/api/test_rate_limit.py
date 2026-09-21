@@ -332,6 +332,69 @@ class TestCredentialBucketing:
         assert keys[0] == keys[1]
 
 
+class TestTheLoginTierIsKeyedOnTheSourceAlone:
+    """GHSA-wq2j-pppw-ff2p. The login limit must not inherit the churn ceiling.
+
+    Per-credential bucketing (#1075) is right for the AUTHENTICATED tier, where
+    200 distinct principals a minute behind one BFF pod IP is a sane floor. The
+    unauthenticated login tier inherited it, because the bucket key was chosen
+    before the tier was consulted — so a password-guesser who sent a fresh
+    random bearer on every attempt minted a new bucket each time and got the
+    churn allowance instead of this tier's limit.
+    """
+
+    def _bucket_keys(self, mock_redis):
+        return [
+            c.args[0]
+            for c in mock_redis.pipeline.return_value.incr.call_args_list
+            if ":churn:" not in c.args[0]
+        ]
+
+    def test_rotating_the_bearer_does_not_mint_a_new_login_bucket(self):
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, auth_rpm=1000)
+        client = TestClient(app)
+
+        client.post("/api/terrapod/v1/auth/login", headers={"Authorization": "Bearer RANDOM-1"})
+        client.post("/api/terrapod/v1/auth/login", headers={"Authorization": "Bearer RANDOM-2"})
+
+        keys = self._bucket_keys(mock_redis)
+        assert len(keys) == 2
+        assert keys[0] == keys[1], (
+            "a different bearer per attempt minted a different login bucket, so the "
+            f"login limit never applies: {keys}"
+        )
+        assert all(k.startswith("tp:ratelimit:auth:") for k in keys), keys
+        assert not any("cred:" in k for k in keys), (
+            f"the login tier must not key on an unverified credential: {keys}"
+        )
+
+    def test_a_login_with_no_credential_shares_that_same_bucket(self):
+        """An honest attempt and a bearer-carrying one are the same source."""
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, auth_rpm=1000)
+        client = TestClient(app)
+
+        client.post("/api/terrapod/v1/auth/login")
+        client.post("/api/terrapod/v1/auth/login", headers={"Authorization": "Bearer ANY"})
+
+        keys = self._bucket_keys(mock_redis)
+        assert keys[0] == keys[1], keys
+
+    def test_the_authenticated_tier_still_buckets_per_credential(self):
+        """The #1075 fix must survive: this narrows the login tier only."""
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, authenticated_rpm=1000)
+        client = TestClient(app)
+
+        client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer AAA"})
+        client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer BBB"})
+
+        keys = self._bucket_keys(mock_redis)
+        assert keys[0] != keys[1], keys
+        assert all(k.startswith("tp:ratelimit:api_authn:cred:") for k in keys), keys
+
+
 class TestCredentialChurnCeiling:
     """Per-credential bucketing (#1075) is only safe with a churn ceiling.
 

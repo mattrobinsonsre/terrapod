@@ -239,7 +239,24 @@ class RateLimitMiddleware:
         # traffic (login, anon) has no credential and stays IP-keyed.
         client_ip = _get_client_ip(request)
         credential = _credential_bucket(auth_header, listener_cert)
-        identity = capability or credential or client_ip
+        if is_auth_endpoint:
+            # The login tier is keyed on the IP and NOTHING else, which is what
+            # the comment above already says it does (GHSA-wq2j-pppw-ff2p).
+            #
+            # It did not. The bucket key was picked without consulting the tier,
+            # so a login attempt carrying any `Authorization` value — never
+            # verified here, by design — landed in a credential bucket instead.
+            # A caller sending a different random bearer on each attempt minted
+            # a fresh bucket each time, so the ceiling on password guessing was
+            # the churn allowance (200/min, sized for authenticated principals
+            # behind one BFF pod) rather than this tier's 10/min.
+            #
+            # The churn ceiling stays exactly as #1075 built it for the tier it
+            # was written for. This only stops the unauthenticated tier
+            # inheriting an allowance that assumes a principal already exists.
+            identity = client_ip
+        else:
+            identity = capability or credential or client_ip
 
         # Sliding window: 60-second buckets
         window_id = int(time.time()) // 60
