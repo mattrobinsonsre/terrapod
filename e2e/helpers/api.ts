@@ -380,14 +380,18 @@ export async function seedRun(
   if (!cvRes.ok) {
     throw new Error(`Create config version failed: ${cvRes.status} ${await cvRes.text()}`);
   }
-  const cvId = (await cvRes.json()).data.id as string;
+  const cvJson = await cvRes.json();
+  const cvId = cvJson.data.id as string;
 
-  // No Authorization header — the upload endpoint is unauthenticated (the CV
-  // UUID is the capability token), matching go-tfe's presigned-style upload.
-  const upRes = await fetch(
-    `${API_URL}/api/v2/configuration-versions/${cvId}/upload`,
-    { method: 'PUT', body: 'terrapod-e2e-config-placeholder' },
-  );
+  // No Authorization header — the upload endpoint takes a signed capability,
+  // which is what `upload-url` carries. FOLLOW the URL the server returned
+  // rather than rebuilding it from the id: rebuilding it produces a bare id,
+  // which is exactly the guessable address the capability replaced, and a
+  // helper that keeps working on a bare id would hide that it had come back.
+  const upRes = await fetch(cvJson.data.attributes['upload-url'] as string, {
+    method: 'PUT',
+    body: 'terrapod-e2e-config-placeholder',
+  });
   if (!upRes.ok) {
     throw new Error(`Config version upload failed: ${upRes.status}`);
   }
@@ -500,6 +504,51 @@ export async function seedStateVersion(
 }
 
 /**
+ * Create a state version and return BOTH its id and the capability-bearing
+ * upload URL from the create response.
+ *
+ * The upload URL is only handed out on create — a read response carries the
+ * plain id, deliberately, so that reading a state version cannot escalate to
+ * writing one. So a caller that needs to upload must keep this value; it
+ * cannot go back and ask for it.
+ */
+export async function seedStateVersionForUpload(
+  token: string,
+  workspaceId: string,
+  serial = 1,
+  md5 = 'd41d8cd98f00b204e9800998ecf8427e',
+): Promise<{ id: string; uploadUrl: string }> {
+  const res = await fetch(
+    `${API_URL}/api/v2/workspaces/${workspaceId}/state-versions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/vnd.api+json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        data: {
+          type: 'state-versions',
+          attributes: {
+            serial,
+            md5,
+            lineage: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          },
+        },
+      }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Create state version failed: ${res.status} ${await res.text()}`);
+  }
+  const json = await res.json();
+  return {
+    id: json.data.id as string,
+    uploadUrl: json.data.attributes['hosted-state-upload-url'] as string,
+  };
+}
+
+/**
  * Seed a state version AND upload real state content, so the state graph
  * (#765) has resources to parse. `resources` is a Terraform-state v4 resource
  * list; each entry needs at least {mode, type, name, instances:[{dependencies}]}.
@@ -522,10 +571,15 @@ export async function seedStateVersionWithContent(
   // The content endpoint enforces that the uploaded bytes hash to the md5
   // declared at create time, so compute it up front and declare it.
   const md5 = createHash('md5').update(body).digest('hex');
-  const svId = await seedStateVersion(token, workspaceId, serial, md5);
-  // Content upload is unauthenticated — the state-version UUID is the capability
-  // token (matches go-tfe's presigned-style upload).
-  const res = await fetch(`${API_URL}/api/v2/state-versions/${svId}/content`, {
+  const { id: svId, uploadUrl } = await seedStateVersionForUpload(
+    token,
+    workspaceId,
+    serial,
+    md5,
+  );
+  // Content upload is unauthenticated — the signed capability in `uploadUrl`
+  // is what authorises it (matches go-tfe's presigned-style upload).
+  const res = await fetch(uploadUrl, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body,
