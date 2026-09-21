@@ -40,4 +40,28 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # GHSA-mjhj-g43q-w6m9 (D1). Dropping this table destroys the ONLY copy of
+    # the wrapped DEK, and every `tpenc:` value in the database then becomes
+    # permanently unreadable — holding the operator master key does not help,
+    # because the KEK unwraps a DEK that no longer exists.
+    #
+    # The docstring above says the table "stays empty until an operator enables
+    # encryption". That was true and unenforced, so the safe case and the
+    # catastrophic one ran the same code path silently. Now only the safe one
+    # does.
+    #
+    # The documented escape hatch is `encryption_migrate decrypt` before
+    # downgrading. Note it was itself incomplete until the ENCRYPTED_COLUMNS
+    # fix in this same release: two columns were never visited, so an operator
+    # who followed the procedure exactly would still have left
+    # `gpg_keys.private_key` and `run_tasks.hmac_key` encrypted, and then
+    # destroyed the key.
+    rows = op.get_bind().execute(sa.text("SELECT count(*) FROM crypto_keys")).scalar()
+    if rows:
+        raise RuntimeError(
+            f"refusing to drop crypto_keys: it holds {rows} key row(s), and they are "
+            "the only copy of the DEK that decrypts every `tpenc:` value in this "
+            "database. Run `terrapod encryption_migrate decrypt` first (and verify it "
+            "reported every encrypted column), then re-run this downgrade."
+        )
     op.drop_table("crypto_keys")
