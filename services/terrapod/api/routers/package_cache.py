@@ -404,32 +404,25 @@ async def npm_packument(
 # ── Ansible Galaxy ──────────────────────────────────────────────────────────
 
 
-def _galaxy_base(request: Request) -> str:
+def _galaxy_base(request: Request, user: AuthenticatedUser | None = None) -> str:
     """The absolute base URL for rewritten Galaxy links.
 
-    Same sources, same precedence and same caveat as :func:`_rewrite_base` —
-    `external_url` first, then the forwarded headers, then the request's own base
-    — because ansible-galaxy resolves nothing relative to the document either.
+    Defers to :func:`_rewrite_base` — same sources, same precedence, same
+    reasoning — because ansible-galaxy resolves nothing relative to the document
+    either, so this surface has the same problem and must not answer it
+    differently. It kept its own copy of that logic and so missed the fix that
+    taught npm to answer a runner with the address it asked on (#1743), and
+    NuGet after it (#1747); an air-gapped runner following these links got the
+    deployment's external address, which is the one address it may well have no
+    route to. Three copies, two of them fixed, was how this one was left behind
+    (#1750).
 
     Unlike npm's packument these documents ARE cached, so a forged
-    `X-Forwarded-Host` could in principle be stored. It cannot: only upstream's
+    `X-Forwarded-Host` could in principle be stored. It cannot, and that is a
+    property of this caller rather than of the shared helper: only upstream's
     document is cached, and rewriting happens on the way out, per request.
     """
-    configured = (settings.external_url or "").strip().rstrip("/")
-    if configured:
-        base = configured
-    else:
-        host = request.headers.get("x-forwarded-host")
-        if host:
-            proto = request.headers.get("x-forwarded-proto", request.url.scheme)
-            base = f"{proto}://{host}"
-        else:
-            base = str(request.base_url).rstrip("/")
-    # Mirrors the prefix the caller used (#1529) — npm resolves
-    # `_authToken` by request path and NuGet matches credentials by
-    # source URI, so rewriting this to canonical would strip the
-    # client's own auth from every follow-up fetch.
-    return f"{base.rstrip('/')}{prefix_of(request.url.path)}/package-cache/galaxy"
+    return _rewrite_base(request, user, ecosystem="galaxy")
 
 
 def _galaxy_names(namespace: str, name: str) -> None:
@@ -468,7 +461,7 @@ async def galaxy_collection(
     """Collection detail, with every link pointed back at us."""
     _galaxy_names(namespace, name)
     key = galaxy.collection_key(namespace, name)
-    base = _galaxy_base(request)
+    base = _galaxy_base(request, user)
 
     # A published collection is answered from our own registry and never proxied.
     # Checking first also means a private name cannot be shadowed by an upstream
@@ -546,7 +539,7 @@ async def galaxy_versions(
     """
     _galaxy_names(namespace, name)
     key = galaxy.collection_key(namespace, name)
-    base = _galaxy_base(request)
+    base = _galaxy_base(request, user)
 
     published = await collections.list_versions(db, namespace, name)
     if published:
@@ -626,7 +619,7 @@ async def galaxy_version(
     if not galaxy.valid_version(version):
         raise HTTPException(status_code=404, detail="Not found")
     key = galaxy.collection_key(namespace, name)
-    base = _galaxy_base(request)
+    base = _galaxy_base(request, user)
 
     row = await collections.get_version(db, namespace, name, version)
     if row is not None:
@@ -822,7 +815,7 @@ async def galaxy_publish(
         except OSError:
             pass
 
-    base = _galaxy_base(request)
+    base = _galaxy_base(request, user)
     return JSONResponse(
         status_code=202,
         content={"task": f"{base}/v3/imports/collections/{row.id}/"},

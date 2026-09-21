@@ -696,6 +696,45 @@ class TestARunnerIsAnsweredWithTheAddressItAskedOn:
             )
         assert got.startswith("https://terrapod.example.com/")
 
+    def test_galaxy_gets_the_same_treatment(self):
+        # The third of three surfaces that hand a client an absolute URL it
+        # follows. npm was fixed in #1743 and NuGet in #1747; this one kept its
+        # own copy of the logic and so was left behind (#1750), which is the
+        # shape of bug that copy invites.
+        from terrapod.api.routers.package_cache import _galaxy_base
+
+        with patch("terrapod.api.routers.package_cache.settings") as st:
+            st.external_url = "https://terrapod.example.com"
+            got = _galaxy_base(
+                self._request("/api/terrapod/v1/package-cache/galaxy/v3/collections/a/b/"),
+                self._runner(),
+            )
+        assert got.startswith("http://terrapod-api:8000/")
+        assert got.endswith("/package-cache/galaxy")
+
+    def test_galaxy_still_gives_everyone_else_external_url(self):
+        from terrapod.api.routers.package_cache import _galaxy_base
+
+        with patch("terrapod.api.routers.package_cache.settings") as st:
+            st.external_url = "https://terrapod.example.com"
+            got = _galaxy_base(
+                self._request("/api/terrapod/v1/package-cache/galaxy/v3/collections/a/b/"),
+                self._person(),
+            )
+        assert got.startswith("https://terrapod.example.com/")
+
+    def test_galaxy_with_no_caller_named_is_unchanged(self):
+        # The parameter is optional, so a call site that has not been updated
+        # keeps the old behaviour rather than silently becoming a runner answer.
+        from terrapod.api.routers.package_cache import _galaxy_base
+
+        with patch("terrapod.api.routers.package_cache.settings") as st:
+            st.external_url = "https://terrapod.example.com"
+            got = _galaxy_base(
+                self._request("/api/terrapod/v1/package-cache/galaxy/v3/collections/a/b/")
+            )
+        assert got.startswith("https://terrapod.example.com/")
+
     def test_the_runner_answer_keeps_the_prefix_the_caller_used(self):
         # npm resolves `_authToken` by request path, so an answer on a different
         # prefix would strip the runner's own credential from every fetch.
