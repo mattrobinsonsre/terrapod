@@ -915,6 +915,20 @@ api:
       # fronts more distinct API clients than this. 0 = unlimited.
       distinct_credentials_per_minute: 200
 
+      # Proxy addresses/CIDRs whose X-Forwarded-For may be believed. The header
+      # is caller-supplied, so it is read ONLY when the connecting peer is
+      # listed here; the client is then the right-most entry that is not itself
+      # a listed proxy.
+      #
+      # EMPTY BY DEFAULT and that is deliberate: with nothing trusted the header
+      # is ignored and the connecting peer is used. That peer is the BFF pod for
+      # every request, so unauthenticated traffic (including the login limit)
+      # shares ONE bucket until you set this. Set it to the CIDR your ingress or
+      # BFF pods run in — e.g. the cluster pod CIDR — to get per-client limits.
+      # Failing closed is the right default: keying on a forgeable header means
+      # the per-client limit was never being enforced at all.
+      trusted_proxy_cidrs: []
+
     # Background triggered-task scheduler (#1296).
     #
     # Consumers PER REPLICA for each lane; deployment-wide concurrency is this
