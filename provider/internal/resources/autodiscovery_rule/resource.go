@@ -73,6 +73,7 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
+	"github.com/mattrobinsonsre/terrapod/provider/internal/ids"
 )
 
 var (
@@ -712,7 +713,12 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 
 	m.Name = types.StringValue(terrapod.GetStringAttr(res, "name"))
 	m.NameTemplate = types.StringValue(terrapod.GetStringAttr(res, "name-template"))
-	m.VCSConnectionID = types.StringValue(terrapod.GetStringAttr(res, "vcs-connection-id"))
+	// Both id attributes keep the form the configuration wrote. This endpoint
+	// serialises them bare while a data source's `.id` -- the obvious thing to
+	// interpolate here -- is prefixed, so storing the server's answer verbatim
+	// failed every apply with "inconsistent result after apply" (#1748).
+	m.VCSConnectionID = ids.Keep(
+		m.VCSConnectionID, terrapod.GetStringAttr(res, "vcs-connection-id"), "vcs-")
 	m.RepoURL = types.StringValue(terrapod.GetStringAttr(res, "repo-url"))
 	m.Branch = types.StringValue(terrapod.GetStringAttr(res, "branch"))
 	m.Pattern = types.StringValue(terrapod.GetStringAttr(res, "pattern"))
@@ -728,7 +734,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.Enabled = types.BoolValue(terrapod.GetBoolAttr(res, "enabled"))
 	m.ExecutionMode = types.StringValue(terrapod.GetStringAttr(res, "execution-mode"))
 	m.ExecutionBackend = types.StringValue(terrapod.GetStringAttr(res, "execution-backend"))
-	m.AgentPoolID = types.StringValue(terrapod.GetStringAttr(res, "agent-pool-id"))
+	m.AgentPoolID = ids.Keep(m.AgentPoolID, terrapod.GetStringAttr(res, "agent-pool-id"), "apool-")
 	m.TerraformVersion = types.StringValue(terrapod.GetStringAttr(res, "terraform-version"))
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
 	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
