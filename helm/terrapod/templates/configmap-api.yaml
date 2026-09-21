@@ -19,6 +19,9 @@ data:
     {{- if .Values.api.config.external_url }}
     external_url: {{ .Values.api.config.external_url | quote }}
     {{- end }}
+    {{- if hasKey .Values.api.config "require_strong_secrets" }}
+    require_strong_secrets: {{ .Values.api.config.require_strong_secrets }}
+    {{- end }}
     {{- /*
       public_webhook_url priority:
         1. explicit api.config.public_webhook_url (operator override wins)
