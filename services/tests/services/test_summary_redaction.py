@@ -376,3 +376,78 @@ class TestTheChokepointAppliesDerivedValues:
         ):
             primary, *_ = await summariser._gather_inputs(AsyncMock(), run, "plan_summary")
         assert "CHOKEPOINT-SECRET-ffff" not in primary
+
+
+class TestSensitiveRootVariables:
+    """The fourth signal `5mpc` names, and the one I missed first time.
+
+    A root variable declared `sensitive = true` has its value in
+    `variables[name].value` and its declaration in
+    `configuration.root_module.variables[name]`. No marker in any change block
+    points at it, so a marker walk cannot see it — and a resource consuming it
+    whose provider does not mark the attribute keeps it in the clear.
+    """
+
+    def _plan(self) -> bytes:
+        return json.dumps(
+            {
+                "variables": {"db_password": {"value": "ROOTVAR-SECRET-xyz"}},
+                "configuration": {
+                    "root_module": {"variables": {"db_password": {"sensitive": True}}}
+                },
+                "resource_changes": [
+                    {
+                        "address": "aws_db_instance.main",
+                        "change": {
+                            "actions": ["update"],
+                            # The provider does NOT mark it here.
+                            "after": {"password": "ROOTVAR-SECRET-xyz", "name": "db"},
+                            "after_sensitive": {},
+                        },
+                    }
+                ],
+            }
+        ).encode()
+
+    def test_the_value_is_collected(self):
+        assert "ROOTVAR-SECRET-xyz" in sr.marked_values(self._plan())
+
+    def test_a_non_sensitive_root_variable_is_not_collected(self):
+        raw = json.dumps(
+            {
+                "variables": {"region": {"value": "eu-west-1-not-secret"}},
+                "configuration": {"root_module": {"variables": {"region": {"sensitive": False}}}},
+            }
+        ).encode()
+        assert sr.marked_values(raw) == []
+
+    def test_a_malformed_configuration_block_is_survivable(self):
+        for raw in (
+            b'{"variables": {"a": {"value": "x"}}}',
+            b'{"configuration": "not a dict", "variables": {}}',
+            b'{"configuration": {"root_module": {}}, "variables": {"a": 1}}',
+        ):
+            assert sr.marked_values(raw) == []
+
+    async def test_it_does_not_reach_the_prompt(self):
+        import uuid
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from terrapod.services import summariser
+
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.workspace_id = uuid.uuid4()
+        run.configuration_version_id = None
+        run.apply_started_at = None
+        storage = AsyncMock()
+        storage.get = AsyncMock(return_value=self._plan())
+        with (
+            patch.object(summariser, "get_storage", return_value=storage),
+            patch(
+                "terrapod.services.variable_service.resolve_variables",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            primary, *_ = await summariser._gather_inputs(AsyncMock(), run, "plan_summary")
+        assert "ROOTVAR-SECRET-xyz" not in primary
