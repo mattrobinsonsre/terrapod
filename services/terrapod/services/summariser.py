@@ -64,7 +64,7 @@ from terrapod.db.models import PlanSummary, PlanSummaryMessage, Run, Workspace, 
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services.summariser_prompt import render_prompt, tool_for_kind
-from terrapod.services.summary_redaction import redact_plan_json, redact_text
+from terrapod.services.summary_redaction import marked_values, redact_plan_json, redact_text
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
@@ -645,6 +645,7 @@ async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, st
     """
     storage = get_storage()
     cfg = settings.ai_summary
+    plan_secrets: list[str] = []
 
     if kind == "plan_summary":
         key = plan_json_output_key(str(run.workspace_id), str(run.id))
@@ -660,6 +661,10 @@ async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, st
         # Clean BEFORE truncation so the head-truncate budget is spent
         # on actual changes, not no-op snapshot noise.
         cleaned = await asyncio.to_thread(_clean_plan_json_bytes, raw)
+        # Collect the marked values BEFORE redacting them, or every one comes
+        # back as the placeholder and the derived-value pass below matches
+        # nothing. Ordering, not an optimisation.
+        plan_secrets = await asyncio.to_thread(marked_values, cleaned)
         # Redact BEFORE truncating, so the budget is not spent carrying
         # secrets that are about to be replaced anyway -- and so a secret
         # can never survive by sitting past the truncation point in a
@@ -733,7 +738,12 @@ async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, st
     # variables. Structural redaction above already covered the plan JSON;
     # this runs over all five anyway, because a sensitive variable's value
     # can appear in a plan JSON field the provider never marked.
-    literals = await _sensitive_literals(db, run)
+    # Values the plan itself marks sensitive, matched anywhere they appear --
+    # including positions no marker points at, which is where a copy of a
+    # secret ends up (see summary_redaction.marked_values). Joined with the
+    # workspace's own sensitive variable values, which cover the reverse case:
+    # a secret that reaches a log or a .tfvars file without ever being marked.
+    literals = list(await _sensitive_literals(db, run)) + plan_secrets
     if literals:
         primary = redact_text(primary, literals)
         code_context = redact_text(code_context, literals)

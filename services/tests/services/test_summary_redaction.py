@@ -254,3 +254,125 @@ class TestTheChokepointRedactsEveryArtifact:
             primary, *_ = await summariser._gather_inputs(AsyncMock(), run, "plan_summary")
         # Degrades to the structural pass, which still covers the plan JSON.
         assert "SUPERSECRET-bbbb" not in primary
+
+
+class TestDerivedSecretsWithNoMarkerOfTheirOwn:
+    """Markers alone do not redact safely — the Go MCP redactor found this
+    first and the same hole existed here."""
+
+    def _plan_with_copy(self) -> bytes:
+        return json.dumps(
+            {
+                "resource_changes": [
+                    {
+                        "address": "random_password.db",
+                        "change": {
+                            "actions": ["create"],
+                            "after": {"result": "DERIVED-SECRET-dddd"},
+                            "after_sensitive": {"result": True},
+                        },
+                    },
+                    {
+                        # terraform_data copies a sensitive input to its output
+                        # and the output carries NO marker.
+                        "address": "terraform_data.copy",
+                        "change": {
+                            "actions": ["create"],
+                            "after": {"input": "DERIVED-SECRET-dddd"},
+                            "after_sensitive": {},
+                        },
+                    },
+                ]
+            }
+        ).encode()
+
+    def test_the_marked_value_is_collected(self):
+        assert "DERIVED-SECRET-dddd" in sr.marked_values(self._plan_with_copy())
+
+    def test_structural_redaction_alone_misses_the_copy(self):
+        # Exactly why value-matching is layered on top: the copy has no marker,
+        # so a position-based pass cannot see it.
+        out = sr.redact_plan_json(self._plan_with_copy()).decode()
+        assert "DERIVED-SECRET-dddd" in out
+
+    def test_value_matching_catches_it(self):
+        raw = self._plan_with_copy()
+        out = sr.redact_text(sr.redact_plan_json(raw).decode(), sr.marked_values(raw))
+        assert "DERIVED-SECRET-dddd" not in out
+
+    def test_numbers_and_booleans_are_not_collected(self):
+        # Matching them would redact unrelated parts of the plan: True and 0
+        # appear everywhere, and as secrets they carry almost nothing.
+        raw = json.dumps(
+            {
+                "resource_changes": [
+                    {
+                        "change": {
+                            "actions": ["create"],
+                            "after": {"port": 5432, "enabled": True, "tok": "LONG-SECRET-eeee"},
+                            "after_sensitive": {"port": True, "enabled": True, "tok": True},
+                        }
+                    }
+                ]
+            }
+        ).encode()
+        collected = sr.marked_values(raw)
+        assert collected == ["LONG-SECRET-eeee"]
+
+    def test_malformed_input_yields_no_values(self):
+        assert sr.marked_values(b"not json") == []
+        assert sr.marked_values(b"[1,2,3]") == []
+
+
+class TestTheChokepointAppliesDerivedValues:
+    async def test_an_unmarked_copy_does_not_reach_the_prompt(self):
+        """The wiring, not just the function.
+
+        Testing `marked_values` alone passes while `_gather_inputs` ignores it —
+        which is how the audit-redaction guard in this same advisory set slipped
+        through, so it is asserted end to end here.
+        """
+        import uuid
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from terrapod.services import summariser
+
+        plan = json.dumps(
+            {
+                "resource_changes": [
+                    {
+                        "address": "random_password.db",
+                        "change": {
+                            "actions": ["create"],
+                            "after": {"result": "CHOKEPOINT-SECRET-ffff"},
+                            "after_sensitive": {"result": True},
+                        },
+                    },
+                    {
+                        "address": "terraform_data.copy",
+                        "change": {
+                            "actions": ["create"],
+                            "after": {"input": "CHOKEPOINT-SECRET-ffff"},
+                            "after_sensitive": {},
+                        },
+                    },
+                ]
+            }
+        ).encode()
+
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.workspace_id = uuid.uuid4()
+        run.configuration_version_id = None
+        run.apply_started_at = None
+        storage = AsyncMock()
+        storage.get = AsyncMock(return_value=plan)
+        with (
+            patch.object(summariser, "get_storage", return_value=storage),
+            patch(
+                "terrapod.services.variable_service.resolve_variables",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            primary, *_ = await summariser._gather_inputs(AsyncMock(), run, "plan_summary")
+        assert "CHOKEPOINT-SECRET-ffff" not in primary
