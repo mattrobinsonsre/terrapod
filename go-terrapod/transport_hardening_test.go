@@ -165,8 +165,8 @@ func TestBidiOverridesAreNeutralised(t *testing.T) {
 	// unicode.IsControl is category Cc only, so the RIGHT-TO-LEFT OVERRIDE and
 	// the directional isolates — the characters Trojan-source spoofing uses —
 	// passed through untouched.
-	got := sanitiseErrorBody([]byte("safe‮gnirts-desrever⁦⁩​end"))
-	for _, bad := range []string{"‮", "⁦", "⁩", "​"} {
+	got := sanitiseErrorBody([]byte("safe\u202Egnirts-desrever\u2066\u2069\u200Bend"))
+	for _, bad := range []string{"\u202E", "\u2066", "\u2069", "\u200B"} {
 		if strings.Contains(got, bad) {
 			t.Errorf("formatting character survived: %q", got)
 		}
