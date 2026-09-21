@@ -1265,3 +1265,70 @@ class TestResolveCancelingRun:
         assert result.status == "errored"
         assert "no state-version" in result.error_message
         assert ws.state_diverged is True
+
+
+class TestCompletePlanSurvivesADuplicatePost:
+    """A retried `/plan-result` must not wedge a run.
+
+    A3C7 observed a run stuck in `planning` after a second plan-result reached
+    it (GHSA-63m3-56rj-qqfh). Authentication stops the forged case, but it does
+    not stop the ordinary one: the runner retries this POST by design, so a
+    duplicate arriving while a gate holds the run in `planning` is a normal
+    event, not an attack. The existing idempotency guard does not cover it —
+    that guard returns early only once the run has LEFT `planning`, and a gated
+    run has not.
+    """
+
+    @pytest.fixture
+    def _stage_none(self):
+        with patch(
+            "terrapod.services.run_task_service.create_task_stage",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            yield
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    async def test_a_gated_run_still_completes_after_a_duplicate(
+        self, _avail, _evt, _mock_db, _stage_none
+    ):
+        run = _mock_run(status="planning", plan_started_at=datetime.now(UTC), plan_only=True)
+
+        # Two posts arrive while a mandatory policy holds the run.
+        with patch(
+            "terrapod.services.policy_set_service.evaluate_post_plan",
+            new=AsyncMock(return_value="blocked"),
+        ):
+            await complete_plan(_mock_db, run, has_changes=True)
+            await complete_plan(_mock_db, run, has_changes=True)
+        assert run.status == "planning", "a blocked policy gate must hold the run"
+
+        # The gate clears (an override, or the policy passing on re-evaluation).
+        # The run must still be able to finish — if the duplicate had wedged it,
+        # this is where it would fail to move.
+        with patch(
+            "terrapod.services.policy_set_service.evaluate_post_plan",
+            new=AsyncMock(return_value="passed"),
+        ):
+            result = await complete_plan(_mock_db, run, has_changes=True)
+        assert result.status == "planned"
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    async def test_the_plan_finished_timestamp_is_not_moved_by_a_retry(
+        self, _avail, _evt, _mock_db, _stage_none
+    ):
+        # It is stamped before the gates, so a retry re-enters that code. The
+        # timestamp means "when the plan finished", not "when we last heard
+        # about it" — a retry must not slide it forward.
+        run = _mock_run(status="planning", plan_started_at=datetime.now(UTC), plan_only=True)
+        with patch(
+            "terrapod.services.policy_set_service.evaluate_post_plan",
+            new=AsyncMock(return_value="blocked"),
+        ):
+            await complete_plan(_mock_db, run, has_changes=True)
+            first = run.plan_finished_at
+            assert first is not None
+            await complete_plan(_mock_db, run, has_changes=True)
+        assert run.plan_finished_at == first
