@@ -202,7 +202,30 @@ def marked_values(raw: bytes) -> list[str]:
             if isinstance(change, dict):
                 for side in ("before", "after"):
                     _collect_marked_leaves(change.get(side), change.get(f"{side}_sensitive"), found)
+    # The fourth sensitivity signal, and the one a marker walk cannot reach: a
+    # root variable declared `sensitive = true`. Its value lives in
+    # `variables[name].value` while the declaration lives somewhere else
+    # entirely -- `configuration.root_module.variables[name].sensitive` -- so
+    # nothing in the change blocks points at it. A resource consuming it whose
+    # provider does not mark the attribute keeps the value in the clear.
+    _collect_sensitive_root_variables(plan, found)
+
     return sorted(found, key=len, reverse=True)
+
+
+def _collect_sensitive_root_variables(plan: Any, out: set[str]) -> None:
+    """Values of root variables the configuration declares sensitive."""
+    config = plan.get("configuration")
+    root = config.get("root_module") if isinstance(config, dict) else None
+    declared = root.get("variables") if isinstance(root, dict) else None
+    values = plan.get("variables")
+    if not isinstance(declared, dict) or not isinstance(values, dict):
+        return
+    for name, spec in declared.items():
+        if isinstance(spec, dict) and spec.get("sensitive") is True:
+            entry = values.get(name)
+            if isinstance(entry, dict):
+                _collect_leaves(entry.get("value"), out)
 
 
 def collect_literals(values: Iterable[str]) -> list[str]:

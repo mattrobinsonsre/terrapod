@@ -93,6 +93,18 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.api.tokenSigningKey.existingSecret }}
                   key: {{ .Values.api.tokenSigningKey.existingSecretKey | default "token_signing_key" }}
+            {{- else }}
+            {{- /* The generated per-install key (GHSA-hc47-q72v-4vcm). Optional,
+                   because it exists only for installs from the fix onward: an
+                   older deployment upgrading in has no such Secret and must keep
+                   its existing derivation rather than have every in-flight token
+                   invalidated. See templates/secret-token-signing.yaml. */}}
+            - name: TERRAPOD_TOKEN_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-token-signing" (include "terrapod.fullname" .) }}
+                  key: token_signing_key
+                  optional: true
             {{- end }}
             {{- if ((.Values.api.config.ha).peer).existingSecret }}
             # HA peer link (#960 phase 3) — the follower's client_credentials

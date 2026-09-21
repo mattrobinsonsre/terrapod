@@ -808,6 +808,36 @@ jobs:
           fi
           echo "all third-party images are overridable, and every mirror ref is listed"
 
+      - name: A token signing key is generated on install, and never on upgrade
+        run: |
+          # GHSA-hc47-q72v-4vcm. The asymmetry IS the fix, and it is invisible
+          # in a normal render: generating on upgrade would rotate the key and
+          # invalidate every token in flight -- which is what running plans and
+          # applies authenticate with. So both directions are asserted.
+          inst=$(helm template tp ./helm/terrapod | grep -c 'token_signing_key:' || true)
+          [ "$inst" = "1" ] \
+            || { echo "install must generate a signing key (got $inst)"; exit 1; }
+
+          # An upgrade of a deployment that has no such Secret must emit
+          # nothing, leaving the existing derivation alone.
+          upg=$(helm template tp ./helm/terrapod --is-upgrade | grep -c 'token_signing_key:' || true)
+          [ "$upg" = "0" ] \
+            || { echo "upgrade must NOT generate a key (got $upg) -- this rotates"; exit 1; }
+
+          # An operator-supplied key always wins, and no Secret is generated.
+          own=$(helm template tp ./helm/terrapod --set api.tokenSigningKey.existingSecret=mine)
+          echo "$own" | grep -q 'name: mine' \
+            || { echo "an operator-supplied secret must be used"; exit 1; }
+          echo "$own" | grep -q 'token_signing_key:' \
+            && { echo "must not generate a key when one is supplied"; exit 1; }
+
+          # The generated key must be long enough to be a key rather than a
+          # token-shaped string: the whole point is that it is not guessable.
+          len=$(helm template tp ./helm/terrapod | grep 'token_signing_key:' | sed 's/.*: //; s/"//g' | tr -d '[:space:]' | wc -c)
+          [ "$len" -ge 32 ] \
+            || { echo "generated key is only $len chars"; exit 1; }
+          echo "signing key: generated on install, absent on upgrade, yielded to when supplied"
+
       - name: The strong-secrets switch reaches the pod and stays off by default
         run: |
           # Config-channel contract for GHSA-hc47-q72v-4vcm. The switch decides
