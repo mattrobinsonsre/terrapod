@@ -31,8 +31,11 @@ test.describe('Large upload through BFF', () => {
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2e-bigupload'))
 
-    // Create a configuration version (small request — API-direct setup is fine).
-    const cvRes = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/configuration-versions`, {
+    // Create the configuration version THROUGH THE BFF as well, so the
+    // `upload-url` it returns already names the BFF. The upload endpoint takes
+    // a signed capability now, so the URL cannot be rebuilt from the id — and
+    // creating here avoids transplanting the capability onto another host.
+    const cvRes = await fetch(`${BASE_URL}/api/v2/workspaces/${wsId}/configuration-versions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -46,7 +49,11 @@ test.describe('Large upload through BFF', () => {
       }),
     })
     expect(cvRes.status).toBe(201)
-    const cvId = (await cvRes.json()).data.id as string
+    const cvJson = await cvRes.json()
+    const cvId = cvJson.data.id as string
+    const uploadUrl = cvJson.data.attributes['upload-url'] as string
+    // The layer under test must still be the one we PUT the 12 MB through.
+    expect(uploadUrl.startsWith(BASE_URL)).toBe(true)
 
     // 12 MB — deliberately over the old 10 MB middleware body cap. The upload
     // endpoint doesn't parse the tarball (that happens at run time), so opaque
@@ -54,7 +61,7 @@ test.describe('Large upload through BFF', () => {
     const body = Buffer.alloc(12 * 1024 * 1024, 7)
 
     // THROUGH THE BFF (BASE_URL) — the layer under test.
-    const upRes = await fetch(`${BASE_URL}/api/v2/configuration-versions/${cvId}/upload`, {
+    const upRes = await fetch(uploadUrl, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/octet-stream' },
       body,
