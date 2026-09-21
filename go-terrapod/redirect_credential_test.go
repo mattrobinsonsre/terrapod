@@ -94,3 +94,61 @@ func TestTheTokenDoesNotReachARedirectTarget(t *testing.T) {
 		t.Errorf("the redirect target received the credential: %q", reachedAuth)
 	}
 }
+
+// The injected-client path had NO redirect protection: CheckRedirect was set
+// only on the default client. The MCP server and the load-test harness both
+// supply their own, so the component that runs unattended against production
+// was precisely the one without the fix.
+func TestAnInjectedHTTPClientStillGetsRedirectProtection(t *testing.T) {
+	c, err := NewClient(Options{
+		BaseURL:    "https://terrapod.example.com",
+		Token:      "t",
+		HTTPClient: &http.Client{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.HTTPClient.CheckRedirect == nil {
+		t.Fatal("an injected client was left with no redirect policy")
+	}
+}
+
+func TestAnInjectedClientIsNotMutated(t *testing.T) {
+	caller := &http.Client{}
+	if _, err := NewClient(Options{
+		BaseURL: "https://terrapod.example.com", Token: "t", HTTPClient: caller,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if caller.CheckRedirect != nil {
+		t.Error("NewClient mutated the caller's http.Client")
+	}
+}
+
+func TestRedirectToADifferentPortDropsTheCredential(t *testing.T) {
+	// Comparing Hostname() alone ignored the port, so another service on the
+	// same host — a registry, a preview app, a metrics UI — got the token.
+	origin := req(t, "https://terrapod.example.com/api/v1/x")
+	r := req(t, "https://terrapod.example.com:8443/x")
+	if err := dropCredentialOnUnsafeRedirect(r, []*http.Request{origin}); err != nil {
+		t.Fatal(err)
+	}
+	if r.Header.Get("Authorization") != "" {
+		t.Error("a redirect to another port kept the credential")
+	}
+}
+
+func TestAPlaintextLoopbackRedirectKeepsWorking(t *testing.T) {
+	// The loopback carve-out permits http://127.0.0.1, so a bare
+	// trailing-slash 301 from that server back to itself must not be stripped
+	// — testing `scheme != "https"` would have 401'd a dev deployment that
+	// worked on the previous release.
+	origin := req(t, "http://127.0.0.1:8080/api/v1/x")
+	r := req(t, "http://127.0.0.1:8080/api/v1/x/")
+	if err := dropCredentialOnUnsafeRedirect(r, []*http.Request{origin}); err != nil {
+		t.Fatal(err)
+	}
+	if r.Header.Get("Authorization") == "" {
+		t.Error("a same-origin loopback redirect lost its credential")
+	}
+}

@@ -69,6 +69,26 @@ def _rules(text: str, section: str) -> list[tuple[str, list[str]]]:
     return out
 
 
+def _is_empty_selector(match: re.Match[str], rule: str) -> bool:
+    """`from: []` admits everything, exactly like no selector at all.
+
+    An earlier version of this test only asked whether the key was WRITTEN, so
+    "fixing" a permissive rule as `- from: []` would have kept it green while
+    admitting every source — the precise defect it exists to catch.
+
+    Callers apply this to ingress only; see the comment at the call site for
+    why an empty egress selector is legitimate.
+    """
+    inline = match.group(1).strip()
+    if inline in ("[]", "[ ]"):
+        return True
+    # `from:` with nothing indented under it and nothing inline is also empty.
+    if inline == "":
+        tail = rule[match.end() :]
+        return not re.search(r"^\s*-\s", tail, flags=re.M)
+    return False
+
+
 class TestEveryRuleNamesItsPeers:
     def test_there_are_policies_to_check(self):
         # A sweep that found nothing would pass silently, which is the shape of
@@ -90,11 +110,17 @@ class TestEveryRuleNamesItsPeers:
             for section, selector in (("ingress", "from"), ("egress", "to")):
                 for _, rule in _rules(text, section):
                     joined = "\n".join(rule)
-                    # The selector may sit on the `- ` line itself or below it.
-                    if re.search(rf"(^|\s|-\s){selector}:", joined):
+                    match = re.search(rf"(?:^|\s|-\s){selector}:(.*)$", joined, flags=re.M)
+                    # Empty is a defect for INGRESS only. `to: []` with ports
+                    # is a real restriction — egress anywhere but on those
+                    # ports, which is how the bundled charts reach DNS and the
+                    # cluster API. An empty `from:` restricts nothing at all.
+                    if match is not None and not (
+                        section == "ingress" and _is_empty_selector(match, joined)
+                    ):
                         continue
                     offenders.append(
-                        f"{path.name}: a {section} rule declares no `{selector}:`, "
+                        f"{path.name}: a {section} rule declares no usable `{selector}:`, "
                         f"so it matches ALL peers on those ports — "
                         f"{joined.strip()[:60]!r}"
                     )

@@ -415,3 +415,24 @@ func TestIsTransientNetError(t *testing.T) {
 		t.Error("connection-refused *net.OpError should not be transient")
 	}
 }
+
+// The Options field is settable only by a Go caller, and nothing plumbs it —
+// not the provider, not terrapod-migrate, not terrapod-publish. Without an env
+// escape hatch, an operator behind a TLS-terminating load balancer at
+// http://terrapod.internal would hit a hard failure on a patch release with no
+// way to opt back in.
+func TestAnEnvVarCanAllowInsecureTransport(t *testing.T) {
+	t.Setenv("TERRAPOD_ALLOW_INSECURE_TRANSPORT", "1")
+	if _, err := NewClient(Options{BaseURL: "http://terrapod.internal", Token: "t"}); err != nil {
+		t.Errorf("the documented escape hatch was refused: %v", err)
+	}
+}
+
+func TestTheEnvVarMustBeExactlyOne(t *testing.T) {
+	for _, v := range []string{"", "0", "true", "yes"} {
+		t.Setenv("TERRAPOD_ALLOW_INSECURE_TRANSPORT", v)
+		if _, err := NewClient(Options{BaseURL: "http://terrapod.internal", Token: "t"}); err == nil {
+			t.Errorf("value %q was treated as an opt-in", v)
+		}
+	}
+}

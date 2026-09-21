@@ -84,7 +84,7 @@ func TestTarGzDirRoundTrip(t *testing.T) {
 	mustMkdir(filepath.Join(dir, "sub"))
 	mustWrite(filepath.Join(dir, "sub", "vars.tf"), []byte("variable {}"))
 
-	gz, err := TarGzDir(dir)
+	gz, _, err := TarGzDir(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestTarGzDirExcludesSecretBearingFiles(t *testing.T) {
 		write(n, "# "+n)
 	}
 
-	gz, err := TarGzDir(dir)
+	gz, _, err := TarGzDir(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,5 +186,61 @@ func TestTarGzDirExcludesSecretBearingFiles(t *testing.T) {
 		if !entries[n] {
 			t.Errorf("the filter dropped module source: %s (entries: %v)", n, entries)
 		}
+	}
+}
+
+// The exclusion table, pinned at its EDGES rather than transcribed from the
+// switch. The review's point was that listing exactly the implemented clauses
+// proves only "the code does what the code does"; the value is in the cases a
+// developer plausibly has lying in a module directory.
+func TestExcludedFileCoversTheRealAccidents(t *testing.T) {
+	mustExclude := []string{
+		".env", ".env.local", ".env.production", ".envrc",
+		".netrc", ".terraformrc", "credentials.tfrc.json", "credentials",
+		"terraform.tfstate", "terraform.tfstate.backup", "prod.tfstate",
+		"terraform.tfstate.1700000000.backup", ".terraform.tfstate.lock.info",
+		"terraform.tfvars", "prod.auto.tfvars", "vars.tfvars.json",
+		"Terraform.TFVars", "TERRAFORM.TFSTATE", // case-insensitive filesystems
+		"key.pem", "id_rsa", "id_ed25519",
+	}
+	mustKeep := []string{
+		"main.tf", "variables.tf", "outputs.tf", "versions.tf",
+		"README.md", "LICENSE", "terraform.tfvars.example", "example.tf",
+	}
+	for _, n := range mustExclude {
+		if !excludedFile(n) {
+			t.Errorf("%q would be published", n)
+		}
+	}
+	for _, n := range mustKeep {
+		if excludedFile(n) {
+			t.Errorf("%q would be dropped from the module", n)
+		}
+	}
+}
+
+// Publishing is irreversible, so the author has to be told what was left out —
+// the filter matches by name and will also catch a deliberately-shipped
+// example tfvars fixture.
+func TestTarGzDirReportsWhatItSkipped(t *testing.T) {
+	dir := t.TempDir()
+	for _, n := range []string{"main.tf", "terraform.tfvars", "examples/basic/dev.tfvars"} {
+		p := filepath.Join(dir, filepath.FromSlash(n))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, skipped, err := TarGzDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(skipped) != 2 {
+		t.Fatalf("expected 2 skipped files, got %v", skipped)
+	}
+	if skipped[0] != "examples/basic/dev.tfvars" || skipped[1] != "terraform.tfvars" {
+		t.Errorf("skipped list wrong or unsorted: %v", skipped)
 	}
 }

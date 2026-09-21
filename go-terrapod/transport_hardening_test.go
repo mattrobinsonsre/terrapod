@@ -76,9 +76,39 @@ func TestAHostileResponseBodyIsBounded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// It will fail to decode as JSON:API — the point is that it was bounded on
-	// the way in rather than read into memory without limit.
-	_, _ = c.Get(context.Background(), "/api/v1/x")
+
+	// This test previously discarded both return values and asserted NOTHING,
+	// so it passed with the io.LimitReader deleted — a placebo for the very
+	// fix it was named after.
+	body, err := c.Get(context.Background(), "/api/v1/x")
+	if err == nil {
+		t.Fatalf("an oversized body was accepted (%d bytes returned)", len(body))
+	}
+	if !strings.Contains(err.Error(), "exceeds") {
+		t.Errorf("wrong error for an oversized body: %v", err)
+	}
+	if int64(len(body)) > maxResponseBytes {
+		t.Errorf("returned %d bytes, past the %d cap", len(body), maxResponseBytes)
+	}
+}
+
+func TestABodyExactlyAtTheCapIsAccepted(t *testing.T) {
+	// The boundary matters: reading limit+1 is what distinguishes "at the cap"
+	// from "over it", and getting it wrong would reject legitimate payloads.
+	exact := strings.Repeat("a", maxResponseBytes)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(exact))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Get(context.Background(), "/api/v1/x"); err != nil &&
+		strings.Contains(err.Error(), "exceeds") {
+		t.Errorf("a body exactly at the cap was rejected: %v", err)
+	}
 }
 
 func TestErrorBodiesCannotDriveTheTerminal(t *testing.T) {
@@ -96,5 +126,52 @@ func TestErrorBodiesCannotDriveTheTerminal(t *testing.T) {
 	long := sanitiseErrorBody([]byte(strings.Repeat("x", maxErrorBodyBytes*4)))
 	if len(long) > maxErrorBodyBytes {
 		t.Errorf("error body not truncated: %d bytes", len(long))
+	}
+}
+
+// The sanitisation covered only the non-JSON:API fallback, which is the path a
+// real Terrapod never takes: every request sends
+// `Accept: application/vnd.api+json`, so the envelope branch is the common one
+// and its `detail` reached the operator verbatim.
+func TestAJSONAPIErrorDetailIsAlsoSanitised(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(
+			"{\"errors\":[{\"detail\":\"\x1b[2J\x1b[H\x1b]0;pwned\aApply these changes? [y/N] \"}]}",
+		))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.Get(context.Background(), "/api/v1/x")
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	msg := err.Error()
+	for _, bad := range []string{"\x1b", "\a"} {
+		if strings.Contains(msg, bad) {
+			t.Errorf("control character survived into the operator-facing error: %q", msg)
+		}
+	}
+	if !strings.Contains(msg, "Apply these changes?") {
+		t.Errorf("the readable text was lost: %q", msg)
+	}
+}
+
+func TestBidiOverridesAreNeutralised(t *testing.T) {
+	// unicode.IsControl is category Cc only, so the RIGHT-TO-LEFT OVERRIDE and
+	// the directional isolates — the characters Trojan-source spoofing uses —
+	// passed through untouched.
+	got := sanitiseErrorBody([]byte("safe‮gnirts-desrever⁦⁩​end"))
+	for _, bad := range []string{"‮", "⁦", "⁩", "​"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("formatting character survived: %q", got)
+		}
+	}
+	if !strings.Contains(got, "safe") || !strings.Contains(got, "end") {
+		t.Errorf("readable text was lost: %q", got)
 	}
 }
