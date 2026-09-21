@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 	"unicode"
@@ -99,14 +100,33 @@ func NewClient(opts Options) (*Client, error) {
 	}
 
 	baseURL := normaliseBaseURL(opts.BaseURL)
-	if strings.HasPrefix(baseURL, "http://") && !isLoopback(baseURL) && !opts.AllowInsecureTransport {
+	// The escape hatch has to be reachable without a code change. `Options` is
+	// only settable by a Go caller, and NOTHING plumbs it: not the provider, not
+	// terrapod-migrate, not terrapod-publish. Without this env var an operator
+	// running an on-prem Terrapod behind a TLS-terminating load balancer at
+	// http://terrapod.internal would have hit a hard failure on a PATCH release
+	// with no way to opt back in.
+	allowInsecure := opts.AllowInsecureTransport || os.Getenv("TERRAPOD_ALLOW_INSECURE_TRANSPORT") == "1"
+	if strings.HasPrefix(baseURL, "http://") && !isLoopback(baseURL) && !allowInsecure {
 		return nil, fmt.Errorf(
 			"base URL %q uses http:// — the bearer token would cross the network in "+
-				"the clear; use https:// or set Options.AllowInsecureTransport",
+				"the clear. Use https://, or set TERRAPOD_ALLOW_INSECURE_TRANSPORT=1 "+
+				"to accept that risk deliberately",
 			baseURL,
 		)
 	}
 	hc := opts.HTTPClient
+	if hc != nil && hc.CheckRedirect == nil {
+		// An injected client got NO redirect protection, because CheckRedirect
+		// was only set on the default one below. That is not a corner: the MCP
+		// server supplies its own client (it needs a token-refreshing
+		// transport), and so does the load-test harness — so the component that
+		// runs unattended against a production instance was the one without the
+		// fix. Copy rather than mutate: the caller owns their http.Client.
+		clone := *hc
+		clone.CheckRedirect = dropCredentialOnUnsafeRedirect
+		hc = &clone
+	}
 	if hc == nil {
 		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13}, //nolint:gosec
@@ -194,10 +214,36 @@ func dropCredentialOnUnsafeRedirect(req *http.Request, via []*http.Request) erro
 		return fmt.Errorf("stopped after %d redirects", len(via))
 	}
 	origin := via[0].URL
-	if !strings.EqualFold(req.URL.Hostname(), origin.Hostname()) || req.URL.Scheme != "https" {
+	if !sameAuthority(req.URL, origin) || isSchemeDowngrade(origin, req.URL) {
 		req.Header.Del("Authorization")
 	}
 	return nil
+}
+
+// sameAuthority compares host AND port. Comparing Hostname() alone ignored the
+// port, so a redirect to another service on the same host — a registry, a
+// preview app, a metrics UI — kept the platform token.
+func sameAuthority(a, b *url.URL) bool {
+	return strings.EqualFold(a.Hostname(), b.Hostname()) && portOf(a) == portOf(b)
+}
+
+func portOf(u *url.URL) string {
+	if p := u.Port(); p != "" {
+		return p
+	}
+	if strings.EqualFold(u.Scheme, "http") {
+		return "80"
+	}
+	return "443"
+}
+
+// isSchemeDowngrade reports a move to weaker transport than the request started
+// on. Testing `!= "https"` instead punished a deployment that is legitimately
+// plaintext — the loopback carve-out permits http://127.0.0.1, and a bare
+// trailing-slash 301 from that server back to itself would have had its
+// credential stripped and 401'd, where the previous release worked.
+func isSchemeDowngrade(from, to *url.URL) bool {
+	return strings.EqualFold(from.Scheme, "https") && !strings.EqualFold(to.Scheme, "https")
 }
 
 // normaliseBaseURL prepends https:// when the scheme is missing, trims
@@ -403,13 +449,27 @@ func (c *Client) doWithContentType(ctx context.Context, method, path string, bod
 		// server (or a MITM on a plaintext connection) could otherwise stream
 		// until the consuming tool died; measured at 512 MiB read straight into
 		// memory. The cap is far above any real JSON:API document.
-		respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 		_ = resp.Body.Close()
 		if err != nil {
 			return nil, resp.StatusCode, fmt.Errorf("read response: %w", err)
 		}
+		// Fail loudly rather than hand back a truncated document. GetRunPlanJSON
+		// returns these bytes verbatim as "the raw JSON", and a plan for a few
+		// thousand resources can genuinely exceed the cap — silently short JSON
+		// surfaces as an unexplained parse error blamed on the server, or worse
+		// is accepted by a tolerant consumer. Reading one byte past the limit is
+		// what lets us tell "exactly at the cap" from "over it".
+		if int64(len(respBody)) > maxResponseBytes {
+			return nil, resp.StatusCode, fmt.Errorf(
+				"response exceeds the %d-byte client limit; refusing a truncated body",
+				maxResponseBytes,
+			)
+		}
 		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500) && isIdempotent(method) {
-			lastErr = &APIError{StatusCode: resp.StatusCode, Body: string(respBody)}
+			// Sanitised: this Body is formatted into the retry-exhaustion
+			// error an operator sees, so it is the same display surface.
+			lastErr = &APIError{StatusCode: resp.StatusCode, Body: sanitiseErrorBody(respBody)}
 			continue
 		}
 		return respBody, resp.StatusCode, nil
@@ -456,7 +516,15 @@ func extractErrorDetail(body []byte) string {
 			}
 		}
 		if len(parts) > 0 {
-			return strings.Join(parts, "; ")
+			// Sanitise here too. Only the non-JSON:API fallback below was
+			// cleaned, which is the UNCOMMON path — every request sends
+			// `Accept: application/vnd.api+json`, so a real or MITM'd Terrapod
+			// returns an envelope and its `detail` reached the operator's
+			// terminal verbatim. The threat this control exists for is a
+			// hostile server forging a confirmation prompt inside a
+			// `terraform apply` transcript, and that is exactly the path it
+			// was skipping.
+			return sanitiseErrorBody([]byte(strings.Join(parts, "; ")))
 		}
 	}
 	return sanitiseErrorBody(body)
@@ -485,7 +553,11 @@ func sanitiseErrorBody(body []byte) string {
 		switch {
 		case r == '\n' || r == '\t':
 			b.WriteRune(' ')
-		case unicode.IsControl(r):
+		case unicode.IsControl(r), unicode.Is(unicode.Cf, r), unicode.Is(unicode.Zl, r),
+			unicode.Is(unicode.Zp, r):
+			// Cf covers the bidirectional overrides (U+202E and the U+2066-2069
+			// isolates) that drive Trojan-source text spoofing, and U+200B.
+			// `unicode.IsControl` is category Cc only, so those passed through.
 			b.WriteRune('?')
 		default:
 			b.WriteRune(r)

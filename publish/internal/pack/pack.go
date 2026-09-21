@@ -80,13 +80,35 @@ func SHA256SUMS(files map[string][]byte) []byte {
 // a registry other people fetch, and a published version is immutable, so the
 // mistake cannot be withdrawn.
 func excludedFile(name string) bool {
-	switch name {
-	case "terraform.tfstate", "terraform.tfstate.backup", ".env":
+	// Case-insensitive throughout: on macOS and Windows a file stored as
+	// `Terraform.TFVars` is still auto-loaded by Terraform, so a
+	// case-sensitive filter would let exactly the file that carries values
+	// through.
+	lower := strings.ToLower(name)
+
+	switch lower {
+	case "terraform.tfstate", "terraform.tfstate.backup",
+		".envrc", ".netrc", ".terraformrc", "credentials.tfrc.json", "credentials":
 		return true
 	}
-	return strings.HasSuffix(name, ".tfvars") ||
-		strings.HasSuffix(name, ".tfvars.json") ||
-		strings.HasPrefix(name, ".terraform.tfstate.lock")
+
+	// `.env` was matched exactly, so `.env.local` and `.env.production` — the
+	// files people actually paste real values into — still shipped.
+	if lower == ".env" || strings.HasPrefix(lower, ".env.") {
+		return true
+	}
+
+	// Any state file, not just the two canonical names: `prod.tfstate`, a state
+	// pulled to `backup.tfstate`, `terraform.tfstate.1700000000.backup`.
+	if strings.HasSuffix(lower, ".tfstate") || strings.Contains(lower, ".tfstate.") {
+		return true
+	}
+
+	return strings.HasSuffix(lower, ".tfvars") ||
+		strings.HasSuffix(lower, ".tfvars.json") ||
+		strings.HasPrefix(lower, ".terraform.tfstate.lock") ||
+		strings.HasSuffix(lower, ".pem") ||
+		lower == "id_rsa" || lower == "id_ed25519"
 }
 
 // TarGzDir builds a gzipped tar of a module source directory. Entry paths are
@@ -97,7 +119,8 @@ func excludedFile(name string) bool {
 // The exclusion list is a floor, not a guarantee — it catches the predictable
 // accidents, not an arbitrary private key a developer happens to have in the
 // directory. Publishers should check the manifest the CLI prints.
-func TarGzDir(dir string) ([]byte, error) {
+func TarGzDir(dir string) ([]byte, []string, error) {
+	var skipped []string
 	var buf bytes.Buffer
 	gw := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gw)
@@ -118,6 +141,7 @@ func TarGzDir(dir string) ([]byte, error) {
 				return filepath.SkipDir
 			}
 		} else if excludedFile(info.Name()) {
+			skipped = append(skipped, filepath.ToSlash(rel))
 			return nil
 		}
 		hdr, err := tar.FileInfoHeader(info, "")
@@ -140,13 +164,14 @@ func TarGzDir(dir string) ([]byte, error) {
 		return err
 	})
 	if walkErr != nil {
-		return nil, walkErr
+		return nil, nil, walkErr
 	}
 	if err := tw.Close(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := gw.Close(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return buf.Bytes(), nil
+	sort.Strings(skipped)
+	return buf.Bytes(), skipped, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 )
 
 // MUST_BE_SENSITIVE names every attribute that carries, or can carry, secret
@@ -34,6 +35,9 @@ var mustBeSensitive = map[string]string{
 	"terrapod_notification_configuration.token":   "a delivery credential",
 	"terrapod_agent_pool_token.token":             "a pool join token",
 	"terrapod_gpg_key.ascii_armor":                "a signing key",
+
+	// Nested, and invisible to this gate until it learned to recurse.
+	"terrapod_autodiscovery_rule.run_task_templates[].hmac_key": "the same key as terrapod_run_task.hmac_key, supplied through a rule",
 }
 
 func TestEverySecretBearingAttributeIsMarkedSensitive(t *testing.T) {
@@ -49,6 +53,11 @@ func TestEverySecretBearingAttributeIsMarkedSensitive(t *testing.T) {
 		r.Schema(ctx, resource.SchemaRequest{}, &sr)
 		for name, a := range sr.Schema.Attributes {
 			actual[md.TypeName+"."+name] = a.IsSensitive()
+			// Recurse. Walking only the top level left every nested secret
+			// invisible to this gate AND to the golden next door, which records
+			// a nested attribute's TYPE but not its sensitive flag — so a
+			// nested `Sensitive: true` could be deleted with nothing failing.
+			collectNested(actual, md.TypeName+"."+name, a)
 		}
 	}
 	for _, factory := range p.DataSources(ctx) {
@@ -105,5 +114,30 @@ func TestTheProviderTokenIsSensitive(t *testing.T) {
 	}
 	if !a.IsSensitive() {
 		t.Error("provider.token is not Sensitive")
+	}
+}
+
+// collectNested walks a nested attribute's children. The framework's own
+// NestedAttribute interface is internal, so this type-switches on the concrete
+// public schema types instead — verbose, but it needs no unexported access and
+// fails loudly if a new nested kind appears.
+func collectNested(out map[string]bool, prefix string, a rschema.Attribute) {
+	var attrs map[string]rschema.Attribute
+	switch n := a.(type) {
+	case rschema.ListNestedAttribute:
+		attrs = n.NestedObject.Attributes
+	case rschema.SetNestedAttribute:
+		attrs = n.NestedObject.Attributes
+	case rschema.MapNestedAttribute:
+		attrs = n.NestedObject.Attributes
+	case rschema.SingleNestedAttribute:
+		attrs = n.Attributes
+	default:
+		return
+	}
+	for name, child := range attrs {
+		key := prefix + "[]." + name
+		out[key] = child.IsSensitive()
+		collectNested(out, key, child)
 	}
 }
