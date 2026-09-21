@@ -66,9 +66,25 @@ def test_build_ssl_context_require_disables_verification():
     assert ctx.verify_mode == ssl.CERT_NONE
 
 
-def test_build_ssl_context_empty_defaults_to_require():
+def test_build_ssl_context_empty_defaults_to_verifying_the_server():
+    """GHSA-qx93-5mjv-78vq. This asserted CERT_NONE, which was the defect.
+
+    `require` is a faithful implementation of libpq's mode of that name; what
+    made it the wrong DEFAULT is that IAM auth sends the short-lived cloud
+    token AS THE PASSWORD, so the unverified connection is the one carrying a
+    cloud credential — and the operator could not see that. AWS's own guidance
+    for RDS IAM auth is verify-full.
+    """
     ctx = iam_auth.build_ssl_context("", "")
+    assert ctx.verify_mode == ssl.CERT_REQUIRED
+    assert ctx.check_hostname is True
+
+
+def test_require_is_still_available_as_an_explicit_override():
+    """The escape hatch has to keep working, and be reachable by name."""
+    ctx = iam_auth.build_ssl_context("require", "")
     assert ctx.verify_mode == ssl.CERT_NONE
+    assert ctx.check_hostname is False
 
 
 def test_build_ssl_context_verify_ca_requires_cert_not_hostname():

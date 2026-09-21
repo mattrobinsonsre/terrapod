@@ -283,6 +283,54 @@ workspace pinned to anything else now needs an explicit entry in the warm
 manifest — the same rule that has always applied to a Terraform workspace on a
 non-default version.
 
+### Cloud-IAM database auth verifies the server by default
+
+If `database.auth_mode` is one of the cloud-IAM modes and you have not set
+`database.ssl_mode`, the TLS mode changes from `require` (encrypt, do not
+verify the server) to `verify-full` (verify the certificate chain and the
+hostname).
+
+**Why it changed.** `require` is a faithful implementation of libpq's mode of
+that name, and as a Postgres connection mode it is correct. What made it the
+wrong default here is specific to IAM auth: the short-lived cloud token is sent
+**as the database password**, so the connection that was not verifying its peer
+was the one carrying a cloud credential. Anyone able to answer for the database
+host could harvest it, and nothing about that was visible to you. AWS's own
+guidance for RDS IAM authentication is `verify-full`, for the same reason.
+
+**What you may need to do.** Verification needs CA material. Some managed
+databases chain to a root the system trust store already carries and will keep
+working untouched; others do not — the AWS RDS bundle is the common case. If a
+connection now fails to verify, point `database.ssl_root_cert` at your
+provider's CA bundle:
+
+```yaml
+api:
+  config:
+    database:
+      ssl_root_cert: /etc/ssl/rds/global-bundle.pem   # mounted via api.extraVolumes
+```
+
+The API logs a warning at startup whenever a verifying mode is in effect with no
+`ssl_root_cert`, naming both keys, so you do not have to work backwards from a
+TLS error.
+
+**To keep the old behaviour**, set it explicitly:
+
+```yaml
+api:
+  config:
+    database:
+      ssl_mode: require
+```
+
+That is a deliberate choice to encrypt without verifying, and it is available on
+purpose — but on a connection that carries a cloud credential, prefer supplying
+the CA bundle.
+
+Deployments using `auth_mode: password` or a Kubernetes secret are unaffected;
+this module is inert unless an IAM mode is selected.
+
 ### The Python floor moves to 3.14
 
 **Affects:** anyone who builds Terrapod's images themselves, overrides `BASE_IMAGE`,

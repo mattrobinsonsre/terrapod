@@ -48,8 +48,24 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# Cloud IAM DB auth always uses TLS; this is the minimum if none was configured.
-_DEFAULT_SSL_MODE = "require"
+# Cloud IAM DB auth always uses TLS. The default VERIFIES the server
+# (GHSA-qx93-5mjv-78vq).
+#
+# `require` — encrypt, do not verify — is a faithful implementation of libpq's
+# mode of that name, and as a Postgres connection mode it is correct. What made
+# it the wrong DEFAULT is specific to this module: in IAM auth the short-lived
+# cloud token is sent AS THE PASSWORD, so the connection that is not verifying
+# its peer is the one carrying a cloud credential. Anyone who can answer for the
+# database host harvests it, and nothing about that is visible to the operator.
+# AWS's own guidance for RDS IAM auth is verify-full, for exactly this reason.
+#
+# An operator who needs the old behaviour sets `database.ssl_mode: require`
+# explicitly — the control was already fully implemented and documented, so this
+# is a default change rather than new code. A deployment opting into
+# workload-identity database auth has already accepted the configuration burden
+# of an IAM role and a token-minting path; a CA bundle alongside that is
+# proportionate.
+_DEFAULT_SSL_MODE = "verify-full"
 _VALID_SSL_MODES = ("require", "verify-ca", "verify-full")
 
 # GCP OAuth2 scope for Cloud SQL IAM login; Azure Entra scope for OSS RDBMS.
@@ -98,6 +114,23 @@ def build_ssl_context(ssl_mode: str, ssl_root_cert: str) -> ssl.SSLContext:
         ctx.load_verify_locations(cafile=ssl_root_cert)
     else:
         ctx.load_default_certs()
+        if mode != "require":
+            # Deliberately a warning and not a startup failure. Some managed
+            # databases chain to a CA that IS in the system store (Azure's
+            # DigiCert roots), so refusing to start would break a working
+            # deployment; others do not (the AWS RDS global bundle), and there
+            # the connection fails with a TLS error whose cause is not obvious.
+            # Naming the two keys here is what turns that into a five-second fix.
+            logger.warning(
+                "cloud-IAM database TLS is verifying against the system trust store",
+                ssl_mode=mode,
+                hint=(
+                    "set database.ssl_root_cert to your provider's CA bundle "
+                    "(e.g. the RDS global-bundle.pem) if the connection fails to "
+                    "verify, or database.ssl_mode='require' to encrypt without "
+                    "verifying as before"
+                ),
+            )
 
     if mode == "require":
         # Encrypt without verifying the server cert. check_hostname must be

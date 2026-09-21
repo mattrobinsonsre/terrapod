@@ -2935,11 +2935,14 @@ class DatabaseConfig(BaseModel):
     ssl_mode: str = Field(
         default="",
         description=(
-            "TLS mode for cloud-IAM auth: 'require' (encrypt, no cert check — "
-            "the default when empty), 'verify-ca' (verify the server cert chain) "
-            "or 'verify-full' (verify chain + hostname). 'verify-ca'/'verify-full' "
-            "require ssl_root_cert (or a system-trusted CA). Cloud IAM auth always "
-            "uses at least 'require'. Ignored when auth_mode='password'."
+            "TLS mode for cloud-IAM auth: 'verify-full' (verify chain + hostname "
+            "— the DEFAULT when empty), 'verify-ca' (verify the chain only) or "
+            "'require' (encrypt without verifying the server). 'verify-ca' and "
+            "'verify-full' need ssl_root_cert, or a CA the system already trusts. "
+            "The default verifies because IAM auth sends the cloud token AS THE "
+            "PASSWORD, so an unverified peer harvests a live credential; set "
+            "'require' explicitly to restore the pre-2.0 behaviour. Ignored when "
+            "auth_mode='password'."
         ),
     )
     ssl_root_cert: str = Field(
