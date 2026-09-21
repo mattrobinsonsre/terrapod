@@ -64,6 +64,7 @@ from terrapod.db.models import PlanSummary, PlanSummaryMessage, Run, Workspace, 
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services.summariser_prompt import render_prompt, tool_for_kind
+from terrapod.services.summary_redaction import redact_plan_json, redact_text
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
@@ -634,6 +635,13 @@ async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, st
     concatenated current .tf source. code_diff is a unified diff of
     *.tf / *.tfvars between this run's CV and the previously-applied
     CV (when both tarballs are available).
+
+    **Every one of the five is redacted before it is returned**
+    (GHSA-5mpc-79pv-6mq7). This is the only function that assembles what
+    leaves the deployment for the model, so it is the only place the
+    redaction can be applied once and cover all of them — the finding was
+    that plan JSON leaked, but the logs, the .tf source and the .tfvars
+    diff carry the same values. See services/summary_redaction.py.
     """
     storage = get_storage()
     cfg = settings.ai_summary
@@ -652,6 +660,11 @@ async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, st
         # Clean BEFORE truncation so the head-truncate budget is spent
         # on actual changes, not no-op snapshot noise.
         cleaned = await asyncio.to_thread(_clean_plan_json_bytes, raw)
+        # Redact BEFORE truncating, so the budget is not spent carrying
+        # secrets that are about to be replaced anyway -- and so a secret
+        # can never survive by sitting past the truncation point in a
+        # payload that is later re-fitted.
+        cleaned = await asyncio.to_thread(redact_plan_json, cleaned)
         primary = await asyncio.to_thread(_fit_plan_json, cleaned, cfg.plan_json_max_bytes)
     else:
         # failure_analysis. Choose log key by phase: apply-phase errors
@@ -715,7 +728,42 @@ async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, st
                 except Exception as e:
                     logger.debug("Failed to build code_diff", error=str(e))
 
+    # The logs and the source are unstructured, so there are no markers to
+    # read -- only the values themselves, taken from the workspace's own
+    # variables. Structural redaction above already covered the plan JSON;
+    # this runs over all five anyway, because a sensitive variable's value
+    # can appear in a plan JSON field the provider never marked.
+    literals = await _sensitive_literals(db, run)
+    if literals:
+        primary = redact_text(primary, literals)
+        code_context = redact_text(code_context, literals)
+        code_diff = redact_text(code_diff, literals)
+
     return primary, primary_label, primary_lang, code_context, code_diff
+
+
+async def _sensitive_literals(db: AsyncSession, run: Run) -> list[str]:
+    """The workspace's sensitive variable values, for literal redaction.
+
+    Best-effort: a resolution failure must not stop a summary being produced,
+    because the structural pass has already handled the plan JSON and this is a
+    backstop over it. It is logged rather than swallowed silently, so a
+    deployment where this never works does not look identical to one where
+    there are simply no sensitive variables.
+    """
+    try:
+        from terrapod.services.variable_service import resolve_variables
+
+        resolved = await resolve_variables(db, run.workspace_id)
+    except Exception as exc:  # noqa: BLE001 - see the docstring
+        logger.warning(
+            "could not resolve variables to redact the AI prompt; "
+            "the structural pass still applies",
+            run_id=str(run.id),
+            error=str(exc),
+        )
+        return []
+    return [v.value for v in resolved if v.sensitive and v.value]
 
 
 # --- Daily budget ------------------------------------------------------------
