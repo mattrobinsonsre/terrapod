@@ -135,6 +135,76 @@ def _redact_state_values(node: Any) -> None:
             _redact_state_values(item)
 
 
+def _collect_marked_leaves(value: Any, markers: Any, out: set[str]) -> None:
+    """Gather the leaf values `markers` flags as sensitive, as strings."""
+    if markers is True:
+        _collect_leaves(value, out)
+    elif isinstance(markers, dict) and isinstance(value, dict):
+        for key, sub in markers.items():
+            _collect_marked_leaves(value.get(key), sub, out)
+    elif isinstance(markers, list) and isinstance(value, list):
+        for i, sub in enumerate(markers):
+            if i < len(value):
+                _collect_marked_leaves(value[i], sub, out)
+
+
+def _collect_leaves(value: Any, out: set[str]) -> None:
+    """Every string under `value`. Booleans and numbers are skipped.
+
+    As secrets they carry almost nothing, and matching them would redact
+    unrelated parts of the plan — `True` and `0` appear everywhere.
+    """
+    if isinstance(value, str):
+        if value:
+            out.add(value)
+    elif isinstance(value, dict):
+        for sub in value.values():
+            _collect_leaves(sub, out)
+    elif isinstance(value, list):
+        for sub in value:
+            _collect_leaves(sub, out)
+
+
+def marked_values(raw: bytes) -> list[str]:
+    """Every value the plan marks sensitive, wherever it is marked.
+
+    **Markers alone do not redact safely, which is why this exists.** A value
+    derived from a sensitive one does not always keep the marking: a
+    `terraform_data` that copies a sensitive input to its output is marked on
+    the input and not on the output, so the same secret sits there in the clear
+    at a position no marker points at. Collecting the marked values and then
+    matching them anywhere closes that.
+
+    The cost is occasionally hiding a harmless value that happens to equal a
+    secret, which is the right way to be wrong here.
+    """
+    try:
+        plan = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return []
+    if not isinstance(plan, dict):
+        return []
+
+    found: set[str] = set()
+    for key in ("resource_changes", "resource_drift", "drift_observed_no_apply_action"):
+        entries = plan.get(key)
+        if isinstance(entries, list):
+            for entry in entries:
+                change = entry.get("change") if isinstance(entry, dict) else None
+                if isinstance(change, dict):
+                    for side in ("before", "after"):
+                        _collect_marked_leaves(
+                            change.get(side), change.get(f"{side}_sensitive"), found
+                        )
+    outputs = plan.get("output_changes")
+    if isinstance(outputs, dict):
+        for change in outputs.values():
+            if isinstance(change, dict):
+                for side in ("before", "after"):
+                    _collect_marked_leaves(change.get(side), change.get(f"{side}_sensitive"), found)
+    return sorted(found, key=len, reverse=True)
+
+
 def collect_literals(values: Iterable[str]) -> list[str]:
     """The secrets worth matching on, longest first.
 
