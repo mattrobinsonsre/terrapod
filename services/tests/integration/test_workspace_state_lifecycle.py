@@ -221,12 +221,13 @@ class TestStateVersions:
         )
         assert sv_resp.status_code == 201
         sv_id = sv_resp.json()["data"]["id"]
+        sv_upload = sv_resp.json()["data"]["attributes"]["hosted-state-upload-url"]
         assert sv_id.startswith("sv-")
 
         # Upload content via the presigned-style URL
         state_bytes = b'{"serial": 1, "lineage": "test-lineage"}'
         upload_resp = await client.put(
-            f"/api/v2/state-versions/{sv_id}/content",
+            sv_upload,
             content=state_bytes,
         )
         assert upload_resp.status_code == 200
@@ -253,9 +254,9 @@ class TestStateVersions:
         sv_resp = await client.post(
             f"/api/v2/workspaces/{ws_id}/state-versions", json=_sv_body(1), headers=AUTH
         )
-        sv_id = sv_resp.json()["data"]["id"]
+        sv_upload = sv_resp.json()["data"]["attributes"]["hosted-state-upload-url"]
         up = await client.put(
-            f"/api/v2/state-versions/{sv_id}/content",
+            sv_upload,
             content=b'{"serial": 1, "lineage": "test-lineage"}',
         )
         assert up.status_code == 200
@@ -288,9 +289,9 @@ class TestStateVersions:
         sv_resp = await client.post(
             f"/api/v2/workspaces/{ws_id}/state-versions", json=_sv_body(1), headers=AUTH
         )
-        sv_id = sv_resp.json()["data"]["id"]
+        sv_upload = sv_resp.json()["data"]["attributes"]["hosted-state-upload-url"]
         up = await client.put(
-            f"/api/v2/state-versions/{sv_id}/content",
+            sv_upload,
             content=b'{"serial": 1, "lineage": "test-lineage"}',
         )
         assert up.status_code == 200
@@ -404,8 +405,9 @@ class TestStateEncryptionRoundTrip:
             )
             assert sv_resp.status_code == 201
             sv_id = sv_resp.json()["data"]["id"]
+            sv_upload = sv_resp.json()["data"]["attributes"]["hosted-state-upload-url"]
 
-            up = await client.put(f"/api/v2/state-versions/{sv_id}/content", content=state_bytes)
+            up = await client.put(sv_upload, content=state_bytes)
             assert up.status_code == 200
 
             # At rest: the object is TPENC1 ciphertext, NOT the plaintext.
