@@ -53,6 +53,11 @@ api:
     existingSecret: ""               # name of a K8s Secret holding the key
     existingSecretKey: "token_signing_key"  # key within that Secret
 
+    # NOTE: leaving tokenSigningKey unset is reported at startup as a warning
+    # (GHSA-hc47-q72v-4vcm). Set api.config.require_strong_secrets to make it
+    # fatal instead, once the key is set and any static encryption key is
+    # generated material rather than a typed passphrase.
+
   # CA bundle for database TLS server-cert verification, used when
   # config.database.ssl_mode is "verify-ca"/"verify-full" (cloud-IAM DB auth).
   # A CA bundle is public, non-secret material, so provide it as a ConfigMap —
@@ -106,6 +111,13 @@ api:
 
   # Configuration mounted as /etc/terrapod/config.yaml
   config:
+    # Refuse to start when the token signing key falls back to the database URL,
+    # or when it (or the static encryption key) is a typed passphrase rather than
+    # generated material (GHSA-hc47-q72v-4vcm). OFF by default so a deployment
+    # already running on a weak secret is not bricked by a patch upgrade -- its
+    # data is encrypted under that very key. Turn it on once both are generated:
+    #   openssl rand -base64 32
+    require_strong_secrets: false
     log_level: info
 
     # Public-facing Terrapod URL (the Next.js frontend ingress).

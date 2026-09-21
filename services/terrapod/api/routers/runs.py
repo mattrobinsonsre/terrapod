@@ -39,16 +39,19 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
+from terrapod.api.capability_access import resolve_capability_or_authenticate
 from terrapod.api.dependencies import (
     AuthenticatedUser,
     ListenerIdentity,
     get_current_user,
     get_listener_identity,
+    require_runner_for_run,
 )
 from terrapod.api.errors import vcs_unavailable
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta
 from terrapod.auth import capabilities as cap
+from terrapod.auth import capability_urls
 from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
 from terrapod.db.models import (
@@ -962,13 +965,18 @@ def _plan_json(run: Run, request: Request | None = None) -> dict:
     The URLs are absolute, so they are built from the host the caller used
     rather than from `auth.callback_base_url` -- an SSO setting whose localhost
     default made `log-read-url` unreachable on an install without SSO (#1703).
+
+    `log-read-url` carries a signed capability in place of the run id, because
+    the client that follows it sends no credential -- see
+    `api/capability_access.py`.
     """
     from terrapod.api.routers.tfe_v2 import _request_base_url
 
     base = _request_base_url(request)
+    log_cap = capability_urls.mint(capability_urls.KIND_PLAN_LOG, str(run.id))
     attrs: dict = {
         "status": _plan_status(run),
-        "log-read-url": f"{base}/api/v2/plans/{run.id}/log",
+        "log-read-url": f"{base}/api/v2/plans/{log_cap}/log",
         "has-changes": run.status in ("planned", "confirmed", "applying", "applied"),
     }
     if run.has_json_output:
@@ -1924,13 +1932,14 @@ def _apply_json(run: Run, request: Request | None = None) -> dict:
     from terrapod.api.routers.tfe_v2 import _request_base_url
 
     base = _request_base_url(request)
+    log_cap = capability_urls.mint(capability_urls.KIND_APPLY_LOG, str(run.id))
     return {
         "data": {
             "id": f"apply-{run.id}",
             "type": "applies",
             "attributes": {
                 "status": _apply_status(run),
-                "log-read-url": f"{base}/api/v2/applies/{run.id}/log",
+                "log-read-url": f"{base}/api/v2/applies/{log_cap}/log",
             },
             "links": {
                 "self": f"/api/v2/applies/apply-{run.id}",
@@ -2547,6 +2556,7 @@ async def upload_log_stream(
 async def report_plan_result(
     run_id: str = Path(...),
     body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Runner Job reports plan completion.
@@ -2562,6 +2572,7 @@ async def report_plan_result(
     network partition, etc.). Both paths land in the same idempotent helper
     so whichever wins, the second is a no-op.
     """
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     has_changes = body.get("has_changes")
@@ -2574,6 +2585,7 @@ async def report_plan_result(
 @extensions_router.post("/runs/{run_id}/apply-result")
 async def report_apply_result(
     run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Runner Job reports apply completion.
@@ -2582,6 +2594,7 @@ async def report_apply_result(
     runner's exit. Drives `applying → applied` via `run_service.complete_apply`,
     which is idempotent against the listener-driven fallback.
     """
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
     await run_service.complete_apply(db, run)
     await db.commit()
@@ -2613,20 +2626,30 @@ _POST_PLAN_STATES = frozenset(
 
 @router.get("/plans/{plan_id}/log")
 async def plan_log(
+    request: Request,
     plan_id: str = Path(...),
     offset: int = Query(0),
     limit: int = Query(0),
     format: Literal["raw", "plain"] = Query("raw"),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Stream plan log content (go-tfe LogReader compatible)."""
-    try:
-        run_uuid = uuid.UUID(plan_id.removeprefix("plan-").removeprefix("run-"))
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Plan not found") from None
+    """Stream plan log content (go-tfe LogReader compatible).
+
+    The segment is a signed capability for the credential-less CLI, or a bare
+    id for an authenticated caller. See `api/capability_access.py`.
+    """
+    segment, user = await resolve_capability_or_authenticate(
+        plan_id,
+        expect_kind=capability_urls.KIND_PLAN_LOG,
+        request=request,
+        not_found="Plan not found",
+    )
+    run_uuid = parse_id(segment, "plan-", "run-", detail="Plan not found")
     run = await run_service.get_run(db, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Plan not found")
+    if user is not None:
+        await _require_run_ws_capability(run, cap.RUN_READ, user, db)
 
     return await _serve_log(
         run=run,
@@ -2641,23 +2664,27 @@ async def plan_log(
 @router.get("/plans/{plan_id}/json-output")
 async def plan_json_output(
     plan_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Serve the structured JSON plan output (`tofu show -json`).
 
     go-tfe's `Plans.ReadJSONOutput` consumes this endpoint via
-    `tofu show -json` against a remote run. Response is raw JSON bytes;
-    auth is by capability (the plan UUID), matching `/plans/{id}/log`.
-    A 302 to a presigned storage URL is fine — `req.Do` follows
-    redirects.
+    `tofu show -json` against a remote run. Response is raw JSON bytes.
+    A 302 to a presigned storage URL is fine — `req.Do` follows redirects.
+
+    **This one takes an ordinary credential, unlike the log endpoints beside
+    it.** `ReadJSONOutput` builds its request with `s.client.NewRequest`, which
+    sets `Authorization`, and constructs the path itself rather than following
+    the `json-output` attribute — so it needs no capability, and it used to
+    treat the plan UUID as one. A plan JSON is the full resolved plan, secrets
+    included, so a guessable id was a worse exposure here than in the logs.
     """
-    try:
-        run_uuid = uuid.UUID(plan_id.removeprefix("plan-").removeprefix("run-"))
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Plan not found") from None
+    run_uuid = parse_id(plan_id, "plan-", "run-", detail="Plan not found")
     run = await run_service.get_run(db, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Plan not found")
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
 
     # Fast path: the flag is the source of truth. Avoid a storage call
     # for runs that never produced JSON (errored, older, upload failed).
@@ -2677,20 +2704,29 @@ async def plan_json_output(
 
 @router.get("/applies/{apply_id}/log")
 async def apply_log(
+    request: Request,
     apply_id: str = Path(...),
     offset: int = Query(0),
     limit: int = Query(0),
     format: Literal["raw", "plain"] = Query("raw"),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Stream apply log content (go-tfe LogReader compatible)."""
-    try:
-        run_uuid = uuid.UUID(apply_id.removeprefix("apply-").removeprefix("run-"))
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Apply not found") from None
+    """Stream apply log content (go-tfe LogReader compatible).
+
+    Capability or authenticated bare id — see `plan_log`.
+    """
+    segment, user = await resolve_capability_or_authenticate(
+        apply_id,
+        expect_kind=capability_urls.KIND_APPLY_LOG,
+        request=request,
+        not_found="Apply not found",
+    )
+    run_uuid = parse_id(segment, "apply-", "run-", detail="Apply not found")
     run = await run_service.get_run(db, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Apply not found")
+    if user is not None:
+        await _require_run_ws_capability(run, cap.RUN_READ, user, db)
 
     return await _serve_log(
         run=run,

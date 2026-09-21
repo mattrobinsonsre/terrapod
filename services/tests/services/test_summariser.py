@@ -1,6 +1,7 @@
 """Unit tests for the AI plan summariser (#401)."""
 
 import io
+import pathlib
 import tarfile
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -1124,21 +1125,35 @@ class TestNoStateLeakage:
                 f"state contents must never enter the AI prompt"
             )
 
-    def test_no_sensitive_marker_field_references(self):
-        """`before_sensitive` / `after_sensitive` are the plan-JSON
-        sensitive-attribute marker fields. `_clean_plan_json_bytes`
-        already strips `prior_state` so they don't reach the model, but
-        the summariser itself should never enumerate them either —
-        that would imply a code path that handles sensitive values
-        intentionally, which is the opposite of the rule (don't
-        receive them at all).
+    def test_sensitive_markers_are_read_only_by_the_redactor(self):
+        """`before_sensitive` / `after_sensitive` belong in ONE module.
+
+        This guard used to forbid them outright, reasoning that stripping
+        `prior_state` already kept sensitive values out of the prompt. That
+        reasoning was wrong and the guard passed anyway: a resource that is
+        *changing* keeps its `change.after` value in the clear, which is
+        GHSA-5mpc-79pv-6mq7. `tests/services/test_summary_redaction.py`
+        measures it.
+
+        So the markers are now load-bearing — they are the authoritative signal
+        for what to redact, coming from the provider schema rather than from a
+        list anyone here maintains. What is worth pinning is that only the
+        redactor reads them: the summariser reaching for them again would be a
+        second, divergent notion of what counts as sensitive.
         """
         src = self._source()
         for marker in ("before_sensitive", "after_sensitive"):
             assert marker not in src, (
-                f"summariser must not reference {marker!r}; "
-                f"sensitive marker fields are state-derived and must "
-                f"not enter the AI prompt"
+                f"summariser must not read {marker!r} itself; "
+                f"redaction belongs in services/summary_redaction.py"
+            )
+        redactor = (
+            pathlib.Path(__file__).resolve().parents[2] / "terrapod/services/summary_redaction.py"
+        ).read_text()
+        for marker in ("before_sensitive", "after_sensitive", "sensitive_values"):
+            assert marker in redactor, (
+                f"the redactor must read {marker!r} — without it, values the "
+                f"provider marked sensitive go to the model in the clear"
             )
 
     def test_clean_plan_json_strips_prior_state(self):

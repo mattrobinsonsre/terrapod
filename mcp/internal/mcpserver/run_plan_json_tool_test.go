@@ -123,6 +123,7 @@ func TestPlanJSONToolFullViewPagesALargeDocument(t *testing.T) {
 
 	var got strings.Builder
 	var offset float64
+	var served float64
 	for i := 0; ; i++ {
 		if i > 100 {
 			t.Fatal("paging did not terminate")
@@ -133,8 +134,16 @@ func TestPlanJSONToolFullViewPagesALargeDocument(t *testing.T) {
 		if out["plan_json"] != nil {
 			t.Fatal("a document larger than max_bytes came back whole")
 		}
-		if out["total_bytes"] != float64(len(fixture)) {
-			t.Errorf("total_bytes = %v, want %d", out["total_bytes"], len(fixture))
+		// total_bytes describes the document being SERVED, which is the
+		// redacted one (GHSA-3g53-5gw3-hh42). It no longer equals the bytes
+		// the API returned, and it must not: the offsets an agent pages with
+		// are offsets into what it is given.
+		if total, ok := out["total_bytes"].(float64); !ok || total <= 0 {
+			t.Errorf("total_bytes = %v, want a positive size", out["total_bytes"])
+		} else if served != 0 && total != served {
+			t.Errorf("total_bytes changed between pages: %v then %v", served, total)
+		} else {
+			served = total
 		}
 		got.WriteString(out["plan_json_text"].(string))
 		if out["truncated"] != true {
@@ -142,8 +151,25 @@ func TestPlanJSONToolFullViewPagesALargeDocument(t *testing.T) {
 		}
 		offset = out["next_offset"].(float64)
 	}
-	if got.String() != string(fixture) {
-		t.Error("the pages do not reassemble into the document")
+	// The pages reassemble into the served document. Compared as parsed JSON,
+	// not byte-for-byte against the fixture: redaction re-serialises, so the
+	// whitespace differs and the sensitive values are gone by design.
+	var round map[string]any
+	if err := json.Unmarshal([]byte(got.String()), &round); err != nil {
+		t.Fatalf("the pages do not reassemble into valid JSON: %v", err)
+	}
+	if int64(len(got.String())) != int64(served) {
+		t.Errorf("reassembled %d bytes, total_bytes said %v", len(got.String()), served)
+	}
+	var original map[string]any
+	if err := json.Unmarshal(fixture, &original); err != nil {
+		t.Fatalf("fixture is not JSON: %v", err)
+	}
+	// Same document, structurally: every top-level key survives redaction.
+	for k := range original {
+		if _, ok := round[k]; !ok {
+			t.Errorf("redaction dropped top-level key %q", k)
+		}
 	}
 }
 

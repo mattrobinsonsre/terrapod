@@ -18,6 +18,7 @@ from terrapod.db.models import (
     Workspace,
 )
 from terrapod.logging_config import get_logger
+from terrapod.runner.reserved_env import RESERVED_ENV_PREFIX, is_reserved_env_key
 
 logger = get_logger(__name__)
 
@@ -59,6 +60,23 @@ def _validated_category(category: str) -> str:
     return category
 
 
+def _validated_env_key(key: str, category: str) -> str:
+    """Refuse an env variable that collides with the runner's own plumbing.
+
+    The injection filter in `job_template` is what actually protects a run, and
+    it covers variables already stored. This exists so the API says no at the
+    point of writing rather than accepting a variable that will be silently
+    dropped later. It lives in the service, not the router, because
+    `catalog_service` creates variables through here directly.
+    """
+    if category == "env" and is_reserved_env_key(key):
+        raise ValueError(
+            f"{key!r} collides with Terrapod's own runner environment; "
+            f"the {RESERVED_ENV_PREFIX}* prefix is reserved"
+        )
+    return key
+
+
 async def create_variable(
     db: AsyncSession,
     workspace_id: uuid.UUID,
@@ -72,6 +90,7 @@ async def create_variable(
 ) -> Variable:
     """Create a workspace variable."""
     category = _validated_category(category)
+    key = _validated_env_key(key, category)
     if category in GIT_AUTH_CATEGORIES:
         sensitive = True  # git-auth values are always secret
     if value_source == "vault":

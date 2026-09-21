@@ -25,6 +25,7 @@ def test_empty_key_falls_back_to_database_url():
     db_url = "postgresql+asyncpg://u:p@h/db"
     with patch("terrapod.config.settings") as s:
         s.token_signing_key = ""
+        s.require_strong_secrets = False
         s.database_url = db_url
         key = token_signing.get_token_signing_key()
     assert key == hashlib.sha256(db_url.encode()).digest()
@@ -34,6 +35,7 @@ def test_dedicated_secret_overrides_database_url():
     """A configured secret is used instead of the DB URL."""
     with patch("terrapod.config.settings") as s:
         s.token_signing_key = "super-secret-signing-key"
+        s.require_strong_secrets = False
         s.database_url = "postgresql+asyncpg://u:p@h/db"
         key = token_signing.get_token_signing_key()
     assert key == hashlib.sha256(b"super-secret-signing-key").digest()
@@ -46,6 +48,7 @@ def test_whitespace_only_key_falls_back():
     db_url = "postgresql+asyncpg://u:p@h/db"
     with patch("terrapod.config.settings") as s:
         s.token_signing_key = "   "
+        s.require_strong_secrets = False
         s.database_url = db_url
         key = token_signing.get_token_signing_key()
     assert key == hashlib.sha256(db_url.encode()).digest()
@@ -55,6 +58,7 @@ def test_key_is_cached():
     """Derivation is cached after first call."""
     with patch("terrapod.config.settings") as s:
         s.token_signing_key = "k1"
+        s.require_strong_secrets = False
         s.database_url = "postgresql+asyncpg://u:p@h/db"
         first = token_signing.get_token_signing_key()
     # Second call must not re-read settings (patch removed) and returns cached.

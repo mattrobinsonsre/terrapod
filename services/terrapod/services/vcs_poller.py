@@ -841,10 +841,21 @@ async def _reconcile_closed_pr_sessions(
         if sess.pr_number in open_pr_numbers:
             continue
         # PR no longer in the open list — cancel active runs, close session.
+        #
+        # Scoped to the workspaces on this connection+repo. Matching on the PR
+        # number alone meant closing PR #7 here cancelled active runs for PR #7
+        # in every other repository Terrapod tracks — PR numbers are small
+        # integers, so two repos sharing one is the normal case, not an edge.
         active = await db.execute(
             select(Run).where(
                 Run.vcs_pull_request_number == sess.pr_number,
                 Run.status.notin_(run_service.TERMINAL_STATES),
+                Run.workspace_id.in_(
+                    select(Workspace.id).where(
+                        Workspace.vcs_connection_id == conn.id,
+                        Workspace.vcs_repo_url.endswith(repo),
+                    )
+                ),
             )
         )
         for run in active.scalars().all():
