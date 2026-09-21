@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/url"
 )
 
 // VaultStatus is the admin view of every configured Vault instance (#1663).
@@ -159,7 +160,7 @@ func (c *Client) CheckWorkspaceVaultReference(
 	ctx context.Context, workspaceID string, opts VaultReferenceCheckOptions,
 ) (*VaultReferenceCheck, error) {
 	return c.checkVaultReference(ctx,
-		"/api/terrapod/v1/workspaces/"+AddPrefix(workspaceID, "ws-")+"/vault-reference-checks", opts)
+		"/api/terrapod/v1/workspaces/"+url.PathEscape(AddPrefix(workspaceID, "ws-"))+"/vault-reference-checks", opts)
 }
 
 // CheckVariableSetVaultReference checks a Vault reference for a variable set.
@@ -169,7 +170,7 @@ func (c *Client) CheckVariableSetVaultReference(
 	ctx context.Context, varsetID string, opts VaultReferenceCheckOptions,
 ) (*VaultReferenceCheck, error) {
 	return c.checkVaultReference(ctx,
-		"/api/terrapod/v1/varsets/"+AddPrefix(varsetID, "varset-")+"/vault-reference-checks", opts)
+		"/api/terrapod/v1/varsets/"+url.PathEscape(AddPrefix(varsetID, "varset-"))+"/vault-reference-checks", opts)
 }
 
 func (c *Client) checkVaultReference(
