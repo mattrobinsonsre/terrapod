@@ -43,6 +43,7 @@ from terrapod.auth.auth_state import (
 )
 from terrapod.auth.connectors import get_connector, get_default_connector, list_connectors
 from terrapod.auth.pkce import s256_challenge
+from terrapod.auth.redirect_uri import InvalidRedirectURI
 from terrapod.auth.sessions import (
     create_session,
     get_session,
@@ -219,7 +220,14 @@ async def authorize(
         nonce=auth_request.nonce,
         idp_code_verifier=auth_request.code_verifier,
     )
-    await store_auth_state(auth_state)
+    # store_auth_state validates client_redirect_uri. This route 302s the
+    # authorization code straight at whatever is stored here, with no
+    # intermediate page, so an unvalidated value is a one-click account
+    # takeover (#cq5h).
+    try:
+        await store_auth_state(auth_state)
+    except InvalidRedirectURI as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     logger.info(
         "Authorize: redirecting to provider",
@@ -406,7 +414,12 @@ async def cli_sso_redirect(
         idp_code_verifier=auth_request.code_verifier,
         credential_type="api_token",
     )
-    await store_auth_state(new_state)
+    # Re-validated on carry-forward: the credential type changes here, so a
+    # same-origin session URI must not be laundered into a CLI state.
+    try:
+        await store_auth_state(new_state)
+    except InvalidRedirectURI as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     logger.info(
         "CLI SSO redirect: redirecting to provider",

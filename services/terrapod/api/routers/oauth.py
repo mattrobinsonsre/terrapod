@@ -26,6 +26,7 @@ from terrapod.auth.auth_state import (
     store_auth_state,
 )
 from terrapod.auth.pkce import s256_challenge
+from terrapod.auth.redirect_uri import LOGIN_PORTS, InvalidRedirectURI
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -62,7 +63,7 @@ async def terraform_service_discovery() -> JSONResponse:
                 "grant_types": ["authz_code"],
                 "authz": "/oauth/authorize",
                 "token": "/oauth/token",
-                "ports": [10000, 10010],
+                "ports": [LOGIN_PORTS[0], LOGIN_PORTS[1]],
             },
             # The canonical paths (#1528). Verified empirically rather than
             # assumed: a real `tofu`/`terraform` init + plan + apply against a
@@ -122,7 +123,12 @@ async def oauth_authorize(
         idp_state=idp_state,
         credential_type="api_token",
     )
-    await store_auth_state(auth_state)
+    # store_auth_state validates client_redirect_uri; an unvalidated one is
+    # handed the authorization code later by /auth/cli-complete (#cq5h).
+    try:
+        await store_auth_state(auth_state)
+    except InvalidRedirectURI as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     logger.info(
         "OAuth authorize: redirecting to login page for provider selection",
