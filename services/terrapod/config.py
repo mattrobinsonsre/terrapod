@@ -1591,6 +1591,21 @@ class RateLimitConfig(BaseModel):
             "genuinely fronts more distinct API clients than this. 0 = unlimited."
         ),
     )
+    trusted_proxy_cidrs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Proxy addresses or CIDRs whose X-Forwarded-For may be believed. "
+            "The header is caller-supplied data, so it is read ONLY when the "
+            "connecting peer is listed here; the client is then the right-most "
+            "entry that is not itself a listed proxy. EMPTY BY DEFAULT, which "
+            "means the header is ignored and the connecting peer is used. In a "
+            "standard deployment that peer is the BFF pod for every request, so "
+            "unauthenticated traffic shares one bucket until this is set — set "
+            "it to the ingress/BFF pod CIDR to get per-client limits back. The "
+            "default fails closed on purpose: a limiter that reports per-client "
+            "enforcement while keying on a forgeable header enforces nothing."
+        ),
+    )
 
 
 # --- Metrics Configuration ---

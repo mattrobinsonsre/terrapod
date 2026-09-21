@@ -5,9 +5,10 @@ Disabled by default; enable via config.rate_limit.enabled = true.
 """
 
 import hashlib
+import ipaddress
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from urllib.parse import parse_qs
 
 from starlette.requests import Request
@@ -55,11 +56,66 @@ def _is_auth_path(path: str) -> bool:
     return any(path.startswith(p) for p in _AUTH_PREFIXES)
 
 
-def _get_client_ip(request: Request) -> str:
-    """Extract client IP, respecting X-Forwarded-For behind a proxy."""
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+def _parse_networks(cidrs: Sequence[str]) -> list[ipaddress._BaseNetwork]:
+    """Parse trusted-proxy CIDRs, discarding anything unparseable.
+
+    A bad entry is logged and dropped rather than raised: this runs per request
+    in middleware, and a typo in configuration must not take the API down. The
+    consequence of dropping one is a *tighter* attribution, never a looser one.
+    """
+    networks: list[ipaddress._BaseNetwork] = []
+    for raw in cidrs:
+        entry = raw.strip()
+        if not entry:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError:
+            logger.warning("Ignoring unparseable trusted_proxy_cidr", entry=entry)
+    return networks
+
+
+def _is_trusted(addr: str, networks: Sequence[ipaddress._BaseNetwork]) -> bool:
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    return any(ip in net for net in networks)
+
+
+def _get_client_ip(
+    request: Request, trusted_networks: Sequence[ipaddress._BaseNetwork] = ()
+) -> str:
+    """The client address to bucket on.
+
+    `X-Forwarded-For` is caller-supplied data. Reading it unconditionally
+    (GHSA-wq2j-pppw-ff2p) let anyone choose their own rate-limit bucket by
+    sending one — and because the credential-churn ceiling is keyed on this
+    value, that removed the bound on the login-tier finding rather than being a
+    lesser issue beside it. Taking a different entry from the list does not fix
+    that: a caller who supplies the whole header controls every entry in it.
+
+    The header is trusted only when the PEER is a configured proxy. Then the
+    right-most entry that is not itself a trusted proxy is the client, because
+    everything to its right was appended by infrastructure we trust and
+    everything to its left is whatever the client sent.
+
+    **The list is empty by default, and that is a deliberate trade.** With no
+    trusted proxy the header is ignored entirely and the socket peer is used —
+    which in Terrapod is the BFF pod for every request, so unauthenticated
+    traffic shares one bucket until an operator sets
+    `rate_limit.trusted_proxy_cidrs`. That is a real cost and it is the right
+    default anyway: the alternative is a control that reports per-client limits
+    it is not enforcing. Failing closed is visible; trusting a forgeable header
+    is not.
+    """
+    if trusted_networks and request.client and _is_trusted(request.client.host, trusted_networks):
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            hops = [h.strip() for h in forwarded.split(",") if h.strip()]
+            for hop in reversed(hops):
+                if not _is_trusted(hop, trusted_networks):
+                    return hop
     if request.client:
         return request.client.host
     return "unknown"
@@ -212,6 +268,7 @@ class RateLimitMiddleware:
         runner_requests_per_minute: int = 0,
         auth_requests_per_minute: int = 10,
         distinct_credentials_per_minute: int = 200,
+        trusted_proxy_cidrs: Sequence[str] = (),
         get_redis: Callable | None = None,
     ) -> None:
         self.app = app
@@ -220,6 +277,8 @@ class RateLimitMiddleware:
         self.runner_requests_per_minute = runner_requests_per_minute
         self.auth_requests_per_minute = auth_requests_per_minute
         self.distinct_credentials_per_minute = distinct_credentials_per_minute
+        # Parsed once at construction: this is consulted on every request.
+        self.trusted_networks = _parse_networks(trusted_proxy_cidrs)
         self._get_redis = get_redis
 
     def _resolve_redis(self):  # type: ignore[no-untyped-def]
@@ -306,7 +365,7 @@ class RateLimitMiddleware:
         # the shared BFF/ingress pod IP behind the proxy, so an IP-keyed
         # authenticated tier is one global bucket (#1075). Unauthenticated
         # traffic (login, anon) has no credential and stays IP-keyed.
-        client_ip = _get_client_ip(request)
+        client_ip = _get_client_ip(request, self.trusted_networks)
         credential = _credential_bucket(auth_header, listener_cert)
         if is_auth_endpoint:
             # The login tier is keyed on the IP and NOTHING else, which is what
