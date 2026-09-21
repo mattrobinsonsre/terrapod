@@ -3,6 +3,7 @@ package terrapod
 import (
 	"context"
 	"fmt"
+	"net/url"
 )
 
 // Registry publishing — client-signed, direct uploads.
@@ -26,7 +27,7 @@ const (
 // UploadProviderSHASUMS uploads the client-built SHA256SUMS manifest for a
 // provider version (the first publish step). Upserts the version.
 func (c *Client) UploadProviderSHASUMS(ctx context.Context, name, version string, shasums []byte) error {
-	path := fmt.Sprintf("%s/%s/versions/%s/shasums", providerPublishBase, name, version)
+	path := fmt.Sprintf("%s/%s/versions/%s/shasums", providerPublishBase, url.PathEscape(name), url.PathEscape(version))
 	_, err := c.PutRaw(ctx, path, "text/plain", shasums)
 	return err
 }
@@ -36,7 +37,7 @@ func (c *Client) UploadProviderSHASUMS(ctx context.Context, name, version string
 // *ValidationError (HTTP 422) if the signature is missing its manifest, is from
 // an unregistered key, or fails verification.
 func (c *Client) UploadProviderSignature(ctx context.Context, name, version string, sig []byte) error {
-	path := fmt.Sprintf("%s/%s/versions/%s/shasums.sig", providerPublishBase, name, version)
+	path := fmt.Sprintf("%s/%s/versions/%s/shasums.sig", providerPublishBase, url.PathEscape(name), url.PathEscape(version))
 	_, err := c.PutRaw(ctx, path, "application/pgp-signature", sig)
 	return err
 }
@@ -47,7 +48,7 @@ func (c *Client) UploadProviderSignature(ctx context.Context, name, version stri
 // *ValidationError (HTTP 422). goos/goarch are the Go OS/arch (e.g. linux,
 // arm64).
 func (c *Client) UploadProviderPlatform(ctx context.Context, name, version, goos, goarch string, zip []byte) error {
-	path := fmt.Sprintf("%s/%s/versions/%s/platforms/%s/%s", providerPublishBase, name, version, goos, goarch)
+	path := fmt.Sprintf("%s/%s/versions/%s/platforms/%s/%s", providerPublishBase, url.PathEscape(name), url.PathEscape(version), url.PathEscape(goos), url.PathEscape(goarch))
 	_, err := c.PutRaw(ctx, path, "application/zip", zip)
 	return err
 }
@@ -56,7 +57,7 @@ func (c *Client) UploadProviderPlatform(ctx context.Context, name, version, goos
 // Upserts the version; the server extracts the module interface and triggers
 // runs on linked workspaces.
 func (c *Client) UploadModuleVersion(ctx context.Context, name, provider, version string, tarball []byte) error {
-	path := fmt.Sprintf("%s/%s/%s/versions/%s/upload", modulePublishBase, name, provider, version)
+	path := fmt.Sprintf("%s/%s/%s/versions/%s/upload", modulePublishBase, url.PathEscape(name), url.PathEscape(provider), url.PathEscape(version))
 	_, err := c.PutRaw(ctx, path, "application/gzip", tarball)
 	return err
 }

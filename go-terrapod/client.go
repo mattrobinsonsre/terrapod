@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // Client is a Terrapod API client. Construct via NewClient. All resource
@@ -360,12 +361,23 @@ func (c *Client) doWithContentType(ctx context.Context, method, path string, bod
 			}
 		}
 
-		url := c.BaseURL + path
+		// G4 (GHSA-5fh8-vj57-6gvh): string concatenation let a `path` that does
+		// not start with "/" reach the AUTHORITY, not just the path —
+		// "http://terrapod.example.com" + "@evil:9/loot" parses with
+		// Host=evil:9 and the real host demoted to userinfo, sending the bearer
+		// token to the attacker. Get/Post/Put/Delete are exported and
+		// documented as the low-level fallback for endpoints without a typed
+		// method, with third-party automation named as a consumer, so `path` is
+		// not always ours. The typed methods all hardcode a leading "/api/…".
+		if !strings.HasPrefix(path, "/") {
+			return nil, 0, fmt.Errorf("request path %q must start with \"/\"", path)
+		}
+		reqURL := c.BaseURL + path
 		var bodyReader io.Reader
 		if body != nil {
 			bodyReader = bytes.NewReader(body)
 		}
-		req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+		req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
 		if err != nil {
 			return nil, 0, fmt.Errorf("build request: %w", err)
 		}
@@ -385,7 +397,13 @@ func (c *Client) doWithContentType(ctx context.Context, method, path string, bod
 			}
 			return nil, 0, err
 		}
-		respBody, err := io.ReadAll(resp.Body)
+		// G5: bounded. The control already existed in this module —
+		// version.go reads its discovery error body through an io.LimitReader —
+		// so this was an inconsistency rather than an oversight. A hostile
+		// server (or a MITM on a plaintext connection) could otherwise stream
+		// until the consuming tool died; measured at 512 MiB read straight into
+		// memory. The cap is far above any real JSON:API document.
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 		_ = resp.Body.Close()
 		if err != nil {
 			return nil, resp.StatusCode, fmt.Errorf("read response: %w", err)
@@ -441,7 +459,39 @@ func extractErrorDetail(body []byte) string {
 			return strings.Join(parts, "; ")
 		}
 	}
-	return string(body)
+	return sanitiseErrorBody(body)
+}
+
+// maxResponseBytes caps any single response the SDK will hold in memory.
+const maxResponseBytes = 32 << 20 // 32 MiB
+
+// maxErrorBodyBytes caps how much of a non-JSON:API body reaches an error
+// string. errors.go documents these as intended for operator display.
+const maxErrorBodyBytes = 512
+
+// sanitiseErrorBody makes a non-JSON:API response body safe to print (G7).
+//
+// It was returned verbatim and uncapped. These strings are shown to operators —
+// in a `terraform apply` transcript, say — so a hostile server could inject
+// terminal escapes: clear the screen, set the window title, and forge a
+// confirmation prompt. Control characters are replaced and the result is
+// truncated.
+func sanitiseErrorBody(body []byte) string {
+	if len(body) > maxErrorBodyBytes {
+		body = body[:maxErrorBodyBytes]
+	}
+	var b strings.Builder
+	for _, r := range string(body) {
+		switch {
+		case r == '\n' || r == '\t':
+			b.WriteRune(' ')
+		case unicode.IsControl(r):
+			b.WriteRune('?')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // isTransientNetError categorises net errors into retryable / not.
