@@ -86,15 +86,6 @@ class TestABareIdNoLongerReadsALog:
         resp = await _get(app, f"/api/v2/applies/{run_id}/log")
         assert resp.status_code == 401
 
-    async def test_the_same_on_the_canonical_tfe_prefix(self):
-        # The alias is what the CLI happens to use today; both are mounted, and
-        # a check that covers only one prefix is the shape of bug the prefix
-        # convention exists to prevent.
-        run_id = str(uuid.uuid4())
-        app = _app()
-        resp = await _get(app, f"/api/tfe/v2/plans/{run_id}/log")
-        assert resp.status_code == 401
-
     async def test_a_forged_capability_is_not_retried_as_an_id(self):
         # It must 404, never fall through to the authenticated path and 401 —
         # and never be served.

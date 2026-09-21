@@ -65,12 +65,11 @@ def _get_client_ip(request: Request) -> str:
 # segment instead gives each run's stream its own budget, isolating runs from
 # each other and from the shared source IP.
 #
-# **Both prefixes.** `canonical_path` normalises only the native surface
-# (`/api/terrapod/v1` → `/api/v1`) and deliberately passes `/api/v2` through, so
-# it does not help here: the TFE surface's canonical prefix is `/api/tfe/v2` and
-# `/api/v2` is its deprecated alias. Matching one spelling meant a CLI addressed
-# at the canonical prefix fell through to the anonymous per-IP bucket and
-# re-created #1075 — the bug this function exists to prevent.
+# The `(?:tfe/)?` alternative is unreachable on this line -- `/api/tfe/v2` is
+# the 2.0 canonical prefix and nothing serves it here. It is kept so the
+# expression matches the one on main, because a bucketing rule that silently
+# differs between release lines is how the anonymous-IP fallback came back once
+# already (#1075).
 _CAPABILITY_PATH_RE = re.compile(r"^/api/(?:tfe/)?v2/(?:plans|applies)/([^/]+)/log$")
 
 

@@ -434,10 +434,10 @@ class TestCapabilityBucketing:
         assert _capability_bucket("/api/v2/plans/run-abc/json-output") is None
 
     def test_both_prefixes_bucket(self):
-        # The TFE surface's canonical prefix is /api/tfe/v2 and /api/v2 is its
-        # deprecated alias. Matching only one meant a CLI on the canonical
-        # prefix fell through to the anonymous per-IP bucket and re-created
-        # #1075 — the bug this function exists to prevent.
+        # /api/tfe/v2 is the 2.0 canonical prefix and is not served on this
+        # line. The expression still matches it, deliberately: keeping it
+        # identical to main's means the next backport cannot land a bucketing
+        # rule that quietly differs between release lines.
         from terrapod.api.rate_limit import _capability_bucket
 
         assert _capability_bucket("/api/tfe/v2/plans/cap-x.y/log") is not None
