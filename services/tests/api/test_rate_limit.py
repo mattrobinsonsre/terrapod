@@ -419,25 +419,51 @@ class TestCredentialChurnCeiling:
 
 
 class TestCapabilityBucketing:
-    """Log/json-output readers authenticate by the run UUID in the path and are
-    polled while a run streams. They must bucket per-run — NOT on the shared BFF
-    source IP, which would collapse every browser's log stream into one
-    anonymous bucket that live tailing exhausts, freezing the log (#1075).
+    """Log readers carry a signed capability in the path and are polled while a
+    run streams, with no credential to key on. They must bucket per-capability —
+    NOT on the shared BFF source IP, which would collapse every browser's log
+    stream into one anonymous bucket that live tailing exhausts, freezing the
+    log (#1075).
     """
 
     def test_capability_bucket_pure(self):
         from terrapod.api.rate_limit import _capability_bucket
 
-        assert _capability_bucket("/api/v2/applies/run-abc/log") == "cap:run-abc"
-        assert _capability_bucket("/api/v2/plans/run-abc/log") == "cap:run-abc"
-        assert _capability_bucket("/api/v2/plans/run-abc/json-output") == "cap:run-abc"
-        # Distinct runs → distinct buckets.
+        assert _capability_bucket("/api/v2/applies/cap-x.y/log") is not None
+        assert _capability_bucket("/api/v2/plans/cap-x.y/log") is not None
+        # Distinct capabilities → distinct buckets.
         assert _capability_bucket("/api/v2/applies/run-A/log") != _capability_bucket(
             "/api/v2/applies/run-B/log"
         )
         # Non-capability paths fall through to credential/IP keying.
         assert _capability_bucket("/api/terrapod/v1/workspaces") is None
         assert _capability_bucket("/api/v2/workspaces/ws-1") is None
+        # json-output takes an ordinary credential now, so it keys on that.
+        assert _capability_bucket("/api/v2/plans/run-abc/json-output") is None
+
+    def test_both_prefixes_bucket(self):
+        # The TFE surface's canonical prefix is /api/tfe/v2 and /api/v2 is its
+        # deprecated alias. Matching only one meant a CLI on the canonical
+        # prefix fell through to the anonymous per-IP bucket and re-created
+        # #1075 — the bug this function exists to prevent.
+        from terrapod.api.rate_limit import _capability_bucket
+
+        assert _capability_bucket("/api/tfe/v2/plans/cap-x.y/log") is not None
+        assert _capability_bucket("/api/tfe/v2/applies/cap-x.y/log") is not None
+        assert _capability_bucket("/api/tfe/v2/plans/cap-x.y/log") == _capability_bucket(
+            "/api/v2/plans/cap-x.y/log"
+        )
+
+    def test_the_capability_is_not_stored_verbatim_in_the_key(self):
+        # The bucket id goes into a Redis key that outlives the request. The
+        # segment used to be a bare run id; it is now the credential itself.
+        from terrapod.api.rate_limit import _capability_bucket
+
+        secret = "cap-abcdef.signaturevalue"
+        bucket = _capability_bucket(f"/api/v2/plans/{secret}/log")
+        assert bucket is not None
+        assert secret not in bucket
+        assert "signaturevalue" not in bucket
 
     def test_log_reader_buckets_per_run_not_shared_ip(self):
         # Two DIFFERENT runs polled anonymously from the SAME source IP (the

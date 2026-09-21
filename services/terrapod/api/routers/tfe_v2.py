@@ -45,6 +45,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.capability_access import resolve_capability_or_authenticate
 from terrapod.api.dependencies import (
     DEFAULT_ORG,
     AuthenticatedUser,
@@ -59,6 +60,7 @@ from terrapod.api.prefixes import TFE_PREFIX
 from terrapod.api.serialization import default_engine_version
 from terrapod.api.serialization import engine_version_attr as _engine_version_attr
 from terrapod.auth import capabilities as cap
+from terrapod.auth import capability_urls
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
     AuditLog,
@@ -2329,7 +2331,12 @@ def _is_safe_scheme(value: str) -> bool:
     return value in ("http", "https")
 
 
-def _state_version_json(sv: StateVersion, request: Request | None = None) -> dict:
+def _state_version_json(
+    sv: StateVersion,
+    request: Request | None = None,
+    *,
+    with_upload_capability: bool = False,
+) -> dict:
     """Serialize a StateVersion to TFE V2 JSON:API format.
 
     go-tfe requires absolute URLs for hosted-state-{download,upload}-url.
@@ -2338,6 +2345,20 @@ def _state_version_json(sv: StateVersion, request: Request | None = None) -> dic
     """
     base = _request_base_url(request)
     sv_id = f"sv-{sv.id}"
+    # **Only the create response carries an upload capability**, because the
+    # capability is what authorises the upload. Minting it in the shared
+    # serializer would hand one to every reader: a user with nothing but
+    # state-read-metadata could list state versions, lift the capability out of
+    # the listing, and overwrite the workspace's state with it -- read
+    # escalating to write through a field meant to be informational.
+    #
+    # Reads keep the plain id, which is not a weakening: following one costs a
+    # credential and state-write, so a reader gains nothing they did not have.
+    upload_seg = (
+        capability_urls.mint(capability_urls.KIND_SV_UPLOAD, str(sv.id))
+        if with_upload_capability
+        else sv_id
+    )
     return {
         "data": {
             "id": sv_id,
@@ -2357,8 +2378,17 @@ def _state_version_json(sv: StateVersion, request: Request | None = None) -> dic
                 # deliberately requires no auth, so it is the last one to leave
                 # drifting.
                 "hosted-state-download-url": f"{base}{TFE_PREFIX}/state-versions/{sv_id}/download",
-                "hosted-state-upload-url": f"{base}{TFE_PREFIX}/state-versions/{sv_id}/content",
-                "hosted-json-state-upload-url": f"{base}{TFE_PREFIX}/state-versions/{sv_id}/json-content",
+                # The two upload URLs carry a signed capability in place of
+                # the id: go-tfe PUTs them with no Authorization header, so a
+                # bare id let anyone who learned it overwrite the workspace's
+                # state. The download URL keeps the plain id -- it is fetched
+                # with a credential and is already permission-checked.
+                "hosted-state-upload-url": (
+                    f"{base}{TFE_PREFIX}/state-versions/{upload_seg}/content"
+                ),
+                "hosted-json-state-upload-url": (
+                    f"{base}{TFE_PREFIX}/state-versions/{upload_seg}/json-content"
+                ),
             },
             "relationships": {
                 "run": {
@@ -2478,10 +2508,23 @@ async def create_state_version(
     await publish_workspace_event(str(ws.id), "state_version_created")
 
     return JSONResponse(
-        content=_state_version_json(sv, request),
+        content=_state_version_json(sv, request, with_upload_capability=True),
         status_code=201,
         headers=_tfe_headers(),
     )
+
+
+async def _require_state_write(db: AsyncSession, user: AuthenticatedUser, sv: StateVersion) -> None:
+    """State-write on the state version's workspace, for the bare-id path."""
+    ws = await db.get(Workspace, sv.workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.STATE_WRITE):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires write permission on workspace",
+        )
 
 
 @router.put("/state-versions/{state_version_id}/content")
@@ -2492,16 +2535,27 @@ async def upload_state_content(
 ) -> Response:
     """Upload raw state JSON for a state version.
 
-    Called by go-tfe after creating the state version record.
-    No auth required — go-tfe uses presigned-style uploads without
-    Authorization header. The state version UUID acts as a capability token.
+    Called by go-tfe after creating the state version record, with no
+    Authorization header — so the segment is a signed capability minted into
+    `hosted-state-upload-url`. An authenticated caller (go-terrapod's
+    `UploadStateContent`, terrapod-migrate) may still address it by plain id,
+    and then needs state-write on the workspace.
+    See `api/capability_access.py`.
     """
-    sv_uuid = state_version_id.removeprefix("sv-")
+    segment, user = await resolve_capability_or_authenticate(
+        state_version_id,
+        expect_kind=capability_urls.KIND_SV_UPLOAD,
+        request=request,
+        not_found="State version not found",
+    )
+    sv_uuid = parse_id(segment, "sv-", detail="State version not found")
 
     result = await db.execute(select(StateVersion).where(StateVersion.id == sv_uuid))
     sv = result.scalar_one_or_none()
     if sv is None:
         raise HTTPException(status_code=404, detail="State version not found")
+    if user is not None:
+        await _require_state_write(db, user, sv)
 
     # Cap state body size to prevent OOM. Real-world terraform states
     # rarely exceed ~50 MB; 256 MB is a generous upper bound that
@@ -2638,10 +2692,19 @@ async def upload_json_state_content(
 ) -> Response:
     """Upload JSON state representation for a state version.
 
-    go-tfe uploads this alongside the raw state. No auth required
-    (same as /content — go-tfe uses presigned-style uploads).
-    For now we accept and discard it.
+    go-tfe uploads this alongside the raw state, unauthenticated, so it takes
+    the same capability as `/content`. The body is accepted and discarded, but
+    the segment is still checked: an endpoint that answers 200 to any id is a
+    probe that confirms ids, and it would be the obvious place to forget when
+    this does start storing the JSON state.
     """
+    segment, user = await resolve_capability_or_authenticate(
+        state_version_id,
+        expect_kind=capability_urls.KIND_SV_UPLOAD,
+        request=request,
+        not_found="State version not found",
+    )
+    del segment, user
     # Drain the body via the stream without buffering it. The JSON state
     # representation is as large as the raw state (tens of MB for big
     # workspaces); `await request.body()` would allocate the whole thing in

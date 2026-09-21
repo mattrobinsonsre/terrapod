@@ -65,29 +65,45 @@ def _get_client_ip(request: Request) -> str:
     return "unknown"
 
 
-# Capability-scoped read endpoints: the run/plan/apply UUID in the PATH is the
-# capability (go-tfe's LogReader and the web log viewer poll these anonymously —
-# no bearer — matching the state-upload capability pattern). They are polled at
-# high frequency while a run streams (~every 2.5s), so keying them on the source
-# IP collapses every browser's stream into ONE anonymous bucket behind the BFF
-# (the API sees a single web-pod IP) — which live log-tailing then exhausts,
-# 429-ing the poll so the log freezes and never recovers (#1075). Bucketing on
-# the path UUID instead gives each run's stream its own budget, isolating runs
-# from each other and from the shared source IP.
-_CAPABILITY_PATH_RE = re.compile(r"^/api/v2/(?:plans|applies)/([^/]+)/(?:log|json-output)$")
+# Capability-scoped read endpoints: the segment in the PATH is the capability
+# (go-tfe's LogReader and the web log viewer both poll these anonymously — no
+# bearer — so there is no credential to key on). They are polled at high
+# frequency while a run streams (~every 2.5s), so keying them on the source IP
+# collapses every browser's stream into ONE anonymous bucket behind the BFF (the
+# API sees a single web-pod IP) — which live log-tailing then exhausts, 429-ing
+# the poll so the log freezes and never recovers (#1075). Bucketing on the path
+# segment instead gives each run's stream its own budget, isolating runs from
+# each other and from the shared source IP.
+#
+# **Both prefixes.** `canonical_path` normalises only the native surface
+# (`/api/terrapod/v1` → `/api/v1`) and deliberately passes `/api/v2` through, so
+# it does not help here: the TFE surface's canonical prefix is `/api/tfe/v2` and
+# `/api/v2` is its deprecated alias. Matching one spelling meant a CLI addressed
+# at the canonical prefix fell through to the anonymous per-IP bucket and
+# re-created #1075 — the bug this function exists to prevent.
+_CAPABILITY_PATH_RE = re.compile(r"^/api/(?:tfe/)?v2/(?:plans|applies)/([^/]+)/log$")
 
 
 def _capability_bucket(path: str) -> str | None:
-    """Per-capability bucket id for UUID-scoped anonymous polling endpoints.
+    """Per-capability bucket id for the anonymous log-polling endpoints.
 
-    Returns ``cap:{id}`` for the plan/apply log + plan json-output readers (the
-    id in the path IS the capability, not a secret — no hashing needed), or None
-    for any other path so the caller falls back to credential/IP keying.
+    Returns ``cap:{digest}`` for the plan/apply log readers, or None for any
+    other path so the caller falls back to credential/IP keying.
+
+    **The segment is hashed, where it used to be used verbatim.** It was a bare
+    run UUID — an identifier, not a secret — and the comment here said as much.
+    It is now a signed capability that grants the read, so putting it in a Redis
+    key unhashed would scatter live credentials through the rate-limiter
+    keyspace, where they long outlive the request. The digest is per-capability
+    just as the raw value was, so the bucketing is unchanged.
+
+    `json-output` is no longer listed: it takes an ordinary credential now
+    (go-tfe authenticates it), so it keys on that like any other endpoint.
     """
     m = _CAPABILITY_PATH_RE.match(path)
     if m is None:
         return None
-    return "cap:" + m.group(1)
+    return "cap:" + hashlib.sha256(m.group(1).encode("utf-8")).hexdigest()[:32]
 
 
 # A package-cache request that arrives WITHOUT a credential is a challenge, not

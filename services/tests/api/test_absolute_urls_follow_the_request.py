@@ -78,7 +78,11 @@ class TestTheUrlsNameTheHostTheCallerUsed:
                     {"x-forwarded-host": "terrapod.example.com", "x-forwarded-proto": "https"}
                 ),
             )["data"]["attributes"]
-        assert attrs["upload-url"].startswith(f"{PUBLIC}/api/v2/configuration-versions/cv-")
+        # The segment is a signed capability rather than the cv- id now
+        # (GHSA: an unauthenticated upload addressed by a guessable id). This
+        # test is about the HOST, so it asserts the base and leaves the segment
+        # to the capability tests.
+        assert attrs["upload-url"].startswith(f"{PUBLIC}/api/v2/configuration-versions/")
         assert "localhost" not in attrs["upload-url"]
 
     def test_plan_log_read_url_and_json_output(self):

@@ -15,6 +15,7 @@ party validating against its own allow-list.
 from __future__ import annotations
 
 import pathlib
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -110,17 +111,32 @@ class TestUrlsThatBypassDiscovery:
     """
 
     def test_hosted_state_urls_use_the_canonical_prefix(self) -> None:
-        src = (
-            pathlib.Path(__file__).resolve().parents[2] / "terrapod/api/routers/tfe_v2.py"
-        ).read_text()
+        # Asserted on the serialized output rather than on the source text.
+        # It was read out of the source with a one-line regex, which silently
+        # stopped matching the moment the upload URLs were wrapped over several
+        # lines -- a guard that fails open on reformatting is not a guard.
+        import uuid as _uuid
+
+        from terrapod.api.prefixes import TFE_PREFIX
+        from terrapod.api.routers.tfe_v2 import _state_version_json
+
+        sv = MagicMock()
+        sv.id = _uuid.uuid4()
+        sv.serial = 1
+        sv.lineage = "abc"
+        sv.md5 = ""
+        sv.state_size = 0
+        sv.created_at = None
+        sv.created_by = ""
+        sv.run_id = None
+        attrs = _state_version_json(sv)["data"]["attributes"]
         for field in (
             "hosted-state-download-url",
             "hosted-state-upload-url",
             "hosted-json-state-upload-url",
         ):
-            line = next(ln for ln in src.split("\n") if field in ln and 'f"' in ln)
-            assert "TFE_PREFIX" in line, (
-                f"{field} hardcodes a prefix instead of using TFE_PREFIX: {line.strip()}"
+            assert f"{TFE_PREFIX}/state-versions/" in attrs[field], (
+                f"{field} does not use the canonical TFE prefix: {attrs[field]}"
             )
 
 

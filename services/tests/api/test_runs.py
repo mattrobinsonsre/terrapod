@@ -1357,6 +1357,19 @@ class TestCLIApplyGuard:
 
 
 class TestPlanJsonOutput:
+    """The plan JSON is the full resolved plan, secrets included. It used to
+    treat the plan UUID as a capability; go-tfe authenticates this endpoint
+    (`Plans.ReadJSONOutput` builds its request with `client.NewRequest`), so it
+    now takes an ordinary credential and a run-read capability."""
+
+    @pytest.fixture(autouse=True)
+    def _can_read_the_run(self):
+        with patch(
+            "terrapod.api.routers.runs.resolve_workspace_capabilities_for",
+            new=AsyncMock(return_value=caps_for_level("plan")),
+        ):
+            yield
+
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -1436,6 +1449,34 @@ class TestPlanJsonOutput:
 
         assert resp.status_code == 404
         mock_storage.exists.assert_not_called()
+        mock_storage.presigned_get_url.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.get_storage")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_a_user_without_run_read_is_refused(
+        self, mock_get_run, mock_get_storage, *_mocks
+    ):
+        """The reason this endpoint stopped being capability-authorised: the
+        plan JSON carries every resolved value, so reaching it must cost a
+        permission on the workspace, not merely knowledge of a run id."""
+        run = _mock_run()
+        run.has_json_output = True
+        mock_get_run.return_value = run
+        mock_storage = AsyncMock()
+        mock_get_storage.return_value = mock_storage
+
+        app, _db = _make_app(_user())
+        with patch(
+            "terrapod.api.routers.runs.resolve_workspace_capabilities_for",
+            new=AsyncMock(return_value=set()),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(f"/api/v2/plans/plan-{run.id}/json-output", headers=_AUTH)
+
+        assert resp.status_code == 403
         mock_storage.presigned_get_url.assert_not_called()
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)

@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.auth import capability_urls
 from terrapod.db.models import AuditLog, generate_uuid7
 from terrapod.logging_config import get_logger
 
@@ -73,7 +74,13 @@ def parse_resource(path: str) -> tuple[str, str]:
         return "oci-repositories", oci.group(1)
     m = _RESOURCE_PATTERN.match(path)
     if m:
-        return m.group(1), m.group(2) or ""
+        resource_id = m.group(2) or ""
+        # Some paths carry a signed capability where an id would normally sit
+        # (plan/apply logs, configuration and state uploads). Record what it
+        # names, never the capability itself — this table is read by auditors,
+        # and the capability grants the access it describes.
+        described = capability_urls.describe_for_logging(resource_id)
+        return m.group(1), described if described is not None else resource_id
     # Fallback: first path segment after leading slash
     parts = path.strip("/").split("/")
     return parts[0] if parts else "", ""
