@@ -41,6 +41,7 @@ func registerDiscover(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_onboard_start",
 		Description: "Start a resource-discovery session for a workspace + provider. Kicks off credential-less schema discovery (which of the provider's data sources are importable). " +
 			"Poll terrapod_onboard_get until status is `schema_ready`, then read the discovery surface and call terrapod_onboard_discover with the types you want. Non-destructive — nothing is imported.",
+		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in onboardStartIn) (*mcp.CallToolResult, *terrapod.OnboardingSession, error) {
 		if in.WorkspaceID == "" || in.Provider == "" {
 			return errText("workspace_id and provider are required"), nil, nil
@@ -108,6 +109,7 @@ func registerDiscover(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_onboard_discover",
 		Description: "Run discovery over the chosen data-source types for a `schema_ready` session — dispatches the discovery run that produces the generated config + `import {}` blocks. selected_types must be a non-empty subset of the session's discovery surface. " +
 			"Non-destructive: it queries and generates config, it does NOT import anything. Poll terrapod_onboard_get until config_ready, then review the output with the user.",
+		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in onboardDiscoverIn) (*mcp.CallToolResult, *terrapod.OnboardingSession, error) {
 		if in.SessionID == "" {
 			return errText("session_id is required"), nil, nil

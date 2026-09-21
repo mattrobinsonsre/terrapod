@@ -6,6 +6,7 @@ variable named `TP_AUTH_TOKEN` won. Anyone with variable-write could point the
 runner at a host they control and collect the run's own token.
 """
 
+from terrapod.runner.job_template import build_job_spec
 from terrapod.runner.reserved_env import is_reserved_env_key
 
 
@@ -29,12 +30,14 @@ class TestTheReservedPredicate:
 
 class TestTheJobSpecDropsThem:
     def _build(self, env_vars):
-        from terrapod.engines.terraform import TerraformRunOptions, TerraformStrategy
         from tests.runner.test_job_template import _runner_config
 
         cfg = _runner_config()
-        return TerraformStrategy().build_job_spec(
-            options=TerraformRunOptions(),
+        # This line has no engine-strategy layer (#1521 is 2.0 work), so the
+        # job spec is built by the module function directly. The fix under test
+        # is the same either way: the reserved key is dropped where workspace
+        # variables are injected.
+        return build_job_spec(
             run_id="abc123",
             phase="plan",
             runner_config=cfg,
