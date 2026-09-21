@@ -3014,6 +3014,9 @@
               }
             }
           }
+        },
+        "require_strong_secrets": {
+          "type": "boolean"
         }
       }
     }

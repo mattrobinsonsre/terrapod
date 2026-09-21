@@ -305,6 +305,7 @@
   "registry.provider_cache.verify",
   "registry.provider_cache.warm_on_first_request",
   "registry.signing_key",
+  "require_strong_secrets",
   "runner_artifacts.plan_artifacts_max_bytes",
   "runs.tfe_post_plan_decisions",
   "scheduler.lane_consumers",

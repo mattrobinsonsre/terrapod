@@ -3042,6 +3042,19 @@ class Settings(BaseSettings):
         "(falls back to sha256(database_url) when empty).",
     )
 
+    # Whether weak secret material is fatal at startup rather than a warning
+    # (GHSA-hc47-q72v-4vcm). Opt-in, and default OFF on this line deliberately:
+    # a deployment already running on a typed passphrase would otherwise refuse
+    # to start on a patch upgrade, and its data is encrypted under that very
+    # passphrase, so refusing to boot is worse than the weakness. Turn it on
+    # once `token_signing_key` is set and the static KEK is generated material.
+    # See terrapod/secret_strength.py.
+    require_strong_secrets: bool = Field(
+        default=False,
+        description="Fail startup when the token signing key or static KEK is "
+        "weak or falls back to the database URL, instead of warning.",
+    )
+
     # Database
     database_url: PostgresDsn = Field(
         default="postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod",

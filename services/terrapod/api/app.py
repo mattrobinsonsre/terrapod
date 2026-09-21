@@ -85,8 +85,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # private key column is EncryptedText, so the service must be ready first.
     # Fail CLOSED when encryption is enabled (a wrong/missing key must crash);
     # tolerate errors only when disabled (e.g. table missing pre-migration).
+    # Report weak secret material HERE, at startup, rather than leaving it to the
+    # first token mint (GHSA-hc47-q72v-4vcm). The derivation checks too and is the
+    # real chokepoint, but it is lazy and cached, so on a quiet deployment the
+    # warning might not appear for hours -- and under `require_strong_secrets` an
+    # operator wants the pod to fail immediately and visibly, not once a run
+    # happens to start.
+    from terrapod.auth.token_signing import report_key_strength
     from terrapod.config import settings as _settings
     from terrapod.crypto.service import init_encryption
+
+    report_key_strength(
+        (_settings.token_signing_key or "").strip(),
+        strict=bool(_settings.require_strong_secrets),
+    )
 
     try:
         async with get_db_session() as db:
