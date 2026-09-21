@@ -28,10 +28,11 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.capability_access import resolve_capability_or_authenticate
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.api.pagination import build_meta
 from terrapod.auth import capabilities as cap
-from terrapod.auth import download_tickets
+from terrapod.auth import capability_urls, download_tickets
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import ConfigurationVersion, Run, Workspace
 from terrapod.db.session import get_db
@@ -66,12 +67,37 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _cv_json(cv: ConfigurationVersion) -> dict:
-    """Serialize a ConfigurationVersion to TFE V2 JSON:API format."""
+def _cv_json(
+    cv: ConfigurationVersion,
+    *,
+    with_upload_capability: bool = False,
+) -> dict:
+    """Serialize a ConfigurationVersion to TFE V2 JSON:API format.
+
+    `upload-url` must be absolute (go-tfe does not resolve a relative one), and
+    must name a host the caller can reach. It is derived from the request, as
+    state upload URLs already are. It used to come straight from
+    `auth.callback_base_url` -- an SSO setting that defaults to
+    `http://localhost:8000` -- so on an install without SSO every CLI config
+    upload was handed an unreachable URL (#1703).
+
+    It carries a signed capability in place of the id: the client that follows
+    it sends no credential, so a bare id let anyone who learned it upload the
+    Terraform the next run would execute. See `api/capability_access.py`.
+    """
     from terrapod.config import settings
 
     base = settings.auth.callback_base_url.rstrip("/")
     cv_id = f"cv-{cv.id}"
+    # Only the create response carries an upload capability -- see the same
+    # reasoning on `_state_version_json`. Minting it here for every read would
+    # let a config-read user lift one out of a listing and upload the Terraform
+    # the next run executes.
+    upload_seg = (
+        capability_urls.mint(capability_urls.KIND_CV_UPLOAD, str(cv.id))
+        if with_upload_capability
+        else cv_id
+    )
 
     return {
         "data": {
@@ -82,7 +108,7 @@ def _cv_json(cv: ConfigurationVersion) -> dict:
                 "status": cv.status,
                 "auto-queue-runs": cv.auto_queue_runs,
                 "speculative": cv.speculative,
-                "upload-url": f"{base}/api/v2/configuration-versions/{cv_id}/upload",
+                "upload-url": f"{base}/api/v2/configuration-versions/{upload_seg}/upload",
                 "created-at": _rfc3339(cv.created_at),
             },
             "relationships": {
@@ -144,7 +170,7 @@ async def create_configuration_version(
     await db.commit()
     await db.refresh(cv)
 
-    return JSONResponse(content=_cv_json(cv), status_code=201)
+    return JSONResponse(content=_cv_json(cv, with_upload_capability=True), status_code=201)
 
 
 @router.get("/configuration-versions/{cv_id}")
@@ -501,13 +527,35 @@ async def upload_configuration(
 ) -> Response:
     """Upload configuration tarball.
 
-    No auth required — the CV UUID acts as a capability token (same pattern
-    as state version upload). go-tfe sends no Authorization header.
+    go-tfe sends no Authorization header here, so the segment is a signed
+    capability minted into `upload-url`. An authenticated caller (go-terrapod,
+    terrapod-migrate) may still address it by plain id, and then needs write on
+    the workspace. See `api/capability_access.py`.
     """
-    cv_uuid = uuid.UUID(cv_id.removeprefix("cv-"))
+    segment, user = await resolve_capability_or_authenticate(
+        cv_id,
+        expect_kind=capability_urls.KIND_CV_UPLOAD,
+        request=request,
+        not_found="Configuration version not found",
+    )
+    try:
+        cv_uuid = uuid.UUID(segment.removeprefix("cv-"))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Configuration version not found") from None
     cv = await run_service.get_configuration_version(db, cv_uuid)
     if cv is None:
         raise HTTPException(status_code=404, detail="Configuration version not found")
+
+    if user is not None:
+        ws = await db.get(Workspace, cv.workspace_id)
+        if ws is None:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        caps = await resolve_workspace_capabilities_for(db, user, ws)
+        if not has_capability(caps, cap.CONFIG_UPLOAD):
+            raise HTTPException(
+                status_code=403,
+                detail="Requires write permission on workspace",
+            )
 
     if cv.status == "uploaded":
         raise HTTPException(status_code=409, detail="Configuration already uploaded")

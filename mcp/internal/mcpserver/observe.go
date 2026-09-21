@@ -183,7 +183,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_plan_json",
-		Description: "Fetch the structured JSON plan output (`tofu show -json`) for a run — the resource_changes, so you can reason precisely about what a plan will create/update/destroy. Returns 'not available' if the run produced no JSON plan.",
+		Description: "Fetch the structured JSON plan output (`tofu show -json`) for a run — the resource_changes, so you can reason precisely about what a plan will create/update/destroy. Values the plan marks sensitive are redacted. Returns 'not available' if the run produced no JSON plan.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in planJSONIn) (*mcp.CallToolResult, planJSONOut, error) {
 		if in.RunID == "" {
@@ -193,7 +193,10 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		if err != nil {
 			return errResult(err), planJSONOut{}, nil
 		}
-		return nil, planJSONOut{RunID: in.RunID, PlanJSON: raw}, nil
+		// Redact before it leaves for the model (GHSA-3g53-5gw3-hh42). The
+		// tool is read-only, which is exactly why a host may call it without
+		// asking -- so it must not be a way to read secrets out.
+		return nil, planJSONOut{RunID: in.RunID, PlanJSON: redactPlanJSON(raw)}, nil
 	})
 
 	// ── terrapod_run_logs ────────────────────────────────────────────

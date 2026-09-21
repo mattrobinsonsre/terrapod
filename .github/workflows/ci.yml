@@ -808,6 +808,61 @@ jobs:
           fi
           echo "all third-party images are overridable, and every mirror ref is listed"
 
+      - name: A token signing key is generated on install, and never on upgrade
+        run: |
+          # GHSA-hc47-q72v-4vcm. The asymmetry IS the fix, and it is invisible
+          # in a normal render: generating on upgrade would rotate the key and
+          # invalidate every token in flight -- which is what running plans and
+          # applies authenticate with. So both directions are asserted.
+          inst=$(helm template tp ./helm/terrapod | grep -c 'token_signing_key:' || true)
+          [ "$inst" = "1" ] \
+            || { echo "install must generate a signing key (got $inst)"; exit 1; }
+
+          # An upgrade of a deployment that has no such Secret must emit
+          # nothing, leaving the existing derivation alone.
+          upg=$(helm template tp ./helm/terrapod --is-upgrade | grep -c 'token_signing_key:' || true)
+          [ "$upg" = "0" ] \
+            || { echo "upgrade must NOT generate a key (got $upg) -- this rotates"; exit 1; }
+
+          # An operator-supplied key always wins, and no Secret is generated.
+          own=$(helm template tp ./helm/terrapod --set api.tokenSigningKey.existingSecret=mine)
+          echo "$own" | grep -q 'name: mine' \
+            || { echo "an operator-supplied secret must be used"; exit 1; }
+          echo "$own" | grep -q 'token_signing_key:' \
+            && { echo "must not generate a key when one is supplied"; exit 1; }
+
+          # The generated key must be long enough to be a key rather than a
+          # token-shaped string: the whole point is that it is not guessable.
+          len=$(helm template tp ./helm/terrapod | grep 'token_signing_key:' | sed 's/.*: //; s/"//g' | tr -d '[:space:]' | wc -c)
+          [ "$len" -ge 32 ] \
+            || { echo "generated key is only $len chars"; exit 1; }
+          echo "signing key: generated on install, absent on upgrade, yielded to when supplied"
+
+      - name: The strong-secrets switch reaches the pod and stays off by default
+        run: |
+          # Config-channel contract for GHSA-hc47-q72v-4vcm. The switch decides
+          # whether the API refuses to start on a weak signing key or a
+          # passphrase KEK, so a render line that goes missing is not cosmetic:
+          # an operator sets it, the pod never sees it, and the code default
+          # (off) silently wins while they believe enforcement is on.
+          out=$(helm template ./helm/terrapod -f helm/terrapod/values.yaml)
+          echo "$out" | grep -q 'require_strong_secrets:' \
+            || { echo "require_strong_secrets is not rendered into the ConfigMap"; exit 1; }
+          # Default must stay OFF on this line: a deployment already running on a
+          # weak secret has its data encrypted under that key, so refusing to boot
+          # on a patch upgrade is worse than the weakness it reports.
+          echo "$out" | grep -q 'require_strong_secrets: false' \
+            || { echo "require_strong_secrets must default to false here"; exit 1; }
+          # And turning it on must actually reach the pod.
+          on=$(helm template ./helm/terrapod --set api.config.require_strong_secrets=true)
+          echo "$on" | grep -q 'require_strong_secrets: true' \
+            || { echo "setting it true does not reach the ConfigMap"; exit 1; }
+          # It is policy, not a credential -- it belongs in the ConfigMap and
+          # must never be smuggled in as a TERRAPOD_* env var (house rule).
+          echo "$out" | grep -q 'TERRAPOD_REQUIRE_STRONG_SECRETS' \
+            && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
+          echo "the strong-secrets switch renders, defaults off, and is ConfigMap-only"
+
       - name: The Vault value source reaches the pod, and its credential never does
         run: |
           # Two halves of the config-channel contract for #1439.

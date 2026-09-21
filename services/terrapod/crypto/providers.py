@@ -52,16 +52,45 @@ class StaticKEKProvider:
     Key durability is the OPERATOR's responsibility — losing the master key makes
     all encrypted data unrecoverable. The master secret is read from the
     ``TERRAPOD_ENCRYPTION__STATIC_KEY`` env (injected from a K8s Secret), and the
-    32-byte KEK is ``sha256(master_secret)`` so any sufficiently-strong passphrase
-    or base64 key works.
+    32-byte KEK is ``sha256(master_secret)``.
+
+    **Supply generated key material, not a passphrase** — ``openssl rand -base64
+    32``. A single unsalted SHA-256 is a sound way to turn 32 random bytes into a
+    32-byte key, and a poor way to turn a memorable phrase into one: there is no
+    salt and no iteration, so guessing the phrase offline costs one hash per
+    attempt against a KEK that protects every encrypted value at rest, for as
+    long as the backups live (GHSA-hc47-q72v-4vcm). This docstring used to invite
+    "any sufficiently-strong passphrase", which is exactly the input the
+    construction does not protect.
+
+    The derivation is unchanged on purpose. Salting or stretching it would change
+    the KEK, and every DEK already wrapped under the old one would stop
+    unwrapping — silent, unrecoverable data loss on a patch upgrade. So the
+    weakness is reported at construction (fatal only under
+    ``require_strong_secrets``) and a versioned, stretched wrap format belongs to
+    a MAJOR, where old wraps can be read and new ones written.
     """
 
     id = "static"
 
-    def __init__(self, master_secret: str) -> None:
+    def __init__(self, master_secret: str, *, strict: bool | None = None) -> None:
         if not master_secret:
             raise ValueError("static encryption provider requires a master key")
+        self._report_strength(master_secret, strict)
         self._kek = hashlib.sha256(master_secret.encode("utf-8")).digest()
+
+    @staticmethod
+    def _report_strength(master_secret: str, strict: bool | None) -> None:
+        from terrapod.secret_strength import describe_weakness
+
+        problem = describe_weakness(master_secret, name="encryption.static_key")
+        if problem is None:
+            return
+        if strict is None:
+            strict = bool(settings.require_strong_secrets)
+        if strict:
+            raise ValueError(problem)
+        logger.warning("weak static encryption key", problem=problem)
 
     async def wrap(self, dek: bytes) -> str:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM

@@ -177,3 +177,44 @@ class TestQueryAuditLog:
 
         assert total == 0
         assert entries == []
+
+
+class TestACapabilityIsNeverRecordedVerbatim:
+    """`audit_logs` is a table auditors read; a capability grants the access it
+    describes, so storing one there hands out a live credential."""
+
+    def _cap(self, kind, resource_id):
+        from unittest.mock import patch
+
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+
+        from terrapod.auth import capability_urls as cu
+        from terrapod.auth.ca import CertificateAuthority
+
+        key = ed25519.Ed25519PrivateKey.from_private_bytes(bytes(range(32)))
+        real = CertificateAuthority.generate()
+        ca = CertificateAuthority(ca_cert=real.ca_cert, ca_key=key)
+        with patch("terrapod.auth.ca.get_ca", return_value=ca):
+            return cu.mint(kind, resource_id)
+
+    def test_a_plan_log_capability_is_replaced_by_what_it_names(self):
+        cap = self._cap("plan-log", "run-abc")
+        rtype, rid = parse_resource(f"/api/v2/plans/{cap}/log")
+        assert rtype == "plans"
+        # The whole point: the secret is not in the row.
+        assert cap not in rid
+        assert cap.split(".")[1] not in rid
+        # And the row still answers the question the table exists for.
+        assert rid == "plan-log:run-abc"
+
+    def test_a_state_upload_capability_is_replaced_too(self):
+        cap = self._cap("sv-upload", "sv-123")
+        _, rid = parse_resource(f"/api/v2/state-versions/{cap}/content")
+        assert cap not in rid
+        assert rid == "sv-upload:sv-123"
+
+    def test_a_plain_id_is_still_recorded_as_itself(self):
+        # The redaction must not swallow ordinary ids — that would gut the
+        # audit trail to fix a leak.
+        rtype, rid = parse_resource("/api/v2/workspaces/ws-abc123")
+        assert (rtype, rid) == ("workspaces", "ws-abc123")

@@ -407,7 +407,7 @@ async def rollback_state_version(
     from terrapod.api.routers.tfe_v2 import _state_version_json
 
     return JSONResponse(
-        content=_state_version_json(new_sv, request),
+        content=_state_version_json(new_sv),
         status_code=201,
     )
 
@@ -527,6 +527,6 @@ async def upload_state_manual(
     from terrapod.api.routers.tfe_v2 import _state_version_json
 
     return JSONResponse(
-        content=_state_version_json(sv, request),
+        content=_state_version_json(sv),
         status_code=201,
     )

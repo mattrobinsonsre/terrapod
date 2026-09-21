@@ -69,7 +69,22 @@ async def store_auth_state(state: AuthState) -> str:
     """Store auth state in Redis, keyed by IDP-facing state.
 
     Returns the IDP state key used for lookup.
+
+    **Validates `client_redirect_uri` here rather than in the routes.** Whatever
+    is stored is later handed the authorization code, and the bug this closes
+    was two routes with one missing check — validating per route would leave the
+    next route to remember. Raises `InvalidRedirectURI`; callers turn it into a
+    400.
     """
+    from terrapod.auth.redirect_uri import validate_redirect_uri
+    from terrapod.config import settings
+
+    validate_redirect_uri(
+        state.client_redirect_uri,
+        credential_type=state.credential_type,
+        allowed_origin=(settings.auth.callback_base_url or settings.external_url or ""),
+    )
+
     redis = get_redis_client()
     key = AUTH_STATE_PREFIX + state.idp_state
     await redis.set(key, json.dumps(asdict(state)), ex=AUTH_STATE_TTL)
