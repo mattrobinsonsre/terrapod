@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // ProviderZip builds a terraform-provider distribution zip in memory. The zip
@@ -65,9 +66,37 @@ func SHA256SUMS(files map[string][]byte) []byte {
 	return buf.Bytes()
 }
 
+// excludedFile reports whether a file must never be packaged into a published
+// module tarball (GHSA-g2c3-vxf6-7jr8).
+//
+// Skipping `.terraform` does NOT cover state: a local backend writes
+// `terraform.tfstate` to the module ROOT, beside main.tf. So a developer who
+// ran `terraform apply` while testing the module — which is the normal way to
+// test one — published that environment's state, and state carries provider
+// attributes and every sensitive output verbatim. `.tfvars` is where variable
+// values live, credentials included.
+//
+// Publishing is the wrong operation to be forgiving about: the artifact goes to
+// a registry other people fetch, and a published version is immutable, so the
+// mistake cannot be withdrawn.
+func excludedFile(name string) bool {
+	switch name {
+	case "terraform.tfstate", "terraform.tfstate.backup", ".env":
+		return true
+	}
+	return strings.HasSuffix(name, ".tfvars") ||
+		strings.HasSuffix(name, ".tfvars.json") ||
+		strings.HasPrefix(name, ".terraform.tfstate.lock")
+}
+
 // TarGzDir builds a gzipped tar of a module source directory. Entry paths are
 // relative to dir (forward slashes). `.git` and `.terraform` directories are
-// skipped; symlinks and other non-regular files are ignored.
+// skipped, as are the secret-bearing files excludedFile names; symlinks and
+// other non-regular files are ignored.
+//
+// The exclusion list is a floor, not a guarantee — it catches the predictable
+// accidents, not an arbitrary private key a developer happens to have in the
+// directory. Publishers should check the manifest the CLI prints.
 func TarGzDir(dir string) ([]byte, error) {
 	var buf bytes.Buffer
 	gw := gzip.NewWriter(&buf)
@@ -88,6 +117,8 @@ func TarGzDir(dir string) ([]byte, error) {
 			if info.Name() == ".git" || info.Name() == ".terraform" {
 				return filepath.SkipDir
 			}
+		} else if excludedFile(info.Name()) {
+			return nil
 		}
 		hdr, err := tar.FileInfoHeader(info, "")
 		if err != nil {
