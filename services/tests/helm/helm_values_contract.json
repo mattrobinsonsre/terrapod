@@ -444,6 +444,7 @@
   "namespace.create",
   "namespace.labels",
   "networkPolicies.enabled",
+  "networkPolicies.web.ingressFrom",
   "postgresql.deploy",
   "postgresql.embedded.extraArgs",
   "postgresql.embedded.image",

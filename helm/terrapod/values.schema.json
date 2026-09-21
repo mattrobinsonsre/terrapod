@@ -1062,6 +1062,18 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "web": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ingressFrom": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
         }
       }
     },

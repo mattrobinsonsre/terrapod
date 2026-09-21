@@ -2155,6 +2155,19 @@ networkPolicies:
 # own api/listener/web.priorityClassName (or runners.priorityClassName) is set,
 # which always wins. Values stay well below the reserved system classes
 # (system-cluster-critical = 2000000000).
+
+  web:
+    # NetworkPolicy peers allowed to reach the web pod on 3000. REQUIRED when
+    # networkPolicies.enabled is true — the chart cannot guess where your
+    # ingress controller runs, and a rule with no `from:` admits every source,
+    # so leaving it empty fails the render rather than shipping a policy that
+    # reads as a restriction and enforces nothing.
+    #
+    #   ingressFrom:
+    #     - namespaceSelector:
+    #         matchLabels:
+    #           kubernetes.io/metadata.name: kube-system
+    ingressFrom: []
 priorityClasses:
   create: false
   # Higher-priority class for the control plane (api, listener, web).
