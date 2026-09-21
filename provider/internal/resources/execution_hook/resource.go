@@ -67,6 +67,10 @@ func (r *executionHookResource) Schema(_ context.Context, _ resource.SchemaReque
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
 				Description: "Shell body run via /bin/sh -c inside the runner Job. Runs with the runner's cloud identity; a non-zero exit fails the run. Secrets should come from workspace variables, not inline here.",
+				// The description asks for secrets to stay out, which is guidance
+				// rather than enforcement — and the body is round-tripped into
+				// state on refresh either way.
+				Sensitive: true,
 			},
 			"enabled": schema.BoolAttribute{
 				Optional:    true,

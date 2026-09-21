@@ -54,6 +54,41 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # GHSA-mjhj-g43q-w6m9 (D3). These four columns exist so a security review
+    # can tell a VCS-driven change from a Terrapod-user one; dropping them
+    # leaves a PR-comment-driven apply by an external VCS user with NO
+    # attribution at all, because such a row has an empty `actor_email` —
+    # precisely the case the dual-actor columns were added to cover.
+    #
+    # Downgrades are an operator action rather than an attacker one, so this is
+    # a forensic-integrity defect rather than an exploitable one. It is worth
+    # guarding because it fires during incident response or a botched upgrade,
+    # which is exactly when the attribution matters most.
+    #
+    # The whole run is wrapped in one transaction (alembic/env.py does not set
+    # transaction_per_migration), so this either aborts cleanly and changes
+    # nothing, or proceeds.
+    bind = op.get_bind()
+    attributed = bind.execute(
+        # Must test for attribution that is NOT reconstructible from the
+        # columns that survive. `upgrade()` backfills every existing row with
+        # server_default 'terrapod_user' / 'api', and every new row gets the
+        # same — so `actor_type <> ''` was true for EVERY row ever written and
+        # the guard blocked the downgrade on every deployment, including the
+        # ones its own comment calls safe.
+        sa.text(
+            "SELECT count(*) FROM audit_logs WHERE "
+            "actor_type <> 'terrapod_user' OR origin <> 'api' "
+            "OR actor_login <> '' OR actor_id <> ''"
+        )
+    ).scalar()
+    if attributed:
+        raise RuntimeError(
+            f"refusing to drop the dual-actor audit columns: {attributed} audit row(s) "
+            "carry non-default attribution (a VCS user, a PR comment, or a background "
+            "task) that exists nowhere else — a VCS-driven action has no actor_email "
+            "to fall back on. Export audit_logs first if you need this downgrade."
+        )
     op.alter_column("audit_logs", "action", type_=sa.String(20))
     op.drop_index("ix_audit_logs_actor_type", table_name="audit_logs")
     op.drop_column("audit_logs", "actor_id")

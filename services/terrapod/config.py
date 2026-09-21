@@ -1174,6 +1174,29 @@ class RateLimitConfig(BaseModel):
             "genuinely fronts more distinct API clients than this. 0 = unlimited."
         ),
     )
+    trusted_proxy_cidrs: list[str] = Field(
+        default_factory=lambda: [
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "100.64.0.0/10",
+            "fd00::/8",
+        ],
+        description=(
+            "Proxy addresses or CIDRs whose X-Forwarded-For may be believed. "
+            "The header is caller-supplied data, so it is read ONLY when the "
+            "connecting peer is listed here; the client is then the right-most "
+            "entry that is not itself a listed proxy. Defaults to the private "
+            "ranges plus the CGNAT/Tailscale range, because in Terrapod the peer "
+            "is ALWAYS an in-cluster BFF pod — every request reaches the API "
+            "through the Next.js proxy by architectural rule — so this trusts "
+            "our own component and nothing publicly routable. An empty list is "
+            "supported and means 'ignore the header, bucket on the peer', but "
+            "since that peer is one BFF pod it collapses every unauthenticated "
+            "caller into a single shared bucket. Only sound if your ingress "
+            "sanitises X-Forwarded-For — see docs/rate-limiting.md."
+        ),
+    )
 
 
 # --- Metrics Configuration ---

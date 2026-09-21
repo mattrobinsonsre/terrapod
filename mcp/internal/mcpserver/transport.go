@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -57,7 +58,11 @@ func (t *refreshTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	// Actively STRIP any Authorization the caller or Go's redirect copier left on
 	// (belt-and-suspenders), then pass it through. Clone first — a RoundTripper
 	// must not mutate the caller's request.
-	if t.apiHost != "" && req.URL.Host != t.apiHost {
+	// Scheme matters as much as host. Scoping on the host alone meant that on an
+	// https -> http redirect to the SAME host, this re-attached a fresh bearer
+	// token to a cleartext request — undoing the SDK's redirect protection one
+	// layer down, on the component that runs unattended against production.
+	if t.apiHost != "" && (req.URL.Host != t.apiHost || !isSecureOrLoopback(req.URL)) {
 		if req.Header.Get("Authorization") != "" {
 			clean := req.Clone(req.Context())
 			clean.Header.Del("Authorization")
@@ -143,4 +148,19 @@ func hostOf(s string) string {
 		return ""
 	}
 	return u.Host
+}
+
+// isSecureOrLoopback reports whether it is safe to put a bearer token on this
+// request. https always is; plaintext is only acceptable to this machine, which
+// matches the SDK's own loopback carve-out for local development.
+func isSecureOrLoopback(u *url.URL) bool {
+	if strings.EqualFold(u.Scheme, "https") {
+		return true
+	}
+	host := u.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

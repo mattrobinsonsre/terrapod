@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // ProviderZip builds a terraform-provider distribution zip in memory. The zip
@@ -65,10 +66,61 @@ func SHA256SUMS(files map[string][]byte) []byte {
 	return buf.Bytes()
 }
 
+// excludedFile reports whether a file must never be packaged into a published
+// module tarball (GHSA-g2c3-vxf6-7jr8).
+//
+// Skipping `.terraform` does NOT cover state: a local backend writes
+// `terraform.tfstate` to the module ROOT, beside main.tf. So a developer who
+// ran `terraform apply` while testing the module — which is the normal way to
+// test one — published that environment's state, and state carries provider
+// attributes and every sensitive output verbatim. `.tfvars` is where variable
+// values live, credentials included.
+//
+// Publishing is the wrong operation to be forgiving about: the artifact goes to
+// a registry other people fetch, and a published version is immutable, so the
+// mistake cannot be withdrawn.
+func excludedFile(name string) bool {
+	// Case-insensitive throughout: on macOS and Windows a file stored as
+	// `Terraform.TFVars` is still auto-loaded by Terraform, so a
+	// case-sensitive filter would let exactly the file that carries values
+	// through.
+	lower := strings.ToLower(name)
+
+	switch lower {
+	case "terraform.tfstate", "terraform.tfstate.backup",
+		".envrc", ".netrc", ".terraformrc", "credentials.tfrc.json", "credentials":
+		return true
+	}
+
+	// `.env` was matched exactly, so `.env.local` and `.env.production` — the
+	// files people actually paste real values into — still shipped.
+	if lower == ".env" || strings.HasPrefix(lower, ".env.") {
+		return true
+	}
+
+	// Any state file, not just the two canonical names: `prod.tfstate`, a state
+	// pulled to `backup.tfstate`, `terraform.tfstate.1700000000.backup`.
+	if strings.HasSuffix(lower, ".tfstate") || strings.Contains(lower, ".tfstate.") {
+		return true
+	}
+
+	return strings.HasSuffix(lower, ".tfvars") ||
+		strings.HasSuffix(lower, ".tfvars.json") ||
+		strings.HasPrefix(lower, ".terraform.tfstate.lock") ||
+		strings.HasSuffix(lower, ".pem") ||
+		lower == "id_rsa" || lower == "id_ed25519"
+}
+
 // TarGzDir builds a gzipped tar of a module source directory. Entry paths are
 // relative to dir (forward slashes). `.git` and `.terraform` directories are
-// skipped; symlinks and other non-regular files are ignored.
-func TarGzDir(dir string) ([]byte, error) {
+// skipped, as are the secret-bearing files excludedFile names; symlinks and
+// other non-regular files are ignored.
+//
+// The exclusion list is a floor, not a guarantee — it catches the predictable
+// accidents, not an arbitrary private key a developer happens to have in the
+// directory. Publishers should check the manifest the CLI prints.
+func TarGzDir(dir string) ([]byte, []string, error) {
+	var skipped []string
 	var buf bytes.Buffer
 	gw := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gw)
@@ -88,6 +140,9 @@ func TarGzDir(dir string) ([]byte, error) {
 			if info.Name() == ".git" || info.Name() == ".terraform" {
 				return filepath.SkipDir
 			}
+		} else if excludedFile(info.Name()) {
+			skipped = append(skipped, filepath.ToSlash(rel))
+			return nil
 		}
 		hdr, err := tar.FileInfoHeader(info, "")
 		if err != nil {
@@ -109,13 +164,14 @@ func TarGzDir(dir string) ([]byte, error) {
 		return err
 	})
 	if walkErr != nil {
-		return nil, walkErr
+		return nil, nil, walkErr
 	}
 	if err := tw.Close(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := gw.Close(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return buf.Bytes(), nil
+	sort.Strings(skipped)
+	return buf.Bytes(), skipped, nil
 }

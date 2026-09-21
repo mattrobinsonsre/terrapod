@@ -642,5 +642,6 @@ data:
       runner_requests_per_minute: {{ .Values.api.config.rate_limit.runner_requests_per_minute }}
       auth_requests_per_minute: {{ .Values.api.config.rate_limit.auth_requests_per_minute }}
       distinct_credentials_per_minute: {{ .Values.api.config.rate_limit.distinct_credentials_per_minute }}
+      trusted_proxy_cidrs: {{ .Values.api.config.rate_limit.trusted_proxy_cidrs | default list | toJson }}
     {{- end }}
 {{- end }}
