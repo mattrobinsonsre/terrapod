@@ -15,8 +15,26 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Allow traffic from ingress controller
-    - ports:
+    {{- /*
+      A rule with only `ports:` and no `from:` admits ALL sources — the comment
+      here used to say "allow traffic from ingress controller" while enforcing
+      nothing, so an operator who turned policies on got a web policy that read
+      as a restriction and was not one (GHSA-vg6r-fvfr-27v5). An enabled policy
+      that permits everything is harder to notice than an absent one.
+
+      The chart cannot guess where the ingress controller runs — traefik in
+      kube-system on k3s, ingress-nginx in its own namespace, something else
+      behind a service mesh — so it has to be told. Failing the render is
+      deliberate: the alternative to a wrong `from:` is either admitting
+      everything again, or an empty `ingress: []` that silently makes the web
+      pod unreachable. A clear message naming the key is better than either.
+    */}}
+    {{- if not .Values.networkPolicies.web.ingressFrom }}
+    {{- fail "networkPolicies.enabled=true requires networkPolicies.web.ingressFrom — the NetworkPolicy peers allowed to reach the web pod (e.g. a namespaceSelector for your ingress controller's namespace). Without it the ingress rule would admit every source, which is the defect this check exists to prevent." }}
+    {{- end }}
+    - from:
+        {{- toYaml .Values.networkPolicies.web.ingressFrom | nindent 8 }}
+      ports:
         - protocol: TCP
           port: 3000
   egress:
