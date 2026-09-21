@@ -14,6 +14,7 @@ the next gap fails the build instead of waiting to be noticed.
 
 from sqlalchemy import inspect as sa_inspect
 
+from terrapod.crypto.columns import ENCRYPTED_COLUMNS
 from terrapod.crypto.types import EncryptedText
 from terrapod.db import models
 
@@ -152,3 +153,60 @@ class TestTheTwoFixes:
         None to NULL rather than encrypting it."""
         assert EncryptedText().process_bind_param(None, None) is None
         assert EncryptedText().process_result_value(None, None) is None
+
+
+class TestTheRegistryMatchesTheModels:
+    """The other direction, which is the one that broke (GHSA-7rj9-qpm8-6mv3).
+
+    Everything above asks "is this column `EncryptedText`?". Nothing asked "is
+    every `EncryptedText` column registered in `ENCRYPTED_COLUMNS`?" — and that
+    list, not the column type, is what drives the loop in
+    `cli.encryption_migrate`. So the two lists were maintained independently
+    with no assertion connecting them, and `gpg_keys.private_key` and
+    `run_tasks.hmac_key` were converted by #1140 without being registered.
+
+    The consequence was silent and worst at the worst moment: an unlisted
+    column is visited by neither `encrypt` nor `decrypt`, so a DEK rotation
+    never re-keys it. An operator rotating because they suspect a compromise
+    would not have rotated the provider-signing key or the run-task HMAC keys.
+
+    Asserting set equality in BOTH directions is what stops a ninth column
+    repeating it.
+    """
+
+    def _encrypted_text_columns(self) -> set[tuple[str, str]]:
+        found = set()
+        for mapper in models.Base.registry.mappers:
+            table = mapper.local_table
+            for column in table.columns:
+                if isinstance(column.type, EncryptedText):
+                    found.add((table.name, column.name))
+        return found
+
+    def test_the_sweep_actually_finds_columns(self):
+        """A sweep that matched nothing would make the assertion below vacuous."""
+        assert len(self._encrypted_text_columns()) >= 8
+
+    def test_every_encrypted_column_is_registered(self):
+        declared = self._encrypted_text_columns()
+        registered = set(ENCRYPTED_COLUMNS)
+
+        unregistered = sorted(declared - registered)
+        assert not unregistered, (
+            "These columns are EncryptedText but absent from ENCRYPTED_COLUMNS, so "
+            "`encryption_migrate` will not encrypt, decrypt or RE-KEY them — a DEK "
+            "rotation silently leaves them on the old key:\n  "
+            + "\n  ".join(f"{t}.{c}" for t, c in unregistered)
+        )
+
+    def test_every_registered_column_is_encrypted(self):
+        declared = self._encrypted_text_columns()
+        registered = set(ENCRYPTED_COLUMNS)
+
+        phantom = sorted(registered - declared)
+        assert not phantom, (
+            "These are in ENCRYPTED_COLUMNS but the model column is not "
+            "EncryptedText. The migration would process a column that stores "
+            "plaintext, which is worse than not listing it:\n  "
+            + "\n  ".join(f"{t}.{c}" for t, c in phantom)
+        )
