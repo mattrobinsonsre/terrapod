@@ -630,6 +630,7 @@ field OnboardingSession.SelectedTypes []string `json:"selected-types,omitempty"`
 field OnboardingSession.Status string `json:"status"`
 field OnboardingSession.UpdatedAt string `json:"updated-at,omitempty"`
 field OnboardingSession.WorkspaceID string `json:"workspace-id"`
+field Options.AllowInsecureTransport bool
 field Options.BaseURL string
 field Options.HTTPClient *http.Client
 field Options.MaxRetries int

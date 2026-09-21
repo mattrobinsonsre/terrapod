@@ -11,6 +11,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -70,6 +71,16 @@ type Options struct {
 
 	// MaxRetries overrides the default of 3.
 	MaxRetries int
+
+	// AllowInsecureTransport permits an http:// BaseURL. Without it, a
+	// plaintext base URL is a construction error rather than a silent
+	// downgrade (GHSA-5fh8-vj57-6gvh): every request the SDK makes carries
+	// a long-lived platform bearer token, and over http:// it carries it in
+	// the clear to anyone on the path. A scheme-less base still defaults to
+	// https, so this only affects an operator who wrote http:// explicitly.
+	//
+	// Mirrors SkipTLSVerify: insecure transport has to be asked for.
+	AllowInsecureTransport bool
 }
 
 // NewClient constructs a Client from Options. Returns an error if
@@ -87,6 +98,13 @@ func NewClient(opts Options) (*Client, error) {
 	}
 
 	baseURL := normaliseBaseURL(opts.BaseURL)
+	if strings.HasPrefix(baseURL, "http://") && !isLoopback(baseURL) && !opts.AllowInsecureTransport {
+		return nil, fmt.Errorf(
+			"base URL %q uses http:// — the bearer token would cross the network in "+
+				"the clear; use https:// or set Options.AllowInsecureTransport",
+			baseURL,
+		)
+	}
 	hc := opts.HTTPClient
 	if hc == nil {
 		transport := &http.Transport{
@@ -96,8 +114,9 @@ func NewClient(opts Options) (*Client, error) {
 			transport.TLSClientConfig.InsecureSkipVerify = true //nolint:gosec
 		}
 		hc = &http.Client{
-			Transport: transport,
-			Timeout:   30 * time.Second,
+			Transport:     transport,
+			Timeout:       30 * time.Second,
+			CheckRedirect: dropCredentialOnUnsafeRedirect,
 		}
 	}
 
@@ -125,6 +144,60 @@ func NewClient(opts Options) (*Client, error) {
 // github.com/mattrobinsonsre/terrapod/go-terrapod.SDKVersion=v0.27.0";
 // the default "dev" identifies development builds.
 var SDKVersion = "dev"
+
+// isLoopback reports whether the base URL addresses this machine.
+//
+// The risk http:// carries is the token crossing a network in the clear, and
+// loopback is not a network — nothing between the two ends can observe it. So
+// plaintext to 127.0.0.1 / ::1 / localhost needs no opt-in, which also keeps
+// every httptest-backed caller working without weakening the gate.
+//
+// Deliberately NOT extended to private ranges: http:// to another pod or host
+// on 10.0.0.0/8 does cross a network, and that is the case the gate is for.
+func isLoopback(baseURL string) bool {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// dropCredentialOnUnsafeRedirect strips Authorization from a redirect that
+// leaves the original host or drops out of TLS (GHSA-5fh8-vj57-6gvh).
+//
+// Go's stdlib already strips the header on a cross-DOMAIN redirect, which is
+// why "302 to attacker.tld" is not the finding. But its rule is
+// isDomainOrSubdomain on the hostname alone: it ignores scheme and port, so
+// both of these carried the platform token —
+//
+//	https://terrapod.example.com -> http://terrapod.example.com       (cleartext)
+//	https://terrapod.example.com -> https://evil.terrapod.example.com (subdomain)
+//
+// and this is concretely reachable: GetRunPlanJSON documents that the endpoint
+// 302s to a presigned storage URL which the client follows, so a deployment
+// whose object storage sits on a subdomain of the API host handed the token to
+// the storage tier on every plan-JSON fetch.
+//
+// It STRIPS rather than refuses, deliberately. Refusing any host change — the
+// reported suggestion — would break that documented redirect, because presigned
+// storage genuinely lives on another host. The presigned URL carries its own
+// signature in the query string and never needed our bearer, so dropping the
+// header keeps the fetch working and takes the credential out of it.
+func dropCredentialOnUnsafeRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 5 {
+		return fmt.Errorf("stopped after %d redirects", len(via))
+	}
+	origin := via[0].URL
+	if !strings.EqualFold(req.URL.Hostname(), origin.Hostname()) || req.URL.Scheme != "https" {
+		req.Header.Del("Authorization")
+	}
+	return nil
+}
 
 // normaliseBaseURL prepends https:// when the scheme is missing, trims
 // trailing slashes, and returns the result. Operator-friendly input
