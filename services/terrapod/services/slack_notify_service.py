@@ -20,6 +20,7 @@ plan file is streamed from storage to the ephemeral PVC, never buffered (rule 14
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 
 import structlog
@@ -174,6 +175,31 @@ def resolved_parent_blocks(ws_name: str, counts: str, status_line: str, url: str
     return blocks
 
 
+#: Matches a URL's query string so it can be dropped from anything leaving for
+#: Slack. Signed storage URLs carry their credential there —
+#: `?expires=…&sig=…` (storage/filesystem.py) — and a plan log picks one up on
+#: any download or upload failure path.
+_URL_QUERY_RE = re.compile(rb"(https?://[^\s\"'<>]*?)\?[^\s\"'<>]*")
+
+
+def _strip_url_queries(chunk: bytes) -> bytes:
+    """Drop the query string from every URL in a line of log output.
+
+    GHSA-5x47-chx9-ww6c. The plan log is uploaded to Slack byte for byte, and
+    a Slack channel is routinely a wider audience than the workspace's access
+    list — the file is then retained by Slack, outside any Terrapod
+    authorization decision. OpenTofu redacts values it knows are sensitive in
+    its DISPLAY output, so a well-behaved plan log is not the credential dump
+    the plan JSON would be; what it can still carry is a signed storage URL,
+    and that is a live credential anyone in the channel can replay.
+
+    Applied per LINE rather than per chunk: a URL cannot span a newline, but it
+    can easily span a 64 KiB read boundary, and a regex applied to raw chunks
+    would miss exactly the ones that straddle one.
+    """
+    return _URL_QUERY_RE.sub(rb"\1?(redacted)", chunk)
+
+
 async def _upload_plan_file(
     client, channel: str, ws_id: str, run_id: str, *, thread_ts: str | None = None
 ) -> None:
@@ -196,8 +222,16 @@ async def _upload_plan_file(
         import aiofiles
 
         async with aiofiles.open(tmp, "wb") as fh:
+            # Line-buffered so a URL split across a read boundary is still seen
+            # whole by the redaction.
+            pending = b""
             async for chunk in storage.get_stream(key):
-                await fh.write(chunk)
+                pending += chunk
+                head, sep, pending = pending.rpartition(b"\n")
+                if sep:
+                    await fh.write(_strip_url_queries(head + sep))
+            if pending:
+                await fh.write(_strip_url_queries(pending))
         kwargs = {"channel": channel, "file": tmp, "filename": "plan.txt", "title": "Plan output"}
         if thread_ts:
             kwargs["thread_ts"] = thread_ts

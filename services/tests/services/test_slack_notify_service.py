@@ -373,3 +373,95 @@ async def test_completed_threads_under_the_approval_parent():
     bot.chat_postMessage.assert_awaited_once()
     assert bot.chat_postMessage.await_args.kwargs.get("thread_ts") == "111.2"
     upload.assert_not_awaited()
+
+
+class TestThePlanLogUploadedToSlackCarriesNoSignedURL:
+    """GHSA-5x47-chx9-ww6c.
+
+    The plan log is uploaded byte for byte, and a Slack channel is routinely a
+    wider audience than the workspace's access list — Slack then retains the
+    file, outside any Terrapod authorization decision. OpenTofu redacts values
+    it knows are sensitive in its DISPLAY output, so a well-behaved plan log is
+    not the credential dump the plan JSON would be; what it still carries is a
+    signed storage URL on any download or upload failure path, and that is a
+    live credential anyone in the channel can replay.
+    """
+
+    def test_a_signed_storage_url_loses_its_credential(self):
+        from terrapod.services.slack_notify_service import _strip_url_queries
+
+        line = b"error fetching https://tp.example/storage/get/plans/x?expires=99&sig=DEADBEEF: 500"
+        out = _strip_url_queries(line)
+        assert b"sig=" not in out
+        assert b"DEADBEEF" not in out
+        assert b"expires=" not in out
+        # The URL is still recognisable, so the log stays useful for debugging.
+        assert b"https://tp.example/storage/get/plans/x" in out
+
+    def test_an_ordinary_url_is_left_alone(self):
+        from terrapod.services.slack_notify_service import _strip_url_queries
+
+        line = b"see https://tp.example/workspaces/ws-1/runs/run-2 for detail"
+        assert _strip_url_queries(line) == line
+
+    def test_several_urls_on_one_line_are_all_redacted(self):
+        from terrapod.services.slack_notify_service import _strip_url_queries
+
+        line = b"a https://x/1?sig=AAA b https://y/2?sig=BBB c"
+        out = _strip_url_queries(line)
+        assert b"AAA" not in out and b"BBB" not in out
+
+    async def test_a_url_split_across_a_read_boundary_is_still_redacted(self):
+        """The subtle one. A URL cannot span a newline but easily spans a
+        64 KiB read, and a regex applied to raw chunks would miss exactly the
+        ones that straddle a boundary."""
+        import os
+        import tempfile
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from terrapod.services import slack_notify_service as svc
+
+        full = (
+            b"line one\nfetch https://tp.example/storage/get/k?expires=1&sig=SPLITSECRET failed\n"
+        )
+        # Split mid-signature, which is where a naive per-chunk regex breaks.
+        cut = full.index(b"SPLITSECRET") + 4
+
+        async def _stream(_key):
+            yield full[:cut]
+            yield full[cut:]
+
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=True)
+        storage.get_stream = _stream
+
+        written = {}
+        real_mkstemp = tempfile.mkstemp
+
+        def _capture_mkstemp(**kwargs):
+            fd, path = real_mkstemp(**kwargs)
+            written["path"] = path
+            return fd, path
+
+        client = MagicMock()
+        client.files_upload_v2 = AsyncMock()
+
+        with (
+            patch.object(svc, "get_storage", return_value=storage, create=True),
+            patch("terrapod.storage.get_storage", return_value=storage),
+            patch("tempfile.mkstemp", side_effect=_capture_mkstemp),
+            patch.object(svc, "_resolve_tmpdir", return_value=None),
+        ):
+            uploaded = {}
+
+            async def _grab(**kwargs):
+                with open(kwargs["file"], "rb") as fh:
+                    uploaded["body"] = fh.read()
+
+            client.files_upload_v2 = AsyncMock(side_effect=_grab)
+            await svc._upload_plan_file(client, "#c", "ws-1", "run-1")
+
+        body = uploaded.get("body", b"")
+        assert b"SPLITSECRET" not in body, body
+        assert b"line one" in body
+        assert not os.path.exists(written.get("path", "")), "temp file was not cleaned up"
