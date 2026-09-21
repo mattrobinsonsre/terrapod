@@ -19,17 +19,25 @@ class TestHelpers:
         assert _is_auth_path("/api/terrapod/v1/workspaces") is False
         assert _is_auth_path("/health") is False
 
-    def test_get_client_ip_forwarded(self):
-        """X-Forwarded-For is respected."""
+    def test_get_client_ip_ignores_forwarded_from_an_untrusted_peer(self):
+        """X-Forwarded-For is NOT respected by default.
+
+        This used to assert `1.2.3.4` — the left-most entry, straight out of a
+        caller-supplied header (GHSA-wq2j-pppw-ff2p). Anyone could pick their
+        own rate-limit bucket by sending one, and the credential-churn ceiling
+        keys on this value, so it also removed the bound on the login tier.
+        With no trusted proxy configured the header is ignored entirely.
+        """
         scope = {
             "type": "http",
             "method": "GET",
             "path": "/",
             "headers": [(b"x-forwarded-for", b"1.2.3.4, 5.6.7.8")],
             "query_string": b"",
+            "client": ("10.0.0.1", 12345),
         }
         request = Request(scope)
-        assert _get_client_ip(request) == "1.2.3.4"
+        assert _get_client_ip(request) == "10.0.0.1"
 
     def test_get_client_ip_direct(self):
         """Falls back to client host."""
@@ -330,6 +338,160 @@ class TestCredentialBucketing:
         ]
         # Same token → same bucket (minus the time-window suffix, which is equal here).
         assert keys[0] == keys[1]
+
+
+class TestForwardedForIsOnlyBelievedFromATrustedProxy:
+    """GHSA-wq2j-pppw-ff2p, second half.
+
+    `X-Forwarded-For` is caller-supplied. Reading it unconditionally let any
+    caller choose its own rate-limit bucket, and since the credential-churn
+    ceiling is keyed on this value, that removed the bound on the login
+    finding rather than being a lesser issue beside it.
+
+    Reading a *different entry* would not have fixed it: a caller who supplies
+    the header supplies every entry in it. Only the peer can be trusted, so the
+    header is believed only when the peer is a configured proxy.
+    """
+
+    def _req(self, header, peer="10.0.0.1"):
+        from starlette.requests import Request
+
+        scope = {
+            "type": "http",
+            "headers": [(b"x-forwarded-for", header.encode())] if header else [],
+            "client": (peer, 1234),
+        }
+        return Request(scope)
+
+    def _nets(self, *cidrs):
+        from terrapod.api.rate_limit import _parse_networks
+
+        return _parse_networks(list(cidrs))
+
+    def test_the_default_ignores_the_header_entirely(self):
+        """Nothing trusted → the header is data, not identity."""
+        from terrapod.api.rate_limit import _get_client_ip
+
+        assert _get_client_ip(self._req("1.2.3.4, 5.6.7.8")) == "10.0.0.1"
+
+    def test_an_untrusted_peer_cannot_spoof_even_when_cidrs_are_configured(self):
+        """The in-cluster caller that bypasses the ingress gets nothing."""
+        from terrapod.api.rate_limit import _get_client_ip
+
+        nets = self._nets("192.168.50.0/24")
+        assert _get_client_ip(self._req("1.2.3.4", peer="10.0.0.99"), nets) == "10.0.0.99"
+
+    def test_a_trusted_peer_yields_the_right_most_untrusted_hop(self):
+        from terrapod.api.rate_limit import _get_client_ip
+
+        nets = self._nets("10.0.0.0/8")
+        # Client, then two trusted proxies that appended as it passed through.
+        req = self._req("203.0.113.7, 10.0.0.5, 10.0.0.6", peer="10.0.0.1")
+        assert _get_client_ip(req, nets) == "203.0.113.7"
+
+    def test_a_forged_prefix_from_a_real_client_is_skipped_not_believed(self):
+        """The client prepends; the trusted proxy appends the truth."""
+        from terrapod.api.rate_limit import _get_client_ip
+
+        nets = self._nets("10.0.0.0/8")
+        req = self._req("1.2.3.4, 203.0.113.7, 10.0.0.5", peer="10.0.0.1")
+        assert _get_client_ip(req, nets) == "203.0.113.7"
+
+    def test_a_single_trusted_hop_matches_the_shipped_topology(self):
+        from terrapod.api.rate_limit import _get_client_ip
+
+        nets = self._nets("10.0.0.0/8")
+        assert _get_client_ip(self._req("203.0.113.7", peer="10.0.0.1"), nets) == "203.0.113.7"
+
+    def test_an_all_trusted_chain_falls_back_to_the_peer(self):
+        """No untrusted hop means no client to attribute — never guess one."""
+        from terrapod.api.rate_limit import _get_client_ip
+
+        nets = self._nets("10.0.0.0/8")
+        assert _get_client_ip(self._req("10.0.0.5, 10.0.0.6", peer="10.0.0.1"), nets) == "10.0.0.1"
+
+    def test_garbage_entries_are_not_trusted_and_do_not_raise(self):
+        from terrapod.api.rate_limit import _get_client_ip
+
+        nets = self._nets("10.0.0.0/8")
+        # "not-an-ip" is not parseable, so it is not a trusted proxy, so it is
+        # returned as the right-most untrusted hop. It cannot masquerade as one.
+        assert _get_client_ip(self._req("1.2.3.4, not-an-ip", peer="10.0.0.1"), nets) == "not-an-ip"
+
+    def test_ipv6_peers_and_hops(self):
+        from terrapod.api.rate_limit import _get_client_ip
+
+        nets = self._nets("fd00::/8")
+        req = self._req("2001:db8::1, fd00::5", peer="fd00::1")
+        assert _get_client_ip(req, nets) == "2001:db8::1"
+
+    def test_an_unparseable_cidr_is_dropped_not_fatal(self):
+        """A typo in config must not take the API down, and must not widen trust."""
+        nets = self._nets("10.0.0.0/8", "nonsense", "")
+        assert len(nets) == 1
+
+
+class TestTheLoginTierIsKeyedOnTheSourceAlone:
+    """GHSA-wq2j-pppw-ff2p. The login limit must not inherit the churn ceiling.
+
+    Per-credential bucketing (#1075) is right for the AUTHENTICATED tier, where
+    200 distinct principals a minute behind one BFF pod IP is a sane floor. The
+    unauthenticated login tier inherited it, because the bucket key was chosen
+    before the tier was consulted — so a password-guesser who sent a fresh
+    random bearer on every attempt minted a new bucket each time and got the
+    churn allowance instead of this tier's limit.
+    """
+
+    def _bucket_keys(self, mock_redis):
+        return [
+            c.args[0]
+            for c in mock_redis.pipeline.return_value.incr.call_args_list
+            if ":churn:" not in c.args[0]
+        ]
+
+    def test_rotating_the_bearer_does_not_mint_a_new_login_bucket(self):
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, auth_rpm=1000)
+        client = TestClient(app)
+
+        client.post("/api/terrapod/v1/auth/login", headers={"Authorization": "Bearer RANDOM-1"})
+        client.post("/api/terrapod/v1/auth/login", headers={"Authorization": "Bearer RANDOM-2"})
+
+        keys = self._bucket_keys(mock_redis)
+        assert len(keys) == 2
+        assert keys[0] == keys[1], (
+            "a different bearer per attempt minted a different login bucket, so the "
+            f"login limit never applies: {keys}"
+        )
+        assert all(k.startswith("tp:ratelimit:auth:") for k in keys), keys
+        assert not any("cred:" in k for k in keys), (
+            f"the login tier must not key on an unverified credential: {keys}"
+        )
+
+    def test_a_login_with_no_credential_shares_that_same_bucket(self):
+        """An honest attempt and a bearer-carrying one are the same source."""
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, auth_rpm=1000)
+        client = TestClient(app)
+
+        client.post("/api/terrapod/v1/auth/login")
+        client.post("/api/terrapod/v1/auth/login", headers={"Authorization": "Bearer ANY"})
+
+        keys = self._bucket_keys(mock_redis)
+        assert keys[0] == keys[1], keys
+
+    def test_the_authenticated_tier_still_buckets_per_credential(self):
+        """The #1075 fix must survive: this narrows the login tier only."""
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, authenticated_rpm=1000)
+        client = TestClient(app)
+
+        client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer AAA"})
+        client.get("/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer BBB"})
+
+        keys = self._bucket_keys(mock_redis)
+        assert keys[0] != keys[1], keys
+        assert all(k.startswith("tp:ratelimit:api_authn:cred:") for k in keys), keys
 
 
 class TestCredentialChurnCeiling:

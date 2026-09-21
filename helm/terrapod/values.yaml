@@ -915,6 +915,33 @@ api:
       # fronts more distinct API clients than this. 0 = unlimited.
       distinct_credentials_per_minute: 200
 
+      # Proxy addresses/CIDRs whose X-Forwarded-For may be believed. The header
+      # is caller-supplied, so it is read ONLY when the connecting peer is
+      # listed here; the client is then the right-most entry that is not itself
+      # a listed proxy.
+      #
+      # Defaults to the private ranges plus CGNAT (100.64/10, which is where
+      # Tailscale and similar overlays live). In Terrapod the connecting peer is
+      # always an in-cluster BFF pod — every request reaches the API through the
+      # Next.js proxy by architectural rule — so this trusts our own component
+      # and nothing publicly routable.
+      #
+      # An empty list is supported and means "ignore the header, bucket on the
+      # peer". Since that peer is the one BFF pod, that collapses every
+      # unauthenticated caller — the login limit included — into a single shared
+      # bucket, which an anonymous stranger can then exhaust for everyone.
+      #
+      # This is only as good as your ingress. Terrapod relies on the ingress
+      # overwriting or appending X-Forwarded-For rather than passing a
+      # client-supplied one through untouched. Read docs/rate-limiting.md if you
+      # run a CDN or external load balancer in front.
+      trusted_proxy_cidrs:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 100.64.0.0/10   # CGNAT — Tailscale and similar overlay networks
+        - fd00::/8
+
     # Background triggered-task scheduler (#1296).
     #
     # Consumers PER REPLICA for each lane; deployment-wide concurrency is this
@@ -1930,6 +1957,19 @@ networkPolicies:
 # own api/listener/web.priorityClassName (or runners.priorityClassName) is set,
 # which always wins. Values stay well below the reserved system classes
 # (system-cluster-critical = 2000000000).
+
+  web:
+    # NetworkPolicy peers allowed to reach the web pod on 3000. REQUIRED when
+    # networkPolicies.enabled is true — the chart cannot guess where your
+    # ingress controller runs, and a rule with no `from:` admits every source,
+    # so leaving it empty fails the render rather than shipping a policy that
+    # reads as a restriction and enforces nothing.
+    #
+    #   ingressFrom:
+    #     - namespaceSelector:
+    #         matchLabels:
+    #           kubernetes.io/metadata.name: kube-system
+    ingressFrom: []
 priorityClasses:
   create: false
   # Higher-priority class for the control plane (api, listener, web).

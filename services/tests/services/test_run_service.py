@@ -607,6 +607,40 @@ class TestConfirmRun:
         with pytest.raises(ValueError, match="speculative"):
             await confirm_run(db, run)
 
+    async def test_rejects_a_plan_only_run(self):
+        """A plan-only run is never applicable, and two gates rely on that.
+
+        `policy_set_service` and `security_scan_service` both short-circuit to
+        GATE_PASSED on `run.plan_only` because "there is no apply to block".
+        Nothing enforced it, so a caller holding only `run:apply` could apply a
+        configuration a MANDATORY policy set had rejected — with no override
+        requested and none recorded.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.locked = False
+        db.get.return_value = ws
+        run = _mock_run(status="planned", plan_only=True)
+        with pytest.raises(ValueError, match="plan-only"):
+            await confirm_run(db, run)
+
+    async def test_rejects_a_plan_only_run_with_an_ordinary_configuration_version(self):
+        """The speculative-CV check does not cover this, which is the whole bug.
+
+        A speculative *configuration version* and a plan-only *run* are separate
+        flags. The reported bypass used a plan-only run against an ordinary,
+        non-speculative CV, so it passed the neighbouring guard untouched.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.locked = False
+        cv = MagicMock()
+        cv.speculative = False
+        db.get.side_effect = [ws, cv]
+        run = _mock_run(status="planned", plan_only=True, configuration_version_id=uuid.uuid4())
+        with pytest.raises(ValueError, match="plan-only"):
+            await confirm_run(db, run)
+
     async def test_rejects_non_planned(self):
         db = AsyncMock(spec=AsyncSession)
         run = _mock_run(status="queued")
@@ -622,6 +656,55 @@ class TestConfirmRun:
         run = _mock_run(status="planned")
         with pytest.raises(ValueError, match="locked"):
             await confirm_run(db, run)
+
+
+class TestAPlanOnlyRunCannotReachAnApplyByAnyPath:
+    """The guard has to live where every caller funnels through.
+
+    It was originally added to `confirm_run` alone, with a comment claiming
+    that covered every caller. It did not: the listener status endpoint
+    (`PATCH .../listeners/{lid}/runs/{rid}`) passes a caller-chosen
+    `target_status` straight to `transition_run`, and plan-only runs are
+    deliberately routed down that branch — so a listener already owning the run
+    could step it `planned -> confirmed -> applying` and apply a configuration
+    a MANDATORY policy set had rejected.
+
+    That path also skips the workspace manual lock, the staleness guards, the
+    speculative-CV check and the mergeability gate, so pinning it here is worth
+    more than the plan-only invariant alone.
+    """
+
+    async def test_confirmed_is_refused(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planned", plan_only=True)
+        with pytest.raises(ValueError, match="plan-only"):
+            await transition_run(db, run, "confirmed")
+
+    async def test_applying_is_refused(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="confirmed", plan_only=True)
+        with pytest.raises(ValueError, match="plan-only"):
+            await transition_run(db, run, "applying")
+
+    async def test_the_states_a_plan_only_run_legitimately_reaches_still_work(self):
+        """The guard must not break speculative PR plans or drift runs."""
+        for source, target in (
+            ("queued", "planning"),
+            ("planning", "planned"),
+            ("planned", "discarded"),
+            ("planning", "errored"),
+            ("queued", "canceled"),
+        ):
+            db = AsyncMock(spec=AsyncSession)
+            run = _mock_run(status=source, plan_only=True)
+            result = await transition_run(db, run, target)
+            assert result.status == target, f"{source} -> {target} was refused"
+
+    async def test_an_apply_capable_run_is_unaffected(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planned", plan_only=False)
+        result = await transition_run(db, run, "confirmed")
+        assert result.status == "confirmed"
 
 
 class TestDiscardRun:

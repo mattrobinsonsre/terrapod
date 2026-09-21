@@ -27,8 +27,18 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Dedupe first: keep the oldest stage per (run_id, stage), drop the rest.
-    # Their task_stage_results cascade-delete via the FK's ON DELETE CASCADE.
+    # Dedupe first: keep ONE stage per (run_id, stage), drop the rest. Their
+    # task_stage_results cascade-delete via the FK's ON DELETE CASCADE — which
+    # is why which row survives matters (GHSA-mjhj-g43q-w6m9, D2).
+    #
+    # It used to order by `created_at ASC` alone, i.e. keep the OLDEST. In the
+    # create-then-post race this migration exists to clean up, the oldest row
+    # is the empty `pending` placeholder and the newer one carries the verdict
+    # — so the surviving stage reported a MANDATORY run task as unresolved
+    # while the evidence that it passed was cascade-deleted. That is a gate
+    # state change, not merely lost history.
+    #
+    # Prefer the row that has results; fall back to age only to break a tie.
     op.execute(
         """
         DELETE FROM task_stages
@@ -37,7 +47,10 @@ def upgrade() -> None:
                 SELECT id,
                        ROW_NUMBER() OVER (
                            PARTITION BY run_id, stage
-                           ORDER BY created_at ASC, id ASC
+                           ORDER BY (
+                               SELECT count(*) FROM task_stage_results r
+                               WHERE r.task_stage_id = task_stages.id
+                           ) DESC, created_at ASC, id ASC
                        ) AS rn
                 FROM task_stages
             ) ranked

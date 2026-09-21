@@ -23,11 +23,24 @@
 //
 // # Version contract
 //
-// The SDK targets one Terrapod API version per Go module version. A
-// build-time-pinned version (see VersionCheck) refuses to talk to a
-// Terrapod deployment whose reported version doesn't match exactly,
-// unless the caller explicitly opts out. This guards against schema
-// drift between the SDK and the server during operator upgrades.
+// The SDK targets one Terrapod API version per Go module version.
+// VersionCheck compares a build-time-pinned version against the version the
+// deployment reports, so a caller can warn about schema drift during an
+// operator upgrade.
+//
+// It is a COMPATIBILITY hint and nothing more — do not read it as an
+// authenticity or anti-downgrade signal (GHSA-5fh8-vj57-6gvh). It fails open
+// by design, and that design is right: an unparseable or "dev" server version
+// returns a nil error rather than blocking the call, because refusing to work
+// against a deployment we merely failed to parse would be worse than
+// proceeding. The client-side default SDKVersion is "dev", which skips the
+// check entirely. Every input it reasons about is supplied by the server it is
+// asking, so a hostile one simply reports whatever passes.
+//
+// This paragraph previously said the check "refuses to talk to" a mismatched
+// deployment unless the caller opts out. It does not refuse anything; it
+// returns an error the caller may ignore, and every consumer in this repo
+// calls it warn-only.
 //
 // # Stability
 //

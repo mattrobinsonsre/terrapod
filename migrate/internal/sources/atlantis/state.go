@@ -157,7 +157,65 @@ func resolveProjectDir(sourcePath, dir string) (string, error) {
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("atlantis project dir %q escapes the repo root", dir)
 	}
+	if err := assertContained(sourcePath, cleaned); err != nil {
+		return "", fmt.Errorf("atlantis project dir %q escapes the repo root: %w", dir, err)
+	}
 	return cleaned, nil
+}
+
+// realPath resolves every symlink in p.
+//
+// A missing FINAL component is not an error: a project legitimately may have no
+// state file yet, and turning that into a hard failure would break migrations
+// that currently work. The parent is still resolved, which is where an escape
+// has to live — a symlink cannot redirect a path component that does not exist.
+func realPath(p string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(p)
+	if err == nil {
+		return resolved, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	parent, parentErr := filepath.EvalSymlinks(filepath.Dir(p))
+	if parentErr != nil {
+		return "", err
+	}
+	return filepath.Join(parent, filepath.Base(p)), nil
+}
+
+// assertContained re-checks containment AFTER resolving symlinks on both sides
+// (GHSA-wqfx-wf44-cgvj).
+//
+// The lexical guards above are correct as far as they go — `../victim`,
+// `../../etc`, `a/../../victim` and `/etc` are all refused — but they operate
+// on the path as written, and `os.ReadFile` follows symlinks below them. A
+// symlink committed to a repository being migrated therefore escapes a guard
+// that never sees anything out of place:
+//
+//	escape -> ../victim          with `dir: escape`, Rel() is "escape"
+//	proj/terraform.tfstate -> /x  Rel() is literally "terraform.tfstate"
+//
+// The second is the easier exploit and needs no unusual atlantis.yaml at all.
+// Git stores symlink blobs verbatim, absolute targets included, and
+// core.symlinks defaults true on Linux and macOS, so both survive a clone.
+//
+// The check must run AFTER resolution — running it before is precisely what
+// makes the existing guard lexical.
+func assertContained(root, path string) error {
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return fmt.Errorf("resolve repo root: %w", err)
+	}
+	resolved, err := realPath(path)
+	if err != nil {
+		return fmt.Errorf("resolve %s: %w", path, err)
+	}
+	rel, err := filepath.Rel(realRoot, resolved)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("%s resolves outside the migration source via a symlink", path)
+	}
+	return nil
 }
 
 func fetchStateForBackend(ctx context.Context, backend *hcl.Backend, projectDir string, opts StateOptions) ([]byte, error) {
@@ -196,6 +254,12 @@ func readLocalState(projectDir, configuredPath string) ([]byte, error) {
 	rel, err := filepath.Rel(projectDir, joined)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return nil, fmt.Errorf("local backend path %q escapes the project directory", configuredPath)
+	}
+	// The file-symlink vector: `proj/terraform.tfstate -> /anywhere` leaves the
+	// directory squarely inside the repo and `rel` equal to the literal
+	// "terraform.tfstate", so nothing above has anything to catch.
+	if err := assertContained(projectDir, joined); err != nil {
+		return nil, fmt.Errorf("local backend path %q escapes the project directory: %w", configuredPath, err)
 	}
 	path = joined
 	raw, err := os.ReadFile(path)

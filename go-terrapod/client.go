@@ -11,8 +11,11 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // Client is a Terrapod API client. Construct via NewClient. All resource
@@ -70,6 +73,16 @@ type Options struct {
 
 	// MaxRetries overrides the default of 3.
 	MaxRetries int
+
+	// AllowInsecureTransport permits an http:// BaseURL. Without it, a
+	// plaintext base URL is a construction error rather than a silent
+	// downgrade (GHSA-5fh8-vj57-6gvh): every request the SDK makes carries
+	// a long-lived platform bearer token, and over http:// it carries it in
+	// the clear to anyone on the path. A scheme-less base still defaults to
+	// https, so this only affects an operator who wrote http:// explicitly.
+	//
+	// Mirrors SkipTLSVerify: insecure transport has to be asked for.
+	AllowInsecureTransport bool
 }
 
 // NewClient constructs a Client from Options. Returns an error if
@@ -87,7 +100,33 @@ func NewClient(opts Options) (*Client, error) {
 	}
 
 	baseURL := normaliseBaseURL(opts.BaseURL)
+	// The escape hatch has to be reachable without a code change. `Options` is
+	// only settable by a Go caller, and NOTHING plumbs it: not the provider, not
+	// terrapod-migrate, not terrapod-publish. Without this env var an operator
+	// running an on-prem Terrapod behind a TLS-terminating load balancer at
+	// http://terrapod.internal would have hit a hard failure on a PATCH release
+	// with no way to opt back in.
+	allowInsecure := opts.AllowInsecureTransport || os.Getenv("TERRAPOD_ALLOW_INSECURE_TRANSPORT") == "1"
+	if strings.HasPrefix(baseURL, "http://") && !isLoopback(baseURL) && !allowInsecure {
+		return nil, fmt.Errorf(
+			"base URL %q uses http:// — the bearer token would cross the network in "+
+				"the clear. Use https://, or set TERRAPOD_ALLOW_INSECURE_TRANSPORT=1 "+
+				"to accept that risk deliberately",
+			baseURL,
+		)
+	}
 	hc := opts.HTTPClient
+	if hc != nil && hc.CheckRedirect == nil {
+		// An injected client got NO redirect protection, because CheckRedirect
+		// was only set on the default one below. That is not a corner: the MCP
+		// server supplies its own client (it needs a token-refreshing
+		// transport), and so does the load-test harness — so the component that
+		// runs unattended against a production instance was the one without the
+		// fix. Copy rather than mutate: the caller owns their http.Client.
+		clone := *hc
+		clone.CheckRedirect = dropCredentialOnUnsafeRedirect
+		hc = &clone
+	}
 	if hc == nil {
 		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13}, //nolint:gosec
@@ -96,8 +135,9 @@ func NewClient(opts Options) (*Client, error) {
 			transport.TLSClientConfig.InsecureSkipVerify = true //nolint:gosec
 		}
 		hc = &http.Client{
-			Transport: transport,
-			Timeout:   30 * time.Second,
+			Transport:     transport,
+			Timeout:       30 * time.Second,
+			CheckRedirect: dropCredentialOnUnsafeRedirect,
 		}
 	}
 
@@ -125,6 +165,86 @@ func NewClient(opts Options) (*Client, error) {
 // github.com/mattrobinsonsre/terrapod/go-terrapod.SDKVersion=v0.27.0";
 // the default "dev" identifies development builds.
 var SDKVersion = "dev"
+
+// isLoopback reports whether the base URL addresses this machine.
+//
+// The risk http:// carries is the token crossing a network in the clear, and
+// loopback is not a network — nothing between the two ends can observe it. So
+// plaintext to 127.0.0.1 / ::1 / localhost needs no opt-in, which also keeps
+// every httptest-backed caller working without weakening the gate.
+//
+// Deliberately NOT extended to private ranges: http:// to another pod or host
+// on 10.0.0.0/8 does cross a network, and that is the case the gate is for.
+func isLoopback(baseURL string) bool {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// dropCredentialOnUnsafeRedirect strips Authorization from a redirect that
+// leaves the original host or drops out of TLS (GHSA-5fh8-vj57-6gvh).
+//
+// Go's stdlib already strips the header on a cross-DOMAIN redirect, which is
+// why "302 to attacker.tld" is not the finding. But its rule is
+// isDomainOrSubdomain on the hostname alone: it ignores scheme and port, so
+// both of these carried the platform token —
+//
+//	https://terrapod.example.com -> http://terrapod.example.com       (cleartext)
+//	https://terrapod.example.com -> https://evil.terrapod.example.com (subdomain)
+//
+// and this is concretely reachable: GetRunPlanJSON documents that the endpoint
+// 302s to a presigned storage URL which the client follows, so a deployment
+// whose object storage sits on a subdomain of the API host handed the token to
+// the storage tier on every plan-JSON fetch.
+//
+// It STRIPS rather than refuses, deliberately. Refusing any host change — the
+// reported suggestion — would break that documented redirect, because presigned
+// storage genuinely lives on another host. The presigned URL carries its own
+// signature in the query string and never needed our bearer, so dropping the
+// header keeps the fetch working and takes the credential out of it.
+func dropCredentialOnUnsafeRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 5 {
+		return fmt.Errorf("stopped after %d redirects", len(via))
+	}
+	origin := via[0].URL
+	if !sameAuthority(req.URL, origin) || isSchemeDowngrade(origin, req.URL) {
+		req.Header.Del("Authorization")
+	}
+	return nil
+}
+
+// sameAuthority compares host AND port. Comparing Hostname() alone ignored the
+// port, so a redirect to another service on the same host — a registry, a
+// preview app, a metrics UI — kept the platform token.
+func sameAuthority(a, b *url.URL) bool {
+	return strings.EqualFold(a.Hostname(), b.Hostname()) && portOf(a) == portOf(b)
+}
+
+func portOf(u *url.URL) string {
+	if p := u.Port(); p != "" {
+		return p
+	}
+	if strings.EqualFold(u.Scheme, "http") {
+		return "80"
+	}
+	return "443"
+}
+
+// isSchemeDowngrade reports a move to weaker transport than the request started
+// on. Testing `!= "https"` instead punished a deployment that is legitimately
+// plaintext — the loopback carve-out permits http://127.0.0.1, and a bare
+// trailing-slash 301 from that server back to itself would have had its
+// credential stripped and 401'd, where the previous release worked.
+func isSchemeDowngrade(from, to *url.URL) bool {
+	return strings.EqualFold(from.Scheme, "https") && !strings.EqualFold(to.Scheme, "https")
+}
 
 // normaliseBaseURL prepends https:// when the scheme is missing, trims
 // trailing slashes, and returns the result. Operator-friendly input
@@ -287,12 +407,23 @@ func (c *Client) doWithContentType(ctx context.Context, method, path string, bod
 			}
 		}
 
-		url := c.BaseURL + path
+		// G4 (GHSA-5fh8-vj57-6gvh): string concatenation let a `path` that does
+		// not start with "/" reach the AUTHORITY, not just the path —
+		// "http://terrapod.example.com" + "@evil:9/loot" parses with
+		// Host=evil:9 and the real host demoted to userinfo, sending the bearer
+		// token to the attacker. Get/Post/Put/Delete are exported and
+		// documented as the low-level fallback for endpoints without a typed
+		// method, with third-party automation named as a consumer, so `path` is
+		// not always ours. The typed methods all hardcode a leading "/api/…".
+		if !strings.HasPrefix(path, "/") {
+			return nil, 0, fmt.Errorf("request path %q must start with \"/\"", path)
+		}
+		reqURL := c.BaseURL + path
 		var bodyReader io.Reader
 		if body != nil {
 			bodyReader = bytes.NewReader(body)
 		}
-		req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+		req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
 		if err != nil {
 			return nil, 0, fmt.Errorf("build request: %w", err)
 		}
@@ -312,13 +443,33 @@ func (c *Client) doWithContentType(ctx context.Context, method, path string, bod
 			}
 			return nil, 0, err
 		}
-		respBody, err := io.ReadAll(resp.Body)
+		// G5: bounded. The control already existed in this module —
+		// version.go reads its discovery error body through an io.LimitReader —
+		// so this was an inconsistency rather than an oversight. A hostile
+		// server (or a MITM on a plaintext connection) could otherwise stream
+		// until the consuming tool died; measured at 512 MiB read straight into
+		// memory. The cap is far above any real JSON:API document.
+		respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 		_ = resp.Body.Close()
 		if err != nil {
 			return nil, resp.StatusCode, fmt.Errorf("read response: %w", err)
 		}
+		// Fail loudly rather than hand back a truncated document. GetRunPlanJSON
+		// returns these bytes verbatim as "the raw JSON", and a plan for a few
+		// thousand resources can genuinely exceed the cap — silently short JSON
+		// surfaces as an unexplained parse error blamed on the server, or worse
+		// is accepted by a tolerant consumer. Reading one byte past the limit is
+		// what lets us tell "exactly at the cap" from "over it".
+		if int64(len(respBody)) > maxResponseBytes {
+			return nil, resp.StatusCode, fmt.Errorf(
+				"response exceeds the %d-byte client limit; refusing a truncated body",
+				maxResponseBytes,
+			)
+		}
 		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500) && isIdempotent(method) {
-			lastErr = &APIError{StatusCode: resp.StatusCode, Body: string(respBody)}
+			// Sanitised: this Body is formatted into the retry-exhaustion
+			// error an operator sees, so it is the same display surface.
+			lastErr = &APIError{StatusCode: resp.StatusCode, Body: sanitiseErrorBody(respBody)}
 			continue
 		}
 		return respBody, resp.StatusCode, nil
@@ -365,10 +516,54 @@ func extractErrorDetail(body []byte) string {
 			}
 		}
 		if len(parts) > 0 {
-			return strings.Join(parts, "; ")
+			// Sanitise here too. Only the non-JSON:API fallback below was
+			// cleaned, which is the UNCOMMON path — every request sends
+			// `Accept: application/vnd.api+json`, so a real or MITM'd Terrapod
+			// returns an envelope and its `detail` reached the operator's
+			// terminal verbatim. The threat this control exists for is a
+			// hostile server forging a confirmation prompt inside a
+			// `terraform apply` transcript, and that is exactly the path it
+			// was skipping.
+			return sanitiseErrorBody([]byte(strings.Join(parts, "; ")))
 		}
 	}
-	return string(body)
+	return sanitiseErrorBody(body)
+}
+
+// maxResponseBytes caps any single response the SDK will hold in memory.
+const maxResponseBytes = 32 << 20 // 32 MiB
+
+// maxErrorBodyBytes caps how much of a non-JSON:API body reaches an error
+// string. errors.go documents these as intended for operator display.
+const maxErrorBodyBytes = 512
+
+// sanitiseErrorBody makes a non-JSON:API response body safe to print (G7).
+//
+// It was returned verbatim and uncapped. These strings are shown to operators —
+// in a `terraform apply` transcript, say — so a hostile server could inject
+// terminal escapes: clear the screen, set the window title, and forge a
+// confirmation prompt. Control characters are replaced and the result is
+// truncated.
+func sanitiseErrorBody(body []byte) string {
+	if len(body) > maxErrorBodyBytes {
+		body = body[:maxErrorBodyBytes]
+	}
+	var b strings.Builder
+	for _, r := range string(body) {
+		switch {
+		case r == '\n' || r == '\t':
+			b.WriteRune(' ')
+		case unicode.IsControl(r), unicode.Is(unicode.Cf, r), unicode.Is(unicode.Zl, r),
+			unicode.Is(unicode.Zp, r):
+			// Cf covers the bidirectional overrides (U+202E and the U+2066-2069
+			// isolates) that drive Trojan-source text spoofing, and U+200B.
+			// `unicode.IsControl` is category Cc only, so those passed through.
+			b.WriteRune('?')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // isTransientNetError categorises net errors into retryable / not.
