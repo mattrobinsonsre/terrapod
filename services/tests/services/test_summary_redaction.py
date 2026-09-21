@@ -184,14 +184,14 @@ class TestTheChokepointRedactsEveryArtifact:
                 key="db_password",
                 value=sensitive_value,
                 category="terraform",
-                structured=False,
+                hcl=False,
                 sensitive=True,
             ),
             ResolvedVariable(
                 key="region",
                 value="eu-west-1-not-secret",
                 category="terraform",
-                structured=False,
+                hcl=False,
                 sensitive=False,
             ),
         ]
