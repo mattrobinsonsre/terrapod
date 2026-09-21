@@ -110,3 +110,81 @@ func TestTarGzDirRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+// TestTarGzDirExcludesSecretBearingFiles pins GHSA-g2c3-vxf6-7jr8.
+//
+// `.terraform` was the only state-adjacent exclusion, and it is the wrong one:
+// a local backend writes `terraform.tfstate` to the module ROOT. Running
+// `terraform apply` while developing a module — the normal way to test one —
+// therefore published that environment's state to an immutable registry
+// version. The `.tf` entries are controls: the filter must not swallow the
+// module itself.
+func TestTarGzDirExcludesSecretBearingFiles(t *testing.T) {
+	dir := t.TempDir()
+	write := func(rel, data string) {
+		t.Helper()
+		p := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	mustBeExcluded := []string{
+		"terraform.tfstate",
+		"terraform.tfstate.backup",
+		"terraform.tfvars",
+		"prod.auto.tfvars",
+		"prod.auto.tfvars.json",
+		".env",
+		".terraform.tfstate.lock.info",
+		"modules/inner/dev.tfvars", // nested, not just the root
+	}
+	mustBeKept := []string{
+		"main.tf",
+		"variables.tf",
+		"README.md",
+		"modules/inner/main.tf",
+		"examples/basic/main.tf",
+	}
+	for _, n := range mustBeExcluded {
+		write(n, "SECRET-"+n)
+	}
+	for _, n := range mustBeKept {
+		write(n, "# "+n)
+	}
+
+	gz, err := TarGzDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gr, err := gzip.NewReader(bytes.NewReader(gz))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := map[string]bool{}
+	tr := tar.NewReader(gr)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries[h.Name] = true
+	}
+
+	for _, n := range mustBeExcluded {
+		if entries[n] {
+			t.Errorf("secret-bearing file was packaged for publication: %s", n)
+		}
+	}
+	for _, n := range mustBeKept {
+		if !entries[n] {
+			t.Errorf("the filter dropped module source: %s (entries: %v)", n, entries)
+		}
+	}
+}
