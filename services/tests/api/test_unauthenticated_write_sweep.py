@@ -38,33 +38,22 @@ PUBLIC_WRITE_ROUTES: dict[str, str] = {
     # follows verbatim. go-tfe's foreign-PUT path sets no Authorization header,
     # so a bearer check would break the CLI. GHSA-63m3 / GHSA-r9v9.
     "/api/v2/configuration-versions/{cv_id}/upload": "signed capability in the path",
-    "/api/tfe/v2/configuration-versions/{cv_id}/upload": "signed capability in the path",
     "/api/v2/state-versions/{state_version_id}/content": "signed capability in the path",
-    "/api/tfe/v2/state-versions/{state_version_id}/content": "signed capability in the path",
     "/api/v2/state-versions/{state_version_id}/json-content": "signed capability in the path",
-    "/api/tfe/v2/state-versions/{state_version_id}/json-content": "signed capability in the path",
     # HMAC over the request body (GitHub) or a timing-safe token (GitLab),
     # against the connection's own secret. The sender is a VCS provider, which
     # cannot hold a Terrapod credential.
-    "/api/v1/vcs-events/github": "HMAC signature over the request body",
     "/api/terrapod/v1/vcs-events/github": "HMAC signature over the request body",
-    "/api/v1/vcs-events/gitlab": "shared token, compared timing-safe",
     "/api/terrapod/v1/vcs-events/gitlab": "shared token, compared timing-safe",
     # How a caller OBTAINS a credential. Requiring one would be circular.
     "/oauth/token": "PKCE-bound authorization code",
-    "/api/v1/auth/local/login": "the password is the credential",
     "/api/terrapod/v1/auth/local/login": "the password is the credential",
-    "/api/v1/auth/local/authorize": "the password is the credential (PKCE start)",
     "/api/terrapod/v1/auth/local/authorize": "the password is the credential (PKCE start)",
-    "/api/v1/auth/token": "one-time authorization code, consumed once",
     "/api/terrapod/v1/auth/token": "one-time authorization code, consumed once",
-    "/api/v1/auth/saml/acs": "signed SAML assertion from the IdP",
     "/api/terrapod/v1/auth/saml/acs": "signed SAML assertion from the IdP",
     # The join token IS the credential: a listener has none until it joins, and
     # exchanges the token for a certificate here.
-    "/api/v1/agent-pools/join": "join token, hashed at rest, exchanged for a cert",
     "/api/terrapod/v1/agent-pools/join": "join token, hashed at rest, exchanged for a cert",
-    "/api/v1/agent-pools/{pool_id}/listeners/join": "join token, exchanged for a cert",
     "/api/terrapod/v1/agent-pools/{pool_id}/listeners/join": "join token, exchanged for a cert",
 }
 
@@ -157,7 +146,11 @@ class TestNoWriteOperationServesAnAnonymousCaller:
         # A guard that found nothing because it looked at nothing would pass
         # silently, which is the failure mode this whole file exists to prevent.
         ops = _write_operations(app)
-        assert len(ops) > 300, f"only {len(ops)} write operations found; did routing change?"
+        # The floor differs per release line: 2.0 mounts each surface at both
+        # its canonical and its deprecated alias prefix (#1529), so it reports
+        # roughly twice what a single-prefix line does. What matters is that the
+        # sweep is looking at the whole API rather than a handful of routes.
+        assert len(ops) > 150, f"only {len(ops)} write operations found; did routing change?"
 
     def test_every_listed_route_still_exists(self, app):
         # An exemption for a route that has been renamed or removed is dead
