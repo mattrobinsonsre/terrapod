@@ -51,9 +51,14 @@ test.describe('Large upload through BFF', () => {
     expect(cvRes.status).toBe(201)
     const cvJson = await cvRes.json()
     const cvId = cvJson.data.id as string
-    const uploadUrl = cvJson.data.attributes['upload-url'] as string
-    // The layer under test must still be the one we PUT the 12 MB through.
-    expect(uploadUrl.startsWith(BASE_URL)).toBe(true)
+    // On this line the URL's host comes from `auth.callback_base_url` rather
+    // than the request (#1703 is 1.7+), so it will not name the BFF even when
+    // the request went through it. Keep the capability — which is the part that
+    // cannot be rebuilt — and put it back on BASE_URL, because the BFF is the
+    // layer this test exists to push 12 MB through.
+    const returned = new URL(cvJson.data.attributes['upload-url'] as string)
+    const uploadUrl = `${BASE_URL}${returned.pathname}${returned.search}`
+    expect(returned.pathname).toContain('/cap-')
 
     // 12 MB — deliberately over the old 10 MB middleware body cap. The upload
     // endpoint doesn't parse the tarball (that happens at run time), so opaque
