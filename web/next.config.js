@@ -103,6 +103,32 @@ const nextConfig = {
           headers: [{ key: 'Content-Encoding', value: 'none' }],
         })),
       )
+    // Security headers on the PAGE routes (GHSA-46gw-rvrr-jqfx).
+    //
+    // The API already sets these on every response; Next.js page routes got
+    // only HSTS. So the console's own pages could be framed while the API they
+    // call could not — and the pages are where a human clicks queue-apply,
+    // delete-workspace and force-unlock, which is what makes clickjacking worth
+    // closing here.
+    //
+    // APPENDED to the array above, never replacing it. That array carries the
+    // Content-Encoding: none entries which are the only thing keeping SSE log
+    // streaming unbuffered, and redefining headers() would silently take them
+    // out — the failure mode being a log that simply stops updating.
+    //
+    // frame-ancestors is the CSP half that matters here and has no
+    // compatibility cost. A full CSP is deliberately not attempted: Next.js
+    // needs 'unsafe-inline' for styles unless nonces are wired through, so a
+    // rushed policy would either break the console or be worth nothing.
+    headers.push({
+      source: '/:path*',
+      headers: [
+        { key: 'X-Frame-Options', value: 'DENY' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+      ],
+    })
     if (hstsValue) {
       headers.push({
         source: '/:path*',
