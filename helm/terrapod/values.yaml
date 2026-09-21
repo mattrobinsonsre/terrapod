@@ -1119,14 +1119,27 @@ api:
       # listed here; the client is then the right-most entry that is not itself
       # a listed proxy.
       #
-      # EMPTY BY DEFAULT and that is deliberate: with nothing trusted the header
-      # is ignored and the connecting peer is used. That peer is the BFF pod for
-      # every request, so unauthenticated traffic (including the login limit)
-      # shares ONE bucket until you set this. Set it to the CIDR your ingress or
-      # BFF pods run in — e.g. the cluster pod CIDR — to get per-client limits.
-      # Failing closed is the right default: keying on a forgeable header means
-      # the per-client limit was never being enforced at all.
-      trusted_proxy_cidrs: []
+      # Defaults to the private ranges plus CGNAT (100.64/10, which is where
+      # Tailscale and similar overlays live). In Terrapod the connecting peer is
+      # always an in-cluster BFF pod — every request reaches the API through the
+      # Next.js proxy by architectural rule — so this trusts our own component
+      # and nothing publicly routable.
+      #
+      # An empty list is supported and means "ignore the header, bucket on the
+      # peer". Since that peer is the one BFF pod, that collapses every
+      # unauthenticated caller — the login limit included — into a single shared
+      # bucket, which an anonymous stranger can then exhaust for everyone.
+      #
+      # This is only as good as your ingress. Terrapod relies on the ingress
+      # overwriting or appending X-Forwarded-For rather than passing a
+      # client-supplied one through untouched. Read docs/rate-limiting.md if you
+      # run a CDN or external load balancer in front.
+      trusted_proxy_cidrs:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+        - 100.64.0.0/10   # CGNAT — Tailscale and similar overlay networks
+        - fd00::/8
 
     # Background triggered-task scheduler (#1296).
     #
