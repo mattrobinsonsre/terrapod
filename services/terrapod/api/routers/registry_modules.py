@@ -68,6 +68,7 @@ from terrapod.services.registry_module_service import (
 from terrapod.services.registry_rbac_service import (
     resolve_registry_capabilities_for,
 )
+from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 from terrapod.storage import get_storage
 from terrapod.storage.protocol import ObjectStore
 
@@ -1032,6 +1033,18 @@ async def create_workspace_link(
     ws = await db.get(Workspace, ws_uuid)
     if ws is None:
         raise HTTPException(status_code=400, detail="Workspace not found")
+
+    # Authority over BOTH sides. The module capability above is self-granting --
+    # module creation is open to any authenticated user and the creator becomes
+    # owner, which confers REGISTRY_ADMIN immediately -- so checking only the
+    # module side let anyone link their own module to any workspace, and a
+    # linked module drives runs on it.
+    ws_caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(ws_caps, cap.WORKSPACE_SETTINGS):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires settings permission on the workspace being linked",
+        )
 
     # Check for duplicate
     existing = await db.execute(

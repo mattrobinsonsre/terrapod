@@ -380,6 +380,45 @@ class TestWorkspaceLinkCRUD:
 
         assert resp.status_code == 403
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.registry_modules.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.registry_modules.resolve_registry_capabilities_for")
+    @patch("terrapod.api.routers.registry_modules.get_module")
+    async def test_create_workspace_link_requires_authority_on_the_workspace_too(
+        self, mock_get_module, mock_resolve, mock_ws_caps, *mocks
+    ):
+        """GHSA-fcvc-826r-72m6.
+
+        The module-side capability is self-granting: module creation is open to
+        any authenticated user and the creator becomes owner, which confers
+        REGISTRY_ADMIN at once. Checking only that side let anyone link their own
+        module to any workspace, and a linked module drives runs on it. So
+        holding admin on the module and nothing on the workspace must fail.
+        """
+        module = _mock_module()
+        mock_get_module.return_value = module
+        mock_resolve.return_value = caps_for_level("admin")  # self-granted
+        mock_ws_caps.return_value = set()  # nothing on the workspace
+
+        app, session = _make_app(_admin_user())
+        session.get = AsyncMock(return_value=MagicMock(id=uuid.uuid4()))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.post(
+                "/api/terrapod/v1/registry-modules/private/default/eks/aws/workspace-links",
+                headers={**_AUTH, "Content-Type": "application/vnd.api+json"},
+                json={
+                    "data": {
+                        "type": "workspace-links",
+                        "attributes": {"workspace_id": str(uuid.uuid4())},
+                    }
+                },
+            )
+
+        assert resp.status_code == 403
+        assert "workspace" in resp.json()["errors"][0]["detail"].lower()
+
 
 # ── Storage Key ─────────────────────────────────────────────────────
 
