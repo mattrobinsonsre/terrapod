@@ -18,6 +18,16 @@ var readOnly = &mcp.ToolAnnotations{ReadOnlyHint: true}
 // policy.
 var destructive = &mcp.ToolAnnotations{DestructiveHint: ptrBool(true)}
 
+// mutating marks a tool that writes but does not itself change or destroy
+// infrastructure — it creates a record, edits a setting, or ends a run.
+//
+// It exists so that "this writes, and is not destructive" is a stated decision
+// rather than a missing field. An unannotated tool is indistinguishable from a
+// read-only one to a host deciding whether to ask the operator first, and ten
+// mutating tools shipped that way (GHSA-3g53-5gw3-hh42). Every tool carries an
+// annotation, enforced by TestEveryToolIsAnnotated.
+var mutating = &mcp.ToolAnnotations{DestructiveHint: ptrBool(false)}
+
 // registerAct adds the gated "Act" tools — queue a run and drive its lifecycle.
 // Everything goes through the normal server-side run lifecycle: no bypass of
 // plan-only, policy, VCS-apply rules, or RBAC. The token's capabilities decide
@@ -42,7 +52,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 			"each with optional subdirectories) for an org-wide rule, which registers from what the poller last found. Run terrapod_module_autodiscovery_rule_preview first and confirm the choice " +
 			"with the user; with no subset an org-wide rule registers every current candidate of every repository. Candidates already registered, or whose name is taken, are skipped and " +
 			"reported. It creates registry modules; it does not touch infrastructure. Platform admin only.",
-		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptrBool(false)},
+		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in moduleRuleScanIn) (*mcp.CallToolResult, *terrapod.ModuleAutodiscoveryScan, error) {
 		if in.RuleID == "" {
 			return errText("rule_id is required"), nil, nil
@@ -134,6 +144,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_discard",
 		Description: "Discard a planned run without applying it (it will not change infrastructure). Use when a plan should not proceed.",
+		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runIDIn) (*mcp.CallToolResult, *terrapod.Run, error) {
 		if in.RunID == "" {
 			return errText("run_id is required"), nil, nil
@@ -149,6 +160,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_cancel",
 		Description: "Cancel a non-terminal run (pending/planning/applying). Stops in-flight work; does not roll back an apply already completed.",
+		Annotations: destructive,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runIDIn) (*mcp.CallToolResult, *terrapod.Run, error) {
 		if in.RunID == "" {
 			return errText("run_id is required"), nil, nil
@@ -183,6 +195,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_security_scan_override",
 		Description: "Override a run's blocking IaC security scan so it can proceed despite failed/errored findings. Requires workspace admin. A run held in planning by an enforced scan is re-driven immediately. Use deliberately — this bypasses a security gate; prefer fixing the finding or adding a skip rule.",
+		Annotations: destructive,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runIDIn) (*mcp.CallToolResult, *terrapod.SecurityScan, error) {
 		if in.RunID == "" {
 			return errText("run_id is required"), nil, nil
@@ -204,6 +217,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 			"policy set on the run, the scan check overrides the security scan. Requires workspace admin. The run is moved on " +
 			"at once; it applies only if it would have without the gate (auto-apply, or a later confirm). Use deliberately — " +
 			"this bypasses a governance gate; read the check's output first and prefer fixing the configuration.",
+		Annotations: destructive,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in policyCheckIDIn) (*mcp.CallToolResult, *terrapod.PolicyCheck, error) {
 		if in.CheckID == "" {
 			return errText("check_id is required"), nil, nil
@@ -237,6 +251,7 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 			"Only the newest state versions are copied — anything beyond the server's cap is reported in " +
 			"`state-versions-skipped` rather than dropped silently. Because a restore materialises state (and " +
 			"therefore secrets) into a workspace the caller can read, confirm with the user before calling it.",
+		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in restoreIn) (*mcp.CallToolResult, *terrapod.RestoredWorkspace, error) {
 		if in.WorkspaceID == "" {
 			return errText("workspace_id is required"), nil, nil

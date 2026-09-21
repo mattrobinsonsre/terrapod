@@ -59,6 +59,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_workspace_create",
 		Description: "Create a workspace. Only `name` is required; everything else falls back to the instance default. " +
 			"For agent execution set execution_mode=agent + agent_pool_id; for VCS-driven runs set vcs_connection_id + vcs_repo_url. Returns the created workspace.",
+		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceCreateIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.Name == "" {
 			return errText("name is required"), nil, nil
@@ -110,6 +111,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_workspace_update",
 		Description: "Update a workspace's settings. Only the fields you pass change; omitted fields are left alone. " +
 			"This is a config change (the new settings apply on the workspace's next run) — it does not itself queue a run.",
+		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceUpdateIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.WorkspaceID == "" {
 			return errText("workspace_id is required"), nil, nil
@@ -226,6 +228,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			"category defaults to terraform; set category=env for an environment variable, or git_http_auth/git_ssh_auth for private-git-module credentials (JSON value, always sensitive — see the module-auth docs). Set structured=true for non-string values (lists/objects/numbers); `hcl` is its deprecated alias. " +
 			"Set value_source=vault to store a reference to an OpenBao (or HashiCorp Vault) secret instead of a literal, so the secret stays in OpenBao/Vault and is read per run — an unresolvable reference fails the run rather than delivering nothing. " +
 			"A reference with a \"file\" object delivers the secret as a file and the variable holds its path, for providers and tools that only read credentials from a file. Returns the variable.",
+		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in variableSetIn) (*mcp.CallToolResult, *terrapod.Variable, error) {
 		if in.WorkspaceID == "" || in.Key == "" {
 			return errText("workspace_id and key are required"), nil, nil

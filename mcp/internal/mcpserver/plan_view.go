@@ -423,3 +423,51 @@ func unionKeys(maps ...map[string]any) []string {
 	slices.Sort(keys)
 	return keys
 }
+
+// redactDocument replaces every known secret leaf anywhere in a decoded plan
+// document, so `view=full` can return the whole thing without handing over the
+// values (GHSA-3g53-5gw3-hh42).
+//
+// view=changes has always redacted; view=full did not, while both were
+// advertised to hosts as read-only. Read-only is true and beside the point: the
+// hint tells a host the call is safe to make without asking, and what made it
+// unsafe was not that it wrote anything but that it read secrets out to a model.
+//
+// It walks the whole document rather than the marked positions because that is
+// what `secrets` is for — a value copied from a sensitive attribute into an
+// unmarked one keeps no marker, so position-based redaction would miss it. See
+// planSecrets.
+func redactDocument(v any, secrets secretSet) any {
+	switch x := v.(type) {
+	case string, float64:
+		if _, ok := secrets[x]; ok {
+			return sensitivePlaceholder
+		}
+		return v
+	case json.Number:
+		// Numbers are decoded with UseNumber so the document round-trips
+		// exactly: a plain decode turns 1234567890123456789 into
+		// ...800, silently corrupting ids and epoch-nanosecond timestamps in
+		// a document we hand back as the plan. The secret set keys numbers as
+		// float64, so match on that and return the original either way.
+		if f, err := x.Float64(); err == nil {
+			if _, ok := secrets[f]; ok {
+				return sensitivePlaceholder
+			}
+		}
+		return v
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, e := range x {
+			out[k] = redactDocument(e, secrets)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, e := range x {
+			out[i] = redactDocument(e, secrets)
+		}
+		return out
+	}
+	return v
+}

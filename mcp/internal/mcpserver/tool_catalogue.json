@@ -274,6 +274,7 @@
   },
   {
     "name": "terrapod_policy_check_override",
+    "destructive": true,
     "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -432,6 +433,7 @@
   },
   {
     "name": "terrapod_run_cancel",
+    "destructive": true,
     "input_schema": {
       "additionalProperties": false,
       "properties": {
@@ -696,6 +698,7 @@
   },
   {
     "name": "terrapod_run_security_scan_override",
+    "destructive": true,
     "input_schema": {
       "additionalProperties": false,
       "properties": {

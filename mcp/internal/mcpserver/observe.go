@@ -217,7 +217,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		Description: "Fetch what a run's plan will do, from its structured JSON plan (`tofu show -json`). " +
 			"The default view=changes is compact, usually a few KB: tofu's add/change/destroy counts, then each resource the plan acts on with only the attributes that change (before and after), sensitive values redacted and values not known until apply marked as such. " +
 			"Narrow it with `address` (a prefix, or a glob) and `actions`; `matched` and `truncated` say whether there is more, and `start`/`limit` page through it. " +
-			"view=full returns the raw document: as the parsed `plan_json` object when it fits in max_bytes, otherwise as a `plan_json_text` chunk to page through with `offset` (pass back `next_offset`). A full plan is often megabytes and its values are NOT redacted. " +
+			"view=full returns the whole document: as the parsed `plan_json` object when it fits in max_bytes, otherwise as a `plan_json_text` chunk to page through with `offset` (pass back `next_offset`). A full plan is often megabytes. Sensitive values are redacted in both views. " +
 			"An error saying no JSON plan is available means the run has not finished planning, or produced none; terrapod_run_logs has the text plan.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in planJSONIn) (*mcp.CallToolResult, planJSONOut, error) {
@@ -248,6 +248,22 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		if err != nil {
 			// Never echo the body: it can be megabytes.
 			return errText(fmt.Sprintf("the run's JSON plan (%d bytes) could not be parsed: %v", len(raw), err)), planJSONOut{}, nil
+		}
+
+		// Redact the WHOLE document once, up front, and treat the result as
+		// the document from here on -- including for `total_bytes` and for
+		// paging. Redacting each chunk as it is served would be wrong twice
+		// over: a secret straddling a chunk boundary would survive, and the
+		// offsets an agent pages with would not match the bytes it was given.
+		if secrets := planSecrets(plan); len(secrets) > 0 {
+			var doc any
+			dec := json.NewDecoder(bytes.NewReader(raw))
+			dec.UseNumber()
+			if err := dec.Decode(&doc); err == nil {
+				if b, err := json.Marshal(redactDocument(doc, secrets)); err == nil {
+					raw = b
+				}
+			}
 		}
 
 		total := int64(len(raw))
@@ -282,8 +298,13 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		}
 		off := min(max(in.Offset, 0), total)
 		if off == 0 && total <= maxBytes {
+			// UseNumber here too: this is the path that returns the parsed
+			// object, and a plain decode would hand back numbers that differ
+			// from the plan's own (see TestPlanJSONFullViewPreservesLargeNumbers).
 			var doc map[string]any
-			if err := json.Unmarshal(raw, &doc); err != nil {
+			dec := json.NewDecoder(bytes.NewReader(raw))
+			dec.UseNumber()
+			if err := dec.Decode(&doc); err != nil {
 				return errText(fmt.Sprintf("the run's JSON plan (%d bytes) could not be parsed: %v", total, err)), planJSONOut{}, nil
 			}
 			out.PlanJSON = doc
