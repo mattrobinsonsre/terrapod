@@ -28,6 +28,10 @@ def _mock_settings():
     """Patch settings for a deterministic signing key (DB-URL fallback path)."""
     with patch("terrapod.config.settings") as mock_settings:
         mock_settings.token_signing_key = ""
+        # `patch(...)` hands back a MagicMock, on which every unset attribute is
+        # truthy -- so without this the strong-secrets switch reads as ON and the
+        # derivation refuses a deliberately-weak test key.
+        mock_settings.require_strong_secrets = False
         mock_settings.database_url = "postgresql+asyncpg://test:test@localhost/test"
         yield mock_settings
 
