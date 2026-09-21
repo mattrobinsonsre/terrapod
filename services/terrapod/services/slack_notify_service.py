@@ -175,18 +175,52 @@ def resolved_parent_blocks(ws_name: str, counts: str, status_line: str, url: str
     return blocks
 
 
-#: Matches a URL's query string so it can be dropped from anything leaving for
-#: Slack. Signed storage URLs carry their credential there —
-#: `?expires=…&sig=…` (storage/filesystem.py) — and a plan log picks one up on
-#: any download or upload failure path.
-_URL_QUERY_RE = re.compile(rb"(https?://[^\s\"'<>]*?)\?[^\s\"'<>]*")
+#: Matches a whole URL token. `\\S+` is greedy with NOTHING required after it, so
+#: the engine never backtracks and the scan is linear in the input.
+#:
+#: The previous pattern required a literal `?` after a lazy character class. On
+#: text with no `?`, that expands one character at a time to end-of-line and
+#: then retries at the next `http` — quadratic. Measured on the real function:
+#: 54 KB of `http://` repeated took 2.8s and 218 KB took 44s, synchronously,
+#: inside an async coroutine, so it blocked the whole worker's event loop. A
+#: plan log is attacker-influenced by design (a PR author writes the config) and
+#: plan logs are routinely tens of MB.
+_URL_RE = re.compile(rb"https?://\S+", re.IGNORECASE)
+
+#: A line longer than this is flushed without waiting for its newline.
+#: Unbounded accumulation would break this module's own "never buffered"
+#: promise (rule 14): a single-line multi-GB object would be held whole in the
+#: API pod. 1 MiB is far longer than any real log line and far short of an OOM.
+_MAX_PENDING = 1 << 20
+
+
+def _drop_query(match: re.Match[bytes]) -> bytes:
+    """Strip both credential-bearing parts of a URL: userinfo and query.
+
+    Userinfo matters at least as much as the query string here. A `tofu init`
+    line for a VCS-backed module source prints
+    `https://x-access-token:ghp_...@github.com/org/repo.git` verbatim, and
+    Terrapod stores exactly such tokens (`vcs_connections.token`) — a far
+    longer-lived credential than the signed storage URL this redaction was
+    originally written for.
+    """
+    url = match.group(0)
+    scheme, sep, rest = url.partition(b"://")
+    if sep:
+        authority, at, tail = rest.partition(b"@")
+        # Only treat it as userinfo if it really precedes the host: an `@` after
+        # the first `/` is part of the path, not a credential.
+        if at and b"/" not in authority:
+            url = scheme + sep + b"(redacted)@" + tail
+    head, qsep, _ = url.partition(b"?")
+    return head + b"?(redacted)" if qsep else url
 
 
 def _strip_url_queries(chunk: bytes) -> bytes:
     """Drop the query string from every URL in a line of log output.
 
-    GHSA-5x47-chx9-ww6c. The plan log is uploaded to Slack byte for byte, and
-    a Slack channel is routinely a wider audience than the workspace's access
+    GHSA-5x47-chx9-ww6c. The plan log is uploaded to Slack byte for byte, and a
+    Slack channel is routinely a wider audience than the workspace's access
     list — the file is then retained by Slack, outside any Terrapod
     authorization decision. OpenTofu redacts values it knows are sensitive in
     its DISPLAY output, so a well-behaved plan log is not the credential dump
@@ -197,7 +231,7 @@ def _strip_url_queries(chunk: bytes) -> bytes:
     can easily span a 64 KiB read boundary, and a regex applied to raw chunks
     would miss exactly the ones that straddle one.
     """
-    return _URL_QUERY_RE.sub(rb"\1?(redacted)", chunk)
+    return _URL_RE.sub(_drop_query, chunk)
 
 
 async def _upload_plan_file(
@@ -230,6 +264,12 @@ async def _upload_plan_file(
                 head, sep, pending = pending.rpartition(b"\n")
                 if sep:
                     await fh.write(_strip_url_queries(head + sep))
+                if len(pending) > _MAX_PENDING:
+                    # No newline in sight. Flush rather than accumulate: a URL
+                    # split at this point loses its redaction, which is the
+                    # lesser harm against holding an unbounded object in RAM.
+                    await fh.write(_strip_url_queries(pending))
+                    pending = b""
             if pending:
                 await fh.write(_strip_url_queries(pending))
         kwargs = {"channel": channel, "file": tmp, "filename": "plan.txt", "title": "Plan output"}

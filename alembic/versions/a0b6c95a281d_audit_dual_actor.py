@@ -70,14 +70,24 @@ def downgrade() -> None:
     # nothing, or proceeds.
     bind = op.get_bind()
     attributed = bind.execute(
-        sa.text("SELECT count(*) FROM audit_logs WHERE actor_type <> '' OR actor_id <> ''")
+        # Must test for attribution that is NOT reconstructible from the
+        # columns that survive. `upgrade()` backfills every existing row with
+        # server_default 'terrapod_user' / 'api', and every new row gets the
+        # same — so `actor_type <> ''` was true for EVERY row ever written and
+        # the guard blocked the downgrade on every deployment, including the
+        # ones its own comment calls safe.
+        sa.text(
+            "SELECT count(*) FROM audit_logs WHERE "
+            "actor_type <> 'terrapod_user' OR origin <> 'api' "
+            "OR actor_login <> '' OR actor_id <> ''"
+        )
     ).scalar()
     if attributed:
         raise RuntimeError(
             f"refusing to drop the dual-actor audit columns: {attributed} audit row(s) "
-            "carry attribution that exists nowhere else, and rows recording a "
-            "VCS-driven action have no actor_email to fall back on. Export "
-            "audit_logs first if you need this downgrade."
+            "carry non-default attribution (a VCS user, a PR comment, or a background "
+            "task) that exists nowhere else — a VCS-driven action has no actor_email "
+            "to fall back on. Export audit_logs first if you need this downgrade."
         )
     op.alter_column("audit_logs", "action", type_=sa.String(20))
     op.drop_index("ix_audit_logs_actor_type", table_name="audit_logs")

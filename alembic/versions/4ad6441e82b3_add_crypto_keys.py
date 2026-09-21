@@ -61,7 +61,16 @@ def downgrade() -> None:
         raise RuntimeError(
             f"refusing to drop crypto_keys: it holds {rows} key row(s), and they are "
             "the only copy of the DEK that decrypts every `tpenc:` value in this "
-            "database. Run `terrapod encryption_migrate decrypt` first (and verify it "
-            "reported every encrypted column), then re-run this downgrade."
+            "database.\n"
+            "  1. Run `terrapod encryption_migrate decrypt` and verify it reported "
+            "every encrypted column (it converts VALUES; it does not touch this "
+            "table).\n"
+            "  2. Confirm nothing is still encrypted: no column should contain a "
+            "value starting `tpenc:`.\n"
+            "  3. Only then DELETE FROM crypto_keys — at that point the rows decrypt "
+            "nothing and removing them is the deliberate final step, not a "
+            "workaround.\n"
+            "Deleting them BEFORE step 2 destroys the data permanently; the master "
+            "key does not help, because it unwraps a DEK that would no longer exist."
         )
     op.drop_table("crypto_keys")
