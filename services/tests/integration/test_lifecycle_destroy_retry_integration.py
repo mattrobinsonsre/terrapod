@@ -45,9 +45,8 @@ async def _seed_ws_with_cv(client, name: str) -> uuid.UUID:
         headers=AUTH,
     )
     assert cv.status_code == 201, cv.text
-    cv_id = cv.json()["data"]["id"]
     up = await client.put(
-        f"/api/v2/configuration-versions/{cv_id}/upload",
+        cv.json()["data"]["attributes"]["upload-url"],
         content=b"placeholder",
         headers={"Content-Type": "application/x-tar"},
     )

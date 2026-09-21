@@ -78,8 +78,11 @@ async def _delete_with_state(
             headers=AUTH,
         )
         assert sv.status_code == 201, sv.text
+        # The create response carries the capability-bearing upload URL; a
+        # read response deliberately does not, so a reader cannot escalate to a
+        # writer (GHSA-63m3 / GHSA-r9v9).
         up = await client.put(
-            f"/api/v2/state-versions/{sv.json()['data']['id']}/content", content=body
+            sv.json()["data"]["attributes"]["hosted-state-upload-url"], content=body
         )
         assert up.status_code == 200
 

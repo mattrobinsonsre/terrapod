@@ -61,7 +61,7 @@ async def _upload_cv(client, ws_id: str) -> str:
     assert resp.status_code == 201, resp.text
     cv_id = resp.json()["data"]["id"]
     resp = await client.put(
-        f"/api/v2/configuration-versions/{cv_id}/upload",
+        resp.json()["data"]["attributes"]["upload-url"],
         content=b"placeholder-tarball-for-tests",
         headers={"Content-Type": "application/x-tar"},
     )
