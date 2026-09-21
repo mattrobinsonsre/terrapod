@@ -138,6 +138,10 @@ async def create_remote_state_consumer(
     await _require_ws_capability(producer, cap.WORKSPACE_SETTINGS, user, db)
 
     consumer = await _get_workspace(_extract_consumer_id(body), db)
+    # The producer's own capability governs sharing its state, but naming a
+    # workspace you cannot see is an existence oracle and leaks its name back in
+    # the response, so the consumer side is checked too.
+    await _require_ws_capability(consumer, cap.WORKSPACE_READ, user, db)
 
     if producer.id == consumer.id:
         raise HTTPException(
@@ -271,6 +275,7 @@ async def replace_remote_state_consumers(
             raise HTTPException(status_code=422, detail="invalid consumer reference")
         raw_id = item.get("id", "")
         consumer = await _get_workspace(raw_id, db)
+        await _require_ws_capability(consumer, cap.WORKSPACE_READ, user, db)
         if consumer.id == producer.id:
             raise HTTPException(
                 status_code=422,
