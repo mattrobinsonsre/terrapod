@@ -829,6 +829,26 @@ async def transition_run(
 ) -> Run:
     """Transition a run to a new status."""
     await ha_role.ensure_leader("transition runs")
+    # A plan-only run can never reach an apply, whatever asks. The guard in
+    # `confirm_run` was NOT enough and its comment claiming to cover "every
+    # caller" was wrong: the listener status endpoint
+    # (routers/runs.py, PATCH .../listeners/{lid}/runs/{rid}) passes a
+    # caller-chosen `target_status` straight here, and plan-only runs are
+    # deliberately routed down that branch. A listener that already owns the run
+    # could PATCH it to `confirmed` and then `applying`, applying a
+    # configuration a MANDATORY policy set had rejected — the whole point of
+    # GHSA-w67x-7rf5-w65g — and in the process also skipping the workspace
+    # manual lock, the #646/#647 staleness guards, the speculative-CV check and
+    # the apply-then-merge mergeability gate, none of which live here either.
+    #
+    # So the invariant belongs at the one place every path funnels through. The
+    # two pre-apply gates short-circuit on `run.plan_only` saying "there is no
+    # apply to block"; this is what finally makes that true.
+    if run.plan_only and target_status in ("confirmed", "applying"):
+        raise ValueError(
+            f"this run is plan-only and cannot be applied (refused transition to "
+            f"{target_status!r}) — queue an apply run instead"
+        )
     if not can_transition(run.status, target_status):
         raise ValueError(f"Invalid transition: {run.status} → {target_status}")
 

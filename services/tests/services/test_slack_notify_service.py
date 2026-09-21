@@ -411,6 +411,40 @@ class TestThePlanLogUploadedToSlackCarriesNoSignedURL:
         out = _strip_url_queries(line)
         assert b"AAA" not in out and b"BBB" not in out
 
+    def test_a_userinfo_credential_is_stripped(self):
+        """A `tofu init` line for a private module source prints this verbatim,
+        and it is a longer-lived credential than the signed URL."""
+        from terrapod.services.slack_notify_service import _strip_url_queries
+
+        out = _strip_url_queries(b"clone https://x-access-token:ghp_SECRET@github.com/o/r.git")
+        assert b"ghp_SECRET" not in out
+        assert b"github.com/o/r.git" in out
+
+    def test_an_at_sign_in_a_path_is_not_mistaken_for_userinfo(self):
+        from terrapod.services.slack_notify_service import _strip_url_queries
+
+        line = b"see https://tp.example/modules/a/b@v1.2.3/main.tf"
+        assert _strip_url_queries(line) == line
+
+    def test_an_uppercase_scheme_is_still_redacted(self):
+        from terrapod.services.slack_notify_service import _strip_url_queries
+
+        assert b"SIG" not in _strip_url_queries(b"HTTPS://tp.example/k?sig=SIG")
+
+    def test_redaction_is_linear_not_quadratic(self):
+        """The original pattern was O(n^2) and ran synchronously inside an async
+        coroutine: 218 KB of `http://` took 44 seconds and blocked the worker's
+        event loop. Plan logs are attacker-influenced and routinely tens of MB."""
+        import time
+
+        from terrapod.services.slack_notify_service import _strip_url_queries
+
+        payload = b"http://" * 128_000  # ~875 KB, no "?" anywhere
+        started = time.perf_counter()
+        _strip_url_queries(payload)
+        elapsed = time.perf_counter() - started
+        assert elapsed < 1.0, f"redaction took {elapsed:.1f}s on 875 KB — backtracking is back"
+
     async def test_a_url_split_across_a_read_boundary_is_still_redacted(self):
         """The subtle one. A URL cannot span a newline but easily spans a
         64 KiB read, and a regex applied to raw chunks would miss exactly the
@@ -424,8 +458,13 @@ class TestThePlanLogUploadedToSlackCarriesNoSignedURL:
         full = (
             b"line one\nfetch https://tp.example/storage/get/k?expires=1&sig=SPLITSECRET failed\n"
         )
-        # Split mid-signature, which is where a naive per-chunk regex breaks.
-        cut = full.index(b"SPLITSECRET") + 4
+        # Split BEFORE the "?", which is the case that actually distinguishes
+        # the fix from the bug. Splitting mid-signature does NOT: a naive
+        # per-chunk regex still matches the URL in chunk 1 and rewrites it to
+        # "...?(redacted)", so the assertion on the whole token passes anyway.
+        # Cutting before the "?" leaves chunk 2 with no scheme, so a per-chunk
+        # regex never matches it and writes the signature verbatim.
+        cut = full.index(b"?")
 
         async def _stream(_key):
             yield full[:cut]
@@ -464,4 +503,5 @@ class TestThePlanLogUploadedToSlackCarriesNoSignedURL:
         body = uploaded.get("body", b"")
         assert b"SPLITSECRET" not in body, body
         assert b"line one" in body
-        assert not os.path.exists(written.get("path", "")), "temp file was not cleaned up"
+        assert "path" in written, "mkstemp was never called — the test proved nothing"
+        assert not os.path.exists(written["path"]), "temp file was not cleaned up"
