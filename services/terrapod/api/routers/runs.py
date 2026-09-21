@@ -44,6 +44,7 @@ from terrapod.api.dependencies import (
     ListenerIdentity,
     get_current_user,
     get_listener_identity,
+    require_runner_for_run,
 )
 from terrapod.api.errors import vcs_unavailable
 from terrapod.api.ids import parse_id
@@ -2547,6 +2548,7 @@ async def upload_log_stream(
 async def report_plan_result(
     run_id: str = Path(...),
     body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Runner Job reports plan completion.
@@ -2562,6 +2564,7 @@ async def report_plan_result(
     network partition, etc.). Both paths land in the same idempotent helper
     so whichever wins, the second is a no-op.
     """
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     has_changes = body.get("has_changes")
@@ -2574,6 +2577,7 @@ async def report_plan_result(
 @extensions_router.post("/runs/{run_id}/apply-result")
 async def report_apply_result(
     run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Runner Job reports apply completion.
@@ -2582,6 +2586,7 @@ async def report_apply_result(
     runner's exit. Drives `applying → applied` via `run_service.complete_apply`,
     which is idempotent against the listener-driven fallback.
     """
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
     await run_service.complete_apply(db, run)
     await db.commit()
