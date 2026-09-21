@@ -630,6 +630,40 @@ class TestConfirmRun:
         with pytest.raises(ValueError, match="speculative"):
             await confirm_run(db, run)
 
+    async def test_rejects_a_plan_only_run(self):
+        """A plan-only run is never applicable, and two gates rely on that.
+
+        `policy_set_service` and `security_scan_service` both short-circuit to
+        GATE_PASSED on `run.plan_only` because "there is no apply to block".
+        Nothing enforced it, so a caller holding only `run:apply` could apply a
+        configuration a MANDATORY policy set had rejected — with no override
+        requested and none recorded.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.locked = False
+        db.get.return_value = ws
+        run = _mock_run(status="planned", plan_only=True)
+        with pytest.raises(ValueError, match="plan-only"):
+            await confirm_run(db, run)
+
+    async def test_rejects_a_plan_only_run_with_an_ordinary_configuration_version(self):
+        """The speculative-CV check does not cover this, which is the whole bug.
+
+        A speculative *configuration version* and a plan-only *run* are separate
+        flags. The reported bypass used a plan-only run against an ordinary,
+        non-speculative CV, so it passed the neighbouring guard untouched.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.locked = False
+        cv = MagicMock()
+        cv.speculative = False
+        db.get.side_effect = [ws, cv]
+        run = _mock_run(status="planned", plan_only=True, configuration_version_id=uuid.uuid4())
+        with pytest.raises(ValueError, match="plan-only"):
+            await confirm_run(db, run)
+
     async def test_rejects_non_planned(self):
         db = AsyncMock(spec=AsyncSession)
         run = _mock_run(status="queued")
