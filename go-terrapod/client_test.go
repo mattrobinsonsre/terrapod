@@ -31,7 +31,6 @@ func TestNewClient_NormalisesBaseURL(t *testing.T) {
 		{"terrapod.example.com", "https://terrapod.example.com"},
 		{"https://terrapod.example.com", "https://terrapod.example.com"},
 		{"https://terrapod.example.com/", "https://terrapod.example.com"},
-		{"http://terrapod-dev.example", "http://terrapod-dev.example"},
 		{"  https://terrapod.example.com  ", "https://terrapod.example.com"},
 	}
 	for _, c := range cases {
@@ -42,6 +41,45 @@ func TestNewClient_NormalisesBaseURL(t *testing.T) {
 		if client.BaseURL != c.want {
 			t.Errorf("NewClient(%q).BaseURL = %q, want %q", c.in, client.BaseURL, c.want)
 		}
+	}
+}
+
+// GHSA-5fh8-vj57-6gvh. This case used to live in the normalisation table
+// above, asserting that "http://terrapod-dev.example" was preserved verbatim.
+// It was: `normaliseBaseURL` defaults a scheme-LESS base to https but passes an
+// explicit http:// straight through, and NewClient validated only that the base
+// was non-empty. So every request then carried the platform bearer token over
+// cleartext, with no diagnostic and no opt-in — unlike SkipTLSVerify, which at
+// least has to be asked for.
+func TestNewClient_RefusesAnInsecureBaseURLUnlessAskedFor(t *testing.T) {
+	if _, err := NewClient(Options{BaseURL: "http://terrapod-dev.example", Token: "t"}); err == nil {
+		t.Error("an http:// base URL was accepted silently")
+	}
+
+	c, err := NewClient(Options{
+		BaseURL:                "http://terrapod-dev.example",
+		Token:                  "t",
+		AllowInsecureTransport: true,
+	})
+	if err != nil {
+		t.Fatalf("the explicit opt-in was refused: %v", err)
+	}
+	if c.BaseURL != "http://terrapod-dev.example" {
+		t.Errorf("BaseURL = %q", c.BaseURL)
+	}
+}
+
+// Loopback needs no opt-in: the token never crosses a network, and every
+// httptest-backed caller in this module depends on it.
+func TestNewClient_AllowsPlaintextLoopback(t *testing.T) {
+	for _, base := range []string{"http://127.0.0.1:8080", "http://localhost:8080", "http://[::1]:8080"} {
+		if _, err := NewClient(Options{BaseURL: base, Token: "t"}); err != nil {
+			t.Errorf("NewClient(%q): %v", base, err)
+		}
+	}
+	// ...but a private address is still a network.
+	if _, err := NewClient(Options{BaseURL: "http://10.1.2.3:8080", Token: "t"}); err == nil {
+		t.Error("plaintext to a private network address was accepted silently")
 	}
 }
 
