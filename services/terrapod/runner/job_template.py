@@ -4,6 +4,7 @@ import re
 
 from terrapod.config import RunnerConfig
 from terrapod.logging_config import get_logger
+from terrapod.runner.reserved_env import is_reserved_env_key
 
 logger = get_logger(__name__)
 
@@ -281,6 +282,21 @@ def build_job_spec(
     # vars can be sensitive and are readable via `kubectl describe` / etcd. The
     # listener populates the Secret (key = the env var name).
     for var in env_vars:
+        # Platform plumbing is never shadowable. Kubernetes gives the LAST
+        # duplicate name precedence, and the workspace block is appended after
+        # the platform block, so a workspace variable named TP_API_URL or
+        # TP_AUTH_TOKEN would win -- redirecting the runner at a host of the
+        # caller's choosing, with the run's own token. Dropping the key here
+        # rather than reordering the blocks fixes it for variables already
+        # stored, and covers the TP_* keys the platform emits only
+        # conditionally (TP_DESTROY, TP_PLAN_ONLY, TP_VAR_FILES and the rest),
+        # which have no collision for precedence to resolve.
+        if is_reserved_env_key(var["key"]):
+            logger.warning(
+                "ignoring workspace variable that collides with platform plumbing",
+                key=var["key"],
+            )
+            continue
         if vars_secret_name:
             container_env.append(
                 {
