@@ -33,9 +33,29 @@ class EncryptedText(TypeDecorator):
     def process_bind_param(self, value: str | None, dialect) -> str | None:  # type: ignore[no-untyped-def]
         if value is None:
             return None
+        from terrapod.crypto import envelope
         from terrapod.crypto.service import get_encryption
 
-        return get_encryption().encrypt(value)
+        svc = get_encryption()
+        # With encryption OFF, encrypt() is a passthrough, so a value that
+        # merely looks like an envelope is stored verbatim -- and every
+        # subsequent read of the row runs it through decrypt(), which fails
+        # loudly. The row becomes unreadable, and because the delete path loads
+        # it first, undeletable too. Refused here rather than in one router
+        # because every encrypted column passes through this one place, and the
+        # reported instance (a workspace variable) was only the cheapest to
+        # reach: a webhook secret or a VCS token does the same thing.
+        #
+        # Only when disabled. With encryption on the value is wrapped into a
+        # real envelope and round-trips back as the literal text the user wrote,
+        # so refusing it there would reject a legitimate value in exactly the
+        # configuration where it is safe.
+        if not svc.enabled and envelope.is_encrypted(value):
+            raise ValueError(
+                f"a value may not begin with {envelope.MARKER!r}: that prefix marks "
+                "an encrypted value and would make this row unreadable"
+            )
+        return svc.encrypt(value)
 
     def process_result_value(self, value: str | None, dialect) -> str | None:  # type: ignore[no-untyped-def]
         if value is None:
