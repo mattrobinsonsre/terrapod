@@ -1712,3 +1712,62 @@ class TestAutodiscoverySharesTheCycleCache:
         with patch("terrapod.services.vcs_poller.get_db_session"):
             with pytest.raises(TypeError, match="meta"):
                 await _poll_autodiscovery()  # type: ignore[call-arg]
+
+
+class TestClosedPRSessionCancelsOnlyThisRepositorysRuns:
+    """Closing PR #7 here must not cancel PR #7's runs in every other repo.
+
+    The cancel query matched on `vcs_pull_request_number` alone, with no repo
+    or workspace filter. PR numbers are small integers, so two repositories
+    sharing one is the ordinary case rather than an edge — the defect stayed
+    latent only because a single workflow mode reached the code.
+
+    Reported, diagnosed and fixed by A3C7 in #1755 / #1756; the scoping is
+    their patch, taken here so the fix reaches the 1.7 line without waiting on
+    the feature it arrived alongside.
+    """
+
+    def _session(self, pr_number=7):
+        sess = MagicMock()
+        sess.pr_number = pr_number
+        sess.state = "open"
+        return sess
+
+    def _db(self, sessions, active_runs):
+        """First execute() returns the open sessions, the rest the active runs."""
+        db = AsyncMock()
+        sess_result = MagicMock()
+        sess_result.scalars.return_value.all.return_value = sessions
+        run_result = MagicMock()
+        run_result.scalars.return_value.all.return_value = active_runs
+        db.execute = AsyncMock(side_effect=[sess_result] + [run_result] * 8)
+        return db
+
+    async def test_the_cancel_query_is_scoped_to_this_repo(self):
+        from terrapod.services.vcs_poller import _reconcile_closed_pr_sessions
+
+        db = self._db([self._session()], [])
+        await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
+
+        # The second execute() is the active-run lookup. Assert on the WHERE
+        # clause, not the whole statement: `select(Run)` lists workspace_id in
+        # its SELECT columns, so checking the rendered statement passes whether
+        # or not the filter is there.
+        where = str(db.execute.await_args_list[1].args[0].whereclause)
+        assert "workspace_id" in where, where
+
+    async def test_a_closed_pr_still_closes_its_session(self):
+        from terrapod.services.vcs_poller import _reconcile_closed_pr_sessions
+
+        sess = self._session()
+        db = self._db([sess], [])
+        await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", set())
+        assert sess.state == "closed"
+
+    async def test_a_still_open_pr_is_left_alone(self):
+        from terrapod.services.vcs_poller import _reconcile_closed_pr_sessions
+
+        sess = self._session()
+        db = self._db([sess], [])
+        await _reconcile_closed_pr_sessions(db, _mock_connection(), "org/repo", {7})
+        assert sess.state == "open"
