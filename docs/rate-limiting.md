@@ -84,7 +84,7 @@ Then confirm the header cannot be forged — from a machine that reaches the
 ingress, send a bogus entry and check it is not what gets recorded:
 
 ```sh
-curl -H 'X-Forwarded-For: 203.0.113.99' https://terrapod.example.com/api/v1/auth/providers
+curl -H 'X-Forwarded-For: 203.0.113.99' https://terrapod.example.com/api/terrapod/v1/auth/providers
 ```
 
 A well-configured ingress records your real address, not `203.0.113.99`.
