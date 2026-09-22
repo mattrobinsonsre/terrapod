@@ -775,6 +775,26 @@ async def transition_run(
 ) -> Run:
     """Transition a run to a new status."""
     await ha_role.ensure_leader("transition runs")
+    # A plan-only run can never reach an apply, whatever asks. The guard in
+    # `confirm_run` was NOT enough and its comment claiming to cover "every
+    # caller" was wrong: the listener status endpoint
+    # (routers/runs.py, PATCH .../listeners/{lid}/runs/{rid}) passes a
+    # caller-chosen `target_status` straight here, and plan-only runs are
+    # deliberately routed down that branch. A listener that already owns the run
+    # could PATCH it to `confirmed` and then `applying`, applying a
+    # configuration a MANDATORY policy set had rejected — the whole point of
+    # GHSA-w67x-7rf5-w65g — and in the process also skipping the workspace
+    # manual lock, the #646/#647 staleness guards, the speculative-CV check and
+    # the apply-then-merge mergeability gate, none of which live here either.
+    #
+    # So the invariant belongs at the one place every path funnels through. The
+    # two pre-apply gates short-circuit on `run.plan_only` saying "there is no
+    # apply to block"; this is what finally makes that true.
+    if run.plan_only and target_status in ("confirmed", "applying"):
+        raise ValueError(
+            f"this run is plan-only and cannot be applied (refused transition to "
+            f"{target_status!r}) — queue an apply run instead"
+        )
     if not can_transition(run.status, target_status):
         raise ValueError(f"Invalid transition: {run.status} → {target_status}")
 
@@ -1518,6 +1538,21 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
     # reflects the current state, or has aged past the workspace TTL, must not be
     # applied. Auto-discard it (unlocking the workspace) and surface a 409 so the
     # caller re-plans. State drift is the always-on correctness guard.
+    # A plan-only run is never applicable, and two pre-apply gates depend on it.
+    # `policy_set_service` and `security_scan_service` both short-circuit to
+    # GATE_PASSED on `run.plan_only`, each saying the same thing in a comment:
+    # "there is no apply to block". Nothing established that. `plan-only` is set
+    # by the caller at create time and costs only `run:apply` to confirm, so a
+    # caller could apply a configuration a MANDATORY policy set had rejected —
+    # reaching the outcome that `POST /actions/override-policy` exists to gate,
+    # with no override requested and none recorded in the audit trail.
+    #
+    # The guard belongs here rather than in the router so it covers every caller,
+    # and it is deliberately separate from the speculative-CV check below: a
+    # speculative *configuration version* and a plan-only *run* are different
+    # flags, and a plan-only run against an ordinary CV passed every guard.
+    if run.plan_only:
+        raise ValueError("this run is plan-only and cannot be applied — queue an apply run instead")
     # Second line of defence for the speculative invariant. `create_run` forces
     # plan-only for a speculative CV, so a run reaching here with one should not
     # exist — but "should not exist" is not a guarantee for rows already in the

@@ -126,6 +126,13 @@ func (r *catalogInstanceResource) Schema(_ context.Context, _ resource.SchemaReq
 				Description: "Input variable values for the module (reconfigurable).",
 				Optional:    true,
 				ElementType: types.StringType,
+				// Sharper than an ordinary missing flag: the server deliberately
+				// omits sensitive inputs (write-only, encrypted at rest, never
+				// round-tripped), so the prior-state copy kept below makes the
+				// PROVIDER the sole durable holder of those secrets. Unmarked, it
+				// held them in plaintext — the server does the right thing and
+				// this undid it (GHSA-9646-883f-wjjm).
+				Sensitive: true,
 			},
 			"version_pin": schema.StringAttribute{
 				Description: "Module version pin to provision/reconfigure to (e.g. \"~> 1.0\").",

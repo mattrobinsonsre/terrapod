@@ -86,9 +86,19 @@ func PublishProvider(ctx context.Context, c *terrapod.Client, in ProviderInput, 
 // server extracts the module interface and triggers linked-workspace runs.
 func PublishModule(ctx context.Context, c *terrapod.Client, name, provider, version, sourceDir string, p Progress) error {
 	note(p, "packing %s", sourceDir)
-	tarball, err := pack.TarGzDir(sourceDir)
+	tarball, skipped, err := pack.TarGzDir(sourceDir)
 	if err != nil {
 		return fmt.Errorf("pack %s: %w", sourceDir, err)
+	}
+	// Publishing is one-way and a published version is immutable, so say what
+	// was left out rather than let the author find out from a consumer. The
+	// exclusions catch secret-bearing files by name, which also catches a
+	// deliberately-shipped `examples/complete/terraform.tfvars` fixture.
+	if len(skipped) > 0 {
+		note(p, "excluded %d secret-bearing file(s) from the tarball:", len(skipped))
+		for _, f := range skipped {
+			note(p, "    %s", f)
+		}
 	}
 	note(p, "uploading module tarball (%d bytes)", len(tarball))
 	if err := c.UploadModuleVersion(ctx, name, provider, version, tarball); err != nil {
