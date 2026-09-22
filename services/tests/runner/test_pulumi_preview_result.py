@@ -237,7 +237,12 @@ class TestTheGateOnAPreview:
         assert calls == ["opa", "plan-result"]
 
     def test_opa_reads_the_policy_input_not_the_digest(self, tmp_path):
-        """The digest is capped at MAX_STEPS; a gate must not decide on a cap."""
+        """The digest is capped at MAX_STEPS; a gate must not decide on a cap.
+
+        `plan_json` is handed over as a FACTORY, not a path, so that the
+        document is built only once a policy set is known to apply -- calling
+        it here is what this asserts about, as well as what it produces.
+        """
         from terrapod.runner import job_entrypoint
 
         seen = {}
@@ -251,10 +256,31 @@ class TestTheGateOnAPreview:
         ):
             job_entrypoint._finish_pulumi_preview(self._cfg(), self._log(tmp_path))
 
-        handed = json.loads(Path(seen["plan_json"]).read_text())
-        assert seen["plan_json"].name == "policy-input.json"
+        factory = seen["plan_json"]
+        assert callable(factory), "the document must not be built before the bundle is known"
+
+        path = factory()
+        assert path.name == "policy-input.json"
+        handed = json.loads(Path(path).read_text())
         assert "resource_changes" in handed
         assert "steps" not in handed
+
+    def test_nothing_is_written_until_the_factory_is_called(self, tmp_path):
+        # The common run has no policy set, so the document -- which has no
+        # other consumer and scales with the change -- should never exist.
+        from terrapod.runner import job_entrypoint
+
+        log = self._log(tmp_path)
+        with (
+            patch("terrapod.runner.phases.uploads.upload_plan_json"),
+            patch("terrapod.runner.phases.uploads.post_plan_result"),
+            # Stands in for a bundle with no applicable sets: the real
+            # evaluate_policies returns 0 without resolving the factory.
+            patch("terrapod.runner.phases.opa.evaluate_policies", return_value=0),
+        ):
+            job_entrypoint._finish_pulumi_preview(self._cfg(), log)
+
+        assert not log.with_name("policy-input.json").exists()
 
     def test_an_incomplete_evaluation_is_fatal_and_stops_the_plan_result(self, tmp_path):
         """`PolicyEvaluationError` means the evaluation could not be COMPLETED.

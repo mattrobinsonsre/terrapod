@@ -1072,20 +1072,28 @@ def _finish_pulumi_preview(cfg, event_log: Path) -> int:  # type: ignore[no-unty
     # Policy evaluation, against the richer document rather than the digest —
     # the digest is capped at MAX_STEPS and a gate must not decide on a
     # truncated list of resources.
-    try:
-        policy_input = pulumi_preview.build_policy_input(event_log)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("could not build the policy input (non-fatal)", err=str(exc))
-        policy_input = None
-    if policy_input is not None:
+    #
+    # Passed as a factory, not a path: this document exists ONLY for OPA (it is
+    # never uploaded), so on the common run with no policy set in scope
+    # building it would be pure waste that scales with the size of the change.
+    # `evaluate_policies` calls this only once the bundle proves non-empty.
+    def _policy_input_path() -> Path | None:
         try:
-            policy_path = pulumi_preview.write_policy_input(
-                policy_input, event_log.with_name("policy-input.json")
-            )
-            opa.evaluate_policies(cfg, plan_json=policy_path, work_dir=_OPA_WORK)
-        except opa.PolicyEvaluationError as exc:
-            log.error("policy evaluation failed", err=str(exc))
-            return 1
+            policy_input = pulumi_preview.build_policy_input(event_log)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("could not build the policy input", err=str(exc))
+            return None
+        if policy_input is None:
+            return None
+        return pulumi_preview.write_policy_input(
+            policy_input, event_log.with_name("policy-input.json")
+        )
+
+    try:
+        opa.evaluate_policies(cfg, plan_json=_policy_input_path, work_dir=_OPA_WORK)
+    except opa.PolicyEvaluationError as exc:
+        log.error("policy evaluation failed", err=str(exc))
+        return 1
 
     try:
         uploads.post_plan_result(cfg, has_changes=bool(digest["has_changes"]))

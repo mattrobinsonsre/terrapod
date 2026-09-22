@@ -296,6 +296,27 @@ def build_policy_input(path: Path) -> dict[str, Any] | None:
 
 
 def write_policy_input(policy_input: dict[str, Any], path: Path) -> Path:
-    """Write the policy input where `opa eval --stdin-input` can read it."""
-    path.write_text(json.dumps(policy_input, indent=2), encoding="utf-8")
+    """Write the policy input where `opa eval --stdin-input` can read it.
+
+    Not indented, unlike the digest: nothing reads this but OPA, and the
+    whitespace is a third of the bytes on a document that already scales with
+    the size of the change.
+
+    There is no byte cap. Excluding `same` steps bounds this by the CHANGE
+    rather than the stack, which is what made a cap look necessary -- a
+    thousand-resource stack with three changes carries three. A change set
+    genuinely large enough to matter is possible (embedded manifests, IAM
+    policy documents) and would be held in memory here, then parsed by `opa
+    eval` under its 60s per-policy timeout; the size is logged so that shows up
+    as a number rather than an OOM. Capping it would mean deciding what happens
+    when a valid policy cannot be evaluated, which is a product decision, not
+    a detail to settle here.
+    """
+    body = json.dumps(policy_input, separators=(",", ":"))
+    path.write_text(body, encoding="utf-8")
+    logger.info(
+        "wrote the policy input",
+        bytes=len(body),
+        resources=len(policy_input.get("resource_changes") or []),
+    )
     return path
