@@ -35,6 +35,7 @@ import (
 	moduleAutodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_autodiscovery_rule"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
+	policyRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/policy"
 	policySetRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/policy_set"
 	providerTemplateRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/provider_template"
 	registryModuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/registry_module"
@@ -172,6 +173,7 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		notificationConfigRes.NewResource,
 		runTaskRes.NewResource,
 		policySetRes.NewResource,
+		policyRes.NewResource,
 		roleRes.NewResource,
 		roleAssignmentRes.NewResource,
 		userRes.NewResource,

@@ -259,6 +259,13 @@ resource terrapod_notification_configuration.triggers required=false optional=tr
 resource terrapod_notification_configuration.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_notification_configuration.url required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_notification_configuration.workspace_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_policy.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_policy.description required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_policy.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_policy.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_policy.policy_set_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_policy.rego required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_policy.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_policy_set.allow_labels required=false optional=true computed=false sensitive=false type=types.MapType[types.ListType[basetypes.StringType]]
 resource terrapod_policy_set.allow_names required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_policy_set.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType

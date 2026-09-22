@@ -386,3 +386,57 @@ func policyFromResource(res *Resource) *Policy {
 		UpdatedAt:   GetStringAttr(res, "updated-at"),
 	}
 }
+
+// ListPolicies returns the policies of an inline policy set.
+//
+// There is no `GET /policies/{id}` — the server never grew one, because the
+// admin UI reads a set and its policies together. `GET /policy-sets/{id}`
+// embeds them in `relationships.policies.data` as full resource objects
+// rather than as linkage, which is a deviation from JSON:API's usual shape
+// but is what the endpoint does; this reads them from there.
+//
+// A consumer that needs one policy fetches the set and picks it out. That is
+// one request either way, since the set is where they live.
+func (c *Client) ListPolicies(ctx context.Context, policySetID string) ([]Policy, error) {
+	data, err := c.Get(ctx, "/api/terrapod/v1/policy-sets/"+url.PathEscape(policySetID))
+	if err != nil {
+		return nil, err
+	}
+	res, err := ParseResource(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse policy-set response: %w", err)
+	}
+
+	rel, ok := res.Relationships["policies"]
+	if !ok || len(rel.Data) == 0 {
+		// A set with no policies, or a VCS set that has not synced yet.
+		return nil, nil
+	}
+
+	var embedded []Resource
+	if err := json.Unmarshal(rel.Data, &embedded); err != nil {
+		return nil, fmt.Errorf("parse embedded policies: %w", err)
+	}
+
+	out := make([]Policy, 0, len(embedded))
+	for i := range embedded {
+		out = append(out, *policyFromResource(&embedded[i]))
+	}
+	return out, nil
+}
+
+// GetPolicy returns one policy of a set, or a NotFoundError when the set no
+// longer holds it — which is what a consumer tracking a single policy needs
+// in order to tell "deleted elsewhere" from "the request failed".
+func (c *Client) GetPolicy(ctx context.Context, policySetID, policyID string) (*Policy, error) {
+	policies, err := c.ListPolicies(ctx, policySetID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range policies {
+		if policies[i].ID == policyID {
+			return &policies[i], nil
+		}
+	}
+	return nil, &NotFoundError{Resource: "policy", ID: policyID}
+}

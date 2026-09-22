@@ -219,3 +219,93 @@ func TestPolicySetWithNoScopingReadsBackEmpty(t *testing.T) {
 		t.Error("global-scope lost")
 	}
 }
+
+// ListPolicies / GetPolicy read the policies the set embeds (#1765).
+//
+// There is no GET /policies/{id}; the server embeds them in
+// `relationships.policies.data` as full resource objects rather than as
+// linkage. That is a deviation from JSON:API's usual shape, so it is worth
+// pinning: a consumer reading them from `included`, or expecting linkage,
+// would silently find nothing.
+
+func policySetWithPolicies(t *testing.T, body string) *Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatalf("client: %v", err)
+	}
+	return c
+}
+
+const twoPolicies = `{"data":{"id":"polset-aaa","type":"policy-sets",
+  "attributes":{"name":"baseline","source":"inline","policy-count":2},
+  "relationships":{"policies":{"data":[
+    {"id":"pol-1","type":"policies","attributes":{"name":"no-public-buckets","rego":"package terrapod","description":"d"},
+     "relationships":{"policy-set":{"data":{"id":"polset-aaa","type":"policy-sets"}}}},
+    {"id":"pol-2","type":"policies","attributes":{"name":"tagging","rego":"package terrapod"}}
+  ]}}}}`
+
+func TestListPoliciesReadsTheEmbeddedObjects(t *testing.T) {
+	c := policySetWithPolicies(t, twoPolicies)
+
+	got, err := c.ListPolicies(t.Context(), "polset-aaa")
+	if err != nil {
+		t.Fatalf("ListPolicies: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d policies, want 2", len(got))
+	}
+	if got[0].Name != "no-public-buckets" || got[0].Rego != "package terrapod" {
+		t.Fatalf("first policy = %+v", got[0])
+	}
+	if got[0].PolicySetID != "polset-aaa" {
+		t.Fatalf("policy-set relationship = %q", got[0].PolicySetID)
+	}
+}
+
+func TestListPoliciesOnASetWithNone(t *testing.T) {
+	// An inline set with no policies, or a VCS set that has not synced: not an
+	// error, and not something a caller should have to distinguish.
+	c := policySetWithPolicies(t,
+		`{"data":{"id":"polset-aaa","type":"policy-sets","attributes":{"name":"empty","source":"inline"}}}`)
+
+	got, err := c.ListPolicies(t.Context(), "polset-aaa")
+	if err != nil {
+		t.Fatalf("ListPolicies: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("got %d policies, want none", len(got))
+	}
+}
+
+func TestGetPolicyFindsOne(t *testing.T) {
+	c := policySetWithPolicies(t, twoPolicies)
+
+	got, err := c.GetPolicy(t.Context(), "polset-aaa", "pol-2")
+	if err != nil {
+		t.Fatalf("GetPolicy: %v", err)
+	}
+	if got.Name != "tagging" {
+		t.Fatalf("policy = %+v", got)
+	}
+}
+
+func TestGetPolicyIsNotFoundWhenTheSetNoLongerHoldsIt(t *testing.T) {
+	// The distinction a consumer tracking one policy needs: deleted elsewhere,
+	// versus the request failed. Without it, a Terraform resource cannot tell
+	// "drop this from state" from "error out".
+	c := policySetWithPolicies(t, twoPolicies)
+
+	_, err := c.GetPolicy(t.Context(), "polset-aaa", "pol-gone")
+	if err == nil {
+		t.Fatal("expected an error for a policy the set does not hold")
+	}
+	if !IsNotFound(err) {
+		t.Fatalf("err = %v, want a NotFoundError", err)
+	}
+}
