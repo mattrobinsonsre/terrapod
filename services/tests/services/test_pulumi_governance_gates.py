@@ -2,14 +2,23 @@
 
 The post-plan OPA and security-scan gates fail closed: a mandatory policy set or
 an enforced scan with no result from the runner records a synthetic `errored`
-result and holds the run. The Pulumi runner evaluates neither -- there is no plan
-JSON for OPA or Checkov/Trivy to read -- so turning governance on for a Pulumi
-workspace held every one of its applies.
+result and holds the run. The Pulumi runner evaluated neither -- there was no
+plan JSON for OPA or Checkov/Trivy to read -- so turning governance on for a
+Pulumi workspace held every one of its applies.
 
-Until OPA over preview JSON lands (#1560) and a scan input exists (#1569), the
-gates do not apply to Pulumi runs, the API refuses to enable a scan that can
-never run, and the run endpoints say why nothing was evaluated. Terraform keeps
-failing closed, which is the half worth proving just as hard.
+That was fixed in two halves, and the difference between them is what this file
+pins:
+
+  - **Policy sets now apply.** The runner builds an OPA input document from the
+    preview's engine event log and evaluates applicable sets against it before
+    posting plan-result, so a Pulumi run fails closed for the same reason a
+    Terraform one does: the runner did not report. Pulumi is no longer exempt.
+  - **Security scans still do not.** Checkov and Trivy read Terraform plan JSON,
+    and whether they have a meaningful Pulumi input at all is #1569. Until then
+    the API refuses to enable a scan that can never run, and the run endpoints
+    say why nothing was scanned.
+
+Terraform failing closed throughout is the half worth proving just as hard.
 """
 
 import uuid
@@ -44,10 +53,16 @@ def _run(ws):
 
 
 class TestWhichEnginesAreEvaluated:
-    def test_terraform_is_and_pulumi_is_not(self):
+    def test_both_engines_are_policy_evaluated(self):
+        # Pulumi joined Terraform when the runner learned to build an OPA input
+        # from the preview's event log (#1567).
         assert engines.evaluates_policy_sets("terraform")
+        assert engines.evaluates_policy_sets("pulumi")
+
+    def test_only_terraform_is_security_scanned(self):
+        # Checkov and Trivy read Terraform plan JSON; whether they have a
+        # meaningful Pulumi input at all is #1569.
         assert engines.evaluates_security_scans("terraform")
-        assert not engines.evaluates_policy_sets("pulumi")
         assert not engines.evaluates_security_scans("pulumi")
 
     def test_a_row_written_before_the_engine_column_is_terraform(self):
@@ -59,24 +74,53 @@ class TestWhichEnginesAreEvaluated:
         assert engines.evaluates_security_scans("chef")
 
     def test_the_answer_does_not_depend_on_the_engine_being_switched_on(self):
-        # A Pulumi workspace still reaches the gate after engines.pulumi is off.
+        # The property under test is that the gate's view of an engine does not
+        # move when `engines.pulumi` is switched off -- a Pulumi workspace still
+        # exists, and still reaches the post-plan gate. Only the expected value
+        # changed with #1567; the independence is the point.
         with patch("terrapod.engines.engine_enabled", return_value=False):
-            assert not engines.evaluates_policy_sets("pulumi")
+            assert engines.evaluates_policy_sets("pulumi")
+            assert not engines.evaluates_security_scans("pulumi")
 
 
 class TestThePolicyGate:
-    async def test_a_pulumi_run_passes_without_a_synthetic_failure(self):
+    async def test_a_pulumi_run_now_fails_closed_like_terraform(self):
+        """The inverse of what this asserted before #1567's second half.
+
+        A mandatory set that the runner did not evaluate used to pass a Pulumi
+        run, because nothing could evaluate it and holding the apply forever was
+        the worse failure. Now the runner does evaluate, so a missing result is
+        the safety net firing for its real reason -- a runner that did not
+        report -- and it must block exactly as Terraform's does.
+        """
         ws = _ws()
         db = AsyncMock()
         db.get = AsyncMock(return_value=ws)
         mandatory = MagicMock(enforcement_level="mandatory", id=uuid.uuid4())
-        with patch.object(
-            policy_set_service, "applicable_policy_sets", AsyncMock(return_value=[mandatory])
-        ) as applicable:
+        mandatory.name = "baseline"
+        recorded = MagicMock(all=MagicMock(return_value=[]))
+        with (
+            patch.object(
+                policy_set_service, "applicable_policy_sets", AsyncMock(return_value=[mandatory])
+            ) as applicable,
+            patch.object(policy_set_service, "_insert_evaluations", AsyncMock()) as insert,
+            patch.object(policy_set_service, "run_is_policy_blocked", AsyncMock(return_value=True)),
+        ):
+            db.execute = AsyncMock(return_value=recorded)
+            gate = await policy_set_service.evaluate_post_plan(db, _run(ws))
+        assert gate == policy_set_service.GATE_BLOCKED
+        applicable.assert_awaited_once()
+        insert.assert_awaited_once()
+
+    async def test_a_pulumi_run_with_no_applicable_set_still_passes(self):
+        # Being evaluated is not the same as being gated: a workspace no set is
+        # scoped to must not acquire one by changing engine.
+        ws = _ws()
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=ws)
+        with patch.object(policy_set_service, "applicable_policy_sets", AsyncMock(return_value=[])):
             gate = await policy_set_service.evaluate_post_plan(db, _run(ws))
         assert gate == policy_set_service.GATE_PASSED
-        applicable.assert_not_awaited()
-        db.execute.assert_not_awaited()
 
     async def test_a_terraform_run_still_fails_closed(self):
         ws = _ws(engine="terraform")
@@ -97,9 +141,25 @@ class TestThePolicyGate:
         assert gate == policy_set_service.GATE_BLOCKED
         insert.assert_awaited_once()
 
-    def test_the_reason_names_the_engine_and_is_none_for_terraform(self):
-        assert "pulumi" in policy_set_service.policy_sets_not_evaluated_reason(_ws())
+    def test_no_engine_reports_a_not_evaluated_reason_today(self):
+        """Both known engines are evaluated, so the reason is None for both.
+
+        The mechanism is deliberately kept rather than deleted: it is how the
+        next engine that cannot be evaluated -- Ansible under #1407, which has
+        no separable plan for OPA to read at all -- reports that instead of
+        silently holding every apply. It is inert, not unused, and a reader who
+        finds a function that cannot currently return non-None should find this
+        test rather than wonder.
+        """
+        assert policy_set_service.policy_sets_not_evaluated_reason(_ws("pulumi")) is None
         assert policy_set_service.policy_sets_not_evaluated_reason(_ws("terraform")) is None
+
+    def test_the_reason_fires_for_an_engine_that_is_not_evaluated(self):
+        # Proves the mechanism still works, without waiting for Ansible.
+        with patch.object(engines, "evaluates_policy_sets", return_value=False):
+            reason = policy_set_service.policy_sets_not_evaluated_reason(_ws("pulumi"))
+        assert reason is not None
+        assert "pulumi" in reason
 
 
 class TestTheScanGate:

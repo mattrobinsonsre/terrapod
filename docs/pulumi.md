@@ -184,11 +184,16 @@ resource's old and new values, which is where a stack's secrets are.
   stack is imported into the Job, worked on against a file backend, and handed
   back once at the end — exactly as a Terraform run downloads and uploads its
   state. The service surface (`pulumi login`) is for local-mode use.
-- **OPA policy sets and security scanning do not apply yet.** Both read
-  Terraform plan JSON, which a Pulumi preview does not produce. Rather than
-  holding every apply for an evaluation that cannot happen, policy sets are not
-  evaluated for Pulumi runs and scanning is refused on a Pulumi workspace
-  (#1567). The run says so in `meta.not-evaluated-reason`.
+- **OPA policy sets apply; security scanning does not yet.** A preview produces
+  no Terraform plan JSON, so Terrapod builds an OPA input from the engine event
+  log instead: each resource's operation, type, URN, declared inputs and changed
+  property paths. Applicable sets are evaluated before the preview is reported,
+  and a mandatory failure holds the run exactly as it would on a Terraform
+  workspace. The input is **not** interchangeable with Terraform's — see
+  [`docs/policies.md`](policies.md#the-pulumi-input) before porting a rule.
+  Checkov and Trivy still read plan JSON, so scanning is refused on a Pulumi
+  workspace rather than holding every apply for a result that cannot arrive
+  (#1569); the run says so in `meta.not-scanned-reason`.
 
 ## See also
 

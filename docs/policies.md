@@ -38,12 +38,17 @@ that key is among the rule's accepted values. This is the same model
 roles use, so "policy set for production" is just a set scoped to
 `env: prod`.
 
-**Policy sets are not evaluated for Pulumi runs yet.** OPA evaluates the
-Terraform plan JSON, and a Pulumi run produces none until OPA over preview JSON
-lands (#1560). A Pulumi workspace is outside every policy set's scope, even a
-global mandatory one, so its applies are never held waiting for an evaluation
-that cannot happen. The run's `GET /api/v1/runs/{run_id}/policy-evaluations`
-says so in `meta.not-evaluated-reason`.
+**Policy sets are evaluated for Pulumi runs too**, against a different input —
+see [What a policy can read](#what-a-policy-can-read). A set scoped to a Pulumi
+workspace is enforced exactly as it is on a Terraform one: the runner evaluates
+applicable sets before reporting the preview, and a mandatory failure holds the
+run. The two inputs are not interchangeable, so a rule written against
+Terraform's plan JSON will not match a Pulumi resource, and vice versa.
+
+**Security scanning is still not available for Pulumi runs.** Checkov and Trivy
+read Terraform plan JSON. A Pulumi workspace cannot have an enforced scan
+turned on, so its applies are never held waiting for a result that cannot
+arrive; the run's scan endpoint says why in `meta.not-scanned-reason`.
 
 ## Writing a policy
 
@@ -71,10 +76,72 @@ A policy set **passes** when every policy's `deny` set is empty.
 
 ### What a policy can read
 
+`data.terrapod_context` is the same whatever the engine. `input` is **the
+engine's own account of the change**, so it differs between them.
+
 | Reference | Contents |
 |---|---|
-| `input` | The raw `terraform show -json` plan document — `input.resource_changes`, `input.planned_values`, etc. Existing community Terraform Rego works unchanged. |
+| `input` (Terraform) | The raw `terraform show -json` plan document — `input.resource_changes`, `input.planned_values`, etc. Existing community Terraform Rego works unchanged. |
+| `input` (Pulumi) | A document built from the preview's engine event log — see below. |
 | `data.terrapod_context` | Terrapod metadata: `workspace` (`id`, `name`, `labels`) and `run` (`id`, `message`, `source`, `is_destroy`, `plan_only`). |
+
+#### The Pulumi input
+
+`pulumi preview` has no equivalent of `terraform show -json`, so Terrapod builds
+one from the engine event log the preview writes:
+
+```json
+{
+  "engine": "pulumi",
+  "change_summary": {"create": 1, "update": 2, "same": 9},
+  "has_changes": true,
+  "resource_changes": [
+    {
+      "op": "create",
+      "urn": "urn:pulumi:dev::shop::aws:s3/bucket:Bucket::assets",
+      "type": "aws:s3/bucket:Bucket",
+      "name": "assets",
+      "parent": "urn:pulumi:dev::shop::pulumi:pulumi:Stack::shop-dev",
+      "provider": "urn:pulumi:dev::shop::pulumi:providers:aws::default::uuid",
+      "custom": true,
+      "protect": false,
+      "inputs": {"acl": "public-read"},
+      "diffs": ["acl"],
+      "detailed_diff": {"acl": {"kind": "update"}}
+    }
+  ]
+}
+```
+
+`resource_changes` deliberately echoes Terraform's key, so the shape of a rule
+carries across even though the contents do not:
+
+```rego
+package terrapod
+
+# No public buckets, whichever engine declares them.
+deny contains msg if {
+    some rc in input.resource_changes
+    rc.type == "aws:s3/bucket:Bucket"
+    rc.inputs.acl == "public-read"
+    msg := sprintf("%s is public-read", [rc.name])
+}
+```
+
+Three things to know before writing one:
+
+- **`inputs` is what the program declared**, the analogue of Terraform's
+  `change.after`. The resource's `outputs` and its previous state are not
+  carried: outputs are the provider's complete returned state, which adds
+  little to a decision and a great deal to the document.
+- **Secrets are redacted by Pulumi, not by Terrapod.** The engine replaces any
+  property marked secret with the literal string `"[secret]"` before writing
+  the log. A value that is sensitive but was never marked secret in the program
+  arrives in the clear — exactly as an unmarked sensitive value does in
+  Terraform's plan JSON, so do not treat this input as scrubbed.
+- **A preview that did not finish is not evaluated.** Without the engine's
+  summary event there is no honest account of the change, so no policy runs
+  rather than one deciding on a partial list.
 
 ```rego
 package terrapod

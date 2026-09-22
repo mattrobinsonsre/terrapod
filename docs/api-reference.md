@@ -4068,7 +4068,7 @@ The Rego is validated with `opa check` on create/update — broken Rego, or Rego
 GET /api/v1/runs/{run_id}/policy-evaluations
 ```
 
-Returns the policy evaluations recorded for a run, plus a `meta.summary` (`status`: `passed` / `advisory-failed` / `blocked`, and counts). Each evaluation's `result` carries the per-policy violations/warnings. This is the endpoint behind the run's `policy-checks` relationship link. For a run whose engine does not evaluate policy sets (Pulumi, until #1560), `meta.not-evaluated-reason` says why there are no evaluations. **Required permission:** `read` on the run's workspace.
+Returns the policy evaluations recorded for a run, plus a `meta.summary` (`status`: `passed` / `advisory-failed` / `blocked`, and counts). Each evaluation's `result` carries the per-policy violations/warnings. This is the endpoint behind the run's `policy-checks` relationship link. Both Terraform and Pulumi runs are evaluated, against their own engine's account of the change (see [`docs/policies.md`](policies.md#what-a-policy-can-read)). `meta.not-evaluated-reason` is present only for an engine that cannot be evaluated at all, and no current engine is in that position. **Required permission:** `read` on the run's workspace.
 
 ### Override Run Policy
 

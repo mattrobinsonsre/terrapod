@@ -180,7 +180,7 @@ class TestTheHooksARunGets:
             ),
             patch("terrapod.runner.phases.pulumi_exec.bind_plan_enabled", return_value=False),
             patch("terrapod.runner.exec_subprocess.run", return_value=MagicMock(exit_code=rc)),
-            patch.object(job_entrypoint, "_report_pulumi_preview"),
+            patch.object(job_entrypoint, "_finish_pulumi_preview", return_value=0),
             patch.object(job_entrypoint, "_hand_back_pulumi_state", return_value=rc),
         ):
             code = job_entrypoint._run_pulumi_phase(

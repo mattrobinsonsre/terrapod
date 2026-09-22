@@ -93,11 +93,17 @@ class PulumiStrategy:
     #: Resolves to `phases.pulumi.*` in the message catalogues.
     vocabulary = "pulumi"
 
-    #: Neither yet. The Pulumi runner produces no plan JSON for OPA or the
-    #: scanners to read; until OPA over preview JSON lands (#1560, #1567) and a
-    #: scan input exists (#1569), policy sets and scans are not applied to Pulumi
-    #: runs, rather than holding every apply for an evaluation that never comes.
-    evaluates_policy_sets = False
+    #: Policy sets, yes (#1567): the preview's engine event log is built into an
+    #: OPA input document carrying each resource's operation, type, URN and
+    #: declared inputs, and the runner evaluates applicable sets against it
+    #: before posting plan-result — the same order, and the same gate, as a
+    #: Terraform run.
+    evaluates_policy_sets = True
+
+    #: Security scans, not yet. Checkov and Trivy read Terraform plan JSON, and
+    #: whether they have a meaningful Pulumi input at all is #1569. Until then a
+    #: scan is not applied to a Pulumi run, rather than holding every apply for
+    #: a result that never comes.
     evaluates_security_scans = False
 
     #: Which phase each internal run status belongs to. The platform's status
