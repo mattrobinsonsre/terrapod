@@ -193,7 +193,7 @@ resource's old and new values, which is where a stack's secrets are.
   [`docs/policies.md`](policies.md#the-pulumi-input) before porting a rule.
   Checkov and Trivy still read plan JSON, so scanning is refused on a Pulumi
   workspace rather than holding every apply for a result that cannot arrive
-  (#1569); the run says so in `meta.not-scanned-reason`.
+  (#1569); the run says so in `meta.not-evaluated-reason`.
 
 ## See also
 

@@ -157,7 +157,16 @@ class TestRefresh:
 class TestTheHooksARunGets:
     """A workspace's hooks are the workspace's, whatever engine it uses."""
 
-    def _phase(self, monkeypatch, tmp_path, *, phase: str, hook_fails: str = "", rc: int = 0):
+    def _phase(
+        self,
+        monkeypatch,
+        tmp_path,
+        *,
+        phase: str,
+        hook_fails: str = "",
+        rc: int = 0,
+        finish_rc: int = 0,
+    ):
         from unittest.mock import MagicMock, patch
 
         from terrapod.runner import job_entrypoint
@@ -180,7 +189,7 @@ class TestTheHooksARunGets:
             ),
             patch("terrapod.runner.phases.pulumi_exec.bind_plan_enabled", return_value=False),
             patch("terrapod.runner.exec_subprocess.run", return_value=MagicMock(exit_code=rc)),
-            patch.object(job_entrypoint, "_finish_pulumi_preview", return_value=0),
+            patch.object(job_entrypoint, "_finish_pulumi_preview", return_value=finish_rc),
             patch.object(job_entrypoint, "_hand_back_pulumi_state", return_value=rc),
         ):
             code = job_entrypoint._run_pulumi_phase(
@@ -193,6 +202,20 @@ class TestTheHooksARunGets:
         ran, code = self._phase(monkeypatch, tmp_path, phase="preview")
         assert ran == ["pre_plan", "post_plan"]
         assert code == 0
+
+    def test_a_failed_policy_evaluation_stops_the_phase(self, monkeypatch, tmp_path):
+        """The caller must ACT on the reporting phase's exit code (#1567 review).
+
+        `_finish_pulumi_preview` returns non-zero when the evaluation could not
+        be completed. Without the caller's guard the run would carry on: the
+        post_plan hook would fire and the phase would return the preview's own
+        exit code, reporting a clean preview that no policy ever saw. Deleting
+        `if rc: return rc` previously passed the entire suite, which is why
+        this exists.
+        """
+        ran, code = self._phase(monkeypatch, tmp_path, phase="preview", finish_rc=1)
+        assert code == 1
+        assert ran == ["pre_plan"], "post_plan must not run once the gate has failed"
 
     def test_an_update_runs_the_apply_hooks(self, monkeypatch, tmp_path):
         ran, code = self._phase(monkeypatch, tmp_path, phase="update")

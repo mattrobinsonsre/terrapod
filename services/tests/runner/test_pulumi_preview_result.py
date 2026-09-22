@@ -256,9 +256,15 @@ class TestTheGateOnAPreview:
         assert "resource_changes" in handed
         assert "steps" not in handed
 
-    def test_a_denial_is_fatal_and_stops_the_plan_result(self, tmp_path):
-        # Same as the Terraform path: proceeding would apply the change the
-        # gate exists to stop, so the run ends non-zero and reports nothing.
+    def test_an_incomplete_evaluation_is_fatal_and_stops_the_plan_result(self, tmp_path):
+        """`PolicyEvaluationError` means the evaluation could not be COMPLETED.
+
+        It is raised only by `fetch_policy_bundle`, `post_results` and the OPA
+        tool fetch -- never by a denial, which `evaluate_set` records as
+        `outcome="failed"` and returns. Without results the server's gate has
+        nothing to read, so the run stops rather than handing the update phase
+        a plan no policy ever saw.
+        """
         from terrapod.runner import job_entrypoint
         from terrapod.runner.phases import opa
 
@@ -267,13 +273,36 @@ class TestTheGateOnAPreview:
             patch("terrapod.runner.phases.uploads.post_plan_result") as post,
             patch(
                 "terrapod.runner.phases.opa.evaluate_policies",
-                side_effect=opa.PolicyEvaluationError("denied"),
+                side_effect=opa.PolicyEvaluationError("policy bundle fetch failed"),
             ),
         ):
             rc = job_entrypoint._finish_pulumi_preview(self._cfg(), self._log(tmp_path))
 
         assert rc == 1
         post.assert_not_called()
+
+    def test_a_denial_is_not_fatal_here_and_the_plan_result_still_posts(self, tmp_path):
+        """A denial takes the runner's ordinary path; the SERVER holds the run.
+
+        This is what a real mandatory failure does, and it had no test: the
+        runner POSTs a `failed` outcome, `evaluate_policies` returns normally,
+        plan-result is posted, and `complete_plan` -> `evaluate_post_plan`
+        blocks. A runner exiting non-zero here would strand the run with no
+        evaluation recorded and nothing for an admin to override.
+        """
+        from terrapod.runner import job_entrypoint
+
+        with (
+            patch("terrapod.runner.phases.uploads.upload_plan_json"),
+            patch("terrapod.runner.phases.uploads.post_plan_result") as post,
+            # One set evaluated and POSTed -- the shape a denial really returns.
+            patch("terrapod.runner.phases.opa.evaluate_policies", return_value=1) as ev,
+        ):
+            rc = job_entrypoint._finish_pulumi_preview(self._cfg(), self._log(tmp_path))
+
+        assert rc == 0
+        ev.assert_called_once()
+        post.assert_called_once()
 
     def test_an_unfinished_preview_is_not_gated(self, tmp_path):
         # No summary event means no honest account of the change, so there is

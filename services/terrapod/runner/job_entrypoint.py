@@ -957,9 +957,14 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     if not is_update and result.exit_code == 0:
         rc = _finish_pulumi_preview(cfg, Path(event_log))
         if rc:
-            # A mandatory policy set denied, or the bundle could not be
-            # fetched. Fatal for the same reason it is on the Terraform path:
-            # proceeding would apply a change the gate exists to stop.
+            # The evaluation could not be COMPLETED -- the policy bundle could
+            # not be fetched, the OPA binary could not be obtained, or the
+            # results could not be POSTed. Not a denial: a denied policy is an
+            # ordinary outcome the runner records and posts, and the server's
+            # post-plan gate is what holds the run. Fatal for the same reason
+            # it is on the Terraform path: without results the gate has nothing
+            # to read, and proceeding would hand the update phase a plan no
+            # policy ever saw.
             return rc
         # After the preview is reported, so its result is visible whatever the
         # hook does — the same order the Terraform path uses.

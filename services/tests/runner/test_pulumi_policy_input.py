@@ -94,9 +94,70 @@ class TestWhatAPolicyCanRead:
         assert doc["has_changes"] is True
 
     def test_a_no_op_preview_says_so(self, tmp_path):
-        doc = pulumi_preview.build_policy_input(_log(tmp_path, _summary(same=9)))
+        # A real no-op preview emits a pre-event per unchanged resource, so the
+        # fixture carries them: an empty log would prove nothing here.
+        same = [_pre_event(op="same", urn=f"{URN}-{i}") for i in range(9)]
+        doc = pulumi_preview.build_policy_input(_log(tmp_path, *same, _summary(same=9)))
         assert doc["has_changes"] is False
         assert doc["resource_changes"] == []
+
+
+class TestUnchangedResourcesAreExcluded:
+    """`same` steps must not reach a policy (#1567 review).
+
+    The engine emits a `resourcePreEvent` for every resource it walks, not only
+    the ones it will touch -- `executeStep` skips only `DiffStep`, so a
+    `SameStep` is reported like any other. Carrying those would put a stack's
+    whole inventory under a key named `resource_changes`, and a rule matching
+    on type and a property would then deny a resource that is not changing:
+    a stack non-compliant since before the policy existed could never be
+    applied again, for any unrelated change.
+    """
+
+    def test_a_same_step_is_not_a_resource_change(self, tmp_path):
+        path = _log(
+            tmp_path,
+            _pre_event(op="same", urn=f"{URN}-untouched"),
+            _pre_event(op="create"),
+            _summary(create=1, same=1),
+        )
+        doc = pulumi_preview.build_policy_input(path)
+        assert [r["op"] for r in doc["resource_changes"]] == ["create"]
+        assert "untouched" not in json.dumps(doc)
+
+    def test_the_docs_example_rule_cannot_deny_an_unchanged_resource(self, tmp_path):
+        """The worked example in docs/policies.md has no `op` guard.
+
+        That is deliberate -- a rule should not have to remember one -- and it
+        is only safe because unchanged resources never arrive. This pins the
+        property the documented rule depends on.
+        """
+        offending_but_unchanged = _pre_event(
+            op="same",
+            new={"inputs": {"acl": "public-read"}, "parent": "", "provider": ""},
+        )
+        doc = pulumi_preview.build_policy_input(
+            _log(tmp_path, offending_but_unchanged, _summary(same=1))
+        )
+        matches = [
+            r
+            for r in doc["resource_changes"]
+            if r["type"] == "aws:s3/bucket:Bucket" and r["inputs"].get("acl") == "public-read"
+        ]
+        assert matches == []
+
+    def test_the_summary_still_counts_what_was_excluded(self, tmp_path):
+        # A policy that wants to reason about the unchanged portion has no
+        # per-resource view of it, but the counts are still honest.
+        path = _log(
+            tmp_path,
+            _pre_event(op="same"),
+            _pre_event(op="update"),
+            _summary(update=1, same=1),
+        )
+        doc = pulumi_preview.build_policy_input(path)
+        assert doc["change_summary"] == {"update": 1, "same": 1}
+        assert len(doc["resource_changes"]) == 1
 
 
 class TestWhatItDeliberatelyOmits:
@@ -111,12 +172,75 @@ class TestWhatItDeliberatelyOmits:
         assert "outputs" not in doc["resource_changes"][0]
         assert "arn:aws:s3:::assets" not in json.dumps(doc)
 
-    def test_the_old_state_is_not_carried(self, tmp_path):
-        # A policy decides about what is being asked for, not what was there.
+    def test_the_old_state_is_ignored_when_there_is_a_new_one(self, tmp_path):
+        # For a create or an update the policy decides about what is being
+        # asked for, not what was there. (A delete is the exception — it has no
+        # new state at all; see TestADeleteStep.)
         event = _pre_event(old={"inputs": {"acl": "private"}})
         doc = pulumi_preview.build_policy_input(_log(tmp_path, event, _summary()))
         assert "old" not in doc["resource_changes"][0]
         assert "private" not in json.dumps(doc)
+
+
+class TestADeleteStep:
+    """A delete carries no new state, and reading only `new` lies (#1567 review).
+
+    `DeleteStep.New()` returns nil, so `metadata.new` is null on a delete.
+    Taking the fields from `new` alone would report `inputs: {}` and
+    `protect: false` for every deletion — making the most obvious Pulumi policy
+    there is, "do not delete a protected resource", impossible to write while
+    appearing to work.
+    """
+
+    def _delete(self, **old):
+        base = {
+            "type": "aws:s3/bucket:Bucket",
+            "urn": URN,
+            "custom": True,
+            "parent": "urn:pulumi:dev::shop::pulumi:pulumi:Stack::shop-dev",
+            "provider": "urn:pulumi:dev::shop::pulumi:providers:aws::default::uuid",
+            "protect": True,
+            "inputs": {"acl": "private"},
+        }
+        base.update(old)
+        return _pre_event(op="delete", new=None, old=base)
+
+    def test_a_protected_resource_reads_as_protected(self, tmp_path):
+        doc = pulumi_preview.build_policy_input(_log(tmp_path, self._delete(), _summary(delete=1)))
+        (res,) = doc["resource_changes"]
+        assert res["op"] == "delete"
+        assert res["protect"] is True, "a policy must be able to deny this"
+
+    def test_the_deleted_resource_describes_itself(self, tmp_path):
+        doc = pulumi_preview.build_policy_input(_log(tmp_path, self._delete(), _summary(delete=1)))
+        (res,) = doc["resource_changes"]
+        assert res["inputs"] == {"acl": "private"}
+        assert res["custom"] is True
+        assert res["parent"].endswith("shop-dev")
+
+    def test_an_unprotected_delete_is_still_false(self, tmp_path):
+        # The fallback must not turn every delete into "protected".
+        doc = pulumi_preview.build_policy_input(
+            _log(tmp_path, self._delete(protect=False), _summary(delete=1))
+        )
+        assert doc["resource_changes"][0]["protect"] is False
+
+
+class TestTheResourceName:
+    def test_a_name_containing_the_delimiter_survives(self, tmp_path):
+        """Pulumi's own URN.Name() rejoins everything from the fourth part on.
+
+        `rsplit("::", 1)` would return "b" for a resource named "a::b" — a
+        different resource, and a policy matching on name would act on the
+        wrong one.
+        """
+        urn = "urn:pulumi:dev::shop::aws:s3/bucket:Bucket::a::b"
+        doc = pulumi_preview.build_policy_input(_log(tmp_path, _pre_event(urn=urn), _summary()))
+        assert doc["resource_changes"][0]["name"] == "a::b"
+
+    def test_an_ordinary_name_is_unaffected(self, tmp_path):
+        doc = pulumi_preview.build_policy_input(_log(tmp_path, _pre_event(), _summary()))
+        assert doc["resource_changes"][0]["name"] == "assets"
 
     def test_an_engine_redacted_secret_stays_redacted(self, tmp_path):
         """Pulumi replaces a marked secret with "[secret]" before writing the log.
