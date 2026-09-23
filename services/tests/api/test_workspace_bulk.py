@@ -64,10 +64,12 @@ def _mock_ws(
     labels=None,
     auto_apply=False,
     var_files=None,
+    engine="terraform",
 ):
     w = MagicMock()
     w.id = ws_id or uuid.uuid4()
     w.name = name
+    w.engine = engine
     w.execution_mode = execution_mode
     w.execution_backend = execution_backend
     w.engine_version = engine_version
@@ -80,6 +82,16 @@ def _mock_ws(
     w.labels = labels if labels is not None else {}
     w.auto_apply = auto_apply
     w.var_files = var_files if var_files is not None else []
+    # Settings bulk update may write (#1763), at the column defaults a real
+    # workspace always carries. Left as MagicMocks they reach the response's
+    # `diff` as the "from" value and fail JSON serialisation — a fixture
+    # artefact, but one that reads like a product bug when it fires.
+    w.security_scan_enforcement = "advisory"
+    w.security_scan_engine = "checkov"
+    w.security_scan_severity_threshold = "high"
+    w.security_scan_skip_rules = []
+    w.ai_summary_mode = "default"
+    w.ai_summary_context = ""
     return w
 
 
@@ -646,3 +658,153 @@ class TestBulkUpdatePoolRbac:
         assert resp.status_code == 200, resp.text
         assert [link.agent_pool_id for link in ws.agent_pool_links] == [pool.id]
         db.commit.assert_awaited_once()
+
+
+# ── security scanning + AI plan summary (#1763) ──────────────────────────
+
+
+class TestBulkUpdateScanAndAISettings:
+    """The two feature sets that shipped without an apply-to-existing path.
+
+    The engine-dependent one is the interesting case: `security-scan-enforcement`
+    cannot be judged from the payload, because Checkov and Trivy read Terraform
+    plan JSON and a Pulumi workspace has nothing to scan (#1567). A mixed-engine
+    match set is the normal case here, so this is not an edge.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_all_six_settings_apply(self, _db, _redis, _storage):
+        ws = _mock_ws(name="w1")
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_list_result([ws]))
+        db.add, db.commit, db.rollback = MagicMock(), AsyncMock(), AsyncMock()
+        body = {
+            "filter": {"all": True},
+            "update": {
+                "security-scan-enforcement": "enforced",
+                "security-scan-engine": "trivy",
+                "security-scan-severity-threshold": "critical",
+                "security-scan-skip-rules": ["CKV_AWS_24"],
+                "ai-summary-mode": "enabled",
+                "ai-summary-context": "payments estate",
+            },
+            "dry_run": False,
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/workspaces/actions/bulk-update", json=body, headers=_AUTH
+            )
+        assert resp.status_code == 200, resp.text
+        assert ws.security_scan_enforcement == "enforced"
+        assert ws.security_scan_engine == "trivy"
+        assert ws.security_scan_severity_threshold == "critical"
+        assert ws.security_scan_skip_rules == ["CKV_AWS_24"]
+        assert ws.ai_summary_mode == "enabled"
+        assert ws.ai_summary_context == "payments estate"
+        db.commit.assert_awaited_once()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_enforcement_is_refused_when_any_matched_engine_is_unscannable(
+        self, _db, _redis, _storage
+    ):
+        """The defect this guard exists to stop reaching a whole fleet.
+
+        Without it, `enforced` lands on the Pulumi workspace and every apply
+        there is held forever waiting on a scan result that cannot arrive.
+        All-or-nothing: the Terraform workspace is not mutated either.
+        """
+        tf = _mock_ws(name="tf-net", engine="terraform")
+        pu = _mock_ws(name="pulumi-app", engine="pulumi")
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_list_result([tf, pu]))
+        db.add, db.commit, db.rollback = MagicMock(), AsyncMock(), AsyncMock()
+        body = {
+            "filter": {"all": True},
+            "update": {"security-scan-enforcement": "enforced"},
+            "dry_run": False,
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/workspaces/actions/bulk-update", json=body, headers=_AUTH
+            )
+        assert resp.status_code == 422, resp.text
+        assert "pulumi-app" in resp.text
+        assert tf.security_scan_enforcement == "advisory"
+        assert pu.security_scan_enforcement == "advisory"
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_off_is_allowed_on_an_unscannable_engine(self, _db, _redis, _storage):
+        """`off` is the value such a workspace is meant to hold — never refused."""
+        pu = _mock_ws(name="pulumi-app", engine="pulumi")
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_list_result([pu]))
+        db.add, db.commit, db.rollback = MagicMock(), AsyncMock(), AsyncMock()
+        body = {
+            "filter": {"all": True},
+            "update": {"security-scan-enforcement": "off"},
+            "dry_run": False,
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/workspaces/actions/bulk-update", json=body, headers=_AUTH
+            )
+        assert resp.status_code == 200, resp.text
+        assert pu.security_scan_enforcement == "off"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_bad_enum_is_refused_before_any_mutation(self, _db, _redis, _storage):
+        ws = _mock_ws(name="w1")
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_list_result([ws]))
+        db.commit, db.rollback = AsyncMock(), AsyncMock()
+        body = {
+            "filter": {"all": True},
+            "update": {"security-scan-engine": "semgrep"},
+            "dry_run": False,
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/workspaces/actions/bulk-update", json=body, headers=_AUTH
+            )
+        assert resp.status_code == 422, resp.text
+        assert ws.security_scan_engine == "checkov"
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_bulk_enforces_the_same_rule_as_the_workspace_patch(self, _db, _redis, _storage):
+        """Both surfaces call `services.workspace_settings`, so both refuse this.
+
+        The point of the shared module: a bulk update must not accept a value
+        the single-workspace PATCH rejects. Restating the rule here is how the
+        two come to disagree, so the cap is asserted through the endpoint.
+        """
+        from terrapod.services.workspace_settings import MAX_SCAN_SKIP_RULES
+
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_list_result([_mock_ws(name="w1")]))
+        db.commit, db.rollback = AsyncMock(), AsyncMock()
+        body = {
+            "filter": {"all": True},
+            "update": {
+                "security-scan-skip-rules": [f"CKV_{i}" for i in range(MAX_SCAN_SKIP_RULES + 1)]
+            },
+            "dry_run": False,
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/workspaces/actions/bulk-update", json=body, headers=_AUTH
+            )
+        assert resp.status_code == 422, resp.text
+        assert str(MAX_SCAN_SKIP_RULES) in resp.text
+        db.commit.assert_not_awaited()

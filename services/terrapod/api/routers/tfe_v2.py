@@ -38,7 +38,9 @@ import hashlib
 import os
 import re
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -78,6 +80,7 @@ from terrapod.services import (
     ha_role,  # noqa: F401
     pool_set,
     run_service,
+    workspace_settings,
 )
 from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
 from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
@@ -271,35 +274,20 @@ def _validate_drift_ignore_rules(raw: object) -> list[str]:
     return result
 
 
-def _scan_enum(value: object, valid: frozenset[str], field: str, default: str) -> str:
-    """Validate a security-scan enum field (#1036); 422 on an unknown value."""
-    s = str(value if value is not None else default)
-    if s not in valid:
-        raise HTTPException(status_code=422, detail=f"{field} must be one of {sorted(valid)}")
-    return s
+def _422(validate: Callable[..., Any], *args: Any) -> Any:
+    """Call a `services.workspace_settings` rule, surfacing its ValueError as a 422.
+
+    The rules themselves live in the service because four paths write these
+    settings (#1763) — this is only the HTTP skin over them.
+    """
+    try:
+        return validate(*args)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 def _validate_scan_skip_rules(raw: object) -> list[str]:
-    """Validate `security-scan-skip-rules` (#1036): a list of non-empty rule-id
-    strings (Checkov CKV_* / Trivy AVD-* ids), capped for sanity."""
-    if raw is None:
-        return []
-    if not isinstance(raw, list):
-        raise HTTPException(status_code=422, detail="security-scan-skip-rules must be a list")
-    if len(raw) > 200:
-        raise HTTPException(status_code=422, detail="security-scan-skip-rules: maximum 200 entries")
-    out: list[str] = []
-    for v in raw:
-        if not isinstance(v, str) or not v.strip():
-            raise HTTPException(
-                status_code=422, detail="security-scan-skip-rules entries must be non-empty strings"
-            )
-        if len(v) > 100:
-            raise HTTPException(
-                status_code=422, detail="security-scan-skip-rules entries must be ≤ 100 characters"
-            )
-        out.append(v.strip())
-    return out
+    return _422(workspace_settings.validate_scan_skip_rules, raw)
 
 
 def _validate_workspace_name(name: str, engine: str = TERRAFORM) -> str:
@@ -320,30 +308,7 @@ def _validate_workspace_name(name: str, engine: str = TERRAFORM) -> str:
 
 
 def _scan_enforcement_for(raw: object, engine: str, default: str) -> str:
-    """`security-scan-enforcement`, refused where the engine is never scanned (#1567).
-
-    Checkov and Trivy read Terraform plan JSON, so a Pulumi run has nothing to
-    scan. `enforced` there held every apply for a result that never came, and
-    `advisory` would record a setting that does nothing while saying it did
-    something. Such a workspace defaults to, and accepts only, `off`.
-    """
-    from terrapod.engines import evaluates_security_scans
-
-    if not evaluates_security_scans(engine):
-        default = "off"
-    value = _scan_enum(
-        raw, frozenset({"off", "advisory", "enforced"}), "security-scan-enforcement", default
-    )
-    if value != "off" and not evaluates_security_scans(engine):
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"security-scan-enforcement must be off for a {engine} workspace: "
-                "security scanning reads Terraform plan JSON and is not available "
-                f"for {engine} runs yet"
-            ),
-        )
-    return value
+    return _422(workspace_settings.validate_scan_enforcement, raw, engine, default)
 
 
 def _validate_pulumi_bind_plan(raw: object, engine: str) -> bool:
@@ -1377,17 +1342,12 @@ async def _create_workspace_impl(
         security_scan_enforcement=_scan_enforcement_for(
             attrs.get("security-scan-enforcement"), engine, "advisory"
         ),
-        security_scan_engine=_scan_enum(
-            attrs.get("security-scan-engine"),
-            frozenset({"checkov", "trivy", "both"}),
-            "security-scan-engine",
-            "checkov",
+        security_scan_engine=_422(
+            workspace_settings.validate_scan_engine, attrs.get("security-scan-engine")
         ),
-        security_scan_severity_threshold=_scan_enum(
+        security_scan_severity_threshold=_422(
+            workspace_settings.validate_scan_severity_threshold,
             attrs.get("security-scan-severity-threshold"),
-            frozenset({"critical", "high", "medium", "low"}),
-            "security-scan-severity-threshold",
-            "high",
         ),
         security_scan_skip_rules=_validate_scan_skip_rules(
             attrs.get("security-scan-skip-rules", [])
@@ -1988,50 +1948,28 @@ async def update_workspace(
             attrs["security-scan-enforcement"], ws.engine, "advisory"
         )
     if "security-scan-engine" in attrs:
-        ws.security_scan_engine = _scan_enum(
-            attrs["security-scan-engine"],
-            frozenset({"checkov", "trivy", "both"}),
-            "security-scan-engine",
-            "checkov",
+        ws.security_scan_engine = _422(
+            workspace_settings.validate_scan_engine, attrs["security-scan-engine"]
         )
     if "security-scan-severity-threshold" in attrs:
-        ws.security_scan_severity_threshold = _scan_enum(
+        ws.security_scan_severity_threshold = _422(
+            workspace_settings.validate_scan_severity_threshold,
             attrs["security-scan-severity-threshold"],
-            frozenset({"critical", "high", "medium", "low"}),
-            "security-scan-severity-threshold",
-            "high",
         )
     if "security-scan-skip-rules" in attrs:
         ws.security_scan_skip_rules = _validate_scan_skip_rules(attrs["security-scan-skip-rules"])
     if "plan-expiry-seconds" in attrs:
         ws.plan_expiry_seconds = _parse_plan_expiry(attrs["plan-expiry-seconds"])
 
-    # AI plan summary opt-in (#401). The mode is a three-state enum
-    # constrained by a DB CHECK; reject other values up-front rather than
-    # surfacing a less-helpful 500 from the integrity error.
+    # AI plan summary opt-in (#401).
     if "ai-summary-mode" in attrs:
-        mode = attrs["ai-summary-mode"]
-        if mode not in ("default", "enabled", "disabled"):
-            raise HTTPException(
-                status_code=422,
-                detail="ai-summary-mode must be 'default', 'enabled', or 'disabled'",
-            )
-        ws.ai_summary_mode = mode
+        ws.ai_summary_mode = _422(
+            workspace_settings.validate_ai_summary_mode, attrs["ai-summary-mode"]
+        )
     if "ai-summary-context" in attrs:
-        ctx = attrs["ai-summary-context"]
-        if ctx is None:
-            ctx = ""
-        if not isinstance(ctx, str):
-            raise HTTPException(status_code=422, detail="ai-summary-context must be a string")
-        # Cap at a reasonable size — workspace context is a hint, not a
-        # repo. Anything bigger lives in fleet_context or a doc the user
-        # can paste into their prompt_suffix.
-        if len(ctx) > 4000:
-            raise HTTPException(
-                status_code=422,
-                detail="ai-summary-context max length is 4000 characters",
-            )
-        ws.ai_summary_context = ctx
+        ws.ai_summary_context = _422(
+            workspace_settings.validate_ai_summary_context, attrs["ai-summary-context"]
+        )
 
     # VCS connection. Accepted as an attribute as well as a relationship,
     # because create takes the attribute (`vcs-connection-id`) and update took

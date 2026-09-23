@@ -2918,6 +2918,12 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
     "resource-cpu": "1", "resource-memory": "2Gi",
     "var-files": ["envs/prod.tfvars"],
     "labels": {"reviewed": "2026-q2"},
+    "security-scan-enforcement": "enforced",
+    "security-scan-engine": "checkov",
+    "security-scan-severity-threshold": "high",
+    "security-scan-skip-rules": ["CKV_AWS_24"],
+    "ai-summary-mode": "enabled",
+    "ai-summary-context": "payments estate; PCI in scope",
     "run-tasks": [
       { "name": "opa-policy-check", "url": "http://opa:8080/webhook",
         "hmac-key": "secret", "stage": "post_plan", "enforcement-level": "mandatory" }
@@ -2934,6 +2940,8 @@ Semantics:
 
 - **Validated once up front** — field enums, `labels` reserved-key check, run-task/notification specs, and agent-pool existence + caller pool-`write` RBAC on **every** pool named. Any error ⇒ `422`, **zero mutation**.
 - **Agent pools** accept either `agent-pool-id` (one pool, replacing the set) or `agent-pool-ids` (the set) — the same mutually-exclusive pair as the workspace endpoints; both in one `update` ⇒ `422`.
+- **`security-scan-enforcement` is checked against the matched set**, not just the payload. Checkov and Trivy read Terraform plan JSON, so a Pulumi workspace has nothing to scan and accepts only `off`. Setting `advisory` or `enforced` across a match set containing one ⇒ `422` naming the offenders, with **zero mutation** — a mixed-engine match set is the normal case, and the alternative is every apply on those workspaces held waiting for a scan result that cannot arrive. Narrow the filter to exclude them.
+- **Scan and AI-summary settings use the same rules as the single-workspace `PATCH`** (enum values, the 200-entry skip-rule cap, the 4000-character context cap), so bulk update never accepts a value the workspace endpoint rejects.
 - `run-tasks` / `notification-configurations` **upsert by `(workspace, name)`**: created if absent, updated in place if present (so re-running with a changed `url` rotates it across the fleet).
 - **All-or-nothing**: the whole batch commits or nothing does. `dry_run` (default `true`, not enforced) runs the identical code path and rolls back — the preview is exactly what apply would do, with provably zero side effects.
 - **Triggers no runs** — pure config write; the change lands on each workspace's next normal run. Reversible (it only writes settings rows).
