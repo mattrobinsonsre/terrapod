@@ -320,6 +320,7 @@ field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field CreateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
+field CreateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field CreateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
@@ -1030,6 +1031,7 @@ field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field UpdateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
+field UpdateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field UpdateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
@@ -1219,6 +1221,7 @@ field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoMerge bool `json:"auto-merge"`
 field Workspace.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field Workspace.CreatedAt string `json:"created-at,omitempty"`
+field Workspace.DebugMode bool `json:"debug-mode"`
 field Workspace.DriftDetectionEnabled bool `json:"drift-detection-enabled"`
 field Workspace.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field Workspace.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`

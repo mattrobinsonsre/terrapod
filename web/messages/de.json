@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-Version",
       "noExpiry": "Kein Ablauf",
-      "addDriftIgnoreRule": "Regel hinzufügen"
+      "addDriftIgnoreRule": "Regel hinzufügen",
+      "debugModeHint": "Pods fehlgeschlagener Runner auf den von dieser Regel erstellten Arbeitsbereichen offen halten. Standardmäßig aus – ein offen gehaltener Pod behält die Zugangsdaten dieses Arbeitsbereichs."
     },
     "table": {
       "name": "Name",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "Zustandsaktion fehlgeschlagen",
       "uploadState": "Zustand konnte nicht hochgeladen werden",
       "uploadStateFile": "Zustandsdatei konnte nicht hochgeladen werden",
-      "updateSecurityScan": "Sicherheitsprüfung konnte nicht aktualisiert werden"
+      "updateSecurityScan": "Sicherheitsprüfung konnte nicht aktualisiert werden",
+      "updateDebugMode": "Debugmodus konnte nicht aktualisiert werden"
     },
     "subtabs": {
       "state": "Zustand",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Keine Regeln ignoriert.",
       "skipRulesHint": "Kommagetrennte Scanner-Regel-IDs, die in diesem Arbeitsbereich ignoriert werden."
+    },
+    "debugMode": {
+      "title": "Runner-Debugmodus",
+      "description": "Den Pod eines fehlgeschlagenen Laufs offen halten, damit Sie hineinschauen können. Der Lauf wird zuerst als fehlgeschlagen gemeldet; erst danach bleibt der Container stehen.",
+      "label": "Debugmodus",
+      "hint": "Standardmäßig aus. Solange er aktiv ist, bleibt der Pod eines fehlgeschlagenen Runners für das von Ihrem Betreiber konfigurierte Zeitfenster per exec erreichbar und behält währenddessen die Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs.",
+      "activeBadge": "Aktiv",
+      "bannerTitle": "Der Debugmodus ist für diesen Arbeitsbereich aktiviert",
+      "bannerBody": "Der Pod eines fehlgeschlagenen Laufs wird zur Untersuchung offen gehalten, statt sich zu beenden, und behält dabei die Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs. Schalten Sie den Debugmodus aus, sobald Sie mit der Fehlersuche fertig sind.",
+      "confirmEnable": "Debugmodus aktivieren? Der Pod eines fehlgeschlagenen Laufs wird mit den Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs offen gehalten, bis das Zeitfenster abläuft oder Sie den Pod löschen."
     }
   },
   "graphs": {

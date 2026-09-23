@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Version de Terragrunt",
       "noExpiry": "Pas d'expiration",
-      "addDriftIgnoreRule": "Ajouter une règle"
+      "addDriftIgnoreRule": "Ajouter une règle",
+      "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Désactivé par défaut — un pod maintenu ouvert conserve les identifiants de cet espace de travail."
     },
     "table": {
       "name": "Nom",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "Échec de l'action sur l'état",
       "uploadState": "Échec du téléversement de l'état",
       "uploadStateFile": "Échec du téléversement du fichier d'état",
-      "updateSecurityScan": "Échec de la mise à jour de l'analyse de sécurité"
+      "updateSecurityScan": "Échec de la mise à jour de l'analyse de sécurité",
+      "updateDebugMode": "Échec de la mise à jour du mode débogage"
     },
     "subtabs": {
       "state": "État",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Aucune règle ignorée.",
       "skipRulesHint": "Identifiants de règles de l'analyseur à ignorer dans cet espace de travail, séparés par des virgules."
+    },
+    "debugMode": {
+      "title": "Mode débogage du runner",
+      "description": "Maintenir ouvert le pod d'une exécution en échec pour pouvoir y entrer. L'échec de l'exécution est signalé d'abord ; le conteneur ne reste actif qu'ensuite.",
+      "label": "Mode débogage",
+      "hint": "Désactivé par défaut. Lorsqu'il est actif, le pod d'un runner en échec reste accessible par exec pendant la fenêtre configurée par votre opérateur, et il conserve pendant tout ce temps les identifiants et les variables déchiffrées de cet espace de travail.",
+      "activeBadge": "Actif",
+      "bannerTitle": "Le mode débogage est activé pour cet espace de travail",
+      "bannerBody": "Le pod d'une exécution en échec est maintenu ouvert pour inspection au lieu de se terminer, et il conserve pendant ce temps les identifiants et les variables déchiffrées de cet espace de travail. Désactivez le mode débogage une fois le diagnostic terminé.",
+      "confirmEnable": "Activer le mode débogage ? Le pod d'une exécution en échec sera maintenu ouvert avec les identifiants et les variables déchiffrées de cet espace de travail jusqu'à l'expiration de la fenêtre ou jusqu'à ce que vous supprimiez le pod."
     }
   },
   "graphs": {

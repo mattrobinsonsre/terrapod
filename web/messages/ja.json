@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt バージョン",
       "noExpiry": "期限なし",
-      "addDriftIgnoreRule": "ルールを追加"
+      "addDriftIgnoreRule": "ルールを追加",
+      "debugModeHint": "このルールが作成するワークスペースで、失敗したランナーの Pod を保持します。既定ではオフです — 保持された Pod はそのワークスペースの認証情報を保持します。"
     },
     "table": {
       "name": "名前",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "状態操作に失敗しました",
       "uploadState": "状態のアップロードに失敗しました",
       "uploadStateFile": "状態ファイルのアップロードに失敗しました",
-      "updateSecurityScan": "セキュリティスキャンの更新に失敗しました"
+      "updateSecurityScan": "セキュリティスキャンの更新に失敗しました",
+      "updateDebugMode": "デバッグモードを更新できませんでした"
     },
     "subtabs": {
       "state": "状態",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "無視するルールはありません。",
       "skipRulesHint": "このワークスペースで無視するスキャナーのルール ID をカンマ区切りで指定します。"
+    },
+    "debugMode": {
+      "title": "ランナーのデバッグモード",
+      "description": "失敗した実行の Pod を開いたまま保持し、中に入って調べられるようにします。実行の失敗はまず報告され、その後にコンテナが残ります。",
+      "label": "デバッグモード",
+      "hint": "既定ではオフです。オンの間、失敗したランナーの Pod は運用者が設定した時間枠のあいだ exec で入れる状態のまま残り、その間ずっとこのワークスペースの認証情報と復号された変数を保持します。",
+      "activeBadge": "有効",
+      "bannerTitle": "このワークスペースではデバッグモードが有効です",
+      "bannerBody": "失敗した実行の Pod は終了せずに調査のため保持され、その間このワークスペースの認証情報と復号された変数を保持し続けます。調査が終わったらデバッグモードをオフにしてください。",
+      "confirmEnable": "デバッグモードを有効にしますか？失敗した実行の Pod は、時間枠が切れるか Pod を削除するまで、このワークスペースの認証情報と復号された変数を保持したまま残ります。"
     }
   },
   "graphs": {

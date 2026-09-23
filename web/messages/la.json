@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Versio Terragrunt",
       "noExpiry": "Nulla expiratio",
-      "addDriftIgnoreRule": "Regulam addere"
+      "addDriftIgnoreRule": "Regulam addere",
+      "debugModeHint": "Podes cursorum defectorum apertos tenere in locis operis quos haec regula creat. Praedefinite exstinctus — pod retentus credentias illius loci operis servat."
     },
     "table": {
       "name": "Nomen",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "Actio status defecit",
       "uploadState": "Status subdi non potuit",
       "uploadStateFile": "Tabula status subdi non potuit",
-      "updateSecurityScan": "Scrutinium securitatis renovari non potuit"
+      "updateSecurityScan": "Scrutinium securitatis renovari non potuit",
+      "updateDebugMode": "Modus purgandi renovari non potuit"
     },
     "subtabs": {
       "state": "Status",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Nullae regulae neglectae.",
       "skipRulesHint": "Identificationes regularum scrutatoris, commatibus separatae, in hoc loco operis neglegendae."
+    },
+    "debugMode": {
+      "title": "Modus purgandi cursoris",
+      "description": "Pod cursus defecti apertum tenere ut intrare possis. Cursus prius ut defectus nuntiatur; tum demum continens stat.",
+      "label": "Modus purgandi",
+      "hint": "Praedefinite exstinctus. Dum accensus est, pod cursoris defecti per fenestram ab operatore tuo constitutam per exec adiri potest, et per id totum tempus credentias variabilesque decryptas huius loci operis servat.",
+      "activeBadge": "Actuosus",
+      "bannerTitle": "Modus purgandi huic loco operis accensus est",
+      "bannerBody": "Pod cursus defecti ad inspiciendum apertus tenetur potius quam finitur, et dum tenetur credentias variabilesque decryptas huius loci operis servat. Modum purgandi exstingue cum quaerere desieris.",
+      "confirmEnable": "Modum purgandi accendere? Pod cursus defecti apertus tenebitur cum credentiis variabilibusque decryptis huius loci operis, donec fenestra exeat aut pod deleas."
     }
   },
   "graphs": {

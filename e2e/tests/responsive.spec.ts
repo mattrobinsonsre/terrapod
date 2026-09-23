@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect, type Page, type Route, type Dialog } from '@playwright/test';
 // Lives in helpers/, not here: Playwright forbids a spec importing a spec, and
 // any suite adding a surface should be able to reuse the mobile guard.
 import { expectNoHorizontalPageScroll } from '../helpers/responsive';
@@ -1315,5 +1315,44 @@ test.describe('Vault diagnostics (#1663)', () => {
     await expect(result.getByText('This reference will not resolve as it is.')).toBeVisible()
     await expect(result.getByText('Terrapod may read it')).toBeVisible()
     await expectNoHorizontalPageScroll(page)
+  })
+})
+
+test.describe('Runner debug mode (#1764)', () => {
+  test('the banner and toggle fit a phone and keep their signal', async ({ page }) => {
+    // The banner carries two long sentences of security copy, which is the
+    // shape most likely to push a phone layout sideways — and the one that
+    // must not be dropped at narrow widths, because it is the only place an
+    // operator is told that failed pods are holding this workspace's
+    // credentials.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespdebug'))
+
+    await page.goto(`/workspaces/${wsId}`)
+    const toggle = page.getByLabel('Debug mode', { exact: true })
+    await expect(toggle).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // Tier 2 of the #719 confirm policy, and only in the ON direction: turning
+    // debug mode on is what starts holding credentials. The handler is
+    // registered BEFORE the click because window.confirm() blocks the handler.
+    let msg = ''
+    page.once('dialog', async (d) => { msg = d.message(); await d.accept() })
+    await toggle.check()
+    await expect.poll(() => msg, { timeout: 5_000 }).toContain('debug mode')
+
+    await expect(page.getByTestId('debug-mode-banner')).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // Turning it back off is the safe direction, so it must NOT prompt --
+    // a confirm in front of "stop holding credentials" trains people to
+    // dismiss the one that matters.
+    let offDialogFired = false
+    const spy = async (d: Dialog) => { offDialogFired = true; await d.dismiss() }
+    page.on('dialog', spy)
+    await toggle.uncheck()
+    await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0)
+    expect(offDialogFired).toBe(false)
+    page.off('dialog', spy)
   })
 })

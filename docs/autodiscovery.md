@@ -80,6 +80,7 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `drift-ignore-rules` | list | no | Address/attribute-path patterns whose drift is ignored on created workspaces (#1763). |
 | `plan-expiry-seconds` | int | no | Auto-discard an unconfirmed plan after this many seconds. Unset means no expiry (#1763). |
 | `slack-channel` | string | no | Slack channel for run notifications on created workspaces; empty is silent (#1763). |
+| `debug-mode` | bool | no | Hold a **failed** runner pod open on created workspaces so an operator can `kubectl exec` into it. Defaults off — a held pod keeps the run's credentials and decrypted variables for the deployment's linger window, so it is worth enabling deliberately rather than across every discovered directory (#1764). See [runners.md → Debug mode](runners.md#debug-mode-inspecting-a-failed-runner-pod). |
 
 ## Pattern syntax
 

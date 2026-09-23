@@ -478,6 +478,7 @@
   "redis.url",
   "runners.affinity",
   "runners.azureWorkloadIdentity",
+  "runners.debugLingerSeconds",
   "runners.defaultExecutionBackend",
   "runners.defaultPulumiVersion",
   "runners.defaultTerraformVersion",

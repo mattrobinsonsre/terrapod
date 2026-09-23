@@ -810,6 +810,18 @@ class RunnerListener:
                 resource_cpu=attrs.get("resource-cpu", "1"),
                 resource_memory=attrs.get("resource-memory", "2Gi"),
                 ca_secret_name=ca_secret_name,
+                # Debug mode (#1764). The API sends intent only -- it cannot
+                # read `runners.*`, which is the listener's own config -- so the
+                # window is resolved here. A workspace admin asks for a debug
+                # pod; the deployment operator decides how long one may live,
+                # and `debugLingerSeconds: 0` refuses outright.
+                #
+                # Passed to the engine's builder, which forwards **kwargs to the
+                # neutral one, so this reaches every engine rather than only
+                # Terraform: a failed Pulumi update is as worth getting inside.
+                debug_linger_seconds=(
+                    self.runner_config.debug_linger_seconds if attrs.get("debug-mode") else 0
+                ),
             )
         except Exception as e:
             logger.error(

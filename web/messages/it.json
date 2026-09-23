@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Versione di Terragrunt",
       "noExpiry": "Nessuna scadenza",
-      "addDriftIgnoreRule": "Aggiungi regola"
+      "addDriftIgnoreRule": "Aggiungi regola",
+      "debugModeHint": "Mantenere aperti i pod dei runner falliti sugli spazi di lavoro creati da questa regola. Disattivato per impostazione predefinita: un pod mantenuto aperto conserva le credenziali di quello spazio di lavoro."
     },
     "table": {
       "name": "Nome",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "Azione sullo stato non riuscita",
       "uploadState": "Impossibile caricare lo stato",
       "uploadStateFile": "Impossibile caricare il file di stato",
-      "updateSecurityScan": "Impossibile aggiornare l'analisi di sicurezza"
+      "updateSecurityScan": "Impossibile aggiornare l'analisi di sicurezza",
+      "updateDebugMode": "Impossibile aggiornare la modalità debug"
     },
     "subtabs": {
       "state": "Stato",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Nessuna regola ignorata.",
       "skipRulesHint": "ID delle regole dello scanner, separati da virgole, da ignorare in questo workspace."
+    },
+    "debugMode": {
+      "title": "Modalità debug del runner",
+      "description": "Mantenere aperto il pod di un'esecuzione fallita per potervi accedere. L'esecuzione viene prima segnalata come fallita; solo dopo il container resta attivo.",
+      "label": "Modalità debug",
+      "hint": "Disattivata per impostazione predefinita. Quando è attiva, il pod di un runner fallito resta raggiungibile con exec per la finestra configurata dal tuo operatore e conserva per tutto quel tempo le credenziali e le variabili decifrate di questo spazio di lavoro.",
+      "activeBadge": "Attiva",
+      "bannerTitle": "La modalità debug è attiva per questo spazio di lavoro",
+      "bannerBody": "Il pod di un'esecuzione fallita viene mantenuto aperto per l'ispezione invece di terminare e, finché resta aperto, conserva le credenziali e le variabili decifrate di questo spazio di lavoro. Disattiva la modalità debug quando hai finito di indagare.",
+      "confirmEnable": "Attivare la modalità debug? Il pod di un'esecuzione fallita verrà mantenuto aperto con le credenziali e le variabili decifrate di questo spazio di lavoro fino alla scadenza della finestra o finché non eliminerai il pod."
     }
   },
   "graphs": {

@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-versjon",
       "noExpiry": "Ingen utløp",
-      "addDriftIgnoreRule": "Legg til regel"
+      "addDriftIgnoreRule": "Legg til regel",
+      "debugModeHint": "Hold pods fra mislykkede runnere åpne på arbeidsområdene denne regelen oppretter. Av som standard – en pod som holdes åpen, beholder det arbeidsområdets legitimasjon."
     },
     "table": {
       "name": "Navn",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "Tilstandshandling mislyktes",
       "uploadState": "Kunne ikke laste opp tilstand",
       "uploadStateFile": "Kunne ikke laste opp tilstandsfil",
-      "updateSecurityScan": "Kunne ikke oppdatere sikkerhetsskanningen"
+      "updateSecurityScan": "Kunne ikke oppdatere sikkerhetsskanningen",
+      "updateDebugMode": "Kunne ikke oppdatere feilsøkingsmodus"
     },
     "subtabs": {
       "state": "Tilstand",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Ingen regler ignoreres.",
       "skipRulesHint": "Kommaseparerte regel-ID-er for skanneren som ignoreres i dette arbeidsområdet."
+    },
+    "debugMode": {
+      "title": "Feilsøkingsmodus for runneren",
+      "description": "Hold poden til en mislykket kjøring åpen så du kan gå inn i den. Kjøringen rapporteres først som mislykket; først deretter blir containeren stående.",
+      "label": "Feilsøkingsmodus",
+      "hint": "Av som standard. Når den er på, forblir poden til en mislykket runner tilgjengelig med exec i vinduet operatøren din har konfigurert, og den beholder hele den tiden dette arbeidsområdets legitimasjon og dekrypterte variabler.",
+      "activeBadge": "Aktiv",
+      "bannerTitle": "Feilsøkingsmodus er på for dette arbeidsområdet",
+      "bannerBody": "Poden til en mislykket kjøring holdes åpen for inspeksjon i stedet for å avslutte, og den beholder dette arbeidsområdets legitimasjon og dekrypterte variabler så lenge den holdes. Slå av feilsøkingsmodus når du er ferdig med å feilsøke.",
+      "confirmEnable": "Slå på feilsøkingsmodus? Poden til en mislykket kjøring holdes åpen med dette arbeidsområdets legitimasjon og dekrypterte variabler til vinduet utløper eller du sletter poden."
     }
   },
   "graphs": {

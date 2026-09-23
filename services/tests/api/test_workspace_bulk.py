@@ -91,6 +91,7 @@ def _mock_ws(
     w.security_scan_engine = "checkov"
     w.security_scan_severity_threshold = "high"
     w.security_scan_skip_rules = []
+    w.debug_mode = False
     w.ai_summary_mode = "default"
     w.ai_summary_context = ""
     w.terragrunt_enabled = False

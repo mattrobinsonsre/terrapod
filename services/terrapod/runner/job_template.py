@@ -187,6 +187,12 @@ def build_job_spec(
     #: Defaults to empty so a caller that supplies none renders a spec with no
     #: engine env rather than failing — the neutral half stands on its own.
     engine_env: list[dict] | None = None,
+    #: How long a FAILED pod is held open for inspection (#1764). 0 -- the
+    #: default -- is the ordinary behaviour: the container exits as it always
+    #: has. Resolved by the listener from the deployment's configured window,
+    #: so a workspace asks for a debug pod and the operator decides how long
+    #: one may survive.
+    debug_linger_seconds: int = 0,
 ) -> dict:
     """Build a K8s Job spec for a run phase.
 
@@ -276,6 +282,14 @@ def build_job_spec(
             "value": str(runner_config.termination_grace_period_seconds),
         }
     )
+
+    # Debug mode (#1764). Platform plumbing, not an engine instruction: it
+    # governs what the orchestrator does after the run has been reported,
+    # whichever engine produced it, so it sits here rather than in engine_env.
+    if debug_linger_seconds > 0:
+        container_env.append(
+            {"name": "TP_DEBUG_LINGER_SECONDS", "value": str(debug_linger_seconds)}
+        )
 
     # Workspace env vars (category=env). Values are sourced from the per-run
     # vars Secret via secretKeyRef — never plaintext in the Job spec, since env
@@ -424,8 +438,18 @@ def build_job_spec(
                     },
                 ],
             },
-            "activeDeadlineSeconds": timeout_minutes * 60,
-            "ttlSecondsAfterFinished": runner_config.ttl_seconds_after_finished,
+            # The run's own timeout, plus the debug window when one is in
+            # force (#1764). This is what actually bounds a lingering pod: the
+            # orchestrator sleeps for at most `debug_linger_seconds`, and if it
+            # misbehaves the cluster ends the pod here regardless. A pod holds
+            # the run's auth token and its decrypted tfvars, so the ceiling is
+            # a safety property rather than a convenience.
+            "activeDeadlineSeconds": timeout_minutes * 60 + max(0, debug_linger_seconds),
+            "ttlSecondsAfterFinished": (
+                max(runner_config.ttl_seconds_after_finished, debug_linger_seconds)
+                if debug_linger_seconds > 0
+                else runner_config.ttl_seconds_after_finished
+            ),
             "template": {
                 "metadata": {
                     "labels": pod_labels,
