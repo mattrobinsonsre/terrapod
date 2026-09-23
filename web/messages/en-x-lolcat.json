@@ -1053,7 +1053,29 @@
       "notificationTemplates": "Notificashun templatez (createded on each new workspace)",
       "saving": "Savin...",
       "previewTitle": "Walk teh repo an preview which workspaces dis rule WUD create — no persistence",
-      "parallelism": "Parallelizm"
+      "parallelism": "Parallelizm",
+      "governance": "Sekurity Scannin an AI Summry",
+      "governanceHint": "Applyd 2 evry werkspace dis rule makez.",
+      "scanEnforcement": "Enforsmint",
+      "scanOff": "Do nawt scan",
+      "scanAdvisory": "Scan an report onlee",
+      "scanEnforced": "Blok apply on findins",
+      "scanEngine": "Scannr",
+      "scanEngineBoth": "Checkov an Trivy",
+      "scanThreshold": "Report findins at or ovr",
+      "severityCritical": "kritikal",
+      "severityHigh": "hai",
+      "severityMedium": "medium",
+      "severityLow": "lo",
+      "aiSummaryMode": "AI Plan Summry",
+      "aiSummaryDefault": "Follo deployment defawlt",
+      "aiSummaryEnabled": "Alwayz summarize",
+      "aiSummaryDisabled": "Nevr summarize",
+      "execution": "Eksekushun, VCS an Drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt vershun",
+      "noExpiry": "No expiry. srsly.",
+      "addDriftIgnoreRule": "Add rule"
     },
     "table": {
       "name": "Naym",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "Failz ta rollbak teh state version",
       "stateActionFailed": "State acshun failz",
       "uploadState": "Failz ta uplod teh state",
-      "uploadStateFile": "Failz ta uplod teh state file"
+      "uploadStateFile": "Failz ta uplod teh state file",
+      "updateSecurityScan": "Faild 2 updayt sekurity scannin"
     },
     "subtabs": {
       "state": "Stayt",
@@ -2880,6 +2903,28 @@
         "global": "Globul",
         "rule": "Matchd by rool"
       }
+    },
+    "securityScan": {
+      "title": "Sekurity Scannin",
+      "description": "Scan da plan fer unsafe infrastruktur b4 it getz applyd.",
+      "enforcement": "Enforsmint",
+      "enforcementOff": "Do nawt scan",
+      "enforcementAdvisory": "Scan an report onlee",
+      "enforcementEnforced": "Blok apply on findins",
+      "engine": "Scannr",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov an Trivy",
+      "threshold": "Report findins at or ovr",
+      "thresholdCritical": "kritikal",
+      "thresholdHigh": "hai",
+      "thresholdMedium": "medium",
+      "thresholdLow": "lo",
+      "skipRules": "Ignord rulez",
+      "skipRulesSuffix": "(optshunal)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "No rulez ignord. yay.",
+      "skipRulesHint": "Comma-separayted scannr rule idz 2 ignor on dis werkspace."
     }
   },
   "graphs": {

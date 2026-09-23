@@ -1053,7 +1053,29 @@
       "notificationTemplates": "Notification templates (created on each new workspace)",
       "saving": "Saving...",
       "previewTitle": "Walk the repo and preview which workspaces this rule WOULD create — no persistence",
-      "parallelism": "Parallelism"
+      "parallelism": "Parallelism",
+      "governance": "Security scanning and AI summary",
+      "governanceHint": "Applied to every workspace this rule creates.",
+      "scanEnforcement": "Security scan enforcement",
+      "scanOff": "Do not scan",
+      "scanAdvisory": "Scan and report only",
+      "scanEnforced": "Block apply on findings",
+      "scanEngine": "Scanner",
+      "scanEngineBoth": "Checkov and Trivy",
+      "scanThreshold": "Report findings at or above",
+      "severityCritical": "Critical",
+      "severityHigh": "High",
+      "severityMedium": "Medium",
+      "severityLow": "Low",
+      "aiSummaryMode": "AI plan summary",
+      "aiSummaryDefault": "Follow deployment default",
+      "aiSummaryEnabled": "Always summarize",
+      "aiSummaryDisabled": "Never summarize",
+      "execution": "Execution, VCS and drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt version",
+      "noExpiry": "No expiry",
+      "addDriftIgnoreRule": "Add rule"
     },
     "table": {
       "name": "Name",
@@ -2867,7 +2889,8 @@
       "rollbackStateVersion": "Failed to rollback state version",
       "stateActionFailed": "State action failed",
       "uploadState": "Failed to upload state",
-      "uploadStateFile": "Failed to upload state file"
+      "uploadStateFile": "Failed to upload state file",
+      "updateSecurityScan": "Failed to update security scanning"
     },
     "applicableVarsets": {
       "title": "Variable sets",
@@ -2880,6 +2903,28 @@
         "global": "Global",
         "rule": "Matched by rule"
       }
+    },
+    "securityScan": {
+      "title": "Security Scanning",
+      "description": "Scan the plan for insecure infrastructure before it is applied.",
+      "enforcement": "Enforcement",
+      "enforcementOff": "Do not scan",
+      "enforcementAdvisory": "Scan and report only",
+      "enforcementEnforced": "Block apply on findings",
+      "engine": "Scanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov and Trivy",
+      "threshold": "Report findings at or above",
+      "thresholdCritical": "Critical",
+      "thresholdHigh": "High",
+      "thresholdMedium": "Medium",
+      "thresholdLow": "Low",
+      "skipRules": "Ignored rules",
+      "skipRulesSuffix": "(optional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "No rules ignored.",
+      "skipRulesHint": "Comma-separated scanner rule ids to ignore on this workspace."
     }
   },
   "graphs": {

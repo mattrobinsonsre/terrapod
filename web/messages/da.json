@@ -1053,7 +1053,29 @@
       "notificationTemplates": "Notifikationsskabeloner (oprettes på hvert nyt arbejdsområde)",
       "saving": "Gemmer...",
       "previewTitle": "Gennemgå repoet og forhåndsvis, hvilke arbejdsområder denne regel VILLE oprette — ingen persistens",
-      "parallelism": "Parallelitet"
+      "parallelism": "Parallelitet",
+      "governance": "Sikkerhedsscanning og AI-opsummering",
+      "governanceHint": "Anvendes på hvert arbejdsområde, som denne regel opretter.",
+      "scanEnforcement": "Håndhævelse",
+      "scanOff": "Scan ikke",
+      "scanAdvisory": "Scan og rapportér kun",
+      "scanEnforced": "Blokér anvendelse ved fund",
+      "scanEngine": "Scanner",
+      "scanEngineBoth": "Checkov og Trivy",
+      "scanThreshold": "Rapportér fund fra og med",
+      "severityCritical": "kritisk",
+      "severityHigh": "høj",
+      "severityMedium": "mellem",
+      "severityLow": "lav",
+      "aiSummaryMode": "AI-planoversigt",
+      "aiSummaryDefault": "Følg deployment-standard",
+      "aiSummaryEnabled": "Opsummer altid",
+      "aiSummaryDisabled": "Opsummer aldrig",
+      "execution": "Kørsel, VCS og drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-version",
+      "noExpiry": "Ingen udløb",
+      "addDriftIgnoreRule": "Tilføj regel"
     },
     "table": {
       "name": "Navn",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "Kunne ikke rulle tilstandsversion tilbage",
       "stateActionFailed": "Tilstandshandling mislykkedes",
       "uploadState": "Kunne ikke uploade tilstand",
-      "uploadStateFile": "Kunne ikke uploade tilstandsfil"
+      "uploadStateFile": "Kunne ikke uploade tilstandsfil",
+      "updateSecurityScan": "Sikkerhedsscanningen kunne ikke opdateres"
     },
     "subtabs": {
       "state": "Tilstand",
@@ -2880,6 +2903,28 @@
         "global": "Global",
         "rule": "Matchet af regel"
       }
+    },
+    "securityScan": {
+      "title": "Sikkerhedsscanning",
+      "description": "Scan planen for usikker infrastruktur, før den anvendes.",
+      "enforcement": "Håndhævelse",
+      "enforcementOff": "Scan ikke",
+      "enforcementAdvisory": "Scan og rapportér kun",
+      "enforcementEnforced": "Blokér anvendelse ved fund",
+      "engine": "Scanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov og Trivy",
+      "threshold": "Rapportér fund fra og med",
+      "thresholdCritical": "kritisk",
+      "thresholdHigh": "høj",
+      "thresholdMedium": "mellem",
+      "thresholdLow": "lav",
+      "skipRules": "Ignorerede regler",
+      "skipRulesSuffix": "(valgfrit)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Ingen regler ignoreres.",
+      "skipRulesHint": "Kommaseparerede regel-id'er for scanneren, der ignoreres i dette arbejdsområde."
     }
   },
   "graphs": {

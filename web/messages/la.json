@@ -1053,7 +1053,29 @@
       "notificationTemplates": "Exemplaria nuntiationum (in quolibet novo loco operis creata)",
       "saving": "Servatur...",
       "previewTitle": "Repositorium perambula et praevide quae loca operis haec regula CREET — nulla persistentia",
-      "parallelism": "Parallelismus"
+      "parallelism": "Parallelismus",
+      "governance": "Scrutinium securitatis et summarium AI",
+      "governanceHint": "Ad omnem locum operis hac regula creatum applicatur.",
+      "scanEnforcement": "Coactio",
+      "scanOff": "Non scrutari",
+      "scanAdvisory": "Scrutari et nuntiare tantum",
+      "scanEnforced": "Applicationem impedire si quid inventum est",
+      "scanEngine": "Scrutator",
+      "scanEngineBoth": "Checkov et Trivy",
+      "scanThreshold": "Inventa nuntiare ab",
+      "severityCritical": "criticus",
+      "severityHigh": "altus",
+      "severityMedium": "medius",
+      "severityLow": "humilis",
+      "aiSummaryMode": "Summarium Consilii AI",
+      "aiSummaryDefault": "Praedefinitum instructionis sequi",
+      "aiSummaryEnabled": "Semper summatim redigere",
+      "aiSummaryDisabled": "Numquam summatim redigere",
+      "execution": "Executio, VCS et aberratio",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versio Terragrunt",
+      "noExpiry": "Nulla expiratio",
+      "addDriftIgnoreRule": "Regulam addere"
     },
     "table": {
       "name": "Nomen",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "Versio status retrovolvi non potuit",
       "stateActionFailed": "Actio status defecit",
       "uploadState": "Status subdi non potuit",
-      "uploadStateFile": "Tabula status subdi non potuit"
+      "uploadStateFile": "Tabula status subdi non potuit",
+      "updateSecurityScan": "Scrutinium securitatis renovari non potuit"
     },
     "subtabs": {
       "state": "Status",
@@ -2880,6 +2903,28 @@
         "global": "Globalis",
         "rule": "Regula congruens"
       }
+    },
+    "securityScan": {
+      "title": "Scrutinium securitatis",
+      "description": "Consilium de infrastructura non tuta scrutare antequam applicetur.",
+      "enforcement": "Coactio",
+      "enforcementOff": "Non scrutari",
+      "enforcementAdvisory": "Scrutari et nuntiare tantum",
+      "enforcementEnforced": "Applicationem impedire si quid inventum est",
+      "engine": "Scrutator",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov et Trivy",
+      "threshold": "Inventa nuntiare ab",
+      "thresholdCritical": "criticus",
+      "thresholdHigh": "altus",
+      "thresholdMedium": "medius",
+      "thresholdLow": "humilis",
+      "skipRules": "Regulae neglectae",
+      "skipRulesSuffix": "(optio)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Nullae regulae neglectae.",
+      "skipRulesHint": "Identificationes regularum scrutatoris, commatibus separatae, in hoc loco operis neglegendae."
     }
   },
   "graphs": {

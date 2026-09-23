@@ -1053,7 +1053,29 @@
       "notificationTemplates": "Шаблони сповіщень (створюються в кожному новому робочому просторі)",
       "saving": "Збереження...",
       "previewTitle": "Пройти по репозиторію і переглянути, які робочі простори це правило СТВОРИЛО Б — без збереження",
-      "parallelism": "Паралелізм"
+      "parallelism": "Паралелізм",
+      "governance": "Перевірка безпеки та зведення ШІ",
+      "governanceHint": "Застосовується до всіх робочих просторів, створених цим правилом.",
+      "scanEnforcement": "Режим застосування",
+      "scanOff": "Не перевіряти",
+      "scanAdvisory": "Лише перевіряти та повідомляти",
+      "scanEnforced": "Блокувати застосування за наявності знахідок",
+      "scanEngine": "Сканер",
+      "scanEngineBoth": "Checkov і Trivy",
+      "scanThreshold": "Повідомляти про знахідки починаючи з",
+      "severityCritical": "критичний",
+      "severityHigh": "високий",
+      "severityMedium": "середній",
+      "severityLow": "низький",
+      "aiSummaryMode": "Зведення плану ШІ",
+      "aiSummaryDefault": "Дотримуватися типового значення розгортання",
+      "aiSummaryEnabled": "Завжди створювати зведення",
+      "aiSummaryDisabled": "Ніколи не створювати зведення",
+      "execution": "Виконання, VCS і дрейф",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Версія Terragrunt",
+      "noExpiry": "Без завершення",
+      "addDriftIgnoreRule": "Додати правило"
     },
     "table": {
       "name": "Назва",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "Не вдалося відкотити версію стану",
       "stateActionFailed": "Не вдалося виконати дію зі станом",
       "uploadState": "Не вдалося завантажити стан",
-      "uploadStateFile": "Не вдалося завантажити файл стану"
+      "uploadStateFile": "Не вдалося завантажити файл стану",
+      "updateSecurityScan": "Не вдалося оновити перевірку безпеки"
     },
     "subtabs": {
       "state": "Стан",
@@ -2880,6 +2903,28 @@
         "global": "Глобальний",
         "rule": "Відповідає правилу"
       }
+    },
+    "securityScan": {
+      "title": "Перевірка безпеки",
+      "description": "Перевіряти план на небезпечну інфраструктуру перед застосуванням.",
+      "enforcement": "Режим застосування",
+      "enforcementOff": "Не перевіряти",
+      "enforcementAdvisory": "Лише перевіряти та повідомляти",
+      "enforcementEnforced": "Блокувати застосування за наявності знахідок",
+      "engine": "Сканер",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov і Trivy",
+      "threshold": "Повідомляти про знахідки починаючи з",
+      "thresholdCritical": "критичний",
+      "thresholdHigh": "високий",
+      "thresholdMedium": "середній",
+      "thresholdLow": "низький",
+      "skipRules": "Ігноровані правила",
+      "skipRulesSuffix": "(необов'язково)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Правила не ігноруються.",
+      "skipRulesHint": "Ідентифікатори правил сканера через кому, які ігноруються у цьому робочому просторі."
     }
   },
   "graphs": {

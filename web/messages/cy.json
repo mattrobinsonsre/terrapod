@@ -1053,7 +1053,29 @@
       "notificationTemplates": "Templedi hysbysu (crëir ar bob gweithfan newydd)",
       "saving": "Wrthi'n cadw...",
       "previewTitle": "Cerdded y storfa a rhagolygu pa weithfannau y BYDDAI'r rheol hon yn eu creu — dim cadw",
-      "parallelism": "Cyfochredd"
+      "parallelism": "Cyfochredd",
+      "governance": "Sgan diogelwch a chrynodeb AI",
+      "governanceHint": "Yn berthnasol i bob gweithfan a grëir gan y rheol hon.",
+      "scanEnforcement": "Gorfodi",
+      "scanOff": "Peidio â sganio",
+      "scanAdvisory": "Sganio ac adrodd yn unig",
+      "scanEnforced": "Rhwystro gweithredu os ceir canfyddiadau",
+      "scanEngine": "Sganiwr",
+      "scanEngineBoth": "Checkov a Trivy",
+      "scanThreshold": "Adrodd canfyddiadau ar neu uwchlaw",
+      "severityCritical": "critigol",
+      "severityHigh": "uchel",
+      "severityMedium": "canolig",
+      "severityLow": "isel",
+      "aiSummaryMode": "Crynodeb Cynllun AI",
+      "aiSummaryDefault": "Dilyn rhagosodiad y defnydd",
+      "aiSummaryEnabled": "Crynhoi bob amser",
+      "aiSummaryDisabled": "Peidio â chrynhoi byth",
+      "execution": "Gweithredu, VCS a drifft",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Fersiwn Terragrunt",
+      "noExpiry": "Dim dod i ben",
+      "addDriftIgnoreRule": "Ychwanegu rheol"
     },
     "table": {
       "name": "Enw",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "Methwyd dychwelyd y fersiwn cyflwr",
       "stateActionFailed": "Methodd y weithred gyflwr",
       "uploadState": "Methwyd llwytho'r cyflwr i fyny",
-      "uploadStateFile": "Methwyd llwytho'r ffeil gyflwr i fyny"
+      "uploadStateFile": "Methwyd llwytho'r ffeil gyflwr i fyny",
+      "updateSecurityScan": "Methwyd diweddaru'r sgan diogelwch"
     },
     "subtabs": {
       "state": "Cyflwr",
@@ -2880,6 +2903,28 @@
         "global": "Byd-eang",
         "rule": "Cydweddu yn ôl rheol"
       }
+    },
+    "securityScan": {
+      "title": "Sgan diogelwch",
+      "description": "Sganio'r cynllun am seilwaith anniogel cyn ei weithredu.",
+      "enforcement": "Gorfodi",
+      "enforcementOff": "Peidio â sganio",
+      "enforcementAdvisory": "Sganio ac adrodd yn unig",
+      "enforcementEnforced": "Rhwystro gweithredu os ceir canfyddiadau",
+      "engine": "Sganiwr",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov a Trivy",
+      "threshold": "Adrodd canfyddiadau ar neu uwchlaw",
+      "thresholdCritical": "critigol",
+      "thresholdHigh": "uchel",
+      "thresholdMedium": "canolig",
+      "thresholdLow": "isel",
+      "skipRules": "Rheolau a anwybyddir",
+      "skipRulesSuffix": "(dewisol)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Ni anwybyddir unrhyw reolau.",
+      "skipRulesHint": "IDau rheolau'r sganiwr, wedi'u gwahanu gan gomas, i'w hanwybyddu ar y weithfan hon."
     }
   },
   "graphs": {

@@ -79,6 +79,14 @@ export default function BulkUpdatePage() {
   const router = useRouter()
   const t = useTranslations('adminBulkUpdate')
   const tMode = useTranslations('common.autoApplyMode')
+  // Reuses the workspace page's own strings (#1763) so a fleet-wide change and
+  // the per-workspace one are described in the same words, in every locale.
+  const tScan = useTranslations('workspaceDetail.securityScan')
+  const tAi = useTranslations('workspaceDetail.aiSummary')
+  const tWs = useTranslations('workspaceDetail')
+  const tAd = useTranslations('adminAutodiscovery.form')
+  // A generic yes/no pair that already exists in every locale.
+  const tCommon = useTranslations('runDetail.common')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pools, setPools] = useState<AgentPool[]>([])
@@ -105,6 +113,20 @@ export default function BulkUpdatePage() {
   const [uAgentPoolId, setUAgentPoolId] = useState('')
   const [uResourceCpu, setUResourceCpu] = useState('')
   const [uResourceMemory, setUResourceMemory] = useState('')
+  const [uScanEnforcement, setUScanEnforcement] = useState('')
+  const [uScanEngine, setUScanEngine] = useState('')
+  const [uScanThreshold, setUScanThreshold] = useState('')
+  const [uAiSummaryMode, setUAiSummaryMode] = useState('')
+  const [uTerragruntEnabled, setUTerragruntEnabled] = useState('')
+  const [uTerragruntVersion, setUTerragruntVersion] = useState('')
+  const [uVcsWorkflow, setUVcsWorkflow] = useState('')
+  const [uAutoMerge, setUAutoMerge] = useState('')
+  const [uAutoMergeStrategy, setUAutoMergeStrategy] = useState('')
+  const [uDriftEnabled, setUDriftEnabled] = useState('')
+  const [uDriftInterval, setUDriftInterval] = useState('')
+  const [uPlanExpiry, setUPlanExpiry] = useState('')
+  const [uSlackChannel, setUSlackChannel] = useState('')
+  const [uBindPlan, setUBindPlan] = useState('')
   const [uSetLabels, setUSetLabels] = useState(false)
   const [uLabels, setULabels] = useState<Record<string, string>>({})
   const [uSetVarFiles, setUSetVarFiles] = useState(false)
@@ -170,6 +192,22 @@ export default function BulkUpdatePage() {
     if (uAgentPoolId) u['agent-pool-id'] = uAgentPoolId
     if (uResourceCpu.trim()) u['resource-cpu'] = uResourceCpu.trim()
     if (uResourceMemory.trim()) u['resource-memory'] = uResourceMemory.trim()
+    if (uScanEnforcement) u['security-scan-enforcement'] = uScanEnforcement
+    if (uScanEngine) u['security-scan-engine'] = uScanEngine
+    if (uScanThreshold) u['security-scan-severity-threshold'] = uScanThreshold
+    if (uAiSummaryMode) u['ai-summary-mode'] = uAiSummaryMode
+    // A tri-state '' | 'true' | 'false': a plain checkbox cannot say "leave
+    // this alone", and the endpoint type-checks booleans rather than coercing.
+    if (uTerragruntEnabled) u['terragrunt-enabled'] = uTerragruntEnabled === 'true'
+    if (uTerragruntVersion.trim()) u['terragrunt-version'] = uTerragruntVersion.trim()
+    if (uVcsWorkflow) u['vcs-workflow'] = uVcsWorkflow
+    if (uAutoMerge) u['auto-merge'] = uAutoMerge === 'true'
+    if (uAutoMergeStrategy) u['auto-merge-strategy'] = uAutoMergeStrategy
+    if (uDriftEnabled) u['drift-detection-enabled'] = uDriftEnabled === 'true'
+    if (uDriftInterval.trim()) u['drift-detection-interval-seconds'] = Number(uDriftInterval)
+    if (uPlanExpiry.trim()) u['plan-expiry-seconds'] = Number(uPlanExpiry)
+    if (uSlackChannel.trim()) u['slack-channel'] = uSlackChannel.trim()
+    if (uBindPlan) u['pulumi-bind-plan'] = uBindPlan === 'true'
     if (uSetLabels) u.labels = uLabels
     if (uSetVarFiles) u['var-files'] = uVarFiles.map((s) => s.trim()).filter(Boolean)
     if (uSetRunTasks) u['run-tasks'] = uRunTasks
@@ -542,6 +580,177 @@ export default function BulkUpdatePage() {
                 placeholder={t('unchanged')}
                 className={inputCls}
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-800">
+            <div>
+              <label className={labelCls}>{tScan('enforcement')}</label>
+              <select
+                value={uScanEnforcement}
+                onChange={(e) => setUScanEnforcement(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="off">{tScan('enforcementOff')}</option>
+                <option value="advisory">{tScan('enforcementAdvisory')}</option>
+                <option value="enforced">{tScan('enforcementEnforced')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tScan('engine')}</label>
+              <select
+                value={uScanEngine}
+                onChange={(e) => setUScanEngine(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="checkov">{tScan('engineCheckov')}</option>
+                <option value="trivy">{tScan('engineTrivy')}</option>
+                <option value="both">{tScan('engineBoth')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tScan('threshold')}</label>
+              <select
+                value={uScanThreshold}
+                onChange={(e) => setUScanThreshold(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="critical">{tScan('thresholdCritical')}</option>
+                <option value="high">{tScan('thresholdHigh')}</option>
+                <option value="medium">{tScan('thresholdMedium')}</option>
+                <option value="low">{tScan('thresholdLow')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tAd('terragruntEnabled')}</label>
+              <select
+                value={uTerragruntEnabled}
+                onChange={(e) => setUTerragruntEnabled(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="true">{tCommon('yes')}</option>
+                <option value="false">{tCommon('no')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tAd('terragruntVersion')}</label>
+              <input
+                type="text"
+                value={uTerragruntVersion}
+                onChange={(e) => setUTerragruntVersion(e.target.value)}
+                placeholder={t('unchanged')}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>{tWs('fields.vcsWorkflow')}</label>
+              <select
+                value={uVcsWorkflow}
+                onChange={(e) => setUVcsWorkflow(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="merge_then_apply">{tWs('fields.vcsWorkflowMergeThenApply')}</option>
+                <option value="apply_then_merge">{tWs('fields.vcsWorkflowApplyThenMerge')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tWs('fields.autoMerge')}</label>
+              <select
+                value={uAutoMerge}
+                onChange={(e) => setUAutoMerge(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="true">{tCommon('yes')}</option>
+                <option value="false">{tCommon('no')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tWs('fields.autoMergeStrategy')}</label>
+              <select
+                value={uAutoMergeStrategy}
+                onChange={(e) => setUAutoMergeStrategy(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="merge">merge</option>{/* i18n-ignore */}
+                <option value="squash">squash</option>{/* i18n-ignore */}
+                <option value="rebase">rebase</option>{/* i18n-ignore */}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tWs('drift.title')}</label>
+              <select
+                value={uDriftEnabled}
+                onChange={(e) => setUDriftEnabled(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="true">{tCommon('yes')}</option>
+                <option value="false">{tCommon('no')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tWs('drift.checkInterval')}</label>
+              <input
+                type="number"
+                min={0}
+                value={uDriftInterval}
+                onChange={(e) => setUDriftInterval(e.target.value)}
+                placeholder={t('unchanged')}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>{tWs('planExpiry.expireAfter')}</label>
+              <input
+                type="number"
+                min={0}
+                value={uPlanExpiry}
+                onChange={(e) => setUPlanExpiry(e.target.value)}
+                placeholder={t('unchanged')}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>{tWs('slack.channel')}</label>
+              <input
+                type="text"
+                value={uSlackChannel}
+                onChange={(e) => setUSlackChannel(e.target.value)}
+                placeholder={t('unchanged')}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>{tWs('fields.bindPlan')}</label>
+              <select
+                value={uBindPlan}
+                onChange={(e) => setUBindPlan(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="true">{tCommon('yes')}</option>
+                <option value="false">{tCommon('no')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tAi('title')}</label>
+              <select
+                value={uAiSummaryMode}
+                onChange={(e) => setUAiSummaryMode(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="default">{tAi('modeDefault')}</option>
+                <option value="enabled">{tAi('modeEnabled')}</option>
+                <option value="disabled">{tAi('modeDisabled')}</option>
+              </select>
             </div>
           </div>
 

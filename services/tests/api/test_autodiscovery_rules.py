@@ -52,6 +52,25 @@ def _mock_rule(
     r.on_directory_delete = "flag"
     r.labels = {"env": "monorepo"}
     r.owner_email = "admin@example.com"
+    # Templated scan / AI-summary settings (#1763), at the column defaults a
+    # real rule always carries. Left as MagicMocks they reach the serialised
+    # response and fail JSON encoding.
+    r.security_scan_enforcement = "advisory"
+    r.security_scan_engine = "checkov"
+    r.security_scan_severity_threshold = "high"
+    r.security_scan_skip_rules = []
+    r.ai_summary_mode = "default"
+    r.ai_summary_context = ""
+    r.terragrunt_enabled = False
+    r.terragrunt_version = "1.0"
+    r.vcs_workflow = "merge_then_apply"
+    r.auto_merge = False
+    r.auto_merge_strategy = "merge"
+    r.drift_detection_enabled = True
+    r.drift_detection_interval_seconds = 86400
+    r.drift_ignore_rules = []
+    r.plan_expiry_seconds = None
+    r.slack_channel = ""
     r.created_at = datetime(2026, 5, 9, tzinfo=UTC)
     r.updated_at = datetime(2026, 5, 9, tzinfo=UTC)
     r.first_scan_at = None
@@ -975,3 +994,76 @@ class TestRuleTemplates318:
             resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
         assert resp.status_code == 422
         assert "owner" in resp.json()["detail"]
+
+
+class TestScanAndAISummaryTemplate1763:
+    """The rule templates security scanning and the AI plan summary (#1763).
+
+    Without these, a rule covering hundreds of directories could not opt its
+    workspaces into either at creation -- and with no apply-to-existing path
+    either, there was no scalable way to set them at all.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_201_with_the_settings_echoed_back(self, *_mocks):
+        conn_id = uuid.uuid4()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[MagicMock(id=conn_id)])
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        body = {
+            "data": {
+                "type": "autodiscovery-rules",
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{conn_id}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "security-scan-enforcement": "enforced",
+                    "security-scan-engine": "both",
+                    "security-scan-severity-threshold": "medium",
+                    "security-scan-skip-rules": ["CKV_AWS_24"],
+                    "ai-summary-mode": "enabled",
+                    "ai-summary-context": "payments estate",
+                },
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 201, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["security-scan-enforcement"] == "enforced"
+        assert attrs["security-scan-engine"] == "both"
+        assert attrs["security-scan-severity-threshold"] == "medium"
+        assert attrs["security-scan-skip-rules"] == ["CKV_AWS_24"]
+        assert attrs["ai-summary-mode"] == "enabled"
+        assert attrs["ai-summary-context"] == "payments estate"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_bad_value_is_refused(self, *_mocks):
+        """The rule shares the workspace's own rules, so it cannot template a
+        value the workspace endpoint would reject."""
+        conn_id = uuid.uuid4()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[MagicMock(id=conn_id)])
+        db.commit = AsyncMock()
+        body = {
+            "data": {
+                "type": "autodiscovery-rules",
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{conn_id}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "**/*.tf",
+                    "ai-summary-mode": "sometimes",
+                },
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 422, resp.text
+        db.commit.assert_not_awaited()

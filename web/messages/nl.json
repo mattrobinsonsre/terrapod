@@ -1053,7 +1053,29 @@
       "notificationTemplates": "Notificatiesjablonen (aangemaakt op elke nieuwe workspace)",
       "saving": "Bezig met opslaan...",
       "previewTitle": "Doorloop de repo en bekijk welke workspaces deze regel ZOU aanmaken — zonder persistentie",
-      "parallelism": "Parallellisme"
+      "parallelism": "Parallellisme",
+      "governance": "Beveiligingsscan en AI-samenvatting",
+      "governanceHint": "Toegepast op elke workspace die deze regel aanmaakt.",
+      "scanEnforcement": "Handhaving",
+      "scanOff": "Niet scannen",
+      "scanAdvisory": "Alleen scannen en rapporteren",
+      "scanEnforced": "Toepassen blokkeren bij bevindingen",
+      "scanEngine": "Scanner",
+      "scanEngineBoth": "Checkov en Trivy",
+      "scanThreshold": "Bevindingen melden vanaf",
+      "severityCritical": "kritiek",
+      "severityHigh": "hoog",
+      "severityMedium": "middel",
+      "severityLow": "laag",
+      "aiSummaryMode": "AI-plansamenvatting",
+      "aiSummaryDefault": "Standaard van deployment volgen",
+      "aiSummaryEnabled": "Altijd samenvatten",
+      "aiSummaryDisabled": "Nooit samenvatten",
+      "execution": "Uitvoering, VCS en drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versie",
+      "noExpiry": "Geen verval",
+      "addDriftIgnoreRule": "Regel toevoegen"
     },
     "table": {
       "name": "Naam",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "Kan state-versie niet terugdraaien",
       "stateActionFailed": "State-actie mislukt",
       "uploadState": "Kan state niet uploaden",
-      "uploadStateFile": "Kan state-bestand niet uploaden"
+      "uploadStateFile": "Kan state-bestand niet uploaden",
+      "updateSecurityScan": "Bijwerken van de beveiligingsscan is mislukt"
     },
     "subtabs": {
       "state": "State",
@@ -2880,6 +2903,28 @@
         "global": "Globaal",
         "rule": "Via regel gekoppeld"
       }
+    },
+    "securityScan": {
+      "title": "Beveiligingsscan",
+      "description": "Scan het plan op onveilige infrastructuur voordat het wordt toegepast.",
+      "enforcement": "Handhaving",
+      "enforcementOff": "Niet scannen",
+      "enforcementAdvisory": "Alleen scannen en rapporteren",
+      "enforcementEnforced": "Toepassen blokkeren bij bevindingen",
+      "engine": "Scanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov en Trivy",
+      "threshold": "Bevindingen melden vanaf",
+      "thresholdCritical": "kritiek",
+      "thresholdHigh": "hoog",
+      "thresholdMedium": "middel",
+      "thresholdLow": "laag",
+      "skipRules": "Genegeerde regels",
+      "skipRulesSuffix": "(optioneel)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Geen regels genegeerd.",
+      "skipRulesHint": "Door komma's gescheiden scanner-regel-ID's die in deze workspace worden genegeerd."
     }
   },
   "graphs": {

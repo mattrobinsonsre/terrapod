@@ -1393,6 +1393,68 @@ class AutodiscoveryRule(Base):
     # #672: execution hooks (by id) to associate with every workspace this rule
     # materialises, so discovered workspaces inherit their hooks automatically.
     execution_hook_templates: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    # #1763: security scanning (#1036) and the AI plan summary (#401), templated
+    # onto every workspace this rule materialises. Without these a rule covering
+    # hundreds of directories could not opt them in at creation — which, with no
+    # apply-to-existing path either, left no scalable way to set them at all.
+    #
+    # No engine guard is needed here, unlike on a workspace: a rule has no
+    # `engine` column, so everything it materialises is Terraform/OpenTofu,
+    # which is exactly what can be scanned (#1567).
+    security_scan_enforcement: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="advisory", server_default="advisory"
+    )
+    security_scan_engine: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="checkov", server_default="checkov"
+    )
+    security_scan_severity_threshold: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="high", server_default="high"
+    )
+    security_scan_skip_rules: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, nullable=False, server_default="[]"
+    )
+    ai_summary_mode: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="default", server_default="default"
+    )
+    ai_summary_context: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+    # The remaining workspace settings a rule templates (#1763). What it
+    # deliberately does NOT template is recorded, with reasons, in
+    # `TestEveryWorkspaceSettingIsTemplatedOrLedgered`.
+    terragrunt_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    terragrunt_version: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="1.0", server_default="1.0"
+    )
+    vcs_workflow: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="merge_then_apply", server_default="merge_then_apply"
+    )
+    auto_merge: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    auto_merge_strategy: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="merge", server_default="merge"
+    )
+    #: Defaults TRUE, unlike the workspace column's own default. Every
+    #: autodiscovered workspace is VCS-connected, and the workspace-creation
+    #: path turns drift detection on for those — so defaulting false here would
+    #: have silently switched it off across every monorepo directory.
+    drift_detection_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    drift_detection_interval_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=86400, server_default="86400"
+    )
+    drift_ignore_rules: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, nullable=False, server_default="[]"
+    )
+    #: NULL means no expiry, matching the workspace column.
+    plan_expiry_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    slack_channel: Mapped[str] = mapped_column(
+        String(128), nullable=False, default="", server_default=""
+    )
     # #314 deletion lifecycle: what to do when a discovered directory is
     # removed on the tracked branch. "flag" (default, safe) marks the
     # workspace pending_deletion and requires an explicit operator

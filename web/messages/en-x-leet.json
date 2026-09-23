@@ -1053,7 +1053,29 @@
       "notificationTemplates": "N071f1c4710n 73mpl4735 (cr3473d 0n 34ch n3w w0rk5p4c3)",
       "saving": "54v1ng...",
       "previewTitle": "W4lk 7h3 r3p0 4nd pr3v13w wh1ch w0rk5p4c35 7h15 rul3 W0ULD cr3473 — n0 p3r51573nc3",
-      "parallelism": "P4r4ll3l15m"
+      "parallelism": "P4r4ll3l15m",
+      "governance": "53cur17y 5c4nn1ng 4nd 41 5umm4ry",
+      "governanceHint": "4ppl13d 70 3v3ry w0rk5p4c3 7h15 rul3 cr34735.",
+      "scanEnforcement": "3nf0rc3m3n7",
+      "scanOff": "D0 n07 5c4n",
+      "scanAdvisory": "5c4n 4nd r3p0r7 0nly",
+      "scanEnforced": "Bl0ck 4pply 0n f1nd1ng5",
+      "scanEngine": "5c4nn3r",
+      "scanEngineBoth": "Ch3ck0v 4nd 7r1vy",
+      "scanThreshold": "R3p0r7 f1nd1ng5 47 0r 4b0v3",
+      "severityCritical": "cr171c4l",
+      "severityHigh": "h1gh",
+      "severityMedium": "m3d1um",
+      "severityLow": "l0w",
+      "aiSummaryMode": "41 Pl4n 5umm4ry",
+      "aiSummaryDefault": "F0ll0w d3pl0ym3n7 d3f4ul7",
+      "aiSummaryEnabled": "4lw4y5 5umm4r1z3",
+      "aiSummaryDisabled": "N3v3r 5umm4r1z3",
+      "execution": "3x3cu710n, VC5 4nd dr1f7",
+      "terragruntEnabled": "73rr4grun7",
+      "terragruntVersion": "73rr4grun7 v3r510n",
+      "noExpiry": "N0 3xp1ry",
+      "addDriftIgnoreRule": "4dd rul3"
     },
     "table": {
       "name": "N4m3",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "F41l3d 70 r0llb4ck 57473 v3r510n",
       "stateActionFailed": "57473 4c710n f41l3d",
       "uploadState": "F41l3d 70 upl04d 57473",
-      "uploadStateFile": "F41l3d 70 upl04d 57473 f1l3"
+      "uploadStateFile": "F41l3d 70 upl04d 57473 f1l3",
+      "updateSecurityScan": "F41l3d 70 upd473 53cur17y 5c4nn1ng"
     },
     "subtabs": {
       "state": "57473",
@@ -2880,6 +2903,28 @@
         "global": "Gl0b4l",
         "rule": "M47ch3d by rul3"
       }
+    },
+    "securityScan": {
+      "title": "53cur17y 5c4nn1ng",
+      "description": "5c4n 7h3 pl4n f0r 1n53cur3 1nfr457ruc7ur3 b3f0r3 17 15 4ppl13d.",
+      "enforcement": "3nf0rc3m3n7",
+      "enforcementOff": "D0 n07 5c4n",
+      "enforcementAdvisory": "5c4n 4nd r3p0r7 0nly",
+      "enforcementEnforced": "Bl0ck 4pply 0n f1nd1ng5",
+      "engine": "5c4nn3r",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Ch3ck0v 4nd 7r1vy",
+      "threshold": "R3p0r7 f1nd1ng5 47 0r 4b0v3",
+      "thresholdCritical": "cr171c4l",
+      "thresholdHigh": "h1gh",
+      "thresholdMedium": "m3d1um",
+      "thresholdLow": "l0w",
+      "skipRules": "1gn0r3d rul35",
+      "skipRulesSuffix": "(0p710n4l)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "N0 rul35 1gn0r3d.",
+      "skipRulesHint": "C0mm4-53p4r473d 5c4nn3r rul3 1d5 70 1gn0r3 0n 7h15 w0rk5p4c3."
     }
   },
   "graphs": {

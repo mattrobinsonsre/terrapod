@@ -1053,7 +1053,29 @@
       "notificationTemplates": "Aviseringsmallar (skapas på varje ny arbetsyta)",
       "saving": "Sparar...",
       "previewTitle": "Gå igenom repot och förhandsgranska vilka arbetsytor denna regel SKULLE skapa — ingen beständighet",
-      "parallelism": "Parallellitet"
+      "parallelism": "Parallellitet",
+      "governance": "Säkerhetsskanning och AI-sammanfattning",
+      "governanceHint": "Tillämpas på varje arbetsyta som den här regeln skapar.",
+      "scanEnforcement": "Tillämpning",
+      "scanOff": "Skanna inte",
+      "scanAdvisory": "Skanna och rapportera endast",
+      "scanEnforced": "Blockera tillämpning vid fynd",
+      "scanEngine": "Skanner",
+      "scanEngineBoth": "Checkov och Trivy",
+      "scanThreshold": "Rapportera fynd från och med",
+      "severityCritical": "kritisk",
+      "severityHigh": "hög",
+      "severityMedium": "medel",
+      "severityLow": "låg",
+      "aiSummaryMode": "AI-plansammanfattning",
+      "aiSummaryDefault": "Följ deploymentstandard",
+      "aiSummaryEnabled": "Sammanfatta alltid",
+      "aiSummaryDisabled": "Sammanfatta aldrig",
+      "execution": "Körning, VCS och drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-version",
+      "noExpiry": "Ingen utgång",
+      "addDriftIgnoreRule": "Lägg till regel"
     },
     "table": {
       "name": "Namn",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "Det gick inte att återställa tillståndsversionen",
       "stateActionFailed": "Tillståndsåtgärd misslyckades",
       "uploadState": "Det gick inte att ladda upp tillstånd",
-      "uploadStateFile": "Det gick inte att ladda upp tillståndsfilen"
+      "uploadStateFile": "Det gick inte att ladda upp tillståndsfilen",
+      "updateSecurityScan": "Det gick inte att uppdatera säkerhetsskanningen"
     },
     "subtabs": {
       "state": "Tillstånd",
@@ -2880,6 +2903,28 @@
         "global": "Global",
         "rule": "Matchad av regel"
       }
+    },
+    "securityScan": {
+      "title": "Säkerhetsskanning",
+      "description": "Skanna planen efter osäker infrastruktur innan den tillämpas.",
+      "enforcement": "Tillämpning",
+      "enforcementOff": "Skanna inte",
+      "enforcementAdvisory": "Skanna och rapportera endast",
+      "enforcementEnforced": "Blockera tillämpning vid fynd",
+      "engine": "Skanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov och Trivy",
+      "threshold": "Rapportera fynd från och med",
+      "thresholdCritical": "kritisk",
+      "thresholdHigh": "hög",
+      "thresholdMedium": "medel",
+      "thresholdLow": "låg",
+      "skipRules": "Ignorerade regler",
+      "skipRulesSuffix": "(valfritt)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Inga regler ignoreras.",
+      "skipRulesHint": "Kommaseparerade regel-ID:n för skannern som ignoreras i den här arbetsytan."
     }
   },
   "graphs": {

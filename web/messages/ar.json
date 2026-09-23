@@ -1053,7 +1053,29 @@
       "notificationTemplates": "قوالب الإشعارات (تُنشأ على كل مساحة عمل جديدة)",
       "saving": "جارٍ الحفظ...",
       "previewTitle": "استعرِض المستودع وعايِن مساحات العمل التي ستُنشئها هذه القاعدة — دون حفظ",
-      "parallelism": "التوازي"
+      "parallelism": "التوازي",
+      "governance": "فحص الأمان وملخص الذكاء الاصطناعي",
+      "governanceHint": "يُطبَّق على كل مساحة عمل تنشئها هذه القاعدة.",
+      "scanEnforcement": "الإلزام",
+      "scanOff": "عدم الفحص",
+      "scanAdvisory": "الفحص والإبلاغ فقط",
+      "scanEnforced": "حظر التطبيق عند وجود نتائج",
+      "scanEngine": "الفاحص",
+      "scanEngineBoth": "‏Checkov و‏Trivy",
+      "scanThreshold": "الإبلاغ عن النتائج ابتداءً من",
+      "severityCritical": "حرج",
+      "severityHigh": "عالٍ",
+      "severityMedium": "متوسط",
+      "severityLow": "منخفض",
+      "aiSummaryMode": "ملخص الخطة بالذكاء الاصطناعي",
+      "aiSummaryDefault": "اتباع الافتراضي للنشر",
+      "aiSummaryEnabled": "التلخيص دائمًا",
+      "aiSummaryDisabled": "عدم التلخيص أبدًا",
+      "execution": "التنفيذ وVCS والانحراف",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "إصدار Terragrunt",
+      "noExpiry": "بدون انتهاء",
+      "addDriftIgnoreRule": "إضافة قاعدة"
     },
     "table": {
       "name": "الاسم",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "فشل التراجع عن نسخة الحالة",
       "stateActionFailed": "فشل إجراء الحالة",
       "uploadState": "فشل رفع الحالة",
-      "uploadStateFile": "فشل رفع ملف الحالة"
+      "uploadStateFile": "فشل رفع ملف الحالة",
+      "updateSecurityScan": "تعذّر تحديث فحص الأمان"
     },
     "subtabs": {
       "state": "الحالة",
@@ -2880,6 +2903,28 @@
         "global": "عام",
         "rule": "مطابق للقاعدة"
       }
+    },
+    "securityScan": {
+      "title": "فحص الأمان",
+      "description": "افحص الخطة بحثًا عن بنية تحتية غير آمنة قبل تطبيقها.",
+      "enforcement": "الإلزام",
+      "enforcementOff": "عدم الفحص",
+      "enforcementAdvisory": "الفحص والإبلاغ فقط",
+      "enforcementEnforced": "حظر التطبيق عند وجود نتائج",
+      "engine": "الفاحص",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "‏Checkov و‏Trivy",
+      "threshold": "الإبلاغ عن النتائج ابتداءً من",
+      "thresholdCritical": "حرج",
+      "thresholdHigh": "عالٍ",
+      "thresholdMedium": "متوسط",
+      "thresholdLow": "منخفض",
+      "skipRules": "القواعد المتجاهَلة",
+      "skipRulesSuffix": "(اختياري)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "لا توجد قواعد متجاهَلة.",
+      "skipRulesHint": "معرّفات قواعد الفاحص مفصولة بفواصل، ليتم تجاهلها في مساحة العمل هذه."
     }
   },
   "graphs": {

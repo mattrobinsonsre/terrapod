@@ -1053,7 +1053,29 @@
       "notificationTemplates": "通知テンプレート（各新規ワークスペースに作成）",
       "saving": "保存中...",
       "previewTitle": "リポジトリを走査し、このルールが作成するであろうワークスペースをプレビューします — 永続化なし",
-      "parallelism": "並列度"
+      "parallelism": "並列度",
+      "governance": "セキュリティスキャンと AI サマリー",
+      "governanceHint": "このルールが作成するすべてのワークスペースに適用されます。",
+      "scanEnforcement": "適用方法",
+      "scanOff": "スキャンしない",
+      "scanAdvisory": "スキャンして報告のみ",
+      "scanEnforced": "検出時に適用をブロック",
+      "scanEngine": "スキャナー",
+      "scanEngineBoth": "Checkov と Trivy",
+      "scanThreshold": "報告する重大度の下限",
+      "severityCritical": "重大",
+      "severityHigh": "高",
+      "severityMedium": "中",
+      "severityLow": "低",
+      "aiSummaryMode": "AIプランサマリー",
+      "aiSummaryDefault": "デプロイメントのデフォルトに従う",
+      "aiSummaryEnabled": "常に要約する",
+      "aiSummaryDisabled": "要約しない",
+      "execution": "実行、VCS、ドリフト",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt バージョン",
+      "noExpiry": "期限なし",
+      "addDriftIgnoreRule": "ルールを追加"
     },
     "table": {
       "name": "名前",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "状態バージョンのロールバックに失敗しました",
       "stateActionFailed": "状態操作に失敗しました",
       "uploadState": "状態のアップロードに失敗しました",
-      "uploadStateFile": "状態ファイルのアップロードに失敗しました"
+      "uploadStateFile": "状態ファイルのアップロードに失敗しました",
+      "updateSecurityScan": "セキュリティスキャンの更新に失敗しました"
     },
     "subtabs": {
       "state": "状態",
@@ -2880,6 +2903,28 @@
         "global": "グローバル",
         "rule": "ルールで一致"
       }
+    },
+    "securityScan": {
+      "title": "セキュリティスキャン",
+      "description": "適用する前に、安全でないインフラストラクチャがないかプランをスキャンします。",
+      "enforcement": "適用方法",
+      "enforcementOff": "スキャンしない",
+      "enforcementAdvisory": "スキャンして報告のみ",
+      "enforcementEnforced": "検出時に適用をブロック",
+      "engine": "スキャナー",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov と Trivy",
+      "threshold": "報告する重大度の下限",
+      "thresholdCritical": "重大",
+      "thresholdHigh": "高",
+      "thresholdMedium": "中",
+      "thresholdLow": "低",
+      "skipRules": "無視するルール",
+      "skipRulesSuffix": "(任意)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "無視するルールはありません。",
+      "skipRulesHint": "このワークスペースで無視するスキャナーのルール ID をカンマ区切りで指定します。"
     }
   },
   "graphs": {

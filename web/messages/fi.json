@@ -1053,7 +1053,29 @@
       "notificationTemplates": "Ilmoitusmallit (luodaan jokaiseen uuteen työtilaan)",
       "saving": "Tallennetaan...",
       "previewTitle": "Käy repo läpi ja esikatsele, mitkä työtilat tämä sääntö LUOISI — ei tallennusta",
-      "parallelism": "Rinnakkaisuus"
+      "parallelism": "Rinnakkaisuus",
+      "governance": "Tietoturvatarkistus ja tekoälyn yhteenveto",
+      "governanceHint": "Sovelletaan jokaiseen työtilaan, jonka tämä sääntö luo.",
+      "scanEnforcement": "Valvonta",
+      "scanOff": "Älä tarkista",
+      "scanAdvisory": "Tarkista ja raportoi vain",
+      "scanEnforced": "Estä käyttöönotto löydösten perusteella",
+      "scanEngine": "Tarkistin",
+      "scanEngineBoth": "Checkov ja Trivy",
+      "scanThreshold": "Raportoi löydökset tasolta",
+      "severityCritical": "kriittinen",
+      "severityHigh": "korkea",
+      "severityMedium": "keskitaso",
+      "severityLow": "matala",
+      "aiSummaryMode": "Tekoälyn suunnitelmayhteenveto",
+      "aiSummaryDefault": "Noudata käyttöönoton oletusta",
+      "aiSummaryEnabled": "Tee aina yhteenveto",
+      "aiSummaryDisabled": "Älä koskaan tee yhteenvetoa",
+      "execution": "Suoritus, VCS ja poikkeama",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versio",
+      "noExpiry": "Ei vanhenemista",
+      "addDriftIgnoreRule": "Lisää sääntö"
     },
     "table": {
       "name": "Nimi",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "Tilaversion palauttaminen epäonnistui",
       "stateActionFailed": "Tilatoiminto epäonnistui",
       "uploadState": "Tilan lataaminen epäonnistui",
-      "uploadStateFile": "Tilatiedoston lataaminen epäonnistui"
+      "uploadStateFile": "Tilatiedoston lataaminen epäonnistui",
+      "updateSecurityScan": "Tietoturvatarkistuksen päivitys epäonnistui"
     },
     "subtabs": {
       "state": "Tila",
@@ -2880,6 +2903,28 @@
         "global": "Yleinen",
         "rule": "Vastaa sääntöä"
       }
+    },
+    "securityScan": {
+      "title": "Tietoturvatarkistus",
+      "description": "Tarkista suunnitelma turvattoman infrastruktuurin varalta ennen käyttöönottoa.",
+      "enforcement": "Valvonta",
+      "enforcementOff": "Älä tarkista",
+      "enforcementAdvisory": "Tarkista ja raportoi vain",
+      "enforcementEnforced": "Estä käyttöönotto löydösten perusteella",
+      "engine": "Tarkistin",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov ja Trivy",
+      "threshold": "Raportoi löydökset tasolta",
+      "thresholdCritical": "kriittinen",
+      "thresholdHigh": "korkea",
+      "thresholdMedium": "keskitaso",
+      "thresholdLow": "matala",
+      "skipRules": "Ohitetut säännöt",
+      "skipRulesSuffix": "(valinnainen)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Sääntöjä ei ohiteta.",
+      "skipRulesHint": "Pilkuin erotetut tarkistimen sääntötunnukset, jotka ohitetaan tässä työtilassa."
     }
   },
   "graphs": {

@@ -1053,7 +1053,29 @@
       "notificationTemplates": "תבניות התראות (נוצרות בכל סביבת עבודה חדשה)",
       "saving": "שומר...",
       "previewTitle": "סקירת המאגר ותצוגה מקדימה של סביבות העבודה שכלל זה היה יוצר — ללא שמירה",
-      "parallelism": "מקביליות"
+      "parallelism": "מקביליות",
+      "governance": "סריקת אבטחה וסיכום AI",
+      "governanceHint": "חל על כל סביבת עבודה שכלל זה יוצר.",
+      "scanEnforcement": "אכיפה",
+      "scanOff": "לא לסרוק",
+      "scanAdvisory": "לסרוק ולדווח בלבד",
+      "scanEnforced": "לחסום החלה כשיש ממצאים",
+      "scanEngine": "סורק",
+      "scanEngineBoth": "Checkov ו-Trivy",
+      "scanThreshold": "לדווח על ממצאים מרמה",
+      "severityCritical": "קריטי",
+      "severityHigh": "גבוה",
+      "severityMedium": "בינוני",
+      "severityLow": "נמוך",
+      "aiSummaryMode": "סיכום תוכנית מבוסס AI",
+      "aiSummaryDefault": "לפי ברירת המחדל של הפריסה",
+      "aiSummaryEnabled": "תמיד לסכם",
+      "aiSummaryDisabled": "לעולם לא לסכם",
+      "execution": "הרצה, VCS וסטייה",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "גרסת Terragrunt",
+      "noExpiry": "ללא תפוגה",
+      "addDriftIgnoreRule": "הוספת כלל"
     },
     "table": {
       "name": "שם",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "שחזור גרסת המצב נכשל",
       "stateActionFailed": "פעולת המצב נכשלה",
       "uploadState": "העלאת המצב נכשלה",
-      "uploadStateFile": "העלאת קובץ המצב נכשלה"
+      "uploadStateFile": "העלאת קובץ המצב נכשלה",
+      "updateSecurityScan": "עדכון סריקת האבטחה נכשל"
     },
     "subtabs": {
       "state": "מצב",
@@ -2880,6 +2903,28 @@
         "global": "גלובלי",
         "rule": "מותאם לפי כלל"
       }
+    },
+    "securityScan": {
+      "title": "סריקת אבטחה",
+      "description": "סרוק את התוכנית לאיתור תשתית לא מאובטחת לפני החלתה.",
+      "enforcement": "אכיפה",
+      "enforcementOff": "לא לסרוק",
+      "enforcementAdvisory": "לסרוק ולדווח בלבד",
+      "enforcementEnforced": "לחסום החלה כשיש ממצאים",
+      "engine": "סורק",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov ו-Trivy",
+      "threshold": "לדווח על ממצאים מרמה",
+      "thresholdCritical": "קריטי",
+      "thresholdHigh": "גבוה",
+      "thresholdMedium": "בינוני",
+      "thresholdLow": "נמוך",
+      "skipRules": "כללים שמתעלמים מהם",
+      "skipRulesSuffix": "(רשות)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "לא מתעלמים מאף כלל.",
+      "skipRulesHint": "מזהי כללים של הסורק, מופרדים בפסיקים, שמהם יש להתעלם בסביבת עבודה זו."
     }
   },
   "graphs": {

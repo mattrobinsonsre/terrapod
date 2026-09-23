@@ -1053,7 +1053,29 @@
       "notificationTemplates": "QIn De'wI'mey (Qumwo' chu' Hoch chenmoHlu')",
       "saving": "poltaH...",
       "previewTitle": "repo yIt 'ej chut vam chenmoHlaHbogh Qumwo'mey tI'ang — polbe'lu'",
-      "parallelism": "tay'' Qu''mey"
+      "parallelism": "tay'' Qu''mey",
+      "governance": "Hujqu'ghach Sup je AI naw'",
+      "governanceHint": "vam chu'wI' chenmoHbogh Qumwo'mey Hoch lo'lu'.",
+      "scanEnforcement": "ra'ghach",
+      "scanOff": "Supbe'",
+      "scanAdvisory": "Sup 'ej ja' neH",
+      "scanEnforced": "tu'lu'chugh, lo' bot",
+      "scanEngine": "Supwl'",
+      "scanEngineBoth": "Checkov je Trivy",
+      "scanThreshold": "tu'lu'bogh ja' vam patlh vo'",
+      "severityCritical": "ghuHqu''",
+      "severityHigh": "jen",
+      "severityMedium": "botlh",
+      "severityLow": "Sup",
+      "aiSummaryMode": "AI nab tlhoS",
+      "aiSummaryDefault": "nISwI' motlh tlha'",
+      "aiSummaryEnabled": "reH tlhoS",
+      "aiSummaryDisabled": "not tlhoS",
+      "execution": "Qap, VCS, je chIch",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt mI'",
+      "noExpiry": "van Hutlh",
+      "addDriftIgnoreRule": "chu'wI' chel"
     },
     "table": {
       "name": "pong",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "Dotlh mI'Daq cheghmeH lujpu'",
       "stateActionFailed": "Dotlh vang lujpu'",
       "uploadState": "Dotlh lI'meH lujpu'",
-      "uploadStateFile": "Dotlh teywI' lI'meH lujpu'"
+      "uploadStateFile": "Dotlh teywI' lI'meH lujpu'",
+      "updateSecurityScan": "Hujqu'ghach Sup choqlaHbe'"
     },
     "subtabs": {
       "state": "Sep",
@@ -2880,6 +2903,28 @@
         "global": "Hoch",
         "rule": "chutmo' rurlu'"
       }
+    },
+    "securityScan": {
+      "title": "Hujqu'ghach Sup",
+      "description": "Sup nab, Qapbe'meH cha'nob Hujbe'bogh, lo'lu'pa'.",
+      "enforcement": "ra'ghach",
+      "enforcementOff": "Supbe'",
+      "enforcementAdvisory": "Sup 'ej ja' neH",
+      "enforcementEnforced": "tu'lu'chugh, lo' bot",
+      "engine": "Supwl'",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov je Trivy",
+      "threshold": "tu'lu'bogh ja' vam patlh vo'",
+      "thresholdCritical": "ghuHqu''",
+      "thresholdHigh": "jen",
+      "thresholdMedium": "botlh",
+      "thresholdLow": "Sup",
+      "skipRules": "chu'wI' buSHa'lu'bogh",
+      "skipRulesSuffix": "(DaHar'a')",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "chu'wI' buSHa'lu'be'.",
+      "skipRulesHint": "Supwl' chu'wI' per, commamey Sep, vam Qumwo'Daq buSHa'lu'bogh."
     }
   },
   "graphs": {

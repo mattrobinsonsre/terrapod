@@ -1053,7 +1053,29 @@
       "notificationTemplates": "قالب‌های اعلان (روی هر فضای کاری جدید ایجاد می‌شود)",
       "saving": "در حال ذخیره...",
       "previewTitle": "مخزن را پیمایش کن و پیش‌نمایش بده که این قاعده کدام فضاهای کاری را ایجاد خواهد کرد — بدون ماندگاری",
-      "parallelism": "موازی‌کاری"
+      "parallelism": "موازی‌کاری",
+      "governance": "بررسی امنیتی و خلاصه هوش مصنوعی",
+      "governanceHint": "برای هر فضای کاری که این قاعده ایجاد می‌کند اعمال می‌شود.",
+      "scanEnforcement": "الزام",
+      "scanOff": "بررسی نشود",
+      "scanAdvisory": "فقط بررسی و گزارش",
+      "scanEnforced": "مسدودکردن اعمال در صورت یافته",
+      "scanEngine": "بررسی‌کننده",
+      "scanEngineBoth": "‏Checkov و‏Trivy",
+      "scanThreshold": "گزارش یافته‌ها از سطح",
+      "severityCritical": "بحرانی",
+      "severityHigh": "بالا",
+      "severityMedium": "متوسط",
+      "severityLow": "پایین",
+      "aiSummaryMode": "خلاصهٔ هوش مصنوعیِ طرح",
+      "aiSummaryDefault": "پیروی از پیش‌فرض استقرار",
+      "aiSummaryEnabled": "همیشه خلاصه کن",
+      "aiSummaryDisabled": "هرگز خلاصه نکن",
+      "execution": "اجرا، VCS و انحراف",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "نسخه Terragrunt",
+      "noExpiry": "بدون انقضا",
+      "addDriftIgnoreRule": "افزودن قاعده"
     },
     "table": {
       "name": "نام",
@@ -2859,7 +2881,8 @@
       "rollbackStateVersion": "بازگردانی نسخهٔ وضعیت ناموفق بود",
       "stateActionFailed": "کنش وضعیت ناموفق بود",
       "uploadState": "بارگذاری وضعیت ناموفق بود",
-      "uploadStateFile": "بارگذاری فایل وضعیت ناموفق بود"
+      "uploadStateFile": "بارگذاری فایل وضعیت ناموفق بود",
+      "updateSecurityScan": "به‌روزرسانی بررسی امنیتی ناموفق بود"
     },
     "subtabs": {
       "state": "وضعیت",
@@ -2880,6 +2903,28 @@
         "global": "سراسری",
         "rule": "مطابق قاعده"
       }
+    },
+    "securityScan": {
+      "title": "بررسی امنیتی",
+      "description": "پیش از اعمال، طرح را از نظر زیرساخت ناامن بررسی کنید.",
+      "enforcement": "الزام",
+      "enforcementOff": "بررسی نشود",
+      "enforcementAdvisory": "فقط بررسی و گزارش",
+      "enforcementEnforced": "مسدودکردن اعمال در صورت یافته",
+      "engine": "بررسی‌کننده",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "‏Checkov و‏Trivy",
+      "threshold": "گزارش یافته‌ها از سطح",
+      "thresholdCritical": "بحرانی",
+      "thresholdHigh": "بالا",
+      "thresholdMedium": "متوسط",
+      "thresholdLow": "پایین",
+      "skipRules": "قواعد نادیده‌گرفته‌شده",
+      "skipRulesSuffix": "(اختیاری)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "هیچ قاعده‌ای نادیده گرفته نمی‌شود.",
+      "skipRulesHint": "شناسه‌های قواعد بررسی‌کننده، جداشده با ویرگول، که در این فضای کاری نادیده گرفته می‌شوند."
     }
   },
   "graphs": {
