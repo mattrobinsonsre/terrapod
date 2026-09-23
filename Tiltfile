@@ -193,6 +193,7 @@ local_resource(
         'services/terrapod/runner/runner_config.py',
         'services/terrapod/runner/download.py',
         'services/terrapod/runner/exec_subprocess.py',
+        'services/terrapod/runner/debug_linger.py',
         'services/terrapod/runner/lock_extender.py',
         'services/terrapod/runner/plan_artifacts.py',
         'services/terrapod/runner/job_entrypoint.py',
