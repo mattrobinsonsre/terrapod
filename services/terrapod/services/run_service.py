@@ -444,9 +444,10 @@ TFE_POST_PLAN_STATUSES = frozenset(
 class PostPlanHold:
     """What holds a run whose plan has finished.
 
-    `gate` is the read-only `blocked-by` attribute (#1725): `run-task`, `policy`
-    or `security-scan`. `tfe_status` is the status Terraform Enterprise reports
-    for the same situation, which the `tofu`/`terraform` CLI acts on.
+    `gate` is the read-only `blocked-by` attribute (#1725): `run-task`,
+    `policy`, `security-scan` or `ai-policy`. `tfe_status` is the status
+    Terraform Enterprise reports for the same situation, which the
+    `tofu`/`terraform` CLI acts on.
     """
 
     gate: str
@@ -463,7 +464,12 @@ async def post_plan_hold(db: AsyncSession, run: Run) -> PostPlanHold | None:
     if not is_held_at_gate(run):
         return None
 
-    from terrapod.services import policy_set_service, run_task_service, security_scan_service
+    from terrapod.services import (
+        ai_policy_service,
+        policy_set_service,
+        run_task_service,
+        security_scan_service,
+    )
 
     stage = await run_task_service._existing_stage(db, run.id, "post_plan")
     if stage is not None and stage.status not in ("passed", "overridden"):
@@ -475,11 +481,26 @@ async def post_plan_hold(db: AsyncSession, run: Run) -> PostPlanHold | None:
         return PostPlanHold("policy", POLICY_OVERRIDE)
     if await security_scan_service.run_is_scan_blocked(db, run.id):
         return PostPlanHold("security-scan", POLICY_OVERRIDE)
+    # Last, matching the order `complete_plan` evaluates the gates.
+    if await ai_policy_service.run_is_ai_policy_blocked(db, run.id):
+        # A verdict that has not landed yet is the gate still working; one that
+        # landed and denied is a decision waiting on a human. The run-task
+        # branch above draws the same distinction, and for the same reason: the
+        # CLI acts on it, and "awaiting your decision" is wrong for a run whose
+        # evidence is still being produced.
+        recorded = await ai_policy_service.get_evaluation(db, run.id)
+        return PostPlanHold(
+            "ai-policy", POLICY_OVERRIDE if recorded is not None else POST_PLAN_RUNNING
+        )
     return None
 
 
 async def blocked_by(db: AsyncSession, run: Run) -> str | None:
-    """Which post-plan gate holds a run: `run-task`, `policy`, `security-scan`."""
+    """Which post-plan gate holds a run.
+
+    One of `run-task`, `policy`, `security-scan`, `ai-policy`; None if nothing
+    holds it.
+    """
     hold = await post_plan_hold(db, run)
     return hold.gate if hold else None
 
@@ -1287,6 +1308,21 @@ async def complete_plan(
 
     scan_gate = await security_scan_service.evaluate_post_plan(db, run)
     if scan_gate != security_scan_service.GATE_PASSED:
+        return run
+
+    # Post-plan AI policy gate (#1766) — the judgement-call sibling of the two
+    # gates above. It sits LAST because it is the only one whose evidence may
+    # not exist yet: the summariser runs in the API and is enqueued from the
+    # plan-JSON upload, after this function. A mandatory gate therefore holds
+    # the run in `planning` until the verdict lands and the summariser
+    # re-drives this idempotent function, rather than failing it for evidence
+    # the runner was never asked to produce. Going last means a run held for a
+    # verdict has already cleared OPA and the scan, so the wait only ever
+    # happens for a run that would otherwise be about to apply.
+    from terrapod.services import ai_policy_service
+
+    ai_gate = await ai_policy_service.evaluate_post_plan(db, run)
+    if ai_gate != ai_policy_service.GATE_PASSED:
         return run
 
     run = await transition_run(db, run, "planned")

@@ -2045,7 +2045,9 @@
       "heldByRunTask": "Povinný run task selhal — přepište ho, nebo běh zahoďte",
       "runTasksRunning": "Čeká na run tasky po plánu",
       "heldByPolicy": "Povinná sada zásad selhala — přepište ji, nebo běh zahoďte",
-      "heldBySecurityScan": "Bezpečnostní kontrola našla blokující nálezy — přepište ji, nebo běh zahoďte"
+      "heldBySecurityScan": "Bezpečnostní kontrola našla blokující nálezy — přepište ji, nebo běh zahoďte",
+      "heldByAiPolicy": "Brána zásad AI tento běh zamítla — přepište ji, nebo běh zahoďte",
+      "awaitingAiPolicy": "Čeká se na verdikt zásad AI"
     },
     "badge": {
       "destroy": "zničit",
@@ -2326,6 +2328,31 @@
       "erroredMessage": "Kontrola nebyla dokončena, takže tento běh nebyl prověřen.",
       "blockedErroredMessage": "Tento běh je zablokován, protože bezpečnostní kontrola nebyla dokončena. Odstraňte příčinu a naplánujte znovu, nebo požádejte správce o přepsání."
     },
+    "aiPolicyPanel": {
+      "heading": "Brána zásad AI",
+      "enforcementLabel": "vynucování: {level}",
+      "thresholdLabel": "práh rizika: {threshold}",
+      "awaitingVerdict": "Čeká se na verdikt zásad AI. Tento běh je pozdržen, dokud nedorazí.",
+      "decisionAllow": "povoleno",
+      "decisionDeny": "zamítnuto",
+      "risk": {
+        "critical": "kritická",
+        "high": "vysoká",
+        "medium": "střední",
+        "low": "nízká"
+      },
+      "blockedDeniedMessage": "Tento běh je <strong>blokován {count, plural, one {# kritériem zásad} few {# kritérii zásad} many {# kritéria zásad} other {# kritérii zásad}}</strong>.",
+      "blockedRiskMessage": "Tento běh je <strong>blokován</strong>, protože jeho úroveň rizika ({level}) je na prahu ({threshold}) nebo nad ním.",
+      "blockedErroredMessage": "Tento běh je blokován, protože nebylo možné dospět k verdiktu zásad AI. Brána selhává uzavřeně, takže verdikt, k němuž nebylo možné dospět, není souhlas.",
+      "erroredMessage": "Brána zásad AI nevrátila použitelný verdikt, takže tento běh nebyl posouzen.",
+      "passed": "Žádná kritéria zásad neodpovídají.",
+      "overriding": "Přepisování...",
+      "overrideContinue": "Přepsat a pokračovat",
+      "overrideConfirm": "Přepsat bránu zásad AI a povolit použití tohoto běhu navzdory verdiktu?",
+      "overrideFailed": "Přepsání selhalo",
+      "overrideFailedStatus": "Přepsání selhalo ({status})",
+      "overriddenBy": "přepsal {by}"
+    },
     "architecture": {
       "loadError": "Nepodařilo se načíst kritiku architektury.",
       "notEnabled": "AI kritik architektury není v tomto nasazení povolen.",
@@ -2581,6 +2608,8 @@
       "modeDefault": "Řídit se výchozím nastavením nasazení",
       "modeEnabled": "Vždy shrnout",
       "modeDisabled": "Nikdy neshrnovat",
+      "policyMode": "Brána zásad",
+      "policyModeNote": "Povinná brána ignoruje „Nikdy“: může tento pracovní prostor vyjmout pouze z doporučujícího verdiktu.",
       "contextLabel": "Kontext pracovního prostoru",
       "contextLabelSuffix": "(volitelné, aditivní)",
       "contextPlaceholder": "Fakta, která by AI měla vědět konkrétně o tomto pracovním prostoru. Např. „Stojí před vaultem pro službu X — zničení KMS klíče způsobí globální výpadek.“",

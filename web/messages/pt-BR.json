@@ -2045,7 +2045,9 @@
       "heldByRunTask": "Uma run task obrigatória falhou — substitua-a ou descarte a execução",
       "runTasksRunning": "Aguardando as run tasks pós-plano",
       "heldByPolicy": "Um conjunto de políticas obrigatório falhou — substitua-o ou descarte a execução",
-      "heldBySecurityScan": "A verificação de segurança encontrou achados bloqueantes — substitua-a ou descarte a execução"
+      "heldBySecurityScan": "A verificação de segurança encontrou achados bloqueantes — substitua-a ou descarte a execução",
+      "heldByAiPolicy": "O portão de política de IA negou esta execução — substitua-o ou descarte a execução",
+      "awaitingAiPolicy": "Aguardando o veredito da política de IA"
     },
     "badge": {
       "destroy": "destroy",
@@ -2326,6 +2328,31 @@
       "erroredMessage": "A verificação não foi concluída, portanto esta execução não foi checada.",
       "blockedErroredMessage": "Esta execução está bloqueada porque a verificação de segurança não foi concluída. Corrija a causa e planeje novamente, ou peça a um administrador para ignorar."
     },
+    "aiPolicyPanel": {
+      "heading": "Portão de política de IA",
+      "enforcementLabel": "aplicação: {level}",
+      "thresholdLabel": "limite de risco: {threshold}",
+      "awaitingVerdict": "Aguardando o veredito da política de IA. Esta execução fica retida até ele chegar.",
+      "decisionAllow": "permitido",
+      "decisionDeny": "negado",
+      "risk": {
+        "critical": "crítico",
+        "high": "alto",
+        "medium": "médio",
+        "low": "baixo"
+      },
+      "blockedDeniedMessage": "Esta execução está <strong>bloqueada por {count, plural, one {# critério de política} other {# critérios de política}}</strong>.",
+      "blockedRiskMessage": "Esta execução está <strong>bloqueada</strong> porque seu nível de risco ({level}) está igual ou acima do limite ({threshold}).",
+      "blockedErroredMessage": "Esta execução está bloqueada porque não foi possível chegar a um veredito da política de IA. O portão falha fechado: um veredito inalcançável não é aprovação.",
+      "erroredMessage": "O portão de política de IA não retornou um veredito utilizável, portanto esta execução não foi julgada.",
+      "passed": "Nenhum critério de política correspondeu.",
+      "overriding": "Substituindo...",
+      "overrideContinue": "Substituir e Continuar",
+      "overrideConfirm": "Substituir o portão de política de IA e permitir que esta execução seja aplicada apesar do veredito?",
+      "overrideFailed": "Falha na substituição",
+      "overrideFailedStatus": "Falha na substituição ({status})",
+      "overriddenBy": "substituído por {by}"
+    },
     "architecture": {
       "loadError": "Não foi possível carregar a crítica de arquitetura.",
       "notEnabled": "O crítico de arquitetura por IA não está habilitado nesta implantação.",
@@ -2581,6 +2608,8 @@
       "modeDefault": "Seguir o padrão da implantação",
       "modeEnabled": "Sempre resumir",
       "modeDisabled": "Nunca resumir",
+      "policyMode": "Portão de política",
+      "policyModeNote": "Um portão obrigatório ignora “Nunca”: ele só pode isentar este workspace de um veredito consultivo.",
       "contextLabel": "Contexto do workspace",
       "contextLabelSuffix": "(opcional, aditivo)",
       "contextPlaceholder": "Fatos que a IA deve conhecer especificamente sobre este workspace. ex.: 'É o front do vault do serviço X — destruir a chave KMS causa uma interrupção global.'",

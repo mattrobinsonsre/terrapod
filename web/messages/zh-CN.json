@@ -2045,7 +2045,9 @@
       "heldByRunTask": "必需的运行任务失败 — 覆盖它或丢弃此运行",
       "runTasksRunning": "正在等待计划后的运行任务",
       "heldByPolicy": "必需的策略集失败 — 覆盖它或丢弃此运行",
-      "heldBySecurityScan": "安全扫描发现阻断性问题 — 覆盖它或丢弃此运行"
+      "heldBySecurityScan": "安全扫描发现阻断性问题 — 覆盖它或丢弃此运行",
+      "heldByAiPolicy": "AI 策略门禁拒绝了此运行 — 覆盖它或丢弃此运行",
+      "awaitingAiPolicy": "正在等待 AI 策略裁定"
     },
     "badge": {
       "destroy": "销毁",
@@ -2326,6 +2328,31 @@
       "erroredMessage": "扫描未完成，因此本次运行尚未检查。",
       "blockedErroredMessage": "本次运行已被阻止，因为安全扫描未完成。请修复原因后重新执行计划，或请管理员覆盖。"
     },
+    "aiPolicyPanel": {
+      "heading": "AI 策略门禁",
+      "enforcementLabel": "强制级别：{level}",
+      "thresholdLabel": "风险阈值：{threshold}",
+      "awaitingVerdict": "正在等待 AI 策略裁定。在裁定到达前，此运行将被保留。",
+      "decisionAllow": "允许",
+      "decisionDeny": "拒绝",
+      "risk": {
+        "critical": "严重",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "blockedDeniedMessage": "此运行被<strong>{count, plural, other {# 条策略标准}}阻断</strong>。",
+      "blockedRiskMessage": "此运行被<strong>阻断</strong>，因为其风险级别（{level}）达到或超过阈值（{threshold}）。",
+      "blockedErroredMessage": "由于无法得出 AI 策略裁定，此运行被阻断。门禁以失败关闭方式运行：无法得出的裁定不等于批准。",
+      "erroredMessage": "AI 策略门禁未返回可用的裁定，因此尚未对此运行作出裁定。",
+      "passed": "没有匹配的策略标准。",
+      "overriding": "正在覆盖...",
+      "overrideContinue": "覆盖并继续",
+      "overrideConfirm": "覆盖 AI 策略门禁并允许此运行在存在裁定的情况下应用？",
+      "overrideFailed": "覆盖失败",
+      "overrideFailedStatus": "覆盖失败（{status}）",
+      "overriddenBy": "由 {by} 覆盖"
+    },
     "architecture": {
       "loadError": "无法加载架构评审。",
       "notEnabled": "此部署未启用 AI 架构评审。",
@@ -2581,6 +2608,8 @@
       "modeDefault": "遵循部署默认设置",
       "modeEnabled": "始终摘要",
       "modeDisabled": "从不摘要",
+      "policyMode": "策略门禁",
+      "policyModeNote": "强制门禁会忽略“从不”：它只能让此工作区豁免建议性裁定。",
       "contextLabel": "工作区上下文",
       "contextLabelSuffix": "（可选，附加）",
       "contextPlaceholder": "AI 应专门了解此工作区的事实。例如 '为服务 X 前置 vault — 销毁 KMS 密钥会导致全局中断。'",

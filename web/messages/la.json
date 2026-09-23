@@ -2045,7 +2045,9 @@
       "heldByRunTask": "Munus exsecutionis necessarium defecit — supersede aut exsecutionem reice",
       "runTasksRunning": "Munera exsecutionis post consilium exspectantur",
       "heldByPolicy": "Copia regularum necessaria defecit — supersede aut exsecutionem reice",
-      "heldBySecurityScan": "Perscrutatio securitatis inventa impedientia repperit — supersede aut exsecutionem reice"
+      "heldBySecurityScan": "Perscrutatio securitatis inventa impedientia repperit — supersede aut exsecutionem reice",
+      "heldByAiPolicy": "Porta regulae AI hanc executionem negavit — supersede aut exsecutionem reice",
+      "awaitingAiPolicy": "Sententia regulae AI exspectatur"
     },
     "badge": {
       "destroy": "destructio",
@@ -2326,6 +2328,31 @@
       "erroredMessage": "Perscrutatio non perfecta est, itaque haec executio explorata non est.",
       "blockedErroredMessage": "Haec executio impedita est quia perscrutatio securitatis non perfecta est. Causam corrige et iterum consilium fac, aut administratorem roga ut eam neglegat."
     },
+    "aiPolicyPanel": {
+      "heading": "Porta Regulae AI",
+      "enforcementLabel": "coactio: {level}",
+      "thresholdLabel": "limen periculi: {threshold}",
+      "awaitingVerdict": "Sententia regulae AI exspectatur. Haec executio retinetur donec adveniat.",
+      "decisionAllow": "permissum",
+      "decisionDeny": "negatum",
+      "risk": {
+        "critical": "criticus",
+        "high": "altus",
+        "medium": "medius",
+        "low": "humilis"
+      },
+      "blockedDeniedMessage": "Haec executio <strong>impeditur {count, plural, one {# criterio regulae} other {# criteriis regulae}}</strong>.",
+      "blockedRiskMessage": "Haec executio <strong>impeditur</strong> quia gradus periculi ({level}) in limine ({threshold}) aut supra est.",
+      "blockedErroredMessage": "Haec executio impeditur quia sententia regulae AI attingi non potuit. Porta clausa deficit: sententia quae attingi non potuit consensus non est.",
+      "erroredMessage": "Porta regulae AI sententiam utilem non reddidit, itaque haec executio iudicata non est.",
+      "passed": "Nulla criteria regulae congruunt.",
+      "overriding": "Superseditur...",
+      "overrideContinue": "Supersedere et Pergere",
+      "overrideConfirm": "Portam regulae AI supersedere et hanc executionem contra sententiam applicari sinere?",
+      "overrideFailed": "Supersessio defecit",
+      "overrideFailedStatus": "Supersessio defecit ({status})",
+      "overriddenBy": "supersessum ab {by}"
+    },
     "architecture": {
       "loadError": "Censura architecturae onerari non potuit.",
       "notEnabled": "Censor architecturae per AI in hac instructione non est actus.",
@@ -2581,6 +2608,8 @@
       "modeDefault": "Praedefinitum instructionis sequi",
       "modeEnabled": "Semper summatim redigere",
       "modeDisabled": "Numquam summatim redigere",
+      "policyMode": "Porta regulae",
+      "policyModeNote": "Porta necessaria “Numquam” neglegit: hunc locum operis ab sententia monenti tantum eximere potest.",
       "contextLabel": "Contextus loci operis",
       "contextLabelSuffix": "(optionalis, additivus)",
       "contextPlaceholder": "Facta quae AI de hoc loco operis specialiter scire debet. e.g. 'Vault pro servitio X frontat — clavem KMS destruere globalem defectionem causat.'",

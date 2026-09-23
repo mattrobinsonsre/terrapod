@@ -2045,7 +2045,9 @@
       "heldByRunTask": "Falló una tarea de ejecución obligatoria: anúlela o descarte la ejecución",
       "runTasksRunning": "Esperando las tareas de ejecución posteriores al plan",
       "heldByPolicy": "Falló un conjunto de políticas obligatorio: anúlelo o descarte la ejecución",
-      "heldBySecurityScan": "El análisis de seguridad encontró hallazgos bloqueantes: anúlelo o descarte la ejecución"
+      "heldBySecurityScan": "El análisis de seguridad encontró hallazgos bloqueantes: anúlelo o descarte la ejecución",
+      "heldByAiPolicy": "La puerta de política de IA denegó esta ejecución: anúlela o descarte la ejecución",
+      "awaitingAiPolicy": "Esperando el veredicto de la política de IA"
     },
     "badge": {
       "destroy": "destruir",
@@ -2326,6 +2328,31 @@
       "erroredMessage": "El análisis no se completó, por lo que esta ejecución no se ha comprobado.",
       "blockedErroredMessage": "Esta ejecución está bloqueada porque el análisis de seguridad no se completó. Corrija la causa y vuelva a planificar, o pida a un administrador que lo anule."
     },
+    "aiPolicyPanel": {
+      "heading": "Puerta de política de IA",
+      "enforcementLabel": "aplicación: {level}",
+      "thresholdLabel": "umbral de riesgo: {threshold}",
+      "awaitingVerdict": "Esperando el veredicto de la política de IA. Esta ejecución queda retenida hasta que llegue.",
+      "decisionAllow": "permitido",
+      "decisionDeny": "denegado",
+      "risk": {
+        "critical": "crítico",
+        "high": "alto",
+        "medium": "medio",
+        "low": "bajo"
+      },
+      "blockedDeniedMessage": "Esta ejecución está <strong>bloqueada por {count, plural, one {# criterio de política} other {# criterios de política}}</strong>.",
+      "blockedRiskMessage": "Esta ejecución está <strong>bloqueada</strong> porque su nivel de riesgo ({level}) está en el umbral ({threshold}) o por encima.",
+      "blockedErroredMessage": "Esta ejecución está bloqueada porque no se pudo alcanzar un veredicto de la política de IA. La puerta falla cerrada: un veredicto inalcanzable no es una aprobación.",
+      "erroredMessage": "La puerta de política de IA no devolvió un veredicto utilizable, por lo que esta ejecución no se ha evaluado.",
+      "passed": "Ningún criterio de política coincidió.",
+      "overriding": "Anulando...",
+      "overrideContinue": "Anular y continuar",
+      "overrideConfirm": "¿Anular la puerta de política de IA y permitir que esta ejecución se aplique a pesar del veredicto?",
+      "overrideFailed": "Error al anular",
+      "overrideFailedStatus": "Error al anular ({status})",
+      "overriddenBy": "anulado por {by}"
+    },
     "architecture": {
       "loadError": "No se pudo cargar la crítica de arquitectura.",
       "notEnabled": "El crítico de arquitectura por IA no está habilitado en esta implementación.",
@@ -2581,6 +2608,8 @@
       "modeDefault": "Seguir el valor predeterminado del despliegue",
       "modeEnabled": "Resumir siempre",
       "modeDisabled": "No resumir nunca",
+      "policyMode": "Puerta de política",
+      "policyModeNote": "Una puerta obligatoria ignora «Nunca»: solo puede eximir a este espacio de trabajo de un veredicto consultivo.",
       "contextLabel": "Contexto del espacio de trabajo",
       "contextLabelSuffix": "(opcional, aditivo)",
       "contextPlaceholder": "Hechos que la IA debe conocer sobre este espacio de trabajo en concreto. p. ej. 'Da servicio a la bóveda del servicio X — destruir la clave KMS provoca una interrupción global.'",

@@ -1418,6 +1418,12 @@ jobs:
           # missing render line would leave an operator who set it true on the
           # 1.x behaviour, with the CLI never offered an override.
           echo "$out" | grep -q "tfe_post_plan_decisions:" || { echo "FAIL: runs.tfe_post_plan_decisions not rendered into config.yaml (#1704)"; exit 1; }
+          # AI policy gate (#1766) reaches config.yaml. Grepping the RENDERED
+          # output, not the template: a values key with no render line is
+          # silently inert -- the operator sets it, the pod never sees it, and
+          # the code default wins with nothing anywhere to say so.
+          echo "$out" | grep -q "enforcement_level:" || { echo "FAIL: ai_summary.policy not rendered into config.yaml (#1766)"; exit 1; }
+          echo "$out" | grep -q "risk_threshold:" || { echo "FAIL: ai_summary.policy.risk_threshold not rendered into config.yaml (#1766)"; exit 1; }
           # Split webhook Ingress (#1529): its `paths` is an ALLOW-LIST, and
           # run-task callback URLs are generated on the canonical prefix. If the
           # default stops covering both, an operator on the default silently loses

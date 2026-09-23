@@ -581,6 +581,14 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"ai_policy_mode": schema.StringAttribute{
+				Description: "Per-workspace override for the AI policy gate (#1766). One of \"default\", \"enabled\", or \"disabled\". Note the asymmetry: \"disabled\" opts out of an *advisory* verdict only — a **mandatory** gate ignores it, because a fleet-wide blocking control any workspace admin could switch off would not be a control. Defaults to \"default\".",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"ai_summary_context": schema.StringAttribute{
 				Description: "Workspace-specific facts appended to the AI summariser's prompt (#401). Additive to the deployment-wide fleet context. Use to flag blast-radius concerns or domain knowledge the model should weigh when describing changes for this workspace. Max 4000 characters.",
 				Optional:    true,
@@ -1035,6 +1043,12 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AISummaryMode.IsNull() && !m.AISummaryMode.IsUnknown() {
 		req.AISummaryMode = m.AISummaryMode.ValueString()
 	}
+	if !m.AIPolicyMode.IsNull() && !m.AIPolicyMode.IsUnknown() {
+		req.AIPolicyMode = m.AIPolicyMode.ValueString()
+	}
+	if !m.AIPolicyMode.IsNull() && !m.AIPolicyMode.IsUnknown() {
+		req.AIPolicyMode = m.AIPolicyMode.ValueString()
+	}
 	if !m.AISummaryContext.IsNull() && !m.AISummaryContext.IsUnknown() {
 		req.AISummaryContext = m.AISummaryContext.ValueString()
 	}
@@ -1379,6 +1393,11 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.AISummaryMode = types.StringValue(ws.AISummaryMode)
 	} else {
 		m.AISummaryMode = types.StringValue("default")
+	}
+	if ws.AIPolicyMode != "" {
+		m.AIPolicyMode = types.StringValue(ws.AIPolicyMode)
+	} else {
+		m.AIPolicyMode = types.StringValue("default")
 	}
 	m.AISummaryContext = types.StringValue(ws.AISummaryContext)
 	m.SlackChannel = types.StringValue(ws.SlackChannel)

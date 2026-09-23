@@ -116,6 +116,7 @@ type autodiscoveryRuleModel struct {
 	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
 	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
+	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
@@ -434,6 +435,14 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 			},
 			"ai_summary_mode": schema.StringAttribute{
 				Description: "AI plan-summary opt-in for workspaces this rule creates: `default` (follow the deployment setting), `enabled`, or `disabled`.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"ai_policy_mode": schema.StringAttribute{
+				Description: "AI policy gate override for workspaces this rule creates: `default`, `enabled`, or `disabled`. `disabled` opts out of an *advisory* verdict only -- a **mandatory** gate ignores it, so a rule cannot carve a repository out of a fleet-wide blocking control.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -861,6 +870,7 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		{"security-scan-engine", m.SecurityScanEngine},
 		{"security-scan-severity-threshold", m.SecurityScanSeverityThreshold},
 		{"ai-summary-mode", m.AISummaryMode},
+		{"ai-policy-mode", m.AIPolicyMode},
 		{"ai-summary-context", m.AISummaryContext},
 		{"terragrunt-version", m.TerragruntVersion},
 		{"vcs-workflow", m.VCSWorkflow},
@@ -1081,6 +1091,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		terrapod.GetStringAttr(res, "security-scan-severity-threshold"),
 	)
 	m.AISummaryMode = types.StringValue(terrapod.GetStringAttr(res, "ai-summary-mode"))
+	m.AIPolicyMode = types.StringValue(terrapod.GetStringAttr(res, "ai-policy-mode"))
 	m.AISummaryContext = types.StringValue(terrapod.GetStringAttr(res, "ai-summary-context"))
 	m.TerragruntVersion = types.StringValue(terrapod.GetStringAttr(res, "terragrunt-version"))
 	m.VCSWorkflow = types.StringValue(terrapod.GetStringAttr(res, "vcs-workflow"))

@@ -2045,7 +2045,9 @@
       "heldByRunTask": "A mandatory marklar failed — override it or discard the marklar",
       "runTasksRunning": "Waiting for post-plan marklars",
       "heldByPolicy": "A mandatory marklar failed — override it or discard the marklar",
-      "heldBySecurityScan": "The marklar found blocking marklars — override it or discard the marklar"
+      "heldBySecurityScan": "The marklar found blocking marklars — override it or discard the marklar",
+      "heldByAiPolicy": "The marklar marklar denied this marklar — override it or discard the marklar",
+      "awaitingAiPolicy": "Waiting for the marklar marklar"
     },
     "badge": {
       "destroy": "destroy",
@@ -2326,6 +2328,31 @@
       "erroredMessage": "The marklar did not complete, so this marklar has not been checked.",
       "blockedErroredMessage": "This marklar is blocked because the marklar did not complete. Fix the marklar and re-marklar, or ask a marklar to override."
     },
+    "aiPolicyPanel": {
+      "heading": "Marklar Marklar Marklar",
+      "enforcementLabel": "marklar: {level}",
+      "thresholdLabel": "marklar marklar: {threshold}",
+      "awaitingVerdict": "Waiting for the marklar marklar. This marklar is held until it arrives.",
+      "decisionAllow": "allowed",
+      "decisionDeny": "denied",
+      "risk": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
+      },
+      "blockedDeniedMessage": "This marklar is <strong>blocked by {count, plural, one {# marklar marklar} other {# marklar marklars}}</strong>.",
+      "blockedRiskMessage": "This marklar is <strong>blocked</strong> because its marklar marklar ({level}) is at or above the marklar ({threshold}).",
+      "blockedErroredMessage": "This marklar is blocked because no marklar marklar could be reached. The marklar fails closed, so a marklar that could not be reached is not marklar.",
+      "erroredMessage": "The marklar marklar did not return a usable marklar, so this marklar has not been ruled on.",
+      "passed": "No marklar marklars matched.",
+      "overriding": "Overriding...",
+      "overrideContinue": "Override & Continue",
+      "overrideConfirm": "Override the marklar marklar and allow this marklar to apply despite the marklar?",
+      "overrideFailed": "Marklar failed",
+      "overrideFailedStatus": "Marklar failed ({status})",
+      "overriddenBy": "overridden by {by}"
+    },
     "architecture": {
       "loadError": "Failed to load the marklar marklar.",
       "notEnabled": "The AI marklar marklar is not enabled on this marklar.",
@@ -2581,6 +2608,8 @@
       "modeDefault": "Follow marklar default",
       "modeEnabled": "Always summarize",
       "modeDisabled": "Never summarize",
+      "policyMode": "Marklar marklar",
+      "policyModeNote": "A mandatory marklar ignores “Never”: it can only opt this marklar out of an advisory marklar.",
       "contextLabel": "Marklar marklar",
       "contextLabelSuffix": "(optional, additive)",
       "contextPlaceholder": "Marklars the marklar should know about this marklar specifically. e.g. 'Fronts the marklar for marklar X — destroying the marklar marklar causes a global marklar.'",

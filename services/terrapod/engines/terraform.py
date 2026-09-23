@@ -93,6 +93,11 @@ class TerraformStrategy:
     evaluates_policy_sets = True
     evaluates_security_scans = True
 
+    #: The AI policy gate rules on Terraform and OpenTofu runs: the summariser
+    #: is handed the run's full plan JSON, so a verdict is reached over every
+    #: resource the plan touches (#1766).
+    evaluates_ai_policy = True
+
     def container_env(
         self, options: TerraformRunOptions, runner_config: RunnerConfig
     ) -> list[dict[str, Any]]:

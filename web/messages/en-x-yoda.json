@@ -2045,7 +2045,9 @@
       "heldByRunTask": "Failed, a mandatory run task has — override it or discard the run, you must",
       "runTasksRunning": "For post-plan run tasks, waiting",
       "heldByPolicy": "Failed, a mandatory policy set has — override it or discard the run, you must",
-      "heldBySecurityScan": "Blocking issues, the security scan found — override it or discard the run, you must"
+      "heldBySecurityScan": "Blocking issues, the security scan found — override it or discard the run, you must",
+      "heldByAiPolicy": "Denied this run, the AI policy gate has — override it or discard the run, you must",
+      "awaitingAiPolicy": "For the AI policy verdict, waiting we are"
     },
     "badge": {
       "destroy": "destroy",
@@ -2326,6 +2328,31 @@
       "erroredMessage": "Complete, the scan did not. Checked, this run has not been.",
       "blockedErroredMessage": "Blocked, this run is, because complete the security scan did not. Fix the cause and plan again you must, or override it, an admin must."
     },
+    "aiPolicyPanel": {
+      "heading": "Gate of AI Policy",
+      "enforcementLabel": "enforcement: {level}",
+      "thresholdLabel": "risk threshold: {threshold}",
+      "awaitingVerdict": "For the AI policy verdict, waiting we are. Held, this run is, until arrive it does.",
+      "decisionAllow": "allowed",
+      "decisionDeny": "denied",
+      "risk": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
+      },
+      "blockedDeniedMessage": "<strong>Blocked by {count, plural, one {# policy criterion} other {# policy criteria}}</strong>, this run is.",
+      "blockedRiskMessage": "<strong>Blocked</strong>, this run is, because at or above the threshold ({threshold}) its risk level ({level}) sits.",
+      "blockedErroredMessage": "Blocked, this run is, because reached no AI policy verdict could be. Closed the gate fails — consent, a verdict unreached is not.",
+      "erroredMessage": "A usable verdict, the AI policy gate did not return. Ruled on, this run has not been.",
+      "passed": "Match, no policy criteria did.",
+      "overriding": "Overriding, we are...",
+      "overrideContinue": "Override and Continue",
+      "overrideConfirm": "Override the AI policy gate, and despite the verdict let this run apply, you would?",
+      "overrideFailed": "Failed, the override did",
+      "overrideFailedStatus": "Failed, the override did ({status})",
+      "overriddenBy": "by {by}, overridden"
+    },
     "architecture": {
       "loadError": "Load the architecture critique, I could not.",
       "notEnabled": "Enabled on this deployment, the AI architecture critic is not.",
@@ -2581,6 +2608,8 @@
       "modeDefault": "The deployment default, follow",
       "modeEnabled": "Summarize, always",
       "modeDisabled": "Summarize, never",
+      "policyMode": "Gate of policy",
+      "policyModeNote": "“Never”, a mandatory gate ignores: out of an advisory verdict only, opt this workspace it can.",
       "contextLabel": "context, Workspace",
       "contextLabelSuffix": "(optional, additive)",
       "contextPlaceholder": "About this workspace specifically, facts the AI should know. e.g. 'The vault for service X, it fronts — destroying the KMS key, a global outage it causes.'",

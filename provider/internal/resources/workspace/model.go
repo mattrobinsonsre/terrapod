@@ -99,6 +99,7 @@ type workspaceModel struct {
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
+	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
 	SlackChannel                  types.String `tfsdk:"slack_channel"`
 
