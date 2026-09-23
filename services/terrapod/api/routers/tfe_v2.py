@@ -692,6 +692,7 @@ def _workspace_json(
                 "drift-ignore-rules": ws.drift_ignore_rules or [],
                 "debug-mode": ws.debug_mode,
                 "ai-summary-mode": ws.ai_summary_mode,
+                "ai-policy-mode": ws.ai_policy_mode,
                 "ai-summary-context": ws.ai_summary_context,
                 # Slack app opt-in channel (#556); empty = this workspace posts nothing.
                 "slack-channel": ws.slack_channel,
@@ -1317,6 +1318,9 @@ async def _create_workspace_impl(
         ai_summary_mode=_422(
             workspace_settings.validate_ai_summary_mode, attrs.get("ai-summary-mode", "default")
         ),
+        ai_policy_mode=_422(
+            workspace_settings.validate_ai_policy_mode, attrs.get("ai-policy-mode", "default")
+        ),
         ai_summary_context=_422(
             workspace_settings.validate_ai_summary_context, attrs.get("ai-summary-context")
         ),
@@ -1909,6 +1913,10 @@ async def update_workspace(
     if "ai-summary-mode" in attrs:
         ws.ai_summary_mode = _422(
             workspace_settings.validate_ai_summary_mode, attrs["ai-summary-mode"]
+        )
+    if "ai-policy-mode" in attrs:
+        ws.ai_policy_mode = _422(
+            workspace_settings.validate_ai_policy_mode, attrs["ai-policy-mode"]
         )
     if "ai-summary-context" in attrs:
         ws.ai_summary_context = _422(

@@ -300,6 +300,7 @@ async def find_or_autocreate_workspace(
         security_scan_severity_threshold=getattr(rule, "security_scan_severity_threshold", "high"),
         security_scan_skip_rules=list(getattr(rule, "security_scan_skip_rules", None) or []),
         ai_summary_mode=getattr(rule, "ai_summary_mode", "default"),
+        ai_policy_mode=getattr(rule, "ai_policy_mode", "default"),
         ai_summary_context=getattr(rule, "ai_summary_context", ""),
         # The rest of the templated settings (#1763), same `getattr` guard: a
         # rule row from a database that predates the migration has no attribute

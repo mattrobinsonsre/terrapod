@@ -147,6 +147,12 @@ type Workspace struct {
 	//   "enabled"  → always summarise (no-op when global is off)
 	//   "disabled" → never summarise this workspace's plans
 	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	// AIPolicyMode is the per-workspace override for the AI policy GATE
+	// (#1766), with the same three states as AISummaryMode. Note the one
+	// asymmetry: "disabled" opts out of an ADVISORY verdict only. A mandatory
+	// gate ignores it, because a fleet-wide blocking control any workspace
+	// admin could switch off would not be a control.
+	AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 	// AISummaryContext is workspace-specific facts added on top of the
 	// deployment-wide fleet_context when the summariser builds its prompt.
 	AISummaryContext string `json:"ai-summary-context,omitempty"`
@@ -224,6 +230,12 @@ type CreateWorkspaceRequest struct {
 	// distinguishable -- a bare bool with omitempty cannot express the second.
 	DebugMode     *bool  `json:"debug-mode,omitempty"`
 	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	// AIPolicyMode is the per-workspace override for the AI policy GATE
+	// (#1766), with the same three states as AISummaryMode. Note the one
+	// asymmetry: "disabled" opts out of an ADVISORY verdict only. A mandatory
+	// gate ignores it, because a fleet-wide blocking control any workspace
+	// admin could switch off would not be a control.
+	AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 	// AISummaryContext is workspace-specific context added to the model
 	// prompt. Capped at 4000 chars server-side.
 	AISummaryContext string `json:"ai-summary-context,omitempty"`
@@ -291,6 +303,10 @@ type UpdateWorkspaceRequest struct {
 	// distinguishable -- a bare bool with omitempty cannot express the second.
 	DebugMode     *bool  `json:"debug-mode,omitempty"`
 	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	// AIPolicyMode see CreateWorkspaceRequest. On UPDATE, empty string leaves
+	// the existing value untouched -- to explicitly set "follow the deployment
+	// default", pass "default".
+	AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 	// AISummaryContext see CreateWorkspaceRequest. To clear an existing
 	// context, set this to "" — but note empty string also means
 	// "leave alone" (a Terrapod-side limitation; clear via the UI).

@@ -57,6 +57,7 @@ ID_PREFIXES: dict[str, str] = {
     "plans": "plan-",
     "policies": "pol-",
     "policy-evaluations": "pe-",
+    "ai-policy-evaluations": "aipol-",
     "policy-sets": "polset-",
     "registry-module-versions": "modver-",
     "remote-state-consumers": "rsc-",

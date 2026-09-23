@@ -2307,6 +2307,35 @@
                   "type": "string"
                 }
               }
+            },
+            "policy": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "enforcement_level": {
+                  "type": "string",
+                  "enum": [
+                    "advisory",
+                    "mandatory"
+                  ]
+                },
+                "risk_threshold": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "low",
+                    "medium",
+                    "high",
+                    "critical"
+                  ]
+                },
+                "deny_criteria": {
+                  "type": "string"
+                }
+              }
             }
           }
         },

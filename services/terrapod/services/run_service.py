@@ -1289,6 +1289,21 @@ async def complete_plan(
     if scan_gate != security_scan_service.GATE_PASSED:
         return run
 
+    # Post-plan AI policy gate (#1766) — the judgement-call sibling of the two
+    # gates above. It sits LAST because it is the only one whose evidence may
+    # not exist yet: the summariser runs in the API and is enqueued from the
+    # plan-JSON upload, after this function. A mandatory gate therefore holds
+    # the run in `planning` until the verdict lands and the summariser
+    # re-drives this idempotent function, rather than failing it for evidence
+    # the runner was never asked to produce. Going last means a run held for a
+    # verdict has already cleared OPA and the scan, so the wait only ever
+    # happens for a run that would otherwise be about to apply.
+    from terrapod.services import ai_policy_service
+
+    ai_gate = await ai_policy_service.evaluate_post_plan(db, run)
+    if ai_gate != ai_policy_service.GATE_PASSED:
+        return run
+
     run = await transition_run(db, run, "planned")
 
     # Zero-change non-speculative plans short-circuit straight to `applied`.

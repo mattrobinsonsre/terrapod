@@ -20,6 +20,21 @@ const RunStatusPolicyOverride
 const RunStatusPostPlanAwaitingDecision
 const RunStatusPostPlanRunning
 const VersionField
+field AIPolicyEvaluation.CreatedAt string `json:"created-at,omitempty"`
+field AIPolicyEvaluation.EnforcementLevel string `json:"enforcement-level"`
+field AIPolicyEvaluation.Error string `json:"error,omitempty"`
+field AIPolicyEvaluation.ID string `json:"id"`
+field AIPolicyEvaluation.Outcome string `json:"outcome"`
+field AIPolicyEvaluation.OverriddenAt string `json:"overridden-at,omitempty"`
+field AIPolicyEvaluation.OverriddenBy string `json:"overridden-by,omitempty"`
+field AIPolicyEvaluation.RiskLevel string `json:"risk-level,omitempty"`
+field AIPolicyEvaluation.RiskThreshold string `json:"risk-threshold"`
+field AIPolicyEvaluation.RunID string `json:"-"`
+field AIPolicyEvaluation.Verdict *AIPolicyVerdict `json:"verdict,omitempty"`
+field AIPolicyVerdict.Decision string `json:"decision"`
+field AIPolicyVerdict.Reasons []AIPolicyVerdictReason `json:"reasons,omitempty"`
+field AIPolicyVerdictReason.Criterion string `json:"criterion"`
+field AIPolicyVerdictReason.Detail string `json:"detail"`
 field APIError.Body string
 field APIError.StatusCode int
 field APIToken.BoundTo string `json:"bound-to,omitempty"`
@@ -1336,6 +1351,7 @@ func NewClient(opts Options) (*Client, error)
 func ParseResource(body []byte) (*Resource, error)
 func ParseResourceList(body []byte) ([]Resource, error)
 func StripPrefix(id, prefix string) string
+method (*AIPolicyEvaluation) IsBlocking() bool
 method (*APIError) Error() string
 method (*AuthenticationError) Error() string
 method (*AuthorizationError) Error() string
@@ -1445,6 +1461,7 @@ method (*Client) GetResourceAccess(ctx context.Context, kind, id string) (*Resou
 method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
 method (*Client) GetRun(ctx context.Context, runID string) (*Run, error)
+method (*Client) GetRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error)
 method (*Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEstimate, error)
 method (*Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
@@ -1519,6 +1536,7 @@ method (*Client) ListWorkspaceVarsets(ctx context.Context, workspaceID string) (
 method (*Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) (*WorkspaceList, error)
 method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
 method (*Client) OverridePolicyCheck(ctx context.Context, checkID string) (*PolicyCheck, error)
+method (*Client) OverrideRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error)
 method (*Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
@@ -1586,6 +1604,9 @@ method (*ConflictError) Error() string
 method (*NotFoundError) Error() string
 method (*ValidationError) Error() string
 method (*WorkspaceSummary) UnmarshalJSON(data []byte) error
+type AIPolicyEvaluation struct
+type AIPolicyVerdict struct
+type AIPolicyVerdictReason struct
 type APIError struct
 type APIToken struct
 type AddPolicyRequest struct

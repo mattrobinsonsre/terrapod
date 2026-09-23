@@ -106,6 +106,17 @@ class PulumiStrategy:
     #: a result that never comes.
     evaluates_security_scans = False
 
+    #: The AI policy gate, not yet, and for a sharper reason than the scan
+    #: above (#1766). A preview DOES upload a plan artifact — but it is the
+    #: digest, capped at `pulumi_preview.MAX_STEPS`, and `steps_truncated` says
+    #: so. Ruling over a truncated list of resources can ALLOW a plan because
+    #: the offending resource fell off the end, which is precisely why
+    #: `write_policy_input` builds an uncapped document for OPA instead. That
+    #: document is built in the runner and never uploaded, so the API cannot
+    #: read it; until it can, a Pulumi run is reported as not evaluated rather
+    #: than judged on a partial plan.
+    evaluates_ai_policy = False
+
     #: Which phase each internal run status belongs to. The platform's status
     #: names never change — a run is `planning` whatever engine it belongs to —
     #: and this is what stops a Pulumi run being described as "planning" to a

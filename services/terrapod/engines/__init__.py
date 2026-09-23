@@ -72,6 +72,14 @@ class EngineStrategy(Protocol):
     #: Trivy read Terraform plan JSON). Same reason as above.
     evaluates_security_scans: bool
 
+    #: Whether the AI policy gate rules on a run of this engine (#1766). The
+    #: gate reads the structured plan the summariser was given, so an engine
+    #: whose uploaded plan artifact is a TRUNCATED summary must answer False:
+    #: a gate that decides over a capped list of resources can allow a plan
+    #: because the offending resource fell off the end, which is a worse
+    #: failure than not gating at all.
+    evaluates_ai_policy: bool
+
     def build_job_spec(self, **kwargs: Any) -> dict:
         """Build the Kubernetes Job spec for one phase of a run."""
         ...
@@ -141,6 +149,16 @@ def evaluates_security_scans(engine: str | None) -> bool:
     """Whether a run of this engine is security-scanned (#1567). As above."""
     strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
     return True if strategy is None else strategy.evaluates_security_scans
+
+
+def evaluates_ai_policy(engine: str | None) -> bool:
+    """Whether the AI policy gate rules on a run of this engine (#1766).
+
+    An unknown engine answers True, as the other two do, so the gate keeps
+    failing closed for a row nobody can vouch for.
+    """
+    strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
+    return True if strategy is None else strategy.evaluates_ai_policy
 
 
 def known_engines() -> tuple[str, ...]:

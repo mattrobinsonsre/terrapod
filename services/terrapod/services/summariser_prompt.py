@@ -30,6 +30,64 @@ PLAN_SUMMARY_JSON_SCHEMA: dict = {
     "additionalProperties": False,
     "required": ["description", "risk_level", "risk_factors"],
     "properties": {
+        # The gate's verdict (#1766). Deliberately OPTIONAL: it is requested
+        # only when DENY_CRITERIA is present, so every ungated run emits the
+        # exact object it emitted before this field existed. Keeping it out of
+        # `required` is what makes extending the schema additive rather than a
+        # change to the summary contract the UI and DB already depend on.
+        "policy_verdict": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["decision", "reasons"],
+            "description": (
+                "Your allow/deny ruling against DENY_CRITERIA. Emit this ONLY "
+                "when DENY_CRITERIA is present in the user message; omit the "
+                "field entirely otherwise."
+            ),
+            "properties": {
+                "decision": {
+                    "type": "string",
+                    "enum": ["allow", "deny"],
+                    "description": (
+                        "`deny` if this plan matches ANY criterion, else "
+                        "`allow`. Judge only what the plan creates, updates, "
+                        "deletes or replaces -- a criterion matching a "
+                        "resource the plan leaves untouched is not a match."
+                    ),
+                },
+                "reasons": {
+                    "type": "array",
+                    "description": (
+                        "One entry per criterion you matched, empty when you "
+                        "allow. Never deny with an empty array: an operator "
+                        "reading a blocked run must be able to see which "
+                        "criterion stopped it and on which resource."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["criterion", "detail"],
+                        "properties": {
+                            "criterion": {
+                                "type": "string",
+                                "maxLength": 200,
+                                "description": (
+                                    "The operator's criterion you matched, quoted as given."
+                                ),
+                            },
+                            "detail": {
+                                "type": "string",
+                                "maxLength": 600,
+                                "description": (
+                                    "What in THIS plan matches it, naming the "
+                                    "terraform address and the property."
+                                ),
+                            },
+                        },
+                    },
+                },
+            },
+        },
         "description": {
             "type": "string",
             "description": (
@@ -682,6 +740,7 @@ def render_prompt(
     security_findings: str = "",
     cost_estimate: str = "",
     output_language: str = "",
+    deny_criteria: str = "",
 ) -> tuple[str, str]:
     """Render the system + user messages for the Chat Completions request.
 
@@ -723,6 +782,32 @@ def render_prompt(
             f"untranslated: resource addresses, provider and module names, HCL "
             f"keywords, CLI flags, file paths, and anything inside backticks."
         )
+    if deny_criteria.strip():
+        # The gate (#1766). Appended rather than folded into the skill prompt so
+        # the summary keeps doing exactly what it was tuned to do; with no
+        # criteria configured this block does not render and the request is
+        # byte-identical to an ungated one.
+        parts.append(
+            "POLICY GATE - you are also ruling on whether this plan may "
+            "proceed.\n\n"
+            "  DENY_CRITERIA in the user message lists the operator's "
+            "conditions. Call `deny` if the plan matches ANY of them, else "
+            "`allow`, and put the ruling in `policy_verdict`.\n\n"
+            "  Judge ONLY what this plan creates, updates, deletes or "
+            "replaces. A criterion describing a resource the plan leaves "
+            "untouched is NOT a match - the same grounding rule the rest of "
+            "this prompt applies to `risk_factors`, and for the same reason: "
+            "blocking a change over a pre-existing condition it does not alter "
+            "stops the operator fixing anything.\n\n"
+            "  Every deny needs at least one entry in `reasons`, naming the "
+            "criterion and the terraform address that matched it. A deny an "
+            "operator cannot act on is worse than no gate.\n\n"
+            "  `policy_verdict` is independent of `risk_level`: rule on the "
+            "criteria as written and let the risk score say what it says. "
+            "Terrapod applies its own threshold to that score separately, so "
+            "do not raise or lower the score to influence the outcome."
+        )
+
     system_message = "\n\n".join(parts)
 
     user_parts: list[str] = []
@@ -757,6 +842,8 @@ def render_prompt(
         user_parts.append(f"SECURITY_FINDINGS:\n```json\n{security_findings}\n```")
     if cost_estimate.strip():
         user_parts.append(f"COST_ESTIMATE:\n```json\n{cost_estimate}\n```")
+    if deny_criteria.strip():
+        user_parts.append(f"DENY_CRITERIA:\n{deny_criteria.strip()}")
 
     tool_name = "submit_plan_summary" if kind == "plan_summary" else "submit_failure_analysis"
     user_parts.append(f"Now call the `{tool_name}` tool exactly once with your structured answer.")

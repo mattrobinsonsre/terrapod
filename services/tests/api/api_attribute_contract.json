@@ -29,6 +29,17 @@
     "max-uses",
     "use-count"
   ],
+  "ai_policy._evaluation_json": [
+    "created-at",
+    "enforcement-level",
+    "error",
+    "outcome",
+    "overridden-at",
+    "overridden-by",
+    "risk-level",
+    "risk-threshold",
+    "verdict"
+  ],
   "audit.list_audit_log": [
     "action",
     "actor-email",
@@ -43,6 +54,7 @@
   ],
   "autodiscovery_rules._rule_json": [
     "agent-pool-id",
+    "ai-policy-mode",
     "ai-summary-context",
     "ai-summary-mode",
     "auto-apply",
@@ -834,6 +846,7 @@
     "agent-pool-ids",
     "agent-pool-name",
     "agent-pool-names",
+    "ai-policy-mode",
     "ai-summary-context",
     "ai-summary-mode",
     "auto-apply",

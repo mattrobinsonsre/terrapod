@@ -68,6 +68,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.lifecycle_reason = overrides.get("lifecycle_reason", "")
     ws.autodiscovery_pr_number = overrides.get("autodiscovery_pr_number", None)
     ws.debug_mode = overrides.get("debug_mode", False)
+    ws.ai_policy_mode = overrides.get("ai_policy_mode", "default")
     ws.ai_summary_mode = overrides.get("ai_summary_mode", "default")
     ws.ai_summary_context = overrides.get("ai_summary_context", "")
     ws.slack_channel = overrides.get("slack_channel", "")
