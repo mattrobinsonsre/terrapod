@@ -813,6 +813,105 @@ async def _budget_charge(tokens: int) -> None:
 # --- Workspace mode resolution ----------------------------------------------
 
 
+async def _settle_ai_policy_gate(
+    db: AsyncSession,
+    run: Run,
+    ws: Workspace,
+    *,
+    verdict: dict | None = None,
+    risk_level: str = "",
+    error: str | None = None,
+) -> None:
+    """Record the gate's verdict for this run and release any hold (#1766).
+
+    **Every terminal path through the summariser must reach this**, including
+    the ones that skip the model entirely. A mandatory gate holds the run in
+    `planning` waiting for a verdict, so a path that returns without recording
+    one does not merely lose a verdict — it strands the run forever, with no
+    error anywhere to say why. That is the single worst failure this feature
+    can have, and it is why `error` is a first-class argument rather than
+    something only the exception handler passes.
+
+    A no-op when the gate does not apply to this run, so the ordinary
+    summary path is unchanged.
+    """
+    from terrapod.services import ai_policy_service
+
+    if not ai_policy_service.gate_applies_to(run, ws):
+        return
+
+    enforcement = ai_policy_service.effective_enforcement(ws)
+
+    if error is not None:
+        outcome, err = "errored", error
+    else:
+        outcome, err = ai_policy_service.decide_outcome(verdict, risk_level)
+
+    await ai_policy_service.record_evaluation(
+        db,
+        run_id=run.id,
+        enforcement_level=enforcement,
+        outcome=outcome,
+        verdict=verdict,
+        risk_level=risk_level,
+        error=err,
+    )
+    await db.commit()
+
+    logger.info(
+        "AI policy gate ruled",
+        run_id=str(run.id),
+        outcome=outcome,
+        enforcement=enforcement,
+        risk_level=risk_level or None,
+    )
+
+    if enforcement != "mandatory":
+        # Advisory never held the run, so there is nothing to release.
+        return
+
+    # Re-drive the idempotent complete_plan so a run held for this verdict
+    # moves on (or stays held, now with a recorded reason an operator can see
+    # and override). The same mechanism an async run-task stage uses.
+    try:
+        from terrapod.services import run_service
+
+        fresh = await db.get(Run, run.id)
+        if fresh is not None and fresh.status == "planning":
+            await run_service.complete_plan(db, fresh)
+            await db.commit()
+    except Exception as exc:  # noqa: BLE001
+        # Never let the re-drive take down the summary that produced the
+        # verdict: the evaluation is committed above, so the reconciler and an
+        # operator override both still have something to work with.
+        logger.error(
+            "AI policy gate could not re-drive the held run",
+            run_id=str(run.id),
+            error=str(exc),
+            exc_info=True,
+        )
+
+
+def _gate_needs_verdict(run: Run, ws: Workspace) -> bool:
+    """Whether the AI policy gate is waiting on a verdict for this run (#1766)."""
+    from terrapod.services import ai_policy_service
+
+    return ai_policy_service.wants_verdict(run, ws)
+
+
+def _gate_deny_criteria(run: Run, ws: Workspace) -> str:
+    """The operator's deny criteria, but only for a run the gate rules on.
+
+    Returning "" for every other run is what keeps the prompt and the forced
+    schema identical to their pre-gate shape outside the gated path.
+    """
+    from terrapod.services import ai_policy_service
+
+    if not ai_policy_service.wants_verdict(run, ws):
+        return ""
+    return ai_policy_service.deny_criteria()
+
+
 def _resolve_workspace_mode(ws: Workspace) -> bool:
     """Resolve the 3-state per-workspace toggle against the global flag.
 
@@ -1446,9 +1545,25 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             )
             await db.commit()
             await _emit_summary_event("plan_summary_skipped", ws.id, run_id)
+            await _settle_ai_policy_gate(
+                db,
+                run,
+                ws,
+                error=(
+                    f"The runner exited abnormally ({run.runner_exit_status}), so there "
+                    "is no plan for the gate to rule over. Re-run once the cause is "
+                    "addressed, or override to release this run."
+                ),
+            )
             return
 
-        if not _resolve_workspace_mode(ws):
+        # The per-workspace AI-summary opt-out does NOT release a run from a
+        # MANDATORY gate (#1766). Letting it would mean any workspace admin
+        # could evade a fleet-wide blocking control by turning summaries off --
+        # the same shape of hole as a plan-only run applying past a mandatory
+        # policy set. When the gate needs a verdict, the call happens regardless
+        # of the summary preference, and the summary it produces rides along.
+        if not _resolve_workspace_mode(ws) and not _gate_needs_verdict(run, ws):
             await _upsert_summary(
                 db,
                 run_id=run_id,
@@ -1458,6 +1573,13 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             )
             await db.commit()
             await _emit_summary_event("plan_summary_skipped", ws.id, run_id)
+            # Reachable only when the gate does not apply (see the guard above),
+            # so there is nothing to settle -- but call it anyway rather than
+            # relying on that reasoning staying true as the guard evolves. It is
+            # a no-op when the gate is off.
+            await _settle_ai_policy_gate(
+                db, run, ws, error="Summaries are disabled for this workspace."
+            )
             return
 
         remaining = await _budget_remaining()
@@ -1472,6 +1594,9 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             )
             await db.commit()
             await _emit_summary_event("plan_summary_skipped", ws.id, run_id)
+            from terrapod.services.ai_policy_service import BUDGET_EXHAUSTED_ERROR
+
+            await _settle_ai_policy_gate(db, run, ws, error=BUDGET_EXHAUSTED_ERROR)
             return
 
         primary, label, lang, code_context, code_diff = await _gather_inputs(db, run, kind)
@@ -1485,6 +1610,14 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             )
             await db.commit()
             await _emit_summary_event("plan_summary_errored", ws.id, run_id)
+            await _settle_ai_policy_gate(
+                db,
+                run,
+                ws,
+                error=(
+                    f"No {label} was available for this run, so the gate had nothing to rule over."
+                ),
+            )
             return
 
         # Grounded design-review signals (plan_summary only; #963/#1036) —
@@ -1509,6 +1642,9 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             security_findings=security_findings,
             cost_estimate=cost_estimate,
             output_language=_output_language(),
+            # The gate rides this same call (#1766) -- empty when it does not
+            # apply, which makes the request byte-identical to an ungated one.
+            deny_criteria=_gate_deny_criteria(run, ws),
         )
 
         try:
@@ -1535,6 +1671,12 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             )
             await db.commit()
             await _emit_summary_event("plan_summary_errored", ws.id, run_id)
+            await _settle_ai_policy_gate(
+                db,
+                run,
+                ws,
+                error=(f"The model call failed, so no verdict was reached: {str(e)[:400]}"),
+            )
             return
 
         description = str(parsed.get("description", ""))[:50_000]
@@ -1573,6 +1715,32 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             output_tokens=out_tok,
         )
         await db.commit()
+
+        # The gate's verdict rode this same response (#1766). The three ways a
+        # model can answer badly all end as `errored` rather than as a silent
+        # allow, which is the "you cannot gate on fuzzy text" objection
+        # answered -- and the one place the summary's graceful degrade would be
+        # exactly the wrong behaviour:
+        #
+        #   * free prose            -> `_call_model` raises, and the except
+        #                              branch above settles the gate errored;
+        #   * body JSON with no
+        #     `policy_verdict`      -> None here, and `decide_outcome` treats
+        #                              silence as un-ruled rather than consent;
+        #   * a verdict whose
+        #     `decision` is neither
+        #     allow nor deny        -> `decide_outcome` rejects it.
+        #
+        # Body-content JSON that DOES carry a well-formed verdict is honoured:
+        # it is structured output that happened to arrive outside a tool call,
+        # which is a transport detail, not fuzzy text.
+        await _settle_ai_policy_gate(
+            db,
+            run,
+            ws,
+            verdict=parsed.get("policy_verdict"),
+            risk_level=risk_level,
+        )
 
     # Out-of-transaction side effects
     await _budget_charge(out_tok)

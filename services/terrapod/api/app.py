@@ -1252,9 +1252,11 @@ def create_application() -> FastAPI:
 
     # Security scanning (#1036): deterministic Checkov/Trivy IaC-misconfig scan
     # stage — runner config/results + run-read + admin override.
+    from terrapod.api.routers.ai_policy import router as ai_policy_router
     from terrapod.api.routers.security_scanning import router as security_scanning_router
 
     include_terrapod(security_scanning_router)
+    include_terrapod(ai_policy_router)
 
     # Audit log query endpoint — Terrapod-specific.
     from terrapod.api.routers.audit import router as audit_router

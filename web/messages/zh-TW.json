@@ -2307,6 +2307,31 @@
       "erroredMessage": "掃描未完成，因此本次執行尚未檢查。",
       "blockedErroredMessage": "本次執行已被封鎖，因為安全掃描未完成。請修正原因後重新執行規劃，或請管理員覆寫。"
     },
+    "aiPolicyPanel": {
+      "heading": "AI 政策閘門",
+      "enforcementLabel": "強制層級：{level}",
+      "thresholdLabel": "風險閾值：{threshold}",
+      "awaitingVerdict": "正在等待 AI 政策裁定。在裁定抵達前，此執行將被保留。",
+      "decisionAllow": "允許",
+      "decisionDeny": "拒絕",
+      "risk": {
+        "critical": "嚴重",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "blockedDeniedMessage": "此執行被<strong>{count, plural, other {# 條政策準則}}阻斷</strong>。",
+      "blockedRiskMessage": "此執行被<strong>阻斷</strong>，因為其風險等級（{level}）達到或超過閾值（{threshold}）。",
+      "blockedErroredMessage": "由於無法得出 AI 政策裁定，此執行被阻斷。閘門以失敗關閉方式運作：無法得出的裁定不等於核准。",
+      "erroredMessage": "AI 政策閘門未傳回可用的裁定，因此尚未對此執行作出裁定。",
+      "passed": "沒有相符的政策準則。",
+      "overriding": "正在覆蓋...",
+      "overrideContinue": "覆蓋並繼續",
+      "overrideConfirm": "覆寫 AI 政策閘門並允許此執行在存在裁定的情況下套用？",
+      "overrideFailed": "覆蓋失敗",
+      "overrideFailedStatus": "覆蓋失敗（{status}）",
+      "overriddenBy": "由 {by} 覆蓋"
+    },
     "architecture": {
       "loadError": "無法載入架構評審。",
       "notEnabled": "此部署未啟用 AI 架構評審。",
@@ -2553,6 +2578,8 @@
       "modeDefault": "遵循部署預設設定",
       "modeEnabled": "始終摘要",
       "modeDisabled": "從不摘要",
+      "policyMode": "政策閘門",
+      "policyModeNote": "強制閘門會忽略「從不」：它只能讓此工作區豁免建議性裁定。",
       "contextLabel": "工作區上下文",
       "contextLabelSuffix": "（可選，附加）",
       "contextPlaceholder": "AI 應專門瞭解此工作區的事實。例如 '為服務 X 前置 vault — 銷毀 KMS 金鑰會導致全域中斷。'",

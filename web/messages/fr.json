@@ -2307,6 +2307,31 @@
       "erroredMessage": "L''analyse ne s''est pas terminée, cette exécution n''a donc pas été vérifiée.",
       "blockedErroredMessage": "Cette exécution est bloquée car l''analyse de sécurité ne s''est pas terminée. Corrigez la cause et relancez la planification, ou demandez à un administrateur de la contourner."
     },
+    "aiPolicyPanel": {
+      "heading": "Barrière de politique IA",
+      "enforcementLabel": "application : {level}",
+      "thresholdLabel": "seuil de risque : {threshold}",
+      "awaitingVerdict": "En attente du verdict de la politique IA. Cette exécution est retenue jusqu''à son arrivée.",
+      "decisionAllow": "autorisé",
+      "decisionDeny": "refusé",
+      "risk": {
+        "critical": "critique",
+        "high": "élevé",
+        "medium": "moyen",
+        "low": "faible"
+      },
+      "blockedDeniedMessage": "Cette exécution est <strong>bloquée par {count, plural, one {# critère de politique} other {# critères de politique}}</strong>.",
+      "blockedRiskMessage": "Cette exécution est <strong>bloquée</strong> car son niveau de risque ({level}) atteint ou dépasse le seuil ({threshold}).",
+      "blockedErroredMessage": "Cette exécution est bloquée car aucun verdict de politique IA n''a pu être obtenu. La barrière échoue en position fermée : un verdict impossible à obtenir ne vaut pas approbation.",
+      "erroredMessage": "La barrière de politique IA n''a pas renvoyé de verdict exploitable, cette exécution n''a donc pas été jugée.",
+      "passed": "Aucun critère de politique ne correspond.",
+      "overriding": "Contournement...",
+      "overrideContinue": "Contourner et continuer",
+      "overrideConfirm": "Contourner la barrière de politique IA et autoriser l''application de cette exécution malgré le verdict ?",
+      "overrideFailed": "Échec du contournement",
+      "overrideFailedStatus": "Échec du contournement ({status})",
+      "overriddenBy": "contourné par {by}"
+    },
     "architecture": {
       "loadError": "Impossible de charger la critique d''architecture.",
       "notEnabled": "Le critique d''architecture par IA n''est pas activé sur ce déploiement.",
@@ -2553,6 +2578,8 @@
       "modeDefault": "Suivre la valeur par défaut du déploiement",
       "modeEnabled": "Toujours résumer",
       "modeDisabled": "Ne jamais résumer",
+      "policyMode": "Barrière de politique",
+      "policyModeNote": "Une barrière obligatoire ignore « Jamais » : elle ne peut exempter cet espace de travail que d''un verdict consultatif.",
       "contextLabel": "Contexte de l'espace de travail",
       "contextLabelSuffix": "(facultatif, additif)",
       "contextPlaceholder": "Faits que l'IA devrait connaître à propos de cet espace de travail en particulier. par ex. « Sert de façade au coffre du service X — détruire la clé KMS provoque une panne globale. »",

@@ -1285,3 +1285,37 @@ test.describe('Runner debug mode (#1764)', () => {
     page.off('dialog', spy)
   })
 })
+
+test.describe('AI policy gate (#1766)', () => {
+  test('the per-workspace override and its caveat fit a phone', async ({ page }) => {
+    // The caveat is the reason this needs a responsive assertion at all: it is
+    // a long sentence saying that "Never" does NOT escape a mandatory gate,
+    // and it sits under a select inside a two-column grid. If it is what
+    // pushes the page sideways, the fix must not be to drop it — someone who
+    // sets this believing they have left a fleet-wide blocking control is
+    // exactly who the line is for.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespaipol'))
+
+    await page.goto(`/workspaces/${wsId}`)
+    const select = page.getByTestId('ai-policy-mode')
+    await expect(select).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // The caveat is present at phone width, not hidden to make the grid fit.
+    await expect(page.getByText(/mandatory gate ignores/i)).toBeVisible()
+
+    // Changing it is a reversible settings write, not a single-tap mutation,
+    // so tier 2 of the #719 confirm policy does not apply and it must NOT
+    // prompt — a confirm here trains people to dismiss the ones that matter.
+    let dialogFired = false
+    const spy = async (d: Dialog) => { dialogFired = true; await d.dismiss() }
+    page.on('dialog', spy)
+    await select.selectOption('disabled')
+    await expect(select).toHaveValue('disabled', { timeout: 15_000 })
+    expect(dialogFired).toBe(false)
+    page.off('dialog', spy)
+
+    await expectNoHorizontalPageScroll(page)
+  })
+})

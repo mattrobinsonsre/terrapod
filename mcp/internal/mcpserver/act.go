@@ -207,6 +207,26 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 		return nil, sc, nil
 	})
 
+	// ── terrapod_run_ai_policy_override ──────────────────────────────
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_run_ai_policy_override",
+		Description: "Release a run held by the AI policy gate so it can proceed despite a deny or an unreachable verdict. " +
+			"Requires workspace admin. A run still held in planning is re-driven immediately. Use deliberately — this " +
+			"bypasses a governance gate; read the verdict's reasons first and prefer fixing what they name. Errors with a " +
+			"conflict when no verdict has been recorded yet: a run held by a mandatory gate is released as soon as its " +
+			"verdict lands, so there is nothing to override before then.",
+		Annotations: destructive,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runIDIn) (*mcp.CallToolResult, *terrapod.AIPolicyEvaluation, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		e, err := c.OverrideRunAIPolicy(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, e, nil
+	})
+
 	// ── terrapod_deleted_workspace_restore ───────────────────────────
 	type restoreIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the id of the DELETED workspace to recover, from terrapod_deleted_workspace_list; either the bare uuid or the ws- prefixed form"`

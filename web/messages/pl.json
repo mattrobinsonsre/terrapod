@@ -2307,6 +2307,31 @@
       "erroredMessage": "Skanowanie nie zostało ukończone, więc to uruchomienie nie zostało sprawdzone.",
       "blockedErroredMessage": "To uruchomienie jest zablokowane, ponieważ skanowanie bezpieczeństwa nie zostało ukończone. Usuń przyczynę i zaplanuj ponownie lub poproś administratora o obejście."
     },
+    "aiPolicyPanel": {
+      "heading": "Bramka zasad AI",
+      "enforcementLabel": "egzekwowanie: {level}",
+      "thresholdLabel": "próg ryzyka: {threshold}",
+      "awaitingVerdict": "Oczekiwanie na werdykt zasad AI. Ten przebieg jest wstrzymany do jego nadejścia.",
+      "decisionAllow": "dozwolony",
+      "decisionDeny": "odrzucony",
+      "risk": {
+        "critical": "krytyczny",
+        "high": "wysoki",
+        "medium": "średni",
+        "low": "niski"
+      },
+      "blockedDeniedMessage": "Ten przebieg jest <strong>zablokowany przez {count, plural, one {# kryterium zasad} few {# kryteria zasad} many {# kryteriów zasad} other {# kryterium zasad}}</strong>.",
+      "blockedRiskMessage": "Ten przebieg jest <strong>zablokowany</strong>, ponieważ jego poziom ryzyka ({level}) jest na progu ({threshold}) lub powyżej.",
+      "blockedErroredMessage": "Ten przebieg jest zablokowany, ponieważ nie udało się uzyskać werdyktu zasad AI. Bramka zawodzi w stanie zamkniętym — werdykt, którego nie uzyskano, nie jest zgodą.",
+      "erroredMessage": "Bramka zasad AI nie zwróciła użytecznego werdyktu, więc ten przebieg nie został oceniony.",
+      "passed": "Żadne kryterium zasad nie pasowało.",
+      "overriding": "Nadpisywanie...",
+      "overrideContinue": "Nadpisz i kontynuuj",
+      "overrideConfirm": "Zastąpić bramkę zasad AI i zezwolić na zastosowanie tego przebiegu mimo werdyktu?",
+      "overrideFailed": "Nadpisanie nie powiodło się",
+      "overrideFailedStatus": "Nadpisanie nie powiodło się ({status})",
+      "overriddenBy": "nadpisane przez {by}"
+    },
     "architecture": {
       "loadError": "Nie udało się wczytać krytyki architektury.",
       "notEnabled": "Krytyk architektury AI nie jest włączony w tym wdrożeniu.",
@@ -2553,6 +2578,8 @@
       "modeDefault": "Zgodnie z domyślnym ustawieniem wdrożenia",
       "modeEnabled": "Zawsze podsumowuj",
       "modeDisabled": "Nigdy nie podsumowuj",
+      "policyMode": "Bramka zasad",
+      "policyModeNote": "Obowiązkowa bramka ignoruje „Nigdy”: może wyłączyć tę przestrzeń roboczą wyłącznie z werdyktu doradczego.",
       "contextLabel": "Kontekst obszaru roboczego",
       "contextLabelSuffix": "(opcjonalny, dodatkowy)",
       "contextPlaceholder": "Fakty, które AI powinno znać konkretnie o tym obszarze roboczym. np. 'Obsługuje magazyn sekretów dla usługi X — zniszczenie klucza KMS powoduje globalną awarię.'",

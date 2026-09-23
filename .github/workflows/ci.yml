@@ -1217,6 +1217,12 @@ jobs:
           echo "$out" | grep -q "cost_estimation:" || { echo "FAIL: cost_estimation config not rendered into config.yaml (#871)"; exit 1; }
           echo "$out" | grep -q "prices_url:" || { echo "FAIL: cost_estimation.prices_url not rendered (#871)"; exit 1; }
           echo "$out" | grep -q "default_region:" || { echo "FAIL: cost_estimation.default_region not rendered (#871)"; exit 1; }
+          # AI policy gate (#1766) reaches config.yaml. Grepping the RENDERED
+          # output, not the template: a values key with no render line is
+          # silently inert -- the operator sets it, the pod never sees it, and
+          # the code default wins with nothing anywhere to say so.
+          echo "$out" | grep -q "enforcement_level:" || { echo "FAIL: ai_summary.policy not rendered into config.yaml (#1766)"; exit 1; }
+          echo "$out" | grep -q "risk_threshold:" || { echo "FAIL: ai_summary.policy.risk_threshold not rendered into config.yaml (#1766)"; exit 1; }
           # Platform tools (#1208): opa/trivy/checkov are no longer baked into the
           # images, so these versions are the ONLY thing telling a runner what to
           # fetch. A missing render line leaves the value inert and the code default
