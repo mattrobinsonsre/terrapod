@@ -618,6 +618,45 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, out, nil
 	})
 
+	// ── terrapod_policy_set_list ─────────────────────────────────────
+	type policySetsIn struct{}
+	type policySetsOut struct {
+		Count      int                  `json:"count"`
+		PolicySets []terrapod.PolicySet `json:"policy_sets"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_policy_set_list",
+		Description: "List the OPA policy sets and how each is scoped. Requires platform admin. " +
+			"This is what answers \"why was this run blocked\" and \"what governs this workspace\" — a run's " +
+			"own policy checks say which set failed, this says what that set is and who else it applies to. " +
+			"`enforcement-level` is the field that decides whether a failure blocks: `mandatory` holds the apply " +
+			"until an admin overrides, `advisory` only records a warning, so an advisory set failing is not why " +
+			"an apply is stuck. `enabled` false means the set is evaluated against nothing whatever its scope. " +
+			"Scope reads as `global-scope` (every workspace) OR the allow rules, minus the deny rules, which " +
+			"always win — and each label key binds a LIST of accepted values, so {\"env\": [\"prod\", \"stg\"]} " +
+			"means \"env is prod OR stg\". A `vcs-last-error` is worth surfacing unprompted: a set that cannot " +
+			"sync is still evaluated, against whatever it last managed to fetch, so the policies in the " +
+			"repository and the policies being enforced may differ.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ policySetsIn) (*mcp.CallToolResult, *policySetsOut, error) {
+		items, err := c.ListPolicySets(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		// A nil map or slice marshals to `null`, which fails the derived
+		// output schema and takes the whole listing down rather than
+		// degrading — the same guard the deleted-workspace tool needs.
+		for i := range items {
+			if items[i].AllowLabels == nil {
+				items[i].AllowLabels = map[string][]string{}
+			}
+			if items[i].DenyLabels == nil {
+				items[i].DenyLabels = map[string][]string{}
+			}
+		}
+		return nil, &policySetsOut{Count: len(items), PolicySets: items}, nil
+	})
+
 	// ── terrapod_deleted_workspace_list ──────────────────────────────
 	type deletedWSIn struct{}
 	type deletedWSOut struct {
