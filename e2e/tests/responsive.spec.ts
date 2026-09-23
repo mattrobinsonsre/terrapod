@@ -1265,8 +1265,9 @@ test.describe('Runner debug mode (#1764)', () => {
     // registered BEFORE the click because window.confirm() blocks the handler.
     let msg = ''
     page.once('dialog', async (d) => { msg = d.message(); await d.accept() })
-    await toggle.check()
+    await toggle.click()
     await expect.poll(() => msg, { timeout: 5_000 }).toContain('debug mode')
+    await expect(toggle).toBeChecked({ timeout: 15_000 })
 
     await expect(page.getByTestId('debug-mode-banner')).toBeVisible({ timeout: 15_000 })
     await expectNoHorizontalPageScroll(page)
@@ -1277,7 +1278,8 @@ test.describe('Runner debug mode (#1764)', () => {
     let offDialogFired = false
     const spy = async (d: Dialog) => { offDialogFired = true; await d.dismiss() }
     page.on('dialog', spy)
-    await toggle.uncheck()
+    await toggle.click()
+    await expect(toggle).not.toBeChecked({ timeout: 15_000 })
     await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0)
     expect(offDialogFired).toBe(false)
     page.off('dialog', spy)
