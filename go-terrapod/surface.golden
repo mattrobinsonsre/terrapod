@@ -327,6 +327,7 @@ field CreateVarsetVariableRequest.Sensitive bool
 field CreateVarsetVariableRequest.Structured bool
 field CreateVarsetVariableRequest.Value string
 field CreateVarsetVariableRequest.ValueSource string
+field CreateWorkspaceRequest.AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 field CreateWorkspaceRequest.AISummaryContext string `json:"ai-summary-context,omitempty"`
 field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
@@ -1038,6 +1039,7 @@ field UpdateVarsetVariableRequest.Sensitive *bool
 field UpdateVarsetVariableRequest.Structured *bool
 field UpdateVarsetVariableRequest.Value *string
 field UpdateVarsetVariableRequest.ValueSource *string
+field UpdateWorkspaceRequest.AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 field UpdateWorkspaceRequest.AISummaryContext *string `json:"ai-summary-context,omitempty"`
 field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
@@ -1225,6 +1227,7 @@ field WarmResult.Error string `json:"error,omitempty"`
 field WarmResult.Kind string `json:"kind"`
 field WarmResult.OK bool `json:"ok"`
 field WarmResult.Ref string `json:"ref"`
+field Workspace.AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 field Workspace.AISummaryContext string `json:"ai-summary-context,omitempty"`
 field Workspace.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field Workspace.AgentPoolID string `json:"agent-pool-id,omitempty"`
