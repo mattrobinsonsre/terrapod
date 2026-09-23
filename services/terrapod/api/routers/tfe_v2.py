@@ -1360,6 +1360,17 @@ async def _create_workspace_impl(
             attrs.get("drift-detection-interval-seconds", 86400)
         ),
         plan_expiry_seconds=_parse_plan_expiry(attrs.get("plan-expiry-seconds")),
+        # The AI plan-summary opt-in (#401) was readable, serialised, and
+        # settable by PATCH — but create silently dropped it (#1763). Both
+        # `CreateWorkspaceRequest` in go-terrapod and the provider's Create
+        # send `ai-summary-mode`, so a configuration asking for `enabled` got a
+        # workspace on `default` and no indication anything had been ignored.
+        ai_summary_mode=_422(
+            workspace_settings.validate_ai_summary_mode, attrs.get("ai-summary-mode", "default")
+        ),
+        ai_summary_context=_422(
+            workspace_settings.validate_ai_summary_context, attrs.get("ai-summary-context")
+        ),
         # Slack opt-in channel (#556): empty = silent for this workspace.
         slack_channel=(attrs.get("slack-channel") or "").strip()[:128],
     )

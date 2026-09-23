@@ -1910,3 +1910,101 @@ class TestAutoApplyModeOnTheWorkspaceEndpoints:
         assert resp.status_code == 422
         # ...and leaves the workspace exactly as it was.
         assert ws.auto_apply_mode != "sometimes"
+
+
+class TestCreateHonoursTheAISummaryOptIn1763:
+    """Create silently dropped `ai-summary-mode` and `ai-summary-context` (#1763).
+
+    Both were serialised on read and settable by `PATCH`, but the create path
+    never looked at them — while `CreateWorkspaceRequest` in go-terrapod and the
+    provider's Create both send them. A configuration asking for `enabled` got a
+    workspace on `default`, with nothing to indicate the value was ignored.
+    """
+
+    def _created_workspace(self, mock_db):
+        return next(
+            call.args[0]
+            for call in mock_db.add.call_args_list
+            if getattr(call.args[0], "__tablename__", "") == "workspaces"
+        )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_the_requested_mode_and_context_are_stored(self, _pub, *_mocks):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.add = MagicMock()
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={
+                    "data": {
+                        "type": "workspaces",
+                        "attributes": {
+                            "name": "ai-opt-in",
+                            "ai-summary-mode": "enabled",
+                            "ai-summary-context": "payments estate",
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201, resp.text
+        ws = self._created_workspace(mock_db)
+        assert ws.ai_summary_mode == "enabled"
+        assert ws.ai_summary_context == "payments estate"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_an_unset_mode_still_defaults(self, _pub, *_mocks):
+        """The fix must not change what a create that says nothing produces."""
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.add = MagicMock()
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={"data": {"type": "workspaces", "attributes": {"name": "plain-ws"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201, resp.text
+        ws = self._created_workspace(mock_db)
+        assert ws.ai_summary_mode == "default"
+        assert ws.ai_summary_context == ""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_a_bad_mode_is_refused_rather_than_ignored(self, _pub, *_mocks):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.commit = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={
+                    "data": {
+                        "type": "workspaces",
+                        "attributes": {"name": "ai-bad", "ai-summary-mode": "sometimes"},
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text
+        mock_db.commit.assert_not_awaited()
