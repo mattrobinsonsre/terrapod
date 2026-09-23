@@ -34,9 +34,14 @@ import sys
 import threading
 from types import FrameType
 
-from terrapod.logging_config import get_logger
+import structlog
 
-log = get_logger(__name__)
+# `structlog` directly, not `terrapod.logging_config`: the runner image ships
+# only the modules Dockerfile.runner names, and that one is not among them --
+# importing it would raise ModuleNotFoundError inside every runner Job while
+# every test on a full checkout passed. Matches `plan_artifacts` and
+# `lock_extender`, which log the same way for the same reason.
+log = structlog.get_logger("runner.debug_linger")
 
 #: Set by `job_template` from the deployment's configured window when the
 #: workspace has debug mode on. Absent or "0" means the normal behaviour.
