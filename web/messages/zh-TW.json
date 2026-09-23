@@ -2608,6 +2608,8 @@
       "modeDefault": "遵循部署預設設定",
       "modeEnabled": "始終摘要",
       "modeDisabled": "從不摘要",
+      "policyMode": "政策閘門",
+      "policyModeNote": "強制閘門會忽略「從不」：它只能讓此工作區豁免建議性裁定。",
       "contextLabel": "工作區上下文",
       "contextLabelSuffix": "（可選，附加）",
       "contextPlaceholder": "AI 應專門瞭解此工作區的事實。例如 '為服務 X 前置 vault — 銷毀 KMS 金鑰會導致全域中斷。'",

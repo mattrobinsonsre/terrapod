@@ -2608,6 +2608,8 @@
       "modeDefault": "Praedefinitum instructionis sequi",
       "modeEnabled": "Semper summatim redigere",
       "modeDisabled": "Numquam summatim redigere",
+      "policyMode": "Porta regulae",
+      "policyModeNote": "Porta necessaria “Numquam” neglegit: hunc locum operis ab sententia monenti tantum eximere potest.",
       "contextLabel": "Contextus loci operis",
       "contextLabelSuffix": "(optionalis, additivus)",
       "contextPlaceholder": "Facta quae AI de hoc loco operis specialiter scire debet. e.g. 'Vault pro servitio X frontat — clavem KMS destruere globalem defectionem causat.'",

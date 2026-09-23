@@ -2608,6 +2608,8 @@
       "modeDefault": "Følg utrullingsstandard",
       "modeEnabled": "Sammendra alltid",
       "modeDisabled": "Sammendra aldri",
+      "policyMode": "Policyport",
+      "policyModeNote": "En obligatorisk port ignorerer «Aldri»: den kan bare frita dette arbeidsområdet fra en veiledende kjennelse.",
       "contextLabel": "Arbeidsområdekontekst",
       "contextLabelSuffix": "(valgfritt, additivt)",
       "contextPlaceholder": "Fakta AI-en bør vite om dette arbeidsområdet spesifikt. f.eks. «Ligger foran vaulten for tjeneste X – å rive ned KMS-nøkkelen forårsaker et globalt driftsavbrudd.»",

@@ -2608,6 +2608,8 @@
       "modeDefault": "Standaard van deployment volgen",
       "modeEnabled": "Altijd samenvatten",
       "modeDisabled": "Nooit samenvatten",
+      "policyMode": "Beleidspoort",
+      "policyModeNote": "Een verplichte poort negeert “Nooit”: die kan deze werkruimte alleen vrijstellen van een adviserend oordeel.",
       "contextLabel": "Workspacecontext",
       "contextLabelSuffix": "(optioneel, aanvullend)",
       "contextPlaceholder": "Feiten die de AI specifiek over deze workspace moet weten. Bijv. 'Fungeert als voorkant van de vault voor service X — het vernietigen van de KMS-sleutel veroorzaakt een wereldwijde storing.'",

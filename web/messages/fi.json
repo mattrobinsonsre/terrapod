@@ -2608,6 +2608,8 @@
       "modeDefault": "Noudata käyttöönoton oletusta",
       "modeEnabled": "Tee aina yhteenveto",
       "modeDisabled": "Älä koskaan tee yhteenvetoa",
+      "policyMode": "Käytäntöportti",
+      "policyModeNote": "Pakollinen portti ohittaa ”Ei koskaan”: se voi vapauttaa tämän työtilan vain neuvoa-antavasta päätöksestä.",
       "contextLabel": "Työtilan konteksti",
       "contextLabelSuffix": "(valinnainen, lisäävä)",
       "contextPlaceholder": "Faktat, jotka tekoälyn tulisi tietää nimenomaan tästä työtilasta. Esim. 'Toimii palvelun X holvin edustana — KMS-avaimen tuhoaminen aiheuttaa globaalin katkoksen.'",

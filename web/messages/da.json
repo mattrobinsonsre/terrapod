@@ -2608,6 +2608,8 @@
       "modeDefault": "Følg deployment-standard",
       "modeEnabled": "Opsummer altid",
       "modeDisabled": "Opsummer aldrig",
+      "policyMode": "Politikport",
+      "policyModeNote": "En obligatorisk port ignorerer “Aldrig”: den kan kun fritage dette arbejdsområde fra en vejledende kendelse.",
       "contextLabel": "Arbejdsområdekontekst",
       "contextLabelSuffix": "(valgfri, additiv)",
       "contextPlaceholder": "Fakta, som AI'en bør kende specifikt om dette arbejdsområde. F.eks. 'Fronter vaulten for tjeneste X — nedrivning af KMS-nøglen forårsager et globalt nedbrud.'",

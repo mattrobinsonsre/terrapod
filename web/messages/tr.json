@@ -2608,6 +2608,8 @@
       "modeDefault": "Dağıtım varsayılanını izle",
       "modeEnabled": "Her zaman özetle",
       "modeDisabled": "Asla özetleme",
+      "policyMode": "Politika kapısı",
+      "policyModeNote": "Zorunlu bir kapı “Asla” seçeneğini yok sayar: bu çalışma alanını yalnızca tavsiye niteliğindeki bir karardan muaf tutabilir.",
       "contextLabel": "Çalışma alanı bağlamı",
       "contextLabelSuffix": "(isteğe bağlı, ek)",
       "contextPlaceholder": "AI''nin özellikle bu çalışma alanı hakkında bilmesi gereken gerçekler. örn. 'X hizmetinin vault''unu önler — KMS anahtarını yok etmek genel bir kesintiye neden olur.'",

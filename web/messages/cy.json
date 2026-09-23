@@ -2608,6 +2608,8 @@
       "modeDefault": "Dilyn rhagosodiad y defnydd",
       "modeEnabled": "Crynhoi bob amser",
       "modeDisabled": "Peidio â chrynhoi byth",
+      "policyMode": "Giât polisi",
+      "policyModeNote": "Mae giât orfodol yn anwybyddu “Byth”: dim ond o ddyfarniad cynghorol y gall eithrio''r gweithle hwn.",
       "contextLabel": "Cyd-destun y weithfan",
       "contextLabelSuffix": "(dewisol, atodol)",
       "contextPlaceholder": "Ffeithiau y dylai'r AI eu gwybod am y weithfan hon yn benodol. e.e. 'Yn ymyl y gladdgell ar gyfer gwasanaeth X — mae dinistrio'r allwedd KMS yn achosi toriad byd-eang.'",

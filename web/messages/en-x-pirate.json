@@ -2608,6 +2608,8 @@
       "modeDefault": "Follow deployment default",
       "modeEnabled": "Always summarize",
       "modeDisabled": "Never summarize",
+      "policyMode": "Articles gate",
+      "policyModeNote": "A mandatory gate pays no heed to “Never”: it can only spare this here workspace an advisory ruling, arr.",
       "contextLabel": "Work-deck context",
       "contextLabelSuffix": "(optional, additive)",
       "contextPlaceholder": "Facts th'' AI should know about this work-deck specifically. e.g. ''Fronts th'' vault fer service X — sendin'' th'' KMS key t'' Davy Jones causes a global outage.''",

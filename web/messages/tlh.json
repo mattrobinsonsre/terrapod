@@ -2608,6 +2608,8 @@
       "modeDefault": "nISwI' motlh tlha'",
       "modeEnabled": "reH tlhoS",
       "modeDisabled": "not tlhoS",
+      "policyMode": "chut lojmIt",
+      "policyModeNote": "“not” buSHa'' lojmIt qar''a''; qaStaHvIS qumwI'' wuq neH lo''laH.",
       "contextLabel": "Qumwo' De'",
       "contextLabelSuffix": "(DaH DIch, chelmeH)",
       "contextPlaceholder": "Qumwo'vam neH AI SovnISbogh ngoDmey. Da 'service X vaultDaq HeghmoH — KMS ngaQHa'wI' Qaw'DI' Hoch nISwI' 'oS.'",

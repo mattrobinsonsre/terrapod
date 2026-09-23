@@ -2608,6 +2608,8 @@
       "modeDefault": "遵循部署默认设置",
       "modeEnabled": "始终摘要",
       "modeDisabled": "从不摘要",
+      "policyMode": "策略门禁",
+      "policyModeNote": "强制门禁会忽略“从不”：它只能让此工作区豁免建议性裁定。",
       "contextLabel": "工作区上下文",
       "contextLabelSuffix": "（可选，附加）",
       "contextPlaceholder": "AI 应专门了解此工作区的事实。例如 '为服务 X 前置 vault — 销毁 KMS 密钥会导致全局中断。'",

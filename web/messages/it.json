@@ -2608,6 +2608,8 @@
       "modeDefault": "Segui l''impostazione predefinita del deployment",
       "modeEnabled": "Riepiloga sempre",
       "modeDisabled": "Non riepilogare mai",
+      "policyMode": "Gate della policy",
+      "policyModeNote": "Un gate obbligatorio ignora «Mai»: può esentare questo workspace solo da un verdetto consultivo.",
       "contextLabel": "Contesto del workspace",
       "contextLabelSuffix": "(opzionale, aggiuntivo)",
       "contextPlaceholder": "Fatti che l''IA dovrebbe conoscere specificamente su questo workspace. es. 'Fa da fronte al vault per il servizio X — distruggere la chiave KMS causa un''interruzione globale.'",

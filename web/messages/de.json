@@ -2608,6 +2608,8 @@
       "modeDefault": "Bereitstellungsstandard folgen",
       "modeEnabled": "Immer zusammenfassen",
       "modeDisabled": "Nie zusammenfassen",
+      "policyMode": "Richtlinien-Gate",
+      "policyModeNote": "Ein verpflichtendes Gate ignoriert „Nie“: es kann diesen Workspace nur von einem beratenden Urteil ausnehmen.",
       "contextLabel": "Arbeitsbereichskontext",
       "contextLabelSuffix": "(optional, ergänzend)",
       "contextPlaceholder": "Fakten, die die KI speziell über diesen Arbeitsbereich wissen sollte. z. B. 'Steht vor dem Vault für Dienst X — das Löschen des KMS-Schlüssels verursacht einen globalen Ausfall.'",

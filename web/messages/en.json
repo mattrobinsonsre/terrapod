@@ -2616,6 +2616,8 @@
       "modeDefault": "Follow deployment default",
       "modeEnabled": "Always summarize",
       "modeDisabled": "Never summarize",
+      "policyMode": "Policy gate",
+      "policyModeNote": "A mandatory gate ignores “Never”: it can only opt this workspace out of an advisory verdict.",
       "contextLabel": "Workspace context",
       "contextLabelSuffix": "(optional, additive)",
       "contextPlaceholder": "Facts the AI should know about this workspace specifically. e.g. 'Fronts the vault for service X — destroying the KMS key causes a global outage.'",

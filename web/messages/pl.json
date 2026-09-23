@@ -2608,6 +2608,8 @@
       "modeDefault": "Zgodnie z domyślnym ustawieniem wdrożenia",
       "modeEnabled": "Zawsze podsumowuj",
       "modeDisabled": "Nigdy nie podsumowuj",
+      "policyMode": "Bramka zasad",
+      "policyModeNote": "Obowiązkowa bramka ignoruje „Nigdy”: może wyłączyć tę przestrzeń roboczą wyłącznie z werdyktu doradczego.",
       "contextLabel": "Kontekst obszaru roboczego",
       "contextLabelSuffix": "(opcjonalny, dodatkowy)",
       "contextPlaceholder": "Fakty, które AI powinno znać konkretnie o tym obszarze roboczym. np. 'Obsługuje magazyn sekretów dla usługi X — zniszczenie klucza KMS powoduje globalną awarię.'",

@@ -2608,6 +2608,8 @@
       "modeDefault": "Seguir a predefinição da implementação",
       "modeEnabled": "Resumir sempre",
       "modeDisabled": "Nunca resumir",
+      "policyMode": "Porta de política",
+      "policyModeNote": "Uma porta obrigatória ignora “Nunca”: só pode isentar esta área de trabalho de um veredicto consultivo.",
       "contextLabel": "Contexto do workspace",
       "contextLabelSuffix": "(opcional, aditivo)",
       "contextPlaceholder": "Factos que a IA deve conhecer especificamente sobre este workspace. ex.: 'Fica à frente do vault do serviço X — destruir a chave KMS causa uma indisponibilidade global.'",

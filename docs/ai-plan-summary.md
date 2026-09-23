@@ -248,6 +248,127 @@ Set both via the workspace settings UI, the API (`PATCH
 /api/tfe/v2/workspaces/{id}`), or the `terrapod_workspace` Terraform resource
 attributes (`ai_summary_mode` and `ai_summary_context`).
 
+## Policy gate
+
+The summary can also act as a **post-plan gate**: the same model call that
+writes the narrative is asked for an allow/deny ruling, and Terrapod holds or
+releases the run on the result. It sits alongside the other two post-plan gates
+— OPA policy sets (deterministic Rego) and security scanning (maintained rule
+catalogues) — and covers what neither does well: criteria you can only state in
+a sentence.
+
+It is **off by default**, and turning the AI summary on never starts blocking
+runs by itself.
+
+```yaml
+api:
+  config:
+    ai_summary:
+      enabled: true
+      policy:
+        enabled: true
+        enforcement_level: advisory     # or mandatory
+        risk_threshold: "off"           # or low / medium / high / critical
+        deny_criteria: |
+          block any security group allowing 0.0.0.0/0 on port 22
+          block making an S3 bucket publicly readable
+```
+
+**It costs no extra tokens.** The gate is not a second AI workload: it rides the
+summary's existing call — same model, same `api_base`, same auth, same daily
+budget — by extending the forced tool schema with a verdict field and appending
+the criteria to the prompt.
+
+### What trips it
+
+Two things, and you can use either or both:
+
+- **`deny_criteria`** — what to block, in your own words, one per line. The
+  model rules `allow` or `deny` against them and must name, for every deny, the
+  criterion it matched and the Terraform address that matched it. A deny you
+  cannot act on is worse than no gate.
+- **`risk_threshold`** — block when the summary's own `risk_level` reaches this.
+  It defaults to `off`, which is the safer place to start: a risk score judges
+  the whole change, so a threshold blocks far more broadly than a criterion.
+
+With `risk_threshold: "off"` and no criteria the gate stays inert even when
+enabled. That is deliberate — flipping the switch must not block anything before
+you have said what to block.
+
+The model rules on the criteria and scores the risk independently; Terrapod
+applies the threshold itself, so the score is not nudged to reach a verdict. And
+it judges only what the plan **creates, updates, deletes or replaces** — a
+criterion describing a resource the plan leaves untouched is not a match, for
+the same reason the rest of the prompt is grounded that way: blocking a change
+over a pre-existing condition it does not alter stops you fixing anything.
+
+### Advisory and mandatory
+
+| | `advisory` | `mandatory` |
+|---|---|---|
+| A deny | recorded, run proceeds | **blocks**, run held in `planning` |
+| Timing | never delays the run | holds until the verdict lands |
+| No usable verdict | recorded, run proceeds | **blocks** (see below) |
+| Per-workspace `disabled` | opts out | **ignored** |
+
+`advisory` never delays: the run reaches `planned` without waiting for the
+model, and the verdict is recorded when it arrives.
+
+`mandatory` has to wait, and that is the one way this gate differs from the
+other two. OPA and the security scan run on the **runner**, which posts their
+results before it reports the plan; the summariser runs in the API and is
+started by the plan-JSON upload, which happens after. So a mandatory gate holds
+the run in `planning` until the verdict lands rather than failing it for
+evidence that does not exist yet. The hold is reported as `blocked-by:
+ai-policy` — or, in the Terraform Enterprise vocabulary, `post_plan_running`
+while the verdict is still being produced and `policy_override` once one has
+landed and denied.
+
+### It fails closed
+
+If the model errors, times out, or returns something unusable, a `mandatory`
+gate records an `errored` evaluation and **holds the run**. A verdict that could
+not be reached is not approval. The run page and the API say so explicitly
+rather than showing a passed gate.
+
+**Budget exhaustion is reported separately from a model fault**, because the two
+call for different responses: one is "raise `daily_token_budget` or wait for the
+reset", the other is "something is wrong with the endpoint". Be aware that with
+`mandatory` enforcement a spent budget holds every subsequent run until the
+budget resets or an admin overrides — the budget is fleet-wide.
+
+### Per-workspace override
+
+`ai_policy_mode` — `default`, `enabled` or `disabled` — on the workspace
+settings UI, the API, the `terrapod_workspace` provider resource, bulk-update
+and autodiscovery rule templates.
+
+**`disabled` opts a workspace out of an *advisory* verdict only.** A
+`mandatory` gate ignores it, and that asymmetry is the point: a fleet-wide
+blocking control that any workspace admin can switch off is not a control.
+
+A workspace also cannot opt *into* a gate the deployment has not enabled —
+there would be no criteria and no threshold to rule against.
+
+### Releasing a held run
+
+`POST /api/terrapod/v1/runs/{run_id}/actions/override-ai-policy` — workspace
+admin, and the run is re-driven immediately. The run page offers it on the
+blocked banner in the **AI** tab; an agent can do it through the
+`terrapod_run_ai_policy_override` MCP tool.
+
+There is nothing to override until a verdict exists: a run held *waiting* for
+one is released as soon as it lands, so the endpoint answers 409 before then.
+
+### Terraform and OpenTofu only
+
+A Pulumi run is reported as not evaluated and is **never held**. Its preview
+uploads a digest capped at 500 steps, and a gate ruling over a truncated
+resource list could allow a plan whose offending resource fell off the end.
+Rather than judge a partial plan, the gate declines — the same call security
+scanning makes there, and the reason `pulumi_preview.write_policy_input` exists
+for OPA.
+
 ## Prompt customisation
 
 The model's system prompt is composed of four layers, top to bottom:

@@ -2608,6 +2608,8 @@
       "modeDefault": "Seguir el valor predeterminado del despliegue",
       "modeEnabled": "Resumir siempre",
       "modeDisabled": "No resumir nunca",
+      "policyMode": "Puerta de política",
+      "policyModeNote": "Una puerta obligatoria ignora «Nunca»: solo puede eximir a este espacio de trabajo de un veredicto consultivo.",
       "contextLabel": "Contexto del espacio de trabajo",
       "contextLabelSuffix": "(opcional, aditivo)",
       "contextPlaceholder": "Hechos que la IA debe conocer sobre este espacio de trabajo en concreto. p. ej. 'Da servicio a la bóveda del servicio X — destruir la clave KMS provoca una interrupción global.'",

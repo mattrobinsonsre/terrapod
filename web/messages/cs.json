@@ -2608,6 +2608,8 @@
       "modeDefault": "Řídit se výchozím nastavením nasazení",
       "modeEnabled": "Vždy shrnout",
       "modeDisabled": "Nikdy neshrnovat",
+      "policyMode": "Brána zásad",
+      "policyModeNote": "Povinná brána ignoruje „Nikdy“: může tento pracovní prostor vyjmout pouze z doporučujícího verdiktu.",
       "contextLabel": "Kontext pracovního prostoru",
       "contextLabelSuffix": "(volitelné, aditivní)",
       "contextPlaceholder": "Fakta, která by AI měla vědět konkrétně o tomto pracovním prostoru. Např. „Stojí před vaultem pro službu X — zničení KMS klíče způsobí globální výpadek.“",

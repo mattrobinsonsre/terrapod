@@ -2608,6 +2608,8 @@
       "modeDefault": "배포 기본값 따르기",
       "modeEnabled": "항상 요약",
       "modeDisabled": "요약하지 않음",
+      "policyMode": "정책 게이트",
+      "policyModeNote": "필수 게이트는 “안 함”을 무시합니다. 권고 판정에서만 이 워크스페이스를 제외할 수 있습니다.",
       "contextLabel": "워크스페이스 컨텍스트",
       "contextLabelSuffix": "(선택 사항, 추가적)",
       "contextPlaceholder": "AI가 이 워크스페이스에 대해 구체적으로 알아야 할 사실. 예: '서비스 X의 vault를 담당함 — KMS 키를 삭제하면 전역 장애가 발생함.'",

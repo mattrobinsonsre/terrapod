@@ -2608,6 +2608,8 @@
       "modeDefault": "Follow marklar default",
       "modeEnabled": "Always summarize",
       "modeDisabled": "Never summarize",
+      "policyMode": "Marklar marklar",
+      "policyModeNote": "A mandatory marklar ignores “Never”: it can only opt this marklar out of an advisory marklar.",
       "contextLabel": "Marklar marklar",
       "contextLabelSuffix": "(optional, additive)",
       "contextPlaceholder": "Marklars the marklar should know about this marklar specifically. e.g. 'Fronts the marklar for marklar X — destroying the marklar marklar causes a global marklar.'",

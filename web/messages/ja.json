@@ -2608,6 +2608,8 @@
       "modeDefault": "デプロイメントのデフォルトに従う",
       "modeEnabled": "常に要約する",
       "modeDisabled": "要約しない",
+      "policyMode": "ポリシーゲート",
+      "policyModeNote": "必須ゲートは「しない」を無視します。除外できるのは助言的な判定のみです。",
       "contextLabel": "ワークスペースコンテキスト",
       "contextLabelSuffix": "（任意、追加）",
       "contextPlaceholder": "AIがこのワークスペース固有の点として知っておくべき事実。例: 「サービスXのVaultのフロントを担っています — KMSキーを破棄するとグローバル障害が発生します。」",

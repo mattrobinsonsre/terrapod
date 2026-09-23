@@ -2608,6 +2608,8 @@
       "modeDefault": "Följ deploymentstandard",
       "modeEnabled": "Sammanfatta alltid",
       "modeDisabled": "Sammanfatta aldrig",
+      "policyMode": "Policygrind",
+      "policyModeNote": "En obligatorisk grind ignorerar ”Aldrig”: den kan bara undanta den här arbetsytan från ett rådgivande utlåtande.",
       "contextLabel": "Arbetsytekontext",
       "contextLabelSuffix": "(valfritt, additivt)",
       "contextPlaceholder": "Fakta som AI:n bör känna till om just denna arbetsyta. t.ex. 'Fronter valvet för tjänst X — att förstöra KMS-nyckeln orsakar ett globalt avbrott.'",

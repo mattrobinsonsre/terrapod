@@ -2608,6 +2608,8 @@
       "modeDefault": "Follo deployment defawlt",
       "modeEnabled": "Alwayz summarize",
       "modeDisabled": "Nevr summarize",
+      "policyMode": "Polisy gate",
+      "policyModeNote": "A mandatry gate ignorez “Nevr”: it can only opt dis workspase out of an advisry verdikt. srsly.",
       "contextLabel": "Workspace contekst",
       "contextLabelSuffix": "(opshunal, additiv)",
       "contextPlaceholder": "Factz teh AI shud knoe about dis workspace speshully. e.g. 'Frontz teh vault fer service X — destroyin teh KMS key causez a globul outage.'",

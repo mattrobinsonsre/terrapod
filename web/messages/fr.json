@@ -2608,6 +2608,8 @@
       "modeDefault": "Suivre la valeur par défaut du déploiement",
       "modeEnabled": "Toujours résumer",
       "modeDisabled": "Ne jamais résumer",
+      "policyMode": "Barrière de politique",
+      "policyModeNote": "Une barrière obligatoire ignore « Jamais » : elle ne peut exempter cet espace de travail que d''un verdict consultatif.",
       "contextLabel": "Contexte de l'espace de travail",
       "contextLabelSuffix": "(facultatif, additif)",
       "contextPlaceholder": "Faits que l'IA devrait connaître à propos de cet espace de travail en particulier. par ex. « Sert de façade au coffre du service X — détruire la clé KMS provoque une panne globale. »",
