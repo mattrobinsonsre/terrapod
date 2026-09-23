@@ -25,6 +25,7 @@ test('the gate comes from blocked-by and nothing else', () => {
   assert.equal(gateOf({ 'blocked-by': 'policy' }), 'policy')
   assert.equal(gateOf({ 'blocked-by': 'security-scan' }), 'security-scan')
   assert.equal(gateOf({ 'blocked-by': 'run-task' }), 'run-task')
+  assert.equal(gateOf({ 'blocked-by': 'ai-policy' }), 'ai-policy')
   assert.equal(gateOf({ 'blocked-by': null }), null)
   assert.equal(gateOf({}), null)
   // An API newer than this page may name a gate it does not know.
@@ -38,4 +39,16 @@ test('a run-task hold says whether tasks are running or one failed', () => {
   assert.equal(holdActivityKey('run-task', 'planning'), 'runTasksRunning')
   assert.equal(holdActivityKey('policy', 'policy_override'), 'heldByPolicy')
   assert.equal(holdActivityKey('security-scan', 'planning'), 'heldBySecurityScan')
+})
+
+test('an AI policy hold distinguishes waiting for a verdict from a denial', () => {
+  // The only gate whose evidence is produced AFTER the plan, in the API rather
+  // than the runner. So a mandatory gate routinely holds a run before there is
+  // anything to decide, and telling someone their decision is awaited then
+  // sends them looking for a button that is not there yet.
+  assert.equal(holdActivityKey('ai-policy', 'post_plan_running'), 'awaitingAiPolicy')
+  assert.equal(holdActivityKey('ai-policy', 'policy_override'), 'heldByAiPolicy')
+  // 1.x keeps the run in `planning` and names the gate in blocked-by; a
+  // verdict has landed and denied by the time the gate holds it there.
+  assert.equal(holdActivityKey('ai-policy', 'planning'), 'heldByAiPolicy')
 })

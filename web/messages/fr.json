@@ -2045,7 +2045,9 @@
       "heldByRunTask": "Une tâche d'exécution obligatoire a échoué — contournez-la ou abandonnez l'exécution",
       "runTasksRunning": "En attente des tâches d'exécution post-plan",
       "heldByPolicy": "Un ensemble de politiques obligatoire a échoué — contournez-le ou abandonnez l'exécution",
-      "heldBySecurityScan": "L'analyse de sécurité a trouvé des résultats bloquants — contournez-la ou abandonnez l'exécution"
+      "heldBySecurityScan": "L'analyse de sécurité a trouvé des résultats bloquants — contournez-la ou abandonnez l'exécution",
+      "heldByAiPolicy": "La barrière de politique IA a refusé cette exécution — contournez-la ou abandonnez l''exécution",
+      "awaitingAiPolicy": "En attente du verdict de la politique IA"
     },
     "badge": {
       "destroy": "destruction",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "application : {level}",
       "erroredMessage": "L''analyse ne s''est pas terminée, cette exécution n''a donc pas été vérifiée.",
       "blockedErroredMessage": "Cette exécution est bloquée car l''analyse de sécurité ne s''est pas terminée. Corrigez la cause et relancez la planification, ou demandez à un administrateur de la contourner."
+    },
+    "aiPolicyPanel": {
+      "heading": "Barrière de politique IA",
+      "enforcementLabel": "application : {level}",
+      "thresholdLabel": "seuil de risque : {threshold}",
+      "awaitingVerdict": "En attente du verdict de la politique IA. Cette exécution est retenue jusqu''à son arrivée.",
+      "decisionAllow": "autorisé",
+      "decisionDeny": "refusé",
+      "risk": {
+        "critical": "critique",
+        "high": "élevé",
+        "medium": "moyen",
+        "low": "faible"
+      },
+      "blockedDeniedMessage": "Cette exécution est <strong>bloquée par {count, plural, one {# critère de politique} other {# critères de politique}}</strong>.",
+      "blockedRiskMessage": "Cette exécution est <strong>bloquée</strong> car son niveau de risque ({level}) atteint ou dépasse le seuil ({threshold}).",
+      "blockedErroredMessage": "Cette exécution est bloquée car aucun verdict de politique IA n''a pu être obtenu. La barrière échoue en position fermée : un verdict impossible à obtenir ne vaut pas approbation.",
+      "erroredMessage": "La barrière de politique IA n''a pas renvoyé de verdict exploitable, cette exécution n''a donc pas été jugée.",
+      "passed": "Aucun critère de politique ne correspond.",
+      "overriding": "Contournement...",
+      "overrideContinue": "Contourner et continuer",
+      "overrideConfirm": "Contourner la barrière de politique IA et autoriser l''application de cette exécution malgré le verdict ?",
+      "overrideFailed": "Échec du contournement",
+      "overrideFailedStatus": "Échec du contournement ({status})",
+      "overriddenBy": "contourné par {by}"
     },
     "architecture": {
       "loadError": "Impossible de charger la critique d''architecture.",

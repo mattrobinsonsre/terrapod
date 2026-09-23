@@ -2045,7 +2045,9 @@
       "heldByRunTask": "משימת ריצה חובה נכשלה — עקוף אותה או דחה את ההרצה",
       "runTasksRunning": "ממתין למשימות ריצה שלאחר התוכנית",
       "heldByPolicy": "מערך מדיניות חובה נכשל — עקוף אותו או דחה את ההרצה",
-      "heldBySecurityScan": "סריקת האבטחה מצאה ממצאים חוסמים — עקוף אותה או דחה את ההרצה"
+      "heldBySecurityScan": "סריקת האבטחה מצאה ממצאים חוסמים — עקוף אותה או דחה את ההרצה",
+      "heldByAiPolicy": "שער מדיניות ה-AI דחה הרצה זו — עקוף אותו או דחה את ההרצה",
+      "awaitingAiPolicy": "ממתין לפסיקת מדיניות ה-AI"
     },
     "badge": {
       "destroy": "השמדה",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "אכיפה: {level}",
       "erroredMessage": "הסריקה לא הושלמה, ולכן ריצה זו לא נבדקה.",
       "blockedErroredMessage": "ריצה זו חסומה מכיוון שסריקת האבטחה לא הושלמה. תקן את הסיבה ותכנן מחדש, או בקש ממנהל לעקוף."
+    },
+    "aiPolicyPanel": {
+      "heading": "שער מדיניות ה-AI",
+      "enforcementLabel": "אכיפה: {level}",
+      "thresholdLabel": "סף סיכון: {threshold}",
+      "awaitingVerdict": "ממתין לפסיקת מדיניות ה-AI. הרצה זו מוחזקת עד שתגיע.",
+      "decisionAllow": "מאושר",
+      "decisionDeny": "נדחה",
+      "risk": {
+        "critical": "קריטי",
+        "high": "גבוה",
+        "medium": "בינוני",
+        "low": "נמוך"
+      },
+      "blockedDeniedMessage": "הרצה זו <strong>חסומה על ידי {count, plural, one {קריטריון מדיניות אחד} two {# קריטריוני מדיניות} many {# קריטריוני מדיניות} other {# קריטריוני מדיניות}}</strong>.",
+      "blockedRiskMessage": "הרצה זו <strong>חסומה</strong> מפני שרמת הסיכון שלה ({level}) נמצאת בסף ({threshold}) או מעליו.",
+      "blockedErroredMessage": "הרצה זו חסומה מפני שלא ניתן היה להגיע לפסיקת מדיניות AI. השער נכשל במצב סגור, ולכן פסיקה שלא ניתן היה להגיע אליה אינה אישור.",
+      "erroredMessage": "שער מדיניות ה-AI לא החזיר פסיקה שמישה, ולכן הרצה זו לא נפסקה.",
+      "passed": "אף קריטריון מדיניות לא התאים.",
+      "overriding": "עוקף...",
+      "overrideContinue": "עקוף והמשך",
+      "overrideConfirm": "לעקוף את שער מדיניות ה-AI ולאפשר להרצה זו להיות מיושמת למרות הפסיקה?",
+      "overrideFailed": "העקיפה נכשלה",
+      "overrideFailedStatus": "העקיפה נכשלה ({status})",
+      "overriddenBy": "נעקף על ידי {by}"
     },
     "architecture": {
       "loadError": "טעינת ביקורת הארכיטקטורה נכשלה.",

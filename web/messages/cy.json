@@ -2045,7 +2045,9 @@
       "heldByRunTask": "Methodd tasg rhediad orfodol — diystyrwch hi neu taflwch y rhediad",
       "runTasksRunning": "Yn aros am dasgau rhediad ar ôl y cynllun",
       "heldByPolicy": "Methodd set polisi orfodol — diystyrwch hi neu taflwch y rhediad",
-      "heldBySecurityScan": "Canfu'r sgan diogelwch broblemau rhwystro — diystyrwch ef neu taflwch y rhediad"
+      "heldBySecurityScan": "Canfu'r sgan diogelwch broblemau rhwystro — diystyrwch ef neu taflwch y rhediad",
+      "heldByAiPolicy": "Gwrthododd y giât polisi AI y rhediad hwn — diystyrwch ef neu taflwch y rhediad",
+      "awaitingAiPolicy": "Aros am ddyfarniad polisi AI"
     },
     "badge": {
       "destroy": "dinistrio",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "gorfodi: {level}",
       "erroredMessage": "Ni chwblhawyd y sgan, felly nid yw''r rhediad hwn wedi''i wirio.",
       "blockedErroredMessage": "Mae''r rhediad hwn wedi''i rwystro am na chwblhawyd y sgan diogelwch. Cywirwch yr achos a chynlluniwch eto, neu gofynnwch i weinyddwr ei ddiystyru."
+    },
+    "aiPolicyPanel": {
+      "heading": "Giât Polisi AI",
+      "enforcementLabel": "gorfodi: {level}",
+      "thresholdLabel": "trothwy risg: {threshold}",
+      "awaitingVerdict": "Aros am ddyfarniad polisi AI. Mae''r rhediad hwn yn cael ei ddal nes iddo gyrraedd.",
+      "decisionAllow": "caniatawyd",
+      "decisionDeny": "gwrthodwyd",
+      "risk": {
+        "critical": "critigol",
+        "high": "uchel",
+        "medium": "canolig",
+        "low": "isel"
+      },
+      "blockedDeniedMessage": "Mae''r rhediad hwn wedi''i <strong>rwystro gan {count, plural, one {# maen prawf polisi} other {# maen prawf polisi}}</strong>.",
+      "blockedRiskMessage": "Mae''r rhediad hwn wedi''i <strong>rwystro</strong> oherwydd bod ei lefel risg ({level}) ar y trothwy ({threshold}) neu''n uwch.",
+      "blockedErroredMessage": "Mae''r rhediad hwn wedi''i rwystro am na ellid cyrraedd dyfarniad polisi AI. Mae''r giât yn methu''n gaeedig, felly nid cydsyniad yw dyfarniad na ellid ei gyrraedd.",
+      "erroredMessage": "Ni ddychwelodd y giât polisi AI ddyfarniad defnyddiadwy, felly ni ddyfarnwyd ar y rhediad hwn.",
+      "passed": "Ni chydweddodd unrhyw feini prawf polisi.",
+      "overriding": "Wrthi'n diystyru...",
+      "overrideContinue": "Diystyru a Pharhau",
+      "overrideConfirm": "Diystyru''r giât polisi AI a chaniatáu i''r rhediad hwn gael ei gymhwyso er gwaethaf y dyfarniad?",
+      "overrideFailed": "Methodd y diystyru",
+      "overrideFailedStatus": "Methodd y diystyru ({status})",
+      "overriddenBy": "diystyrwyd gan {by}"
     },
     "architecture": {
       "loadError": "Methwyd llwytho''r feirniadaeth bensaernïol.",

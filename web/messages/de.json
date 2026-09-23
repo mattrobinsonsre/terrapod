@@ -2045,7 +2045,9 @@
       "heldByRunTask": "Eine verpflichtende Ausführungsaufgabe ist fehlgeschlagen – überschreiben oder die Ausführung verwerfen",
       "runTasksRunning": "Wartet auf Ausführungsaufgaben nach dem Plan",
       "heldByPolicy": "Ein verpflichtender Richtliniensatz ist fehlgeschlagen – überschreiben oder die Ausführung verwerfen",
-      "heldBySecurityScan": "Der Sicherheits-Scan hat blockierende Funde – überschreiben oder die Ausführung verwerfen"
+      "heldBySecurityScan": "Der Sicherheits-Scan hat blockierende Funde – überschreiben oder die Ausführung verwerfen",
+      "heldByAiPolicy": "Das KI-Richtlinien-Gate hat diesen Lauf abgelehnt – überschreiben oder die Ausführung verwerfen",
+      "awaitingAiPolicy": "Warten auf das Urteil der KI-Richtlinie"
     },
     "badge": {
       "destroy": "Zerstören",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "Durchsetzung: {level}",
       "erroredMessage": "Der Scan wurde nicht abgeschlossen, daher wurde dieser Lauf nicht geprüft.",
       "blockedErroredMessage": "Dieser Lauf ist blockiert, weil der Sicherheitsscan nicht abgeschlossen wurde. Beheben Sie die Ursache und planen Sie erneut, oder bitten Sie einen Administrator um eine Übersteuerung."
+    },
+    "aiPolicyPanel": {
+      "heading": "KI-Richtlinien-Gate",
+      "enforcementLabel": "Durchsetzung: {level}",
+      "thresholdLabel": "Risikoschwelle: {threshold}",
+      "awaitingVerdict": "Warten auf das Urteil der KI-Richtlinie. Dieser Lauf wird bis dahin angehalten.",
+      "decisionAllow": "erlaubt",
+      "decisionDeny": "abgelehnt",
+      "risk": {
+        "critical": "kritisch",
+        "high": "hoch",
+        "medium": "mittel",
+        "low": "niedrig"
+      },
+      "blockedDeniedMessage": "Dieser Lauf ist <strong>durch {count, plural, one {# Richtlinienkriterium} other {# Richtlinienkriterien}} blockiert</strong>.",
+      "blockedRiskMessage": "Dieser Lauf ist <strong>blockiert</strong>, weil sein Risikoniveau ({level}) den Schwellenwert ({threshold}) erreicht oder überschreitet.",
+      "blockedErroredMessage": "Dieser Lauf ist blockiert, weil kein Urteil der KI-Richtlinie erreicht werden konnte. Das Gate schlägt geschlossen fehl – ein nicht erreichbares Urteil ist keine Zustimmung.",
+      "erroredMessage": "Das KI-Richtlinien-Gate hat kein verwertbares Urteil geliefert, daher wurde dieser Lauf nicht bewertet.",
+      "passed": "Keine Richtlinienkriterien trafen zu.",
+      "overriding": "Wird überschrieben...",
+      "overrideContinue": "Überschreiben und fortfahren",
+      "overrideConfirm": "Das KI-Richtlinien-Gate überschreiben und diesen Lauf trotz des Urteils anwenden lassen?",
+      "overrideFailed": "Überschreiben fehlgeschlagen",
+      "overrideFailedStatus": "Überschreiben fehlgeschlagen ({status})",
+      "overriddenBy": "überschrieben von {by}"
     },
     "architecture": {
       "loadError": "Die Architekturkritik konnte nicht geladen werden.",

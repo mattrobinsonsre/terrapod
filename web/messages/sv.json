@@ -2045,7 +2045,9 @@
       "heldByRunTask": "En obligatorisk körningsuppgift misslyckades — åsidosätt den eller kassera körningen",
       "runTasksRunning": "Väntar på körningsuppgifter efter planen",
       "heldByPolicy": "En obligatorisk policyuppsättning misslyckades — åsidosätt den eller kassera körningen",
-      "heldBySecurityScan": "Säkerhetsskanningen hittade blockerande fynd — åsidosätt den eller kassera körningen"
+      "heldBySecurityScan": "Säkerhetsskanningen hittade blockerande fynd — åsidosätt den eller kassera körningen",
+      "heldByAiPolicy": "AI-policygrinden nekade den här körningen — åsidosätt den eller kassera körningen",
+      "awaitingAiPolicy": "Väntar på AI-policyns utlåtande"
     },
     "badge": {
       "destroy": "förstör",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "tillämpning: {level}",
       "erroredMessage": "Skanningen slutfördes inte, så den här körningen har inte kontrollerats.",
       "blockedErroredMessage": "Den här körningen är blockerad eftersom säkerhetsskanningen inte slutfördes. Åtgärda orsaken och planera om, eller be en administratör att åsidosätta."
+    },
+    "aiPolicyPanel": {
+      "heading": "AI-policygrind",
+      "enforcementLabel": "tillämpning: {level}",
+      "thresholdLabel": "riskgräns: {threshold}",
+      "awaitingVerdict": "Väntar på AI-policyns utlåtande. Körningen hålls kvar tills det kommer.",
+      "decisionAllow": "tillåten",
+      "decisionDeny": "nekad",
+      "risk": {
+        "critical": "kritisk",
+        "high": "hög",
+        "medium": "medel",
+        "low": "låg"
+      },
+      "blockedDeniedMessage": "Den här körningen är <strong>blockerad av {count, plural, one {# policykriterium} other {# policykriterier}}</strong>.",
+      "blockedRiskMessage": "Den här körningen är <strong>blockerad</strong> eftersom dess risknivå ({level}) ligger vid eller över gränsen ({threshold}).",
+      "blockedErroredMessage": "Den här körningen är blockerad eftersom inget AI-policyutlåtande kunde nås. Grinden fallerar stängd — ett utlåtande som inte kunde nås är inte ett godkännande.",
+      "erroredMessage": "AI-policygrinden returnerade inget användbart utlåtande, så den här körningen har inte bedömts.",
+      "passed": "Inga policykriterier matchade.",
+      "overriding": "Åsidosätter...",
+      "overrideContinue": "Åsidosätt och fortsätt",
+      "overrideConfirm": "Åsidosätt AI-policygrinden och låt körningen tillämpas trots utlåtandet?",
+      "overrideFailed": "Åsidosättning misslyckades",
+      "overrideFailedStatus": "Åsidosättning misslyckades ({status})",
+      "overriddenBy": "åsidosatt av {by}"
     },
     "architecture": {
       "loadError": "Det gick inte att läsa in arkitekturkritiken.",

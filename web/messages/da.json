@@ -2045,7 +2045,9 @@
       "heldByRunTask": "En obligatorisk kørselsopgave mislykkedes — tilsidesæt den eller kassér kørslen",
       "runTasksRunning": "Venter på kørselsopgaver efter planen",
       "heldByPolicy": "Et obligatorisk politiksæt mislykkedes — tilsidesæt det eller kassér kørslen",
-      "heldBySecurityScan": "Sikkerhedsscanningen fandt blokerende fund — tilsidesæt den eller kassér kørslen"
+      "heldBySecurityScan": "Sikkerhedsscanningen fandt blokerende fund — tilsidesæt den eller kassér kørslen",
+      "heldByAiPolicy": "AI-politikporten afviste denne kørsel — tilsidesæt den eller kassér kørslen",
+      "awaitingAiPolicy": "Venter på AI-politikkens kendelse"
     },
     "badge": {
       "destroy": "nedriv",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "håndhævelse: {level}",
       "erroredMessage": "Scanningen blev ikke fuldført, så denne kørsel er ikke kontrolleret.",
       "blockedErroredMessage": "Denne kørsel er blokeret, fordi sikkerhedsscanningen ikke blev fuldført. Ret årsagen og planlæg igen, eller bed en administrator om at tilsidesætte."
+    },
+    "aiPolicyPanel": {
+      "heading": "AI-politikport",
+      "enforcementLabel": "håndhævelse: {level}",
+      "thresholdLabel": "risikotærskel: {threshold}",
+      "awaitingVerdict": "Venter på AI-politikkens kendelse. Denne kørsel holdes tilbage, indtil den ankommer.",
+      "decisionAllow": "tilladt",
+      "decisionDeny": "afvist",
+      "risk": {
+        "critical": "kritisk",
+        "high": "høj",
+        "medium": "mellem",
+        "low": "lav"
+      },
+      "blockedDeniedMessage": "Denne kørsel er <strong>blokeret af {count, plural, one {# politikkriterium} other {# politikkriterier}}</strong>.",
+      "blockedRiskMessage": "Denne kørsel er <strong>blokeret</strong>, fordi dens risikoniveau ({level}) er på eller over tærsklen ({threshold}).",
+      "blockedErroredMessage": "Denne kørsel er blokeret, fordi der ikke kunne nås en AI-politikkendelse. Porten fejler lukket, så en kendelse, der ikke kunne nås, er ikke et samtykke.",
+      "erroredMessage": "AI-politikporten returnerede ingen brugbar kendelse, så denne kørsel er ikke bedømt.",
+      "passed": "Ingen politikkriterier matchede.",
+      "overriding": "Tilsidesætter...",
+      "overrideContinue": "Tilsidesæt og fortsæt",
+      "overrideConfirm": "Tilsidesæt AI-politikporten og lad denne kørsel blive anvendt på trods af kendelsen?",
+      "overrideFailed": "Tilsidesættelse mislykkedes",
+      "overrideFailedStatus": "Tilsidesættelse mislykkedes ({status})",
+      "overriddenBy": "tilsidesat af {by}"
     },
     "architecture": {
       "loadError": "Arkitekturkritikken kunne ikke indlæses.",

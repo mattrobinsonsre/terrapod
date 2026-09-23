@@ -2045,7 +2045,9 @@
       "heldByRunTask": "Zorunlu bir çalıştırma görevi başarısız oldu — geçersiz kılın veya çalıştırmayı iptal edin",
       "runTasksRunning": "Plan sonrası çalıştırma görevleri bekleniyor",
       "heldByPolicy": "Zorunlu bir politika seti başarısız oldu — geçersiz kılın veya çalıştırmayı iptal edin",
-      "heldBySecurityScan": "Güvenlik taraması engelleyen bulgular buldu — geçersiz kılın veya çalıştırmayı iptal edin"
+      "heldBySecurityScan": "Güvenlik taraması engelleyen bulgular buldu — geçersiz kılın veya çalıştırmayı iptal edin",
+      "heldByAiPolicy": "AI politika kapısı bu çalıştırmayı reddetti — geçersiz kılın veya çalıştırmayı iptal edin",
+      "awaitingAiPolicy": "AI politika kararı bekleniyor"
     },
     "badge": {
       "destroy": "yok et",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "uygulama: {level}",
       "erroredMessage": "Tarama tamamlanmadı, bu nedenle bu çalıştırma denetlenmedi.",
       "blockedErroredMessage": "Güvenlik taraması tamamlanmadığı için bu çalıştırma engellendi. Nedenini giderip yeniden plan yapın veya bir yöneticiden geçersiz kılmasını isteyin."
+    },
+    "aiPolicyPanel": {
+      "heading": "AI politika kapısı",
+      "enforcementLabel": "uygulama: {level}",
+      "thresholdLabel": "risk eşiği: {threshold}",
+      "awaitingVerdict": "AI politika kararı bekleniyor. Karar gelene kadar bu çalıştırma tutuluyor.",
+      "decisionAllow": "izin verildi",
+      "decisionDeny": "reddedildi",
+      "risk": {
+        "critical": "kritik",
+        "high": "yüksek",
+        "medium": "orta",
+        "low": "düşük"
+      },
+      "blockedDeniedMessage": "Bu çalıştırma <strong>{count, plural, one {# politika ölçütü} other {# politika ölçütü}} tarafından engellendi</strong>.",
+      "blockedRiskMessage": "Bu çalıştırma, risk düzeyi ({level}) eşikte ({threshold}) veya üzerinde olduğu için <strong>engellendi</strong>.",
+      "blockedErroredMessage": "AI politika kararına ulaşılamadığı için bu çalıştırma engellendi. Kapı kapalı konumda başarısız olur; ulaşılamayan bir karar onay değildir.",
+      "erroredMessage": "AI politika kapısı kullanılabilir bir karar döndürmedi, bu nedenle bu çalıştırma değerlendirilmedi.",
+      "passed": "Hiçbir politika ölçütü eşleşmedi.",
+      "overriding": "Geçersiz kılınıyor...",
+      "overrideContinue": "Geçersiz Kıl ve Devam Et",
+      "overrideConfirm": "AI politika kapısı geçersiz kılınıp karara rağmen bu çalıştırmanın uygulanmasına izin verilsin mi?",
+      "overrideFailed": "Geçersiz kılma başarısız",
+      "overrideFailedStatus": "Geçersiz kılma başarısız ({status})",
+      "overriddenBy": "{by} tarafından geçersiz kılındı"
     },
     "architecture": {
       "loadError": "Mimari eleştirisi yüklenemedi.",

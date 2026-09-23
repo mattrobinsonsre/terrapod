@@ -2045,7 +2045,9 @@
       "heldByRunTask": "Sar Qu' ramtaHbe'bogh luj — DIvI'moH pagh Sar woD",
       "runTasksRunning": "nab pIq Sar Qu'mey loS",
       "heldByPolicy": "chut Segh ramtaHbe'bogh luj — DIvI'moH pagh Sar woD",
-      "heldBySecurityScan": "Hurgh QaD wanI' QaD botlh tu' — DIvI'moH pagh Sar woD"
+      "heldBySecurityScan": "Hurgh QaD wanI' QaD botlh tu' — DIvI'moH pagh Sar woD",
+      "heldByAiPolicy": "AI chut lojmIt wanI''vam lajQo'' — DIvI''moH pagh Sar woD",
+      "awaitingAiPolicy": "AI chut wuq loStaH"
     },
     "badge": {
       "destroy": "Qaw'",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "ra'': {level}",
       "erroredMessage": "rInbe'' QaD; vaj wanI'' buSlu''be''.",
       "blockedErroredMessage": "rInbe'' Hurgh QaD; vaj botlhlu'' wanI''. meq tI''; nu'' nuq; ghap la'' pIn yIrI''."
+    },
+    "aiPolicyPanel": {
+      "heading": "AI chut lojmIt",
+      "enforcementLabel": "ra'': {level}",
+      "thresholdLabel": "Qob ''ampas: {threshold}",
+      "awaitingVerdict": "AI chut wuq loStaH. wuq pawpa'' wanI'' QotlhlU''.",
+      "decisionAllow": "chaw''lu''",
+      "decisionDeny": "lajQo''",
+      "risk": {
+        "critical": "ghuHqu''",
+        "high": "jen",
+        "medium": "botlh",
+        "low": "Sup"
+      },
+      "blockedDeniedMessage": "<strong>{count, plural, one {# chut mIw} other {# chut mIw}} bot wanI''vam</strong>.",
+      "blockedRiskMessage": "<strong>botlu''</strong> wanI''vam, Qob patlh ({level}) ''ampas ({threshold}) rap ghap Dung.",
+      "blockedErroredMessage": "botlu'' wanI''vam, AI chut wuq Sammeh Qapbe''. SoQ lojmIt Qagh; wuq SamlaHbe''bogh chaw''be''.",
+      "erroredMessage": "AI chut lojmIt wuq lo''laHbogh nobbe'', vaj wanI''vam wuqlu''be''.",
+      "passed": "chut mIw rapbe''.",
+      "overriding": "DIvI'moHtaH...",
+      "overrideContinue": "DIvI'moH 'ej taH",
+      "overrideConfirm": "AI chut lojmIt DIvI''moH ''ej wuq pIH wanI''vam lo''lu''nIS''a''?",
+      "overrideFailed": "DIvI'moH lujpu'",
+      "overrideFailedStatus": "DIvI'moH lujpu' ({status})",
+      "overriddenBy": "{by} DIvI'moHlu'pu'"
     },
     "architecture": {
       "loadError": "qach tI'ang ghelmeH lujpu'.",

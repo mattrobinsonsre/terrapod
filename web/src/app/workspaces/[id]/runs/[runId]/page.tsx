@@ -14,6 +14,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { PlanAiSummary } from '@/components/plan-ai-summary'
 import { ResourceUsage, parseMemoryToBytes, humanBytes } from '@/components/resource-usage'
 import { SecurityPanel } from '@/components/security-panel'
+import { AIPolicyPanel } from '@/components/ai-policy-panel'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
@@ -1322,7 +1323,12 @@ function RunDetailPageInner() {
     ...((attrs['has-json-output']
       ? [['impact', t('tabs.impact'), t('tabs.impactFull')]]
       : []) as [RunView, React.ReactNode, string][]),
-    ...((aiInfo?.present ? [['ai', t('tabs.ai'), t('tabs.aiFull')]] : []) as [RunView, React.ReactNode, string][]),
+    // Also present when the AI policy gate (#1766) holds this run. A run held
+    // waiting for a verdict has no summary yet, so gating the tab on the
+    // summary alone would hide the only page that says why it is held.
+    ...((aiInfo?.present || gate === 'ai-policy'
+      ? [['ai', t('tabs.ai'), t('tabs.aiFull')]]
+      : []) as [RunView, React.ReactNode, string][]),
     ['details', t('tabs.details'), t('tabs.details')],
     ...((attrs['plan-only'] ? [] : [['apply', applyLabel, t('tabs.applyFull')]]) as [RunView, React.ReactNode, string][]),
   ]
@@ -1694,7 +1700,13 @@ function RunDetailPageInner() {
               ? () => switchView('opa')
               : gate === 'security-scan' && tabs.some(([v]) => v === 'security')
                 ? () => switchView('security')
-                : undefined
+                : // The AI gate's verdict renders in the AI tab, which is
+                  // present whenever that gate holds the run — a run held
+                  // waiting for a verdict has no summary yet, and the tab is
+                  // widened for exactly that case.
+                  gate === 'ai-policy' && tabs.some(([v]) => v === 'ai')
+                  ? () => switchView('ai')
+                  : undefined
           }
           engine={attrs.engine}
           timestamps={timestamps}
@@ -1809,7 +1821,21 @@ function RunDetailPageInner() {
             folded into its risk factors, fed by the deterministic scan + cost.
             The tab only appears when the run has an AI summary. */}
         {view === 'ai' && (
-          <PlanAiSummary runId={runId.replace(/^run-/, '')} refreshKey={aiSummaryRefresh} />
+          <>
+            {/* The gate's ruling (#1766) sits ABOVE the narrative: when a run is
+                held, the verdict and its override are what the operator came
+                for, and the summary is the context behind it. The panel hides
+                itself when the gate is off. */}
+            <AIPolicyPanel
+              runId={runId}
+              runStatus={attrs.status}
+              onChanged={() => {
+                loadRun()
+                loadAiInfo()
+              }}
+            />
+            <PlanAiSummary runId={runId.replace(/^run-/, '')} refreshKey={aiSummaryRefresh} />
+          </>
         )}
 
         {/* OPA policy tab (#343) — full evaluations + admin override; the tab

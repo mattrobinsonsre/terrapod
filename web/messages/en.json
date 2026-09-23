@@ -2045,7 +2045,9 @@
       "heldByRunTask": "A mandatory run task failed — override it or discard the run",
       "runTasksRunning": "Waiting for post-plan run tasks",
       "heldByPolicy": "A mandatory policy set failed — override it or discard the run",
-      "heldBySecurityScan": "The security scan found blocking issues — override it or discard the run"
+      "heldBySecurityScan": "The security scan found blocking issues — override it or discard the run",
+      "heldByAiPolicy": "The AI policy gate denied this run — override it or discard the run",
+      "awaitingAiPolicy": "Waiting for the AI policy verdict"
     },
     "badge": {
       "destroy": "destroy",
@@ -2265,6 +2267,31 @@
       "enforcementLabel": "enforcement: {level}",
       "erroredMessage": "The scan did not complete, so this run has not been checked.",
       "blockedErroredMessage": "This run is blocked because the security scan did not complete. Fix the cause and re-plan, or ask an admin to override."
+    },
+    "aiPolicyPanel": {
+      "heading": "AI Policy Gate",
+      "enforcementLabel": "enforcement: {level}",
+      "thresholdLabel": "risk threshold: {threshold}",
+      "awaitingVerdict": "Waiting for the AI policy verdict. This run is held until it arrives.",
+      "decisionAllow": "allowed",
+      "decisionDeny": "denied",
+      "risk": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
+      },
+      "blockedDeniedMessage": "This run is <strong>blocked by {count, plural, one {# policy criterion} other {# policy criteria}}</strong>.",
+      "blockedRiskMessage": "This run is <strong>blocked</strong> because its risk level ({level}) is at or above the threshold ({threshold}).",
+      "blockedErroredMessage": "This run is blocked because no AI policy verdict could be reached. The gate fails closed, so a verdict that could not be reached is not approval.",
+      "erroredMessage": "The AI policy gate did not return a usable verdict, so this run has not been ruled on.",
+      "passed": "No policy criteria matched.",
+      "overriding": "Overriding...",
+      "overrideContinue": "Override & Continue",
+      "overrideConfirm": "Override the AI policy gate and allow this run to apply despite the verdict?",
+      "overrideFailed": "Override failed",
+      "overrideFailedStatus": "Override failed ({status})",
+      "overriddenBy": "overridden by {by}"
     },
     "architecture": {
       "loadError": "Failed to load the architecture critique.",

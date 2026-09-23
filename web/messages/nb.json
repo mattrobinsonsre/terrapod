@@ -2045,7 +2045,9 @@
       "heldByRunTask": "En obligatorisk kjøringsoppgave feilet — overstyr den eller forkast kjøringen",
       "runTasksRunning": "Venter på kjøringsoppgaver etter planen",
       "heldByPolicy": "Et obligatorisk regelsett feilet — overstyr det eller forkast kjøringen",
-      "heldBySecurityScan": "Sikkerhetsskanningen fant blokkerende funn — overstyr den eller forkast kjøringen"
+      "heldBySecurityScan": "Sikkerhetsskanningen fant blokkerende funn — overstyr den eller forkast kjøringen",
+      "heldByAiPolicy": "AI-policyporten avviste denne kjøringen — overstyr den eller forkast kjøringen",
+      "awaitingAiPolicy": "Venter på AI-policyens kjennelse"
     },
     "badge": {
       "destroy": "riv ned",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "håndheving: {level}",
       "erroredMessage": "Skanningen ble ikke fullført, så denne kjøringen er ikke kontrollert.",
       "blockedErroredMessage": "Denne kjøringen er blokkert fordi sikkerhetsskanningen ikke ble fullført. Rett årsaken og planlegg på nytt, eller be en administrator om å overstyre."
+    },
+    "aiPolicyPanel": {
+      "heading": "AI-policyport",
+      "enforcementLabel": "håndheving: {level}",
+      "thresholdLabel": "risikoterskel: {threshold}",
+      "awaitingVerdict": "Venter på AI-policyens kjennelse. Denne kjøringen holdes tilbake til den kommer.",
+      "decisionAllow": "tillatt",
+      "decisionDeny": "avvist",
+      "risk": {
+        "critical": "kritisk",
+        "high": "høy",
+        "medium": "middels",
+        "low": "lav"
+      },
+      "blockedDeniedMessage": "Denne kjøringen er <strong>blokkert av {count, plural, one {# policykriterium} other {# policykriterier}}</strong>.",
+      "blockedRiskMessage": "Denne kjøringen er <strong>blokkert</strong> fordi risikonivået ({level}) er på eller over terskelen ({threshold}).",
+      "blockedErroredMessage": "Denne kjøringen er blokkert fordi ingen AI-policykjennelse kunne nås. Porten feiler lukket, så en kjennelse som ikke kunne nås, er ikke et samtykke.",
+      "erroredMessage": "AI-policyporten returnerte ingen brukbar kjennelse, så denne kjøringen er ikke vurdert.",
+      "passed": "Ingen policykriterier samsvarte.",
+      "overriding": "Overstyrer …",
+      "overrideContinue": "Overstyr og fortsett",
+      "overrideConfirm": "Overstyre AI-policyporten og la denne kjøringen bli anvendt til tross for kjennelsen?",
+      "overrideFailed": "Overstyring mislyktes",
+      "overrideFailedStatus": "Overstyring mislyktes ({status})",
+      "overriddenBy": "overstyrt av {by}"
     },
     "architecture": {
       "loadError": "Kunne ikke laste arkitekturkritikken.",

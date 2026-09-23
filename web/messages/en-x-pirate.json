@@ -2045,7 +2045,9 @@
       "heldByRunTask": "A mandatory run task be sunk — override it or scuttle the run",
       "runTasksRunning": "Waitin'' on the run tasks after the plan",
       "heldByPolicy": "A mandatory policy set be sunk — override it or scuttle the run",
-      "heldBySecurityScan": "The lookout spied blockin'' reefs — override it or scuttle the run"
+      "heldBySecurityScan": "The lookout spied blockin'' reefs — override it or scuttle the run",
+      "heldByAiPolicy": "The AI articles gate refused this run — override it or scuttle the run",
+      "awaitingAiPolicy": "Awaitin'' the AI articles ruling"
     },
     "badge": {
       "destroy": "send t'' Davy Jones",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "enforcement: {level}",
       "erroredMessage": "The scan never made port, so this here run be unchecked, arr.",
       "blockedErroredMessage": "This here run be blocked on account o'' the security scan never makin'' port. Mend the cause and chart a new plan, or have an admin wave it through."
+    },
+    "aiPolicyPanel": {
+      "heading": "AI Articles Gate",
+      "enforcementLabel": "enforcement: {level}",
+      "thresholdLabel": "risk threshold: {threshold}",
+      "awaitingVerdict": "Awaitin'' the AI articles ruling. This here run be held fast till it arrives.",
+      "decisionAllow": "allowed",
+      "decisionDeny": "refused",
+      "risk": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "middlin'",
+        "low": "low"
+      },
+      "blockedDeniedMessage": "This run be <strong>blocked by {count, plural, one {# article o'' the code} other {# articles o'' the code}}</strong>, arr.",
+      "blockedRiskMessage": "This run be <strong>blocked</strong>, for its risk ({level}) sits at or above the threshold ({threshold}).",
+      "blockedErroredMessage": "This run be blocked, for no AI articles ruling could be reached. The gate fails shut — a ruling ye never got be no blessin''.",
+      "erroredMessage": "The AI articles gate gave no usable ruling, so this here run be unjudged, arr.",
+      "passed": "No articles o'' the code were broken, matey.",
+      "overriding": "Overridin''...",
+      "overrideContinue": "Override & Continue",
+      "overrideConfirm": "Override the AI articles gate an'' let this run be applied despite the ruling?",
+      "overrideFailed": "Override foundered",
+      "overrideFailedStatus": "Override foundered ({status})",
+      "overriddenBy": "overridden by {by}"
     },
     "architecture": {
       "loadError": "Couldn''t haul in th'' architecture critique.",

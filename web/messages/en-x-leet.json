@@ -2045,7 +2045,9 @@
       "heldByRunTask": "4 m4nd470ry run 745k f41l3d — 0v3rr1d3 17 0r d15c4rd 7h3 run",
       "runTasksRunning": "W4171ng f0r p057-pl4n run 745k5",
       "heldByPolicy": "4 m4nd470ry p0l1cy 537 f41l3d — 0v3rr1d3 17 0r d15c4rd 7h3 run",
-      "heldBySecurityScan": "7h3 53cur17y 5c4n f0und bl0ck1ng 155u35 — 0v3rr1d3 17 0r d15c4rd 7h3 run"
+      "heldBySecurityScan": "7h3 53cur17y 5c4n f0und bl0ck1ng 155u35 — 0v3rr1d3 17 0r d15c4rd 7h3 run",
+      "heldByAiPolicy": "7h3 41 p0l1cy g473 d3n13d 7h15 run — 0v3rr1d3 17 0r d15c4rd 7h3 run",
+      "awaitingAiPolicy": "W4171ng f0r 7h3 41 p0l1cy v3rd1c7"
     },
     "badge": {
       "destroy": "d357r0y",
@@ -2325,6 +2327,31 @@
       "enforcementLabel": "3nf0rc3m3n7: {level}",
       "erroredMessage": "7h3 5c4n d1d n07 c0mpl373, 50 7h15 run h45 n07 b33n ch3ck3d.",
       "blockedErroredMessage": "7h15 run 15 bl0ck3d b3c4u53 7h3 53cur17y 5c4n d1d n07 c0mpl373. F1x 7h3 c4u53 4nd r3-pl4n, 0r 45k 4n 4dm1n 70 0v3rr1d3."
+    },
+    "aiPolicyPanel": {
+      "heading": "41 P0l1cy G473",
+      "enforcementLabel": "3nf0rc3m3n7: {level}",
+      "thresholdLabel": "r15k 7hr35h0ld: {threshold}",
+      "awaitingVerdict": "W4171ng f0r 7h3 41 p0l1cy v3rd1c7. 7h15 run 15 h3ld un71l 17 4rr1v35.",
+      "decisionAllow": "4ll0w3d",
+      "decisionDeny": "d3n13d",
+      "risk": {
+        "critical": "cr171c4l",
+        "high": "h1gh",
+        "medium": "m3d1um",
+        "low": "l0w"
+      },
+      "blockedDeniedMessage": "7h15 run 15 <strong>bl0ck3d by {count, plural, one {# policy criterion} other {# policy criteria}}</strong>.",
+      "blockedRiskMessage": "7h15 run 15 <strong>bl0ck3d</strong> b3c4u53 175 r15k l3v3l ({level}) 15 47 0r 4b0v3 7h3 7hr35h0ld ({threshold}).",
+      "blockedErroredMessage": "7h15 run 15 bl0ck3d b3c4u53 n0 41 p0l1cy v3rd1c7 c0uld b3 r34ch3d. 7h3 g473 f41l5 cl053d, 50 4 v3rd1c7 7h47 c0uld n07 b3 r34ch3d 15 n07 4ppr0v4l.",
+      "erroredMessage": "7h3 41 p0l1cy g473 d1d n07 r37urn 4 u54bl3 v3rd1c7, 50 7h15 run h45 n07 b33n rul3d 0n.",
+      "passed": "N0 p0l1cy cr173r14 m47ch3d.",
+      "overriding": "0v3rr1d1ng...",
+      "overrideContinue": "0v3rr1d3 & C0n71nu3",
+      "overrideConfirm": "0v3rr1d3 7h3 41 p0l1cy g473 4nd 4ll0w 7h15 run 70 4pply d35p173 7h3 v3rd1c7?",
+      "overrideFailed": "0v3rr1d3 f41l3d",
+      "overrideFailedStatus": "0v3rr1d3 f41l3d ({status})",
+      "overriddenBy": "0v3rr1dd3n by {by}"
     },
     "architecture": {
       "loadError": "F41l3d 70 l04d 7h3 4rch173c7ur3 cr171qu3.",
