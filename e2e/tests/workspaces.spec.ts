@@ -393,7 +393,7 @@ test.describe('Workspace security scanning settings (#1763)', () => {
       await expect(page.getByLabel('Enforcement', { exact: true })).toHaveValue('enforced');
     }).toPass({ timeout: 20_000 });
 
-    const res = await page.request.get(`/api/terrapod/v1/workspaces/${wsId}`, {
+    const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status()).toBe(200);
@@ -412,7 +412,7 @@ test.describe('Workspace security scanning settings (#1763)', () => {
     await skip.blur();
 
     await expect(async () => {
-      const res = await page.request.get(`/api/terrapod/v1/workspaces/${wsId}`, {
+      const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect((await res.json()).data.attributes['security-scan-skip-rules']).toEqual([

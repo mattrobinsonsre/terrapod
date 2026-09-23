@@ -1216,7 +1216,7 @@ function WorkspaceDetailContent() {
     if (!workspace) return
     setSavingSecurityScan(true)
     try {
-      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}`, {
+      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'workspaces', attributes: patch } }),
