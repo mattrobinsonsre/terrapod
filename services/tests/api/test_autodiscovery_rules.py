@@ -58,6 +58,7 @@ def _mock_rule(
     r.security_scan_engine = "checkov"
     r.security_scan_severity_threshold = "high"
     r.security_scan_skip_rules = []
+    r.debug_mode = False
     r.ai_summary_mode = "default"
     r.ai_summary_context = ""
     r.terragrunt_enabled = False

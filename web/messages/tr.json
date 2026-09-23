@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt sürümü",
       "noExpiry": "Süre dolumu yok",
-      "addDriftIgnoreRule": "Kural ekle"
+      "addDriftIgnoreRule": "Kural ekle",
+      "debugModeHint": "Bu kuralın oluşturduğu çalışma alanlarında başarısız çalıştırıcı pod'larını açık tutun. Varsayılan olarak kapalı — açık tutulan bir pod o çalışma alanının kimlik bilgilerini barındırır."
     },
     "table": {
       "name": "Ad",
@@ -2853,7 +2854,8 @@
       "stateActionFailed": "Durum eylemi başarısız",
       "uploadState": "Durum yüklenemedi",
       "uploadStateFile": "Durum dosyası yüklenemedi",
-      "updateSecurityScan": "Güvenlik taraması güncellenemedi"
+      "updateSecurityScan": "Güvenlik taraması güncellenemedi",
+      "updateDebugMode": "Hata ayıklama modu güncellenemedi"
     },
     "subtabs": {
       "state": "Durum",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Yok sayılan kural yok.",
       "skipRulesHint": "Bu çalışma alanında yok sayılacak tarayıcı kural kimlikleri, virgülle ayrılmış."
+    },
+    "debugMode": {
+      "title": "Çalıştırıcı hata ayıklama modu",
+      "description": "Başarısız bir çalıştırmanın pod'unu içine girebilmeniz için açık tutun. Çalıştırma önce başarısız olarak bildirilir; kapsayıcı ancak ondan sonra ayakta kalır.",
+      "label": "Hata ayıklama modu",
+      "hint": "Varsayılan olarak kapalı. Açıkken, başarısız bir çalıştırıcının pod'u operatörünüzün yapılandırdığı pencere boyunca exec ile erişilebilir kalır ve bu süre boyunca bu çalışma alanının kimlik bilgilerini ve şifresi çözülmüş değişkenlerini barındırır.",
+      "activeBadge": "Etkin",
+      "bannerTitle": "Bu çalışma alanı için hata ayıklama modu açık",
+      "bannerBody": "Başarısız bir çalıştırmanın pod'u sonlanmak yerine inceleme için açık tutulur ve tutulduğu sürece bu çalışma alanının kimlik bilgilerini ve şifresi çözülmüş değişkenlerini barındırır. Sorun gidermeyi bitirdiğinizde hata ayıklama modunu kapatın.",
+      "confirmEnable": "Hata ayıklama modu açılsın mı? Başarısız bir çalıştırmanın pod'u, pencere dolana ya da siz pod'u silene kadar bu çalışma alanının kimlik bilgileri ve şifresi çözülmüş değişkenleriyle birlikte açık tutulacak."
     }
   },
   "graphs": {

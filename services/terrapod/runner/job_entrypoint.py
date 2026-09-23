@@ -38,7 +38,7 @@ from pathlib import Path
 
 import structlog
 
-from terrapod.runner import lock_extender, plan_artifacts
+from terrapod.runner import debug_linger, lock_extender, plan_artifacts
 from terrapod.runner.phases import (
     backend_backstop,
     cost,
@@ -842,6 +842,12 @@ def main(argv: list[str] | None = None) -> int:
 
     log.info("phase complete", phase=cfg.phase, exit_code=exit_code)
     _flush_stdio()
+
+    # Debug mode (#1764). Deliberately the LAST thing, after every upload and
+    # after the phase result has been posted: the run is already reported
+    # failed, and the pod merely stays around so an operator can get inside
+    # it. A no-op unless the workspace has debug mode on.
+    debug_linger.hold_for_inspection(exit_code)
     return exit_code
 
 

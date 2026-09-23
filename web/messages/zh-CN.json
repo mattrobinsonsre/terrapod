@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt 版本",
       "noExpiry": "不过期",
-      "addDriftIgnoreRule": "添加规则"
+      "addDriftIgnoreRule": "添加规则",
+      "debugModeHint": "在此规则创建的工作区上保持失败运行器的 Pod 打开。默认关闭 — 被保持的 Pod 会保留该工作区的凭据。"
     },
     "table": {
       "name": "名称",
@@ -2853,7 +2854,8 @@
       "stateActionFailed": "状态操作失败",
       "uploadState": "上传状态失败",
       "uploadStateFile": "上传状态文件失败",
-      "updateSecurityScan": "更新安全扫描失败"
+      "updateSecurityScan": "更新安全扫描失败",
+      "updateDebugMode": "更新调试模式失败"
     },
     "subtabs": {
       "state": "状态",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "未忽略任何规则。",
       "skipRulesHint": "在此工作区中要忽略的扫描器规则 ID，以逗号分隔。"
+    },
+    "debugMode": {
+      "title": "运行器调试模式",
+      "description": "保持失败运行的 Pod 处于打开状态，以便你进入其中查看。运行失败会先被上报，之后容器才会继续存在。",
+      "label": "调试模式",
+      "hint": "默认关闭。开启后，失败运行器的 Pod 会在运维人员配置的时间窗口内保持可 exec 进入，并在这段时间内一直保留该工作区的凭据和已解密变量。",
+      "activeBadge": "已启用",
+      "bannerTitle": "此工作区已开启调试模式",
+      "bannerBody": "失败运行的 Pod 不会退出，而是保持打开以供检查，并在保持期间保留该工作区的凭据和已解密变量。排查结束后请关闭调试模式。",
+      "confirmEnable": "要开启调试模式吗？失败运行的 Pod 将保持打开，并保留此工作区的凭据和已解密变量，直到时间窗口到期或你删除该 Pod。"
     }
   },
   "graphs": {

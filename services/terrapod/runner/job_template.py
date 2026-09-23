@@ -203,6 +203,7 @@ def build_job_spec(
     onboard_provider: str = "",
     onboard_provider_version: str = "",
     onboard_types: list[str] | None = None,
+    debug_linger_seconds: int = 0,
 ) -> dict:
     """Build a K8s Job spec for a run phase.
 
@@ -325,6 +326,16 @@ def build_job_spec(
         container_env.append({"name": "TP_COST_ESTIMATION", "value": "false"})
     elif cost_default_region:
         container_env.append({"name": "TP_COST_DEFAULT_REGION", "value": cost_default_region})
+    if debug_linger_seconds > 0:
+        # Debug mode (#1764). Conditional, like the rest of the TP_* run
+        # options, so a workspace without it gets a byte-identical Job spec.
+        #
+        # AFTER the cost if/elif, never between its arms: slipping a statement
+        # in there re-binds the `elif` to the new `if`, which silently stops
+        # `TP_COST_DEFAULT_REGION` being emitted whenever debug mode is on.
+        container_env.append(
+            {"name": "TP_DEBUG_LINGER_SECONDS", "value": str(debug_linger_seconds)}
+        )
     if working_directory:
         container_env.append({"name": "TP_WORKING_DIR", "value": working_directory})
 
@@ -494,8 +505,18 @@ def build_job_spec(
                     },
                 ],
             },
-            "activeDeadlineSeconds": timeout_minutes * 60,
-            "ttlSecondsAfterFinished": runner_config.ttl_seconds_after_finished,
+            # The run's own timeout, plus the debug window when one is in
+            # force (#1764). This is what actually bounds a lingering pod: the
+            # orchestrator sleeps for at most `debug_linger_seconds`, and if it
+            # misbehaves the cluster ends the pod here regardless. A pod holds
+            # the run's auth token and its decrypted tfvars, so the ceiling is
+            # a safety property rather than a convenience.
+            "activeDeadlineSeconds": timeout_minutes * 60 + max(0, debug_linger_seconds),
+            "ttlSecondsAfterFinished": (
+                max(runner_config.ttl_seconds_after_finished, debug_linger_seconds)
+                if debug_linger_seconds > 0
+                else runner_config.ttl_seconds_after_finished
+            ),
             "template": {
                 "metadata": {
                     "labels": pod_labels,

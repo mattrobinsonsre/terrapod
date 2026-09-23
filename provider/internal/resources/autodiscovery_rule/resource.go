@@ -112,6 +112,7 @@ type autodiscoveryRuleModel struct {
 	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
+	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	VCSWorkflow                   types.String `tfsdk:"vcs_workflow"`
@@ -375,6 +376,14 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 			// The remaining templated workspace settings (#1763). Optional+Computed
 			// throughout, so a rule that never sets one keeps the server's
 			// default instead of planning a change on every run (#684).
+			"debug_mode": schema.BoolAttribute{
+				Description: "Hold failed runner pods open for inspection on workspaces this rule creates.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"terragrunt_enabled": schema.BoolAttribute{
 				Description: "Run Terragrunt on workspaces this rule creates.",
 				Optional:    true,
@@ -791,6 +800,7 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		key string
 		val types.Bool
 	}{
+		{"debug-mode", m.DebugMode},
 		{"terragrunt-enabled", m.TerragruntEnabled},
 		{"auto-merge", m.AutoMerge},
 		{"drift-detection-enabled", m.DriftDetectionEnabled},
@@ -986,6 +996,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.VCSWorkflow = types.StringValue(terrapod.GetStringAttr(res, "vcs-workflow"))
 	m.AutoMergeStrategy = types.StringValue(terrapod.GetStringAttr(res, "auto-merge-strategy"))
 	m.SlackChannel = types.StringValue(terrapod.GetStringAttr(res, "slack-channel"))
+	m.DebugMode = types.BoolValue(terrapod.GetBoolAttr(res, "debug-mode"))
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
 	m.AutoMerge = types.BoolValue(terrapod.GetBoolAttr(res, "auto-merge"))
 	m.DriftDetectionEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "drift-detection-enabled"))

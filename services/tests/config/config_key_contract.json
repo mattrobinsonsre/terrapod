@@ -4,6 +4,7 @@
   "[runners.yaml] ca_bundle_enabled",
   "[runners.yaml] ca_bundle_source_path",
   "[runners.yaml] credentials_secret_name",
+  "[runners.yaml] debug_linger_seconds",
   "[runners.yaml] default_execution_backend",
   "[runners.yaml] default_terraform_version",
   "[runners.yaml] drift_max_duration_seconds",

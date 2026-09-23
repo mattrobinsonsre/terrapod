@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-version",
       "noExpiry": "Ingen utgång",
-      "addDriftIgnoreRule": "Lägg till regel"
+      "addDriftIgnoreRule": "Lägg till regel",
+      "debugModeHint": "Håll misslyckade runner-poddar öppna på de arbetsytor som den här regeln skapar. Av som standard – en kvarhållen podd behåller den arbetsytans autentiseringsuppgifter."
     },
     "table": {
       "name": "Namn",
@@ -2853,7 +2854,8 @@
       "stateActionFailed": "Tillståndsåtgärd misslyckades",
       "uploadState": "Det gick inte att ladda upp tillstånd",
       "uploadStateFile": "Det gick inte att ladda upp tillståndsfilen",
-      "updateSecurityScan": "Det gick inte att uppdatera säkerhetsskanningen"
+      "updateSecurityScan": "Det gick inte att uppdatera säkerhetsskanningen",
+      "updateDebugMode": "Det gick inte att uppdatera felsökningsläget"
     },
     "subtabs": {
       "state": "Tillstånd",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Inga regler ignoreras.",
       "skipRulesHint": "Kommaseparerade regel-ID:n för skannern som ignoreras i den här arbetsytan."
+    },
+    "debugMode": {
+      "title": "Felsökningsläge för runnern",
+      "description": "Håll podden för en misslyckad körning öppen så att du kan gå in i den. Körningen rapporteras först som misslyckad; först därefter står containern kvar.",
+      "label": "Felsökningsläge",
+      "hint": "Av som standard. När det är på förblir podden för en misslyckad runner åtkomlig med exec under det fönster som din operatör har konfigurerat, och den behåller hela den tiden den här arbetsytans autentiseringsuppgifter och dekrypterade variabler.",
+      "activeBadge": "Aktivt",
+      "bannerTitle": "Felsökningsläget är på för den här arbetsytan",
+      "bannerBody": "Podden för en misslyckad körning hålls öppen för inspektion i stället för att avslutas, och den behåller den här arbetsytans autentiseringsuppgifter och dekrypterade variabler så länge den hålls kvar. Stäng av felsökningsläget när du är klar med felsökningen.",
+      "confirmEnable": "Slå på felsökningsläget? Podden för en misslyckad körning hålls öppen med den här arbetsytans autentiseringsuppgifter och dekrypterade variabler tills fönstret går ut eller du tar bort podden."
     }
   },
   "graphs": {

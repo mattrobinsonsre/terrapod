@@ -192,6 +192,7 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 | `runners.topologySpreadConstraints` | `[]` | Topology spread constraints |
 | `runners.podSecurityContext` | `{}` | Pod-level security context override |
 | `runners.ttlSecondsAfterFinished` | `600` | Clean up completed Jobs after this many seconds |
+| `runners.debugLingerSeconds` | `1800` | How long a **failed** Job's pod is held open when its workspace has `debug_mode` on (see [Debug mode](#debug-mode-inspecting-a-failed-runner-pod)). `0` disables debug mode deployment-wide regardless of any workspace setting; maximum `14400` (4 hours) |
 | `runners.terminationGracePeriodSeconds` | `120` | Time budget for graceful shutdown + artifact uploads |
 | `runners.tokenTTLSeconds` | `3600` | Runner token TTL (1 hour) |
 | `runners.hooksEnabled` | `true` | Master kill-switch for execution hooks. When `false`, the listener never delivers execution hooks to runner Jobs (for sealed/security-conscious deployments) |
@@ -292,6 +293,83 @@ The Run detail page surfaces an **OOM-killed / Killed (likely OOM)** badge when 
 4. After the next successful run, re-check the Resource usage panel — the memory bar should be in the amber or green band, not red.
 
 The peak data accumulates across runs (per-run snapshot on the row, plus visible on each Run detail page), so right-sizing the workspace is a matter of looking at a few representative runs' peaks and setting `resource_memory` to roughly half-again the typical peak. Anything tracking ≥95% (red) is one provider-schema change away from OOMing.
+
+### Debug mode: inspecting a failed runner pod
+
+Some failures are only answerable from **inside** the pod that hit them: the
+credential that was not what you thought, the private endpoint that did not
+resolve, the mount that was not there, the egress a NetworkPolicy blocked. The
+run log tells you the call failed; it cannot tell you what the runner could see.
+
+A runner Job's pod runs `restartPolicy: Never`, so the moment the orchestrator
+exits non-zero the container is **terminated** — and you cannot `kubectl exec`
+into a terminated container at any TTL. `runners.ttlSecondsAfterFinished` does
+not help: it governs how long a *finished* Job is kept, not whether the process
+is still running, and it is deployment-wide so it cannot be raised for one
+workspace.
+
+**Debug mode is the per-workspace, opt-in answer.** With it on, a failed run
+reports its failure to the API exactly as it always does, and only *then* holds
+the container open instead of exiting:
+
+```hcl
+resource "terrapod_workspace" "core" {
+  name           = "core"
+  execution_mode = "agent"
+  debug_mode     = true
+}
+```
+
+or the **Debug mode** toggle in the workspace UI (Configuration), the
+`debug-mode` attribute on the workspace API, the bulk-update endpoint, or an
+autodiscovery rule's template.
+
+Then, while the window is open:
+
+```sh
+kubectl -n <runner-namespace> get pods -l terrapod.io/run-id=<run-id>
+kubectl -n <runner-namespace> exec -it <pod> -- sh
+```
+
+The run id is on the Run detail page; the pods also carry a
+`terrapod.io/phase` label (`plan` / `apply`) if a run has both.
+
+Things worth knowing before you turn it on:
+
+- **The run is already failed.** Terrapod reports and finalises the failure
+  before the hold, so the run page, notifications and the API all show the
+  outcome at the normal time. The pod lingering is invisible to the run
+  lifecycle — it is not "stuck", and nothing waits on it.
+- **A successful run is not held — its Job is just kept longer.** Nothing sleeps
+  on the success path, so a workspace left in debug mode does not accumulate
+  *running* pods. What changes is teardown: the Job's
+  `ttlSecondsAfterFinished` becomes the debug window when that is longer than
+  the deployment default, so a finished run's pod survives long enough to
+  `kubectl describe` or `kubectl logs` it. The container has exited, so you
+  cannot `exec` into that one — for that you need the failure path above.
+- **Deleting the pod ends the hold immediately.** The orchestrator waits on a
+  signal as well as the clock, so `kubectl delete pod` releases it at once
+  rather than waiting out the window — the operator says they are finished by
+  deleting it.
+- **It expires on its own, and the cluster enforces that.** The window is
+  `runners.debugLingerSeconds` (default 30 minutes, maximum 4 hours), and the
+  Job's `activeDeadlineSeconds` already covers the run plus that window — so
+  even if the runner process misbehaves, Kubernetes ends the pod. Expiry is a
+  safety property, not a convenience.
+- **Who can reach a held pod is decided by Kubernetes, not by Terrapod.** The
+  pod keeps the run's auth token and its decrypted `terraform.tfvars.json` — the
+  same material it holds while running — for the whole window, so anyone with
+  `pods/exec` in the runner namespace can read that workspace's secrets during
+  it. The longer TTL on the success path extends the *Secrets'* lifetime the
+  same way, because they are garbage-collected with the Job that owns them.
+  The exposure is to your cluster operators, not to Terrapod users: a
+  workspace admin can ask for a debug pod, but only the deployment operator
+  decides how long one may survive, and `runners.debugLingerSeconds: 0` refuses
+  the request outright no matter what any workspace is set to.
+- **It does not catch an OOM, deliberately.** An OOMKill is a SIGKILL from the
+  kernel — nothing in the runner gets to run, so nothing could hold the
+  container. It does not need to: an OOM is already answerable from the run page
+  via `runner_exit_status` and the peak-memory panel above, without a shell.
 
 ---
 

@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt version",
       "noExpiry": "No expiry",
-      "addDriftIgnoreRule": "Add rule"
+      "addDriftIgnoreRule": "Add rule",
+      "debugModeHint": "Hold failed runner pods open on the workspaces this rule creates. Off by default — a held pod keeps that workspace's credentials."
     },
     "table": {
       "name": "Name",
@@ -2861,7 +2862,8 @@
       "stateActionFailed": "State action failed",
       "uploadState": "Failed to upload state",
       "uploadStateFile": "Failed to upload state file",
-      "updateSecurityScan": "Failed to update security scanning"
+      "updateSecurityScan": "Failed to update security scanning",
+      "updateDebugMode": "Failed to update debug mode"
     },
     "applicableVarsets": {
       "title": "Variable sets",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "No rules ignored.",
       "skipRulesHint": "Comma-separated scanner rule ids to ignore on this workspace."
+    },
+    "debugMode": {
+      "title": "Runner debug mode",
+      "description": "Hold a failed run's pod open so you can get inside it. The run is reported as failed first; only then does the container stay up.",
+      "label": "Debug mode",
+      "hint": "Off by default. While on, a failed runner pod stays exec-able for the window your operator configured, and it keeps this workspace's credentials and decrypted variables for that whole time.",
+      "activeBadge": "Active",
+      "bannerTitle": "Debug mode is on for this workspace",
+      "bannerBody": "A failed run's pod is held open for inspection instead of exiting, and it keeps this workspace's credentials and decrypted variables while it is held. Turn debug mode off when you are finished troubleshooting.",
+      "confirmEnable": "Turn on debug mode? A failed run's pod will be held open holding this workspace's credentials and decrypted variables until the window expires or you delete the pod."
     }
   },
   "graphs": {

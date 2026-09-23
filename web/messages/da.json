@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-version",
       "noExpiry": "Ingen udløb",
-      "addDriftIgnoreRule": "Tilføj regel"
+      "addDriftIgnoreRule": "Tilføj regel",
+      "debugModeHint": "Hold mislykkede runner-pods åbne på de arbejdsområder, denne regel opretter. Slået fra som standard – en tilbageholdt pod beholder det arbejdsområdes legitimationsoplysninger."
     },
     "table": {
       "name": "Navn",
@@ -2853,7 +2854,8 @@
       "stateActionFailed": "Tilstandshandling mislykkedes",
       "uploadState": "Kunne ikke uploade tilstand",
       "uploadStateFile": "Kunne ikke uploade tilstandsfil",
-      "updateSecurityScan": "Sikkerhedsscanningen kunne ikke opdateres"
+      "updateSecurityScan": "Sikkerhedsscanningen kunne ikke opdateres",
+      "updateDebugMode": "Fejlfindingstilstanden kunne ikke opdateres"
     },
     "subtabs": {
       "state": "Tilstand",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Ingen regler ignoreres.",
       "skipRulesHint": "Kommaseparerede regel-id'er for scanneren, der ignoreres i dette arbejdsområde."
+    },
+    "debugMode": {
+      "title": "Fejlfindingstilstand for runneren",
+      "description": "Hold en mislykket kørsels pod åben, så du kan komme ind i den. Kørslen rapporteres først som mislykket; først derefter bliver containeren stående.",
+      "label": "Fejlfindingstilstand",
+      "hint": "Slået fra som standard. Når den er slået til, forbliver en mislykket runners pod tilgængelig med exec i det vindue, din operatør har konfigureret, og den beholder hele den tid dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler.",
+      "activeBadge": "Aktiv",
+      "bannerTitle": "Fejlfindingstilstand er slået til for dette arbejdsområde",
+      "bannerBody": "En mislykket kørsels pod holdes åben til inspektion i stedet for at afslutte, og den beholder dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler, så længe den holdes. Slå fejlfindingstilstanden fra, når du er færdig med at fejlsøge.",
+      "confirmEnable": "Slå fejlfindingstilstand til? En mislykket kørsels pod holdes åben med dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler, indtil vinduet udløber, eller du sletter podden."
     }
   },
   "graphs": {
