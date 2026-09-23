@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AIプランサマリー",
       "aiSummaryDefault": "デプロイメントのデフォルトに従う",
       "aiSummaryEnabled": "常に要約する",
-      "aiSummaryDisabled": "要約しない"
+      "aiSummaryDisabled": "要約しない",
+      "execution": "実行、VCS、ドリフト",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt バージョン",
+      "noExpiry": "期限なし",
+      "addDriftIgnoreRule": "ルールを追加"
     },
     "table": {
       "name": "名前",

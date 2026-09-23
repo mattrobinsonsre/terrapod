@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI-plansammendrag",
       "aiSummaryDefault": "Følg utrullingsstandard",
       "aiSummaryEnabled": "Sammendra alltid",
-      "aiSummaryDisabled": "Sammendra aldri"
+      "aiSummaryDisabled": "Sammendra aldri",
+      "execution": "Kjøring, VCS og drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versjon",
+      "noExpiry": "Ingen utløp",
+      "addDriftIgnoreRule": "Legg til regel"
     },
     "table": {
       "name": "Navn",

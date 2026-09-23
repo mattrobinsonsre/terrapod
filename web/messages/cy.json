@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "Crynodeb Cynllun AI",
       "aiSummaryDefault": "Dilyn rhagosodiad y defnydd",
       "aiSummaryEnabled": "Crynhoi bob amser",
-      "aiSummaryDisabled": "Peidio â chrynhoi byth"
+      "aiSummaryDisabled": "Peidio â chrynhoi byth",
+      "execution": "Gweithredu, VCS a drifft",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Fersiwn Terragrunt",
+      "noExpiry": "Dim dod i ben",
+      "addDriftIgnoreRule": "Ychwanegu rheol"
     },
     "table": {
       "name": "Enw",

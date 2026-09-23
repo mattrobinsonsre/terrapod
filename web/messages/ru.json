@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "ИИ-сводка плана",
       "aiSummaryDefault": "Использовать значение по умолчанию для развёртывания",
       "aiSummaryEnabled": "Всегда создавать сводку",
-      "aiSummaryDisabled": "Никогда не создавать сводку"
+      "aiSummaryDisabled": "Никогда не создавать сводку",
+      "execution": "Выполнение, VCS и дрейф",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Версия Terragrunt",
+      "noExpiry": "Без истечения",
+      "addDriftIgnoreRule": "Добавить правило"
     },
     "table": {
       "name": "Имя",

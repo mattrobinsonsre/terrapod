@@ -514,6 +514,16 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "security_scan_skip_rules",
         "ai_summary_mode",
         "ai_summary_context",
+        "terragrunt_enabled",
+        "terragrunt_version",
+        "vcs_workflow",
+        "auto_merge",
+        "auto_merge_strategy",
+        "drift_detection_enabled",
+        "drift_detection_interval_seconds",
+        "drift_ignore_rules",
+        "plan_expiry_seconds",
+        "slack_channel",
     )
 
     def _materialisation_source(self) -> str:
@@ -539,3 +549,83 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         columns = {c.key for c in AutodiscoveryRule.__table__.columns}
         stale = [c for c in self.TEMPLATED if c not in columns]
         assert not stale, f"TEMPLATED names non-existent AutodiscoveryRule column(s): {stale}"
+
+
+class TestEveryWorkspaceSettingIsTemplatedOrLedgered:
+    """The rule's template is accounted for, column by column (#1763).
+
+    The sibling gate above checks that what the rule *has* reaches the
+    workspace. This checks the other direction: that a workspace setting the
+    rule does NOT template is a decision someone wrote down, rather than
+    something nobody got to. That asymmetry is how the two feature sets in
+    #1763 went missing here in the first place.
+    """
+
+    #: Workspace columns an autodiscovery rule deliberately does not template.
+    NOT_TEMPLATED: dict[str, str] = {
+        "trigger_prefixes": (
+            "computed at materialisation — scoped to the discovered directory, so a "
+            "templated value would break the poller's targeting"
+        ),
+        "pulumi_bind_plan": "a rule has no engine; everything it creates is Terraform/OpenTofu",
+        "working_directory": "the discovered directory itself",
+        "name": "derived from the rule's name template and the directory",
+        "engine": "a rule has no engine",
+        "vcs_connection_id": "the rule's own connection",
+        "vcs_repo_url": "the rule's own repo",
+        "vcs_branch": "the rule's own branch",
+        "autodiscovery_rule_id": "provenance, written at materialisation",
+        "autodiscovery_pr_number": "provenance, written at materialisation",
+        "vcs_last_commit_sha": "the baseline seeded at materialisation (#313)",
+        # Identity, audit and runtime state — never template material.
+        "id": "primary key",
+        "created_at": "audit timestamp",
+        "updated_at": "audit timestamp",
+        "locked": "lock protocol",
+        "lock_id": "lock protocol",
+        "lock_reason": "lock protocol",
+        "locked_by": "lock protocol",
+        "vcs_last_polled_at": "poller state",
+        "vcs_last_attempted_at": "poller state",
+        "vcs_last_error": "poller state",
+        "vcs_last_error_at": "poller state",
+        "drift_last_checked_at": "drift result",
+        "drift_status": "drift result",
+        "drift_latest_run_id": "drift result",
+        "state_diverged": "runtime state",
+        "lifecycle_state": "owned by the autodiscovery lifecycle service",
+        "lifecycle_reason": "owned by the autodiscovery lifecycle service",
+        "catalog_item_id": "catalog provenance; a rule never creates a catalog workspace",
+        "catalog_version_pin": "catalog provenance",
+        "catalog_input_values": "catalog provenance",
+    }
+
+    def test_every_workspace_setting_is_templated_or_written_down(self):
+        from terrapod.db.models import Workspace
+
+        # The explicit list, not `workspace_columns & rule_columns`: `id`,
+        # `name`, `created_at`, `updated_at` and `vcs_connection_id` exist on
+        # both models and mean the RULE's own, not a template. Intersecting
+        # would read those as templated and hide five real answers.
+        templated = set(TestEveryTemplatedSettingReachesTheWorkspace.TEMPLATED)
+        workspace_columns = {c.key for c in Workspace.__table__.columns}
+        unaccounted = workspace_columns - templated - set(self.NOT_TEMPLATED)
+        assert not unaccounted, (
+            f"Workspace setting(s) {sorted(unaccounted)} are neither templated by an "
+            "autodiscovery rule nor listed in NOT_TEMPLATED. A rule that cannot set a "
+            "setting means every workspace it creates has to be fixed up by hand — "
+            "which is the gap #1763 is about. Add the column to AutodiscoveryRule and "
+            "pass it through at materialisation, or record why it does not belong."
+        )
+
+    def test_the_ledger_does_not_name_a_templated_or_dropped_column(self):
+        from terrapod.db.models import Workspace
+
+        workspace_columns = {c.key for c in Workspace.__table__.columns}
+        templated = set(TestEveryTemplatedSettingReachesTheWorkspace.TEMPLATED)
+        contradictory = sorted(set(self.NOT_TEMPLATED) & templated)
+        assert not contradictory, (
+            f"{contradictory} is templated by the rule but listed as NOT_TEMPLATED"
+        )
+        stale = sorted(set(self.NOT_TEMPLATED) - workspace_columns)
+        assert not stale, f"NOT_TEMPLATED names dropped Workspace column(s): {stale}"

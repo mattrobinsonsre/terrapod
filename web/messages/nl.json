@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI-plansamenvatting",
       "aiSummaryDefault": "Standaard van deployment volgen",
       "aiSummaryEnabled": "Altijd samenvatten",
-      "aiSummaryDisabled": "Nooit samenvatten"
+      "aiSummaryDisabled": "Nooit samenvatten",
+      "execution": "Uitvoering, VCS en drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versie",
+      "noExpiry": "Geen verval",
+      "addDriftIgnoreRule": "Regel toevoegen"
     },
     "table": {
       "name": "Naam",

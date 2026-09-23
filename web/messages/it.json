@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "Riepilogo IA del plan",
       "aiSummaryDefault": "Segui l''impostazione predefinita del deployment",
       "aiSummaryEnabled": "Riepiloga sempre",
-      "aiSummaryDisabled": "Non riepilogare mai"
+      "aiSummaryDisabled": "Non riepilogare mai",
+      "execution": "Esecuzione, VCS e deriva",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versione di Terragrunt",
+      "noExpiry": "Nessuna scadenza",
+      "addDriftIgnoreRule": "Aggiungi regola"
     },
     "table": {
       "name": "Nome",

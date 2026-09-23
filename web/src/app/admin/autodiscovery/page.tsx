@@ -51,6 +51,16 @@ interface AutodiscoveryRule {
     'security-scan-engine'?: string
     'security-scan-severity-threshold'?: string
     'ai-summary-mode'?: string
+    'terragrunt-enabled'?: boolean
+    'terragrunt-version'?: string
+    'vcs-workflow'?: string
+    'auto-merge'?: boolean
+    'auto-merge-strategy'?: string
+    'drift-detection-enabled'?: boolean
+    'drift-detection-interval-seconds'?: number
+    'drift-ignore-rules'?: string[]
+    'plan-expiry-seconds'?: number | null
+    'slack-channel'?: string
     'run-task-templates': RunTaskSpec[]
     'notification-templates': NotificationSpec[]
     'created-at': string
@@ -79,6 +89,9 @@ export default function AutodiscoveryPage() {
   const router = useRouter()
   const t = useTranslations('adminAutodiscovery')
   const tMode = useTranslations('common.autoApplyMode')
+  // Reuses the workspace page's own labels (#1763) so a rule's template and the
+  // setting it produces are described in the same words, in every locale.
+  const tWs = useTranslations('workspaceDetail')
   const fmt = useFormat()
   const [rules, setRules] = useState<AutodiscoveryRule[]>([])
   const [connections, setConnections] = useState<VCSConnection[]>([])
@@ -117,6 +130,16 @@ export default function AutodiscoveryPage() {
   const [scanEngine, setScanEngine] = useState('checkov')
   const [scanThreshold, setScanThreshold] = useState('high')
   const [aiSummaryMode, setAiSummaryMode] = useState('default')
+  const [terragruntEnabled, setTerragruntEnabled] = useState(false)
+  const [terragruntVersion, setTerragruntVersion] = useState('1.0')
+  const [ruleVcsWorkflow, setRuleVcsWorkflow] = useState('merge_then_apply')
+  const [ruleAutoMerge, setRuleAutoMerge] = useState(false)
+  const [ruleAutoMergeStrategy, setRuleAutoMergeStrategy] = useState('merge')
+  const [driftEnabled, setDriftEnabled] = useState(true)
+  const [driftInterval, setDriftInterval] = useState(86400)
+  const [driftIgnoreRules, setDriftIgnoreRules] = useState<string[]>([])
+  const [planExpiry, setPlanExpiry] = useState('')
+  const [ruleSlackChannel, setRuleSlackChannel] = useState('')
   const [runTaskTemplates, setRunTaskTemplates] = useState<RunTaskSpec[]>([])
   const [notificationTemplates, setNotificationTemplates] = useState<NotificationSpec[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -211,6 +234,16 @@ export default function AutodiscoveryPage() {
     setScanEngine('checkov')
     setScanThreshold('high')
     setAiSummaryMode('default')
+    setTerragruntEnabled(false)
+    setTerragruntVersion('1.0')
+    setRuleVcsWorkflow('merge_then_apply')
+    setRuleAutoMerge(false)
+    setRuleAutoMergeStrategy('merge')
+    setDriftEnabled(true)
+    setDriftInterval(86400)
+    setDriftIgnoreRules([])
+    setPlanExpiry('')
+    setRuleSlackChannel('')
     setRunTaskTemplates([])
     setNotificationTemplates([])
   }
@@ -249,6 +282,16 @@ export default function AutodiscoveryPage() {
     setScanEngine(a['security-scan-engine'] || 'checkov')
     setScanThreshold(a['security-scan-severity-threshold'] || 'high')
     setAiSummaryMode(a['ai-summary-mode'] || 'default')
+    setTerragruntEnabled(a['terragrunt-enabled'] ?? false)
+    setTerragruntVersion(a['terragrunt-version'] || '1.0')
+    setRuleVcsWorkflow(a['vcs-workflow'] || 'merge_then_apply')
+    setRuleAutoMerge(a['auto-merge'] ?? false)
+    setRuleAutoMergeStrategy(a['auto-merge-strategy'] || 'merge')
+    setDriftEnabled(a['drift-detection-enabled'] ?? true)
+    setDriftInterval(a['drift-detection-interval-seconds'] ?? 86400)
+    setDriftIgnoreRules(a['drift-ignore-rules'] || [])
+    setPlanExpiry(a['plan-expiry-seconds'] ? String(a['plan-expiry-seconds']) : '')
+    setRuleSlackChannel(a['slack-channel'] || '')
     setRunTaskTemplates(a['run-task-templates'] || [])
     setNotificationTemplates(a['notification-templates'] || [])
     setShowForm(true)
@@ -291,6 +334,16 @@ export default function AutodiscoveryPage() {
       'security-scan-engine': scanEngine,
       'security-scan-severity-threshold': scanThreshold,
       'ai-summary-mode': aiSummaryMode,
+      'terragrunt-enabled': terragruntEnabled,
+      'terragrunt-version': terragruntVersion.trim() || '1.0',
+      'vcs-workflow': ruleVcsWorkflow,
+      'auto-merge': ruleAutoMerge,
+      'auto-merge-strategy': ruleAutoMergeStrategy,
+      'drift-detection-enabled': driftEnabled,
+      'drift-detection-interval-seconds': driftInterval,
+      'drift-ignore-rules': driftIgnoreRules.map(r => r.trim()).filter(Boolean),
+      'plan-expiry-seconds': planExpiry.trim() ? Number(planExpiry) : null,
+      'slack-channel': ruleSlackChannel.trim(),
       'run-task-templates': runTaskTemplates,
       'notification-templates': notificationTemplates,
     }
@@ -710,6 +763,123 @@ export default function AutodiscoveryPage() {
                   addLabel={t('form.addVarFile')}
                 />
               </div>
+              {/* The rest of the templated workspace settings (#1763) */}
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <label className="block text-sm text-slate-300 mb-1">{t('form.execution')}</label>
+                <p className="text-xs text-slate-500 mb-2">{t('form.governanceHint')}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="flex items-center gap-2 text-xs text-slate-400">
+                      <input
+                        type="checkbox"
+                        checked={terragruntEnabled}
+                        onChange={(e) => setTerragruntEnabled(e.target.checked)}
+                      />
+                      {t('form.terragruntEnabled')}
+                    </label>
+                    <input
+                      type="text"
+                      aria-label={t('form.terragruntVersion')}
+                      value={terragruntVersion}
+                      onChange={(e) => setTerragruntVersion(e.target.value)}
+                      placeholder={tWs('fields.terragruntVersionPlaceholder')}
+                      className={`w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-2`}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="ad-vcs-workflow" className="block text-xs text-slate-500 mb-1">
+                      {tWs('fields.vcsWorkflow')}
+                    </label>
+                    <select
+                      id="ad-vcs-workflow"
+                      value={ruleVcsWorkflow}
+                      onChange={(e) => setRuleVcsWorkflow(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="merge_then_apply">{tWs('fields.vcsWorkflowMergeThenApply')}</option>
+                      <option value="apply_then_merge">{tWs('fields.vcsWorkflowApplyThenMerge')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-xs text-slate-400">
+                      <input
+                        type="checkbox"
+                        checked={ruleAutoMerge}
+                        onChange={(e) => setRuleAutoMerge(e.target.checked)}
+                      />
+                      {tWs('fields.autoMerge')}
+                    </label>
+                    <select
+                      aria-label={tWs('fields.autoMergeStrategy')}
+                      value={ruleAutoMergeStrategy}
+                      onChange={(e) => setRuleAutoMergeStrategy(e.target.value)}
+                      className={`w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-2`}
+                    >
+                      <option value="merge">merge</option>{/* i18n-ignore */}
+                      <option value="squash">squash</option>{/* i18n-ignore */}
+                      <option value="rebase">rebase</option>{/* i18n-ignore */}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-xs text-slate-400">
+                      <input
+                        type="checkbox"
+                        checked={driftEnabled}
+                        onChange={(e) => setDriftEnabled(e.target.checked)}
+                      />
+                      {tWs('drift.title')}
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      aria-label={tWs('drift.checkInterval')}
+                      value={driftInterval}
+                      onChange={(e) => setDriftInterval(Number(e.target.value))}
+                      className={`w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 mt-2`}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="ad-plan-expiry" className="block text-xs text-slate-500 mb-1">
+                      {tWs('planExpiry.expireAfter')}
+                    </label>
+                    <input
+                      id="ad-plan-expiry"
+                      type="number"
+                      min={0}
+                      value={planExpiry}
+                      onChange={(e) => setPlanExpiry(e.target.value)}
+                      placeholder={t('form.noExpiry')}
+                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="ad-slack" className="block text-xs text-slate-500 mb-1">
+                      {tWs('slack.channel')}
+                    </label>
+                    <input
+                      id="ad-slack"
+                      type="text"
+                      value={ruleSlackChannel}
+                      onChange={(e) => setRuleSlackChannel(e.target.value)}
+                      placeholder={tWs('slack.channelPlaceholder')}
+                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="block text-xs text-slate-500 mb-1">
+                    {tWs('fields.driftIgnoreRules')}
+                  </label>
+                  <StringListEditor
+                    values={driftIgnoreRules}
+                    onChange={setDriftIgnoreRules}
+                    // A Terraform address, not UX copy — identical in every locale.
+                    placeholder="aws_instance.web.tags[&quot;LastSeen&quot;]" // i18n-ignore
+                    addLabel={t('form.addDriftIgnoreRule')}
+                  />
+                </div>
+              </div>
+
               {/* Templated onto every workspace the rule creates (#1763) */}
               <div className="mt-4 pt-4 border-t border-slate-800">
                 <label className="block text-sm text-slate-300 mb-1">{t('form.governance')}</label>

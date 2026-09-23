@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI 계획 요약",
       "aiSummaryDefault": "배포 기본값 따르기",
       "aiSummaryEnabled": "항상 요약",
-      "aiSummaryDisabled": "요약하지 않음"
+      "aiSummaryDisabled": "요약하지 않음",
+      "execution": "실행, VCS 및 드리프트",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt 버전",
+      "noExpiry": "만료 없음",
+      "addDriftIgnoreRule": "규칙 추가"
     },
     "table": {
       "name": "이름",

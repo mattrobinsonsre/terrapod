@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI-plansammanfattning",
       "aiSummaryDefault": "Följ deploymentstandard",
       "aiSummaryEnabled": "Sammanfatta alltid",
-      "aiSummaryDisabled": "Sammanfatta aldrig"
+      "aiSummaryDisabled": "Sammanfatta aldrig",
+      "execution": "Körning, VCS och drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-version",
+      "noExpiry": "Ingen utgång",
+      "addDriftIgnoreRule": "Lägg till regel"
     },
     "table": {
       "name": "Namn",

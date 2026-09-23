@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "Summarium Consilii AI",
       "aiSummaryDefault": "Praedefinitum instructionis sequi",
       "aiSummaryEnabled": "Semper summatim redigere",
-      "aiSummaryDisabled": "Numquam summatim redigere"
+      "aiSummaryDisabled": "Numquam summatim redigere",
+      "execution": "Executio, VCS et aberratio",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versio Terragrunt",
+      "noExpiry": "Nulla expiratio",
+      "addDriftIgnoreRule": "Regulam addere"
     },
     "table": {
       "name": "Nomen",

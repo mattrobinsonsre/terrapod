@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "Podsumowanie planu AI",
       "aiSummaryDefault": "Zgodnie z domyślnym ustawieniem wdrożenia",
       "aiSummaryEnabled": "Zawsze podsumowuj",
-      "aiSummaryDisabled": "Nigdy nie podsumowuj"
+      "aiSummaryDisabled": "Nigdy nie podsumowuj",
+      "execution": "Wykonanie, VCS i dryf",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Wersja Terragrunt",
+      "noExpiry": "Bez wygaśnięcia",
+      "addDriftIgnoreRule": "Dodaj regułę"
     },
     "table": {
       "name": "Nazwa",

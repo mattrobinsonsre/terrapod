@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "KI-Plan-Zusammenfassung",
       "aiSummaryDefault": "Bereitstellungsstandard folgen",
       "aiSummaryEnabled": "Immer zusammenfassen",
-      "aiSummaryDisabled": "Nie zusammenfassen"
+      "aiSummaryDisabled": "Nie zusammenfassen",
+      "execution": "Ausführung, VCS und Drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-Version",
+      "noExpiry": "Kein Ablauf",
+      "addDriftIgnoreRule": "Regel hinzufügen"
     },
     "table": {
       "name": "Name",

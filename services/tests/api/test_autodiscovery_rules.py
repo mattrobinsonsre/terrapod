@@ -61,6 +61,16 @@ def _mock_rule(
     r.security_scan_skip_rules = []
     r.ai_summary_mode = "default"
     r.ai_summary_context = ""
+    r.terragrunt_enabled = False
+    r.terragrunt_version = "1.0"
+    r.vcs_workflow = "merge_then_apply"
+    r.auto_merge = False
+    r.auto_merge_strategy = "merge"
+    r.drift_detection_enabled = True
+    r.drift_detection_interval_seconds = 86400
+    r.drift_ignore_rules = []
+    r.plan_expiry_seconds = None
+    r.slack_channel = ""
     r.created_at = datetime(2026, 5, 9, tzinfo=UTC)
     r.updated_at = datetime(2026, 5, 9, tzinfo=UTC)
     r.first_scan_at = None

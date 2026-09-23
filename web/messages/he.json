@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "סיכום תוכנית מבוסס AI",
       "aiSummaryDefault": "לפי ברירת המחדל של הפריסה",
       "aiSummaryEnabled": "תמיד לסכם",
-      "aiSummaryDisabled": "לעולם לא לסכם"
+      "aiSummaryDisabled": "לעולם לא לסכם",
+      "execution": "הרצה, VCS וסטייה",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "גרסת Terragrunt",
+      "noExpiry": "ללא תפוגה",
+      "addDriftIgnoreRule": "הוספת כלל"
     },
     "table": {
       "name": "שם",

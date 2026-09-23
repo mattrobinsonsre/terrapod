@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI 計畫摘要",
       "aiSummaryDefault": "遵循部署預設設定",
       "aiSummaryEnabled": "始終摘要",
-      "aiSummaryDisabled": "從不摘要"
+      "aiSummaryDisabled": "從不摘要",
+      "execution": "執行、VCS 與偏移",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt 版本",
+      "noExpiry": "不過期",
+      "addDriftIgnoreRule": "新增規則"
     },
     "table": {
       "name": "名稱",

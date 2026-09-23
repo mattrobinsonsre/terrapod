@@ -2679,6 +2679,7 @@ These are editable in the UI under **Admin → Autodiscovery**, alongside the ru
 
 - `security-scan-enforcement` / `security-scan-engine` / `security-scan-severity-threshold` / `security-scan-skip-rules` — [security scanning](security-scanning.md) for every created workspace (#1763). Unlike on a workspace, `enforced` is always accepted here: a rule has no engine, so everything it creates is a Terraform/OpenTofu workspace, which is exactly what can be scanned.
 - `ai-summary-mode` / `ai-summary-context` — the AI plan-summary opt-in and its free-text context for every created workspace (#1763).
+- `terragrunt-enabled` / `terragrunt-version`, `vcs-workflow`, `auto-merge` / `auto-merge-strategy`, `drift-detection-enabled` / `drift-detection-interval-seconds`, `drift-ignore-rules`, `plan-expiry-seconds` and `slack-channel` — the remaining per-workspace settings (#1763). `drift-detection-enabled` defaults **true** here, unlike the workspace column, because every autodiscovered workspace is VCS-connected.
 
 These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template). The same pairing holds for the scan and AI-summary settings, and their values are validated by the same rules the workspace endpoint uses — so a rule cannot template a setting the workspace API would reject.
 

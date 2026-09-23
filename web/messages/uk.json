@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "Зведення плану ШІ",
       "aiSummaryDefault": "Дотримуватися типового значення розгортання",
       "aiSummaryEnabled": "Завжди створювати зведення",
-      "aiSummaryDisabled": "Ніколи не створювати зведення"
+      "aiSummaryDisabled": "Ніколи не створювати зведення",
+      "execution": "Виконання, VCS і дрейф",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Версія Terragrunt",
+      "noExpiry": "Без завершення",
+      "addDriftIgnoreRule": "Додати правило"
     },
     "table": {
       "name": "Назва",

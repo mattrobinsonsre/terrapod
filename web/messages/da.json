@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI-planoversigt",
       "aiSummaryDefault": "Følg deployment-standard",
       "aiSummaryEnabled": "Opsummer altid",
-      "aiSummaryDisabled": "Opsummer aldrig"
+      "aiSummaryDisabled": "Opsummer aldrig",
+      "execution": "Kørsel, VCS og drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-version",
+      "noExpiry": "Ingen udløb",
+      "addDriftIgnoreRule": "Tilføj regel"
     },
     "table": {
       "name": "Navn",

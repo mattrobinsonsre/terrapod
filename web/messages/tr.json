@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI Plan Özeti",
       "aiSummaryDefault": "Dağıtım varsayılanını izle",
       "aiSummaryEnabled": "Her zaman özetle",
-      "aiSummaryDisabled": "Asla özetleme"
+      "aiSummaryDisabled": "Asla özetleme",
+      "execution": "Yürütme, VCS ve sapma",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt sürümü",
+      "noExpiry": "Süre dolumu yok",
+      "addDriftIgnoreRule": "Kural ekle"
     },
     "table": {
       "name": "Ad",

@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI nab tlhoS",
       "aiSummaryDefault": "nISwI' motlh tlha'",
       "aiSummaryEnabled": "reH tlhoS",
-      "aiSummaryDisabled": "not tlhoS"
+      "aiSummaryDisabled": "not tlhoS",
+      "execution": "Qap, VCS, je chIch",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt mI'",
+      "noExpiry": "van Hutlh",
+      "addDriftIgnoreRule": "chu'wI' chel"
     },
     "table": {
       "name": "pong",

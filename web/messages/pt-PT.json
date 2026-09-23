@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "Resumo do Plano por IA",
       "aiSummaryDefault": "Seguir a predefinição da implementação",
       "aiSummaryEnabled": "Resumir sempre",
-      "aiSummaryDisabled": "Nunca resumir"
+      "aiSummaryDisabled": "Nunca resumir",
+      "execution": "Execução, VCS e desvio",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versão do Terragrunt",
+      "noExpiry": "Sem expiração",
+      "addDriftIgnoreRule": "Adicionar regra"
     },
     "table": {
       "name": "Nome",

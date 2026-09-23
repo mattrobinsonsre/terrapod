@@ -73,6 +73,13 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `security-scan-skip-rules` | list | no | Scanner rule ids (Checkov `CKV_*` / Trivy `AVD-*`) ignored on every created workspace (#1763). |
 | `ai-summary-mode` | string | no | AI plan-summary opt-in on created workspaces: `default` (follow the deployment setting), `enabled`, `disabled` (#1763). |
 | `ai-summary-context` | string | no | Free-text context handed to the AI plan summariser for created workspaces, max 4000 characters (#1763). |
+| `terragrunt-enabled` / `terragrunt-version` | bool / string | no | Run Terragrunt on created workspaces, and at which version (#1763). |
+| `vcs-workflow` | string | no | `merge_then_apply` (default) or `apply_then_merge` on created workspaces (#1763). |
+| `auto-merge` / `auto-merge-strategy` | bool / string | no | Merge the PR after a successful apply, and how (`merge`, `squash`, `rebase`) (#1763). |
+| `drift-detection-enabled` / `drift-detection-interval-seconds` | bool / int | no | Scheduled drift checks on created workspaces. **Defaults enabled**, because every autodiscovered workspace is VCS-connected and the workspace-creation path enables it for those — defaulting off would have silently disabled drift detection across every discovered directory (#1763). |
+| `drift-ignore-rules` | list | no | Address/attribute-path patterns whose drift is ignored on created workspaces (#1763). |
+| `plan-expiry-seconds` | int | no | Auto-discard an unconfirmed plan after this many seconds. Unset means no expiry (#1763). |
+| `slack-channel` | string | no | Slack channel for run notifications on created workspaces; empty is silent (#1763). |
 
 ## Pattern syntax
 
@@ -109,7 +116,7 @@ name-template: "ws-{root}"         →  ws-accounts-alpha-network  ({root} prese
 A workspace created by a rule:
 - Inherits all template fields above.
 - Has its `var-files`, plus a `run-task` / `notification-configuration` for each entry in the rule's `run-task-templates` / `notification-templates`, materialised at creation — so the workspace is fully configured with no second pass (#318).
-- Inherits the rule's security-scan and AI plan-summary settings, so a rule covering hundreds of directories can opt them all in at creation rather than one workspace at a time (#1763).
+- Inherits **every** workspace setting the rule templates — security scanning, AI plan summary, Terragrunt, VCS workflow and auto-merge, drift detection, plan expiry and the Slack channel — so a rule covering hundreds of directories configures them all at creation rather than one workspace at a time (#1763). What a rule deliberately does *not* template (the working directory, trigger prefixes and provenance, all computed at materialisation) is recorded with its reason in the test suite, so the next setting cannot go missing here silently.
 - Has `vcs-connection-id`, `vcs-repo-url`, `vcs-branch` set from the rule.
 - Has `working-directory` set to the matched file's parent.
 - Has `trigger-prefixes` set to `[working_directory]` so subsequent PRs that touch the same dir route to the same workspace via the regular PR-scan path (not via re-running autodiscovery).

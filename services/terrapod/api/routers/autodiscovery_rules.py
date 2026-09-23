@@ -98,6 +98,16 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "security-scan-skip-rules": list(rule.security_scan_skip_rules or []),
             "ai-summary-mode": rule.ai_summary_mode,
             "ai-summary-context": rule.ai_summary_context or "",
+            "terragrunt-enabled": rule.terragrunt_enabled,
+            "terragrunt-version": rule.terragrunt_version,
+            "vcs-workflow": rule.vcs_workflow,
+            "auto-merge": rule.auto_merge,
+            "auto-merge-strategy": rule.auto_merge_strategy,
+            "drift-detection-enabled": rule.drift_detection_enabled,
+            "drift-detection-interval-seconds": rule.drift_detection_interval_seconds,
+            "drift-ignore-rules": list(rule.drift_ignore_rules or []),
+            "plan-expiry-seconds": rule.plan_expiry_seconds,
+            "slack-channel": rule.slack_channel or "",
             "created-at": _rfc3339(rule.created_at),
             "updated-at": _rfc3339(rule.updated_at),
         },
@@ -353,6 +363,50 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
         if key in attrs:
             try:
                 out[attr] = rule_fn(attrs[key])
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+    for key, attr, rule_fn in (
+        (
+            "terragrunt-version",
+            "terragrunt_version",
+            workspace_settings.validate_terragrunt_version,
+        ),
+        ("vcs-workflow", "vcs_workflow", workspace_settings.validate_vcs_workflow),
+        (
+            "auto-merge-strategy",
+            "auto_merge_strategy",
+            workspace_settings.validate_auto_merge_strategy,
+        ),
+        (
+            "drift-detection-interval-seconds",
+            "drift_detection_interval_seconds",
+            workspace_settings.clamp_drift_interval,
+        ),
+        (
+            "drift-ignore-rules",
+            "drift_ignore_rules",
+            workspace_settings.validate_drift_ignore_rules,
+        ),
+        (
+            "plan-expiry-seconds",
+            "plan_expiry_seconds",
+            workspace_settings.validate_plan_expiry_seconds,
+        ),
+        ("slack-channel", "slack_channel", workspace_settings.validate_slack_channel),
+    ):
+        if key in attrs:
+            try:
+                out[attr] = rule_fn(attrs[key])
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+    for key, attr in (
+        ("terragrunt-enabled", "terragrunt_enabled"),
+        ("auto-merge", "auto_merge"),
+        ("drift-detection-enabled", "drift_detection_enabled"),
+    ):
+        if key in attrs:
+            try:
+                out[attr] = workspace_settings.validate_bool(attrs[key], key)
             except ValueError as exc:
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
     if "security-scan-enforcement" in attrs:

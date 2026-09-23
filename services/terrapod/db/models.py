@@ -1419,6 +1419,42 @@ class AutodiscoveryRule(Base):
     ai_summary_context: Mapped[str] = mapped_column(
         Text, nullable=False, default="", server_default=""
     )
+    # The remaining workspace settings a rule templates (#1763). What it
+    # deliberately does NOT template is recorded, with reasons, in
+    # `TestEveryWorkspaceSettingIsTemplatedOrLedgered`.
+    terragrunt_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    terragrunt_version: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="1.0", server_default="1.0"
+    )
+    vcs_workflow: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="merge_then_apply", server_default="merge_then_apply"
+    )
+    auto_merge: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    auto_merge_strategy: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="merge", server_default="merge"
+    )
+    #: Defaults TRUE, unlike the workspace column's own default. Every
+    #: autodiscovered workspace is VCS-connected, and the workspace-creation
+    #: path turns drift detection on for those — so defaulting false here would
+    #: have silently switched it off across every monorepo directory.
+    drift_detection_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    drift_detection_interval_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=86400, server_default="86400"
+    )
+    drift_ignore_rules: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, nullable=False, server_default="[]"
+    )
+    #: NULL means no expiry, matching the workspace column.
+    plan_expiry_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    slack_channel: Mapped[str] = mapped_column(
+        String(128), nullable=False, default="", server_default=""
+    )
     # #314 deletion lifecycle: what to do when a discovered directory is
     # removed on the tracked branch. "flag" (default, safe) marks the
     # workspace pending_deletion and requires an explicit operator

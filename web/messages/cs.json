@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI shrnutí plánu",
       "aiSummaryDefault": "Řídit se výchozím nastavením nasazení",
       "aiSummaryEnabled": "Vždy shrnout",
-      "aiSummaryDisabled": "Nikdy neshrnovat"
+      "aiSummaryDisabled": "Nikdy neshrnovat",
+      "execution": "Spuštění, VCS a drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Verze Terragrunt",
+      "noExpiry": "Bez vypršení",
+      "addDriftIgnoreRule": "Přidat pravidlo"
     },
     "table": {
       "name": "Název",

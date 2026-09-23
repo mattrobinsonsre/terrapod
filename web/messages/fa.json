@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "خلاصهٔ هوش مصنوعیِ طرح",
       "aiSummaryDefault": "پیروی از پیش‌فرض استقرار",
       "aiSummaryEnabled": "همیشه خلاصه کن",
-      "aiSummaryDisabled": "هرگز خلاصه نکن"
+      "aiSummaryDisabled": "هرگز خلاصه نکن",
+      "execution": "اجرا، VCS و انحراف",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "نسخه Terragrunt",
+      "noExpiry": "بدون انقضا",
+      "addDriftIgnoreRule": "افزودن قاعده"
     },
     "table": {
       "name": "نام",

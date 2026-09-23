@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI 计划摘要",
       "aiSummaryDefault": "遵循部署默认设置",
       "aiSummaryEnabled": "始终摘要",
-      "aiSummaryDisabled": "从不摘要"
+      "aiSummaryDisabled": "从不摘要",
+      "execution": "执行、VCS 与漂移",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt 版本",
+      "noExpiry": "不过期",
+      "addDriftIgnoreRule": "添加规则"
     },
     "table": {
       "name": "名称",

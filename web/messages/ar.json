@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "ملخص الخطة بالذكاء الاصطناعي",
       "aiSummaryDefault": "اتباع الافتراضي للنشر",
       "aiSummaryEnabled": "التلخيص دائمًا",
-      "aiSummaryDisabled": "عدم التلخيص أبدًا"
+      "aiSummaryDisabled": "عدم التلخيص أبدًا",
+      "execution": "التنفيذ وVCS والانحراف",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "إصدار Terragrunt",
+      "noExpiry": "بدون انتهاء",
+      "addDriftIgnoreRule": "إضافة قاعدة"
     },
     "table": {
       "name": "الاسم",

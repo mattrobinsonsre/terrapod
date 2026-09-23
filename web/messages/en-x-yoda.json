@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "Summary, AI Plan",
       "aiSummaryDefault": "The deployment default, follow",
       "aiSummaryEnabled": "Summarize, always",
-      "aiSummaryDisabled": "Summarize, never"
+      "aiSummaryDisabled": "Summarize, never",
+      "execution": "VCS and drift, execution",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Version, Terragrunt",
+      "noExpiry": "Expiry, there is none",
+      "addDriftIgnoreRule": "A rule, add"
     },
     "table": {
       "name": "Name",

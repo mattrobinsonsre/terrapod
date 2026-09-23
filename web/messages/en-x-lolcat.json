@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI Plan Summry",
       "aiSummaryDefault": "Follo deployment defawlt",
       "aiSummaryEnabled": "Alwayz summarize",
-      "aiSummaryDisabled": "Nevr summarize"
+      "aiSummaryDisabled": "Nevr summarize",
+      "execution": "Eksekushun, VCS an Drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt vershun",
+      "noExpiry": "No expiry. srsly.",
+      "addDriftIgnoreRule": "Add rule"
     },
     "table": {
       "name": "Naym",

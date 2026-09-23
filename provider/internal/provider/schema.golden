@@ -155,8 +155,13 @@ resource terrapod_autodiscovery_rule.ai_summary_context required=false optional=
 resource terrapod_autodiscovery_rule.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.auto_merge required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_autodiscovery_rule.auto_merge_strategy required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.branch required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.drift_detection_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_autodiscovery_rule.drift_detection_interval_seconds required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
+resource terrapod_autodiscovery_rule.drift_ignore_rules required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_autodiscovery_rule.enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.engine_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.execution_backend required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -172,6 +177,7 @@ resource terrapod_autodiscovery_rule.on_directory_delete required=false optional
 resource terrapod_autodiscovery_rule.owner_email required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.parallelism required=false optional=true computed=true sensitive=false type=basetypes.Int64Type
 resource terrapod_autodiscovery_rule.pattern required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.plan_expiry_seconds required=false optional=true computed=false sensitive=false type=basetypes.Int64Type
 resource terrapod_autodiscovery_rule.repo_url required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.resource_cpu required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.resource_memory required=false optional=true computed=true sensitive=false type=basetypes.StringType
@@ -180,10 +186,14 @@ resource terrapod_autodiscovery_rule.security_scan_enforcement required=false op
 resource terrapod_autodiscovery_rule.security_scan_engine required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.security_scan_severity_threshold required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.security_scan_skip_rules required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
+resource terrapod_autodiscovery_rule.slack_channel required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.terraform_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.terragrunt_enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_autodiscovery_rule.terragrunt_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.var_files required=false optional=true computed=false sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_autodiscovery_rule.vcs_connection_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_autodiscovery_rule.vcs_workflow required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_catalog_instance.agent_pool_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_catalog_instance.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_catalog_instance.catalog_item_id required=true optional=false computed=false sensitive=false type=basetypes.StringType

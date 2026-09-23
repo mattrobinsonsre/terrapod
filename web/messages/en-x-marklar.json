@@ -1070,7 +1070,12 @@
       "aiSummaryMode": "AI Marklar Marklar",
       "aiSummaryDefault": "Follow marklar default",
       "aiSummaryEnabled": "Always summarize",
-      "aiSummaryDisabled": "Never summarize"
+      "aiSummaryDisabled": "Never summarize",
+      "execution": "Marklar, Marklar and Marklar",
+      "terragruntEnabled": "Marklar",
+      "terragruntVersion": "Marklar marklar",
+      "noExpiry": "No marklar",
+      "addDriftIgnoreRule": "Add marklar"
     },
     "table": {
       "name": "Marklar",
