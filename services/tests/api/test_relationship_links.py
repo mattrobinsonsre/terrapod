@@ -83,6 +83,15 @@ class TestAutodiscoveryRule:
             run_task_templates=[],
             notification_templates=[],
             execution_hook_templates=[],
+            # Templated scan / AI-summary settings (#1763), at their column
+            # defaults. The serializer reads them directly, as it does every
+            # other column — a real rule always carries them.
+            security_scan_enforcement="advisory",
+            security_scan_engine="checkov",
+            security_scan_severity_threshold="high",
+            security_scan_skip_rules=[],
+            ai_summary_mode="default",
+            ai_summary_context="",
             created_at=None,
             updated_at=None,
         )

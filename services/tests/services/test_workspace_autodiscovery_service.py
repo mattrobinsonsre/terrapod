@@ -477,3 +477,65 @@ class TestMaterialisationInheritsTheRule:
         ws, _ = await find_or_autocreate_workspace(db, rule, "accounts/legacy/vpc")
 
         assert ws.auto_apply_mode == "never"
+
+
+class TestEveryTemplatedSettingReachesTheWorkspace:
+    """A template column that isn't passed through silently does nothing (#1763).
+
+    This is the failure mode the issue describes, one level down: the column
+    exists on the rule, the API accepts it, the UI shows it — and the workspace
+    it materialises never receives it. Nothing errors; the setting just has no
+    effect, which is indistinguishable from the feature working until someone
+    checks a created workspace.
+
+    Reads the materialisation source rather than driving the function, because
+    what is being asserted is the *wiring* — that each column is named at the
+    one place the `Workspace` is constructed.
+    """
+
+    #: Columns the rule templates onto every workspace it creates. Adding a
+    #: template column means adding it here and passing it through; that is the
+    #: point of the test.
+    TEMPLATED = (
+        "execution_mode",
+        "execution_backend",
+        "engine_version",
+        "resource_cpu",
+        "resource_memory",
+        "parallelism",
+        "auto_apply",
+        "auto_apply_mode",
+        "labels",
+        "owner_email",
+        "var_files",
+        "security_scan_enforcement",
+        "security_scan_engine",
+        "security_scan_severity_threshold",
+        "security_scan_skip_rules",
+        "ai_summary_mode",
+        "ai_summary_context",
+    )
+
+    def _materialisation_source(self) -> str:
+        import inspect
+
+        from terrapod.services import workspace_autodiscovery_service as svc
+
+        return inspect.getsource(svc.find_or_autocreate_workspace)
+
+    def test_each_templated_column_is_read_when_materialising(self):
+        src = self._materialisation_source()
+        missing = [c for c in self.TEMPLATED if c not in src]
+        assert not missing, (
+            f"AutodiscoveryRule column(s) {missing} are templated but never read where the "
+            "Workspace is constructed in `find_or_autocreate_workspace`, so a rule setting "
+            "them would have no effect on the workspaces it creates."
+        )
+
+    def test_every_templated_column_exists_on_the_rule(self):
+        """Keeps the list above honest if a column is renamed or dropped."""
+        from terrapod.db.models import AutodiscoveryRule
+
+        columns = {c.key for c in AutodiscoveryRule.__table__.columns}
+        stale = [c for c in self.TEMPLATED if c not in columns]
+        assert not stale, f"TEMPLATED names non-existent AutodiscoveryRule column(s): {stale}"

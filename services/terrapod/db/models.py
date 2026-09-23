@@ -1393,6 +1393,32 @@ class AutodiscoveryRule(Base):
     # #672: execution hooks (by id) to associate with every workspace this rule
     # materialises, so discovered workspaces inherit their hooks automatically.
     execution_hook_templates: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    # #1763: security scanning (#1036) and the AI plan summary (#401), templated
+    # onto every workspace this rule materialises. Without these a rule covering
+    # hundreds of directories could not opt them in at creation — which, with no
+    # apply-to-existing path either, left no scalable way to set them at all.
+    #
+    # No engine guard is needed here, unlike on a workspace: a rule has no
+    # `engine` column, so everything it materialises is Terraform/OpenTofu,
+    # which is exactly what can be scanned (#1567).
+    security_scan_enforcement: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="advisory", server_default="advisory"
+    )
+    security_scan_engine: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="checkov", server_default="checkov"
+    )
+    security_scan_severity_threshold: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="high", server_default="high"
+    )
+    security_scan_skip_rules: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, nullable=False, server_default="[]"
+    )
+    ai_summary_mode: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="default", server_default="default"
+    )
+    ai_summary_context: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
     # #314 deletion lifecycle: what to do when a discovered directory is
     # removed on the tracked branch. "flag" (default, safe) marks the
     # workspace pending_deletion and requires an explicit operator

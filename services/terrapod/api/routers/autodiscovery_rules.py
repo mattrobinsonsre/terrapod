@@ -42,7 +42,7 @@ from terrapod.api.serialization import engine_version_attr
 from terrapod.db.models import AgentPool, AutodiscoveryRule, VCSConnection
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import run_service
+from terrapod.services import run_service, workspace_settings
 from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
 
 router = APIRouter(tags=["autodiscovery-rules"])
@@ -91,6 +91,13 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "execution-hook-templates": [
                 f"hook-{h}" for h in (rule.execution_hook_templates or [])
             ],
+            # Templated onto every workspace this rule materialises (#1763).
+            "security-scan-enforcement": rule.security_scan_enforcement,
+            "security-scan-engine": rule.security_scan_engine,
+            "security-scan-severity-threshold": rule.security_scan_severity_threshold,
+            "security-scan-skip-rules": list(rule.security_scan_skip_rules or []),
+            "ai-summary-mode": rule.ai_summary_mode,
+            "ai-summary-context": rule.ai_summary_context or "",
             "created-at": _rfc3339(rule.created_at),
             "updated-at": _rfc3339(rule.updated_at),
         },
@@ -319,6 +326,46 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
                     detail=f"Invalid execution hook id: {item}",
                 ) from exc
         out["execution_hook_templates"] = ids
+
+    # Security scanning and the AI plan summary (#1763). The rules are the
+    # workspace's own, from `services.workspace_settings`, so a rule cannot
+    # template a value the workspace endpoint would reject. No engine argument:
+    # a rule has no engine, and everything it materialises is scannable.
+    for key, attr, rule_fn in (
+        ("security-scan-engine", "security_scan_engine", workspace_settings.validate_scan_engine),
+        (
+            "security-scan-severity-threshold",
+            "security_scan_severity_threshold",
+            workspace_settings.validate_scan_severity_threshold,
+        ),
+        (
+            "security-scan-skip-rules",
+            "security_scan_skip_rules",
+            workspace_settings.validate_scan_skip_rules,
+        ),
+        ("ai-summary-mode", "ai_summary_mode", workspace_settings.validate_ai_summary_mode),
+        (
+            "ai-summary-context",
+            "ai_summary_context",
+            workspace_settings.validate_ai_summary_context,
+        ),
+    ):
+        if key in attrs:
+            try:
+                out[attr] = rule_fn(attrs[key])
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if "security-scan-enforcement" in attrs:
+        raw = attrs["security-scan-enforcement"]
+        if raw not in workspace_settings.SCAN_ENFORCEMENTS:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "security-scan-enforcement must be one of "
+                    f"{sorted(workspace_settings.SCAN_ENFORCEMENTS)}"
+                ),
+            )
+        out["security_scan_enforcement"] = raw
 
     return out
 
