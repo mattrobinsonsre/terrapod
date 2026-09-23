@@ -440,7 +440,13 @@ test.describe('Workspace runner debug mode (#1764)', () => {
     // Off means no banner, not a banner saying "off".
     await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0);
 
-    await toggle.check();
+    // `.click()`, never `.check()`: the toggle is a controlled input whose
+    // checked state comes from the fetched workspace, so it only flips once the
+    // PATCH resolves. `.check()` asserts the state changed synchronously and
+    // throws "Clicking the checkbox did not change its state". The
+    // `toBeChecked()` below is the wait.
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
 
     await expect(page.getByTestId('debug-mode-banner')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('debug-mode-indicator')).toBeVisible();
@@ -467,10 +473,12 @@ test.describe('Workspace runner debug mode (#1764)', () => {
     const toggle = page.getByLabel('Debug mode', { exact: true });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
 
-    await toggle.check();
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
     await expect(page.getByTestId('debug-mode-banner')).toBeVisible({ timeout: 15_000 });
 
-    await toggle.uncheck();
+    await toggle.click();
+    await expect(toggle).not.toBeChecked({ timeout: 15_000 });
     await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0);
 
     await expect(async () => {
