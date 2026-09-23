@@ -1053,7 +1053,24 @@
       "notificationTemplates": "通知模板（在每个新工作区上创建）",
       "saving": "正在保存...",
       "previewTitle": "遍历仓库并预览此规则将会创建哪些工作区 — 不会持久化",
-      "parallelism": "并行度"
+      "parallelism": "并行度",
+      "governance": "安全扫描与 AI 摘要",
+      "governanceHint": "应用于此规则创建的所有工作区。",
+      "scanEnforcement": "强制方式",
+      "scanOff": "不扫描",
+      "scanAdvisory": "仅扫描并报告",
+      "scanEnforced": "发现问题时阻止应用",
+      "scanEngine": "扫描器",
+      "scanEngineBoth": "Checkov 和 Trivy",
+      "scanThreshold": "报告不低于此级别的问题",
+      "severityCritical": "严重",
+      "severityHigh": "高",
+      "severityMedium": "中",
+      "severityLow": "低",
+      "aiSummaryMode": "AI 计划摘要",
+      "aiSummaryDefault": "遵循部署默认设置",
+      "aiSummaryEnabled": "始终摘要",
+      "aiSummaryDisabled": "从不摘要"
     },
     "table": {
       "name": "名称",
@@ -2859,7 +2876,8 @@
       "rollbackStateVersion": "回滚状态版本失败",
       "stateActionFailed": "状态操作失败",
       "uploadState": "上传状态失败",
-      "uploadStateFile": "上传状态文件失败"
+      "uploadStateFile": "上传状态文件失败",
+      "updateSecurityScan": "更新安全扫描失败"
     },
     "subtabs": {
       "state": "状态",
@@ -2880,6 +2898,28 @@
         "global": "全局",
         "rule": "按规则匹配"
       }
+    },
+    "securityScan": {
+      "title": "安全扫描",
+      "description": "在应用之前扫描计划中是否存在不安全的基础设施。",
+      "enforcement": "强制方式",
+      "enforcementOff": "不扫描",
+      "enforcementAdvisory": "仅扫描并报告",
+      "enforcementEnforced": "发现问题时阻止应用",
+      "engine": "扫描器",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov 和 Trivy",
+      "threshold": "报告不低于此级别的问题",
+      "thresholdCritical": "严重",
+      "thresholdHigh": "高",
+      "thresholdMedium": "中",
+      "thresholdLow": "低",
+      "skipRules": "忽略的规则",
+      "skipRulesSuffix": "（可选）",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "未忽略任何规则。",
+      "skipRulesHint": "在此工作区中要忽略的扫描器规则 ID，以逗号分隔。"
     }
   },
   "graphs": {

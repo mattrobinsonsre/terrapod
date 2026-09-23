@@ -1053,7 +1053,24 @@
       "notificationTemplates": "Šablony oznámení (vytvořené na každém novém pracovním prostoru)",
       "saving": "Ukládání...",
       "previewTitle": "Projděte repozitář a zobrazte náhled, které pracovní prostory by toto pravidlo VYTVOŘILO — bez uložení",
-      "parallelism": "Paralelismus"
+      "parallelism": "Paralelismus",
+      "governance": "Bezpečnostní kontrola a souhrn AI",
+      "governanceHint": "Použije se na každý pracovní prostor, který toto pravidlo vytvoří.",
+      "scanEnforcement": "Vynucování",
+      "scanOff": "Nekontrolovat",
+      "scanAdvisory": "Pouze zkontrolovat a nahlásit",
+      "scanEnforced": "Zablokovat použití při nálezech",
+      "scanEngine": "Skener",
+      "scanEngineBoth": "Checkov a Trivy",
+      "scanThreshold": "Hlásit nálezy od úrovně",
+      "severityCritical": "kritická",
+      "severityHigh": "vysoká",
+      "severityMedium": "střední",
+      "severityLow": "nízká",
+      "aiSummaryMode": "AI shrnutí plánu",
+      "aiSummaryDefault": "Řídit se výchozím nastavením nasazení",
+      "aiSummaryEnabled": "Vždy shrnout",
+      "aiSummaryDisabled": "Nikdy neshrnovat"
     },
     "table": {
       "name": "Název",
@@ -2859,7 +2876,8 @@
       "rollbackStateVersion": "Nepodařilo se vrátit verzi stavu zpět",
       "stateActionFailed": "Akce se stavem selhala",
       "uploadState": "Nepodařilo se nahrát stav",
-      "uploadStateFile": "Nepodařilo se nahrát soubor stavu"
+      "uploadStateFile": "Nepodařilo se nahrát soubor stavu",
+      "updateSecurityScan": "Nepodařilo se aktualizovat bezpečnostní kontrolu"
     },
     "subtabs": {
       "state": "Stav",
@@ -2880,6 +2898,28 @@
         "global": "Globální",
         "rule": "Odpovídá pravidlu"
       }
+    },
+    "securityScan": {
+      "title": "Bezpečnostní kontrola",
+      "description": "Zkontrolovat plán na nezabezpečenou infrastrukturu před jeho použitím.",
+      "enforcement": "Vynucování",
+      "enforcementOff": "Nekontrolovat",
+      "enforcementAdvisory": "Pouze zkontrolovat a nahlásit",
+      "enforcementEnforced": "Zablokovat použití při nálezech",
+      "engine": "Skener",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov a Trivy",
+      "threshold": "Hlásit nálezy od úrovně",
+      "thresholdCritical": "kritická",
+      "thresholdHigh": "vysoká",
+      "thresholdMedium": "střední",
+      "thresholdLow": "nízká",
+      "skipRules": "Ignorovaná pravidla",
+      "skipRulesSuffix": "(volitelné)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Žádná pravidla nejsou ignorována.",
+      "skipRulesHint": "Identifikátory pravidel skeneru oddělené čárkami, které se v tomto pracovním prostoru ignorují."
     }
   },
   "graphs": {

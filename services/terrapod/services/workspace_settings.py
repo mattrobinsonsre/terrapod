@@ -21,10 +21,14 @@ reason bulk-update cannot validate this setting from the payload alone — see
 
 from __future__ import annotations
 
+import re
+
 SCAN_ENFORCEMENTS = frozenset({"off", "advisory", "enforced"})
 SCAN_ENGINES = frozenset({"checkov", "trivy", "both"})
 SCAN_SEVERITY_THRESHOLDS = frozenset({"critical", "high", "medium", "low"})
 AI_SUMMARY_MODES = frozenset({"default", "enabled", "disabled"})
+VCS_WORKFLOWS = frozenset({"merge_then_apply", "apply_then_merge"})
+AUTO_MERGE_STRATEGIES = frozenset({"merge", "squash", "rebase"})
 
 #: A guard against a value that is certainly a mistake, not a limit the
 #: scanners impose.
@@ -112,3 +116,166 @@ def validate_ai_summary_context(raw: object) -> str:
     if len(ctx) > MAX_AI_SUMMARY_CONTEXT:
         raise ValueError(f"ai-summary-context max length is {MAX_AI_SUMMARY_CONTEXT} characters")
     return ctx
+
+
+def validate_vcs_workflow(raw: object) -> str:
+    if raw not in VCS_WORKFLOWS:
+        raise ValueError("vcs-workflow must be 'merge_then_apply' or 'apply_then_merge'")
+    return str(raw)
+
+
+def validate_auto_merge_strategy(raw: object) -> str:
+    if raw not in AUTO_MERGE_STRATEGIES:
+        raise ValueError("auto-merge-strategy must be 'merge', 'squash', or 'rebase'")
+    return str(raw)
+
+
+def check_apply_then_merge_allowed(
+    workflow: str, *, has_vcs_connection: bool, auto_apply: bool
+) -> None:
+    """The two invariants `apply_then_merge` carries, in one place.
+
+    Under `apply_then_merge` the apply runs BEFORE the PR merges, so it needs a
+    VCS connection to have a PR at all, and auto-applying would apply changes
+    from a branch nobody has approved — which is the whole thing the workflow
+    exists to prevent.
+
+    Shared because three paths set the workflow — create, the workspace PATCH,
+    and bulk update — and only the PATCH used to enforce this. Create ignored
+    `vcs-workflow` entirely (#1763), so a configuration asking for
+    `apply_then_merge` silently got the default and no one was told.
+    """
+    if workflow != "apply_then_merge":
+        return
+    if not has_vcs_connection:
+        raise ValueError(
+            "vcs-workflow 'apply_then_merge' requires a VCS connection — "
+            "configure the workspace's VCS settings first"
+        )
+    if auto_apply:
+        raise ValueError(
+            "vcs-workflow 'apply_then_merge' is incompatible with auto-apply — "
+            "set auto-apply to false in the same request"
+        )
+
+
+# ── Settings that three or more paths write (#1763) ──────────────────────
+#
+# These moved out of `routers/tfe_v2` when bulk update gained them. They were
+# private helpers on the one router that happened to need them first, which is
+# the shape `services.parallelism` warns about: the next caller re-implements
+# the rule, or skips it.
+
+MAX_TRIGGER_PREFIXES = 20
+MAX_DRIFT_IGNORE_RULES = 50
+MAX_DRIFT_IGNORE_RULE_LENGTH = 500
+MAX_SLACK_CHANNEL = 128
+
+_DRIFT_IGNORE_RULE_RE = re.compile(r"^[A-Za-z0-9_*.\-\[\]\"]+$")
+
+
+def sanitize_working_directory(raw: str) -> str:
+    """Strip leading/trailing slashes, reject traversal."""
+    v = raw.strip().strip("/")
+    if ".." in v:
+        raise ValueError("working-directory: path traversal not allowed")
+    return v
+
+
+def validate_trigger_prefixes(raw: object) -> list[str]:
+    """Each entry is normalised like a working directory; at most 20."""
+    if not isinstance(raw, list):
+        raise ValueError("trigger-prefixes must be a list of strings")
+    if len(raw) > MAX_TRIGGER_PREFIXES:
+        raise ValueError(f"trigger-prefixes: maximum {MAX_TRIGGER_PREFIXES} entries")
+    result: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str):
+            raise ValueError("trigger-prefixes entries must be strings")
+        v = sanitize_working_directory(entry)
+        if not v:
+            raise ValueError("trigger-prefixes entries must be non-empty")
+        result.append(v)
+    return result
+
+
+def validate_drift_ignore_rules(raw: object) -> list[str]:
+    """Glob-aware address-plus-attribute-path strings (#482).
+
+    The character set is deliberately narrow, and the length cap is what keeps
+    a legitimate deep path expressible without allowing unbounded growth.
+    """
+    if not isinstance(raw, list):
+        raise ValueError("drift-ignore-rules must be a list of strings")
+    if len(raw) > MAX_DRIFT_IGNORE_RULES:
+        raise ValueError(f"drift-ignore-rules: maximum {MAX_DRIFT_IGNORE_RULES} entries")
+    result: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str):
+            raise ValueError("drift-ignore-rules entries must be strings")
+        v = entry.strip()
+        if not v:
+            raise ValueError("drift-ignore-rules entries must be non-empty")
+        if len(v) > MAX_DRIFT_IGNORE_RULE_LENGTH:
+            raise ValueError(
+                f"drift-ignore-rules entries must be ≤ {MAX_DRIFT_IGNORE_RULE_LENGTH} characters"
+            )
+        if not _DRIFT_IGNORE_RULE_RE.match(v):
+            raise ValueError(
+                "drift-ignore-rules entries may only contain letters, digits, "
+                "underscores, hyphens, dots, brackets, asterisks, and double quotes"
+            )
+        result.append(v)
+    return result
+
+
+def validate_plan_expiry_seconds(raw: object) -> int | None:
+    """A plan-expiry TTL (#646). None / 0 disables it and stores NULL."""
+    if raw is None:
+        return None
+    try:
+        seconds = int(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise ValueError("plan-expiry-seconds must be an integer") from None
+    if seconds < 0:
+        raise ValueError("plan-expiry-seconds must not be negative")
+    return seconds or None
+
+
+def clamp_drift_interval(raw: object) -> int:
+    """Clamp to the deployment's configured minimum."""
+    from terrapod.config import settings
+
+    try:
+        value = int(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise ValueError("drift-detection-interval-seconds must be an integer") from None
+    return max(value, settings.drift_detection.min_workspace_interval_seconds)
+
+
+def validate_terragrunt_version(raw: object) -> str:
+    if not isinstance(raw, str) or not raw.strip():
+        raise ValueError("terragrunt-version must be a non-empty string")
+    return raw.strip()
+
+
+def validate_slack_channel(raw: object) -> str:
+    """Empty means silent for this workspace (#556)."""
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise ValueError("slack-channel must be a string")
+    return raw.strip()[:MAX_SLACK_CHANNEL]
+
+
+def validate_bool(raw: object, field: str) -> bool:
+    """Type-check rather than coerce.
+
+    `bool("false")` is True, so a JSON string sails through as an enable AND
+    writes the string itself into a Boolean column. A caller who typed the
+    value wrong gets told, instead of getting the opposite of what they asked
+    for (#1301).
+    """
+    if not isinstance(raw, bool):
+        raise ValueError(f"{field} must be true or false, not a string or number")
+    return raw

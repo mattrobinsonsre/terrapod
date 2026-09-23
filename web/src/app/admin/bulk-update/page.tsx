@@ -79,6 +79,10 @@ export default function BulkUpdatePage() {
   const router = useRouter()
   const t = useTranslations('adminBulkUpdate')
   const tMode = useTranslations('common.autoApplyMode')
+  // Reuses the workspace page's own strings (#1763) so a fleet-wide change and
+  // the per-workspace one are described in the same words, in every locale.
+  const tScan = useTranslations('workspaceDetail.securityScan')
+  const tAi = useTranslations('workspaceDetail.aiSummary')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pools, setPools] = useState<AgentPool[]>([])
@@ -105,6 +109,10 @@ export default function BulkUpdatePage() {
   const [uAgentPoolId, setUAgentPoolId] = useState('')
   const [uResourceCpu, setUResourceCpu] = useState('')
   const [uResourceMemory, setUResourceMemory] = useState('')
+  const [uScanEnforcement, setUScanEnforcement] = useState('')
+  const [uScanEngine, setUScanEngine] = useState('')
+  const [uScanThreshold, setUScanThreshold] = useState('')
+  const [uAiSummaryMode, setUAiSummaryMode] = useState('')
   const [uSetLabels, setUSetLabels] = useState(false)
   const [uLabels, setULabels] = useState<Record<string, string>>({})
   const [uSetVarFiles, setUSetVarFiles] = useState(false)
@@ -170,6 +178,10 @@ export default function BulkUpdatePage() {
     if (uAgentPoolId) u['agent-pool-id'] = uAgentPoolId
     if (uResourceCpu.trim()) u['resource-cpu'] = uResourceCpu.trim()
     if (uResourceMemory.trim()) u['resource-memory'] = uResourceMemory.trim()
+    if (uScanEnforcement) u['security-scan-enforcement'] = uScanEnforcement
+    if (uScanEngine) u['security-scan-engine'] = uScanEngine
+    if (uScanThreshold) u['security-scan-severity-threshold'] = uScanThreshold
+    if (uAiSummaryMode) u['ai-summary-mode'] = uAiSummaryMode
     if (uSetLabels) u.labels = uLabels
     if (uSetVarFiles) u['var-files'] = uVarFiles.map((s) => s.trim()).filter(Boolean)
     if (uSetRunTasks) u['run-tasks'] = uRunTasks
@@ -542,6 +554,62 @@ export default function BulkUpdatePage() {
                 placeholder={t('unchanged')}
                 className={inputCls}
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-800">
+            <div>
+              <label className={labelCls}>{tScan('enforcement')}</label>
+              <select
+                value={uScanEnforcement}
+                onChange={(e) => setUScanEnforcement(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="off">{tScan('enforcementOff')}</option>
+                <option value="advisory">{tScan('enforcementAdvisory')}</option>
+                <option value="enforced">{tScan('enforcementEnforced')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tScan('engine')}</label>
+              <select
+                value={uScanEngine}
+                onChange={(e) => setUScanEngine(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="checkov">{tScan('engineCheckov')}</option>
+                <option value="trivy">{tScan('engineTrivy')}</option>
+                <option value="both">{tScan('engineBoth')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tScan('threshold')}</label>
+              <select
+                value={uScanThreshold}
+                onChange={(e) => setUScanThreshold(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="critical">{tScan('thresholdCritical')}</option>
+                <option value="high">{tScan('thresholdHigh')}</option>
+                <option value="medium">{tScan('thresholdMedium')}</option>
+                <option value="low">{tScan('thresholdLow')}</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tAi('title')}</label>
+              <select
+                value={uAiSummaryMode}
+                onChange={(e) => setUAiSummaryMode(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="default">{tAi('modeDefault')}</option>
+                <option value="enabled">{tAi('modeEnabled')}</option>
+                <option value="disabled">{tAi('modeDisabled')}</option>
+              </select>
             </div>
           </div>
 

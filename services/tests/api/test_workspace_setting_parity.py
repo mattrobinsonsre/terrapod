@@ -19,7 +19,9 @@ has to write down which of the three it is. The split matters — collapsing the
 last two into one list would let a genuine gap hide behind the word "exempt",
 which is the failure this test exists to prevent. `NOT_YET_BULK_SETTABLE` is a
 ratchet in the same shape as the migration-contraction ledger: it may shrink,
-and an entry leaving it is the work being finished.
+and an entry leaving it is the work being finished. It is currently **empty** —
+every genuine per-workspace setting is reachable — and the right way to keep it
+that way is to wire a new setting up rather than add a line.
 """
 
 from __future__ import annotations
@@ -78,23 +80,16 @@ NEVER_BULK_SETTABLE: dict[str, str] = {
     "catalog_input_values": "owned by the catalog service's reconfigure path",
 }
 
-#: Genuine settings that bulk update cannot reach yet. Each is an ordinary
-#: per-workspace setting an operator could reasonably want to apply across a
-#: fleet — these are the backlog #1763 describes, not exemptions. Entries leave
-#: this dict as the work lands; nothing may be added without a tracking issue.
+#: Genuine settings bulk update cannot reach yet — a debt, not an exemption.
+#: #1763 closed the last of them, so this is empty and should stay that way:
+#: an entry here means an operator cannot apply a real setting across a fleet.
 NOT_YET_BULK_SETTABLE: dict[str, str] = {
-    "terragrunt_enabled": "#1763",
-    "terragrunt_version": "#1763",
-    "trigger_prefixes": "#1763",
-    "vcs_workflow": "#1763 — pairs with auto_apply, see _reject_auto_apply_on_apply_then_merge",
-    "auto_merge": "#1763",
-    "auto_merge_strategy": "#1763",
-    "plan_expiry_seconds": "#1763",
-    "drift_detection_enabled": "#1763",
-    "drift_detection_interval_seconds": "#1763",
-    "drift_ignore_rules": "#1763",
-    "slack_channel": "#1763",
-    "pulumi_bind_plan": "#1763 — engine-dependent, like security_scan_enforcement",
+    # EMPTY, and that is the goal state. Every genuine per-workspace setting is
+    # reachable from bulk update.
+    #
+    # This exists so a gap can be recorded deliberately rather than discovered
+    # later -- but an entry here is a debt, not a decision, and it must name the
+    # issue that will clear it. Prefer wiring the setting up to adding a line.
 }
 
 

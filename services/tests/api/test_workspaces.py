@@ -2008,3 +2008,103 @@ class TestCreateHonoursTheAISummaryOptIn1763:
             )
         assert resp.status_code == 422, resp.text
         mock_db.commit.assert_not_awaited()
+
+
+class TestCreateHonoursTheVCSWorkflowSettings1763:
+    """Create dropped `vcs-workflow`, `auto-merge` and `auto-merge-strategy` (#1763).
+
+    All three are sent by `CreateWorkspaceRequest` in go-terrapod and none was
+    read. `vcs-workflow` is the one that matters: under `apply_then_merge` the
+    apply runs BEFORE the PR merges, and that is a governance control. Asking
+    for it at create silently produced `merge_then_apply` instead — the control
+    absent, and nothing saying so.
+    """
+
+    def _created_workspace(self, mock_db):
+        return next(
+            call.args[0]
+            for call in mock_db.add.call_args_list
+            if getattr(call.args[0], "__tablename__", "") == "workspaces"
+        )
+
+    def _app(self):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.add = MagicMock()
+        mock_db.refresh = AsyncMock()
+        mock_db.commit = AsyncMock()
+        return app, mock_db
+
+    async def _post(self, app, attributes):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            return await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={"data": {"type": "workspaces", "attributes": attributes}},
+                headers=_AUTH,
+            )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_auto_merge_settings_are_stored(self, _pub, *_mocks):
+        app, mock_db = self._app()
+        resp = await self._post(
+            app, {"name": "am-ws", "auto-merge": True, "auto-merge-strategy": "squash"}
+        )
+        assert resp.status_code == 201, resp.text
+        ws = self._created_workspace(mock_db)
+        assert ws.auto_merge is True
+        assert ws.auto_merge_strategy == "squash"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_unset_values_keep_the_column_defaults(self, _pub, *_mocks):
+        """The fix must not change what a create that says nothing produces."""
+        app, mock_db = self._app()
+        resp = await self._post(app, {"name": "plain-vcs-ws"})
+        assert resp.status_code == 201, resp.text
+        ws = self._created_workspace(mock_db)
+        assert ws.vcs_workflow == "merge_then_apply"
+        assert ws.auto_merge is False
+        assert ws.auto_merge_strategy == "merge"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_apply_then_merge_without_a_vcs_connection_is_refused(self, _pub, *_mocks):
+        """The invariant the PATCH path has always enforced, now enforced here.
+
+        Previously this create was accepted and quietly produced a
+        `merge_then_apply` workspace, because the attribute was never read.
+        """
+        app, mock_db = self._app()
+        resp = await self._post(app, {"name": "atm-ws", "vcs-workflow": "apply_then_merge"})
+        assert resp.status_code == 422, resp.text
+        assert "requires a VCS connection" in resp.text
+        mock_db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_a_bad_workflow_is_refused_rather_than_ignored(self, _pub, *_mocks):
+        app, mock_db = self._app()
+        resp = await self._post(app, {"name": "bad-wf", "vcs-workflow": "merge_whenever"})
+        assert resp.status_code == 422, resp.text
+        mock_db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_a_bad_merge_strategy_is_refused(self, _pub, *_mocks):
+        app, mock_db = self._app()
+        resp = await self._post(app, {"name": "bad-strat", "auto-merge-strategy": "fast-forward"})
+        assert resp.status_code == 422, resp.text
+        mock_db.commit.assert_not_awaited()

@@ -1053,7 +1053,24 @@
       "notificationTemplates": "Benachrichtigungsvorlagen (auf jedem neuen Arbeitsbereich angelegt)",
       "saving": "Wird gespeichert...",
       "previewTitle": "Das Repository durchlaufen und in der Vorschau zeigen, welche Arbeitsbereiche diese Regel anlegen WÜRDE — keine Persistenz",
-      "parallelism": "Parallelität"
+      "parallelism": "Parallelität",
+      "governance": "Sicherheitsprüfung und KI-Zusammenfassung",
+      "governanceHint": "Wird auf jeden Arbeitsbereich angewendet, den diese Regel erstellt.",
+      "scanEnforcement": "Durchsetzung",
+      "scanOff": "Nicht prüfen",
+      "scanAdvisory": "Nur prüfen und melden",
+      "scanEnforced": "Anwenden bei Funden blockieren",
+      "scanEngine": "Scanner",
+      "scanEngineBoth": "Checkov und Trivy",
+      "scanThreshold": "Funde melden ab",
+      "severityCritical": "kritisch",
+      "severityHigh": "hoch",
+      "severityMedium": "mittel",
+      "severityLow": "niedrig",
+      "aiSummaryMode": "KI-Plan-Zusammenfassung",
+      "aiSummaryDefault": "Bereitstellungsstandard folgen",
+      "aiSummaryEnabled": "Immer zusammenfassen",
+      "aiSummaryDisabled": "Nie zusammenfassen"
     },
     "table": {
       "name": "Name",
@@ -2859,7 +2876,8 @@
       "rollbackStateVersion": "Zustandsversion konnte nicht zurückgesetzt werden",
       "stateActionFailed": "Zustandsaktion fehlgeschlagen",
       "uploadState": "Zustand konnte nicht hochgeladen werden",
-      "uploadStateFile": "Zustandsdatei konnte nicht hochgeladen werden"
+      "uploadStateFile": "Zustandsdatei konnte nicht hochgeladen werden",
+      "updateSecurityScan": "Sicherheitsprüfung konnte nicht aktualisiert werden"
     },
     "subtabs": {
       "state": "Zustand",
@@ -2880,6 +2898,28 @@
         "global": "Global",
         "rule": "Über Regel zugeordnet"
       }
+    },
+    "securityScan": {
+      "title": "Sicherheitsprüfung",
+      "description": "Den Plan vor dem Anwenden auf unsichere Infrastruktur prüfen.",
+      "enforcement": "Durchsetzung",
+      "enforcementOff": "Nicht prüfen",
+      "enforcementAdvisory": "Nur prüfen und melden",
+      "enforcementEnforced": "Anwenden bei Funden blockieren",
+      "engine": "Scanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov und Trivy",
+      "threshold": "Funde melden ab",
+      "thresholdCritical": "kritisch",
+      "thresholdHigh": "hoch",
+      "thresholdMedium": "mittel",
+      "thresholdLow": "niedrig",
+      "skipRules": "Ignorierte Regeln",
+      "skipRulesSuffix": "(optional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Keine Regeln ignoriert.",
+      "skipRulesHint": "Kommagetrennte Scanner-Regel-IDs, die in diesem Arbeitsbereich ignoriert werden."
     }
   },
   "graphs": {

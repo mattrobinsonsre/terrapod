@@ -195,83 +195,15 @@ def _validate_var_files(raw: object) -> list[str]:
 
 
 def _sanitize_working_directory(raw: str) -> str:
-    """Sanitize working-directory: strip leading/trailing slashes, reject traversal."""
-    v = raw.strip().strip("/")
-    if ".." in v:
-        raise HTTPException(status_code=422, detail="working-directory: path traversal not allowed")
-    return v
+    return _422(workspace_settings.sanitize_working_directory, raw)
 
 
 def _validate_trigger_prefixes(raw: object) -> list[str]:
-    """Validate and sanitize trigger-prefixes input.
-
-    Each entry is normalized the same way as working-directory (strip slashes,
-    reject traversal).  Max 20 entries.
-    """
-    if not isinstance(raw, list):
-        raise HTTPException(status_code=422, detail="trigger-prefixes must be a list of strings")
-    if len(raw) > 20:
-        raise HTTPException(status_code=422, detail="trigger-prefixes: maximum 20 entries")
-    result: list[str] = []
-    for entry in raw:
-        if not isinstance(entry, str):
-            raise HTTPException(status_code=422, detail="trigger-prefixes entries must be strings")
-        v = _sanitize_working_directory(entry)
-        if not v:
-            raise HTTPException(
-                status_code=422, detail="trigger-prefixes entries must be non-empty"
-            )
-        result.append(v)
-    return result
-
-
-_DRIFT_IGNORE_RULE_RE = re.compile(r"^[A-Za-z0-9_*.\-\[\]\"]+$")
+    return _422(workspace_settings.validate_trigger_prefixes, raw)
 
 
 def _validate_drift_ignore_rules(raw: object) -> list[str]:
-    """Validate `drift-ignore-rules` input (#482).
-
-    Each entry is a glob-aware Terraform-address-plus-attribute-path
-    string consumed by `drift_ignore_classifier.classify_drift`. The
-    character set is intentionally narrow — letters, digits, the
-    delimiters `.` `[` `]` `*`, plus underscore, hyphen, double quote
-    (for `for_each` keys). Anything else is rejected so a stray space
-    or backtick can't sneak through and cause a regex-compile failure
-    later in the drift-classifier path. Max 50 entries; max 500 chars
-    per entry (loose enough for `module.x.module.y.aws_iam_policy.z
-    .statements[*].conditions[*].values[*]`-style paths without
-    risking unbounded growth).
-    """
-    if not isinstance(raw, list):
-        raise HTTPException(status_code=422, detail="drift-ignore-rules must be a list of strings")
-    if len(raw) > 50:
-        raise HTTPException(status_code=422, detail="drift-ignore-rules: maximum 50 entries")
-    result: list[str] = []
-    for entry in raw:
-        if not isinstance(entry, str):
-            raise HTTPException(
-                status_code=422, detail="drift-ignore-rules entries must be strings"
-            )
-        v = entry.strip()
-        if not v:
-            raise HTTPException(
-                status_code=422, detail="drift-ignore-rules entries must be non-empty"
-            )
-        if len(v) > 500:
-            raise HTTPException(
-                status_code=422,
-                detail="drift-ignore-rules entries must be ≤ 500 characters",
-            )
-        if not _DRIFT_IGNORE_RULE_RE.match(v):
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "drift-ignore-rules entries may only contain letters, digits, "
-                    "underscores, hyphens, dots, brackets, asterisks, and double quotes"
-                ),
-            )
-        result.append(v)
-    return result
+    return _422(workspace_settings.validate_drift_ignore_rules, raw)
 
 
 def _422(validate: Callable[..., Any], *args: Any) -> Any:
@@ -358,26 +290,11 @@ def _labels_to_tag_names(labels: dict | None) -> list[str]:
 
 
 def _clamp_drift_interval(value: int) -> int:
-    """Clamp drift detection interval to the configured minimum."""
-    from terrapod.config import settings
-
-    return max(int(value), settings.drift_detection.min_workspace_interval_seconds)
+    return _422(workspace_settings.clamp_drift_interval, value)
 
 
 def _parse_plan_expiry(value) -> int | None:
-    """Validate a plan-expiry TTL (#646). None / 0 → disabled (stored NULL); a
-    positive integer is seconds. Rejects negatives / non-ints with 422."""
-    if value is None:
-        return None
-    try:
-        seconds = int(value)
-    except (TypeError, ValueError):
-        raise HTTPException(
-            status_code=422, detail="plan-expiry-seconds must be an integer"
-        ) from None
-    if seconds < 0:
-        raise HTTPException(status_code=422, detail="plan-expiry-seconds must not be negative")
-    return seconds or None
+    return _422(workspace_settings.validate_plan_expiry_seconds, value)
 
 
 @router.get("/ping")
@@ -1316,11 +1233,39 @@ async def _create_workspace_impl(
             detail="auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES),
         )
 
+    # `vcs-workflow` / `auto-merge` / `auto-merge-strategy` were dropped on
+    # create (#1763) while `CreateWorkspaceRequest` in go-terrapod sends all
+    # three -- so a configuration asking for `apply_then_merge` silently got
+    # `merge_then_apply`, which is the governance control the workflow exists
+    # to provide, absent and unreported. The workflow's own invariants are
+    # enforced here too, through the same rule the PATCH path uses: create had
+    # no equivalent check because it never read the field.
+    vcs_workflow = (
+        _422(workspace_settings.validate_vcs_workflow, attrs["vcs-workflow"])
+        if "vcs-workflow" in attrs
+        else "merge_then_apply"
+    )
+    _422(
+        lambda: workspace_settings.check_apply_then_merge_allowed(
+            vcs_workflow,
+            has_vcs_connection=vcs_connection_id is not None,
+            auto_apply=auto_apply_mode != "never",
+        )
+    )
+    auto_merge_strategy = (
+        _422(workspace_settings.validate_auto_merge_strategy, attrs["auto-merge-strategy"])
+        if "auto-merge-strategy" in attrs
+        else "merge"
+    )
+
     ws = Workspace(
         name=name,
         engine=engine,
         execution_mode=execution_mode,
         auto_apply=auto_apply_mode != "never",
+        vcs_workflow=vcs_workflow,
+        auto_merge=bool(attrs.get("auto-merge", False)),
+        auto_merge_strategy=auto_merge_strategy,
         auto_apply_mode=auto_apply_mode,
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
         engine_version=_engine_version_attr(attrs, default_engine_version(engine)),
@@ -1772,12 +1717,7 @@ async def update_workspace(
     # (drift, pool assignment, labels) must not pay the cross-validation
     # tax or fail it.
     if "vcs-workflow" in attrs:
-        new_workflow = attrs["vcs-workflow"]
-        if new_workflow not in ("merge_then_apply", "apply_then_merge"):
-            raise HTTPException(
-                status_code=422,
-                detail="vcs-workflow must be 'merge_then_apply' or 'apply_then_merge'",
-            )
+        new_workflow = _422(workspace_settings.validate_vcs_workflow, attrs["vcs-workflow"])
         # Flipping vcs_workflow while PR runs are in-flight is rejected
         # (Q4 in #282): the operator must explicitly cancel/discard them
         # first.
@@ -1818,33 +1758,20 @@ async def update_workspace(
     if pending_workflow == "apply_then_merge" and (
         "vcs-workflow" in attrs or "auto-apply" in attrs or "auto-apply-mode" in attrs
     ):
-        if ws.vcs_connection_id is None:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "vcs-workflow 'apply_then_merge' requires a VCS connection — "
-                    "configure the workspace's VCS settings first"
-                ),
+        _422(
+            lambda: workspace_settings.check_apply_then_merge_allowed(
+                pending_workflow,
+                has_vcs_connection=ws.vcs_connection_id is not None,
+                auto_apply=pending_auto_apply,
             )
-        if pending_auto_apply:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "vcs-workflow 'apply_then_merge' is incompatible with auto-apply — "
-                    "set auto-apply to false in the same request"
-                ),
-            )
+        )
 
     if "auto-merge" in attrs:
         ws.auto_merge = bool(attrs["auto-merge"])
     if "auto-merge-strategy" in attrs:
-        strat = attrs["auto-merge-strategy"]
-        if strat not in ("merge", "squash", "rebase"):
-            raise HTTPException(
-                status_code=422,
-                detail="auto-merge-strategy must be 'merge', 'squash', or 'rebase'",
-            )
-        ws.auto_merge_strategy = strat
+        ws.auto_merge_strategy = _422(
+            workspace_settings.validate_auto_merge_strategy, attrs["auto-merge-strategy"]
+        )
 
     if "execution-backend" in attrs:
         backend = attrs["execution-backend"]

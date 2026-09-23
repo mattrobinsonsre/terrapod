@@ -47,6 +47,10 @@ interface AutodiscoveryRule {
     'owner-email': string
     'var-files': string[]
     'execution-hook-templates'?: string[]
+    'security-scan-enforcement'?: string
+    'security-scan-engine'?: string
+    'security-scan-severity-threshold'?: string
+    'ai-summary-mode'?: string
     'run-task-templates': RunTaskSpec[]
     'notification-templates': NotificationSpec[]
     'created-at': string
@@ -108,6 +112,11 @@ export default function AutodiscoveryPage() {
   const [ownerEmail, setOwnerEmail] = useState('')
   const [varFiles, setVarFiles] = useState<string[]>([])
   const [executionHookTemplates, setExecutionHookTemplates] = useState<string[]>([])
+  // Templated onto every workspace the rule materialises (#1763).
+  const [scanEnforcement, setScanEnforcement] = useState('advisory')
+  const [scanEngine, setScanEngine] = useState('checkov')
+  const [scanThreshold, setScanThreshold] = useState('high')
+  const [aiSummaryMode, setAiSummaryMode] = useState('default')
   const [runTaskTemplates, setRunTaskTemplates] = useState<RunTaskSpec[]>([])
   const [notificationTemplates, setNotificationTemplates] = useState<NotificationSpec[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -198,6 +207,10 @@ export default function AutodiscoveryPage() {
     setOwnerEmail('')
     setVarFiles([])
     setExecutionHookTemplates([])
+    setScanEnforcement('advisory')
+    setScanEngine('checkov')
+    setScanThreshold('high')
+    setAiSummaryMode('default')
     setRunTaskTemplates([])
     setNotificationTemplates([])
   }
@@ -232,6 +245,10 @@ export default function AutodiscoveryPage() {
     setOwnerEmail(a['owner-email'] || '')
     setVarFiles(a['var-files'] || [])
     setExecutionHookTemplates(a['execution-hook-templates'] || [])
+    setScanEnforcement(a['security-scan-enforcement'] || 'advisory')
+    setScanEngine(a['security-scan-engine'] || 'checkov')
+    setScanThreshold(a['security-scan-severity-threshold'] || 'high')
+    setAiSummaryMode(a['ai-summary-mode'] || 'default')
     setRunTaskTemplates(a['run-task-templates'] || [])
     setNotificationTemplates(a['notification-templates'] || [])
     setShowForm(true)
@@ -270,6 +287,10 @@ export default function AutodiscoveryPage() {
       'owner-email': ownerEmail,
       'var-files': varFiles.map(s => s.trim()).filter(Boolean),
       'execution-hook-templates': executionHookTemplates.map(s => s.trim()).filter(Boolean),
+      'security-scan-enforcement': scanEnforcement,
+      'security-scan-engine': scanEngine,
+      'security-scan-severity-threshold': scanThreshold,
+      'ai-summary-mode': aiSummaryMode,
       'run-task-templates': runTaskTemplates,
       'notification-templates': notificationTemplates,
     }
@@ -688,6 +709,75 @@ export default function AutodiscoveryPage() {
                   placeholder="env/prod.tfvars"
                   addLabel={t('form.addVarFile')}
                 />
+              </div>
+              {/* Templated onto every workspace the rule creates (#1763) */}
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <label className="block text-sm text-slate-300 mb-1">{t('form.governance')}</label>
+                <p className="text-xs text-slate-500 mb-2">{t('form.governanceHint')}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="ad-scan-enforcement" className="block text-xs text-slate-500 mb-1">
+                      {t('form.scanEnforcement')}
+                    </label>
+                    <select
+                      id="ad-scan-enforcement"
+                      value={scanEnforcement}
+                      onChange={(e) => setScanEnforcement(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="off">{t('form.scanOff')}</option>
+                      <option value="advisory">{t('form.scanAdvisory')}</option>
+                      <option value="enforced">{t('form.scanEnforced')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="ad-scan-engine" className="block text-xs text-slate-500 mb-1">
+                      {t('form.scanEngine')}
+                    </label>
+                    <select
+                      id="ad-scan-engine"
+                      value={scanEngine}
+                      onChange={(e) => setScanEngine(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      {/* Product names, not UX copy — identical in every locale. */}
+                      <option value="checkov">Checkov</option>{/* i18n-ignore */}
+                      <option value="trivy">Trivy</option>{/* i18n-ignore */}
+                      <option value="both">{t('form.scanEngineBoth')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="ad-scan-threshold" className="block text-xs text-slate-500 mb-1">
+                      {t('form.scanThreshold')}
+                    </label>
+                    <select
+                      id="ad-scan-threshold"
+                      value={scanThreshold}
+                      onChange={(e) => setScanThreshold(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="critical">{t('form.severityCritical')}</option>
+                      <option value="high">{t('form.severityHigh')}</option>
+                      <option value="medium">{t('form.severityMedium')}</option>
+                      <option value="low">{t('form.severityLow')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="ad-ai-summary" className="block text-xs text-slate-500 mb-1">
+                      {t('form.aiSummaryMode')}
+                    </label>
+                    <select
+                      id="ad-ai-summary"
+                      value={aiSummaryMode}
+                      onChange={(e) => setAiSummaryMode(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="default">{t('form.aiSummaryDefault')}</option>
+                      <option value="enabled">{t('form.aiSummaryEnabled')}</option>
+                      <option value="disabled">{t('form.aiSummaryDisabled')}</option>
+                    </select>
+                  </div>
+                </div>
               </div>
               <div className="mt-4 pt-4 border-t border-slate-800">
                 <label className="block text-sm text-slate-300 mb-1">{t('form.executionHooks')}</label>

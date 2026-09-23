@@ -1053,7 +1053,24 @@
       "notificationTemplates": "Notification templates (created on each new work-deck)",
       "saving": "Savin''...",
       "previewTitle": "Walk th'' repo and preview which work-decks this rule WOULD create — nay persistence",
-      "parallelism": "Hands at Once"
+      "parallelism": "Hands at Once",
+      "governance": "Security Sweep and AI Summary",
+      "governanceHint": "Applied to every work-deck this rule creates.",
+      "scanEnforcement": "Enforcement",
+      "scanOff": "Do not sweep",
+      "scanAdvisory": "Sweep and report only",
+      "scanEnforced": "Bar the applyin'' on findings",
+      "scanEngine": "Sweeper",
+      "scanEngineBoth": "Checkov and Trivy",
+      "scanThreshold": "Sing out findings at or above",
+      "severityCritical": "critical",
+      "severityHigh": "high",
+      "severityMedium": "middlin'",
+      "severityLow": "low",
+      "aiSummaryMode": "AI Plan Summary",
+      "aiSummaryDefault": "Follow deployment default",
+      "aiSummaryEnabled": "Always summarize",
+      "aiSummaryDisabled": "Never summarize"
     },
     "table": {
       "name": "Name",
@@ -2859,7 +2876,8 @@
       "rollbackStateVersion": "Failed t'' rollback th'' state version",
       "stateActionFailed": "State action failed",
       "uploadState": "Failed t'' hoist th'' state aboard",
-      "uploadStateFile": "Failed t'' hoist th'' state file aboard"
+      "uploadStateFile": "Failed t'' hoist th'' state file aboard",
+      "updateSecurityScan": "Failed to update the security sweep"
     },
     "subtabs": {
       "state": "State",
@@ -2880,6 +2898,28 @@
         "global": "Global",
         "rule": "Matched by the code"
       }
+    },
+    "securityScan": {
+      "title": "Security Sweep",
+      "description": "Sweep the plan fer unsafe infrastructure afore it be applied.",
+      "enforcement": "Enforcement",
+      "enforcementOff": "Do not sweep",
+      "enforcementAdvisory": "Sweep and report only",
+      "enforcementEnforced": "Bar the applyin'' on findings",
+      "engine": "Sweeper",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov and Trivy",
+      "threshold": "Sing out findings at or above",
+      "thresholdCritical": "critical",
+      "thresholdHigh": "high",
+      "thresholdMedium": "middlin'",
+      "thresholdLow": "low",
+      "skipRules": "Rules we be ignorin''",
+      "skipRulesSuffix": "(optional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "No rules ignored, matey.",
+      "skipRulesHint": "Comma-separated sweeper rule ids to ignore on this work-deck."
     }
   },
   "graphs": {

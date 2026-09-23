@@ -1053,7 +1053,24 @@
       "notificationTemplates": "알림 템플릿 (각 새 워크스페이스에 생성됨)",
       "saving": "저장 중...",
       "previewTitle": "저장소를 탐색하여 이 규칙이 생성할 워크스페이스를 미리 봅니다 — 저장하지 않음",
-      "parallelism": "병렬 처리 수"
+      "parallelism": "병렬 처리 수",
+      "governance": "보안 검사 및 AI 요약",
+      "governanceHint": "이 규칙이 생성하는 모든 워크스페이스에 적용됩니다.",
+      "scanEnforcement": "적용 방식",
+      "scanOff": "검사하지 않음",
+      "scanAdvisory": "검사 후 보고만 수행",
+      "scanEnforced": "발견 시 적용 차단",
+      "scanEngine": "검사 도구",
+      "scanEngineBoth": "Checkov 및 Trivy",
+      "scanThreshold": "보고할 최소 심각도",
+      "severityCritical": "치명적",
+      "severityHigh": "높음",
+      "severityMedium": "중간",
+      "severityLow": "낮음",
+      "aiSummaryMode": "AI 계획 요약",
+      "aiSummaryDefault": "배포 기본값 따르기",
+      "aiSummaryEnabled": "항상 요약",
+      "aiSummaryDisabled": "요약하지 않음"
     },
     "table": {
       "name": "이름",
@@ -2859,7 +2876,8 @@
       "rollbackStateVersion": "상태 버전을 롤백하지 못했습니다",
       "stateActionFailed": "상태 작업에 실패했습니다",
       "uploadState": "상태를 업로드하지 못했습니다",
-      "uploadStateFile": "상태 파일을 업로드하지 못했습니다"
+      "uploadStateFile": "상태 파일을 업로드하지 못했습니다",
+      "updateSecurityScan": "보안 검사 업데이트에 실패했습니다"
     },
     "subtabs": {
       "state": "상태",
@@ -2880,6 +2898,28 @@
         "global": "전역",
         "rule": "규칙으로 일치"
       }
+    },
+    "securityScan": {
+      "title": "보안 검사",
+      "description": "적용하기 전에 플랜에서 안전하지 않은 인프라를 검사합니다.",
+      "enforcement": "적용 방식",
+      "enforcementOff": "검사하지 않음",
+      "enforcementAdvisory": "검사 후 보고만 수행",
+      "enforcementEnforced": "발견 시 적용 차단",
+      "engine": "검사 도구",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov 및 Trivy",
+      "threshold": "보고할 최소 심각도",
+      "thresholdCritical": "치명적",
+      "thresholdHigh": "높음",
+      "thresholdMedium": "중간",
+      "thresholdLow": "낮음",
+      "skipRules": "무시할 규칙",
+      "skipRulesSuffix": "(선택 사항)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "무시하는 규칙이 없습니다.",
+      "skipRulesHint": "이 워크스페이스에서 무시할 검사 도구의 규칙 ID를 쉼표로 구분하여 입력합니다."
     }
   },
   "graphs": {

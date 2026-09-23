@@ -1053,7 +1053,24 @@
       "notificationTemplates": "Шаблоны уведомлений (создаются на каждой новой рабочей области)",
       "saving": "Сохранение...",
       "previewTitle": "Пройти по репозиторию и показать, какие рабочие области СОЗДАЛО БЫ это правило — без сохранения",
-      "parallelism": "Параллелизм"
+      "parallelism": "Параллелизм",
+      "governance": "Проверка безопасности и сводка ИИ",
+      "governanceHint": "Применяется ко всем рабочим областям, создаваемым этим правилом.",
+      "scanEnforcement": "Режим применения",
+      "scanOff": "Не проверять",
+      "scanAdvisory": "Только проверять и сообщать",
+      "scanEnforced": "Блокировать применение при находках",
+      "scanEngine": "Сканер",
+      "scanEngineBoth": "Checkov и Trivy",
+      "scanThreshold": "Сообщать о находках начиная с",
+      "severityCritical": "критический",
+      "severityHigh": "высокий",
+      "severityMedium": "средний",
+      "severityLow": "низкий",
+      "aiSummaryMode": "ИИ-сводка плана",
+      "aiSummaryDefault": "Использовать значение по умолчанию для развёртывания",
+      "aiSummaryEnabled": "Всегда создавать сводку",
+      "aiSummaryDisabled": "Никогда не создавать сводку"
     },
     "table": {
       "name": "Имя",
@@ -2859,7 +2876,8 @@
       "rollbackStateVersion": "Не удалось откатить версию состояния",
       "stateActionFailed": "Действие над состоянием не удалось",
       "uploadState": "Не удалось загрузить состояние",
-      "uploadStateFile": "Не удалось загрузить файл состояния"
+      "uploadStateFile": "Не удалось загрузить файл состояния",
+      "updateSecurityScan": "Не удалось обновить проверку безопасности"
     },
     "subtabs": {
       "state": "Состояние",
@@ -2880,6 +2898,28 @@
         "global": "Глобальный",
         "rule": "Соответствует правилу"
       }
+    },
+    "securityScan": {
+      "title": "Проверка безопасности",
+      "description": "Проверять план на небезопасную инфраструктуру до применения.",
+      "enforcement": "Режим применения",
+      "enforcementOff": "Не проверять",
+      "enforcementAdvisory": "Только проверять и сообщать",
+      "enforcementEnforced": "Блокировать применение при находках",
+      "engine": "Сканер",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov и Trivy",
+      "threshold": "Сообщать о находках начиная с",
+      "thresholdCritical": "критический",
+      "thresholdHigh": "высокий",
+      "thresholdMedium": "средний",
+      "thresholdLow": "низкий",
+      "skipRules": "Игнорируемые правила",
+      "skipRulesSuffix": "(необязательно)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Правила не игнорируются.",
+      "skipRulesHint": "Идентификаторы правил сканера через запятую, игнорируемые в этой рабочей области."
     }
   },
   "graphs": {

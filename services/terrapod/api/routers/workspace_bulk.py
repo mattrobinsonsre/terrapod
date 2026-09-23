@@ -89,6 +89,19 @@ _FIELD_MAP: dict[str, str] = {
     "security-scan-skip-rules": "security_scan_skip_rules",
     "ai-summary-mode": "ai_summary_mode",
     "ai-summary-context": "ai_summary_context",
+    # The remaining per-workspace settings (#1763). These were settable on the
+    # workspace API and nowhere else either; they are listed separately only
+    # because they arrived in a second pass.
+    "terragrunt-enabled": "terragrunt_enabled",
+    "terragrunt-version": "terragrunt_version",
+    "trigger-prefixes": "trigger_prefixes",
+    "auto-merge": "auto_merge",
+    "auto-merge-strategy": "auto_merge_strategy",
+    "plan-expiry-seconds": "plan_expiry_seconds",
+    "drift-detection-enabled": "drift_detection_enabled",
+    "drift-detection-interval-seconds": "drift_detection_interval_seconds",
+    "drift-ignore-rules": "drift_ignore_rules",
+    "slack-channel": "slack_channel",
 }
 
 #: Payload keys that write a workspace column but cannot live in `_FIELD_MAP`,
@@ -99,7 +112,12 @@ _FIELDS_HANDLED_SEPARATELY: dict[str, str] = {
     "agent-pool-id": "agent_pool_id",
     "agent-pool-ids": "agent_pool_ids",
     "auto-apply-mode": "auto_apply_mode",
+    # Each of these three needs something the homogeneous payload does not
+    # carry -- the workspace's engine, its VCS connection, or its auto-apply
+    # state -- so each is judged against the matched set instead.
     "security-scan-enforcement": "security_scan_enforcement",
+    "vcs-workflow": "vcs_workflow",
+    "pulumi-bind-plan": "pulumi_bind_plan",
 }
 
 
@@ -332,6 +350,19 @@ _SETTING_RULES: dict[str, Any] = {
     "security-scan-skip-rules": workspace_settings.validate_scan_skip_rules,
     "ai-summary-mode": workspace_settings.validate_ai_summary_mode,
     "ai-summary-context": workspace_settings.validate_ai_summary_context,
+    "terragrunt-version": workspace_settings.validate_terragrunt_version,
+    "trigger-prefixes": workspace_settings.validate_trigger_prefixes,
+    "auto-merge-strategy": workspace_settings.validate_auto_merge_strategy,
+    "plan-expiry-seconds": workspace_settings.validate_plan_expiry_seconds,
+    "drift-detection-interval-seconds": workspace_settings.clamp_drift_interval,
+    "drift-ignore-rules": workspace_settings.validate_drift_ignore_rules,
+    "slack-channel": workspace_settings.validate_slack_channel,
+    # Type-checked, never coerced -- see `validate_bool`.
+    "terragrunt-enabled": lambda v: workspace_settings.validate_bool(v, "terragrunt-enabled"),
+    "auto-merge": lambda v: workspace_settings.validate_bool(v, "auto-merge"),
+    "drift-detection-enabled": lambda v: workspace_settings.validate_bool(
+        v, "drift-detection-enabled"
+    ),
 }
 
 
@@ -388,6 +419,7 @@ def _validate_scalar_fields(update: dict) -> dict[str, Any]:
         fields[attr] = val
     fields.update(_validate_auto_apply(update, fields))
     fields.update(_validate_scan_enforcement(update))
+    fields.update(_validate_context_dependent(update))
     return fields
 
 
@@ -411,6 +443,93 @@ def _validate_scan_enforcement(update: dict[str, Any]) -> dict[str, Any]:
             ),
         )
     return {"security_scan_enforcement": raw}
+
+
+def _validate_context_dependent(update: dict[str, Any]) -> dict[str, Any]:
+    """`vcs-workflow` and `pulumi-bind-plan`: the half the payload can judge.
+
+    Both are otherwise ordinary settings, but each needs something only the
+    matched workspaces carry -- a VCS connection and auto-apply state for the
+    first, the engine for the second -- so only their shape is checked here.
+    """
+    out: dict[str, Any] = {}
+    if "vcs-workflow" in update:
+        try:
+            out["vcs_workflow"] = workspace_settings.validate_vcs_workflow(update["vcs-workflow"])
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if "pulumi-bind-plan" in update:
+        try:
+            out["pulumi_bind_plan"] = workspace_settings.validate_bool(
+                update["pulumi-bind-plan"], "pulumi-bind-plan"
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return out
+
+
+def _reject_apply_then_merge_where_it_cannot_hold(fields: dict[str, Any], workspaces: list) -> None:
+    """`apply_then_merge` across a match set, checked per workspace.
+
+    The workflow applies BEFORE the PR merges, so it needs a VCS connection to
+    have a PR at all, and auto-apply would apply from a branch nobody approved.
+    The single-workspace PATCH has always refused both; bulk update reaches a
+    hundred workspaces at once, and a match set is rarely uniform in either
+    respect. The post-update auto-apply state is what matters, so a request
+    that turns auto-apply off in the same call is allowed -- exactly as the
+    PATCH path allows flipping both together.
+    """
+    workflow = fields.get("vcs_workflow")
+    if workflow != "apply_then_merge":
+        return
+    pending_auto_apply = fields.get("auto_apply")
+    offenders: list[str] = []
+    for w in workspaces:
+        auto_apply = w.auto_apply if pending_auto_apply is None else pending_auto_apply
+        try:
+            workspace_settings.check_apply_then_merge_allowed(
+                workflow,
+                has_vcs_connection=getattr(w, "vcs_connection_id", None) is not None,
+                auto_apply=bool(auto_apply),
+            )
+        except ValueError:
+            offenders.append(w.name)
+    if not offenders:
+        return
+    shown = ", ".join(sorted(offenders)[:10])
+    more = f" (and {len(offenders) - 10} more)" if len(offenders) > 10 else ""
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            f"vcs-workflow 'apply_then_merge' cannot be set on {len(offenders)} matched "
+            f"workspace(s): {shown}{more}. Each needs a VCS connection and auto-apply "
+            "off — set auto-apply false in the same request, or narrow the filter."
+        ),
+    )
+
+
+def _reject_bind_plan_on_non_pulumi_engines(fields: dict[str, Any], workspaces: list) -> None:
+    """`pulumi-bind-plan` means nothing where the engine is not Pulumi.
+
+    Setting it true on a Terraform workspace would record a setting that does
+    nothing while reporting that it does something — the same failure the scan
+    guard above exists to prevent.
+    """
+    if not fields.get("pulumi_bind_plan"):
+        return
+    offenders = [w.name for w in workspaces if getattr(w, "engine", "") != "pulumi"]
+    if not offenders:
+        return
+    shown = ", ".join(sorted(offenders)[:10])
+    more = f" (and {len(offenders) - 10} more)" if len(offenders) > 10 else ""
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            f"pulumi-bind-plan applies only to Pulumi workspaces, and {len(offenders)} "
+            f"matched workspace(s) use another engine: {shown}{more}. "
+            "Narrow the filter to exclude them."
+        ),
+    )
 
 
 def _reject_scan_enforcement_on_unscannable_engines(
@@ -686,6 +805,8 @@ async def bulk_update_workspaces(
     workspaces = list((await db.execute(query)).scalars().all())
     _reject_auto_apply_on_apply_then_merge(plan["fields"], workspaces)
     _reject_scan_enforcement_on_unscannable_engines(plan["fields"], workspaces)
+    _reject_apply_then_merge_where_it_cannot_hold(plan["fields"], workspaces)
+    _reject_bind_plan_on_non_pulumi_engines(plan["fields"], workspaces)
 
     try:
         changed, unchanged = await _apply(db, workspaces, plan, user.email)

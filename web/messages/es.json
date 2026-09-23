@@ -1053,7 +1053,24 @@
       "notificationTemplates": "Plantillas de notificación (creadas en cada nuevo espacio de trabajo)",
       "saving": "Guardando...",
       "previewTitle": "Recorrer el repositorio y previsualizar qué espacios de trabajo CREARÍA esta regla — sin persistencia",
-      "parallelism": "Paralelismo"
+      "parallelism": "Paralelismo",
+      "governance": "Análisis de seguridad y resumen de IA",
+      "governanceHint": "Se aplica a todos los espacios de trabajo que crea esta regla.",
+      "scanEnforcement": "Aplicación",
+      "scanOff": "No analizar",
+      "scanAdvisory": "Analizar e informar solamente",
+      "scanEnforced": "Bloquear la aplicación si hay hallazgos",
+      "scanEngine": "Analizador",
+      "scanEngineBoth": "Checkov y Trivy",
+      "scanThreshold": "Informar hallazgos a partir de",
+      "severityCritical": "crítico",
+      "severityHigh": "alto",
+      "severityMedium": "medio",
+      "severityLow": "bajo",
+      "aiSummaryMode": "Resumen de plan por IA",
+      "aiSummaryDefault": "Seguir el valor predeterminado del despliegue",
+      "aiSummaryEnabled": "Resumir siempre",
+      "aiSummaryDisabled": "No resumir nunca"
     },
     "table": {
       "name": "Nombre",
@@ -2859,7 +2876,8 @@
       "rollbackStateVersion": "No se pudo revertir la versión de estado",
       "stateActionFailed": "La acción de estado falló",
       "uploadState": "No se pudo subir el estado",
-      "uploadStateFile": "No se pudo subir el archivo de estado"
+      "uploadStateFile": "No se pudo subir el archivo de estado",
+      "updateSecurityScan": "No se pudo actualizar el análisis de seguridad"
     },
     "subtabs": {
       "state": "Estado",
@@ -2880,6 +2898,28 @@
         "global": "Global",
         "rule": "Coincide con la regla"
       }
+    },
+    "securityScan": {
+      "title": "Análisis de seguridad",
+      "description": "Analizar el plan en busca de infraestructura insegura antes de aplicarlo.",
+      "enforcement": "Aplicación",
+      "enforcementOff": "No analizar",
+      "enforcementAdvisory": "Analizar e informar solamente",
+      "enforcementEnforced": "Bloquear la aplicación si hay hallazgos",
+      "engine": "Analizador",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov y Trivy",
+      "threshold": "Informar hallazgos a partir de",
+      "thresholdCritical": "crítico",
+      "thresholdHigh": "alto",
+      "thresholdMedium": "medio",
+      "thresholdLow": "bajo",
+      "skipRules": "Reglas ignoradas",
+      "skipRulesSuffix": "(opcional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Ninguna regla ignorada.",
+      "skipRulesHint": "IDs de reglas del analizador, separadas por comas, que se ignoran en este espacio de trabajo."
     }
   },
   "graphs": {
