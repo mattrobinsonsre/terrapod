@@ -641,6 +641,42 @@ multi-language implementation ships in the same PR**:
     **`secretKeyRef`** / env on the Deployment, and are **never** rendered into
     a ConfigMap. Prefer a first-class `existingSecret`/key block in the
     Deployment template over relying on `extraEnv`.
+  - **A Secret injected as env needs a `checksum/` pod-template annotation
+    (hard requirement).** Env from a `secretKeyRef` is snapshotted at pod start
+    and **never refreshes**, so changing the Secret under a running Deployment
+    does nothing until each pod happens to restart. Where the value must be
+    consistent across replicas -- a signing key, a shared HMAC secret -- that
+    leaves older pods on the old value and newer ones on the new, and if the
+    application caches it per process (a module global rather than Redis-backed
+    state) nothing detects the split. Requests round-robin, so a fraction of
+    them fail while the rest succeed: the signing key shipped exactly this way
+    and roughly half of every run's API calls returned 401 until a human
+    restarted the Deployment. Add
+    `checksum/<thing>: {{ include (print $.Template.BasePath "/secret-x.yaml") . | sha256sum }}`
+    to the consuming pod template, as `deployment-api.yaml` does for
+    `configmap-api.yaml`, so a change rolls every pod together and the rotation
+    is atomic. For an operator-supplied `existingSecret`, `lookup` it and hash
+    its `data`.
+  - **Never generate a credential with `randAlphaNum` unless `lookup` is
+    proven to work (hard requirement).** A rendered manifest must be a pure
+    function of its inputs, and a random generator is not one. Under
+    `helm install`/`upgrade` a `lookup` for the existing Secret rescues that by
+    reusing the stored value. Under **`helm template` -- which is what Argo CD
+    and Flux run -- `lookup` returns nothing AND `.Release.IsInstall` is always
+    true**, so an unguarded branch mints a fresh credential on *every render*
+    and rotates it under the running deployment. Gate generation on a probe
+    that must succeed (`lookup "v1" "Namespace" "" .Release.Namespace`) and emit
+    nothing when it fails; with `helm.sh/resource-policy: keep` the existing
+    Secret is left exactly as it is. The question the probe answers is the one
+    that matters: can we see the cluster well enough to know whether a
+    credential already exists?
+  - **Render an API-only object only where the API is deployed.** A Secret or
+    ConfigMap consumed by one component must carry that component's own gate
+    (`{{- if ne .Values.api.enabled false }}`, matching
+    `deployment-api.yaml`). A component-only release that renders another
+    component's Secret creates material nothing reads -- and, in a namespace a
+    second release also targets, two releases declare the same object and
+    fight over owning it.
   - **The chart never sets a non-sensitive setting via a `TERRAPOD_*` env var.**
     Deployment `env:` is reserved for secrets (`secretKeyRef`) and unavoidable
     runtime values (Downward API like `POD_NAME`, and the proxy/TLS env vars
