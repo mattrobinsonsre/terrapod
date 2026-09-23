@@ -65,3 +65,48 @@ def test_the_api_deployment_still_gates_on_the_same_value():
         "secret gate is now pinned to a condition its consumer does not share. "
         "Re-derive both from whatever replaced it."
     )
+
+
+def test_a_signing_key_change_rolls_the_api_pods():
+    """A Secret injected as env must roll the Deployment when it changes.
+
+    Env from a `secretKeyRef` is snapshotted at pod start and never refreshes,
+    and the signing key is a per-process module global -- not Redis-backed
+    state like sessions or the scheduler, so the fleet has no way to notice it
+    disagrees. A Secret that changes under a running Deployment therefore
+    leaves older pods on the old key while newer ones use the new one, and a
+    runner token minted by one is rejected by the other: half of every run's
+    API calls 401 until a human restarts it.
+
+    The `checksum/` pod-template annotation is what makes a rotation atomic.
+    `configmap-api.yaml` already had one; the signing key did not.
+    """
+    body = (_TEMPLATES / "deployment-api.yaml").read_text()
+    assert "checksum/token-signing" in body, (
+        "deployment-api.yaml has no checksum annotation for the token signing "
+        "key, so changing the key leaves running pods on the old one and half "
+        "of every run's calls 401. Add a checksum/ annotation over the key, as "
+        "checksum/config does for the ConfigMap."
+    )
+
+
+def test_a_key_is_never_minted_without_the_means_to_check_for_one_first():
+    """Generation must be conditional on `lookup` actually working.
+
+    A rendered manifest has to be a pure function of its inputs and
+    `randAlphaNum` is not. Under `helm install` the `lookup` rescues that by
+    finding the existing key and reusing it. Under a GitOps renderer --
+    `helm template`, which is what Argo CD and Flux run -- `lookup` returns
+    nothing and `.Release.IsInstall` is ALWAYS true, so an unguarded branch
+    mints a fresh key on every render against a running deployment.
+    """
+    body = (_TEMPLATES / "secret-token-signing.yaml").read_text()
+    gen = [ln for ln in body.splitlines() if "randAlphaNum" in ln]
+    assert gen, "the generation branch has moved; update this test rather than deleting it"
+
+    assert re.search(r"IsInstall.*lookup|lookup.*IsInstall", body), (
+        "the key is generated without first proving `lookup` works. Under "
+        "`helm template` lookup returns nothing and IsInstall is always true, "
+        "so every render mints a new key and rotates it under the running "
+        "fleet. Gate generation on a lookup that must succeed."
+    )
