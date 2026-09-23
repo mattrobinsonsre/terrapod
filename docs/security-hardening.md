@@ -118,10 +118,20 @@ For production, use [External Secrets Operator](https://external-secrets.io/) to
 
 ### Dedicated token signing key
 
-Runner tokens and run-task callback tokens are stateless HMAC tokens. By
-default their signing key is derived from the database URL, which couples
-token-forgery resistance to the database credentials. To decouple them, set a
-dedicated secret via `api.tokenSigningKey` (injected as
+One key signs four families of stateless token — runner tokens, run-task
+callback tokens, download tickets and Slack link tokens. Without one it is
+derived from `sha256(database_url)`, which is the wrong material for the job: a
+database URL is a credential for another system, handed to every client of that
+database, to backup and migration jobs, and to a DBA who has no business
+forging platform tokens.
+
+A fresh `helm install` generates a key for you. An **upgrade never does**, and
+that asymmetry is deliberate: a new key invalidates every token already in
+flight, and those tokens are what running plans and applies authenticate with.
+A deployment upgrading into this keeps the key it already had and warns at
+startup until you supply one.
+
+Supply your own via `api.tokenSigningKey` (injected as
 `TERRAPOD_TOKEN_SIGNING_KEY` from a K8s Secret, never a ConfigMap):
 
 ```zsh
@@ -136,8 +146,54 @@ api:
     existingSecretKey: "token_signing_key"
 ```
 
-Leaving it unset keeps the database-URL-derived key, so configuring it later
-does not invalidate any in-flight token.
+Naming a Secret this way stops the chart generating anything, so the key
+changes only when you change it.
+
+Rotating it has to roll every API pod at once. Environment from a
+`secretKeyRef` is captured when a pod starts and never refreshes, so a fleet
+that disagrees about the key is not a clean failure — it serves `401` on
+whatever share of requests lands on a pod holding the other one, which for a
+run means roughly half its API calls fail while the rest succeed. Under `helm
+install`/`helm upgrade` the chart handles this: the pod template carries a
+checksum over the key, so a change rolls the Deployment. That checksum is built
+from a cluster `lookup`, so **a renderer cannot produce it** — see below.
+
+#### Under a GitOps controller, own the Secret yourself
+
+If you deploy the chart through Argo CD, Flux, or anything else that renders
+with `helm template` and reconciles the result, **set
+`api.tokenSigningKey.existingSecret`**. Do not rely on the generated key.
+
+Two properties of `helm template` rule it out there. It cannot read the
+cluster, so the chart cannot tell whether a key already exists — it emits
+nothing rather than mint a fresh one on every render, which would rotate the
+key underneath a running deployment. And a rendered manifest that omits the
+Secret reads, to a controller configured to prune, as an instruction to delete
+it. `helm.sh/resource-policy: keep` does not prevent that: it is an annotation
+Helm honours, and a GitOps controller is not Helm.
+
+So treat the Secret as yours — create it out of band (an External Secrets
+Operator `ExternalSecret` from your cloud secret manager, a sealed secret, or
+whatever your tooling uses) and keep it outside anything that prunes. Express
+that however your controller expresses it; Terrapod does not ship
+vendor-specific annotations for it.
+
+Rotation is yours too. The `checksum/token-signing` annotation that rolls the
+Deployment on a key change is computed by reading the Secret from the cluster,
+which a renderer cannot do, so it is absent from a rendered manifest. **After
+changing the key, restart the API yourself** — otherwise the old pods keep the
+old key and the fleet splits:
+
+```zsh
+kubectl -n terrapod rollout restart deploy/<release>-api
+```
+
+If the Secret is pruned anyway, the deployment does not fail cleanly. Pods
+already running keep the key in their environment, while any pod started
+afterwards falls back to the derived one, and requests return `401` wherever
+they land on the wrong half — until the last pod holding the old key retires,
+at which point the fleet agrees again on the weaker derived key without saying
+so. Recreate the Secret and roll the API.
 
 ## Network Policies
 
