@@ -1271,7 +1271,7 @@ function WorkspaceDetailContent() {
     if (next && isTouch && !window.confirm(t('debugMode.confirmEnable'))) return
     setSavingDebugMode(true)
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({

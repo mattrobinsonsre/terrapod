@@ -452,7 +452,7 @@ test.describe('Workspace runner debug mode (#1764)', () => {
       await expect(page.getByTestId('debug-mode-banner')).toBeVisible();
     }).toPass({ timeout: 20_000 });
 
-    const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
+    const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status()).toBe(200);
@@ -474,7 +474,7 @@ test.describe('Workspace runner debug mode (#1764)', () => {
     await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0);
 
     await expect(async () => {
-      const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
+      const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect((await res.json()).data.attributes['debug-mode']).toBe(false);

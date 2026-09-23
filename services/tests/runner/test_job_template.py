@@ -955,10 +955,23 @@ class TestDebugModeBoundsTheLinger1764:
         spec = self._spec(debug_linger_seconds=5)
         assert spec["spec"]["ttlSecondsAfterFinished"] == 300
 
-    def test_debug_mode_does_not_disturb_the_cost_region(self):
-        """Regression: the debug block was first written between the cost
-        `if` and its `elif`, which re-bound the `elif` and silently stopped
-        `TP_COST_DEFAULT_REGION` being emitted whenever debug mode was on."""
-        env = self._env(self._spec(debug_linger_seconds=600, cost_default_region="eu-west-1"))
+    def test_debug_mode_does_not_disturb_the_engines_own_env(self):
+        """Regression, carried from the 1.8 line and re-pointed at this one.
+
+        There the debug block was first written between the cost `if` and its
+        `elif`, which re-bound the `elif` and silently stopped
+        `TP_COST_DEFAULT_REGION` being emitted whenever debug mode was on. That
+        chain does not exist here -- cost is a `TerraformRunOptions` field the
+        strategy composes (#1488) -- so the same mistake would take a different
+        shape: the platform block clobbering or truncating `engine_env`.
+
+        Rendered through the strategy rather than the neutral builder, because
+        that is the only path that has both halves to get wrong.
+        """
+        env = TestCostEstimationEnv()._spec_env(
+            cost_estimation=True,
+            cost_default_region="eu-west-1",
+            debug_linger_seconds=600,
+        )
         assert env["TP_COST_DEFAULT_REGION"] == "eu-west-1"
         assert env["TP_DEBUG_LINGER_SECONDS"] == "600"
