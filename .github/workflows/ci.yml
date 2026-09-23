@@ -836,7 +836,16 @@ jobs:
           len=$(helm template tp ./helm/terrapod | grep 'token_signing_key:' | sed 's/.*: //; s/"//g' | tr -d '[:space:]' | wc -c)
           [ "$len" -ge 32 ] \
             || { echo "generated key is only $len chars"; exit 1; }
-          echo "signing key: generated on install, absent on upgrade, yielded to when supplied"
+
+          # A listener-only release must not render it at all. The key is read
+          # by the API alone -- a listener asks the API for runner tokens and
+          # never signs anything -- so a listener release that generated one
+          # would mint a key nothing reads and, in a namespace the API release
+          # also targets, fight that release over owning the same Secret.
+          lst=$(helm template tp ./helm/terrapod --set api.enabled=false --set web.enabled=false | grep -c 'token_signing_key:' || true)
+          [ "$lst" = "0" ] \
+            || { echo "a listener-only install must not generate a signing key (got $lst)"; exit 1; }
+          echo "signing key: generated on install, absent on upgrade, yielded to when supplied, absent without an API"
 
       - name: The strong-secrets switch reaches the pod and stays off by default
         run: |
