@@ -514,6 +514,7 @@ Workspaces carry two attributes that govern the optional AI plan-summary feature
 |---|---|---|---|
 | `ai-summary-mode` | string | `"default"` | Per-workspace override. One of `"default"` (follow the global toggle), `"enabled"` (always summarise this workspace's plans), or `"disabled"` (never summarise this workspace — overrides global). |
 | `ai-summary-context` | string | `""` | Free text up to 4000 characters appended to the model's prompt as workspace-specific facts (e.g. "Fronts the vault for service X — destroying the KMS key causes a global outage."). Additive to the deployment-wide `fleet_context`. |
+| `ai-policy-mode` | string | `"default"` | Per-workspace override for the AI **policy gate** (#1766). One of `"default"` (follow the deployment setting), `"enabled"`, or `"disabled"`. `"disabled"` opts out of an **advisory** verdict only — a `mandatory` gate ignores it, so a fleet-wide blocking control cannot be switched off per workspace. A workspace also cannot opt into a gate the deployment has not enabled. |
 | `slack-channel` | string | `""` | Opt-in Slack channel (name or ID) this workspace's run notifications post to (#556) — approval requests, applies, errors, drift. Empty = silent (there is no deployment-wide fan-out). Only effective when the Slack app is enabled server-side (`api.config.slack.enabled`). See [slack-integration.md](slack-integration.md). |
 
 422 errors:
@@ -788,11 +789,13 @@ This is enforced server-side regardless of run source (VCS, CLI/API, UI), so the
 
 #### Runs held at a post-plan gate: `blocked-by`
 
-A mandatory policy set, an enforced security scan, or a mandatory post-plan run task can stop a run after its plan has finished. The run stays at `status: planning`, and the read-only **`blocked-by`** attribute names the gate holding it: `run-task`, `policy` or `security-scan` (checked in that order), or `null` for any run not held. While held:
+A mandatory policy set, an enforced security scan, a mandatory post-plan run task, or a mandatory AI policy gate can stop a run after its plan has finished. The run stays at `status: planning`, and the read-only **`blocked-by`** attribute names the gate holding it: `run-task`, `policy`, `security-scan` or `ai-policy` (checked in that order), or `null` for any run not held. While held:
 
 - the run's plan reports `status: finished`, so a CLI waiting on the plan log returns;
 - the run is **discardable** (`actions.is-discardable: true`) unless it is plan-only, and a newer apply-capable run supersedes it as it would a `planned` run;
-- it is released by an override (policy or security scan) or a passing run task, which the reconciler picks up on its next tick. Kubernetes cleaning up the finished plan Job does not error it.
+- it is released by an override (policy, security scan or AI policy) or a passing run task, which the reconciler picks up on its next tick. Kubernetes cleaning up the finished plan Job does not error it.
+
+`ai-policy` is the one gate that can hold a run before there is anything to decide: its verdict is produced in the API after the plan JSON is uploaded, not by the runner before plan-result, so a mandatory gate waits for it rather than failing the run for evidence that does not exist yet. See [ai-plan-summary.md → Policy gate](ai-plan-summary.md#policy-gate).
 
 In 2.0 a held run reports `policy_override` or `post_plan_awaiting_decision` instead of `planning`; see [deprecations.md](deprecations.md#announced-behaviour-changes-for-20).
 
@@ -1013,6 +1016,25 @@ POST /api/terrapod/v1/runs/{run_id}/actions/override-security-scan    # override
 **POST override** marks a failed/errored result overridden and, when the run is still held in `planning` by an enforced scan, re-drives it immediately (mirrors the policy override). Requires **admin** on the workspace; audit-logged. Prefer fixing the finding or adding a skip rule.
 
 The runner protocol (runner-token, run_id-scoped) — `GET .../security-scan-config` and `POST .../security-scan-results` — is internal to the runner and mirrors the OPA `policy-bundle`/`policy-results` pair; the enforcement level and severity threshold are re-resolved **server-side from the workspace** on results POST, never trusted from the runner body.
+
+### AI Policy Gate (#1766)
+
+The AI plan summary's optional post-plan gate — the third structural sibling of the OPA policy and security-scan endpoints. See [ai-plan-summary.md → Policy gate](ai-plan-summary.md#policy-gate) for the feature guide; the per-workspace override (`ai-policy-mode`) is in the workspace attributes table above.
+
+```
+GET  /api/terrapod/v1/runs/{run_id}/ai-policy                     # read the verdict (workspace read)
+POST /api/terrapod/v1/runs/{run_id}/actions/override-ai-policy    # release a held run (workspace admin)
+```
+
+**GET** returns `{"data": <resource>|null, "meta": {...}}`. The resource `attributes` are: `enforcement-level` (`advisory`/`mandatory`), `risk-threshold`, `outcome` (`passed`/`failed`/`errored`), `verdict` (`{decision: "allow"|"deny", reasons: [{criterion, detail}]}`), `risk-level`, `error`, `overridden-by`, `overridden-at`, `created-at`. `meta` carries the resolved `enforcement-level` and `blocking`, plus `not-evaluated-reason` when no verdict is recorded.
+
+`data` is `null` for three different reasons and `meta` distinguishes them, because a held run legitimately sits in the last one: the gate is off, the token budget is spent, or the verdict has simply not landed yet.
+
+**`outcome: errored` BLOCKS under a mandatory gate rather than passing.** The gate fails closed: a verdict that could not be reached is not approval, so an empty `verdict` never reads as a clean pass. `error` distinguishes a spent daily token budget from a model fault, because the two call for different responses.
+
+**POST override** marks the verdict overridden and, when the run is still held in `planning`, re-drives `complete_plan` immediately (mirrors the policy and scan overrides). Requires **admin** on the workspace; audit-logged. It answers **409** when no verdict has been recorded yet — a run held *waiting* for one is released as soon as it lands, so there is nothing to override before then.
+
+Unlike the other two gates there is **no runner protocol**: the verdict is produced in the API by the summariser, which is why a mandatory gate holds the run until it arrives instead of failing it.
 
 ### Estate Graph
 

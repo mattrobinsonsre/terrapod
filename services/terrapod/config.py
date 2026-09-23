@@ -2187,6 +2187,66 @@ class AISummaryContextConfig(BaseModel):
     )
 
 
+class AIPolicyConfig(BaseModel):
+    """The AI plan-summary's optional post-plan GATE (#1766).
+
+    This is not a second AI workload. It rides the summary's existing model
+    call -- same model, same `api_base`, same auth, same daily budget -- by
+    extending the forced tool schema with a verdict field and appending a
+    criteria section to the prompt. A separate config block with its own model
+    would imply a second call that does not happen.
+
+    Two things trip the gate, and an operator can use either or both: a
+    threshold on the summary's own `risk_level`, and free-text `deny_criteria`
+    the model resolves to allow/deny alongside that score.
+
+    **Terraform and OpenTofu only.** The gate reads the structured plan JSON. A
+    Pulumi preview uploads a digest capped at 500 steps, and a gate evaluated
+    over a truncated list of resources can pass because the offending one fell
+    off the end -- the same reason `pulumi_preview.write_policy_input` exists
+    for OPA. Rather than decide on a truncated document, a Pulumi run is
+    reported as not evaluated and never held, exactly as security scanning is
+    refused there (#1569).
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description=(
+            "Master switch for the gate. Off by default, so enabling the AI "
+            "summary never starts blocking runs by itself."
+        ),
+    )
+    enforcement_level: Literal["advisory", "mandatory"] = Field(
+        default="advisory",
+        description=(
+            "`advisory` records the verdict and never blocks -- and never "
+            "delays, so the run reaches `planned` without waiting for the "
+            "model. `mandatory` HOLDS the run in `planning` until the verdict "
+            "lands, then blocks on a deny. Mirrors PolicySet.enforcement_level."
+        ),
+    )
+    risk_threshold: Literal["off", "low", "medium", "high", "critical"] = Field(
+        default="off",
+        description=(
+            "Block when the summary's own `risk_level` is at or above this. "
+            "`off` (the default) gates on `deny_criteria` alone, which is the "
+            "safer starting point: a risk score is a judgement about the whole "
+            "change, so a threshold blocks far more broadly than a criterion."
+        ),
+    )
+    deny_criteria: str = Field(
+        default="",
+        description=(
+            "Free-text criteria the model resolves to allow/deny, one per "
+            "line (e.g. 'block any 0.0.0.0/0 ingress'). Empty means no "
+            "criteria are evaluated -- with `risk_threshold: off` that "
+            "leaves the gate inert even when enabled, which is deliberate: "
+            "turning the switch on must not block anything until an operator "
+            "has said what to block."
+        ),
+    )
+
+
 class AISummaryConfig(BaseModel):
     """AI plan-summary configuration (#401).
 
@@ -2336,6 +2396,7 @@ class AISummaryConfig(BaseModel):
     )
     auth: AISummaryAuthConfig = Field(default_factory=AISummaryAuthConfig)
     context: AISummaryContextConfig = Field(default_factory=AISummaryContextConfig)
+    policy: AIPolicyConfig = Field(default_factory=AIPolicyConfig)
 
 
 class AIOnboardingAuthConfig(BaseModel):

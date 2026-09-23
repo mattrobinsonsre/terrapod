@@ -577,6 +577,32 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, sc, nil
 	})
 
+	// ── terrapod_run_ai_policy ───────────────────────────────────────
+	type runAIPolicyIn struct {
+		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose AI policy verdict to fetch"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_run_ai_policy",
+		Description: "Get a run's AI policy gate verdict (#1766): the model's allow/deny ruling against the operator's " +
+			"natural-language deny criteria, the reasons it matched (criterion + the terraform address), the summary's " +
+			"risk level, the enforcement level (advisory/mandatory), the outcome (passed/failed/errored) and any override. " +
+			"Note `errored` BLOCKS under a mandatory gate rather than passing: the gate fails closed, so a verdict that " +
+			"could not be reached is not consent, and `error` says why (a spent token budget reads differently from a model " +
+			"fault). Returns null when no verdict is recorded — the meta then says whether the gate is off, the engine is " +
+			"not ruled on (Pulumi), or the verdict has simply not landed yet.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runAIPolicyIn) (*mcp.CallToolResult, *terrapod.AIPolicyEvaluation, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		e, err := c.GetRunAIPolicy(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, e, nil
+	})
+
+	// ── terrapod_run_policy_checks ───────────────────────────────────
 	// ── terrapod_policy_set_list ─────────────────────────────────────
 	type policySetsIn struct{}
 	type policySetsOut struct {

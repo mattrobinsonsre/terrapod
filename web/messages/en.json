@@ -2247,6 +2247,31 @@
       "erroredMessage": "The scan did not complete, so this run has not been checked.",
       "blockedErroredMessage": "This run is blocked because the security scan did not complete. Fix the cause and re-plan, or ask an admin to override."
     },
+    "aiPolicyPanel": {
+      "heading": "AI Policy Gate",
+      "enforcementLabel": "enforcement: {level}",
+      "thresholdLabel": "risk threshold: {threshold}",
+      "awaitingVerdict": "Waiting for the AI policy verdict. This run is held until it arrives.",
+      "decisionAllow": "allowed",
+      "decisionDeny": "denied",
+      "risk": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
+      },
+      "blockedDeniedMessage": "This run is <strong>blocked by {count, plural, one {# policy criterion} other {# policy criteria}}</strong>.",
+      "blockedRiskMessage": "This run is <strong>blocked</strong> because its risk level ({level}) is at or above the threshold ({threshold}).",
+      "blockedErroredMessage": "This run is blocked because no AI policy verdict could be reached. The gate fails closed, so a verdict that could not be reached is not approval.",
+      "erroredMessage": "The AI policy gate did not return a usable verdict, so this run has not been ruled on.",
+      "passed": "No policy criteria matched.",
+      "overriding": "Overriding...",
+      "overrideContinue": "Override & Continue",
+      "overrideConfirm": "Override the AI policy gate and allow this run to apply despite the verdict?",
+      "overrideFailed": "Override failed",
+      "overrideFailedStatus": "Override failed ({status})",
+      "overriddenBy": "overridden by {by}"
+    },
     "architecture": {
       "loadError": "Failed to load the architecture critique.",
       "notEnabled": "The AI architecture critic is not enabled on this deployment.",
@@ -2561,6 +2586,8 @@
       "modeDefault": "Follow deployment default",
       "modeEnabled": "Always summarize",
       "modeDisabled": "Never summarize",
+      "policyMode": "Policy gate",
+      "policyModeNote": "A mandatory gate ignores “Never”: it can only opt this workspace out of an advisory verdict.",
       "contextLabel": "Workspace context",
       "contextLabelSuffix": "(optional, additive)",
       "contextPlaceholder": "Facts the AI should know about this workspace specifically. e.g. 'Fronts the vault for service X — destroying the KMS key causes a global outage.'",

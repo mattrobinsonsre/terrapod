@@ -80,6 +80,7 @@ def _mock_workspace(ws_id=None, **overrides):
     ws.drift_status = ""
     ws.state_diverged = False
     ws.debug_mode = overrides.get("debug_mode", False)
+    ws.ai_policy_mode = overrides.get("ai_policy_mode", "default")
     ws.ai_summary_mode = overrides.get("ai_summary_mode", "default")
     ws.ai_summary_context = overrides.get("ai_summary_context", "")
     ws.slack_channel = overrides.get("slack_channel", "")

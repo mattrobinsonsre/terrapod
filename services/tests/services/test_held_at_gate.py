@@ -175,17 +175,20 @@ class TestBlockedBy:
         assert await run_service.blocked_by(AsyncMock(), _run(status="planned")) is None
 
     @pytest.mark.parametrize(
-        ("stage_status", "policy", "scan", "expected"),
+        ("stage_status", "policy", "scan", "ai", "expected"),
         [
-            ("pending", True, True, "run-task"),
-            ("passed", True, True, "policy"),
-            ("overridden", False, True, "security-scan"),
-            (None, False, True, "security-scan"),
-            ("passed", False, False, None),
+            ("pending", True, True, True, "run-task"),
+            ("passed", True, True, True, "policy"),
+            ("overridden", False, True, True, "security-scan"),
+            (None, False, True, True, "security-scan"),
+            # The AI gate is checked LAST, so it only ever names itself once the
+            # three before it are clear -- the same order `complete_plan` runs.
+            ("passed", False, False, True, "ai-policy"),
+            ("passed", False, False, False, None),
         ],
     )
     async def test_names_the_gate_in_the_order_complete_plan_checks_them(
-        self, stage_status, policy, scan, expected
+        self, stage_status, policy, scan, ai, expected
     ):
         stage = None if stage_status is None else MagicMock(status=stage_status)
         with (
@@ -200,6 +203,10 @@ class TestBlockedBy:
             patch(
                 "terrapod.services.security_scan_service.run_is_scan_blocked",
                 AsyncMock(return_value=scan),
+            ),
+            patch(
+                "terrapod.services.ai_policy_service.run_is_ai_policy_blocked",
+                AsyncMock(return_value=ai),
             ),
         ):
             assert await run_service.blocked_by(AsyncMock(), _run()) == expected

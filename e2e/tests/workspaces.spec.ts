@@ -489,3 +489,64 @@ test.describe('Workspace runner debug mode (#1764)', () => {
     }).toPass({ timeout: 20_000 });
   });
 });
+
+test.describe('AI policy gate (#1766)', () => {
+  // The E2E stack runs with `ai_summary.enabled = false`, so the gate is off
+  // and there is no verdict to assert on — the positive paths need a real
+  // model and belong to the live Tilt smoke. What IS load-bearing here, and
+  // what a mocked test could not show, is the surface parity #1763 exists to
+  // enforce: the per-workspace override reaching the GUI, and the gate-off
+  // path staying quiet instead of rendering an empty panel on every run.
+  test('the per-workspace override round-trips through the GUI', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('aipolui'));
+
+    await page.goto(`/workspaces/${wsId}`);
+
+    const select = page.getByTestId('ai-policy-mode');
+    await expect(select).toBeVisible({ timeout: 15_000 });
+    await expect(select).toHaveValue('default');
+
+    await select.selectOption('disabled');
+    // The value comes from the fetched workspace, so it settles only once the
+    // PATCH resolves — this assertion is the wait, not a redundant check.
+    await expect(select).toHaveValue('disabled', { timeout: 15_000 });
+
+    // Survives a reload, so this is the stored value and not browser state.
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByTestId('ai-policy-mode')).toHaveValue('disabled');
+    }).toPass({ timeout: 20_000 });
+
+    const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status()).toBe(200);
+    expect((await res.json()).data.attributes['ai-policy-mode']).toBe('disabled');
+  });
+
+  test('the gate being off is reported, not a 500', async ({ page }) => {
+    // A run that does not exist must 404. The endpoint is the one an operator
+    // (and the MCP tool) reads to find out WHY a run is held, so it failing
+    // loudly is worse than the gate being off.
+    const token = getStoredToken();
+    const res = await page.request.get(
+      '/api/terrapod/v1/runs/run-00000000-0000-0000-0000-000000000000/ai-policy',
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    expect(res.status()).toBe(404);
+  });
+
+  test('no AI policy panel leaks onto a workspace with the gate off', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('aipoloff'));
+
+    await page.goto(`/workspaces/${wsId}`);
+    await expect(page.getByTestId('ai-policy-mode')).toBeVisible({ timeout: 15_000 });
+
+    // The panel is a RUN surface. Its heading must not appear on the workspace
+    // page, and no half-rendered verdict box either.
+    await expect(page.locator('text=AI Policy Gate')).toHaveCount(0);
+    await expect(page.locator('text=Waiting for the AI policy verdict')).toHaveCount(0);
+  });
+});

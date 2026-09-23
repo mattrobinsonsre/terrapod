@@ -2307,6 +2307,31 @@
       "erroredMessage": "La scansione non è stata completata, quindi questa esecuzione non è stata verificata.",
       "blockedErroredMessage": "Questa esecuzione è bloccata perché la scansione di sicurezza non è stata completata. Correggi la causa ed esegui di nuovo il piano, oppure chiedi a un amministratore di ignorarla."
     },
+    "aiPolicyPanel": {
+      "heading": "Gate della policy IA",
+      "enforcementLabel": "applicazione: {level}",
+      "thresholdLabel": "soglia di rischio: {threshold}",
+      "awaitingVerdict": "In attesa del verdetto della policy IA. Questa esecuzione resta trattenuta finché non arriva.",
+      "decisionAllow": "consentito",
+      "decisionDeny": "negato",
+      "risk": {
+        "critical": "critico",
+        "high": "alto",
+        "medium": "medio",
+        "low": "basso"
+      },
+      "blockedDeniedMessage": "Questa esecuzione è <strong>bloccata da {count, plural, one {# criterio di policy} other {# criteri di policy}}</strong>.",
+      "blockedRiskMessage": "Questa esecuzione è <strong>bloccata</strong> perché il suo livello di rischio ({level}) è pari o superiore alla soglia ({threshold}).",
+      "blockedErroredMessage": "Questa esecuzione è bloccata perché non è stato possibile raggiungere un verdetto della policy IA. Il gate fallisce in chiusura: un verdetto non raggiungibile non è un''approvazione.",
+      "erroredMessage": "Il gate della policy IA non ha restituito un verdetto utilizzabile, quindi questa esecuzione non è stata giudicata.",
+      "passed": "Nessun criterio di policy corrisponde.",
+      "overriding": "Sovrascrittura in corso...",
+      "overrideContinue": "Sovrascrivi e continua",
+      "overrideConfirm": "Sovrascrivere il gate della policy IA e permettere l''applicazione di questa esecuzione nonostante il verdetto?",
+      "overrideFailed": "Sovrascrittura non riuscita",
+      "overrideFailedStatus": "Sovrascrittura non riuscita ({status})",
+      "overriddenBy": "sovrascritto da {by}"
+    },
     "architecture": {
       "loadError": "Impossibile caricare la critica dell''architettura.",
       "notEnabled": "Il critico dell''architettura basato sull''IA non è abilitato in questo deployment.",
@@ -2553,6 +2578,8 @@
       "modeDefault": "Segui l''impostazione predefinita del deployment",
       "modeEnabled": "Riepiloga sempre",
       "modeDisabled": "Non riepilogare mai",
+      "policyMode": "Gate della policy",
+      "policyModeNote": "Un gate obbligatorio ignora «Mai»: può esentare questo workspace solo da un verdetto consultivo.",
       "contextLabel": "Contesto del workspace",
       "contextLabelSuffix": "(opzionale, aggiuntivo)",
       "contextPlaceholder": "Fatti che l''IA dovrebbe conoscere specificamente su questo workspace. es. 'Fa da fronte al vault per il servizio X — distruggere la chiave KMS causa un''interruzione globale.'",

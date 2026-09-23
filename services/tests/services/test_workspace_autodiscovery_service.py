@@ -511,6 +511,7 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "security_scan_severity_threshold",
         "security_scan_skip_rules",
         "ai_summary_mode",
+        "ai_policy_mode",
         "ai_summary_context",
         "terragrunt_enabled",
         "terragrunt_version",

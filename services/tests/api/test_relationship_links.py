@@ -90,6 +90,7 @@ class TestAutodiscoveryRule:
             security_scan_severity_threshold="high",
             security_scan_skip_rules=[],
             debug_mode=False,
+            ai_policy_mode="default",
             ai_summary_mode="default",
             ai_summary_context="",
             terragrunt_enabled=False,

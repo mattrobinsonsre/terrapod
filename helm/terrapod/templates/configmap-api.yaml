@@ -568,6 +568,13 @@ data:
         prompt_suffix: {{ .prompt_suffix | default "" | quote }}
         fleet_context: {{ .fleet_context | default "" | quote }}
       {{- end }}
+      {{- with .Values.api.config.ai_summary.policy }}
+      policy:
+        enabled: {{ .enabled | default false }}
+        enforcement_level: {{ .enforcement_level | default "advisory" | quote }}
+        risk_threshold: {{ .risk_threshold | default "off" | quote }}
+        deny_criteria: {{ .deny_criteria | default "" | quote }}
+      {{- end }}
     {{- end }}
     {{- if .Values.api.config.ai_onboarding }}
     ai_onboarding:

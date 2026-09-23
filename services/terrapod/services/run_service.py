@@ -429,7 +429,7 @@ def is_discardable_hold(run: Run) -> bool:
 
 
 async def blocked_by(db: AsyncSession, run: Run) -> str | None:
-    """Which post-plan gate holds a run: `run-task`, `policy`, `security-scan`.
+    """Which gate holds a run: `run-task`, `policy`, `security-scan`, `ai-policy`.
 
     None when the run is not held. Read-only -- checked in the order
     `complete_plan` evaluates the gates, so it names the one actually holding
@@ -439,7 +439,12 @@ async def blocked_by(db: AsyncSession, run: Run) -> str | None:
     if not is_held_at_gate(run):
         return None
 
-    from terrapod.services import policy_set_service, run_task_service, security_scan_service
+    from terrapod.services import (
+        ai_policy_service,
+        policy_set_service,
+        run_task_service,
+        security_scan_service,
+    )
 
     stage = await run_task_service._existing_stage(db, run.id, "post_plan")
     if stage is not None and stage.status not in ("passed", "overridden"):
@@ -448,6 +453,13 @@ async def blocked_by(db: AsyncSession, run: Run) -> str | None:
         return "policy"
     if await security_scan_service.run_is_scan_blocked(db, run.id):
         return "security-scan"
+    # Last, matching the order `complete_plan` evaluates the gates. The gate's
+    # verdict is produced in the API AFTER the plan, not by the runner before
+    # plan-result, so a mandatory gate holds a run while the verdict is still
+    # being produced as well as once one has landed and denied. Both are the
+    # same answer here: this gate is what is holding it.
+    if await ai_policy_service.run_is_ai_policy_blocked(db, run.id):
+        return "ai-policy"
     return None
 
 
@@ -1190,6 +1202,21 @@ async def complete_plan(
 
     scan_gate = await security_scan_service.evaluate_post_plan(db, run)
     if scan_gate != security_scan_service.GATE_PASSED:
+        return run
+
+    # Post-plan AI policy gate (#1766) — the judgement-call sibling of the two
+    # gates above. It sits LAST because it is the only one whose evidence may
+    # not exist yet: the summariser runs in the API and is enqueued from the
+    # plan-JSON upload, after this function. A mandatory gate therefore holds
+    # the run in `planning` until the verdict lands and the summariser
+    # re-drives this idempotent function, rather than failing it for evidence
+    # the runner was never asked to produce. Going last means a run held for a
+    # verdict has already cleared OPA and the scan, so the wait only ever
+    # happens for a run that would otherwise be about to apply.
+    from terrapod.services import ai_policy_service
+
+    ai_gate = await ai_policy_service.evaluate_post_plan(db, run)
+    if ai_gate != ai_policy_service.GATE_PASSED:
         return run
 
     run = await transition_run(db, run, "planned")

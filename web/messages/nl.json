@@ -2307,6 +2307,31 @@
       "erroredMessage": "De scan is niet voltooid, dus deze uitvoering is niet gecontroleerd.",
       "blockedErroredMessage": "Deze uitvoering is geblokkeerd omdat de beveiligingsscan niet is voltooid. Los de oorzaak op en plan opnieuw, of vraag een beheerder om dit te negeren."
     },
+    "aiPolicyPanel": {
+      "heading": "AI-beleidspoort",
+      "enforcementLabel": "handhaving: {level}",
+      "thresholdLabel": "risicodrempel: {threshold}",
+      "awaitingVerdict": "Wachten op het oordeel van het AI-beleid. Deze uitvoering wordt vastgehouden tot het er is.",
+      "decisionAllow": "toegestaan",
+      "decisionDeny": "geweigerd",
+      "risk": {
+        "critical": "kritiek",
+        "high": "hoog",
+        "medium": "middel",
+        "low": "laag"
+      },
+      "blockedDeniedMessage": "Deze uitvoering is <strong>geblokkeerd door {count, plural, one {# beleidscriterium} other {# beleidscriteria}}</strong>.",
+      "blockedRiskMessage": "Deze uitvoering is <strong>geblokkeerd</strong> omdat het risiconiveau ({level}) op of boven de drempel ({threshold}) ligt.",
+      "blockedErroredMessage": "Deze uitvoering is geblokkeerd omdat er geen AI-beleidsoordeel kon worden bereikt. De poort faalt gesloten: een oordeel dat niet bereikt kon worden is geen goedkeuring.",
+      "erroredMessage": "De AI-beleidspoort gaf geen bruikbaar oordeel, dus deze uitvoering is niet beoordeeld.",
+      "passed": "Geen beleidscriteria kwamen overeen.",
+      "overriding": "Bezig met overschrijven...",
+      "overrideContinue": "Overschrijven & doorgaan",
+      "overrideConfirm": "De AI-beleidspoort overschrijven en deze uitvoering laten toepassen ondanks het oordeel?",
+      "overrideFailed": "Overschrijven mislukt",
+      "overrideFailedStatus": "Overschrijven mislukt ({status})",
+      "overriddenBy": "overschreven door {by}"
+    },
     "architecture": {
       "loadError": "Kan de architectuurkritiek niet laden.",
       "notEnabled": "De AI-architectuurcriticus is niet ingeschakeld in deze installatie.",
@@ -2553,6 +2578,8 @@
       "modeDefault": "Standaard van deployment volgen",
       "modeEnabled": "Altijd samenvatten",
       "modeDisabled": "Nooit samenvatten",
+      "policyMode": "Beleidspoort",
+      "policyModeNote": "Een verplichte poort negeert “Nooit”: die kan deze werkruimte alleen vrijstellen van een adviserend oordeel.",
       "contextLabel": "Workspacecontext",
       "contextLabelSuffix": "(optioneel, aanvullend)",
       "contextPlaceholder": "Feiten die de AI specifiek over deze workspace moet weten. Bijv. 'Fungeert als voorkant van de vault voor service X — het vernietigen van de KMS-sleutel veroorzaakt een wereldwijde storing.'",

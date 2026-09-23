@@ -2307,6 +2307,31 @@
       "erroredMessage": "7h3 5c4n d1d n07 c0mpl373, 50 7h15 run h45 n07 b33n ch3ck3d.",
       "blockedErroredMessage": "7h15 run 15 bl0ck3d b3c4u53 7h3 53cur17y 5c4n d1d n07 c0mpl373. F1x 7h3 c4u53 4nd r3-pl4n, 0r 45k 4n 4dm1n 70 0v3rr1d3."
     },
+    "aiPolicyPanel": {
+      "heading": "41 P0l1cy G473",
+      "enforcementLabel": "3nf0rc3m3n7: {level}",
+      "thresholdLabel": "r15k 7hr35h0ld: {threshold}",
+      "awaitingVerdict": "W4171ng f0r 7h3 41 p0l1cy v3rd1c7. 7h15 run 15 h3ld un71l 17 4rr1v35.",
+      "decisionAllow": "4ll0w3d",
+      "decisionDeny": "d3n13d",
+      "risk": {
+        "critical": "cr171c4l",
+        "high": "h1gh",
+        "medium": "m3d1um",
+        "low": "l0w"
+      },
+      "blockedDeniedMessage": "7h15 run 15 <strong>bl0ck3d by {count, plural, one {# policy criterion} other {# policy criteria}}</strong>.",
+      "blockedRiskMessage": "7h15 run 15 <strong>bl0ck3d</strong> b3c4u53 175 r15k l3v3l ({level}) 15 47 0r 4b0v3 7h3 7hr35h0ld ({threshold}).",
+      "blockedErroredMessage": "7h15 run 15 bl0ck3d b3c4u53 n0 41 p0l1cy v3rd1c7 c0uld b3 r34ch3d. 7h3 g473 f41l5 cl053d, 50 4 v3rd1c7 7h47 c0uld n07 b3 r34ch3d 15 n07 4ppr0v4l.",
+      "erroredMessage": "7h3 41 p0l1cy g473 d1d n07 r37urn 4 u54bl3 v3rd1c7, 50 7h15 run h45 n07 b33n rul3d 0n.",
+      "passed": "N0 p0l1cy cr173r14 m47ch3d.",
+      "overriding": "0v3rr1d1ng...",
+      "overrideContinue": "0v3rr1d3 & C0n71nu3",
+      "overrideConfirm": "0v3rr1d3 7h3 41 p0l1cy g473 4nd 4ll0w 7h15 run 70 4pply d35p173 7h3 v3rd1c7?",
+      "overrideFailed": "0v3rr1d3 f41l3d",
+      "overrideFailedStatus": "0v3rr1d3 f41l3d ({status})",
+      "overriddenBy": "0v3rr1dd3n by {by}"
+    },
     "architecture": {
       "loadError": "F41l3d 70 l04d 7h3 4rch173c7ur3 cr171qu3.",
       "notEnabled": "7h3 41 4rch173c7ur3 cr171c 15 n07 3n4bl3d 0n 7h15 d3pl0ym3n7.",
@@ -2553,6 +2578,8 @@
       "modeDefault": "F0ll0w d3pl0ym3n7 d3f4ul7",
       "modeEnabled": "4lw4y5 5umm4r1z3",
       "modeDisabled": "N3v3r 5umm4r1z3",
+      "policyMode": "P0l1cy g473",
+      "policyModeNote": "4 m4nd470ry g473 1gn0r35 “N3v3r”: 17 c4n 0nly 0p7 7h15 w0rk5p4c3 0u7 0f 4n 4dv150ry v3rd1c7.",
       "contextLabel": "W0rk5p4c3 c0n73x7",
       "contextLabelSuffix": "(0p710n4l, 4dd171v3)",
       "contextPlaceholder": "F4c75 7h3 41 5h0uld kn0w 4b0u7 7h15 w0rk5p4c3 5p3c1f1c4lly. 3.g. 'Fr0n75 7h3 v4ul7 f0r 53rv1c3 X — d357r0y1ng 7h3 KM5 k3y c4u535 4 gl0b4l 0u74g3.'",

@@ -2307,6 +2307,31 @@
       "erroredMessage": "스캔이 완료되지 않아 이 실행은 검사되지 않았습니다.",
       "blockedErroredMessage": "보안 스캔이 완료되지 않아 이 실행이 차단되었습니다. 원인을 해결하고 다시 계획하거나 관리자에게 재정의를 요청하세요."
     },
+    "aiPolicyPanel": {
+      "heading": "AI 정책 게이트",
+      "enforcementLabel": "적용: {level}",
+      "thresholdLabel": "위험 임계값: {threshold}",
+      "awaitingVerdict": "AI 정책 판정을 기다리는 중입니다. 판정이 도착할 때까지 이 실행은 보류됩니다.",
+      "decisionAllow": "허용됨",
+      "decisionDeny": "거부됨",
+      "risk": {
+        "critical": "치명적",
+        "high": "높음",
+        "medium": "중간",
+        "low": "낮음"
+      },
+      "blockedDeniedMessage": "이 실행은 <strong>{count, plural, other {정책 기준 #개}}에 의해 차단되었습니다</strong>.",
+      "blockedRiskMessage": "이 실행은 위험 수준({level})이 임계값({threshold}) 이상이므로 <strong>차단되었습니다</strong>.",
+      "blockedErroredMessage": "AI 정책 판정에 도달하지 못해 이 실행이 차단되었습니다. 게이트는 닫힘으로 실패하므로, 도달하지 못한 판정은 승인이 아닙니다.",
+      "erroredMessage": "AI 정책 게이트가 사용 가능한 판정을 반환하지 않아 이 실행은 판정되지 않았습니다.",
+      "passed": "일치하는 정책 기준이 없습니다.",
+      "overriding": "재정의 중...",
+      "overrideContinue": "재정의 및 계속",
+      "overrideConfirm": "AI 정책 게이트를 재정의하고 판정과 관계없이 이 실행의 적용을 허용하시겠습니까?",
+      "overrideFailed": "재정의에 실패했습니다",
+      "overrideFailedStatus": "재정의 실패 ({status})",
+      "overriddenBy": "{by}에 의해 재정의됨"
+    },
     "architecture": {
       "loadError": "아키텍처 평가를 불러오지 못했습니다.",
       "notEnabled": "이 배포에서는 AI 아키텍처 평가가 활성화되어 있지 않습니다.",
@@ -2553,6 +2578,8 @@
       "modeDefault": "배포 기본값 따르기",
       "modeEnabled": "항상 요약",
       "modeDisabled": "요약하지 않음",
+      "policyMode": "정책 게이트",
+      "policyModeNote": "필수 게이트는 “안 함”을 무시합니다. 권고 판정에서만 이 워크스페이스를 제외할 수 있습니다.",
       "contextLabel": "워크스페이스 컨텍스트",
       "contextLabelSuffix": "(선택 사항, 추가적)",
       "contextPlaceholder": "AI가 이 워크스페이스에 대해 구체적으로 알아야 할 사실. 예: '서비스 X의 vault를 담당함 — KMS 키를 삭제하면 전역 장애가 발생함.'",

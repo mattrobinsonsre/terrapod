@@ -90,6 +90,7 @@ interface WorkspaceAttrs {
   'auto-merge-strategy': 'merge' | 'squash' | 'rebase'
   'ai-summary-mode': 'default' | 'enabled' | 'disabled'
   'ai-summary-context': string
+  'ai-policy-mode': 'default' | 'enabled' | 'disabled'
   'security-scan-enforcement': 'off' | 'advisory' | 'enforced'
   'security-scan-engine': 'checkov' | 'trivy' | 'both'
   'security-scan-severity-threshold': 'critical' | 'high' | 'medium' | 'low'
@@ -1191,8 +1192,12 @@ function WorkspaceDetailContent() {
     }
   }
 
-  // AI plan summary (#401)
-  async function handleAiSummaryAttrUpdate(patch: { 'ai-summary-mode'?: string; 'ai-summary-context'?: string }) {
+  // AI plan summary (#401), and the policy gate layered on it (#1766)
+  async function handleAiSummaryAttrUpdate(patch: {
+    'ai-summary-mode'?: string
+    'ai-summary-context'?: string
+    'ai-policy-mode'?: string
+  }) {
     if (!workspace) return
     setSavingAiSummary(true)
     try {
@@ -2851,6 +2856,48 @@ function WorkspaceDetailContent() {
                             : t('aiSummary.modeDefault')}
                       </span>
                     )}
+                  </dd>
+                </div>
+                {/* The policy gate layered on the same summary (#1766). Its
+                    own per-workspace override, because a workspace may want
+                    the narrative without the gate or the other way round. */}
+                <div>
+                  <dt className="text-xs text-slate-500">{t('aiSummary.policyMode')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <select
+                        // A <dt> does not label a <select>, so name it here —
+                        // otherwise the control is unreachable by label to a
+                        // screen reader and to a test.
+                        aria-label={t('aiSummary.policyMode')}
+                        data-testid="ai-policy-mode"
+                        value={attrs['ai-policy-mode'] || 'default'}
+                        onChange={(e) =>
+                          handleAiSummaryAttrUpdate({ 'ai-policy-mode': e.target.value })
+                        }
+                        disabled={savingAiSummary}
+                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="default">{t('aiSummary.modeDefault')}</option>
+                        <option value="enabled">{t('aiSummary.modeEnabled')}</option>
+                        <option value="disabled">{t('aiSummary.modeDisabled')}</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['ai-policy-mode'] === 'enabled'
+                          ? t('aiSummary.modeEnabled')
+                          : attrs['ai-policy-mode'] === 'disabled'
+                            ? t('aiSummary.modeDisabled')
+                            : t('aiSummary.modeDefault')}
+                      </span>
+                    )}
+                    {/* Says plainly what `disabled` does NOT do. A workspace
+                        admin setting it and believing they have opted out of a
+                        fleet-wide blocking control is the misunderstanding this
+                        line exists to prevent. */}
+                    <p className="mt-1 text-xs text-slate-500">
+                      {t('aiSummary.policyModeNote')}
+                    </p>
                   </dd>
                 </div>
                 <div className="sm:col-span-2">

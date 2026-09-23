@@ -86,6 +86,7 @@ _FIELD_MAP: dict[str, str] = {
     "security-scan-severity-threshold": "security_scan_severity_threshold",
     "security-scan-skip-rules": "security_scan_skip_rules",
     "ai-summary-mode": "ai_summary_mode",
+    "ai-policy-mode": "ai_policy_mode",
     "ai-summary-context": "ai_summary_context",
     "security-scan-enforcement": "security_scan_enforcement",
     # The remaining per-workspace settings (#1763). These were settable on the
@@ -336,6 +337,7 @@ _SETTING_RULES: dict[str, Any] = {
     "security-scan-skip-rules": workspace_settings.validate_scan_skip_rules,
     "security-scan-enforcement": workspace_settings.validate_scan_enforcement,
     "ai-summary-mode": workspace_settings.validate_ai_summary_mode,
+    "ai-policy-mode": workspace_settings.validate_ai_policy_mode,
     "ai-summary-context": workspace_settings.validate_ai_summary_context,
     "terragrunt-version": workspace_settings.validate_terragrunt_version,
     "trigger-prefixes": workspace_settings.validate_trigger_prefixes,

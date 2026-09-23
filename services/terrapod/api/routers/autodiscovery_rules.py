@@ -93,6 +93,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "security-scan-severity-threshold": rule.security_scan_severity_threshold,
             "security-scan-skip-rules": list(rule.security_scan_skip_rules or []),
             "ai-summary-mode": rule.ai_summary_mode,
+            "ai-policy-mode": rule.ai_policy_mode,
             "ai-summary-context": rule.ai_summary_context or "",
             "terragrunt-enabled": rule.terragrunt_enabled,
             "terragrunt-version": rule.terragrunt_version,
@@ -346,6 +347,7 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
             workspace_settings.validate_scan_skip_rules,
         ),
         ("ai-summary-mode", "ai_summary_mode", workspace_settings.validate_ai_summary_mode),
+        ("ai-policy-mode", "ai_policy_mode", workspace_settings.validate_ai_policy_mode),
         (
             "ai-summary-context",
             "ai_summary_context",

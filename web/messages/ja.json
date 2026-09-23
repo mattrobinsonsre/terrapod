@@ -2307,6 +2307,31 @@
       "erroredMessage": "スキャンが完了しなかったため、この実行は検査されていません。",
       "blockedErroredMessage": "セキュリティスキャンが完了しなかったため、この実行はブロックされています。原因を修正して再度プランを実行するか、管理者に上書きを依頼してください。"
     },
+    "aiPolicyPanel": {
+      "heading": "AI ポリシーゲート",
+      "enforcementLabel": "適用: {level}",
+      "thresholdLabel": "リスクしきい値: {threshold}",
+      "awaitingVerdict": "AI ポリシーの判定を待っています。判定が届くまでこの実行は保留されます。",
+      "decisionAllow": "許可",
+      "decisionDeny": "拒否",
+      "risk": {
+        "critical": "重大",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "blockedDeniedMessage": "この実行は<strong>{count, plural, other {# 件のポリシー基準}}によりブロックされています</strong>。",
+      "blockedRiskMessage": "この実行は、リスクレベル（{level}）がしきい値（{threshold}）以上のため<strong>ブロックされています</strong>。",
+      "blockedErroredMessage": "AI ポリシーの判定に到達できなかったため、この実行はブロックされています。ゲートはフェイルクローズで動作します。到達できなかった判定は承認ではありません。",
+      "erroredMessage": "AI ポリシーゲートが使用可能な判定を返さなかったため、この実行は判定されていません。",
+      "passed": "一致したポリシー基準はありません。",
+      "overriding": "オーバーライド中...",
+      "overrideContinue": "オーバーライドして続行",
+      "overrideConfirm": "AI ポリシーゲートをオーバーライドし、判定にかかわらずこの実行の適用を許可しますか？",
+      "overrideFailed": "オーバーライドに失敗しました",
+      "overrideFailedStatus": "オーバーライドに失敗しました（{status}）",
+      "overriddenBy": "{by} によりオーバーライド"
+    },
     "architecture": {
       "loadError": "アーキテクチャ評価の読み込みに失敗しました。",
       "notEnabled": "この環境では AI アーキテクチャ評価が有効になっていません。",
@@ -2553,6 +2578,8 @@
       "modeDefault": "デプロイメントのデフォルトに従う",
       "modeEnabled": "常に要約する",
       "modeDisabled": "要約しない",
+      "policyMode": "ポリシーゲート",
+      "policyModeNote": "必須ゲートは「しない」を無視します。除外できるのは助言的な判定のみです。",
       "contextLabel": "ワークスペースコンテキスト",
       "contextLabelSuffix": "（任意、追加）",
       "contextPlaceholder": "AIがこのワークスペース固有の点として知っておくべき事実。例: 「サービスXのVaultのフロントを担っています — KMSキーを破棄するとグローバル障害が発生します。」",

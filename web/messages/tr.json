@@ -2307,6 +2307,31 @@
       "erroredMessage": "Tarama tamamlanmadı, bu nedenle bu çalıştırma denetlenmedi.",
       "blockedErroredMessage": "Güvenlik taraması tamamlanmadığı için bu çalıştırma engellendi. Nedenini giderip yeniden plan yapın veya bir yöneticiden geçersiz kılmasını isteyin."
     },
+    "aiPolicyPanel": {
+      "heading": "AI politika kapısı",
+      "enforcementLabel": "uygulama: {level}",
+      "thresholdLabel": "risk eşiği: {threshold}",
+      "awaitingVerdict": "AI politika kararı bekleniyor. Karar gelene kadar bu çalıştırma tutuluyor.",
+      "decisionAllow": "izin verildi",
+      "decisionDeny": "reddedildi",
+      "risk": {
+        "critical": "kritik",
+        "high": "yüksek",
+        "medium": "orta",
+        "low": "düşük"
+      },
+      "blockedDeniedMessage": "Bu çalıştırma <strong>{count, plural, one {# politika ölçütü} other {# politika ölçütü}} tarafından engellendi</strong>.",
+      "blockedRiskMessage": "Bu çalıştırma, risk düzeyi ({level}) eşikte ({threshold}) veya üzerinde olduğu için <strong>engellendi</strong>.",
+      "blockedErroredMessage": "AI politika kararına ulaşılamadığı için bu çalıştırma engellendi. Kapı kapalı konumda başarısız olur; ulaşılamayan bir karar onay değildir.",
+      "erroredMessage": "AI politika kapısı kullanılabilir bir karar döndürmedi, bu nedenle bu çalıştırma değerlendirilmedi.",
+      "passed": "Hiçbir politika ölçütü eşleşmedi.",
+      "overriding": "Geçersiz kılınıyor...",
+      "overrideContinue": "Geçersiz Kıl ve Devam Et",
+      "overrideConfirm": "AI politika kapısı geçersiz kılınıp karara rağmen bu çalıştırmanın uygulanmasına izin verilsin mi?",
+      "overrideFailed": "Geçersiz kılma başarısız",
+      "overrideFailedStatus": "Geçersiz kılma başarısız ({status})",
+      "overriddenBy": "{by} tarafından geçersiz kılındı"
+    },
     "architecture": {
       "loadError": "Mimari eleştirisi yüklenemedi.",
       "notEnabled": "AI mimari eleştirmeni bu dağıtımda etkin değil.",
@@ -2553,6 +2578,8 @@
       "modeDefault": "Dağıtım varsayılanını izle",
       "modeEnabled": "Her zaman özetle",
       "modeDisabled": "Asla özetleme",
+      "policyMode": "Politika kapısı",
+      "policyModeNote": "Zorunlu bir kapı “Asla” seçeneğini yok sayar: bu çalışma alanını yalnızca tavsiye niteliğindeki bir karardan muaf tutabilir.",
       "contextLabel": "Çalışma alanı bağlamı",
       "contextLabelSuffix": "(isteğe bağlı, ek)",
       "contextPlaceholder": "AI''nin özellikle bu çalışma alanı hakkında bilmesi gereken gerçekler. örn. 'X hizmetinin vault''unu önler — KMS anahtarını yok etmek genel bir kesintiye neden olur.'",
