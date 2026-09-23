@@ -654,7 +654,9 @@ field Policy.Name string `json:"name"`
 field Policy.PolicySetID string `json:"policy-set-id"`
 field Policy.Rego string `json:"rego"`
 field Policy.UpdatedAt string `json:"updated-at,omitempty"`
+field PolicySet.AllowLabels map[string]string `json:"allow-labels,omitempty"`
 field PolicySet.CreatedAt string `json:"created-at,omitempty"`
+field PolicySet.DenyLabels map[string]string `json:"deny-labels,omitempty"`
 field PolicySet.Description string `json:"description,omitempty"`
 field PolicySet.Enabled bool `json:"enabled"`
 field PolicySet.EnforcementLevel string `json:"enforcement-level"`
@@ -1387,6 +1389,7 @@ method (*Client) GetOnboardingAvailability(ctx context.Context) (*OnboardingAvai
 method (*Client) GetOnboardingSession(ctx context.Context, sessionID string) (*OnboardingSession, error)
 method (*Client) GetPlanLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error)
 method (*Client) GetPlanSummary(ctx context.Context, planID string) (*PlanSummary, error)
+method (*Client) GetPolicy(ctx context.Context, policySetID, policyID string) (*Policy, error)
 method (*Client) GetPolicySet(ctx context.Context, id string) (*PolicySet, error)
 method (*Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderTemplate, error)
 method (*Client) GetRegistryModule(ctx context.Context, name, providerName string) (*RegistryModule, error)
@@ -1445,6 +1448,7 @@ method (*Client) ListNotificationConfigurations(ctx context.Context, workspaceID
 method (*Client) ListOnboardingSessions(ctx context.Context, workspaceID string) ([]OnboardingSession, error)
 method (*Client) ListOutboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error)
 method (*Client) ListPlanSummaryMessages(ctx context.Context, runID string) ([]*PlanSummaryMessage, error)
+method (*Client) ListPolicies(ctx context.Context, policySetID string) ([]Policy, error)
 method (*Client) ListPolicySets(ctx context.Context) ([]PolicySet, error)
 method (*Client) ListProviderTemplates(ctx context.Context) ([]ProviderTemplate, error)
 method (*Client) ListRegistryModules(ctx context.Context) ([]RegistryModule, error)
