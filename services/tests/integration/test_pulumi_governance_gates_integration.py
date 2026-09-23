@@ -1,10 +1,20 @@
 """Integration: governance never holds a Pulumi apply for a result that never comes (#1567).
 
 Real Postgres, real rows. A global mandatory policy set that denies everything
-and an enforced security scan are both in force; the Pulumi runner evaluates
-neither. The Pulumi run must reach `planned` with nothing recorded, and the same
-setup on a Terraform workspace must still be held -- the gates keep failing
-closed where a runner does evaluate.
+and an enforced security scan are both in force.
+
+The two gates now differ, and the difference is the whole point of this file:
+
+  - **Policy sets apply to Pulumi**, since the runner builds an OPA input from
+    the preview's engine event log. A missing result holds the run, exactly as
+    it does for Terraform -- the safety net firing for its real reason, a
+    runner that did not report.
+  - **Security scans still do not.** Checkov and Trivy read Terraform plan
+    JSON, so a scan must never be what holds a Pulumi apply; that is the
+    original defect, and an enforced scan cannot even be turned on.
+
+Terraform failing closed on both throughout is the part worth proving just as
+hard.
 """
 
 import uuid
@@ -77,7 +87,17 @@ async def _plan_finishes(ws_id: str) -> tuple[str, int, int]:
 
 
 class TestAPulumiWorkspaceUnderGovernance:
-    async def test_its_apply_is_not_held_and_nothing_is_recorded(self, app, client):
+    async def test_its_apply_is_held_by_policy_exactly_as_terraform_is(self, app, client):
+        """The inverse of what this asserted before #1567's second half.
+
+        A mandatory set used to pass a Pulumi run, because nothing could
+        evaluate it and holding the apply forever was the worse failure. The
+        runner now builds an OPA input from the preview's event log, so a
+        missing result is the safety net firing for its real reason -- a runner
+        that did not report -- and must hold the run exactly as Terraform's
+        does. One evaluation is recorded; the scan is still not reached, and
+        would not be recorded for a Pulumi workspace anyway.
+        """
         set_auth(app, admin_user())
         await _deny_everything_globally()
         status, body = await _create(client, "proj::governed", "pulumi")
@@ -85,8 +105,24 @@ class TestAPulumiWorkspaceUnderGovernance:
 
         run_status, evals, scans = await _plan_finishes(body["data"]["id"])
 
-        assert run_status == "planned"
-        assert (evals, scans) == (0, 0)
+        assert run_status == "planning"
+        assert (evals, scans) == (1, 0)
+
+    async def test_its_apply_is_still_never_held_by_a_scan(self, app, client):
+        """The half of #1567 that has NOT changed.
+
+        Checkov and Trivy read Terraform plan JSON; whether they have a
+        meaningful Pulumi input at all is #1569. Until then a scan must not be
+        what holds a Pulumi apply -- which is the original defect, and is why
+        this stays pinned separately now that the policy half has moved.
+        """
+        set_auth(app, admin_user())
+        status, body = await _create(client, "proj::unscanned", "pulumi")
+        assert status == 201, body
+
+        _run_status, _evals, scans = await _plan_finishes(body["data"]["id"])
+
+        assert scans == 0
 
     async def test_the_same_setup_still_holds_a_terraform_apply(self, app, client):
         set_auth(app, admin_user())
