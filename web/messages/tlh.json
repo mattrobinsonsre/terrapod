@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt mI'",
       "noExpiry": "van Hutlh",
-      "addDriftIgnoreRule": "chu'wI' chel"
+      "addDriftIgnoreRule": "chu'wI' chel",
+      "debugModeHint": "Qumwo'mey chenmoHbogh chu'wI'vam, pa' poSqu'moH vumwI' pod lujpu'bogh. motlh chu'Ha'lu' — pod pollu'bogh Qumwo'vetlh pegh pol."
     },
     "table": {
       "name": "pong",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "Dotlh vang lujpu'",
       "uploadState": "Dotlh lI'meH lujpu'",
       "uploadStateFile": "Dotlh teywI' lI'meH lujpu'",
-      "updateSecurityScan": "Hujqu'ghach Sup choqlaHbe'"
+      "updateSecurityScan": "Hujqu'ghach Sup choqlaHbe'",
+      "updateDebugMode": "Qagh Sam mIw choHmeH lujpu'"
     },
     "subtabs": {
       "state": "Sep",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "chu'wI' buSHa'lu'be'.",
       "skipRulesHint": "Supwl' chu'wI' per, commamey Sep, vam Qumwo'Daq buSHa'lu'bogh."
+    },
+    "debugMode": {
+      "title": "vumwI' Qagh Sam mIw",
+      "description": "Sar lujpu'bogh pod yIpoSmoH, vaj qoD DajaHlaH. wa'DIch lujpu' Sar maqlu'; ghIq neH taH ngaSwI'.",
+      "label": "Qagh Sam mIw",
+      "hint": "motlh chu'Ha'lu'. chu'lu'taHvIS, poH che'wI'lIj wIvpu'bogh, poSqu'taH vumwI' pod lujpu'bogh, 'ej poH naQ Qumwo'vam pegh je choHlaHmey pollu'.",
+      "activeBadge": "vangtaH",
+      "bannerTitle": "Qumwo'vamvaD chu'lu'pu' Qagh Sam mIw",
+      "bannerBody": "mevbe'; nuDmeH poSqu'taH Sar lujpu'bogh pod, 'ej pollu'taHvIS Qumwo'vam pegh je choHlaHmey pol. Qagh DaSampu'DI', Qagh Sam mIw yIchu'Ha'.",
+      "confirmEnable": "Qagh Sam mIw Dachu' 'e' DaneH'a'? Qumwo'vam pegh je choHlaHmey qengtaHvIS poSqu'taH Sar lujpu'bogh pod, poH mevDI' pagh pod DaQaw'DI'."
     }
   },
   "graphs": {

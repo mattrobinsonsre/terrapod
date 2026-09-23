@@ -524,6 +524,7 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "drift_ignore_rules",
         "plan_expiry_seconds",
         "slack_channel",
+        "debug_mode",
     )
 
     def _materialisation_source(self) -> str:

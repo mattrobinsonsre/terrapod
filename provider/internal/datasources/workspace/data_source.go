@@ -38,6 +38,7 @@ type workspaceDataSourceModel struct {
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
+	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
 	Parallelism                   types.Int64  `tfsdk:"parallelism"`
 	ResourceMemory                types.String `tfsdk:"resource_memory"`
@@ -108,6 +109,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
 			"working_directory":                computedString("Working directory."),
 			"parallelism":                      computedInt64("How many operations the engine performs at once."),
+			"debug_mode":                       computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
 			"resource_cpu":                     computedString("CPU request."),
 			"resource_memory":                  computedString("Memory request."),
 			"labels":                           computedMap("Labels."),
@@ -234,6 +236,7 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	setOptionalString(&m.TerraformVersion, engineVersion)
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
 	setOptionalString(&m.TerragruntVersion, terrapod.GetStringAttr(res, "terragrunt-version"))
+	m.DebugMode = types.BoolValue(terrapod.GetBoolAttr(res, "debug-mode"))
 	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))
 	setOptionalString(&m.VCSBranch, terrapod.GetStringAttr(res, "vcs-branch"))
 	setOptionalString(&m.AgentPoolID, terrapod.GetStringAttr(res, "agent-pool-id"))

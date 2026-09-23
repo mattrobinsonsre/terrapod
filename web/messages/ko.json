@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt 버전",
       "noExpiry": "만료 없음",
-      "addDriftIgnoreRule": "규칙 추가"
+      "addDriftIgnoreRule": "규칙 추가",
+      "debugModeHint": "이 규칙이 만드는 워크스페이스에서 실패한 러너 파드를 유지합니다. 기본값은 꺼짐 — 유지된 파드는 해당 워크스페이스의 자격 증명을 보관합니다."
     },
     "table": {
       "name": "이름",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "상태 작업에 실패했습니다",
       "uploadState": "상태를 업로드하지 못했습니다",
       "uploadStateFile": "상태 파일을 업로드하지 못했습니다",
-      "updateSecurityScan": "보안 검사 업데이트에 실패했습니다"
+      "updateSecurityScan": "보안 검사 업데이트에 실패했습니다",
+      "updateDebugMode": "디버그 모드를 업데이트하지 못했습니다"
     },
     "subtabs": {
       "state": "상태",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "무시하는 규칙이 없습니다.",
       "skipRulesHint": "이 워크스페이스에서 무시할 검사 도구의 규칙 ID를 쉼표로 구분하여 입력합니다."
+    },
+    "debugMode": {
+      "title": "러너 디버그 모드",
+      "description": "실패한 실행의 파드를 열어 둔 채 유지해 안으로 들어가 볼 수 있게 합니다. 실행 실패는 먼저 보고되고, 그다음에야 컨테이너가 남습니다.",
+      "label": "디버그 모드",
+      "hint": "기본값은 꺼짐입니다. 켜져 있는 동안 실패한 러너의 파드는 운영자가 설정한 시간 동안 exec으로 접근할 수 있는 상태로 남으며, 그 시간 내내 이 워크스페이스의 자격 증명과 복호화된 변수를 보관합니다.",
+      "activeBadge": "활성",
+      "bannerTitle": "이 워크스페이스에 디버그 모드가 켜져 있습니다",
+      "bannerBody": "실패한 실행의 파드는 종료되지 않고 점검을 위해 유지되며, 유지되는 동안 이 워크스페이스의 자격 증명과 복호화된 변수를 보관합니다. 문제 해결이 끝나면 디버그 모드를 끄세요.",
+      "confirmEnable": "디버그 모드를 켤까요? 실패한 실행의 파드는 시간이 만료되거나 파드를 삭제할 때까지 이 워크스페이스의 자격 증명과 복호화된 변수를 지닌 채 유지됩니다."
     }
   },
   "graphs": {

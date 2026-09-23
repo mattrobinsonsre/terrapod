@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Verze Terragrunt",
       "noExpiry": "Bez vypršení",
-      "addDriftIgnoreRule": "Přidat pravidlo"
+      "addDriftIgnoreRule": "Přidat pravidlo",
+      "debugModeHint": "Ponechat pody neúspěšných runnerů otevřené v pracovních prostorech, které toto pravidlo vytvoří. Ve výchozím stavu vypnuto — ponechaný pod si drží přihlašovací údaje daného pracovního prostoru."
     },
     "table": {
       "name": "Název",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "Akce se stavem selhala",
       "uploadState": "Nepodařilo se nahrát stav",
       "uploadStateFile": "Nepodařilo se nahrát soubor stavu",
-      "updateSecurityScan": "Nepodařilo se aktualizovat bezpečnostní kontrolu"
+      "updateSecurityScan": "Nepodařilo se aktualizovat bezpečnostní kontrolu",
+      "updateDebugMode": "Režim ladění se nepodařilo aktualizovat"
     },
     "subtabs": {
       "state": "Stav",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Žádná pravidla nejsou ignorována.",
       "skipRulesHint": "Identifikátory pravidel skeneru oddělené čárkami, které se v tomto pracovním prostoru ignorují."
+    },
+    "debugMode": {
+      "title": "Režim ladění runneru",
+      "description": "Ponechat pod neúspěšného běhu otevřený, abyste se do něj mohli dostat. Selhání běhu se nahlásí nejdřív; teprve pak kontejner zůstane stát.",
+      "label": "Režim ladění",
+      "hint": "Ve výchozím stavu vypnuto. Když je zapnutý, pod neúspěšného runneru zůstane dostupný přes exec po dobu okna nastaveného vaším operátorem a celou tu dobu si ponechává přihlašovací údaje a dešifrované proměnné tohoto pracovního prostoru.",
+      "activeBadge": "Aktivní",
+      "bannerTitle": "Pro tento pracovní prostor je zapnutý režim ladění",
+      "bannerBody": "Pod neúspěšného běhu se místo ukončení ponechá otevřený k prohlídce a po celou tu dobu si ponechává přihlašovací údaje a dešifrované proměnné tohoto pracovního prostoru. Až dokončíte hledání příčiny, režim ladění vypněte.",
+      "confirmEnable": "Zapnout režim ladění? Pod neúspěšného běhu zůstane otevřený i s přihlašovacími údaji a dešifrovanými proměnnými tohoto pracovního prostoru, dokud okno nevyprší nebo dokud pod nesmažete."
     }
   },
   "graphs": {

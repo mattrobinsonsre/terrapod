@@ -594,6 +594,12 @@ Workspaces support the following drift detection attributes (settable on create 
 | `security-scan-severity-threshold` | string | `high` | Lowest finding severity that counts as a scan failure: `critical`, `high`, `medium`, or `low` |
 | `security-scan-skip-rules` | list[string] | `[]` | Scanner rule-ids to suppress (Checkov `CKV_*` / Trivy `AVD-*`). Max 200 entries, ≤ 100 chars each |
 
+### Runner Debug Mode
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `debug-mode` | boolean | `false` | Hold this workspace's **failed** runner pods open so an operator can `kubectl exec` into one (#1764). The run is reported as failed first and is final from Terrapod's side; only then does the container stay up, for at most `runners.debugLingerSeconds`. Successful runs are unaffected. See [runners.md → Debug mode](runners.md#debug-mode-inspecting-a-failed-runner-pod) for what a held pod exposes and who can reach it |
+
 ### Terragrunt Attributes
 
 Workspaces support running agent-mode plans/applies through Terragrunt (settable on create and update). See [terragrunt.md](terragrunt.md) for the full feature description, including the CLI-driven path that needs no configuration.
@@ -2680,6 +2686,7 @@ These are editable in the UI under **Admin → Autodiscovery**, alongside the ru
 - `security-scan-enforcement` / `security-scan-engine` / `security-scan-severity-threshold` / `security-scan-skip-rules` — [security scanning](security-scanning.md) for every created workspace (#1763). Unlike on a workspace, `enforced` is always accepted here: a rule has no engine, so everything it creates is a Terraform/OpenTofu workspace, which is exactly what can be scanned.
 - `ai-summary-mode` / `ai-summary-context` — the AI plan-summary opt-in and its free-text context for every created workspace (#1763).
 - `terragrunt-enabled` / `terragrunt-version`, `vcs-workflow`, `auto-merge` / `auto-merge-strategy`, `drift-detection-enabled` / `drift-detection-interval-seconds`, `drift-ignore-rules`, `plan-expiry-seconds` and `slack-channel` — the remaining per-workspace settings (#1763). `drift-detection-enabled` defaults **true** here, unlike the workspace column, because every autodiscovered workspace is VCS-connected.
+- `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **false**, as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
 
 These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template). The same pairing holds for the scan and AI-summary settings, and their values are validated by the same rules the workspace endpoint uses — so a rule cannot template a setting the workspace API would reject.
 

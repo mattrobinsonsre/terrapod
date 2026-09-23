@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Version, Terragrunt",
       "noExpiry": "Expiry, there is none",
-      "addDriftIgnoreRule": "A rule, add"
+      "addDriftIgnoreRule": "A rule, add",
+      "debugModeHint": "Open failed runner pods hold, on the workspaces this rule creates. Off by default — that workspace's credentials, a held pod keeps."
     },
     "table": {
       "name": "Name",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "Failed, the state action did",
       "uploadState": "Upload the state, it did not",
       "uploadStateFile": "Upload the state file, it did not",
-      "updateSecurityScan": "Update the security scanning, failed it did"
+      "updateSecurityScan": "Update the security scanning, failed it did",
+      "updateDebugMode": "Update debug mode, it did not"
     },
     "subtabs": {
       "state": "State",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Ignored, no rules are.",
       "skipRulesHint": "To ignore on this workspace, comma-separated scanner rule ids there are."
+    },
+    "debugMode": {
+      "title": "Mode, Runner Debug",
+      "description": "Open the pod of a failed run, hold you must, so inside it get you can. As failed, reported first the run is; only then stay up, the container does.",
+      "label": "Mode, Debug",
+      "hint": "Off by default, it is. While on, exec-able a failed runner pod stays, for the window your operator configured, and this workspace's credentials and decrypted variables, keep it does, for that whole time.",
+      "activeBadge": "Active",
+      "bannerTitle": "On for this workspace, debug mode is",
+      "bannerBody": "Held open for inspection instead of exiting, a failed run's pod is, and this workspace's credentials and decrypted variables it keeps, while held it is. Off turn debug mode, when finished troubleshooting you are.",
+      "confirmEnable": "On debug mode, turn? Held open a failed run's pod will be, holding this workspace's credentials and decrypted variables, until expires the window or delete the pod you do."
     }
   },
   "graphs": {

@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-versie",
       "noExpiry": "Geen verval",
-      "addDriftIgnoreRule": "Regel toevoegen"
+      "addDriftIgnoreRule": "Regel toevoegen",
+      "debugModeHint": "Pods van mislukte runners openhouden op de werkruimten die deze regel aanmaakt. Standaard uit — een opengehouden pod behoudt de referenties van die werkruimte."
     },
     "table": {
       "name": "Naam",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "State-actie mislukt",
       "uploadState": "Kan state niet uploaden",
       "uploadStateFile": "Kan state-bestand niet uploaden",
-      "updateSecurityScan": "Bijwerken van de beveiligingsscan is mislukt"
+      "updateSecurityScan": "Bijwerken van de beveiligingsscan is mislukt",
+      "updateDebugMode": "Bijwerken van de foutopsporingsmodus mislukt"
     },
     "subtabs": {
       "state": "State",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Geen regels genegeerd.",
       "skipRulesHint": "Door komma's gescheiden scanner-regel-ID's die in deze workspace worden genegeerd."
+    },
+    "debugMode": {
+      "title": "Foutopsporingsmodus voor de runner",
+      "description": "De pod van een mislukte uitvoering openhouden zodat je erin kunt kijken. De uitvoering wordt eerst als mislukt gemeld; pas daarna blijft de container staan.",
+      "label": "Foutopsporingsmodus",
+      "hint": "Standaard uit. Zolang deze aanstaat blijft de pod van een mislukte runner bereikbaar met exec gedurende het venster dat je beheerder heeft ingesteld, en behoudt hij al die tijd de referenties en ontsleutelde variabelen van deze werkruimte.",
+      "activeBadge": "Actief",
+      "bannerTitle": "Foutopsporingsmodus staat aan voor deze werkruimte",
+      "bannerBody": "De pod van een mislukte uitvoering wordt voor inspectie opengehouden in plaats van af te sluiten, en behoudt zolang de referenties en ontsleutelde variabelen van deze werkruimte. Zet de foutopsporingsmodus uit zodra je klaar bent met onderzoeken.",
+      "confirmEnable": "Foutopsporingsmodus aanzetten? De pod van een mislukte uitvoering wordt opengehouden met de referenties en ontsleutelde variabelen van deze werkruimte totdat het venster verloopt of je de pod verwijdert."
     }
   },
   "graphs": {

@@ -118,6 +118,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "security_scan_engine": ws.security_scan_engine,
         "security_scan_severity_threshold": ws.security_scan_severity_threshold,
         "security_scan_skip_rules": list(ws.security_scan_skip_rules or []),
+        "debug_mode": ws.debug_mode,
         "ai_summary_mode": ws.ai_summary_mode,
         "ai_summary_context": ws.ai_summary_context,
         "slack_channel": ws.slack_channel,
@@ -576,6 +577,7 @@ async def restore_workspace(
             settings.get("security_scan_severity_threshold") or "high"
         ),
         security_scan_skip_rules=list(settings.get("security_scan_skip_rules") or []),
+        debug_mode=bool(settings.get("debug_mode", False)),
         ai_summary_mode=settings.get("ai_summary_mode") or "default",
         ai_summary_context=settings.get("ai_summary_context") or "",
         slack_channel=settings.get("slack_channel") or "",

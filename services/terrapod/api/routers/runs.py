@@ -2352,6 +2352,13 @@ async def next_run(
     # falls back to enabled if a lagging listener drops the field.
     run_data["data"]["attributes"]["cost-estimation"] = settings.cost_estimation.enabled
     run_data["data"]["attributes"]["cost-default-region"] = settings.cost_estimation.default_region
+    # Debug mode (#1764). The API sends only the workspace's INTENT; the
+    # window comes from `runners.yaml` on the listener side, because that is
+    # where `RunnerConfig` lives — the API's own settings never see it (the
+    # config-channel split). So a workspace admin asks for a debug pod and the
+    # operator decides how long one may survive, which matters because the pod
+    # holds the run's auth token and its decrypted tfvars for that window.
+    run_data["data"]["attributes"]["debug-mode"] = bool(ws and ws.debug_mode)
     run_data["data"]["attributes"]["var-files"] = ws.var_files if ws and ws.var_files else []
     run_data["data"]["attributes"]["working-directory"] = ws.working_directory if ws else ""
     run_data["data"]["attributes"]["phase"] = phase

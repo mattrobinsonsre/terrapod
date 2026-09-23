@@ -512,6 +512,13 @@ class Workspace(Base):
     ai_summary_context: Mapped[str] = mapped_column(
         Text, nullable=False, server_default="", default=""
     )
+    #: Hold this workspace's failed runner pods open for inspection (#1764).
+    #: How long is the deployment's call (`runners.debugLingerSeconds`), not
+    #: the workspace's: the pod keeps the run's auth token and its decrypted
+    #: tfvars for that window.
+    debug_mode: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     # Autodiscovery lifecycle (#314). lifecycle_state: active (normal) |
     # pending_deletion (origin dir/PR gone — needs explicit operator
@@ -1454,6 +1461,9 @@ class AutodiscoveryRule(Base):
     plan_expiry_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     slack_channel: Mapped[str] = mapped_column(
         String(128), nullable=False, default="", server_default=""
+    )
+    debug_mode: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
     # #314 deletion lifecycle: what to do when a discovered directory is
     # removed on the tracked branch. "flag" (default, safe) marks the

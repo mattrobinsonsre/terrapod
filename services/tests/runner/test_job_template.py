@@ -901,3 +901,77 @@ class TestHostAliasesAndExtraVolumes:
         mounts = {m["name"] for m in spec["containers"][0]["volumeMounts"]}
         assert original_mounts <= mounts, f"dropped mounts: {original_mounts - mounts}"
         assert "creds" in mounts
+
+
+class TestDebugModeBoundsTheLinger1764:
+    """A lingering pod holds the run's auth token and its decrypted tfvars.
+
+    So the window is bounded twice: the orchestrator sleeps for at most what it
+    is told, and the Job carries a deadline that ends the pod even if the
+    orchestrator misbehaves. The second is the one that actually guarantees it.
+    """
+
+    def _spec(self, **kw):
+        from terrapod.runner.job_template import build_job_spec
+
+        return build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+            timeout_minutes=60,
+            **kw,
+        )
+
+    def _env(self, spec):
+        return {
+            e["name"]: e.get("value")
+            for e in spec["spec"]["template"]["spec"]["containers"][0]["env"]
+        }
+
+    def test_off_by_default_the_job_is_unchanged(self):
+        spec = self._spec()
+        assert "TP_DEBUG_LINGER_SECONDS" not in self._env(spec)
+        assert spec["spec"]["activeDeadlineSeconds"] == 60 * 60
+        assert spec["spec"]["ttlSecondsAfterFinished"] == 300
+
+    def test_the_deadline_covers_the_run_plus_the_window(self):
+        # Not just the run's timeout: a pod held after a failure would
+        # otherwise be killed mid-inspection at exactly the wrong moment.
+        spec = self._spec(debug_linger_seconds=1800)
+        assert spec["spec"]["activeDeadlineSeconds"] == 60 * 60 + 1800
+
+    def test_the_window_reaches_the_runner(self):
+        assert self._env(self._spec(debug_linger_seconds=900))["TP_DEBUG_LINGER_SECONDS"] == "900"
+
+    def test_a_successful_run_keeps_its_job_longer_too(self):
+        """The other half of the ask: delayed teardown for a run that passed."""
+        spec = self._spec(debug_linger_seconds=1500)
+        assert spec["spec"]["ttlSecondsAfterFinished"] == 1500
+
+    def test_a_short_window_never_shortens_the_normal_ttl(self):
+        spec = self._spec(debug_linger_seconds=5)
+        assert spec["spec"]["ttlSecondsAfterFinished"] == 300
+
+    def test_debug_mode_does_not_disturb_the_engines_own_env(self):
+        """Regression, carried from the 1.8 line and re-pointed at this one.
+
+        There the debug block was first written between the cost `if` and its
+        `elif`, which re-bound the `elif` and silently stopped
+        `TP_COST_DEFAULT_REGION` being emitted whenever debug mode was on. That
+        chain does not exist here -- cost is a `TerraformRunOptions` field the
+        strategy composes (#1488) -- so the same mistake would take a different
+        shape: the platform block clobbering or truncating `engine_env`.
+
+        Rendered through the strategy rather than the neutral builder, because
+        that is the only path that has both halves to get wrong.
+        """
+        env = TestCostEstimationEnv()._spec_env(
+            cost_estimation=True,
+            cost_default_region="eu-west-1",
+            debug_linger_seconds=600,
+        )
+        assert env["TP_COST_DEFAULT_REGION"] == "eu-west-1"
+        assert env["TP_DEBUG_LINGER_SECONDS"] == "600"

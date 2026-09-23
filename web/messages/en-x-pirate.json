@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt version",
       "noExpiry": "No expiry, matey",
-      "addDriftIgnoreRule": "Add a rule"
+      "addDriftIgnoreRule": "Add a rule",
+      "debugModeHint": "Keep failed runner pods open on the work-decks this rule creates. Off by default — a held pod keeps that work-deck''s credentials."
     },
     "table": {
       "name": "Name",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "State action failed",
       "uploadState": "Failed t'' hoist th'' state aboard",
       "uploadStateFile": "Failed t'' hoist th'' state file aboard",
-      "updateSecurityScan": "Failed to update the security sweep"
+      "updateSecurityScan": "Failed to update the security sweep",
+      "updateDebugMode": "Failed t'' update debuggin'' mode"
     },
     "subtabs": {
       "state": "State",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "No rules ignored, matey.",
       "skipRulesHint": "Comma-separated sweeper rule ids to ignore on this work-deck."
+    },
+    "debugMode": {
+      "title": "Runner Debuggin'' Mode",
+      "description": "Keep a failed voyage''s pod open so ye can climb aboard it. The voyage be reported as failed first; only then does the hold stay afloat.",
+      "label": "Debuggin'' Mode",
+      "hint": "Off by default. While on, a failed runner''s pod stays exec-able fer the window yer quartermaster set, an'' it keeps this work-deck''s credentials an'' decrypted variables that whole time.",
+      "activeBadge": "Active",
+      "bannerTitle": "Debuggin'' mode be on fer this work-deck",
+      "bannerBody": "A failed voyage''s pod be held open fer inspection instead o'' endin'', an'' it keeps this work-deck''s credentials an'' decrypted variables while it be held. Douse debuggin'' mode once ye be done huntin'' the fault.",
+      "confirmEnable": "Hoist debuggin'' mode? A failed voyage''s pod will be held open carryin'' this work-deck''s credentials an'' decrypted variables until the window runs out or ye delete the pod."
     }
   },
   "graphs": {

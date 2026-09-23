@@ -138,6 +138,10 @@ type Workspace struct {
 	// VCSConnectionName is the human-readable name of the assigned VCS
 	// connection, server-derived from VCSConnectionID. Empty when none.
 	VCSConnectionName string `json:"vcs-connection-name,omitempty"`
+	// DebugMode holds this workspace's failed runner pods open for
+	// inspection (#1764). How long is the deployment's setting, not the
+	// workspace's — the pod keeps the run's credentials for that window.
+	DebugMode bool `json:"debug-mode"`
 	// AISummaryMode is the three-state per-workspace override (#401):
 	//   "default"  → follow the deployment-wide ai_summary.enabled flag
 	//   "enabled"  → always summarise (no-op when global is off)
@@ -215,6 +219,10 @@ type CreateWorkspaceRequest struct {
 	// AISummaryMode is the three-state per-workspace override (#401):
 	// "default" | "enabled" | "disabled". Empty string omits the field
 	// (server-side default applies — "default").
+	// DebugMode holds this workspace's failed runner pods open for inspection
+	// (#1764). A pointer so that "leave it alone" and "turn it off" stay
+	// distinguishable -- a bare bool with omitempty cannot express the second.
+	DebugMode     *bool  `json:"debug-mode,omitempty"`
 	AISummaryMode string `json:"ai-summary-mode,omitempty"`
 	// AISummaryContext is workspace-specific context added to the model
 	// prompt. Capped at 4000 chars server-side.
@@ -278,6 +286,10 @@ type UpdateWorkspaceRequest struct {
 	// AISummaryMode see CreateWorkspaceRequest. On UPDATE, empty string
 	// leaves the existing value untouched — to explicitly set "follow
 	// deployment default", pass "default".
+	// DebugMode holds this workspace's failed runner pods open for inspection
+	// (#1764). A pointer so that "leave it alone" and "turn it off" stay
+	// distinguishable -- a bare bool with omitempty cannot express the second.
+	DebugMode     *bool  `json:"debug-mode,omitempty"`
 	AISummaryMode string `json:"ai-summary-mode,omitempty"`
 	// AISummaryContext see CreateWorkspaceRequest. To clear an existing
 	// context, set this to "" — but note empty string also means
@@ -840,6 +852,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		VCSLastErrorAt:                GetStringAttr(res, "vcs-last-error-at"),
 		AgentPoolName:                 GetStringAttr(res, "agent-pool-name"),
 		VCSConnectionName:             GetStringAttr(res, "vcs-connection-name"),
+		DebugMode:                     GetBoolAttr(res, "debug-mode"),
 		AISummaryMode:                 GetStringAttr(res, "ai-summary-mode"),
 		AISummaryContext:              GetStringAttr(res, "ai-summary-context"),
 		SlackChannel:                  GetStringAttr(res, "slack-channel"),

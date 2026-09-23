@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt vershun",
       "noExpiry": "No expiry. srsly.",
-      "addDriftIgnoreRule": "Add rule"
+      "addDriftIgnoreRule": "Add rule",
+      "debugModeHint": "Hold faild runnr podz open on da werkspaces dis rule makez. Off by defalt — a held pod keepz dat werkspace credenshulz."
     },
     "table": {
       "name": "Naym",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "State acshun failz",
       "uploadState": "Failz ta uplod teh state",
       "uploadStateFile": "Failz ta uplod teh state file",
-      "updateSecurityScan": "Faild 2 updayt sekurity scannin"
+      "updateSecurityScan": "Faild 2 updayt sekurity scannin",
+      "updateDebugMode": "Failz ta updat teh debug mode"
     },
     "subtabs": {
       "state": "Stayt",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "No rulez ignord. yay.",
       "skipRulesHint": "Comma-separayted scannr rule idz 2 ignor on dis werkspace."
+    },
+    "debugMode": {
+      "title": "Runnr Debuggin Mode",
+      "description": "Hold a faild runz pod open so u can get insyde it. Da run getz reportd as faild furst; only den duz da contaynr stay up.",
+      "label": "Debug Mode",
+      "hint": "Off by defalt. Wen its on, a faild runnr pod stayz exec-abul fer da windo yer operatr set, an it keepz dis werkspace credenshulz an dekrypted variablez dat hole tyme.",
+      "activeBadge": "Aktiv",
+      "bannerTitle": "Debug mode iz ON fer dis werkspace",
+      "bannerBody": "A faild runz pod getz held open fer snoopin insted ov exitin, an it keepz dis werkspace credenshulz an dekrypted variablez wile its held. Turn debug mode off wen u iz dun troubleshootin.",
+      "confirmEnable": "Turn on debug mode? A faild runz pod will b held open wif dis werkspace credenshulz an dekrypted variablez til da windo runz out or u delet da pod."
     }
   },
   "graphs": {

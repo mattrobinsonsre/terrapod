@@ -1075,7 +1075,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt-versio",
       "noExpiry": "Ei vanhenemista",
-      "addDriftIgnoreRule": "Lisää sääntö"
+      "addDriftIgnoreRule": "Lisää sääntö",
+      "debugModeHint": "Pidä epäonnistuneiden suorittajien podit auki työtiloissa, jotka tämä sääntö luo. Oletuksena pois päältä – auki pidetty podi säilyttää kyseisen työtilan tunnukset."
     },
     "table": {
       "name": "Nimi",
@@ -2882,7 +2883,8 @@
       "stateActionFailed": "Tilatoiminto epäonnistui",
       "uploadState": "Tilan lataaminen epäonnistui",
       "uploadStateFile": "Tilatiedoston lataaminen epäonnistui",
-      "updateSecurityScan": "Tietoturvatarkistuksen päivitys epäonnistui"
+      "updateSecurityScan": "Tietoturvatarkistuksen päivitys epäonnistui",
+      "updateDebugMode": "Virheenkorjaustilan päivitys epäonnistui"
     },
     "subtabs": {
       "state": "Tila",
@@ -2925,6 +2927,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Sääntöjä ei ohiteta.",
       "skipRulesHint": "Pilkuin erotetut tarkistimen sääntötunnukset, jotka ohitetaan tässä työtilassa."
+    },
+    "debugMode": {
+      "title": "Suorittajan virheenkorjaustila",
+      "description": "Pidä epäonnistuneen ajon podi auki, jotta pääset sen sisälle. Ajo raportoidaan ensin epäonnistuneeksi; vasta sen jälkeen kontti jää pystyyn.",
+      "label": "Virheenkorjaustila",
+      "hint": "Oletuksena pois päältä. Päällä ollessaan epäonnistuneen suorittajan podiin pääsee exec-komennolla ylläpitäjäsi määrittämän ikkunan ajan, ja se säilyttää koko sen ajan tämän työtilan tunnukset ja puretut muuttujat.",
+      "activeBadge": "Käytössä",
+      "bannerTitle": "Virheenkorjaustila on päällä tässä työtilassa",
+      "bannerBody": "Epäonnistuneen ajon podi pidetään auki tarkastelua varten sen sijaan, että se päättyisi, ja se säilyttää koko sen ajan tämän työtilan tunnukset ja puretut muuttujat. Kytke virheenkorjaustila pois, kun olet saanut selvityksen valmiiksi.",
+      "confirmEnable": "Otetaanko virheenkorjaustila käyttöön? Epäonnistuneen ajon podi pidetään auki tämän työtilan tunnusten ja purettujen muuttujien kanssa, kunnes ikkuna umpeutuu tai poistat podin."
     }
   },
   "graphs": {

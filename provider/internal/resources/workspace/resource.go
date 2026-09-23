@@ -565,6 +565,14 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
+			"debug_mode": schema.BoolAttribute{
+				Description: "Hold this workspace's failed runner pods open so they can be exec'd into. A failed run's container is normally terminated immediately, which is exactly when you want to look inside it. How long a pod lingers is the deployment's `runners.debugLingerSeconds`, not this resource's — the pod keeps the run's credentials for that window.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"ai_summary_mode": schema.StringAttribute{
 				Description: "Per-workspace AI plan-summary opt-in (#401). One of \"default\" (follow the deployment's global `ai_summary.enabled` setting), \"enabled\" (always summarise this workspace's plans), or \"disabled\" (never summarise — overrides global). Defaults to \"default\".",
 				Optional:    true,
@@ -1020,6 +1028,10 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.PlanExpirySeconds.ValueInt64()
 		req.PlanExpirySeconds = &v
 	}
+	if !m.DebugMode.IsNull() && !m.DebugMode.IsUnknown() {
+		v := m.DebugMode.ValueBool()
+		req.DebugMode = &v
+	}
 	if !m.AISummaryMode.IsNull() && !m.AISummaryMode.IsUnknown() {
 		req.AISummaryMode = m.AISummaryMode.ValueString()
 	}
@@ -1169,6 +1181,10 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.PlanExpirySeconds.IsNull() && !m.PlanExpirySeconds.IsUnknown() {
 		v := m.PlanExpirySeconds.ValueInt64()
 		req.PlanExpirySeconds = &v
+	}
+	if !m.DebugMode.IsNull() && !m.DebugMode.IsUnknown() {
+		v := m.DebugMode.ValueBool()
+		req.DebugMode = &v
 	}
 	if !m.AISummaryMode.IsNull() && !m.AISummaryMode.IsUnknown() {
 		req.AISummaryMode = m.AISummaryMode.ValueString()
@@ -1358,6 +1374,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	// value for `ai-summary-mode` (defaulting to "default"); the
 	// context is the empty string for new workspaces. Pin both to
 	// concrete StringValues so Terraform doesn't see "unknown" drift.
+	m.DebugMode = types.BoolValue(ws.DebugMode)
 	if ws.AISummaryMode != "" {
 		m.AISummaryMode = types.StringValue(ws.AISummaryMode)
 	} else {
