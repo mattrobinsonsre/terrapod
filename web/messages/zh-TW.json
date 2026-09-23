@@ -1041,7 +1041,29 @@
       "runTaskTemplates": "執行任務模板（在每個新工作區上建立）",
       "notificationTemplates": "通知模板（在每個新工作區上建立）",
       "saving": "正在儲存...",
-      "previewTitle": "遍歷倉庫並預覽此規則將會建立哪些工作區 — 不會持久化"
+      "previewTitle": "遍歷倉庫並預覽此規則將會建立哪些工作區 — 不會持久化",
+      "governance": "安全掃描與 AI 摘要",
+      "governanceHint": "套用於此規則建立的所有工作區。",
+      "scanEnforcement": "強制方式",
+      "scanOff": "不掃描",
+      "scanAdvisory": "僅掃描並回報",
+      "scanEnforced": "發現問題時封鎖套用",
+      "scanEngine": "掃描器",
+      "scanEngineBoth": "Checkov 和 Trivy",
+      "scanThreshold": "回報不低於此等級的問題",
+      "severityCritical": "嚴重",
+      "severityHigh": "高",
+      "severityMedium": "中",
+      "severityLow": "低",
+      "aiSummaryMode": "AI 計畫摘要",
+      "aiSummaryDefault": "遵循部署預設設定",
+      "aiSummaryEnabled": "始終摘要",
+      "aiSummaryDisabled": "從不摘要",
+      "execution": "執行、VCS 與偏移",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt 版本",
+      "noExpiry": "不過期",
+      "addDriftIgnoreRule": "新增規則"
     },
     "table": {
       "name": "名稱",
@@ -2830,7 +2852,8 @@
       "rollbackStateVersion": "回滾狀態版本失敗",
       "stateActionFailed": "狀態操作失敗",
       "uploadState": "上傳狀態失敗",
-      "uploadStateFile": "上傳狀態檔案失敗"
+      "uploadStateFile": "上傳狀態檔案失敗",
+      "updateSecurityScan": "更新安全掃描失敗"
     },
     "subtabs": {
       "state": "狀態",
@@ -2851,6 +2874,28 @@
         "global": "全域",
         "rule": "依規則比對"
       }
+    },
+    "securityScan": {
+      "title": "安全掃描",
+      "description": "在套用之前掃描計畫中是否存在不安全的基礎架構。",
+      "enforcement": "強制方式",
+      "enforcementOff": "不掃描",
+      "enforcementAdvisory": "僅掃描並回報",
+      "enforcementEnforced": "發現問題時封鎖套用",
+      "engine": "掃描器",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov 和 Trivy",
+      "threshold": "回報不低於此等級的問題",
+      "thresholdCritical": "嚴重",
+      "thresholdHigh": "高",
+      "thresholdMedium": "中",
+      "thresholdLow": "低",
+      "skipRules": "忽略的規則",
+      "skipRulesSuffix": "（選填）",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "未忽略任何規則。",
+      "skipRulesHint": "在此工作區中要忽略的掃描器規則 ID，以逗號分隔。"
     }
   },
   "graphs": {

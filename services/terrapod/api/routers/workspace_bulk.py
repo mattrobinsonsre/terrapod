@@ -43,7 +43,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import pool_set, run_service
+from terrapod.services import pool_set, run_service, workspace_settings
 from terrapod.services.capability_resolver import resolve_capabilities
 from terrapod.services.notification_service import VALID_TRIGGERS
 from terrapod.services.run_task_service import VALID_ENFORCEMENT_LEVELS, VALID_STAGES
@@ -73,6 +73,53 @@ _FIELD_MAP: dict[str, str] = {
     "resource-memory": "resource_memory",
     "var-files": "var_files",
     "labels": "labels",
+    # Security scanning (#1036) and the AI plan summary (#401), added here by
+    # #1763. Both shipped settable on the workspace API and the provider and
+    # nowhere else, so there was no apply-to-existing path for either — which
+    # for a fleet is the same as not having the setting.
+    #
+    # `security-scan-enforcement` is deliberately NOT in this map: its rule
+    # depends on the workspace's engine, which a homogeneous payload does not
+    # know. It is validated against the matched set instead, by
+    # `_reject_scan_enforcement_on_unscannable_engines` below.
+    "security-scan-engine": "security_scan_engine",
+    "security-scan-severity-threshold": "security_scan_severity_threshold",
+    "security-scan-skip-rules": "security_scan_skip_rules",
+    "ai-summary-mode": "ai_summary_mode",
+    "ai-summary-context": "ai_summary_context",
+    "security-scan-enforcement": "security_scan_enforcement",
+    # The remaining per-workspace settings (#1763). These were settable on the
+    # workspace API and nowhere else either; they are listed separately only
+    # because they arrived in a second pass.
+    "terragrunt-enabled": "terragrunt_enabled",
+    "terragrunt-version": "terragrunt_version",
+    "trigger-prefixes": "trigger_prefixes",
+    "auto-merge": "auto_merge",
+    "auto-merge-strategy": "auto_merge_strategy",
+    "plan-expiry-seconds": "plan_expiry_seconds",
+    "drift-detection-enabled": "drift_detection_enabled",
+    "drift-detection-interval-seconds": "drift_detection_interval_seconds",
+    "drift-ignore-rules": "drift_ignore_rules",
+    "slack-channel": "slack_channel",
+}
+
+#: Payload keys that write a workspace column but cannot live in `_FIELD_MAP`,
+#: because each needs something the homogeneous payload does not carry (a
+#: second column, or the workspace's own engine). Named so the parity gate can
+#: tell "handled elsewhere" from "forgotten".
+_FIELDS_HANDLED_SEPARATELY: dict[str, str] = {
+    "agent-pool-id": "agent_pool_id",
+    "agent-pool-ids": "agent_pool_ids",
+    "auto-apply-mode": "auto_apply_mode",
+    # `vcs-workflow` needs each workspace's VCS connection and auto-apply
+    # state, which a homogeneous payload does not carry, so it is judged
+    # against the matched set instead.
+    #
+    # `security-scan-enforcement` is an ordinary mapped field here. On `main`
+    # it needs the matched set too, because a Pulumi run has nothing to scan
+    # (#1567) -- this line has no engine strategy layer, so every workspace is
+    # scannable and there is nothing to refuse.
+    "vcs-workflow": "vcs_workflow",
 }
 
 
@@ -278,26 +325,142 @@ def _validate_auto_apply(update: dict[str, Any], fields: dict[str, Any]) -> dict
     return {}
 
 
-def _validate_update_fields_for_test(update: dict) -> dict[str, Any]:
-    """The field-validation half of `_validate_update`, without the DB.
+#: Payload key -> a `services.workspace_settings` rule taking the raw value.
+#: These are the settings whose rule is shared with the single-workspace PATCH
+#: rather than restated here (#1763) — restating one is how the two surfaces
+#: come to disagree about what is valid.
+_SETTING_RULES: dict[str, Any] = {
+    "security-scan-engine": workspace_settings.validate_scan_engine,
+    "security-scan-severity-threshold": workspace_settings.validate_scan_severity_threshold,
+    "security-scan-skip-rules": workspace_settings.validate_scan_skip_rules,
+    "security-scan-enforcement": workspace_settings.validate_scan_enforcement,
+    "ai-summary-mode": workspace_settings.validate_ai_summary_mode,
+    "ai-summary-context": workspace_settings.validate_ai_summary_context,
+    "terragrunt-version": workspace_settings.validate_terragrunt_version,
+    "trigger-prefixes": workspace_settings.validate_trigger_prefixes,
+    "auto-merge-strategy": workspace_settings.validate_auto_merge_strategy,
+    "plan-expiry-seconds": workspace_settings.validate_plan_expiry_seconds,
+    "drift-detection-interval-seconds": workspace_settings.clamp_drift_interval,
+    "drift-ignore-rules": workspace_settings.validate_drift_ignore_rules,
+    "slack-channel": workspace_settings.validate_slack_channel,
+    # Type-checked, never coerced -- see `validate_bool`.
+    "terragrunt-enabled": lambda v: workspace_settings.validate_bool(v, "terragrunt-enabled"),
+    "auto-merge": lambda v: workspace_settings.validate_bool(v, "auto-merge"),
+    "drift-detection-enabled": lambda v: workspace_settings.validate_bool(
+        v, "drift-detection-enabled"
+    ),
+}
 
-    `_validate_update` is async and resolves agent pools against the database,
-    which is irrelevant to the scalar field rules — so tests drive this rather
-    than re-implementing the loop and drifting from it.
+
+def _validate_scalar_fields(update: dict) -> dict[str, Any]:
+    """Every field validatable from the payload alone — no DB, no matched set.
+
+    ONE implementation, because `_validate_update` (async, resolves agent pools)
+    and the test-facing entry point below both need it. They used to be separate
+    loops that had already drifted: the test-facing one checked two of the rules
+    and silently skipped the rest, so a test could assert a payload was accepted
+    while the real endpoint rejected it.
     """
     fields: dict[str, Any] = {}
     for key, attr in _FIELD_MAP.items():
         if key not in update:
             continue
         val = update[key]
-        if key == "auto-apply" and not isinstance(val, bool):
+        if key == "execution-backend" and val not in _VALID_BACKENDS:
             raise HTTPException(
-                status_code=422,
-                detail="auto-apply must be true or false, not a string or number",
+                status_code=422, detail="execution-backend must be 'terraform' or 'tofu'"
             )
+        if key == "execution-mode" and val not in _VALID_MODES:
+            raise HTTPException(status_code=422, detail="execution-mode must be 'local' or 'agent'")
+        if key == "terraform-version" and not str(val).strip():
+            raise HTTPException(status_code=422, detail="terraform-version cannot be empty")
+        if key == "labels":
+            val = validate_labels(val)  # reserved-key chokepoint (#316) -> 422
+        if key == "auto-apply":
+            # Type-check rather than coerce (#1301). `bool("false")` is True,
+            # so a JSON string sailed through as an enable AND -- since the
+            # pairing landed -- wrote the string itself into a Boolean column
+            # while `auto_apply_mode` was set to "always". A caller who typed
+            # the value wrong gets told, instead of getting the opposite of
+            # what they asked for.
+            if not isinstance(val, bool):
+                raise HTTPException(
+                    status_code=422,
+                    detail="auto-apply must be true or false, not a string or number",
+                )
+        if key == "var-files":
+            if not isinstance(val, list):
+                raise HTTPException(status_code=422, detail="var-files must be a list")
+        if key in _SETTING_RULES:
+            try:
+                val = _SETTING_RULES[key](val)
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e)) from e
         fields[attr] = val
     fields.update(_validate_auto_apply(update, fields))
+    fields.update(_validate_context_dependent(update))
     return fields
+
+
+def _validate_context_dependent(update: dict[str, Any]) -> dict[str, Any]:
+    """`vcs-workflow`: the half a homogeneous payload can judge.
+
+    An otherwise ordinary setting, but `apply_then_merge` depends on each
+    matched workspace's VCS connection and auto-apply state, which the payload
+    does not carry -- so only its shape is checked here.
+    """
+    out: dict[str, Any] = {}
+    if "vcs-workflow" in update:
+        try:
+            out["vcs_workflow"] = workspace_settings.validate_vcs_workflow(update["vcs-workflow"])
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return out
+
+
+def _reject_apply_then_merge_where_it_cannot_hold(fields: dict[str, Any], workspaces: list) -> None:
+    """`apply_then_merge` across a match set, checked per workspace.
+
+    The workflow applies BEFORE the PR merges, so it needs a VCS connection to
+    have a PR at all, and auto-apply would apply from a branch nobody approved.
+    The single-workspace PATCH has always refused both; bulk update reaches a
+    hundred workspaces at once, and a match set is rarely uniform in either
+    respect. The post-update auto-apply state is what matters, so a request
+    that turns auto-apply off in the same call is allowed -- exactly as the
+    PATCH path allows flipping both together.
+    """
+    workflow = fields.get("vcs_workflow")
+    if workflow != "apply_then_merge":
+        return
+    pending_auto_apply = fields.get("auto_apply")
+    offenders: list[str] = []
+    for w in workspaces:
+        auto_apply = w.auto_apply if pending_auto_apply is None else pending_auto_apply
+        try:
+            workspace_settings.check_apply_then_merge_allowed(
+                workflow,
+                has_vcs_connection=getattr(w, "vcs_connection_id", None) is not None,
+                auto_apply=bool(auto_apply),
+            )
+        except ValueError:
+            offenders.append(w.name)
+    if not offenders:
+        return
+    shown = ", ".join(sorted(offenders)[:10])
+    more = f" (and {len(offenders) - 10} more)" if len(offenders) > 10 else ""
+    raise HTTPException(
+        status_code=422,
+        detail=(
+            f"vcs-workflow 'apply_then_merge' cannot be set on {len(offenders)} matched "
+            f"workspace(s): {shown}{more}. Each needs a VCS connection and auto-apply "
+            "off — set auto-apply false in the same request, or narrow the filter."
+        ),
+    )
+
+
+def _validate_update_fields_for_test(update: dict) -> dict[str, Any]:
+    """Tests drive the scalar rules here rather than re-implementing the loop."""
+    return _validate_scalar_fields(update)
 
 
 def _reject_auto_apply_on_apply_then_merge(fields: dict[str, Any], workspaces: list) -> None:
@@ -343,39 +506,7 @@ async def _validate_update(
     if not isinstance(update, dict) or not update:
         raise HTTPException(status_code=422, detail="'update' must be a non-empty object")
 
-    fields: dict[str, Any] = {}
-    for key, attr in _FIELD_MAP.items():
-        if key not in update:
-            continue
-        val = update[key]
-        if key == "execution-backend" and val not in _VALID_BACKENDS:
-            raise HTTPException(
-                status_code=422, detail="execution-backend must be 'terraform' or 'tofu'"
-            )
-        if key == "execution-mode" and val not in _VALID_MODES:
-            raise HTTPException(status_code=422, detail="execution-mode must be 'local' or 'agent'")
-        if key == "terraform-version" and not str(val).strip():
-            raise HTTPException(status_code=422, detail="terraform-version cannot be empty")
-        if key == "labels":
-            val = validate_labels(val)  # reserved-key chokepoint (#316) → 422
-        if key == "auto-apply":
-            # Type-check rather than coerce (#1301). `bool("false")` is True,
-            # so a JSON string sailed through as an enable AND — since the
-            # pairing landed — wrote the string itself into a Boolean column
-            # while `auto_apply_mode` was set to "always". A caller who typed
-            # the value wrong gets told, instead of getting the opposite of
-            # what they asked for.
-            if not isinstance(val, bool):
-                raise HTTPException(
-                    status_code=422,
-                    detail="auto-apply must be true or false, not a string or number",
-                )
-        if key == "var-files":
-            if not isinstance(val, list):
-                raise HTTPException(status_code=422, detail="var-files must be a list")
-        fields[attr] = val
-
-    fields.update(_validate_auto_apply(update, fields))
+    fields = _validate_scalar_fields(update)
     fields.update(await _validate_pool_set(update, db, user))
 
     run_tasks = validate_run_task_specs(update["run-tasks"]) if "run-tasks" in update else None
@@ -560,6 +691,7 @@ async def bulk_update_workspaces(
 
     workspaces = list((await db.execute(query)).scalars().all())
     _reject_auto_apply_on_apply_then_merge(plan["fields"], workspaces)
+    _reject_apply_then_merge_where_it_cannot_hold(plan["fields"], workspaces)
 
     try:
         changed, unchanged = await _apply(db, workspaces, plan, user.email)

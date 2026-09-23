@@ -1041,7 +1041,29 @@
       "runTaskTemplates": "Modèles de tâches d'exécution (créés sur chaque nouvel espace de travail)",
       "notificationTemplates": "Modèles de notification (créés sur chaque nouvel espace de travail)",
       "saving": "Enregistrement...",
-      "previewTitle": "Parcourir le dépôt et prévisualiser quels espaces de travail cette règle CRÉERAIT — sans persistance"
+      "previewTitle": "Parcourir le dépôt et prévisualiser quels espaces de travail cette règle CRÉERAIT — sans persistance",
+      "governance": "Analyse de sécurité et résumé IA",
+      "governanceHint": "Appliqué à chaque espace de travail créé par cette règle.",
+      "scanEnforcement": "Application",
+      "scanOff": "Ne pas analyser",
+      "scanAdvisory": "Analyser et signaler uniquement",
+      "scanEnforced": "Bloquer l'application en cas de résultats",
+      "scanEngine": "Analyseur",
+      "scanEngineBoth": "Checkov et Trivy",
+      "scanThreshold": "Signaler les résultats à partir de",
+      "severityCritical": "critique",
+      "severityHigh": "élevé",
+      "severityMedium": "moyen",
+      "severityLow": "faible",
+      "aiSummaryMode": "Résumé de plan IA",
+      "aiSummaryDefault": "Suivre la valeur par défaut du déploiement",
+      "aiSummaryEnabled": "Toujours résumer",
+      "aiSummaryDisabled": "Ne jamais résumer",
+      "execution": "Exécution, VCS et dérive",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Version de Terragrunt",
+      "noExpiry": "Pas d'expiration",
+      "addDriftIgnoreRule": "Ajouter une règle"
     },
     "table": {
       "name": "Nom",
@@ -2830,7 +2852,8 @@
       "rollbackStateVersion": "Échec de la restauration de la version d'état",
       "stateActionFailed": "Échec de l'action sur l'état",
       "uploadState": "Échec du téléversement de l'état",
-      "uploadStateFile": "Échec du téléversement du fichier d'état"
+      "uploadStateFile": "Échec du téléversement du fichier d'état",
+      "updateSecurityScan": "Échec de la mise à jour de l'analyse de sécurité"
     },
     "subtabs": {
       "state": "État",
@@ -2851,6 +2874,28 @@
         "global": "Global",
         "rule": "Correspond à une règle"
       }
+    },
+    "securityScan": {
+      "title": "Analyse de sécurité",
+      "description": "Analyser le plan à la recherche d'infrastructure non sécurisée avant son application.",
+      "enforcement": "Application",
+      "enforcementOff": "Ne pas analyser",
+      "enforcementAdvisory": "Analyser et signaler uniquement",
+      "enforcementEnforced": "Bloquer l'application en cas de résultats",
+      "engine": "Analyseur",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov et Trivy",
+      "threshold": "Signaler les résultats à partir de",
+      "thresholdCritical": "critique",
+      "thresholdHigh": "élevé",
+      "thresholdMedium": "moyen",
+      "thresholdLow": "faible",
+      "skipRules": "Règles ignorées",
+      "skipRulesSuffix": "(facultatif)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Aucune règle ignorée.",
+      "skipRulesHint": "Identifiants de règles de l'analyseur à ignorer dans cet espace de travail, séparés par des virgules."
     }
   },
   "graphs": {

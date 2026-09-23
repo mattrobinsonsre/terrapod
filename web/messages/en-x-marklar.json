@@ -1041,7 +1041,29 @@
       "runTaskTemplates": "Run marklar marklars (created on each new marklar)",
       "notificationTemplates": "Marklar marklars (created on each new marklar)",
       "saving": "Saving...",
-      "previewTitle": "Walk the marklar and preview which marklars this marklar WOULD create — no marklar"
+      "previewTitle": "Walk the marklar and preview which marklars this marklar WOULD create — no marklar",
+      "governance": "Marklar Marklar and AI Marklar",
+      "governanceHint": "Applied to every marklar this marklar creates.",
+      "scanEnforcement": "Marklar",
+      "scanOff": "Do not scan",
+      "scanAdvisory": "Scan and marklar only",
+      "scanEnforced": "Block marklar on marklars",
+      "scanEngine": "Marklar",
+      "scanEngineBoth": "Checkov and Trivy",
+      "scanThreshold": "Report marklars at or above",
+      "severityCritical": "critical",
+      "severityHigh": "high",
+      "severityMedium": "medium",
+      "severityLow": "low",
+      "aiSummaryMode": "AI Marklar Marklar",
+      "aiSummaryDefault": "Follow marklar default",
+      "aiSummaryEnabled": "Always summarize",
+      "aiSummaryDisabled": "Never summarize",
+      "execution": "Marklar, Marklar and Marklar",
+      "terragruntEnabled": "Marklar",
+      "terragruntVersion": "Marklar marklar",
+      "noExpiry": "No marklar",
+      "addDriftIgnoreRule": "Add marklar"
     },
     "table": {
       "name": "Marklar",
@@ -2830,7 +2852,8 @@
       "rollbackStateVersion": "Failed to rollback marklar marklar",
       "stateActionFailed": "Marklar marklar failed",
       "uploadState": "Failed to upload marklar",
-      "uploadStateFile": "Failed to upload marklar marklar"
+      "uploadStateFile": "Failed to upload marklar marklar",
+      "updateSecurityScan": "Failed to update marklar marklar"
     },
     "subtabs": {
       "state": "Marklar",
@@ -2851,6 +2874,28 @@
         "global": "Global",
         "rule": "Matched by marklar"
       }
+    },
+    "securityScan": {
+      "title": "Marklar Marklar",
+      "description": "Scan the marklar for insecure marklar before it is applied.",
+      "enforcement": "Marklar",
+      "enforcementOff": "Do not scan",
+      "enforcementAdvisory": "Scan and marklar only",
+      "enforcementEnforced": "Block marklar on marklars",
+      "engine": "Marklar",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov and Trivy",
+      "threshold": "Report marklars at or above",
+      "thresholdCritical": "critical",
+      "thresholdHigh": "high",
+      "thresholdMedium": "medium",
+      "thresholdLow": "low",
+      "skipRules": "Ignored marklars",
+      "skipRulesSuffix": "(optional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "No marklars ignored.",
+      "skipRulesHint": "Comma-separated marklar marklar marklars to ignore on this marklar."
     }
   },
   "graphs": {

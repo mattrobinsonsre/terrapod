@@ -290,6 +290,29 @@ async def find_or_autocreate_workspace(
         labels=safe_labels,
         owner_email=rule.owner_email or "",
         var_files=list(rule.var_files or []),
+        # Security scanning and the AI plan summary (#1763). `getattr` with the
+        # column default, like `auto_apply_mode` above: a rule row loaded from
+        # a database that predates the migration has no attribute to read, and
+        # the poll cycle must not break on one.
+        security_scan_enforcement=getattr(rule, "security_scan_enforcement", "advisory"),
+        security_scan_engine=getattr(rule, "security_scan_engine", "checkov"),
+        security_scan_severity_threshold=getattr(rule, "security_scan_severity_threshold", "high"),
+        security_scan_skip_rules=list(getattr(rule, "security_scan_skip_rules", None) or []),
+        ai_summary_mode=getattr(rule, "ai_summary_mode", "default"),
+        ai_summary_context=getattr(rule, "ai_summary_context", ""),
+        # The rest of the templated settings (#1763), same `getattr` guard: a
+        # rule row from a database that predates the migration has no attribute
+        # to read, and the poll cycle must not break on one.
+        terragrunt_enabled=getattr(rule, "terragrunt_enabled", False),
+        terragrunt_version=getattr(rule, "terragrunt_version", "1.0"),
+        vcs_workflow=getattr(rule, "vcs_workflow", "merge_then_apply"),
+        auto_merge=getattr(rule, "auto_merge", False),
+        auto_merge_strategy=getattr(rule, "auto_merge_strategy", "merge"),
+        drift_detection_enabled=getattr(rule, "drift_detection_enabled", True),
+        drift_detection_interval_seconds=getattr(rule, "drift_detection_interval_seconds", 86400),
+        drift_ignore_rules=list(getattr(rule, "drift_ignore_rules", None) or []),
+        plan_expiry_seconds=getattr(rule, "plan_expiry_seconds", None),
+        slack_channel=getattr(rule, "slack_channel", ""),
         vcs_connection_id=rule.vcs_connection_id,
         vcs_repo_url=rule.repo_url,
         vcs_branch=rule.branch,

@@ -1041,7 +1041,29 @@
       "runTaskTemplates": "Modelos de run task (criados em cada novo workspace)",
       "notificationTemplates": "Modelos de notificação (criados em cada novo workspace)",
       "saving": "A guardar...",
-      "previewTitle": "Percorre o repositório e pré-visualiza quais os workspaces que esta regra CRIARIA — sem persistência"
+      "previewTitle": "Percorre o repositório e pré-visualiza quais os workspaces que esta regra CRIARIA — sem persistência",
+      "governance": "Verificação de segurança e resumo de IA",
+      "governanceHint": "Aplicado a todos os workspaces criados por esta regra.",
+      "scanEnforcement": "Aplicação",
+      "scanOff": "Não verificar",
+      "scanAdvisory": "Apenas verificar e comunicar",
+      "scanEnforced": "Bloquear a aplicação se houver deteções",
+      "scanEngine": "Verificador",
+      "scanEngineBoth": "Checkov e Trivy",
+      "scanThreshold": "Comunicar deteções a partir de",
+      "severityCritical": "crítico",
+      "severityHigh": "alto",
+      "severityMedium": "médio",
+      "severityLow": "baixo",
+      "aiSummaryMode": "Resumo do Plano por IA",
+      "aiSummaryDefault": "Seguir a predefinição da implementação",
+      "aiSummaryEnabled": "Resumir sempre",
+      "aiSummaryDisabled": "Nunca resumir",
+      "execution": "Execução, VCS e desvio",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versão do Terragrunt",
+      "noExpiry": "Sem expiração",
+      "addDriftIgnoreRule": "Adicionar regra"
     },
     "table": {
       "name": "Nome",
@@ -2830,7 +2852,8 @@
       "rollbackStateVersion": "Falha ao reverter a versão de estado",
       "stateActionFailed": "Falha na ação de estado",
       "uploadState": "Falha ao carregar o estado",
-      "uploadStateFile": "Falha ao carregar o ficheiro de estado"
+      "uploadStateFile": "Falha ao carregar o ficheiro de estado",
+      "updateSecurityScan": "Falha ao atualizar a verificação de segurança"
     },
     "subtabs": {
       "state": "Estado",
@@ -2851,6 +2874,28 @@
         "global": "Global",
         "rule": "Correspondeu à regra"
       }
+    },
+    "securityScan": {
+      "title": "Verificação de segurança",
+      "description": "Verifique o plano em busca de infraestrutura insegura antes de o aplicar.",
+      "enforcement": "Aplicação",
+      "enforcementOff": "Não verificar",
+      "enforcementAdvisory": "Apenas verificar e comunicar",
+      "enforcementEnforced": "Bloquear a aplicação se houver deteções",
+      "engine": "Verificador",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov e Trivy",
+      "threshold": "Comunicar deteções a partir de",
+      "thresholdCritical": "crítico",
+      "thresholdHigh": "alto",
+      "thresholdMedium": "médio",
+      "thresholdLow": "baixo",
+      "skipRules": "Regras ignoradas",
+      "skipRulesSuffix": "(opcional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Nenhuma regra ignorada.",
+      "skipRulesHint": "IDs de regras do verificador, separados por vírgulas, a ignorar neste workspace."
     }
   },
   "graphs": {

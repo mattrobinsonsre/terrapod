@@ -368,3 +368,57 @@ test.describe('Workspace access tab (#1456)', () => {
     await expect(panel.getByText(/platform admins/i)).toBeVisible({ timeout: 15_000 });
   });
 });
+
+test.describe('Workspace security scanning settings (#1763)', () => {
+  test('an operator can see and change enforcement from the UI', async ({ page }) => {
+    // Before #1763 these were managed through the API and the Terraform
+    // provider only, so an operator with the UI in front of them could not
+    // see what the workspace was set to, let alone change it.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('scanui'));
+
+    await page.goto(`/workspaces/${wsId}`);
+
+    const enforcement = page.getByLabel('Enforcement', { exact: true });
+    await expect(enforcement).toBeVisible({ timeout: 15_000 });
+    // The workspace default, shown rather than assumed.
+    await expect(enforcement).toHaveValue('advisory');
+
+    await enforcement.selectOption('enforced');
+
+    // The change round-trips through the API, so it survives a reload —
+    // a select that only moved in the browser would pass a naive assertion.
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByLabel('Enforcement', { exact: true })).toHaveValue('enforced');
+    }).toPass({ timeout: 20_000 });
+
+    const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status()).toBe(200);
+    expect((await res.json()).data.attributes['security-scan-enforcement']).toBe('enforced');
+  });
+
+  test('ignored rules round-trip as a list', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('scanskip'));
+
+    await page.goto(`/workspaces/${wsId}`);
+    const skip = page.getByLabel('Ignored rules');
+    await expect(skip).toBeVisible({ timeout: 15_000 });
+
+    await skip.fill('CKV_AWS_24, CKV2_AWS_5');
+    await skip.blur();
+
+    await expect(async () => {
+      const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect((await res.json()).data.attributes['security-scan-skip-rules']).toEqual([
+        'CKV_AWS_24',
+        'CKV2_AWS_5',
+      ]);
+    }).toPass({ timeout: 20_000 });
+  });
+});
