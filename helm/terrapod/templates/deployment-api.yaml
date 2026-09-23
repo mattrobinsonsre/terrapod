@@ -39,6 +39,22 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap-api.yaml") . | sha256sum }}
+        {{- /* The signing key is injected from a Secret via env, and env is
+             snapshotted at pod start -- it never refreshes. So a Secret that
+             changes under a running Deployment leaves older pods on the old key
+             while newer ones use the new one, and a runner token minted by one
+             is rejected by the other. Nothing detects that: the key is a
+             per-process module global, not Redis-backed state like sessions or
+             the scheduler, so the fleet has no way to notice it disagrees.
+             Half of every run's API calls then 401 until someone restarts.
+             Rolling on a change makes a key rotation atomic instead. */}}
+        {{- if .Values.api.tokenSigningKey.existingSecret }}
+        {{- with (lookup "v1" "Secret" .Release.Namespace .Values.api.tokenSigningKey.existingSecret) }}
+        checksum/token-signing: {{ .data | toYaml | sha256sum }}
+        {{- end }}
+        {{- else }}
+        checksum/token-signing: {{ include (print $.Template.BasePath "/secret-token-signing.yaml") . | sha256sum }}
+        {{- end }}
         {{- if .Values.api.config.metrics.enabled }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "8000"

@@ -814,9 +814,27 @@ jobs:
           # in a normal render: generating on upgrade would rotate the key and
           # invalidate every token in flight -- which is what running plans and
           # applies authenticate with. So both directions are asserted.
-          inst=$(helm template tp ./helm/terrapod | grep -c 'token_signing_key:' || true)
-          [ "$inst" = "1" ] \
-            || { echo "install must generate a signing key (got $inst)"; exit 1; }
+          # #1781: generation now requires a working `lookup`, and this job has
+          # no cluster -- so a plain render must mint NOTHING. That is the whole
+          # fix: `helm template` is what Argo CD and Flux run, `lookup` returns
+          # nothing there and `.Release.IsInstall` is always true, so the old
+          # unguarded branch minted a fresh key on every render and rotated it
+          # under the running fleet. Two consecutive renders must also agree,
+          # or the checksum annotation below would roll the API every sync.
+          r1=$(helm template tp ./helm/terrapod | grep -c 'token_signing_key:' || true)
+          [ "$r1" = "0" ] \
+            || { echo "a render with no cluster must NOT mint a key (got $r1) -- this rotates"; exit 1; }
+          a=$(helm template tp ./helm/terrapod | grep 'checksum/token-signing' | sed 's/.*: //')
+          b=$(helm template tp ./helm/terrapod | grep 'checksum/token-signing' | sed 's/.*: //')
+          [ -n "$a" ] && [ "$a" = "$b" ] \
+            || { echo "token-signing checksum is not stable across renders ($a vs $b)"; exit 1; }
+
+          # A key change must roll the API pods. Env from a secretKeyRef is
+          # snapshotted at pod start and never refreshes, and the key is a
+          # per-process global -- so without this annotation a changed Secret
+          # leaves older pods on the old key and half of every run's calls 401.
+          grep -q 'checksum/token-signing' ./helm/terrapod/templates/deployment-api.yaml \
+            || { echo "the API pod template has no checksum for the signing key"; exit 1; }
 
           # An upgrade of a deployment that has no such Secret must emit
           # nothing, leaving the existing derivation alone.
@@ -831,11 +849,12 @@ jobs:
           echo "$own" | grep -q 'token_signing_key:' \
             && { echo "must not generate a key when one is supplied"; exit 1; }
 
-          # The generated key must be long enough to be a key rather than a
-          # token-shaped string: the whole point is that it is not guessable.
-          len=$(helm template tp ./helm/terrapod | grep 'token_signing_key:' | sed 's/.*: //; s/"//g' | tr -d '[:space:]' | wc -c)
-          [ "$len" -ge 32 ] \
-            || { echo "generated key is only $len chars"; exit 1; }
+          # When a key IS generated it must be long enough to be a key rather
+          # than a token-shaped string. Asserted against the template's own
+          # literal, since a cluster-less render no longer emits one (#1781).
+          klen=$(grep -o 'randAlphaNum [0-9]*' ./helm/terrapod/templates/secret-token-signing.yaml | awk '{print $2}')
+          [ -n "$klen" ] && [ "$klen" -ge 32 ] \
+            || { echo "generated key would be only $klen chars"; exit 1; }
 
           # A listener-only release must not render it at all. The key is read
           # by the API alone -- a listener asks the API for runner tokens and
