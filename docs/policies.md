@@ -14,7 +14,7 @@ open source and is the supported engine.
 
 | Concept | Description |
 |---|---|
-| **Policy set** | A named, admin-managed collection of policies with a single enforcement level and a workspace scope. |
+| **Policy set** | A named collection of policies with a single enforcement level and a workspace scope. Managed by platform admins, in the UI, the API, or as code with `terrapod_policy_set`. |
 | **Policy** | One Rego document inside a set. Must declare `package terrapod`. |
 | **Enforcement level** | `advisory` (record a warning, never block) or `mandatory` (block the apply on failure). Set per policy set. |
 | **Scope** | Which workspaces a set applies to — either `global` (every workspace) or label-based allow/deny rules. |
@@ -135,13 +135,64 @@ the right action.
 ## Managing policy sets
 
 Policy sets are managed by platform admins under **Policy Sets** in the
-admin area, or via the API (see
-[api-reference.md](api-reference.md#policy-sets)):
+admin area, via the API (see
+[api-reference.md](api-reference.md#policy-sets)), or **as code** with the
+Terraform provider:
 
 - Create a set, choosing its enforcement level and scope.
 - Add policies — the Rego is validated on save.
 - Edit scoping (global, or allow/deny labels and names).
 - Disable a set to stop it being evaluated without deleting it.
+
+### As code
+
+A policy set can block applies across the whole estate, so it is worth
+managing the same way as the infrastructure it governs — reviewed in a pull
+request rather than changed in a form.
+
+```hcl
+resource "terrapod_policy_set" "baseline" {
+  name              = "baseline"
+  description       = "Controls every production workspace must satisfy"
+  enforcement_level = "mandatory"
+
+  # One key binds one accepted value, the same shape terrapod_role uses —
+  # the server matches both with the same code. A workspace matching any
+  # one entry is in scope.
+  allow_labels = {
+    env = "prod"
+  }
+  # Deny always wins, including over global_scope.
+  deny_labels = {
+    exempt = "true"
+  }
+}
+
+resource "terrapod_policy" "no_public_buckets" {
+  policy_set_id = terrapod_policy_set.baseline.id
+  name          = "no-public-buckets"
+  rego          = file("${path.module}/policies/no_public_buckets.rego")
+}
+```
+
+Two things worth knowing before you write one:
+
+- **A VCS-backed set manages its own policies.** Set `source = "vcs"` with a
+  `vcs_connection_id` and `vcs_repo_url`, and the policies come from the
+  repository; a `terrapod_policy` against such a set is refused with a 409.
+  Use one or the other, not both.
+- **Importing a policy takes `<policy-set-id>/<policy-id>`.** A policy is read
+  through its set, because the API has no endpoint for one on its own:
+
+  ```console
+  $ terraform import terrapod_policy.no_public_buckets polset-abc123/pol-def456
+  ```
+
+An agent can read the sets too — `terrapod_policy_set_list` over MCP lists
+each set with its enforcement level and scope, which is what answers "why was
+this run blocked" and "what governs this workspace". It is read-only:
+changing a gate that can hold every apply in the estate goes through a plan a
+person reads.
 
 Deleting a policy set removes its policies but **keeps** the historical
 `policy_evaluation` records of past runs (their set reference is nulled,

@@ -273,6 +273,14 @@
     }
   },
   {
+    "name": "terrapod_policy_set_list",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_registry_module_get",
     "read_only": true,
     "input_schema": {
