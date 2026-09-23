@@ -4,7 +4,7 @@ Pure expand: six new tables, nothing altered and nothing dropped, so a lagging
 replica during a rolling upgrade neither sees nor needs them.
 
 Revision ID: cddfa0bf6bfb
-Revises: f9b3aac00aac
+Revises: 87560d7db332
 Create Date: 2026-08-21
 
 """
@@ -21,7 +21,7 @@ revision = "cddfa0bf6bfb"
 # the newest release line's head. If this is "tidied" back, `alembic upgrade
 # head` on such a database skips main's OCI/package-cache work, or finds two
 # heads. tests/db/test_alembic_revision_graph.py fails if it is (#1594).
-down_revision = "f9b3aac00aac"
+down_revision = "87560d7db332"
 branch_labels = None
 depends_on = None
 

@@ -17,7 +17,7 @@ an autodiscovery rule has no `engine` column, so every workspace it materialises
 is a Terraform/OpenTofu one, which is precisely the case that can be scanned.
 
 Revision ID: a6751186f8b7
-Revises: e2450c5ecc86
+Revises: f9b3aac00aac
 """
 
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "a6751186f8b7"
-down_revision: str | Sequence[str] | None = "e2450c5ecc86"
+down_revision: str | Sequence[str] | None = "f9b3aac00aac"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
