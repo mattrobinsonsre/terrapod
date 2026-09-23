@@ -789,6 +789,10 @@ class RunnerListener:
             # Cost estimation (#871): the API instructs per-run (fallback yes);
             # the listener only relays it, never self-configures.
             cost_estimation=attrs.get("cost-estimation", True),
+            # The workspace asks; `runners.yaml` decides for how long (#1764).
+            debug_linger_seconds=(
+                self.runner_config.debug_linger_seconds if attrs.get("debug-mode") else 0
+            ),
             cost_default_region=attrs.get("cost-default-region", "us-east-1"),
             working_directory=attrs.get("working-directory", ""),
             ca_secret_name=ca_secret_name,

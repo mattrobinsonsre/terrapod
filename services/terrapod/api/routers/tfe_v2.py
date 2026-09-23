@@ -690,6 +690,7 @@ def _workspace_json(
                 "var-files": ws.var_files or [],
                 "trigger-prefixes": ws.trigger_prefixes or [],
                 "drift-ignore-rules": ws.drift_ignore_rules or [],
+                "debug-mode": ws.debug_mode,
                 "ai-summary-mode": ws.ai_summary_mode,
                 "ai-summary-context": ws.ai_summary_context,
                 # Slack app opt-in channel (#556); empty = this workspace posts nothing.
@@ -1265,6 +1266,9 @@ async def create_workspace(
         # `CreateWorkspaceRequest` in go-terrapod and the provider's Create
         # send `ai-summary-mode`, so a configuration asking for `enabled` got a
         # workspace on `default` and no indication anything had been ignored.
+        debug_mode=_422(
+            workspace_settings.validate_bool, attrs.get("debug-mode", False), "debug-mode"
+        ),
         ai_summary_mode=_422(
             workspace_settings.validate_ai_summary_mode, attrs.get("ai-summary-mode", "default")
         ),
@@ -1829,6 +1833,8 @@ async def update_workspace(
         ws.plan_expiry_seconds = _parse_plan_expiry(attrs["plan-expiry-seconds"])
 
     # AI plan summary opt-in (#401).
+    if "debug-mode" in attrs:
+        ws.debug_mode = _422(workspace_settings.validate_bool, attrs["debug-mode"], "debug-mode")
     if "ai-summary-mode" in attrs:
         ws.ai_summary_mode = _422(
             workspace_settings.validate_ai_summary_mode, attrs["ai-summary-mode"]

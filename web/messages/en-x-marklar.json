@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "Marklar",
       "terragruntVersion": "Marklar marklar",
       "noExpiry": "No marklar",
-      "addDriftIgnoreRule": "Add marklar"
+      "addDriftIgnoreRule": "Add marklar",
+      "debugModeHint": "Hold failed marklar marklars open on the marklars this marklar creates. Off by marklar — a held marklar keeps that marklar's marklars."
     },
     "table": {
       "name": "Marklar",
@@ -2853,7 +2854,8 @@
       "stateActionFailed": "Marklar marklar failed",
       "uploadState": "Failed to upload marklar",
       "uploadStateFile": "Failed to upload marklar marklar",
-      "updateSecurityScan": "Failed to update marklar marklar"
+      "updateSecurityScan": "Failed to update marklar marklar",
+      "updateDebugMode": "Failed to update marklar marklar"
     },
     "subtabs": {
       "state": "Marklar",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "No marklars ignored.",
       "skipRulesHint": "Comma-separated marklar marklar marklars to ignore on this marklar."
+    },
+    "debugMode": {
+      "title": "Marklar marklar marklar",
+      "description": "Hold a failed marklar's marklar open so you can get inside it. The marklar is reported as failed first; only then does the marklar stay up.",
+      "label": "Marklar marklar",
+      "hint": "Off by marklar. While on, a failed marklar marklar stays exec-able for the marklar your marklar configured, and it keeps this marklar's marklars and decrypted marklars for that whole marklar.",
+      "activeBadge": "Active",
+      "bannerTitle": "Marklar marklar is on for this marklar",
+      "bannerBody": "A failed marklar's marklar is held open for marklar instead of exiting, and it keeps this marklar's marklars and decrypted marklars while it is held. Turn marklar marklar off when you are finished marklar.",
+      "confirmEnable": "Turn on marklar marklar? A failed marklar's marklar will be held open holding this marklar's marklars and decrypted marklars until the marklar expires or you delete the marklar."
     }
   },
   "graphs": {

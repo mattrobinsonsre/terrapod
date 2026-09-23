@@ -60,6 +60,7 @@ interface AutodiscoveryRule {
     'drift-ignore-rules'?: string[]
     'plan-expiry-seconds'?: number | null
     'slack-channel'?: string
+    'debug-mode'?: boolean
     'run-task-templates': RunTaskSpec[]
     'notification-templates': NotificationSpec[]
     'created-at': string
@@ -138,6 +139,9 @@ export default function AutodiscoveryPage() {
   const [driftIgnoreRules, setDriftIgnoreRules] = useState<string[]>([])
   const [planExpiry, setPlanExpiry] = useState('')
   const [ruleSlackChannel, setRuleSlackChannel] = useState('')
+  // Runner debug mode (#1764). Off by default here as on a workspace: a rule
+  // can materialise hundreds of workspaces, and a held pod keeps credentials.
+  const [ruleDebugMode, setRuleDebugMode] = useState(false)
   const [runTaskTemplates, setRunTaskTemplates] = useState<RunTaskSpec[]>([])
   const [notificationTemplates, setNotificationTemplates] = useState<NotificationSpec[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -242,6 +246,7 @@ export default function AutodiscoveryPage() {
     setDriftIgnoreRules([])
     setPlanExpiry('')
     setRuleSlackChannel('')
+    setRuleDebugMode(false)
     setRunTaskTemplates([])
     setNotificationTemplates([])
   }
@@ -289,6 +294,7 @@ export default function AutodiscoveryPage() {
     setDriftIgnoreRules(a['drift-ignore-rules'] || [])
     setPlanExpiry(a['plan-expiry-seconds'] ? String(a['plan-expiry-seconds']) : '')
     setRuleSlackChannel(a['slack-channel'] || '')
+    setRuleDebugMode(a['debug-mode'] ?? false)
     setRunTaskTemplates(a['run-task-templates'] || [])
     setNotificationTemplates(a['notification-templates'] || [])
     setShowForm(true)
@@ -340,6 +346,7 @@ export default function AutodiscoveryPage() {
       'drift-ignore-rules': driftIgnoreRules.map(r => r.trim()).filter(Boolean),
       'plan-expiry-seconds': planExpiry.trim() ? Number(planExpiry) : null,
       'slack-channel': ruleSlackChannel.trim(),
+      'debug-mode': ruleDebugMode,
       'run-task-templates': runTaskTemplates,
       'notification-templates': notificationTemplates,
     }
@@ -848,6 +855,24 @@ export default function AutodiscoveryPage() {
                       placeholder={tWs('slack.channelPlaceholder')}
                       className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
+                  </div>
+                  <div>
+                    <label htmlFor="ad-debug-mode" className="block text-xs text-slate-500 mb-1">
+                      {tWs('debugMode.label')}
+                    </label>
+                    <label className="flex items-center gap-2 mt-2">
+                      <input
+                        id="ad-debug-mode"
+                        type="checkbox"
+                        checked={ruleDebugMode}
+                        onChange={(e) => setRuleDebugMode(e.target.checked)}
+                        className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
+                      />
+                      <span className="text-sm text-slate-200">
+                        {ruleDebugMode ? tWs('common.enabled') : tWs('common.disabled')}
+                      </span>
+                    </label>
+                    <p className="text-xs text-slate-500 mt-1">{t('form.debugModeHint')}</p>
                   </div>
                 </div>
                 <div className="mt-3">

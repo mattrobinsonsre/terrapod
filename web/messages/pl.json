@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Wersja Terragrunt",
       "noExpiry": "Bez wygaśnięcia",
-      "addDriftIgnoreRule": "Dodaj regułę"
+      "addDriftIgnoreRule": "Dodaj regułę",
+      "debugModeHint": "Utrzymuj pody nieudanych runnerów otwarte w przestrzeniach roboczych tworzonych przez tę regułę. Domyślnie wyłączone — utrzymywany pod przechowuje poświadczenia tej przestrzeni roboczej."
     },
     "table": {
       "name": "Nazwa",
@@ -2853,7 +2854,8 @@
       "stateActionFailed": "Akcja stanu nie powiodła się",
       "uploadState": "Nie udało się przesłać stanu",
       "uploadStateFile": "Nie udało się przesłać pliku stanu",
-      "updateSecurityScan": "Nie udało się zaktualizować skanowania bezpieczeństwa"
+      "updateSecurityScan": "Nie udało się zaktualizować skanowania bezpieczeństwa",
+      "updateDebugMode": "Nie udało się zaktualizować trybu debugowania"
     },
     "subtabs": {
       "state": "Stan",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Nie zignorowano żadnych reguł.",
       "skipRulesHint": "Identyfikatory reguł skanera oddzielone przecinkami, ignorowane w tym obszarze roboczym."
+    },
+    "debugMode": {
+      "title": "Tryb debugowania runnera",
+      "description": "Utrzymuj pod nieudanego uruchomienia otwarty, aby móc wejść do środka. Najpierw zgłaszana jest porażka uruchomienia; dopiero potem kontener pozostaje uruchomiony.",
+      "label": "Tryb debugowania",
+      "hint": "Domyślnie wyłączony. Gdy jest włączony, pod nieudanego runnera pozostaje dostępny przez exec przez okno skonfigurowane przez twojego operatora i przez cały ten czas przechowuje poświadczenia oraz odszyfrowane zmienne tej przestrzeni roboczej.",
+      "activeBadge": "Aktywny",
+      "bannerTitle": "Tryb debugowania jest włączony dla tej przestrzeni roboczej",
+      "bannerBody": "Pod nieudanego uruchomienia jest utrzymywany otwarty do inspekcji zamiast się kończyć i przez ten czas przechowuje poświadczenia oraz odszyfrowane zmienne tej przestrzeni roboczej. Wyłącz tryb debugowania, gdy skończysz diagnozowanie.",
+      "confirmEnable": "Włączyć tryb debugowania? Pod nieudanego uruchomienia będzie utrzymywany otwarty wraz z poświadczeniami i odszyfrowanymi zmiennymi tej przestrzeni roboczej, dopóki okno nie wygaśnie lub nie usuniesz poda."
     }
   },
   "graphs": {

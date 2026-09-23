@@ -422,3 +422,70 @@ test.describe('Workspace security scanning settings (#1763)', () => {
     }).toPass({ timeout: 20_000 });
   });
 });
+
+test.describe('Workspace runner debug mode (#1764)', () => {
+  test('the toggle round-trips and the banner says it is on', async ({ page }) => {
+    // The indicator is the half that is easy to drop: a setting that only
+    // shows on the tab that sets it leaves an operator on any other tab
+    // unaware that failed pods are being held with this workspace's
+    // credentials in them.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('debugui'));
+
+    await page.goto(`/workspaces/${wsId}`);
+
+    const toggle = page.getByLabel('Debug mode', { exact: true });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+    await expect(toggle).not.toBeChecked();
+    // Off means no banner, not a banner saying "off".
+    await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0);
+
+    // `.click()`, never `.check()`: the toggle is a controlled input whose
+    // checked state comes from the fetched workspace, so it only flips once the
+    // PATCH resolves. `.check()` asserts the state changed synchronously and
+    // throws "Clicking the checkbox did not change its state". The
+    // `toBeChecked()` below is the wait.
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
+
+    await expect(page.getByTestId('debug-mode-banner')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('debug-mode-indicator')).toBeVisible();
+
+    // Survives a reload, so this is the stored value and not browser state.
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByLabel('Debug mode', { exact: true })).toBeChecked();
+      await expect(page.getByTestId('debug-mode-banner')).toBeVisible();
+    }).toPass({ timeout: 20_000 });
+
+    const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status()).toBe(200);
+    expect((await res.json()).data.attributes['debug-mode']).toBe(true);
+  });
+
+  test('turning it back off clears the banner', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('debugoff'));
+
+    await page.goto(`/workspaces/${wsId}`);
+    const toggle = page.getByLabel('Debug mode', { exact: true });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
+    await expect(page.getByTestId('debug-mode-banner')).toBeVisible({ timeout: 15_000 });
+
+    await toggle.click();
+    await expect(toggle).not.toBeChecked({ timeout: 15_000 });
+    await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0);
+
+    await expect(async () => {
+      const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect((await res.json()).data.attributes['debug-mode']).toBe(false);
+    }).toPass({ timeout: 20_000 });
+  });
+});

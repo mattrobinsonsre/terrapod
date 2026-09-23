@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Terragrunt 版本",
       "noExpiry": "不過期",
-      "addDriftIgnoreRule": "新增規則"
+      "addDriftIgnoreRule": "新增規則",
+      "debugModeHint": "在此規則建立的工作區上讓失敗執行器的 Pod 保持開啟。預設關閉 — 保持開啟的 Pod 會保留該工作區的憑證。"
     },
     "table": {
       "name": "名稱",
@@ -2853,7 +2854,8 @@
       "stateActionFailed": "狀態操作失敗",
       "uploadState": "上傳狀態失敗",
       "uploadStateFile": "上傳狀態檔案失敗",
-      "updateSecurityScan": "更新安全掃描失敗"
+      "updateSecurityScan": "更新安全掃描失敗",
+      "updateDebugMode": "更新偵錯模式失敗"
     },
     "subtabs": {
       "state": "狀態",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "未忽略任何規則。",
       "skipRulesHint": "在此工作區中要忽略的掃描器規則 ID，以逗號分隔。"
+    },
+    "debugMode": {
+      "title": "執行器偵錯模式",
+      "description": "讓失敗執行的 Pod 保持開啟，以便你進入其中查看。執行失敗會先回報，之後容器才會繼續存在。",
+      "label": "偵錯模式",
+      "hint": "預設關閉。開啟後，失敗執行器的 Pod 會在維運人員設定的時間窗內保持可用 exec 進入，並在這段期間一直保留此工作區的憑證與已解密的變數。",
+      "activeBadge": "已啟用",
+      "bannerTitle": "此工作區已開啟偵錯模式",
+      "bannerBody": "失敗執行的 Pod 不會結束，而是保持開啟供檢查，並在保持期間保留此工作區的憑證與已解密的變數。排查完畢後請關閉偵錯模式。",
+      "confirmEnable": "要開啟偵錯模式嗎？失敗執行的 Pod 將保持開啟，並保留此工作區的憑證與已解密的變數，直到時間窗到期或你刪除該 Pod。"
     }
   },
   "graphs": {

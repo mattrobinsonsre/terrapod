@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Fersiwn Terragrunt",
       "noExpiry": "Dim dod i ben",
-      "addDriftIgnoreRule": "Ychwanegu rheol"
+      "addDriftIgnoreRule": "Ychwanegu rheol",
+      "debugModeHint": "Cadw podiau rhedwyr a fethodd ar agor ar y gweithleoedd y mae'r rheol hon yn eu creu. I ffwrdd yn ddiofyn — mae pod sy'n cael ei gadw yn cadw tystlythyrau'r gweithle hwnnw."
     },
     "table": {
       "name": "Enw",
@@ -2853,7 +2854,8 @@
       "stateActionFailed": "Methodd y weithred gyflwr",
       "uploadState": "Methwyd llwytho'r cyflwr i fyny",
       "uploadStateFile": "Methwyd llwytho'r ffeil gyflwr i fyny",
-      "updateSecurityScan": "Methwyd diweddaru'r sgan diogelwch"
+      "updateSecurityScan": "Methwyd diweddaru'r sgan diogelwch",
+      "updateDebugMode": "Methwyd diweddaru'r modd dadfygio"
     },
     "subtabs": {
       "state": "Cyflwr",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Ni anwybyddir unrhyw reolau.",
       "skipRulesHint": "IDau rheolau'r sganiwr, wedi'u gwahanu gan gomas, i'w hanwybyddu ar y weithfan hon."
+    },
+    "debugMode": {
+      "title": "Modd dadfygio'r rhedwr",
+      "description": "Cadw pod rhediad a fethodd ar agor fel y gallwch fynd i mewn iddo. Caiff y rhediad ei adrodd fel un a fethodd yn gyntaf; dim ond wedyn y bydd y cynhwysydd yn aros ar waith.",
+      "label": "Modd dadfygio",
+      "hint": "I ffwrdd yn ddiofyn. Tra bo ymlaen, mae pod rhedwr a fethodd yn aros ar gael drwy exec am y ffenestr a ffurfweddwyd gan eich gweithredwr, ac mae'n cadw tystlythyrau a newidynnau datgryptiedig y gweithle hwn drwy'r amser hwnnw.",
+      "activeBadge": "Gweithredol",
+      "bannerTitle": "Mae'r modd dadfygio ymlaen ar gyfer y gweithle hwn",
+      "bannerBody": "Caiff pod rhediad a fethodd ei gadw ar agor i'w archwilio yn lle gorffen, ac mae'n cadw tystlythyrau a newidynnau datgryptiedig y gweithle hwn tra'i fod ar gadw. Diffoddwch y modd dadfygio pan fyddwch wedi gorffen datrys problemau.",
+      "confirmEnable": "Troi'r modd dadfygio ymlaen? Bydd pod rhediad a fethodd yn cael ei gadw ar agor gyda thystlythyrau a newidynnau datgryptiedig y gweithle hwn nes i'r ffenestr ddod i ben neu nes i chi ddileu'r pod."
     }
   },
   "graphs": {

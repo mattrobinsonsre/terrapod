@@ -68,6 +68,7 @@ interface WorkspaceAttrs {
   locked: boolean
   'resource-cpu': string
   'resource-memory': string
+  'debug-mode': boolean
   'agent-pool-id': string | null
   // The full pool set (#1085). Flat — a run is offered to every pool at once
   // and whichever has a live runner claims it first.
@@ -455,6 +456,10 @@ function WorkspaceDetailContent() {
   const [savingSecurityScan, setSavingSecurityScan] = useState(false)
   const [scanSkipRulesDraft, setScanSkipRulesDraft] = useState<string | null>(null)
   const [aiSummaryContextDraft, setAiSummaryContextDraft] = useState<string | null>(null)
+
+  // Runner debug mode (#1764). A held pod keeps the run's credentials, so the
+  // toggle is deliberate rather than a convenience — hence the touch confirm.
+  const [savingDebugMode, setSavingDebugMode] = useState(false)
 
   // Slack run notifications (#556). Local draft for the channel input,
   // autosaved on blur. Opt-in: empty channel = this workspace stays silent.
@@ -1234,6 +1239,33 @@ function WorkspaceDetailContent() {
     }
   }
 
+  // Runner debug mode (#1764). Turning it ON is the direction that costs
+  // something — a failed pod then lingers holding this workspace's decrypted
+  // variables — so the touch confirm guards that direction only.
+  async function handleDebugModeUpdate(next: boolean) {
+    if (!workspace) return
+    if (next && isTouch && !window.confirm(t('debugMode.confirmEnable'))) return
+    setSavingDebugMode(true)
+    try {
+      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: { type: 'workspaces', attributes: { 'debug-mode': next } },
+        }),
+      })
+      if (!res.ok) {
+        throw new Error(await parseApiError(res, t('errors.updateDebugMode')))
+      }
+      const data = await res.json()
+      setWorkspace(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.updateDebugMode'))
+    } finally {
+      setSavingDebugMode(false)
+    }
+  }
+
   // Slack run notifications (#556)
   async function handleSlackChannelUpdate(channel: string) {
     if (!workspace) return
@@ -1980,6 +2012,18 @@ function WorkspaceDetailContent() {
             <p className="text-sm text-slate-400 mt-1">
               {attrs['lifecycle-reason'] || t('lifecycle.archivedDefault')}
             </p>
+          </div>
+        )}
+
+        {/* Debug mode is a standing exposure, not a per-run one, so it is said
+            here rather than only on the Configuration tab (#1764). */}
+        {attrs['debug-mode'] && (
+          <div
+            data-testid="debug-mode-banner"
+            className="mb-4 p-4 rounded-lg bg-amber-900/30 border border-amber-700/50"
+          >
+            <p className="text-sm font-semibold text-amber-300">{t('debugMode.bannerTitle')}</p>
+            <p className="text-sm text-amber-200/80 mt-1">{t('debugMode.bannerBody')}</p>
           </div>
         )}
 
@@ -2979,6 +3023,56 @@ function WorkspaceDetailContent() {
                     <p className="text-xs text-slate-500 mt-1">
                       {t('securityScan.skipRulesHint')}
                       {savingSecurityScan && (
+                        <span className="ms-2 text-brand-400">{t('actions.saving')}</span>
+                      )}
+                    </p>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Runner debug mode (#1764) */}
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-sm font-medium text-slate-300">{t('debugMode.title')}</h3>
+                  <p className="text-xs text-slate-500 mt-1">{t('debugMode.description')}</p>
+                </div>
+                {attrs['debug-mode'] && (
+                  <span
+                    data-testid="debug-mode-indicator"
+                    className="shrink-0 px-2 py-1 rounded text-xs font-medium bg-amber-900/40 text-amber-300 border border-amber-700/50"
+                  >
+                    {t('debugMode.activeBadge')}
+                  </span>
+                )}
+              </div>
+              <dl>
+                <div>
+                  <dt className="text-xs text-slate-500">{t('debugMode.label')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          aria-label={t('debugMode.label')}
+                          checked={!!attrs['debug-mode']}
+                          onChange={(e) => handleDebugModeUpdate(e.target.checked)}
+                          disabled={savingDebugMode}
+                          className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
+                        />
+                        <span className="text-sm text-slate-200">
+                          {attrs['debug-mode'] ? t('common.enabled') : t('common.disabled')}
+                        </span>
+                      </label>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['debug-mode'] ? t('common.enabled') : t('common.disabled')}
+                      </span>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      {t('debugMode.hint')}
+                      {savingDebugMode && (
                         <span className="ms-2 text-brand-400">{t('actions.saving')}</span>
                       )}
                     </p>

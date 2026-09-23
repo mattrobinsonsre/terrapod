@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "73rr4grun7",
       "terragruntVersion": "73rr4grun7 v3r510n",
       "noExpiry": "N0 3xp1ry",
-      "addDriftIgnoreRule": "4dd rul3"
+      "addDriftIgnoreRule": "4dd rul3",
+      "debugModeHint": "H0ld f41l3d runn3r p0d5 0p3n 0n 7h3 w0rk5p4c35 7h15 rul3 cr34735. 0ff by d3f4ul7 — 4 h3ld p0d k33p5 7h47 w0rk5p4c3'5 cr3d3n714l5."
     },
     "table": {
       "name": "N4m3",
@@ -2853,7 +2854,8 @@
       "stateActionFailed": "57473 4c710n f41l3d",
       "uploadState": "F41l3d 70 upl04d 57473",
       "uploadStateFile": "F41l3d 70 upl04d 57473 f1l3",
-      "updateSecurityScan": "F41l3d 70 upd473 53cur17y 5c4nn1ng"
+      "updateSecurityScan": "F41l3d 70 upd473 53cur17y 5c4nn1ng",
+      "updateDebugMode": "F41l3d 70 upd473 d3bug m0d3"
     },
     "subtabs": {
       "state": "57473",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "N0 rul35 1gn0r3d.",
       "skipRulesHint": "C0mm4-53p4r473d 5c4nn3r rul3 1d5 70 1gn0r3 0n 7h15 w0rk5p4c3."
+    },
+    "debugMode": {
+      "title": "Runn3r d3bug m0d3",
+      "description": "H0ld 4 f41l3d run'5 p0d 0p3n 50 y0u c4n g37 1n51d3 17. 7h3 run 15 r3p0r73d 45 f41l3d f1r57; 0nly 7h3n d035 7h3 c0n741n3r 574y up.",
+      "label": "D3bug m0d3",
+      "hint": "0ff by d3f4ul7. Wh1l3 0n, 4 f41l3d runn3r p0d 574y5 3x3c-4bl3 f0r 7h3 w1nd0w y0ur 0p3r470r c0nf1gur3d, 4nd 17 k33p5 7h15 w0rk5p4c3'5 cr3d3n714l5 4nd d3cryp73d v4r14bl35 f0r 7h47 wh0l3 71m3.",
+      "activeBadge": "4c71v3",
+      "bannerTitle": "D3bug m0d3 15 0n f0r 7h15 w0rk5p4c3",
+      "bannerBody": "4 f41l3d run'5 p0d 15 h3ld 0p3n f0r 1n5p3c710n 1n5734d 0f 3x171ng, 4nd 17 k33p5 7h15 w0rk5p4c3'5 cr3d3n714l5 4nd d3cryp73d v4r14bl35 wh1l3 17 15 h3ld. 7urn d3bug m0d3 0ff wh3n y0u 4r3 f1n15h3d 7r0ubl35h0071ng.",
+      "confirmEnable": "7urn 0n d3bug m0d3? 4 f41l3d run'5 p0d w1ll b3 h3ld 0p3n h0ld1ng 7h15 w0rk5p4c3'5 cr3d3n714l5 4nd d3cryp73d v4r14bl35 un71l 7h3 w1nd0w 3xp1r35 0r y0u d3l373 7h3 p0d."
     }
   },
   "graphs": {

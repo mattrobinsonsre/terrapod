@@ -126,6 +126,7 @@ export default function BulkUpdatePage() {
   const [uDriftInterval, setUDriftInterval] = useState('')
   const [uPlanExpiry, setUPlanExpiry] = useState('')
   const [uSlackChannel, setUSlackChannel] = useState('')
+  const [uDebugMode, setUDebugMode] = useState('')
   const [uSetLabels, setUSetLabels] = useState(false)
   const [uLabels, setULabels] = useState<Record<string, string>>({})
   const [uSetVarFiles, setUSetVarFiles] = useState(false)
@@ -206,6 +207,7 @@ export default function BulkUpdatePage() {
     if (uDriftInterval.trim()) u['drift-detection-interval-seconds'] = Number(uDriftInterval)
     if (uPlanExpiry.trim()) u['plan-expiry-seconds'] = Number(uPlanExpiry)
     if (uSlackChannel.trim()) u['slack-channel'] = uSlackChannel.trim()
+    if (uDebugMode) u['debug-mode'] = uDebugMode === 'true'
     if (uSetLabels) u.labels = uLabels
     if (uSetVarFiles) u['var-files'] = uVarFiles.map((s) => s.trim()).filter(Boolean)
     if (uSetRunTasks) u['run-tasks'] = uRunTasks
@@ -724,6 +726,18 @@ export default function BulkUpdatePage() {
                 placeholder={t('unchanged')}
                 className={inputCls}
               />
+            </div>
+            <div>
+              <label className={labelCls}>{tWs('debugMode.title')}</label>
+              <select
+                value={uDebugMode}
+                onChange={(e) => setUDebugMode(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="true">{tCommon('yes')}</option>
+                <option value="false">{tCommon('no')}</option>
+              </select>
             </div>
             <div>
               <label className={labelCls}>{tAi('title')}</label>

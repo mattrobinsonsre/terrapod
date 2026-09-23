@@ -155,6 +155,20 @@ class RunnerConfig(BaseSettings):
     service_account_name: str = Field(default="")
     azure_workload_identity: bool = Field(default=False)
     ttl_seconds_after_finished: int = Field(default=600)
+    #: How long a failed runner pod is held open for inspection when its
+    #: workspace has debug mode on (#1764). The pod keeps the run's auth token
+    #: and its decrypted tfvars for this long, so the deployment sets the
+    #: ceiling rather than the workspace: an operator can ask for a debug pod
+    #: but not for how long it survives.
+    debug_linger_seconds: int = Field(
+        default=1800,
+        ge=0,
+        le=14400,
+        description=(
+            "Seconds a failed runner pod is held open for exec when the workspace "
+            "has debug mode on. 0 disables debug mode deployment-wide."
+        ),
+    )
     termination_grace_period_seconds: int = Field(
         default=120,
         description="Time budget for graceful shutdown + artifact uploads (pod terminationGracePeriodSeconds)",

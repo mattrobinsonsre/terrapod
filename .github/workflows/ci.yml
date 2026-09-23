@@ -1141,6 +1141,10 @@ jobs:
           # Execution-hooks kill-switch (#619) renders into runners.yaml on by
           # default (config-channel contract).
           echo "$out" | grep -q "hooks_enabled: true" || { echo "FAIL: runners.yaml hooks_enabled not rendered"; exit 1; }
+          # Debug linger (#1764) reaches runners.yaml. Grepping the RENDERED
+          # output, not the template: a values key with no render line is
+          # silently inert, and the code default wins with nothing to show it.
+          echo "$out" | grep -q "debug_linger_seconds: 1800" || { echo "FAIL: runners.yaml debug_linger_seconds not rendered"; exit 1; }
           # Slack integration (#556) is OFF by default: config renders but no
           # secret env is injected (no existingSecret) — config-channel contract.
           echo "$out" | grep -q "TERRAPOD_SLACK__" && { echo "FAIL: Slack secret env injected when disabled"; exit 1; }

@@ -1063,7 +1063,8 @@
       "terragruntEnabled": "Terragrunt",
       "terragruntVersion": "Versão do Terragrunt",
       "noExpiry": "Sem expiração",
-      "addDriftIgnoreRule": "Adicionar regra"
+      "addDriftIgnoreRule": "Adicionar regra",
+      "debugModeHint": "Manter abertos os pods de runners com falha nos espaços de trabalho criados por esta regra. Desativado por padrão — um pod mantido aberto conserva as credenciais daquele espaço de trabalho."
     },
     "table": {
       "name": "Nome",
@@ -2853,7 +2854,8 @@
       "stateActionFailed": "Falha na ação de estado",
       "uploadState": "Falha ao enviar o estado",
       "uploadStateFile": "Falha ao enviar o arquivo de estado",
-      "updateSecurityScan": "Falha ao atualizar a verificação de segurança"
+      "updateSecurityScan": "Falha ao atualizar a verificação de segurança",
+      "updateDebugMode": "Falha ao atualizar o modo de depuração"
     },
     "subtabs": {
       "state": "Estado",
@@ -2896,6 +2898,16 @@
       "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
       "noSkipRules": "Nenhuma regra ignorada.",
       "skipRulesHint": "IDs de regras do verificador, separados por vírgulas, a ignorar neste workspace."
+    },
+    "debugMode": {
+      "title": "Modo de depuração do runner",
+      "description": "Manter aberto o pod de uma execução com falha para que você possa entrar nele. A falha da execução é reportada primeiro; só depois o contêiner continua de pé.",
+      "label": "Modo de depuração",
+      "hint": "Desativado por padrão. Enquanto estiver ativo, o pod de um runner com falha continua acessível por exec durante a janela configurada pelo seu operador e mantém, por todo esse tempo, as credenciais e as variáveis descriptografadas deste espaço de trabalho.",
+      "activeBadge": "Ativo",
+      "bannerTitle": "O modo de depuração está ativado para este espaço de trabalho",
+      "bannerBody": "O pod de uma execução com falha é mantido aberto para inspeção em vez de encerrar e, enquanto isso, mantém as credenciais e as variáveis descriptografadas deste espaço de trabalho. Desative o modo de depuração quando terminar a investigação.",
+      "confirmEnable": "Ativar o modo de depuração? O pod de uma execução com falha será mantido aberto com as credenciais e as variáveis descriptografadas deste espaço de trabalho até a janela expirar ou você excluir o pod."
     }
   },
   "graphs": {

@@ -1453,6 +1453,17 @@ runners:
   extraVolumes: []
   extraVolumeMounts: []
   ttlSecondsAfterFinished: 600  # Clean up completed Jobs after 10 min
+  # How long a FAILED runner pod is held open for `kubectl exec` when its
+  # workspace has debug mode on (#1764). A failed run's container is normally
+  # terminated at once, which is exactly when an operator wants to look inside
+  # it — at the credentials that did not work, the DNS that did not resolve,
+  # the mounts that were not there.
+  #
+  # This is the operator's ceiling, not the workspace's: while a pod lingers it
+  # still holds the run's auth token and its decrypted terraform.tfvars.json,
+  # and whoever can `kubectl exec` in the runner namespace can read them. Set 0
+  # to disable debug mode across the deployment however workspaces are set.
+  debugLingerSeconds: 1800
   terminationGracePeriodSeconds: 120  # Time budget for graceful shutdown + artifact uploads
   tokenTTLSeconds: 3600         # Runner token TTL (default 1 hour)
   maxTokenTTLSeconds: 7200      # Runner token max TTL (default 2 hours)
