@@ -89,6 +89,10 @@ interface WorkspaceAttrs {
   'auto-merge-strategy': 'merge' | 'squash' | 'rebase'
   'ai-summary-mode': 'default' | 'enabled' | 'disabled'
   'ai-summary-context': string
+  'security-scan-enforcement': 'off' | 'advisory' | 'enforced'
+  'security-scan-engine': 'checkov' | 'trivy' | 'both'
+  'security-scan-severity-threshold': 'critical' | 'high' | 'medium' | 'low'
+  'security-scan-skip-rules': string[]
   'slack-channel': string
   'drift-detection-enabled': boolean
   'drift-detection-interval-seconds': number
@@ -448,6 +452,8 @@ function WorkspaceDetailContent() {
   // can autosave on blur rather than every keystroke; mode is saved on
   // dropdown change directly.
   const [savingAiSummary, setSavingAiSummary] = useState(false)
+  const [savingSecurityScan, setSavingSecurityScan] = useState(false)
+  const [scanSkipRulesDraft, setScanSkipRulesDraft] = useState<string | null>(null)
   const [aiSummaryContextDraft, setAiSummaryContextDraft] = useState<string | null>(null)
 
   // Slack run notifications (#556). Local draft for the channel input,
@@ -1200,6 +1206,31 @@ function WorkspaceDetailContent() {
       setError(err instanceof Error ? err.message : t('errors.updateAiSummary'))
     } finally {
       setSavingAiSummary(false)
+    }
+  }
+
+  // Security scanning (#1036). Settable here as of #1763 — it was managed
+  // through the API and the provider only, so an operator with the UI in front
+  // of them had no way to see or change it.
+  async function handleSecurityScanAttrUpdate(patch: Record<string, unknown>) {
+    if (!workspace) return
+    setSavingSecurityScan(true)
+    try {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'workspaces', attributes: patch } }),
+      })
+      if (!res.ok) {
+        throw new Error(await parseApiError(res, t('errors.updateSecurityScan')))
+      }
+      const data = await res.json()
+      setWorkspace(data.data)
+      setScanSkipRulesDraft(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.updateSecurityScan'))
+    } finally {
+      setSavingSecurityScan(false)
     }
   }
 
@@ -2812,6 +2843,144 @@ function WorkspaceDetailContent() {
                     <p className="text-xs text-slate-500 mt-1">
                       {t('aiSummary.contextHint')}
                       {savingAiSummary && <span className="ms-2 text-brand-400">{t('actions.saving')}</span>}
+                    </p>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Security scanning (#1036) — exposed here by #1763 */}
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-medium text-slate-300">{t('securityScan.title')}</h3>
+                  <p className="text-xs text-slate-500 mt-1">{t('securityScan.description')}</p>
+                </div>
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-xs text-slate-500">{t('securityScan.enforcement')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <select
+                        aria-label={t('securityScan.enforcement')}
+                        value={attrs['security-scan-enforcement'] || 'advisory'}
+                        onChange={(e) =>
+                          handleSecurityScanAttrUpdate({ 'security-scan-enforcement': e.target.value })
+                        }
+                        disabled={savingSecurityScan}
+                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="off">{t('securityScan.enforcementOff')}</option>
+                        <option value="advisory">{t('securityScan.enforcementAdvisory')}</option>
+                        <option value="enforced">{t('securityScan.enforcementEnforced')}</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['security-scan-enforcement'] === 'off'
+                          ? t('securityScan.enforcementOff')
+                          : attrs['security-scan-enforcement'] === 'enforced'
+                            ? t('securityScan.enforcementEnforced')
+                            : t('securityScan.enforcementAdvisory')}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">{t('securityScan.engine')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <select
+                        aria-label={t('securityScan.engine')}
+                        value={attrs['security-scan-engine'] || 'checkov'}
+                        onChange={(e) =>
+                          handleSecurityScanAttrUpdate({ 'security-scan-engine': e.target.value })
+                        }
+                        disabled={savingSecurityScan}
+                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="checkov">{t('securityScan.engineCheckov')}</option>
+                        <option value="trivy">{t('securityScan.engineTrivy')}</option>
+                        <option value="both">{t('securityScan.engineBoth')}</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['security-scan-engine'] || 'checkov'}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">{t('securityScan.threshold')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <select
+                        aria-label={t('securityScan.threshold')}
+                        value={attrs['security-scan-severity-threshold'] || 'high'}
+                        onChange={(e) =>
+                          handleSecurityScanAttrUpdate({
+                            'security-scan-severity-threshold': e.target.value,
+                          })
+                        }
+                        disabled={savingSecurityScan}
+                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="critical">{t('securityScan.thresholdCritical')}</option>
+                        <option value="high">{t('securityScan.thresholdHigh')}</option>
+                        <option value="medium">{t('securityScan.thresholdMedium')}</option>
+                        <option value="low">{t('securityScan.thresholdLow')}</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['security-scan-severity-threshold'] || 'high'}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-slate-500">
+                    {t('securityScan.skipRules')}
+                    <span className="ms-2 text-slate-600">{t('securityScan.skipRulesSuffix')}</span>
+                  </dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <input
+                        type="text"
+                        aria-label={t('securityScan.skipRules')}
+                        value={
+                          scanSkipRulesDraft ??
+                          (attrs['security-scan-skip-rules'] || []).join(', ')
+                        }
+                        onChange={(e) => setScanSkipRulesDraft(e.target.value)}
+                        onBlur={() => {
+                          if (scanSkipRulesDraft === null) return
+                          const next = scanSkipRulesDraft
+                            .split(',')
+                            .map((r) => r.trim())
+                            .filter(Boolean)
+                          const current = attrs['security-scan-skip-rules'] || []
+                          if (next.join('\u0000') !== current.join('\u0000')) {
+                            handleSecurityScanAttrUpdate({ 'security-scan-skip-rules': next })
+                          } else {
+                            setScanSkipRulesDraft(null)
+                          }
+                        }}
+                        placeholder={t('securityScan.skipRulesPlaceholder')}
+                        disabled={savingSecurityScan}
+                        className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
+                      />
+                    ) : (attrs['security-scan-skip-rules'] || []).length > 0 ? (
+                      <p className="text-sm text-slate-200 font-mono">
+                        {(attrs['security-scan-skip-rules'] || []).join(', ')}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-slate-500 italic">{t('securityScan.noSkipRules')}</p>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      {t('securityScan.skipRulesHint')}
+                      {savingSecurityScan && (
+                        <span className="ms-2 text-brand-400">{t('actions.saving')}</span>
+                      )}
                     </p>
                   </dd>
                 </div>

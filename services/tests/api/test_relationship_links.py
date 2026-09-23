@@ -82,6 +82,25 @@ class TestAutodiscoveryRule:
             run_task_templates=[],
             notification_templates=[],
             execution_hook_templates=[],
+            # Templated scan / AI-summary settings (#1763), at their column
+            # defaults. The serializer reads them directly, as it does every
+            # other column — a real rule always carries them.
+            security_scan_enforcement="advisory",
+            security_scan_engine="checkov",
+            security_scan_severity_threshold="high",
+            security_scan_skip_rules=[],
+            ai_summary_mode="default",
+            ai_summary_context="",
+            terragrunt_enabled=False,
+            terragrunt_version="1.0",
+            vcs_workflow="merge_then_apply",
+            auto_merge=False,
+            auto_merge_strategy="merge",
+            drift_detection_enabled=True,
+            drift_detection_interval_seconds=86400,
+            drift_ignore_rules=[],
+            plan_expiry_seconds=None,
+            slack_channel="",
             created_at=None,
             updated_at=None,
         )

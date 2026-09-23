@@ -380,6 +380,21 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('the security scanning panel is usable at phone width (#1763)', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2eresp-scanpanel'))
+
+    await page.goto(`/workspaces/${wsId}`)
+
+    // Three selects and a free-text field in one panel is the shape that
+    // pushes a card sideways on a phone.
+    const enforcement = page.getByLabel('Enforcement', { exact: true })
+    await expect(enforcement).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByLabel('Scanner', { exact: true })).toBeVisible()
+    await expect(page.getByLabel('Ignored rules')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('runs at a phone viewport', async ({ page }) => {
     const vp = page.viewportSize();
     expect(vp, 'responsive project must set a viewport').not.toBeNull();

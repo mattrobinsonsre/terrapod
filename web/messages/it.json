@@ -1041,7 +1041,29 @@
       "runTaskTemplates": "Template di run task (creati su ogni nuovo workspace)",
       "notificationTemplates": "Template di notifica (creati su ogni nuovo workspace)",
       "saving": "Salvataggio in corso...",
-      "previewTitle": "Percorri il repository e visualizza in anteprima quali workspace questa regola CREEREBBE — nessuna persistenza"
+      "previewTitle": "Percorri il repository e visualizza in anteprima quali workspace questa regola CREEREBBE — nessuna persistenza",
+      "governance": "Analisi di sicurezza e riepilogo IA",
+      "governanceHint": "Applicato a ogni workspace creato da questa regola.",
+      "scanEnforcement": "Applicazione",
+      "scanOff": "Non analizzare",
+      "scanAdvisory": "Analizza e segnala soltanto",
+      "scanEnforced": "Blocca l'applicazione in caso di risultati",
+      "scanEngine": "Scanner",
+      "scanEngineBoth": "Checkov e Trivy",
+      "scanThreshold": "Segnala i risultati a partire da",
+      "severityCritical": "critico",
+      "severityHigh": "alto",
+      "severityMedium": "medio",
+      "severityLow": "basso",
+      "aiSummaryMode": "Riepilogo IA del plan",
+      "aiSummaryDefault": "Segui l''impostazione predefinita del deployment",
+      "aiSummaryEnabled": "Riepiloga sempre",
+      "aiSummaryDisabled": "Non riepilogare mai",
+      "execution": "Esecuzione, VCS e deriva",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versione di Terragrunt",
+      "noExpiry": "Nessuna scadenza",
+      "addDriftIgnoreRule": "Aggiungi regola"
     },
     "table": {
       "name": "Nome",
@@ -2830,7 +2852,8 @@
       "rollbackStateVersion": "Impossibile ripristinare la versione dello stato",
       "stateActionFailed": "Azione sullo stato non riuscita",
       "uploadState": "Impossibile caricare lo stato",
-      "uploadStateFile": "Impossibile caricare il file di stato"
+      "uploadStateFile": "Impossibile caricare il file di stato",
+      "updateSecurityScan": "Impossibile aggiornare l'analisi di sicurezza"
     },
     "subtabs": {
       "state": "Stato",
@@ -2851,6 +2874,28 @@
         "global": "Globale",
         "rule": "Corrisponde a una regola"
       }
+    },
+    "securityScan": {
+      "title": "Analisi di sicurezza",
+      "description": "Analizza il piano alla ricerca di infrastruttura non sicura prima di applicarlo.",
+      "enforcement": "Applicazione",
+      "enforcementOff": "Non analizzare",
+      "enforcementAdvisory": "Analizza e segnala soltanto",
+      "enforcementEnforced": "Blocca l'applicazione in caso di risultati",
+      "engine": "Scanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov e Trivy",
+      "threshold": "Segnala i risultati a partire da",
+      "thresholdCritical": "critico",
+      "thresholdHigh": "alto",
+      "thresholdMedium": "medio",
+      "thresholdLow": "basso",
+      "skipRules": "Regole ignorate",
+      "skipRulesSuffix": "(facoltativo)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Nessuna regola ignorata.",
+      "skipRulesHint": "ID delle regole dello scanner, separati da virgole, da ignorare in questo workspace."
     }
   },
   "graphs": {

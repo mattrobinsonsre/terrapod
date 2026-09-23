@@ -1041,7 +1041,29 @@
       "runTaskTemplates": "Szablony zadań przebiegu (tworzone na każdym nowym obszarze roboczym)",
       "notificationTemplates": "Szablony powiadomień (tworzone na każdym nowym obszarze roboczym)",
       "saving": "Zapisywanie...",
-      "previewTitle": "Przejdź przez repozytorium i wyświetl podgląd obszarów roboczych, które ta reguła BY utworzyła — bez zapisu"
+      "previewTitle": "Przejdź przez repozytorium i wyświetl podgląd obszarów roboczych, które ta reguła BY utworzyła — bez zapisu",
+      "governance": "Skanowanie bezpieczeństwa i podsumowanie AI",
+      "governanceHint": "Stosowane do każdego obszaru roboczego tworzonego przez tę regułę.",
+      "scanEnforcement": "Egzekwowanie",
+      "scanOff": "Nie skanuj",
+      "scanAdvisory": "Tylko skanuj i raportuj",
+      "scanEnforced": "Blokuj zastosowanie przy znaleziskach",
+      "scanEngine": "Skaner",
+      "scanEngineBoth": "Checkov i Trivy",
+      "scanThreshold": "Raportuj znaleziska od poziomu",
+      "severityCritical": "krytyczny",
+      "severityHigh": "wysoki",
+      "severityMedium": "średni",
+      "severityLow": "niski",
+      "aiSummaryMode": "Podsumowanie planu AI",
+      "aiSummaryDefault": "Zgodnie z domyślnym ustawieniem wdrożenia",
+      "aiSummaryEnabled": "Zawsze podsumowuj",
+      "aiSummaryDisabled": "Nigdy nie podsumowuj",
+      "execution": "Wykonanie, VCS i dryf",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Wersja Terragrunt",
+      "noExpiry": "Bez wygaśnięcia",
+      "addDriftIgnoreRule": "Dodaj regułę"
     },
     "table": {
       "name": "Nazwa",
@@ -2830,7 +2852,8 @@
       "rollbackStateVersion": "Nie udało się wycofać wersji stanu",
       "stateActionFailed": "Akcja stanu nie powiodła się",
       "uploadState": "Nie udało się przesłać stanu",
-      "uploadStateFile": "Nie udało się przesłać pliku stanu"
+      "uploadStateFile": "Nie udało się przesłać pliku stanu",
+      "updateSecurityScan": "Nie udało się zaktualizować skanowania bezpieczeństwa"
     },
     "subtabs": {
       "state": "Stan",
@@ -2851,6 +2874,28 @@
         "global": "Globalny",
         "rule": "Dopasowany regułą"
       }
+    },
+    "securityScan": {
+      "title": "Skanowanie bezpieczeństwa",
+      "description": "Skanuj plan pod kątem niebezpiecznej infrastruktury przed jego zastosowaniem.",
+      "enforcement": "Egzekwowanie",
+      "enforcementOff": "Nie skanuj",
+      "enforcementAdvisory": "Tylko skanuj i raportuj",
+      "enforcementEnforced": "Blokuj zastosowanie przy znaleziskach",
+      "engine": "Skaner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov i Trivy",
+      "threshold": "Raportuj znaleziska od poziomu",
+      "thresholdCritical": "krytyczny",
+      "thresholdHigh": "wysoki",
+      "thresholdMedium": "średni",
+      "thresholdLow": "niski",
+      "skipRules": "Ignorowane reguły",
+      "skipRulesSuffix": "(opcjonalnie)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Nie zignorowano żadnych reguł.",
+      "skipRulesHint": "Identyfikatory reguł skanera oddzielone przecinkami, ignorowane w tym obszarze roboczym."
     }
   },
   "graphs": {

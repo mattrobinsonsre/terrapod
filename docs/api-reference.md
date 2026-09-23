@@ -338,6 +338,8 @@ either/or rule.
 }
 ```
 
+Create accepts the same settings `PATCH` does, including `vcs-workflow`, `auto-merge`, `auto-merge-strategy`, `ai-summary-mode` and `ai-summary-context`. Before #1763 those five were **silently dropped** on create — accepted with a `201` and ignored — so a configuration asking for `apply_then_merge` quietly got `merge_then_apply`. They are now read and validated by the same rules `PATCH` uses, including `apply_then_merge`'s requirement for a VCS connection and auto-apply off.
+
 **Required permission:** Any authenticated user can create workspaces (creator becomes owner).
 
 ### Agent pool set
@@ -2527,14 +2529,20 @@ Runs the same walk as Preview but actually creates the workspaces (idempotent, c
 
 ### Rule templating (run tasks / notifications / var files)
 
-`POST`/`PATCH` rule bodies accept three additional attributes that are **materialised onto every workspace the rule creates**, so autodiscovered workspaces are fully configured at creation:
+These are editable in the UI under **Admin → Autodiscovery**, alongside the rule's other workspace-template fields.
+
+`POST`/`PATCH` rule bodies accept further attributes that are **materialised onto every workspace the rule creates**, so autodiscovered workspaces are fully configured at creation:
 
 - `var-files` — list of var-file paths.
 - `run-task-templates` — list of run-task specs (same shape as the bulk-update `run-tasks`, below): `{name, url, hmac-key?, stage, enforcement-level?, enabled?}`.
 - `notification-templates` — list of notification specs: `{name, destination-type, url?, token?, triggers?, email-addresses?, enabled?}`.
 - `execution-hook-templates` — list of [execution hook](execution-hooks.md) ids (`hook-<uuid>`) associated with every created workspace (#672).
 
-These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template).
+- `security-scan-enforcement` / `security-scan-engine` / `security-scan-severity-threshold` / `security-scan-skip-rules` — [security scanning](security-scanning.md) for every created workspace (#1763). Unlike on a workspace, `enforced` is always accepted here: a rule has no engine, so everything it creates is a Terraform/OpenTofu workspace, which is exactly what can be scanned.
+- `ai-summary-mode` / `ai-summary-context` — the AI plan-summary opt-in and its free-text context for every created workspace (#1763).
+- `terragrunt-enabled` / `terragrunt-version`, `vcs-workflow`, `auto-merge` / `auto-merge-strategy`, `drift-detection-enabled` / `drift-detection-interval-seconds`, `drift-ignore-rules`, `plan-expiry-seconds` and `slack-channel` — the remaining per-workspace settings (#1763). `drift-detection-enabled` defaults **true** here, unlike the workspace column, because every autodiscovered workspace is VCS-connected.
+
+These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template). The same pairing holds for the scan and AI-summary settings, and their values are validated by the same rules the workspace endpoint uses — so a rule cannot template a setting the workspace API would reject.
 
 ---
 
@@ -2779,6 +2787,21 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
     "resource-cpu": "1", "resource-memory": "2Gi",
     "var-files": ["envs/prod.tfvars"],
     "labels": {"reviewed": "2026-q2"},
+    "security-scan-enforcement": "enforced",
+    "security-scan-engine": "checkov",
+    "security-scan-severity-threshold": "high",
+    "security-scan-skip-rules": ["CKV_AWS_24"],
+    "ai-summary-mode": "enabled",
+    "ai-summary-context": "payments estate; PCI in scope",
+    "terragrunt-enabled": true, "terragrunt-version": "0.67.4",
+    "trigger-prefixes": ["infra/net"],
+    "vcs-workflow": "merge_then_apply",
+    "auto-merge": true, "auto-merge-strategy": "squash",
+    "plan-expiry-seconds": 3600,
+    "drift-detection-enabled": true, "drift-detection-interval-seconds": 86400,
+    "drift-ignore-rules": ["aws_instance.web.tags[\"LastSeen\"]"],
+    "slack-channel": "#platform",
+    "pulumi-bind-plan": false,
     "run-tasks": [
       { "name": "opa-policy-check", "url": "http://opa:8080/webhook",
         "hmac-key": "secret", "stage": "post_plan", "enforcement-level": "mandatory" }
@@ -2795,6 +2818,12 @@ Semantics:
 
 - **Validated once up front** — field enums, `labels` reserved-key check, run-task/notification specs, and agent-pool existence + caller pool-`write` RBAC on **every** pool named. Any error ⇒ `422`, **zero mutation**.
 - **Agent pools** accept either `agent-pool-id` (one pool, replacing the set) or `agent-pool-ids` (the set) — the same mutually-exclusive pair as the workspace endpoints; both in one `update` ⇒ `422`.
+- **`security-scan-enforcement` is checked against the matched set**, not just the payload. Checkov and Trivy read Terraform plan JSON, so a Pulumi workspace has nothing to scan and accepts only `off`. Setting `advisory` or `enforced` across a match set containing one ⇒ `422` naming the offenders, with **zero mutation** — a mixed-engine match set is the normal case, and the alternative is every apply on those workspaces held waiting for a scan result that cannot arrive. Narrow the filter to exclude them.
+- **Every settable per-workspace setting is reachable here** (#1763). A source-introspection gate requires each `Workspace` column to be wired up, permanently exempt with a reason, or a recorded gap — so a new setting cannot be silently missing.
+- **All settings use the same rules as the single-workspace `PATCH`** (enum values, the 200-entry skip-rule cap, the 4000-character context cap, the drift-rule character set), so bulk update never accepts a value the workspace endpoint rejects. Booleans are type-checked, never coerced: `"false"` is refused rather than read as `true`.
+- **Two more settings are checked against the matched set**, for the same reason as `security-scan-enforcement`:
+  - `vcs-workflow: apply_then_merge` needs a VCS connection and auto-apply off on **every** matched workspace — the apply runs before the PR merges, so auto-applying would apply from a branch nobody approved. Turning auto-apply off in the same request is allowed, mirroring the `PATCH` path.
+  - `pulumi-bind-plan` applies only to Pulumi workspaces; setting it across a match set containing another engine ⇒ `422`, rather than recording a setting that does nothing.
 - `run-tasks` / `notification-configurations` **upsert by `(workspace, name)`**: created if absent, updated in place if present (so re-running with a changed `url` rotates it across the fleet).
 - **All-or-nothing**: the whole batch commits or nothing does. `dry_run` (default `true`, not enforced) runs the identical code path and rolls back — the preview is exactly what apply would do, with provably zero side effects.
 - **Triggers no runs** — pure config write; the change lands on each workspace's next normal run. Reversible (it only writes settings rows).

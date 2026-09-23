@@ -1041,7 +1041,29 @@
       "runTaskTemplates": "task templates, Run (on each new workspace, created)",
       "notificationTemplates": "templates, Notification (on each new workspace, created)",
       "saving": "Saving, we are...",
-      "previewTitle": "The repo walk, and which workspaces this rule WOULD create preview — no persistence, there is"
+      "previewTitle": "The repo walk, and which workspaces this rule WOULD create preview — no persistence, there is",
+      "governance": "AI Summary and Security Scanning",
+      "governanceHint": "To every workspace this rule creates, applied it is.",
+      "scanEnforcement": "Enforcement",
+      "scanOff": "Scan, do not",
+      "scanAdvisory": "Scan and report only, you will",
+      "scanEnforced": "On findings, block the apply",
+      "scanEngine": "Scanner",
+      "scanEngineBoth": "Checkov and Trivy",
+      "scanThreshold": "At or above, report findings",
+      "severityCritical": "critical",
+      "severityHigh": "high",
+      "severityMedium": "medium",
+      "severityLow": "low",
+      "aiSummaryMode": "Summary, AI Plan",
+      "aiSummaryDefault": "The deployment default, follow",
+      "aiSummaryEnabled": "Summarize, always",
+      "aiSummaryDisabled": "Summarize, never",
+      "execution": "VCS and drift, execution",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Version, Terragrunt",
+      "noExpiry": "Expiry, there is none",
+      "addDriftIgnoreRule": "A rule, add"
     },
     "table": {
       "name": "Name",
@@ -2830,7 +2852,8 @@
       "rollbackStateVersion": "Rollback the state version, it did not",
       "stateActionFailed": "Failed, the state action did",
       "uploadState": "Upload the state, it did not",
-      "uploadStateFile": "Upload the state file, it did not"
+      "uploadStateFile": "Upload the state file, it did not",
+      "updateSecurityScan": "Update the security scanning, failed it did"
     },
     "subtabs": {
       "state": "State",
@@ -2851,6 +2874,28 @@
         "global": "Global",
         "rule": "By rule, matched"
       }
+    },
+    "securityScan": {
+      "title": "Scanning, Security",
+      "description": "For insecure infrastructure, scan the plan you must, before applied it is.",
+      "enforcement": "Enforcement",
+      "enforcementOff": "Scan, do not",
+      "enforcementAdvisory": "Scan and report only, you will",
+      "enforcementEnforced": "On findings, block the apply",
+      "engine": "Scanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov and Trivy",
+      "threshold": "At or above, report findings",
+      "thresholdCritical": "critical",
+      "thresholdHigh": "high",
+      "thresholdMedium": "medium",
+      "thresholdLow": "low",
+      "skipRules": "Rules, ignored",
+      "skipRulesSuffix": "(optional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Ignored, no rules are.",
+      "skipRulesHint": "To ignore on this workspace, comma-separated scanner rule ids there are."
     }
   },
   "graphs": {

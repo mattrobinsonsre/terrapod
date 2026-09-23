@@ -38,7 +38,9 @@ import hashlib
 import os
 import re
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -74,6 +76,7 @@ from terrapod.services import (
     ha_role,  # noqa: F401
     pool_set,
     run_service,
+    workspace_settings,
 )
 from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
 from terrapod.services.workspace_name import validate_workspace_name
@@ -161,114 +164,31 @@ def _validate_var_files(raw: object) -> list[str]:
 
 
 def _sanitize_working_directory(raw: str) -> str:
-    """Sanitize working-directory: strip leading/trailing slashes, reject traversal."""
-    v = raw.strip().strip("/")
-    if ".." in v:
-        raise HTTPException(status_code=422, detail="working-directory: path traversal not allowed")
-    return v
+    return _422(workspace_settings.sanitize_working_directory, raw)
 
 
 def _validate_trigger_prefixes(raw: object) -> list[str]:
-    """Validate and sanitize trigger-prefixes input.
-
-    Each entry is normalized the same way as working-directory (strip slashes,
-    reject traversal).  Max 20 entries.
-    """
-    if not isinstance(raw, list):
-        raise HTTPException(status_code=422, detail="trigger-prefixes must be a list of strings")
-    if len(raw) > 20:
-        raise HTTPException(status_code=422, detail="trigger-prefixes: maximum 20 entries")
-    result: list[str] = []
-    for entry in raw:
-        if not isinstance(entry, str):
-            raise HTTPException(status_code=422, detail="trigger-prefixes entries must be strings")
-        v = _sanitize_working_directory(entry)
-        if not v:
-            raise HTTPException(
-                status_code=422, detail="trigger-prefixes entries must be non-empty"
-            )
-        result.append(v)
-    return result
-
-
-_DRIFT_IGNORE_RULE_RE = re.compile(r"^[A-Za-z0-9_*.\-\[\]\"]+$")
+    return _422(workspace_settings.validate_trigger_prefixes, raw)
 
 
 def _validate_drift_ignore_rules(raw: object) -> list[str]:
-    """Validate `drift-ignore-rules` input (#482).
+    return _422(workspace_settings.validate_drift_ignore_rules, raw)
 
-    Each entry is a glob-aware Terraform-address-plus-attribute-path
-    string consumed by `drift_ignore_classifier.classify_drift`. The
-    character set is intentionally narrow — letters, digits, the
-    delimiters `.` `[` `]` `*`, plus underscore, hyphen, double quote
-    (for `for_each` keys). Anything else is rejected so a stray space
-    or backtick can't sneak through and cause a regex-compile failure
-    later in the drift-classifier path. Max 50 entries; max 500 chars
-    per entry (loose enough for `module.x.module.y.aws_iam_policy.z
-    .statements[*].conditions[*].values[*]`-style paths without
-    risking unbounded growth).
+
+def _422(validate: Callable[..., Any], *args: Any) -> Any:
+    """Call a `services.workspace_settings` rule, surfacing its ValueError as a 422.
+
+    The rules themselves live in the service because four paths write these
+    settings (#1763) — this is only the HTTP skin over them.
     """
-    if not isinstance(raw, list):
-        raise HTTPException(status_code=422, detail="drift-ignore-rules must be a list of strings")
-    if len(raw) > 50:
-        raise HTTPException(status_code=422, detail="drift-ignore-rules: maximum 50 entries")
-    result: list[str] = []
-    for entry in raw:
-        if not isinstance(entry, str):
-            raise HTTPException(
-                status_code=422, detail="drift-ignore-rules entries must be strings"
-            )
-        v = entry.strip()
-        if not v:
-            raise HTTPException(
-                status_code=422, detail="drift-ignore-rules entries must be non-empty"
-            )
-        if len(v) > 500:
-            raise HTTPException(
-                status_code=422,
-                detail="drift-ignore-rules entries must be ≤ 500 characters",
-            )
-        if not _DRIFT_IGNORE_RULE_RE.match(v):
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "drift-ignore-rules entries may only contain letters, digits, "
-                    "underscores, hyphens, dots, brackets, asterisks, and double quotes"
-                ),
-            )
-        result.append(v)
-    return result
-
-
-def _scan_enum(value: object, valid: frozenset[str], field: str, default: str) -> str:
-    """Validate a security-scan enum field (#1036); 422 on an unknown value."""
-    s = str(value if value is not None else default)
-    if s not in valid:
-        raise HTTPException(status_code=422, detail=f"{field} must be one of {sorted(valid)}")
-    return s
+    try:
+        return validate(*args)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 def _validate_scan_skip_rules(raw: object) -> list[str]:
-    """Validate `security-scan-skip-rules` (#1036): a list of non-empty rule-id
-    strings (Checkov CKV_* / Trivy AVD-* ids), capped for sanity."""
-    if raw is None:
-        return []
-    if not isinstance(raw, list):
-        raise HTTPException(status_code=422, detail="security-scan-skip-rules must be a list")
-    if len(raw) > 200:
-        raise HTTPException(status_code=422, detail="security-scan-skip-rules: maximum 200 entries")
-    out: list[str] = []
-    for v in raw:
-        if not isinstance(v, str) or not v.strip():
-            raise HTTPException(
-                status_code=422, detail="security-scan-skip-rules entries must be non-empty strings"
-            )
-        if len(v) > 100:
-            raise HTTPException(
-                status_code=422, detail="security-scan-skip-rules entries must be ≤ 100 characters"
-            )
-        out.append(v.strip())
-    return out
+    return _422(workspace_settings.validate_scan_skip_rules, raw)
 
 
 def _validate_workspace_name(name: str) -> str:
@@ -283,6 +203,17 @@ def _validate_workspace_name(name: str) -> str:
         return validate_workspace_name(name)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+def _scan_enforcement_for(raw: object, default: str = "advisory") -> str:
+    """`security-scan-enforcement`.
+
+    No engine argument on this line: it has no engine strategy layer, so every
+    workspace is Terraform/OpenTofu and therefore always scannable. On `main`
+    this takes an engine and refuses a non-`off` value where scanning cannot
+    run (#1567) -- there is nothing here for that to guard.
+    """
+    return _422(workspace_settings.validate_scan_enforcement, raw, default)
 
 
 def _labels_to_tag_names(labels: dict | None) -> list[str]:
@@ -308,26 +239,11 @@ def _labels_to_tag_names(labels: dict | None) -> list[str]:
 
 
 def _clamp_drift_interval(value: int) -> int:
-    """Clamp drift detection interval to the configured minimum."""
-    from terrapod.config import settings
-
-    return max(int(value), settings.drift_detection.min_workspace_interval_seconds)
+    return _422(workspace_settings.clamp_drift_interval, value)
 
 
 def _parse_plan_expiry(value) -> int | None:
-    """Validate a plan-expiry TTL (#646). None / 0 → disabled (stored NULL); a
-    positive integer is seconds. Rejects negatives / non-ints with 422."""
-    if value is None:
-        return None
-    try:
-        seconds = int(value)
-    except (TypeError, ValueError):
-        raise HTTPException(
-            status_code=422, detail="plan-expiry-seconds must be an integer"
-        ) from None
-    if seconds < 0:
-        raise HTTPException(status_code=422, detail="plan-expiry-seconds must not be negative")
-    return seconds or None
+    return _422(workspace_settings.validate_plan_expiry_seconds, value)
 
 
 async def _update_state_index(
@@ -1277,10 +1193,38 @@ async def create_workspace(
             detail="auto-apply-mode must be one of: " + ", ".join(run_service.AUTO_APPLY_MODES),
         )
 
+    # `vcs-workflow` / `auto-merge` / `auto-merge-strategy` were dropped on
+    # create (#1763) while `CreateWorkspaceRequest` in go-terrapod sends all
+    # three -- so a configuration asking for `apply_then_merge` silently got
+    # `merge_then_apply`, which is the governance control the workflow exists
+    # to provide, absent and unreported. The workflow's own invariants are
+    # enforced here too, through the same rule the PATCH path uses: create had
+    # no equivalent check because it never read the field.
+    vcs_workflow = (
+        _422(workspace_settings.validate_vcs_workflow, attrs["vcs-workflow"])
+        if "vcs-workflow" in attrs
+        else "merge_then_apply"
+    )
+    _422(
+        lambda: workspace_settings.check_apply_then_merge_allowed(
+            vcs_workflow,
+            has_vcs_connection=vcs_connection_id is not None,
+            auto_apply=auto_apply_mode != "never",
+        )
+    )
+    auto_merge_strategy = (
+        _422(workspace_settings.validate_auto_merge_strategy, attrs["auto-merge-strategy"])
+        if "auto-merge-strategy" in attrs
+        else "merge"
+    )
+
     ws = Workspace(
         name=name,
         execution_mode=execution_mode,
         auto_apply=auto_apply_mode != "never",
+        vcs_workflow=vcs_workflow,
+        auto_merge=bool(attrs.get("auto-merge", False)),
+        auto_merge_strategy=auto_merge_strategy,
         auto_apply_mode=auto_apply_mode,
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
         terraform_version=attrs.get("terraform-version", settings.default_terraform_version),
@@ -1297,23 +1241,13 @@ async def create_workspace(
         var_files=_validate_var_files(attrs.get("var-files", [])),
         trigger_prefixes=_validate_trigger_prefixes(attrs.get("trigger-prefixes", [])),
         drift_ignore_rules=_validate_drift_ignore_rules(attrs.get("drift-ignore-rules", [])),
-        security_scan_enforcement=_scan_enum(
-            attrs.get("security-scan-enforcement"),
-            frozenset({"off", "advisory", "enforced"}),
-            "security-scan-enforcement",
-            "advisory",
+        security_scan_enforcement=_scan_enforcement_for(attrs.get("security-scan-enforcement")),
+        security_scan_engine=_422(
+            workspace_settings.validate_scan_engine, attrs.get("security-scan-engine")
         ),
-        security_scan_engine=_scan_enum(
-            attrs.get("security-scan-engine"),
-            frozenset({"checkov", "trivy", "both"}),
-            "security-scan-engine",
-            "checkov",
-        ),
-        security_scan_severity_threshold=_scan_enum(
+        security_scan_severity_threshold=_422(
+            workspace_settings.validate_scan_severity_threshold,
             attrs.get("security-scan-severity-threshold"),
-            frozenset({"critical", "high", "medium", "low"}),
-            "security-scan-severity-threshold",
-            "high",
         ),
         security_scan_skip_rules=_validate_scan_skip_rules(
             attrs.get("security-scan-skip-rules", [])
@@ -1326,6 +1260,17 @@ async def create_workspace(
             attrs.get("drift-detection-interval-seconds", 86400)
         ),
         plan_expiry_seconds=_parse_plan_expiry(attrs.get("plan-expiry-seconds")),
+        # The AI plan-summary opt-in (#401) was readable, serialised, and
+        # settable by PATCH — but create silently dropped it (#1763). Both
+        # `CreateWorkspaceRequest` in go-terrapod and the provider's Create
+        # send `ai-summary-mode`, so a configuration asking for `enabled` got a
+        # workspace on `default` and no indication anything had been ignored.
+        ai_summary_mode=_422(
+            workspace_settings.validate_ai_summary_mode, attrs.get("ai-summary-mode", "default")
+        ),
+        ai_summary_context=_422(
+            workspace_settings.validate_ai_summary_context, attrs.get("ai-summary-context")
+        ),
         # Slack opt-in channel (#556): empty = silent for this workspace.
         slack_channel=(attrs.get("slack-channel") or "").strip()[:128],
     )
@@ -1707,12 +1652,7 @@ async def update_workspace(
     # (drift, pool assignment, labels) must not pay the cross-validation
     # tax or fail it.
     if "vcs-workflow" in attrs:
-        new_workflow = attrs["vcs-workflow"]
-        if new_workflow not in ("merge_then_apply", "apply_then_merge"):
-            raise HTTPException(
-                status_code=422,
-                detail="vcs-workflow must be 'merge_then_apply' or 'apply_then_merge'",
-            )
+        new_workflow = _422(workspace_settings.validate_vcs_workflow, attrs["vcs-workflow"])
         # Flipping vcs_workflow while PR runs are in-flight is rejected
         # (Q4 in #282): the operator must explicitly cancel/discard them
         # first.
@@ -1753,33 +1693,20 @@ async def update_workspace(
     if pending_workflow == "apply_then_merge" and (
         "vcs-workflow" in attrs or "auto-apply" in attrs or "auto-apply-mode" in attrs
     ):
-        if ws.vcs_connection_id is None:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "vcs-workflow 'apply_then_merge' requires a VCS connection — "
-                    "configure the workspace's VCS settings first"
-                ),
+        _422(
+            lambda: workspace_settings.check_apply_then_merge_allowed(
+                pending_workflow,
+                has_vcs_connection=ws.vcs_connection_id is not None,
+                auto_apply=pending_auto_apply,
             )
-        if pending_auto_apply:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "vcs-workflow 'apply_then_merge' is incompatible with auto-apply — "
-                    "set auto-apply to false in the same request"
-                ),
-            )
+        )
 
     if "auto-merge" in attrs:
         ws.auto_merge = bool(attrs["auto-merge"])
     if "auto-merge-strategy" in attrs:
-        strat = attrs["auto-merge-strategy"]
-        if strat not in ("merge", "squash", "rebase"):
-            raise HTTPException(
-                status_code=422,
-                detail="auto-merge-strategy must be 'merge', 'squash', or 'rebase'",
-            )
-        ws.auto_merge_strategy = strat
+        ws.auto_merge_strategy = _422(
+            workspace_settings.validate_auto_merge_strategy, attrs["auto-merge-strategy"]
+        )
 
     if "execution-backend" in attrs:
         backend = attrs["execution-backend"]
@@ -1886,57 +1813,30 @@ async def update_workspace(
         )
     # Security scanning (#1036)
     if "security-scan-enforcement" in attrs:
-        ws.security_scan_enforcement = _scan_enum(
-            attrs["security-scan-enforcement"],
-            frozenset({"off", "advisory", "enforced"}),
-            "security-scan-enforcement",
-            "advisory",
-        )
+        ws.security_scan_enforcement = _scan_enforcement_for(attrs["security-scan-enforcement"])
     if "security-scan-engine" in attrs:
-        ws.security_scan_engine = _scan_enum(
-            attrs["security-scan-engine"],
-            frozenset({"checkov", "trivy", "both"}),
-            "security-scan-engine",
-            "checkov",
+        ws.security_scan_engine = _422(
+            workspace_settings.validate_scan_engine, attrs["security-scan-engine"]
         )
     if "security-scan-severity-threshold" in attrs:
-        ws.security_scan_severity_threshold = _scan_enum(
+        ws.security_scan_severity_threshold = _422(
+            workspace_settings.validate_scan_severity_threshold,
             attrs["security-scan-severity-threshold"],
-            frozenset({"critical", "high", "medium", "low"}),
-            "security-scan-severity-threshold",
-            "high",
         )
     if "security-scan-skip-rules" in attrs:
         ws.security_scan_skip_rules = _validate_scan_skip_rules(attrs["security-scan-skip-rules"])
     if "plan-expiry-seconds" in attrs:
         ws.plan_expiry_seconds = _parse_plan_expiry(attrs["plan-expiry-seconds"])
 
-    # AI plan summary opt-in (#401). The mode is a three-state enum
-    # constrained by a DB CHECK; reject other values up-front rather than
-    # surfacing a less-helpful 500 from the integrity error.
+    # AI plan summary opt-in (#401).
     if "ai-summary-mode" in attrs:
-        mode = attrs["ai-summary-mode"]
-        if mode not in ("default", "enabled", "disabled"):
-            raise HTTPException(
-                status_code=422,
-                detail="ai-summary-mode must be 'default', 'enabled', or 'disabled'",
-            )
-        ws.ai_summary_mode = mode
+        ws.ai_summary_mode = _422(
+            workspace_settings.validate_ai_summary_mode, attrs["ai-summary-mode"]
+        )
     if "ai-summary-context" in attrs:
-        ctx = attrs["ai-summary-context"]
-        if ctx is None:
-            ctx = ""
-        if not isinstance(ctx, str):
-            raise HTTPException(status_code=422, detail="ai-summary-context must be a string")
-        # Cap at a reasonable size — workspace context is a hint, not a
-        # repo. Anything bigger lives in fleet_context or a doc the user
-        # can paste into their prompt_suffix.
-        if len(ctx) > 4000:
-            raise HTTPException(
-                status_code=422,
-                detail="ai-summary-context max length is 4000 characters",
-            )
-        ws.ai_summary_context = ctx
+        ws.ai_summary_context = _422(
+            workspace_settings.validate_ai_summary_context, attrs["ai-summary-context"]
+        )
 
     # VCS connection. Accepted as an attribute as well as a relationship,
     # because create takes the attribute (`vcs-connection-id`) and update took
