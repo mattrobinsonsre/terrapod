@@ -955,7 +955,17 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     )
 
     if not is_update and result.exit_code == 0:
-        _report_pulumi_preview(cfg, Path(event_log))
+        rc = _finish_pulumi_preview(cfg, Path(event_log))
+        if rc:
+            # The evaluation could not be COMPLETED -- the policy bundle could
+            # not be fetched, the OPA binary could not be obtained, or the
+            # results could not be POSTed. Not a denial: a denied policy is an
+            # ordinary outcome the runner records and posts, and the server's
+            # post-plan gate is what holds the run. Fatal for the same reason
+            # it is on the Terraform path: without results the gate has nothing
+            # to read, and proceeding would hand the update phase a plan no
+            # policy ever saw.
+            return rc
         # After the preview is reported, so its result is visible whatever the
         # hook does — the same order the Terraform path uses.
         rc = _run_pulumi_hook("post_plan")
@@ -1013,42 +1023,77 @@ def _run_pulumi_hook(point: str) -> int:
     return 0
 
 
-def _report_pulumi_preview(cfg, event_log: Path) -> None:  # type: ignore[no-untyped-def]
-    """Report what the preview found: `has_changes`, the counts, the artifact.
+def _finish_pulumi_preview(cfg, event_log: Path) -> int:  # type: ignore[no-untyped-def]
+    """Report what the preview found, and gate it. Non-zero means stop.
 
     The same two things the Terraform path posts after a plan, which is what
     the no-op short-circuit, the change badges, drift and conditional auto-apply
-    all read (#1560). Best-effort in the same way: a run whose report does not
-    arrive is resolved by the reconciler from its Job's outcome, with
-    `has_changes` left unknown, exactly as before this existed.
+    all read (#1560). Reporting is best-effort in the same way: a run whose
+    report does not arrive is resolved by the reconciler from its Job's
+    outcome, with `has_changes` left unknown, exactly as before this existed.
 
-    The digest is uploaded before the result is posted, because posting the
-    result is what drives the run out of `planning` — and a conditional
-    auto-apply decides on the counts, which come from the digest.
+    **OPA is not best-effort**, and the ordering here is load-bearing (#1567):
+
+      1. the digest is uploaded, because a conditional auto-apply decides on
+         the counts it carries;
+      2. policies are evaluated and their results POSTed;
+      3. only then is the plan-result posted.
+
+    Step 3 is what drives the run out of `planning` and into `complete_plan`,
+    where the post-plan gate reads the evaluations. Posting it before step 2
+    would have the gate decide against evaluations that have not arrived --
+    which, failing closed, holds every apply. That is the shape of the bug
+    this issue exists to fix, so it must not be reintroduced by reordering.
     """
     import structlog
 
-    from terrapod.runner.phases import pulumi_preview, uploads
+    from terrapod.runner.phases import opa, pulumi_preview, uploads
 
     log = structlog.get_logger("runner.job_entrypoint")
     if not cfg.has_api:
-        return
+        return 0
     try:
         digest = pulumi_preview.parse_event_log(event_log)
     except Exception as exc:  # noqa: BLE001
         log.warning("could not read the preview's event log (non-fatal)", err=str(exc))
-        return
+        return 0
     if digest is None:
         # No summary event: the preview did not finish one. Saying nothing is
         # right — `has_changes` stays unknown rather than being guessed at.
         log.warning("preview reported no summary; has_changes stays unknown")
-        return
+        return 0
 
     try:
         digest_path = pulumi_preview.write_digest(digest, event_log.with_name("preview.json"))
         uploads.upload_plan_json(cfg, digest_path)
     except Exception as exc:  # noqa: BLE001
         log.warning("preview digest upload raised (non-fatal)", err=str(exc))
+
+    # Policy evaluation, against the richer document rather than the digest —
+    # the digest is capped at MAX_STEPS and a gate must not decide on a
+    # truncated list of resources.
+    #
+    # Passed as a factory, not a path: this document exists ONLY for OPA (it is
+    # never uploaded), so on the common run with no policy set in scope
+    # building it would be pure waste that scales with the size of the change.
+    # `evaluate_policies` calls this only once the bundle proves non-empty.
+    def _policy_input_path() -> Path | None:
+        try:
+            policy_input = pulumi_preview.build_policy_input(event_log)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("could not build the policy input", err=str(exc))
+            return None
+        if policy_input is None:
+            return None
+        return pulumi_preview.write_policy_input(
+            policy_input, event_log.with_name("policy-input.json")
+        )
+
+    try:
+        opa.evaluate_policies(cfg, plan_json=_policy_input_path, work_dir=_OPA_WORK)
+    except opa.PolicyEvaluationError as exc:
+        log.error("policy evaluation failed", err=str(exc))
+        return 1
 
     try:
         uploads.post_plan_result(cfg, has_changes=bool(digest["has_changes"]))
@@ -1059,6 +1104,7 @@ def _report_pulumi_preview(cfg, event_log: Path) -> None:  # type: ignore[no-unt
         has_changes=digest["has_changes"],
         changes=digest["change_summary"],
     )
+    return 0
 
 
 def _hand_back_pulumi_state(  # type: ignore[no-untyped-def]
