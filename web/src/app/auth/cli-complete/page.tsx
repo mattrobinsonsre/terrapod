@@ -6,6 +6,20 @@ import { useTranslations } from 'next-intl'
 
 type Status = 'delivering' | 'polling' | 'complete' | 'timeout' | 'fallback'
 
+// How long to wait for the CLI to confirm it has the code.
+//
+// Only reached when the fetch RESOLVED but no confirmation followed -- a
+// browser that blocks the call to 127.0.0.1 rejects immediately, and that path
+// navigates instead of waiting. So this is the "delivered, but the CLI has not
+// said so" case, where some patience is warranted and 20s is generous for a
+// call to the user's own machine.
+//
+// The old value was 60s against a 60s AUTH_CODE_TTL, so anyone who reached the
+// fallback was handed a code that had already expired -- the manual path could
+// not work at all, by arithmetic rather than by race. Keep this well under
+// that TTL; `test_cli_login_timing.py` enforces the margin.
+const POLL_TIMEOUT_MS = 20_000
+
 function CliCompleteInner() {
   const t = useTranslations('cliComplete')
   const params = useSearchParams()
@@ -21,7 +35,20 @@ function CliCompleteInner() {
 
   const localhostUrl = `${redirectUri}?code=${code}&state=${state}`
 
-  // Step 1: deliver code to CLI via fetch (no-cors)
+  // Step 1: deliver the code to the CLI's local listener.
+  //
+  // This is a subresource request from an HTTPS page to http://127.0.0.1, so
+  // it is mixed content. Chromium exempts it -- the Secure Contexts spec makes
+  // 127.0.0.1 and localhost "potentially trustworthy origins" -- but WebKit
+  // does not implement that carve-out, so on Safari the fetch is blocked and
+  // rejects. A top-level NAVIGATION to the same URL is not subresource
+  // content and is allowed in every browser, which is why the manual link
+  // worked where the automatic delivery did not.
+  //
+  // So a rejection is not a dead end: navigate, and the CLI gets its code with
+  // no user action at all. The fetch stays as the fast path because it keeps
+  // the user on this page for the success state; the navigation is the
+  // fallback that always works.
   useEffect(() => {
     if (!code || !redirectUri || deliveredRef.current) return
     deliveredRef.current = true
@@ -31,8 +58,18 @@ function CliCompleteInner() {
         setStatus('polling')
       })
       .catch(() => {
+        // Blocked or unreachable. We know delivery failed -- an opaque
+        // success resolves -- so there is nothing to poll for. Hand off
+        // immediately rather than spending the auth code's whole lifetime
+        // waiting for something that cannot arrive.
         setFetchFailed(true)
+        // Keep polling as well. The navigation below is what actually
+        // delivers, but if the browser declines or defers it the user must
+        // still end up somewhere useful rather than stranded on "delivering"
+        // forever -- after POLL_TIMEOUT_MS this becomes the manual link.
         setStatus('polling')
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- localhostUrl is EXTERNAL (the terraform CLI's local callback listener), not an internal route. A router push would not leave the origin, and leaving it is the point: a top-level navigation is not subresource content, so it is not mixed-content blocked.
+        window.location.href = localhostUrl
       })
   }, [code, redirectUri, localhostUrl])
 
@@ -57,7 +94,7 @@ function CliCompleteInner() {
         // ignore poll errors
       }
 
-      if (Date.now() - startRef.current > 60_000) {
+      if (Date.now() - startRef.current > POLL_TIMEOUT_MS) {
         setStatus(fetchFailed ? 'fallback' : 'timeout')
         if (pollRef.current) clearInterval(pollRef.current)
       }
