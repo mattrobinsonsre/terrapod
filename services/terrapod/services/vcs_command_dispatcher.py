@@ -22,6 +22,7 @@ Payload shape:
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any
 
@@ -61,6 +62,35 @@ _HELP_BODY = "\n".join(
         "discussion never triggers it.",
     ]
 )
+
+
+#: A flag, as every documented command's arguments are (`-W <workspace>`).
+_FLAG = re.compile(r"^-{1,2}[A-Za-z]")
+
+
+def _looks_like_a_command_attempt(raw: str) -> bool:
+    """Whether an unrecognised line was plausibly aimed at Terrapod.
+
+    The parser maps every unknown verb to `help`, and `help` posts a
+    twelve-line usage table -- so a comment that merely BEGINS with the
+    product's name ("terrapod is working well now") drew that table onto
+    someone's pull request, seen by every reviewer, with no way to switch it
+    off (#1836).
+
+    The test is: the verb stands alone, or is followed by a FLAG. That is what
+    every documented command looks like, and it is the only signal separating a
+    typo from prose -- counting trailing tokens does not, because "working well
+    now" is three perfectly workspace-shaped words.
+
+    Deliberately biased toward silence. A missed typo hint costs the author one
+    puzzled moment; an unsolicited table on every passing mention is noise
+    nobody can turn off.
+    """
+    parts = raw.split()
+    if len(parts) < 2:
+        return False
+    rest = parts[2:]
+    return not rest or bool(_FLAG.match(rest[0]))
 
 
 async def _post_reply(db, sess: PRSession, body: str) -> None:
@@ -193,6 +223,16 @@ async def _route(
         # the parser maps every UNKNOWN verb to `help`, a typo was silent too.
         # That is the worst case: the author cannot tell a mistyped command
         # from one Terrapod never received.
+        # Only when the line was plausibly aimed at us. A passing mention in
+        # prose is not a command, and answering it puts a usage table on
+        # someone's PR for nothing (#1836).
+        if not _looks_like_a_command_attempt(cmd.raw):
+            logger.info(
+                "vcs_comment_dispatch: prose mention, not replying",
+                raw=cmd.raw[:120],
+                **audit_ctx,
+            )
+            return
         logger.info("vcs_comment_dispatch: help requested", **audit_ctx)
         await _post_reply(db, sess, _HELP_BODY)
         return
