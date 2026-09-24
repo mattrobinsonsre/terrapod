@@ -99,10 +99,14 @@ def _bot_client():
 
 
 def run_url(workspace_id, run_id) -> str:
-    from terrapod.config import settings
+    """The run's page, or "" when no external URL is configured.
 
-    base = (settings.external_url or "").rstrip("/")
-    return f"{base}/workspaces/{workspace_id}/runs/{run_id}" if base else ""
+    Thin adapter over `run_links.run_url`; the empty string is this module's
+    rendering choice and its callers depend on it.
+    """
+    from terrapod.services.run_links import run_url as _shared
+
+    return _shared(workspace_id, run_id) or ""
 
 
 def _resolve_tmpdir() -> str | None:

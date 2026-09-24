@@ -955,15 +955,27 @@ async def _poll_workspace_prs(
     """Check open PRs/MRs targeting the tracked branch for speculative plans."""
     prs = await _list_open_prs(conn, owner, repo, branch, meta=meta)
 
-    # Hook-and-poll fallbacks (#282). Only run for apply-then-merge —
-    # default-mode PR runs are plan-only and don't drive any of this.
+    # Hook-and-poll fallbacks (#282).
+    #
+    # PR-closed reconciliation runs in BOTH modes, because both now create the
+    # PRSession it closes (the PR status comment hangs off that row). Leaving
+    # it apply-then-merge-only stranded every merge-then-apply session at
+    # `state='open'` for good. It also cancels the closed PR's speculative
+    # runs, which is work nobody is waiting for any more.
+    #
+    # Depends on #1760, which scopes the cancel inside that function to the
+    # repository whose PR closed. Without it, reaching this code from every
+    # workspace rather than only apply-then-merge ones turns a latent
+    # cross-repository collision into a likely one.
+    open_pr_numbers = {pr.number for pr in prs}
+    await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers)
+
     if ws.vcs_workflow == "apply_then_merge":
-        open_pr_numbers = {pr.number for pr in prs}
-        # PR-closed: cancel runs, release workspace locks.
-        await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers)
-        # Comment polling: dispatch any new `terrapod ...` commands the
-        # webhook either didn't deliver (no subscription, firewall) or
-        # raced with this poll cycle (dedup key in dispatcher handles the race).
+        # Comment polling stays apply-then-merge only: it dispatches
+        # `terrapod ...` commands, and those drive applies, which default-mode
+        # PR runs do not do. Covers a webhook the provider didn't deliver (no
+        # subscription, firewall) or one that raced this poll cycle (the
+        # dispatcher's dedup key handles the race).
         await _poll_pr_comments(db, conn, f"{owner}/{repo}")
 
     for pr in prs:
@@ -1092,17 +1104,42 @@ async def _poll_workspace_prs(
 
         if run:
             VCS_RUNS_CREATED.labels(provider=conn.provider, type="pr").inc()
-            # For apply-then-merge, upsert the conversation-state row so
-            # later phases (status comment, dispatcher) can hang state
-            # off a stable PRSession id without re-querying the VCS.
-            if is_apply_then_merge:
-                sess = await _upsert_pr_session(db, conn, f"{owner}/{repo}", pr.number, pr.head_sha)
-                # Fire the status-comment refresh asynchronously so the
-                # poll cycle isn't blocked on the VCS API write.
+            # Upsert the conversation-state row so later phases (status
+            # comment, dispatcher) can hang state off a stable PRSession id
+            # without re-querying the VCS.
+            #
+            # Both modes, not just apply-then-merge: the PR status comment is
+            # driven off a PRSession, so restricting the row to one mode left
+            # merge-then-apply PRs with only the per-workspace link comment —
+            # no plan counts, no cost delta, no gate verdicts — although the
+            # renderer has always had a merge-then-apply cell ("will apply on
+            # merge"). The mode-specific fallbacks above (closed-PR
+            # reconciliation, comment-command polling) stay apply-then-merge
+            # only, because those drive applies rather than reporting.
+            sess = await _upsert_pr_session(db, conn, f"{owner}/{repo}", pr.number, pr.head_sha)
+            # Fire the status-comment refresh asynchronously so the
+            # poll cycle isn't blocked on the VCS API write.
+            #
+            # Deliberately best-effort (no retry): the enqueue needs Redis, and
+            # the run is created but NOT yet committed at this point, so a
+            # raising enqueue would roll the run back and leave the PR unplanned
+            # for as long as Redis is down. A missing comment is worth less than
+            # a missing plan. The plan-completion refresh in
+            # `run_service.complete_plan` re-posts the comment with the real
+            # counts anyway, so a dropped enqueue here costs the "queued"
+            # snapshot, not the comment.
+            try:
                 await enqueue_trigger(
                     "vcs_status_comment_update",
                     {"session_id": str(sess.id)},
                     dedup_key=f"vcs_status:{sess.id}",
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to enqueue PR status-comment refresh",
+                    pr_number=pr.number,
+                    workspace=ws.name,
+                    error=repr(e),
                 )
             await db.commit()
             logger.info(
