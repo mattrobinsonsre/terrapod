@@ -756,5 +756,14 @@ func workspaceFromResource(res *Resource) *Workspace {
 	if v := GetIntAttr(res, "drift-detection-interval-seconds"); v > 0 {
 		ws.DriftDetectionIntervalSeconds = &v
 	}
+	// Written by BOTH request builders and served by the API, but never read
+	// back until now -- so it was `nil` on every read, the provider's
+	// non-nil guard always took the null branch, and
+	// `plan_expiry_seconds = 3600` failed the apply with "Provider produced
+	// inconsistent result". The same defect as `debug-mode`, in the same
+	// struct, three lines from the pattern that fixes it.
+	if v := GetIntAttr(res, "plan-expiry-seconds"); v > 0 {
+		ws.PlanExpirySeconds = &v
+	}
 	return ws
 }

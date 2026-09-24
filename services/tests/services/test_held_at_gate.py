@@ -205,11 +205,44 @@ class TestBlockedBy:
                 AsyncMock(return_value=scan),
             ),
             patch(
-                "terrapod.services.ai_policy_service.run_is_ai_policy_blocked",
+                "terrapod.services.ai_policy_service.run_is_held_by_ai_policy",
                 AsyncMock(return_value=ai),
             ),
         ):
             assert await run_service.blocked_by(AsyncMock(), _run()) == expected
+
+    async def test_a_hold_with_no_verdict_yet_still_names_the_ai_gate(self):
+        """The gate holds a run in TWO states -- denied, and not yet ruled on
+        -- and only the first leaves a row. `blocked_by` read the row-only
+        predicate, so a run held waiting for a verdict reported `blocked-by:
+        null`: the API said nothing was holding a run that nothing would move
+        until a person acted, and the PR comment repeated it.
+        """
+        from terrapod.services import ai_policy_service
+
+        ws = MagicMock(ai_policy_mode="default")
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=ws)
+
+        with (
+            patch(
+                "terrapod.services.run_task_service._existing_stage",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "terrapod.services.policy_set_service.run_is_policy_blocked",
+                AsyncMock(return_value=False),
+            ),
+            patch(
+                "terrapod.services.security_scan_service.run_is_scan_blocked",
+                AsyncMock(return_value=False),
+            ),
+            patch.object(ai_policy_service, "gate_applies_to", return_value=True),
+            patch.object(ai_policy_service, "effective_enforcement", return_value="mandatory"),
+            # No row at all: the summariser has not answered, or never will.
+            patch.object(ai_policy_service, "get_evaluation", new=AsyncMock(return_value=None)),
+        ):
+            assert await run_service.blocked_by(db, _run()) == "ai-policy"
 
 
 class TestWhatTheApiReports:
