@@ -138,7 +138,7 @@ async def test_a_run_with_no_verdict_says_why_rather_than_returning_a_bare_null(
         ),
         patch.object(
             router.ai_policy_service,
-            "run_is_ai_policy_blocked",
+            "run_is_held_by_ai_policy",
             new=AsyncMock(return_value=False),
         ),
     ):
@@ -174,7 +174,7 @@ async def test_the_blocking_flag_comes_from_the_service_not_the_row() -> None:
         ),
         patch.object(
             router.ai_policy_service,
-            "run_is_ai_policy_blocked",
+            "run_is_held_by_ai_policy",
             new=AsyncMock(return_value=False),
         ),
     ):
@@ -187,6 +187,54 @@ async def test_the_blocking_flag_comes_from_the_service_not_the_row() -> None:
     body = json.loads(resp.body)
     assert body["data"]["attributes"]["outcome"] == "denied"
     assert body["meta"]["blocking"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_mandatory_hold_with_no_verdict_reports_blocking_true() -> None:
+    """The state the live smoke caught (#1822).
+
+    A mandatory gate holds a run while no verdict has landed, and
+    `run_service.blocked_by` says so -- but this endpoint built `blocking`
+    from the ROW-only predicate, which answers False when there is no row.
+    Two endpoints then described the same run differently.
+
+    It is not a cosmetic disagreement: the web panel keys both its blocked
+    banner and its override button on `meta.blocking`, so a False here renders
+    the quiet "gate is off" styling and hides the only control that releases
+    the run -- on a run that is held indefinitely, which is precisely when an
+    operator needs it.
+    """
+    ws = _ws()
+    run = _run(ws)
+    with (
+        patch.object(
+            router, "resolve_workspace_capabilities_for", new=AsyncMock(return_value={cap.RUN_READ})
+        ),
+        # No row at all: the summariser never ran, or failed before settling.
+        patch.object(router.ai_policy_service, "get_evaluation", new=AsyncMock(return_value=None)),
+        patch.object(
+            router.ai_policy_service,
+            "effective_enforcement",
+            new=MagicMock(return_value="mandatory"),
+        ),
+        patch.object(
+            router.ai_policy_service,
+            "run_is_held_by_ai_policy",
+            new=AsyncMock(return_value=True),
+        ),
+    ):
+        resp = await router.get_run_ai_policy(
+            run_id=f"run-{run.id}", user=_user(), db=_mock_db(run, ws)
+        )
+
+    import json
+
+    body = json.loads(resp.body)
+    assert body["data"] is None
+    assert body["meta"]["blocking"] is True, (
+        "a held run must report blocking=true even with no verdict recorded, "
+        "or the UI hides the override that is the only way out"
+    )
 
 
 # ── POST override (workspace admin) ───────────────────────────────────
