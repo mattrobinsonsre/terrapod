@@ -2568,6 +2568,7 @@ These are editable in the UI under **Admin → Autodiscovery**, alongside the ru
 
 - `security-scan-enforcement` / `security-scan-engine` / `security-scan-severity-threshold` / `security-scan-skip-rules` — [security scanning](security-scanning.md) for every created workspace (#1763). Unlike on a workspace, `enforced` is always accepted here: a rule has no engine, so everything it creates is a Terraform/OpenTofu workspace, which is exactly what can be scanned.
 - `ai-summary-mode` / `ai-summary-context` — the AI plan-summary opt-in and its free-text context for every created workspace (#1763).
+- `ai-policy-mode` — the AI **policy gate** opt-in for every created workspace. A mandatory deployment-wide gate ignores `disabled`; it opts a workspace out of an advisory verdict only (#1766).
 - `terragrunt-enabled` / `terragrunt-version`, `vcs-workflow`, `auto-merge` / `auto-merge-strategy`, `drift-detection-enabled` / `drift-detection-interval-seconds`, `drift-ignore-rules`, `plan-expiry-seconds` and `slack-channel` — the remaining per-workspace settings (#1763). `drift-detection-enabled` defaults **true** here, unlike the workspace column, because every autodiscovered workspace is VCS-connected.
 - `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **false**, as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
 
