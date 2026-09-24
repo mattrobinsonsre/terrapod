@@ -63,12 +63,61 @@ _HELP_BODY = "\n".join(
 )
 
 
-async def _post_reply(db, sess: PRSession, body: str) -> None:
-    """Post a standalone comment on the PR/MR.
+# Reasons a command is dropped. Each one answers the question the author is
+# actually asking — "did you get it?" — and then says what to do about it.
+# Silence cannot distinguish "not received" from "received and ignored", which
+# is the complaint #1799 was opened about.
+_NO_SESSION_BODY = (
+    "Terrapod received this command, but it is not tracking this "
+    "pull request, so there is nothing to run.\n\n"
+    "That happens when no workspace in **apply-then-merge** mode plans "
+    "against this repository and branch, or when the pull request was "
+    "closed before the command arrived. Workspaces in the default "
+    "merge-then-apply mode do not take commands — they plan on the pull "
+    "request and apply after it merges.\n\n"
+    "See [VCS workflows](https://github.com/mattrobinsonsre/terrapod/blob/main/docs/vcs-workflows.md)."
+)
+
+_NO_CANDIDATES_BODY = (
+    "Terrapod received this command, but no **apply-then-merge** workspace "
+    "is affected by this pull request, so there is nothing to run.\n\n"
+    "Check that a workspace points at this repository and that its "
+    "working directory matches a path this pull request changes."
+)
+
+
+def _no_workspace_body(name: str) -> str:
+    return (
+        f"Terrapod received this command, but no workspace named `{name}` is "
+        "affected by this pull request.\n\n"
+        "Check the spelling, and that the workspace is in **apply-then-merge** "
+        "mode with a working directory this pull request touches. Omit "
+        "`-W` to act on every affected workspace."
+    )
+
+
+def _unknown_verb_body(verb: str) -> str:
+    return f"Terrapod does not recognise `{verb}`.\n\n{_HELP_BODY}"
+
+
+# The acknowledgement emoji. Spelled without colons, which is what both
+# GitHub's reactions API and GitLab's award-emoji API expect.
+ACK_RECEIVED = "eyes"
+ACK_DONE = "thumbsup"
+ACK_REJECTED = "thumbsdown"
+
+
+async def _post_comment(conn: VCSConnection, repo: str, pr_number: int, body: str) -> None:
+    """Post a standalone comment on the PR/MR, addressed by (repo, number).
 
     Deliberately a NEW comment rather than an edit of the status comment: a
     reply to something you just typed belongs next to it, and the status
     comment is edited in place, often far up the thread.
+
+    Takes the coordinates rather than a `PRSession` because the cases that
+    most need an answer are the ones with no session to read them from
+    (#1799) — a command on a PR Terrapod is not tracking is exactly the
+    silence the issue is about.
 
     Best-effort. A reply that cannot be posted must never fail the dispatch —
     the command it accompanies has already run.
@@ -76,24 +125,93 @@ async def _post_reply(db, sess: PRSession, body: str) -> None:
     from terrapod.services import github_service, gitlab_service
 
     try:
-        conn = await db.get(VCSConnection, sess.vcs_connection_id)
-        if conn is None:
-            return
-        # `PRSession.repo` is stored as "owner/name" — see `_upsert_pr_session`,
-        # which is handed `f"{owner}/{repo}"`. No URL parsing needed.
-        owner, _, repo_name = sess.repo.partition("/")
+        # `repo` is "owner/name" throughout this path — `PRSession.repo` is
+        # stored that way and the webhook passes GitHub's `full_name`.
+        owner, _, repo_name = repo.partition("/")
         if not repo_name:
-            logger.warning("vcs_comment_dispatch: malformed repo", repo=sess.repo)
+            logger.warning("vcs_comment_dispatch: malformed repo", repo=repo)
             return
         if conn.provider == "gitlab":
-            await gitlab_service.create_mr_comment(conn, owner, repo_name, sess.pr_number, body)
+            await gitlab_service.create_mr_comment(conn, owner, repo_name, pr_number, body)
         else:
-            await github_service.create_pr_comment(conn, owner, repo_name, sess.pr_number, body)
+            await github_service.create_pr_comment(conn, owner, repo_name, pr_number, body)
     except Exception as e:
         logger.warning(
             "vcs_comment_dispatch: could not post reply",
-            repo=sess.repo,
-            pr_number=sess.pr_number,
+            repo=repo,
+            pr_number=pr_number,
+            error=str(e),
+        )
+
+
+async def _post_reply(db, sess: PRSession, body: str) -> None:
+    """Post a standalone comment on the PR/MR this session tracks."""
+    conn = await db.get(VCSConnection, sess.vcs_connection_id)
+    if conn is None:
+        return
+    await _post_comment(conn, sess.repo, sess.pr_number, body)
+
+
+async def _react(
+    conn: VCSConnection, repo: str, pr_number: int, comment_id: str, content: str
+) -> int | None:
+    """React to the command comment. Returns the reaction id, or None.
+
+    Best-effort for the same reason the reply is, and for one more: an
+    acknowledgement that fails must never be the thing that stops a command
+    from running. A deployment whose App predates the permission simply
+    gets no emoji, and every other signal — the reply, the status comment,
+    the commit status — is unaffected.
+    """
+    from terrapod.services import github_service, gitlab_service
+
+    try:
+        owner, _, repo_name = repo.partition("/")
+        if not repo_name:
+            return None
+        if conn.provider == "gitlab":
+            return await gitlab_service.add_comment_reaction(
+                conn, owner, repo_name, pr_number, int(comment_id), content
+            )
+        return await github_service.add_comment_reaction(
+            conn, owner, repo_name, int(comment_id), content
+        )
+    except Exception as e:
+        logger.info(
+            "vcs_comment_dispatch: could not react to comment",
+            repo=repo,
+            pr_number=pr_number,
+            comment_id=comment_id,
+            content=content,
+            error=str(e),
+        )
+        return None
+
+
+async def _unreact(
+    conn: VCSConnection, repo: str, pr_number: int, comment_id: str, reaction_id: int
+) -> None:
+    """Remove a reaction we added. Best-effort, as above."""
+    from terrapod.services import github_service, gitlab_service
+
+    try:
+        owner, _, repo_name = repo.partition("/")
+        if not repo_name:
+            return
+        if conn.provider == "gitlab":
+            await gitlab_service.remove_comment_reaction(
+                conn, owner, repo_name, pr_number, int(comment_id), reaction_id
+            )
+        else:
+            await github_service.remove_comment_reaction(
+                conn, owner, repo_name, int(comment_id), reaction_id
+            )
+    except Exception as e:
+        logger.info(
+            "vcs_comment_dispatch: could not remove reaction",
+            repo=repo,
+            pr_number=pr_number,
+            comment_id=comment_id,
             error=str(e),
         )
 
@@ -120,12 +238,27 @@ async def handle_vcs_comment_dispatch(payload: dict[str, Any]) -> None:
 
     actor_login = payload.get("actor_login") or ""
     actor_user_id = str(payload.get("actor_user_id") or "")
+    comment_id = str(payload.get("comment_id") or "")
 
     async with get_db_session() as db:
         conn = await db.get(VCSConnection, uuid.UUID(connection_id))
         if conn is None:
             logger.warning("vcs_comment_dispatch: unknown connection", connection_id=connection_id)
             return
+
+        # Acknowledge receipt BEFORE any validation, because the cases that
+        # most need acknowledging are the ones that go on to drop the
+        # command. An eye that is never replaced says "received, outcome
+        # unknown", which is the honest state if this process dies here.
+        ack = await _react(conn, repo, pr_number, comment_id, ACK_RECEIVED) if comment_id else None
+
+        async def settle(accepted: bool) -> None:
+            """Replace the eyes with the outcome."""
+            if not comment_id:
+                return
+            await _react(conn, repo, pr_number, comment_id, ACK_DONE if accepted else ACK_REJECTED)
+            if ack is not None:
+                await _unreact(conn, repo, pr_number, comment_id, ack)
 
         sess_result = await db.execute(
             select(PRSession).where(
@@ -137,7 +270,9 @@ async def handle_vcs_comment_dispatch(payload: dict[str, Any]) -> None:
         sess = sess_result.scalar_one_or_none()
         # No active session means either (a) no apply-then-merge
         # workspace plans against this PR, or (b) the PR closed before
-        # the dispatcher ran. Silently drop — there's nothing to act on.
+        # the dispatcher ran. There is nothing to act on — but saying so
+        # is the difference between "not received" and "received and
+        # ignored", which is the whole of #1799.
         if sess is None or sess.state != "open":
             logger.info(
                 "vcs_comment_dispatch: no open session for PR",
@@ -146,6 +281,8 @@ async def handle_vcs_comment_dispatch(payload: dict[str, Any]) -> None:
                 pr_number=pr_number,
                 verb=cmd.verb,
             )
+            await _post_comment(conn, repo, pr_number, _NO_SESSION_BODY)
+            await settle(False)
             return
 
         # Find PR-affected apply-then-merge workspaces (the ones the
@@ -165,7 +302,8 @@ async def handle_vcs_comment_dispatch(payload: dict[str, Any]) -> None:
         if cmd.workspace:
             candidates = [ws for ws in candidates if ws.name == cmd.workspace]
 
-        await _route(db, cmd, conn, sess, candidates, actor_login, actor_user_id)
+        accepted = await _route(db, cmd, conn, sess, candidates, actor_login, actor_user_id)
+        await settle(accepted)
 
 
 async def _route(
@@ -176,8 +314,14 @@ async def _route(
     candidates: list[Workspace],
     actor_login: str,
     actor_user_id: str,
-) -> None:
-    """Dispatch a parsed command to the right action."""
+) -> bool:
+    """Dispatch a parsed command to the right action.
+
+    Returns whether the command was acted on, which decides the outcome
+    reaction the caller leaves on the comment (#1799). "Acted on" means
+    routed, not finished: an apply that is queued has been accepted even
+    though its run has not started.
+    """
     audit_ctx = {
         "verb": cmd.verb,
         "repo": sess.repo,
@@ -193,9 +337,18 @@ async def _route(
         # the parser maps every UNKNOWN verb to `help`, a typo was silent too.
         # That is the worst case: the author cannot tell a mistyped command
         # from one Terrapod never received.
-        logger.info("vcs_comment_dispatch: help requested", **audit_ctx)
+        logger.info(
+            "vcs_comment_dispatch: help requested",
+            unrecognised=cmd.unrecognised,
+            **audit_ctx,
+        )
+        if cmd.unrecognised:
+            # Name the token, so a typo reads as a typo rather than as
+            # Terrapod volunteering a usage table for no reason (#1799).
+            await _post_reply(db, sess, _unknown_verb_body(cmd.unrecognised))
+            return False
         await _post_reply(db, sess, _HELP_BODY)
-        return
+        return True
 
     if cmd.verb == "merge":
         # Force-merge: skip the cross-workspace gate, record the partial
@@ -225,7 +378,9 @@ async def _route(
             {"session_id": str(sess.id)},
             dedup_key=f"vcs_status:{sess.id}",
         )
-        return
+        # A merge the provider refused is a rejected command, not a done one
+        # — the status comment carries the reason.
+        return merged
 
     if not candidates:
         if cmd.workspace:
@@ -234,9 +389,11 @@ async def _route(
                 workspace_filter=cmd.workspace,
                 **audit_ctx,
             )
+            await _post_reply(db, sess, _no_workspace_body(cmd.workspace))
         else:
             logger.info("vcs_comment_dispatch: no apply-then-merge workspaces on PR", **audit_ctx)
-        return
+            await _post_reply(db, sess, _NO_CANDIDATES_BODY)
+        return False
 
     if cmd.verb == "apply":
         await _route_apply(db, sess, candidates, actor_login, actor_user_id)
@@ -270,6 +427,7 @@ async def _route(
         {"session_id": str(sess.id)},
         dedup_key=f"vcs_status:{sess.id}",
     )
+    return True
 
 
 async def _route_apply(

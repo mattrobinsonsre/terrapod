@@ -164,6 +164,7 @@ def _build_comment_body(
     run_url: str,
     ai_summary: "PlanSummary | None" = None,
     gate: str | None = None,
+    commit_sha: str = "",
 ) -> str:
     """Build the markdown body for a PR/MR comment.
 
@@ -190,7 +191,10 @@ def _build_comment_body(
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     parts = [
-        f"<!-- terrapod:ws:{workspace_id} -->",
+        # Built by the same helper the lookup searches for — the two drifting
+        # apart would mean every status posts a new comment instead of
+        # editing one, so they must never be spelled out separately.
+        _comment_marker(workspace_id, commit_sha),
         f"### Terrapod — {workspace_name}",
         "",
         f"**Status:** {emoji} {description}",
@@ -249,8 +253,25 @@ def _render_ai_summary_section(s: "PlanSummary") -> str:
     return "\n".join(lines)
 
 
-def _comment_marker(workspace_id: str) -> str:
-    return f"<!-- terrapod:ws:{workspace_id} -->"
+def _comment_marker(workspace_id: str, commit_sha: str = "") -> str:
+    """The hidden marker identifying our comment for this workspace.
+
+    The commit SHA is part of the identity (#1799), so a push gets a NEW
+    comment at the foot of the thread rather than a silent edit of one
+    posted commits ago. Within a commit the marker is stable, so the
+    queued → planning → planned → applied progression keeps editing a
+    single comment: one comment per push, not one per status change.
+
+    A comment written before this became SHA-scoped carries the old
+    two-part marker and will not be matched again. That is deliberate and
+    self-limiting — it is left where it is, and the next status posts one
+    fresh comment.
+    """
+    return (
+        f"<!-- terrapod:ws:{workspace_id}:{commit_sha} -->"
+        if commit_sha
+        else (f"<!-- terrapod:ws:{workspace_id} -->")
+    )
 
 
 async def _find_or_create_comment(
@@ -260,6 +281,7 @@ async def _find_or_create_comment(
     pr_number: int,
     workspace_id: str,
     body: str,
+    commit_sha: str = "",
 ) -> None:
     """Find an existing comment by marker, update it, or create a new one.
 
@@ -277,8 +299,8 @@ async def _find_or_create_comment(
     from terrapod.redis.client import get_redis_client
 
     redis = get_redis_client()
-    cache_key = f"{_COMMENT_CACHE_PREFIX}{workspace_id}:{pr_number}"
-    marker = _comment_marker(workspace_id)
+    cache_key = f"{_COMMENT_CACHE_PREFIX}{workspace_id}:{pr_number}:{commit_sha}"
+    marker = _comment_marker(workspace_id, commit_sha)
 
     lock_key = f"{_COMMENT_LOCK_PREFIX}{workspace_id}:{pr_number}"
     lock_token = await _acquire_comment_lock(redis, lock_key)
@@ -582,9 +604,16 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                 run_url=run_url,
                 ai_summary=ai_summary,
                 gate=gate,
+                commit_sha=run.vcs_commit_sha or "",
             )
             await _find_or_create_comment(
-                conn, owner, repo, run.vcs_pull_request_number, str(ws.id), body
+                conn,
+                owner,
+                repo,
+                run.vcs_pull_request_number,
+                str(ws.id),
+                body,
+                run.vcs_commit_sha or "",
             )
 
     logger.info(
