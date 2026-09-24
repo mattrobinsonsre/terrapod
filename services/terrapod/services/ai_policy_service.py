@@ -180,6 +180,17 @@ def decide_outcome(verdict: dict[str, Any] | None, risk_level: str) -> tuple[str
     return "passed", None
 
 
+def _override_was_acted_on(row: AIPolicyEvaluation) -> bool:
+    """Whether this override has already released a run.
+
+    An override recorded on a row whose outcome is still `overridden` and which
+    carries no verdict is one that acted on a hold with nothing to rule on --
+    the #1815 case. Once a real verdict overwrites it, the attribution is the
+    only evidence the release happened.
+    """
+    return bool(row.overridden_by) and not (row.verdict or {})
+
+
 async def record_evaluation(
     db: AsyncSession,
     *,
@@ -213,8 +224,18 @@ async def record_evaluation(
         # verdict, so the override does not carry over -- otherwise
         # regenerating a summary would silently launder a fresh deny through a
         # decision an admin made about a different one.
-        existing.overridden_by = None
-        existing.overridden_at = None
+        #
+        # EXCEPT when the override has already been acted on. A run can be
+        # released before any verdict exists (#1815), and by the time one lands
+        # the run may have applied. Clearing the attribution then destroys the
+        # only record of who released it: the row would read `failed` with
+        # `overridden_by` NULL beside an applied run, which reads as the gate
+        # having failed to stop it rather than as a person having decided to.
+        # The re-ruling is still recorded; what survives is who overrode, which
+        # is the half an auditor cannot reconstruct.
+        if not _override_was_acted_on(existing):
+            existing.overridden_by = None
+            existing.overridden_at = None
         return existing
 
     row = AIPolicyEvaluation(
@@ -237,7 +258,14 @@ async def get_evaluation(db: AsyncSession, run_id: uuid.UUID) -> AIPolicyEvaluat
 
 
 async def run_is_ai_policy_blocked(db: AsyncSession, run_id: uuid.UUID) -> bool:
-    """True when a mandatory evaluation failed or errored and was not overridden."""
+    """True when a mandatory evaluation failed or errored and was not overridden.
+
+    Row-only: a run held because no verdict has landed YET has no row, so this
+    answers False for it. That is right for what it is asked -- "did a ruling
+    go against this run" -- and wrong for "is this gate holding it", which is
+    what a caller reporting the hold to a human needs. Use
+    `run_is_held_by_ai_policy` for that.
+    """
     row = await get_evaluation(db, run_id)
     if row is None:
         return False
@@ -246,6 +274,31 @@ async def run_is_ai_policy_blocked(db: AsyncSession, run_id: uuid.UUID) -> bool:
     if row.overridden_by:
         return False
     return row.outcome in {"failed", "errored"}
+
+
+async def run_is_held_by_ai_policy(db: AsyncSession, run: Run) -> bool:
+    """Whether this gate is what holds the run -- verdict landed or not.
+
+    `evaluate_post_plan` holds a run under a mandatory gate in BOTH states: a
+    ruling that denied, and no ruling at all (the summariser has not answered
+    yet, or never will). `run_is_ai_policy_blocked` only sees the first,
+    because it reads the row -- so every caller that asked it "what is holding
+    this run" got None for a run this gate was holding, and told the reviewer
+    nothing was wrong while the run sat indefinitely.
+
+    Deliberately mirrors `evaluate_post_plan`'s conditions rather than calling
+    it, because that one logs and is written as part of the transition; this is
+    a read a serializer and a comment renderer can make on any run.
+    """
+    ws = await db.get(Workspace, run.workspace_id)
+    if not gate_applies_to(run, ws):
+        return False
+    if effective_enforcement(ws) != "mandatory":
+        return False
+    row = await get_evaluation(db, run.id)
+    if row is None:
+        return True  # held waiting for a verdict
+    return await run_is_ai_policy_blocked(db, run.id)
 
 
 async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:

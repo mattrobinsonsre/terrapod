@@ -458,7 +458,7 @@ async def blocked_by(db: AsyncSession, run: Run) -> str | None:
     # plan-result, so a mandatory gate holds a run while the verdict is still
     # being produced as well as once one has landed and denied. Both are the
     # same answer here: this gate is what is holding it.
-    if await ai_policy_service.run_is_ai_policy_blocked(db, run.id):
+    if await ai_policy_service.run_is_held_by_ai_policy(db, run):
         return "ai-policy"
     return None
 

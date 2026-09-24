@@ -369,8 +369,10 @@ admin, and the run is re-driven immediately. The run page offers it on the
 blocked banner in the **AI** tab; an agent can do it through the
 `terrapod_run_ai_policy_override` MCP tool.
 
-There is nothing to override until a verdict exists: a run held *waiting* for
-one is released as soon as it lands, so the endpoint answers 409 before then.
+It also releases a run held with **no verdict at all** -- the summariser never
+ran, or failed before ruling -- which is the one state a mandatory gate cannot
+otherwise escape. That records an explicit no-verdict override, honest about
+never having ruled, rather than a pass the gate never gave.
 
 ## Prompt customisation
 
