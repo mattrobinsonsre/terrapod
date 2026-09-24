@@ -754,10 +754,6 @@ api:
       # model, endpoint, auth and token budget -- by asking for an extra
       # allow/deny verdict, so turning it on costs no additional tokens.
       #
-      # Terraform/OpenTofu only. A Pulumi preview uploads a capped digest, and
-      # a gate ruling over a truncated resource list could allow a plan whose
-      # offending resource fell off the end, so a Pulumi run is reported as
-      # not evaluated instead of being judged on a partial plan.
       policy:
         # Off by default, so enabling AI summaries never starts blocking runs.
         enabled: false
