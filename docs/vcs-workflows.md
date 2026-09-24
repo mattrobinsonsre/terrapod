@@ -99,9 +99,33 @@ command posted before then — while the App was still missing the Issues
 permission, say, or before the workspace was `apply_then_merge` — is not
 replayed when tracking begins.
 
+## Command acknowledgement
+
+Every `terrapod ...` comment is reacted to as soon as it is received, so you can
+tell a command Terrapod never saw from one it saw and had nothing to do with:
+
+| Reaction | Meaning |
+|---|---|
+| 👀 | Received. Replaced by one of the below once routed — an 👀 that stays is a command whose outcome is unknown. |
+| 👍 | Acted on. For `plan` and `apply` that means queued, not finished — watch the status comment for the outcome. |
+| 👎 | Not acted on. A reply on the PR says why. |
+
+A command that is dropped gets a short reply explaining which of the three
+reasons applies: Terrapod is not tracking this PR, no apply-then-merge
+workspace is affected by it, or the named workspace is not among them. An
+unrecognised verb is named back to you (`Terrapod does not recognise
+\`plna\``) with the command list, so a typo reads as a typo.
+
+Reactions are best-effort. If the App installation has not accepted the
+permission, you get no emoji and everything else — the reply, the status
+comment, the commit status — works exactly as before. On GitLab commands
+arrive by polling rather than webhook, so the acknowledgement appears within
+one poll interval rather than immediately.
+
 ## Status comment
 
-One Terrapod-authored comment per PR, edited in place:
+One Terrapod-authored comment per workspace **per commit**, edited in place as
+that commit's run progresses:
 
 ```
 | Workspace             | Mode             | Plan      | Apply       | Mergeable |
@@ -115,6 +139,18 @@ Auto-merge will fire when all workspaces are applied.
 ```
 
 The table covers every workspace whose runs reference this PR, regardless of mode. `merge_then_apply` workspaces show "will apply on merge" in the Apply column to make the mode distinction explicit.
+
+**A push gets a new comment rather than a silent edit.** The comment's identity
+includes the commit it describes, so a plan triggered by pushing appears at the
+foot of the thread next to that push. Within one commit the comment is edited in
+place, so `queued → planning → planned → applied` stays a single comment: one
+comment per push, not one per status change. Previously a single comment was
+edited for the life of the PR, which meant a push-triggered plan produced no
+visible change in the thread at all — the edit was often far above the commit
+that caused it.
+
+Comments written before the upgrade carry the older identity and are left
+where they are; the next status posts one fresh comment.
 
 ## Monorepo behaviour
 
@@ -167,7 +203,7 @@ Project / Group access tokens need `api` scope (the existing requirement covers 
 
 **"No changes — nothing to apply"** — the plan found nothing to do, so no apply was launched. The run still reaches `applied` because it is complete, not because anything was applied.
 
-**Comment didn't trigger anything** — check (a) the comment starts with `terrapod` at the beginning of a line, (b) the verb is one of the supported commands, (c) the workspace is in `apply_then_merge` mode, (d) the GitHub App has Issues permission accepted, (e) `tilt logs` (local) or `kubectl logs` (cluster) on the API pod for `vcs_comment_dispatch` events.
+**Comment didn't trigger anything** — look at the reaction first. **No reaction at all** means the comment never reached the dispatcher: check that it starts with `terrapod` at the beginning of a line (a command inside a code fence is ignored by design), that the GitHub App has Issues permission accepted, and the API pod logs for `vcs_comment_dispatch` events. **👎 with a reply** means it arrived and the reply says why. **👀 that never changes** means dispatch started and did not finish — check the API pod logs. If reactions are absent everywhere but replies still appear, the App has not accepted the permission that lets Terrapod react; that is cosmetic and nothing else is affected.
 
 **Workflow flip rejected** — you can't change `vcs_workflow` while PR runs are in flight on the workspace. Cancel or merge those PR runs first.
 
