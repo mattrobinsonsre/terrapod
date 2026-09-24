@@ -139,11 +139,14 @@ class TestAGateTakingHoldRefreshesTheCommitStatus:
         """
         import inspect
 
-        # `complete_plan` is a thin wrapper; the gates live in `_complete_plan`.
-        # Reading the wrapper finds nothing and the assertion would be
-        # vacuous -- the same delegation trap that produced a false audit
-        # against `create_workspace` rather than `_create_workspace_impl`.
-        src = inspect.getsource(run_service._complete_plan)
+        # Where the gates live differs by line: 1.8+ delegates from
+        # `complete_plan` to `_complete_plan`, 1.7 does not. Read whichever
+        # exists, because reading the WRAPPER finds nothing and the assertion
+        # would pass vacuously -- the same delegation trap that produced a
+        # false audit against `create_workspace` rather than
+        # `_create_workspace_impl`.
+        impl = getattr(run_service, "_complete_plan", run_service.complete_plan)
+        src = inspect.getsource(impl)
         assert src.count("await _enqueue_gate_hold_status(run)") == 4, (
             "expected one gate-hold status refresh per holding gate "
             f"(run-task, policy, security-scan, ai-policy); found "

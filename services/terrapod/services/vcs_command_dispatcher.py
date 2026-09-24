@@ -22,6 +22,7 @@ Payload shape:
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any
 
@@ -94,6 +95,50 @@ def _no_workspace_body(name: str) -> str:
         "mode with a working directory this pull request touches. Omit "
         "`-W` to act on every affected workspace."
     )
+
+
+#: A flag, as every documented command's arguments are (`-W <workspace>`).
+_FLAG = re.compile(r"^-{1,2}[A-Za-z]")
+
+
+def _looks_like_a_command_attempt(raw: str) -> bool:
+    """Whether an unrecognised line was plausibly aimed at Terrapod.
+
+    The parser maps every unknown verb to `help`, so without this a comment
+    that merely BEGINS with the word -- "terrapod is working well now" -- drew
+    a twelve-line usage table onto someone's pull request, unprompted and with
+    no way to switch it off (#1836).
+
+    The test is: the verb stands alone, or is followed by a FLAG. That is what
+    every documented command looks like (`terrapod apply -W web`), and it is
+    the only signal that separates a typo from prose -- counting trailing
+    tokens does not, because "working well now" is three perfectly
+    workspace-shaped words.
+
+    Deliberately biased toward silence. A missed typo hint costs the author one
+    puzzled moment; an unsolicited table on every passing mention is noise
+    every reviewer on that PR has to scroll past, and there is no opt-out.
+    """
+    parts = raw.split()
+    if len(parts) < 2:
+        return False
+    rest = parts[2:]
+    return not rest or bool(_FLAG.match(rest[0]))
+
+
+def _unrecognised_verb(raw: str) -> str | None:
+    """The verb from a line the parser could not route, or None.
+
+    Read back off `raw` rather than taken from `Command.unrecognised`, which
+    is set only when there is NO trailing text -- so `terrapod aply -W web`,
+    the most command-shaped typo there is, arrived with it empty and got the
+    generic table instead of its own name back.
+    """
+    parts = raw.split()
+    if len(parts) < 2:
+        return None
+    verb = parts[1].strip(".,!?:;").lower()
+    return None if verb == "help" else verb
 
 
 def _unknown_verb_body(verb: str) -> str:
@@ -342,10 +387,21 @@ async def _route(
             unrecognised=cmd.unrecognised,
             **audit_ctx,
         )
-        if cmd.unrecognised:
+        unrecognised = cmd.unrecognised or _unrecognised_verb(cmd.raw)
+        if unrecognised:
+            # Only when the line was plausibly aimed at us. A passing mention
+            # in prose is not a command, and answering it puts a usage table
+            # on someone's PR for nothing (#1836).
+            if not _looks_like_a_command_attempt(cmd.raw):
+                logger.info(
+                    "vcs_comment_dispatch: prose mention, not replying",
+                    raw=cmd.raw[:120],
+                    **audit_ctx,
+                )
+                return False
             # Name the token, so a typo reads as a typo rather than as
             # Terrapod volunteering a usage table for no reason (#1799).
-            await _post_reply(db, sess, _unknown_verb_body(cmd.unrecognised))
+            await _post_reply(db, sess, _unknown_verb_body(unrecognised))
             return False
         await _post_reply(db, sess, _HELP_BODY)
         return True
