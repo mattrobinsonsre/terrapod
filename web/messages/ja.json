@@ -1053,7 +1053,30 @@
       "notificationTemplates": "通知テンプレート（各新規ワークスペースに作成）",
       "saving": "保存中...",
       "previewTitle": "リポジトリを走査し、このルールが作成するであろうワークスペースをプレビューします — 永続化なし",
-      "parallelism": "並列度"
+      "parallelism": "並列度",
+      "governance": "セキュリティスキャンと AI サマリー",
+      "governanceHint": "このルールが作成するすべてのワークスペースに適用されます。",
+      "scanEnforcement": "適用方法",
+      "scanOff": "スキャンしない",
+      "scanAdvisory": "スキャンして報告のみ",
+      "scanEnforced": "検出時に適用をブロック",
+      "scanEngine": "スキャナー",
+      "scanEngineBoth": "Checkov と Trivy",
+      "scanThreshold": "報告する重大度の下限",
+      "severityCritical": "重大",
+      "severityHigh": "高",
+      "severityMedium": "中",
+      "severityLow": "低",
+      "aiSummaryMode": "AIプランサマリー",
+      "aiSummaryDefault": "デプロイメントのデフォルトに従う",
+      "aiSummaryEnabled": "常に要約する",
+      "aiSummaryDisabled": "要約しない",
+      "execution": "実行、VCS、ドリフト",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt バージョン",
+      "noExpiry": "期限なし",
+      "addDriftIgnoreRule": "ルールを追加",
+      "debugModeHint": "このルールが作成するワークスペースで、失敗したランナーの Pod を保持します。既定ではオフです — 保持された Pod はそのワークスペースの認証情報を保持します。"
     },
     "table": {
       "name": "名前",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "必須の実行タスクが失敗しました — オーバーライドするか実行を破棄してください",
       "runTasksRunning": "プラン後の実行タスクを待機中",
       "heldByPolicy": "必須のポリシーセットが失敗しました — オーバーライドするか実行を破棄してください",
-      "heldBySecurityScan": "セキュリティスキャンでブロック検出がありました — オーバーライドするか実行を破棄してください"
+      "heldBySecurityScan": "セキュリティスキャンでブロック検出がありました — オーバーライドするか実行を破棄してください",
+      "heldByAiPolicy": "AI ポリシーゲートがこの実行を拒否しました — オーバーライドするか実行を破棄してください",
+      "awaitingAiPolicy": "AI ポリシーの判定を待っています"
     },
     "badge": {
       "destroy": "破棄",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "スキャンが完了しなかったため、この実行は検査されていません。",
       "blockedErroredMessage": "セキュリティスキャンが完了しなかったため、この実行はブロックされています。原因を修正して再度プランを実行するか、管理者に上書きを依頼してください。"
     },
+    "aiPolicyPanel": {
+      "heading": "AI ポリシーゲート",
+      "enforcementLabel": "適用: {level}",
+      "thresholdLabel": "リスクしきい値: {threshold}",
+      "awaitingVerdict": "AI ポリシーの判定を待っています。判定が届くまでこの実行は保留されます。",
+      "decisionAllow": "許可",
+      "decisionDeny": "拒否",
+      "risk": {
+        "critical": "重大",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "blockedDeniedMessage": "この実行は<strong>{count, plural, other {# 件のポリシー基準}}によりブロックされています</strong>。",
+      "blockedRiskMessage": "この実行は、リスクレベル（{level}）がしきい値（{threshold}）以上のため<strong>ブロックされています</strong>。",
+      "blockedErroredMessage": "AI ポリシーの判定に到達できなかったため、この実行はブロックされています。ゲートはフェイルクローズで動作します。到達できなかった判定は承認ではありません。",
+      "erroredMessage": "AI ポリシーゲートが使用可能な判定を返さなかったため、この実行は判定されていません。",
+      "passed": "一致したポリシー基準はありません。",
+      "overriding": "オーバーライド中...",
+      "overrideContinue": "オーバーライドして続行",
+      "overrideConfirm": "AI ポリシーゲートをオーバーライドし、判定にかかわらずこの実行の適用を許可しますか？",
+      "overrideFailed": "オーバーライドに失敗しました",
+      "overrideFailedStatus": "オーバーライドに失敗しました（{status}）",
+      "overriddenBy": "{by} によりオーバーライド"
+    },
     "architecture": {
       "loadError": "アーキテクチャ評価の読み込みに失敗しました。",
       "notEnabled": "この環境では AI アーキテクチャ評価が有効になっていません。",
@@ -2558,6 +2608,8 @@
       "modeDefault": "デプロイメントのデフォルトに従う",
       "modeEnabled": "常に要約する",
       "modeDisabled": "要約しない",
+      "policyMode": "ポリシーゲート",
+      "policyModeNote": "必須ゲートは「しない」を無視します。除外できるのは助言的な判定のみです。",
       "contextLabel": "ワークスペースコンテキスト",
       "contextLabelSuffix": "（任意、追加）",
       "contextPlaceholder": "AIがこのワークスペース固有の点として知っておくべき事実。例: 「サービスXのVaultのフロントを担っています — KMSキーを破棄するとグローバル障害が発生します。」",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "状態バージョンのロールバックに失敗しました",
       "stateActionFailed": "状態操作に失敗しました",
       "uploadState": "状態のアップロードに失敗しました",
-      "uploadStateFile": "状態ファイルのアップロードに失敗しました"
+      "uploadStateFile": "状態ファイルのアップロードに失敗しました",
+      "updateSecurityScan": "セキュリティスキャンの更新に失敗しました",
+      "updateDebugMode": "デバッグモードを更新できませんでした"
     },
     "subtabs": {
       "state": "状態",
@@ -2880,6 +2934,38 @@
         "global": "グローバル",
         "rule": "ルールで一致"
       }
+    },
+    "securityScan": {
+      "title": "セキュリティスキャン",
+      "description": "適用する前に、安全でないインフラストラクチャがないかプランをスキャンします。",
+      "enforcement": "適用方法",
+      "enforcementOff": "スキャンしない",
+      "enforcementAdvisory": "スキャンして報告のみ",
+      "enforcementEnforced": "検出時に適用をブロック",
+      "engine": "スキャナー",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov と Trivy",
+      "threshold": "報告する重大度の下限",
+      "thresholdCritical": "重大",
+      "thresholdHigh": "高",
+      "thresholdMedium": "中",
+      "thresholdLow": "低",
+      "skipRules": "無視するルール",
+      "skipRulesSuffix": "(任意)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "無視するルールはありません。",
+      "skipRulesHint": "このワークスペースで無視するスキャナーのルール ID をカンマ区切りで指定します。"
+    },
+    "debugMode": {
+      "title": "ランナーのデバッグモード",
+      "description": "失敗した実行の Pod を開いたまま保持し、中に入って調べられるようにします。実行の失敗はまず報告され、その後にコンテナが残ります。",
+      "label": "デバッグモード",
+      "hint": "既定ではオフです。オンの間、失敗したランナーの Pod は運用者が設定した時間枠のあいだ exec で入れる状態のまま残り、その間ずっとこのワークスペースの認証情報と復号された変数を保持します。",
+      "activeBadge": "有効",
+      "bannerTitle": "このワークスペースではデバッグモードが有効です",
+      "bannerBody": "失敗した実行の Pod は終了せずに調査のため保持され、その間このワークスペースの認証情報と復号された変数を保持し続けます。調査が終わったらデバッグモードをオフにしてください。",
+      "confirmEnable": "デバッグモードを有効にしますか？失敗した実行の Pod は、時間枠が切れるか Pod を削除するまで、このワークスペースの認証情報と復号された変数を保持したまま残ります。"
     }
   },
   "graphs": {

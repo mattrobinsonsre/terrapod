@@ -93,12 +93,29 @@ class PulumiStrategy:
     #: Resolves to `phases.pulumi.*` in the message catalogues.
     vocabulary = "pulumi"
 
-    #: Neither yet. The Pulumi runner produces no plan JSON for OPA or the
-    #: scanners to read; until OPA over preview JSON lands (#1560, #1567) and a
-    #: scan input exists (#1569), policy sets and scans are not applied to Pulumi
-    #: runs, rather than holding every apply for an evaluation that never comes.
-    evaluates_policy_sets = False
+    #: Policy sets, yes (#1567): the preview's engine event log is built into an
+    #: OPA input document carrying each resource's operation, type, URN and
+    #: declared inputs, and the runner evaluates applicable sets against it
+    #: before posting plan-result — the same order, and the same gate, as a
+    #: Terraform run.
+    evaluates_policy_sets = True
+
+    #: Security scans, not yet. Checkov and Trivy read Terraform plan JSON, and
+    #: whether they have a meaningful Pulumi input at all is #1569. Until then a
+    #: scan is not applied to a Pulumi run, rather than holding every apply for
+    #: a result that never comes.
     evaluates_security_scans = False
+
+    #: The AI policy gate, not yet, and for a sharper reason than the scan
+    #: above (#1766). A preview DOES upload a plan artifact — but it is the
+    #: digest, capped at `pulumi_preview.MAX_STEPS`, and `steps_truncated` says
+    #: so. Ruling over a truncated list of resources can ALLOW a plan because
+    #: the offending resource fell off the end, which is precisely why
+    #: `write_policy_input` builds an uncapped document for OPA instead. That
+    #: document is built in the runner and never uploaded, so the API cannot
+    #: read it; until it can, a Pulumi run is reported as not evaluated rather
+    #: than judged on a partial plan.
+    evaluates_ai_policy = False
 
     #: Which phase each internal run status belongs to. The platform's status
     #: names never change — a run is `planning` whatever engine it belongs to —

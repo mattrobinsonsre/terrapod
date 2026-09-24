@@ -110,6 +110,26 @@ type autodiscoveryRuleModel struct {
 	OwnerEmail        types.String `tfsdk:"owner_email"`
 	OnDirectoryDelete types.String `tfsdk:"on_directory_delete"`
 
+	// Templated onto every workspace this rule materialises (#1763).
+	SecurityScanEnforcement       types.String `tfsdk:"security_scan_enforcement"`
+	SecurityScanEngine            types.String `tfsdk:"security_scan_engine"`
+	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
+	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
+	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
+	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
+	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
+	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
+	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
+	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
+	VCSWorkflow                   types.String `tfsdk:"vcs_workflow"`
+	AutoMerge                     types.Bool   `tfsdk:"auto_merge"`
+	AutoMergeStrategy             types.String `tfsdk:"auto_merge_strategy"`
+	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
+	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
+	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
+	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
+	SlackChannel                  types.String `tfsdk:"slack_channel"`
+
 	VarFiles               types.List `tfsdk:"var_files"`
 	RunTaskTemplates       types.List `tfsdk:"run_task_templates"`
 	NotificationTemplates  types.List `tfsdk:"notification_templates"`
@@ -376,6 +396,150 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Description: "Execution hook ids (hook-<uuid>) associated with every workspace this rule creates.",
 				Optional:    true,
 				ElementType: types.StringType,
+			},
+			// Templated onto every workspace this rule materialises (#1763).
+			// Optional+Computed so a rule that never sets one keeps the
+			// server's default without planning a change every run (#684).
+			//
+			// No engine constraint here, unlike `terrapod_workspace`: a rule
+			// has no engine, so everything it creates is Terraform/OpenTofu,
+			// which is exactly what can be scanned.
+			"security_scan_enforcement": schema.StringAttribute{
+				Description: "IaC security-scan enforcement for workspaces this rule creates: `off` (skip), `advisory` (scan, never block — the default), or `enforced` (a failed/errored scan blocks apply until fixed or overridden).",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"security_scan_engine": schema.StringAttribute{
+				Description: "Which scanner(s) run on workspaces this rule creates: `checkov` (default), `trivy`, or `both`.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"security_scan_severity_threshold": schema.StringAttribute{
+				Description: "Lowest severity that counts as a finding on workspaces this rule creates: `critical`, `high` (default), `medium`, or `low`.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"security_scan_skip_rules": schema.ListAttribute{
+				Description: "Scanner rule ids (Checkov `CKV_*` / Trivy `AVD-*`) to ignore on workspaces this rule creates.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
+			"ai_summary_mode": schema.StringAttribute{
+				Description: "AI plan-summary opt-in for workspaces this rule creates: `default` (follow the deployment setting), `enabled`, or `disabled`.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"ai_policy_mode": schema.StringAttribute{
+				Description: "AI policy gate override for workspaces this rule creates: `default`, `enabled`, or `disabled`. `disabled` opts out of an *advisory* verdict only -- a **mandatory** gate ignores it, so a rule cannot carve a repository out of a fleet-wide blocking control.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"ai_summary_context": schema.StringAttribute{
+				Description: "Free-text context given to the AI plan summariser for workspaces this rule creates (max 4000 characters).",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			// The remaining templated workspace settings (#1763). Optional+Computed
+			// throughout, so a rule that never sets one keeps the server's
+			// default instead of planning a change on every run (#684).
+			"debug_mode": schema.BoolAttribute{
+				Description: "Hold failed runner pods open for inspection on workspaces this rule creates.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"terragrunt_enabled": schema.BoolAttribute{
+				Description: "Run Terragrunt on workspaces this rule creates.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"terragrunt_version": schema.StringAttribute{
+				Description: "Terragrunt version for workspaces this rule creates.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"vcs_workflow": schema.StringAttribute{
+				Description: "VCS workflow for workspaces this rule creates: `merge_then_apply` (default) or `apply_then_merge`.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"auto_merge": schema.BoolAttribute{
+				Description: "Merge the PR automatically after a successful apply, on workspaces this rule creates.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"auto_merge_strategy": schema.StringAttribute{
+				Description: "How an auto-merge merges on workspaces this rule creates: `merge` (default), `squash` or `rebase`.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"drift_detection_enabled": schema.BoolAttribute{
+				Description: "Run scheduled drift checks on workspaces this rule creates. Defaults true, as every autodiscovered workspace is VCS-connected.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"drift_detection_interval_seconds": schema.Int64Attribute{
+				Description: "Seconds between drift checks on workspaces this rule creates. Clamped to the deployment minimum.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
+			},
+			"drift_ignore_rules": schema.ListAttribute{
+				Description: "Resource-address/attribute-path patterns whose drift is ignored on workspaces this rule creates.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
+			"plan_expiry_seconds": schema.Int64Attribute{
+				Description: "Seconds a plan stays applicable on workspaces this rule creates. Unset means no expiry.",
+				Optional:    true,
+			},
+			"slack_channel": schema.StringAttribute{
+				Description: "Slack channel for run notifications on workspaces this rule creates. Empty means silent.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"run_task_templates": schema.ListNestedAttribute{
 				Description: "Run task definitions auto-applied to workspaces created by this rule.",
@@ -694,6 +858,68 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		attrs["on-directory-delete"] = m.OnDirectoryDelete.ValueString()
 	}
 
+	// Templated scan / AI-summary settings (#1763). Omitted when unset, on
+	// the same rule as every other optional template field: a rule that
+	// never set one must be left as the server has it, not reset to a
+	// provider-side default.
+	for _, f := range []struct {
+		key string
+		val types.String
+	}{
+		{"security-scan-enforcement", m.SecurityScanEnforcement},
+		{"security-scan-engine", m.SecurityScanEngine},
+		{"security-scan-severity-threshold", m.SecurityScanSeverityThreshold},
+		{"ai-summary-mode", m.AISummaryMode},
+		{"ai-policy-mode", m.AIPolicyMode},
+		{"ai-summary-context", m.AISummaryContext},
+		{"terragrunt-version", m.TerragruntVersion},
+		{"vcs-workflow", m.VCSWorkflow},
+		{"auto-merge-strategy", m.AutoMergeStrategy},
+		{"slack-channel", m.SlackChannel},
+	} {
+		if !f.val.IsNull() && !f.val.IsUnknown() {
+			attrs[f.key] = f.val.ValueString()
+		}
+	}
+	if !m.SecurityScanSkipRules.IsNull() && !m.SecurityScanSkipRules.IsUnknown() {
+		rules := make([]string, 0, len(m.SecurityScanSkipRules.Elements()))
+		for _, v := range m.SecurityScanSkipRules.Elements() {
+			rules = append(rules, v.(types.String).ValueString())
+		}
+		attrs["security-scan-skip-rules"] = rules
+	}
+	for _, f := range []struct {
+		key string
+		val types.Bool
+	}{
+		{"debug-mode", m.DebugMode},
+		{"terragrunt-enabled", m.TerragruntEnabled},
+		{"auto-merge", m.AutoMerge},
+		{"drift-detection-enabled", m.DriftDetectionEnabled},
+	} {
+		if !f.val.IsNull() && !f.val.IsUnknown() {
+			attrs[f.key] = f.val.ValueBool()
+		}
+	}
+	for _, f := range []struct {
+		key string
+		val types.Int64
+	}{
+		{"drift-detection-interval-seconds", m.DriftDetectionIntervalSeconds},
+		{"plan-expiry-seconds", m.PlanExpirySeconds},
+	} {
+		if !f.val.IsNull() && !f.val.IsUnknown() {
+			attrs[f.key] = f.val.ValueInt64()
+		}
+	}
+	if !m.DriftIgnoreRules.IsNull() && !m.DriftIgnoreRules.IsUnknown() {
+		rules := make([]string, 0, len(m.DriftIgnoreRules.Elements()))
+		for _, v := range m.DriftIgnoreRules.Elements() {
+			rules = append(rules, v.(types.String).ValueString())
+		}
+		attrs["drift-ignore-rules"] = rules
+	}
+
 	// Optional templating fields (#318): omit entirely when unset so a
 	// rule without them is left unchanged on the server.
 	if !m.VarFiles.IsNull() && !m.VarFiles.IsUnknown() {
@@ -849,6 +1075,53 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		m.OnDirectoryDelete = types.StringValue(v)
 	} else {
 		m.OnDirectoryDelete = types.StringNull()
+	}
+
+	// Templated scan / AI-summary settings (#1763). These are
+	// Optional+Computed (the #684 pattern, matching `terrapod_workspace`'s
+	// own scan attributes), so the server's column default is legitimately
+	// stored for a rule that never set one and produces no perpetual diff.
+	// The skip-rule list stays null when empty -- a Computed empty list and
+	// a null one are different values to Terraform.
+	m.SecurityScanEnforcement = types.StringValue(
+		terrapod.GetStringAttr(res, "security-scan-enforcement"),
+	)
+	m.SecurityScanEngine = types.StringValue(terrapod.GetStringAttr(res, "security-scan-engine"))
+	m.SecurityScanSeverityThreshold = types.StringValue(
+		terrapod.GetStringAttr(res, "security-scan-severity-threshold"),
+	)
+	m.AISummaryMode = types.StringValue(terrapod.GetStringAttr(res, "ai-summary-mode"))
+	m.AIPolicyMode = types.StringValue(terrapod.GetStringAttr(res, "ai-policy-mode"))
+	m.AISummaryContext = types.StringValue(terrapod.GetStringAttr(res, "ai-summary-context"))
+	m.TerragruntVersion = types.StringValue(terrapod.GetStringAttr(res, "terragrunt-version"))
+	m.VCSWorkflow = types.StringValue(terrapod.GetStringAttr(res, "vcs-workflow"))
+	m.AutoMergeStrategy = types.StringValue(terrapod.GetStringAttr(res, "auto-merge-strategy"))
+	m.SlackChannel = types.StringValue(terrapod.GetStringAttr(res, "slack-channel"))
+	m.DebugMode = types.BoolValue(terrapod.GetBoolAttr(res, "debug-mode"))
+	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
+	m.AutoMerge = types.BoolValue(terrapod.GetBoolAttr(res, "auto-merge"))
+	m.DriftDetectionEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "drift-detection-enabled"))
+	m.DriftDetectionIntervalSeconds = types.Int64Value(
+		terrapod.GetIntAttr(res, "drift-detection-interval-seconds"),
+	)
+	if v := terrapod.GetIntAttr(res, "plan-expiry-seconds"); v > 0 {
+		m.PlanExpirySeconds = types.Int64Value(v)
+	} else {
+		m.PlanExpirySeconds = types.Int64Null()
+	}
+	if rules := terrapod.GetListAttr(res, "drift-ignore-rules"); len(rules) > 0 {
+		v, d := types.ListValueFrom(ctx, types.StringType, rules)
+		diags.Append(d...)
+		m.DriftIgnoreRules = v
+	} else {
+		m.DriftIgnoreRules = types.ListNull(types.StringType)
+	}
+	if rules := terrapod.GetListAttr(res, "security-scan-skip-rules"); len(rules) > 0 {
+		v, d := types.ListValueFrom(ctx, types.StringType, rules)
+		diags.Append(d...)
+		m.SecurityScanSkipRules = v
+	} else {
+		m.SecurityScanSkipRules = types.ListNull(types.StringType)
 	}
 
 	// Optional templating fields (#318). Tolerate missing/empty: an

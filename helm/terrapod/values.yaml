@@ -554,7 +554,7 @@ api:
       platform_tools:
         opa_version: "1.20.2"
         trivy_version: "0.74.0"
-        checkov_version: "3.3.17"
+        checkov_version: "3.3.19"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
         checkov_mirror_url: "https://github.com/bridgecrewio/checkov/releases/download"
@@ -933,6 +933,33 @@ api:
         # Deployment-wide facts about your infrastructure. Plain text
         # or markdown. Multiline strings are supported via `|`.
         fleet_context: ""
+      # Post-plan GATE (#1766). Rides the summary's own model call -- same
+      # model, endpoint, auth and token budget -- by asking for an extra
+      # allow/deny verdict, so turning it on costs no additional tokens.
+      #
+      # Terraform/OpenTofu only. A Pulumi preview uploads a capped digest, and
+      # a gate ruling over a truncated resource list could allow a plan whose
+      # offending resource fell off the end, so a Pulumi run is reported as
+      # not evaluated instead of being judged on a partial plan.
+      policy:
+        # Off by default, so enabling AI summaries never starts blocking runs.
+        enabled: false
+        # advisory = record the verdict, never block, never delay the run.
+        # mandatory = HOLD the run until the verdict lands, then block a deny.
+        enforcement_level: advisory
+        # Block when the summary's own risk_level reaches this. "off" gates on
+        # deny_criteria alone, which is the safer place to start: a risk score
+        # judges the whole change, so a threshold blocks far more broadly than
+        # a criterion does.
+        risk_threshold: "off"
+        # What to block, in your own words, one per line. With risk_threshold
+        # "off" and no criteria the gate stays inert even when enabled -- a
+        # deliberate choice, so flipping the switch cannot block anything
+        # before you have said what to block. For example:
+        #   deny_criteria: |
+        #     block any security group allowing 0.0.0.0/0 on port 22
+        #     block making an S3 bucket publicly readable
+        deny_criteria: ""
 
     # AI Onboarding (#824) — an INDEPENDENT AI feature, separate from
     # ai_summary above. Discovers existing, unmanaged cloud resources (via
@@ -1653,6 +1680,17 @@ runners:
   extraVolumes: []
   extraVolumeMounts: []
   ttlSecondsAfterFinished: 600  # Clean up completed Jobs after 10 min
+  # How long a FAILED runner pod is held open for `kubectl exec` when its
+  # workspace has debug mode on (#1764). A failed run's container is normally
+  # terminated at once, which is exactly when an operator wants to look inside
+  # it — at the credentials that did not work, the DNS that did not resolve,
+  # the mounts that were not there.
+  #
+  # This is the operator's ceiling, not the workspace's: while a pod lingers it
+  # still holds the run's auth token and its decrypted terraform.tfvars.json,
+  # and whoever can `kubectl exec` in the runner namespace can read them. Set 0
+  # to disable debug mode across the deployment however workspaces are set.
+  debugLingerSeconds: 1800
   terminationGracePeriodSeconds: 120  # Time budget for graceful shutdown + artifact uploads
   tokenTTLSeconds: 3600         # Runner token TTL (default 1 hour)
   maxTokenTTLSeconds: 7200      # Runner token max TTL (default 2 hours)

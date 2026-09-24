@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Modelos de notificação (criados em cada novo workspace)",
       "saving": "A guardar...",
       "previewTitle": "Percorre o repositório e pré-visualiza quais os workspaces que esta regra CRIARIA — sem persistência",
-      "parallelism": "Paralelismo"
+      "parallelism": "Paralelismo",
+      "governance": "Verificação de segurança e resumo de IA",
+      "governanceHint": "Aplicado a todos os workspaces criados por esta regra.",
+      "scanEnforcement": "Aplicação",
+      "scanOff": "Não verificar",
+      "scanAdvisory": "Apenas verificar e comunicar",
+      "scanEnforced": "Bloquear a aplicação se houver deteções",
+      "scanEngine": "Verificador",
+      "scanEngineBoth": "Checkov e Trivy",
+      "scanThreshold": "Comunicar deteções a partir de",
+      "severityCritical": "crítico",
+      "severityHigh": "alto",
+      "severityMedium": "médio",
+      "severityLow": "baixo",
+      "aiSummaryMode": "Resumo do Plano por IA",
+      "aiSummaryDefault": "Seguir a predefinição da implementação",
+      "aiSummaryEnabled": "Resumir sempre",
+      "aiSummaryDisabled": "Nunca resumir",
+      "execution": "Execução, VCS e desvio",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Versão do Terragrunt",
+      "noExpiry": "Sem expiração",
+      "addDriftIgnoreRule": "Adicionar regra",
+      "debugModeHint": "Manter abertos os pods de runners falhados nos espaços de trabalho criados por esta regra. Desativado por predefinição — um pod mantido aberto conserva as credenciais desse espaço de trabalho."
     },
     "table": {
       "name": "Nome",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "Uma run task obrigatória falhou — substitua-a ou descarte a execução",
       "runTasksRunning": "A aguardar as run tasks pós-plano",
       "heldByPolicy": "Um conjunto de políticas obrigatório falhou — substitua-o ou descarte a execução",
-      "heldBySecurityScan": "A análise de segurança encontrou resultados bloqueantes — substitua-a ou descarte a execução"
+      "heldBySecurityScan": "A análise de segurança encontrou resultados bloqueantes — substitua-a ou descarte a execução",
+      "heldByAiPolicy": "A porta de política de IA negou esta execução — substitua-a ou descarte a execução",
+      "awaitingAiPolicy": "A aguardar o veredicto da política de IA"
     },
     "badge": {
       "destroy": "destroy",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "A análise não foi concluída, pelo que esta execução não foi verificada.",
       "blockedErroredMessage": "Esta execução está bloqueada porque a análise de segurança não foi concluída. Corrija a causa e volte a planear, ou peça a um administrador para ignorar."
     },
+    "aiPolicyPanel": {
+      "heading": "Porta de política de IA",
+      "enforcementLabel": "aplicação: {level}",
+      "thresholdLabel": "limiar de risco: {threshold}",
+      "awaitingVerdict": "A aguardar o veredicto da política de IA. Esta execução fica retida até que chegue.",
+      "decisionAllow": "permitido",
+      "decisionDeny": "negado",
+      "risk": {
+        "critical": "crítico",
+        "high": "alto",
+        "medium": "médio",
+        "low": "baixo"
+      },
+      "blockedDeniedMessage": "Esta execução está <strong>bloqueada por {count, plural, one {# critério de política} other {# critérios de política}}</strong>.",
+      "blockedRiskMessage": "Esta execução está <strong>bloqueada</strong> porque o seu nível de risco ({level}) está igual ou acima do limiar ({threshold}).",
+      "blockedErroredMessage": "Esta execução está bloqueada porque não foi possível obter um veredicto da política de IA. A porta falha fechada: um veredicto que não pôde ser obtido não é aprovação.",
+      "erroredMessage": "A porta de política de IA não devolveu um veredicto utilizável, pelo que esta execução não foi julgada.",
+      "passed": "Nenhum critério de política correspondeu.",
+      "overriding": "A substituir...",
+      "overrideContinue": "Substituir e Continuar",
+      "overrideConfirm": "Ignorar a porta de política de IA e permitir que esta execução seja aplicada apesar do veredicto?",
+      "overrideFailed": "Falha na substituição",
+      "overrideFailedStatus": "Falha na substituição ({status})",
+      "overriddenBy": "substituído por {by}"
+    },
     "architecture": {
       "loadError": "Não foi possível carregar a crítica de arquitetura.",
       "notEnabled": "O crítico de arquitetura por IA não está ativado nesta implementação.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Seguir a predefinição da implementação",
       "modeEnabled": "Resumir sempre",
       "modeDisabled": "Nunca resumir",
+      "policyMode": "Porta de política",
+      "policyModeNote": "Uma porta obrigatória ignora “Nunca”: só pode isentar esta área de trabalho de um veredicto consultivo.",
       "contextLabel": "Contexto do workspace",
       "contextLabelSuffix": "(opcional, aditivo)",
       "contextPlaceholder": "Factos que a IA deve conhecer especificamente sobre este workspace. ex.: 'Fica à frente do vault do serviço X — destruir a chave KMS causa uma indisponibilidade global.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Falha ao reverter a versão de estado",
       "stateActionFailed": "Falha na ação de estado",
       "uploadState": "Falha ao carregar o estado",
-      "uploadStateFile": "Falha ao carregar o ficheiro de estado"
+      "uploadStateFile": "Falha ao carregar o ficheiro de estado",
+      "updateSecurityScan": "Falha ao atualizar a verificação de segurança",
+      "updateDebugMode": "Não foi possível atualizar o modo de depuração"
     },
     "subtabs": {
       "state": "Estado",
@@ -2880,6 +2934,38 @@
         "global": "Global",
         "rule": "Correspondeu à regra"
       }
+    },
+    "securityScan": {
+      "title": "Verificação de segurança",
+      "description": "Verifique o plano em busca de infraestrutura insegura antes de o aplicar.",
+      "enforcement": "Aplicação",
+      "enforcementOff": "Não verificar",
+      "enforcementAdvisory": "Apenas verificar e comunicar",
+      "enforcementEnforced": "Bloquear a aplicação se houver deteções",
+      "engine": "Verificador",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov e Trivy",
+      "threshold": "Comunicar deteções a partir de",
+      "thresholdCritical": "crítico",
+      "thresholdHigh": "alto",
+      "thresholdMedium": "médio",
+      "thresholdLow": "baixo",
+      "skipRules": "Regras ignoradas",
+      "skipRulesSuffix": "(opcional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Nenhuma regra ignorada.",
+      "skipRulesHint": "IDs de regras do verificador, separados por vírgulas, a ignorar neste workspace."
+    },
+    "debugMode": {
+      "title": "Modo de depuração do runner",
+      "description": "Manter aberto o pod de uma execução falhada para que possa entrar nele. A falha da execução é comunicada primeiro; só depois é que o contentor se mantém de pé.",
+      "label": "Modo de depuração",
+      "hint": "Desativado por predefinição. Enquanto estiver ativo, o pod de um runner falhado mantém-se acessível por exec durante a janela configurada pelo seu operador e conserva, durante todo esse tempo, as credenciais e as variáveis desencriptadas deste espaço de trabalho.",
+      "activeBadge": "Ativo",
+      "bannerTitle": "O modo de depuração está ativado para este espaço de trabalho",
+      "bannerBody": "O pod de uma execução falhada é mantido aberto para inspeção em vez de terminar e, entretanto, conserva as credenciais e as variáveis desencriptadas deste espaço de trabalho. Desative o modo de depuração quando terminar a investigação.",
+      "confirmEnable": "Ativar o modo de depuração? O pod de uma execução falhada será mantido aberto com as credenciais e as variáveis desencriptadas deste espaço de trabalho até a janela expirar ou eliminar o pod."
     }
   },
   "graphs": {

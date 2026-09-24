@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Varselmaler (opprettes på hvert nytt arbeidsområde)",
       "saving": "Lagrer …",
       "previewTitle": "Gå gjennom repoet og forhåndsvis hvilke arbeidsområder denne regelen VILLE opprette – ingen lagring",
-      "parallelism": "Parallellitet"
+      "parallelism": "Parallellitet",
+      "governance": "Sikkerhetsskanning og AI-sammendrag",
+      "governanceHint": "Brukes på hvert arbeidsområde som denne regelen oppretter.",
+      "scanEnforcement": "Håndheving",
+      "scanOff": "Ikke skann",
+      "scanAdvisory": "Bare skann og rapporter",
+      "scanEnforced": "Blokker bruk ved funn",
+      "scanEngine": "Skanner",
+      "scanEngineBoth": "Checkov og Trivy",
+      "scanThreshold": "Rapporter funn fra og med",
+      "severityCritical": "kritisk",
+      "severityHigh": "høy",
+      "severityMedium": "middels",
+      "severityLow": "lav",
+      "aiSummaryMode": "AI-plansammendrag",
+      "aiSummaryDefault": "Følg utrullingsstandard",
+      "aiSummaryEnabled": "Sammendra alltid",
+      "aiSummaryDisabled": "Sammendra aldri",
+      "execution": "Kjøring, VCS og drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versjon",
+      "noExpiry": "Ingen utløp",
+      "addDriftIgnoreRule": "Legg til regel",
+      "debugModeHint": "Hold pods fra mislykkede runnere åpne på arbeidsområdene denne regelen oppretter. Av som standard – en pod som holdes åpen, beholder det arbeidsområdets legitimasjon."
     },
     "table": {
       "name": "Navn",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "En obligatorisk kjøringsoppgave feilet — overstyr den eller forkast kjøringen",
       "runTasksRunning": "Venter på kjøringsoppgaver etter planen",
       "heldByPolicy": "Et obligatorisk regelsett feilet — overstyr det eller forkast kjøringen",
-      "heldBySecurityScan": "Sikkerhetsskanningen fant blokkerende funn — overstyr den eller forkast kjøringen"
+      "heldBySecurityScan": "Sikkerhetsskanningen fant blokkerende funn — overstyr den eller forkast kjøringen",
+      "heldByAiPolicy": "AI-policyporten avviste denne kjøringen — overstyr den eller forkast kjøringen",
+      "awaitingAiPolicy": "Venter på AI-policyens kjennelse"
     },
     "badge": {
       "destroy": "riv ned",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "Skanningen ble ikke fullført, så denne kjøringen er ikke kontrollert.",
       "blockedErroredMessage": "Denne kjøringen er blokkert fordi sikkerhetsskanningen ikke ble fullført. Rett årsaken og planlegg på nytt, eller be en administrator om å overstyre."
     },
+    "aiPolicyPanel": {
+      "heading": "AI-policyport",
+      "enforcementLabel": "håndheving: {level}",
+      "thresholdLabel": "risikoterskel: {threshold}",
+      "awaitingVerdict": "Venter på AI-policyens kjennelse. Denne kjøringen holdes tilbake til den kommer.",
+      "decisionAllow": "tillatt",
+      "decisionDeny": "avvist",
+      "risk": {
+        "critical": "kritisk",
+        "high": "høy",
+        "medium": "middels",
+        "low": "lav"
+      },
+      "blockedDeniedMessage": "Denne kjøringen er <strong>blokkert av {count, plural, one {# policykriterium} other {# policykriterier}}</strong>.",
+      "blockedRiskMessage": "Denne kjøringen er <strong>blokkert</strong> fordi risikonivået ({level}) er på eller over terskelen ({threshold}).",
+      "blockedErroredMessage": "Denne kjøringen er blokkert fordi ingen AI-policykjennelse kunne nås. Porten feiler lukket, så en kjennelse som ikke kunne nås, er ikke et samtykke.",
+      "erroredMessage": "AI-policyporten returnerte ingen brukbar kjennelse, så denne kjøringen er ikke vurdert.",
+      "passed": "Ingen policykriterier samsvarte.",
+      "overriding": "Overstyrer …",
+      "overrideContinue": "Overstyr og fortsett",
+      "overrideConfirm": "Overstyre AI-policyporten og la denne kjøringen bli anvendt til tross for kjennelsen?",
+      "overrideFailed": "Overstyring mislyktes",
+      "overrideFailedStatus": "Overstyring mislyktes ({status})",
+      "overriddenBy": "overstyrt av {by}"
+    },
     "architecture": {
       "loadError": "Kunne ikke laste arkitekturkritikken.",
       "notEnabled": "AI-arkitekturkritikeren er ikke aktivert i denne installasjonen.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Følg utrullingsstandard",
       "modeEnabled": "Sammendra alltid",
       "modeDisabled": "Sammendra aldri",
+      "policyMode": "Policyport",
+      "policyModeNote": "En obligatorisk port ignorerer «Aldri»: den kan bare frita dette arbeidsområdet fra en veiledende kjennelse.",
       "contextLabel": "Arbeidsområdekontekst",
       "contextLabelSuffix": "(valgfritt, additivt)",
       "contextPlaceholder": "Fakta AI-en bør vite om dette arbeidsområdet spesifikt. f.eks. «Ligger foran vaulten for tjeneste X – å rive ned KMS-nøkkelen forårsaker et globalt driftsavbrudd.»",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Kunne ikke tilbakerulle tilstandsversjon",
       "stateActionFailed": "Tilstandshandling mislyktes",
       "uploadState": "Kunne ikke laste opp tilstand",
-      "uploadStateFile": "Kunne ikke laste opp tilstandsfil"
+      "uploadStateFile": "Kunne ikke laste opp tilstandsfil",
+      "updateSecurityScan": "Kunne ikke oppdatere sikkerhetsskanningen",
+      "updateDebugMode": "Kunne ikke oppdatere feilsøkingsmodus"
     },
     "subtabs": {
       "state": "Tilstand",
@@ -2880,6 +2934,38 @@
         "global": "Global",
         "rule": "Samsvarer med regel"
       }
+    },
+    "securityScan": {
+      "title": "Sikkerhetsskanning",
+      "description": "Skann planen for usikker infrastruktur før den tas i bruk.",
+      "enforcement": "Håndheving",
+      "enforcementOff": "Ikke skann",
+      "enforcementAdvisory": "Bare skann og rapporter",
+      "enforcementEnforced": "Blokker bruk ved funn",
+      "engine": "Skanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov og Trivy",
+      "threshold": "Rapporter funn fra og med",
+      "thresholdCritical": "kritisk",
+      "thresholdHigh": "høy",
+      "thresholdMedium": "middels",
+      "thresholdLow": "lav",
+      "skipRules": "Ignorerte regler",
+      "skipRulesSuffix": "(valgfritt)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Ingen regler ignoreres.",
+      "skipRulesHint": "Kommaseparerte regel-ID-er for skanneren som ignoreres i dette arbeidsområdet."
+    },
+    "debugMode": {
+      "title": "Feilsøkingsmodus for runneren",
+      "description": "Hold poden til en mislykket kjøring åpen så du kan gå inn i den. Kjøringen rapporteres først som mislykket; først deretter blir containeren stående.",
+      "label": "Feilsøkingsmodus",
+      "hint": "Av som standard. Når den er på, forblir poden til en mislykket runner tilgjengelig med exec i vinduet operatøren din har konfigurert, og den beholder hele den tiden dette arbeidsområdets legitimasjon og dekrypterte variabler.",
+      "activeBadge": "Aktiv",
+      "bannerTitle": "Feilsøkingsmodus er på for dette arbeidsområdet",
+      "bannerBody": "Poden til en mislykket kjøring holdes åpen for inspeksjon i stedet for å avslutte, og den beholder dette arbeidsområdets legitimasjon og dekrypterte variabler så lenge den holdes. Slå av feilsøkingsmodus når du er ferdig med å feilsøke.",
+      "confirmEnable": "Slå på feilsøkingsmodus? Poden til en mislykket kjøring holdes åpen med dette arbeidsområdets legitimasjon og dekrypterte variabler til vinduet utløper eller du sletter poden."
     }
   },
   "graphs": {

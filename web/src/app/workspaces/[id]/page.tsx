@@ -78,6 +78,7 @@ interface WorkspaceAttrs {
   'resource-cpu': string
   parallelism: number
   'resource-memory': string
+  'debug-mode': boolean
   'agent-pool-id': string | null
   // The full pool set (#1085). Flat — a run is offered to every pool at once
   // and whichever has a live runner claims it first.
@@ -99,6 +100,11 @@ interface WorkspaceAttrs {
   'auto-merge-strategy': 'merge' | 'squash' | 'rebase'
   'ai-summary-mode': 'default' | 'enabled' | 'disabled'
   'ai-summary-context': string
+  'ai-policy-mode': 'default' | 'enabled' | 'disabled'
+  'security-scan-enforcement': 'off' | 'advisory' | 'enforced'
+  'security-scan-engine': 'checkov' | 'trivy' | 'both'
+  'security-scan-severity-threshold': 'critical' | 'high' | 'medium' | 'low'
+  'security-scan-skip-rules': string[]
   'slack-channel': string
   'drift-detection-enabled': boolean
   'drift-detection-interval-seconds': number
@@ -464,7 +470,13 @@ function WorkspaceDetailContent() {
   // can autosave on blur rather than every keystroke; mode is saved on
   // dropdown change directly.
   const [savingAiSummary, setSavingAiSummary] = useState(false)
+  const [savingSecurityScan, setSavingSecurityScan] = useState(false)
+  const [scanSkipRulesDraft, setScanSkipRulesDraft] = useState<string | null>(null)
   const [aiSummaryContextDraft, setAiSummaryContextDraft] = useState<string | null>(null)
+
+  // Runner debug mode (#1764). A held pod keeps the run's credentials, so the
+  // toggle is deliberate rather than a convenience — hence the touch confirm.
+  const [savingDebugMode, setSavingDebugMode] = useState(false)
 
   // Slack run notifications (#556). Local draft for the channel input,
   // autosaved on blur. Opt-in: empty channel = this workspace stays silent.
@@ -1204,8 +1216,12 @@ function WorkspaceDetailContent() {
     }
   }
 
-  // AI plan summary (#401)
-  async function handleAiSummaryAttrUpdate(patch: { 'ai-summary-mode'?: string; 'ai-summary-context'?: string }) {
+  // AI plan summary (#401), and the policy gate layered on it (#1766)
+  async function handleAiSummaryAttrUpdate(patch: {
+    'ai-summary-mode'?: string
+    'ai-summary-context'?: string
+    'ai-policy-mode'?: string
+  }) {
     if (!workspace) return
     setSavingAiSummary(true)
     try {
@@ -1224,6 +1240,58 @@ function WorkspaceDetailContent() {
       setError(err instanceof Error ? err.message : t('errors.updateAiSummary'))
     } finally {
       setSavingAiSummary(false)
+    }
+  }
+
+  // Security scanning (#1036). Settable here as of #1763 — it was managed
+  // through the API and the provider only, so an operator with the UI in front
+  // of them had no way to see or change it.
+  async function handleSecurityScanAttrUpdate(patch: Record<string, unknown>) {
+    if (!workspace) return
+    setSavingSecurityScan(true)
+    try {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'workspaces', attributes: patch } }),
+      })
+      if (!res.ok) {
+        throw new Error(await parseApiError(res, t('errors.updateSecurityScan')))
+      }
+      const data = await res.json()
+      setWorkspace(data.data)
+      setScanSkipRulesDraft(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.updateSecurityScan'))
+    } finally {
+      setSavingSecurityScan(false)
+    }
+  }
+
+  // Runner debug mode (#1764). Turning it ON is the direction that costs
+  // something — a failed pod then lingers holding this workspace's decrypted
+  // variables — so the touch confirm guards that direction only.
+  async function handleDebugModeUpdate(next: boolean) {
+    if (!workspace) return
+    if (next && isTouch && !window.confirm(t('debugMode.confirmEnable'))) return
+    setSavingDebugMode(true)
+    try {
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: { type: 'workspaces', attributes: { 'debug-mode': next } },
+        }),
+      })
+      if (!res.ok) {
+        throw new Error(await parseApiError(res, t('errors.updateDebugMode')))
+      }
+      const data = await res.json()
+      setWorkspace(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.updateDebugMode'))
+    } finally {
+      setSavingDebugMode(false)
     }
   }
 
@@ -1976,6 +2044,18 @@ function WorkspaceDetailContent() {
             <p className="text-sm text-slate-400 mt-1">
               {attrs['lifecycle-reason'] || t('lifecycle.archivedDefault')}
             </p>
+          </div>
+        )}
+
+        {/* Debug mode is a standing exposure, not a per-run one, so it is said
+            here rather than only on the Configuration tab (#1764). */}
+        {attrs['debug-mode'] && (
+          <div
+            data-testid="debug-mode-banner"
+            className="mb-4 p-4 rounded-lg bg-amber-900/30 border border-amber-700/50"
+          >
+            <p className="text-sm font-semibold text-amber-300">{t('debugMode.bannerTitle')}</p>
+            <p className="text-sm text-amber-200/80 mt-1">{t('debugMode.bannerBody')}</p>
           </div>
         )}
 
@@ -2867,6 +2947,48 @@ function WorkspaceDetailContent() {
                     )}
                   </dd>
                 </div>
+                {/* The policy gate layered on the same summary (#1766). Its
+                    own per-workspace override, because a workspace may want
+                    the narrative without the gate or the other way round. */}
+                <div>
+                  <dt className="text-xs text-slate-500">{t('aiSummary.policyMode')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <select
+                        // A <dt> does not label a <select>, so name it here —
+                        // otherwise the control is unreachable by label to a
+                        // screen reader and to a test.
+                        aria-label={t('aiSummary.policyMode')}
+                        data-testid="ai-policy-mode"
+                        value={attrs['ai-policy-mode'] || 'default'}
+                        onChange={(e) =>
+                          handleAiSummaryAttrUpdate({ 'ai-policy-mode': e.target.value })
+                        }
+                        disabled={savingAiSummary}
+                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="default">{t('aiSummary.modeDefault')}</option>
+                        <option value="enabled">{t('aiSummary.modeEnabled')}</option>
+                        <option value="disabled">{t('aiSummary.modeDisabled')}</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['ai-policy-mode'] === 'enabled'
+                          ? t('aiSummary.modeEnabled')
+                          : attrs['ai-policy-mode'] === 'disabled'
+                            ? t('aiSummary.modeDisabled')
+                            : t('aiSummary.modeDefault')}
+                      </span>
+                    )}
+                    {/* Says plainly what `disabled` does NOT do. A workspace
+                        admin setting it and believing they have opted out of a
+                        fleet-wide blocking control is the misunderstanding this
+                        line exists to prevent. */}
+                    <p className="mt-1 text-xs text-slate-500">
+                      {t('aiSummary.policyModeNote')}
+                    </p>
+                  </dd>
+                </div>
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-slate-500">
                     {t('aiSummary.contextLabel')}
@@ -2901,6 +3023,194 @@ function WorkspaceDetailContent() {
                     <p className="text-xs text-slate-500 mt-1">
                       {t('aiSummary.contextHint')}
                       {savingAiSummary && <span className="ms-2 text-brand-400">{t('actions.saving')}</span>}
+                    </p>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Security scanning (#1036) — exposed here by #1763 */}
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-medium text-slate-300">{t('securityScan.title')}</h3>
+                  <p className="text-xs text-slate-500 mt-1">{t('securityScan.description')}</p>
+                </div>
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-xs text-slate-500">{t('securityScan.enforcement')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <select
+                        aria-label={t('securityScan.enforcement')}
+                        value={attrs['security-scan-enforcement'] || 'advisory'}
+                        onChange={(e) =>
+                          handleSecurityScanAttrUpdate({ 'security-scan-enforcement': e.target.value })
+                        }
+                        disabled={savingSecurityScan}
+                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="off">{t('securityScan.enforcementOff')}</option>
+                        <option value="advisory">{t('securityScan.enforcementAdvisory')}</option>
+                        <option value="enforced">{t('securityScan.enforcementEnforced')}</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['security-scan-enforcement'] === 'off'
+                          ? t('securityScan.enforcementOff')
+                          : attrs['security-scan-enforcement'] === 'enforced'
+                            ? t('securityScan.enforcementEnforced')
+                            : t('securityScan.enforcementAdvisory')}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">{t('securityScan.engine')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <select
+                        aria-label={t('securityScan.engine')}
+                        value={attrs['security-scan-engine'] || 'checkov'}
+                        onChange={(e) =>
+                          handleSecurityScanAttrUpdate({ 'security-scan-engine': e.target.value })
+                        }
+                        disabled={savingSecurityScan}
+                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="checkov">{t('securityScan.engineCheckov')}</option>
+                        <option value="trivy">{t('securityScan.engineTrivy')}</option>
+                        <option value="both">{t('securityScan.engineBoth')}</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['security-scan-engine'] || 'checkov'}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">{t('securityScan.threshold')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <select
+                        aria-label={t('securityScan.threshold')}
+                        value={attrs['security-scan-severity-threshold'] || 'high'}
+                        onChange={(e) =>
+                          handleSecurityScanAttrUpdate({
+                            'security-scan-severity-threshold': e.target.value,
+                          })
+                        }
+                        disabled={savingSecurityScan}
+                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="critical">{t('securityScan.thresholdCritical')}</option>
+                        <option value="high">{t('securityScan.thresholdHigh')}</option>
+                        <option value="medium">{t('securityScan.thresholdMedium')}</option>
+                        <option value="low">{t('securityScan.thresholdLow')}</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['security-scan-severity-threshold'] || 'high'}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-slate-500">
+                    {t('securityScan.skipRules')}
+                    <span className="ms-2 text-slate-600">{t('securityScan.skipRulesSuffix')}</span>
+                  </dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <input
+                        type="text"
+                        aria-label={t('securityScan.skipRules')}
+                        value={
+                          scanSkipRulesDraft ??
+                          (attrs['security-scan-skip-rules'] || []).join(', ')
+                        }
+                        onChange={(e) => setScanSkipRulesDraft(e.target.value)}
+                        onBlur={() => {
+                          if (scanSkipRulesDraft === null) return
+                          const next = scanSkipRulesDraft
+                            .split(',')
+                            .map((r) => r.trim())
+                            .filter(Boolean)
+                          const current = attrs['security-scan-skip-rules'] || []
+                          if (next.join('\u0000') !== current.join('\u0000')) {
+                            handleSecurityScanAttrUpdate({ 'security-scan-skip-rules': next })
+                          } else {
+                            setScanSkipRulesDraft(null)
+                          }
+                        }}
+                        placeholder={t('securityScan.skipRulesPlaceholder')}
+                        disabled={savingSecurityScan}
+                        className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
+                      />
+                    ) : (attrs['security-scan-skip-rules'] || []).length > 0 ? (
+                      <p className="text-sm text-slate-200 font-mono">
+                        {(attrs['security-scan-skip-rules'] || []).join(', ')}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-slate-500 italic">{t('securityScan.noSkipRules')}</p>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      {t('securityScan.skipRulesHint')}
+                      {savingSecurityScan && (
+                        <span className="ms-2 text-brand-400">{t('actions.saving')}</span>
+                      )}
+                    </p>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Runner debug mode (#1764) */}
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-sm font-medium text-slate-300">{t('debugMode.title')}</h3>
+                  <p className="text-xs text-slate-500 mt-1">{t('debugMode.description')}</p>
+                </div>
+                {attrs['debug-mode'] && (
+                  <span
+                    data-testid="debug-mode-indicator"
+                    className="shrink-0 px-2 py-1 rounded text-xs font-medium bg-amber-900/40 text-amber-300 border border-amber-700/50"
+                  >
+                    {t('debugMode.activeBadge')}
+                  </span>
+                )}
+              </div>
+              <dl>
+                <div>
+                  <dt className="text-xs text-slate-500">{t('debugMode.label')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          aria-label={t('debugMode.label')}
+                          checked={!!attrs['debug-mode']}
+                          onChange={(e) => handleDebugModeUpdate(e.target.checked)}
+                          disabled={savingDebugMode}
+                          className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
+                        />
+                        <span className="text-sm text-slate-200">
+                          {attrs['debug-mode'] ? t('common.enabled') : t('common.disabled')}
+                        </span>
+                      </label>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['debug-mode'] ? t('common.enabled') : t('common.disabled')}
+                      </span>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      {t('debugMode.hint')}
+                      {savingDebugMode && (
+                        <span className="ms-2 text-brand-400">{t('actions.saving')}</span>
+                      )}
                     </p>
                   </dd>
                 </div>

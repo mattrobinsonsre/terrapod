@@ -94,6 +94,13 @@ SCENARIOS: dict[str, dict] = {
         "onboard_provider_version": "5.60.0",
         "onboard_types": ["aws_s3_bucket", "aws_iam_role"],
     },
+    # Debug mode (#1764). Pinned because it is the one option that changes the
+    # Job's own lifecycle fields rather than the container's env alone: the
+    # deadline has to cover the run PLUS the window, and the TTL has to take
+    # the longer of the two. A refactor that quietly dropped either would leave
+    # a credential-holding pod killed mid-inspection, or reaped before anyone
+    # reached it.
+    "debug-linger": {"phase": "plan", "debug_linger_seconds": 900},
 }
 
 #: Values held fixed so a diff can only come from the scenario or the code.

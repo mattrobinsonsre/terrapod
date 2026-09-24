@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Notificashun templatez (createded on each new workspace)",
       "saving": "Savin...",
       "previewTitle": "Walk teh repo an preview which workspaces dis rule WUD create — no persistence",
-      "parallelism": "Parallelizm"
+      "parallelism": "Parallelizm",
+      "governance": "Sekurity Scannin an AI Summry",
+      "governanceHint": "Applyd 2 evry werkspace dis rule makez.",
+      "scanEnforcement": "Enforsmint",
+      "scanOff": "Do nawt scan",
+      "scanAdvisory": "Scan an report onlee",
+      "scanEnforced": "Blok apply on findins",
+      "scanEngine": "Scannr",
+      "scanEngineBoth": "Checkov an Trivy",
+      "scanThreshold": "Report findins at or ovr",
+      "severityCritical": "kritikal",
+      "severityHigh": "hai",
+      "severityMedium": "medium",
+      "severityLow": "lo",
+      "aiSummaryMode": "AI Plan Summry",
+      "aiSummaryDefault": "Follo deployment defawlt",
+      "aiSummaryEnabled": "Alwayz summarize",
+      "aiSummaryDisabled": "Nevr summarize",
+      "execution": "Eksekushun, VCS an Drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt vershun",
+      "noExpiry": "No expiry. srsly.",
+      "addDriftIgnoreRule": "Add rule",
+      "debugModeHint": "Hold faild runnr podz open on da werkspaces dis rule makez. Off by defalt — a held pod keepz dat werkspace credenshulz."
     },
     "table": {
       "name": "Naym",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "A mandatoree run task faild — overryd it or discard teh run",
       "runTasksRunning": "Waitin fer post-plan run taskz",
       "heldByPolicy": "A mandatoree polisee set faild — overryd it or discard teh run",
-      "heldBySecurityScan": "Teh sekurity scan findz blockin problemz — overryd it or discard teh run"
+      "heldBySecurityScan": "Teh sekurity scan findz blockin problemz — overryd it or discard teh run",
+      "heldByAiPolicy": "Teh AI polisy gate sez no to dis run — overryd it or discard teh run",
+      "awaitingAiPolicy": "Waitin for teh AI polisy verdikt"
     },
     "badge": {
       "destroy": "destroy",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "Da scan no finishd, so dis run no getz checkd. sad.",
       "blockedErroredMessage": "Dis run iz blockd cuz da sekurity scan no finishd. Fix wat brokd it an plan agin, or ask a admin to sez okai."
     },
+    "aiPolicyPanel": {
+      "heading": "AI Polisy Gate",
+      "enforcementLabel": "enforcementz: {level}",
+      "thresholdLabel": "risk threshold: {threshold}",
+      "awaitingVerdict": "Waitin for teh AI polisy verdikt. Dis run getz held til it arrivez.",
+      "decisionAllow": "allowd",
+      "decisionDeny": "denyd",
+      "risk": {
+        "critical": "kritikal",
+        "high": "hai",
+        "medium": "medium",
+        "low": "lo"
+      },
+      "blockedDeniedMessage": "Dis run iz <strong>blockd by {count, plural, one {# polisy kriterion} other {# polisy kriteria}}</strong>. oh noes.",
+      "blockedRiskMessage": "Dis run iz <strong>blockd</strong> cuz itz risk levl ({level}) iz at or ovr da threshold ({threshold}).",
+      "blockedErroredMessage": "Dis run iz blockd cuz no AI polisy verdikt could be reachd. Da gate failz closd, so a verdikt u cant reach iz not a yes.",
+      "erroredMessage": "Da AI polisy gate no givd a usabl verdikt, so dis run no getz ruld on. sad.",
+      "passed": "No polisy kriteria matchd. yay.",
+      "overriding": "Overridin...",
+      "overrideContinue": "Override & Continyoo",
+      "overrideConfirm": "Overryd teh AI polisy gate an let dis run apply anywayz despite da verdikt?",
+      "overrideFailed": "Override failed",
+      "overrideFailedStatus": "Override failed ({status})",
+      "overriddenBy": "overridd by {by}"
+    },
     "architecture": {
       "loadError": "Cudnt lode teh architeksher criteek.",
       "notEnabled": "Teh AI architeksher critik iz not turnd on on dis deploymint.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Follo deployment defawlt",
       "modeEnabled": "Alwayz summarize",
       "modeDisabled": "Nevr summarize",
+      "policyMode": "Polisy gate",
+      "policyModeNote": "A mandatry gate ignorez “Nevr”: it can only opt dis workspase out of an advisry verdikt. srsly.",
       "contextLabel": "Workspace contekst",
       "contextLabelSuffix": "(opshunal, additiv)",
       "contextPlaceholder": "Factz teh AI shud knoe about dis workspace speshully. e.g. 'Frontz teh vault fer service X — destroyin teh KMS key causez a globul outage.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Failz ta rollbak teh state version",
       "stateActionFailed": "State acshun failz",
       "uploadState": "Failz ta uplod teh state",
-      "uploadStateFile": "Failz ta uplod teh state file"
+      "uploadStateFile": "Failz ta uplod teh state file",
+      "updateSecurityScan": "Faild 2 updayt sekurity scannin",
+      "updateDebugMode": "Failz ta updat teh debug mode"
     },
     "subtabs": {
       "state": "Stayt",
@@ -2880,6 +2934,38 @@
         "global": "Globul",
         "rule": "Matchd by rool"
       }
+    },
+    "securityScan": {
+      "title": "Sekurity Scannin",
+      "description": "Scan da plan fer unsafe infrastruktur b4 it getz applyd.",
+      "enforcement": "Enforsmint",
+      "enforcementOff": "Do nawt scan",
+      "enforcementAdvisory": "Scan an report onlee",
+      "enforcementEnforced": "Blok apply on findins",
+      "engine": "Scannr",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov an Trivy",
+      "threshold": "Report findins at or ovr",
+      "thresholdCritical": "kritikal",
+      "thresholdHigh": "hai",
+      "thresholdMedium": "medium",
+      "thresholdLow": "lo",
+      "skipRules": "Ignord rulez",
+      "skipRulesSuffix": "(optshunal)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "No rulez ignord. yay.",
+      "skipRulesHint": "Comma-separayted scannr rule idz 2 ignor on dis werkspace."
+    },
+    "debugMode": {
+      "title": "Runnr Debuggin Mode",
+      "description": "Hold a faild runz pod open so u can get insyde it. Da run getz reportd as faild furst; only den duz da contaynr stay up.",
+      "label": "Debug Mode",
+      "hint": "Off by defalt. Wen its on, a faild runnr pod stayz exec-abul fer da windo yer operatr set, an it keepz dis werkspace credenshulz an dekrypted variablez dat hole tyme.",
+      "activeBadge": "Aktiv",
+      "bannerTitle": "Debug mode iz ON fer dis werkspace",
+      "bannerBody": "A faild runz pod getz held open fer snoopin insted ov exitin, an it keepz dis werkspace credenshulz an dekrypted variablez wile its held. Turn debug mode off wen u iz dun troubleshootin.",
+      "confirmEnable": "Turn on debug mode? A faild runz pod will b held open wif dis werkspace credenshulz an dekrypted variablez til da windo runz out or u delet da pod."
     }
   },
   "graphs": {

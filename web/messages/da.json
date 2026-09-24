@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Notifikationsskabeloner (oprettes på hvert nyt arbejdsområde)",
       "saving": "Gemmer...",
       "previewTitle": "Gennemgå repoet og forhåndsvis, hvilke arbejdsområder denne regel VILLE oprette — ingen persistens",
-      "parallelism": "Parallelitet"
+      "parallelism": "Parallelitet",
+      "governance": "Sikkerhedsscanning og AI-opsummering",
+      "governanceHint": "Anvendes på hvert arbejdsområde, som denne regel opretter.",
+      "scanEnforcement": "Håndhævelse",
+      "scanOff": "Scan ikke",
+      "scanAdvisory": "Scan og rapportér kun",
+      "scanEnforced": "Blokér anvendelse ved fund",
+      "scanEngine": "Scanner",
+      "scanEngineBoth": "Checkov og Trivy",
+      "scanThreshold": "Rapportér fund fra og med",
+      "severityCritical": "kritisk",
+      "severityHigh": "høj",
+      "severityMedium": "mellem",
+      "severityLow": "lav",
+      "aiSummaryMode": "AI-planoversigt",
+      "aiSummaryDefault": "Følg deployment-standard",
+      "aiSummaryEnabled": "Opsummer altid",
+      "aiSummaryDisabled": "Opsummer aldrig",
+      "execution": "Kørsel, VCS og drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-version",
+      "noExpiry": "Ingen udløb",
+      "addDriftIgnoreRule": "Tilføj regel",
+      "debugModeHint": "Hold mislykkede runner-pods åbne på de arbejdsområder, denne regel opretter. Slået fra som standard – en tilbageholdt pod beholder det arbejdsområdes legitimationsoplysninger."
     },
     "table": {
       "name": "Navn",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "En obligatorisk kørselsopgave mislykkedes — tilsidesæt den eller kassér kørslen",
       "runTasksRunning": "Venter på kørselsopgaver efter planen",
       "heldByPolicy": "Et obligatorisk politiksæt mislykkedes — tilsidesæt det eller kassér kørslen",
-      "heldBySecurityScan": "Sikkerhedsscanningen fandt blokerende fund — tilsidesæt den eller kassér kørslen"
+      "heldBySecurityScan": "Sikkerhedsscanningen fandt blokerende fund — tilsidesæt den eller kassér kørslen",
+      "heldByAiPolicy": "AI-politikporten afviste denne kørsel — tilsidesæt den eller kassér kørslen",
+      "awaitingAiPolicy": "Venter på AI-politikkens kendelse"
     },
     "badge": {
       "destroy": "nedriv",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "Scanningen blev ikke fuldført, så denne kørsel er ikke kontrolleret.",
       "blockedErroredMessage": "Denne kørsel er blokeret, fordi sikkerhedsscanningen ikke blev fuldført. Ret årsagen og planlæg igen, eller bed en administrator om at tilsidesætte."
     },
+    "aiPolicyPanel": {
+      "heading": "AI-politikport",
+      "enforcementLabel": "håndhævelse: {level}",
+      "thresholdLabel": "risikotærskel: {threshold}",
+      "awaitingVerdict": "Venter på AI-politikkens kendelse. Denne kørsel holdes tilbage, indtil den ankommer.",
+      "decisionAllow": "tilladt",
+      "decisionDeny": "afvist",
+      "risk": {
+        "critical": "kritisk",
+        "high": "høj",
+        "medium": "mellem",
+        "low": "lav"
+      },
+      "blockedDeniedMessage": "Denne kørsel er <strong>blokeret af {count, plural, one {# politikkriterium} other {# politikkriterier}}</strong>.",
+      "blockedRiskMessage": "Denne kørsel er <strong>blokeret</strong>, fordi dens risikoniveau ({level}) er på eller over tærsklen ({threshold}).",
+      "blockedErroredMessage": "Denne kørsel er blokeret, fordi der ikke kunne nås en AI-politikkendelse. Porten fejler lukket, så en kendelse, der ikke kunne nås, er ikke et samtykke.",
+      "erroredMessage": "AI-politikporten returnerede ingen brugbar kendelse, så denne kørsel er ikke bedømt.",
+      "passed": "Ingen politikkriterier matchede.",
+      "overriding": "Tilsidesætter...",
+      "overrideContinue": "Tilsidesæt og fortsæt",
+      "overrideConfirm": "Tilsidesæt AI-politikporten og lad denne kørsel blive anvendt på trods af kendelsen?",
+      "overrideFailed": "Tilsidesættelse mislykkedes",
+      "overrideFailedStatus": "Tilsidesættelse mislykkedes ({status})",
+      "overriddenBy": "tilsidesat af {by}"
+    },
     "architecture": {
       "loadError": "Arkitekturkritikken kunne ikke indlæses.",
       "notEnabled": "AI-arkitekturkritikeren er ikke aktiveret i denne installation.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Følg deployment-standard",
       "modeEnabled": "Opsummer altid",
       "modeDisabled": "Opsummer aldrig",
+      "policyMode": "Politikport",
+      "policyModeNote": "En obligatorisk port ignorerer “Aldrig”: den kan kun fritage dette arbejdsområde fra en vejledende kendelse.",
       "contextLabel": "Arbejdsområdekontekst",
       "contextLabelSuffix": "(valgfri, additiv)",
       "contextPlaceholder": "Fakta, som AI'en bør kende specifikt om dette arbejdsområde. F.eks. 'Fronter vaulten for tjeneste X — nedrivning af KMS-nøglen forårsager et globalt nedbrud.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Kunne ikke rulle tilstandsversion tilbage",
       "stateActionFailed": "Tilstandshandling mislykkedes",
       "uploadState": "Kunne ikke uploade tilstand",
-      "uploadStateFile": "Kunne ikke uploade tilstandsfil"
+      "uploadStateFile": "Kunne ikke uploade tilstandsfil",
+      "updateSecurityScan": "Sikkerhedsscanningen kunne ikke opdateres",
+      "updateDebugMode": "Fejlfindingstilstanden kunne ikke opdateres"
     },
     "subtabs": {
       "state": "Tilstand",
@@ -2880,6 +2934,38 @@
         "global": "Global",
         "rule": "Matchet af regel"
       }
+    },
+    "securityScan": {
+      "title": "Sikkerhedsscanning",
+      "description": "Scan planen for usikker infrastruktur, før den anvendes.",
+      "enforcement": "Håndhævelse",
+      "enforcementOff": "Scan ikke",
+      "enforcementAdvisory": "Scan og rapportér kun",
+      "enforcementEnforced": "Blokér anvendelse ved fund",
+      "engine": "Scanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov og Trivy",
+      "threshold": "Rapportér fund fra og med",
+      "thresholdCritical": "kritisk",
+      "thresholdHigh": "høj",
+      "thresholdMedium": "mellem",
+      "thresholdLow": "lav",
+      "skipRules": "Ignorerede regler",
+      "skipRulesSuffix": "(valgfrit)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Ingen regler ignoreres.",
+      "skipRulesHint": "Kommaseparerede regel-id'er for scanneren, der ignoreres i dette arbejdsområde."
+    },
+    "debugMode": {
+      "title": "Fejlfindingstilstand for runneren",
+      "description": "Hold en mislykket kørsels pod åben, så du kan komme ind i den. Kørslen rapporteres først som mislykket; først derefter bliver containeren stående.",
+      "label": "Fejlfindingstilstand",
+      "hint": "Slået fra som standard. Når den er slået til, forbliver en mislykket runners pod tilgængelig med exec i det vindue, din operatør har konfigureret, og den beholder hele den tid dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler.",
+      "activeBadge": "Aktiv",
+      "bannerTitle": "Fejlfindingstilstand er slået til for dette arbejdsområde",
+      "bannerBody": "En mislykket kørsels pod holdes åben til inspektion i stedet for at afslutte, og den beholder dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler, så længe den holdes. Slå fejlfindingstilstanden fra, når du er færdig med at fejlsøge.",
+      "confirmEnable": "Slå fejlfindingstilstand til? En mislykket kørsels pod holdes åben med dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler, indtil vinduet udløber, eller du sletter podden."
     }
   },
   "graphs": {

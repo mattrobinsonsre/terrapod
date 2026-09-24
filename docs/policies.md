@@ -14,7 +14,7 @@ open source and is the supported engine.
 
 | Concept | Description |
 |---|---|
-| **Policy set** | A named, admin-managed collection of policies with a single enforcement level and a workspace scope. |
+| **Policy set** | A named collection of policies with a single enforcement level and a workspace scope. Managed by platform admins, in the UI, the API, or as code with `terrapod_policy_set`. |
 | **Policy** | One Rego document inside a set. Must declare `package terrapod`. |
 | **Enforcement level** | `advisory` (record a warning, never block) or `mandatory` (block the apply on failure). Set per policy set. |
 | **Scope** | Which workspaces a set applies to — either `global` (every workspace) or label-based allow/deny rules. |
@@ -38,12 +38,17 @@ that key is among the rule's accepted values. This is the same model
 roles use, so "policy set for production" is just a set scoped to
 `env: prod`.
 
-**Policy sets are not evaluated for Pulumi runs yet.** OPA evaluates the
-Terraform plan JSON, and a Pulumi run produces none until OPA over preview JSON
-lands (#1560). A Pulumi workspace is outside every policy set's scope, even a
-global mandatory one, so its applies are never held waiting for an evaluation
-that cannot happen. The run's `GET /api/v1/runs/{run_id}/policy-evaluations`
-says so in `meta.not-evaluated-reason`.
+**Policy sets are evaluated for Pulumi runs too**, against a different input —
+see [What a policy can read](#what-a-policy-can-read). A set scoped to a Pulumi
+workspace is enforced exactly as it is on a Terraform one: the runner evaluates
+applicable sets before reporting the preview, and a mandatory failure holds the
+run. The two inputs are not interchangeable, so a rule written against
+Terraform's plan JSON will not match a Pulumi resource, and vice versa.
+
+**Security scanning is still not available for Pulumi runs.** Checkov and Trivy
+read Terraform plan JSON. A Pulumi workspace cannot have an enforced scan
+turned on, so its applies are never held waiting for a result that cannot
+arrive; the run's scan endpoint says why in `meta.not-evaluated-reason`.
 
 ## Writing a policy
 
@@ -71,10 +76,94 @@ A policy set **passes** when every policy's `deny` set is empty.
 
 ### What a policy can read
 
+`data.terrapod_context` is the same whatever the engine. `input` is **the
+engine's own account of the change**, so it differs between them.
+
 | Reference | Contents |
 |---|---|
-| `input` | The raw `terraform show -json` plan document — `input.resource_changes`, `input.planned_values`, etc. Existing community Terraform Rego works unchanged. |
+| `input` (Terraform) | The raw `terraform show -json` plan document — `input.resource_changes`, `input.planned_values`, etc. Existing community Terraform Rego works unchanged. |
+| `input` (Pulumi) | A document built from the preview's engine event log — see below. |
 | `data.terrapod_context` | Terrapod metadata: `workspace` (`id`, `name`, `labels`) and `run` (`id`, `message`, `source`, `is_destroy`, `plan_only`). |
+
+#### The Pulumi input
+
+`pulumi preview` has no equivalent of `terraform show -json`, so Terrapod builds
+one from the engine event log the preview writes:
+
+Note the counts and the array: nine resources are unchanged and do not appear,
+because `resource_changes` carries only what the preview will touch.
+
+```json
+{
+  "engine": "pulumi",
+  "change_summary": {"create": 1, "same": 9},
+  "has_changes": true,
+  "resource_changes": [
+    {
+      "op": "create",
+      "urn": "urn:pulumi:dev::shop::aws:s3/bucket:Bucket::assets",
+      "type": "aws:s3/bucket:Bucket",
+      "name": "assets",
+      "parent": "urn:pulumi:dev::shop::pulumi:pulumi:Stack::shop-dev",
+      "provider": "urn:pulumi:dev::shop::pulumi:providers:aws::default::uuid",
+      "custom": true,
+      "protect": false,
+      "inputs": {"acl": "public-read"},
+      "diffs": ["acl"],
+      "detailed_diff": {"acl": {"kind": "update"}}
+    }
+  ]
+}
+```
+
+`resource_changes` deliberately echoes Terraform's key, so the shape of a rule
+carries across even though the contents do not:
+
+```rego
+package terrapod
+
+# No public buckets, whichever engine declares them.
+deny contains msg if {
+    some rc in input.resource_changes
+    rc.type == "aws:s3/bucket:Bucket"
+    rc.inputs.acl == "public-read"
+    msg := sprintf("%s is public-read", [rc.name])
+}
+```
+
+Four things to know before writing one:
+
+- **Only changing resources appear.** `resource_changes` means changes, as it
+  does on Terraform: a resource the preview reports as `same` is not carried,
+  so the rule above cannot deny a bucket that is not being touched. There is no
+  Pulumi equivalent of Terraform's `planned_values`, so a policy cannot inspect
+  the unchanged remainder of a stack — `change_summary.same` counts it, and
+  that is all. Guarding on `rc.op` is still good practice when a rule should
+  only fire for, say, a `create`.
+- **`inputs` is what the program declared**, the analogue of Terraform's
+  `change.after`. The resource's `outputs` are not carried: they are the
+  provider's complete returned state, which adds little to a decision and a
+  great deal to the document. **On a `delete` there is no new state**, so the
+  entry describes the resource as it exists today — which is what a rule like
+  "do not delete a protected resource" needs, and why `protect` is meaningful
+  on a deletion rather than always `false`.
+- **A marked secret is invisible to policy, and this is not parity with
+  Terraform.** The engine replaces any property marked secret with the literal
+  string `"[secret]"` before writing the log, so
+  `deny if rc.inputs.encrypted == false` silently stops firing the moment a
+  program author wraps that value in `pulumi.secret()` — the property becomes a
+  truthy string. Terraform's plan JSON carries sensitive values in the clear and
+  flags them in `after_sensitive`, so the equivalent Terraform rule still works.
+  **A mandatory Pulumi gate can therefore be evaded from inside the program it
+  governs.** Write rules against properties a program has no reason to mark
+  secret, and treat `"[secret]"` as a value worth denying on where it matters.
+- **A preview that did not finish is not evaluated.** Without the engine's
+  summary event there is no honest account of the change, so no policy runs
+  rather than one deciding on a partial list.
+
+Separately, a value that is sensitive but was never marked secret arrives in
+the clear — the same gap Terraform's plan JSON has. Do not treat this input as
+scrubbed.
 
 ```rego
 package terrapod
@@ -144,13 +233,62 @@ deployment reports runs in the Terraform Enterprise vocabulary — see
 ## Managing policy sets
 
 Policy sets are managed by platform admins under **Policy Sets** in the
-admin area, or via the API (see
-[api-reference.md](api-reference.md#policy-sets)):
+admin area, via the API (see
+[api-reference.md](api-reference.md#policy-sets)), or **as code** with the
+Terraform provider:
 
 - Create a set, choosing its enforcement level and scope.
 - Add policies — the Rego is validated on save.
 - Edit scoping (global, or allow/deny labels and names).
 - Disable a set to stop it being evaluated without deleting it.
+
+### As code
+
+A policy set can block applies across the whole estate, so it is worth
+managing the same way as the infrastructure it governs — reviewed in a pull
+request rather than changed in a form.
+
+```hcl
+resource "terrapod_policy_set" "baseline" {
+  name              = "baseline"
+  description       = "Controls every production workspace must satisfy"
+  enforcement_level = "mandatory"
+
+  # Each key binds a LIST of accepted values: "env is prod OR stg".
+  allow_labels = {
+    env = ["prod", "stg"]
+  }
+  # Deny always wins, including over global_scope.
+  deny_labels = {
+    exempt = ["true"]
+  }
+}
+
+resource "terrapod_policy" "no_public_buckets" {
+  policy_set_id = terrapod_policy_set.baseline.id
+  name          = "no-public-buckets"
+  rego          = file("${path.module}/policies/no_public_buckets.rego")
+}
+```
+
+Two things worth knowing before you write one:
+
+- **A VCS-backed set manages its own policies.** Set `source = "vcs"` with a
+  `vcs_connection_id` and `vcs_repo_url`, and the policies come from the
+  repository; a `terrapod_policy` against such a set is refused with a 409.
+  Use one or the other, not both.
+- **Importing a policy takes `<policy-set-id>/<policy-id>`.** A policy is read
+  through its set, because the API has no endpoint for one on its own:
+
+  ```console
+  $ terraform import terrapod_policy.no_public_buckets polset-abc123/pol-def456
+  ```
+
+An agent can read the sets too — `terrapod_policy_set_list` over MCP lists
+each set with its enforcement level and scope, which is what answers "why was
+this run blocked" and "what governs this workspace". It is read-only:
+changing a gate that can hold every apply in the estate goes through a plan a
+person reads.
 
 Deleting a policy set removes its policies but **keeps** the historical
 `policy_evaluation` records of past runs (their set reference is nulled,

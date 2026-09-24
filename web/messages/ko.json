@@ -1053,7 +1053,30 @@
       "notificationTemplates": "알림 템플릿 (각 새 워크스페이스에 생성됨)",
       "saving": "저장 중...",
       "previewTitle": "저장소를 탐색하여 이 규칙이 생성할 워크스페이스를 미리 봅니다 — 저장하지 않음",
-      "parallelism": "병렬 처리 수"
+      "parallelism": "병렬 처리 수",
+      "governance": "보안 검사 및 AI 요약",
+      "governanceHint": "이 규칙이 생성하는 모든 워크스페이스에 적용됩니다.",
+      "scanEnforcement": "적용 방식",
+      "scanOff": "검사하지 않음",
+      "scanAdvisory": "검사 후 보고만 수행",
+      "scanEnforced": "발견 시 적용 차단",
+      "scanEngine": "검사 도구",
+      "scanEngineBoth": "Checkov 및 Trivy",
+      "scanThreshold": "보고할 최소 심각도",
+      "severityCritical": "치명적",
+      "severityHigh": "높음",
+      "severityMedium": "중간",
+      "severityLow": "낮음",
+      "aiSummaryMode": "AI 계획 요약",
+      "aiSummaryDefault": "배포 기본값 따르기",
+      "aiSummaryEnabled": "항상 요약",
+      "aiSummaryDisabled": "요약하지 않음",
+      "execution": "실행, VCS 및 드리프트",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt 버전",
+      "noExpiry": "만료 없음",
+      "addDriftIgnoreRule": "규칙 추가",
+      "debugModeHint": "이 규칙이 만드는 워크스페이스에서 실패한 러너 파드를 유지합니다. 기본값은 꺼짐 — 유지된 파드는 해당 워크스페이스의 자격 증명을 보관합니다."
     },
     "table": {
       "name": "이름",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "필수 실행 작업이 실패했습니다 — 재정의하거나 실행을 폐기하세요",
       "runTasksRunning": "계획 후 실행 작업을 기다리는 중",
       "heldByPolicy": "필수 정책 집합이 실패했습니다 — 재정의하거나 실행을 폐기하세요",
-      "heldBySecurityScan": "보안 스캔에서 차단 발견이 나왔습니다 — 재정의하거나 실행을 폐기하세요"
+      "heldBySecurityScan": "보안 스캔에서 차단 발견이 나왔습니다 — 재정의하거나 실행을 폐기하세요",
+      "heldByAiPolicy": "AI 정책 게이트가 이 실행을 거부했습니다 — 재정의하거나 실행을 폐기하세요",
+      "awaitingAiPolicy": "AI 정책 판정을 기다리는 중"
     },
     "badge": {
       "destroy": "삭제",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "스캔이 완료되지 않아 이 실행은 검사되지 않았습니다.",
       "blockedErroredMessage": "보안 스캔이 완료되지 않아 이 실행이 차단되었습니다. 원인을 해결하고 다시 계획하거나 관리자에게 재정의를 요청하세요."
     },
+    "aiPolicyPanel": {
+      "heading": "AI 정책 게이트",
+      "enforcementLabel": "적용: {level}",
+      "thresholdLabel": "위험 임계값: {threshold}",
+      "awaitingVerdict": "AI 정책 판정을 기다리는 중입니다. 판정이 도착할 때까지 이 실행은 보류됩니다.",
+      "decisionAllow": "허용됨",
+      "decisionDeny": "거부됨",
+      "risk": {
+        "critical": "치명적",
+        "high": "높음",
+        "medium": "중간",
+        "low": "낮음"
+      },
+      "blockedDeniedMessage": "이 실행은 <strong>{count, plural, other {정책 기준 #개}}에 의해 차단되었습니다</strong>.",
+      "blockedRiskMessage": "이 실행은 위험 수준({level})이 임계값({threshold}) 이상이므로 <strong>차단되었습니다</strong>.",
+      "blockedErroredMessage": "AI 정책 판정에 도달하지 못해 이 실행이 차단되었습니다. 게이트는 닫힘으로 실패하므로, 도달하지 못한 판정은 승인이 아닙니다.",
+      "erroredMessage": "AI 정책 게이트가 사용 가능한 판정을 반환하지 않아 이 실행은 판정되지 않았습니다.",
+      "passed": "일치하는 정책 기준이 없습니다.",
+      "overriding": "재정의 중...",
+      "overrideContinue": "재정의 및 계속",
+      "overrideConfirm": "AI 정책 게이트를 재정의하고 판정과 관계없이 이 실행의 적용을 허용하시겠습니까?",
+      "overrideFailed": "재정의에 실패했습니다",
+      "overrideFailedStatus": "재정의 실패 ({status})",
+      "overriddenBy": "{by}에 의해 재정의됨"
+    },
     "architecture": {
       "loadError": "아키텍처 평가를 불러오지 못했습니다.",
       "notEnabled": "이 배포에서는 AI 아키텍처 평가가 활성화되어 있지 않습니다.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "배포 기본값 따르기",
       "modeEnabled": "항상 요약",
       "modeDisabled": "요약하지 않음",
+      "policyMode": "정책 게이트",
+      "policyModeNote": "필수 게이트는 “안 함”을 무시합니다. 권고 판정에서만 이 워크스페이스를 제외할 수 있습니다.",
       "contextLabel": "워크스페이스 컨텍스트",
       "contextLabelSuffix": "(선택 사항, 추가적)",
       "contextPlaceholder": "AI가 이 워크스페이스에 대해 구체적으로 알아야 할 사실. 예: '서비스 X의 vault를 담당함 — KMS 키를 삭제하면 전역 장애가 발생함.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "상태 버전을 롤백하지 못했습니다",
       "stateActionFailed": "상태 작업에 실패했습니다",
       "uploadState": "상태를 업로드하지 못했습니다",
-      "uploadStateFile": "상태 파일을 업로드하지 못했습니다"
+      "uploadStateFile": "상태 파일을 업로드하지 못했습니다",
+      "updateSecurityScan": "보안 검사 업데이트에 실패했습니다",
+      "updateDebugMode": "디버그 모드를 업데이트하지 못했습니다"
     },
     "subtabs": {
       "state": "상태",
@@ -2880,6 +2934,38 @@
         "global": "전역",
         "rule": "규칙으로 일치"
       }
+    },
+    "securityScan": {
+      "title": "보안 검사",
+      "description": "적용하기 전에 플랜에서 안전하지 않은 인프라를 검사합니다.",
+      "enforcement": "적용 방식",
+      "enforcementOff": "검사하지 않음",
+      "enforcementAdvisory": "검사 후 보고만 수행",
+      "enforcementEnforced": "발견 시 적용 차단",
+      "engine": "검사 도구",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov 및 Trivy",
+      "threshold": "보고할 최소 심각도",
+      "thresholdCritical": "치명적",
+      "thresholdHigh": "높음",
+      "thresholdMedium": "중간",
+      "thresholdLow": "낮음",
+      "skipRules": "무시할 규칙",
+      "skipRulesSuffix": "(선택 사항)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "무시하는 규칙이 없습니다.",
+      "skipRulesHint": "이 워크스페이스에서 무시할 검사 도구의 규칙 ID를 쉼표로 구분하여 입력합니다."
+    },
+    "debugMode": {
+      "title": "러너 디버그 모드",
+      "description": "실패한 실행의 파드를 열어 둔 채 유지해 안으로 들어가 볼 수 있게 합니다. 실행 실패는 먼저 보고되고, 그다음에야 컨테이너가 남습니다.",
+      "label": "디버그 모드",
+      "hint": "기본값은 꺼짐입니다. 켜져 있는 동안 실패한 러너의 파드는 운영자가 설정한 시간 동안 exec으로 접근할 수 있는 상태로 남으며, 그 시간 내내 이 워크스페이스의 자격 증명과 복호화된 변수를 보관합니다.",
+      "activeBadge": "활성",
+      "bannerTitle": "이 워크스페이스에 디버그 모드가 켜져 있습니다",
+      "bannerBody": "실패한 실행의 파드는 종료되지 않고 점검을 위해 유지되며, 유지되는 동안 이 워크스페이스의 자격 증명과 복호화된 변수를 보관합니다. 문제 해결이 끝나면 디버그 모드를 끄세요.",
+      "confirmEnable": "디버그 모드를 켤까요? 실패한 실행의 파드는 시간이 만료되거나 파드를 삭제할 때까지 이 워크스페이스의 자격 증명과 복호화된 변수를 지닌 채 유지됩니다."
     }
   },
   "graphs": {

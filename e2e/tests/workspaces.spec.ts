@@ -368,3 +368,185 @@ test.describe('Workspace access tab (#1456)', () => {
     await expect(panel.getByText(/platform admins/i)).toBeVisible({ timeout: 15_000 });
   });
 });
+
+test.describe('Workspace security scanning settings (#1763)', () => {
+  test('an operator can see and change enforcement from the UI', async ({ page }) => {
+    // Before #1763 these were managed through the API and the Terraform
+    // provider only, so an operator with the UI in front of them could not
+    // see what the workspace was set to, let alone change it.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('scanui'));
+
+    await page.goto(`/workspaces/${wsId}`);
+
+    const enforcement = page.getByLabel('Enforcement', { exact: true });
+    await expect(enforcement).toBeVisible({ timeout: 15_000 });
+    // The workspace default, shown rather than assumed.
+    await expect(enforcement).toHaveValue('advisory');
+
+    await enforcement.selectOption('enforced');
+
+    // The change round-trips through the API, so it survives a reload —
+    // a select that only moved in the browser would pass a naive assertion.
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByLabel('Enforcement', { exact: true })).toHaveValue('enforced');
+    }).toPass({ timeout: 20_000 });
+
+    const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status()).toBe(200);
+    expect((await res.json()).data.attributes['security-scan-enforcement']).toBe('enforced');
+  });
+
+  test('ignored rules round-trip as a list', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('scanskip'));
+
+    await page.goto(`/workspaces/${wsId}`);
+    const skip = page.getByLabel('Ignored rules');
+    await expect(skip).toBeVisible({ timeout: 15_000 });
+
+    await skip.fill('CKV_AWS_24, CKV2_AWS_5');
+    await skip.blur();
+
+    await expect(async () => {
+      const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect((await res.json()).data.attributes['security-scan-skip-rules']).toEqual([
+        'CKV_AWS_24',
+        'CKV2_AWS_5',
+      ]);
+    }).toPass({ timeout: 20_000 });
+  });
+});
+
+test.describe('Workspace runner debug mode (#1764)', () => {
+  test('the toggle round-trips and the banner says it is on', async ({ page }) => {
+    // The indicator is the half that is easy to drop: a setting that only
+    // shows on the tab that sets it leaves an operator on any other tab
+    // unaware that failed pods are being held with this workspace's
+    // credentials in them.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('debugui'));
+
+    await page.goto(`/workspaces/${wsId}`);
+
+    const toggle = page.getByLabel('Debug mode', { exact: true });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+    await expect(toggle).not.toBeChecked();
+    // Off means no banner, not a banner saying "off".
+    await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0);
+
+    // `.click()`, never `.check()`: the toggle is a controlled input whose
+    // checked state comes from the fetched workspace, so it only flips once the
+    // PATCH resolves. `.check()` asserts the state changed synchronously and
+    // throws "Clicking the checkbox did not change its state". The
+    // `toBeChecked()` below is the wait.
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
+
+    await expect(page.getByTestId('debug-mode-banner')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('debug-mode-indicator')).toBeVisible();
+
+    // Survives a reload, so this is the stored value and not browser state.
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByLabel('Debug mode', { exact: true })).toBeChecked();
+      await expect(page.getByTestId('debug-mode-banner')).toBeVisible();
+    }).toPass({ timeout: 20_000 });
+
+    const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status()).toBe(200);
+    expect((await res.json()).data.attributes['debug-mode']).toBe(true);
+  });
+
+  test('turning it back off clears the banner', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('debugoff'));
+
+    await page.goto(`/workspaces/${wsId}`);
+    const toggle = page.getByLabel('Debug mode', { exact: true });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
+    await expect(page.getByTestId('debug-mode-banner')).toBeVisible({ timeout: 15_000 });
+
+    await toggle.click();
+    await expect(toggle).not.toBeChecked({ timeout: 15_000 });
+    await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0);
+
+    await expect(async () => {
+      const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect((await res.json()).data.attributes['debug-mode']).toBe(false);
+    }).toPass({ timeout: 20_000 });
+  });
+});
+
+test.describe('AI policy gate (#1766)', () => {
+  // The E2E stack runs with `ai_summary.enabled = false`, so the gate is off
+  // and there is no verdict to assert on — the positive paths need a real
+  // model and belong to the live Tilt smoke. What IS load-bearing here, and
+  // what a mocked test could not show, is the surface parity #1763 exists to
+  // enforce: the per-workspace override reaching the GUI, and the gate-off
+  // path staying quiet instead of rendering an empty panel on every run.
+  test('the per-workspace override round-trips through the GUI', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('aipolui'));
+
+    await page.goto(`/workspaces/${wsId}`);
+
+    const select = page.getByTestId('ai-policy-mode');
+    await expect(select).toBeVisible({ timeout: 15_000 });
+    await expect(select).toHaveValue('default');
+
+    await select.selectOption('disabled');
+    // The value comes from the fetched workspace, so it settles only once the
+    // PATCH resolves — this assertion is the wait, not a redundant check.
+    await expect(select).toHaveValue('disabled', { timeout: 15_000 });
+
+    // Survives a reload, so this is the stored value and not browser state.
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByTestId('ai-policy-mode')).toHaveValue('disabled');
+    }).toPass({ timeout: 20_000 });
+
+    const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status()).toBe(200);
+    expect((await res.json()).data.attributes['ai-policy-mode']).toBe('disabled');
+  });
+
+  test('the gate being off is reported, not a 500', async ({ page }) => {
+    // A run that does not exist must 404. The endpoint is the one an operator
+    // (and the MCP tool) reads to find out WHY a run is held, so it failing
+    // loudly is worse than the gate being off.
+    const token = getStoredToken();
+    const res = await page.request.get(
+      '/api/terrapod/v1/runs/run-00000000-0000-0000-0000-000000000000/ai-policy',
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    expect(res.status()).toBe(404);
+  });
+
+  test('no AI policy panel leaks onto a workspace with the gate off', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('aipoloff'));
+
+    await page.goto(`/workspaces/${wsId}`);
+    await expect(page.getByTestId('ai-policy-mode')).toBeVisible({ timeout: 15_000 });
+
+    // The panel is a RUN surface. Its heading must not appear on the workspace
+    // page, and no half-rendered verdict box either.
+    await expect(page.locator('text=AI Policy Gate')).toHaveCount(0);
+    await expect(page.locator('text=Waiting for the AI policy verdict')).toHaveCount(0);
+  });
+});

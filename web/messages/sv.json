@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Aviseringsmallar (skapas på varje ny arbetsyta)",
       "saving": "Sparar...",
       "previewTitle": "Gå igenom repot och förhandsgranska vilka arbetsytor denna regel SKULLE skapa — ingen beständighet",
-      "parallelism": "Parallellitet"
+      "parallelism": "Parallellitet",
+      "governance": "Säkerhetsskanning och AI-sammanfattning",
+      "governanceHint": "Tillämpas på varje arbetsyta som den här regeln skapar.",
+      "scanEnforcement": "Tillämpning",
+      "scanOff": "Skanna inte",
+      "scanAdvisory": "Skanna och rapportera endast",
+      "scanEnforced": "Blockera tillämpning vid fynd",
+      "scanEngine": "Skanner",
+      "scanEngineBoth": "Checkov och Trivy",
+      "scanThreshold": "Rapportera fynd från och med",
+      "severityCritical": "kritisk",
+      "severityHigh": "hög",
+      "severityMedium": "medel",
+      "severityLow": "låg",
+      "aiSummaryMode": "AI-plansammanfattning",
+      "aiSummaryDefault": "Följ deploymentstandard",
+      "aiSummaryEnabled": "Sammanfatta alltid",
+      "aiSummaryDisabled": "Sammanfatta aldrig",
+      "execution": "Körning, VCS och drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-version",
+      "noExpiry": "Ingen utgång",
+      "addDriftIgnoreRule": "Lägg till regel",
+      "debugModeHint": "Håll misslyckade runner-poddar öppna på de arbetsytor som den här regeln skapar. Av som standard – en kvarhållen podd behåller den arbetsytans autentiseringsuppgifter."
     },
     "table": {
       "name": "Namn",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "En obligatorisk körningsuppgift misslyckades — åsidosätt den eller kassera körningen",
       "runTasksRunning": "Väntar på körningsuppgifter efter planen",
       "heldByPolicy": "En obligatorisk policyuppsättning misslyckades — åsidosätt den eller kassera körningen",
-      "heldBySecurityScan": "Säkerhetsskanningen hittade blockerande fynd — åsidosätt den eller kassera körningen"
+      "heldBySecurityScan": "Säkerhetsskanningen hittade blockerande fynd — åsidosätt den eller kassera körningen",
+      "heldByAiPolicy": "AI-policygrinden nekade den här körningen — åsidosätt den eller kassera körningen",
+      "awaitingAiPolicy": "Väntar på AI-policyns utlåtande"
     },
     "badge": {
       "destroy": "förstör",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "Skanningen slutfördes inte, så den här körningen har inte kontrollerats.",
       "blockedErroredMessage": "Den här körningen är blockerad eftersom säkerhetsskanningen inte slutfördes. Åtgärda orsaken och planera om, eller be en administratör att åsidosätta."
     },
+    "aiPolicyPanel": {
+      "heading": "AI-policygrind",
+      "enforcementLabel": "tillämpning: {level}",
+      "thresholdLabel": "riskgräns: {threshold}",
+      "awaitingVerdict": "Väntar på AI-policyns utlåtande. Körningen hålls kvar tills det kommer.",
+      "decisionAllow": "tillåten",
+      "decisionDeny": "nekad",
+      "risk": {
+        "critical": "kritisk",
+        "high": "hög",
+        "medium": "medel",
+        "low": "låg"
+      },
+      "blockedDeniedMessage": "Den här körningen är <strong>blockerad av {count, plural, one {# policykriterium} other {# policykriterier}}</strong>.",
+      "blockedRiskMessage": "Den här körningen är <strong>blockerad</strong> eftersom dess risknivå ({level}) ligger vid eller över gränsen ({threshold}).",
+      "blockedErroredMessage": "Den här körningen är blockerad eftersom inget AI-policyutlåtande kunde nås. Grinden fallerar stängd — ett utlåtande som inte kunde nås är inte ett godkännande.",
+      "erroredMessage": "AI-policygrinden returnerade inget användbart utlåtande, så den här körningen har inte bedömts.",
+      "passed": "Inga policykriterier matchade.",
+      "overriding": "Åsidosätter...",
+      "overrideContinue": "Åsidosätt och fortsätt",
+      "overrideConfirm": "Åsidosätt AI-policygrinden och låt körningen tillämpas trots utlåtandet?",
+      "overrideFailed": "Åsidosättning misslyckades",
+      "overrideFailedStatus": "Åsidosättning misslyckades ({status})",
+      "overriddenBy": "åsidosatt av {by}"
+    },
     "architecture": {
       "loadError": "Det gick inte att läsa in arkitekturkritiken.",
       "notEnabled": "AI-arkitekturkritikern är inte aktiverad i denna installation.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Följ deploymentstandard",
       "modeEnabled": "Sammanfatta alltid",
       "modeDisabled": "Sammanfatta aldrig",
+      "policyMode": "Policygrind",
+      "policyModeNote": "En obligatorisk grind ignorerar ”Aldrig”: den kan bara undanta den här arbetsytan från ett rådgivande utlåtande.",
       "contextLabel": "Arbetsytekontext",
       "contextLabelSuffix": "(valfritt, additivt)",
       "contextPlaceholder": "Fakta som AI:n bör känna till om just denna arbetsyta. t.ex. 'Fronter valvet för tjänst X — att förstöra KMS-nyckeln orsakar ett globalt avbrott.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Det gick inte att återställa tillståndsversionen",
       "stateActionFailed": "Tillståndsåtgärd misslyckades",
       "uploadState": "Det gick inte att ladda upp tillstånd",
-      "uploadStateFile": "Det gick inte att ladda upp tillståndsfilen"
+      "uploadStateFile": "Det gick inte att ladda upp tillståndsfilen",
+      "updateSecurityScan": "Det gick inte att uppdatera säkerhetsskanningen",
+      "updateDebugMode": "Det gick inte att uppdatera felsökningsläget"
     },
     "subtabs": {
       "state": "Tillstånd",
@@ -2880,6 +2934,38 @@
         "global": "Global",
         "rule": "Matchad av regel"
       }
+    },
+    "securityScan": {
+      "title": "Säkerhetsskanning",
+      "description": "Skanna planen efter osäker infrastruktur innan den tillämpas.",
+      "enforcement": "Tillämpning",
+      "enforcementOff": "Skanna inte",
+      "enforcementAdvisory": "Skanna och rapportera endast",
+      "enforcementEnforced": "Blockera tillämpning vid fynd",
+      "engine": "Skanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov och Trivy",
+      "threshold": "Rapportera fynd från och med",
+      "thresholdCritical": "kritisk",
+      "thresholdHigh": "hög",
+      "thresholdMedium": "medel",
+      "thresholdLow": "låg",
+      "skipRules": "Ignorerade regler",
+      "skipRulesSuffix": "(valfritt)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Inga regler ignoreras.",
+      "skipRulesHint": "Kommaseparerade regel-ID:n för skannern som ignoreras i den här arbetsytan."
+    },
+    "debugMode": {
+      "title": "Felsökningsläge för runnern",
+      "description": "Håll podden för en misslyckad körning öppen så att du kan gå in i den. Körningen rapporteras först som misslyckad; först därefter står containern kvar.",
+      "label": "Felsökningsläge",
+      "hint": "Av som standard. När det är på förblir podden för en misslyckad runner åtkomlig med exec under det fönster som din operatör har konfigurerat, och den behåller hela den tiden den här arbetsytans autentiseringsuppgifter och dekrypterade variabler.",
+      "activeBadge": "Aktivt",
+      "bannerTitle": "Felsökningsläget är på för den här arbetsytan",
+      "bannerBody": "Podden för en misslyckad körning hålls öppen för inspektion i stället för att avslutas, och den behåller den här arbetsytans autentiseringsuppgifter och dekrypterade variabler så länge den hålls kvar. Stäng av felsökningsläget när du är klar med felsökningen.",
+      "confirmEnable": "Slå på felsökningsläget? Podden för en misslyckad körning hålls öppen med den här arbetsytans autentiseringsuppgifter och dekrypterade variabler tills fönstret går ut eller du tar bort podden."
     }
   },
   "graphs": {

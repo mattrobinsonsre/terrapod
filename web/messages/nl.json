@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Notificatiesjablonen (aangemaakt op elke nieuwe workspace)",
       "saving": "Bezig met opslaan...",
       "previewTitle": "Doorloop de repo en bekijk welke workspaces deze regel ZOU aanmaken — zonder persistentie",
-      "parallelism": "Parallellisme"
+      "parallelism": "Parallellisme",
+      "governance": "Beveiligingsscan en AI-samenvatting",
+      "governanceHint": "Toegepast op elke workspace die deze regel aanmaakt.",
+      "scanEnforcement": "Handhaving",
+      "scanOff": "Niet scannen",
+      "scanAdvisory": "Alleen scannen en rapporteren",
+      "scanEnforced": "Toepassen blokkeren bij bevindingen",
+      "scanEngine": "Scanner",
+      "scanEngineBoth": "Checkov en Trivy",
+      "scanThreshold": "Bevindingen melden vanaf",
+      "severityCritical": "kritiek",
+      "severityHigh": "hoog",
+      "severityMedium": "middel",
+      "severityLow": "laag",
+      "aiSummaryMode": "AI-plansamenvatting",
+      "aiSummaryDefault": "Standaard van deployment volgen",
+      "aiSummaryEnabled": "Altijd samenvatten",
+      "aiSummaryDisabled": "Nooit samenvatten",
+      "execution": "Uitvoering, VCS en drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versie",
+      "noExpiry": "Geen verval",
+      "addDriftIgnoreRule": "Regel toevoegen",
+      "debugModeHint": "Pods van mislukte runners openhouden op de werkruimten die deze regel aanmaakt. Standaard uit — een opengehouden pod behoudt de referenties van die werkruimte."
     },
     "table": {
       "name": "Naam",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "Een verplichte run-task is mislukt — overschrijf deze of verwerp de uitvoering",
       "runTasksRunning": "Wachten op run-tasks na het plan",
       "heldByPolicy": "Een verplichte beleidsset is mislukt — overschrijf deze of verwerp de uitvoering",
-      "heldBySecurityScan": "De beveiligingsscan vond blokkerende bevindingen — overschrijf deze of verwerp de uitvoering"
+      "heldBySecurityScan": "De beveiligingsscan vond blokkerende bevindingen — overschrijf deze of verwerp de uitvoering",
+      "heldByAiPolicy": "De AI-beleidspoort weigerde deze uitvoering — overschrijf deze of verwerp de uitvoering",
+      "awaitingAiPolicy": "Wachten op het oordeel van het AI-beleid"
     },
     "badge": {
       "destroy": "vernietigen",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "De scan is niet voltooid, dus deze uitvoering is niet gecontroleerd.",
       "blockedErroredMessage": "Deze uitvoering is geblokkeerd omdat de beveiligingsscan niet is voltooid. Los de oorzaak op en plan opnieuw, of vraag een beheerder om dit te negeren."
     },
+    "aiPolicyPanel": {
+      "heading": "AI-beleidspoort",
+      "enforcementLabel": "handhaving: {level}",
+      "thresholdLabel": "risicodrempel: {threshold}",
+      "awaitingVerdict": "Wachten op het oordeel van het AI-beleid. Deze uitvoering wordt vastgehouden tot het er is.",
+      "decisionAllow": "toegestaan",
+      "decisionDeny": "geweigerd",
+      "risk": {
+        "critical": "kritiek",
+        "high": "hoog",
+        "medium": "middel",
+        "low": "laag"
+      },
+      "blockedDeniedMessage": "Deze uitvoering is <strong>geblokkeerd door {count, plural, one {# beleidscriterium} other {# beleidscriteria}}</strong>.",
+      "blockedRiskMessage": "Deze uitvoering is <strong>geblokkeerd</strong> omdat het risiconiveau ({level}) op of boven de drempel ({threshold}) ligt.",
+      "blockedErroredMessage": "Deze uitvoering is geblokkeerd omdat er geen AI-beleidsoordeel kon worden bereikt. De poort faalt gesloten: een oordeel dat niet bereikt kon worden is geen goedkeuring.",
+      "erroredMessage": "De AI-beleidspoort gaf geen bruikbaar oordeel, dus deze uitvoering is niet beoordeeld.",
+      "passed": "Geen beleidscriteria kwamen overeen.",
+      "overriding": "Bezig met overschrijven...",
+      "overrideContinue": "Overschrijven & doorgaan",
+      "overrideConfirm": "De AI-beleidspoort overschrijven en deze uitvoering laten toepassen ondanks het oordeel?",
+      "overrideFailed": "Overschrijven mislukt",
+      "overrideFailedStatus": "Overschrijven mislukt ({status})",
+      "overriddenBy": "overschreven door {by}"
+    },
     "architecture": {
       "loadError": "Kan de architectuurkritiek niet laden.",
       "notEnabled": "De AI-architectuurcriticus is niet ingeschakeld in deze installatie.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Standaard van deployment volgen",
       "modeEnabled": "Altijd samenvatten",
       "modeDisabled": "Nooit samenvatten",
+      "policyMode": "Beleidspoort",
+      "policyModeNote": "Een verplichte poort negeert “Nooit”: die kan deze werkruimte alleen vrijstellen van een adviserend oordeel.",
       "contextLabel": "Workspacecontext",
       "contextLabelSuffix": "(optioneel, aanvullend)",
       "contextPlaceholder": "Feiten die de AI specifiek over deze workspace moet weten. Bijv. 'Fungeert als voorkant van de vault voor service X — het vernietigen van de KMS-sleutel veroorzaakt een wereldwijde storing.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Kan state-versie niet terugdraaien",
       "stateActionFailed": "State-actie mislukt",
       "uploadState": "Kan state niet uploaden",
-      "uploadStateFile": "Kan state-bestand niet uploaden"
+      "uploadStateFile": "Kan state-bestand niet uploaden",
+      "updateSecurityScan": "Bijwerken van de beveiligingsscan is mislukt",
+      "updateDebugMode": "Bijwerken van de foutopsporingsmodus mislukt"
     },
     "subtabs": {
       "state": "State",
@@ -2880,6 +2934,38 @@
         "global": "Globaal",
         "rule": "Via regel gekoppeld"
       }
+    },
+    "securityScan": {
+      "title": "Beveiligingsscan",
+      "description": "Scan het plan op onveilige infrastructuur voordat het wordt toegepast.",
+      "enforcement": "Handhaving",
+      "enforcementOff": "Niet scannen",
+      "enforcementAdvisory": "Alleen scannen en rapporteren",
+      "enforcementEnforced": "Toepassen blokkeren bij bevindingen",
+      "engine": "Scanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov en Trivy",
+      "threshold": "Bevindingen melden vanaf",
+      "thresholdCritical": "kritiek",
+      "thresholdHigh": "hoog",
+      "thresholdMedium": "middel",
+      "thresholdLow": "laag",
+      "skipRules": "Genegeerde regels",
+      "skipRulesSuffix": "(optioneel)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Geen regels genegeerd.",
+      "skipRulesHint": "Door komma's gescheiden scanner-regel-ID's die in deze workspace worden genegeerd."
+    },
+    "debugMode": {
+      "title": "Foutopsporingsmodus voor de runner",
+      "description": "De pod van een mislukte uitvoering openhouden zodat je erin kunt kijken. De uitvoering wordt eerst als mislukt gemeld; pas daarna blijft de container staan.",
+      "label": "Foutopsporingsmodus",
+      "hint": "Standaard uit. Zolang deze aanstaat blijft de pod van een mislukte runner bereikbaar met exec gedurende het venster dat je beheerder heeft ingesteld, en behoudt hij al die tijd de referenties en ontsleutelde variabelen van deze werkruimte.",
+      "activeBadge": "Actief",
+      "bannerTitle": "Foutopsporingsmodus staat aan voor deze werkruimte",
+      "bannerBody": "De pod van een mislukte uitvoering wordt voor inspectie opengehouden in plaats van af te sluiten, en behoudt zolang de referenties en ontsleutelde variabelen van deze werkruimte. Zet de foutopsporingsmodus uit zodra je klaar bent met onderzoeken.",
+      "confirmEnable": "Foutopsporingsmodus aanzetten? De pod van een mislukte uitvoering wordt opengehouden met de referenties en ontsleutelde variabelen van deze werkruimte totdat het venster verloopt of je de pod verwijdert."
     }
   },
   "graphs": {

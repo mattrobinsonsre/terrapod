@@ -38,6 +38,7 @@ type workspaceDataSourceModel struct {
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
+	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
 	Parallelism                   types.Int64  `tfsdk:"parallelism"`
 	ResourceMemory                types.String `tfsdk:"resource_memory"`
@@ -59,6 +60,7 @@ type workspaceDataSourceModel struct {
 	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
+	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
 	SlackChannel                  types.String `tfsdk:"slack_channel"`
 	OwnerEmail                    types.String `tfsdk:"owner_email"`
@@ -108,6 +110,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
 			"working_directory":                computedString("Working directory."),
 			"parallelism":                      computedInt64("How many operations the engine performs at once."),
+			"debug_mode":                       computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
 			"resource_cpu":                     computedString("CPU request."),
 			"resource_memory":                  computedString("Memory request."),
 			"labels":                           computedMap("Labels."),
@@ -127,6 +130,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"security_scan_severity_threshold": computedString("Lowest severity that counts as a scan failure (#1036): 'critical', 'high' (default), 'medium', or 'low'."),
 			"security_scan_skip_rules":         computedList("Scanner rule-ids to suppress (#1036; Checkov CKV_* / Trivy AVD-*)."),
 			"plan_expiry_seconds":              computedInt64("Per-workspace plan expiry TTL in seconds (#646); null/0 = disabled."),
+			"ai_policy_mode":                   computedString("Per-workspace AI policy gate override: 'default', 'enabled', or 'disabled'. 'disabled' opts out of an advisory verdict only -- a mandatory gate ignores it."),
 			"ai_summary_mode":                  computedString("Per-workspace AI plan-summary mode: 'default' (follow deployment global), 'enabled' (always summarise), or 'disabled' (never summarise)."),
 			"ai_summary_context":               computedString("Workspace-specific context appended to the AI summariser prompt."),
 			"slack_channel":                    computedString("Opt-in Slack channel for this workspace's run notifications (#556); empty = silent."),
@@ -221,6 +225,11 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		mode = "default"
 	}
 	m.AISummaryMode = types.StringValue(mode)
+	policyMode := terrapod.GetStringAttr(res, "ai-policy-mode")
+	if policyMode == "" {
+		policyMode = "default"
+	}
+	m.AIPolicyMode = types.StringValue(policyMode)
 	m.AISummaryContext = types.StringValue(terrapod.GetStringAttr(res, "ai-summary-context"))
 	m.SlackChannel = types.StringValue(terrapod.GetStringAttr(res, "slack-channel"))
 
@@ -234,6 +243,7 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	setOptionalString(&m.TerraformVersion, engineVersion)
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
 	setOptionalString(&m.TerragruntVersion, terrapod.GetStringAttr(res, "terragrunt-version"))
+	m.DebugMode = types.BoolValue(terrapod.GetBoolAttr(res, "debug-mode"))
 	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))
 	setOptionalString(&m.VCSBranch, terrapod.GetStringAttr(res, "vcs-branch"))
 	setOptionalString(&m.AgentPoolID, terrapod.GetStringAttr(res, "agent-pool-id"))

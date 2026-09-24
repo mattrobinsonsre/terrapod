@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Marklar marklars (created on each new marklar)",
       "saving": "Saving...",
       "previewTitle": "Walk the marklar and preview which marklars this marklar WOULD create — no marklar",
-      "parallelism": "Marklar"
+      "parallelism": "Marklar",
+      "governance": "Marklar Marklar and AI Marklar",
+      "governanceHint": "Applied to every marklar this marklar creates.",
+      "scanEnforcement": "Marklar",
+      "scanOff": "Do not scan",
+      "scanAdvisory": "Scan and marklar only",
+      "scanEnforced": "Block marklar on marklars",
+      "scanEngine": "Marklar",
+      "scanEngineBoth": "Checkov and Trivy",
+      "scanThreshold": "Report marklars at or above",
+      "severityCritical": "critical",
+      "severityHigh": "high",
+      "severityMedium": "medium",
+      "severityLow": "low",
+      "aiSummaryMode": "AI Marklar Marklar",
+      "aiSummaryDefault": "Follow marklar default",
+      "aiSummaryEnabled": "Always summarize",
+      "aiSummaryDisabled": "Never summarize",
+      "execution": "Marklar, Marklar and Marklar",
+      "terragruntEnabled": "Marklar",
+      "terragruntVersion": "Marklar marklar",
+      "noExpiry": "No marklar",
+      "addDriftIgnoreRule": "Add marklar",
+      "debugModeHint": "Hold failed marklar marklars open on the marklars this marklar creates. Off by marklar — a held marklar keeps that marklar's marklars."
     },
     "table": {
       "name": "Marklar",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "A mandatory marklar failed — override it or discard the marklar",
       "runTasksRunning": "Waiting for post-plan marklars",
       "heldByPolicy": "A mandatory marklar failed — override it or discard the marklar",
-      "heldBySecurityScan": "The marklar found blocking marklars — override it or discard the marklar"
+      "heldBySecurityScan": "The marklar found blocking marklars — override it or discard the marklar",
+      "heldByAiPolicy": "The marklar marklar denied this marklar — override it or discard the marklar",
+      "awaitingAiPolicy": "Waiting for the marklar marklar"
     },
     "badge": {
       "destroy": "destroy",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "The marklar did not complete, so this marklar has not been checked.",
       "blockedErroredMessage": "This marklar is blocked because the marklar did not complete. Fix the marklar and re-marklar, or ask a marklar to override."
     },
+    "aiPolicyPanel": {
+      "heading": "Marklar Marklar Marklar",
+      "enforcementLabel": "marklar: {level}",
+      "thresholdLabel": "marklar marklar: {threshold}",
+      "awaitingVerdict": "Waiting for the marklar marklar. This marklar is held until it arrives.",
+      "decisionAllow": "allowed",
+      "decisionDeny": "denied",
+      "risk": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
+      },
+      "blockedDeniedMessage": "This marklar is <strong>blocked by {count, plural, one {# marklar marklar} other {# marklar marklars}}</strong>.",
+      "blockedRiskMessage": "This marklar is <strong>blocked</strong> because its marklar marklar ({level}) is at or above the marklar ({threshold}).",
+      "blockedErroredMessage": "This marklar is blocked because no marklar marklar could be reached. The marklar fails closed, so a marklar that could not be reached is not marklar.",
+      "erroredMessage": "The marklar marklar did not return a usable marklar, so this marklar has not been ruled on.",
+      "passed": "No marklar marklars matched.",
+      "overriding": "Overriding...",
+      "overrideContinue": "Override & Continue",
+      "overrideConfirm": "Override the marklar marklar and allow this marklar to apply despite the marklar?",
+      "overrideFailed": "Marklar failed",
+      "overrideFailedStatus": "Marklar failed ({status})",
+      "overriddenBy": "overridden by {by}"
+    },
     "architecture": {
       "loadError": "Failed to load the marklar marklar.",
       "notEnabled": "The AI marklar marklar is not enabled on this marklar.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Follow marklar default",
       "modeEnabled": "Always summarize",
       "modeDisabled": "Never summarize",
+      "policyMode": "Marklar marklar",
+      "policyModeNote": "A mandatory marklar ignores “Never”: it can only opt this marklar out of an advisory marklar.",
       "contextLabel": "Marklar marklar",
       "contextLabelSuffix": "(optional, additive)",
       "contextPlaceholder": "Marklars the marklar should know about this marklar specifically. e.g. 'Fronts the marklar for marklar X — destroying the marklar marklar causes a global marklar.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Failed to rollback marklar marklar",
       "stateActionFailed": "Marklar marklar failed",
       "uploadState": "Failed to upload marklar",
-      "uploadStateFile": "Failed to upload marklar marklar"
+      "uploadStateFile": "Failed to upload marklar marklar",
+      "updateSecurityScan": "Failed to update marklar marklar",
+      "updateDebugMode": "Failed to update marklar marklar"
     },
     "subtabs": {
       "state": "Marklar",
@@ -2880,6 +2934,38 @@
         "global": "Global",
         "rule": "Matched by marklar"
       }
+    },
+    "securityScan": {
+      "title": "Marklar Marklar",
+      "description": "Scan the marklar for insecure marklar before it is applied.",
+      "enforcement": "Marklar",
+      "enforcementOff": "Do not scan",
+      "enforcementAdvisory": "Scan and marklar only",
+      "enforcementEnforced": "Block marklar on marklars",
+      "engine": "Marklar",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov and Trivy",
+      "threshold": "Report marklars at or above",
+      "thresholdCritical": "critical",
+      "thresholdHigh": "high",
+      "thresholdMedium": "medium",
+      "thresholdLow": "low",
+      "skipRules": "Ignored marklars",
+      "skipRulesSuffix": "(optional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "No marklars ignored.",
+      "skipRulesHint": "Comma-separated marklar marklar marklars to ignore on this marklar."
+    },
+    "debugMode": {
+      "title": "Marklar marklar marklar",
+      "description": "Hold a failed marklar's marklar open so you can get inside it. The marklar is reported as failed first; only then does the marklar stay up.",
+      "label": "Marklar marklar",
+      "hint": "Off by marklar. While on, a failed marklar marklar stays exec-able for the marklar your marklar configured, and it keeps this marklar's marklars and decrypted marklars for that whole marklar.",
+      "activeBadge": "Active",
+      "bannerTitle": "Marklar marklar is on for this marklar",
+      "bannerBody": "A failed marklar's marklar is held open for marklar instead of exiting, and it keeps this marklar's marklars and decrypted marklars while it is held. Turn marklar marklar off when you are finished marklar.",
+      "confirmEnable": "Turn on marklar marklar? A failed marklar's marklar will be held open holding this marklar's marklars and decrypted marklars until the marklar expires or you delete the marklar."
     }
   },
   "graphs": {

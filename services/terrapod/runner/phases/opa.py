@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import subprocess
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -338,7 +339,7 @@ def post_results(
 def evaluate_policies(
     cfg: RunnerConfig,
     *,
-    plan_json: Path,
+    plan_json: Path | None | Callable[[], Path | None],
     work_dir: Path,
     opa_binary: str | None = None,
     client: httpx.Client | None = None,
@@ -350,12 +351,25 @@ def evaluate_policies(
     `opa_binary` defaults to fetching OPA from the binary cache (#1208) — but
     only *after* the bundle turns out to have applicable sets, so a run with no
     policy never pays for a download it will not use. Tests pass an explicit
-    path."""
+    path.
+
+    `plan_json` may be a **callable**, for the same reason. Terraform's plan
+    JSON is produced for the UI artifact regardless, so OPA rides along on it
+    free; Pulumi's policy input has no other consumer and is built solely for
+    this, so building it before knowing whether any set applies is pure waste
+    on the overwhelmingly common no-policy run (#1567 review). Passing a
+    factory defers that until the bundle proves non-empty. A factory that
+    returns None is not an error here — `evaluate_set` records an `errored`
+    evaluation per set, which is what makes the failure visible and
+    overridable rather than silently skipped."""
     bundle = fetch_policy_bundle(cfg, client=client)
     policy_sets = bundle.get("policy_sets") or []
     if not policy_sets:
         logger.info("no applicable policy sets — skipping evaluation")
         return 0
+
+    # Only now: past this point at least one set applies.
+    plan_json = plan_json() if callable(plan_json) else plan_json
 
     if opa_binary is None:
         # FATAL, deliberately. OPA is no longer baked into the runner image, so
