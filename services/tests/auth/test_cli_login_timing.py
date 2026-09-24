@@ -49,11 +49,18 @@ def _web_source() -> str:
 
 def _poll_timeout_seconds() -> float:
     src = _web_source()
-    m = re.search(r"const\s+POLL_TIMEOUT_MS\s*=\s*([0-9_]+)", src)
+    # Anchored to end-of-statement on purpose. The loose form matched the
+    # leading digits of an EXPRESSION, so `const POLL_TIMEOUT_MS = 60 * 1000`
+    # read as 60 MILLISECONDS and every assertion here passed while the real
+    # timeout was the 60s bug this gate exists to prevent.
+    m = re.search(r"const\s+POLL_TIMEOUT_MS\s*=\s*([0-9_]+)\s*$", src, re.MULTILINE)
     assert m, (
-        "POLL_TIMEOUT_MS is not declared in the CLI hand-off page. If it was "
-        "renamed, update this gate rather than deleting it — it is the only "
-        "thing tying the page's wait to the code's lifetime."
+        "POLL_TIMEOUT_MS must be declared as a bare integer literal in "
+        "milliseconds (e.g. `const POLL_TIMEOUT_MS = 20_000`). An expression "
+        "such as `60 * 1000` is refused: this gate cannot evaluate one, and a "
+        "partial match silently reads the wrong number. If it was renamed, "
+        "update this gate rather than deleting it — it is the only thing tying "
+        "the page's wait to the code's lifetime."
     )
     return int(m.group(1).replace("_", "")) / 1000.0
 
@@ -113,6 +120,10 @@ def test_a_blocked_delivery_navigates_rather_than_only_offering_a_link():
     src = _web_source()
     catch = src[src.index(".catch(") :]
     catch = catch[: catch.index("}, [code")]
+    # Commented-out code is not code. A plain substring check passed with the
+    # navigation sitting behind a `//`, which is exactly the regression this
+    # asserts against.
+    catch = "\n".join(line for line in catch.splitlines() if not line.strip().startswith("//"))
     assert "window.location.href = localhostUrl" in catch, (
         "the failed-delivery path no longer navigates to the CLI listener. "
         "Safari blocks the fetch that Chromium allows, so without this "
