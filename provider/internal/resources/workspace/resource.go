@@ -933,9 +933,6 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AIPolicyMode.IsNull() && !m.AIPolicyMode.IsUnknown() {
 		req.AIPolicyMode = m.AIPolicyMode.ValueString()
 	}
-	if !m.AIPolicyMode.IsNull() && !m.AIPolicyMode.IsUnknown() {
-		req.AIPolicyMode = m.AIPolicyMode.ValueString()
-	}
 	if !m.AISummaryContext.IsNull() && !m.AISummaryContext.IsUnknown() {
 		req.AISummaryContext = m.AISummaryContext.ValueString()
 	}
@@ -1077,6 +1074,9 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	}
 	if !m.AISummaryMode.IsNull() && !m.AISummaryMode.IsUnknown() {
 		req.AISummaryMode = m.AISummaryMode.ValueString()
+	}
+	if !m.AIPolicyMode.IsNull() && !m.AIPolicyMode.IsUnknown() {
+		req.AIPolicyMode = m.AIPolicyMode.ValueString()
 	}
 	if !m.AISummaryContext.IsNull() && !m.AISummaryContext.IsUnknown() {
 		v := m.AISummaryContext.ValueString()
