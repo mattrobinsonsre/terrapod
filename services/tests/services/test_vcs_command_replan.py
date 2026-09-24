@@ -72,6 +72,13 @@ async def test_a_replacement_run_is_created_after_the_cancel():
     created = SimpleNamespace(id=uuid.uuid4(), vcs_actor_login=None, vcs_actor_user_id=None)
 
     with (
+        # Path narrowing is an input to the create these tests stub out, so it
+        # is stubbed too — otherwise its query consumes an entry from the
+        # fixed `db.execute` side_effect lists below (#1835).
+        patch(
+            "terrapod.services.vcs_poller._compute_paths_unions",
+            new=AsyncMock(return_value={}),
+        ),
         patch("terrapod.services.run_service.cancel_run", new_callable=AsyncMock) as cancel,
         patch(
             "terrapod.services.vcs_poller._create_vcs_run",
@@ -99,6 +106,13 @@ async def test_the_replacement_bypasses_the_dedup_the_cancel_created():
     db = _db_returning([live], live)
 
     with (
+        # Path narrowing is an input to the create these tests stub out, so it
+        # is stubbed too — otherwise its query consumes an entry from the
+        # fixed `db.execute` side_effect lists below (#1835).
+        patch(
+            "terrapod.services.vcs_poller._compute_paths_unions",
+            new=AsyncMock(return_value={}),
+        ),
         patch("terrapod.services.run_service.cancel_run", new_callable=AsyncMock),
         patch(
             "terrapod.services.vcs_poller._create_vcs_run",
@@ -118,6 +132,13 @@ async def test_an_apply_then_merge_replan_is_not_speculative():
     db = _db_returning([live], live)
 
     with (
+        # Path narrowing is an input to the create these tests stub out, so it
+        # is stubbed too — otherwise its query consumes an entry from the
+        # fixed `db.execute` side_effect lists below (#1835).
+        patch(
+            "terrapod.services.vcs_poller._compute_paths_unions",
+            new=AsyncMock(return_value={}),
+        ),
         patch("terrapod.services.run_service.cancel_run", new_callable=AsyncMock),
         patch(
             "terrapod.services.vcs_poller._create_vcs_run",
@@ -133,6 +154,13 @@ async def test_an_apply_then_merge_replan_is_not_speculative():
     live2 = _prior_run()
     db2 = _db_returning([live2], live2)
     with (
+        # Path narrowing is an input to the create these tests stub out, so it
+        # is stubbed too — otherwise its query consumes an entry from the
+        # fixed `db.execute` side_effect lists below (#1835).
+        patch(
+            "terrapod.services.vcs_poller._compute_paths_unions",
+            new=AsyncMock(return_value={}),
+        ),
         patch("terrapod.services.run_service.cancel_run", new_callable=AsyncMock),
         patch(
             "terrapod.services.vcs_poller._create_vcs_run",
@@ -152,6 +180,13 @@ async def test_a_pr_with_no_prior_run_is_left_to_the_poller():
     db = _db_returning([], None)
 
     with (
+        # Path narrowing is an input to the create these tests stub out, so it
+        # is stubbed too — otherwise its query consumes an entry from the
+        # fixed `db.execute` side_effect lists below (#1835).
+        patch(
+            "terrapod.services.vcs_poller._compute_paths_unions",
+            new=AsyncMock(return_value={}),
+        ),
         patch("terrapod.services.run_service.cancel_run", new_callable=AsyncMock),
         patch("terrapod.services.vcs_poller._create_vcs_run", new_callable=AsyncMock) as create,
     ):
@@ -175,6 +210,13 @@ async def test_one_workspace_failing_does_not_strand_the_others():
     db.get = AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4(), provider="github"))
 
     with (
+        # Path narrowing is an input to the create these tests stub out, so it
+        # is stubbed too — otherwise its query consumes an entry from the
+        # fixed `db.execute` side_effect lists below (#1835).
+        patch(
+            "terrapod.services.vcs_poller._compute_paths_unions",
+            new=AsyncMock(return_value={}),
+        ),
         patch("terrapod.services.run_service.cancel_run", new_callable=AsyncMock),
         patch(
             "terrapod.services.vcs_poller._create_vcs_run",
