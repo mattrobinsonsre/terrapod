@@ -327,6 +327,15 @@ denied; Terrapod has no equivalent vocabulary here, so do not write automation
 expecting one — read `blocked-by` and, if you need the verdict itself,
 `GET /runs/{id}/ai-policy`.
 
+### It needs the summariser
+
+The gate rides the summary's own model call, so `ai_summary.enabled: true` is a
+**prerequisite**, not a coincidence. With summaries off no verdict can be
+produced, and a `mandatory` gate holds a run it has no ruling for — which would
+be every apply-capable run in the deployment. Terrapod refuses to start on that
+combination rather than deadlocking quietly. `advisory` with summaries off is
+inert and allowed.
+
 ### It fails closed
 
 If the model errors, times out, or returns something unusable, a `mandatory`

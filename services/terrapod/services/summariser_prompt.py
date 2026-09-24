@@ -40,9 +40,11 @@ PLAN_SUMMARY_JSON_SCHEMA: dict = {
             "additionalProperties": False,
             "required": ["decision", "reasons"],
             "description": (
-                "Your allow/deny ruling against DENY_CRITERIA. Emit this ONLY "
-                "when DENY_CRITERIA is present in the user message; omit the "
-                "field entirely otherwise."
+                "Your allow/deny ruling for the policy gate. Emit this "
+                "whenever the POLICY GATE section is present in the system "
+                "message -- which is not the same as DENY_CRITERIA being "
+                "present, since a gate may rule on the risk score alone. Omit "
+                "the field entirely when there is no POLICY GATE section."
             ),
             "properties": {
                 "decision": {
@@ -741,6 +743,7 @@ def render_prompt(
     cost_estimate: str = "",
     output_language: str = "",
     deny_criteria: str = "",
+    wants_verdict: bool = False,
 ) -> tuple[str, str]:
     """Render the system + user messages for the Chat Completions request.
 
@@ -782,11 +785,19 @@ def render_prompt(
             f"untranslated: resource addresses, provider and module names, HCL "
             f"keywords, CLI flags, file paths, and anything inside backticks."
         )
-    if deny_criteria.strip():
+    if wants_verdict:
         # The gate (#1766). Appended rather than folded into the skill prompt so
-        # the summary keeps doing exactly what it was tuned to do; with no
-        # criteria configured this block does not render and the request is
-        # byte-identical to an ungated one.
+        # the summary keeps doing exactly what it was tuned to do; for an ungated
+        # run this block does not render and the request is byte-identical to a
+        # pre-gate one.
+        #
+        # Gated on `wants_verdict`, NOT on deny_criteria being non-empty. A gate
+        # configured with a risk threshold and no criteria is explicitly
+        # supported -- values.yaml says "use either or both" -- and keying the
+        # block on the criteria meant the model was never asked for a verdict,
+        # `decide_outcome` saw None, and EVERY run was recorded `errored`. Under
+        # a mandatory gate that held every run in the deployment, blaming the
+        # model for a question nobody put to it.
         parts.append(
             "POLICY GATE - you are also ruling on whether this plan may "
             "proceed.\n\n"
@@ -805,7 +816,12 @@ def render_prompt(
             "  `policy_verdict` is independent of `risk_level`: rule on the "
             "criteria as written and let the risk score say what it says. "
             "Terrapod applies its own threshold to that score separately, so "
-            "do not raise or lower the score to influence the outcome."
+            "do not raise or lower the score to influence the outcome.\n\n"
+            "  If no DENY_CRITERIA section is present, the operator is gating "
+            "on the risk score alone. Still emit `policy_verdict`: call "
+            "`allow` with a one-line reason saying there were no criteria to "
+            "match. Terrapod applies the threshold itself -- an `allow` here "
+            "does not mean the run proceeds."
         )
 
     system_message = "\n\n".join(parts)

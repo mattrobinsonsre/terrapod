@@ -210,23 +210,41 @@ async def test_overriding_requires_admin_not_merely_read() -> None:
 
 
 @pytest.mark.asyncio
-async def test_overriding_a_verdict_that_has_not_arrived_is_a_409() -> None:
-    """Silently succeeding would read as "released" while the run stays held."""
+async def test_overriding_releases_a_run_held_with_no_verdict_at_all() -> None:
+    """The case that most needs releasing, and the one that used to 409.
+
+    A run can be held BECAUSE no verdict landed -- the summariser never ran, or
+    raised before settling. Refusing the override there told the operator to
+    wait for something that was never coming, while the run kept its workspace
+    lock and discard was the only exit.
+    """
     ws = _ws()
-    run = _run(ws)
+    run = _run(ws, status="planning")
+    recorded = _row(outcome="overridden", overridden_by="user@terrapod")
     with (
         patch.object(
             router,
             "resolve_workspace_capabilities_for",
             new=AsyncMock(return_value={cap.WORKSPACE_SETTINGS}),
         ),
-        patch.object(router.ai_policy_service, "override", new=AsyncMock(return_value=None)),
+        patch.object(
+            router.ai_policy_service, "override", new=AsyncMock(return_value=recorded)
+        ) as override,
+        patch.object(
+            router.ai_policy_service,
+            "effective_enforcement",
+            new=MagicMock(return_value="mandatory"),
+        ),
+        patch.object(router.run_service, "complete_plan", new=AsyncMock(return_value=run)),
     ):
-        with pytest.raises(HTTPException) as exc:
-            await router.override_run_ai_policy(
-                run_id=f"run-{run.id}", user=_user(), db=_mock_db(run, ws)
-            )
-    assert exc.value.status_code == 409
+        resp = await router.override_run_ai_policy(
+            run_id=f"run-{run.id}", user=_user(), db=_mock_db(run, ws)
+        )
+
+    assert resp.status_code == 200
+    # The service is told the enforcement level so the row it writes for a
+    # never-ruled run is honest about the gate it was held by.
+    assert override.await_args.kwargs["enforcement_level"] == "mandatory"
 
 
 @pytest.mark.asyncio
