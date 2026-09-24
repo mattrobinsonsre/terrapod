@@ -201,6 +201,7 @@ function RunActivityHeader({
   gate = null,
   reportedStatus,
   onOpenGate,
+  hasChanges,
 }: {
   status: string
   gate?: Gate | null
@@ -211,6 +212,8 @@ function RunActivityHeader({
   planOnly: boolean
   isConfirmable: boolean
   engine?: string
+  // Null/undefined for a run whose plan has not produced the flag yet.
+  hasChanges?: boolean | null
 }) {
   const t = useTranslations('runDetail')
   // The four phase states are the engine's vocabulary, not the platform's: a
@@ -245,7 +248,23 @@ function RunActivityHeader({
     confirmed: { label: t('status.confirmed'), activity: t('activity.confirmed'), dot: 'bg-blue-400', card: 'border-blue-800/40 bg-blue-900/10', sinceKey: 'confirmed-at' },
     applying: { label: phase('runStatus', 'applying'), activity: phase('activity', 'applying'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'applying-at' },
     canceling: { label: t('status.canceling'), activity: t('activity.canceling'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10' },
-    applied: { label: phase('runStatus', 'applied'), activity: t('activity.applied'), dot: 'bg-green-400', card: 'border-green-800/40 bg-green-900/10', sinceKey: 'applied-at' },
+    applied:
+      hasChanges === false
+        ? {
+            // A zero-change run short-circuits to `applied` without ever
+            // launching an apply (#1794). The status is right; "Applied" was
+            // not — on a workspace with auto-apply OFF it reads as though
+            // something was applied without anyone confirming it.
+            // Reuses the wording the change card and the log surface already
+            // use for this state, so the page does not grow a second name for
+            // the same thing.
+            label: t('changes.noChanges'),
+            activity: t('log.applySkippedNoChanges'),
+            dot: 'bg-slate-400',
+            card: 'border-slate-700/50 bg-slate-800/40',
+            sinceKey: 'applied-at',
+          }
+        : { label: phase('runStatus', 'applied'), activity: t('activity.applied'), dot: 'bg-green-400', card: 'border-green-800/40 bg-green-900/10', sinceKey: 'applied-at' },
     errored: { label: t('status.errored'), activity: t('activity.errored'), dot: 'bg-red-400', card: 'border-red-800/40 bg-red-900/10', sinceKey: 'errored-at' },
     canceled: { label: t('status.canceled'), activity: t('activity.canceled'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'canceled-at' },
     discarded: { label: t('status.discarded'), activity: t('activity.discarded'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'discarded-at' },
@@ -1709,6 +1728,7 @@ function RunDetailPageInner() {
                   : undefined
           }
           engine={attrs.engine}
+          hasChanges={attrs['has-changes']}
           timestamps={timestamps}
           planOnly={attrs['plan-only']}
           isConfirmable={actions['is-confirmable']}
