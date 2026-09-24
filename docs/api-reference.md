@@ -2830,7 +2830,6 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
     "drift-detection-enabled": true, "drift-detection-interval-seconds": 86400,
     "drift-ignore-rules": ["aws_instance.web.tags[\"LastSeen\"]"],
     "slack-channel": "#platform",
-    "pulumi-bind-plan": false,
     "run-tasks": [
       { "name": "opa-policy-check", "url": "http://opa:8080/webhook",
         "hmac-key": "secret", "stage": "post_plan", "enforcement-level": "mandatory" }
@@ -2847,12 +2846,11 @@ Semantics:
 
 - **Validated once up front** — field enums, `labels` reserved-key check, run-task/notification specs, and agent-pool existence + caller pool-`write` RBAC on **every** pool named. Any error ⇒ `422`, **zero mutation**.
 - **Agent pools** accept either `agent-pool-id` (one pool, replacing the set) or `agent-pool-ids` (the set) — the same mutually-exclusive pair as the workspace endpoints; both in one `update` ⇒ `422`.
-- **`security-scan-enforcement` is checked against the matched set**, not just the payload. Checkov and Trivy read Terraform plan JSON, so a Pulumi workspace has nothing to scan and accepts only `off`. Setting `advisory` or `enforced` across a match set containing one ⇒ `422` naming the offenders, with **zero mutation** — a mixed-engine match set is the normal case, and the alternative is every apply on those workspaces held waiting for a scan result that cannot arrive. Narrow the filter to exclude them.
+- **`security-scan-enforcement` is validated against the matched set**, not just the payload — the same value has to be legal for every workspace the filter matched, with **zero mutation** on any error.
 - **Every settable per-workspace setting is reachable here** (#1763). A source-introspection gate requires each `Workspace` column to be wired up, permanently exempt with a reason, or a recorded gap — so a new setting cannot be silently missing.
 - **All settings use the same rules as the single-workspace `PATCH`** (enum values, the 200-entry skip-rule cap, the 4000-character context cap, the drift-rule character set), so bulk update never accepts a value the workspace endpoint rejects. Booleans are type-checked, never coerced: `"false"` is refused rather than read as `true`.
-- **Two more settings are checked against the matched set**, for the same reason as `security-scan-enforcement`:
+- **One more setting is checked against the matched set**, for the same reason as `security-scan-enforcement`:
   - `vcs-workflow: apply_then_merge` needs a VCS connection and auto-apply off on **every** matched workspace — the apply runs before the PR merges, so auto-applying would apply from a branch nobody approved. Turning auto-apply off in the same request is allowed, mirroring the `PATCH` path.
-  - `pulumi-bind-plan` applies only to Pulumi workspaces; setting it across a match set containing another engine ⇒ `422`, rather than recording a setting that does nothing.
 - `run-tasks` / `notification-configurations` **upsert by `(workspace, name)`**: created if absent, updated in place if present (so re-running with a changed `url` rotates it across the fleet).
 - **All-or-nothing**: the whole batch commits or nothing does. `dry_run` (default `true`, not enforced) runs the identical code path and rolls back — the preview is exactly what apply would do, with provably zero side effects.
 - **Triggers no runs** — pure config write; the change lands on each workspace's next normal run. Reversible (it only writes settings rows).
