@@ -94,6 +94,9 @@ COPY provider/internal/datasources/workspace/*.go ./provider/internal/datasource
 # out of four because the rule was a convention nothing checked.
 COPY web/src/app/admin/bulk-update/page.tsx ./web/src/app/admin/bulk-update/page.tsx
 COPY web/src/app/admin/autodiscovery/page.tsx ./web/src/app/admin/autodiscovery/page.tsx
+# Read by tests/auth/test_cli_login_timing.py, which ties this page's
+# POLL_TIMEOUT_MS to AUTH_CODE_TTL. Without the file the gate raises.
+COPY web/src/app/auth/cli-complete/page.tsx ./web/src/app/auth/cli-complete/page.tsx
 
 # Storage data directory for tests
 RUN mkdir -p /var/lib/terrapod/storage
