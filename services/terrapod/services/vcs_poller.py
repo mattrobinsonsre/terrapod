@@ -482,7 +482,19 @@ async def _create_vcs_run(
     else:
         dedup_q = dedup_q.where(Run.vcs_pull_request_number == pr_number)
     if replaces_canceled:
-        dedup_q = dedup_q.where(Run.status != "canceled")
+        # An explicit re-plan is blocked only by a run that is still LIVE.
+        #
+        # This excluded `canceled` alone, which made `terrapod plan` a
+        # permanent no-op in its most likely case (#1831). `_route_plan`
+        # cancels runs `notin_(TERMINAL_STATES)`, so after a plan ERRORED
+        # there is nothing to cancel -- and the errored run then matched this
+        # dedup, `_create_vcs_run` returned None, and the author was told
+        # nothing. The only escape was a new commit, which is the very
+        # symptom #1795 set out to fix. Same for a run discarded in the UI.
+        #
+        # A terminal run is history, not coverage: none of applied, errored,
+        # discarded or canceled means "a plan for this SHA is on its way".
+        dedup_q = dedup_q.where(Run.status.notin_(run_service.TERMINAL_STATES))
     existing = await db.execute(dedup_q.limit(1))
     if existing.scalar_one_or_none() is not None:
         logger.info(
