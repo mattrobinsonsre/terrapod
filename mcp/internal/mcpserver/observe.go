@@ -588,8 +588,8 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			"risk level, the enforcement level (advisory/mandatory), the outcome (passed/failed/errored) and any override. " +
 			"Note `errored` BLOCKS under a mandatory gate rather than passing: the gate fails closed, so a verdict that " +
 			"could not be reached is not consent, and `error` says why (a spent token budget reads differently from a model " +
-			"fault). Returns null when no verdict is recorded — the meta then says whether the gate is off, the engine is " +
-			"not ruled on (Pulumi), or the verdict has simply not landed yet.",
+			"fault). Returns null when no verdict is recorded — the meta then says whether the gate is off " +
+			"or the verdict has simply not landed yet.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runAIPolicyIn) (*mcp.CallToolResult, *terrapod.AIPolicyEvaluation, error) {
 		if in.RunID == "" {
@@ -602,7 +602,6 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, e, nil
 	})
 
-	// ── terrapod_run_policy_checks ───────────────────────────────────
 	// ── terrapod_policy_set_list ─────────────────────────────────────
 	type policySetsIn struct{}
 	type policySetsOut struct {
