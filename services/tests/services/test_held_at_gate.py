@@ -205,7 +205,7 @@ class TestBlockedBy:
                 AsyncMock(return_value=scan),
             ),
             patch(
-                "terrapod.services.ai_policy_service.run_is_ai_policy_blocked",
+                "terrapod.services.ai_policy_service.run_is_held_by_ai_policy",
                 AsyncMock(return_value=ai),
             ),
             patch(
@@ -242,7 +242,7 @@ class TestBlockedBy:
                 AsyncMock(return_value=False),
             ),
             patch(
-                "terrapod.services.ai_policy_service.run_is_ai_policy_blocked",
+                "terrapod.services.ai_policy_service.run_is_held_by_ai_policy",
                 AsyncMock(return_value=True),
             ),
             patch(
@@ -253,6 +253,47 @@ class TestBlockedBy:
             hold = await run_service.post_plan_hold(AsyncMock(), _run())
 
         assert hold == run_service.PostPlanHold("ai-policy", tfe_status)
+
+    async def test_a_hold_with_no_verdict_yet_is_REACHABLE_not_just_correct(self):
+        """The parametrised test above patches the guard to True, so it proves
+        what the branch returns and nothing about whether production reaches it.
+
+        It did not. `run_is_ai_policy_blocked` reads the evaluation row and
+        answers False when there is none -- which is precisely the
+        not-yet-landed case -- so `recorded` could never be None inside that
+        branch and POST_PLAN_RUNNING was dead code. A run held waiting for a
+        verdict reported `blocked-by: null` AND no TFE status, so the CLI was
+        told nothing at all about a run nothing would move.
+
+        This drives the real predicate: only `get_evaluation` is stubbed, to
+        the empty state.
+        """
+        from terrapod.services import ai_policy_service
+
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=MagicMock(ai_policy_mode="default"))
+
+        with (
+            patch(
+                "terrapod.services.run_task_service._existing_stage",
+                AsyncMock(return_value=None),
+            ),
+            patch(
+                "terrapod.services.policy_set_service.run_is_policy_blocked",
+                AsyncMock(return_value=False),
+            ),
+            patch(
+                "terrapod.services.security_scan_service.run_is_scan_blocked",
+                AsyncMock(return_value=False),
+            ),
+            patch.object(ai_policy_service, "gate_applies_to", return_value=True),
+            patch.object(ai_policy_service, "effective_enforcement", return_value="mandatory"),
+            # No row at all: the summariser has not answered, or never will.
+            patch.object(ai_policy_service, "get_evaluation", new=AsyncMock(return_value=None)),
+        ):
+            hold = await run_service.post_plan_hold(db, _run())
+
+        assert hold == run_service.PostPlanHold("ai-policy", run_service.POST_PLAN_RUNNING)
 
 
 class TestWhatTheApiReports:
