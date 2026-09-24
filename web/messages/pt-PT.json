@@ -2157,6 +2157,7 @@
       "endTitle": "Ir para o fim do log",
       "planEmpty": "Ainda não há saída de plan disponível.",
       "applyEmpty": "Ainda não há saída de apply disponível.",
+      "applySkippedNoChanges": "Nenhuma aplicação foi executada: o plano não tinha alterações, pelo que não havia nada a aplicar.",
       "index": {
         "label": "Ir para",
         "title": "Ir para uma alteração de recurso ou para o resumo do plano",

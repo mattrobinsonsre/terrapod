@@ -2157,6 +2157,7 @@
       "endTitle": "跳转到日志末尾",
       "planEmpty": "暂无可用的计划输出。",
       "applyEmpty": "暂无可用的应用输出。",
+      "applySkippedNoChanges": "未执行应用：计划中没有变更，因此无需应用。",
       "index": {
         "label": "跳转到",
         "title": "跳转到资源变更或计划摘要",

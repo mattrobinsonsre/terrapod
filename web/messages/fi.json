@@ -2157,6 +2157,7 @@
       "endTitle": "Siirry lokin loppuun",
       "planEmpty": "Suunnitelman tulostetta ei ole vielä saatavilla.",
       "applyEmpty": "Käyttöönoton tulostetta ei ole vielä saatavilla.",
+      "applySkippedNoChanges": "Käyttöönottoa ei ajettu: suunnitelmassa ei ollut muutoksia, joten mitään ei ollut otettavana käyttöön.",
       "index": {
         "label": "Siirry",
         "title": "Siirry resurssimuutokseen tai suunnitelman yhteenvetoon",

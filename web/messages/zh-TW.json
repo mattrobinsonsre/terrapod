@@ -2157,6 +2157,7 @@
       "endTitle": "跳轉到日誌末尾",
       "planEmpty": "暫無可用的計畫輸出。",
       "applyEmpty": "暫無可用的應用輸出。",
+      "applySkippedNoChanges": "未執行套用：計畫中沒有變更，因此無需套用。",
       "index": {
         "label": "跳至",
         "title": "跳至資源變更或計畫摘要",

@@ -2157,6 +2157,7 @@
       "endTitle": "Ad finem diarii salire",
       "planEmpty": "Nullus egressus consilii adhuc praesto.",
       "applyEmpty": "Nullus egressus applicationis adhuc praesto.",
+      "applySkippedNoChanges": "Nulla applicatio acta est: consilium nullas mutationes habuit, itaque nihil applicandum erat.",
       "index": {
         "label": "Salire ad",
         "title": "Salire ad mutationem rei aut ad summarium consilii",
