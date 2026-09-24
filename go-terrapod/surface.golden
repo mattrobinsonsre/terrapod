@@ -697,8 +697,10 @@ field PolicyCheck.Scope string `json:"scope"`
 field PolicyCheck.SoftFailed int `json:"soft-failed"`
 field PolicyCheck.Status string `json:"status"`
 field PolicySet.AllowLabels map[string][]string `json:"allow-labels,omitempty"`
+field PolicySet.AllowNames []string `json:"allow-names,omitempty"`
 field PolicySet.CreatedAt string `json:"created-at,omitempty"`
 field PolicySet.DenyLabels map[string][]string `json:"deny-labels,omitempty"`
+field PolicySet.DenyNames []string `json:"deny-names,omitempty"`
 field PolicySet.Description string `json:"description,omitempty"`
 field PolicySet.Enabled bool `json:"enabled"`
 field PolicySet.EnforcementLevel string `json:"enforcement-level"`

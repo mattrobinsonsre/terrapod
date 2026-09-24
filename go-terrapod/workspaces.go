@@ -647,6 +647,12 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.AISummaryContext != "" {
 		attrs["ai-summary-context"] = req.AISummaryContext
 	}
+	if req.AIPolicyMode != "" {
+		attrs["ai-policy-mode"] = req.AIPolicyMode
+	}
+	if req.DebugMode != nil {
+		attrs["debug-mode"] = *req.DebugMode
+	}
 	if req.SlackChannel != "" {
 		attrs["slack-channel"] = req.SlackChannel
 	}
@@ -764,6 +770,12 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 		// *string so callers can explicitly clear the context with &"".
 		attrs["ai-summary-context"] = *req.AISummaryContext
 	}
+	if req.AIPolicyMode != "" {
+		attrs["ai-policy-mode"] = req.AIPolicyMode
+	}
+	if req.DebugMode != nil {
+		attrs["debug-mode"] = *req.DebugMode
+	}
 	if req.SlackChannel != nil {
 		// *string so callers can explicitly go silent with &"".
 		attrs["slack-channel"] = *req.SlackChannel
@@ -871,6 +883,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		DebugMode:                     GetBoolAttr(res, "debug-mode"),
 		AISummaryMode:                 GetStringAttr(res, "ai-summary-mode"),
 		AISummaryContext:              GetStringAttr(res, "ai-summary-context"),
+		AIPolicyMode:                  GetStringAttr(res, "ai-policy-mode"),
 		SlackChannel:                  GetStringAttr(res, "slack-channel"),
 		CreatedAt:                     GetStringAttr(res, "created-at"),
 		UpdatedAt:                     GetStringAttr(res, "updated-at"),

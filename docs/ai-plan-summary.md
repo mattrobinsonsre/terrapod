@@ -414,7 +414,7 @@ A plan **does NOT** get a summary when:
 - The plan has no JSON output (older runs, or runner upload failed)
 
 In every case, run lifecycle is unaffected — the feature is best-effort
-and never blocks plan or apply.
+and never blocks plan or apply — **provided the policy gate is off**. With `ai_summary.policy.enabled` and `enforcement_level: mandatory`, a skipped or errored summary is not a shrug: the gate fails closed and the run is held. Read the gate section above before turning the feature on in a deployment that gates.
 
 ## What gets sent to the model
 
