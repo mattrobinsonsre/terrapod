@@ -413,7 +413,30 @@ func readFromSDK(ctx context.Context, ps *terrapod.PolicySet, m *policySetModel)
 	if diags.HasError() {
 		return diags
 	}
+
+	m.AllowNames, diags = namesToTF(ctx, m.AllowNames, ps.AllowNames)
+	if diags.HasError() {
+		return diags
+	}
+	m.DenyNames, diags = namesToTF(ctx, m.DenyNames, ps.DenyNames)
+	if diags.HasError() {
+		return diags
+	}
 	return diags
+}
+
+// namesToTF mirrors labelsToTF for the name rules. Reading them back is what
+// makes a change made elsewhere show as a diff — and, more importantly, what
+// stops an imported set losing its scoping: `buildUpdateRequest` sends a
+// non-nil empty slice for a null list, so without this the first apply after
+// an import PATCHed `allow-names: []` and erased the rule.
+func namesToTF(
+	ctx context.Context, configured types.List, server []string,
+) (types.List, diag.Diagnostics) {
+	if len(server) == 0 && (configured.IsNull() || configured.IsUnknown()) {
+		return types.ListNull(types.StringType), nil
+	}
+	return types.ListValueFrom(ctx, types.StringType, server)
 }
 
 // optionalString keeps an unset attribute null rather than "" — the server
