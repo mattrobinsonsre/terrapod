@@ -11,11 +11,10 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
-from terrapod.config import settings
-from terrapod.db.models import PlanSummary, Run, VCSConnection, Workspace
+from terrapod.db.models import PlanSummary, PRSession, Run, VCSConnection, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service
+from terrapod.services import github_service, gitlab_service, run_links
 
 logger = get_logger(__name__)
 
@@ -130,8 +129,9 @@ def _build_comment_body(
     has_changes: bool | None,
     run_url: str,
     ai_summary: PlanSummary | None = None,
-) -> str:
-    """Build the markdown body for a PR/MR comment.
+    narrative_only: bool = False,
+) -> str | None:
+    """Build the markdown body for a PR/MR comment, or None for no comment.
 
     `has_changes` is consumed by ``_resolve_status`` to form the status
     description ("Has changes" / "No changes"); we don't append a second
@@ -142,7 +142,26 @@ def _build_comment_body(
     description + risk pill + risk-factor list (#401). Other statuses
     (pending / skipped / errored) are skipped — the comment shouldn't
     advertise empty or error rows to PR readers.
+
+    ``narrative_only`` is set when the PR already carries the PR-level status
+    table (#282), which reports the plan counts, the cost delta, the gate
+    verdicts and a link to the run. Repeating the status word and the run
+    link underneath it is duplication, and the one thing the table cannot
+    carry is the AI narrative — so this comment becomes exactly that, and
+    returns None when there is no narrative to show. `ai_summary.enabled`
+    defaults to false, so in a default deployment this comment never posts
+    and a PR carries a single Terrapod comment.
+
+    The caller decides `narrative_only` by looking for the table rather than
+    assuming it: a run can carry a PR number and still have no table — a
+    module-impact run does, because its number belongs to the module's
+    repository rather than the workspace's — and those must keep the full
+    comment or they are left with nothing.
     """
+    ready = ai_summary is not None and ai_summary.status == "ready"
+    if narrative_only and not ready:
+        return None
+
     _, _, description = _resolve_status(run_status, plan_only, has_changes)
     emoji = _STATUS_EMOJI.get(run_status, ":grey_question:")
 
@@ -151,16 +170,53 @@ def _build_comment_body(
     parts = [
         f"<!-- terrapod:ws:{workspace_id} -->",
         f"### Terrapod — {workspace_name}",
-        "",
-        f"**Status:** {emoji} {description}",
-        f"**Run:** [{run_id}]({run_url})",
     ]
-    if ai_summary is not None and ai_summary.status == "ready":
+    if not narrative_only:
+        parts.extend(
+            [
+                "",
+                f"**Status:** {emoji} {description}",
+                f"**Run:** [{run_id}]({run_url})",
+            ]
+        )
+    if ready:
         parts.append("")
         parts.append(_render_ai_summary_section(ai_summary))
     parts.append("")
     parts.append(f"*Updated {now}*")
     return "\n".join(parts)
+
+
+async def _pr_has_status_table(db, vcs_connection_id, repo: str, pr_number: int) -> bool:
+    """Whether the PR-level status table (#282) has been posted on this PR.
+
+    Keyed on `PRSession.status_comment_id`, which `vcs_status_comment` fills
+    only after the table is actually posted — so this answers "is the table
+    there", not the weaker "does a session row exist".
+
+    Asked rather than assumed, because a run can carry a PR number and have
+    no table: a module-impact run's number belongs to the module's
+    repository, while this comment goes to the workspace's, so nothing
+    matches. Those runs keep the full comment, which is the only one they get.
+
+    Failure answers False. Reporting should degrade towards saying more, and
+    the cost of being wrong that way is a duplicated status line rather than
+    a PR with no comment at all.
+    """
+    try:
+        return (
+            await db.execute(
+                select(PRSession.status_comment_id).where(
+                    PRSession.vcs_connection_id == vcs_connection_id,
+                    PRSession.repo == repo,
+                    PRSession.pr_number == pr_number,
+                    PRSession.status_comment_id.isnot(None),
+                )
+            )
+        ).scalar_one_or_none() is not None
+    except Exception as e:
+        logger.debug("Could not determine whether the PR status table exists", error=str(e))
+        return False
 
 
 def _render_ai_summary_section(s: PlanSummary) -> str:
@@ -411,10 +467,9 @@ async def handle_vcs_commit_status(payload: dict) -> None:
             target_status, run.plan_only, has_changes
         )
 
-        # Build target URL
-        target_url = ""
-        if settings.external_url:
-            target_url = f"{settings.external_url.rstrip('/')}/workspaces/{ws.id}/runs/{run.id}"
+        # Build target URL. "" rather than None because the provider clients
+        # take a plain string for the commit status's target.
+        target_url = run_links.run_url(ws.id, run.id) or ""
 
         # Scope context to the workspace so multiple workspaces linked to the
         # same PR (e.g. module-impact fan-out) each get a distinct check,
@@ -512,6 +567,12 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                     )
                 )
             ).scalar_one_or_none()
+            # When the PR-level table (#282) is already there, this comment
+            # drops to the one thing the table cannot carry — the AI
+            # narrative — and is not posted at all when there is none.
+            narrative_only = await _pr_has_status_table(
+                db, ws.vcs_connection_id, f"{owner}/{repo}", run.vcs_pull_request_number
+            )
             body = _build_comment_body(
                 workspace_name=ws.name,
                 workspace_id=str(ws.id),
@@ -521,10 +582,12 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                 has_changes=has_changes,
                 run_url=run_url,
                 ai_summary=ai_summary,
+                narrative_only=narrative_only,
             )
-            await _find_or_create_comment(
-                conn, owner, repo, run.vcs_pull_request_number, str(ws.id), body
-            )
+            if body is not None:
+                await _find_or_create_comment(
+                    conn, owner, repo, run.vcs_pull_request_number, str(ws.id), body
+                )
 
     logger.info(
         "VCS commit status posted",

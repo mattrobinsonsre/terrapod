@@ -1112,3 +1112,90 @@ class TestUploadCostEstimate:
             )
 
         assert resp.status_code == 403
+
+
+# ── PR status-comment refresh (#282) ──────────────────────────────────
+
+
+class TestArtifactUploadsRefreshThePRComment:
+    """Each artifact upload re-posts the PR comment, because each carries a
+    field the comment shows.
+
+    The runner sends these in separate requests — the counts with the JSON
+    plan, the cost seconds later again — so no single moment has all of them.
+    Observed live: a comment showing `changes` / `—` while the run row already
+    held `+3` and a USD estimate, because nothing refreshed after the uploads.
+
+    Reuses this module's `_mock_run` / `_make_app` / `_runner_user` harness.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch("terrapod.services.vcs_status_comment.refresh_for_run", new_callable=AsyncMock)
+    async def test_the_cost_upload_refreshes_with_the_cost_reason(
+        self, refresh, mock_get_storage, *_mocks
+    ):
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        run.has_cost_estimate = False
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        estimate = {
+            "currency": "USD",
+            "total": {"min": 73.0, "max": 146.0},
+            "diff": {"min": 12.0, "max": 20.0},
+            "resources": [],
+            "unpriced": [],
+        }
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/cost-estimate",
+                content=json.dumps(estimate).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        # The delta the comment's Cost column reports.
+        assert run.cost_diff_min == 12.0
+        assert run.cost_diff_max == 20.0
+        refresh.assert_awaited_once()
+        assert refresh.await_args.args[2] == "cost"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch("terrapod.services.vcs_status_comment.refresh_for_run", new_callable=AsyncMock)
+    async def test_the_plan_json_upload_refreshes_with_the_counts_reason(
+        self, refresh, mock_get_storage, *_mocks
+    ):
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        plan = {
+            "resource_changes": [
+                {"change": {"actions": ["create"]}},
+                {"change": {"actions": ["create"]}},
+            ]
+        }
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=json.dumps(plan).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code in (200, 204)
+        refresh.assert_awaited_once()
+        assert refresh.await_args.args[2] == "counts"

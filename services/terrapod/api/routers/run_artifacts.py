@@ -30,6 +30,7 @@ import os
 import re
 import tempfile
 import uuid
+from dataclasses import dataclass
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
@@ -444,25 +445,63 @@ async def _enqueue_plan_json_followups(run: Run, db: AsyncSession) -> Response:
         except Exception as e:
             logger.debug("Failed to re-enqueue drift completion after upload", error=str(e))
 
+    # PR status comment (#282) — the third case of the same race. The
+    # comment's Plan column reports the add/change/destroy counts, and those
+    # are written by THIS request, after the plan-result POST that drove
+    # `complete_plan`. A comment rendered at plan-result time therefore reads
+    # "changes" forever, whatever the counts turned out to be. Its own dedup
+    # reason, for the same purpose as `drift_postjson` above.
+    from terrapod.services import vcs_status_comment
+
+    await vcs_status_comment.refresh_for_run(db, run, "counts")
+
     return Response(status_code=204)
 
 
-def _summarize_cost_file(path: str) -> tuple[str | None, float | None, float | None] | None:
-    """Read (currency, monthly_min, monthly_max) from a cost_estimate.json.
+@dataclass(frozen=True)
+class _CostSummary:
+    """The figures cached on the run from a `cost_estimate.json`.
+
+    `monthly_*` is the projected spend of the planned state; `diff_*` is the
+    delta this run introduces (positive adds, negative removes), which the
+    engine already computes. Caching the delta means the PR status comment can
+    read it rather than re-deriving a value that cannot change once the plan
+    has finished.
+    """
+
+    currency: str | None
+    monthly_min: float | None
+    monthly_max: float | None
+    diff_min: float | None
+    diff_max: float | None
+
+
+def _summarize_cost_file(path: str) -> _CostSummary | None:
+    """Read the cached figures from a cost_estimate.json.
 
     Reads + parses on disk (never the raw request body) so it can run in a
     worker thread off the event loop. Returns None on any parse/shape error —
-    the artifact is still stored and served; only the cached totals are skipped.
+    the artifact is still stored and served; only the cached figures are
+    skipped. A payload with no `diff` block (anything written before the delta
+    was cached) still yields the totals, with the delta left None.
     """
+
+    def _f(block: dict, key: str) -> float | None:
+        value = block.get(key)
+        return float(value) if value is not None else None
+
     try:
         with open(path) as fh:
             data = json.load(fh)
         total = data.get("total") or {}
+        diff = data.get("diff") or {}
         currency = data.get("currency")
-        return (
-            currency if isinstance(currency, str) else None,
-            float(total["min"]) if total.get("min") is not None else None,
-            float(total["max"]) if total.get("max") is not None else None,
+        return _CostSummary(
+            currency=currency if isinstance(currency, str) else None,
+            monthly_min=_f(total, "min"),
+            monthly_max=_f(total, "max"),
+            diff_min=_f(diff, "min"),
+            diff_max=_f(diff, "max"),
         )
     except (OSError, ValueError, KeyError, TypeError):
         return None
@@ -498,7 +537,11 @@ async def upload_cost_estimate(
         run.has_cost_estimate = True
         totals = await asyncio.to_thread(_summarize_cost_file, tmp_path)
         if totals is not None:
-            run.cost_currency, run.cost_monthly_min, run.cost_monthly_max = totals
+            run.cost_currency = totals.currency
+            run.cost_monthly_min = totals.monthly_min
+            run.cost_monthly_max = totals.monthly_max
+            run.cost_diff_min = totals.diff_min
+            run.cost_diff_max = totals.diff_max
         else:
             logger.warning(
                 "cost_estimate.summary_unparseable",
@@ -522,6 +565,13 @@ async def upload_cost_estimate(
                 )
             except Exception as e:
                 logger.debug("Failed to enqueue ai_cost_summary after upload", error=str(e))
+        # PR status comment (#282) — the Cost column reads the delta cached
+        # just above. This upload is the last of the three the runner sends
+        # (measured: ~14s after the plan-result POST), so without a refresh
+        # here the comment reports a cost of "—" on every run that has one.
+        from terrapod.services import vcs_status_comment
+
+        await vcs_status_comment.refresh_for_run(db, run, "cost")
         return Response(status_code=204)
     finally:
         try:

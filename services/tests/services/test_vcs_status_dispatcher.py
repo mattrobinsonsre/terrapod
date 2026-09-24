@@ -609,3 +609,117 @@ class TestStaleStatusDoesNotClobberTheComment:
         body = await self._dispatch(live_status="applied", payload_status="errored")
         assert "Run failed" in body
         assert "Apply complete" not in body
+
+
+class TestNarrativeOnlyComment:
+    """Where the PR-level table exists, this comment carries only what the
+    table cannot: the AI narrative.
+
+    The table reports the plan counts, the cost delta, the gate verdicts and
+    a link to the run, so repeating the status word and the run link here is
+    duplication. What it has no way to carry is the #401 summary, so that is
+    what this comment becomes — and where there is no summary, there is
+    nothing left to say and no comment is posted at all.
+
+    `ai_summary.enabled` defaults to false, so in a default deployment this
+    comment never posts and a PR carries exactly one Terrapod comment.
+    """
+
+    def _summary(self):
+        s = MagicMock()
+        s.status = "ready"
+        s.kind = "plan_summary"
+        s.risk_level = "medium"
+        s.description = "Widens the subnet group to a second AZ."
+        s.risk_factors = []
+        return s
+
+    def _body(self, *, narrative_only, ai_summary):
+        from terrapod.services.vcs_status_dispatcher import _build_comment_body
+
+        return _build_comment_body(
+            workspace_name="prod-vpc",
+            workspace_id="w1",
+            run_id="run-r1",
+            run_status="planned",
+            plan_only=True,
+            has_changes=True,
+            run_url="https://terrapod.example/workspaces/w1/runs/r1",
+            ai_summary=ai_summary,
+            narrative_only=narrative_only,
+        )
+
+    def test_drops_the_status_and_link_the_table_already_carries(self):
+        out = self._body(narrative_only=True, ai_summary=self._summary())
+        assert out is not None
+        assert "**Status:**" not in out
+        assert "**Run:**" not in out
+
+    def test_keeps_the_narrative_and_says_which_workspace(self):
+        """On a multi-workspace PR the heading is what attaches it to a row."""
+        out = self._body(narrative_only=True, ai_summary=self._summary())
+        assert "### Terrapod — prod-vpc" in out
+        assert "AI summary" in out
+        assert "Widens the subnet group" in out
+
+    def test_nothing_to_say_means_no_comment(self):
+        out = self._body(narrative_only=True, ai_summary=None)
+        assert out is None
+
+    def test_an_unready_summary_is_also_nothing_to_say(self):
+        pending = self._summary()
+        pending.status = "pending"
+        assert self._body(narrative_only=True, ai_summary=pending) is None
+
+    def test_without_a_table_the_full_comment_is_unchanged(self):
+        """A run whose PR has no table — a module-impact run, for one — must
+        keep the status and the link, or it is left with no comment at all."""
+        out = self._body(narrative_only=False, ai_summary=None)
+        assert out is not None
+        assert "**Status:**" in out
+        assert "**Run:**" in out
+
+
+class TestTableDetection:
+    """Whether the PR already carries the PR-level status table.
+
+    This decides `narrative_only`, and it is a lookup rather than an
+    assumption: a run can carry a PR number and have no table. A
+    module-impact run is the case in hand — its number belongs to the module
+    repository, while the comment is posted against the workspace's, so no
+    PRSession matches and the full comment must still be posted.
+
+    Keyed on `PRSession.status_comment_id`, which `vcs_status_comment` sets
+    only once the table has actually been posted, so this means "the table is
+    there" rather than the weaker "a session row exists".
+    """
+
+    def _db_returning(self, value):
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = value
+        db.execute.return_value = result
+        return db
+
+    async def test_true_when_a_table_comment_has_been_posted(self):
+        from terrapod.services.vcs_status_dispatcher import _pr_has_status_table
+
+        db = self._db_returning("5758605718")
+        assert await _pr_has_status_table(db, uuid.uuid4(), "org/repo", 7) is True
+
+    async def test_false_when_the_session_has_no_comment_yet(self):
+        """A session exists but the table has not been posted — the run is
+        mid-flight and this comment is still the only one there is."""
+        from terrapod.services.vcs_status_dispatcher import _pr_has_status_table
+
+        db = self._db_returning(None)
+        assert await _pr_has_status_table(db, uuid.uuid4(), "org/repo", 7) is False
+
+    async def test_a_db_failure_keeps_the_full_comment(self):
+        """Reporting degrades towards saying more, not less: if we cannot tell
+        whether the table is there, post the comment that stands alone."""
+        from terrapod.services.vcs_status_dispatcher import _pr_has_status_table
+
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=RuntimeError("database is down"))
+        assert await _pr_has_status_table(db, uuid.uuid4(), "org/repo", 7) is False

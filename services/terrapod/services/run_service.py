@@ -1209,6 +1209,32 @@ async def complete_plan(
     run: Run,
     has_changes: bool | None = None,
 ) -> Run:
+    """Land the plan, then refresh the PR status comment.
+
+    A thin wrapper over :func:`_complete_plan`, which holds the actual
+    post-plan logic. The refresh lives out here because `_complete_plan` has
+    six exits — three of them the gates holding the run — and the held exits
+    are exactly the ones the comment needs to report ("blocked by policy").
+    Hooking each one separately is how one gets missed.
+
+    Only the racer that actually did the work reports: `_complete_plan` is
+    idempotent and returns early when the run has already left `planning`, so
+    the loser would otherwise re-post the same comment.
+    """
+    from terrapod.services import vcs_status_comment
+
+    did_the_work = run.status == "planning"
+    run = await _complete_plan(db, run, has_changes)
+    if did_the_work:
+        await vcs_status_comment.refresh_for_run(db, run, "plan")
+    return run
+
+
+async def _complete_plan(
+    db: AsyncSession,
+    run: Run,
+    has_changes: bool | None = None,
+) -> Run:
     """Drive a `planning` run to its post-plan terminal state.
 
     Idempotent landing point shared by the two paths that can authoritatively

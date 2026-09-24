@@ -1415,3 +1415,76 @@ class TestCompletePlanSurvivesADuplicatePost:
             assert first is not None
             await complete_plan(_mock_db, run, has_changes=True)
         assert run.plan_finished_at == first
+
+
+class TestCompletePlanRefreshesThePRComment:
+    """The PR status comment is refreshed when the plan lands.
+
+    The poller enqueues the comment when it *creates* the run, before the plan
+    has run: no resource counts, no cost estimate, no gate verdicts exist at
+    that moment. `complete_plan` is where all three become true — including on
+    the paths that stop early because a gate is holding the run, which is the
+    state the comment most needs to report.
+
+    Reuses this module's `_mock_run` and `_mock_db` rather than standing up a
+    second complete_plan harness.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _stub_policy_gate(self):
+        with patch(
+            "terrapod.services.policy_set_service.evaluate_post_plan",
+            new=AsyncMock(return_value="passed"),
+        ):
+            yield
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch(
+        "terrapod.services.run_task_service.create_task_stage",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
+    @patch("terrapod.services.vcs_status_comment.refresh_for_run", new_callable=AsyncMock)
+    async def test_a_finished_plan_refreshes_the_comment(
+        self, refresh, _stage, _avail, _evt, _mock_db
+    ):
+        run = _mock_run(status="planning", plan_started_at=datetime.now(UTC), plan_only=True)
+        run.has_changes = True
+        await complete_plan(_mock_db, run, has_changes=True)
+        refresh.assert_awaited_once()
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch(
+        "terrapod.services.run_task_service.create_task_stage",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
+    @patch("terrapod.services.vcs_status_comment.refresh_for_run", new_callable=AsyncMock)
+    async def test_a_run_held_at_the_policy_gate_still_refreshes(
+        self, refresh, _stage, _avail, _evt, _mock_db
+    ):
+        """The blocked case is the one the comment exists to explain."""
+        run = _mock_run(status="planning", plan_started_at=datetime.now(UTC), plan_only=True)
+        run.has_changes = True
+        with patch(
+            "terrapod.services.policy_set_service.evaluate_post_plan",
+            new=AsyncMock(return_value="policy_failed"),
+        ):
+            await complete_plan(_mock_db, run, has_changes=True)
+        refresh.assert_awaited_once()
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch(
+        "terrapod.services.run_task_service.create_task_stage",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
+    @patch("terrapod.services.vcs_status_comment.refresh_for_run", new_callable=AsyncMock)
+    async def test_the_losing_racer_does_not_refresh(self, refresh, _stage, _avail, _evt, _mock_db):
+        """Both completion paths can race; only the winner reports."""
+        run = _mock_run(status="planned")
+        await complete_plan(_mock_db, run)
+        refresh.assert_not_awaited()

@@ -2127,6 +2127,14 @@ class Run(Base):
     cost_currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
     cost_monthly_min: Mapped[float | None] = mapped_column(Float, nullable=True)
     cost_monthly_max: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # The monthly delta this run introduces (positive adds, negative removes),
+    # cached from the same `cost_estimate.json` as the totals above. The engine
+    # already computes it; caching it lets the PR status comment show a
+    # difference without re-deriving a value that is fixed once the plan ends.
+    # Null = no `diff` block in the artifact (anything written before this), not
+    # zero — same "don't know" vs "nothing" distinction as the resource counts.
+    cost_diff_min: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cost_diff_max: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Job tracking (populated by listener after launching K8s Job)
     job_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
