@@ -26,6 +26,8 @@ that way is to wire a new setting up rather than add a line.
 
 from __future__ import annotations
 
+import pathlib
+
 from terrapod.api.routers.workspace_bulk import _FIELD_MAP, _FIELDS_HANDLED_SEPARATELY
 from terrapod.db.models import Workspace
 
@@ -169,3 +171,113 @@ class TestEveryWorkspaceSettingIsAccountedFor:
         columns = _columns()
         bogus = sorted(a for a in _FIELD_MAP.values() if a not in columns)
         assert not bogus, f"_FIELD_MAP maps to non-existent Workspace column(s): {bogus}"
+
+
+# ── the other three surfaces #1763 named (#1763, second pass) ─────────
+#
+# The gate above covers bulk update SERVER-side only. Its own failure message
+# tells you to wire a new setting into "the autodiscovery rule template and the
+# GUI" too -- but nothing checked that, so the advice was a convention rather
+# than a rule. `ai_policy_mode` then shipped in the same release as the gate,
+# reachable from the API and the provider and absent from both admin pages: the
+# exact defect class #1763 was filed to end, recurring inside the release that
+# claimed to close it.
+#
+# These read the real surfaces and require each bulk-settable attribute to be
+# present or deliberately excused, in the same shape as the ledgers above.
+
+# The test image lays the tree out differently from a checkout: tests live at
+# `/app/tests` with the surfaces beside them, not under `services/`. Try both,
+# and fail loudly rather than silently passing if a surface is missing — a
+# gate that cannot read the file it checks proves nothing, and this one exists
+# because an unchecked convention already failed once.
+_TESTS_DIR = pathlib.Path(__file__).resolve().parent
+
+
+def _surface(*relative: str) -> pathlib.Path:
+    for rel in relative:
+        for base in (_TESTS_DIR.parents[2], _TESTS_DIR.parents[1]):  # local, docker
+            candidate = base / rel
+            if candidate.exists():
+                return candidate
+    raise FileNotFoundError(
+        f"Cannot find {relative[0]} from {_TESTS_DIR}. If this is the test image, "
+        "the file needs a COPY line in docker/Dockerfile.test — the parity gate "
+        "reads it, so without it the gate would pass vacuously."
+    )
+
+
+_BULK_GUI = _surface("web/src/app/admin/bulk-update/page.tsx")
+_AD_GUI = _surface("web/src/app/admin/autodiscovery/page.tsx")
+_AD_API = _surface(
+    "services/terrapod/api/routers/autodiscovery_rules.py",
+    "terrapod/api/routers/autodiscovery_rules.py",
+)
+
+#: Attributes a surface deliberately does not offer, and why. Each is a
+#: judgement that the control costs more than it is worth THERE -- never a
+#: record that somebody forgot. An entry is cheap to add and must say why.
+_SURFACE_EXEMPT: dict[str, dict[str, str]] = {
+    "bulk-update GUI": {
+        "labels": "handled by the dedicated label editor, not a named field",
+        "agent-pool-ids": "pool assignment needs per-pool RBAC; the API takes it, the fleet form does not",
+        "auto-apply": "deliberately not fleet-settable from a form: it arms unattended applies",
+        "drift-ignore-rules": "a rule list needs per-workspace context a fleet form cannot show",
+        "trigger-prefixes": "path lists are per-repository; a fleet-wide value is rarely meaningful",
+        "security-scan-skip-rules": "a skip list is per-workspace reasoning, not a fleet default",
+    },
+    "autodiscovery GUI": {
+        "labels": "handled by the dedicated label editor, not a named field",
+        "agent-pool-ids": "the rule form sets a single pool; the list form is API-only",
+        "trigger-prefixes": "the rule's own path patterns already scope what it matches",
+        "security-scan-skip-rules": "a skip list is per-workspace reasoning, not a rule default",
+    },
+    "autodiscovery API": {
+        "agent-pool-ids": "the rule template carries a single agent-pool id",
+        "trigger-prefixes": "the rule's own path patterns already scope what it matches",
+    },
+}
+
+
+def _surface_sources() -> dict[str, str]:
+    return {
+        "bulk-update GUI": _BULK_GUI.read_text(),
+        "autodiscovery GUI": _AD_GUI.read_text(),
+        "autodiscovery API": _AD_API.read_text(),
+    }
+
+
+class TestEverySettableAttributeReachesEverySurface:
+    def test_no_surface_is_silently_missing_a_setting(self):
+        """The rule #1763 asked for, enforced rather than advised."""
+        attrs = set(_FIELD_MAP) | set(_FIELDS_HANDLED_SEPARATELY)
+        problems: list[str] = []
+        for surface, src in _surface_sources().items():
+            excused = _SURFACE_EXEMPT.get(surface, {})
+            for a in sorted(attrs):
+                if a in excused:
+                    continue
+                if f"'{a}'" not in src and f'"{a}"' not in src:
+                    problems.append(f"{surface}: {a}")
+        assert not problems, (
+            "Settable per-workspace attribute(s) unreachable from a surface that "
+            f"manages workspaces: {problems}. Wire each one up, or record it in "
+            "_SURFACE_EXEMPT with the reason it does not belong there. #1763 asked "
+            "for exactly this rule; leaving it to convention is how ai-policy-mode "
+            "shipped on three surfaces out of four."
+        )
+
+    def test_the_ai_gate_override_reaches_all_of_them(self):
+        """Pinned by name: this is the one that regressed, and the general gate
+        above would pass again if a future change excused it instead."""
+        for surface, src in _surface_sources().items():
+            assert "'ai-policy-mode'" in src or '"ai-policy-mode"' in src, (
+                f"ai-policy-mode is unreachable from {surface}"
+            )
+
+    def test_no_exemption_names_an_attribute_that_is_not_settable(self):
+        """A stale excuse hides the setting it used to describe."""
+        attrs = set(_FIELD_MAP) | set(_FIELDS_HANDLED_SEPARATELY)
+        for surface, excused in _SURFACE_EXEMPT.items():
+            stale = set(excused) - attrs
+            assert not stale, f"{surface} excuses non-settable attribute(s): {sorted(stale)}"

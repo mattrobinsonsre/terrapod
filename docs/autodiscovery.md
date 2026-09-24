@@ -72,6 +72,8 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `security-scan-severity-threshold` | string | no | Lowest severity counted as a finding on created workspaces: `critical`, `high` (default), `medium`, `low` (#1763). |
 | `security-scan-skip-rules` | list | no | Scanner rule ids (Checkov `CKV_*` / Trivy `AVD-*`) ignored on every created workspace (#1763). |
 | `ai-summary-mode` | string | no | AI plan-summary opt-in on created workspaces: `default` (follow the deployment setting), `enabled`, `disabled` (#1763). |
+| `ai-policy-mode` | string | no | AI **policy gate** opt-in on created workspaces: `default`, `enabled`, `disabled`. A mandatory deployment-wide gate ignores `disabled` — it can only opt a workspace out of an *advisory* verdict (#1766). |
+| `ai-summary-context` | string | no | Free-text context added to the AI prompt for every created workspace. Max 4000 characters (#1763). |
 | `ai-summary-context` | string | no | Free-text context handed to the AI plan summariser for created workspaces, max 4000 characters (#1763). |
 | `terragrunt-enabled` / `terragrunt-version` | bool / string | no | Run Terragrunt on created workspaces, and at which version (#1763). |
 | `vcs-workflow` | string | no | `merge_then_apply` (default) or `apply_then_merge` on created workspaces (#1763). |
