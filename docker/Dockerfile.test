@@ -87,6 +87,9 @@ COPY go-terrapod/*.go ./go-terrapod/
 COPY provider/internal/resources/workspace/*.go ./provider/internal/resources/workspace/
 COPY provider/internal/datasources/workspace/*.go ./provider/internal/datasources/workspace/
 
+# Read by tests/auth/test_cli_login_timing.py, which ties this page's
+# POLL_TIMEOUT_MS to AUTH_CODE_TTL. Without the file the gate raises.
+COPY web/src/app/auth/cli-complete/page.tsx ./web/src/app/auth/cli-complete/page.tsx
 # Storage data directory for tests
 RUN mkdir -p /var/lib/terrapod/storage
 
