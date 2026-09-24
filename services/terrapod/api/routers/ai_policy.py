@@ -144,20 +144,18 @@ async def override_run_ai_policy(
     if not has_capability(caps, cap.WORKSPACE_SETTINGS):
         raise HTTPException(status_code=403, detail="Requires admin permission on workspace")
 
-    row = await ai_policy_service.override(db, run_id=run.id, actor=user.email)
-    if row is None:
-        # Nothing recorded yet. Overriding a verdict that has not arrived would
-        # be a no-op the caller could easily read as "released", so say so
-        # plainly instead: the run is held precisely because there is no ruling.
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "No AI policy verdict has been recorded for this run yet, so there "
-                "is nothing to override. A run held by a mandatory gate is "
-                "released as soon as the verdict lands; discard it if you do not "
-                "want to wait."
-            ),
-        )
+    # Releases the hold even when no verdict was ever recorded. That used to be
+    # a 409 on the grounds that there was nothing to override -- but a run held
+    # BECAUSE no verdict landed is exactly the run an operator most needs to
+    # release, and the advice to wait was advice to wait for something that was
+    # never coming. The service writes an honest row for that case rather than
+    # a forged pass.
+    row = await ai_policy_service.override(
+        db,
+        run_id=run.id,
+        actor=user.email,
+        enforcement_level=ai_policy_service.effective_enforcement(ws),
+    )
     await db.commit()
 
     if run.status == "planning":

@@ -2398,6 +2398,44 @@ class AISummaryConfig(BaseModel):
     context: AISummaryContextConfig = Field(default_factory=AISummaryContextConfig)
     policy: AIPolicyConfig = Field(default_factory=AIPolicyConfig)
 
+    @model_validator(mode="after")
+    def _gate_needs_the_summariser(self) -> "AISummaryConfig":
+        """A mandatory gate with the summariser off would hold every run forever.
+
+        The gate's verdict is produced BY the summariser. With
+        `ai_summary.enabled: false` nothing enqueues it, so no verdict ever
+        lands -- and a mandatory gate reads "no verdict" as "not ruled on" and
+        holds the run, by design, because silence is not consent. The run then
+        keeps its workspace lock, the reconciler re-drives it forever, and the
+        override endpoint answers 409 because there is no evaluation row to
+        override. Every apply-capable run in the deployment stops, with no
+        documented way out but discarding each one.
+
+        Nothing legitimate needs this combination, and it is reachable by
+        following the AI-outage runbook, which used to say "set
+        ai_summary.enabled: false". So refuse it at load rather than accept a
+        configuration whose only outcome is a deadlock.
+
+        Deliberately narrow: only MANDATORY is refused. Advisory records a
+        verdict and never blocks, so advisory-with-summaries-off is merely
+        inert, and refusing it would break deployments that are working.
+        """
+        if (
+            not self.enabled
+            and self.policy.enabled
+            and self.policy.enforcement_level == "mandatory"
+        ):
+            raise ValueError(
+                "ai_summary.policy.enforcement_level is 'mandatory' but "
+                "ai_summary.enabled is false. The gate's verdict is produced by "
+                "the summariser, so no verdict could ever land and every "
+                "apply-capable run would be held indefinitely with no way to "
+                "release it. Set ai_summary.enabled: true, or set "
+                "ai_summary.policy.enabled: false, or drop the gate to "
+                "'advisory'."
+            )
+        return self
+
 
 class AIOnboardingAuthConfig(BaseModel):
     """Auth for the AI onboarding model (#824).
