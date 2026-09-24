@@ -912,6 +912,18 @@ def _gate_deny_criteria(run: Run, ws: Workspace) -> str:
     return ai_policy_service.deny_criteria()
 
 
+def _gate_wants_verdict(run: Run, ws: Workspace) -> bool:
+    """Whether to ask the model for a `policy_verdict` on this run.
+
+    Deliberately separate from `_gate_deny_criteria`: a gate configured with a
+    risk threshold and no criteria still needs a verdict, and conflating the
+    two is what made such a gate record every run as `errored`.
+    """
+    from terrapod.services import ai_policy_service
+
+    return ai_policy_service.wants_verdict(run, ws)
+
+
 def _resolve_workspace_mode(ws: Workspace) -> bool:
     """Resolve the 3-state per-workspace toggle against the global flag.
 
@@ -1642,9 +1654,14 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             security_findings=security_findings,
             cost_estimate=cost_estimate,
             output_language=_output_language(),
-            # The gate rides this same call (#1766) -- empty when it does not
-            # apply, which makes the request byte-identical to an ungated one.
+            # The gate rides this same call (#1766) -- both are inert when it
+            # does not apply, which makes the request byte-identical to an
+            # ungated one. `wants_verdict` is passed SEPARATELY from the
+            # criteria: a gate may rule on the risk score alone, and keying the
+            # prompt on the criteria meant such a gate never asked for a verdict
+            # and then recorded every run as errored for not supplying one.
             deny_criteria=_gate_deny_criteria(run, ws),
+            wants_verdict=_gate_wants_verdict(run, ws),
         )
 
         try:
