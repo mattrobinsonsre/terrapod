@@ -112,7 +112,13 @@ async def get_run_ai_policy(
     row = await ai_policy_service.get_evaluation(db, run.id)
     meta: dict = {
         "enforcement-level": ai_policy_service.effective_enforcement(ws),
-        "blocking": await ai_policy_service.run_is_ai_policy_blocked(db, run.id),
+        # What HOLDS the run, not what ruled against it -- the same question
+        # `run_service.blocked_by` answers. The row-only predicate says False
+        # when no verdict has landed, which is exactly the state a mandatory
+        # gate holds a run in; the panel keys its blocked banner AND its
+        # override button on this, so reporting False there hid the only
+        # control that releases the run.
+        "blocking": await ai_policy_service.run_is_held_by_ai_policy(db, run),
     }
     if row is None:
         reason = _not_evaluated_reason(run, ws)

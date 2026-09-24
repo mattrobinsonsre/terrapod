@@ -1192,9 +1192,11 @@ service=terrapod-api logger=terrapod.services.vcs_status_dispatcher
   alone would hold every apply-capable run in the deployment: the gate's
   verdict is produced by the summariser, so none would ever land, and a
   mandatory gate holds a run it has no ruling for. Terrapod now **refuses to
-  start** on that combination rather than deadlocking quietly, so the pod would
-  fail its readiness probe instead — but the fix is the same either way, and it
-  is the gate that has to move.
+  start** on that combination rather than deadlocking quietly. The validator runs
+  when config is loaded, which is at import, so the pod exits before it serves
+  anything: you get `CrashLoopBackOff` and the reason in the container log, not
+  a failing readiness probe. The fix is the same either way — it is the gate
+  that has to move.
 
   ```yaml
   api:

@@ -15,7 +15,7 @@ downgrade drops them without data loss. Nothing reads them as a source
 of truth.
 
 Revision ID: c4d1e7b90a26
-Revises: e2450c5ecc86
+Revises: ede22f4eab33
 Create Date: 2026-09-21
 """
 

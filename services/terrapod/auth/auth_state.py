@@ -2,7 +2,7 @@
 
 Stores two types of state:
 - auth_state: Created in /authorize, consumed in /callback (TTL 5 minutes)
-- auth_code: Created in /callback, consumed in /token (TTL 60 seconds)
+- auth_code: Created in /callback, consumed in /token (TTL 5 minutes)
 
 Both use atomic GET+DELETE for one-time consumption.
 """
@@ -19,7 +19,21 @@ logger = get_logger(__name__)
 AUTH_STATE_PREFIX = "tp:auth_state:"
 AUTH_CODE_PREFIX = "tp:auth_code:"
 AUTH_STATE_TTL = 300  # 5 minutes
-AUTH_CODE_TTL = 60  # 1 minute
+
+# The window the CLI has to redeem the code the browser just handed it.
+#
+# This was 60s, and the browser hand-off page waited 60s before offering its
+# manual fallback -- so a user who needed that fallback was always given a code
+# that had already expired. The manual path could not work at all, and on
+# Safari it is the ONLY path: WebKit blocks the page's mixed-content fetch to
+# http://127.0.0.1 that Chromium permits.
+#
+# 5 minutes is well inside RFC 6749 s4.1.2's recommended 10-minute maximum for
+# an authorization code, and the code's real protections are unchanged: it is
+# single-use (atomic GET+DELETE below) and bound to the PKCE verifier, which
+# `/oauth/token` checks before issuing anything. Matching AUTH_STATE_TTL keeps
+# the two legs of the same login consistent.
+AUTH_CODE_TTL = 300  # 5 minutes
 
 
 @dataclass

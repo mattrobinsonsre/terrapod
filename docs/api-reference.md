@@ -1154,7 +1154,7 @@ POST /api/v1/runs/{run_id}/actions/override-ai-policy    # release a held run (w
 
 **`outcome: errored` BLOCKS under a mandatory gate rather than passing.** The gate fails closed: a verdict that could not be reached is not approval, so an empty `verdict` never reads as a clean pass. `error` distinguishes a spent daily token budget from a model fault, because the two call for different responses.
 
-**POST override** marks the verdict overridden and, when the run is still held in `planning`, re-drives `complete_plan` immediately (mirrors the policy and scan overrides). Requires **admin** on the workspace; audit-logged. It answers **409** when no verdict has been recorded yet — a run held *waiting* for one is released as soon as it lands, so there is nothing to override before then.
+**POST override** marks the verdict overridden and, when the run is still held in `planning`, re-drives `complete_plan` immediately (mirrors the policy and scan overrides). Requires **admin** on the workspace; audit-logged. It also releases a run held with **no verdict recorded** — the summariser never ran, or failed before ruling — writing an explicit no-verdict override (`outcome: overridden`, `verdict: null`, an `error` saying the gate never ruled) rather than a forged pass, so an auditor can tell the two apart.
 
 Unlike the other two gates there is **no runner protocol**: the verdict is produced in the API by the summariser, which is why a mandatory gate holds the run until it arrives instead of failing it. A Pulumi run is reported as not evaluated and never held — its preview digest is capped, and a gate ruling over a truncated resource list could allow a plan whose offending resource fell off the end.
 
@@ -2962,6 +2962,8 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
     "security-scan-skip-rules": ["CKV_AWS_24"],
     "ai-summary-mode": "enabled",
     "ai-summary-context": "payments estate; PCI in scope",
+    "ai-policy-mode": "enabled",
+    "debug-mode": true,
     "terragrunt-enabled": true, "terragrunt-version": "0.67.4",
     "trigger-prefixes": ["infra/net"],
     "vcs-workflow": "merge_then_apply",

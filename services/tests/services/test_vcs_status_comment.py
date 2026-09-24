@@ -1,6 +1,7 @@
 """Tests for the VCS PR status comment — plan counts, cost delta, gate details."""
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from terrapod.services.vcs_status_comment import _plan_summary
@@ -338,6 +339,56 @@ class TestCostDelta:
         assert _cost_delta(run) == "+7/mo"
 
 
+class _FakeResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return self._rows
+
+    def first(self):
+        return self._rows[0] if self._rows else None
+
+
+class _GateFakeDB:
+    """Answers the three row-backed gate queries by call order."""
+
+    def __init__(self):
+        self.calls = 0
+
+    async def execute(self, _stmt):
+        self.calls += 1
+        if self.calls == 1:  # post-plan task stage
+            return _FakeResult([("failed",)])
+        if self.calls == 2:  # policy evaluations
+            return _FakeResult([("prod-guardrails", "mandatory", "passed", None)])
+        return _FakeResult([("enforced", "failed", None)])  # security scan
+
+    async def get(self, _model, _pk):
+        return SimpleNamespace(id=_pk, ai_policy_mode="default")
+
+
+def _gate_run():
+    import uuid as _uuid
+
+    return SimpleNamespace(id=_uuid.uuid4(), workspace_id=_uuid.uuid4())
+
+
+async def _gates_with_ai(*, enforcement, row, held):
+    """Drive `_collect_gates` with the AI gate's three answers pinned."""
+    from terrapod.services import ai_policy_service
+    from terrapod.services.vcs_status_comment import _collect_gates
+
+    with (
+        patch.object(ai_policy_service, "get_evaluation", new=AsyncMock(return_value=row)),
+        patch.object(ai_policy_service, "effective_enforcement", return_value=enforcement),
+        patch.object(
+            ai_policy_service, "run_is_held_by_ai_policy", new=AsyncMock(return_value=held)
+        ),
+    ):
+        return await _collect_gates(_GateFakeDB(), _gate_run())
+
+
 class TestCollectGatesOrder:
     """Gates come back in the order `post_plan_hold` evaluates them.
 
@@ -345,41 +396,77 @@ class TestCollectGatesOrder:
     same gate the run's `blocked-by` attribute names.
     """
 
-    async def test_run_task_then_policy_then_scan(self):
-        import uuid as _uuid
-
-        from terrapod.services.vcs_status_comment import _collect_gates
-
-        class _FakeResult:
-            def __init__(self, rows):
-                self._rows = rows
-
-            def all(self):
-                return self._rows
-
-            def first(self):
-                return self._rows[0] if self._rows else None
-
-        class _FakeDB:
-            """Answers each of the three gate queries by call order."""
-
-            def __init__(self):
-                self.calls = 0
-
-            async def execute(self, _stmt):
-                self.calls += 1
-                if self.calls == 1:  # post-plan task stage
-                    return _FakeResult([("failed",)])
-                if self.calls == 2:  # policy evaluations
-                    return _FakeResult([("prod-guardrails", "mandatory", "passed", None)])
-                return _FakeResult([("enforced", "failed", None)])  # security scan
-
-        gates = await _collect_gates(_FakeDB(), _uuid.uuid4())
+    async def test_run_task_then_policy_then_scan_then_ai(self):
+        gates = await _gates_with_ai(
+            enforcement="mandatory", row=SimpleNamespace(outcome="failed"), held=True
+        )
         assert [(g.gate, g.passed) for g in gates] == [
             ("run-task", False),
             ("policy", True),
             ("security-scan", False),
+            ("ai-policy", False),
         ]
+
+
+class TestTheAIPolicyGateAppearsInTheComment:
+    """It did not, and that was the whole defect: `_collect_gates` read three
+    gates and `post_plan_hold` checks four. A run this gate was
+    holding rendered as all-green AND was offered a `terrapod apply` that the
+    gate would refuse -- the comment contradicting the platform."""
+
+    async def test_a_hold_with_no_verdict_yet_is_reported_as_blocking(self):
+        """The state with no row at all. Keying on the row reports it clear,
+        which is precisely the run that most needs the comment to speak up:
+        nothing moves until a person acts."""
+        gates = await _gates_with_ai(enforcement="mandatory", row=None, held=True)
+        ai = [g for g in gates if g.gate == "ai-policy"]
+        assert len(ai) == 1
+        assert ai[0].passed is False
+        assert "awaiting verdict" in ai[0].name
+
+    async def test_a_passing_verdict_is_listed_as_an_attestation(self):
+        gates = await _gates_with_ai(
+            enforcement="mandatory", row=SimpleNamespace(outcome="passed"), held=False
+        )
+        ai = [g for g in gates if g.gate == "ai-policy"]
+        assert [(g.passed, g.name) for g in ai] == [(True, "AI policy gate")]
+
+    async def test_an_advisory_gate_is_left_out(self):
+        """Advisory cannot hold a run, so listing it would dilute an
+        attestation meant to say "these are the gates with teeth"."""
+        gates = await _gates_with_ai(
+            enforcement="advisory", row=SimpleNamespace(outcome="failed"), held=False
+        )
+        assert not [g for g in gates if g.gate == "ai-policy"]
+
+    async def test_an_off_gate_is_left_out(self):
+        gates = await _gates_with_ai(enforcement="off", row=None, held=False)
+        assert not [g for g in gates if g.gate == "ai-policy"]
+
+    async def test_a_mandatory_gate_not_ruling_on_this_run_is_left_out(self):
+        """Mandatory deployment-wide, but exempt for this run (plan-only, or
+        no criteria and no threshold): no row and not held. Attesting to a
+        gate that never looked would be a false assurance."""
+        gates = await _gates_with_ai(enforcement="mandatory", row=None, held=False)
+        assert not [g for g in gates if g.gate == "ai-policy"]
+
+    def test_a_held_run_is_not_offered_an_apply(self):
+        """The consequence the reviewer actually sees."""
+        from terrapod.services.vcs_status_comment import GateVerdict, _Row, render_comment
+
+        row = _Row(
+            workspace_name="prod-net",
+            mode="apply_then_merge",
+            plan_summary="+ 1",
+            apply_summary="not applied",
+            mergeable_summary="yes",
+            gates=(
+                GateVerdict("ai-policy", "AI policy gate (awaiting verdict)", False, "mandatory"),
+            ),
+        )
+        body = render_comment([row])
+        assert "terrapod apply" not in body
+        assert "AI policy gate" in body
 
 
 class TestCollectRowsEnrichment:
@@ -396,6 +483,7 @@ class TestCollectRowsEnrichment:
 
         run = _FakeRun(status="planned", has_changes=True, resource_additions=2)
         run.id = _uuid.uuid4()
+        run.workspace_id = _uuid.uuid4()
         run.vcs_apply_blocked_reason = None
         run.cost_currency = "USD"
         run.cost_diff_min = 25.0
@@ -430,12 +518,18 @@ class TestCollectRowsEnrichment:
                     return _FakeResult([("prod-guardrails", "mandatory", "failed", None)])
                 return _FakeResult([])  # security scan: none
 
+            async def get(self, _model, _pk):
+                return _Workspace()
+
         class _Session:
             pr_number = 7
             vcs_connection_id = _uuid.uuid4()
             repo = "acme/infra"
 
-        rows = await _collect_rows(_FakeDB(), _Session())
+        from terrapod.services import ai_policy_service
+
+        with patch.object(ai_policy_service, "effective_enforcement", return_value="off"):
+            rows = await _collect_rows(_FakeDB(), _Session())
         assert len(rows) == 1
         assert rows[0].cost_delta == "+25 USD/mo"
         assert [(g.gate, g.passed) for g in rows[0].gates] == [("policy", False)]
