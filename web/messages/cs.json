@@ -2180,6 +2180,7 @@
       "endTitle": "Přejít na konec logu",
       "planEmpty": "Zatím není k dispozici žádný výstup plánu.",
       "applyEmpty": "Zatím není k dispozici žádný výstup apply.",
+      "applySkippedNoChanges": "Žádná aplikace neproběhla: plán neobsahoval žádné změny, takže nebylo co aplikovat.",
       "index": {
         "label": "Přejít na",
         "title": "Přejít na změnu zdroje nebo na souhrn plánu",

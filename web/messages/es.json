@@ -2180,6 +2180,7 @@
       "endTitle": "Ir al final del registro",
       "planEmpty": "Aún no hay salida del plan disponible.",
       "applyEmpty": "Aún no hay salida del apply disponible.",
+      "applySkippedNoChanges": "No se ejecutó ninguna aplicación: el plan no tenía cambios, así que no había nada que aplicar.",
       "index": {
         "label": "Ir a",
         "title": "Ir a un cambio de recurso o al resumen del plan",

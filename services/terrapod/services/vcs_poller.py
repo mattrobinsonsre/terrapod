@@ -53,6 +53,7 @@ from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
 from terrapod.services.vcs_metadata_cache import VCSMetadataCache
 from terrapod.services.vcs_provider import (
+    PRComment,
     PullRequest,
 )
 from terrapod.services.vcs_provider import (
@@ -446,6 +447,7 @@ async def _create_vcs_run(
     cache: VCSArchiveCache | None = None,
     meta: VCSMetadataCache | None = None,
     fetch_paths: list[str] | None = None,
+    replaces_canceled: bool = False,
 ) -> Run | None:
     """Download archive (via cache + streaming), create ConfigurationVersion and Run.
 
@@ -458,6 +460,15 @@ async def _create_vcs_run(
     pr_number), return None rather than creating a duplicate. This catches
     races from any path that might create VCS-sourced runs — including the
     vcs_poll ↔ vcs_immediate_poll race fixed by the CAS in _poll_workspace_branch.
+
+    `replaces_canceled` drops CANCELED runs from that dedup, for the one caller
+    that has just cancelled a run and means to replace it (`terrapod plan`,
+    #1795). It is deliberately NOT the default: the poller must keep treating a
+    cancelled run as "this SHA has been dealt with", or cancelling a PR run
+    from the UI would simply bring it back on the next cycle — and on an
+    apply_then_merge workspace that is the only way to release the lock the run
+    holds. Whether a cancel means "stop" or "do it again" is the caller's
+    knowledge, not something to infer from the row.
     """
     # Belt-and-braces against any path creating a duplicate run for the same
     # commit — the CAS in _poll_workspace_branch is the primary race closer.
@@ -470,6 +481,8 @@ async def _create_vcs_run(
         dedup_q = dedup_q.where(Run.vcs_pull_request_number.is_(None))
     else:
         dedup_q = dedup_q.where(Run.vcs_pull_request_number == pr_number)
+    if replaces_canceled:
+        dedup_q = dedup_q.where(Run.status != "canceled")
     existing = await db.execute(dedup_q.limit(1))
     if existing.scalar_one_or_none() is not None:
         logger.info(
@@ -723,6 +736,38 @@ async def _upsert_pr_session(
     return sess
 
 
+def _comment_is_after_session_start(c: PRComment, sess: PRSession) -> bool:
+    """Whether a comment was written after Terrapod began tracking the PR.
+
+    Only used for a session with no cursor yet — see `_poll_pr_comments`.
+
+    Fails CLOSED on a timestamp we cannot read: an unparseable date means we
+    cannot tell whether the comment predates the session, and dispatching a
+    command that might be days old is the failure this guard exists to stop.
+    Skipping it costs the author a re-comment; running it cancelled their run.
+    """
+    created = getattr(c, "created_at", "") or ""
+    try:
+        # `fromisoformat` handles the `Z` suffix from 3.11 on; both providers
+        # send RFC3339.
+        when = datetime.fromisoformat(created.replace("Z", "+00:00"))
+    except ValueError:
+        logger.warning(
+            "comment poll: unreadable comment timestamp, skipping",
+            repo=sess.repo,
+            pr_number=sess.pr_number,
+            comment_id=c.id,
+            created_at=created,
+        )
+        return False
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    started = sess.created_at
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=UTC)
+    return when >= started
+
+
 async def _poll_pr_comments(
     db: AsyncSession,
     conn: VCSConnection,
@@ -776,11 +821,30 @@ async def _poll_pr_comments(
         # Filter to comments newer than the last processed id (string
         # compare is fine — GitHub + GitLab comment ids are
         # monotonically increasing integers as strings).
+        #
+        # A session that has never processed a comment has no cursor, and
+        # treating that as "everything is new" replayed the PR's entire
+        # history the moment Terrapod started tracking it (#1796). A
+        # `terrapod plan` written days earlier — before the App had the
+        # permission, or before the workspace was apply_then_merge — then
+        # ran against the session's first run and cancelled it. So the
+        # session's own creation time is the cursor until a real one
+        # exists: a command predates Terrapod's knowledge of the PR or it
+        # does not, and only the latter was addressed to us.
+        #
+        # Timestamps rather than a stamped id deliberately: stamping would
+        # need a provider call at session creation, and would swallow a
+        # command posted in the window between creating the session and
+        # first polling it — up to a poll interval, because sessions are
+        # created after this function runs in the same cycle.
         new_comments = [
             c
             for c in comments
-            if sess.last_processed_comment_id is None
-            or int(c.id) > int(sess.last_processed_comment_id)
+            if (
+                _comment_is_after_session_start(c, sess)
+                if sess.last_processed_comment_id is None
+                else int(c.id) > int(sess.last_processed_comment_id)
+            )
         ]
         for c in new_comments:
             # Local import to avoid pulling the parser into the global

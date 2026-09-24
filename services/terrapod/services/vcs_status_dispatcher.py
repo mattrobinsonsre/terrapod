@@ -93,10 +93,33 @@ _COMMENT_CACHE_PREFIX = "tp:vcs_comment:"
 _COMMENT_CACHE_TTL = 7 * 24 * 3600  # 7 days
 
 
+# A run held at a post-plan gate stays in `planning`, so the status map alone
+# reported "Plan in progress" for as long as it was held — which is to say
+# indefinitely, because nothing moves until a person acts (#1798). The plan has
+# finished; what is outstanding is a decision. Each gate names itself and says
+# what would release it, because "blocked" without the verb leaves the reader
+# hunting through the UI for a button.
+_GATE_DESCRIPTION: dict[str, str] = {
+    "run-task": "Blocked by a run task — waiting on it, or override/discard the run",
+    "policy": "Blocked by a policy check — override or discard the run",
+    "security-scan": "Blocked by the security scan — override or discard the run",
+    "ai-policy": "Blocked by the AI policy gate — override or discard the run",
+}
+
+
 def _resolve_status(
-    run_status: str, plan_only: bool, has_changes: bool | None = None
+    run_status: str,
+    plan_only: bool,
+    has_changes: bool | None = None,
+    gate: str | None = None,
 ) -> tuple[str, str, str]:
     """Map run status to (github_state, gitlab_state, description).
+
+    `gate` is the post-plan gate holding the run, from `run_service.blocked_by`.
+    A held run reports `pending` rather than `failure`: the plan succeeded and
+    the run is awaiting a decision, which is the same reading the existing
+    "awaiting confirmation" case gets. It still keeps a required check unmet,
+    so a PR cannot merge past a gate that is holding its run.
 
     Plan-only 'planned' runs use the plan's has_changes flag to produce a
     descriptive message ("Has changes" / "No changes") instead of the generic
@@ -106,6 +129,16 @@ def _resolve_status(
     is None (older runs, pre-plan statuses) the description falls back to
     the bare form.
     """
+    if gate and run_status == "planning":
+        return ("pending", "running", _GATE_DESCRIPTION.get(gate, f"Blocked by {gate}"))
+    if run_status == "applied" and has_changes is False:
+        # A zero-change run short-circuits straight to `applied` without
+        # launching an apply — deliberately, because there is nothing to apply
+        # and an empty apply trips the duplicate-serial 500 on state upload.
+        # The run status is right; "Apply complete" was not (#1794). It read as
+        # though something had been applied, which on a workspace with
+        # auto-apply OFF is alarming rather than merely imprecise.
+        return ("success", "success", "No changes — nothing to apply")
     if run_status == "planned":
         # A no-op plan is effectively done — nothing to apply, nothing to
         # confirm. Report success regardless of plan_only.
@@ -130,6 +163,7 @@ def _build_comment_body(
     has_changes: bool | None,
     run_url: str,
     ai_summary: "PlanSummary | None" = None,
+    gate: str | None = None,
 ) -> str:
     """Build the markdown body for a PR/MR comment.
 
@@ -143,8 +177,15 @@ def _build_comment_body(
     (pending / skipped / errored) are skipped — the comment shouldn't
     advertise empty or error rows to PR readers.
     """
-    github_state, _, description = _resolve_status(run_status, plan_only, has_changes)
-    emoji = _STATUS_EMOJI.get(run_status, ":grey_question:")
+    _, _, description = _resolve_status(run_status, plan_only, has_changes, gate)
+    # A held run is still `planning`, whose emoji is a turning gear. Next to
+    # "Blocked by a policy check" that reads as "still working on it", which is
+    # the impression this whole fix exists to correct.
+    emoji = (
+        ":no_entry:"
+        if gate and run_status == "planning"
+        else _STATUS_EMOJI.get(run_status, ":grey_question:")
+    )
 
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -407,8 +448,27 @@ async def handle_vcs_commit_status(payload: dict) -> None:
             if payload_has_changes is _UNSET:
                 has_changes = run.has_changes
 
+        # Which gate, if any, is holding this run (#1798). Resolved from the
+        # live row rather than the payload: a gate blocks AFTER the transition
+        # that enqueued this, so the payload cannot know. Best-effort — a
+        # status update is not worth failing over a gate lookup.
+        gate: str | None = None
+        if target_status == "planning":
+            # Local import: run_service pulls in the run/engine stack, and this
+            # dispatcher is reached from the scheduler on every status change.
+            from terrapod.services import run_service
+
+            try:
+                gate = await run_service.blocked_by(db, run)
+            except Exception as e:
+                logger.warning(
+                    "Could not resolve the gate holding this run",
+                    run_id=run_id_str,
+                    error=str(e),
+                )
+
         github_state, gitlab_state, description = _resolve_status(
-            target_status, run.plan_only, has_changes
+            target_status, run.plan_only, has_changes, gate
         )
 
         # Build target URL
@@ -521,6 +581,7 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                 has_changes=has_changes,
                 run_url=run_url,
                 ai_summary=ai_summary,
+                gate=gate,
             )
             await _find_or_create_comment(
                 conn, owner, repo, run.vcs_pull_request_number, str(ws.id), body

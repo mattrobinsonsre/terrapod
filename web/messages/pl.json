@@ -2180,6 +2180,7 @@
       "endTitle": "Przejdź na koniec dziennika",
       "planEmpty": "Brak dostępnego wyjścia planu.",
       "applyEmpty": "Brak dostępnego wyjścia zastosowania.",
+      "applySkippedNoChanges": "Nie uruchomiono zastosowania: plan nie zawierał zmian, więc nie było czego zastosować.",
       "index": {
         "label": "Przejdź do",
         "title": "Przejdź do zmiany zasobu lub do podsumowania planu",

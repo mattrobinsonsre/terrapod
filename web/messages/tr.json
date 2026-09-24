@@ -2180,6 +2180,7 @@
       "endTitle": "Günlüğün sonuna atla",
       "planEmpty": "Henüz plan çıktısı mevcut değil.",
       "applyEmpty": "Henüz uygulama çıktısı mevcut değil.",
+      "applySkippedNoChanges": "Uygulama çalıştırılmadı: planda değişiklik yoktu, bu yüzden uygulanacak bir şey yoktu.",
       "index": {
         "label": "Şuraya git",
         "title": "Bir kaynak değişikliğine veya plan özetine git",

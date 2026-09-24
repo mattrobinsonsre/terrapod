@@ -2180,6 +2180,7 @@
       "endTitle": "Salta alla fine del log",
       "planEmpty": "Nessun output del plan ancora disponibile.",
       "applyEmpty": "Nessun output dell''apply ancora disponibile.",
+      "applySkippedNoChanges": "Nessuna applicazione eseguita: il piano non conteneva modifiche, quindi non c''era nulla da applicare.",
       "index": {
         "label": "Vai a",
         "title": "Vai a una modifica di risorsa o al riepilogo del piano",

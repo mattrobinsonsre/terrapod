@@ -2180,6 +2180,7 @@
       "endTitle": "Jump ta teh end ov teh log",
       "planEmpty": "No plan output availabul yet.",
       "applyEmpty": "No apply output availabul yet.",
+      "applySkippedNoChanges": "No apply happend: teh plan haz no changez, so nuthin to apply.",
       "index": {
         "label": "Jumpz to",
         "title": "Jumpz to a rezorce chanj, or teh plan summry",

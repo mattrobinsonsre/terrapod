@@ -2180,6 +2180,7 @@
       "endTitle": "Hopp til slutten av loggen",
       "planEmpty": "Ingen planutdata tilgjengelig ennå.",
       "applyEmpty": "Ingen anvendelsesutdata tilgjengelig ennå.",
+      "applySkippedNoChanges": "Ingen anvendelse ble kjørt: planen hadde ingen endringer, så det var ingenting å anvende.",
       "index": {
         "label": "Gå til",
         "title": "Gå til en ressursendring eller til plansammendraget",
