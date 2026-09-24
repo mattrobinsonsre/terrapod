@@ -671,8 +671,10 @@ field Policy.PolicySetID string `json:"policy-set-id"`
 field Policy.Rego string `json:"rego"`
 field Policy.UpdatedAt string `json:"updated-at,omitempty"`
 field PolicySet.AllowLabels map[string]string `json:"allow-labels,omitempty"`
+field PolicySet.AllowNames []string `json:"allow-names,omitempty"`
 field PolicySet.CreatedAt string `json:"created-at,omitempty"`
 field PolicySet.DenyLabels map[string]string `json:"deny-labels,omitempty"`
+field PolicySet.DenyNames []string `json:"deny-names,omitempty"`
 field PolicySet.Description string `json:"description,omitempty"`
 field PolicySet.Enabled bool `json:"enabled"`
 field PolicySet.EnforcementLevel string `json:"enforcement-level"`

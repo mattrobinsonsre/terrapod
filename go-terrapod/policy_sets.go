@@ -29,6 +29,15 @@ type PolicySet struct {
 	AllowLabels map[string]string `json:"allow-labels,omitempty"`
 	DenyLabels  map[string]string `json:"deny-labels,omitempty"`
 
+	// AllowNames/DenyNames scope the set by workspace NAME. They had the same
+	// write-but-never-read gap the label rules had, with a worse consequence:
+	// the provider's Read left the prior state in place, so changing a name
+	// rule elsewhere showed no diff, and after `terraform import` the rules
+	// read as null and the next apply PATCHed them to `[]` — silently erasing
+	// the scoping, with no plan beforehand to show it happening.
+	AllowNames []string `json:"allow-names,omitempty"`
+	DenyNames  []string `json:"deny-names,omitempty"`
+
 	// Source discriminator: "inline" (default) or "vcs".
 	Source string `json:"source"`
 
@@ -267,6 +276,8 @@ func policySetFromResource(res *Resource) *PolicySet {
 		PolicyCount:      GetIntAttr(res, "policy-count"),
 		AllowLabels:      labelRuleAttr(res, "allow-labels"),
 		DenyLabels:       labelRuleAttr(res, "deny-labels"),
+		AllowNames:       GetListAttr(res, "allow-names"),
+		DenyNames:        GetListAttr(res, "deny-names"),
 		Source:           GetStringAttr(res, "source"),
 		VCSConnectionID:  GetStringAttr(res, "vcs-connection-id"),
 		VCSRepoURL:       GetStringAttr(res, "vcs-repo-url"),

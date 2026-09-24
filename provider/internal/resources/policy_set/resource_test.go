@@ -203,3 +203,53 @@ func TestReadCarriesTheSyncStatus(t *testing.T) {
 		t.Fatalf("policy_count = %d, want 4", m.PolicyCount.ValueInt64())
 	}
 }
+
+// A name-scoped set that is imported, then applied, used to lose its scope.
+//
+// `readFromSDK` never populated AllowNames/DenyNames (go-terrapod did not even
+// decode them), so after `terraform import` both read as null. The next apply
+// called buildUpdateRequest, whose `sliceFromTFListOrEmpty` turns a null list
+// into a NON-NIL empty slice, and policySetUpdateAttrs sends any non-nil
+// slice — so the PATCH carried `"allow-names": []` and erased the rule. No
+// plan showed it beforehand, because Read had never populated the value there
+// was a diff against.
+func TestReadPopulatesNameRulesSoImportDoesNotEraseThem(t *testing.T) {
+	ctx := context.Background()
+	// The shape `terraform import` produces: nothing configured locally yet.
+	m := &policySetModel{}
+	ps := &terrapod.PolicySet{
+		ID:         "pset-1",
+		Name:       "prod-guardrails",
+		AllowNames: []string{"prod-network", "prod-data"},
+		DenyNames:  []string{"sandbox"},
+	}
+
+	if d := readFromSDK(ctx, ps, m); d.HasError() {
+		t.Fatalf("readFromSDK: %v", d)
+	}
+
+	if m.AllowNames.IsNull() {
+		t.Fatal("allow_names read back null — the next apply would PATCH it to [] and erase the scope")
+	}
+	got := sliceFromTFList(m.AllowNames)
+	if len(got) != 2 || got[0] != "prod-network" || got[1] != "prod-data" {
+		t.Errorf("allow_names = %v, want [prod-network prod-data]", got)
+	}
+	if deny := sliceFromTFList(m.DenyNames); len(deny) != 1 || deny[0] != "sandbox" {
+		t.Errorf("deny_names = %v, want [sandbox]", deny)
+	}
+}
+
+// The other half: a set with genuinely no name scoping must stay null rather
+// than becoming an empty list, or every plan shows a permanent null -> [] diff.
+func TestAnUnscopedSetKeepsItsNameRulesNull(t *testing.T) {
+	ctx := context.Background()
+	m := &policySetModel{}
+
+	if d := readFromSDK(ctx, &terrapod.PolicySet{ID: "pset-2", Name: "global"}, m); d.HasError() {
+		t.Fatalf("readFromSDK: %v", d)
+	}
+	if !m.AllowNames.IsNull() || !m.DenyNames.IsNull() {
+		t.Error("an unscoped set read back non-null name rules — that plans forever")
+	}
+}
