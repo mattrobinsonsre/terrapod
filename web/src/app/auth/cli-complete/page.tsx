@@ -167,7 +167,20 @@ function CliCompleteInner() {
         ) : status === 'timeout' ? (
           <>
             <h1 className="text-2xl font-bold mb-2">{t('success.title')}</h1>
-            <p className="text-slate-400">{t('timeout.description')}</p>
+            <p className="text-slate-400 mb-4">{t('timeout.description')}</p>
+            {/*
+              The same retry the fallback offers (#1835). This state used to be
+              reached at 60s, by which point the 60s code was dead and a button
+              would have been a lie. It is now reached at 20s with most of a
+              300s code left -- the one moment a manual retry actually works is
+              exactly when the page stopped offering one.
+            */}
+            <button
+              onClick={handleManualRedirect}
+              className="bg-brand-600 hover:bg-brand-500 text-white font-medium py-2 px-6 rounded-lg transition-colors inline-block btn-smoke"
+            >
+              {t('fallback.button')}
+            </button>
           </>
         ) : (
           <>

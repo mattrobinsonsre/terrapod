@@ -1,7 +1,7 @@
 """Tests for Redis-backed ephemeral auth state."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 from terrapod.auth.auth_state import (
     AUTH_CODE_PREFIX,
@@ -73,11 +73,6 @@ class TestConsumeAuthState:
         redis = AsyncMock()
         mock_get_redis.return_value = redis
 
-        pipe = AsyncMock()
-        pipe.__aenter__ = AsyncMock(return_value=pipe)
-        pipe.__aexit__ = AsyncMock(return_value=False)
-        redis.pipeline = MagicMock(return_value=pipe)
-
         state_data = {
             "provider_name": "oidc",
             "client_redirect_uri": "http://localhost:10000/login",
@@ -89,7 +84,7 @@ class TestConsumeAuthState:
             "idp_code_verifier": "upstream-verifier",
             "credential_type": "session",
         }
-        pipe.execute.return_value = [json.dumps(state_data), 1]
+        redis.getdel = AsyncMock(return_value=json.dumps(state_data))
 
         result = await consume_auth_state("idp-state-xyz")
 
@@ -101,19 +96,16 @@ class TestConsumeAuthState:
         assert result.credential_type == "session"
 
         # Verify atomic get+delete
-        pipe.get.assert_called_once_with(AUTH_STATE_PREFIX + "idp-state-xyz")
-        pipe.delete.assert_called_once_with(AUTH_STATE_PREFIX + "idp-state-xyz")
+        # One atomic GETDEL, not a GET then a DELETE: a pipeline without
+        # MULTI/EXEC lets two clients redeem the same one-time value.
+        redis.getdel.assert_awaited_once_with(AUTH_STATE_PREFIX + "idp-state-xyz")
 
     @patch("terrapod.auth.auth_state.get_redis_client")
     async def test_consume_expired_state_returns_none(self, mock_get_redis):
         redis = AsyncMock()
         mock_get_redis.return_value = redis
 
-        pipe = AsyncMock()
-        pipe.__aenter__ = AsyncMock(return_value=pipe)
-        pipe.__aexit__ = AsyncMock(return_value=False)
-        redis.pipeline = MagicMock(return_value=pipe)
-        pipe.execute.return_value = [None, 0]
+        redis.getdel = AsyncMock(return_value=None)
 
         result = await consume_auth_state("nonexistent")
         assert result is None
@@ -153,11 +145,6 @@ class TestConsumeAuthCode:
         redis = AsyncMock()
         mock_get_redis.return_value = redis
 
-        pipe = AsyncMock()
-        pipe.__aenter__ = AsyncMock(return_value=pipe)
-        pipe.__aexit__ = AsyncMock(return_value=False)
-        redis.pipeline = MagicMock(return_value=pipe)
-
         code_data = {
             "email": "test@example.com",
             "roles": ["admin", "audit"],
@@ -168,7 +155,7 @@ class TestConsumeAuthCode:
             "max_session_ttl": 3600,
             "credential_type": "session",
         }
-        pipe.execute.return_value = [json.dumps(code_data), 1]
+        redis.getdel = AsyncMock(return_value=json.dumps(code_data))
 
         result = await consume_auth_code("code-123")
 
@@ -178,19 +165,16 @@ class TestConsumeAuthCode:
         assert result.max_session_ttl == 3600
         assert result.credential_type == "session"
 
-        pipe.get.assert_called_once_with(AUTH_CODE_PREFIX + "code-123")
-        pipe.delete.assert_called_once_with(AUTH_CODE_PREFIX + "code-123")
+        # One atomic GETDEL, not a GET then a DELETE: a pipeline without
+        # MULTI/EXEC lets two clients redeem the same one-time value.
+        redis.getdel.assert_awaited_once_with(AUTH_CODE_PREFIX + "code-123")
 
     @patch("terrapod.auth.auth_state.get_redis_client")
     async def test_consume_expired_code_returns_none(self, mock_get_redis):
         redis = AsyncMock()
         mock_get_redis.return_value = redis
 
-        pipe = AsyncMock()
-        pipe.__aenter__ = AsyncMock(return_value=pipe)
-        pipe.__aexit__ = AsyncMock(return_value=False)
-        redis.pipeline = MagicMock(return_value=pipe)
-        pipe.execute.return_value = [None, 0]
+        redis.getdel = AsyncMock(return_value=None)
 
         result = await consume_auth_code("expired-code")
         assert result is None
