@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { isDeliverableRedirect } from '@/lib/cli-redirect'
 
 type Status = 'delivering' | 'polling' | 'complete' | 'timeout' | 'fallback'
 
@@ -34,6 +35,9 @@ function CliCompleteInner() {
   const deliveredRef = useRef(false)
 
   const localhostUrl = `${redirectUri}?code=${code}&state=${state}`
+  // Checked before EITHER sink -- the automatic navigation below and the
+  // manual button -- so a hand-crafted link cannot reach either one.
+  const deliverable = isDeliverableRedirect(redirectUri)
 
   // Step 1: deliver the code to the CLI's local listener.
   //
@@ -50,7 +54,7 @@ function CliCompleteInner() {
   // the user on this page for the success state; the navigation is the
   // fallback that always works.
   useEffect(() => {
-    if (!code || !redirectUri || deliveredRef.current) return
+    if (!code || !deliverable || deliveredRef.current) return
     deliveredRef.current = true
 
     fetch(localhostUrl, { mode: 'no-cors' })
@@ -71,7 +75,7 @@ function CliCompleteInner() {
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- localhostUrl is EXTERNAL (the terraform CLI's local callback listener), not an internal route. A router push would not leave the origin, and leaving it is the point: a top-level navigation is not subresource content, so it is not mixed-content blocked.
         window.location.href = localhostUrl
       })
-  }, [code, redirectUri, localhostUrl])
+  }, [code, deliverable, localhostUrl])
 
   // Step 2: poll for completion
   useEffect(() => {
@@ -109,11 +113,12 @@ function CliCompleteInner() {
   }, [status, code, fetchFailed])
 
   const handleManualRedirect = useCallback(() => {
+    if (!deliverable) return
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- localhostUrl is EXTERNAL (the terraform CLI's local callback listener), not an internal route.
     window.location.href = localhostUrl
-  }, [localhostUrl])
+  }, [localhostUrl, deliverable])
 
-  if (!code || !redirectUri) {
+  if (!code || !deliverable) {
     return (
       <main className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-md text-center">
