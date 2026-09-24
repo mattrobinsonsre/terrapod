@@ -31,14 +31,26 @@ _KNOWN_VERBS = frozenset({"plan", "apply", "unlock", "merge", "help"})
 class Command:
     """Parsed `terrapod ...` command from a PR/MR comment.
 
-    `verb` is one of the known verbs (or "help" if the verb was missing
-    or unrecognised). `workspace` is the value of the `-W` / `--workspace`
-    flag, if any. `raw` is the matched line for diagnostics + audit.
+    `verb` is one of the known verbs, or "help" if it was unrecognised. A
+    line carrying the prefix alone does not parse as a command at all, so
+    there is no "missing verb" case to represent.
+
+    `workspace` is the value of the `-W` / `--workspace` flag, if any.
+    `raw` is the matched line for diagnostics + audit.
+
+    `unrecognised` carries the token we could not match, so the reply can
+    name it (#1799) rather than answering a typo with a bare usage table.
+    It is set ONLY when the line is the prefix plus that one token: a line
+    like `terrapod is broken` is prose that happens to open with the
+    prefix, and quoting "is" back at its author would read as a parser
+    talking nonsense. Both still get the usage table — that is #1797's
+    deliberate trade, unchanged here.
     """
 
     verb: str
     workspace: str | None
     raw: str
+    unrecognised: str | None = None
 
 
 # Match `terrapod <verb>` optionally with `-W <name>` / `--workspace=<name>`.
@@ -82,7 +94,12 @@ def parse(body: str, *, mention_prefix: str = "terrapod") -> Command | None:
         verb = m.group("verb").strip(".,!?:;").lower()
         rest = m.group("rest") or ""
         if verb not in _KNOWN_VERBS:
-            return Command(verb="help", workspace=None, raw=raw_line.strip())
+            return Command(
+                verb="help",
+                workspace=None,
+                raw=raw_line.strip(),
+                unrecognised=verb if not rest.strip() else None,
+            )
         ws_match = _WORKSPACE_RE.search(rest)
         workspace = ws_match.group("ws") if ws_match else None
         return Command(verb=verb, workspace=workspace, raw=raw_line.strip())
