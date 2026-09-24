@@ -180,10 +180,33 @@ class TestEveryWorkspaceSettingIsAccountedFor:
 # These read the real surfaces and require each bulk-settable attribute to be
 # present or deliberately excused, in the same shape as the ledgers above.
 
-_REPO = pathlib.Path(__file__).resolve().parents[3]
-_BULK_GUI = _REPO / "web/src/app/admin/bulk-update/page.tsx"
-_AD_GUI = _REPO / "web/src/app/admin/autodiscovery/page.tsx"
-_AD_API = _REPO / "services/terrapod/api/routers/autodiscovery_rules.py"
+# The test image lays the tree out differently from a checkout: tests live at
+# `/app/tests` with the surfaces beside them, not under `services/`. Try both,
+# and fail loudly rather than silently passing if a surface is missing — a
+# gate that cannot read the file it checks proves nothing, and this one exists
+# because an unchecked convention already failed once.
+_TESTS_DIR = pathlib.Path(__file__).resolve().parent
+
+
+def _surface(*relative: str) -> pathlib.Path:
+    for rel in relative:
+        for base in (_TESTS_DIR.parents[2], _TESTS_DIR.parents[1]):  # local, docker
+            candidate = base / rel
+            if candidate.exists():
+                return candidate
+    raise FileNotFoundError(
+        f"Cannot find {relative[0]} from {_TESTS_DIR}. If this is the test image, "
+        "the file needs a COPY line in docker/Dockerfile.test — the parity gate "
+        "reads it, so without it the gate would pass vacuously."
+    )
+
+
+_BULK_GUI = _surface("web/src/app/admin/bulk-update/page.tsx")
+_AD_GUI = _surface("web/src/app/admin/autodiscovery/page.tsx")
+_AD_API = _surface(
+    "services/terrapod/api/routers/autodiscovery_rules.py",
+    "terrapod/api/routers/autodiscovery_rules.py",
+)
 
 #: Attributes a surface deliberately does not offer, and why. Each is a
 #: judgement that the control costs more than it is worth THERE -- never a
