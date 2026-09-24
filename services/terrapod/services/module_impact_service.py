@@ -29,7 +29,13 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service, run_service, vcs_rate_limit
+from terrapod.services import (
+    github_service,
+    gitlab_service,
+    run_links,
+    run_service,
+    vcs_rate_limit,
+)
 from terrapod.services.archive_utils import strip_archive_top_level_dir_async
 from terrapod.services.module_subdirectory import scope_archive_to_subdirectory
 from terrapod.services.vcs_provider import PullRequest
@@ -587,7 +593,6 @@ async def _post_module_vcs_status(
     which rendered a completed plan as "Plan finished" rather than "No changes"
     (#1378). Falls back to the row when the payload predates the field.
     """
-    from terrapod.config import settings
     from terrapod.services.vcs_status_dispatcher import (
         _build_comment_body,
         _find_or_create_comment,
@@ -612,12 +617,9 @@ async def _post_module_vcs_status(
     ws = await db.get(Workspace, run.workspace_id)
     ws_name = ws.name if ws else str(run.workspace_id)
 
-    # Build target URL
-    target_url = ""
-    if settings.external_url:
-        target_url = (
-            f"{settings.external_url.rstrip('/')}/workspaces/{run.workspace_id}/runs/{run.id}"
-        )
+    # Build target URL. "" rather than None: the commit-status clients take a
+    # plain string.
+    target_url = run_links.run_url(run.workspace_id, run.id) or ""
 
     # Post commit status
     has_changes = (
