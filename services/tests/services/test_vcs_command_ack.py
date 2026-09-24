@@ -220,16 +220,25 @@ async def test_an_explicit_help_request_is_answered_and_counts_as_handled():
     assert accepted is True
 
 
-async def test_prose_opening_with_the_prefix_is_not_quoted_back():
+async def test_prose_opening_with_the_prefix_gets_no_reply_at_all():
     """`terrapod is broken` parses as an unknown verb, but "is" is not a typo
-    of anything — quoting it would read as the parser talking nonsense."""
+    of anything — quoting it would read as the parser talking nonsense.
+
+    This used to answer with the generic help table instead, which fixed the
+    nonsense and left the noise: a twelve-line usage table on someone's PR
+    because their sentence happened to start with the product's name, seen by
+    every reviewer, with no way to switch it off (#1836).
+
+    Silence serves the original concern better than the table did. A comment
+    that was not addressed to Terrapod gets no answer from Terrapod.
+    """
     db = AsyncMock()
     with patch.object(disp, "_post_reply", new_callable=AsyncMock) as reply:
         await disp._route(
             db, disp.parse("terrapod is broken"), _conn(), _sess(), [_ws()], "octocat", "1"
         )
 
-    assert reply.await_args.args[2] == disp._HELP_BODY
+    reply.assert_not_awaited()
 
 
 async def test_a_named_workspace_that_is_not_affected_says_which_name():
