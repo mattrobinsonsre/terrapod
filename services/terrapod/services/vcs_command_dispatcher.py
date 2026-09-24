@@ -531,7 +531,28 @@ async def _route_plan(
     # Local import: the dispatcher is reached from the scheduler, and the
     # poller pulls in the archive/storage stack. Importing it at module
     # scope would drag that into every dispatch.
-    from terrapod.services.vcs_poller import _create_vcs_run, _provider_parse_repo_url
+    from terrapod.services.vcs_poller import (
+        _compute_paths_unions,
+        _create_vcs_run,
+        _provider_parse_repo_url,
+    )
+
+    # The same path narrowing the poller applies (#1835). Without it a
+    # `terrapod plan` pulled the ENTIRE repo where the poll cycle pulls a
+    # few directories -- on a monorepo that is a real PVC-fill and
+    # bandwidth hazard, and it wrote a second archive-cache entry for the
+    # same SHA, because the cache is keyed on sha+paths. It also meant the
+    # replacement config version was not byte-identical to the one the
+    # poller would have produced, so `terrapod plan` was not the
+    # like-for-like re-plan it is documented to be.
+    try:
+        paths_unions = await _compute_paths_unions(db, [ws.id for ws in candidates])
+    except Exception as e:
+        # Narrowing is an optimisation; failing to compute it must not
+        # stop the re-plan. Falling back to None fetches the whole repo,
+        # which is correct, just slower.
+        logger.warning("plan: could not compute path narrowing", error=repr(e))
+        paths_unions = None
 
     for ws in candidates:
         active = await db.execute(
@@ -570,8 +591,23 @@ async def _route_plan(
             create=_create_vcs_run,
             parse_repo_url=_provider_parse_repo_url,
             canceled_any=canceled_any,
+            paths_unions=paths_unions,
         )
-    await db.commit()
+        # Per workspace, matching the poller (#1835). A single commit after
+        # the loop meant a failure on workspace 3 of 5 discarded the cancels
+        # already performed on 1 and 2 -- the `_replan_pr` docstring's promise
+        # that "a failure here cannot stop the remaining candidates being
+        # re-planned" held for a provider error and not for a DB one.
+        try:
+            await db.commit()
+        except Exception as e:
+            logger.warning(
+                "plan: commit failed for this workspace",
+                workspace=ws.name,
+                pr_number=sess.pr_number,
+                error=repr(e),
+            )
+            await db.rollback()
 
 
 async def _replan_pr(
@@ -584,6 +620,7 @@ async def _replan_pr(
     create,
     parse_repo_url,
     canceled_any: bool,
+    paths_unions: dict | None = None,
 ) -> None:
     """Create the replacement plan for `terrapod plan` on one workspace.
 
@@ -640,6 +677,7 @@ async def _replan_pr(
             pr_number=sess.pr_number,
             message=f"Re-plan for PR #{sess.pr_number} requested by {actor_login}",
             replaces_canceled=True,
+            fetch_paths=(paths_unions.get((conn.id, owner, repo_name)) if paths_unions else None),
         )
     except Exception as e:
         logger.warning(
@@ -648,6 +686,14 @@ async def _replan_pr(
             pr_number=sess.pr_number,
             error=repr(e),
         )
+        # A DB-level failure (IntegrityError, DBAPIError) leaves the session
+        # needing a rollback, and `_create_vcs_run` flushes before it creates
+        # the run. Without this the NEXT candidate's first query raises
+        # PendingRollbackError, which escapes the handler entirely and the
+        # scheduler drops the whole command with no retry -- one bad workspace
+        # silently killing the rest. Rolling back also discards the orphaned
+        # configuration_version row a partial create leaves behind.
+        await db.rollback()
         return
 
     if run is None:
