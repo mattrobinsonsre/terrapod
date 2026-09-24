@@ -22,6 +22,7 @@ Payload shape:
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any
 
@@ -94,6 +95,50 @@ def _no_workspace_body(name: str) -> str:
         "mode with a working directory this pull request touches. Omit "
         "`-W` to act on every affected workspace."
     )
+
+
+#: A flag, as every documented command's arguments are (`-W <workspace>`).
+_FLAG = re.compile(r"^-{1,2}[A-Za-z]")
+
+
+def _looks_like_a_command_attempt(raw: str) -> bool:
+    """Whether an unrecognised line was plausibly aimed at Terrapod.
+
+    The parser maps every unknown verb to `help`, so without this a comment
+    that merely BEGINS with the word -- "terrapod is working well now" -- drew
+    a twelve-line usage table onto someone's pull request, unprompted and with
+    no way to switch it off (#1836).
+
+    The test is: the verb stands alone, or is followed by a FLAG. That is what
+    every documented command looks like (`terrapod apply -W web`), and it is
+    the only signal that separates a typo from prose -- counting trailing
+    tokens does not, because "working well now" is three perfectly
+    workspace-shaped words.
+
+    Deliberately biased toward silence. A missed typo hint costs the author one
+    puzzled moment; an unsolicited table on every passing mention is noise
+    every reviewer on that PR has to scroll past, and there is no opt-out.
+    """
+    parts = raw.split()
+    if len(parts) < 2:
+        return False
+    rest = parts[2:]
+    return not rest or bool(_FLAG.match(rest[0]))
+
+
+def _unrecognised_verb(raw: str) -> str | None:
+    """The verb from a line the parser could not route, or None.
+
+    Read back off `raw` rather than taken from `Command.unrecognised`, which
+    is set only when there is NO trailing text -- so `terrapod aply -W web`,
+    the most command-shaped typo there is, arrived with it empty and got the
+    generic table instead of its own name back.
+    """
+    parts = raw.split()
+    if len(parts) < 2:
+        return None
+    verb = parts[1].strip(".,!?:;").lower()
+    return None if verb == "help" else verb
 
 
 def _unknown_verb_body(verb: str) -> str:
@@ -342,10 +387,21 @@ async def _route(
             unrecognised=cmd.unrecognised,
             **audit_ctx,
         )
-        if cmd.unrecognised:
+        unrecognised = cmd.unrecognised or _unrecognised_verb(cmd.raw)
+        if unrecognised:
+            # Only when the line was plausibly aimed at us. A passing mention
+            # in prose is not a command, and answering it puts a usage table
+            # on someone's PR for nothing (#1836).
+            if not _looks_like_a_command_attempt(cmd.raw):
+                logger.info(
+                    "vcs_comment_dispatch: prose mention, not replying",
+                    raw=cmd.raw[:120],
+                    **audit_ctx,
+                )
+                return False
             # Name the token, so a typo reads as a typo rather than as
             # Terrapod volunteering a usage table for no reason (#1799).
-            await _post_reply(db, sess, _unknown_verb_body(cmd.unrecognised))
+            await _post_reply(db, sess, _unknown_verb_body(unrecognised))
             return False
         await _post_reply(db, sess, _HELP_BODY)
         return True
@@ -531,7 +587,28 @@ async def _route_plan(
     # Local import: the dispatcher is reached from the scheduler, and the
     # poller pulls in the archive/storage stack. Importing it at module
     # scope would drag that into every dispatch.
-    from terrapod.services.vcs_poller import _create_vcs_run, _provider_parse_repo_url
+    from terrapod.services.vcs_poller import (
+        _compute_paths_unions,
+        _create_vcs_run,
+        _provider_parse_repo_url,
+    )
+
+    # The same path narrowing the poller applies (#1835). Without it a
+    # `terrapod plan` pulled the ENTIRE repo where the poll cycle pulls a
+    # few directories -- on a monorepo that is a real PVC-fill and
+    # bandwidth hazard, and it wrote a second archive-cache entry for the
+    # same SHA, because the cache is keyed on sha+paths. It also meant the
+    # replacement config version was not byte-identical to the one the
+    # poller would have produced, so `terrapod plan` was not the
+    # like-for-like re-plan it is documented to be.
+    try:
+        paths_unions = await _compute_paths_unions(db, [ws.id for ws in candidates])
+    except Exception as e:
+        # Narrowing is an optimisation; failing to compute it must not
+        # stop the re-plan. Falling back to None fetches the whole repo,
+        # which is correct, just slower.
+        logger.warning("plan: could not compute path narrowing", error=repr(e))
+        paths_unions = None
 
     for ws in candidates:
         active = await db.execute(
@@ -570,8 +647,23 @@ async def _route_plan(
             create=_create_vcs_run,
             parse_repo_url=_provider_parse_repo_url,
             canceled_any=canceled_any,
+            paths_unions=paths_unions,
         )
-    await db.commit()
+        # Per workspace, matching the poller (#1835). A single commit after
+        # the loop meant a failure on workspace 3 of 5 discarded the cancels
+        # already performed on 1 and 2 -- the `_replan_pr` docstring's promise
+        # that "a failure here cannot stop the remaining candidates being
+        # re-planned" held for a provider error and not for a DB one.
+        try:
+            await db.commit()
+        except Exception as e:
+            logger.warning(
+                "plan: commit failed for this workspace",
+                workspace=ws.name,
+                pr_number=sess.pr_number,
+                error=repr(e),
+            )
+            await db.rollback()
 
 
 async def _replan_pr(
@@ -584,6 +676,7 @@ async def _replan_pr(
     create,
     parse_repo_url,
     canceled_any: bool,
+    paths_unions: dict | None = None,
 ) -> None:
     """Create the replacement plan for `terrapod plan` on one workspace.
 
@@ -640,6 +733,7 @@ async def _replan_pr(
             pr_number=sess.pr_number,
             message=f"Re-plan for PR #{sess.pr_number} requested by {actor_login}",
             replaces_canceled=True,
+            fetch_paths=(paths_unions.get((conn.id, owner, repo_name)) if paths_unions else None),
         )
     except Exception as e:
         logger.warning(
@@ -648,6 +742,14 @@ async def _replan_pr(
             pr_number=sess.pr_number,
             error=repr(e),
         )
+        # A DB-level failure (IntegrityError, DBAPIError) leaves the session
+        # needing a rollback, and `_create_vcs_run` flushes before it creates
+        # the run. Without this the NEXT candidate's first query raises
+        # PendingRollbackError, which escapes the handler entirely and the
+        # scheduler drops the whole command with no retry -- one bad workspace
+        # silently killing the rest. Rolling back also discards the orphaned
+        # configuration_version row a partial create leaves behind.
+        await db.rollback()
         return
 
     if run is None:
