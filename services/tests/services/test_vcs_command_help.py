@@ -80,3 +80,25 @@ def test_the_help_text_lists_every_routable_verb():
     exists but nobody is told about it."""
     for verb in disp._ROUTABLE_VERBS:
         assert f"terrapod {verb}" in disp._HELP_BODY, verb
+
+
+def test_the_routable_verbs_are_the_verbs_the_dispatcher_actually_routes():
+    """The test above pins the help against a HAND-WRITTEN list, so it can only
+    catch a verb someone remembered to add to that list -- which is not the
+    failure it describes. The dispatcher routes with a chain of
+    `cmd.verb == "..."` and never reads `_ROUTABLE_VERBS`, so a verb added to
+    the chain alone is routed, undocumented, and green.
+
+    Enumerate from the source instead, the way the wire-completeness gate does,
+    so the list cannot drift from the routing it claims to describe.
+    """
+    import inspect
+    import re
+
+    routed = set(re.findall(r'cmd\.verb\s*==\s*"([a-z-]+)"', inspect.getsource(disp)))
+    assert routed, "found no `cmd.verb == ...` comparisons; the routing shape changed"
+    assert routed == set(disp._ROUTABLE_VERBS), (
+        "_ROUTABLE_VERBS and the dispatcher disagree about what is routable. "
+        f"routed only: {sorted(routed - set(disp._ROUTABLE_VERBS))}; "
+        f"listed only: {sorted(set(disp._ROUTABLE_VERBS) - routed)}"
+    )
