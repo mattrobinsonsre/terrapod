@@ -20,6 +20,21 @@ const RunStatusPolicyOverride
 const RunStatusPostPlanAwaitingDecision
 const RunStatusPostPlanRunning
 const VersionField
+field AIPolicyEvaluation.CreatedAt string `json:"created-at,omitempty"`
+field AIPolicyEvaluation.EnforcementLevel string `json:"enforcement-level"`
+field AIPolicyEvaluation.Error string `json:"error,omitempty"`
+field AIPolicyEvaluation.ID string `json:"id"`
+field AIPolicyEvaluation.Outcome string `json:"outcome"`
+field AIPolicyEvaluation.OverriddenAt string `json:"overridden-at,omitempty"`
+field AIPolicyEvaluation.OverriddenBy string `json:"overridden-by,omitempty"`
+field AIPolicyEvaluation.RiskLevel string `json:"risk-level,omitempty"`
+field AIPolicyEvaluation.RiskThreshold string `json:"risk-threshold"`
+field AIPolicyEvaluation.RunID string `json:"-"`
+field AIPolicyEvaluation.Verdict *AIPolicyVerdict `json:"verdict,omitempty"`
+field AIPolicyVerdict.Decision string `json:"decision"`
+field AIPolicyVerdict.Reasons []AIPolicyVerdictReason `json:"reasons,omitempty"`
+field AIPolicyVerdictReason.Criterion string `json:"criterion"`
+field AIPolicyVerdictReason.Detail string `json:"detail"`
 field APIError.Body string
 field APIError.StatusCode int
 field APIToken.BoundTo string `json:"bound-to,omitempty"`
@@ -312,6 +327,7 @@ field CreateVarsetVariableRequest.Sensitive bool
 field CreateVarsetVariableRequest.Structured bool
 field CreateVarsetVariableRequest.Value string
 field CreateVarsetVariableRequest.ValueSource string
+field CreateWorkspaceRequest.AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 field CreateWorkspaceRequest.AISummaryContext string `json:"ai-summary-context,omitempty"`
 field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
@@ -320,6 +336,7 @@ field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field CreateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
+field CreateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field CreateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field CreateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
@@ -680,8 +697,10 @@ field PolicyCheck.Scope string `json:"scope"`
 field PolicyCheck.SoftFailed int `json:"soft-failed"`
 field PolicyCheck.Status string `json:"status"`
 field PolicySet.AllowLabels map[string][]string `json:"allow-labels,omitempty"`
+field PolicySet.AllowNames []string `json:"allow-names,omitempty"`
 field PolicySet.CreatedAt string `json:"created-at,omitempty"`
 field PolicySet.DenyLabels map[string][]string `json:"deny-labels,omitempty"`
+field PolicySet.DenyNames []string `json:"deny-names,omitempty"`
 field PolicySet.Description string `json:"description,omitempty"`
 field PolicySet.Enabled bool `json:"enabled"`
 field PolicySet.EnforcementLevel string `json:"enforcement-level"`
@@ -1022,6 +1041,7 @@ field UpdateVarsetVariableRequest.Sensitive *bool
 field UpdateVarsetVariableRequest.Structured *bool
 field UpdateVarsetVariableRequest.Value *string
 field UpdateVarsetVariableRequest.ValueSource *string
+field UpdateWorkspaceRequest.AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 field UpdateWorkspaceRequest.AISummaryContext *string `json:"ai-summary-context,omitempty"`
 field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
@@ -1030,6 +1050,7 @@ field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
 field UpdateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
+field UpdateWorkspaceRequest.DebugMode *bool `json:"debug-mode,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
 field UpdateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field UpdateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
@@ -1208,6 +1229,7 @@ field WarmResult.Error string `json:"error,omitempty"`
 field WarmResult.Kind string `json:"kind"`
 field WarmResult.OK bool `json:"ok"`
 field WarmResult.Ref string `json:"ref"`
+field Workspace.AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 field Workspace.AISummaryContext string `json:"ai-summary-context,omitempty"`
 field Workspace.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field Workspace.AgentPoolID string `json:"agent-pool-id,omitempty"`
@@ -1219,6 +1241,7 @@ field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoMerge bool `json:"auto-merge"`
 field Workspace.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
 field Workspace.CreatedAt string `json:"created-at,omitempty"`
+field Workspace.DebugMode bool `json:"debug-mode"`
 field Workspace.DriftDetectionEnabled bool `json:"drift-detection-enabled"`
 field Workspace.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
 field Workspace.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
@@ -1333,6 +1356,7 @@ func NewClient(opts Options) (*Client, error)
 func ParseResource(body []byte) (*Resource, error)
 func ParseResourceList(body []byte) ([]Resource, error)
 func StripPrefix(id, prefix string) string
+method (*AIPolicyEvaluation) IsBlocking() bool
 method (*APIError) Error() string
 method (*AuthenticationError) Error() string
 method (*AuthorizationError) Error() string
@@ -1430,6 +1454,7 @@ method (*Client) GetOnboardingAvailability(ctx context.Context) (*OnboardingAvai
 method (*Client) GetOnboardingSession(ctx context.Context, sessionID string) (*OnboardingSession, error)
 method (*Client) GetPlanLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error)
 method (*Client) GetPlanSummary(ctx context.Context, planID string) (*PlanSummary, error)
+method (*Client) GetPolicy(ctx context.Context, policySetID, policyID string) (*Policy, error)
 method (*Client) GetPolicyCheck(ctx context.Context, checkID string) (*PolicyCheck, error)
 method (*Client) GetPolicyCheckOutput(ctx context.Context, checkID string) (string, error)
 method (*Client) GetPolicySet(ctx context.Context, id string) (*PolicySet, error)
@@ -1441,6 +1466,7 @@ method (*Client) GetResourceAccess(ctx context.Context, kind, id string) (*Resou
 method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
 method (*Client) GetRun(ctx context.Context, runID string) (*Run, error)
+method (*Client) GetRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error)
 method (*Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEstimate, error)
 method (*Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
@@ -1491,6 +1517,7 @@ method (*Client) ListNotificationConfigurations(ctx context.Context, workspaceID
 method (*Client) ListOnboardingSessions(ctx context.Context, workspaceID string) ([]OnboardingSession, error)
 method (*Client) ListOutboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error)
 method (*Client) ListPlanSummaryMessages(ctx context.Context, runID string) ([]*PlanSummaryMessage, error)
+method (*Client) ListPolicies(ctx context.Context, policySetID string) ([]Policy, error)
 method (*Client) ListPolicySets(ctx context.Context) ([]PolicySet, error)
 method (*Client) ListProviderTemplates(ctx context.Context) ([]ProviderTemplate, error)
 method (*Client) ListRegistryModules(ctx context.Context) ([]RegistryModule, error)
@@ -1514,6 +1541,7 @@ method (*Client) ListWorkspaceVarsets(ctx context.Context, workspaceID string) (
 method (*Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) (*WorkspaceList, error)
 method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
 method (*Client) OverridePolicyCheck(ctx context.Context, checkID string) (*PolicyCheck, error)
+method (*Client) OverrideRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error)
 method (*Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
@@ -1581,6 +1609,9 @@ method (*ConflictError) Error() string
 method (*NotFoundError) Error() string
 method (*ValidationError) Error() string
 method (*WorkspaceSummary) UnmarshalJSON(data []byte) error
+type AIPolicyEvaluation struct
+type AIPolicyVerdict struct
+type AIPolicyVerdictReason struct
 type APIError struct
 type APIToken struct
 type AddPolicyRequest struct

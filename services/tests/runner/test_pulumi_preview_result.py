@@ -35,8 +35,15 @@ def _step(op: str, urn: str = "urn:pulumi:dev::p::aws:s3/bucket:Bucket::b") -> d
                 "op": op,
                 "urn": urn,
                 "type": "aws:s3/bucket:Bucket",
-                # The engine also sends the resource's state, which is where a
-                # stack's secrets live. The digest must not carry it.
+                # The engine also sends the resource's state, and the digest
+                # must not carry it. Note the reason is size and breadth, not
+                # plaintext secrets: Pulumi's `makeStepEventStateMetadata` runs
+                # both inputs and outputs through `filterResourceProperties`,
+                # which replaces anything marked secret with the literal
+                # "[secret]" unless the CLI was given --show-secrets, and a
+                # preview never is. A value that is sensitive but was never
+                # marked stays in the clear -- which is the same gap Terraform's
+                # plan JSON has, and why this stays out of the digest anyway.
                 "new": {"inputs": {"password": "hunter2"}},
             }
         }
@@ -141,11 +148,16 @@ class TestReportingIt:
         log.write_text(lines)
         from terrapod.runner import job_entrypoint
 
+        # OPA is patched out here, not because it is incidental but because it
+        # is not what these assert: the preview now evaluates policy sets
+        # (#1567), and an unpatched call fetches a bundle over the network and
+        # a binary from the cache. Its own behaviour is asserted below.
         with (
             patch("terrapod.runner.phases.uploads.post_plan_result") as post,
             patch("terrapod.runner.phases.uploads.upload_plan_json") as upload,
+            patch("terrapod.runner.phases.opa.evaluate_policies"),
         ):
-            job_entrypoint._report_pulumi_preview(self._cfg(), log)
+            job_entrypoint._finish_pulumi_preview(self._cfg(), log)
         return post, upload, log
 
     def test_it_posts_the_result_and_uploads_the_digest(self, tmp_path):
@@ -179,10 +191,161 @@ class TestReportingIt:
         with (
             patch("terrapod.runner.phases.uploads.upload_plan_json", side_effect=OSError("boom")),
             patch("terrapod.runner.phases.uploads.post_plan_result") as post,
+            patch("terrapod.runner.phases.opa.evaluate_policies"),
         ):
-            job_entrypoint._report_pulumi_preview(self._cfg(), log)
+            job_entrypoint._finish_pulumi_preview(self._cfg(), log)
 
         post.assert_called_once()
+
+
+class TestTheGateOnAPreview:
+    """Policy sets are evaluated for a Pulumi run, and the ORDER is the fix (#1567).
+
+    The post-plan gate fails closed, and it is `plan-result` that drives the run
+    into `complete_plan` where the gate reads the evaluations. So the results
+    must be posted first. Getting this backwards does not fail loudly: the gate
+    simply finds nothing, records a synthetic failure, and holds every apply --
+    which is the bug this issue exists to fix, reintroduced by a reordering.
+    """
+
+    def _cfg(self):
+        return MagicMock(has_api=True, run_id="01a0", api_url="https://tp", auth_token="t")
+
+    def _log(self, tmp_path):
+        log = tmp_path / "events.json"
+        log.write_text(_events(_step("create"), _summary(create=1)))
+        return log
+
+    def test_policies_are_evaluated_before_the_plan_result_is_posted(self, tmp_path):
+        from terrapod.runner import job_entrypoint
+
+        calls: list[str] = []
+        with (
+            patch("terrapod.runner.phases.uploads.upload_plan_json"),
+            patch(
+                "terrapod.runner.phases.uploads.post_plan_result",
+                side_effect=lambda *a, **k: calls.append("plan-result"),
+            ),
+            patch(
+                "terrapod.runner.phases.opa.evaluate_policies",
+                side_effect=lambda *a, **k: calls.append("opa"),
+            ),
+        ):
+            rc = job_entrypoint._finish_pulumi_preview(self._cfg(), self._log(tmp_path))
+
+        assert rc == 0
+        assert calls == ["opa", "plan-result"]
+
+    def test_opa_reads_the_policy_input_not_the_digest(self, tmp_path):
+        """The digest is capped at MAX_STEPS; a gate must not decide on a cap.
+
+        `plan_json` is handed over as a FACTORY, not a path, so that the
+        document is built only once a policy set is known to apply -- calling
+        it here is what this asserts about, as well as what it produces.
+        """
+        from terrapod.runner import job_entrypoint
+
+        seen = {}
+        with (
+            patch("terrapod.runner.phases.uploads.upload_plan_json"),
+            patch("terrapod.runner.phases.uploads.post_plan_result"),
+            patch(
+                "terrapod.runner.phases.opa.evaluate_policies",
+                side_effect=lambda cfg, **k: seen.update(k),
+            ),
+        ):
+            job_entrypoint._finish_pulumi_preview(self._cfg(), self._log(tmp_path))
+
+        factory = seen["plan_json"]
+        assert callable(factory), "the document must not be built before the bundle is known"
+
+        path = factory()
+        assert path.name == "policy-input.json"
+        handed = json.loads(Path(path).read_text())
+        assert "resource_changes" in handed
+        assert "steps" not in handed
+
+    def test_nothing_is_written_until_the_factory_is_called(self, tmp_path):
+        # The common run has no policy set, so the document -- which has no
+        # other consumer and scales with the change -- should never exist.
+        from terrapod.runner import job_entrypoint
+
+        log = self._log(tmp_path)
+        with (
+            patch("terrapod.runner.phases.uploads.upload_plan_json"),
+            patch("terrapod.runner.phases.uploads.post_plan_result"),
+            # Stands in for a bundle with no applicable sets: the real
+            # evaluate_policies returns 0 without resolving the factory.
+            patch("terrapod.runner.phases.opa.evaluate_policies", return_value=0),
+        ):
+            job_entrypoint._finish_pulumi_preview(self._cfg(), log)
+
+        assert not log.with_name("policy-input.json").exists()
+
+    def test_an_incomplete_evaluation_is_fatal_and_stops_the_plan_result(self, tmp_path):
+        """`PolicyEvaluationError` means the evaluation could not be COMPLETED.
+
+        It is raised only by `fetch_policy_bundle`, `post_results` and the OPA
+        tool fetch -- never by a denial, which `evaluate_set` records as
+        `outcome="failed"` and returns. Without results the server's gate has
+        nothing to read, so the run stops rather than handing the update phase
+        a plan no policy ever saw.
+        """
+        from terrapod.runner import job_entrypoint
+        from terrapod.runner.phases import opa
+
+        with (
+            patch("terrapod.runner.phases.uploads.upload_plan_json"),
+            patch("terrapod.runner.phases.uploads.post_plan_result") as post,
+            patch(
+                "terrapod.runner.phases.opa.evaluate_policies",
+                side_effect=opa.PolicyEvaluationError("policy bundle fetch failed"),
+            ),
+        ):
+            rc = job_entrypoint._finish_pulumi_preview(self._cfg(), self._log(tmp_path))
+
+        assert rc == 1
+        post.assert_not_called()
+
+    def test_a_denial_is_not_fatal_here_and_the_plan_result_still_posts(self, tmp_path):
+        """A denial takes the runner's ordinary path; the SERVER holds the run.
+
+        This is what a real mandatory failure does, and it had no test: the
+        runner POSTs a `failed` outcome, `evaluate_policies` returns normally,
+        plan-result is posted, and `complete_plan` -> `evaluate_post_plan`
+        blocks. A runner exiting non-zero here would strand the run with no
+        evaluation recorded and nothing for an admin to override.
+        """
+        from terrapod.runner import job_entrypoint
+
+        with (
+            patch("terrapod.runner.phases.uploads.upload_plan_json"),
+            patch("terrapod.runner.phases.uploads.post_plan_result") as post,
+            # One set evaluated and POSTed -- the shape a denial really returns.
+            patch("terrapod.runner.phases.opa.evaluate_policies", return_value=1) as ev,
+        ):
+            rc = job_entrypoint._finish_pulumi_preview(self._cfg(), self._log(tmp_path))
+
+        assert rc == 0
+        ev.assert_called_once()
+        post.assert_called_once()
+
+    def test_an_unfinished_preview_is_not_gated(self, tmp_path):
+        # No summary event means no honest account of the change, so there is
+        # nothing to decide about -- and the run is not failed for it.
+        from terrapod.runner import job_entrypoint
+
+        log = tmp_path / "events.json"
+        log.write_text(_events(_step("create")))
+        with (
+            patch("terrapod.runner.phases.uploads.upload_plan_json"),
+            patch("terrapod.runner.phases.uploads.post_plan_result"),
+            patch("terrapod.runner.phases.opa.evaluate_policies") as ev,
+        ):
+            rc = job_entrypoint._finish_pulumi_preview(self._cfg(), log)
+
+        assert rc == 0
+        ev.assert_not_called()
 
     def test_nothing_is_reported_without_an_api(self, tmp_path):
         log = tmp_path / "events.json"
@@ -193,7 +356,7 @@ class TestReportingIt:
             patch("terrapod.runner.phases.uploads.post_plan_result") as post,
             patch("terrapod.runner.phases.uploads.upload_plan_json") as upload,
         ):
-            job_entrypoint._report_pulumi_preview(MagicMock(has_api=False), log)
+            job_entrypoint._finish_pulumi_preview(MagicMock(has_api=False), log)
 
         post.assert_not_called()
         upload.assert_not_called()

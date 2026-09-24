@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Modèles de notification (créés sur chaque nouvel espace de travail)",
       "saving": "Enregistrement...",
       "previewTitle": "Parcourir le dépôt et prévisualiser quels espaces de travail cette règle CRÉERAIT — sans persistance",
-      "parallelism": "Parallélisme"
+      "parallelism": "Parallélisme",
+      "governance": "Analyse de sécurité et résumé IA",
+      "governanceHint": "Appliqué à chaque espace de travail créé par cette règle.",
+      "scanEnforcement": "Application",
+      "scanOff": "Ne pas analyser",
+      "scanAdvisory": "Analyser et signaler uniquement",
+      "scanEnforced": "Bloquer l'application en cas de résultats",
+      "scanEngine": "Analyseur",
+      "scanEngineBoth": "Checkov et Trivy",
+      "scanThreshold": "Signaler les résultats à partir de",
+      "severityCritical": "critique",
+      "severityHigh": "élevé",
+      "severityMedium": "moyen",
+      "severityLow": "faible",
+      "aiSummaryMode": "Résumé de plan IA",
+      "aiSummaryDefault": "Suivre la valeur par défaut du déploiement",
+      "aiSummaryEnabled": "Toujours résumer",
+      "aiSummaryDisabled": "Ne jamais résumer",
+      "execution": "Exécution, VCS et dérive",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Version de Terragrunt",
+      "noExpiry": "Pas d'expiration",
+      "addDriftIgnoreRule": "Ajouter une règle",
+      "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Désactivé par défaut — un pod maintenu ouvert conserve les identifiants de cet espace de travail."
     },
     "table": {
       "name": "Nom",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "Une tâche d'exécution obligatoire a échoué — contournez-la ou abandonnez l'exécution",
       "runTasksRunning": "En attente des tâches d'exécution post-plan",
       "heldByPolicy": "Un ensemble de politiques obligatoire a échoué — contournez-le ou abandonnez l'exécution",
-      "heldBySecurityScan": "L'analyse de sécurité a trouvé des résultats bloquants — contournez-la ou abandonnez l'exécution"
+      "heldBySecurityScan": "L'analyse de sécurité a trouvé des résultats bloquants — contournez-la ou abandonnez l'exécution",
+      "heldByAiPolicy": "La barrière de politique IA a refusé cette exécution — contournez-la ou abandonnez l''exécution",
+      "awaitingAiPolicy": "En attente du verdict de la politique IA"
     },
     "badge": {
       "destroy": "destruction",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "L''analyse ne s''est pas terminée, cette exécution n''a donc pas été vérifiée.",
       "blockedErroredMessage": "Cette exécution est bloquée car l''analyse de sécurité ne s''est pas terminée. Corrigez la cause et relancez la planification, ou demandez à un administrateur de la contourner."
     },
+    "aiPolicyPanel": {
+      "heading": "Barrière de politique IA",
+      "enforcementLabel": "application : {level}",
+      "thresholdLabel": "seuil de risque : {threshold}",
+      "awaitingVerdict": "En attente du verdict de la politique IA. Cette exécution est retenue jusqu''à son arrivée.",
+      "decisionAllow": "autorisé",
+      "decisionDeny": "refusé",
+      "risk": {
+        "critical": "critique",
+        "high": "élevé",
+        "medium": "moyen",
+        "low": "faible"
+      },
+      "blockedDeniedMessage": "Cette exécution est <strong>bloquée par {count, plural, one {# critère de politique} other {# critères de politique}}</strong>.",
+      "blockedRiskMessage": "Cette exécution est <strong>bloquée</strong> car son niveau de risque ({level}) atteint ou dépasse le seuil ({threshold}).",
+      "blockedErroredMessage": "Cette exécution est bloquée car aucun verdict de politique IA n''a pu être obtenu. La barrière échoue en position fermée : un verdict impossible à obtenir ne vaut pas approbation.",
+      "erroredMessage": "La barrière de politique IA n''a pas renvoyé de verdict exploitable, cette exécution n''a donc pas été jugée.",
+      "passed": "Aucun critère de politique ne correspond.",
+      "overriding": "Contournement...",
+      "overrideContinue": "Contourner et continuer",
+      "overrideConfirm": "Contourner la barrière de politique IA et autoriser l''application de cette exécution malgré le verdict ?",
+      "overrideFailed": "Échec du contournement",
+      "overrideFailedStatus": "Échec du contournement ({status})",
+      "overriddenBy": "contourné par {by}"
+    },
     "architecture": {
       "loadError": "Impossible de charger la critique d''architecture.",
       "notEnabled": "Le critique d''architecture par IA n''est pas activé sur ce déploiement.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Suivre la valeur par défaut du déploiement",
       "modeEnabled": "Toujours résumer",
       "modeDisabled": "Ne jamais résumer",
+      "policyMode": "Barrière de politique",
+      "policyModeNote": "Une barrière obligatoire ignore « Jamais » : elle ne peut exempter cet espace de travail que d''un verdict consultatif.",
       "contextLabel": "Contexte de l'espace de travail",
       "contextLabelSuffix": "(facultatif, additif)",
       "contextPlaceholder": "Faits que l'IA devrait connaître à propos de cet espace de travail en particulier. par ex. « Sert de façade au coffre du service X — détruire la clé KMS provoque une panne globale. »",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Échec de la restauration de la version d'état",
       "stateActionFailed": "Échec de l'action sur l'état",
       "uploadState": "Échec du téléversement de l'état",
-      "uploadStateFile": "Échec du téléversement du fichier d'état"
+      "uploadStateFile": "Échec du téléversement du fichier d'état",
+      "updateSecurityScan": "Échec de la mise à jour de l'analyse de sécurité",
+      "updateDebugMode": "Échec de la mise à jour du mode débogage"
     },
     "subtabs": {
       "state": "État",
@@ -2880,6 +2934,38 @@
         "global": "Global",
         "rule": "Correspond à une règle"
       }
+    },
+    "securityScan": {
+      "title": "Analyse de sécurité",
+      "description": "Analyser le plan à la recherche d'infrastructure non sécurisée avant son application.",
+      "enforcement": "Application",
+      "enforcementOff": "Ne pas analyser",
+      "enforcementAdvisory": "Analyser et signaler uniquement",
+      "enforcementEnforced": "Bloquer l'application en cas de résultats",
+      "engine": "Analyseur",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov et Trivy",
+      "threshold": "Signaler les résultats à partir de",
+      "thresholdCritical": "critique",
+      "thresholdHigh": "élevé",
+      "thresholdMedium": "moyen",
+      "thresholdLow": "faible",
+      "skipRules": "Règles ignorées",
+      "skipRulesSuffix": "(facultatif)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Aucune règle ignorée.",
+      "skipRulesHint": "Identifiants de règles de l'analyseur à ignorer dans cet espace de travail, séparés par des virgules."
+    },
+    "debugMode": {
+      "title": "Mode débogage du runner",
+      "description": "Maintenir ouvert le pod d'une exécution en échec pour pouvoir y entrer. L'échec de l'exécution est signalé d'abord ; le conteneur ne reste actif qu'ensuite.",
+      "label": "Mode débogage",
+      "hint": "Désactivé par défaut. Lorsqu'il est actif, le pod d'un runner en échec reste accessible par exec pendant la fenêtre configurée par votre opérateur, et il conserve pendant tout ce temps les identifiants et les variables déchiffrées de cet espace de travail.",
+      "activeBadge": "Actif",
+      "bannerTitle": "Le mode débogage est activé pour cet espace de travail",
+      "bannerBody": "Le pod d'une exécution en échec est maintenu ouvert pour inspection au lieu de se terminer, et il conserve pendant ce temps les identifiants et les variables déchiffrées de cet espace de travail. Désactivez le mode débogage une fois le diagnostic terminé.",
+      "confirmEnable": "Activer le mode débogage ? Le pod d'une exécution en échec sera maintenu ouvert avec les identifiants et les variables déchiffrées de cet espace de travail jusqu'à l'expiration de la fenêtre ou jusqu'à ce que vous supprimiez le pod."
     }
   },
   "graphs": {

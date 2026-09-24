@@ -14,6 +14,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { PlanAiSummary } from '@/components/plan-ai-summary'
 import { ResourceUsage, parseMemoryToBytes, humanBytes } from '@/components/resource-usage'
 import { SecurityPanel } from '@/components/security-panel'
+import { AIPolicyPanel } from '@/components/ai-policy-panel'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
@@ -200,6 +201,7 @@ function RunActivityHeader({
   gate = null,
   reportedStatus,
   onOpenGate,
+  hasChanges,
 }: {
   status: string
   gate?: Gate | null
@@ -210,6 +212,8 @@ function RunActivityHeader({
   planOnly: boolean
   isConfirmable: boolean
   engine?: string
+  // Null/undefined for a run whose plan has not produced the flag yet.
+  hasChanges?: boolean | null
 }) {
   const t = useTranslations('runDetail')
   // The four phase states are the engine's vocabulary, not the platform's: a
@@ -244,7 +248,23 @@ function RunActivityHeader({
     confirmed: { label: t('status.confirmed'), activity: t('activity.confirmed'), dot: 'bg-blue-400', card: 'border-blue-800/40 bg-blue-900/10', sinceKey: 'confirmed-at' },
     applying: { label: phase('runStatus', 'applying'), activity: phase('activity', 'applying'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10', sinceKey: 'applying-at' },
     canceling: { label: t('status.canceling'), activity: t('activity.canceling'), dot: 'bg-yellow-400', card: 'border-yellow-800/40 bg-yellow-900/10' },
-    applied: { label: phase('runStatus', 'applied'), activity: t('activity.applied'), dot: 'bg-green-400', card: 'border-green-800/40 bg-green-900/10', sinceKey: 'applied-at' },
+    applied:
+      hasChanges === false
+        ? {
+            // A zero-change run short-circuits to `applied` without ever
+            // launching an apply (#1794). The status is right; "Applied" was
+            // not — on a workspace with auto-apply OFF it reads as though
+            // something was applied without anyone confirming it.
+            // Reuses the wording the change card and the log surface already
+            // use for this state, so the page does not grow a second name for
+            // the same thing.
+            label: t('changes.noChanges'),
+            activity: t('log.applySkippedNoChanges'),
+            dot: 'bg-slate-400',
+            card: 'border-slate-700/50 bg-slate-800/40',
+            sinceKey: 'applied-at',
+          }
+        : { label: phase('runStatus', 'applied'), activity: t('activity.applied'), dot: 'bg-green-400', card: 'border-green-800/40 bg-green-900/10', sinceKey: 'applied-at' },
     errored: { label: t('status.errored'), activity: t('activity.errored'), dot: 'bg-red-400', card: 'border-red-800/40 bg-red-900/10', sinceKey: 'errored-at' },
     canceled: { label: t('status.canceled'), activity: t('activity.canceled'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'canceled-at' },
     discarded: { label: t('status.discarded'), activity: t('activity.discarded'), dot: 'bg-slate-400', card: 'border-slate-700/50 bg-slate-800/40', sinceKey: 'discarded-at' },
@@ -1322,7 +1342,12 @@ function RunDetailPageInner() {
     ...((attrs['has-json-output']
       ? [['impact', t('tabs.impact'), t('tabs.impactFull')]]
       : []) as [RunView, React.ReactNode, string][]),
-    ...((aiInfo?.present ? [['ai', t('tabs.ai'), t('tabs.aiFull')]] : []) as [RunView, React.ReactNode, string][]),
+    // Also present when the AI policy gate (#1766) holds this run. A run held
+    // waiting for a verdict has no summary yet, so gating the tab on the
+    // summary alone would hide the only page that says why it is held.
+    ...((aiInfo?.present || gate === 'ai-policy'
+      ? [['ai', t('tabs.ai'), t('tabs.aiFull')]]
+      : []) as [RunView, React.ReactNode, string][]),
     ['details', t('tabs.details'), t('tabs.details')],
     ...((attrs['plan-only'] ? [] : [['apply', applyLabel, t('tabs.applyFull')]]) as [RunView, React.ReactNode, string][]),
   ]
@@ -1694,9 +1719,16 @@ function RunDetailPageInner() {
               ? () => switchView('opa')
               : gate === 'security-scan' && tabs.some(([v]) => v === 'security')
                 ? () => switchView('security')
-                : undefined
+                : // The AI gate's verdict renders in the AI tab, which is
+                  // present whenever that gate holds the run — a run held
+                  // waiting for a verdict has no summary yet, and the tab is
+                  // widened for exactly that case.
+                  gate === 'ai-policy' && tabs.some(([v]) => v === 'ai')
+                  ? () => switchView('ai')
+                  : undefined
           }
           engine={attrs.engine}
+          hasChanges={attrs['has-changes']}
           timestamps={timestamps}
           planOnly={attrs['plan-only']}
           isConfirmable={actions['is-confirmable']}
@@ -1809,7 +1841,21 @@ function RunDetailPageInner() {
             folded into its risk factors, fed by the deterministic scan + cost.
             The tab only appears when the run has an AI summary. */}
         {view === 'ai' && (
-          <PlanAiSummary runId={runId.replace(/^run-/, '')} refreshKey={aiSummaryRefresh} />
+          <>
+            {/* The gate's ruling (#1766) sits ABOVE the narrative: when a run is
+                held, the verdict and its override are what the operator came
+                for, and the summary is the context behind it. The panel hides
+                itself when the gate is off. */}
+            <AIPolicyPanel
+              runId={runId}
+              runStatus={attrs.status}
+              onChanged={() => {
+                loadRun()
+                loadAiInfo()
+              }}
+            />
+            <PlanAiSummary runId={runId.replace(/^run-/, '')} refreshKey={aiSummaryRefresh} />
+          </>
         )}
 
         {/* OPA policy tab (#343) — full evaluations + admin override; the tab

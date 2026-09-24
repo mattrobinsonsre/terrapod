@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Bildirim şablonları (her yeni çalışma alanında oluşturulur)",
       "saving": "Kaydediliyor...",
       "previewTitle": "Repo''yu tarayın ve bu kuralın HANGİ çalışma alanlarını oluşturacağını önizleyin — kalıcılık yok",
-      "parallelism": "Paralellik"
+      "parallelism": "Paralellik",
+      "governance": "Güvenlik taraması ve AI özeti",
+      "governanceHint": "Bu kuralın oluşturduğu her çalışma alanına uygulanır.",
+      "scanEnforcement": "Zorlama",
+      "scanOff": "Tarama",
+      "scanAdvisory": "Yalnızca tara ve raporla",
+      "scanEnforced": "Bulgu varsa uygulamayı engelle",
+      "scanEngine": "Tarayıcı",
+      "scanEngineBoth": "Checkov ve Trivy",
+      "scanThreshold": "Şu düzeyden itibaren bulguları raporla",
+      "severityCritical": "kritik",
+      "severityHigh": "yüksek",
+      "severityMedium": "orta",
+      "severityLow": "düşük",
+      "aiSummaryMode": "AI Plan Özeti",
+      "aiSummaryDefault": "Dağıtım varsayılanını izle",
+      "aiSummaryEnabled": "Her zaman özetle",
+      "aiSummaryDisabled": "Asla özetleme",
+      "execution": "Yürütme, VCS ve sapma",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt sürümü",
+      "noExpiry": "Süre dolumu yok",
+      "addDriftIgnoreRule": "Kural ekle",
+      "debugModeHint": "Bu kuralın oluşturduğu çalışma alanlarında başarısız çalıştırıcı pod'larını açık tutun. Varsayılan olarak kapalı — açık tutulan bir pod o çalışma alanının kimlik bilgilerini barındırır."
     },
     "table": {
       "name": "Ad",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "Zorunlu bir çalıştırma görevi başarısız oldu — geçersiz kılın veya çalıştırmayı iptal edin",
       "runTasksRunning": "Plan sonrası çalıştırma görevleri bekleniyor",
       "heldByPolicy": "Zorunlu bir politika seti başarısız oldu — geçersiz kılın veya çalıştırmayı iptal edin",
-      "heldBySecurityScan": "Güvenlik taraması engelleyen bulgular buldu — geçersiz kılın veya çalıştırmayı iptal edin"
+      "heldBySecurityScan": "Güvenlik taraması engelleyen bulgular buldu — geçersiz kılın veya çalıştırmayı iptal edin",
+      "heldByAiPolicy": "AI politika kapısı bu çalıştırmayı reddetti — geçersiz kılın veya çalıştırmayı iptal edin",
+      "awaitingAiPolicy": "AI politika kararı bekleniyor"
     },
     "badge": {
       "destroy": "yok et",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "Tarama tamamlanmadı, bu nedenle bu çalıştırma denetlenmedi.",
       "blockedErroredMessage": "Güvenlik taraması tamamlanmadığı için bu çalıştırma engellendi. Nedenini giderip yeniden plan yapın veya bir yöneticiden geçersiz kılmasını isteyin."
     },
+    "aiPolicyPanel": {
+      "heading": "AI politika kapısı",
+      "enforcementLabel": "uygulama: {level}",
+      "thresholdLabel": "risk eşiği: {threshold}",
+      "awaitingVerdict": "AI politika kararı bekleniyor. Karar gelene kadar bu çalıştırma tutuluyor.",
+      "decisionAllow": "izin verildi",
+      "decisionDeny": "reddedildi",
+      "risk": {
+        "critical": "kritik",
+        "high": "yüksek",
+        "medium": "orta",
+        "low": "düşük"
+      },
+      "blockedDeniedMessage": "Bu çalıştırma <strong>{count, plural, one {# politika ölçütü} other {# politika ölçütü}} tarafından engellendi</strong>.",
+      "blockedRiskMessage": "Bu çalıştırma, risk düzeyi ({level}) eşikte ({threshold}) veya üzerinde olduğu için <strong>engellendi</strong>.",
+      "blockedErroredMessage": "AI politika kararına ulaşılamadığı için bu çalıştırma engellendi. Kapı kapalı konumda başarısız olur; ulaşılamayan bir karar onay değildir.",
+      "erroredMessage": "AI politika kapısı kullanılabilir bir karar döndürmedi, bu nedenle bu çalıştırma değerlendirilmedi.",
+      "passed": "Hiçbir politika ölçütü eşleşmedi.",
+      "overriding": "Geçersiz kılınıyor...",
+      "overrideContinue": "Geçersiz Kıl ve Devam Et",
+      "overrideConfirm": "AI politika kapısı geçersiz kılınıp karara rağmen bu çalıştırmanın uygulanmasına izin verilsin mi?",
+      "overrideFailed": "Geçersiz kılma başarısız",
+      "overrideFailedStatus": "Geçersiz kılma başarısız ({status})",
+      "overriddenBy": "{by} tarafından geçersiz kılındı"
+    },
     "architecture": {
       "loadError": "Mimari eleştirisi yüklenemedi.",
       "notEnabled": "AI mimari eleştirmeni bu dağıtımda etkin değil.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Dağıtım varsayılanını izle",
       "modeEnabled": "Her zaman özetle",
       "modeDisabled": "Asla özetleme",
+      "policyMode": "Politika kapısı",
+      "policyModeNote": "Zorunlu bir kapı “Asla” seçeneğini yok sayar: bu çalışma alanını yalnızca tavsiye niteliğindeki bir karardan muaf tutabilir.",
       "contextLabel": "Çalışma alanı bağlamı",
       "contextLabelSuffix": "(isteğe bağlı, ek)",
       "contextPlaceholder": "AI''nin özellikle bu çalışma alanı hakkında bilmesi gereken gerçekler. örn. 'X hizmetinin vault''unu önler — KMS anahtarını yok etmek genel bir kesintiye neden olur.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Durum sürümü geri alınamadı",
       "stateActionFailed": "Durum eylemi başarısız",
       "uploadState": "Durum yüklenemedi",
-      "uploadStateFile": "Durum dosyası yüklenemedi"
+      "uploadStateFile": "Durum dosyası yüklenemedi",
+      "updateSecurityScan": "Güvenlik taraması güncellenemedi",
+      "updateDebugMode": "Hata ayıklama modu güncellenemedi"
     },
     "subtabs": {
       "state": "Durum",
@@ -2880,6 +2934,38 @@
         "global": "Genel",
         "rule": "Kuralla eşleşti"
       }
+    },
+    "securityScan": {
+      "title": "Güvenlik taraması",
+      "description": "Uygulanmadan önce planı güvensiz altyapı açısından tarayın.",
+      "enforcement": "Zorlama",
+      "enforcementOff": "Tarama",
+      "enforcementAdvisory": "Yalnızca tara ve raporla",
+      "enforcementEnforced": "Bulgu varsa uygulamayı engelle",
+      "engine": "Tarayıcı",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov ve Trivy",
+      "threshold": "Şu düzeyden itibaren bulguları raporla",
+      "thresholdCritical": "kritik",
+      "thresholdHigh": "yüksek",
+      "thresholdMedium": "orta",
+      "thresholdLow": "düşük",
+      "skipRules": "Yok sayılan kurallar",
+      "skipRulesSuffix": "(isteğe bağlı)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Yok sayılan kural yok.",
+      "skipRulesHint": "Bu çalışma alanında yok sayılacak tarayıcı kural kimlikleri, virgülle ayrılmış."
+    },
+    "debugMode": {
+      "title": "Çalıştırıcı hata ayıklama modu",
+      "description": "Başarısız bir çalıştırmanın pod'unu içine girebilmeniz için açık tutun. Çalıştırma önce başarısız olarak bildirilir; kapsayıcı ancak ondan sonra ayakta kalır.",
+      "label": "Hata ayıklama modu",
+      "hint": "Varsayılan olarak kapalı. Açıkken, başarısız bir çalıştırıcının pod'u operatörünüzün yapılandırdığı pencere boyunca exec ile erişilebilir kalır ve bu süre boyunca bu çalışma alanının kimlik bilgilerini ve şifresi çözülmüş değişkenlerini barındırır.",
+      "activeBadge": "Etkin",
+      "bannerTitle": "Bu çalışma alanı için hata ayıklama modu açık",
+      "bannerBody": "Başarısız bir çalıştırmanın pod'u sonlanmak yerine inceleme için açık tutulur ve tutulduğu sürece bu çalışma alanının kimlik bilgilerini ve şifresi çözülmüş değişkenlerini barındırır. Sorun gidermeyi bitirdiğinizde hata ayıklama modunu kapatın.",
+      "confirmEnable": "Hata ayıklama modu açılsın mı? Başarısız bir çalıştırmanın pod'u, pencere dolana ya da siz pod'u silene kadar bu çalışma alanının kimlik bilgileri ve şifresi çözülmüş değişkenleriyle birlikte açık tutulacak."
     }
   },
   "graphs": {

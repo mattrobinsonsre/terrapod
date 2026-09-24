@@ -2,11 +2,13 @@
 
 import asyncio
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from terrapod.db.models import VCSConnection
+from terrapod.services import vcs_status_dispatcher as dispatcher
 from terrapod.services.vcs_status_dispatcher import (
     _build_comment_body,
     _resolve_status,
@@ -353,6 +355,13 @@ class TestSupersededRunComment:
                 "terrapod.services.vcs_status_dispatcher._find_or_create_comment",
                 new=AsyncMock(),
             ) as mock_comment,
+            # #1798 added a gate lookup on the `planning` path. These suites are
+            # about other things, so hold it at "nothing is holding the run";
+            # the gate cases have their own tests below.
+            patch(
+                "terrapod.services.run_service.blocked_by",
+                new=AsyncMock(return_value=None),
+            ),
         ):
             await handle_vcs_commit_status(
                 {
@@ -573,6 +582,13 @@ class TestStaleStatusDoesNotClobberTheComment:
                 "terrapod.services.vcs_status_dispatcher._find_or_create_comment",
                 new=AsyncMock(),
             ) as mock_comment,
+            # #1798 added a gate lookup on the `planning` path. These suites are
+            # about other things, so hold it at "nothing is holding the run";
+            # the gate cases have their own tests below.
+            patch(
+                "terrapod.services.run_service.blocked_by",
+                new=AsyncMock(return_value=None),
+            ),
         ):
             await handle_vcs_commit_status(
                 {
@@ -723,3 +739,216 @@ class TestTableDetection:
         db = AsyncMock()
         db.execute = AsyncMock(side_effect=RuntimeError("database is down"))
         assert await _pr_has_status_table(db, uuid.uuid4(), "org/repo", 7) is False
+
+
+# ── a run held at a post-plan gate (#1798) ───────────────────────────
+#
+# A held run stays in `planning`, so the status map reported "Plan in progress"
+# for as long as it was held — indefinitely, since nothing moves until a person
+# acts. The plan had finished; what was outstanding was a decision, and the PR
+# said nothing about it.
+
+
+class TestAHeldRunSaysWhatIsHoldingIt:
+    def test_each_gate_names_itself_and_the_way_out(self):
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        for gate, expected in [
+            ("policy", "policy check"),
+            ("security-scan", "security scan"),
+            ("run-task", "run task"),
+            # Added by #1766 and the reason this matters most: that gate holds
+            # a run while its verdict is produced, so the wait is real.
+            ("ai-policy", "AI policy gate"),
+        ]:
+            gh, gl, description = _resolve_status("planning", False, None, gate)
+            assert expected in description, (gate, description)
+            assert "Plan in progress" not in description
+            # Pending, not failure: the plan succeeded and a decision is owed.
+            # It still leaves a required check unmet, so the PR cannot merge.
+            assert (gh, gl) == ("pending", "running")
+
+    def test_an_unheld_planning_run_is_unchanged(self):
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        assert _resolve_status("planning", False, None, None) == (
+            "pending",
+            "running",
+            "Plan in progress",
+        )
+
+    def test_a_gate_we_do_not_recognise_still_says_blocked(self):
+        """A newer API naming a gate this build does not know must not fall
+        back to "Plan in progress" — the run is stopped either way."""
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        _, _, description = _resolve_status("planning", False, None, "something-new")
+        assert "Blocked" in description
+
+    def test_the_gate_only_applies_while_planning(self):
+        """A stale gate value must not rewrite a terminal status."""
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        assert _resolve_status("applied", False, None, "policy")[2] == "Apply complete"
+
+    def test_the_comment_does_not_show_a_turning_gear_for_a_blocked_run(self):
+        from terrapod.services.vcs_status_dispatcher import _build_comment_body
+
+        body = _build_comment_body(
+            workspace_name="prod",
+            workspace_id="ws-1",
+            run_id="run-1",
+            run_status="planning",
+            plan_only=False,
+            has_changes=True,
+            run_url="https://example.invalid/r",
+            gate="policy",
+        )
+        assert "policy check" in body
+        assert ":gear:" not in body
+
+
+# ── a no-op run is not an apply (#1794) ──────────────────────────────
+
+
+class TestANoOpRunDoesNotClaimToHaveApplied:
+    def test_a_zero_change_applied_run_says_there_was_nothing_to_apply(self):
+        """The run reaches `applied` without launching an apply, deliberately.
+        "Apply complete" read as though something had been applied — alarming
+        on a workspace with auto-apply off, where nobody confirmed anything."""
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        gh, gl, description = _resolve_status("applied", False, has_changes=False)
+        assert "nothing to apply" in description
+        assert "Apply complete" not in description
+        # Still a success: the run did everything it needed to.
+        assert (gh, gl) == ("success", "success")
+
+    def test_a_real_apply_is_untouched(self):
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        assert _resolve_status("applied", False, has_changes=True)[2] == "Apply complete"
+        # Unknown (an older run, or the flag never landed) keeps the old text
+        # rather than claiming a no-op we cannot demonstrate.
+        assert _resolve_status("applied", False, has_changes=None)[2] == "Apply complete"
+
+
+# ── one comment per push, not one edited forever (#1799) ──────────────
+#
+# Terrapod edited a single per-workspace comment in place for the life of the
+# PR, so a plan triggered by a push produced no visible change in the thread —
+# the edit was often far above the latest commit, and the only new signal was
+# the commit status at the very bottom. A command-triggered plan looked
+# different only because the reply landed next to what you had just typed.
+
+
+class TestTheStatusCommentIsScopedToTheCommit:
+    def test_the_marker_carries_the_commit(self):
+        m = dispatcher._comment_marker("ws-1", "abc123")
+        assert "ws-1" in m and "abc123" in m
+
+    def test_a_body_carries_the_marker_its_own_lookup_searches_for(self):
+        """The body used to spell the marker out as a literal while the lookup
+        built it from a helper. Drift between the two does not fail loudly —
+        it means the search never matches, so every status posts a NEW
+        comment and the PR fills up. Pin them together."""
+        sha = "cafe1234"
+        body = dispatcher._build_comment_body(
+            workspace_name="prod",
+            workspace_id="ws-1",
+            run_id="run-1",
+            run_status="planned",
+            plan_only=False,
+            has_changes=True,
+            run_url="https://example.invalid/r/1",
+            commit_sha=sha,
+        )
+        assert dispatcher._comment_marker("ws-1", sha) in body
+
+    async def test_a_second_push_gets_its_own_comment(self):
+        """Two runs on two commits: two comments, so the newer plan appears
+        at the foot of the thread next to the push that caused it."""
+        conn = SimpleNamespace(id=uuid.uuid4(), provider="github")
+        fake_redis = _FakeRedis()
+        created: list[str] = []
+        updated: list[int] = []
+        posted: list[dict] = []
+
+        async def _create(conn, owner, repo, pr_number, body):
+            created.append(body)
+            cid = 100 + len(created)
+            posted.append({"id": cid, "body": body})
+            return cid
+
+        async def _update(conn, owner, repo, comment_id, body):
+            updated.append(comment_id)
+
+        async def _list(conn, owner, repo, pr_number):
+            return posted
+
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=fake_redis),
+            patch.object(dispatcher.github_service, "list_pr_comments", new=_list),
+            patch.object(dispatcher.github_service, "create_pr_comment", new=_create),
+            patch.object(dispatcher.github_service, "update_pr_comment", new=_update),
+        ):
+            for sha in ("sha1111", "sha2222"):
+                # The body must carry the marker the lookup searches for,
+                # exactly as production builds it — a markerless fake body
+                # never matches the search, so the test would create twice
+                # for the wrong reason and survive the marker being
+                # reverted to workspace-only.
+                await dispatcher._find_or_create_comment(
+                    conn,
+                    "org",
+                    "repo",
+                    7,
+                    "ws-1",
+                    f"{dispatcher._comment_marker('ws-1', sha)}\nplan for {sha}",
+                    sha,
+                )
+
+        assert len(created) == 2, created
+        assert updated == []
+
+    async def test_status_changes_within_one_commit_keep_editing_one_comment(self):
+        """The other half of the bargain: one comment per push, NOT one per
+        status. queued → planning → planned on the same commit must not post
+        three comments."""
+        conn = SimpleNamespace(id=uuid.uuid4(), provider="github")
+        fake_redis = _FakeRedis()
+        created: list[str] = []
+        updated: list[int] = []
+        posted: list[dict] = []
+
+        async def _create(conn, owner, repo, pr_number, body):
+            created.append(body)
+            cid = 200 + len(created)
+            posted.append({"id": cid, "body": body})
+            return cid
+
+        async def _update(conn, owner, repo, comment_id, body):
+            updated.append(comment_id)
+
+        async def _list(conn, owner, repo, pr_number):
+            return posted
+
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=fake_redis),
+            patch.object(dispatcher.github_service, "list_pr_comments", new=_list),
+            patch.object(dispatcher.github_service, "create_pr_comment", new=_create),
+            patch.object(dispatcher.github_service, "update_pr_comment", new=_update),
+        ):
+            for body in ("queued", "planning", "planned"):
+                await dispatcher._find_or_create_comment(
+                    conn,
+                    "org",
+                    "repo",
+                    7,
+                    "ws-1",
+                    f"{dispatcher._comment_marker('ws-1', 'sha1111')}\n{body}",
+                    "sha1111",
+                )
+
+        assert len(created) == 1, created
+        assert len(updated) == 2, updated

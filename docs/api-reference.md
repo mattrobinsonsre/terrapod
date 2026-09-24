@@ -390,6 +390,8 @@ either/or rule.
 }
 ```
 
+Create accepts the same settings `PATCH` does, including `vcs-workflow`, `auto-merge`, `auto-merge-strategy`, `ai-summary-mode` and `ai-summary-context`. Before #1763 those five were **silently dropped** on create — accepted with a `201` and ignored — so a configuration asking for `apply_then_merge` quietly got `merge_then_apply`. They are now read and validated by the same rules `PATCH` uses, including `apply_then_merge`'s requirement for a VCS connection and auto-apply off.
+
 **Required permission:** Any authenticated user can create workspaces (creator becomes owner).
 
 ### `engine-version`, and its older name `terraform-version`
@@ -592,6 +594,12 @@ Workspaces support the following drift detection attributes (settable on create 
 | `security-scan-severity-threshold` | string | `high` | Lowest finding severity that counts as a scan failure: `critical`, `high`, `medium`, or `low` |
 | `security-scan-skip-rules` | list[string] | `[]` | Scanner rule-ids to suppress (Checkov `CKV_*` / Trivy `AVD-*`). Max 200 entries, ≤ 100 chars each |
 
+### Runner Debug Mode
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `debug-mode` | boolean | `false` | Hold this workspace's **failed** runner pods open so an operator can `kubectl exec` into one (#1764). The run is reported as failed first and is final from Terrapod's side; only then does the container stay up, for at most `runners.debugLingerSeconds`. Successful runs are unaffected. See [runners.md → Debug mode](runners.md#debug-mode-inspecting-a-failed-runner-pod) for what a held pod exposes and who can reach it |
+
 ### Terragrunt Attributes
 
 Workspaces support running agent-mode plans/applies through Terragrunt (settable on create and update). See [terragrunt.md](terragrunt.md) for the full feature description, including the CLI-driven path that needs no configuration.
@@ -609,6 +617,7 @@ Workspaces carry two attributes that govern the optional AI plan-summary feature
 |---|---|---|---|
 | `ai-summary-mode` | string | `"default"` | Per-workspace override. One of `"default"` (follow the global toggle), `"enabled"` (always summarise this workspace's plans), or `"disabled"` (never summarise this workspace — overrides global). |
 | `ai-summary-context` | string | `""` | Free text up to 4000 characters appended to the model's prompt as workspace-specific facts (e.g. "Fronts the vault for service X — destroying the KMS key causes a global outage."). Additive to the deployment-wide `fleet_context`. |
+| `ai-policy-mode` | string | `"default"` | Per-workspace override for the AI **policy gate** (#1766). One of `"default"` (follow the deployment setting), `"enabled"`, or `"disabled"`. `"disabled"` opts out of an **advisory** verdict only — a `mandatory` gate ignores it, so a fleet-wide blocking control cannot be switched off per workspace. A workspace also cannot opt into a gate the deployment has not enabled. |
 | `slack-channel` | string | `""` | Opt-in Slack channel (name or ID) this workspace's run notifications post to (#556) — approval requests, applies, errors, drift. Empty = silent (there is no deployment-wide fan-out). Only effective when the Slack app is enabled server-side (`api.config.slack.enabled`). See [slack-integration.md](slack-integration.md). |
 
 422 errors:
@@ -884,13 +893,15 @@ This is enforced server-side regardless of run source (VCS, CLI/API, UI), so the
 
 #### Runs held at a post-plan gate: `blocked-by`
 
-A mandatory policy set, an enforced security scan, or a mandatory post-plan run task can stop a run after its plan has finished. The run stays at `status: planning`, and the read-only **`blocked-by`** attribute names the gate holding it: `run-task`, `policy` or `security-scan` (checked in that order), or `null` for any run not held. While held:
+A mandatory policy set, an enforced security scan, a mandatory post-plan run task, or a mandatory AI policy gate can stop a run after its plan has finished. The run stays at `status: planning`, and the read-only **`blocked-by`** attribute names the gate holding it: `run-task`, `policy`, `security-scan` or `ai-policy` (checked in that order), or `null` for any run not held. While held:
 
 - the run's plan reports `status: finished`, so a CLI waiting on the plan log returns;
 - the run is **discardable** (`actions.is-discardable: true`) unless it is plan-only, and a newer apply-capable run supersedes it as it would a `planned` run;
-- it is released by an override (policy or security scan) or a passing run task, which the reconciler picks up on its next tick. Kubernetes cleaning up the finished plan Job does not error it.
+- it is released by an override (policy, security scan or AI policy) or a passing run task, which the reconciler picks up on its next tick. Kubernetes cleaning up the finished plan Job does not error it.
 
-In the Terraform Enterprise vocabulary (#1704) — `api.config.runs.tfe_post_plan_decisions: true`, the default from 2.0, or the request header `X-Terrapod-Post-Plan-Decisions: tfe` — a held run instead reports `status` as `post_plan_running` (post-plan tasks still running), `post_plan_awaiting_decision` (a mandatory task failed) or `policy_override` (a mandatory policy set or an enforced scan failed); `blocked-by` is unchanged. The `policy-checks` and `task-stages` relationships then carry `data` (the run's [policy checks](#policy-checks) and task stages), and `GET /api/tfe/v2/runs/{id}?include=task_stages` returns the stages and their `task-results` in `included`. `X-Terrapod-Post-Plan-Decisions: legacy` asks for the 1.x answer. See [post-plan-decisions.md](post-plan-decisions.md).
+`ai-policy` is the one gate that can hold a run before there is anything to decide: its verdict is produced in the API after the plan JSON is uploaded, not by the runner before plan-result, so a mandatory gate waits for it rather than failing the run for evidence that does not exist yet. See [ai-plan-summary.md → Policy gate](ai-plan-summary.md#policy-gate).
+
+In the Terraform Enterprise vocabulary (#1704) — `api.config.runs.tfe_post_plan_decisions: true`, the default from 2.0, or the request header `X-Terrapod-Post-Plan-Decisions: tfe` — a held run instead reports `status` as `post_plan_running` (post-plan tasks still running, or an AI policy verdict still being produced), `post_plan_awaiting_decision` (a mandatory task failed) or `policy_override` (a mandatory policy set, an enforced scan, or a landed AI policy deny); `blocked-by` is unchanged. The `policy-checks` and `task-stages` relationships then carry `data` (the run's [policy checks](#policy-checks) and task stages), and `GET /api/tfe/v2/runs/{id}?include=task_stages` returns the stages and their `task-results` in `included`. `X-Terrapod-Post-Plan-Decisions: legacy` asks for the 1.x answer. See [post-plan-decisions.md](post-plan-decisions.md).
 
 #### Stale-plan guards: state drift (#647) & expiry (#646)
 
@@ -1127,6 +1138,25 @@ POST /api/v1/runs/{run_id}/actions/override-security-scan    # override a blocki
 **POST override** marks a failed/errored result overridden and, when the run is still held in `planning` by an enforced scan, re-drives it immediately (mirrors the policy override). Requires **admin** on the workspace; audit-logged. Prefer fixing the finding or adding a skip rule.
 
 The runner protocol (runner-token, run_id-scoped) — `GET .../security-scan-config` and `POST .../security-scan-results` — is internal to the runner and mirrors the OPA `policy-bundle`/`policy-results` pair; the enforcement level and severity threshold are re-resolved **server-side from the workspace** on results POST, never trusted from the runner body.
+
+### AI Policy Gate (#1766)
+
+The AI plan summary's optional post-plan gate — the third structural sibling of the OPA policy and security-scan endpoints. See [ai-plan-summary.md → Policy gate](ai-plan-summary.md#policy-gate) for the feature guide; the per-workspace override (`ai-policy-mode`) is in the workspace attributes table above.
+
+```
+GET  /api/v1/runs/{run_id}/ai-policy                     # read the verdict (workspace read)
+POST /api/v1/runs/{run_id}/actions/override-ai-policy    # release a held run (workspace admin)
+```
+
+**GET** returns `{"data": <resource>|null, "meta": {...}}`. The resource `attributes` are: `enforcement-level` (`advisory`/`mandatory`), `risk-threshold`, `outcome` (`passed`/`failed`/`errored`), `verdict` (`{decision: "allow"|"deny", reasons: [{criterion, detail}]}`), `risk-level`, `error`, `overridden-by`, `overridden-at`, `created-at`. `meta` carries the resolved `enforcement-level` and `blocking`, plus `not-evaluated-reason` when no verdict is recorded.
+
+`data` is `null` for four different reasons and `meta` distinguishes them, because a held run legitimately sits in the last one: the gate is off, the engine is not ruled on (Pulumi — see below), the token budget is spent, or the verdict has simply not landed yet.
+
+**`outcome: errored` BLOCKS under a mandatory gate rather than passing.** The gate fails closed: a verdict that could not be reached is not approval, so an empty `verdict` never reads as a clean pass. `error` distinguishes a spent daily token budget from a model fault, because the two call for different responses.
+
+**POST override** marks the verdict overridden and, when the run is still held in `planning`, re-drives `complete_plan` immediately (mirrors the policy and scan overrides). Requires **admin** on the workspace; audit-logged. It answers **409** when no verdict has been recorded yet — a run held *waiting* for one is released as soon as it lands, so there is nothing to override before then.
+
+Unlike the other two gates there is **no runner protocol**: the verdict is produced in the API by the summariser, which is why a mandatory gate holds the run until it arrives instead of failing it. A Pulumi run is reported as not evaluated and never held — its preview digest is capped, and a gate ruling over a truncated resource list could allow a plan whose offending resource fell off the end.
 
 ### Estate Graph
 
@@ -2666,14 +2696,22 @@ Runs the same walk as Preview but actually creates the workspaces (idempotent, c
 
 ### Rule templating (run tasks / notifications / var files)
 
-`POST`/`PATCH` rule bodies accept three additional attributes that are **materialised onto every workspace the rule creates**, so autodiscovered workspaces are fully configured at creation:
+These are editable in the UI under **Admin → Autodiscovery**, alongside the rule's other workspace-template fields.
+
+`POST`/`PATCH` rule bodies accept further attributes that are **materialised onto every workspace the rule creates**, so autodiscovered workspaces are fully configured at creation:
 
 - `var-files` — list of var-file paths.
 - `run-task-templates` — list of run-task specs (same shape as the bulk-update `run-tasks`, below): `{name, url, hmac-key?, stage, enforcement-level?, enabled?}`.
 - `notification-templates` — list of notification specs: `{name, destination-type, url?, token?, triggers?, email-addresses?, enabled?}`.
 - `execution-hook-templates` — list of [execution hook](execution-hooks.md) ids (`hook-<uuid>`) associated with every created workspace (#672).
 
-These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template).
+- `security-scan-enforcement` / `security-scan-engine` / `security-scan-severity-threshold` / `security-scan-skip-rules` — [security scanning](security-scanning.md) for every created workspace (#1763). Unlike on a workspace, `enforced` is always accepted here: a rule has no engine, so everything it creates is a Terraform/OpenTofu workspace, which is exactly what can be scanned.
+- `ai-summary-mode` / `ai-summary-context` — the AI plan-summary opt-in and its free-text context for every created workspace (#1763).
+- `ai-policy-mode` — the AI **policy gate** opt-in for every created workspace. A mandatory deployment-wide gate ignores `disabled`; it opts a workspace out of an advisory verdict only (#1766).
+- `terragrunt-enabled` / `terragrunt-version`, `vcs-workflow`, `auto-merge` / `auto-merge-strategy`, `drift-detection-enabled` / `drift-detection-interval-seconds`, `drift-ignore-rules`, `plan-expiry-seconds` and `slack-channel` — the remaining per-workspace settings (#1763). `drift-detection-enabled` defaults **true** here, unlike the workspace column, because every autodiscovered workspace is VCS-connected.
+- `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **false**, as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
+
+These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template). The same pairing holds for the scan and AI-summary settings, and their values are validated by the same rules the workspace endpoint uses — so a rule cannot template a setting the workspace API would reject.
 
 ---
 
@@ -2918,6 +2956,21 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
     "resource-cpu": "1", "resource-memory": "2Gi",
     "var-files": ["envs/prod.tfvars"],
     "labels": {"reviewed": "2026-q2"},
+    "security-scan-enforcement": "enforced",
+    "security-scan-engine": "checkov",
+    "security-scan-severity-threshold": "high",
+    "security-scan-skip-rules": ["CKV_AWS_24"],
+    "ai-summary-mode": "enabled",
+    "ai-summary-context": "payments estate; PCI in scope",
+    "terragrunt-enabled": true, "terragrunt-version": "0.67.4",
+    "trigger-prefixes": ["infra/net"],
+    "vcs-workflow": "merge_then_apply",
+    "auto-merge": true, "auto-merge-strategy": "squash",
+    "plan-expiry-seconds": 3600,
+    "drift-detection-enabled": true, "drift-detection-interval-seconds": 86400,
+    "drift-ignore-rules": ["aws_instance.web.tags[\"LastSeen\"]"],
+    "slack-channel": "#platform",
+    "pulumi-bind-plan": false,
     "run-tasks": [
       { "name": "opa-policy-check", "url": "http://opa:8080/webhook",
         "hmac-key": "secret", "stage": "post_plan", "enforcement-level": "mandatory" }
@@ -2934,6 +2987,12 @@ Semantics:
 
 - **Validated once up front** — field enums, `labels` reserved-key check, run-task/notification specs, and agent-pool existence + caller pool-`write` RBAC on **every** pool named. Any error ⇒ `422`, **zero mutation**.
 - **Agent pools** accept either `agent-pool-id` (one pool, replacing the set) or `agent-pool-ids` (the set) — the same mutually-exclusive pair as the workspace endpoints; both in one `update` ⇒ `422`.
+- **`security-scan-enforcement` is checked against the matched set**, not just the payload. Checkov and Trivy read Terraform plan JSON, so a Pulumi workspace has nothing to scan and accepts only `off`. Setting `advisory` or `enforced` across a match set containing one ⇒ `422` naming the offenders, with **zero mutation** — a mixed-engine match set is the normal case, and the alternative is every apply on those workspaces held waiting for a scan result that cannot arrive. Narrow the filter to exclude them.
+- **Every settable per-workspace setting is reachable here** (#1763). A source-introspection gate requires each `Workspace` column to be wired up, permanently exempt with a reason, or a recorded gap — so a new setting cannot be silently missing.
+- **All settings use the same rules as the single-workspace `PATCH`** (enum values, the 200-entry skip-rule cap, the 4000-character context cap, the drift-rule character set), so bulk update never accepts a value the workspace endpoint rejects. Booleans are type-checked, never coerced: `"false"` is refused rather than read as `true`.
+- **Two more settings are checked against the matched set**, for the same reason as `security-scan-enforcement`:
+  - `vcs-workflow: apply_then_merge` needs a VCS connection and auto-apply off on **every** matched workspace — the apply runs before the PR merges, so auto-applying would apply from a branch nobody approved. Turning auto-apply off in the same request is allowed, mirroring the `PATCH` path.
+  - `pulumi-bind-plan` applies only to Pulumi workspaces; setting it across a match set containing another engine ⇒ `422`, rather than recording a setting that does nothing.
 - `run-tasks` / `notification-configurations` **upsert by `(workspace, name)`**: created if absent, updated in place if present (so re-running with a changed `url` rotates it across the fleet).
 - **All-or-nothing**: the whole batch commits or nothing does. `dry_run` (default `true`, not enforced) runs the identical code path and rolls back — the preview is exactly what apply would do, with provably zero side effects.
 - **Triggers no runs** — pure config write; the change lands on each workspace's next normal run. Reversible (it only writes settings rows).
@@ -4068,7 +4127,7 @@ The Rego is validated with `opa check` on create/update — broken Rego, or Rego
 GET /api/v1/runs/{run_id}/policy-evaluations
 ```
 
-Returns the policy evaluations recorded for a run, plus a `meta.summary` (`status`: `passed` / `advisory-failed` / `blocked`, and counts). Each evaluation's `result` carries the per-policy violations/warnings. This is the endpoint behind the run's `policy-checks` relationship link. For a run whose engine does not evaluate policy sets (Pulumi, until #1560), `meta.not-evaluated-reason` says why there are no evaluations. **Required permission:** `read` on the run's workspace.
+Returns the policy evaluations recorded for a run, plus a `meta.summary` (`status`: `passed` / `advisory-failed` / `blocked`, and counts). Each evaluation's `result` carries the per-policy violations/warnings. This is the endpoint behind the run's `policy-checks` relationship link. Both Terraform and Pulumi runs are evaluated, against their own engine's account of the change (see [`docs/policies.md`](policies.md#what-a-policy-can-read)). `meta.not-evaluated-reason` is present only for an engine that cannot be evaluated at all, and no current engine is in that position. **Required permission:** `read` on the run's workspace.
 
 ### Override Run Policy
 

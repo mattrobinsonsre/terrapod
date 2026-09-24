@@ -1053,7 +1053,30 @@
       "notificationTemplates": "templates, Notification (on each new workspace, created)",
       "saving": "Saving, we are...",
       "previewTitle": "The repo walk, and which workspaces this rule WOULD create preview — no persistence, there is",
-      "parallelism": "Parallelism"
+      "parallelism": "Parallelism",
+      "governance": "AI Summary and Security Scanning",
+      "governanceHint": "To every workspace this rule creates, applied it is.",
+      "scanEnforcement": "Enforcement",
+      "scanOff": "Scan, do not",
+      "scanAdvisory": "Scan and report only, you will",
+      "scanEnforced": "On findings, block the apply",
+      "scanEngine": "Scanner",
+      "scanEngineBoth": "Checkov and Trivy",
+      "scanThreshold": "At or above, report findings",
+      "severityCritical": "critical",
+      "severityHigh": "high",
+      "severityMedium": "medium",
+      "severityLow": "low",
+      "aiSummaryMode": "Summary, AI Plan",
+      "aiSummaryDefault": "The deployment default, follow",
+      "aiSummaryEnabled": "Summarize, always",
+      "aiSummaryDisabled": "Summarize, never",
+      "execution": "VCS and drift, execution",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Version, Terragrunt",
+      "noExpiry": "Expiry, there is none",
+      "addDriftIgnoreRule": "A rule, add",
+      "debugModeHint": "Open failed runner pods hold, on the workspaces this rule creates. Off by default — that workspace's credentials, a held pod keeps."
     },
     "table": {
       "name": "Name",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "Failed, a mandatory run task has — override it or discard the run, you must",
       "runTasksRunning": "For post-plan run tasks, waiting",
       "heldByPolicy": "Failed, a mandatory policy set has — override it or discard the run, you must",
-      "heldBySecurityScan": "Blocking issues, the security scan found — override it or discard the run, you must"
+      "heldBySecurityScan": "Blocking issues, the security scan found — override it or discard the run, you must",
+      "heldByAiPolicy": "Denied this run, the AI policy gate has — override it or discard the run, you must",
+      "awaitingAiPolicy": "For the AI policy verdict, waiting we are"
     },
     "badge": {
       "destroy": "destroy",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "Complete, the scan did not. Checked, this run has not been.",
       "blockedErroredMessage": "Blocked, this run is, because complete the security scan did not. Fix the cause and plan again you must, or override it, an admin must."
     },
+    "aiPolicyPanel": {
+      "heading": "Gate of AI Policy",
+      "enforcementLabel": "enforcement: {level}",
+      "thresholdLabel": "risk threshold: {threshold}",
+      "awaitingVerdict": "For the AI policy verdict, waiting we are. Held, this run is, until arrive it does.",
+      "decisionAllow": "allowed",
+      "decisionDeny": "denied",
+      "risk": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low"
+      },
+      "blockedDeniedMessage": "<strong>Blocked by {count, plural, one {# policy criterion} other {# policy criteria}}</strong>, this run is.",
+      "blockedRiskMessage": "<strong>Blocked</strong>, this run is, because at or above the threshold ({threshold}) its risk level ({level}) sits.",
+      "blockedErroredMessage": "Blocked, this run is, because reached no AI policy verdict could be. Closed the gate fails — consent, a verdict unreached is not.",
+      "erroredMessage": "A usable verdict, the AI policy gate did not return. Ruled on, this run has not been.",
+      "passed": "Match, no policy criteria did.",
+      "overriding": "Overriding, we are...",
+      "overrideContinue": "Override and Continue",
+      "overrideConfirm": "Override the AI policy gate, and despite the verdict let this run apply, you would?",
+      "overrideFailed": "Failed, the override did",
+      "overrideFailedStatus": "Failed, the override did ({status})",
+      "overriddenBy": "by {by}, overridden"
+    },
     "architecture": {
       "loadError": "Load the architecture critique, I could not.",
       "notEnabled": "Enabled on this deployment, the AI architecture critic is not.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "The deployment default, follow",
       "modeEnabled": "Summarize, always",
       "modeDisabled": "Summarize, never",
+      "policyMode": "Gate of policy",
+      "policyModeNote": "“Never”, a mandatory gate ignores: out of an advisory verdict only, opt this workspace it can.",
       "contextLabel": "context, Workspace",
       "contextLabelSuffix": "(optional, additive)",
       "contextPlaceholder": "About this workspace specifically, facts the AI should know. e.g. 'The vault for service X, it fronts — destroying the KMS key, a global outage it causes.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Rollback the state version, it did not",
       "stateActionFailed": "Failed, the state action did",
       "uploadState": "Upload the state, it did not",
-      "uploadStateFile": "Upload the state file, it did not"
+      "uploadStateFile": "Upload the state file, it did not",
+      "updateSecurityScan": "Update the security scanning, failed it did",
+      "updateDebugMode": "Update debug mode, it did not"
     },
     "subtabs": {
       "state": "State",
@@ -2880,6 +2934,38 @@
         "global": "Global",
         "rule": "By rule, matched"
       }
+    },
+    "securityScan": {
+      "title": "Scanning, Security",
+      "description": "For insecure infrastructure, scan the plan you must, before applied it is.",
+      "enforcement": "Enforcement",
+      "enforcementOff": "Scan, do not",
+      "enforcementAdvisory": "Scan and report only, you will",
+      "enforcementEnforced": "On findings, block the apply",
+      "engine": "Scanner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov and Trivy",
+      "threshold": "At or above, report findings",
+      "thresholdCritical": "critical",
+      "thresholdHigh": "high",
+      "thresholdMedium": "medium",
+      "thresholdLow": "low",
+      "skipRules": "Rules, ignored",
+      "skipRulesSuffix": "(optional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Ignored, no rules are.",
+      "skipRulesHint": "To ignore on this workspace, comma-separated scanner rule ids there are."
+    },
+    "debugMode": {
+      "title": "Mode, Runner Debug",
+      "description": "Open the pod of a failed run, hold you must, so inside it get you can. As failed, reported first the run is; only then stay up, the container does.",
+      "label": "Mode, Debug",
+      "hint": "Off by default, it is. While on, exec-able a failed runner pod stays, for the window your operator configured, and this workspace's credentials and decrypted variables, keep it does, for that whole time.",
+      "activeBadge": "Active",
+      "bannerTitle": "On for this workspace, debug mode is",
+      "bannerBody": "Held open for inspection instead of exiting, a failed run's pod is, and this workspace's credentials and decrypted variables it keeps, while held it is. Off turn debug mode, when finished troubleshooting you are.",
+      "confirmEnable": "On debug mode, turn? Held open a failed run's pod will be, holding this workspace's credentials and decrypted variables, until expires the window or delete the pod you do."
     }
   },
   "graphs": {

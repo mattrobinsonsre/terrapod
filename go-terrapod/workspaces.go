@@ -138,11 +138,21 @@ type Workspace struct {
 	// VCSConnectionName is the human-readable name of the assigned VCS
 	// connection, server-derived from VCSConnectionID. Empty when none.
 	VCSConnectionName string `json:"vcs-connection-name,omitempty"`
+	// DebugMode holds this workspace's failed runner pods open for
+	// inspection (#1764). How long is the deployment's setting, not the
+	// workspace's — the pod keeps the run's credentials for that window.
+	DebugMode bool `json:"debug-mode"`
 	// AISummaryMode is the three-state per-workspace override (#401):
 	//   "default"  → follow the deployment-wide ai_summary.enabled flag
 	//   "enabled"  → always summarise (no-op when global is off)
 	//   "disabled" → never summarise this workspace's plans
 	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	// AIPolicyMode is the per-workspace override for the AI policy GATE
+	// (#1766), with the same three states as AISummaryMode. Note the one
+	// asymmetry: "disabled" opts out of an ADVISORY verdict only. A mandatory
+	// gate ignores it, because a fleet-wide blocking control any workspace
+	// admin could switch off would not be a control.
+	AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 	// AISummaryContext is workspace-specific facts added on top of the
 	// deployment-wide fleet_context when the summariser builds its prompt.
 	AISummaryContext string `json:"ai-summary-context,omitempty"`
@@ -215,7 +225,17 @@ type CreateWorkspaceRequest struct {
 	// AISummaryMode is the three-state per-workspace override (#401):
 	// "default" | "enabled" | "disabled". Empty string omits the field
 	// (server-side default applies — "default").
+	// DebugMode holds this workspace's failed runner pods open for inspection
+	// (#1764). A pointer so that "leave it alone" and "turn it off" stay
+	// distinguishable -- a bare bool with omitempty cannot express the second.
+	DebugMode     *bool  `json:"debug-mode,omitempty"`
 	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	// AIPolicyMode is the per-workspace override for the AI policy GATE
+	// (#1766), with the same three states as AISummaryMode. Note the one
+	// asymmetry: "disabled" opts out of an ADVISORY verdict only. A mandatory
+	// gate ignores it, because a fleet-wide blocking control any workspace
+	// admin could switch off would not be a control.
+	AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 	// AISummaryContext is workspace-specific context added to the model
 	// prompt. Capped at 4000 chars server-side.
 	AISummaryContext string `json:"ai-summary-context,omitempty"`
@@ -278,7 +298,15 @@ type UpdateWorkspaceRequest struct {
 	// AISummaryMode see CreateWorkspaceRequest. On UPDATE, empty string
 	// leaves the existing value untouched — to explicitly set "follow
 	// deployment default", pass "default".
+	// DebugMode holds this workspace's failed runner pods open for inspection
+	// (#1764). A pointer so that "leave it alone" and "turn it off" stay
+	// distinguishable -- a bare bool with omitempty cannot express the second.
+	DebugMode     *bool  `json:"debug-mode,omitempty"`
 	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	// AIPolicyMode see CreateWorkspaceRequest. On UPDATE, empty string leaves
+	// the existing value untouched -- to explicitly set "follow the deployment
+	// default", pass "default".
+	AIPolicyMode string `json:"ai-policy-mode,omitempty"`
 	// AISummaryContext see CreateWorkspaceRequest. To clear an existing
 	// context, set this to "" — but note empty string also means
 	// "leave alone" (a Terrapod-side limitation; clear via the UI).
@@ -619,6 +647,12 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.AISummaryContext != "" {
 		attrs["ai-summary-context"] = req.AISummaryContext
 	}
+	if req.AIPolicyMode != "" {
+		attrs["ai-policy-mode"] = req.AIPolicyMode
+	}
+	if req.DebugMode != nil {
+		attrs["debug-mode"] = *req.DebugMode
+	}
 	if req.SlackChannel != "" {
 		attrs["slack-channel"] = req.SlackChannel
 	}
@@ -736,6 +770,12 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 		// *string so callers can explicitly clear the context with &"".
 		attrs["ai-summary-context"] = *req.AISummaryContext
 	}
+	if req.AIPolicyMode != "" {
+		attrs["ai-policy-mode"] = req.AIPolicyMode
+	}
+	if req.DebugMode != nil {
+		attrs["debug-mode"] = *req.DebugMode
+	}
 	if req.SlackChannel != nil {
 		// *string so callers can explicitly go silent with &"".
 		attrs["slack-channel"] = *req.SlackChannel
@@ -840,8 +880,10 @@ func workspaceFromResource(res *Resource) *Workspace {
 		VCSLastErrorAt:                GetStringAttr(res, "vcs-last-error-at"),
 		AgentPoolName:                 GetStringAttr(res, "agent-pool-name"),
 		VCSConnectionName:             GetStringAttr(res, "vcs-connection-name"),
+		DebugMode:                     GetBoolAttr(res, "debug-mode"),
 		AISummaryMode:                 GetStringAttr(res, "ai-summary-mode"),
 		AISummaryContext:              GetStringAttr(res, "ai-summary-context"),
+		AIPolicyMode:                  GetStringAttr(res, "ai-policy-mode"),
 		SlackChannel:                  GetStringAttr(res, "slack-channel"),
 		CreatedAt:                     GetStringAttr(res, "created-at"),
 		UpdatedAt:                     GetStringAttr(res, "updated-at"),

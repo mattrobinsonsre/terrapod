@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Notification templates (created on each new work-deck)",
       "saving": "Savin''...",
       "previewTitle": "Walk th'' repo and preview which work-decks this rule WOULD create — nay persistence",
-      "parallelism": "Hands at Once"
+      "parallelism": "Hands at Once",
+      "governance": "Security Sweep and AI Summary",
+      "governanceHint": "Applied to every work-deck this rule creates.",
+      "scanEnforcement": "Enforcement",
+      "scanOff": "Do not sweep",
+      "scanAdvisory": "Sweep and report only",
+      "scanEnforced": "Bar the applyin'' on findings",
+      "scanEngine": "Sweeper",
+      "scanEngineBoth": "Checkov and Trivy",
+      "scanThreshold": "Sing out findings at or above",
+      "severityCritical": "critical",
+      "severityHigh": "high",
+      "severityMedium": "middlin'",
+      "severityLow": "low",
+      "aiSummaryMode": "AI Plan Summary",
+      "aiSummaryDefault": "Follow deployment default",
+      "aiSummaryEnabled": "Always summarize",
+      "aiSummaryDisabled": "Never summarize",
+      "execution": "Sailin, VCS and driftin",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt version",
+      "noExpiry": "No expiry, matey",
+      "addDriftIgnoreRule": "Add a rule",
+      "debugModeHint": "Keep failed runner pods open on the work-decks this rule creates. Off by default — a held pod keeps that work-deck''s credentials."
     },
     "table": {
       "name": "Name",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "A mandatory run task be sunk — override it or scuttle the run",
       "runTasksRunning": "Waitin'' on the run tasks after the plan",
       "heldByPolicy": "A mandatory policy set be sunk — override it or scuttle the run",
-      "heldBySecurityScan": "The lookout spied blockin'' reefs — override it or scuttle the run"
+      "heldBySecurityScan": "The lookout spied blockin'' reefs — override it or scuttle the run",
+      "heldByAiPolicy": "The AI articles gate refused this run — override it or scuttle the run",
+      "awaitingAiPolicy": "Awaitin'' the AI articles ruling"
     },
     "badge": {
       "destroy": "send t'' Davy Jones",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "The scan never made port, so this here run be unchecked, arr.",
       "blockedErroredMessage": "This here run be blocked on account o'' the security scan never makin'' port. Mend the cause and chart a new plan, or have an admin wave it through."
     },
+    "aiPolicyPanel": {
+      "heading": "AI Articles Gate",
+      "enforcementLabel": "enforcement: {level}",
+      "thresholdLabel": "risk threshold: {threshold}",
+      "awaitingVerdict": "Awaitin'' the AI articles ruling. This here run be held fast till it arrives.",
+      "decisionAllow": "allowed",
+      "decisionDeny": "refused",
+      "risk": {
+        "critical": "critical",
+        "high": "high",
+        "medium": "middlin'",
+        "low": "low"
+      },
+      "blockedDeniedMessage": "This run be <strong>blocked by {count, plural, one {# article o'' the code} other {# articles o'' the code}}</strong>, arr.",
+      "blockedRiskMessage": "This run be <strong>blocked</strong>, for its risk ({level}) sits at or above the threshold ({threshold}).",
+      "blockedErroredMessage": "This run be blocked, for no AI articles ruling could be reached. The gate fails shut — a ruling ye never got be no blessin''.",
+      "erroredMessage": "The AI articles gate gave no usable ruling, so this here run be unjudged, arr.",
+      "passed": "No articles o'' the code were broken, matey.",
+      "overriding": "Overridin''...",
+      "overrideContinue": "Override & Continue",
+      "overrideConfirm": "Override the AI articles gate an'' let this run be applied despite the ruling?",
+      "overrideFailed": "Override foundered",
+      "overrideFailedStatus": "Override foundered ({status})",
+      "overriddenBy": "overridden by {by}"
+    },
     "architecture": {
       "loadError": "Couldn''t haul in th'' architecture critique.",
       "notEnabled": "Th'' AI architecture critic be not hoisted on this deployment.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Follow deployment default",
       "modeEnabled": "Always summarize",
       "modeDisabled": "Never summarize",
+      "policyMode": "Articles gate",
+      "policyModeNote": "A mandatory gate pays no heed to “Never”: it can only spare this here workspace an advisory ruling, arr.",
       "contextLabel": "Work-deck context",
       "contextLabelSuffix": "(optional, additive)",
       "contextPlaceholder": "Facts th'' AI should know about this work-deck specifically. e.g. ''Fronts th'' vault fer service X — sendin'' th'' KMS key t'' Davy Jones causes a global outage.''",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Failed t'' rollback th'' state version",
       "stateActionFailed": "State action failed",
       "uploadState": "Failed t'' hoist th'' state aboard",
-      "uploadStateFile": "Failed t'' hoist th'' state file aboard"
+      "uploadStateFile": "Failed t'' hoist th'' state file aboard",
+      "updateSecurityScan": "Failed to update the security sweep",
+      "updateDebugMode": "Failed t'' update debuggin'' mode"
     },
     "subtabs": {
       "state": "State",
@@ -2880,6 +2934,38 @@
         "global": "Global",
         "rule": "Matched by the code"
       }
+    },
+    "securityScan": {
+      "title": "Security Sweep",
+      "description": "Sweep the plan fer unsafe infrastructure afore it be applied.",
+      "enforcement": "Enforcement",
+      "enforcementOff": "Do not sweep",
+      "enforcementAdvisory": "Sweep and report only",
+      "enforcementEnforced": "Bar the applyin'' on findings",
+      "engine": "Sweeper",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov and Trivy",
+      "threshold": "Sing out findings at or above",
+      "thresholdCritical": "critical",
+      "thresholdHigh": "high",
+      "thresholdMedium": "middlin'",
+      "thresholdLow": "low",
+      "skipRules": "Rules we be ignorin''",
+      "skipRulesSuffix": "(optional)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "No rules ignored, matey.",
+      "skipRulesHint": "Comma-separated sweeper rule ids to ignore on this work-deck."
+    },
+    "debugMode": {
+      "title": "Runner Debuggin'' Mode",
+      "description": "Keep a failed voyage''s pod open so ye can climb aboard it. The voyage be reported as failed first; only then does the hold stay afloat.",
+      "label": "Debuggin'' Mode",
+      "hint": "Off by default. While on, a failed runner''s pod stays exec-able fer the window yer quartermaster set, an'' it keeps this work-deck''s credentials an'' decrypted variables that whole time.",
+      "activeBadge": "Active",
+      "bannerTitle": "Debuggin'' mode be on fer this work-deck",
+      "bannerBody": "A failed voyage''s pod be held open fer inspection instead o'' endin'', an'' it keeps this work-deck''s credentials an'' decrypted variables while it be held. Douse debuggin'' mode once ye be done huntin'' the fault.",
+      "confirmEnable": "Hoist debuggin'' mode? A failed voyage''s pod will be held open carryin'' this work-deck''s credentials an'' decrypted variables until the window runs out or ye delete the pod."
     }
   },
   "graphs": {

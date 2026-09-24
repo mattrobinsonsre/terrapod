@@ -587,6 +587,45 @@ async def update_mr_comment(
         resp.raise_for_status()
 
 
+async def add_comment_reaction(
+    conn: VCSConnection, owner: str, repo: str, mr_number: int, note_id: int, content: str
+) -> int:
+    """Award an emoji to an MR note. Returns the award ID, for later removal.
+
+    GitLab names its emoji without colons (`eyes`, `thumbsup`), the same
+    spelling GitHub's reactions API uses, so callers pass one name for both.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{api}/projects/{project}/merge_requests/{mr_number}/notes/{note_id}/award_emoji",
+            json={"name": content},
+            headers=_headers(conn),
+        )
+        await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
+        resp.raise_for_status()
+        return resp.json()["id"]
+
+
+async def remove_comment_reaction(
+    conn: VCSConnection, owner: str, repo: str, mr_number: int, note_id: int, award_id: int
+) -> None:
+    """Remove one of our own awarded emoji from an MR note."""
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.delete(
+            f"{api}/projects/{project}/merge_requests/{mr_number}"
+            f"/notes/{note_id}/award_emoji/{award_id}",
+            headers=_headers(conn),
+        )
+        await vcs_rate_limit.record(conn, resp.headers, outcome=str(resp.status_code))
+        resp.raise_for_status()
+
+
 async def list_mr_comments(
     conn: VCSConnection, owner: str, repo: str, mr_number: int
 ) -> list[dict]:

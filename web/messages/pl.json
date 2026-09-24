@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Szablony powiadomień (tworzone na każdym nowym obszarze roboczym)",
       "saving": "Zapisywanie...",
       "previewTitle": "Przejdź przez repozytorium i wyświetl podgląd obszarów roboczych, które ta reguła BY utworzyła — bez zapisu",
-      "parallelism": "Równoległość"
+      "parallelism": "Równoległość",
+      "governance": "Skanowanie bezpieczeństwa i podsumowanie AI",
+      "governanceHint": "Stosowane do każdego obszaru roboczego tworzonego przez tę regułę.",
+      "scanEnforcement": "Egzekwowanie",
+      "scanOff": "Nie skanuj",
+      "scanAdvisory": "Tylko skanuj i raportuj",
+      "scanEnforced": "Blokuj zastosowanie przy znaleziskach",
+      "scanEngine": "Skaner",
+      "scanEngineBoth": "Checkov i Trivy",
+      "scanThreshold": "Raportuj znaleziska od poziomu",
+      "severityCritical": "krytyczny",
+      "severityHigh": "wysoki",
+      "severityMedium": "średni",
+      "severityLow": "niski",
+      "aiSummaryMode": "Podsumowanie planu AI",
+      "aiSummaryDefault": "Zgodnie z domyślnym ustawieniem wdrożenia",
+      "aiSummaryEnabled": "Zawsze podsumowuj",
+      "aiSummaryDisabled": "Nigdy nie podsumowuj",
+      "execution": "Wykonanie, VCS i dryf",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Wersja Terragrunt",
+      "noExpiry": "Bez wygaśnięcia",
+      "addDriftIgnoreRule": "Dodaj regułę",
+      "debugModeHint": "Utrzymuj pody nieudanych runnerów otwarte w przestrzeniach roboczych tworzonych przez tę regułę. Domyślnie wyłączone — utrzymywany pod przechowuje poświadczenia tej przestrzeni roboczej."
     },
     "table": {
       "name": "Nazwa",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "Obowiązkowe zadanie przebiegu nie powiodło się — nadpisz je lub odrzuć przebieg",
       "runTasksRunning": "Oczekiwanie na zadania przebiegu po planie",
       "heldByPolicy": "Obowiązkowy zestaw zasad nie powiódł się — nadpisz go lub odrzuć przebieg",
-      "heldBySecurityScan": "Skan bezpieczeństwa wykrył blokujące problemy — nadpisz go lub odrzuć przebieg"
+      "heldBySecurityScan": "Skan bezpieczeństwa wykrył blokujące problemy — nadpisz go lub odrzuć przebieg",
+      "heldByAiPolicy": "Bramka zasad AI odrzuciła ten przebieg — nadpisz ją lub odrzuć przebieg",
+      "awaitingAiPolicy": "Oczekiwanie na werdykt zasad AI"
     },
     "badge": {
       "destroy": "niszczenie",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "Skanowanie nie zostało ukończone, więc to uruchomienie nie zostało sprawdzone.",
       "blockedErroredMessage": "To uruchomienie jest zablokowane, ponieważ skanowanie bezpieczeństwa nie zostało ukończone. Usuń przyczynę i zaplanuj ponownie lub poproś administratora o obejście."
     },
+    "aiPolicyPanel": {
+      "heading": "Bramka zasad AI",
+      "enforcementLabel": "egzekwowanie: {level}",
+      "thresholdLabel": "próg ryzyka: {threshold}",
+      "awaitingVerdict": "Oczekiwanie na werdykt zasad AI. Ten przebieg jest wstrzymany do jego nadejścia.",
+      "decisionAllow": "dozwolony",
+      "decisionDeny": "odrzucony",
+      "risk": {
+        "critical": "krytyczny",
+        "high": "wysoki",
+        "medium": "średni",
+        "low": "niski"
+      },
+      "blockedDeniedMessage": "Ten przebieg jest <strong>zablokowany przez {count, plural, one {# kryterium zasad} few {# kryteria zasad} many {# kryteriów zasad} other {# kryterium zasad}}</strong>.",
+      "blockedRiskMessage": "Ten przebieg jest <strong>zablokowany</strong>, ponieważ jego poziom ryzyka ({level}) jest na progu ({threshold}) lub powyżej.",
+      "blockedErroredMessage": "Ten przebieg jest zablokowany, ponieważ nie udało się uzyskać werdyktu zasad AI. Bramka zawodzi w stanie zamkniętym — werdykt, którego nie uzyskano, nie jest zgodą.",
+      "erroredMessage": "Bramka zasad AI nie zwróciła użytecznego werdyktu, więc ten przebieg nie został oceniony.",
+      "passed": "Żadne kryterium zasad nie pasowało.",
+      "overriding": "Nadpisywanie...",
+      "overrideContinue": "Nadpisz i kontynuuj",
+      "overrideConfirm": "Zastąpić bramkę zasad AI i zezwolić na zastosowanie tego przebiegu mimo werdyktu?",
+      "overrideFailed": "Nadpisanie nie powiodło się",
+      "overrideFailedStatus": "Nadpisanie nie powiodło się ({status})",
+      "overriddenBy": "nadpisane przez {by}"
+    },
     "architecture": {
       "loadError": "Nie udało się wczytać krytyki architektury.",
       "notEnabled": "Krytyk architektury AI nie jest włączony w tym wdrożeniu.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Zgodnie z domyślnym ustawieniem wdrożenia",
       "modeEnabled": "Zawsze podsumowuj",
       "modeDisabled": "Nigdy nie podsumowuj",
+      "policyMode": "Bramka zasad",
+      "policyModeNote": "Obowiązkowa bramka ignoruje „Nigdy”: może wyłączyć tę przestrzeń roboczą wyłącznie z werdyktu doradczego.",
       "contextLabel": "Kontekst obszaru roboczego",
       "contextLabelSuffix": "(opcjonalny, dodatkowy)",
       "contextPlaceholder": "Fakty, które AI powinno znać konkretnie o tym obszarze roboczym. np. 'Obsługuje magazyn sekretów dla usługi X — zniszczenie klucza KMS powoduje globalną awarię.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Nie udało się wycofać wersji stanu",
       "stateActionFailed": "Akcja stanu nie powiodła się",
       "uploadState": "Nie udało się przesłać stanu",
-      "uploadStateFile": "Nie udało się przesłać pliku stanu"
+      "uploadStateFile": "Nie udało się przesłać pliku stanu",
+      "updateSecurityScan": "Nie udało się zaktualizować skanowania bezpieczeństwa",
+      "updateDebugMode": "Nie udało się zaktualizować trybu debugowania"
     },
     "subtabs": {
       "state": "Stan",
@@ -2880,6 +2934,38 @@
         "global": "Globalny",
         "rule": "Dopasowany regułą"
       }
+    },
+    "securityScan": {
+      "title": "Skanowanie bezpieczeństwa",
+      "description": "Skanuj plan pod kątem niebezpiecznej infrastruktury przed jego zastosowaniem.",
+      "enforcement": "Egzekwowanie",
+      "enforcementOff": "Nie skanuj",
+      "enforcementAdvisory": "Tylko skanuj i raportuj",
+      "enforcementEnforced": "Blokuj zastosowanie przy znaleziskach",
+      "engine": "Skaner",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov i Trivy",
+      "threshold": "Raportuj znaleziska od poziomu",
+      "thresholdCritical": "krytyczny",
+      "thresholdHigh": "wysoki",
+      "thresholdMedium": "średni",
+      "thresholdLow": "niski",
+      "skipRules": "Ignorowane reguły",
+      "skipRulesSuffix": "(opcjonalnie)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Nie zignorowano żadnych reguł.",
+      "skipRulesHint": "Identyfikatory reguł skanera oddzielone przecinkami, ignorowane w tym obszarze roboczym."
+    },
+    "debugMode": {
+      "title": "Tryb debugowania runnera",
+      "description": "Utrzymuj pod nieudanego uruchomienia otwarty, aby móc wejść do środka. Najpierw zgłaszana jest porażka uruchomienia; dopiero potem kontener pozostaje uruchomiony.",
+      "label": "Tryb debugowania",
+      "hint": "Domyślnie wyłączony. Gdy jest włączony, pod nieudanego runnera pozostaje dostępny przez exec przez okno skonfigurowane przez twojego operatora i przez cały ten czas przechowuje poświadczenia oraz odszyfrowane zmienne tej przestrzeni roboczej.",
+      "activeBadge": "Aktywny",
+      "bannerTitle": "Tryb debugowania jest włączony dla tej przestrzeni roboczej",
+      "bannerBody": "Pod nieudanego uruchomienia jest utrzymywany otwarty do inspekcji zamiast się kończyć i przez ten czas przechowuje poświadczenia oraz odszyfrowane zmienne tej przestrzeni roboczej. Wyłącz tryb debugowania, gdy skończysz diagnozowanie.",
+      "confirmEnable": "Włączyć tryb debugowania? Pod nieudanego uruchomienia będzie utrzymywany otwarty wraz z poświadczeniami i odszyfrowanymi zmiennymi tej przestrzeni roboczej, dopóki okno nie wygaśnie lub nie usuniesz poda."
     }
   },
   "graphs": {

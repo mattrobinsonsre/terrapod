@@ -105,6 +105,14 @@ COPY go-terrapod/*.go ./go-terrapod/
 COPY provider/internal/resources/workspace/*.go ./provider/internal/resources/workspace/
 COPY provider/internal/datasources/workspace/*.go ./provider/internal/datasources/workspace/
 
+# The two admin pages the workspace-setting parity gate reads (#1763). The gate
+# requires every bulk-settable setting to be reachable from the GUI too; without
+# these files it cannot see the GUI and would pass vacuously, which is exactly
+# the failure it exists to prevent -- `ai-policy-mode` shipped on three surfaces
+# out of four because the rule was a convention nothing checked.
+COPY web/src/app/admin/bulk-update/page.tsx ./web/src/app/admin/bulk-update/page.tsx
+COPY web/src/app/admin/autodiscovery/page.tsx ./web/src/app/admin/autodiscovery/page.tsx
+
 # Storage data directory for tests
 RUN mkdir -p /var/lib/terrapod/storage
 

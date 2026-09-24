@@ -352,3 +352,95 @@ class TestOPAIsFetchedNotBaked:
                 _cfg(), plan_json=plan, work_dir=tmp_path / "w", opa_binary="/usr/bin/opa"
             )
         fetch.assert_not_called()
+
+
+class TestThePlanJSONCanBeLazy:
+    """A factory is resolved only once a policy set applies (#1567 review).
+
+    Terraform's plan JSON is produced for the UI artifact regardless, so OPA
+    rides along on it for free. Pulumi's policy input has no other consumer --
+    it is built solely for this and never uploaded -- so building it before
+    knowing whether any set applies is pure waste on the common no-policy run,
+    and it scales with the size of the change.
+    """
+
+    def test_the_factory_is_not_called_when_no_set_applies(self, tmp_path: Path) -> None:
+        factory = MagicMock(return_value=tmp_path / "never.json")
+        with patch.object(opa, "fetch_policy_bundle", return_value={"policy_sets": []}):
+            count = opa.evaluate_policies(_cfg(), plan_json=factory, work_dir=tmp_path / "w")
+        assert count == 0
+        factory.assert_not_called()
+
+    def test_the_factory_is_called_once_a_set_applies(self, tmp_path: Path) -> None:
+        plan = tmp_path / "plan.json"
+        plan.write_text("{}")
+        factory = MagicMock(return_value=plan)
+        bundle = {
+            "policy_sets": [
+                {"id": "ps-1", "name": "prod", "enforcement_level": "advisory", "policies": []}
+            ],
+            "context": {},
+        }
+        with (
+            patch.object(opa, "fetch_policy_bundle", return_value=bundle),
+            patch.object(opa, "post_results"),
+        ):
+            count = opa.evaluate_policies(
+                _cfg(), plan_json=factory, work_dir=tmp_path / "w", opa_binary="/bin/true"
+            )
+        assert count == 1
+        factory.assert_called_once()
+
+    def test_a_factory_returning_none_records_an_errored_evaluation(self, tmp_path: Path) -> None:
+        """Not a silent skip.
+
+        A policy input that cannot be built must still produce a row per set:
+        a mandatory set is then blocked with something an admin can see and
+        override, and an advisory one leaves a record. Returning early instead
+        would drop the advisory entirely and give the mandatory block a
+        misleading reason ("the runner image is older than...").
+        """
+        bundle = {
+            "policy_sets": [
+                {
+                    "id": "ps-1",
+                    "name": "prod",
+                    "enforcement_level": "mandatory",
+                    "policies": [{"name": "p", "rego": "package terrapod"}],
+                }
+            ],
+            "context": {},
+        }
+        posted: list = []
+        with (
+            patch.object(opa, "fetch_policy_bundle", return_value=bundle),
+            patch.object(opa, "post_results", side_effect=lambda cfg, r, **k: posted.append(r)),
+        ):
+            count = opa.evaluate_policies(
+                _cfg(),
+                plan_json=lambda: None,
+                work_dir=tmp_path / "w",
+                opa_binary="/bin/true",
+            )
+        assert count == 1
+        (results,) = posted
+        assert results[0]["outcome"] == "errored"
+
+    def test_a_plain_path_still_works(self, tmp_path: Path) -> None:
+        # The Terraform path passes a Path and must be untouched by this.
+        plan = tmp_path / "plan.json"
+        plan.write_text("{}")
+        bundle = {
+            "policy_sets": [
+                {"id": "ps-1", "name": "prod", "enforcement_level": "advisory", "policies": []}
+            ],
+            "context": {},
+        }
+        with (
+            patch.object(opa, "fetch_policy_bundle", return_value=bundle),
+            patch.object(opa, "post_results"),
+        ):
+            count = opa.evaluate_policies(
+                _cfg(), plan_json=plan, work_dir=tmp_path / "w", opa_binary="/bin/true"
+            )
+        assert count == 1

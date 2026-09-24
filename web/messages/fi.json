@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Ilmoitusmallit (luodaan jokaiseen uuteen työtilaan)",
       "saving": "Tallennetaan...",
       "previewTitle": "Käy repo läpi ja esikatsele, mitkä työtilat tämä sääntö LUOISI — ei tallennusta",
-      "parallelism": "Rinnakkaisuus"
+      "parallelism": "Rinnakkaisuus",
+      "governance": "Tietoturvatarkistus ja tekoälyn yhteenveto",
+      "governanceHint": "Sovelletaan jokaiseen työtilaan, jonka tämä sääntö luo.",
+      "scanEnforcement": "Valvonta",
+      "scanOff": "Älä tarkista",
+      "scanAdvisory": "Tarkista ja raportoi vain",
+      "scanEnforced": "Estä käyttöönotto löydösten perusteella",
+      "scanEngine": "Tarkistin",
+      "scanEngineBoth": "Checkov ja Trivy",
+      "scanThreshold": "Raportoi löydökset tasolta",
+      "severityCritical": "kriittinen",
+      "severityHigh": "korkea",
+      "severityMedium": "keskitaso",
+      "severityLow": "matala",
+      "aiSummaryMode": "Tekoälyn suunnitelmayhteenveto",
+      "aiSummaryDefault": "Noudata käyttöönoton oletusta",
+      "aiSummaryEnabled": "Tee aina yhteenveto",
+      "aiSummaryDisabled": "Älä koskaan tee yhteenvetoa",
+      "execution": "Suoritus, VCS ja poikkeama",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt-versio",
+      "noExpiry": "Ei vanhenemista",
+      "addDriftIgnoreRule": "Lisää sääntö",
+      "debugModeHint": "Pidä epäonnistuneiden suorittajien podit auki työtiloissa, jotka tämä sääntö luo. Oletuksena pois päältä – auki pidetty podi säilyttää kyseisen työtilan tunnukset."
     },
     "table": {
       "name": "Nimi",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "Pakollinen ajotehtävä epäonnistui – ohita se tai hylkää ajo",
       "runTasksRunning": "Odotetaan suunnitelman jälkeisiä ajotehtäviä",
       "heldByPolicy": "Pakollinen käytäntöjoukko epäonnistui – ohita se tai hylkää ajo",
-      "heldBySecurityScan": "Turvatarkistus löysi estäviä havaintoja – ohita se tai hylkää ajo"
+      "heldBySecurityScan": "Turvatarkistus löysi estäviä havaintoja – ohita se tai hylkää ajo",
+      "heldByAiPolicy": "Tekoälykäytäntöportti hylkäsi tämän ajon – ohita se tai hylkää ajo",
+      "awaitingAiPolicy": "Odotetaan tekoälykäytännön päätöstä"
     },
     "badge": {
       "destroy": "tuhoa",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "Tarkistus ei valmistunut, joten tätä ajoa ei ole tarkastettu.",
       "blockedErroredMessage": "Tämä ajo on estetty, koska tietoturvatarkistus ei valmistunut. Korjaa syy ja suunnittele uudelleen, tai pyydä ylläpitäjää ohittamaan."
     },
+    "aiPolicyPanel": {
+      "heading": "Tekoälykäytäntöportti",
+      "enforcementLabel": "valvonta: {level}",
+      "thresholdLabel": "riskikynnys: {threshold}",
+      "awaitingVerdict": "Odotetaan tekoälykäytännön päätöstä. Tämä ajo pidetään pysäytettynä siihen asti.",
+      "decisionAllow": "sallittu",
+      "decisionDeny": "hylätty",
+      "risk": {
+        "critical": "kriittinen",
+        "high": "korkea",
+        "medium": "keskitaso",
+        "low": "matala"
+      },
+      "blockedDeniedMessage": "Tämä ajo on <strong>estetty {count, plural, one {# käytäntökriteerin} other {# käytäntökriteerin}} vuoksi</strong>.",
+      "blockedRiskMessage": "Tämä ajo on <strong>estetty</strong>, koska sen riskitaso ({level}) on kynnyksellä ({threshold}) tai sen yli.",
+      "blockedErroredMessage": "Tämä ajo on estetty, koska tekoälykäytännön päätöstä ei saatu. Portti epäonnistuu suljettuna: päätös, jota ei saatu, ei ole hyväksyntä.",
+      "erroredMessage": "Tekoälykäytäntöportti ei palauttanut käyttökelpoista päätöstä, joten tätä ajoa ei ole arvioitu.",
+      "passed": "Yksikään käytäntökriteeri ei täsmännyt.",
+      "overriding": "Ohitetaan...",
+      "overrideContinue": "Ohita ja jatka",
+      "overrideConfirm": "Ohitetaanko tekoälykäytäntöportti ja sallitaanko tämän ajon soveltaminen päätöksestä huolimatta?",
+      "overrideFailed": "Ohitus epäonnistui",
+      "overrideFailedStatus": "Ohitus epäonnistui ({status})",
+      "overriddenBy": "ohittanut {by}"
+    },
     "architecture": {
       "loadError": "Arkkitehtuurikritiikin lataaminen epäonnistui.",
       "notEnabled": "Tekoälyn arkkitehtuurikriitikkoa ei ole otettu käyttöön tässä asennuksessa.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Noudata käyttöönoton oletusta",
       "modeEnabled": "Tee aina yhteenveto",
       "modeDisabled": "Älä koskaan tee yhteenvetoa",
+      "policyMode": "Käytäntöportti",
+      "policyModeNote": "Pakollinen portti ohittaa ”Ei koskaan”: se voi vapauttaa tämän työtilan vain neuvoa-antavasta päätöksestä.",
       "contextLabel": "Työtilan konteksti",
       "contextLabelSuffix": "(valinnainen, lisäävä)",
       "contextPlaceholder": "Faktat, jotka tekoälyn tulisi tietää nimenomaan tästä työtilasta. Esim. 'Toimii palvelun X holvin edustana — KMS-avaimen tuhoaminen aiheuttaa globaalin katkoksen.'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Tilaversion palauttaminen epäonnistui",
       "stateActionFailed": "Tilatoiminto epäonnistui",
       "uploadState": "Tilan lataaminen epäonnistui",
-      "uploadStateFile": "Tilatiedoston lataaminen epäonnistui"
+      "uploadStateFile": "Tilatiedoston lataaminen epäonnistui",
+      "updateSecurityScan": "Tietoturvatarkistuksen päivitys epäonnistui",
+      "updateDebugMode": "Virheenkorjaustilan päivitys epäonnistui"
     },
     "subtabs": {
       "state": "Tila",
@@ -2880,6 +2934,38 @@
         "global": "Yleinen",
         "rule": "Vastaa sääntöä"
       }
+    },
+    "securityScan": {
+      "title": "Tietoturvatarkistus",
+      "description": "Tarkista suunnitelma turvattoman infrastruktuurin varalta ennen käyttöönottoa.",
+      "enforcement": "Valvonta",
+      "enforcementOff": "Älä tarkista",
+      "enforcementAdvisory": "Tarkista ja raportoi vain",
+      "enforcementEnforced": "Estä käyttöönotto löydösten perusteella",
+      "engine": "Tarkistin",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov ja Trivy",
+      "threshold": "Raportoi löydökset tasolta",
+      "thresholdCritical": "kriittinen",
+      "thresholdHigh": "korkea",
+      "thresholdMedium": "keskitaso",
+      "thresholdLow": "matala",
+      "skipRules": "Ohitetut säännöt",
+      "skipRulesSuffix": "(valinnainen)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Sääntöjä ei ohiteta.",
+      "skipRulesHint": "Pilkuin erotetut tarkistimen sääntötunnukset, jotka ohitetaan tässä työtilassa."
+    },
+    "debugMode": {
+      "title": "Suorittajan virheenkorjaustila",
+      "description": "Pidä epäonnistuneen ajon podi auki, jotta pääset sen sisälle. Ajo raportoidaan ensin epäonnistuneeksi; vasta sen jälkeen kontti jää pystyyn.",
+      "label": "Virheenkorjaustila",
+      "hint": "Oletuksena pois päältä. Päällä ollessaan epäonnistuneen suorittajan podiin pääsee exec-komennolla ylläpitäjäsi määrittämän ikkunan ajan, ja se säilyttää koko sen ajan tämän työtilan tunnukset ja puretut muuttujat.",
+      "activeBadge": "Käytössä",
+      "bannerTitle": "Virheenkorjaustila on päällä tässä työtilassa",
+      "bannerBody": "Epäonnistuneen ajon podi pidetään auki tarkastelua varten sen sijaan, että se päättyisi, ja se säilyttää koko sen ajan tämän työtilan tunnukset ja puretut muuttujat. Kytke virheenkorjaustila pois, kun olet saanut selvityksen valmiiksi.",
+      "confirmEnable": "Otetaanko virheenkorjaustila käyttöön? Epäonnistuneen ajon podi pidetään auki tämän työtilan tunnusten ja purettujen muuttujien kanssa, kunnes ikkuna umpeutuu tai poistat podin."
     }
   },
   "graphs": {

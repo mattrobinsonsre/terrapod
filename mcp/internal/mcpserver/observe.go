@@ -580,6 +580,31 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, sc, nil
 	})
 
+	// ── terrapod_run_ai_policy ───────────────────────────────────────
+	type runAIPolicyIn struct {
+		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose AI policy verdict to fetch"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_run_ai_policy",
+		Description: "Get a run's AI policy gate verdict (#1766): the model's allow/deny ruling against the operator's " +
+			"natural-language deny criteria, the reasons it matched (criterion + the terraform address), the summary's " +
+			"risk level, the enforcement level (advisory/mandatory), the outcome (passed/failed/errored) and any override. " +
+			"Note `errored` BLOCKS under a mandatory gate rather than passing: the gate fails closed, so a verdict that " +
+			"could not be reached is not consent, and `error` says why (a spent token budget reads differently from a model " +
+			"fault). Returns null when no verdict is recorded — the meta then says whether the gate is off, the engine is " +
+			"not ruled on (Pulumi), or the verdict has simply not landed yet.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runAIPolicyIn) (*mcp.CallToolResult, *terrapod.AIPolicyEvaluation, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		e, err := c.GetRunAIPolicy(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, e, nil
+	})
+
 	// ── terrapod_run_policy_checks ───────────────────────────────────
 	type runPolicyChecksIn struct {
 		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose policy checks to fetch"`
@@ -616,6 +641,45 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			out.Checks = append(out.Checks, policyCheckWithOutput{PolicyCheck: pc, Output: text})
 		}
 		return nil, out, nil
+	})
+
+	// ── terrapod_policy_set_list ─────────────────────────────────────
+	type policySetsIn struct{}
+	type policySetsOut struct {
+		Count      int                  `json:"count"`
+		PolicySets []terrapod.PolicySet `json:"policy_sets"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_policy_set_list",
+		Description: "List the OPA policy sets and how each is scoped. Requires platform admin. " +
+			"This is what answers \"why was this run blocked\" and \"what governs this workspace\" — a run's " +
+			"own policy checks say which set failed, this says what that set is and who else it applies to. " +
+			"`enforcement-level` is the field that decides whether a failure blocks: `mandatory` holds the apply " +
+			"until an admin overrides, `advisory` only records a warning, so an advisory set failing is not why " +
+			"an apply is stuck. `enabled` false means the set is evaluated against nothing whatever its scope. " +
+			"Scope reads as `global-scope` (every workspace) OR the allow rules, minus the deny rules, which " +
+			"always win — and each label key binds a LIST of accepted values, so {\"env\": [\"prod\", \"stg\"]} " +
+			"means \"env is prod OR stg\". A `vcs-last-error` is worth surfacing unprompted: a set that cannot " +
+			"sync is still evaluated, against whatever it last managed to fetch, so the policies in the " +
+			"repository and the policies being enforced may differ.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ policySetsIn) (*mcp.CallToolResult, *policySetsOut, error) {
+		items, err := c.ListPolicySets(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		// A nil map or slice marshals to `null`, which fails the derived
+		// output schema and takes the whole listing down rather than
+		// degrading — the same guard the deleted-workspace tool needs.
+		for i := range items {
+			if items[i].AllowLabels == nil {
+				items[i].AllowLabels = map[string][]string{}
+			}
+			if items[i].DenyLabels == nil {
+				items[i].DenyLabels = map[string][]string{}
+			}
+		}
+		return nil, &policySetsOut{Count: len(items), PolicySets: items}, nil
 	})
 
 	// ── terrapod_deleted_workspace_list ──────────────────────────────

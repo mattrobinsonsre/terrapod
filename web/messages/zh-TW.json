@@ -1053,7 +1053,30 @@
       "notificationTemplates": "通知模板（在每個新工作區上建立）",
       "saving": "正在儲存...",
       "previewTitle": "遍歷倉庫並預覽此規則將會建立哪些工作區 — 不會持久化",
-      "parallelism": "平行度"
+      "parallelism": "平行度",
+      "governance": "安全掃描與 AI 摘要",
+      "governanceHint": "套用於此規則建立的所有工作區。",
+      "scanEnforcement": "強制方式",
+      "scanOff": "不掃描",
+      "scanAdvisory": "僅掃描並回報",
+      "scanEnforced": "發現問題時封鎖套用",
+      "scanEngine": "掃描器",
+      "scanEngineBoth": "Checkov 和 Trivy",
+      "scanThreshold": "回報不低於此等級的問題",
+      "severityCritical": "嚴重",
+      "severityHigh": "高",
+      "severityMedium": "中",
+      "severityLow": "低",
+      "aiSummaryMode": "AI 計畫摘要",
+      "aiSummaryDefault": "遵循部署預設設定",
+      "aiSummaryEnabled": "始終摘要",
+      "aiSummaryDisabled": "從不摘要",
+      "execution": "執行、VCS 與偏移",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Terragrunt 版本",
+      "noExpiry": "不過期",
+      "addDriftIgnoreRule": "新增規則",
+      "debugModeHint": "在此規則建立的工作區上讓失敗執行器的 Pod 保持開啟。預設關閉 — 保持開啟的 Pod 會保留該工作區的憑證。"
     },
     "table": {
       "name": "名稱",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "必要的執行任務失敗 — 覆蓋它或丟棄此執行",
       "runTasksRunning": "正在等待計畫後的執行任務",
       "heldByPolicy": "必要的策略集失敗 — 覆蓋它或丟棄此執行",
-      "heldBySecurityScan": "安全掃描發現阻斷性問題 — 覆蓋它或丟棄此執行"
+      "heldBySecurityScan": "安全掃描發現阻斷性問題 — 覆蓋它或丟棄此執行",
+      "heldByAiPolicy": "AI 政策閘門拒絕了此執行 — 覆蓋它或丟棄此執行",
+      "awaitingAiPolicy": "正在等待 AI 政策裁定"
     },
     "badge": {
       "destroy": "銷毀",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "掃描未完成，因此本次執行尚未檢查。",
       "blockedErroredMessage": "本次執行已被封鎖，因為安全掃描未完成。請修正原因後重新執行規劃，或請管理員覆寫。"
     },
+    "aiPolicyPanel": {
+      "heading": "AI 政策閘門",
+      "enforcementLabel": "強制層級：{level}",
+      "thresholdLabel": "風險閾值：{threshold}",
+      "awaitingVerdict": "正在等待 AI 政策裁定。在裁定抵達前，此執行將被保留。",
+      "decisionAllow": "允許",
+      "decisionDeny": "拒絕",
+      "risk": {
+        "critical": "嚴重",
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      },
+      "blockedDeniedMessage": "此執行被<strong>{count, plural, other {# 條政策準則}}阻斷</strong>。",
+      "blockedRiskMessage": "此執行被<strong>阻斷</strong>，因為其風險等級（{level}）達到或超過閾值（{threshold}）。",
+      "blockedErroredMessage": "由於無法得出 AI 政策裁定，此執行被阻斷。閘門以失敗關閉方式運作：無法得出的裁定不等於核准。",
+      "erroredMessage": "AI 政策閘門未傳回可用的裁定，因此尚未對此執行作出裁定。",
+      "passed": "沒有相符的政策準則。",
+      "overriding": "正在覆蓋...",
+      "overrideContinue": "覆蓋並繼續",
+      "overrideConfirm": "覆寫 AI 政策閘門並允許此執行在存在裁定的情況下套用？",
+      "overrideFailed": "覆蓋失敗",
+      "overrideFailedStatus": "覆蓋失敗（{status}）",
+      "overriddenBy": "由 {by} 覆蓋"
+    },
     "architecture": {
       "loadError": "無法載入架構評審。",
       "notEnabled": "此部署未啟用 AI 架構評審。",
@@ -2558,6 +2608,8 @@
       "modeDefault": "遵循部署預設設定",
       "modeEnabled": "始終摘要",
       "modeDisabled": "從不摘要",
+      "policyMode": "政策閘門",
+      "policyModeNote": "強制閘門會忽略「從不」：它只能讓此工作區豁免建議性裁定。",
       "contextLabel": "工作區上下文",
       "contextLabelSuffix": "（可選，附加）",
       "contextPlaceholder": "AI 應專門瞭解此工作區的事實。例如 '為服務 X 前置 vault — 銷毀 KMS 金鑰會導致全域中斷。'",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "回滾狀態版本失敗",
       "stateActionFailed": "狀態操作失敗",
       "uploadState": "上傳狀態失敗",
-      "uploadStateFile": "上傳狀態檔案失敗"
+      "uploadStateFile": "上傳狀態檔案失敗",
+      "updateSecurityScan": "更新安全掃描失敗",
+      "updateDebugMode": "更新偵錯模式失敗"
     },
     "subtabs": {
       "state": "狀態",
@@ -2880,6 +2934,38 @@
         "global": "全域",
         "rule": "依規則比對"
       }
+    },
+    "securityScan": {
+      "title": "安全掃描",
+      "description": "在套用之前掃描計畫中是否存在不安全的基礎架構。",
+      "enforcement": "強制方式",
+      "enforcementOff": "不掃描",
+      "enforcementAdvisory": "僅掃描並回報",
+      "enforcementEnforced": "發現問題時封鎖套用",
+      "engine": "掃描器",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov 和 Trivy",
+      "threshold": "回報不低於此等級的問題",
+      "thresholdCritical": "嚴重",
+      "thresholdHigh": "高",
+      "thresholdMedium": "中",
+      "thresholdLow": "低",
+      "skipRules": "忽略的規則",
+      "skipRulesSuffix": "（選填）",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "未忽略任何規則。",
+      "skipRulesHint": "在此工作區中要忽略的掃描器規則 ID，以逗號分隔。"
+    },
+    "debugMode": {
+      "title": "執行器偵錯模式",
+      "description": "讓失敗執行的 Pod 保持開啟，以便你進入其中查看。執行失敗會先回報，之後容器才會繼續存在。",
+      "label": "偵錯模式",
+      "hint": "預設關閉。開啟後，失敗執行器的 Pod 會在維運人員設定的時間窗內保持可用 exec 進入，並在這段期間一直保留此工作區的憑證與已解密的變數。",
+      "activeBadge": "已啟用",
+      "bannerTitle": "此工作區已開啟偵錯模式",
+      "bannerBody": "失敗執行的 Pod 不會結束，而是保持開啟供檢查，並在保持期間保留此工作區的憑證與已解密的變數。排查完畢後請關閉偵錯模式。",
+      "confirmEnable": "要開啟偵錯模式嗎？失敗執行的 Pod 將保持開啟，並保留此工作區的憑證與已解密的變數，直到時間窗到期或你刪除該 Pod。"
     }
   },
   "graphs": {

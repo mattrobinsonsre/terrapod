@@ -25,7 +25,13 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "c4d1e7b90a26"
-down_revision: str | None = "e2450c5ecc86"
+# Inserted at the 1.8 branch point, not appended to the end of the chain.
+# `release/v1.8` carries this revision on top of its own head (`ede22f4eab33`),
+# and a release line's migrations must be a PREFIX of main's AT THE SAME
+# POSITIONS -- otherwise a 1.8 deployment upgrading to 2.0 meets them in a
+# different order and silently skips work. `cddfa0bf6bfb` is re-parented onto
+# this revision to close the chain back up.
+down_revision: str | None = "ede22f4eab33"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

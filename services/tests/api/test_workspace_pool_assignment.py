@@ -84,6 +84,8 @@ def _mock_workspace(ws_id=None, pool_id=None, extra_pool_ids=None):
     ws.lifecycle_state = "active"
     ws.lifecycle_reason = ""
     ws.autodiscovery_pr_number = None
+    ws.debug_mode = False
+    ws.ai_policy_mode = "default"
     ws.ai_summary_mode = "default"
     ws.ai_summary_context = ""
     ws.slack_channel = ""

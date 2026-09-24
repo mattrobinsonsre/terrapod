@@ -682,6 +682,45 @@ async def update_pr_comment(
     resp.raise_for_status()
 
 
+async def add_comment_reaction(
+    conn: VCSConnection, owner: str, repo: str, comment_id: int, content: str
+) -> int:
+    """React to a PR comment. Returns the reaction ID, for later removal.
+
+    PR comments are Issues-API objects on GitHub, so this needs the same
+    permission the App already holds to post them — reacting adds no new
+    permission requirement over answering.
+    """
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+
+    resp = await _github_request(
+        "POST",
+        f"{api_url}/repos/{owner}/{repo}/issues/comments/{comment_id}/reactions",
+        token,
+        json={"content": content},
+        conn=conn,
+    )
+    resp.raise_for_status()
+    return resp.json()["id"]
+
+
+async def remove_comment_reaction(
+    conn: VCSConnection, owner: str, repo: str, comment_id: int, reaction_id: int
+) -> None:
+    """Remove one of our own reactions from a PR comment."""
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+
+    resp = await _github_request(
+        "DELETE",
+        f"{api_url}/repos/{owner}/{repo}/issues/comments/{comment_id}/reactions/{reaction_id}",
+        token,
+        conn=conn,
+    )
+    resp.raise_for_status()
+
+
 async def list_pr_comments(
     conn: VCSConnection, owner: str, repo: str, pr_number: int
 ) -> list[dict]:

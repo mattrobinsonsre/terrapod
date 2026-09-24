@@ -449,6 +449,12 @@
           "items": {
             "type": "object"
           }
+        },
+        "debugLingerSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 14400,
+          "description": "Seconds a failed runner pod is held open for exec when its workspace has debug mode on. 0 disables debug mode deployment-wide."
         }
       }
     },
@@ -2298,6 +2304,35 @@
                   "type": "string"
                 },
                 "fleet_context": {
+                  "type": "string"
+                }
+              }
+            },
+            "policy": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "enforcement_level": {
+                  "type": "string",
+                  "enum": [
+                    "advisory",
+                    "mandatory"
+                  ]
+                },
+                "risk_threshold": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "low",
+                    "medium",
+                    "high",
+                    "critical"
+                  ]
+                },
+                "deny_criteria": {
                   "type": "string"
                 }
               }

@@ -704,6 +704,10 @@ class TestChokepointRecords:
             "client.get(",
             "client.post(",
             "client.put(",
+            # A raw DELETE was invisible to this gate until the first one was
+            # written (#1799's reaction removal), so it could have skipped the
+            # record with nothing complaining.
+            "client.delete(",
             "client.request(",
             "client.stream(",
         )

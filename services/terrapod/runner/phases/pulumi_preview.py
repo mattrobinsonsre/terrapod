@@ -107,8 +107,11 @@ def _step(event: dict[str, Any]) -> dict[str, Any]:
     """One resource step: what happens to what.
 
     Deliberately the metadata only -- the operation, the resource's URN and its
-    type. The event also carries the resource's old and new state, which is
-    where a stack's secrets live.
+    type. The event also carries the resource's old and new state, and while the
+    engine redacts marked secrets there before writing the log (see
+    `build_policy_input`), that state is the whole provider-returned shape of
+    every resource: it dwarfs the change it describes, and the digest exists to
+    be read.
     """
     metadata = event.get("metadata")
     metadata = metadata if isinstance(metadata, dict) else {}
@@ -122,4 +125,198 @@ def _step(event: dict[str, Any]) -> dict[str, Any]:
 def write_digest(digest: dict[str, Any], path: Path) -> Path:
     """Write the digest where the artifact upload expects a file."""
     path.write_text(json.dumps(digest, indent=2), encoding="utf-8")
+    return path
+
+
+# ── OPA policy input (#1567) ──────────────────────────────────────────
+
+
+def _resource_name(urn: str) -> str:
+    """The resource's own name: everything after the third `::` in its URN.
+
+    A URN reads `urn:pulumi:<stack>::<project>::<type-chain>::<name>`, and the
+    name is what a policy is most likely to match on after the type.
+
+    Split from the LEFT on a fixed count, not `rsplit`. The URN's prefix has
+    exactly four parts, but a resource NAME may itself contain `::` -- Pulumi's
+    own `URN.Name()` rejoins everything from the fourth component onward for
+    that reason. `rsplit("::", 1)` would return `b` for a resource named
+    `a::b`, which is a different resource. Identical for names without `::`.
+    """
+    parts = urn.split("::", 3)
+    return parts[3] if len(parts) == 4 else ""
+
+
+def _policy_resource(metadata: dict[str, Any]) -> dict[str, Any]:
+    """One resource change, in the shape a policy reads.
+
+    `inputs` is normally the step's NEW state, the analogue of Terraform's
+    `change.after`: what the program declared, before the provider answers.
+
+    **A delete has no new state, and falling back to the old one matters.**
+    `DeleteStep.New()` returns nil, so `metadata.new` is null on a delete.
+    Reading only `new` would report `inputs: {}` and -- far worse --
+    `protect: false` for every deletion, which makes the most obvious Pulumi
+    policy there is ("do not delete a protected resource") impossible to write
+    while looking as though it works. On a delete the old state IS the subject
+    of the decision, so it is what gets carried.
+
+    `outputs` is deliberately absent either way. It is the provider's complete
+    returned state rather than anything the program said, so it adds little to
+    a policy decision and a great deal to the document's size.
+    """
+    new = metadata.get("new")
+    old = metadata.get("old")
+    # Prefer `new`; fall back to `old` so a delete describes the thing being
+    # deleted rather than an absence.
+    state = new if isinstance(new, dict) else (old if isinstance(old, dict) else {})
+    inputs = state.get("inputs")
+    detailed = metadata.get("detailedDiff")
+    urn = str(metadata.get("urn") or "")
+
+    return {
+        "op": str(metadata.get("op") or ""),
+        "urn": urn,
+        "type": str(metadata.get("type") or ""),
+        "name": _resource_name(urn),
+        "parent": str(state.get("parent") or ""),
+        "provider": str(state.get("provider") or ""),
+        "custom": bool(state.get("custom", False)),
+        "protect": bool(state.get("protect", False)),
+        "inputs": inputs if isinstance(inputs, dict) else {},
+        # Which property paths this step changes, and how. `diffs` names them;
+        # `detailedDiff` classifies each one. Both are how a policy asks "did
+        # anything under `tags` change?" without diffing the states itself.
+        "diffs": [str(d) for d in metadata.get("diffs") or [] if isinstance(d, str)],
+        "detailed_diff": detailed if isinstance(detailed, dict) else {},
+    }
+
+
+def build_policy_input(path: Path) -> dict[str, Any] | None:
+    """The event log as an OPA input document, or None if the preview did not finish.
+
+    Terraform hands OPA its plan JSON, so a policy reads real property values
+    and decides about the change being proposed. Pulumi's runner had nothing to
+    hand over, which is why policy sets were reported as out of scope for a
+    Pulumi workspace rather than enforced (#1567).
+
+    This is that missing document. It is built from the same engine event log
+    the digest reads, but it is NOT the digest: the digest is a summary capped
+    at `MAX_STEPS` for readability, and a gate evaluated over a truncated list
+    of resources can pass because the offending one fell off the end. Every
+    CHANGING step is carried here for that reason -- no cap.
+
+    **`same` steps are excluded, and that is load-bearing.** The engine emits a
+    `resourcePreEvent` for every resource it walks, not only the ones it will
+    touch: `executeStep` skips only `DiffStep`, so a `SameStep` reaches
+    `OnResourceStepPre` and is reported like any other. Carrying those would
+    put a stack's entire inventory under a key named `resource_changes`, and
+    the consequence is not merely size -- a rule matching on type and a
+    property would deny a resource that is not being changed at all, so a stack
+    that has been non-compliant since before the policy existed could never be
+    applied again, for any unrelated change. Terraform's `resource_changes`
+    means changes; so does this.
+
+    A policy that does need the whole inventory has no equivalent here (that is
+    Terraform's `planned_values`, which has no Pulumi counterpart). Say so
+    rather than half-providing it: `change_summary` still counts `same`, so a
+    rule can at least assert on how much is unchanged.
+
+    **On secrets.** The values here are what Pulumi's engine wrote, and the
+    engine redacts before writing: `makeStepEventStateMetadata` passes both
+    inputs and outputs through `filterResourceProperties`, which replaces every
+    property marked secret with the literal string `"[secret]"` unless the CLI
+    was given `--show-secrets`. The preview never is -- Terrapod passes that
+    flag only to `pulumi stack export`, where the API seals the result. What
+    this does NOT protect against is a value that is sensitive but was never
+    marked secret in the program; Terraform's plan JSON has exactly the same
+    gap, so this is parity rather than a new exposure, and the docs say so.
+
+    The shape deliberately echoes Terraform's `resource_changes`, so a policy
+    author moving between engines meets a familiar key rather than a new
+    vocabulary for the same idea.
+    """
+    if not path.exists():
+        return None
+
+    summary: dict[str, Any] | None = None
+    resources: list[dict[str, Any]] = []
+    unparseable = 0
+    unchanged = 0
+    with path.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except ValueError:
+                unparseable += 1
+                continue
+            if not isinstance(event, dict):
+                continue
+            if isinstance(event.get("summaryEvent"), dict):
+                summary = event["summaryEvent"]
+            elif isinstance(event.get("resourcePreEvent"), dict):
+                metadata = event["resourcePreEvent"].get("metadata")
+                if isinstance(metadata, dict):
+                    # `same` steps are excluded -- see the docstring. The engine
+                    # emits a pre-event for EVERY resource it walks, unchanged
+                    # ones included, so without this a stack's whole inventory
+                    # arrives under a key named `resource_changes`.
+                    if str(metadata.get("op") or "") != _UNCHANGED:
+                        resources.append(_policy_resource(metadata))
+                    else:
+                        unchanged += 1
+
+    if unparseable:
+        logger.warning("pulumi event log had unparseable lines", lines=unparseable)
+    if unchanged:
+        # Not a warning: this is the ordinary case and the reason a policy sees
+        # fewer resources than the stack holds. Logged so that is discoverable
+        # rather than something an author has to infer from a rule not firing.
+        logger.info(
+            "unchanged resources excluded from the policy input",
+            unchanged=unchanged,
+            changing=len(resources),
+        )
+    if summary is None:
+        # Same rule the digest follows: no summary event means the preview did
+        # not finish, and a gate must not decide on a partial account of it.
+        return None
+
+    changes = summary.get("resourceChanges")
+    changes = changes if isinstance(changes, dict) else {}
+    return {
+        "engine": "pulumi",
+        "change_summary": {k: int(v) for k, v in changes.items() if isinstance(v, int)},
+        "has_changes": has_changes(changes),
+        "resource_changes": resources,
+    }
+
+
+def write_policy_input(policy_input: dict[str, Any], path: Path) -> Path:
+    """Write the policy input where `opa eval --stdin-input` can read it.
+
+    Not indented, unlike the digest: nothing reads this but OPA, and the
+    whitespace is a third of the bytes on a document that already scales with
+    the size of the change.
+
+    There is no byte cap. Excluding `same` steps bounds this by the CHANGE
+    rather than the stack, which is what made a cap look necessary -- a
+    thousand-resource stack with three changes carries three. A change set
+    genuinely large enough to matter is possible (embedded manifests, IAM
+    policy documents) and would be held in memory here, then parsed by `opa
+    eval` under its 60s per-policy timeout; the size is logged so that shows up
+    as a number rather than an OOM. Capping it would mean deciding what happens
+    when a valid policy cannot be evaluated, which is a product decision, not
+    a detail to settle here.
+    """
+    body = json.dumps(policy_input, separators=(",", ":"))
+    path.write_text(body, encoding="utf-8")
+    logger.info(
+        "wrote the policy input",
+        bytes=len(body),
+        resources=len(policy_input.get("resource_changes") or []),
+    )
     return path

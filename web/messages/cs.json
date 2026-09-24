@@ -1053,7 +1053,30 @@
       "notificationTemplates": "Šablony oznámení (vytvořené na každém novém pracovním prostoru)",
       "saving": "Ukládání...",
       "previewTitle": "Projděte repozitář a zobrazte náhled, které pracovní prostory by toto pravidlo VYTVOŘILO — bez uložení",
-      "parallelism": "Paralelismus"
+      "parallelism": "Paralelismus",
+      "governance": "Bezpečnostní kontrola a souhrn AI",
+      "governanceHint": "Použije se na každý pracovní prostor, který toto pravidlo vytvoří.",
+      "scanEnforcement": "Vynucování",
+      "scanOff": "Nekontrolovat",
+      "scanAdvisory": "Pouze zkontrolovat a nahlásit",
+      "scanEnforced": "Zablokovat použití při nálezech",
+      "scanEngine": "Skener",
+      "scanEngineBoth": "Checkov a Trivy",
+      "scanThreshold": "Hlásit nálezy od úrovně",
+      "severityCritical": "kritická",
+      "severityHigh": "vysoká",
+      "severityMedium": "střední",
+      "severityLow": "nízká",
+      "aiSummaryMode": "AI shrnutí plánu",
+      "aiSummaryDefault": "Řídit se výchozím nastavením nasazení",
+      "aiSummaryEnabled": "Vždy shrnout",
+      "aiSummaryDisabled": "Nikdy neshrnovat",
+      "execution": "Spuštění, VCS a drift",
+      "terragruntEnabled": "Terragrunt",
+      "terragruntVersion": "Verze Terragrunt",
+      "noExpiry": "Bez vypršení",
+      "addDriftIgnoreRule": "Přidat pravidlo",
+      "debugModeHint": "Ponechat pody neúspěšných runnerů otevřené v pracovních prostorech, které toto pravidlo vytvoří. Ve výchozím stavu vypnuto — ponechaný pod si drží přihlašovací údaje daného pracovního prostoru."
     },
     "table": {
       "name": "Název",
@@ -2022,7 +2045,9 @@
       "heldByRunTask": "Povinný run task selhal — přepište ho, nebo běh zahoďte",
       "runTasksRunning": "Čeká na run tasky po plánu",
       "heldByPolicy": "Povinná sada zásad selhala — přepište ji, nebo běh zahoďte",
-      "heldBySecurityScan": "Bezpečnostní kontrola našla blokující nálezy — přepište ji, nebo běh zahoďte"
+      "heldBySecurityScan": "Bezpečnostní kontrola našla blokující nálezy — přepište ji, nebo běh zahoďte",
+      "heldByAiPolicy": "Brána zásad AI tento běh zamítla — přepište ji, nebo běh zahoďte",
+      "awaitingAiPolicy": "Čeká se na verdikt zásad AI"
     },
     "badge": {
       "destroy": "zničit",
@@ -2303,6 +2328,31 @@
       "erroredMessage": "Kontrola nebyla dokončena, takže tento běh nebyl prověřen.",
       "blockedErroredMessage": "Tento běh je zablokován, protože bezpečnostní kontrola nebyla dokončena. Odstraňte příčinu a naplánujte znovu, nebo požádejte správce o přepsání."
     },
+    "aiPolicyPanel": {
+      "heading": "Brána zásad AI",
+      "enforcementLabel": "vynucování: {level}",
+      "thresholdLabel": "práh rizika: {threshold}",
+      "awaitingVerdict": "Čeká se na verdikt zásad AI. Tento běh je pozdržen, dokud nedorazí.",
+      "decisionAllow": "povoleno",
+      "decisionDeny": "zamítnuto",
+      "risk": {
+        "critical": "kritická",
+        "high": "vysoká",
+        "medium": "střední",
+        "low": "nízká"
+      },
+      "blockedDeniedMessage": "Tento běh je <strong>blokován {count, plural, one {# kritériem zásad} few {# kritérii zásad} many {# kritéria zásad} other {# kritérii zásad}}</strong>.",
+      "blockedRiskMessage": "Tento běh je <strong>blokován</strong>, protože jeho úroveň rizika ({level}) je na prahu ({threshold}) nebo nad ním.",
+      "blockedErroredMessage": "Tento běh je blokován, protože nebylo možné dospět k verdiktu zásad AI. Brána selhává uzavřeně, takže verdikt, k němuž nebylo možné dospět, není souhlas.",
+      "erroredMessage": "Brána zásad AI nevrátila použitelný verdikt, takže tento běh nebyl posouzen.",
+      "passed": "Žádná kritéria zásad neodpovídají.",
+      "overriding": "Přepisování...",
+      "overrideContinue": "Přepsat a pokračovat",
+      "overrideConfirm": "Přepsat bránu zásad AI a povolit použití tohoto běhu navzdory verdiktu?",
+      "overrideFailed": "Přepsání selhalo",
+      "overrideFailedStatus": "Přepsání selhalo ({status})",
+      "overriddenBy": "přepsal {by}"
+    },
     "architecture": {
       "loadError": "Nepodařilo se načíst kritiku architektury.",
       "notEnabled": "AI kritik architektury není v tomto nasazení povolen.",
@@ -2558,6 +2608,8 @@
       "modeDefault": "Řídit se výchozím nastavením nasazení",
       "modeEnabled": "Vždy shrnout",
       "modeDisabled": "Nikdy neshrnovat",
+      "policyMode": "Brána zásad",
+      "policyModeNote": "Povinná brána ignoruje „Nikdy“: může tento pracovní prostor vyjmout pouze z doporučujícího verdiktu.",
       "contextLabel": "Kontext pracovního prostoru",
       "contextLabelSuffix": "(volitelné, aditivní)",
       "contextPlaceholder": "Fakta, která by AI měla vědět konkrétně o tomto pracovním prostoru. Např. „Stojí před vaultem pro službu X — zničení KMS klíče způsobí globální výpadek.“",
@@ -2859,7 +2911,9 @@
       "rollbackStateVersion": "Nepodařilo se vrátit verzi stavu zpět",
       "stateActionFailed": "Akce se stavem selhala",
       "uploadState": "Nepodařilo se nahrát stav",
-      "uploadStateFile": "Nepodařilo se nahrát soubor stavu"
+      "uploadStateFile": "Nepodařilo se nahrát soubor stavu",
+      "updateSecurityScan": "Nepodařilo se aktualizovat bezpečnostní kontrolu",
+      "updateDebugMode": "Režim ladění se nepodařilo aktualizovat"
     },
     "subtabs": {
       "state": "Stav",
@@ -2880,6 +2934,38 @@
         "global": "Globální",
         "rule": "Odpovídá pravidlu"
       }
+    },
+    "securityScan": {
+      "title": "Bezpečnostní kontrola",
+      "description": "Zkontrolovat plán na nezabezpečenou infrastrukturu před jeho použitím.",
+      "enforcement": "Vynucování",
+      "enforcementOff": "Nekontrolovat",
+      "enforcementAdvisory": "Pouze zkontrolovat a nahlásit",
+      "enforcementEnforced": "Zablokovat použití při nálezech",
+      "engine": "Skener",
+      "engineCheckov": "Checkov",
+      "engineTrivy": "Trivy",
+      "engineBoth": "Checkov a Trivy",
+      "threshold": "Hlásit nálezy od úrovně",
+      "thresholdCritical": "kritická",
+      "thresholdHigh": "vysoká",
+      "thresholdMedium": "střední",
+      "thresholdLow": "nízká",
+      "skipRules": "Ignorovaná pravidla",
+      "skipRulesSuffix": "(volitelné)",
+      "skipRulesPlaceholder": "CKV_AWS_24, AVD-AWS-0107",
+      "noSkipRules": "Žádná pravidla nejsou ignorována.",
+      "skipRulesHint": "Identifikátory pravidel skeneru oddělené čárkami, které se v tomto pracovním prostoru ignorují."
+    },
+    "debugMode": {
+      "title": "Režim ladění runneru",
+      "description": "Ponechat pod neúspěšného běhu otevřený, abyste se do něj mohli dostat. Selhání běhu se nahlásí nejdřív; teprve pak kontejner zůstane stát.",
+      "label": "Režim ladění",
+      "hint": "Ve výchozím stavu vypnuto. Když je zapnutý, pod neúspěšného runneru zůstane dostupný přes exec po dobu okna nastaveného vaším operátorem a celou tu dobu si ponechává přihlašovací údaje a dešifrované proměnné tohoto pracovního prostoru.",
+      "activeBadge": "Aktivní",
+      "bannerTitle": "Pro tento pracovní prostor je zapnutý režim ladění",
+      "bannerBody": "Pod neúspěšného běhu se místo ukončení ponechá otevřený k prohlídce a po celou tu dobu si ponechává přihlašovací údaje a dešifrované proměnné tohoto pracovního prostoru. Až dokončíte hledání příčiny, režim ladění vypněte.",
+      "confirmEnable": "Zapnout režim ladění? Pod neúspěšného běhu zůstane otevřený i s přihlašovacími údaji a dešifrovanými proměnnými tohoto pracovního prostoru, dokud okno nevyprší nebo dokud pod nesmažete."
     }
   },
   "graphs": {
