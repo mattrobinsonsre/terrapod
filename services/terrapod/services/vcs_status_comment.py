@@ -68,11 +68,11 @@ class GateVerdict:
     alarm.
 
     `gate` deliberately reuses the vocabulary of `PostPlanHold.gate` and the
-    run's `blocked-by` attribute (`policy`, `security-scan`, `run-task`), so the
-    comment and the API cannot describe the same run differently. It is a
-    separate type because `PostPlanHold` answers "what holds this run" with a
-    single gate and `None` when nothing does, where this is per-gate and
-    includes passes.
+    run's `blocked-by` attribute (`run-task`, `policy`, `security-scan`,
+    `ai-policy`), so the comment and the API cannot describe the same run
+    differently. It is a separate type because `PostPlanHold` answers "what
+    holds this run" with a single gate and `None` when nothing does, where this
+    is per-gate and includes passes.
     """
 
     gate: str
@@ -217,6 +217,31 @@ def _verdict_from_scan(
     return GateVerdict("security-scan", "security scan", passed, enforcement)
 
 
+def _verdict_from_ai_policy(row: Any | None, enforcement: str, *, held: bool) -> GateVerdict | None:
+    """The AI policy gate's verdict, or None when it could not have blocked.
+
+    Unlike its three siblings this gate can hold a run with **no row at all**:
+    its verdict is produced in the API after the plan, so a mandatory gate
+    holds the run while the summariser is still ruling, and forever if it never
+    does. Keying the verdict on a row therefore reports a held run as clear —
+    which is the bug this exists to fix, because the comment then offered a
+    `terrapod apply` the gate would refuse.
+
+    `held` is the authority (`ai_policy_service.run_is_held_by_ai_policy`);
+    `row` only supplies the wording.
+    """
+    if enforcement != "mandatory":
+        return None
+    if row is None and not held:
+        # The gate is mandatory but not ruling on this run at all (plan-only,
+        # or no criteria and no threshold). Nothing to attest.
+        return None
+    name = "AI policy gate"
+    if row is None:
+        name = "AI policy gate (awaiting verdict)"
+    return GateVerdict("ai-policy", name, not held, "mandatory")
+
+
 def _verdict_from_stage(status: str) -> GateVerdict:
     """The post-plan run-task verdict for a stage that exists.
 
@@ -228,16 +253,19 @@ def _verdict_from_stage(status: str) -> GateVerdict:
     return GateVerdict("run-task", "post-plan tasks", status in _STAGE_PASS_STATUSES, "mandatory")
 
 
-async def _collect_gates(db, run_id: uuid.UUID) -> tuple[GateVerdict, ...]:
+async def _collect_gates(db, run: Run) -> tuple[GateVerdict, ...]:
     """Every gate that could hold this run, in `post_plan_hold` evaluation order.
 
-    Run task, then policy, then security scan — the order
-    `run_service.post_plan_hold` checks them in, so the first failing verdict
-    here is the same gate the run's `blocked-by` attribute names.
+    Run task, then policy, then security scan, then the AI policy gate — the
+    order `run_service.post_plan_hold` checks them in, so the first failing
+    verdict here is the same gate the run's `blocked-by` attribute names.
 
-    Queries rather than calling the three services because those answer "is it
-    blocked" with a bool; the comment needs the names and the passes too.
+    Queries rather than calling the services because those answer "is it
+    blocked" with a bool; the comment needs the names and the passes too. The
+    AI gate is the exception — it is asked directly, because the state that
+    matters there (held with no verdict yet) has no row to read.
     """
+    run_id = run.id
     gates: list[GateVerdict] = []
 
     stage = (
@@ -280,6 +308,21 @@ async def _collect_gates(db, run_id: uuid.UUID) -> tuple[GateVerdict, ...]:
         verdict = _verdict_from_scan(scan[0], scan[1], scan[2])
         if verdict is not None:
             gates.append(verdict)
+
+    from terrapod.services import ai_policy_service
+
+    ws = await db.get(Workspace, run.workspace_id)
+    enforcement = ai_policy_service.effective_enforcement(ws)
+    if enforcement == "mandatory":
+        # Only then are the two reads worth making: an off or advisory gate
+        # cannot hold a run, so it never appears in the attestation.
+        ai_verdict = _verdict_from_ai_policy(
+            await ai_policy_service.get_evaluation(db, run_id),
+            enforcement,
+            held=await ai_policy_service.run_is_held_by_ai_policy(db, run),
+        )
+        if ai_verdict is not None:
+            gates.append(ai_verdict)
 
     return tuple(gates)
 
@@ -450,7 +493,7 @@ async def _collect_rows(db, sess: PRSession) -> list[_Row]:
                 apply_summary=_apply_summary(run),
                 mergeable_summary=_mergeable_summary(run),
                 cost_delta=_cost_delta(run),
-                gates=await _collect_gates(db, run.id),
+                gates=await _collect_gates(db, run),
                 run_url=run_links.run_url(ws.id, run.id),
             )
         )

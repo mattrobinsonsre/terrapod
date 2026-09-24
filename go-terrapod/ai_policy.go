@@ -74,10 +74,11 @@ func (c *Client) GetRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEva
 // OverrideRunAIPolicy releases a run held by the AI policy gate (requires
 // workspace admin). A run still held in planning is re-driven immediately.
 //
-// Returns a ConflictError when no verdict has been recorded yet: a run held by
-// a mandatory gate is released as soon as its verdict lands, so there is
-// nothing to override before then, and answering "overridden" would be a
-// no-op the caller would read as success.
+// A run held with NO verdict recorded is released too, and is the case that
+// most needs it: the summariser never ran, or failed before ruling, so the
+// verdict a mandatory gate is waiting for can never arrive. That writes an
+// explicit no-verdict override -- honest about never having ruled -- rather
+// than a forged pass, so an auditor can tell the two apart.
 func (c *Client) OverrideRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error) {
 	id, err := runIDPath(runID)
 	if err != nil {

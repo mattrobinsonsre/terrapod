@@ -818,6 +818,7 @@ async def _settle_ai_policy_gate(
     run: Run,
     ws: Workspace,
     *,
+    kind: str = "plan_summary",
     verdict: dict | None = None,
     risk_level: str = "",
     error: str | None = None,
@@ -836,6 +837,15 @@ async def _settle_ai_policy_gate(
     summary path is unchanged.
     """
     from terrapod.services import ai_policy_service
+
+    if kind != "plan_summary":
+        # The gate rules on a PLAN. An apply-phase failure enqueues a
+        # `failure_analysis`, which reaches here with the gate still applying
+        # and a verdict parsed out of a failure-analysis response -- overwriting
+        # the plan's recorded ruling and, with it, any override attribution.
+        # The plan's verdict is the one that gated the run; nothing later
+        # re-rules it.
+        return
 
     if not ai_policy_service.gate_applies_to(run, ws):
         return
@@ -1561,6 +1571,7 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
                 db,
                 run,
                 ws,
+                kind=kind,
                 error=(
                     f"The runner exited abnormally ({run.runner_exit_status}), so there "
                     "is no plan for the gate to rule over. Re-run once the cause is "
@@ -1590,7 +1601,7 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             # relying on that reasoning staying true as the guard evolves. It is
             # a no-op when the gate is off.
             await _settle_ai_policy_gate(
-                db, run, ws, error="Summaries are disabled for this workspace."
+                db, run, ws, kind=kind, error="Summaries are disabled for this workspace."
             )
             return
 
@@ -1608,7 +1619,7 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             await _emit_summary_event("plan_summary_skipped", ws.id, run_id)
             from terrapod.services.ai_policy_service import BUDGET_EXHAUSTED_ERROR
 
-            await _settle_ai_policy_gate(db, run, ws, error=BUDGET_EXHAUSTED_ERROR)
+            await _settle_ai_policy_gate(db, run, ws, kind=kind, error=BUDGET_EXHAUSTED_ERROR)
             return
 
         primary, label, lang, code_context, code_diff = await _gather_inputs(db, run, kind)
@@ -1626,6 +1637,7 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
                 db,
                 run,
                 ws,
+                kind=kind,
                 error=(
                     f"No {label} was available for this run, so the gate had nothing to rule over."
                 ),
@@ -1692,6 +1704,7 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
                 db,
                 run,
                 ws,
+                kind=kind,
                 error=(f"The model call failed, so no verdict was reached: {str(e)[:400]}"),
             )
             return
@@ -1755,6 +1768,7 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             db,
             run,
             ws,
+            kind=kind,
             verdict=parsed.get("policy_verdict"),
             risk_level=risk_level,
         )

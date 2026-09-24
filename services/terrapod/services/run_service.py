@@ -481,13 +481,22 @@ async def post_plan_hold(db: AsyncSession, run: Run) -> PostPlanHold | None:
         return PostPlanHold("policy", POLICY_OVERRIDE)
     if await security_scan_service.run_is_scan_blocked(db, run.id):
         return PostPlanHold("security-scan", POLICY_OVERRIDE)
-    # Last, matching the order `complete_plan` evaluates the gates.
-    if await ai_policy_service.run_is_ai_policy_blocked(db, run.id):
+    # Last, matching the order `complete_plan` evaluates the gates. Asks
+    # whether the gate HOLDS the run, not whether a ruling went against it:
+    # the gate's verdict is produced in the API after the plan, so a mandatory
+    # gate holds a run while the verdict is still being produced as well as
+    # once one has landed and denied.
+    if await ai_policy_service.run_is_held_by_ai_policy(db, run):
         # A verdict that has not landed yet is the gate still working; one that
         # landed and denied is a decision waiting on a human. The run-task
         # branch above draws the same distinction, and for the same reason: the
         # CLI acts on it, and "awaiting your decision" is wrong for a run whose
         # evidence is still being produced.
+        #
+        # This branch was unreachable until the guard above changed. The old
+        # predicate reads the row and answers False when there is none, which
+        # is exactly the not-yet-landed case -- so `recorded` could never be
+        # None here and POST_PLAN_RUNNING was never returned.
         recorded = await ai_policy_service.get_evaluation(db, run.id)
         return PostPlanHold(
             "ai-policy", POLICY_OVERRIDE if recorded is not None else POST_PLAN_RUNNING

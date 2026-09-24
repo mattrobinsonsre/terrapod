@@ -85,9 +85,12 @@ Below the table, each workspace with gates that can actually block gets a collap
     🟢 post-plan tasks — run-task, mandatory
     🔴 prod-guardrails — policy, mandatory
     🟢 security scan — security-scan, enforced
+    🟢 AI policy gate — ai-policy, mandatory
 ```
 
-Gates appear in the order the run evaluates them — run tasks, then policy sets, then the security scan — so the first failing one is the same gate the run's `blocked-by` attribute names. Passing gates are listed too: the comment is an attestation of what was checked, not only an alarm. Advisory policy sets and advisory scans are left out, because they cannot hold a run; read their findings on the run page. A gate that was **overridden** shows as passed, with its name still listed so the override stays visible in the PR.
+Gates appear in the order the run evaluates them — run tasks, then policy sets, then the security scan, then the [AI policy gate](ai-plan-summary.md#policy-gate) — so the first failing one is the same gate the run's `blocked-by` attribute names. Passing gates are listed too: the comment is an attestation of what was checked, not only an alarm. Advisory policy sets and advisory scans are left out, because they cannot hold a run; read their findings on the run page. A gate that was **overridden** shows as passed, with its name still listed so the override stays visible in the PR.
+
+The AI policy gate is the one that can hold a run **without having ruled**: its verdict is produced after the plan, so a mandatory gate holds the run while the summariser is still ruling, and indefinitely if it never does. That shows as `AI policy gate (awaiting verdict)`, so a run waiting on a verdict that is not coming is visible rather than silent.
 
 A workspace whose mandatory gate failed is **not** offered an apply — `terrapod apply` would be refused while the gate holds the run. Override the gate (or fix the finding and push), and the next comment update offers it.
 
