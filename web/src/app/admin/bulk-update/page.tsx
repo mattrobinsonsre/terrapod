@@ -117,6 +117,8 @@ export default function BulkUpdatePage() {
   const [uScanEngine, setUScanEngine] = useState('')
   const [uScanThreshold, setUScanThreshold] = useState('')
   const [uAiSummaryMode, setUAiSummaryMode] = useState('')
+  const [uAiPolicyMode, setUAiPolicyMode] = useState('')
+  const [uAiSummaryContext, setUAiSummaryContext] = useState('')
   const [uTerragruntEnabled, setUTerragruntEnabled] = useState('')
   const [uTerragruntVersion, setUTerragruntVersion] = useState('')
   const [uVcsWorkflow, setUVcsWorkflow] = useState('')
@@ -196,6 +198,8 @@ export default function BulkUpdatePage() {
     if (uScanEngine) u['security-scan-engine'] = uScanEngine
     if (uScanThreshold) u['security-scan-severity-threshold'] = uScanThreshold
     if (uAiSummaryMode) u['ai-summary-mode'] = uAiSummaryMode
+    if (uAiPolicyMode) u['ai-policy-mode'] = uAiPolicyMode
+    if (uAiSummaryContext) u['ai-summary-context'] = uAiSummaryContext
     // A tri-state '' | 'true' | 'false': a plain checkbox cannot say "leave
     // this alone", and the endpoint type-checks booleans rather than coercing.
     if (uTerragruntEnabled) u['terragrunt-enabled'] = uTerragruntEnabled === 'true'
@@ -751,6 +755,34 @@ export default function BulkUpdatePage() {
                 <option value="enabled">{tAi('modeEnabled')}</option>
                 <option value="disabled">{tAi('modeDisabled')}</option>
               </select>
+            </div>
+            <div>
+              <label className={labelCls}>{tAi('policyMode')}</label>
+              <select
+                value={uAiPolicyMode}
+                onChange={(e) => setUAiPolicyMode(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('unchanged')}</option>
+                <option value="default">{tAi('modeDefault')}</option>
+                <option value="enabled">{tAi('modeEnabled')}</option>
+                <option value="disabled">{tAi('modeDisabled')}</option>
+              </select>
+              <p className="mt-1 text-xs text-slate-400">{tAi('policyModeNote')}</p>
+            </div>
+            <div className="sm:col-span-2">
+              <label className={labelCls}>
+                {tAi('contextLabel')} {tAi('contextLabelSuffix')}
+              </label>
+              <textarea
+                value={uAiSummaryContext}
+                onChange={(e) => setUAiSummaryContext(e.target.value)}
+                rows={3}
+                maxLength={4000}
+                placeholder={tAi('contextPlaceholder')}
+                className={inputCls}
+              />
+              <p className="mt-1 text-xs text-slate-400">{tAi('contextHint')}</p>
             </div>
           </div>
 

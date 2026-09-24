@@ -50,6 +50,8 @@ interface AutodiscoveryRule {
     'security-scan-engine'?: string
     'security-scan-severity-threshold'?: string
     'ai-summary-mode'?: string
+    'ai-policy-mode'?: string
+    'ai-summary-context'?: string
     'terragrunt-enabled'?: boolean
     'terragrunt-version'?: string
     'vcs-workflow'?: string
@@ -129,6 +131,8 @@ export default function AutodiscoveryPage() {
   const [scanEngine, setScanEngine] = useState('checkov')
   const [scanThreshold, setScanThreshold] = useState('high')
   const [aiSummaryMode, setAiSummaryMode] = useState('default')
+  const [aiPolicyMode, setAiPolicyMode] = useState('default')
+  const [aiSummaryContext, setAiSummaryContext] = useState('')
   const [terragruntEnabled, setTerragruntEnabled] = useState(false)
   const [terragruntVersion, setTerragruntVersion] = useState('1.0')
   const [ruleVcsWorkflow, setRuleVcsWorkflow] = useState('merge_then_apply')
@@ -284,6 +288,8 @@ export default function AutodiscoveryPage() {
     setScanEngine(a['security-scan-engine'] || 'checkov')
     setScanThreshold(a['security-scan-severity-threshold'] || 'high')
     setAiSummaryMode(a['ai-summary-mode'] || 'default')
+    setAiPolicyMode(a['ai-policy-mode'] || 'default')
+    setAiSummaryContext(a['ai-summary-context'] || '')
     setTerragruntEnabled(a['terragrunt-enabled'] ?? false)
     setTerragruntVersion(a['terragrunt-version'] || '1.0')
     setRuleVcsWorkflow(a['vcs-workflow'] || 'merge_then_apply')
@@ -336,6 +342,8 @@ export default function AutodiscoveryPage() {
       'security-scan-engine': scanEngine,
       'security-scan-severity-threshold': scanThreshold,
       'ai-summary-mode': aiSummaryMode,
+      'ai-policy-mode': aiPolicyMode,
+      'ai-summary-context': aiSummaryContext,
       'terragrunt-enabled': terragruntEnabled,
       'terragrunt-version': terragruntVersion.trim() || '1.0',
       'vcs-workflow': ruleVcsWorkflow,
@@ -955,6 +963,36 @@ export default function AutodiscoveryPage() {
                       <option value="enabled">{t('form.aiSummaryEnabled')}</option>
                       <option value="disabled">{t('form.aiSummaryDisabled')}</option>
                     </select>
+                  </div>
+                  <div>
+                    <label htmlFor="ad-ai-policy" className="block text-xs text-slate-500 mb-1">
+                      {tWs('aiSummary.policyMode')}
+                    </label>
+                    <select
+                      id="ad-ai-policy"
+                      value={aiPolicyMode}
+                      onChange={(e) => setAiPolicyMode(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="default">{tWs('aiSummary.modeDefault')}</option>
+                      <option value="enabled">{tWs('aiSummary.modeEnabled')}</option>
+                      <option value="disabled">{tWs('aiSummary.modeDisabled')}</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="ad-ai-context" className="block text-xs text-slate-500 mb-1">
+                      {tWs('aiSummary.contextLabel')} {tWs('aiSummary.contextLabelSuffix')}
+                    </label>
+                    <textarea
+                      id="ad-ai-context"
+                      value={aiSummaryContext}
+                      onChange={(e) => setAiSummaryContext(e.target.value)}
+                      rows={3}
+                      maxLength={4000}
+                      placeholder={tWs('aiSummary.contextPlaceholder')}
+                      className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                    <p className="mt-1 text-xs text-slate-500">{tWs('aiSummary.contextHint')}</p>
                   </div>
                 </div>
               </div>
