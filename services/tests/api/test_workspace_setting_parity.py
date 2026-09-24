@@ -239,6 +239,28 @@ _SURFACE_EXEMPT: dict[str, dict[str, str]] = {
 }
 
 
+#: Genuine gaps -- a debt, not a decision, and kept in a SEPARATE ledger from
+#: `_SURFACE_EXEMPT` for the same reason `NOT_YET_BULK_SETTABLE` is separate
+#: above: collapsing them would let a real gap hide behind the word "exempt",
+#: which is the failure this gate exists to prevent. Every entry names the
+#: issue that will clear it, and clearing one means wiring the setting up and
+#: deleting the line. This should end empty.
+_SURFACE_DEBT: dict[str, dict[str, str]] = {
+    "bulk-update GUI": {
+        "engine-version": "#1813 -- settable through the API and the provider, not the UI",
+        "parallelism": "#1813 -- settable through the API and the provider, not the UI",
+    },
+    "autodiscovery GUI": {
+        "engine-version": "#1813",
+        "parallelism": "#1813",
+        "pulumi-bind-plan": "#1813 -- the rule template cannot set it at all",
+    },
+    "autodiscovery API": {
+        "pulumi-bind-plan": "#1813 -- bulk-settable, but a rule cannot template it",
+    },
+}
+
+
 def _surface_sources() -> dict[str, str]:
     return {
         "bulk-update GUI": _BULK_GUI.read_text(),
@@ -253,7 +275,7 @@ class TestEverySettableAttributeReachesEverySurface:
         attrs = set(_FIELD_MAP) | set(_FIELDS_HANDLED_SEPARATELY)
         problems: list[str] = []
         for surface, src in _surface_sources().items():
-            excused = _SURFACE_EXEMPT.get(surface, {})
+            excused = {**_SURFACE_EXEMPT.get(surface, {}), **_SURFACE_DEBT.get(surface, {})}
             for a in sorted(attrs):
                 if a in excused:
                     continue
@@ -281,3 +303,18 @@ class TestEverySettableAttributeReachesEverySurface:
         for surface, excused in _SURFACE_EXEMPT.items():
             stale = set(excused) - attrs
             assert not stale, f"{surface} excuses non-settable attribute(s): {sorted(stale)}"
+
+    def test_no_debt_entry_names_an_attribute_that_is_not_settable(self):
+        """A debt entry for something no longer settable is a line nobody will
+        ever clear, and it hides the next real gap behind a stale name."""
+        attrs = set(_FIELD_MAP) | set(_FIELDS_HANDLED_SEPARATELY)
+        for surface, owed in _SURFACE_DEBT.items():
+            stale = set(owed) - attrs
+            assert not stale, f"{surface} owes work on non-settable attribute(s): {sorted(stale)}"
+
+    def test_debt_and_exemptions_do_not_overlap(self):
+        """A setting is either deliberately absent or owed. Both at once means
+        one of the two ledgers is lying about it."""
+        for surface in set(_SURFACE_EXEMPT) | set(_SURFACE_DEBT):
+            both = set(_SURFACE_EXEMPT.get(surface, {})) & set(_SURFACE_DEBT.get(surface, {}))
+            assert not both, f"{surface} both excuses and owes: {sorted(both)}"
