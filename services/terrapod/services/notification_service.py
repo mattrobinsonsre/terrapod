@@ -98,12 +98,12 @@ def run_ui_url(workspace_id: str, run_id: str) -> str:
     there is no honest link to give, and an empty `run_url` is what a receiver
     already handles (#1706).
     """
-    from terrapod.config import settings
+    from terrapod.services.run_links import run_url
 
-    base = (settings.external_url or "").rstrip("/")
-    if not base:
-        return ""
-    return f"{base}/workspaces/{workspace_id}/runs/{run_id}"
+    # Prefixed ids (`ws-…`, `run-…`) are what this caller has always passed and
+    # what existing notifications link to; `run_links.run_url` passes them
+    # through rather than normalising, for that reason.
+    return run_url(workspace_id, run_id) or ""
 
 
 def build_verification_payload(nc_name: str) -> dict:
