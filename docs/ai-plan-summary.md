@@ -320,9 +320,12 @@ results before it reports the plan; the summariser runs in the API and is
 started by the plan-JSON upload, which happens after. So a mandatory gate holds
 the run in `planning` until the verdict lands rather than failing it for
 evidence that does not exist yet. The hold is reported as `blocked-by:
-ai-policy` — or, in the Terraform Enterprise vocabulary, `post_plan_running`
-while the verdict is still being produced and `policy_override` once one has
-landed and denied.
+ai-policy`, and that is the whole of it on this release line: the run stays
+`planning` and names the gate holding it. Terraform Enterprise draws a further
+distinction between a verdict still being produced and one that landed and
+denied; Terrapod has no equivalent vocabulary here, so do not write automation
+expecting one — read `blocked-by` and, if you need the verdict itself,
+`GET /runs/{id}/ai-policy`.
 
 ### It fails closed
 
@@ -405,7 +408,7 @@ A plan **does NOT** get a summary when:
 - The plan has no JSON output (older runs, or runner upload failed)
 
 In every case, run lifecycle is unaffected — the feature is best-effort
-and never blocks plan or apply.
+and never blocks plan or apply — **provided the policy gate is off**. With `ai_summary.policy.enabled` and `enforcement_level: mandatory`, a skipped or errored summary is not a shrug: the gate fails closed and the run is held. Read the gate section above before turning the feature on in a deployment that gates.
 
 ## What gets sent to the model
 
