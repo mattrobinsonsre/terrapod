@@ -2157,6 +2157,7 @@
       "endTitle": "Hoppa till slutet av loggen",
       "planEmpty": "Ingen planutdata tillgänglig ännu.",
       "applyEmpty": "Ingen applicerings-utdata tillgänglig ännu.",
+      "applySkippedNoChanges": "Ingen applicering kördes: planen hade inga ändringar, så det fanns inget att applicera.",
       "index": {
         "label": "Gå till",
         "title": "Gå till en resursändring eller till planöversikten",

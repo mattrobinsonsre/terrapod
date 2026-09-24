@@ -353,6 +353,13 @@ class TestSupersededRunComment:
                 "terrapod.services.vcs_status_dispatcher._find_or_create_comment",
                 new=AsyncMock(),
             ) as mock_comment,
+            # #1798 added a gate lookup on the `planning` path. These suites are
+            # about other things, so hold it at "nothing is holding the run";
+            # the gate cases have their own tests below.
+            patch(
+                "terrapod.services.run_service.blocked_by",
+                new=AsyncMock(return_value=None),
+            ),
         ):
             await handle_vcs_commit_status(
                 {
@@ -573,6 +580,13 @@ class TestStaleStatusDoesNotClobberTheComment:
                 "terrapod.services.vcs_status_dispatcher._find_or_create_comment",
                 new=AsyncMock(),
             ) as mock_comment,
+            # #1798 added a gate lookup on the `planning` path. These suites are
+            # about other things, so hold it at "nothing is holding the run";
+            # the gate cases have their own tests below.
+            patch(
+                "terrapod.services.run_service.blocked_by",
+                new=AsyncMock(return_value=None),
+            ),
         ):
             await handle_vcs_commit_status(
                 {
@@ -609,3 +623,95 @@ class TestStaleStatusDoesNotClobberTheComment:
         body = await self._dispatch(live_status="applied", payload_status="errored")
         assert "Run failed" in body
         assert "Apply complete" not in body
+
+
+# ── a run held at a post-plan gate (#1798) ───────────────────────────
+#
+# A held run stays in `planning`, so the status map reported "Plan in progress"
+# for as long as it was held — indefinitely, since nothing moves until a person
+# acts. The plan had finished; what was outstanding was a decision, and the PR
+# said nothing about it.
+
+
+class TestAHeldRunSaysWhatIsHoldingIt:
+    def test_each_gate_names_itself_and_the_way_out(self):
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        for gate, expected in [
+            ("policy", "policy check"),
+            ("security-scan", "security scan"),
+            ("run-task", "run task"),
+            # No `ai-policy` row: that gate arrived with #1766, which this line
+            # does not carry, so `blocked_by` can never name it here. An entry
+            # for it would assert on a description nothing can produce.
+        ]:
+            gh, gl, description = _resolve_status("planning", False, None, gate)
+            assert expected in description, (gate, description)
+            assert "Plan in progress" not in description
+            # Pending, not failure: the plan succeeded and a decision is owed.
+            # It still leaves a required check unmet, so the PR cannot merge.
+            assert (gh, gl) == ("pending", "running")
+
+    def test_an_unheld_planning_run_is_unchanged(self):
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        assert _resolve_status("planning", False, None, None) == (
+            "pending",
+            "running",
+            "Plan in progress",
+        )
+
+    def test_a_gate_we_do_not_recognise_still_says_blocked(self):
+        """A newer API naming a gate this build does not know must not fall
+        back to "Plan in progress" — the run is stopped either way."""
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        _, _, description = _resolve_status("planning", False, None, "something-new")
+        assert "Blocked" in description
+
+    def test_the_gate_only_applies_while_planning(self):
+        """A stale gate value must not rewrite a terminal status."""
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        assert _resolve_status("applied", False, None, "policy")[2] == "Apply complete"
+
+    def test_the_comment_does_not_show_a_turning_gear_for_a_blocked_run(self):
+        from terrapod.services.vcs_status_dispatcher import _build_comment_body
+
+        body = _build_comment_body(
+            workspace_name="prod",
+            workspace_id="ws-1",
+            run_id="run-1",
+            run_status="planning",
+            plan_only=False,
+            has_changes=True,
+            run_url="https://example.invalid/r",
+            gate="policy",
+        )
+        assert "policy check" in body
+        assert ":gear:" not in body
+
+
+# ── a no-op run is not an apply (#1794) ──────────────────────────────
+
+
+class TestANoOpRunDoesNotClaimToHaveApplied:
+    def test_a_zero_change_applied_run_says_there_was_nothing_to_apply(self):
+        """The run reaches `applied` without launching an apply, deliberately.
+        "Apply complete" read as though something had been applied — alarming
+        on a workspace with auto-apply off, where nobody confirmed anything."""
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        gh, gl, description = _resolve_status("applied", False, has_changes=False)
+        assert "nothing to apply" in description
+        assert "Apply complete" not in description
+        # Still a success: the run did everything it needed to.
+        assert (gh, gl) == ("success", "success")
+
+    def test_a_real_apply_is_untouched(self):
+        from terrapod.services.vcs_status_dispatcher import _resolve_status
+
+        assert _resolve_status("applied", False, has_changes=True)[2] == "Apply complete"
+        # Unknown (an older run, or the flag never landed) keeps the old text
+        # rather than claiming a no-op we cannot demonstrate.
+        assert _resolve_status("applied", False, has_changes=None)[2] == "Apply complete"

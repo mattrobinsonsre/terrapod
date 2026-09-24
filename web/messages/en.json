@@ -2163,6 +2163,7 @@
       "endTitle": "Jump to the end of the log",
       "planEmpty": "No plan output available yet.",
       "applyEmpty": "No apply output available yet.",
+      "applySkippedNoChanges": "No apply ran: the plan had no changes, so there was nothing to apply.",
       "index": {
         "label": "Jump to",
         "title": "Jump to a resource change, or the plan summary",

@@ -2157,6 +2157,7 @@
       "endTitle": "Aller à la fin du journal",
       "planEmpty": "Aucune sortie de plan disponible pour l'instant.",
       "applyEmpty": "Aucune sortie d'application disponible pour l'instant.",
+      "applySkippedNoChanges": "Aucune application n''a été exécutée : le plan ne contenait aucun changement, il n''y avait donc rien à appliquer.",
       "index": {
         "label": "Aller à",
         "title": "Aller à une modification de ressource ou au résumé du plan",

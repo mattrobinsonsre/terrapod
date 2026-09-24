@@ -2157,6 +2157,7 @@
       "endTitle": "Naar het einde van het logboek springen",
       "planEmpty": "Nog geen planuitvoer beschikbaar.",
       "applyEmpty": "Nog geen applyuitvoer beschikbaar.",
+      "applySkippedNoChanges": "Er is niets toegepast: het plan bevatte geen wijzigingen, dus er was niets toe te passen.",
       "index": {
         "label": "Ga naar",
         "title": "Ga naar een resourcewijziging of naar de plansamenvatting",
