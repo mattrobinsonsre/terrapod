@@ -2,11 +2,13 @@
 
 import asyncio
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from terrapod.db.models import VCSConnection
+from terrapod.services import vcs_status_dispatcher as dispatcher
 from terrapod.services.vcs_status_dispatcher import (
     _build_comment_body,
     _resolve_status,
@@ -715,3 +717,124 @@ class TestANoOpRunDoesNotClaimToHaveApplied:
         # Unknown (an older run, or the flag never landed) keeps the old text
         # rather than claiming a no-op we cannot demonstrate.
         assert _resolve_status("applied", False, has_changes=None)[2] == "Apply complete"
+
+
+# ── one comment per push, not one edited forever (#1799) ──────────────
+#
+# Terrapod edited a single per-workspace comment in place for the life of the
+# PR, so a plan triggered by a push produced no visible change in the thread —
+# the edit was often far above the latest commit, and the only new signal was
+# the commit status at the very bottom. A command-triggered plan looked
+# different only because the reply landed next to what you had just typed.
+
+
+class TestTheStatusCommentIsScopedToTheCommit:
+    def test_the_marker_carries_the_commit(self):
+        m = dispatcher._comment_marker("ws-1", "abc123")
+        assert "ws-1" in m and "abc123" in m
+
+    def test_a_body_carries_the_marker_its_own_lookup_searches_for(self):
+        """The body used to spell the marker out as a literal while the lookup
+        built it from a helper. Drift between the two does not fail loudly —
+        it means the search never matches, so every status posts a NEW
+        comment and the PR fills up. Pin them together."""
+        sha = "cafe1234"
+        body = dispatcher._build_comment_body(
+            workspace_name="prod",
+            workspace_id="ws-1",
+            run_id="run-1",
+            run_status="planned",
+            plan_only=False,
+            has_changes=True,
+            run_url="https://example.invalid/r/1",
+            commit_sha=sha,
+        )
+        assert dispatcher._comment_marker("ws-1", sha) in body
+
+    async def test_a_second_push_gets_its_own_comment(self):
+        """Two runs on two commits: two comments, so the newer plan appears
+        at the foot of the thread next to the push that caused it."""
+        conn = SimpleNamespace(id=uuid.uuid4(), provider="github")
+        fake_redis = _FakeRedis()
+        created: list[str] = []
+        updated: list[int] = []
+        posted: list[dict] = []
+
+        async def _create(conn, owner, repo, pr_number, body):
+            created.append(body)
+            cid = 100 + len(created)
+            posted.append({"id": cid, "body": body})
+            return cid
+
+        async def _update(conn, owner, repo, comment_id, body):
+            updated.append(comment_id)
+
+        async def _list(conn, owner, repo, pr_number):
+            return posted
+
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=fake_redis),
+            patch.object(dispatcher.github_service, "list_pr_comments", new=_list),
+            patch.object(dispatcher.github_service, "create_pr_comment", new=_create),
+            patch.object(dispatcher.github_service, "update_pr_comment", new=_update),
+        ):
+            for sha in ("sha1111", "sha2222"):
+                # The body must carry the marker the lookup searches for,
+                # exactly as production builds it — a markerless fake body
+                # never matches the search, so the test would create twice
+                # for the wrong reason and survive the marker being
+                # reverted to workspace-only.
+                await dispatcher._find_or_create_comment(
+                    conn,
+                    "org",
+                    "repo",
+                    7,
+                    "ws-1",
+                    f"{dispatcher._comment_marker('ws-1', sha)}\nplan for {sha}",
+                    sha,
+                )
+
+        assert len(created) == 2, created
+        assert updated == []
+
+    async def test_status_changes_within_one_commit_keep_editing_one_comment(self):
+        """The other half of the bargain: one comment per push, NOT one per
+        status. queued → planning → planned on the same commit must not post
+        three comments."""
+        conn = SimpleNamespace(id=uuid.uuid4(), provider="github")
+        fake_redis = _FakeRedis()
+        created: list[str] = []
+        updated: list[int] = []
+        posted: list[dict] = []
+
+        async def _create(conn, owner, repo, pr_number, body):
+            created.append(body)
+            cid = 200 + len(created)
+            posted.append({"id": cid, "body": body})
+            return cid
+
+        async def _update(conn, owner, repo, comment_id, body):
+            updated.append(comment_id)
+
+        async def _list(conn, owner, repo, pr_number):
+            return posted
+
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=fake_redis),
+            patch.object(dispatcher.github_service, "list_pr_comments", new=_list),
+            patch.object(dispatcher.github_service, "create_pr_comment", new=_create),
+            patch.object(dispatcher.github_service, "update_pr_comment", new=_update),
+        ):
+            for body in ("queued", "planning", "planned"):
+                await dispatcher._find_or_create_comment(
+                    conn,
+                    "org",
+                    "repo",
+                    7,
+                    "ws-1",
+                    f"{dispatcher._comment_marker('ws-1', 'sha1111')}\n{body}",
+                    "sha1111",
+                )
+
+        assert len(created) == 1, created
+        assert len(updated) == 2, updated

@@ -140,3 +140,32 @@ class TestIsCommandComment:
     def test_false_for_code_block(self):
         body = "```\nterrapod apply\n```"
         assert is_command_comment(body) is False
+
+
+# ── naming the token we did not understand (#1799) ────────────────────
+#
+# Every unknown verb becomes `help`, which is what lets a typo get an answer
+# at all. But answering a typo with a bare usage table reads as a non-sequitur
+# — the author wants to know that `plna` was the problem.
+
+
+class TestAnUnrecognisedVerbIsCarried:
+    def test_a_lone_mistyped_verb_is_named(self):
+        cmd = parse("terrapod plna")
+        assert cmd.verb == "help"
+        assert cmd.unrecognised == "plna"
+
+    def test_a_known_verb_carries_nothing(self):
+        assert parse("terrapod plan").unrecognised is None
+        assert parse("terrapod help").unrecognised is None
+
+    def test_prose_that_merely_opens_with_the_prefix_is_not_named(self):
+        """`terrapod is broken` is a sentence, not a typo. Quoting "is" back
+        would read as the parser talking nonsense, so the reply falls back to
+        the plain usage table."""
+        cmd = parse("terrapod is broken")
+        assert cmd.verb == "help"
+        assert cmd.unrecognised is None
+
+    def test_trailing_punctuation_does_not_hide_a_typo(self):
+        assert parse("terrapod aply.").unrecognised == "aply"
