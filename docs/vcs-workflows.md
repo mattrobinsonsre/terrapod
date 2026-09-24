@@ -89,6 +89,16 @@ Commands must start with `terrapod` (or the configured mention prefix — e.g. `
 
 Code-fenced blocks don't match — discussing the bot in a code sample never accidentally triggers a command.
 
+`terrapod help` replies with this table as a new comment, next to the one you
+wrote rather than in the status comment further up the thread. An unrecognised
+verb gets the same reply, so a typo tells you it was received and misread
+rather than leaving you unsure it arrived at all.
+
+Only comments written **after** Terrapod starts tracking a PR are acted on. A
+command posted before then — while the App was still missing the Issues
+permission, say, or before the workspace was `apply_then_merge` — is not
+replayed when tracking begins.
+
 ## Status comment
 
 One Terrapod-authored comment per PR, edited in place:
@@ -152,6 +162,10 @@ Project / Group access tokens need `api` scope (the existing requirement covers 
 **"PR #X currently holds the lock"** — another PR is mid-flight on the same workspace. Wait for it to merge/discard, or merge/discard it yourself, then push your PR to retrigger the plan.
 
 **Stale plan after a sibling apply** — `terrapod plan` to replan against the new state, then `terrapod apply`.
+
+**A commit status that stays "Blocked by …"** — the plan finished and a post-plan gate is holding the run: a mandatory run task, a mandatory policy set, an enforced security scan, or the AI policy gate. The status names which. Override it from the run's matching tab, or discard the run. The check stays unmet meanwhile, so the PR cannot merge past it.
+
+**"No changes — nothing to apply"** — the plan found nothing to do, so no apply was launched. The run still reaches `applied` because it is complete, not because anything was applied.
 
 **Comment didn't trigger anything** — check (a) the comment starts with `terrapod` at the beginning of a line, (b) the verb is one of the supported commands, (c) the workspace is in `apply_then_merge` mode, (d) the GitHub App has Issues permission accepted, (e) `tilt logs` (local) or `kubectl logs` (cluster) on the API pod for `vcs_comment_dispatch` events.
 

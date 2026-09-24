@@ -2180,6 +2180,7 @@
       "endTitle": "Neidio i ddiwedd y log",
       "planEmpty": "Dim allbwn cynllun ar gael eto.",
       "applyEmpty": "Dim allbwn gweithredu ar gael eto.",
+      "applySkippedNoChanges": "Ni redodd unrhyw weithredu: nid oedd newidiadau yn y cynllun, felly nid oedd dim i''w weithredu.",
       "index": {
         "label": "Neidio i",
         "title": "Neidio i newid adnodd, neu grynodeb y cynllun",

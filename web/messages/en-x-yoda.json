@@ -2180,6 +2180,7 @@
       "endTitle": "To the end of the log, jump",
       "planEmpty": "No plan output available yet, there is.",
       "applyEmpty": "No apply output available yet, there is.",
+      "applySkippedNoChanges": "Run, no apply did: no changes, the plan had, so to apply, nothing there was.",
       "index": {
         "label": "Jump, you will",
         "title": "To a resource change, or to the plan summary, jump you will",
