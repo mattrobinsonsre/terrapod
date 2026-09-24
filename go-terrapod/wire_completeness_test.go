@@ -81,7 +81,7 @@ func fill(v reflect.Value) {
 			}
 		case reflect.Map:
 			f.Set(reflect.MakeMap(f.Type()))
-		case reflect.Ptr:
+		case reflect.Pointer:
 			p := reflect.New(f.Type().Elem())
 			switch p.Elem().Kind() {
 			case reflect.Bool:
@@ -152,7 +152,7 @@ func TestEveryWorkspaceFieldIsDecoded(t *testing.T) {
 			attrs[name] = "x"
 		case reflect.Int64, reflect.Int:
 			attrs[name] = 7
-		case reflect.Ptr:
+		case reflect.Pointer:
 			attrs[name] = 7
 		}
 	}
