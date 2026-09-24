@@ -1185,13 +1185,31 @@ service=terrapod-api logger=terrapod.services.vcs_status_dispatcher
   # update TERRAPOD_AI_SUMMARY__AUTH__API_KEY, save
   kubectl rollout restart deployment/<release>-api -n <ns>
   ```
-- **Emergency disable** if the provider is down for an extended period and the red panels are visible to many reviewers, flip the global toggle off without restart-required code changes:
+- **Emergency disable** if the provider is down for an extended period and the red panels are visible to many reviewers.
+
+  **Turn the GATE off first, and check whether you need to at all.** If
+  `ai_summary.policy.enforcement_level` is `mandatory`, disabling summaries
+  alone would hold every apply-capable run in the deployment: the gate's
+  verdict is produced by the summariser, so none would ever land, and a
+  mandatory gate holds a run it has no ruling for. Terrapod now **refuses to
+  start** on that combination rather than deadlocking quietly, so the pod would
+  fail its readiness probe instead — but the fix is the same either way, and it
+  is the gate that has to move.
+
   ```yaml
   api:
     config:
       ai_summary:
+        # Drop the gate out of the way BEFORE disabling summaries. Either is
+        # enough; `advisory` keeps recording verdicts for when the provider
+        # returns, `enabled: false` stops the gate entirely.
+        policy:
+          enforcement_level: advisory   # or: enabled: false
         enabled: false
   ```
+
+  With the gate `advisory` or off, disabling summaries is purely cosmetic and
+  the run lifecycle is unaffected, as it always was.
   followed by `helm upgrade ...`. The API pod re-reads its config on rollout and the trigger handler stops registering. All subsequent plans go through without ever attempting to summarise — no `plan_summaries` row is written at all (the handler short-circuits before the DB write). Re-enable when the upstream is healthy.
 
 ### Verification

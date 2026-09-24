@@ -942,6 +942,12 @@ api:
       # offending resource fell off the end, so a Pulumi run is reported as
       # not evaluated instead of being judged on a partial plan.
       policy:
+        # REQUIRES `ai_summary.enabled: true`. The gate's verdict is produced by
+        # the summariser, so with summaries off no verdict can land and a
+        # `mandatory` gate would hold every apply-capable run indefinitely.
+        # Terrapod refuses to start on that combination rather than deadlocking
+        # quietly; `advisory` with summaries off is merely inert and is allowed.
+        #
         # Off by default, so enabling AI summaries never starts blocking runs.
         enabled: false
         # advisory = record the verdict, never block, never delay the run.

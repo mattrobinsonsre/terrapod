@@ -286,13 +286,37 @@ async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
     return GATE_BLOCKED if await run_is_ai_policy_blocked(db, run.id) else GATE_PASSED
 
 
-async def override(db: AsyncSession, *, run_id: uuid.UUID, actor: str) -> AIPolicyEvaluation | None:
-    """Release a held run. Returns the evaluation, or None when there is none."""
+async def override(
+    db: AsyncSession, *, run_id: uuid.UUID, actor: str, enforcement_level: str = ""
+) -> AIPolicyEvaluation:
+    """Release a held run, recording who did it.
+
+    Creates the evaluation when none exists rather than refusing. A run can be
+    held precisely BECAUSE no verdict landed -- the summariser never ran, its
+    enqueue was dropped, or it raised before settling -- and that is the state
+    where release is most needed. Refusing it was backwards: the endpoint
+    answered 409 and told the operator to wait for a verdict that was never
+    coming, leaving discard as the only exit while the run kept its workspace
+    lock.
+
+    The row it writes is an honest record, not a forged pass: outcome
+    `overridden`, no verdict, and an `error` saying no ruling was ever
+    reached. An auditor can tell it apart from a gate that actually ran.
+    """
     from terrapod.db.models import now_utc
 
     row = await get_evaluation(db, run_id)
     if row is None:
-        return None
+        row = await record_evaluation(
+            db,
+            run_id=run_id,
+            enforcement_level=enforcement_level or "mandatory",
+            outcome="overridden",
+            error=(
+                "Released by an operator before any verdict was recorded. The "
+                "gate never ruled on this run."
+            ),
+        )
     row.overridden_by = actor
     row.overridden_at = now_utc()
     await db.flush()
