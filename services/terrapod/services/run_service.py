@@ -228,6 +228,49 @@ async def _enqueue_notification(run: Run, target_status: str) -> None:
     await enqueue_slack_notify(run, trigger)
 
 
+async def _enqueue_gate_hold_status(run: Run) -> None:
+    """Refresh the commit status when a post-plan gate takes hold (#1831).
+
+    A held run stays in `planning` -- `complete_plan` returns without a
+    transition -- so the ordinary `_enqueue_vcs_status` call in
+    `transition_run` never fires for it. The only `planning` status a PR ever
+    received was the one from `queued -> planning`, sent before
+    `plan_finished_at` was set, when `blocked_by` still answers None.
+
+    So the gate vocabulary #1798 added could never render: the check sat on
+    "Plan in progress" for as long as the gate held, which is the bug it was
+    written to fix. Verified by reading the call graph, not inferred.
+
+    A DISTINCT dedup key is load-bearing. `_enqueue_vcs_status` keys on
+    `vcs_status:{run}:{target}` with a 60s TTL, so any plan finishing within a
+    minute of starting -- the common case -- would have this silently
+    swallowed as a duplicate of its own plan-start status.
+    """
+    from terrapod.services.scheduler import enqueue_trigger
+
+    if run.is_drift_detection or not run.vcs_commit_sha:
+        return
+
+    try:
+        await enqueue_trigger(
+            "vcs_commit_status",
+            {
+                "run_id": str(run.id),
+                "workspace_id": str(run.workspace_id),
+                "target_status": "planning",
+                "has_changes": run.has_changes,
+            },
+            dedup_key=f"vcs_status:gate:{run.id}",
+            dedup_ttl=60,
+        )
+    except Exception as e:  # pragma: no cover - best effort, never fail the gate
+        logger.warning(
+            "Could not enqueue the gate-hold commit status",
+            run_id=str(run.id),
+            error=str(e),
+        )
+
+
 async def _enqueue_vcs_status(run: Run, target_status: str) -> None:
     """Enqueue a VCS commit status update for a run state change.
 
@@ -1318,6 +1361,10 @@ async def _complete_plan(
             # Otherwise the run stays in `planning`: its tasks are still running,
             # or a failed mandatory task holds it for an override or a discard
             # (#1704), exactly as a failed mandatory policy set does.
+            else:
+                # Still pending/running: the run is held, and the PR needs to
+                # say so rather than showing a turning gear indefinitely.
+                await _enqueue_gate_hold_status(run)
             return run
 
     # Post-plan OPA policy gate (#343). The runner has already evaluated
@@ -1332,6 +1379,7 @@ async def _complete_plan(
 
     gate = await policy_set_service.evaluate_post_plan(db, run)
     if gate != policy_set_service.GATE_PASSED:
+        await _enqueue_gate_hold_status(run)
         return run
 
     # Post-plan security-scan gate (#1036) — the deterministic Checkov/Trivy
@@ -1343,6 +1391,7 @@ async def _complete_plan(
 
     scan_gate = await security_scan_service.evaluate_post_plan(db, run)
     if scan_gate != security_scan_service.GATE_PASSED:
+        await _enqueue_gate_hold_status(run)
         return run
 
     # Post-plan AI policy gate (#1766) — the judgement-call sibling of the two
@@ -1358,6 +1407,7 @@ async def _complete_plan(
 
     ai_gate = await ai_policy_service.evaluate_post_plan(db, run)
     if ai_gate != ai_policy_service.GATE_PASSED:
+        await _enqueue_gate_hold_status(run)
         return run
 
     run = await transition_run(db, run, "planned")
