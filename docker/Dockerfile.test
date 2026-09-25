@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # `opa check` behaviour, so a large drift would test something operators do not
 # run.
 ARG TARGETARCH
-ARG OPA_VERSION=1.19.0
+ARG OPA_VERSION=1.21.0
 RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
     && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \
