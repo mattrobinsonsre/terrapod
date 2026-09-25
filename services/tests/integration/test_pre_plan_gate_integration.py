@@ -170,6 +170,34 @@ class TestTheGateHoldsTheRun:
         await _queue_run(ws_id, cv_id)
         assert await _claim(pool_id) is not None
 
+    async def test_a_plan_only_run_is_gated_too(self, app):
+        """Parity with `post_plan`, which is the behaviour to match.
+
+        `_complete_plan` creates its stage with no `plan_only` check, so
+        post-plan run tasks already gate speculative PR plans — unlike the
+        policy and security-scan gates, which short-circuit on `plan_only`
+        because "there is no apply to block". A pre-plan task is input
+        validation, and a speculative plan has inputs, so excluding it would be
+        the surprising choice.
+
+        Pinned because it is a decision someone could reasonably reverse on
+        volume grounds (one webhook per speculative run) without noticing it
+        splits the two boundaries apart.
+        """
+        ws_id, pool_id, cv_id = await _seed("pre-plan-speculative", stage="pre_plan")
+        async with get_db_session() as db:
+            ws = (await db.execute(select(Workspace).where(Workspace.id == ws_id))).scalar_one()
+            run = await run_service.create_run(
+                db, ws, configuration_version_id=cv_id, plan_only=True
+            )
+            run = await run_service.transition_run(db, run, "queued")
+            await db.commit()
+
+        assert await _claim(pool_id) is None, (
+            "a speculative plan must be held by a pre-plan gate, as it would be by a post-plan one"
+        )
+        assert (await _reload(run.id)).status == "queued"
+
 
 class TestAMandatoryFailureIsFinal:
     async def test_it_errors_the_run_naming_the_task(self, app):
