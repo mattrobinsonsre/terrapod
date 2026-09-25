@@ -137,6 +137,7 @@ Everything below is implemented and shipped today.
 | Feature | Description |
 |---|---|
 | Label-based RBAC | Roles with granular `resource:verb` capabilities (e.g. `run:plan` without `run:apply`); read/plan/write/admin levels remain as authoring shorthand |
+| AI policy gate | The plan summary's own verdict as a post-plan gate: operator-written natural-language deny criteria plus a risk threshold, advisory or mandatory, with admin override. Rides the summary's existing model call, so gating costs no extra tokens. Off by default |
 | Policy-as-code (OPA) | Rego enforcement on plan JSON — the open-source equivalent of Sentinel. Advisory or mandatory sets, label-scoped to workspaces, evaluated on the runner, with admin override. Optional shared evaluation lets a set's policies share helper rules and data files |
 | IaC security scanning | Checkov/Trivy misconfiguration scanning of the plan JSON with maintained rule catalogues — per-workspace `off`/`advisory`/`enforced`, severity threshold, skip rules; enforced holds the run at the gate on a failed finding, with admin override |
 | SSO (OIDC / SAML) | Pluggable identity providers (Auth0, Okta, Azure AD, any standards-compliant IdP) |
@@ -169,6 +170,7 @@ Everything below is implemented and shipped today.
 | Terragrunt | Per-workspace Terragrunt for agent-mode runs (a flag + pinned version, pull-through binary cache, local-backend reconciliation so Terrapod still owns state); CLI-driven runs need no extra config |
 | Variables & secrets | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets, assignable by rule (labels/globs) as well as one by one; values can be [read from OpenBao (or HashiCorp Vault)](docs/vault.md) at run time, including dynamic secrets |
 | Private module source auth | First-class auth for private `git::https://` / `git::ssh://` module sources — a scoped `git_http_auth` / `git_ssh_auth` variable (static token or minted from a VCS connection), with ssh↔https protocol rewriting; credentials are log-safe and delivered only via the per-run Secret ([module-auth.md](docs/module-auth.md)) |
+| Runner debug mode | Per-workspace opt-in that keeps a failed runner pod alive so you can `kubectl exec` into it and reproduce a credential, DNS or mount failure with the run's real environment. Auto-expires; off by default |
 | Drift detection | Scheduled plan-only runs to detect out-of-band changes, with a per-workspace ignore allowlist |
 | Notifications | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | Outbound URL guard | Bounds where a user-supplied webhook or run-task callback may point: loopback and link-local always refused, private space optional (`block_private_addresses`), with per-host and per-CIDR allow-lists for the endpoints an operator means |
