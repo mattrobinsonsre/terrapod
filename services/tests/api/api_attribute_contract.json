@@ -423,6 +423,9 @@
     "size",
     "subject-digest"
   ],
+  "oci_admin.list_untagged:meta": [
+    "count"
+  ],
   "onboarding._session_json": [
     "ai-assisted",
     "created-at",
@@ -450,6 +453,9 @@
   "onboarding.onboarding_availability": [
     "ai-available",
     "ai-model-configured"
+  ],
+  "package_cache.galaxy_versions:meta": [
+    "count"
   ],
   "policy_checks._check_json": [
     "actions",
@@ -510,6 +516,7 @@
     "vcs-repo-url"
   ],
   "policy_sets.list_run_policy_evaluations:meta": [
+    "not-evaluated-reason",
     "summary"
   ],
   "policy_sets.override_run_policy:meta": [
@@ -871,6 +878,7 @@
     "summary"
   ],
   "security_scanning.get_run_security_scan:meta": [
+    "not-evaluated-reason",
     "summary"
   ],
   "security_scanning.override_run_security_scan:meta": [
