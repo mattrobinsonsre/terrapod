@@ -102,3 +102,73 @@ def test_the_routable_verbs_are_the_verbs_the_dispatcher_actually_routes():
         f"routed only: {sorted(routed - set(disp._ROUTABLE_VERBS))}; "
         f"listed only: {sorted(set(disp._ROUTABLE_VERBS) - routed)}"
     )
+
+
+class TestProseNeverReachesAnyReplyPath:
+    """#1836 added the prose guard INSIDE `_route`, i.e. after the session
+    lookup — so it never covered the no-session branch #1799 had added one
+    commit earlier.
+
+    With the GitHub App installed org-wide (the common deployment) that branch
+    fires on every repo with no Terrapod workspace at all. A passing mention on
+    an unrelated PR drew an eyes reaction, a six-line explanation about
+    apply-then-merge workspaces, and a thumbs-down: three API calls and a
+    comment on a repo that has nothing to do with Terrapod.
+    """
+
+    @staticmethod
+    def _payload(body: str) -> dict:
+        return {
+            "body": body,
+            "connection_id": str(uuid.uuid4()),
+            "repo": "org/unrelated-service",
+            "pr_number": 7,
+            "comment_id": "c1",
+            "actor_login": "someone",
+        }
+
+    async def _dispatch(self, body: str):
+        """Returns (reacted, commented) — what the PR would have seen."""
+        conn = SimpleNamespace(id=uuid.uuid4(), provider="github")
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=conn)
+        db.execute = AsyncMock(
+            return_value=SimpleNamespace(scalar_one_or_none=lambda: None)  # no session
+        )
+
+        class _Ctx:
+            async def __aenter__(self_inner):
+                return db
+
+            async def __aexit__(self_inner, *a):
+                return False
+
+        with (
+            patch.object(disp, "get_db_session", return_value=_Ctx()),
+            patch.object(disp, "_react", new=AsyncMock(return_value="eyes")) as react,
+            patch.object(disp, "_unreact", new=AsyncMock()),
+            patch.object(disp, "_post_comment", new=AsyncMock()) as comment,
+        ):
+            await disp.handle_vcs_comment_dispatch(self._payload(body))
+        return react.await_count, comment.await_count
+
+    async def test_a_passing_mention_on_an_unrelated_pr_is_silent(self):
+        reacted, commented = await self._dispatch("terrapod is working well now")
+        assert commented == 0, "Terrapod commented on a PR that mentioned it in passing"
+        assert reacted == 0, "Terrapod reacted to prose"
+
+    async def test_prose_in_a_longer_sentence_is_silent(self):
+        reacted, commented = await self._dispatch("terrapod has been really solid this week")
+        assert (reacted, commented) == (0, 0)
+
+    async def test_a_real_command_still_gets_its_no_session_explanation(self):
+        """The #1799 behaviour must survive: a genuine command on a PR with no
+        session is told why nothing happened, rather than ignored."""
+        reacted, commented = await self._dispatch("terrapod apply")
+        assert commented == 1, "a real command lost its 'received and ignored' reply"
+        assert reacted >= 1
+
+    async def test_a_typo_still_gets_its_explanation(self):
+        """A mistyped verb followed by a FLAG is a command attempt, not prose."""
+        reacted, commented = await self._dispatch("terrapod aply -W web")
+        assert commented == 1

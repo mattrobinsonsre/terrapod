@@ -104,22 +104,42 @@ def _local_dict_keys(fn: ast.AST) -> dict[str, set[str]]:
     return var_keys
 
 
-def _attributes_of_function(fn: ast.AST) -> set[str] | None:
-    """Return the string keys of the function's ``"attributes"`` block — whether
-    written inline (``"attributes": {...}``) or via a local variable
-    (``attrs = {...}; "attributes": attrs``) — or None if it isn't a serializer."""
+def _block_of_function(fn: ast.AST, block: str) -> set[str] | None:
+    """Return the string keys of the function's ``block`` dict — whether written
+    inline (``"attributes": {...}``) or via a local variable
+    (``attrs = {...}; "attributes": attrs``) — or None if it has no such block."""
     var_keys = _local_dict_keys(fn)
     for node in ast.walk(fn):
         if not isinstance(node, ast.Dict):
             continue
         for key, value in zip(node.keys, node.values, strict=True):
-            if not (isinstance(key, ast.Constant) and key.value == "attributes"):
+            if not (isinstance(key, ast.Constant) and key.value == block):
                 continue
             if isinstance(value, ast.Dict):
                 return _dict_literal_keys(value)
             if isinstance(value, ast.Name) and value.id in var_keys:
                 return var_keys[value.id]
     return None
+
+
+def _attributes_of_function(fn: ast.AST) -> set[str] | None:
+    return _block_of_function(fn, "attributes")
+
+
+def _meta_of_function(fn: ast.AST) -> set[str] | None:
+    """The response's ``meta`` keys.
+
+    Gated for the same reason attributes are, and it was NOT. The AI policy
+    endpoint puts its authoritative answer in `meta.blocking` — the web panel
+    keys both its blocked banner and its override button on that — and
+    `meta.not-evaluated-reason` is the only thing distinguishing "waiting for a
+    verdict" from "no verdict is coming". Renaming either would have broken the
+    one control that releases a held run, with ZERO CI signal.
+
+    `meta.pagination` rides the same gate, which is the other load-bearing
+    meta block in the API.
+    """
+    return _block_of_function(fn, "meta")
 
 
 def extract_attribute_contract() -> dict[str, list[str]]:
@@ -135,6 +155,9 @@ def extract_attribute_contract() -> dict[str, list[str]]:
             attrs = _attributes_of_function(node)
             if attrs:
                 contract[f"{path.stem}.{node.name}"] = sorted(attrs)
+            meta = _meta_of_function(node)
+            if meta:
+                contract[f"{path.stem}.{node.name}:meta"] = sorted(meta)
     return contract
 
 
