@@ -589,8 +589,31 @@ class TestConfirmRun:
         ws.locked = False
         db.get.return_value = ws
         run = _mock_run(status="planned")
-        result = await confirm_run(db, run)
+        # #1837: confirm now consults the pre-apply run task gate. This test is
+        # about the happy path, so let it pass; the gate has its own tests.
+        with patch(
+            "terrapod.services.run_service.pre_apply_gate",
+            AsyncMock(return_value=("passed", "")),
+        ):
+            result = await confirm_run(db, run)
         assert result.status == "confirmed"
+
+    async def test_a_held_pre_apply_gate_refuses_the_confirm(self):
+        """#1837. The run stays `planned` — the plan is still good, only the
+        go/no-go said no — and the caller is told why rather than getting a
+        confirm that silently did nothing."""
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.locked = False
+        db.get.return_value = ws
+        run = _mock_run(status="planned")
+        with patch(
+            "terrapod.services.run_service.pre_apply_gate",
+            AsyncMock(return_value=("failed", "a mandatory pre-apply run task failed (sec)")),
+        ):
+            with pytest.raises(ValueError, match="pre-apply run task failed"):
+                await confirm_run(db, run)
+        assert run.status == "planned", "a refused confirm must not move the run"
 
     async def test_rejects_a_speculative_configuration_version(self):
         """#1396. A speculative CV is the artifact of a plan-only run — an
@@ -792,7 +815,13 @@ class TestClaimNextRun:
         listener_id = uuid.uuid4()
         pool_id = uuid.uuid4()
 
-        result = await claim_next_run(db, listener_id, pool_id, "listener-1")
+        # #1837: the pre-plan pre-pass issues its own query before the claim
+        # loop, which would consume the first side_effect entry. It is about
+        # opening gates, not claiming, and has its own tests.
+        with patch(
+            "terrapod.services.run_service._open_pre_plan_stages", AsyncMock(return_value=None)
+        ):
+            result = await claim_next_run(db, listener_id, pool_id, "listener-1")
         assert result is not None
         claimed_run, phase = result
         assert phase == "apply"

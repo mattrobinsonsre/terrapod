@@ -510,6 +510,35 @@ async def task_stage_result_callback(
 
     # Resolve the parent stage
     stage_status = await resolve_stage(db, tsr.task_stage_id)
+
+    # A `pre_apply` stage that has just settled needs someone to act on it
+    # (#1837). Nothing else will: the reconciler only drives runs in
+    # `planning`/`applying`, and the run is sitting in `planned`. Without this
+    # an auto-applying run whose gate passed would wait for a human who has no
+    # reason to know they are needed.
+    #
+    # `pre_plan` deliberately gets nothing here — the listener's next poll is
+    # its re-drive — and `post_plan` already has the reconciler.
+    # `db.get`, not `get_task_stage`: this only needs the boundary and the run
+    # id, so the eager-loaded results that function fetches would be waste.
+    stage = await db.get(TaskStage, tsr.task_stage_id)
+    if stage is not None and stage.stage == "pre_apply":
+        from terrapod.services import run_service
+
+        gated_run = await db.get(Run, stage.run_id)
+        if gated_run is not None:
+            try:
+                await run_service.redrive_auto_apply(db, gated_run)
+            except Exception:
+                # The callback itself succeeded; the result is recorded and the
+                # stage is resolved. Failing the external service's request
+                # because our follow-on decision errored would have it retry
+                # and hit the "already in terminal state" 409.
+                logger.exception(
+                    "failed to re-drive auto-apply after pre-apply gate",
+                    run_id=str(stage.run_id),
+                )
+
     await db.commit()
 
     logger.info(

@@ -234,11 +234,21 @@ def _column_python_type(column_type: Any) -> type | None:
     that propagate would take replication down on any custom column type — the
     first one being `EncryptedText`, i.e. precisely when a credential is in
     flight.
+
+    There are TWO ways a type declines, and which one you get depends on the
+    installed SQLAlchemy: 2.0.52 raises `NotImplementedError` from the base
+    `TypeEngine`, while later versions return a bare `object`. Both mean "I
+    cannot name my Python type", so both must answer None here — otherwise the
+    contract this docstring states holds on one version and not the other, and
+    a caller that trusts it breaks on upgrade rather than at the point of
+    change. (`_coerce` happens not to care today, because it compares against
+    two specific types and `object` is neither. That is luck, not design.)
     """
     try:
-        return column_type.python_type  # type: ignore[no-any-return]
+        resolved = column_type.python_type
     except NotImplementedError:
         return None
+    return None if resolved is object else resolved  # type: ignore[no-any-return]
 
 
 def _coerce(spec: ReplicatedClass, payload: dict) -> dict:
