@@ -151,7 +151,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Estate Topology](estate-topology.md) | Whole-estate dependency + module-impact graph — workspaces + modules wired by run-triggers, remote-state, and module links; group by any label / pool / name prefix; RBAC-filtered; accessible table fallback |
 | [State Resource Graph](state-resource-graph.md) | Per-workspace resource dependency graph from Terraform state — resources wired by `depends-on`; current state version by default with an older-version picker; group by type / module / provider / mode; accessible table fallback |
 | [Notifications](notifications.md) | Webhook, Slack, and email alerts on run events |
-| [Run Tasks](run-tasks.md) | Pre/post-plan webhook hooks for external validation |
+| [Run Tasks](run-tasks.md) | Webhook hooks for external validation at `pre_plan`, `post_plan` and `pre_apply`; only `post_plan` failures are overridable |
 | [Execution Hooks](execution-hooks.md) | Custom shell steps in the runner Job at five lifecycle points |
 | [Policy-as-Code](policies.md) | OPA/Rego policy sets, advisory/mandatory enforcement, label scoping |
 | [Pulumi](pulumi.md) | Pulumi workspaces and runs: the stack a workspace names, what each run option maps to, hooks, binding an update to its preview, and where Pulumi is not coerced into the Terraform flow |

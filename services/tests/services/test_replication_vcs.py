@@ -207,6 +207,28 @@ class TestOpaqueColumnTypes:
 
         assert replication._column_python_type(TypeEngine()) is None
 
+    def test_both_ways_of_declining_answer_none(self):
+        """A type declines in one of two ways and WHICH one depends on the
+        installed SQLAlchemy — 2.0.52 raises `NotImplementedError`, later
+        versions return a bare `object`.
+
+        Driving `TypeEngine()` alone therefore tests whichever branch the
+        local version happens to take, which is how this passed in the venv
+        and failed in the container. Both are pinned explicitly so the test
+        means the same thing on either.
+        """
+
+        class _Raises:
+            @property
+            def python_type(self):
+                raise NotImplementedError
+
+        class _ShrugsWithObject:
+            python_type = object
+
+        assert replication._column_python_type(_Raises()) is None
+        assert replication._column_python_type(_ShrugsWithObject()) is None
+
     def test_coercion_still_revives_uuids_and_timestamps(self):
         """The tolerance must not have quietly disabled the coercion the path
         exists to do."""
