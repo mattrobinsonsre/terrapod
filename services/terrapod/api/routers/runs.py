@@ -637,7 +637,9 @@ def _bind_plan_of(ws) -> bool | None:
     return bool(ws.pulumi_bind_plan)
 
 
-async def _post_plan_view(db: AsyncSession, request: Request, run: Run) -> dict:
+async def _post_plan_view(
+    db: AsyncSession, request: Request, run: Run, *, unresolved_gate: set | None = None
+) -> dict:
     """The `_run_json` arguments that describe a run stopped after its plan.
 
     Always `blocked_by` (#1725). In the Terraform Enterprise vocabulary (#1704)
@@ -649,7 +651,15 @@ async def _post_plan_view(db: AsyncSession, request: Request, run: Run) -> dict:
     from terrapod.services import policy_check_service, run_task_service
 
     hold = await run_service.post_plan_hold(db, run)
-    view: dict = {"blocked_by": hold.gate if hold else None}
+    gate = hold.gate if hold else None
+    if gate is None and run.status in ("queued", "planned"):
+        # The #1837 boundaries are not post-plan holds, so `post_plan_hold`
+        # never reports them — it pairs each gate with a TFE post-plan status
+        # and a `queued`/`planned` run has none. Ask `blocked_by`, which does
+        # know them, or a run held before its plan or before its apply reads
+        # here as though nothing is holding it.
+        gate = await run_service.blocked_by(db, run, unresolved_gate=unresolved_gate)
+    view: dict = {"blocked_by": gate}
     if reports_tfe_post_plan(request):
         view["reported_status"] = hold.tfe_status if hold else None
         view["policy_check_ids"] = [c.id for c in await policy_check_service.list_checks(db, run)]
@@ -747,6 +757,10 @@ async def list_workspace_runs(
     total = await run_service.count_workspace_runs(db, ws.id)
     has_vcs = ws.vcs_connection_id is not None
     bind_plan = _bind_plan_of(ws)
+    # One query for the page rather than one per run (#1837). See `blocked_by`.
+    from terrapod.services.run_task_service import runs_with_unresolved_gate
+
+    unresolved_gate = await runs_with_unresolved_gate(db, [r.id for r in runs])
     return JSONResponse(
         content={
             "data": [
@@ -756,7 +770,7 @@ async def list_workspace_runs(
                     workspace_name=ws.name,
                     workspace_has_vcs=has_vcs,
                     pulumi_bind_plan=bind_plan,
-                    **await _post_plan_view(db, request, r),
+                    **await _post_plan_view(db, request, r, unresolved_gate=unresolved_gate),
                 )["data"]
                 for r in runs
             ],
