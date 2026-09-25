@@ -289,10 +289,71 @@ class TestAutoApplyGuardsAreSharedByBothEntryPoints:
         db.get = AsyncMock(return_value=ws)
         with (
             patch.object(run_service, "_staleness_reason", AsyncMock(return_value=None)),
+            patch.object(run_service, "pre_apply_gate", AsyncMock(return_value=("passed", ""))),
             patch.object(run_service, "transition_run", AsyncMock(return_value=run)) as transition,
         ):
             await run_service._auto_apply_if_permitted(db, run)
         assert transition.await_args.args[2] == "confirmed"
+
+    async def test_a_held_pre_apply_gate_blocks_the_auto_apply_path(self):
+        """#1837. The gate has to hold BOTH routes into `confirmed`.
+
+        `_auto_apply_if_permitted` transitions straight to `confirmed`
+        without going through `confirm_run`, so a gate written only into
+        `confirm_run` would be enforced where a person is watching and
+        skipped on every auto-applying workspace — the exact shape of
+        drift this class exists to catch.
+        """
+        run = _decider_run()
+        ws = SimpleNamespace(id=run.workspace_id, locked=False, lock_id=None)
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=ws)
+        with (
+            patch.object(run_service, "_staleness_reason", AsyncMock(return_value=None)),
+            patch.object(
+                run_service,
+                "pre_apply_gate",
+                AsyncMock(return_value=("running", "a pre-apply run task is still running")),
+            ),
+            patch.object(run_service, "transition_run", AsyncMock()) as transition,
+        ):
+            await run_service._auto_apply_if_permitted(db, run)
+        transition.assert_not_awaited(), "must not auto-apply past a held pre-apply gate"
+
+    async def test_a_held_gate_records_why_rather_than_declining_silently(self):
+        """A run parked in `planned` with nothing to read is the failure
+        `evaluate_conditional_auto_apply` already had to be fixed for once."""
+        run = _decider_run()
+        ws = SimpleNamespace(id=run.workspace_id, locked=False, lock_id=None)
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=ws)
+        with (
+            patch.object(run_service, "_staleness_reason", AsyncMock(return_value=None)),
+            patch.object(
+                run_service,
+                "pre_apply_gate",
+                AsyncMock(return_value=("failed", "a mandatory pre-apply run task failed (sec)")),
+            ),
+            patch.object(run_service, "transition_run", AsyncMock()),
+        ):
+            await run_service._auto_apply_if_permitted(db, run)
+        assert run.auto_apply_declined_reason == "a mandatory pre-apply run task failed (sec)"
+
+    def test_the_gate_is_the_same_predicate_on_both_paths(self):
+        """Read the source rather than trusting the two to agree.
+
+        A second, separately-written check in `confirm_run` could pass every
+        behavioural test above while diverging on enforcement level, stage
+        name, or what counts as passing.
+        """
+        import inspect
+
+        for fn in (run_service._auto_apply_if_permitted, run_service.confirm_run):
+            src = inspect.getsource(fn)
+            assert "pre_apply_gate(db, run)" in src, (
+                f"{fn.__name__} must go through the shared pre_apply_gate predicate, "
+                "not its own copy of the check"
+            )
 
     async def test_a_stale_plan_is_discarded_not_applied(self):
         # #646/#647: state moved or the TTL lapsed between plan and apply.

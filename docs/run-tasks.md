@@ -16,13 +16,30 @@ Run tasks are webhook hooks that call external services at specific points in a 
 
 ## Stages
 
-Run tasks can be attached to three lifecycle boundaries:
+Run tasks can be attached to three lifecycle boundaries. They differ in when
+they fire, in what a run does while it waits, and — importantly — in whether a
+mandatory failure can be waived:
 
-| Stage | When It Fires | Use Case |
-|---|---|---|
-| `pre_plan` | Before planning starts | Input validation, cost estimation pre-checks |
-| `post_plan` | After planning completes | Plan review, cost analysis, compliance checks |
-| `pre_apply` | Before apply starts | Final approval, change advisory board sign-off |
+| Stage | When It Fires | Run waits in | Mandatory failure | Use Case |
+|---|---|---|---|---|
+| `pre_plan` | Before the run is handed to a runner | `queued` | **Final** — the run errors | Input validation, pre-flight checks |
+| `post_plan` | After planning completes | `planning` | **Overridable** by an admin | Plan review, cost analysis, compliance checks |
+| `pre_apply` | After confirm, before the apply starts | `planned` | **Final** — the run stays `planned` | Final approval, change advisory board sign-off |
+
+A run held at any boundary is waiting, not failing. It moves on by itself as
+soon as the external service reports back — nothing needs to be re-triggered by
+hand.
+
+A held run keeps its ordinary status (`queued`, `planning` or `planned`), so
+the way to tell "waiting on a gate" from "waiting its turn" is to look at the
+stages:
+
+```
+GET /api/terrapod/v1/runs/{run_id}/task-stages
+```
+
+A stage still `running` there is what is holding the run, and its results name
+the task that has not answered yet.
 
 ---
 
@@ -30,8 +47,50 @@ Run tasks can be attached to three lifecycle boundaries:
 
 | Level | Behaviour |
 |---|---|
-| `mandatory` | A failure blocks the run from proceeding. An admin can override |
+| `mandatory` | A failure blocks the run from proceeding |
 | `advisory` | A failure is reported but does not block the run |
+
+---
+
+## Overrides, and why only `post_plan` has one
+
+A failed **mandatory** `post_plan` task can be waived by an admin, which lets
+the run continue:
+
+```
+POST /api/v2/task-stages/{id}/actions/override
+```
+
+**`pre_plan` and `pre_apply` have no override.** The same endpoint refuses a
+stage at either boundary with a 409. This is deliberate, and it is not a gap to
+be filled later.
+
+The reasoning differs slightly for each:
+
+- **`pre_apply`** sits at a point where the platform *already* opens itself to
+  human intervention. A run reaching `planned` stops and waits for a person to
+  confirm or discard it — that is the designed decision point, and it happens
+  before any infrastructure moves. A pre-apply task is a go/no-go taken at that
+  same moment, so an override would be a second, weaker escape from a decision
+  that is meant to be final. Once an apply has actually started there is nothing
+  an override could usefully release: the change is already happening.
+- **`pre_plan`** is final for a simpler reason. Nothing has executed yet, so
+  there is no work to rescue — fixing the cause and queueing a new run costs
+  nothing.
+
+**If you want a gate somebody can wave through, put the task at `post_plan`.**
+Overridability is a property you choose by picking the boundary, so nothing is
+lost by the restriction. Use `pre_plan` or `pre_apply` when you mean the
+verdict to stand.
+
+### What to do when a final gate says no
+
+| Boundary | What you see | The way forward |
+|---|---|---|
+| `pre_plan` | The run is `errored`, naming the task that failed | Fix the cause, queue a new run |
+| `pre_apply` | The run stays `planned`; confirming returns 409 with the reason. On an auto-applying workspace the reason is recorded on the run instead | Discard the run, fix the cause, plan again |
+
+In both cases the run has changed nothing, so re-planning is safe.
 
 ---
 
@@ -110,7 +169,9 @@ Returns the stage and its results as included resources.
 POST /api/tfe/v2/task-stages/{id}/actions/override
 ```
 
-Requires `admin` permission. Only works on stages with `failed` status. Sets the stage to `overridden`, allowing the run to proceed.
+Requires `admin` permission. Only works on **`post_plan`** stages with `failed` status. Sets the stage to `overridden`, allowing the run to proceed.
+
+A `pre_plan` or `pre_apply` stage is refused with a 409 — those verdicts are final. See [Overrides](#overrides-and-why-only-post_plan-has-one).
 
 ### External Callback
 
@@ -214,7 +275,7 @@ Advisory failures do not block stage resolution.
 
 ## Admin Override
 
-When a mandatory task fails, the run is blocked. An admin can override the failed stage:
+When a mandatory **`post_plan`** task fails, the run is blocked. An admin can override the failed stage:
 
 ```bash
 curl -X POST https://terrapod.local/api/tfe/v2/task-stages/ts-id/actions/override \
@@ -228,6 +289,11 @@ By default a failed mandatory post-plan task errors the run. With
 the run instead, reported as `post_plan_awaiting_decision`, so it can be
 overridden later or discarded, and `tofu apply` shows the task results and
 offers the override — see [post-plan-decisions.md](post-plan-decisions.md).
+
+`pre_plan` and `pre_apply` stages are **not** overridable — the same call
+returns a 409. Those boundaries are for decisions you mean to stand; see
+[Overrides](#overrides-and-why-only-post_plan-has-one) for why, and for what to
+do when one blocks a run.
 
 ---
 
