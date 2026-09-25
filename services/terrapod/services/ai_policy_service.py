@@ -41,6 +41,7 @@ from typing import Any
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import settings
@@ -51,6 +52,11 @@ logger = structlog.get_logger(__name__)
 
 GATE_PASSED = "passed"
 GATE_BLOCKED = "blocked"
+
+#: Postgres SQLSTATE for `unique_violation`. Used to tell "another writer
+#: inserted this run's row first" (retryable) from every other integrity
+#: failure, such as a foreign key to a run that does not exist (not).
+_UNIQUE_VIOLATION = "23505"
 
 #: Ordered worst-last, so a threshold comparison is an index comparison.
 _RISK_ORDER = ("low", "medium", "high", "critical")
@@ -206,12 +212,18 @@ async def record_evaluation(
     verdict: dict[str, Any] | None = None,
     risk_level: str = "",
     error: str | None = None,
+    _retry: bool = True,
 ) -> AIPolicyEvaluation:
     """Upsert this run's evaluation.
 
     Upsert rather than insert because a summary can be regenerated, and a
     re-ruling must replace the old verdict rather than collide with it or
     accumulate a second row the gate would then have to choose between.
+
+    `_retry` is internal: the insert below races a concurrent writer, and the
+    loser re-enters once to take the update path. One retry is enough -- the
+    row exists by then and cannot go away, since nothing deletes an evaluation
+    except the run's own cascade.
     """
     existing = (
         await db.execute(select(AIPolicyEvaluation).where(AIPolicyEvaluation.run_id == run_id))
@@ -244,17 +256,67 @@ async def record_evaluation(
             existing.overridden_at = None
         return existing
 
-    row = AIPolicyEvaluation(
-        run_id=run_id,
-        enforcement_level=enforcement_level,
-        risk_threshold=threshold,
-        outcome=outcome,
-        verdict=verdict or {},
-        risk_level=risk_level or "",
-        error=error,
-    )
-    db.add(row)
-    return row
+    # The insert races the other writer. `run_id` is UNIQUE
+    # (`uq_ai_policy_evaluations_run`), and the two writers are an operator
+    # clicking Override and the summariser's verdict landing -- which converge
+    # precisely when the gate is holding a run with no verdict yet, i.e. the
+    # state Override exists for. Both read None, both insert, the loser gets
+    # an IntegrityError and, unhandled, a 500 that tells the operator nothing
+    # about whether the run was released.
+    #
+    # The retry runs in a SAVEPOINT so losing the race rolls back only this
+    # insert. A bare `db.rollback()` here would discard whatever the caller
+    # had pending -- for the override endpoint that is the release itself.
+    if not _retry:
+        # Re-entered after losing the race and STILL no row: the other writer
+        # rolled back. Insert plainly and let any error surface rather than
+        # bouncing between the two paths.
+        row = AIPolicyEvaluation(
+            run_id=run_id,
+            enforcement_level=enforcement_level,
+            risk_threshold=threshold,
+            outcome=outcome,
+            verdict=verdict or {},
+            risk_level=risk_level or "",
+            error=error,
+        )
+        db.add(row)
+        return row
+
+    try:
+        async with db.begin_nested():
+            row = AIPolicyEvaluation(
+                run_id=run_id,
+                enforcement_level=enforcement_level,
+                risk_threshold=threshold,
+                outcome=outcome,
+                verdict=verdict or {},
+                risk_level=risk_level or "",
+                error=error,
+            )
+            db.add(row)
+            await db.flush()
+        return row
+    except IntegrityError as exc:
+        # ONLY the unique violation means "the other writer won". A foreign-key
+        # violation means the run does not exist, and retrying that just loses
+        # the real error behind a second identical failure -- which is how this
+        # first surfaced, as a confusing FK error from the retry path rather
+        # than from the insert that caused it.
+        if getattr(exc.orig, "sqlstate", None) != _UNIQUE_VIOLATION:
+            raise
+        # The other writer won. Re-read and update its row, which is what we
+        # would have done had the SELECT above seen it.
+        return await record_evaluation(
+            db,
+            run_id=run_id,
+            enforcement_level=enforcement_level,
+            outcome=outcome,
+            verdict=verdict,
+            risk_level=risk_level,
+            error=error,
+            _retry=False,
+        )
 
 
 async def get_evaluation(db: AsyncSession, run_id: uuid.UUID) -> AIPolicyEvaluation | None:
