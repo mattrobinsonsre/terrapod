@@ -671,6 +671,23 @@
     }
   },
   {
+    "name": "terrapod_run_policy_checks",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "description": "the run id (run-... or a bare uuid) whose OPA policy results to fetch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_run_retry",
     "destructive": true,
     "input_schema": {

@@ -476,3 +476,76 @@ func (c *Client) GetPolicy(ctx context.Context, policySetID, policyID string) (*
 	}
 	return nil, &NotFoundError{Resource: "policy", ID: policyID}
 }
+
+// PolicyEvaluation is one OPA policy set's verdict on one run — the
+// deterministic sibling of an AIPolicyEvaluation and a SecurityScan.
+//
+// One row per (run, policy set): a run matched by three sets has three
+// evaluations, and the gate is held by any MANDATORY one that failed.
+// Advisory failures are recorded and never block, which is why Outcome alone
+// does not tell you whether a run is stuck — pair it with EnforcementLevel.
+type PolicyEvaluation struct {
+	ID               string         `json:"id"`
+	PolicySetID      string         `json:"policy-set-id,omitempty"`
+	PolicySetName    string         `json:"policy-set-name"`
+	EnforcementLevel string         `json:"enforcement-level"`
+	Outcome          string         `json:"outcome"`
+	Result           map[string]any `json:"result,omitempty"`
+	OverriddenBy     string         `json:"overridden-by,omitempty"`
+	OverriddenAt     string         `json:"overridden-at,omitempty"`
+	CreatedAt        string         `json:"created-at,omitempty"`
+}
+
+// IsBlocking reports whether this evaluation is holding the run: a mandatory
+// set that failed or errored, and not overridden. Advisory never blocks
+// whatever its outcome, which is the distinction a caller comparing Outcome
+// to "failed" gets wrong.
+func (e *PolicyEvaluation) IsBlocking() bool {
+	if e == nil || e.EnforcementLevel != "mandatory" || e.OverriddenBy != "" {
+		return false
+	}
+	return e.Outcome == "failed" || e.Outcome == "errored"
+}
+
+// ListRunPolicyEvaluations returns every OPA policy set verdict recorded for a
+// run.
+//
+// This answers "why was this run blocked" for the OPA gate. Until it existed
+// the results were reachable only from the web UI — the SDK could read the
+// security scan and the AI policy verdict but not the one gate that has been
+// in the product longest.
+func (c *Client) ListRunPolicyEvaluations(ctx context.Context, runID string) ([]PolicyEvaluation, error) {
+	id, err := runIDPath(runID)
+	if err != nil {
+		return nil, err
+	}
+	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+id+"/policy-evaluations")
+	if err != nil {
+		return nil, err
+	}
+	resources, err := ParseResourceList(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse policy evaluations: %w", err)
+	}
+	out := make([]PolicyEvaluation, 0, len(resources))
+	for i := range resources {
+		res := &resources[i]
+		e := PolicyEvaluation{
+			ID:               res.ID,
+			PolicySetName:    GetStringAttr(res, "policy-set-name"),
+			EnforcementLevel: GetStringAttr(res, "enforcement-level"),
+			Outcome:          GetStringAttr(res, "outcome"),
+			OverriddenBy:     GetStringAttr(res, "overridden-by"),
+			OverriddenAt:     GetStringAttr(res, "overridden-at"),
+			CreatedAt:        GetStringAttr(res, "created-at"),
+		}
+		if raw, ok := res.Attributes["result"]; ok {
+			var m map[string]any
+			if json.Unmarshal(raw, &m) == nil {
+				e.Result = m
+			}
+		}
+		out = append(out, e)
+	}
+	return out, nil
+}

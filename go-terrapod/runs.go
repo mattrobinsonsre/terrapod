@@ -48,9 +48,16 @@ type Run struct {
 	Status        string `json:"status"`
 	Message       string `json:"message,omitempty"`
 	DiscardReason string `json:"discard-reason,omitempty"`
-	// BlockedBy names the post-plan gate holding a run whose plan has
-	// finished: "run-task", "policy" or "security-scan". Empty otherwise.
-	// Such a run still reports Status "planning" until 2.0 (#1725).
+	// BlockedBy names the gate holding a run: "run-task", "policy",
+	// "security-scan" or "ai-policy". Empty otherwise.
+	//
+	// Do NOT assume a held run is in "planning". That was true while every
+	// gate was post-plan, and #1837 added two more boundaries: a run held at
+	// `pre_plan` sits in "queued" and one held at `pre_apply` in "planned",
+	// both reporting BlockedBy "run-task". Only the post-plan hold keeps a
+	// run in "planning" until 2.0 (#1725), and only that one is discardable
+	// through the held-run route — a "planned" run is already discardable the
+	// ordinary way, and a "queued" one has no plan to discard.
 	BlockedBy string `json:"blocked-by,omitempty"`
 	IsDestroy bool   `json:"is-destroy"`
 	AutoApply bool   `json:"auto-apply"`

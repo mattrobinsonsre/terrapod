@@ -676,6 +676,15 @@ field Policy.Name string `json:"name"`
 field Policy.PolicySetID string `json:"policy-set-id"`
 field Policy.Rego string `json:"rego"`
 field Policy.UpdatedAt string `json:"updated-at,omitempty"`
+field PolicyEvaluation.CreatedAt string `json:"created-at,omitempty"`
+field PolicyEvaluation.EnforcementLevel string `json:"enforcement-level"`
+field PolicyEvaluation.ID string `json:"id"`
+field PolicyEvaluation.Outcome string `json:"outcome"`
+field PolicyEvaluation.OverriddenAt string `json:"overridden-at,omitempty"`
+field PolicyEvaluation.OverriddenBy string `json:"overridden-by,omitempty"`
+field PolicyEvaluation.PolicySetID string `json:"policy-set-id,omitempty"`
+field PolicyEvaluation.PolicySetName string `json:"policy-set-name"`
+field PolicyEvaluation.Result map[string]any `json:"result,omitempty"`
 field PolicySet.AllowLabels map[string]string `json:"allow-labels,omitempty"`
 field PolicySet.AllowNames []string `json:"allow-names,omitempty"`
 field PolicySet.CreatedAt string `json:"created-at,omitempty"`
@@ -1491,6 +1500,7 @@ method (*Client) ListRoleAssignments(ctx context.Context) ([]RoleAssignment, err
 method (*Client) ListRoleAssignmentsForIdentity(ctx context.Context, providerName, email string) ([]RoleAssignment, error)
 method (*Client) ListRoles(ctx context.Context) ([]Role, error)
 method (*Client) ListRunCostSummaryMessages(ctx context.Context, runID string) ([]*CostSummaryMessage, error)
+method (*Client) ListRunPolicyEvaluations(ctx context.Context, runID string) ([]PolicyEvaluation, error)
 method (*Client) ListRunTasks(ctx context.Context, workspaceID string) ([]RunTask, error)
 method (*Client) ListUserAPITokens(ctx context.Context, userID string) ([]APIToken, error)
 method (*Client) ListUsers(ctx context.Context) ([]User, error)
@@ -1569,6 +1579,7 @@ method (*Client) WarmCacheBulk(ctx context.Context, req BulkWarmRequest) (*BulkW
 method (*Client) WhoAmI(ctx context.Context) (*HANode, error)
 method (*ConflictError) Error() string
 method (*NotFoundError) Error() string
+method (*PolicyEvaluation) IsBlocking() bool
 method (*ValidationError) Error() string
 type AIPolicyEvaluation struct
 type AIPolicyStatus struct
@@ -1681,6 +1692,7 @@ type PlanSummary struct
 type PlanSummaryMessage struct
 type PlanSummaryRiskFactor struct
 type Policy struct
+type PolicyEvaluation struct
 type PolicySet struct
 type ProviderTemplate struct
 type RegisteredModuleRef struct

@@ -4,6 +4,8 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from terrapod.services.vcs_status_comment import _plan_summary
 
 
@@ -351,18 +353,57 @@ class _FakeResult:
 
 
 class _GateFakeDB:
-    """Answers the three row-backed gate queries by call order."""
+    """Answers each gate query by INSPECTING it, not by call order.
 
-    def __init__(self):
-        self.calls = 0
+    The previous version dispatched on a call counter, which made
+    `TestCollectGatesOrder` circular: it asserted the ordering the fake itself
+    fabricated, so reordering `_collect_gates` could not fail it — the fake
+    would simply hand the task-stage rows to the policy query instead. Keying
+    on the table each statement selects from means the assertions are about
+    the code under test.
+    """
 
-    async def execute(self, _stmt):
-        self.calls += 1
-        if self.calls == 1:  # post-plan task stage
-            return _FakeResult([("failed",)])
-        if self.calls == 2:  # policy evaluations
+    def __init__(self, *, stages=(("post_plan", "failed"),)):
+        self._stages = tuple(stages)
+        self.tables_queried: list[str] = []
+
+    async def execute(self, stmt):
+        table = self._table_of(stmt)
+        self.tables_queried.append(table)
+        if table == "task_stages":
+            # Honour the statement's own stage filter. Returning every stage
+            # regardless would make these tests prove only that
+            # `_verdict_from_stage` labels correctly — narrowing the query back
+            # to `post_plan` would still pass, which is the bug they exist for.
+            wanted = self._stage_filter(stmt)
+            return _FakeResult([row for row in self._stages if row[0] in wanted])
+        if table == "policy_evaluations":
             return _FakeResult([("prod-guardrails", "mandatory", "passed", None)])
-        return _FakeResult([("enforced", "failed", None)])  # security scan
+        if table == "security_scan_results":
+            return _FakeResult([("enforced", "failed", None)])
+        raise AssertionError(f"_collect_gates issued an unexpected query against {table!r}")
+
+    @staticmethod
+    def _stage_filter(stmt) -> set[str]:
+        """The stage names the statement actually asks for, read off its
+        compiled bind parameters."""
+        params = stmt.compile().params
+        wanted = set()
+        for value in params.values():
+            if isinstance(value, str):
+                wanted.add(value)
+            elif isinstance(value, (list, tuple)):
+                wanted.update(v for v in value if isinstance(v, str))
+        return wanted
+
+    @staticmethod
+    def _table_of(stmt) -> str:
+        froms = stmt.get_final_froms()
+        for f in froms:
+            name = getattr(f, "name", None)
+            if name:
+                return str(name)
+        return "unknown"
 
     async def get(self, _model, _pk):
         return SimpleNamespace(id=_pk, ai_policy_mode="default")
@@ -782,3 +823,67 @@ class TestCommentHeading:
 
         out = render_comment([])
         assert out.splitlines()[2].startswith("### Terrapod")
+
+
+class TestAllThreeRunTaskBoundariesReachTheComment:
+    """#1837 added `pre_plan` and `pre_apply`; the comment knew only
+    `post_plan`.
+
+    A run held at `pre_apply` therefore came back with NO gates, so `blocked`
+    was False and the comment offered "Comment `terrapod apply`" for a run
+    `confirm_run` would refuse. The refusal posted nothing, so the reviewer
+    commented, got a success reaction, and watched the same invitation
+    re-render. `apply_then_merge` plus a mandatory `pre_apply` task is the
+    headline use case for #1837, so that is the intended configuration.
+    """
+
+    async def _gates(self, stages):
+        from terrapod.services import ai_policy_service
+        from terrapod.services.vcs_status_comment import _collect_gates
+
+        with (
+            patch.object(ai_policy_service, "get_evaluation", new=AsyncMock(return_value=None)),
+            patch.object(ai_policy_service, "effective_enforcement", return_value="off"),
+            patch.object(
+                ai_policy_service, "run_is_held_by_ai_policy", new=AsyncMock(return_value=False)
+            ),
+        ):
+            return await _collect_gates(_GateFakeDB(stages=stages), _gate_run())
+
+    @pytest.mark.parametrize(
+        ("stage", "label"),
+        [
+            ("pre_plan", "pre-plan tasks"),
+            ("post_plan", "post-plan tasks"),
+            ("pre_apply", "pre-apply tasks"),
+        ],
+    )
+    async def test_a_failed_stage_at_any_boundary_is_reported(self, stage, label):
+        gates = await self._gates([(stage, "failed")])
+        task_gates = [g for g in gates if g.gate == "run-task"]
+        assert len(task_gates) == 1
+        assert task_gates[0].name == label
+        assert task_gates[0].passed is False, (
+            "a run held at this boundary would be reported as having nothing wrong"
+        )
+
+    async def test_a_passing_stage_is_listed_as_an_attestation(self):
+        gates = await self._gates([("pre_apply", "passed")])
+        task_gates = [g for g in gates if g.gate == "run-task"]
+        assert task_gates and task_gates[0].passed is True
+
+    async def test_every_boundary_gets_its_own_verdict(self):
+        gates = await self._gates(
+            [("pre_plan", "passed"), ("post_plan", "passed"), ("pre_apply", "failed")]
+        )
+        names = [g.name for g in gates if g.gate == "run-task"]
+        assert names == ["pre-plan tasks", "post-plan tasks", "pre-apply tasks"]
+
+    async def test_a_re_driven_stage_is_not_counted_twice(self):
+        """A re-driven run can accumulate more than one row per boundary; the
+        earliest is the live one, and two verdicts for one stage would read as
+        two gates."""
+        gates = await self._gates([("post_plan", "failed"), ("post_plan", "passed")])
+        task_gates = [g for g in gates if g.gate == "run-task"]
+        assert len(task_gates) == 1
+        assert task_gates[0].passed is False

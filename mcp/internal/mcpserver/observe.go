@@ -624,6 +624,49 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		}, nil
 	})
 
+	// ── terrapod_run_policy_checks ───────────────────────────────────
+	type runPolicyChecksIn struct {
+		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose OPA policy results to fetch"`
+	}
+	type runPolicyChecksOut struct {
+		Count       int                         `json:"count"`
+		Blocking    bool                        `json:"blocking"`
+		Evaluations []terrapod.PolicyEvaluation `json:"evaluations"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_run_policy_checks",
+		Description: "Get a run's OPA policy set results — which sets were evaluated, how each ruled, and which " +
+			"one is holding the run. This is the OPA sibling of terrapod_run_security_scan and " +
+			"terrapod_run_ai_policy, and it is what answers \"why is this run blocked\" when `blocked_by` is " +
+			"`policy`. One evaluation per matched set: a run matched by three sets has three results. " +
+			"`blocking` is true when any MANDATORY set failed or errored and was not overridden — an advisory " +
+			"set failing is recorded and never blocks, so `outcome` alone does not tell you whether the run is " +
+			"stuck. `result` carries the violations the policies produced. Use terrapod_policy_set_list to see " +
+			"what a named set is and who else it applies to.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runPolicyChecksIn) (*mcp.CallToolResult, *runPolicyChecksOut, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		evals, err := c.ListRunPolicyEvaluations(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		// A nil slice marshals to `null`, which fails the derived output
+		// schema; an empty list is the honest answer for a run no set matched.
+		if evals == nil {
+			evals = []terrapod.PolicyEvaluation{}
+		}
+		blocking := false
+		for i := range evals {
+			if evals[i].IsBlocking() {
+				blocking = true
+				break
+			}
+		}
+		return nil, &runPolicyChecksOut{Count: len(evals), Blocking: blocking, Evaluations: evals}, nil
+	})
+
 	// ── terrapod_policy_set_list ─────────────────────────────────────
 	type policySetsIn struct{}
 	type policySetsOut struct {
@@ -634,7 +677,8 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_policy_set_list",
 		Description: "List the OPA policy sets and how each is scoped. Requires platform admin. " +
 			"This is what answers \"why was this run blocked\" and \"what governs this workspace\" — a run's " +
-			"own policy checks say which set failed, this says what that set is and who else it applies to. " +
+			"own policy checks (terrapod_run_policy_checks) say which set failed, this says what that set is and " +
+			"who else it applies to. " +
 			"`enforcement-level` is the field that decides whether a failure blocks: `mandatory` holds the apply " +
 			"until an admin overrides, `advisory` only records a warning, so an advisory set failing is not why " +
 			"an apply is stuck. `enabled` false means the set is evaluated against nothing whatever its scope. " +
