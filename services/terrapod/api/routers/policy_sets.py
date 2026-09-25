@@ -400,9 +400,15 @@ async def trigger_sync_policy_set(
 
     from terrapod.services.scheduler import enqueue_trigger
 
+    # force: an explicit sync re-reads the repository even when the branch
+    # head has not moved. Someone who clicks Sync is asking for the files to
+    # be re-read, and after #1842 that is the only way to populate
+    # `support_files` on a set whose SHA is already current -- which is every
+    # set that existed before the upgrade. Without it the button did nothing
+    # and shared evaluation ran with no data, passing a mandatory gate.
     await enqueue_trigger(
         "policy_vcs_sync",
-        payload={"policy_set_id": str(ps.id)},
+        payload={"policy_set_id": str(ps.id), "force": True},
         dedup_key=f"policy_vcs_sync:{ps.id}",
         dedup_ttl=30,
     )

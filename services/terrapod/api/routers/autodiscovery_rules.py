@@ -181,7 +181,7 @@ def _reject_directory_pattern(pattern: str, *, field: str) -> None:
         )
 
 
-def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
+def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict[str, Any]:
     """Normalise + validate request attributes. Returns a dict suitable
     for `setattr` onto a model.
     """
@@ -404,6 +404,33 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
                 out[attr] = workspace_settings.validate_bool(attrs[key], key)
             except ValueError as exc:
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # A rule TEMPLATES workspaces, so it is a fourth path that sets
+    # `vcs_workflow` -- one `check_apply_then_merge_allowed`'s docstring still
+    # calls "three paths", because #1763 added this one after it was written.
+    # Without the cross-check a rule could carry `apply_then_merge` together
+    # with auto-apply, a pairing create, PATCH and bulk update all refuse, and
+    # materialise it into every directory it discovers: the apply runs before
+    # the PR merges AND nobody confirms it, which is precisely what the
+    # workflow exists to prevent. Judged on the POST-update pair, the way bulk
+    # update does it, so setting both in one request is allowed to resolve.
+    # `existing` is what makes this correct on a PATCH. Judging `out` alone
+    # would let a request that sets only `auto-apply: true` slip past a rule
+    # whose STORED workflow is already `apply_then_merge` -- each half legal on
+    # its own, the pair not. Create passes None and falls back to the defaults.
+    resolved_workflow = out.get(
+        "vcs_workflow", getattr(existing, "vcs_workflow", None) or "merge_then_apply"
+    )
+    resolved_auto_apply = out.get("auto_apply", getattr(existing, "auto_apply", False))
+    try:
+        workspace_settings.check_apply_then_merge_allowed(
+            resolved_workflow or "merge_then_apply",
+            # A rule always materialises a VCS-connected workspace.
+            has_vcs_connection=True,
+            auto_apply=bool(resolved_auto_apply),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     if "security-scan-enforcement" in attrs:
         raw = attrs["security-scan-enforcement"]
         if raw not in workspace_settings.SCAN_ENFORCEMENTS:
@@ -516,7 +543,7 @@ async def update_rule(
         raise HTTPException(status_code=404, detail="autodiscovery rule not found")
 
     attrs = body.get("data", {}).get("attributes", {})
-    fields = _coerce_attrs(attrs, on_create=False)
+    fields = _coerce_attrs(attrs, on_create=False, existing=rule)
     if "vcs_connection_id" in fields:
         await _validate_connection(db, fields["vcs_connection_id"])
     if "agent_pool_id" in fields:
