@@ -924,6 +924,91 @@ If the producer workspace was deleted, the grant rows cascade-deleted automatica
 
 ---
 
+## Runner pods are lingering after failed runs
+
+**Symptom**: finished runner Jobs stay `Active` for up to four hours instead of
+being cleaned up, and `kubectl get pods -n <runner-ns>` shows `tprun-*` pods
+alive long after their runs errored.
+
+**Why**: per-workspace **debug mode** (`debug-mode: true`) is on for those
+workspaces. A failed run's pod is deliberately held open so an operator can
+`kubectl exec` into it and reproduce the failure with the run's real
+environment — the credentials, DNS and mounts a local reproduction cannot
+recreate. The window is `runners.debugLingerSeconds` (default 1800, max 14400).
+
+**This is a credential-exposure window, and it is the reason to check.** While
+a pod lingers it still holds the run's auth token and its decrypted
+`terraform.tfvars.json` at `/var/run/terrapod/vars`. Anyone with `pods/exec` in
+the runner namespace can read both — a wider set than the workspace admins who
+can turn debug mode on.
+
+### Diagnosis
+
+```sql
+SELECT name FROM workspaces WHERE debug_mode = true;
+```
+
+```sh
+kubectl get pods -n <runner-ns> -l terrapod.io/run-id --sort-by=.status.startTime
+```
+
+### Resolution
+
+- **Per workspace**: set `debug-mode: false` once the investigation is done.
+  It is an opt-in for a debugging session, not a standing setting.
+- **Deployment-wide**: `runners.debugLingerSeconds: 0` disables the linger
+  regardless of any workspace's setting.
+- A lingering pod can always be deleted by hand; the run is already terminal
+  and deleting the pod does not change its outcome.
+
+---
+
+## Every apply is held and `blocked-by` says `ai-policy`
+
+**Symptom**: runs across many or all workspaces stop advancing. They sit in
+`planning` with a finished plan, `blocked-by: ai-policy`, and the AI panel
+shows either a deny verdict or — the confusing case — **no verdict at all**.
+
+**Why**: `ai_summary.policy.enabled` is on with
+`enforcement_level: mandatory`, and the gate **fails closed**. Three distinct
+states land here, and they need different responses:
+
+| What you see | What happened | Response |
+|---|---|---|
+| A `failed` verdict with reasons | The model denied against your `deny_criteria`, or the summary's `risk_level` met `risk_threshold` | Read the reasons; fix what they name, or override |
+| An `errored` verdict naming the token budget | The fleet-wide `daily_token_budget` is spent, so no verdict could be reached | Raise the budget, wait for rollover, or override |
+| An `errored` verdict saying no verdict arrived | The summariser never ruled — its queued work was lost to a restart. The reconciler re-enqueues once, then records this after an hour | Regenerate the plan summary, or override |
+| No verdict at all, run held < 1 h | The verdict has not landed yet. A slow model call is normal | Wait; the reconciler re-enqueues at 10 minutes |
+
+**An AI provider outage DOES stop applies when this gate is mandatory.** The
+"the summariser is best-effort" note under *AI plan-summary provider outage*
+describes the gate-off case only.
+
+### Diagnosis
+
+```sql
+-- How many runs are held, and in which state.
+SELECT e.outcome, count(*)
+FROM runs r LEFT JOIN ai_policy_evaluations e ON e.run_id = r.id
+WHERE r.status = 'planning'
+GROUP BY e.outcome;   -- a NULL outcome is "held with no verdict"
+```
+
+### Resolution
+
+- **Per run**: `POST /api/terrapod/v1/runs/{id}/actions/override-ai-policy`
+  (workspace admin). This works even with **no verdict recorded**, and writes
+  an explicit no-verdict override rather than forging a pass.
+- **Fleet-wide, immediately**: set `api.config.ai_summary.policy.enforcement_level: advisory`
+  and roll the API. Verdicts are still recorded; nothing is held.
+- **Turn it off**: `api.config.ai_summary.policy.enabled: false`.
+
+A workspace cannot opt out of a **mandatory** gate — `ai_policy_mode: disabled`
+only opts out of an advisory one. That asymmetry is deliberate: a fleet-wide
+blocking control any workspace admin could switch off is not a control.
+
+---
+
 ## Policy enforcement blocking all runs
 
 **Symptom**: after creating or editing an OPA policy set, runs across many (or all) workspaces stop advancing — they sit in `planning` and the run's **Policy Checks** panel shows a mandatory failure.
