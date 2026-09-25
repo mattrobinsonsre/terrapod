@@ -148,11 +148,15 @@ class TestThePrePlanGateHoldsTheRunBeforeItPlans:
         """Final, with no override. Nothing has executed, so the escape is to
         fix the cause and queue again — and the run must say that rather than
         sitting `queued` forever."""
-        run = _run()
+        run = _run(status="queued")
         db = AsyncMock()
-        result = MagicMock()
-        result.scalars.return_value.all.return_value = [run]
-        db.execute = AsyncMock(return_value=result)
+        candidates = MagicMock()
+        candidates.scalars.return_value.all.return_value = [run]
+        # The failure path re-reads the run under a row lock before erroring
+        # it, so the candidate object cannot be acted on while stale.
+        locked = MagicMock()
+        locked.scalar_one_or_none.return_value = run
+        db.execute = AsyncMock(side_effect=[candidates, locked])
 
         with (
             patch.object(
@@ -192,10 +196,19 @@ class TestThePrePlanGateHoldsTheRunBeforeItPlans:
 
         transition.assert_not_awaited(), "a pending verdict is not a failure"
 
-    async def test_one_runs_gate_error_does_not_starve_the_listener(self):
-        """The pre-pass runs on every poll. An exception evaluating one run's
-        gate must not stop the listener being handed other work — the run
-        stays `queued` and is retried next poll."""
+    async def test_one_runs_gate_error_does_not_stop_the_loop(self):
+        """The pre-pass runs on every poll, so one run's gate blowing up must
+        not stop the others being considered.
+
+        **This proves less than its old name claimed.** It drove an
+        `AsyncMock` db, where there is no transaction state to poison and no
+        claim afterwards — so it passed happily while the real failure (a
+        session left needing a rollback, which then breaks the claim query and
+        500s the endpoint for the whole pool) went unnoticed. The property it
+        cannot reach lives in
+        `test_pre_plan_gate_integration.py::TestThePrePassCannotStarveTheListener`,
+        against real Postgres. Kept for the cheap loop-continues check only.
+        """
         bad, good = _run(), _run()
         db = AsyncMock()
         result = MagicMock()
