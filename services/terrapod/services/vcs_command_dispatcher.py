@@ -286,6 +286,28 @@ async def handle_vcs_comment_dispatch(payload: dict[str, Any]) -> None:
     if cmd is None:
         return  # not a command
 
+    # Prose that merely BEGINS with the product name is not a command, and
+    # must not draw a reaction or a reply. The parser maps every unknown verb
+    # to `help`, so "terrapod is working well now" arrives here looking exactly
+    # like a typo.
+    #
+    # #1836 added this check, but inside `_route` -- i.e. AFTER the session
+    # lookup, so it never covered the no-session branch that #1799 had added
+    # just before it. With the GitHub App installed org-wide (the common
+    # deployment) that branch fires on every repo with no Terrapod workspace at
+    # all: a developer's passing mention on an unrelated PR drew an eyes
+    # reaction, a six-line explanation about apply-then-merge workspaces, and a
+    # thumbs-down. Three API calls and a comment, on a repo that has nothing to
+    # do with Terrapod -- precisely the noise #1836 was raised about, one
+    # commit earlier. Checking here covers every downstream path at once.
+    if cmd.verb == "help" and not _looks_like_a_command_attempt(cmd.raw):
+        logger.debug(
+            "vcs_comment_dispatch: prose, not a command attempt",
+            repo=payload.get("repo"),
+            pr_number=payload.get("pr_number"),
+        )
+        return
+
     connection_id = payload.get("connection_id")
     repo = payload.get("repo")
     pr_number = payload.get("pr_number")

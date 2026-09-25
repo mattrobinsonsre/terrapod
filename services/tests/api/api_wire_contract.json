@@ -76,5 +76,15 @@
     "var-files",
     "vault-files",
     "working-directory"
+  ],
+  "policy_bundle_keys": [
+    "context",
+    "enforcement_level",
+    "id",
+    "name",
+    "policies",
+    "policy_sets",
+    "shared_evaluation",
+    "support_files"
   ]
 }

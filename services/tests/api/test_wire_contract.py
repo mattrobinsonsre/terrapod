@@ -37,6 +37,8 @@ _LISTENER = _ROOT / "runner" / "listener.py"
 _UPLOADS = _ROOT / "runner" / "phases" / "uploads.py"
 _RUN_SERVICE = _ROOT / "services" / "run_service.py"
 _RECONCILER = _ROOT / "services" / "run_reconciler.py"
+_POLICY_BUNDLE = _ROOT / "api" / "routers" / "policy_sets.py"
+_OPA_PHASE = _ROOT / "runner" / "phases" / "opa.py"
 _SNAPSHOT = Path(__file__).parent / "api_wire_contract.json"
 
 
@@ -65,11 +67,33 @@ def _listener_read_keys() -> set[str]:
     return set(re.findall(r'\.get\("([a-z][a-z0-9_-]*)"', src))
 
 
+def _policy_bundle_keys() -> set[str]:
+    """The keys the runner reads off the POLICY BUNDLE.
+
+    A fourth runner-facing wire surface the other three cannot see: the bundle
+    is built as a literal dict in `policy_sets.get_policy_bundle` and consumed
+    by `runner/phases/opa.py`, so neither the listener extractors nor the
+    JSON:API attribute gate covers it. v1.8 grew it by two keys
+    (`shared_evaluation`, `support_files`) and nothing would have failed had
+    one been renamed — the runner would silently fall back to its default,
+    which for `shared_evaluation` means evaluating WITHOUT the data files and
+    reporting a pass a mandatory set has not earned.
+
+    Read from the consumer side, because that is what breaks: a key the runner
+    asks for and the API no longer sends.
+    """
+    src = _OPA_PHASE.read_text()
+    keys = set(re.findall(r'policy_set\.get\("([a-z][a-z0-9_]*)"', src))
+    keys |= set(re.findall(r'bundle\.get\("([a-z][a-z0-9_]*)"', src))
+    return keys
+
+
 def wire_contract() -> dict[str, list[str]]:
     return {
         "sse_event_names": sorted(_sse_event_names()),
         "runs_next_attributes": sorted(_runs_next_attributes()),
         "listener_read_keys": sorted(_listener_read_keys()),
+        "policy_bundle_keys": sorted(_policy_bundle_keys()),
     }
 
 
