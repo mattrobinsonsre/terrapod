@@ -45,7 +45,6 @@ _ENGINES = sorted((_ROOT / "engines").glob("*.py"))
 _UPLOADS = _ROOT / "runner" / "phases" / "uploads.py"
 _RUN_SERVICE = _ROOT / "services" / "run_service.py"
 _RECONCILER = _ROOT / "services" / "run_reconciler.py"
-_POLICY_BUNDLE = _ROOT / "api" / "routers" / "policy_sets.py"
 _OPA_PHASE = _ROOT / "runner" / "phases" / "opa.py"
 _SNAPSHOT = Path(__file__).parent / "api_wire_contract.json"
 

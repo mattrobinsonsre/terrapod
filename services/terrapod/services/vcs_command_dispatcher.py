@@ -58,8 +58,12 @@ _HELP_BODY = "\n".join(
         "| `terrapod merge` | Force-merge despite incomplete applies (audit-logged) |",
         "| `terrapod help` | This list |",
         "",
+        # Explicit `+`, not adjacent string literals: inside a list the two
+        # forms look identical, so a genuinely missing comma reads exactly
+        # like a deliberate line-wrap. Saying which one this is costs a
+        # character and removes the ambiguity for a reader and a scanner.
         "A command in a code-fenced block is ignored, so quoting one in a "
-        "discussion never triggers it.",
+        + "discussion never triggers it.",
     ]
 )
 

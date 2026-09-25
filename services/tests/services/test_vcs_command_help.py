@@ -137,10 +137,10 @@ class TestProseNeverReachesAnyReplyPath:
         )
 
         class _Ctx:
-            async def __aenter__(self_inner):
+            async def __aenter__(self):
                 return db
 
-            async def __aexit__(self_inner, *a):
+            async def __aexit__(self, *a):
                 return False
 
         with (
