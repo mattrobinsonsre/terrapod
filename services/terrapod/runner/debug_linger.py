@@ -8,10 +8,25 @@ that did not resolve, the mounts that were not there, the egress that was
 blocked. Raising `ttlSecondsAfterFinished` does not help, because the problem is
 not how long the Job is kept but that the process is already gone.
 
-So when the workspace has debug mode on, the orchestrator reports the failure to
-the API exactly as it always does, and only *then* holds the container open
-instead of exiting. The run is failed, visible and final from Terrapod's side;
-the pod is simply still there.
+So when the workspace has debug mode on, the orchestrator finishes every upload
+and posts the run's resource profile and failure reason exactly as it always
+does, and only *then* holds the container open instead of exiting.
+
+**What the hold DOES delay is the run reaching a terminal state, and that is
+the cost of the feature.** A failed phase is not reported by the runner -- it
+returns its exit code without posting a phase result -- so Terrapod learns the
+run failed from the Job going terminal, which cannot happen while this function
+is still holding the container. For the length of the window the run therefore
+reads `planning` (or `applying`) in the UI and the API, and because
+`run_service` serialises apply-capable runs per workspace, the next such run on
+that workspace waits. Both end the moment the hold does, and deleting the pod
+ends it immediately.
+
+That is acceptable for a feature that is off by default, opt-in per workspace,
+bounded by its own window and by the Job's `activeDeadlineSeconds`, and only
+ever reached on a run that has already failed -- but it is not invisible, and
+an operator turning it on for a busy production workspace needs to know it
+before they do, not afterwards.
 
 **This deliberately does not try to catch an OOM.** An OOMKill is a SIGKILL from
 the kernel — nothing in this process gets to run, so nothing here could hold the
@@ -92,8 +107,9 @@ def hold_for_inspection(exit_code: int, *, sleep: object = None) -> bool:
 
     log.warning(
         "holding this pod open for inspection — debug mode is on for this "
-        "workspace. The run has already been reported as failed. The pod will "
-        "be removed when the window expires or when you delete it.",
+        "workspace. The phase has failed and will be reported as errored once "
+        "this window ends; until then the run still reads as in progress and "
+        "the workspace's next apply waits. Delete the pod to end it now.",
         seconds=seconds,
         exit_code=exit_code,
     )
@@ -101,7 +117,9 @@ def hold_for_inspection(exit_code: int, *, sleep: object = None) -> bool:
     # structured logger's sink.
     print(
         f"\n=== debug mode: holding this pod for up to {seconds}s so you can "
-        f"exec into it. The run has already failed with exit {exit_code}. ===",
+        f"exec into it. This phase failed with exit {exit_code}; the run is "
+        f"reported errored once the hold ends, so it still shows as in "
+        f"progress until then. `kubectl delete pod` to finish now. ===",
         flush=True,
     )
     sys.stdout.flush()

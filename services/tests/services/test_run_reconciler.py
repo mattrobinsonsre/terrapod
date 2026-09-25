@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -1057,3 +1058,141 @@ class TestAbandonedJobsAreReaped:
 
         mock_handle.assert_awaited_once()
         assert "insufficient cluster resources" in mock_handle.call_args.args[2]
+
+
+class TestAnApplyCapableRunHeldForAVerdictIsBounded:
+    """`_check_stale` is plan-only, so an apply-capable run held at the AI gate
+    had NO timeout: the only exits were an admin override or a newer run
+    superseding it.
+
+    That is fine while the verdict is merely slow and not fine when the trigger
+    is lost — `_run_trigger_consumer` pops with BRPOP and no ack, so a pod
+    evicted between pop and handler drops the item, and a follower that pops
+    one discards it. The run then holds its workspace's apply serialization
+    indefinitely, with a finished Job and nothing to look at.
+    """
+
+    @staticmethod
+    def _run(*, held_for_seconds: int):
+        from datetime import UTC, datetime, timedelta
+
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            workspace_id=uuid.uuid4(),
+            status="planning",
+            plan_only=False,
+            plan_started_at=datetime.now(UTC) - timedelta(seconds=held_for_seconds + 60),
+            plan_finished_at=datetime.now(UTC) - timedelta(seconds=held_for_seconds),
+        )
+
+    async def _drive(self, run, *, evaluation=None):
+        """Run the backstop with the gate mandatory and applying to this run."""
+        from terrapod.services import ai_policy_service, run_reconciler
+
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=SimpleNamespace(id=run.workspace_id))
+        enqueued: list[tuple] = []
+
+        async def _enqueue(name, payload, **kw):
+            enqueued.append((name, payload))
+
+        with (
+            patch.object(ai_policy_service, "gate_applies_to", return_value=True),
+            patch.object(ai_policy_service, "effective_enforcement", return_value="mandatory"),
+            patch.object(
+                ai_policy_service, "get_evaluation", new=AsyncMock(return_value=evaluation)
+            ),
+            patch.object(ai_policy_service, "record_evaluation", new=AsyncMock()) as rec,
+            patch("terrapod.services.scheduler.enqueue_trigger", new=_enqueue),
+        ):
+            await run_reconciler._backstop_ai_policy_hold(db, run)
+        return enqueued, rec
+
+    async def test_a_recent_hold_is_left_alone(self):
+        """A slow model call is normal. Re-enqueueing early would double the
+        token spend for no reason."""
+        enqueued, rec = await self._drive(self._run(held_for_seconds=60))
+        assert enqueued == []
+        rec.assert_not_awaited()
+
+    async def test_a_long_hold_re_enqueues_the_summariser(self):
+        """The self-heal: a dropped trigger is the common cause, and this
+        recovers it with no operator action."""
+        enqueued, rec = await self._drive(self._run(held_for_seconds=900))
+        assert [n for n, _ in enqueued] == ["ai_plan_summary"]
+        rec.assert_not_awaited(), "it must not give up while a retry may still land"
+
+    async def test_giving_up_records_a_reason_rather_than_releasing(self):
+        """A mandatory gate fails CLOSED. What changes is that the hold stops
+        being silent — `blocked-by` names the gate and an operator can override
+        it knowing why."""
+        enqueued, rec = await self._drive(self._run(held_for_seconds=7200))
+        rec.assert_awaited_once()
+        kwargs = rec.await_args.kwargs
+        assert kwargs["outcome"] == "errored", "inventing a pass would be worse than holding"
+        assert "never ruled" in kwargs["error"] or "No AI policy verdict" in kwargs["error"]
+
+    async def test_a_run_that_already_has_a_verdict_is_untouched(self):
+        """A hold with a verdict is a DECISION, not a silence."""
+        enqueued, rec = await self._drive(
+            self._run(held_for_seconds=7200), evaluation=SimpleNamespace(outcome="failed")
+        )
+        assert enqueued == []
+        rec.assert_not_awaited()
+
+    async def test_an_advisory_gate_is_never_backstopped(self):
+        """Advisory never held the run, so there is nothing to bound."""
+        from terrapod.services import ai_policy_service, run_reconciler
+
+        run = self._run(held_for_seconds=7200)
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=SimpleNamespace(id=run.workspace_id))
+        with (
+            patch.object(ai_policy_service, "gate_applies_to", return_value=True),
+            patch.object(ai_policy_service, "effective_enforcement", return_value="advisory"),
+            patch.object(ai_policy_service, "record_evaluation", new=AsyncMock()) as rec,
+        ):
+            await run_reconciler._backstop_ai_policy_hold(db, run)
+        rec.assert_not_awaited()
+
+    async def test_the_backstop_is_actually_reached_from_reconcile_held(self):
+        """Proves the WIRING, not just the helper.
+
+        Every test above calls `_backstop_ai_policy_hold` directly, so all of
+        them pass if the call site is deleted — which is the failure shape this
+        repo has been bitten by before. Drive `_reconcile_held` instead.
+        """
+        from terrapod.services import run_reconciler, run_service
+
+        run = self._run(held_for_seconds=7200)
+        db = AsyncMock()
+
+        with (
+            patch.object(run_service, "_is_supersedeable_kind", return_value=False),
+            patch.object(run_service, "complete_plan", new=AsyncMock()),
+            patch.object(run_reconciler, "_backstop_ai_policy_hold", new=AsyncMock()) as backstop,
+            patch.object(run_reconciler, "_check_stale", new=AsyncMock()) as stale,
+        ):
+            await run_reconciler._reconcile_held(db, run)
+
+        backstop.assert_awaited_once()
+        stale.assert_not_awaited(), "the plan-only path must not claim an apply-capable run"
+
+    async def test_a_plan_only_run_still_takes_the_stale_path(self):
+        """The backstop must not displace the existing plan-only timeout."""
+        from terrapod.services import run_reconciler, run_service
+
+        run = self._run(held_for_seconds=7200)
+        run.plan_only = True
+        db = AsyncMock()
+
+        with (
+            patch.object(run_service, "_is_supersedeable_kind", return_value=False),
+            patch.object(run_service, "complete_plan", new=AsyncMock()),
+            patch.object(run_reconciler, "_backstop_ai_policy_hold", new=AsyncMock()) as backstop,
+            patch.object(run_reconciler, "_check_stale", new=AsyncMock()) as stale,
+        ):
+            await run_reconciler._reconcile_held(db, run)
+
+        stale.assert_awaited_once()
+        backstop.assert_not_awaited()

@@ -8,7 +8,7 @@ disabled, so an upgrade changes nothing until an operator both enables
 `ai_summary.policy` and says what to block.
 
 Revision ID: ede22f4eab33
-Revises: e2450c5ecc86
+Revises: 30b3243d256e
 """
 
 from collections.abc import Sequence

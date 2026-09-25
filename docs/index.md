@@ -46,10 +46,12 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Notifications** | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | **Outbound URL guard** | Bounds where a user-supplied [webhook or run-task callback](notifications.md#where-a-webhook-may-point) may point: loopback and link-local always refused, private space optional, with per-host and per-CIDR allow-lists |
 | **Interactive Slack app** | Outbound Socket Mode app: `/terrapod` account linking (explicit confirm step) + opt-in per-workspace run notifications with RBAC-checked Approve/Discard buttons; multiple deployments can share one Slack workspace via per-deployment `slack.command`/`slack.label` ([Slack integration](slack-integration.md)) |
-| **Run Tasks** | Pre/post-plan webhook hooks for external validation |
+| **Run Tasks** | Webhook hooks for external validation at `pre_plan`, `post_plan` and `pre_apply`; only `post_plan` failures are overridable |
 | **Execution Hooks** | **Custom execution steps** — admin-managed shell run in the runner Job at five run-lifecycle points, associated with workspaces (`pre_init` is the setup/tooling/auth slot; custom runner images cover heavier needs) |
+| **AI Policy Gate** | The plan summary's verdict as a post-plan gate — natural-language deny criteria plus a risk threshold, advisory or mandatory, with admin override; off by default |
 | **Policy-as-Code** | OPA/Rego policy sets evaluated on every run; advisory or mandatory enforcement, label-scoped; optional shared evaluation for helper rules and data files |
 | **IaC Security Scanning** | Checkov/Trivy misconfiguration scanning of the plan JSON; per-workspace advisory or enforced, severity threshold, skip rules |
+| **Runner Debug Mode** | Per-workspace opt-in keeping a failed runner pod exec-able so a credential, DNS or mount failure can be reproduced with the run's real environment; auto-expires, off by default |
 | **Drift Detection** | Scheduled plan-only runs to detect out-of-band infrastructure changes |
 | **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
 | **Cloud Credentials** | Dynamic provider credentials via Kubernetes workload identity (AWS EKS Pod Identity or IRSA, GCP WIF, Azure WI) |

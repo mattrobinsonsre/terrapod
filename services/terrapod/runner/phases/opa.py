@@ -283,7 +283,7 @@ def _evaluate_set_together(
     # A directory PER SET, emptied first. Every set in a run shares one
     # `rego_dir`, and `opa eval` loads a directory recursively -- so a single
     # shared path let one set's files reach another's evaluation. Measured
-    # against OPA 1.20.2: with set A (advisory, two policies, a data.yaml)
+    # against OPA (re-verified on 1.21.0): with set A (advisory, two policies, a data.yaml)
     # evaluated before set B (mandatory, one policy), B's own `policy_0.rego`
     # overwrote A's but A's `policy_1.rego` and `data.yaml` remained, so B
     # reported `failed` citing a rule it does not contain -- an advisory rule

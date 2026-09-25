@@ -79,11 +79,25 @@ NOT_EVALUATED_ENGINE = (
 def effective_enforcement(ws: Workspace | None) -> str:
     """The gate's enforcement for this workspace: off / advisory / mandatory.
 
-    The per-workspace `ai_policy_mode` can opt a workspace IN when the
-    deployment default is off, and OUT of an advisory verdict. It cannot opt out
-    of a **mandatory** gate, and that asymmetry is the point: a fleet-wide
-    blocking control any workspace admin could switch off is not a control. It
-    is the same hole as a `plan_only` run applying past a mandatory policy set.
+    The per-workspace `ai_policy_mode` can opt a workspace OUT of an advisory
+    verdict. It cannot opt out of a **mandatory** gate, and that asymmetry is
+    the point: a fleet-wide blocking control any workspace admin could switch
+    off is not a control. It is the same hole as a `plan_only` run applying
+    past a mandatory policy set.
+
+    **"enabled" is accepted and is a synonym for "default" -- it cannot opt a
+    workspace IN.** There is nothing for it to opt into: when the deployment
+    has the gate off (`policy.enabled` false) there are no criteria and no
+    threshold to rule against, and when the gate is on, `enforcement_level` is
+    only ever "advisory" or "mandatory" -- there is no third, opted-out-by-
+    default level a workspace could raise itself from. So all four
+    combinations of (deployment state x mode) are already decided by the
+    deployment: off stays off, mandatory stays mandatory, and advisory with
+    "enabled" is identical to advisory with "default". The value is kept
+    because rejecting it would break configurations that already set it, and
+    because it reads as the natural opposite of "disabled" -- but it changes
+    nothing, and saying so here is better than leaving an operator to believe
+    they have armed a gate they have not.
     """
     cfg = settings.ai_summary.policy
     if not cfg.enabled:
@@ -232,6 +246,16 @@ async def record_evaluation(
     threshold = settings.ai_summary.policy.risk_threshold
 
     if existing is not None:
+        # Read the predicate BEFORE the mutation below overwrites the verdict
+        # it asks about. `_override_was_acted_on` tests "was this override
+        # recorded against a row that had no verdict yet" -- a question about
+        # the row as it stood, which stops being answerable the moment
+        # `existing.verdict` is reassigned. Evaluating it afterwards inverts
+        # the branch exactly: an ordinary re-ruling (one that carries a real
+        # verdict) would look un-acted-on and have its attribution cleared,
+        # while only a verdict-less re-ruling would keep it.
+        override_was_acted_on = _override_was_acted_on(existing)
+
         existing.enforcement_level = enforcement_level
         existing.risk_threshold = threshold
         existing.outcome = outcome
@@ -251,7 +275,7 @@ async def record_evaluation(
         # having failed to stop it rather than as a person having decided to.
         # The re-ruling is still recorded; what survives is who overrode, which
         # is the half an auditor cannot reconstruct.
-        if not _override_was_acted_on(existing):
+        if not override_was_acted_on:
             existing.overridden_by = None
             existing.overridden_at = None
         return existing
