@@ -80,6 +80,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
+from terrapod.config import settings
 from terrapod.db.models import Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -526,6 +527,19 @@ async def delete_stack(
 DEPLOYMENT_VERSION = 3
 
 
+def _canonical_pulumi_service_url() -> str | None:
+    """This deployment's declared Pulumi service address, or None if undeclared.
+
+    Deliberately does NOT fall back to the request's host, unlike the upload
+    path's `_pulumi_service_url`: that fallback is fine for filling in a block
+    that has none, and wrong as a reason to overwrite one that already names a
+    reachable address. No `external_url` means no opinion, and the stored block
+    is served untouched.
+    """
+    base = settings.external_url
+    return f"{base.rstrip('/')}/api/v1/pulumi" if base else None
+
+
 async def _read_deployment(ws: Workspace, db: AsyncSession) -> dict[str, Any] | None:
     """The stack's current deployment, or None when it has never been written."""
     from terrapod.crypto.state import decrypt_state_bytes
@@ -570,9 +584,19 @@ async def export_stack(
     capture found the CLI's snapshot integrity check rejects a synthetic empty
     deployment, so "nothing yet" has to be expressed as null rather than as an
     empty shape that looks tidier.
+
+    The `service` secrets-provider block is served naming this deployment's
+    canonical address rather than whatever is stored (#1580) — see
+    `with_canonical_service_url` for why the stored one can be unreachable and
+    why this is done on the way out instead of in storage.
     """
+    from terrapod.services.pulumi_state_service import with_canonical_service_url
+
     ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_READ)
-    return {"version": DEPLOYMENT_VERSION, "deployment": await _read_deployment(ws, db)}
+    deployment = with_canonical_service_url(
+        await _read_deployment(ws, db), _canonical_pulumi_service_url()
+    )
+    return {"version": DEPLOYMENT_VERSION, "deployment": deployment}
 
 
 @router.post("/api/stacks/{org}/{project}/{stack}/import")

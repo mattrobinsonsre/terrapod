@@ -97,6 +97,46 @@ against a digest upstream published, and it is worth being plain about rather
 than implying a check that does not happen. Pulumi's own verification is that
 the plugin unpacks and runs.
 
+## The stored secrets-provider URL is the one the CLI uses (#1580)
+
+A stack sealed by Terrapod carries a `service` secrets-provider block:
+
+```json
+{"type": "service",
+ "state": {"url": "…/api/v1/pulumi", "owner": "default", "project": "p", "stack": "dev"}}
+```
+
+**The CLI takes that `url` literally and never checks it against the backend it
+is logged in to.** From Pulumi's own source: `NewServiceSecretsManagerFromState`
+unmarshals the stored state and passes `s.URL` straight to
+`getServiceSecretsAccount`, which looks up the saved credential **for that exact
+URL**. There is no comparison and no mismatch error — it fails later with:
+
+```
+could not find access token for <url>, have you logged in?
+```
+
+That is why a stale URL here is not cosmetic. Agent runs before #1576 wrote the
+runner's *in-cluster* API address into this block
+(`http://terrapod-api:8000/…`). An operator cannot clear that error by logging
+in, because the address does not resolve outside the cluster at all.
+
+**Terrapod normalises the URL on the way out, not in storage.** `stack export`
+— which is also how the CLI reads state before an update — serves the block
+naming `{external_url}/api/v1/pulumi`. Doing it on read fixes every existing
+stack at once, including ones that will never take another write, and changes
+nothing stored, so it stays reversible by configuration.
+
+**With no `external_url` configured the block is served exactly as stored.**
+Without it the deployment has not declared the address it answers at, and the
+only fallback is whichever host the caller happened to use — normalising to a
+guess could replace a reachable address with a worse one.
+
+One consequence worth stating plainly: a stack whose block names some *other*
+reachable address is normalised to `external_url` too. That operator is not
+stranded — `external_url` is by definition where the deployment answers, so
+`pulumi login` against it works.
+
 ## Deliberately not implemented
 
 Publishing private plugins. The gate asks for `pulumi plugin install` to succeed
