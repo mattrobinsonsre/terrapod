@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import time
 import uuid
+from datetime import UTC, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -305,6 +306,57 @@ async def get_task_stage_result(db: AsyncSession, tsr_id: uuid.UUID) -> TaskStag
     return await db.get(TaskStageResult, tsr_id)
 
 
+def expire_unreachable_results(ts: TaskStage) -> int:
+    """Fail results whose callback token has expired. Returns how many.
+
+    **The wedge this closes.** `run_task_dispatcher` leaves a result at
+    ``running`` when the webhook returns 2xx, and `resolve_stage` holds the
+    whole stage ``running`` while any result is non-terminal. Nothing else ages
+    a result out, so an external service that accepts the webhook and then
+    never calls back holds the run **forever** — and the enforcement level is
+    irrelevant, because an *advisory* task that never answers blocks exactly as
+    hard as a mandatory one. The stage simply never resolves.
+
+    That was survivable while `post_plan` was the only boundary: a held run sat
+    in ``planning``, where the reconciler's staleness backstop could still
+    reach a plan-only run. `pre_plan` (held ``queued``) and `pre_apply` (held
+    ``planned``) have no such backstop at all, so #1837 turned a bounded
+    annoyance into an unbounded one. Hence fixing it here, for all three
+    boundaries at once, rather than at either new gate.
+
+    **The deadline is derived, not invented.** A callback is authenticated by
+    `verify_callback_token`, which refuses anything older than
+    ``_CALLBACK_TOKEN_TTL``. So once that elapses the external service *cannot*
+    report back — its callback would 401. The result is not slow, it is
+    unreachable, and saying so is a statement of fact rather than a policy
+    choice. That is also why this needs no config knob: a tunable timeout would
+    only let an operator pick a number that disagrees with the token.
+    """
+    from terrapod.db.models import now_utc
+
+    cutoff = now_utc() - timedelta(seconds=_CALLBACK_TOKEN_TTL)
+    expired = 0
+    for r in ts.results:
+        if r.status not in ("pending", "running"):
+            continue
+        created = r.created_at
+        if created is None:
+            continue
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        if created > cutoff:
+            continue
+        r.status = "errored"
+        r.message = (
+            "No callback was received before the callback token expired "
+            f"({_CALLBACK_TOKEN_TTL // 60} minutes), so this result can no "
+            "longer be reported. Check the external service."
+        )
+        r.finished_at = now_utc()
+        expired += 1
+    return expired
+
+
 async def resolve_stage(db: AsyncSession, task_stage_id: uuid.UUID) -> str:
     """Check all results for a task stage and resolve its status.
 
@@ -321,6 +373,8 @@ async def resolve_stage(db: AsyncSession, task_stage_id: uuid.UUID) -> str:
 
     if ts.status in ("passed", "failed", "errored", "canceled", "overridden"):
         return ts.status
+
+    expire_unreachable_results(ts)
 
     has_pending = False
     has_mandatory_failure = False
@@ -408,3 +462,103 @@ async def list_run_task_stages(db: AsyncSession, run_id: uuid.UUID) -> list[Task
         .order_by(TaskStage.created_at.asc())
     )
     return list(result.scalars().all())
+
+
+async def sweep_unreachable_stages(db: AsyncSession) -> int:
+    """Resolve stages whose results can no longer be reported, and re-drive.
+
+    `expire_unreachable_results` runs inside `resolve_stage`, which covers
+    every boundary that has something asking again: `pre_plan` is re-driven by
+    the listener poll, `post_plan` by the reconciler, and a manually-confirmed
+    `pre_apply` by the operator clicking Apply.
+
+    One case has nobody asking. A run on an AUTO-APPLYING workspace that
+    reached `planned` and was declined by a held `pre_apply` gate is driven
+    only by the run task callback — and the whole failure mode here is that
+    the callback never comes. The reconciler does not work `planned` runs and
+    `_complete_plan` returns early once a run leaves `planning`, so without
+    this sweep that run waits for a webhook that is never going to arrive,
+    with no human expected to be watching.
+
+    Returns the number of stages resolved.
+    """
+    from terrapod.db.models import now_utc
+
+    cutoff = now_utc() - timedelta(seconds=_CALLBACK_TOKEN_TTL)
+    stale = await db.execute(
+        select(TaskStage.id)
+        .join(TaskStageResult, TaskStageResult.task_stage_id == TaskStage.id)
+        .where(
+            TaskStage.status == "running",
+            TaskStageResult.status.in_(["pending", "running"]),
+            TaskStageResult.created_at < cutoff,
+        )
+        .distinct()
+    )
+    stage_ids = [row[0] for row in stale.all()]
+
+    resolved = 0
+    for stage_id in stage_ids:
+        try:
+            stage = await get_task_stage(db, stage_id)
+            if stage is None:
+                continue
+            run_id, boundary = stage.run_id, stage.stage
+            status = await resolve_stage(db, stage_id)
+            await db.commit()
+            resolved += 1
+            logger.info(
+                "Resolved a task stage whose callbacks can no longer arrive",
+                task_stage_id=str(stage_id),
+                stage=boundary,
+                status=status,
+            )
+            # Only `pre_apply` needs pushing: the other two boundaries are
+            # re-driven by something that is already polling.
+            if boundary == "pre_apply":
+                from terrapod.db.models import Run
+                from terrapod.services import run_service
+
+                run = await db.get(Run, run_id)
+                if run is not None:
+                    await run_service.redrive_auto_apply(db, run)
+                    await db.commit()
+        except Exception:
+            # One bad stage must not stop the sweep, and the rollback keeps the
+            # session usable for the next one (see the pre-plan pre-pass).
+            logger.exception("failed to resolve an unreachable task stage", stage_id=str(stage_id))
+            try:
+                await db.rollback()
+            except Exception:
+                logger.exception("rollback during task stage sweep also failed")
+    return resolved
+
+
+async def unreachable_stage_sweep_cycle() -> None:
+    """Periodic entry point for :func:`sweep_unreachable_stages`."""
+    from terrapod.db.session import get_db_session
+
+    async with get_db_session() as db:
+        await sweep_unreachable_stages(db)
+
+
+async def runs_with_unresolved_gate(db: AsyncSession, run_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    """Which of these runs have an unresolved `pre_plan`/`pre_apply` stage.
+
+    One query for a whole page. `blocked_by` needs this answer per run, and a
+    list endpoint asking per run turns a page of N into N queries — which for
+    `queued` and `planned` runs used to be zero, since `blocked_by` returned
+    early for anything not in `planning`. Rebuilding that cost into a list
+    serializer is the shape of regression the workspace-list work existed to
+    remove, so the list path batches instead.
+    """
+    if not run_ids:
+        return set()
+    rows = await db.execute(
+        select(TaskStage.run_id).where(
+            TaskStage.run_id.in_(run_ids),
+            TaskStage.stage.in_(["pre_plan", "pre_apply"]),
+            TaskStage.status.notin_(["passed", "overridden"]),
+        )
+    )
+    return {row[0] for row in rows.all()}

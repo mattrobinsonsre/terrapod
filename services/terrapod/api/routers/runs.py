@@ -633,6 +633,10 @@ async def list_workspace_runs(
     runs = await run_service.list_workspace_runs(db, ws.id, page_number, page_size)
     total = await run_service.count_workspace_runs(db, ws.id)
     has_vcs = ws.vcs_connection_id is not None
+    # One query for the page rather than one per run (#1837). See `blocked_by`.
+    from terrapod.services.run_task_service import runs_with_unresolved_gate
+
+    unresolved_gate = await runs_with_unresolved_gate(db, [r.id for r in runs])
     return JSONResponse(
         content={
             "data": [
@@ -640,7 +644,7 @@ async def list_workspace_runs(
                     r,
                     workspace_name=ws.name,
                     workspace_has_vcs=has_vcs,
-                    blocked_by=await run_service.blocked_by(db, r),
+                    blocked_by=await run_service.blocked_by(db, r, unresolved_gate=unresolved_gate),
                 )["data"]
                 for r in runs
             ],

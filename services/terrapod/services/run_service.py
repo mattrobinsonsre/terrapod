@@ -481,14 +481,46 @@ def is_discardable_hold(run: Run) -> bool:
     return is_held_at_gate(run) and not run.plan_only
 
 
-async def blocked_by(db: AsyncSession, run: Run) -> str | None:
-    """Which post-plan gate holds a run: `run-task`, `policy`, `security-scan`.
+async def blocked_by(
+    db: AsyncSession, run: Run, *, unresolved_gate: set | None = None
+) -> str | None:
+    """Which gate holds a run: `run-task`, `policy`, `security-scan`.
 
     None when the run is not held. Read-only -- checked in the order
     `complete_plan` evaluates the gates, so it names the one actually holding
     the run. Returns None for a held run if no gate still blocks it (it is
     about to move on at the next re-drive).
+
+    **The two #1837 boundaries answer here too, and the `pre_apply` one is not
+    cosmetic.** A run held at `pre_apply` sits in `planned`, which every
+    consumer reads as "the plan succeeded, waiting for a human" — so the PR
+    check reported SUCCESS and a required check was satisfied while the run
+    was in fact held and would never apply. Someone could merge on the
+    strength of it. `pre_plan` is the milder version of the same thing: the
+    run sits `queued` looking like it is waiting its turn.
+
+    `is_held_at_gate` is deliberately NOT widened to cover them. It means
+    "a finished plan waiting for a decision" and governs discardability and
+    whether the CLI waits (#1725); a `queued` run has no plan yet and a
+    `planned` one is already discardable by the ordinary route.
     """
+    # Held before the plan (`queued`) or after confirm (`planned`) — #1837.
+    #
+    # `unresolved_gate` lets a list endpoint answer for a whole page from one
+    # query instead of one per run; without it we ask per run. Both boundaries
+    # are checked together because a run is only ever in one of these states.
+    if run.status in ("queued", "planned"):
+        if unresolved_gate is not None:
+            return "run-task" if run.id in unresolved_gate else None
+
+        from terrapod.services import run_task_service
+
+        boundary = "pre_plan" if run.status == "queued" else "pre_apply"
+        stage = await run_task_service._existing_stage(db, run.id, boundary)
+        if stage is not None and stage.status not in ("passed", "overridden"):
+            return "run-task"
+        return None
+
     if not is_held_at_gate(run):
         return None
 
