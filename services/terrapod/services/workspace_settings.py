@@ -103,12 +103,18 @@ def validate_ai_policy_mode(raw: object) -> str:
     """The AI policy gate's per-workspace override (#1766).
 
     Same three states as `ai-summary-mode`, and validated the same way -- but
-    accepting "disabled" here is not the same as honouring it. A MANDATORY gate
-    ignores it by design (`ai_policy_service.effective_enforcement`), because a
-    fleet-wide blocking control any workspace admin could switch off is not a
-    control. Rejecting the value instead would be worse: it would stop an
-    operator recording an advisory opt-out that is perfectly legitimate, and
-    imply the gate is weaker than it is.
+    accepting a value here is not the same as honouring it, in BOTH directions.
+
+    "disabled": a MANDATORY gate ignores it by design
+    (`ai_policy_service.effective_enforcement`), because a fleet-wide blocking
+    control any workspace admin could switch off is not a control. Rejecting
+    the value instead would be worse: it would stop an operator recording an
+    advisory opt-out that is perfectly legitimate, and imply the gate is
+    weaker than it is.
+
+    "enabled": accepted, and a **synonym for "default"** -- it cannot opt a
+    workspace into a gate the deployment has not turned on. See
+    `effective_enforcement` for why there is nothing to opt into.
     """
     if raw not in AI_SUMMARY_MODES:
         raise ValueError("ai-policy-mode must be 'default', 'enabled', or 'disabled'")

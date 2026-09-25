@@ -844,9 +844,15 @@ def main(argv: list[str] | None = None) -> int:
     _flush_stdio()
 
     # Debug mode (#1764). Deliberately the LAST thing, after every upload and
-    # after the phase result has been posted: the run is already reported
-    # failed, and the pod merely stays around so an operator can get inside
-    # it. A no-op unless the workspace has debug mode on.
+    # after the resource profile and failure reason have been posted, so the
+    # run page already carries why it failed. A no-op unless the workspace has
+    # debug mode on.
+    #
+    # Note what this does NOT do: a failed phase returns its exit code above
+    # without posting a phase result, so the run is not transitioned to
+    # `errored` until the Job goes terminal -- which the hold below postpones.
+    # The run stays in `planning`/`applying` for the window, which also holds
+    # the workspace's apply queue. See `debug_linger`'s module docstring.
     debug_linger.hold_for_inspection(exit_code)
     return exit_code
 
