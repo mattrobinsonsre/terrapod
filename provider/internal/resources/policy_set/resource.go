@@ -55,6 +55,8 @@ type policySetModel struct {
 	Description      types.String `tfsdk:"description"`
 	EnforcementLevel types.String `tfsdk:"enforcement_level"`
 	Enabled          types.Bool   `tfsdk:"enabled"`
+	SharedEvaluation types.Bool   `tfsdk:"shared_evaluation"`
+	SupportFileNames types.List   `tfsdk:"support_file_names"`
 
 	GlobalScope types.Bool `tfsdk:"global_scope"`
 	AllowLabels types.Map  `tfsdk:"allow_labels"`
@@ -116,6 +118,16 @@ func (r *policySetResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"enabled": schema.BoolAttribute{
 				Description: "Whether the set is evaluated at all. A disabled set applies to nothing, whatever its scope. Defaults to true.",
 				Optional:    true,
+				Computed:    true,
+			},
+			"shared_evaluation": schema.BoolAttribute{
+				Description: "Evaluate the set's files TOGETHER in one `opa eval`, so policies can call shared helper rules and read data files committed beside them, instead of each policy being evaluated alone. Defaults to false, which is how every set behaved before this existed.\n\nTurning it on changes how results are reported: all the files share `package terrapod`, so OPA cannot attribute a denial to the file that produced it, and results become per-SET rather than per-policy. Leave it off if you want the per-policy breakdown.\n\nRequires runners new enough to understand it — an older runner ignores the setting and evaluates each policy alone, without the data files.",
+				Optional:    true,
+				Computed:    true,
+			},
+			"support_file_names": schema.ListAttribute{
+				Description: "Names of the data files (`.yaml`, `.yml`, `.json`) and deny-less `.rego` helpers the VCS sync found beside the policies. Read-only — useful for confirming the files you committed were actually picked up, which otherwise looks identical to the feature not working.",
+				ElementType: types.StringType,
 				Computed:    true,
 			},
 
@@ -325,6 +337,7 @@ func buildCreateRequest(m *policySetModel) terrapod.CreatePolicySetRequest {
 		Description:      m.Description.ValueString(),
 		EnforcementLevel: m.EnforcementLevel.ValueString(),
 		Enabled:          m.Enabled.IsNull() || m.Enabled.ValueBool(),
+		SharedEvaluation: m.SharedEvaluation.ValueBool(),
 		GlobalScope:      m.GlobalScope.ValueBool(),
 		AllowLabels:      mapFromTFMap(m.AllowLabels),
 		AllowNames:       sliceFromTFList(m.AllowNames),
@@ -346,17 +359,19 @@ func buildUpdateRequest(m *policySetModel) terrapod.UpdatePolicySetRequest {
 	name := m.Name.ValueString()
 	desc := m.Description.ValueString()
 	enabled := m.Enabled.ValueBool()
+	sharedEvaluation := m.SharedEvaluation.ValueBool()
 	global := m.GlobalScope.ValueBool()
 
 	req := terrapod.UpdatePolicySetRequest{
-		Name:        &name,
-		Description: &desc,
-		Enabled:     &enabled,
-		GlobalScope: &global,
-		AllowLabels: mapFromTFMapOrEmpty(m.AllowLabels),
-		AllowNames:  sliceFromTFListOrEmpty(m.AllowNames),
-		DenyLabels:  mapFromTFMapOrEmpty(m.DenyLabels),
-		DenyNames:   sliceFromTFListOrEmpty(m.DenyNames),
+		Name:             &name,
+		Description:      &desc,
+		Enabled:          &enabled,
+		SharedEvaluation: &sharedEvaluation,
+		GlobalScope:      &global,
+		AllowLabels:      mapFromTFMapOrEmpty(m.AllowLabels),
+		AllowNames:       sliceFromTFListOrEmpty(m.AllowNames),
+		DenyLabels:       mapFromTFMapOrEmpty(m.DenyLabels),
+		DenyNames:        sliceFromTFListOrEmpty(m.DenyNames),
 	}
 	if !m.EnforcementLevel.IsNull() && !m.EnforcementLevel.IsUnknown() {
 		level := m.EnforcementLevel.ValueString()
@@ -384,6 +399,12 @@ func readFromSDK(ctx context.Context, ps *terrapod.PolicySet, m *policySetModel)
 	m.Name = types.StringValue(ps.Name)
 	m.EnforcementLevel = types.StringValue(ps.EnforcementLevel)
 	m.Enabled = types.BoolValue(ps.Enabled)
+	m.SharedEvaluation = types.BoolValue(ps.SharedEvaluation)
+	supportNames, supportDiags := types.ListValueFrom(
+		ctx, types.StringType, ps.SupportFileNames,
+	)
+	diags.Append(supportDiags...)
+	m.SupportFileNames = supportNames
 	m.GlobalScope = types.BoolValue(ps.GlobalScope)
 	m.Source = types.StringValue(ps.Source)
 	m.PolicyCount = types.Int64Value(ps.PolicyCount)

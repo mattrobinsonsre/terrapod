@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "Échec de l'enregistrement de la politique ({status})",
       "deletePolicy": "Échec de la suppression de la politique",
       "deletePolicyStatus": "Échec de la suppression ({status})"
+    },
+    "shared": {
+      "label": "Évaluer tout le jeu ensemble",
+      "help": "Les politiques peuvent appeler des règles auxiliaires partagées et lire les fichiers de données déposés à côté. Sinon, chaque politique est évaluée seule.",
+      "perSetResults": "Les résultats sont rapportés pour le jeu entier. Lors d une évaluation commune, OPA ne peut attribuer un refus à une politique précise.",
+      "filesFound": "Fichiers de données et règles auxiliaires trouvés",
+      "noFiles": "Aucun fichier de données ni règle auxiliaire trouvé à côté des politiques. Vérifiez le chemin des politiques."
     }
   },
   "slackLink": {

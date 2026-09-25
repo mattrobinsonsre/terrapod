@@ -116,6 +116,13 @@ def _policy_set_json(ps: PolicySet, *, embed_policies: bool = False) -> dict:
         "description": ps.description or "",
         "enforcement-level": ps.enforcement_level,
         "enabled": ps.enabled,
+        "shared-evaluation": ps.shared_evaluation,
+        # Read-only: the names of the data files and helpers the sync found.
+        # The CONTENT is deliberately not served here — it is bundle-sized and
+        # only the runner needs it — but an operator has to be able to see
+        # that the files they committed were actually picked up, or a typo in
+        # `policy-path` looks identical to a feature that does not work.
+        "support-file-names": sorted((ps.support_files or {}).keys()),
         "global-scope": ps.global_scope,
         "allow-labels": ps.allow_labels or {},
         "allow-names": ps.allow_names or [],
@@ -267,6 +274,7 @@ async def create_policy_set(
         description=attrs.get("description", "") or "",
         enforcement_level=_validate_enforcement(attrs.get("enforcement-level", "advisory")),
         enabled=bool(attrs.get("enabled", True)),
+        shared_evaluation=bool(attrs.get("shared-evaluation", False)),
         global_scope=bool(attrs.get("global-scope", False)),
         allow_labels=attrs.get("allow-labels", {}) or {},
         allow_names=attrs.get("allow-names", []) or [],
@@ -329,6 +337,8 @@ async def update_policy_set(
         ps.enforcement_level = _validate_enforcement(attrs["enforcement-level"])
     if "enabled" in attrs:
         ps.enabled = bool(attrs["enabled"])
+    if "shared-evaluation" in attrs:
+        ps.shared_evaluation = bool(attrs["shared-evaluation"])
     if "global-scope" in attrs:
         ps.global_scope = bool(attrs["global-scope"])
     if "allow-labels" in attrs:
@@ -703,6 +713,16 @@ async def get_policy_bundle(
                     "id": f"polset-{ps.id}",
                     "name": ps.name,
                     "enforcement_level": ps.enforcement_level,
+                    # #1842. Additive, so a runner that predates them ignores
+                    # both and evaluates one policy at a time exactly as
+                    # before. The consequence is accepted rather than guarded:
+                    # on such a runner a set with `shared_evaluation` on is
+                    # evaluated WITHOUT its data, and a rule referencing
+                    # `data.something` is undefined rather than failing — so it
+                    # passes. Upgrade runners before turning the flag on; see
+                    # docs/policies.md.
+                    "shared_evaluation": ps.shared_evaluation,
+                    "support_files": ps.support_files or {},
                     "policies": [
                         {"id": f"pol-{p.id}", "name": p.name, "rego": p.rego}
                         for p in sorted(ps.policies, key=lambda x: x.name)

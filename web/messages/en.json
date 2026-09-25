@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "Failed to save policy ({status})",
       "deletePolicy": "Failed to delete policy",
       "deletePolicyStatus": "Failed to delete ({status})"
+    },
+    "shared": {
+      "label": "Evaluate the whole set together",
+      "help": "Policies can call shared helper rules and read data files committed beside them. When off, each policy is evaluated alone.",
+      "perSetResults": "Results are reported for the set as a whole. When files are evaluated together, OPA cannot attribute a denial to one policy.",
+      "filesFound": "Data files and helpers found",
+      "noFiles": "No data files or helpers were found beside the policies. Check the policy path."
     }
   },
   "slackLink": {

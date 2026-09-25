@@ -108,7 +108,13 @@ def _run_opa_eval(
     opa_binary: str = "opa",
 ) -> tuple[int, str, str]:
     """Invoke `opa eval` against the plan JSON. Returns
-    (exit_code, stdout, stderr). Stdin is the plan JSON file."""
+    (exit_code, stdout, stderr). Stdin is the plan JSON file.
+
+    ``rego_path`` may be a single file or a DIRECTORY. OPA loads a directory
+    recursively, picking up `.rego`, `.json` and `.yaml` by extension, which is
+    exactly what shared evaluation needs (#1842) — so the two modes differ only
+    in what is written to disk beforehand, not in how OPA is invoked.
+    """
     cmd = [
         opa_binary,
         "eval",
@@ -193,6 +199,145 @@ def fetch_policy_bundle(
             client.close()
 
 
+def _safe_support_name(name: str) -> str | None:
+    """A support file's name, reduced to something safe to write to disk.
+
+    The name reaches us from a git repository by way of the policy bundle, so
+    it is attacker-influenced in the same sense the rego is. Anything with a
+    path separator or a parent reference is dropped rather than sanitised:
+    a support file is a direct child of the policy path by construction, so a
+    name that is not a bare filename did not come from the sync and there is
+    nothing to salvage.
+    """
+    if not name or "/" in name or "\\" in name or name.startswith("."):
+        return None
+    if not name.endswith((".rego", ".yaml", ".yml", ".json")):
+        return None
+    return name
+
+
+def _evaluate_set_together(
+    *,
+    set_id: str,
+    set_name: str,
+    enforcement: str,
+    policies: list[dict],
+    support_files: dict,
+    plan_json: Path | None,
+    context_path: Path,
+    rego_dir: Path,
+    opa_binary: str = "opa",
+) -> dict:
+    """Evaluate a whole set in ONE `opa eval`, so its files can share (#1842).
+
+    Every policy and every support file goes into one directory, which OPA
+    loads recursively — helpers become callable from any policy and data lands
+    under `data.<key>` the way `conftest -d` does it.
+
+    **Results are per SET here, not per policy, and that is not a shortcut.**
+    Every file shares `package terrapod`, so once they are evaluated together
+    the `deny` set is the union of all of them and OPA does not say which file
+    produced which message. Reporting a per-policy breakdown would mean
+    inventing an attribution we do not have. One honest entry, named for the
+    set, is the truthful shape — and it is why `shared_evaluation` is opt-in
+    rather than the default: a set that wants per-policy results keeps them by
+    leaving it off.
+    """
+    if plan_json is None or not plan_json.exists() or plan_json.stat().st_size == 0:
+        return {
+            "policy_set_id": set_id,
+            "policy_set_name": set_name,
+            "enforcement_level": enforcement,
+            "outcome": "errored",
+            "result": {
+                "policies": [
+                    {
+                        "policy": set_name,
+                        "passed": False,
+                        "violations": [],
+                        "warnings": [],
+                        "error": "plan JSON was not available for policy evaluation",
+                    }
+                ],
+                "shared_evaluation": True,
+                "evaluated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
+        }
+
+    shared_dir = rego_dir / "shared"
+    shared_dir.mkdir(parents=True, exist_ok=True)
+
+    for ix, pol in enumerate(policies):
+        (shared_dir / f"policy_{ix}.rego").write_text(pol.get("rego", ""))
+
+    skipped: list[str] = []
+    for raw_name, content in sorted(support_files.items()):
+        safe = _safe_support_name(raw_name)
+        if safe is None:
+            skipped.append(raw_name)
+            continue
+        (shared_dir / safe).write_text(content if isinstance(content, str) else str(content))
+    if skipped:
+        logger.warning("support files skipped: unsafe names", files=skipped, set=set_name)
+
+    opa_exit, opa_stdout, opa_stderr = _run_opa_eval(
+        plan_json=plan_json,
+        rego_path=shared_dir,
+        context_path=context_path,
+        opa_binary=opa_binary,
+    )
+
+    evaluated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    names = [p.get("name", "") for p in policies]
+
+    if opa_exit != 0:
+        err = opa_stderr.strip()[:1000] or f"OPA evaluation failed with exit code {opa_exit}"
+        return {
+            "policy_set_id": set_id,
+            "policy_set_name": set_name,
+            "enforcement_level": enforcement,
+            "outcome": "errored",
+            "result": {
+                "policies": [
+                    {
+                        "policy": set_name,
+                        "passed": False,
+                        "violations": [],
+                        "warnings": [],
+                        "error": err,
+                    }
+                ],
+                "shared_evaluation": True,
+                "evaluated_from": names,
+                "evaluated_at": evaluated_at,
+            },
+        }
+
+    deny, warn = _extract_deny_warn(opa_stdout)
+    return {
+        "policy_set_id": set_id,
+        "policy_set_name": set_name,
+        "enforcement_level": enforcement,
+        "outcome": "failed" if deny else "passed",
+        "result": {
+            "policies": [
+                {
+                    "policy": set_name,
+                    "passed": not deny,
+                    "violations": deny,
+                    "warnings": warn,
+                    "error": None,
+                }
+            ],
+            # Which files went in, so a reader can see what produced the
+            # verdict even though OPA cannot attribute each message.
+            "shared_evaluation": True,
+            "evaluated_from": names,
+            "evaluated_at": evaluated_at,
+        },
+    }
+
+
 def evaluate_set(
     *,
     policy_set: dict,
@@ -216,6 +361,19 @@ def evaluate_set(
     set_name = policy_set.get("name", "")
     enforcement = policy_set.get("enforcement_level", "")
     policies = policy_set.get("policies") or []
+
+    if policy_set.get("shared_evaluation"):
+        return _evaluate_set_together(
+            set_id=set_id,
+            set_name=set_name,
+            enforcement=enforcement,
+            policies=policies,
+            support_files=policy_set.get("support_files") or {},
+            plan_json=plan_json,
+            context_path=context_path,
+            rego_dir=rego_dir,
+            opa_binary=opa_binary,
+        )
 
     policy_results: list[dict] = []
     outcome = "passed"

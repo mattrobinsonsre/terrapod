@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "No se pudo guardar la política ({status})",
       "deletePolicy": "No se pudo eliminar la política",
       "deletePolicyStatus": "No se pudo eliminar ({status})"
+    },
+    "shared": {
+      "label": "Evaluar todo el conjunto en bloque",
+      "help": "Las políticas pueden llamar a reglas auxiliares compartidas y leer archivos de datos incluidos junto a ellas. Si se desactiva, cada política se evalúa por separado.",
+      "perSetResults": "Los resultados se informan para el conjunto completo. Al evaluarse en bloque, OPA no puede atribuir una denegación a una política concreta.",
+      "filesFound": "Archivos de datos y reglas auxiliares encontrados",
+      "noFiles": "No se encontraron archivos de datos ni reglas auxiliares junto a las políticas. Revise la ruta de políticas."
     }
   },
   "slackLink": {

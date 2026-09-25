@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "Nepodařilo se uložit zásadu ({status})",
       "deletePolicy": "Nepodařilo se smazat zásadu",
       "deletePolicyStatus": "Nepodařilo se smazat ({status})"
+    },
+    "shared": {
+      "label": "Vyhodnotit celou sadu společně",
+      "help": "Politiky mohou volat sdílená pomocná pravidla a číst datové soubory uložené vedle nich. Když je vypnuto, každá politika se vyhodnocuje samostatně.",
+      "perSetResults": "Výsledky se hlásí za celou sadu. Při společném vyhodnocení nedokáže OPA přiřadit zamítnutí ke konkrétní politice.",
+      "filesFound": "Nalezené datové soubory a pomocná pravidla",
+      "noFiles": "Vedle politik nebyly nalezeny žádné datové soubory ani pomocná pravidla. Zkontrolujte cestu k politikám."
     }
   },
   "slackLink": {

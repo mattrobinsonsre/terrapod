@@ -131,7 +131,13 @@ async def test_bundle_returns_applicable_sets_and_context() -> None:
         id=uuid.uuid4(), rego='package terrapod\ndeny contains x if {false; x := ""}'
     )
     policy.name = "no-public-buckets"
-    ps = MagicMock(id=uuid.uuid4(), enforcement_level="mandatory", policies=[policy])
+    ps = MagicMock(
+        id=uuid.uuid4(),
+        enforcement_level="mandatory",
+        policies=[policy],
+        shared_evaluation=False,
+        support_files={},
+    )
     ps.name = "prod-guardrails"
 
     with patch.object(
@@ -148,6 +154,48 @@ async def test_bundle_returns_applicable_sets_and_context() -> None:
     assert body["policy_sets"][0]["enforcement_level"] == "mandatory"
     assert body["policy_sets"][0]["policies"][0]["name"] == "no-public-buckets"
     assert body["context"]["workspace"]["name"] == "smoke"
+
+
+@pytest.mark.asyncio
+async def test_bundle_carries_shared_evaluation_and_support_files() -> None:
+    """The bundle is the runner's only view of a set (#1842).
+
+    The runner decides how to evaluate from what the bundle says, so a set
+    whose flag or data files do not reach it silently evaluates the old way —
+    the operator turns shared evaluation on and nothing changes.
+    """
+    run = _run()
+    ws = _ws()
+    run_id = f"run-{run.id}"
+    db = _mock_db_with_run(run, ws)
+    user = _user(method="runner_token", run_id=run_id)
+
+    policy = MagicMock(id=uuid.uuid4(), rego="package terrapod\ndeny contains x if {false}")
+    policy.name = "cidr-allowlist"
+    ps = MagicMock(
+        id=uuid.uuid4(),
+        enforcement_level="mandatory",
+        policies=[policy],
+        shared_evaluation=True,
+        support_files={"data.yaml": "approved_cidrs: []", "helpers.rego": "package terrapod"},
+    )
+    ps.name = "network"
+
+    with patch.object(
+        router.policy_set_service,
+        "applicable_policy_sets",
+        new=AsyncMock(return_value=[ps]),
+    ):
+        resp = await router.get_policy_bundle(run_id=run_id, user=user, db=db)
+
+    import json
+
+    entry = json.loads(resp.body)["policy_sets"][0]
+    assert entry["shared_evaluation"] is True
+    assert entry["support_files"] == {
+        "data.yaml": "approved_cidrs: []",
+        "helpers.rego": "package terrapod",
+    }
 
 
 # ── POST /policy-results ──────────────────────────────────────────────

@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "Kunne ikke lagre regel ({status})",
       "deletePolicy": "Kunne ikke slette regel",
       "deletePolicyStatus": "Kunne ikke slette ({status})"
+    },
+    "shared": {
+      "label": "Evaluer hele settet samlet",
+      "help": "Regler kan kalle delte hjelperegler og lese datafiler som ligger ved siden av. Når dette er av, evalueres hver regel for seg.",
+      "perSetResults": "Resultater rapporteres for hele settet. Ved samlet evaluering kan ikke OPA knytte et avslag til én enkelt regel.",
+      "filesFound": "Funne datafiler og hjelperegler",
+      "noFiles": "Ingen datafiler eller hjelperegler ble funnet ved siden av reglene. Kontroller regelstien."
     }
   },
   "slackLink": {
