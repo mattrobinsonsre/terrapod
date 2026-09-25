@@ -2656,6 +2656,17 @@ class PolicySet(Base):
     vcs_repo_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     policy_path: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
+    # Evaluate a set's files together in one `opa eval` so policies can share
+    # helper rules and data, rather than one `opa eval` per policy (#1842).
+    # Opt-in: off leaves a set evaluating exactly as it always has.
+    shared_evaluation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # The files a set carries that are not themselves policies: `.yaml`/`.yml`/
+    # `.json` data, and `.rego` helpers defining no `deny`/`warn`. Keyed by
+    # filename WITH the extension — that is what tells OPA how to load each one.
+    # Always synced, used only when `shared_evaluation` is on, so flipping the
+    # flag takes effect without waiting for the next poll.
+    support_files: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     vcs_last_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")
     vcs_last_synced_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

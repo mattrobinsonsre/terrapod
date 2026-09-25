@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "Kan beleidsregel niet opslaan ({status})",
       "deletePolicy": "Kan beleidsregel niet verwijderen",
       "deletePolicyStatus": "Kan niet verwijderen ({status})"
+    },
+    "shared": {
+      "label": "Evalueer de hele set samen",
+      "help": "Policies kunnen gedeelde hulpregels aanroepen en databestanden lezen die ernaast staan. Staat dit uit, dan wordt elke policy apart geëvalueerd.",
+      "perSetResults": "Resultaten worden voor de hele set gerapporteerd. Bij gezamenlijke evaluatie kan OPA een afwijzing niet aan één policy toeschrijven.",
+      "filesFound": "Gevonden databestanden en hulpregels",
+      "noFiles": "Er zijn geen databestanden of hulpregels naast de policies gevonden. Controleer het policy-pad."
     }
   },
   "slackLink": {

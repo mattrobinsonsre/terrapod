@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "Failed t'' save policy ({status})",
       "deletePolicy": "Failed t'' send th'' policy t'' Davy Jones",
       "deletePolicyStatus": "Failed t'' send t'' Davy Jones ({status})"
+    },
+    "shared": {
+      "label": "Judge the whole fleet as one",
+      "help": "Articles may hail shared helper orders an read charts stowed alongside 'em. With this struck, every article be judged alone.",
+      "perSetResults": "Verdicts be cried for the whole fleet. When charts be judged as one, OPA cannot name which article damned ye.",
+      "filesFound": "Charts an helper orders sighted",
+      "noFiles": "No charts nor helper orders sighted alongside the articles. Check yer course to the articles."
     }
   },
   "slackLink": {

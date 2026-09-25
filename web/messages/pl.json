@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "Nie udało się zapisać zasady ({status})",
       "deletePolicy": "Nie udało się usunąć zasady",
       "deletePolicyStatus": "Nie udało się usunąć ({status})"
+    },
+    "shared": {
+      "label": "Oceń cały zestaw razem",
+      "help": "Zasady mogą wywoływać wspólne reguły pomocnicze i czytać pliki danych umieszczone obok. Gdy wyłączone, każda zasada jest oceniana osobno.",
+      "perSetResults": "Wyniki są raportowane dla całego zestawu. Przy wspólnej ocenie OPA nie potrafi przypisać odmowy do jednej zasady.",
+      "filesFound": "Znalezione pliki danych i reguły pomocnicze",
+      "noFiles": "Obok zasad nie znaleziono plików danych ani reguł pomocniczych. Sprawdź ścieżkę zasad."
     }
   },
   "slackLink": {

@@ -8,7 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.services.policy_vcs_poller import (
-    _extract_rego_files,
+    _classify,
+    _extract_policy_files,
     _sync_policy_set,
     policy_vcs_poll_cycle,
 )
@@ -26,7 +27,15 @@ def _make_tarball(files: dict[str, str]) -> bytes:
     return buf.getvalue()
 
 
-class TestExtractRegoFiles:
+class TestExtractPolicyFiles:
+    """Extraction keeps every filename INTACT, extension included (#1842).
+
+    It used to return `{name_without_extension: content}` and take `.rego`
+    alone, which is why a `data.yaml` beside the policies could not be seen at
+    all. Naming the policy is now `_classify`'s job — see `TestClassify` — and
+    is tested there rather than here.
+    """
+
     def test_extracts_from_policy_path(self):
         archive = _make_tarball(
             {
@@ -36,11 +45,12 @@ class TestExtractRegoFiles:
                 "repo-abc123/README.md": "# Policies",
             }
         )
-        result = _extract_rego_files(archive, "policies")
-        assert "deny_s3" in result
-        assert "warn_tags" in result
-        assert "nested" not in result
-        assert "README" not in result
+        result = _extract_policy_files(archive, "policies")
+        assert "deny_s3.rego" in result
+        assert "warn_tags.rego" in result
+        assert "sub/nested.rego" not in result
+        assert "nested.rego" not in result
+        assert "README.md" not in result
 
     def test_extracts_from_root_when_path_empty(self):
         archive = _make_tarball(
@@ -49,31 +59,36 @@ class TestExtractRegoFiles:
                 "repo-abc123/sub/other.rego": "package terrapod\n# sub should be excluded",
             }
         )
-        result = _extract_rego_files(archive, "")
-        assert "main" in result
-        assert "other" not in result
+        result = _extract_policy_files(archive, "")
+        assert "main.rego" in result
+        assert "other.rego" not in result
 
-    def test_strips_rego_extension_for_name(self):
+    def test_keeps_the_extension_on_the_key(self):
+        """The extension is what tells OPA how to load a file and what
+        separates a helper from a data file, so extraction must not strip it."""
         archive = _make_tarball(
             {
                 "repo-abc123/my-policy.rego": "package terrapod\ndeny contains msg if { false }",
             }
         )
-        result = _extract_rego_files(archive, "")
-        assert "my-policy" in result
-        assert "my-policy.rego" not in result
+        result = _extract_policy_files(archive, "")
+        assert result.keys() == {"my-policy.rego"}
 
-    def test_ignores_non_rego_files(self):
+    def test_takes_data_files_and_still_ignores_everything_else(self):
+        """`data.json` used to be dropped here — the reason a set could not
+        carry data at all. A README beside the policies is still ignored."""
         archive = _make_tarball(
             {
                 "repo-abc123/policies/valid.rego": "package terrapod\ndeny contains msg if { false }",
-                "repo-abc123/policies/README.md": "# docs",
                 "repo-abc123/policies/data.json": "{}",
+                "repo-abc123/policies/data.yaml": "a: 1",
+                "repo-abc123/policies/data.yml": "b: 2",
+                "repo-abc123/policies/README.md": "# docs",
+                "repo-abc123/policies/Makefile": "all:",
             }
         )
-        result = _extract_rego_files(archive, "policies")
-        assert "valid" in result
-        assert len(result) == 1
+        result = _extract_policy_files(archive, "policies")
+        assert sorted(result) == ["data.json", "data.yaml", "data.yml", "valid.rego"]
 
     def test_handles_trailing_slash_in_path(self):
         archive = _make_tarball(
@@ -81,12 +96,12 @@ class TestExtractRegoFiles:
                 "repo-abc123/policies/test.rego": "package terrapod\ndeny contains msg if { false }",
             }
         )
-        result = _extract_rego_files(archive, "policies/")
-        assert "test" in result
+        result = _extract_policy_files(archive, "policies/")
+        assert "test.rego" in result
 
     def test_empty_archive_returns_empty(self):
         archive = _make_tarball({})
-        result = _extract_rego_files(archive, "policies")
+        result = _extract_policy_files(archive, "policies")
         assert result == {}
 
     def test_no_matching_path_returns_empty(self):
@@ -95,7 +110,7 @@ class TestExtractRegoFiles:
                 "repo-abc123/other-dir/test.rego": "package terrapod\ndeny contains msg if { false }",
             }
         )
-        result = _extract_rego_files(archive, "policies")
+        result = _extract_policy_files(archive, "policies")
         assert result == {}
 
     def test_rejects_absolute_path_traversal(self):
@@ -104,7 +119,7 @@ class TestExtractRegoFiles:
                 "/etc/passwd.rego": "package terrapod\n",
             }
         )
-        result = _extract_rego_files(archive, "")
+        result = _extract_policy_files(archive, "")
         assert result == {}
 
     def test_rejects_dotdot_traversal(self):
@@ -113,7 +128,7 @@ class TestExtractRegoFiles:
                 "../../../etc/shadow.rego": "package terrapod\n",
             }
         )
-        result = _extract_rego_files(archive, "")
+        result = _extract_policy_files(archive, "")
         assert result == {}
 
     def test_rejects_embedded_dotdot(self):
@@ -122,8 +137,27 @@ class TestExtractRegoFiles:
                 "repo-abc123/../../../etc/passwd.rego": "package terrapod\n",
             }
         )
-        result = _extract_rego_files(archive, "")
+        result = _extract_policy_files(archive, "")
         assert result == {}
+
+    def test_traversal_is_rejected_for_data_files_too(self):
+        """The suffix list grew, so the traversal guard has to cover the new
+        suffixes as well — it sits before the suffix check, and this pins it."""
+        archive = _make_tarball({"repo-abc123/../../../etc/evil.yaml": "a: 1"})
+        assert _extract_policy_files(archive, "") == {}
+
+
+class TestClassify:
+    """Naming a policy moved here from extraction (#1842)."""
+
+    def test_a_policy_keeps_the_name_it_has_always_had(self):
+        """Extension-stripped, because that name is what the UI, the results
+        and the API call a policy — renaming them would break every consumer."""
+        policies, support = _classify(
+            {"my-policy.rego": "package terrapod\ndeny contains msg if { false }"}
+        )
+        assert policies.keys() == {"my-policy"}
+        assert support == {}
 
 
 # ── _sync_policy_set tests ──────────────────────────────────────────────
@@ -311,8 +345,14 @@ class TestSyncPolicySet:
     @patch(f"{_PATCH_PREFIX}._download_archive", new_callable=AsyncMock)
     @patch(f"{_PATCH_PREFIX}._get_branch_sha", new_callable=AsyncMock)
     @patch(f"{_PATCH_PREFIX}._parse_repo_url")
-    async def test_skips_rego_with_wrong_package(self, mock_parse, mock_sha, mock_download):
-        """Files not declaring 'package terrapod' are skipped."""
+    async def test_rego_with_wrong_package_is_not_a_policy(
+        self, mock_parse, mock_sha, mock_download
+    ):
+        """It is kept as a support file rather than becoming a Policy row.
+
+        Before #1842 it was dropped at sync. It is still not a policy — the
+        package check is what stops an unrelated rego file in the directory
+        being run as one — but a set may legitimately carry it as a helper."""
         archive = _make_tarball(
             {
                 "repo-abc123/policies/good.rego": "package terrapod\ndeny contains msg if { false }",
@@ -332,17 +372,22 @@ class TestSyncPolicySet:
         add_arg = db.add.call_args_list[0][0][0]
         assert add_arg.name == "good"
         assert len(db.add.call_args_list) == 1
+        assert ps.support_files.keys() == {"bad_pkg.rego"}
 
     @pytest.mark.asyncio
     @patch(f"{_PATCH_PREFIX}._download_archive", new_callable=AsyncMock)
     @patch(f"{_PATCH_PREFIX}._get_branch_sha", new_callable=AsyncMock)
     @patch(f"{_PATCH_PREFIX}._parse_repo_url")
-    async def test_skips_rego_without_deny_rule(self, mock_parse, mock_sha, mock_download):
-        """Files without a deny rule are skipped."""
+    async def test_a_verdictless_rego_becomes_a_support_file(
+        self, mock_parse, mock_sha, mock_download
+    ):
+        """The shared helper the issue is about. It produces no verdict, so it
+        is not a Policy — but it must reach the set, or it cannot be called."""
         archive = _make_tarball(
             {
                 "repo-abc123/policies/good.rego": "package terrapod\ndeny contains msg if { false }",
-                "repo-abc123/policies/no_deny.rego": "package terrapod\nallow := true",
+                "repo-abc123/policies/helpers.rego": "package terrapod\nis_ok(x) if { x == 1 }",
+                "repo-abc123/policies/data.yaml": "approved: []",
             }
         )
         mock_parse.return_value = ("org", "policies")
@@ -354,10 +399,62 @@ class TestSyncPolicySet:
 
         await _sync_policy_set(db, ps)
 
-        assert db.add.called
-        add_arg = db.add.call_args_list[0][0][0]
-        assert add_arg.name == "good"
         assert len(db.add.call_args_list) == 1
+        assert db.add.call_args_list[0][0][0].name == "good"
+        assert sorted(ps.support_files) == ["data.yaml", "helpers.rego"]
+
+    @pytest.mark.asyncio
+    @patch(f"{_PATCH_PREFIX}._download_archive", new_callable=AsyncMock)
+    @patch(f"{_PATCH_PREFIX}._get_branch_sha", new_callable=AsyncMock)
+    @patch(f"{_PATCH_PREFIX}._parse_repo_url")
+    async def test_support_files_are_synced_whatever_the_flag_says(
+        self, mock_parse, mock_sha, mock_download
+    ):
+        """Gating the sync on `shared_evaluation` would mean an operator who
+        turns it on sees nothing change until the next poll, which reads as the
+        feature being broken."""
+        archive = _make_tarball(
+            {
+                "repo-abc123/policies/good.rego": "package terrapod\ndeny contains msg if { false }",
+                "repo-abc123/policies/data.yaml": "approved: []",
+            }
+        )
+        mock_parse.return_value = ("org", "policies")
+        mock_sha.return_value = "new-sha"
+        mock_download.return_value = archive
+
+        ps = _mock_policy_set(vcs_last_commit_sha="old-sha")
+        ps.shared_evaluation = False
+        db = AsyncMock()
+
+        await _sync_policy_set(db, ps)
+
+        assert ps.support_files.keys() == {"data.yaml"}
+
+    @pytest.mark.asyncio
+    @patch(f"{_PATCH_PREFIX}._download_archive", new_callable=AsyncMock)
+    @patch(f"{_PATCH_PREFIX}._get_branch_sha", new_callable=AsyncMock)
+    @patch(f"{_PATCH_PREFIX}._parse_repo_url")
+    async def test_a_deleted_support_file_stops_being_carried(
+        self, mock_parse, mock_sha, mock_download
+    ):
+        """`support_files` is REPLACED, not merged — deleting a data file from
+        the repo must stop the policies seeing its data. A merge would leave a
+        removed allowlist silently in force."""
+        archive = _make_tarball(
+            {"repo-abc123/policies/good.rego": "package terrapod\ndeny contains msg if { false }"}
+        )
+        mock_parse.return_value = ("org", "policies")
+        mock_sha.return_value = "new-sha"
+        mock_download.return_value = archive
+
+        ps = _mock_policy_set(vcs_last_commit_sha="old-sha")
+        ps.support_files = {"data.yaml": "approved: [everything]"}
+        db = AsyncMock()
+
+        await _sync_policy_set(db, ps)
+
+        assert ps.support_files == {}
 
 
 # ── policy_vcs_poll_cycle tests ──────────────────────────────────────────

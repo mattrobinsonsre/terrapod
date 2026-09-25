@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "F41l3d 70 54v3 p0l1cy ({status})",
       "deletePolicy": "F41l3d 70 d3l373 p0l1cy",
       "deletePolicyStatus": "F41l3d 70 d3l373 ({status})"
+    },
+    "shared": {
+      "label": "3v4lu473 7h3 wh0l3 537 70g37h3r",
+      "help": "P0l1c135 c4n c4ll 5h4r3d h3lp3r rul35 4nd r34d d474 f1l35 c0mm1773d b351d3 7h3m. Wh3n 0ff, 34ch p0l1cy 15 3v4lu473d 4l0n3.",
+      "perSetResults": "R35ul75 4r3 r3p0r73d f0r 7h3 537 45 4 wh0l3. Wh3n f1l35 4r3 3v4lu473d 70g37h3r, 0P4 c4nn07 477r1bu73 4 d3n14l 70 0n3 p0l1cy.",
+      "filesFound": "D474 f1l35 4nd h3lp3r5 f0und",
+      "noFiles": "N0 d474 f1l35 0r h3lp3r5 w3r3 f0und b351d3 7h3 p0l1c135. Ch3ck 7h3 p0l1cy p47h."
     }
   },
   "slackLink": {

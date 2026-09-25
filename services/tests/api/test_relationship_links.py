@@ -141,6 +141,8 @@ class TestPolicySet:
             vcs_repo_url=None,
             vcs_branch=None,
             policy_path=None,
+            shared_evaluation=False,
+            support_files={},
             vcs_last_commit_sha=None,
             vcs_last_synced_at=None,
             vcs_last_error=None,

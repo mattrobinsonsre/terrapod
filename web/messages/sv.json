@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "Det gick inte att spara policyn ({status})",
       "deletePolicy": "Det gick inte att ta bort policyn",
       "deletePolicyStatus": "Det gick inte att ta bort ({status})"
+    },
+    "shared": {
+      "label": "Utvärdera hela uppsättningen tillsammans",
+      "help": "Policyer kan anropa delade hjälpregler och läsa datafiler som ligger bredvid. När detta är av utvärderas varje policy för sig.",
+      "perSetResults": "Resultat rapporteras för hela uppsättningen. Vid gemensam utvärdering kan OPA inte koppla ett avslag till en enskild policy.",
+      "filesFound": "Hittade datafiler och hjälpregler",
+      "noFiles": "Inga datafiler eller hjälpregler hittades bredvid policyerna. Kontrollera policysökvägen."
     }
   },
   "slackLink": {

@@ -74,6 +74,71 @@ deny contains msg if {
 
 A policy set **passes** when every policy's `deny` set is empty.
 
+## Sharing data and helpers between policies
+
+By default each policy is evaluated **on its own** — one `opa eval` per policy,
+seeing only that file and the run context. Nothing is shared, so a set of
+policies that all need the same allowlist has to carry a copy of it in every
+file, and the copies drift.
+
+Turning on **shared evaluation** for a set evaluates its files *together*, in a
+single pass:
+
+```
+policies/
+  data.yaml        # approved_cidrs, denied_types, ...
+  helpers.rego     # package terrapod, no deny rule
+  network.rego     # uses data.approved_cidrs
+  modules.rego     # calls a helper from helpers.rego
+```
+
+- **Data files** (`.yaml`, `.yml`, `.json`) load at the `data.` root, the same
+  way `conftest -d` loads them. `approved_cidrs` in `data.yaml` is readable as
+  `data.approved_cidrs`.
+- **Helper `.rego` files** — ones that declare `package terrapod` but define no
+  `deny` or `warn` — become callable from any policy in the set. Without shared
+  evaluation these are not merely unused: they are **dropped at sync time**, so
+  a shared helper cannot exist at all.
+- `*_test.rego` is never synced, so OPA test fixtures cannot leak into the data
+  your policies see.
+
+Enable it per set, in the UI under **Admin → Policy sets**, or as code:
+
+```hcl
+resource "terrapod_policy_set" "network" {
+  name              = "network"
+  shared_evaluation = true
+  # ...
+}
+```
+
+### What you give up, and why it is a choice
+
+**Results become per-SET rather than per-policy.** Every file declares
+`package terrapod`, so once they are evaluated together the `deny` set is the
+union of all of them and OPA does not record which file produced which message.
+Terrapod reports one result for the set rather than inventing an attribution it
+does not have.
+
+That is the whole reason the setting is opt-in. If the per-policy breakdown
+matters more to you than sharing, leave it off — nothing about a set changes
+until you turn it on.
+
+### Runner version
+
+Shared evaluation is carried out **by the runner**, so it needs runners new
+enough to understand it. An older runner ignores the setting and evaluates each
+policy alone, *without* the data files — and a rule referencing
+`data.approved_cidrs` is then undefined rather than failing, which means it
+**passes**. Upgrade runners before enabling this on a set you rely on.
+
+### Confirming your files were picked up
+
+The policy set page lists the data files and helpers the sync found, and the
+same list is on the API as `support-file-names`. A set with shared evaluation
+on and nothing listed is the usual symptom of a wrong `policy-path` — which
+otherwise looks exactly like the feature not working.
+
 ### What a policy can read
 
 `data.terrapod_context` is the same whatever the engine. `input` is **the

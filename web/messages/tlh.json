@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "chut polmeH lujpu' ({status})",
       "deletePolicy": "chut Qaw'meH lujpu'",
       "deletePolicyStatus": "Qaw'meH lujpu' ({status})"
+    },
+    "shared": {
+      "label": "naQ Segh boq ghojmoH",
+      "help": "chutmey boqDaj QaH chutmey jatlh, 'ej De' teywI'mey lughoj. chu'be'chugh, pagh chut mob ghojmoH.",
+      "perSetResults": "naQ SeghvaD Qapmey ja'. boq ghojmoHlu'chugh, wa' chutvaD lujbe' ja'laHbe' OPA.",
+      "filesFound": "De' teywI'mey QaH chutmey je tu'lu'",
+      "noFiles": "chutmey retlhDaq De' teywI'mey QaH chutmey joq tu'be'lu'. chut He yInuD."
     }
   },
   "slackLink": {

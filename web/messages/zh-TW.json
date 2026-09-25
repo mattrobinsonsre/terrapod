@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "儲存策略失敗（{status}）",
       "deletePolicy": "刪除策略失敗",
       "deletePolicyStatus": "刪除失敗（{status}）"
+    },
+    "shared": {
+      "label": "將整個原則集一起評估",
+      "help": "原則可以呼叫共用的輔助規則，並讀取一同提交的資料檔。關閉時，每條原則各自評估。",
+      "perSetResults": "結果以整個原則集回報。一起評估時，OPA 無法將某次拒絕歸因於單一原則。",
+      "filesFound": "找到的資料檔與輔助規則",
+      "noFiles": "未在原則旁找到資料檔或輔助規則。請檢查原則路徑。"
     }
   },
   "slackLink": {

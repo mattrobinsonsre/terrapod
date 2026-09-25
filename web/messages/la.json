@@ -3171,6 +3171,13 @@
       "savePolicyStatus": "Regula servari non potuit ({status})",
       "deletePolicy": "Regula deleri non potuit",
       "deletePolicyStatus": "Deleri non potuit ({status})"
+    },
+    "shared": {
+      "label": "Totum conlectum simul aestimare",
+      "help": "Regulae auxiliares communes vocare et tabellas datorum iuxta positas legere possunt. Cum hoc exstinctum est, singula regula sola aestimatur.",
+      "perSetResults": "Eventus pro toto conlecto nuntiantur. Cum simul aestimantur, OPA negationem uni regulae tribuere non potest.",
+      "filesFound": "Tabellae datorum et auxilia inventa",
+      "noFiles": "Nullae tabellae datorum nec auxilia iuxta regulas inventa sunt. Semitam regularum inspice."
     }
   },
   "slackLink": {

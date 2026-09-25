@@ -240,6 +240,7 @@ field CreatePolicySetRequest.EnforcementLevel string
 field CreatePolicySetRequest.GlobalScope bool
 field CreatePolicySetRequest.Name string
 field CreatePolicySetRequest.PolicyPath string
+field CreatePolicySetRequest.SharedEvaluation bool
 field CreatePolicySetRequest.Source string
 field CreatePolicySetRequest.VCSBranch string
 field CreatePolicySetRequest.VCSConnectionID string
@@ -709,7 +710,9 @@ field PolicySet.ID string `json:"id"`
 field PolicySet.Name string `json:"name"`
 field PolicySet.PolicyCount int64 `json:"policy-count"`
 field PolicySet.PolicyPath string `json:"policy-path,omitempty"`
+field PolicySet.SharedEvaluation bool `json:"shared-evaluation"`
 field PolicySet.Source string `json:"source"`
+field PolicySet.SupportFileNames []string `json:"support-file-names"`
 field PolicySet.UpdatedAt string `json:"updated-at,omitempty"`
 field PolicySet.VCSBranch string `json:"vcs-branch,omitempty"`
 field PolicySet.VCSConnectionID string `json:"vcs-connection-id,omitempty"`
@@ -984,6 +987,7 @@ field UpdatePolicySetRequest.EnforcementLevel *string
 field UpdatePolicySetRequest.GlobalScope *bool
 field UpdatePolicySetRequest.Name *string
 field UpdatePolicySetRequest.PolicyPath *string
+field UpdatePolicySetRequest.SharedEvaluation *bool
 field UpdatePolicySetRequest.VCSBranch *string
 field UpdatePolicySetRequest.VCSRepoURL *string
 field UpdateRegistryModuleRequest.Labels *map[string]string

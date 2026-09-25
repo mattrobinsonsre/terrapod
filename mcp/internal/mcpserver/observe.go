@@ -661,7 +661,13 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			"always win — and each label key binds a LIST of accepted values, so {\"env\": [\"prod\", \"stg\"]} " +
 			"means \"env is prod OR stg\". A `vcs-last-error` is worth surfacing unprompted: a set that cannot " +
 			"sync is still evaluated, against whatever it last managed to fetch, so the policies in the " +
-			"repository and the policies being enforced may differ.",
+			"repository and the policies being enforced may differ. " +
+			"`shared-evaluation` changes how to read a failure: with it on, the set's policies, helper " +
+			"rules and data files are evaluated together in one pass, so a denial is attributed to the SET " +
+			"and not to any one policy — do not report which policy failed for such a set, because nothing " +
+			"knows. `support-file-names` lists the data files and helpers the sync picked up; a set whose " +
+			"policies read `data.something` and whose support-file-names is empty is misconfigured, and that " +
+			"is worth saying even though the run will not obviously fail because of it.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ policySetsIn) (*mcp.CallToolResult, *policySetsOut, error) {
 		items, err := c.ListPolicySets(ctx)
@@ -677,6 +683,9 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			}
 			if items[i].DenyLabels == nil {
 				items[i].DenyLabels = map[string][]string{}
+			}
+			if items[i].SupportFileNames == nil {
+				items[i].SupportFileNames = []string{}
 			}
 		}
 		return nil, &policySetsOut{Count: len(items), PolicySets: items}, nil
