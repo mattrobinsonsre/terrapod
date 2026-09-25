@@ -163,3 +163,74 @@ class TestItRefusesToBindToNobody:
                 )
         assert exc.value.status_code == 422
         assert "deactivated" in exc.value.detail
+
+
+class TestListingIsAlsoAboutTheUserInThePath:
+    """The sibling endpoint had the same defect, and #1838 made it matter.
+
+    `list_user_tokens_endpoint` gated on `user_id` and then listed
+    `user.email`, so an admin asking for Alice's tokens got their OWN back
+    under Alice's path. That is verbatim the bug #1838 fixed one endpoint
+    along — `user_id` treated as a permission check rather than as the
+    subject.
+
+    It was survivable while every token belonged to its creator. Now that a
+    token can be created bound to someone else, this is the endpoint for
+    finding one again, and answering with the caller's own tokens makes a
+    delegated token look as though it was never created.
+    """
+
+    async def test_an_admin_lists_the_named_users_tokens(self):
+        db = _db(local_row=SimpleNamespace(email="planner@example.com", is_active=True))
+        with (
+            patch.object(router, "effective_platform_roles", return_value={"admin"}),
+            patch.object(router, "list_user_tokens", new=AsyncMock(return_value=[])) as listed,
+            patch.object(router, "paginate", return_value=([], {})),
+        ):
+            await router.list_user_tokens_endpoint(
+                user_id="planner@example.com", request=None, user=_user(), db=db
+            )
+        assert listed.await_args.args[1] == "planner@example.com", (
+            "must list the tokens of the user named in the path, not the caller's"
+        )
+
+    async def test_listing_your_own_is_unchanged(self):
+        db = _db()
+        with (
+            patch.object(router, "effective_platform_roles", return_value=set()),
+            patch.object(router, "list_user_tokens", new=AsyncMock(return_value=[])) as listed,
+            patch.object(router, "paginate", return_value=([], {})),
+        ):
+            await router.list_user_tokens_endpoint(
+                user_id="alice", request=None, user=_user("alice@example.com", roles=()), db=db
+            )
+        assert listed.await_args.args[1] == "alice@example.com"
+
+    async def test_you_may_list_your_own_by_email_too(self):
+        """Create accepts the email form, so list must as well — otherwise you
+        cannot list back what you just made using the identifier you made it
+        with."""
+        db = _db()
+        with (
+            patch.object(router, "effective_platform_roles", return_value=set()),
+            patch.object(router, "list_user_tokens", new=AsyncMock(return_value=[])) as listed,
+            patch.object(router, "paginate", return_value=([], {})),
+        ):
+            await router.list_user_tokens_endpoint(
+                user_id="alice@example.com",
+                request=None,
+                user=_user("alice@example.com", roles=()),
+                db=db,
+            )
+        assert listed.await_args.args[1] == "alice@example.com"
+
+    async def test_a_non_admin_still_cannot_list_someone_elses(self):
+        with patch.object(router, "effective_platform_roles", return_value=set()):
+            with pytest.raises(HTTPException) as exc:
+                await router.list_user_tokens_endpoint(
+                    user_id="bob@example.com",
+                    request=None,
+                    user=_user("alice@example.com", roles=()),
+                    db=_db(),
+                )
+        assert exc.value.status_code == 403

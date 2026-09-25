@@ -327,6 +327,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Backfill deferred Slack approval posts the summariser missed",
         )
 
+    # A run task whose webhook returned 2xx and then never called back would
+    # otherwise hold its run forever — the callback token expires after an
+    # hour, so no report can ever arrive, but nothing aged the result out
+    # (#1837). `resolve_stage` handles the boundaries something is already
+    # polling; this covers the one that has nobody asking, an auto-applying
+    # run sitting `planned` on a held pre-apply gate.
+    from terrapod.services.run_task_service import unreachable_stage_sweep_cycle
+
+    register_periodic_task(
+        "run_task_stage_sweep",
+        interval_seconds=300,
+        handler=unreachable_stage_sweep_cycle,
+        description="Resolve task stages whose callbacks can no longer arrive",
+    )
+
     # Run task webhook delivery handler
     from terrapod.services.run_task_dispatcher import handle_run_task_call
 

@@ -255,3 +255,73 @@ async def _results_for(db, stage_id):
         .scalars()
         .all()
     )
+
+
+class TestThePrePassCannotStarveTheListener:
+    """The pre-pass runs BEFORE the claim loop, on every poll.
+
+    So a failure there is not one run's problem — it 500s `/runs/next` and no
+    listener in the pool is handed any work, including runs on workspaces with
+    no run tasks at all. A deterministic fault would be an estate-wide
+    dispatch outage with no run-level signal.
+
+    Needs a real engine: the failure is a session left needing a rollback
+    (`PendingRollbackError` on the next statement), which cannot exist against
+    an `AsyncMock`. The services-tier test of this loop passed throughout the
+    window in which this was broken.
+    """
+
+    async def test_a_poisoned_gate_still_leaves_an_unrelated_run_claimable(self, app):
+        gated_ws, pool_id, gated_cv = await _seed("pre-plan-poison", stage="pre_plan")
+        await _queue_run(gated_ws, gated_cv)
+
+        # A second workspace on the SAME pool, with no run tasks at all. It is
+        # the bystander: nothing about it involves the gate.
+        async with get_db_session() as db:
+            ws = Workspace(name="pre-plan-bystander", execution_mode="agent")
+            pool_set.set_workspace_pools(ws, [pool_id])
+            db.add(ws)
+            await db.flush()
+            cv = ConfigurationVersion(workspace_id=ws.id, status="uploaded", source="tfe-api")
+            db.add(cv)
+            await db.flush()
+            await db.commit()
+            bystander_ws, bystander_cv = ws.id, cv.id
+        bystander = await _queue_run(bystander_ws, bystander_cv)
+
+        # Poison the session for real. An exception raised *after* a
+        # successful query does NOT leave the session needing a rollback, so
+        # simulating the fault that way proves nothing — the first version of
+        # this test did exactly that and passed with the fix removed. A failed
+        # FLUSH is what `create_task_stage` can actually hit, and it is what
+        # puts the session into the state whose next statement raises
+        # `PendingRollbackError`.
+        async def _poison(db, run, stage):
+            db.add(TaskStage(run_id=None, stage="pre_plan", status="running"))
+            await db.flush()  # NOT NULL violation -> session needs rollback
+
+        with patch.object(run_task_service, "evaluate_gate", _poison):
+            claim = await _claim(pool_id)
+
+        assert claim is not None, (
+            "a failure opening one workspace's gate must not stop the pool "
+            "being handed unrelated work"
+        )
+        assert claim[0].id == bystander.id
+        assert (await _reload(bystander.id)).status == "planning"
+
+    async def test_the_pass_failing_outright_still_permits_a_claim(self, app):
+        """Belt and braces at the call site, distinct from the per-candidate
+        handling: whatever `_open_pre_plan_stages` does, a claim follows."""
+        ws_id, pool_id, cv_id = await _seed("pre-plan-passfail")
+        run = await _queue_run(ws_id, cv_id)
+
+        with patch.object(
+            run_service,
+            "_open_pre_plan_stages",
+            AsyncMock(side_effect=RuntimeError("the whole pass fell over")),
+        ):
+            claim = await _claim(pool_id)
+
+        assert claim is not None, "the pre-pass is a side errand, never a gate on claiming"
+        assert claim[0].id == run.id
