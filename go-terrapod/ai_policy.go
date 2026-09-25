@@ -52,6 +52,46 @@ type AIPolicyVerdictReason struct {
 	Detail    string `json:"detail"`
 }
 
+// AIPolicyStatus is the whole answer to "is this gate holding the run, and
+// why" — the evaluation if one exists, plus the response meta that says what
+// the evaluation alone cannot.
+//
+// It exists because the row is not enough. A mandatory gate holds a run in
+// BOTH states: a verdict that denied, and no verdict at all (the summariser
+// has not answered, or never will). Reading only the row answers "nothing is
+// wrong" for the second, which is the state that most needs an answer — the
+// run sits indefinitely and OverrideRunAIPolicy is the control that releases
+// it. The server computes the authoritative answer and puts it in meta;
+// Blocking carries it through rather than recomputing it here.
+type AIPolicyStatus struct {
+	// Evaluation is nil when no verdict has been recorded. That is not an
+	// error, and it does not mean the gate is idle — see Blocking.
+	Evaluation *AIPolicyEvaluation
+
+	// Blocking is the server's own answer to "is this gate what holds the
+	// run", true even when Evaluation is nil.
+	Blocking bool
+
+	// NotEvaluatedReason distinguishes "waiting for a verdict" from "no
+	// verdict is coming" when Evaluation is nil. Empty when one exists.
+	NotEvaluatedReason string
+
+	// EnforcementLevel is the workspace's CURRENT setting. It can differ from
+	// Evaluation.EnforcementLevel, which is snapshotted at evaluation time —
+	// that divergence is the point of snapshotting, so the two are kept apart.
+	EnforcementLevel string
+
+	// RunStatus is the run's status when the gate was queried.
+	RunStatus string
+}
+
+// IsBlocking reports whether the gate is holding the run. Unlike the method of
+// the same name on AIPolicyEvaluation, this is correct when no verdict has
+// been recorded, because it reads the server's answer rather than a row.
+func (s *AIPolicyStatus) IsBlocking() bool {
+	return s != nil && s.Blocking
+}
+
 // GetRunAIPolicy fetches the AI policy verdict recorded for a run.
 //
 // Returns (nil, nil) when nothing has been recorded — the endpoint answers 200
@@ -69,6 +109,25 @@ func (c *Client) GetRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEva
 		return nil, err
 	}
 	return aiPolicyFromBody(data, runID)
+}
+
+// GetRunAIPolicyStatus fetches the verdict AND the server's answer to whether
+// the gate is holding the run.
+//
+// Prefer this over GetRunAIPolicy whenever the question is "is anything
+// blocking this run": GetRunAIPolicy returns (nil, nil) for a run held with no
+// verdict recorded, and AIPolicyEvaluation.IsBlocking on that nil is false —
+// so the one state that most needs surfacing reads as "nothing is wrong".
+func (c *Client) GetRunAIPolicyStatus(ctx context.Context, runID string) (*AIPolicyStatus, error) {
+	id, err := runIDPath(runID)
+	if err != nil {
+		return nil, err
+	}
+	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+id+"/ai-policy")
+	if err != nil {
+		return nil, err
+	}
+	return aiPolicyStatusFromBody(data, runID)
 }
 
 // OverrideRunAIPolicy releases a run held by the AI policy gate (requires
@@ -94,20 +153,44 @@ func (c *Client) OverrideRunAIPolicy(ctx context.Context, runID string) (*AIPoli
 // aiPolicyFromBody decodes the {"data": <resource>|null, "meta": ...} body.
 // A null data element means "no verdict recorded" → (nil, nil).
 func aiPolicyFromBody(data []byte, runID string) (*AIPolicyEvaluation, error) {
+	st, err := aiPolicyStatusFromBody(data, runID)
+	if err != nil {
+		return nil, err
+	}
+	return st.Evaluation, nil
+}
+
+// aiPolicyStatusFromBody decodes BOTH halves of the body. The meta half is
+// what makes a held-with-no-verdict run visible, so it is not optional
+// decoding — it is the part the row cannot tell you.
+func aiPolicyStatusFromBody(data []byte, runID string) (*AIPolicyStatus, error) {
 	var envelope struct {
 		Data json.RawMessage `json:"data"`
+		Meta struct {
+			Blocking           bool   `json:"blocking"`
+			NotEvaluatedReason string `json:"not-evaluated-reason"`
+			EnforcementLevel   string `json:"enforcement-level"`
+			RunStatus          string `json:"run-status"`
+		} `json:"meta"`
 	}
 	if err := json.Unmarshal(data, &envelope); err != nil {
 		return nil, fmt.Errorf("parse ai-policy response: %w", err)
 	}
+	st := &AIPolicyStatus{
+		Blocking:           envelope.Meta.Blocking,
+		NotEvaluatedReason: envelope.Meta.NotEvaluatedReason,
+		EnforcementLevel:   envelope.Meta.EnforcementLevel,
+		RunStatus:          envelope.Meta.RunStatus,
+	}
 	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-		return nil, nil
+		return st, nil
 	}
 	res, err := ParseResource(data)
 	if err != nil {
 		return nil, fmt.Errorf("parse ai-policy resource: %w", err)
 	}
-	return aiPolicyFromResource(res, runID), nil
+	st.Evaluation = aiPolicyFromResource(res, runID)
+	return st, nil
 }
 
 func aiPolicyFromResource(res *Resource, runID string) *AIPolicyEvaluation {
@@ -141,6 +224,11 @@ func aiPolicyFromResource(res *Resource, runID string) *AIPolicyEvaluation {
 // An overridden evaluation never blocks, and an advisory one never blocks
 // whatever its outcome — which is why this is a method rather than a caller
 // comparing Outcome to "failed" and getting the other two conditions wrong.
+//
+// It answers only for a verdict that EXISTS. A mandatory gate also holds a run
+// with no verdict at all, and this reports false on the nil receiver you get
+// in that case. Use Client.GetRunAIPolicyStatus and AIPolicyStatus.IsBlocking
+// when the question is "is this run held", rather than "did this ruling deny".
 func (e *AIPolicyEvaluation) IsBlocking() bool {
 	if e == nil {
 		return false

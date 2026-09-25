@@ -172,6 +172,74 @@ class TestSharedEvaluationAgainstRealOpa:
         assert out["outcome"] == "errored"
         assert out["result"]["policies"][0]["error"]
 
+    def test_one_sets_files_never_reach_another_sets_evaluation(self, tmp_path):
+        """Two shared sets in ONE run, through ONE rego_dir — production's shape.
+
+        `opa eval` loads a directory recursively, so a single shared directory
+        let set A's leftovers be evaluated as part of set B. It hid whenever
+        the two sets had equal file counts, because the per-index names
+        overwrote each other; A having MORE files than B is what exposes it.
+
+        The consequence is not cosmetic: B here is MANDATORY and A's rule is
+        ADVISORY, so the leak turns an advisory rule into a blocking one and
+        reports it under a set that does not contain it.
+        """
+        plan_json = tmp_path / "plan.json"
+        plan_json.write_text(
+            json.dumps(
+                {"resource_changes": [{"address": "aws_iam_policy.x", "type": "aws_iam_policy"}]}
+            )
+        )
+        context = tmp_path / "ctx.json"
+        context.write_text(json.dumps({"terrapod_context": {}}))
+        rego_dir = tmp_path / "rego"
+
+        noop = (
+            'package terrapod\nimport rego.v1\n\ndeny contains m if {\n\tfalse\n\tm := "never"\n}\n'
+        )
+        iam = (
+            "package terrapod\nimport rego.v1\n\ndeny contains m if {\n"
+            '\tsome r in input.resource_changes\n\tr.type == "aws_iam_policy"\n'
+            '\tm := "set A rule"\n}\n'
+        )
+        nat = (
+            "package terrapod\nimport rego.v1\n\ndeny contains m if {\n"
+            '\tsome r in input.resource_changes\n\tr.type == "aws_nat_gateway"\n'
+            '\tm := "set B rule"\n}\n'
+        )
+
+        first = _set(
+            id="polset-a",
+            name="platform-guardrails",
+            enforcement_level="advisory",
+            support_files={"data.yaml": "approved_cidrs: []\n"},
+            policies=[{"name": "noop", "rego": noop}, {"name": "iam", "rego": iam}],
+        )
+        second = _set(
+            id="polset-b",
+            name="cost-guardrails",
+            enforcement_level="mandatory",
+            support_files={},
+            policies=[{"name": "nat", "rego": nat}],
+        )
+
+        for ps in (first, second):
+            out = opa.evaluate_set(
+                policy_set=ps,
+                plan_json=plan_json,
+                context_path=context,
+                rego_dir=rego_dir,
+                opa_binary=self.opa,
+            )
+            if ps is first:
+                assert out["result"]["policies"][0]["violations"] == ["set A rule"]
+            else:
+                assert out["result"]["policies"][0]["violations"] == [], (
+                    "set B evaluated set A's leftover rule — the mandatory set "
+                    "would have blocked on an advisory set's policy"
+                )
+                assert out["outcome"] == "passed"
+
 
 class TestSharedEvaluationShape:
     """Shape assertions, which need no binary."""

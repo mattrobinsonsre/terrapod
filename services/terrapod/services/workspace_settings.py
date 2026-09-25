@@ -272,7 +272,12 @@ def clamp_drift_interval(raw: object) -> int:
 def validate_terragrunt_version(raw: object) -> str:
     if not isinstance(raw, str) or not raw.strip():
         raise ValueError("terragrunt-version must be a non-empty string")
-    return raw.strip()
+    cleaned = raw.strip()
+    # The column is String(50). Without this the over-long case is a DataError
+    # at commit -- a 500 -- rather than the 422 this validator exists to give.
+    if len(cleaned) > 50:
+        raise ValueError("terragrunt-version must be 50 characters or fewer")
+    return cleaned
 
 
 def validate_slack_channel(raw: object) -> str:

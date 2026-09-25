@@ -29,6 +29,8 @@ Flow:
 from __future__ import annotations
 
 import json
+import re
+import shutil
 import subprocess
 import time
 from collections.abc import Callable
@@ -199,6 +201,20 @@ def fetch_policy_bundle(
             client.close()
 
 
+def _safe_dir_component(set_id: str) -> str:
+    """A policy set's id reduced to one safe path component.
+
+    The id is server-generated (`polset-<uuid>`), but it reaches the runner
+    over the wire, so it is sanitised for the same reason support-file names
+    are rather than trusted. Anything outside the allow-list becomes `_`, and
+    an empty result falls back to a constant -- a set with an unusable id still
+    gets a directory, it just does not get an isolated one, which is no worse
+    than the single shared directory this replaced.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", set_id or "")
+    return cleaned or "unnamed"
+
+
 def _safe_support_name(name: str) -> str | None:
     """A support file's name, reduced to something safe to write to disk.
 
@@ -264,7 +280,17 @@ def _evaluate_set_together(
             },
         }
 
-    shared_dir = rego_dir / "shared"
+    # A directory PER SET, emptied first. Every set in a run shares one
+    # `rego_dir`, and `opa eval` loads a directory recursively -- so a single
+    # shared path let one set's files reach another's evaluation. Measured
+    # against OPA 1.20.2: with set A (advisory, two policies, a data.yaml)
+    # evaluated before set B (mandatory, one policy), B's own `policy_0.rego`
+    # overwrote A's but A's `policy_1.rego` and `data.yaml` remained, so B
+    # reported `failed` citing a rule it does not contain -- an advisory rule
+    # silently became blocking under another set's name. Same-named files hid
+    # it whenever the sets had equal file counts, which is what the tests had.
+    shared_dir = rego_dir / f"shared-{_safe_dir_component(set_id)}"
+    shutil.rmtree(shared_dir, ignore_errors=True)
     shared_dir.mkdir(parents=True, exist_ok=True)
 
     for ix, pol in enumerate(policies):

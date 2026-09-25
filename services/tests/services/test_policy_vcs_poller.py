@@ -14,6 +14,8 @@ from terrapod.services.policy_vcs_poller import (
     policy_vcs_poll_cycle,
 )
 
+POLICY = 'package terrapod\ndeny contains msg if { false\n  msg := "no" }'
+
 
 def _make_tarball(files: dict[str, str]) -> bytes:
     """Create an in-memory gzipped tarball with the given path->content mapping."""
@@ -45,7 +47,7 @@ class TestExtractPolicyFiles:
                 "repo-abc123/README.md": "# Policies",
             }
         )
-        result = _extract_policy_files(archive, "policies")
+        result, _skipped = _extract_policy_files(archive, "policies")
         assert "deny_s3.rego" in result
         assert "warn_tags.rego" in result
         assert "sub/nested.rego" not in result
@@ -59,7 +61,7 @@ class TestExtractPolicyFiles:
                 "repo-abc123/sub/other.rego": "package terrapod\n# sub should be excluded",
             }
         )
-        result = _extract_policy_files(archive, "")
+        result, _skipped = _extract_policy_files(archive, "")
         assert "main.rego" in result
         assert "other.rego" not in result
 
@@ -71,7 +73,7 @@ class TestExtractPolicyFiles:
                 "repo-abc123/my-policy.rego": "package terrapod\ndeny contains msg if { false }",
             }
         )
-        result = _extract_policy_files(archive, "")
+        result, _skipped = _extract_policy_files(archive, "")
         assert result.keys() == {"my-policy.rego"}
 
     def test_takes_data_files_and_still_ignores_everything_else(self):
@@ -87,7 +89,7 @@ class TestExtractPolicyFiles:
                 "repo-abc123/policies/Makefile": "all:",
             }
         )
-        result = _extract_policy_files(archive, "policies")
+        result, _skipped = _extract_policy_files(archive, "policies")
         assert sorted(result) == ["data.json", "data.yaml", "data.yml", "valid.rego"]
 
     def test_handles_trailing_slash_in_path(self):
@@ -96,12 +98,12 @@ class TestExtractPolicyFiles:
                 "repo-abc123/policies/test.rego": "package terrapod\ndeny contains msg if { false }",
             }
         )
-        result = _extract_policy_files(archive, "policies/")
+        result, _skipped = _extract_policy_files(archive, "policies/")
         assert "test.rego" in result
 
     def test_empty_archive_returns_empty(self):
         archive = _make_tarball({})
-        result = _extract_policy_files(archive, "policies")
+        result, _skipped = _extract_policy_files(archive, "policies")
         assert result == {}
 
     def test_no_matching_path_returns_empty(self):
@@ -110,7 +112,7 @@ class TestExtractPolicyFiles:
                 "repo-abc123/other-dir/test.rego": "package terrapod\ndeny contains msg if { false }",
             }
         )
-        result = _extract_policy_files(archive, "policies")
+        result, _skipped = _extract_policy_files(archive, "policies")
         assert result == {}
 
     def test_rejects_absolute_path_traversal(self):
@@ -119,7 +121,7 @@ class TestExtractPolicyFiles:
                 "/etc/passwd.rego": "package terrapod\n",
             }
         )
-        result = _extract_policy_files(archive, "")
+        result, _skipped = _extract_policy_files(archive, "")
         assert result == {}
 
     def test_rejects_dotdot_traversal(self):
@@ -128,7 +130,7 @@ class TestExtractPolicyFiles:
                 "../../../etc/shadow.rego": "package terrapod\n",
             }
         )
-        result = _extract_policy_files(archive, "")
+        result, _skipped = _extract_policy_files(archive, "")
         assert result == {}
 
     def test_rejects_embedded_dotdot(self):
@@ -137,14 +139,14 @@ class TestExtractPolicyFiles:
                 "repo-abc123/../../../etc/passwd.rego": "package terrapod\n",
             }
         )
-        result = _extract_policy_files(archive, "")
+        result, _skipped = _extract_policy_files(archive, "")
         assert result == {}
 
     def test_traversal_is_rejected_for_data_files_too(self):
         """The suffix list grew, so the traversal guard has to cover the new
         suffixes as well — it sits before the suffix check, and this pins it."""
         archive = _make_tarball({"repo-abc123/../../../etc/evil.yaml": "a: 1"})
-        assert _extract_policy_files(archive, "") == {}
+        assert _extract_policy_files(archive, "")[0] == {}
 
 
 class TestClassify:
@@ -207,6 +209,86 @@ class TestSyncPolicySet:
         await _sync_policy_set(db, ps)
 
         assert ps.vcs_last_error is None
+
+    @pytest.mark.asyncio
+    @patch(f"{_PATCH_PREFIX}._download_archive", new_callable=AsyncMock)
+    @patch(f"{_PATCH_PREFIX}._get_branch_sha", new_callable=AsyncMock)
+    @patch(f"{_PATCH_PREFIX}._parse_repo_url")
+    async def test_force_re_reads_an_unchanged_head(self, mock_parse, mock_sha, mock_download):
+        """The backfill path. Same SHA, but the files are read anyway.
+
+        This is what makes enabling `shared_evaluation` on an existing set
+        work: `support_files` has no commit coming to populate it.
+        """
+        archive = _make_tarball(
+            {
+                "repo-abc123/policies/net.rego": POLICY,
+                "repo-abc123/policies/data.yaml": "approved_cidrs: []",
+            }
+        )
+        mock_parse.return_value = ("org", "policies")
+        mock_sha.return_value = "same-sha"
+        mock_download.return_value = archive
+
+        ps = _mock_policy_set(vcs_last_commit_sha="same-sha")
+        ps.support_files = {}
+        db = AsyncMock()
+
+        await _sync_policy_set(db, ps, force=True)
+
+        assert ps.support_files == {"data.yaml": "approved_cidrs: []"}
+        mock_download.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @patch(f"{_PATCH_PREFIX}._download_archive", new_callable=AsyncMock)
+    @patch(f"{_PATCH_PREFIX}._get_branch_sha", new_callable=AsyncMock)
+    @patch(f"{_PATCH_PREFIX}._parse_repo_url")
+    async def test_without_force_an_unchanged_head_still_short_circuits(
+        self, mock_parse, mock_sha, mock_download
+    ):
+        """The periodic poller must NOT re-download every cycle."""
+        mock_parse.return_value = ("org", "policies")
+        mock_sha.return_value = "same-sha"
+
+        ps = _mock_policy_set(vcs_last_commit_sha="same-sha")
+        db = AsyncMock()
+
+        await _sync_policy_set(db, ps)
+
+        mock_download.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @patch(f"{_PATCH_PREFIX}._download_archive", new_callable=AsyncMock)
+    @patch(f"{_PATCH_PREFIX}._get_branch_sha", new_callable=AsyncMock)
+    @patch(f"{_PATCH_PREFIX}._parse_repo_url")
+    async def test_a_skipped_file_is_reported_rather_than_passing_as_clean(
+        self, mock_parse, mock_sha, mock_download
+    ):
+        """A skip can DELETE an enforced policy, so it cannot read as success.
+
+        `s3_test.rego` is skipped as a fixture. If a policy of that name had
+        been synced before, the reconcile removes its row — and reporting
+        `vcs_last_error = None` left a mandatory set looking green while the
+        rule it enforced was gone.
+        """
+        archive = _make_tarball(
+            {
+                "repo-abc123/policies/net.rego": POLICY,
+                "repo-abc123/policies/s3_test.rego": POLICY,
+            }
+        )
+        mock_parse.return_value = ("org", "policies")
+        mock_sha.return_value = "new-sha"
+        mock_download.return_value = archive
+
+        ps = _mock_policy_set(vcs_last_commit_sha="old-sha")
+        db = AsyncMock()
+
+        await _sync_policy_set(db, ps)
+
+        assert ps.vcs_last_error is not None, "a partial sync reported clean"
+        assert "s3_test.rego" in ps.vcs_last_error
+        assert ps.vcs_last_commit_sha == "new-sha", "the policies that DID sync still land"
 
     @pytest.mark.asyncio
     @patch(f"{_PATCH_PREFIX}._get_branch_sha", new_callable=AsyncMock)
@@ -507,8 +589,34 @@ class TestHandlePolicyVCSSync:
 
         await handle_policy_vcs_sync({"policy_set_id": str(ps.id)})
 
-        mock_sync.assert_called_once_with(db, ps)
+        mock_sync.assert_called_once_with(db, ps, force=False)
         db.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch(f"{_PATCH_PREFIX}.get_db_session")
+    @patch(f"{_PATCH_PREFIX}._sync_policy_set", new_callable=AsyncMock)
+    async def test_an_explicit_sync_forces_a_re_read(self, mock_sync, mock_session):
+        """The Sync button has to re-read a repository whose head has not moved.
+
+        `support_files` arrived with #1842, so a set that predates it has `{}`
+        and no commit coming to fill it — and the SHA check returns before the
+        line that would. Without force, Sync did nothing and a set with shared
+        evaluation on evaluated with no data, which passes a mandatory gate.
+        """
+        from terrapod.services.policy_vcs_poller import handle_policy_vcs_sync
+
+        ps = _mock_policy_set()
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = ps
+        db.execute = AsyncMock(return_value=result)
+        db.commit = AsyncMock()
+        mock_session.return_value.__aenter__ = AsyncMock(return_value=db)
+        mock_session.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        await handle_policy_vcs_sync({"policy_set_id": str(ps.id), "force": True})
+
+        mock_sync.assert_called_once_with(db, ps, force=True)
 
     @pytest.mark.asyncio
     @patch(f"{_PATCH_PREFIX}.get_db_session")

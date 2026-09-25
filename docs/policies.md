@@ -128,9 +128,17 @@ until you turn it on.
 
 Shared evaluation is carried out **by the runner**, so it needs runners new
 enough to understand it. An older runner ignores the setting and evaluates each
-policy alone, *without* the data files — and a rule referencing
-`data.approved_cidrs` is then undefined rather than failing, which means it
-**passes**. Upgrade runners before enabling this on a set you rely on.
+policy alone, without the support files. What happens next depends on what your
+policy does with them, and the two cases are very different:
+
+| Your policy | On a lagging runner |
+|---|---|
+| **Reads `data.<key>`** from a data file | The data is simply absent, so the rule never matches. Empty `deny`, exit 0 — the set reports a **clean pass it has not earned**. Silent. |
+| **Calls a helper** defined in another file | It does not compile on its own (`rego_type_error: undefined function`), so the set reports `errored` — which a mandatory set treats as blocking. Visible, and fails closed. |
+
+The first is the dangerous one: a mandatory gate passes an apply it should have
+blocked, with no error anywhere. **Upgrade runners before enabling this on a set
+you rely on.** A set that leaves it off is unaffected on any runner version.
 
 ### Confirming your files were picked up
 
@@ -138,6 +146,19 @@ The policy set page lists the data files and helpers the sync found, and the
 same list is on the API as `support-file-names`. A set with shared evaluation
 on and nothing listed is the usual symptom of a wrong `policy-path` — which
 otherwise looks exactly like the feature not working.
+
+**Turning the flag on does not by itself re-read the repository.** The poller
+skips a set whose branch head has not moved, so a set that existed before this
+feature has no support files and no commit coming to give it any. Press **Sync
+now** (or `POST /policy-sets/{id}/actions/sync`) after enabling it: an explicit
+sync forces a re-read even when the head is unchanged.
+
+**A file the sync declines to read is reported, not silently dropped.** Files
+over 1 MiB, files that are not valid UTF-8, and anything named `*_test.rego`
+are skipped — and because a skipped file's policy is removed from the set like
+any other file that disappeared, the sync records what it skipped on
+`vcs-last-error` rather than reporting a clean sync. If a policy you expect is
+missing, look there first.
 
 ### What a policy can read
 

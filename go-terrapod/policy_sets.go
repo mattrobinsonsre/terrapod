@@ -182,10 +182,19 @@ func (c *Client) SyncPolicySet(ctx context.Context, id string) (*PolicySet, erro
 func policySetCreateAttrs(req CreatePolicySetRequest) map[string]any {
 	attrs := map[string]any{
 		"name":              req.Name,
-		"enforcement-level": req.EnforcementLevel,
 		"enabled":           req.Enabled,
 		"shared-evaluation": req.SharedEvaluation,
 		"global-scope":      req.GlobalScope,
+	}
+	// Omitted rather than sent empty, like every other optional field here.
+	// The server reads `attrs.get("enforcement-level", "advisory")`, so a key
+	// present with "" does not fall back to the default -- it reaches the
+	// allow-list and 422s. Sending it unconditionally made the minimal
+	// documented block (`resource "terrapod_policy_set" "x" { name = "x" }`)
+	// fail outright, because the provider leaves an unset Optional+Computed
+	// attribute unknown and ValueString() renders that as "".
+	if req.EnforcementLevel != "" {
+		attrs["enforcement-level"] = req.EnforcementLevel
 	}
 	if req.Description != "" {
 		attrs["description"] = req.Description
