@@ -891,9 +891,19 @@ Apply-capable (plan+apply) runs are **serialized per workspace** — only one ex
 
 This is enforced server-side regardless of run source (VCS, CLI/API, UI), so the same guarantees hold for `terraform`/`tofu` CLI-driven runs as for VCS-driven runs.
 
-#### Runs held at a post-plan gate: `blocked-by`
+#### Runs held at a gate: `blocked-by`
 
-A mandatory policy set, an enforced security scan, a mandatory post-plan run task, or a mandatory AI policy gate can stop a run after its plan has finished. The run stays at `status: planning`, and the read-only **`blocked-by`** attribute names the gate holding it: `run-task`, `policy`, `security-scan` or `ai-policy` (checked in that order), or `null` for any run not held. While held:
+A mandatory policy set, an enforced security scan, a mandatory run task, or a mandatory AI policy gate can stop a run. The read-only **`blocked-by`** attribute names the gate holding it: `run-task`, `policy`, `security-scan` or `ai-policy` (checked in that order), or `null` for any run not held.
+
+**A held run is not necessarily in `planning`.** Run tasks fire at three boundaries (#1837), and the run's status tells you which one is holding it — do not write a client that assumes `planning`:
+
+| Boundary | Status while held | Notes |
+|---|---|---|
+| `pre_plan` (run task) | `queued` | Looks like a run waiting its turn. No plan exists yet, so there is nothing to discard. |
+| post-plan (all four gates) | `planning` | Until 2.0 — see below. The case the rest of this section describes. |
+| `pre_apply` (run task) | `planned` | Looks like a run awaiting a human. Already discardable by the ordinary route. |
+
+A **post-plan** hold specifically:
 
 - the run's plan reports `status: finished`, so a CLI waiting on the plan log returns;
 - the run is **discardable** (`actions.is-discardable: true`) unless it is plan-only, and a newer apply-capable run supersedes it as it would a `planned` run;

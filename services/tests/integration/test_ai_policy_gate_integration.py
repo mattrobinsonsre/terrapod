@@ -226,3 +226,108 @@ class TestTheOverrideIsAdminOnly:
         )
         assert resp.status_code == 403, resp.text
         assert (await _evaluation(rid)).overridden_by is None
+
+
+class TestTwoWritersRaceForTheOneEvaluationRow:
+    """`run_id` is UNIQUE, and the two writers converge on exactly the state
+    the override exists for: a mandatory gate holding a run with no verdict.
+    The operator clicks Override while the summariser's model call returns.
+
+    Both read None, both insert, and before this the loser raised
+    `IntegrityError` out of the endpoint -- a 500 that told the operator
+    nothing about whether the run had been released.
+
+    Real Postgres, because the defect IS the unique constraint; a mocked
+    session cannot raise it. A real run too, because the row carries a foreign
+    key -- which is also why the retry is narrowed to the unique violation.
+    """
+
+    async def test_two_concurrent_writers_produce_one_row_and_no_error(self, app, client):
+        """GENUINELY concurrent, which the first version of this test was not.
+
+        Writing it sequentially proves nothing: the second writer's SELECT
+        finds the first writer's committed row and takes the update path, so
+        the insert never races and the test passes with the fix removed. Both
+        transactions have to be open at once — the second INSERT then blocks on
+        the unique index until the first commits, and is rejected.
+        """
+        import asyncio
+
+        from terrapod.db.session import get_db_session
+        from terrapod.services import ai_policy_service
+
+        set_auth(app, admin_user())
+        ws = await _create_workspace(client, f"ai-race-{uuid.uuid4().hex[:8]}")
+        run = await _create_run(client, ws)
+        rid = uuid.UUID(run["id"].removeprefix("run-"))
+
+        async def writer(outcome: str) -> None:
+            async with get_db_session() as db:
+                await ai_policy_service.record_evaluation(
+                    db, run_id=rid, enforcement_level="mandatory", outcome=outcome
+                )
+
+        # Neither may raise. Before the fix the loser raised IntegrityError out
+        # of its commit, which reached the override endpoint as a 500.
+        await asyncio.gather(writer("failed"), writer("passed"))
+
+        async with get_db_session() as db:
+            rows = (
+                (
+                    await db.execute(
+                        select(AIPolicyEvaluation).where(AIPolicyEvaluation.run_id == rid)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert len(rows) == 1, f"the race produced {len(rows)} rows"
+
+    async def test_the_savepoint_does_not_discard_the_callers_other_work(self, app, client):
+        """The reason this is a savepoint and not a bare `db.rollback()`.
+
+        The override endpoint has the release itself pending when it records
+        the evaluation; rolling the whole transaction back to recover from the
+        race would throw that away and silently fail to release the run.
+        """
+        from terrapod.db.session import get_db_session
+        from terrapod.services import ai_policy_service
+
+        set_auth(app, admin_user())
+        ws = await _create_workspace(client, f"ai-race2-{uuid.uuid4().hex[:8]}")
+        run = await _create_run(client, ws)
+        rid = uuid.UUID(run["id"].removeprefix("run-"))
+
+        async with get_db_session() as db:
+            await ai_policy_service.record_evaluation(
+                db, run_id=rid, enforcement_level="mandatory", outcome="failed"
+            )
+
+        marker = f"race-marker-{uuid.uuid4().hex[:8]}"
+        async with get_db_session() as db:
+            other = (await db.execute(select(Run).where(Run.id == rid))).scalar_one()
+            other.message = marker  # pending work the caller cares about
+            await ai_policy_service.record_evaluation(
+                db, run_id=rid, enforcement_level="mandatory", outcome="passed"
+            )
+
+        async with get_db_session() as db:
+            after = (await db.execute(select(Run).where(Run.id == rid))).scalar_one()
+        assert after.message == marker, "the retry rolled back the caller's pending work"
+
+    async def test_a_foreign_key_violation_is_not_retried(self, app, client):
+        """Narrow the catch, or the retry turns "no such run" into the same
+        error raised twice from a confusing place."""
+        from sqlalchemy.exc import IntegrityError
+
+        from terrapod.db.session import get_db_session
+        from terrapod.services import ai_policy_service
+
+        with pytest.raises(IntegrityError):
+            async with get_db_session() as db:
+                await ai_policy_service.record_evaluation(
+                    db,
+                    run_id=uuid.uuid4(),  # no such run
+                    enforcement_level="mandatory",
+                    outcome="failed",
+                )

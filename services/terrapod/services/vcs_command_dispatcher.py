@@ -141,8 +141,20 @@ def _unrecognised_verb(raw: str) -> str | None:
     return None if verb == "help" else verb
 
 
+def _inline_code(text: str) -> str:
+    """Attacker-influenced text, safe inside a markdown code span.
+
+    The verb comes straight off a PR comment, so a backtick in it breaks out
+    of the span and the rest of Terrapod's own reply renders as the commenter
+    wrote it. Backticks are stripped rather than escaped because a code span
+    has no escape sequence for them, and newlines go with them so one token
+    cannot become several lines.
+    """
+    return text.replace("`", "").replace("\n", " ").replace("\r", " ").strip() or "(empty)"
+
+
 def _unknown_verb_body(verb: str) -> str:
-    return f"Terrapod does not recognise `{verb}`.\n\n{_HELP_BODY}"
+    return f"Terrapod does not recognise `{_inline_code(verb)}`.\n\n{_HELP_BODY}"
 
 
 # The acknowledgement emoji. Spelled without colons, which is what both
@@ -542,6 +554,26 @@ async def _route_apply(
                 run_id=str(run.id),
                 pr_number=sess.pr_number,
                 reason=e.reason,
+            )
+        except ValueError as e:
+            # A gate refused the confirm — `pre_apply_gate` raises a bare
+            # ValueError carrying its reason (#1837). Only logging it left the
+            # reviewer in a silent loop: they commented, got a success
+            # reaction, nothing happened, and the comment re-rendered the same
+            # "Comment `terrapod apply`" invitation. Say why instead. The run
+            # stays `planned` — the plan is still good, only the go/no-go said
+            # no — so the invitation is honest once the gate clears.
+            logger.info(
+                "apply: refused by a gate",
+                workspace=ws.name,
+                run_id=str(run.id),
+                pr_number=sess.pr_number,
+                reason=str(e),
+            )
+            await _post_reply(
+                db,
+                sess,
+                f"Cannot apply `{_inline_code(ws.name)}` yet — {_inline_code(str(e))}",
             )
         except Exception as e:
             logger.warning(
