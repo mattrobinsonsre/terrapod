@@ -617,7 +617,7 @@ Workspaces carry two attributes that govern the optional AI plan-summary feature
 |---|---|---|---|
 | `ai-summary-mode` | string | `"default"` | Per-workspace override. One of `"default"` (follow the global toggle), `"enabled"` (always summarise this workspace's plans), or `"disabled"` (never summarise this workspace — overrides global). |
 | `ai-summary-context` | string | `""` | Free text up to 4000 characters appended to the model's prompt as workspace-specific facts (e.g. "Fronts the vault for service X — destroying the KMS key causes a global outage."). Additive to the deployment-wide `fleet_context`. |
-| `ai-policy-mode` | string | `"default"` | Per-workspace override for the AI **policy gate** (#1766). One of `"default"` (follow the deployment setting), `"enabled"`, or `"disabled"`. `"disabled"` opts out of an **advisory** verdict only — a `mandatory` gate ignores it, so a fleet-wide blocking control cannot be switched off per workspace. A workspace also cannot opt into a gate the deployment has not enabled. |
+| `ai-policy-mode` | string | `"default"` | Per-workspace override for the AI **policy gate** (#1766). One of `"default"` (follow the deployment setting), `"enabled"`, or `"disabled"`. **`"disabled"` is the only value with an effect**, and it opts out of an **advisory** verdict only — a `mandatory` gate ignores it, so a fleet-wide blocking control cannot be switched off per workspace. `"enabled"` is accepted as a synonym for `"default"` and changes nothing: a workspace cannot opt into a gate the deployment has not enabled, and when the deployment *has* enabled it the level is already either advisory or mandatory, so there is nothing to raise. |
 | `slack-channel` | string | `""` | Opt-in Slack channel (name or ID) this workspace's run notifications post to (#556) — approval requests, applies, errors, drift. Empty = silent (there is no deployment-wide fan-out). Only effective when the Slack app is enabled server-side (`api.config.slack.enabled`). See [slack-integration.md](slack-integration.md). |
 
 422 errors:
@@ -2717,7 +2717,7 @@ These are editable in the UI under **Admin → Autodiscovery**, alongside the ru
 
 - `security-scan-enforcement` / `security-scan-engine` / `security-scan-severity-threshold` / `security-scan-skip-rules` — [security scanning](security-scanning.md) for every created workspace (#1763). Unlike on a workspace, `enforced` is always accepted here: a rule has no engine, so everything it creates is a Terraform/OpenTofu workspace, which is exactly what can be scanned.
 - `ai-summary-mode` / `ai-summary-context` — the AI plan-summary opt-in and its free-text context for every created workspace (#1763).
-- `ai-policy-mode` — the AI **policy gate** opt-in for every created workspace. A mandatory deployment-wide gate ignores `disabled`; it opts a workspace out of an advisory verdict only (#1766).
+- `ai-policy-mode` — the AI **policy gate** per-workspace override for every created workspace. `disabled` opts out of an advisory verdict only, and a mandatory deployment-wide gate ignores it; `enabled` is a synonym for `default` and has no effect (#1766).
 - `terragrunt-enabled` / `terragrunt-version`, `vcs-workflow`, `auto-merge` / `auto-merge-strategy`, `drift-detection-enabled` / `drift-detection-interval-seconds`, `drift-ignore-rules`, `plan-expiry-seconds` and `slack-channel` — the remaining per-workspace settings (#1763). `drift-detection-enabled` defaults **true** here, unlike the workspace column, because every autodiscovered workspace is VCS-connected.
 - `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **false**, as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
 
@@ -2972,7 +2972,7 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
     "security-scan-skip-rules": ["CKV_AWS_24"],
     "ai-summary-mode": "enabled",
     "ai-summary-context": "payments estate; PCI in scope",
-    "ai-policy-mode": "enabled",
+    "ai-policy-mode": "disabled",
     "debug-mode": true,
     "terragrunt-enabled": true, "terragrunt-version": "0.67.4",
     "trigger-prefixes": ["infra/net"],

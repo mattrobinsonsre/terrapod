@@ -337,8 +337,11 @@ async def update_policy_set(
         ps.enforcement_level = _validate_enforcement(attrs["enforcement-level"])
     if "enabled" in attrs:
         ps.enabled = bool(attrs["enabled"])
+    shared_evaluation_switched_on = False
     if "shared-evaluation" in attrs:
+        was_shared = bool(ps.shared_evaluation)
         ps.shared_evaluation = bool(attrs["shared-evaluation"])
+        shared_evaluation_switched_on = ps.shared_evaluation and not was_shared
     if "global-scope" in attrs:
         ps.global_scope = bool(attrs["global-scope"])
     if "allow-labels" in attrs:
@@ -366,6 +369,25 @@ async def update_policy_set(
         raise HTTPException(
             status_code=409, detail="A policy set with that name already exists"
         ) from exc
+    # Switching shared evaluation on has to re-read the repository, for the
+    # same reason the Sync button forces one: `support_files` is only
+    # populated by a sync, and the poller returns early when the branch head
+    # has not moved -- which it has not, for every set that already existed.
+    # Without this, a set turned shared through the API or the provider
+    # evaluates with NO data files, so a rule reading `data.<key>` is
+    # undefined rather than failing and a mandatory gate reports `passed`.
+    # Fixing the button and not this path left the as-code route -- the one
+    # `terrapod_policy_set` takes -- on the fail-open side.
+    if shared_evaluation_switched_on and ps.source == "vcs":
+        from terrapod.services.scheduler import enqueue_trigger
+
+        await enqueue_trigger(
+            "policy_vcs_sync",
+            payload={"policy_set_id": str(ps.id), "force": True},
+            dedup_key=f"policy_vcs_sync:{ps.id}",
+            dedup_ttl=30,
+        )
+
     ps = await _get_policy_set(db, ps_id)
     return JSONResponse(content={"data": _policy_set_json(ps, embed_policies=True)})
 

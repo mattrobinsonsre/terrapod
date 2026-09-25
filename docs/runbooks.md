@@ -973,7 +973,13 @@ If the producer workspace was deleted, the grant rows cascade-deleted automatica
 
 **Symptom**: finished runner Jobs stay `Active` for up to four hours instead of
 being cleaned up, and `kubectl get pods -n <runner-ns>` shows `tprun-*` pods
-alive long after their runs errored.
+alive long after their runs should have errored.
+
+Two things follow from that, and the second is the one that gets reported:
+those runs still read `planning` or `applying` in the UI and the API rather
+than `errored`, and because Terrapod runs at most one apply-capable run per
+workspace at a time, **the affected workspaces stop dispatching new runs** —
+which presents as a stuck queue rather than as a debugging session left on.
 
 **Why**: per-workspace **debug mode** (`debug-mode: true`) is on for those
 workspaces. A failed run's pod is deliberately held open so an operator can
@@ -1003,8 +1009,13 @@ kubectl get pods -n <runner-ns> -l terrapod.io/run-id --sort-by=.status.startTim
   It is an opt-in for a debugging session, not a standing setting.
 - **Deployment-wide**: `runners.debugLingerSeconds: 0` disables the linger
   regardless of any workspace's setting.
-- A lingering pod can always be deleted by hand; the run is already terminal
-  and deleting the pod does not change its outcome.
+- A lingering pod can always be deleted by hand, and that is the normal way to
+  finish a debugging session. The phase has already failed, so deleting the pod
+  does not change the run's outcome — it only brings it forward: the Job goes
+  terminal, and the reconciler errors the run on its next tick instead of at
+  the end of the debug window. Until then the run reads as still in progress
+  and the workspace's next apply-capable run waits behind it, so delete the pod
+  as soon as you have what you came for.
 
 ---
 

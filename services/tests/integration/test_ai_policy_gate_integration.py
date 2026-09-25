@@ -331,3 +331,105 @@ class TestTwoWritersRaceForTheOneEvaluationRow:
                     enforcement_level="mandatory",
                     outcome="failed",
                 )
+
+
+class TestOverrideAttributionSurvivesTheRightReRuling:
+    """Who released a run is the half an auditor cannot reconstruct.
+
+    `record_evaluation` clears `overridden_by` on a re-ruling, because an
+    override belongs to the verdict it released and regenerating a summary
+    must not launder a fresh deny through a decision made about a different
+    one. The exception is an override that has ALREADY released a run --
+    the #1815 case, where the run was held with no verdict at all.
+
+    The predicate that tells those apart asks about the row as it stood
+    BEFORE the write. Evaluating it after the write inverts it exactly, and
+    an inverted guard is worse than no guard: it preserves the attribution in
+    the one case that does not need it and destroys it in the only case that
+    does. Both directions are pinned here, because a test for either one
+    alone passes with the bug present.
+    """
+
+    async def test_an_override_that_already_released_a_run_keeps_its_attribution(self, app, client):
+        set_auth(app, admin_user())
+        ws = await _create_workspace(client, f"ai-attr-a-{uuid.uuid4().hex[:8]}")
+        run = await _create_run(client, ws)
+        rid = uuid.UUID(run["id"].removeprefix("run-"))
+
+        # The #1815 shape: held with nothing to rule on, released by a person.
+        async with get_db_session() as db:
+            row = await ai_policy_service.record_evaluation(
+                db, run_id=rid, enforcement_level="mandatory", outcome="overridden"
+            )
+            row.overridden_by = "admin@example.com"
+            row.overridden_at = datetime.now(UTC)
+
+        # The verdict lands afterwards, carrying a real body -- the ordinary
+        # case, and the one the post-mutation read got wrong.
+        async with get_db_session() as db:
+            await ai_policy_service.record_evaluation(
+                db,
+                run_id=rid,
+                enforcement_level="mandatory",
+                outcome="failed",
+                verdict={"decision": "deny", "reason": "landed late"},
+                risk_level="high",
+            )
+
+        async with get_db_session() as db:
+            after = (
+                await db.execute(select(AIPolicyEvaluation).where(AIPolicyEvaluation.run_id == rid))
+            ).scalar_one()
+
+        assert after.outcome == "failed", "the re-ruling itself must still be recorded"
+        assert after.overridden_by == "admin@example.com", (
+            "the attribution was cleared, so the row now reads `failed` with no "
+            "override beside a run a person released -- which reads as the gate "
+            "having failed to stop it"
+        )
+        assert after.overridden_at is not None
+
+    async def test_an_override_of_a_real_verdict_does_not_carry_over(self, app, client):
+        """The other direction, and the reason the guard is narrow.
+
+        Here the override was made about a verdict that existed. A later
+        re-ruling is a different verdict, so the decision does not travel with
+        it -- otherwise regenerating a summary would silently release a deny
+        nobody has looked at.
+        """
+        set_auth(app, admin_user())
+        ws = await _create_workspace(client, f"ai-attr-b-{uuid.uuid4().hex[:8]}")
+        run = await _create_run(client, ws)
+        rid = uuid.UUID(run["id"].removeprefix("run-"))
+
+        async with get_db_session() as db:
+            row = await ai_policy_service.record_evaluation(
+                db,
+                run_id=rid,
+                enforcement_level="mandatory",
+                outcome="failed",
+                verdict={"decision": "deny", "reason": "the one that was overridden"},
+                risk_level="high",
+            )
+            row.overridden_by = "admin@example.com"
+            row.overridden_at = datetime.now(UTC)
+
+        async with get_db_session() as db:
+            await ai_policy_service.record_evaluation(
+                db,
+                run_id=rid,
+                enforcement_level="mandatory",
+                outcome="failed",
+                verdict={"decision": "deny", "reason": "a freshly regenerated one"},
+                risk_level="high",
+            )
+
+        async with get_db_session() as db:
+            after = (
+                await db.execute(select(AIPolicyEvaluation).where(AIPolicyEvaluation.run_id == rid))
+            ).scalar_one()
+
+        assert after.overridden_by is None, (
+            "a new verdict inherited a decision an admin made about a different one"
+        )
+        assert after.overridden_at is None
