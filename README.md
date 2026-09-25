@@ -156,7 +156,7 @@ Everything below is implemented and shipped today.
 | Feature | Description |
 |---|---|
 | Label-based RBAC | Roles with granular `resource:verb` capabilities (e.g. `run:plan` without `run:apply`); read/plan/write/admin levels remain as authoring shorthand |
-| Policy-as-code (OPA) | Rego enforcement on plan JSON — the open-source equivalent of Sentinel. Advisory or mandatory sets, label-scoped to workspaces, evaluated on the runner, with admin override |
+| Policy-as-code (OPA) | Rego enforcement on plan JSON — the open-source equivalent of Sentinel. Advisory or mandatory sets, label-scoped to workspaces, evaluated on the runner, with admin override. Optional shared evaluation lets a set's policies share helper rules and data files |
 | IaC security scanning | Checkov/Trivy misconfiguration scanning of the plan JSON with maintained rule catalogues — per-workspace `off`/`advisory`/`enforced`, severity threshold, skip rules; enforced holds the run at the gate on a failed finding, with admin override |
 | SSO (OIDC / SAML) | Pluggable identity providers (Auth0, Okta, Azure AD, any standards-compliant IdP) |
 | Audit logging | Immutable event log with configurable retention |

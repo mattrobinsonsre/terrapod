@@ -116,14 +116,14 @@ class TestClassification:
 
 class TestExtraction:
     def test_it_takes_data_files_the_old_extractor_ignored(self):
-        files = poller._extract_policy_files(
+        files, _skipped = poller._extract_policy_files(
             _tar({"policies/net.rego": POLICY, "policies/data.yaml": "a: 1"}), "policies"
         )
         assert sorted(files) == ["data.yaml", "net.rego"]
 
     def test_unrelated_files_are_left_alone(self):
         """A README or a CI config beside the policies costs nothing."""
-        files = poller._extract_policy_files(
+        files, _skipped = poller._extract_policy_files(
             _tar({"policies/net.rego": POLICY, "policies/README.md": "hi"}), "policies"
         )
         assert sorted(files) == ["net.rego"]
@@ -132,14 +132,14 @@ class TestExtraction:
         """`*_test.rego` defines no `deny`, so it would land as a support file
         and be loaded into a shared evaluation — putting its fixtures into the
         data the real policies see."""
-        files = poller._extract_policy_files(
+        files, _skipped = poller._extract_policy_files(
             _tar({"policies/net.rego": POLICY, "policies/net_test.rego": "package terrapod"}),
             "policies",
         )
         assert sorted(files) == ["net.rego"]
 
     def test_subdirectories_are_still_not_descended_into(self):
-        files = poller._extract_policy_files(
+        files, _skipped = poller._extract_policy_files(
             _tar({"policies/net.rego": POLICY, "policies/nested/deep.rego": POLICY}), "policies"
         )
         assert sorted(files) == ["net.rego"]
@@ -148,7 +148,7 @@ class TestExtraction:
         """Every applicable run fetches the bundle, so one pathological file
         would be paid for on every run of every matching workspace."""
         big = "x" * (poller._MAX_POLICY_FILE_BYTES + 1)
-        files = poller._extract_policy_files(
+        files, _skipped = poller._extract_policy_files(
             _tar({"policies/net.rego": POLICY, "policies/huge.json": big}), "policies"
         )
         assert sorted(files) == ["net.rego"]
@@ -163,5 +163,5 @@ class TestExtraction:
                 info = tarfile.TarInfo(name=name)
                 info.size = len(raw)
                 tar.addfile(info, io.BytesIO(raw))
-        files = poller._extract_policy_files(buf.getvalue(), "policies")
+        files, _skipped = poller._extract_policy_files(buf.getvalue(), "policies")
         assert sorted(files) == ["net.rego"], "one bad file must not lose the good ones"

@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
@@ -1069,3 +1070,79 @@ class TestScanAndAISummaryTemplate1763:
             resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
         assert resp.status_code == 422, resp.text
         db.commit.assert_not_awaited()
+
+
+class TestApplyThenMergeCannotBeTemplatedWithAutoApply:
+    """A rule TEMPLATES workspaces, so it is a fourth path that sets
+    `vcs_workflow` — one the shared guard's docstring still calls "three
+    paths", because #1763 added this one after it was written.
+
+    Under `apply_then_merge` the apply runs BEFORE the PR merges; with
+    auto-apply nobody confirms it either. Create, PATCH and bulk update all
+    refuse that pairing on a workspace. The rule path did not, so it could
+    materialise the refused state into every directory it discovered.
+    """
+
+    BASE = {
+        "name": "r",
+        "repo-url": "https://github.com/o/r",
+        "pattern": "envs/*",
+    }
+
+    def _coerce(self, extra, *, existing=None, on_create=True):
+        import uuid as _uuid
+
+        from terrapod.api.routers import autodiscovery_rules as ar
+
+        attrs = {**self.BASE, "vcs-connection-id": f"vcs-{_uuid.uuid4()}", **extra}
+        return ar._coerce_attrs(attrs, on_create=on_create, existing=existing)
+
+    def test_the_pairing_is_refused_at_create(self):
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc:
+            self._coerce({"vcs-workflow": "apply_then_merge", "auto-apply": True})
+        assert exc.value.status_code == 422
+        assert "apply_then_merge" in str(exc.value.detail)
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            {"vcs-workflow": "apply_then_merge"},
+            {"auto-apply": True},
+            {"vcs-workflow": "merge_then_apply", "auto-apply": True},
+            {},
+        ],
+    )
+    def test_every_legal_combination_is_still_accepted(self, extra):
+        """The guard must not reject halves that are fine on their own — and
+        setting both legally in ONE request has to resolve, not be rejected on
+        the pre-update state."""
+        assert self._coerce(extra) is not None
+
+    def test_a_patch_is_judged_on_the_merged_state_not_the_request(self):
+        """Either half can arrive alone and still complete the refused pair.
+
+        Judging only the request body would let `auto-apply: true` slip past a
+        rule whose STORED workflow is already `apply_then_merge`.
+        """
+        from types import SimpleNamespace
+
+        from fastapi import HTTPException
+
+        stored = SimpleNamespace(vcs_workflow="apply_then_merge", auto_apply=False)
+        with pytest.raises(HTTPException) as exc:
+            self._coerce({"auto-apply": True}, existing=stored, on_create=False)
+        assert exc.value.status_code == 422
+
+        stored_other = SimpleNamespace(vcs_workflow="merge_then_apply", auto_apply=True)
+        with pytest.raises(HTTPException):
+            self._coerce(
+                {"vcs-workflow": "apply_then_merge"}, existing=stored_other, on_create=False
+            )
+
+    def test_an_unrelated_patch_on_a_clean_rule_is_untouched(self):
+        from types import SimpleNamespace
+
+        stored = SimpleNamespace(vcs_workflow="merge_then_apply", auto_apply=False)
+        assert self._coerce({"name": "x"}, existing=stored, on_create=False) is not None

@@ -1266,13 +1266,30 @@ async def _create_workspace_impl(
         execution_mode=execution_mode,
         auto_apply=auto_apply_mode != "never",
         vcs_workflow=vcs_workflow,
-        auto_merge=bool(attrs.get("auto-merge", False)),
+        # `bool()` COERCES, it does not check: bool("false") is True, so a
+        # client that stringifies booleans enabled auto-merge against the
+        # operator's explicit intent, 201 and no complaint. `validate_bool`
+        # exists for this and is used forty lines below on `debug-mode`.
+        auto_merge=_422(
+            workspace_settings.validate_bool, attrs.get("auto-merge", False), "auto-merge"
+        ),
         auto_merge_strategy=auto_merge_strategy,
         auto_apply_mode=auto_apply_mode,
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
         engine_version=_engine_version_attr(attrs, default_engine_version(engine)),
-        terragrunt_enabled=bool(attrs.get("terragrunt-enabled", False)),
-        terragrunt_version=(attrs.get("terragrunt-version") or "1.0"),
+        terragrunt_enabled=_422(
+            workspace_settings.validate_bool,
+            attrs.get("terragrunt-enabled", False),
+            "terragrunt-enabled",
+        ),
+        # Unvalidated, this reached a String(50) column raw: an over-long or
+        # non-string value became a DataError at commit, i.e. a 500 where the
+        # rule exists to give a 422. Both other write paths already route
+        # through the shared validator.
+        terragrunt_version=_422(
+            workspace_settings.validate_terragrunt_version,
+            attrs.get("terragrunt-version") or "1.0",
+        ),
         working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),
         resource_cpu=attrs.get("resource-cpu", "1"),
         parallelism=_validate_parallelism(attrs.get("parallelism", DEFAULT_PARALLELISM)),
@@ -1775,7 +1792,7 @@ async def update_workspace(
         )
 
     if "auto-merge" in attrs:
-        ws.auto_merge = bool(attrs["auto-merge"])
+        ws.auto_merge = _422(workspace_settings.validate_bool, attrs["auto-merge"], "auto-merge")
     if "auto-merge-strategy" in attrs:
         ws.auto_merge_strategy = _422(
             workspace_settings.validate_auto_merge_strategy, attrs["auto-merge-strategy"]
@@ -1795,11 +1812,16 @@ async def update_workspace(
         # Slack opt-in channel (#556): empty clears it (workspace goes silent).
         ws.slack_channel = (attrs["slack-channel"] or "").strip()[:128]
     if "terragrunt-enabled" in attrs:
-        ws.terragrunt_enabled = bool(attrs["terragrunt-enabled"])
+        ws.terragrunt_enabled = _422(
+            workspace_settings.validate_bool, attrs["terragrunt-enabled"], "terragrunt-enabled"
+        )
     if "terragrunt-version" in attrs:
         # Partial version (e.g. "1.0"), resolved via the binary cache like
         # terraform-version. Empty falls back to the "1.0" default.
-        ws.terragrunt_version = attrs["terragrunt-version"] or "1.0"
+        ws.terragrunt_version = _422(
+            workspace_settings.validate_terragrunt_version,
+            attrs["terragrunt-version"] or "1.0",
+        )
     if "working-directory" in attrs:
         ws.working_directory = _sanitize_working_directory(attrs["working-directory"])
     if "parallelism" in attrs:

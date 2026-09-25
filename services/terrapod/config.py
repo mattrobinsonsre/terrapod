@@ -2533,13 +2533,16 @@ class AIPolicyConfig(BaseModel):
     threshold on the summary's own `risk_level`, and free-text `deny_criteria`
     the model resolves to allow/deny alongside that score.
 
-    **Terraform and OpenTofu only.** The gate reads the structured plan JSON. A
-    Pulumi preview uploads a digest capped at 500 steps, and a gate evaluated
-    over a truncated list of resources can pass because the offending one fell
-    off the end -- the same reason `pulumi_preview.write_policy_input` exists
-    for OPA. Rather than decide on a truncated document, a Pulumi run is
-    reported as not evaluated and never held, exactly as security scanning is
-    refused there (#1569).
+    The gate reads the structured plan JSON.
+
+    **On this line every run is Terraform/OpenTofu, so there is no engine to
+    exempt** -- `ai_policy_service.gate_applies_to` says the same. The engine
+    strategy layer and `pulumi_preview` are on `main`; a docstring carried from
+    there once claimed this gate exempts Pulumi and pointed at
+    `pulumi_preview.write_policy_input`, which does not exist here. On `main`
+    the exemption is real and the reasoning is that a Pulumi preview uploads a
+    digest capped at 500 steps, so a gate evaluated over a truncated resource
+    list could pass because the offending one fell off the end (#1569).
     """
 
     enabled: bool = Field(

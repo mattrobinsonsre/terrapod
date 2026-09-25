@@ -31,6 +31,11 @@ field AIPolicyEvaluation.RiskLevel string `json:"risk-level,omitempty"`
 field AIPolicyEvaluation.RiskThreshold string `json:"risk-threshold"`
 field AIPolicyEvaluation.RunID string `json:"-"`
 field AIPolicyEvaluation.Verdict *AIPolicyVerdict `json:"verdict,omitempty"`
+field AIPolicyStatus.Blocking bool
+field AIPolicyStatus.EnforcementLevel string
+field AIPolicyStatus.Evaluation *AIPolicyEvaluation
+field AIPolicyStatus.NotEvaluatedReason string
+field AIPolicyStatus.RunStatus string
 field AIPolicyVerdict.Decision string `json:"decision"`
 field AIPolicyVerdict.Reasons []AIPolicyVerdictReason `json:"reasons,omitempty"`
 field AIPolicyVerdictReason.Criterion string `json:"criterion"`
@@ -1361,6 +1366,7 @@ func ParseResource(body []byte) (*Resource, error)
 func ParseResourceList(body []byte) ([]Resource, error)
 func StripPrefix(id, prefix string) string
 method (*AIPolicyEvaluation) IsBlocking() bool
+method (*AIPolicyStatus) IsBlocking() bool
 method (*APIError) Error() string
 method (*AuthenticationError) Error() string
 method (*AuthorizationError) Error() string
@@ -1471,6 +1477,7 @@ method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
 method (*Client) GetRun(ctx context.Context, runID string) (*Run, error)
 method (*Client) GetRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error)
+method (*Client) GetRunAIPolicyStatus(ctx context.Context, runID string) (*AIPolicyStatus, error)
 method (*Client) GetRunCostEstimate(ctx context.Context, runID string) (*CostEstimate, error)
 method (*Client) GetRunCostSummary(ctx context.Context, runID string) (*CostSummary, error)
 method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
@@ -1614,6 +1621,7 @@ method (*NotFoundError) Error() string
 method (*ValidationError) Error() string
 method (*WorkspaceSummary) UnmarshalJSON(data []byte) error
 type AIPolicyEvaluation struct
+type AIPolicyStatus struct
 type AIPolicyVerdict struct
 type AIPolicyVerdictReason struct
 type APIError struct

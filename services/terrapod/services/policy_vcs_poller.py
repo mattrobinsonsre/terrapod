@@ -65,13 +65,24 @@ async def _get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: st
     return await _provider_get_branch_sha(conn, owner, repo, branch)
 
 
-def _extract_policy_files(archive_bytes: bytes, policy_path: str) -> dict[str, str]:
+def _extract_policy_files(
+    archive_bytes: bytes, policy_path: str
+) -> tuple[dict[str, str], list[str]]:
     """Extract a policy set's files from a tarball at the given path.
 
-    Returns {filename_with_extension: content}. The extension is kept — unlike
-    the old rego-only extractor, which stripped it — because it is what
-    distinguishes a policy from a data file, and what tells OPA how to load
-    each one (#1842).
+    Returns ({filename_with_extension: content}, [skipped descriptions]).
+
+    The skipped list is returned rather than only logged because a skip can
+    DELETE an enforced policy. The reconcile below removes any policy whose
+    file is no longer extracted, and it cannot tell "the author deleted it"
+    from "we declined to read it" — so a file that grows past the size cap, or
+    a policy someone named `s3_bucket_test.rego`, silently lost its rule and
+    the sync still reported clean. A mandatory set then passes on a policy
+    that no longer exists. The caller surfaces these on `vcs_last_error`.
+
+    The extension is kept — unlike the old rego-only extractor, which stripped
+    it — because it is what distinguishes a policy from a data file, and what
+    tells OPA how to load each one (#1842).
 
     `.rego`, `.yaml`, `.yml` and `.json` are taken; everything else is ignored,
     so a README or a CI config in the same directory costs nothing. Only direct
@@ -82,11 +93,13 @@ def _extract_policy_files(archive_bytes: bytes, policy_path: str) -> dict[str, s
     fixtures become part of the data the real policies see.
     """
     files: dict[str, str] = {}
+    skipped: list[str] = []
     with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:gz") as tar:
         for member in tar.getmembers():
             if not member.isfile() or not member.name.endswith(_POLICY_FILE_SUFFIXES):
                 continue
             if member.name.endswith("_test.rego"):
+                skipped.append(f"{posixpath.basename(member.name)} (test fixture)")
                 continue
 
             # Reject path traversal: absolute paths or .. components.
@@ -123,13 +136,15 @@ def _extract_policy_files(archive_bytes: bytes, policy_path: str) -> dict[str, s
                     size=len(raw),
                     cap=_MAX_POLICY_FILE_BYTES,
                 )
+                skipped.append(f"{remainder} (over {_MAX_POLICY_FILE_BYTES // 1024} KiB)")
                 continue
             try:
                 files[remainder] = raw.decode("utf-8")
             except UnicodeDecodeError:
                 # A binary file sharing the directory is not ours to carry.
                 logger.warning("policy file skipped: not UTF-8", file=remainder)
-    return files
+                skipped.append(f"{remainder} (not UTF-8)")
+    return files, skipped
 
 
 def _classify(files: dict[str, str]) -> tuple[dict[str, str], dict[str, str]]:
@@ -219,8 +234,22 @@ def _read_file(path: str) -> bytes:
         return f.read()
 
 
-async def _sync_policy_set(db: AsyncSession, ps: PolicySet) -> None:
-    """Sync a single VCS policy set."""
+async def _sync_policy_set(db: AsyncSession, ps: PolicySet, *, force: bool = False) -> None:
+    """Sync a single VCS policy set.
+
+    `force` re-reads the repository even when the branch head has not moved.
+    The periodic poller never sets it -- an unchanged SHA means unchanged
+    files, and re-downloading every archive every cycle would be waste.
+
+    An explicit sync DOES set it, because #1842 gave the sync a second job.
+    `support_files` is new, so every set that existed before the upgrade has
+    `{}` and no commit to trigger a refill; the SHA check returned before the
+    line that populates it. An operator who enabled `shared_evaluation` on
+    such a set got an evaluation with no data files -- and a rule reading
+    `data.approved_cidrs` is undefined rather than failing, so a mandatory set
+    reported a clean pass. The UI's "no files found" warning blamed a wrong
+    `policy-path`, and pushing an unrelated commit was the only real remedy.
+    """
     conn = ps.vcs_connection
     if conn is None:
         ps.vcs_last_error = "VCS connection deleted"
@@ -243,11 +272,13 @@ async def _sync_policy_set(db: AsyncSession, ps: PolicySet) -> None:
             ps.vcs_last_error = f"Branch '{branch}' not found"
             return
 
-        if sha == ps.vcs_last_commit_sha:
+        if sha == ps.vcs_last_commit_sha and not force:
             return
 
         archive = await _download_archive(conn, owner, repo, sha)
-        files = await asyncio.to_thread(_extract_policy_files, archive, ps.policy_path)
+        files, skipped_files = await asyncio.to_thread(
+            _extract_policy_files, archive, ps.policy_path
+        )
         rego_files, support_files = _classify(files)
         ps.support_files = support_files
 
@@ -273,7 +304,17 @@ async def _sync_policy_set(db: AsyncSession, ps: PolicySet) -> None:
 
         ps.vcs_last_commit_sha = sha
         ps.vcs_last_synced_at = now_utc()
-        ps.vcs_last_error = None
+        # A sync that declined to read a file is NOT a clean sync. Reporting
+        # None here is what made a deleted-because-skipped policy invisible:
+        # the set showed green while a rule it used to enforce was gone.
+        ps.vcs_last_error = (
+            (
+                f"Synced, but {len(skipped_files)} file(s) were skipped and are not "
+                f"part of this set: {', '.join(sorted(skipped_files))}"
+            )[:500]
+            if skipped_files
+            else None
+        )
 
         logger.info(
             "Policy set synced from VCS",
@@ -298,6 +339,8 @@ async def handle_policy_vcs_sync(payload: dict) -> None:
     policy_vcs_poll_cycle (fan-out).
     """
     ps_id = uuid.UUID(payload["policy_set_id"])
+    # The fan-out poller omits it; the explicit sync endpoint sets it.
+    force = bool(payload.get("force", False))
     async with get_db_session() as db:
         ps = (
             await db.execute(
@@ -313,7 +356,7 @@ async def handle_policy_vcs_sync(payload: dict) -> None:
         # handler, on a different task with a fresh context. Labelling only the
         # cycle left every policy-set call recorded as `unknown` (#1339).
         with vcs_rate_limit.vcs_source("policy-sets", consumer=ps.name, kind="policy-set"):
-            await _sync_policy_set(db, ps)
+            await _sync_policy_set(db, ps, force=force)
         await db.commit()
 
 
