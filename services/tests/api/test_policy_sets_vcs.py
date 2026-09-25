@@ -350,3 +350,130 @@ class TestSyncPolicySetEndpoint:
             )
         assert resp.status_code == 409
         assert "VCS-sourced" in resp.json()["detail"]
+
+
+class TestSwitchingSharedEvaluationOnReReadsTheRepository:
+    """The as-code path has to force a sync, exactly as the Sync button does.
+
+    `support_files` is only ever populated by a sync, and the poller returns
+    early when the branch head has not moved -- which it has not, for every
+    set that already existed when the deployment upgraded. So a set switched
+    to shared evaluation without a forced re-read evaluates with NO data
+    files, and a rule reading `data.<key>` is *undefined* rather than failing:
+    `deny` comes back empty and a MANDATORY gate reports `passed`.
+
+    That is the failure the Sync button was fixed for. Fixing the button and
+    not this path left the route `terrapod_policy_set` takes -- the one an
+    operator managing policy as code actually uses -- on the fail-open side,
+    reachable by a `terraform apply` with no commit behind it.
+    """
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_switching_it_on_forces_a_resync(
+        self, _init_db, _init_redis, _init_storage, mock_enqueue
+    ):
+        ps = _mock_policy_set(source="vcs")
+        ps.shared_evaluation = False
+        app, db = _make_app()
+        db.commit = AsyncMock()
+        db.execute = AsyncMock(return_value=_scalar_result(ps))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/policy-sets/polset-{ps.id}",
+                json={"data": {"attributes": {"shared-evaluation": True}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        mock_enqueue.assert_called_once()
+        payload = mock_enqueue.call_args.kwargs["payload"]
+        assert payload["force"] is True, (
+            "an unforced sync is a no-op when the SHA has not moved, which is "
+            "the whole case this exists for"
+        )
+        assert payload["policy_set_id"] == str(ps.id)
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unrelated_edit_does_not_resync(
+        self, _init_db, _init_redis, _init_storage, mock_enqueue
+    ):
+        """Narrow on purpose: a PATCH is not a sync request.
+
+        Re-reading a repository on every description change would turn routine
+        provider drift into VCS traffic on every policy set in the fleet.
+        """
+        ps = _mock_policy_set(source="vcs")
+        ps.shared_evaluation = False
+        app, db = _make_app()
+        db.commit = AsyncMock()
+        db.execute = AsyncMock(return_value=_scalar_result(ps))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/policy-sets/polset-{ps.id}",
+                json={"data": {"attributes": {"description": "unrelated"}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        mock_enqueue.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_leaving_it_on_does_not_resync(
+        self, _init_db, _init_redis, _init_storage, mock_enqueue
+    ):
+        """A provider re-applying an unchanged `shared_evaluation = true` sends
+        the attribute every time. Only the transition re-reads, or steady-state
+        Terraform runs would sync the whole fleet on every plan."""
+        ps = _mock_policy_set(source="vcs")
+        ps.shared_evaluation = True
+        app, db = _make_app()
+        db.commit = AsyncMock()
+        db.execute = AsyncMock(return_value=_scalar_result(ps))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/policy-sets/polset-{ps.id}",
+                json={"data": {"attributes": {"shared-evaluation": True}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        mock_enqueue.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_inline_set_has_no_repository_to_read(
+        self, _init_db, _init_redis, _init_storage, mock_enqueue
+    ):
+        ps = _mock_policy_set(source="inline")
+        ps.shared_evaluation = False
+        app, db = _make_app()
+        db.commit = AsyncMock()
+        db.execute = AsyncMock(return_value=_scalar_result(ps))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/policy-sets/polset-{ps.id}",
+                json={"data": {"attributes": {"shared-evaluation": True}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        mock_enqueue.assert_not_called()

@@ -336,10 +336,22 @@ The run id is on the Run detail page; the pods also carry a
 
 Things worth knowing before you turn it on:
 
-- **The run is already failed.** Terrapod reports and finalises the failure
-  before the hold, so the run page, notifications and the API all show the
-  outcome at the normal time. The pod lingering is invisible to the run
-  lifecycle — it is not "stuck", and nothing waits on it.
+- **The run stays in progress for the length of the hold — budget for it.**
+  The failure reason and the resource profile are posted before the hold, so
+  the run page already shows *why* it failed. But a failed phase is reported
+  as errored via the Job going terminal, and the Job cannot go terminal while
+  its pod is deliberately still running. So for up to the debug window the run
+  reads `planning` (or `applying`) in the UI, the API and notifications — and
+  because Terrapod runs at most one apply-capable run per workspace at a time,
+  **the next plan-and-apply run on that workspace waits.** On a busy
+  production workspace with the default 30-minute window, one failed plan
+  stalls the queue for 30 minutes.
+
+  Both end as soon as the hold does. `kubectl delete pod <pod>` ends it
+  immediately — the runner traps the signal and exits — so the ordinary
+  workflow is: look at what you needed, delete the pod, and the run errors
+  within a reconciler tick. Prefer a short `debugLingerSeconds` on shared
+  workspaces, and turn debug mode off again once you have your answer.
 - **A successful run is not held — its Job is just kept longer.** Nothing sleeps
   on the success path, so a workspace left in debug mode does not accumulate
   *running* pods. What changes is teardown: the Job's
