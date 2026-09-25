@@ -40,6 +40,14 @@
     "risk-threshold",
     "verdict"
   ],
+  "ai_policy.get_run_ai_policy:meta": [
+    "blocking",
+    "enforcement-level",
+    "not-evaluated-reason"
+  ],
+  "ai_policy.override_run_ai_policy:meta": [
+    "run-status"
+  ],
   "audit.list_audit_log": [
     "action",
     "actor-email",
@@ -220,6 +228,9 @@
   "config_versions.diff_configuration_versions": [
     "from-id",
     "to-id"
+  ],
+  "config_versions.list_configuration_versions:meta": [
+    "current-id"
   ],
   "config_versions.mint_download_ticket": [
     "expires-at",
@@ -498,6 +509,13 @@
     "vcs-last-synced-at",
     "vcs-repo-url"
   ],
+  "policy_sets.list_run_policy_evaluations:meta": [
+    "summary"
+  ],
+  "policy_sets.override_run_policy:meta": [
+    "overridden",
+    "run-status"
+  ],
   "registry_modules._link_to_jsonapi": [
     "created-at",
     "created-by",
@@ -576,10 +594,24 @@
     "created-by",
     "producer-workspace-name"
   ],
+  "replication.backfill:meta": [
+    "complete",
+    "cursor"
+  ],
   "replication.list_blobs": [
     "etag",
     "key",
     "size-bytes"
+  ],
+  "replication.list_blobs:meta": [
+    "complete",
+    "cursor"
+  ],
+  "replication.list_events:meta": [
+    "cursor",
+    "latest-id",
+    "oldest-unapplied-at",
+    "stale-cursor"
   ],
   "role_assignments._assignment_json": [
     "created-at",
@@ -771,9 +803,17 @@
     "content",
     "translated"
   ],
+  "runs.list_cost_summary_messages:meta": [
+    "count",
+    "language"
+  ],
   "runs.list_plan_summary_messages": [
     "content",
     "translated"
+  ],
+  "runs.list_plan_summary_messages:meta": [
+    "count",
+    "language"
   ],
   "runs.list_run_events": [
     "action",
@@ -829,6 +869,13 @@
     "overridden-by",
     "severity-threshold",
     "summary"
+  ],
+  "security_scanning.get_run_security_scan:meta": [
+    "summary"
+  ],
+  "security_scanning.override_run_security_scan:meta": [
+    "overridden",
+    "run-status"
   ],
   "tfe_v2._state_version_json": [
     "created-at",
@@ -1112,6 +1159,12 @@
     "tls-trust",
     "ttl-seconds",
     "version"
+  ],
+  "vault_diagnostics.vault_status:meta": [
+    "vault",
+    "vault.enabled",
+    "vault.sampled-at",
+    "vault.unavailable-reason"
   ],
   "vcs_connections._connection_json": [
     "budget-window-seconds",

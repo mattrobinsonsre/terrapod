@@ -556,8 +556,20 @@ async def _reconcile_held(db: AsyncSession, run: Run) -> None:
         return
 
     await run_service.complete_plan(db, run)
-    if run.plan_only and run.status == "planning":
-        await _check_stale(db, run)
+    if run.status == "planning":
+        if run.plan_only:
+            await _check_stale(db, run)
+        else:
+            # An APPLY-CAPABLE run held for an AI verdict had no timeout at
+            # all: `_check_stale` is plan-only, so the only exits were an
+            # admin override or a newer run superseding it. That is fine while
+            # the verdict is merely slow, and not fine when the trigger is
+            # LOST -- `_run_trigger_consumer` pops with BRPOP and no ack, so a
+            # pod evicted between pop and handler drops the item, and a
+            # follower that pops one discards it outright. The run then sits
+            # in `planning` forever, holding its workspace's apply
+            # serialization, with a finished Job and no error to look at.
+            await _backstop_ai_policy_hold(db, run)
 
 
 async def _check_stale(db: AsyncSession, run: Run) -> None:
@@ -623,4 +635,85 @@ async def _check_stale(db: AsyncSession, run: Run) -> None:
             run_id=str(run.id),
             status=run.status,
             had_job=run.job_name is not None,
+        )
+
+
+#: How long an apply-capable run may sit held for an AI verdict before the
+#: reconciler intervenes. Generous, because a slow model call is normal and
+#: re-enqueueing early would double the token spend for no reason; the point is
+#: to bound a LOST trigger, not to race a working one.
+_AI_VERDICT_RETRY_SECONDS = 600
+#: And how long before the hold stops being silent. At this point the verdict is
+#: not coming: the summariser has had the retry and still produced nothing.
+_AI_VERDICT_GIVE_UP_SECONDS = 3600
+
+
+async def _backstop_ai_policy_hold(db: AsyncSession, run: Run) -> None:
+    """Bound the wait for an AI policy verdict that may never arrive (#1855).
+
+    Two stages, deliberately:
+
+    1. **Re-enqueue** the summariser once the wait is unreasonable. A dropped
+       trigger is the common cause and this heals it with no operator action.
+       `enqueue_trigger`'s dedup key is per run, so a verdict already in flight
+       is not duplicated.
+    2. **Record an `errored` verdict** if it still has not landed much later.
+       This does NOT release the run -- a mandatory gate fails closed, and
+       inventing a pass would be the one thing worse than holding. What it
+       changes is that the hold acquires a REASON: the run page, the PR comment
+       and `blocked-by` all name the gate, and an operator can override it
+       knowing why. Before this the run was indistinguishable from one whose
+       plan was merely slow.
+    """
+    from terrapod.services import ai_policy_service
+
+    ws = await db.get(Workspace, run.workspace_id)
+    if not ai_policy_service.gate_applies_to(run, ws):
+        return
+    if ai_policy_service.effective_enforcement(ws) != "mandatory":
+        return
+    if await ai_policy_service.get_evaluation(db, run.id) is not None:
+        return  # a verdict exists; the hold is a decision, not a silence
+
+    waited_from = run.plan_finished_at or run.plan_started_at
+    if waited_from is None:
+        return
+    waited = (datetime.now(UTC) - waited_from).total_seconds()
+
+    if waited >= _AI_VERDICT_GIVE_UP_SECONDS:
+        await ai_policy_service.record_evaluation(
+            db,
+            run_id=run.id,
+            enforcement_level="mandatory",
+            outcome="errored",
+            error=(
+                "No AI policy verdict arrived within "
+                f"{_AI_VERDICT_GIVE_UP_SECONDS // 60} minutes. The summariser "
+                "never ruled on this run — most often because its queued work "
+                "was lost to a restart. The gate is mandatory, so the run is "
+                "held rather than allowed through unchecked. Regenerate the "
+                "plan summary, or override this run."
+            ),
+        )
+        await db.commit()
+        logger.warning(
+            "AI policy gate gave up waiting for a verdict",
+            run_id=str(run.id),
+            waited_seconds=int(waited),
+        )
+        return
+
+    if waited >= _AI_VERDICT_RETRY_SECONDS:
+        from terrapod.services.scheduler import enqueue_trigger
+
+        await enqueue_trigger(
+            "ai_plan_summary",
+            {"run_id": str(run.id), "kind": "plan_summary"},
+            dedup_key=f"aisum:{run.id}:plan_summary",
+            dedup_ttl=300,
+        )
+        logger.info(
+            "Re-enqueued the plan summary for a run held without a verdict",
+            run_id=str(run.id),
+            waited_seconds=int(waited),
         )
