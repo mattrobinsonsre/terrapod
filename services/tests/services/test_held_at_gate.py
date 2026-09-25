@@ -172,7 +172,30 @@ class TestANewerRunSupersedesAHeldOne:
 
 class TestBlockedBy:
     async def test_not_held_is_none(self):
-        assert await run_service.blocked_by(AsyncMock(), _run(status="planned")) is None
+        """A `planned` run with no task stage is not blocked.
+
+        `planned` stopped being unconditionally unblocked in #1837: a run held
+        by a `pre_apply` gate waits there too, and reporting it as clear is
+        what let a required PR check pass while the run would never apply. So
+        the case this asserts has to be stated — no stage — rather than left
+        to a bare AsyncMock, which answers every lookup with a truthy stage.
+        """
+        from terrapod.services import run_task_service
+
+        with patch.object(run_task_service, "_existing_stage", AsyncMock(return_value=None)):
+            assert await run_service.blocked_by(AsyncMock(), _run(status="planned")) is None
+
+    async def test_a_planned_run_held_by_a_pre_apply_gate_is_blocked(self):
+        """The other half, and the one that matters: it must NOT read as
+        clear (#1837)."""
+        from types import SimpleNamespace
+
+        from terrapod.services import run_task_service
+
+        held = SimpleNamespace(stage="pre_apply", status="running")
+        with patch.object(run_task_service, "_existing_stage", AsyncMock(return_value=held)):
+            got = await run_service.blocked_by(AsyncMock(), _run(status="planned"))
+        assert got == "run-task"
 
     @pytest.mark.parametrize(
         ("stage_status", "policy", "scan", "ai", "expected"),

@@ -20,6 +20,7 @@ override. See docs/run-tasks.md.
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -148,11 +149,15 @@ class TestThePrePlanGateHoldsTheRunBeforeItPlans:
         """Final, with no override. Nothing has executed, so the escape is to
         fix the cause and queue again — and the run must say that rather than
         sitting `queued` forever."""
-        run = _run()
+        run = _run(status="queued")
         db = AsyncMock()
-        result = MagicMock()
-        result.scalars.return_value.all.return_value = [run]
-        db.execute = AsyncMock(return_value=result)
+        candidates = MagicMock()
+        candidates.scalars.return_value.all.return_value = [run]
+        # The failure path re-reads the run under a row lock before erroring
+        # it, so the candidate object cannot be acted on while stale.
+        locked = MagicMock()
+        locked.scalar_one_or_none.return_value = run
+        db.execute = AsyncMock(side_effect=[candidates, locked])
 
         with (
             patch.object(
@@ -192,10 +197,19 @@ class TestThePrePlanGateHoldsTheRunBeforeItPlans:
 
         transition.assert_not_awaited(), "a pending verdict is not a failure"
 
-    async def test_one_runs_gate_error_does_not_starve_the_listener(self):
-        """The pre-pass runs on every poll. An exception evaluating one run's
-        gate must not stop the listener being handed other work — the run
-        stays `queued` and is retried next poll."""
+    async def test_one_runs_gate_error_does_not_stop_the_loop(self):
+        """The pre-pass runs on every poll, so one run's gate blowing up must
+        not stop the others being considered.
+
+        **This proves less than its old name claimed.** It drove an
+        `AsyncMock` db, where there is no transaction state to poison and no
+        claim afterwards — so it passed happily while the real failure (a
+        session left needing a rollback, which then breaks the claim query and
+        500s the endpoint for the whole pool) went unnoticed. The property it
+        cannot reach lives in
+        `test_pre_plan_gate_integration.py::TestThePrePassCannotStarveTheListener`,
+        against real Postgres. Kept for the cheap loop-continues check only.
+        """
         bad, good = _run(), _run()
         db = AsyncMock()
         result = MagicMock()
@@ -351,3 +365,162 @@ class TestThePreApplyMessageIsActionable:
             verdict, message = await run_service.pre_apply_gate(AsyncMock(), run)
         assert verdict == "running"
         assert "failed" not in message
+
+
+# ── the unreachable-callback wedge ────────────────────────────────────
+
+
+class TestAResultThatCanNoLongerBeReportedIsExpired:
+    """The wedge #1837 turned from bounded into unbounded.
+
+    `run_task_dispatcher` leaves a result `running` on a 2xx, and
+    `resolve_stage` holds the stage while any result is non-terminal. Nothing
+    aged a result out, so an external service that accepts the webhook and
+    never calls back held the run forever — and ENFORCEMENT LEVEL DID NOT
+    MATTER, because the stage never resolved at all.
+
+    The deadline is the callback token's own TTL, which makes it a fact rather
+    than a policy: past it `verify_callback_token` refuses, so the service
+    cannot report back even if it tries.
+    """
+
+    def _result(self, *, age_seconds: int, status: str = "running"):
+        from terrapod.db.models import now_utc
+
+        return SimpleNamespace(
+            status=status,
+            message="",
+            finished_at=None,
+            created_at=now_utc() - timedelta(seconds=age_seconds),
+            run_task=SimpleNamespace(enforcement_level="mandatory", name="slow-task"),
+        )
+
+    def test_a_result_past_its_token_lifetime_is_errored(self):
+        stage = SimpleNamespace(status="running", results=[self._result(age_seconds=3601)])
+        assert run_task_service.expire_unreachable_results(stage) == 1
+        assert stage.results[0].status == "errored"
+        assert "callback token expired" in stage.results[0].message
+
+    def test_a_result_still_within_its_lifetime_is_left_alone(self):
+        stage = SimpleNamespace(status="running", results=[self._result(age_seconds=60)])
+        assert run_task_service.expire_unreachable_results(stage) == 0
+        assert stage.results[0].status == "running"
+
+    def test_an_advisory_task_expires_too(self):
+        """Advisory means "does not BLOCK on failure", not "cannot hold the
+        run". An advisory task that never answers wedges the stage exactly as
+        hard as a mandatory one, because resolution waits on every result."""
+        r = self._result(age_seconds=7200)
+        r.run_task = SimpleNamespace(enforcement_level="advisory", name="advisory-task")
+        stage = SimpleNamespace(status="running", results=[r])
+        assert run_task_service.expire_unreachable_results(stage) == 1
+        assert r.status == "errored"
+
+    def test_terminal_results_are_untouched(self):
+        for status in ("passed", "failed", "errored", "unreachable"):
+            r = self._result(age_seconds=99999, status=status)
+            stage = SimpleNamespace(status="running", results=[r])
+            assert run_task_service.expire_unreachable_results(stage) == 0
+            assert r.status == status
+
+    def test_a_naive_created_at_does_not_crash_the_sweep(self):
+        """Defensive: a row read back without tzinfo must not raise inside
+        what is otherwise a liveness backstop."""
+        from datetime import datetime
+
+        r = self._result(age_seconds=7200)
+        r.created_at = datetime.utcnow() - timedelta(seconds=7200)  # noqa: DTZ003
+        stage = SimpleNamespace(status="running", results=[r])
+        assert run_task_service.expire_unreachable_results(stage) == 1
+
+    def test_the_deadline_is_the_callback_token_ttl(self):
+        """Not an independent number. A tunable timeout would only let an
+        operator pick one that disagrees with the token, producing results
+        that are 'still waiting' for a callback that would be refused."""
+        import inspect
+
+        src = inspect.getsource(run_task_service.expire_unreachable_results)
+        assert "_CALLBACK_TOKEN_TTL" in src
+
+
+# ── a held run must not read as unblocked ─────────────────────────────
+
+
+class TestBlockedByAnswersForTheNewBoundaries:
+    """The `pre_apply` case is a safety issue, not a cosmetic one.
+
+    A run held there sits in `planned`, which every consumer reads as "plan
+    succeeded, waiting for a human". So the PR check reported SUCCESS: a
+    required check passed and the PR looked mergeable while the run was held
+    and would never apply. Someone could merge on the strength of it.
+
+    #1831 in this same release exists because a held run's check sat on
+    "Plan in progress"; these two boundaries reintroduced that class.
+    """
+
+    async def test_a_run_held_before_its_plan_names_the_gate(self):
+        run = _run(status="queued", plan_finished_at=None)
+        held = _stage(stage="pre_plan", status="running")
+        with patch.object(run_task_service, "_existing_stage", AsyncMock(return_value=held)):
+            assert await run_service.blocked_by(AsyncMock(), run) == "run-task"
+
+    async def test_a_run_held_before_its_apply_names_the_gate(self):
+        run = _run(status="planned", plan_finished_at=None)
+        held = _stage(stage="pre_apply", status="running")
+        with patch.object(run_task_service, "_existing_stage", AsyncMock(return_value=held)):
+            assert await run_service.blocked_by(AsyncMock(), run) == "run-task"
+
+    @pytest.mark.parametrize("cleared", ["passed", "overridden"])
+    async def test_a_cleared_gate_does_not_report_a_block(self, cleared):
+        run = _run(status="planned", plan_finished_at=None)
+        with patch.object(
+            run_task_service,
+            "_existing_stage",
+            AsyncMock(return_value=_stage(stage="pre_apply", status=cleared)),
+        ):
+            assert await run_service.blocked_by(AsyncMock(), run) is None
+
+    async def test_an_ordinary_planned_run_is_not_blocked(self):
+        """The overwhelmingly common case: no stage at all. It must not start
+        reporting a block, or every run awaiting confirm looks gated."""
+        run = _run(status="planned", plan_finished_at=None)
+        with patch.object(run_task_service, "_existing_stage", AsyncMock(return_value=None)):
+            assert await run_service.blocked_by(AsyncMock(), run) is None
+
+    def test_is_held_at_gate_is_deliberately_not_widened(self):
+        """It means "a finished plan waiting for a decision" and governs
+        discardability and whether the CLI waits (#1725). A `queued` run has
+        no plan yet; a `planned` one is already discardable the ordinary way.
+        Widening it to cover the new boundaries would change both."""
+        assert run_service.is_held_at_gate(_run(status="queued", plan_finished_at=None)) is False
+        assert run_service.is_held_at_gate(_run(status="planned", plan_finished_at=None)) is False
+
+    async def test_resolve_stage_actually_applies_the_expiry(self):
+        """Drives `resolve_stage`, not the helper.
+
+        Testing the helper alone proves it can expire a result, not that
+        anything ever calls it — and an expiry nothing invokes fixes no wedge.
+        Caught by mutation: neutering the call inside `resolve_stage` left
+        every direct-call test above passing.
+        """
+        from terrapod.db.models import now_utc
+
+        overdue = SimpleNamespace(
+            status="running",
+            message="",
+            finished_at=None,
+            created_at=now_utc() - timedelta(seconds=7200),
+            run_task=SimpleNamespace(enforcement_level="mandatory", name="silent-task"),
+        )
+        stage = SimpleNamespace(
+            id=uuid.uuid4(), stage="pre_apply", status="running", results=[overdue]
+        )
+        db = AsyncMock()
+        with patch.object(run_task_service, "get_task_stage", AsyncMock(return_value=stage)):
+            status = await run_task_service.resolve_stage(db, stage.id)
+
+        assert status == "failed", (
+            "a stage whose only result can no longer be reported must resolve, "
+            "not stay `running` forever"
+        )
+        assert overdue.status == "errored"
