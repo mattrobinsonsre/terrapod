@@ -3141,6 +3141,13 @@
       "savePolicyStatus": "Käytännön tallentaminen epäonnistui ({status})",
       "deletePolicy": "Käytännön poistaminen epäonnistui",
       "deletePolicyStatus": "Poistaminen epäonnistui ({status})"
+    },
+    "shared": {
+      "label": "Arvioi koko joukko yhdessä",
+      "help": "Käytännöt voivat kutsua jaettuja apusääntöjä ja lukea viereen tallennettuja datatiedostoja. Kun tämä on pois päältä, jokainen käytäntö arvioidaan erikseen.",
+      "perSetResults": "Tulokset raportoidaan koko joukolle. Yhdessä arvioitaessa OPA ei voi kohdistaa hylkäystä yhteen käytäntöön.",
+      "filesFound": "Löydetyt datatiedostot ja apusäännöt",
+      "noFiles": "Käytäntöjen vierestä ei löytynyt datatiedostoja eikä apusääntöjä. Tarkista käytäntöpolku."
     }
   },
   "slackLink": {

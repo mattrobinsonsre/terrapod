@@ -290,7 +290,9 @@ resource terrapod_policy_set.id required=false optional=false computed=true sens
 resource terrapod_policy_set.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_policy_set.policy_count required=false optional=false computed=true sensitive=false type=basetypes.Int64Type
 resource terrapod_policy_set.policy_path required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_policy_set.shared_evaluation required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_policy_set.source required=false optional=true computed=true sensitive=false type=basetypes.StringType
+resource terrapod_policy_set.support_file_names required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_policy_set.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_policy_set.vcs_branch required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_policy_set.vcs_connection_id required=false optional=true computed=false sensitive=false type=basetypes.StringType

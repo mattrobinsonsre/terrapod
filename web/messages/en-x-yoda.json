@@ -3141,6 +3141,13 @@
       "savePolicyStatus": "Save the policy, it did not ({status})",
       "deletePolicy": "Delete the policy, it did not",
       "deletePolicyStatus": "Delete, it did not ({status})"
+    },
+    "shared": {
+      "label": "Together, the whole set evaluate",
+      "help": "Shared helper rules, call the policies can, and data files committed beside them, read they can. Off when, alone evaluated each policy is.",
+      "perSetResults": "For the set as a whole, reported the results are. Together evaluated the files are, attribute a denial to one policy OPA cannot.",
+      "filesFound": "Found, data files and helpers were",
+      "noFiles": "Beside the policies, no data files or helpers found were. The policy path, check you must."
     }
   },
   "slackLink": {

@@ -3141,6 +3141,13 @@
       "savePolicyStatus": "Failz ta save teh policy ({status})",
       "deletePolicy": "Failz ta delet teh policy",
       "deletePolicyStatus": "Failz ta delet ({status})"
+    },
+    "shared": {
+      "label": "Chek da whole set togethr",
+      "help": "Poliseez can haz shared helpr roolz an reed data filez committd rite next to dem. When off, each polisee getz chekd all alone. sad.",
+      "perSetResults": "Resultz is reportd for da whole set. When filez getz chekd togethr, OPA can not say WHICH polisee sez no. it just sez no.",
+      "filesFound": "Data filez an helperz we finded",
+      "noFiles": "No data filez or helperz wuz finded next to da poliseez. Check ur polisee path plz."
     }
   },
   "slackLink": {

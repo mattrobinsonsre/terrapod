@@ -3141,6 +3141,13 @@
       "savePolicyStatus": "Methwyd cadw'r polisi ({status})",
       "deletePolicy": "Methwyd dileu'r polisi",
       "deletePolicyStatus": "Methwyd dileu ({status})"
+    },
+    "shared": {
+      "label": "Gwerthuso'r set gyfan gyda'i gilydd",
+      "help": "Gall polisïau alw rheolau cynorthwyol a rennir a darllen ffeiliau data a osodwyd wrth eu hymyl. Pan fo hyn i ffwrdd, gwerthusir pob polisi ar ei ben ei hun.",
+      "perSetResults": "Adroddir canlyniadau ar gyfer y set gyfan. Wrth werthuso gyda'i gilydd, ni all OPA briodoli gwrthodiad i un polisi.",
+      "filesFound": "Ffeiliau data a rheolau cynorthwyol a ganfuwyd",
+      "noFiles": "Ni chanfuwyd ffeiliau data na rheolau cynorthwyol wrth ymyl y polisïau. Gwiriwch lwybr y polisi."
     }
   },
   "slackLink": {

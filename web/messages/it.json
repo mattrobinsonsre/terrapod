@@ -3141,6 +3141,13 @@
       "savePolicyStatus": "Impossibile salvare il criterio ({status})",
       "deletePolicy": "Impossibile eliminare il criterio",
       "deletePolicyStatus": "Impossibile eliminare ({status})"
+    },
+    "shared": {
+      "label": "Valuta l intero set insieme",
+      "help": "Le policy possono richiamare regole di supporto condivise e leggere file di dati depositati accanto. Se disattivato, ogni policy viene valutata da sola.",
+      "perSetResults": "I risultati sono riportati per l intero set. Con la valutazione congiunta, OPA non può attribuire un rifiuto a una singola policy.",
+      "filesFound": "File di dati e regole di supporto trovati",
+      "noFiles": "Nessun file di dati o regola di supporto trovato accanto alle policy. Controlla il percorso delle policy."
     }
   },
   "slackLink": {

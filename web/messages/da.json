@@ -3141,6 +3141,13 @@
       "savePolicyStatus": "Kunne ikke gemme politik ({status})",
       "deletePolicy": "Kunne ikke slette politik",
       "deletePolicyStatus": "Kunne ikke slette ({status})"
+    },
+    "shared": {
+      "label": "Evaluer hele sættet samlet",
+      "help": "Politikker kan kalde delte hjælperegler og læse datafiler, der ligger ved siden af. Når det er slået fra, evalueres hver politik for sig.",
+      "perSetResults": "Resultater rapporteres for hele sættet. Ved samlet evaluering kan OPA ikke henføre et afslag til én politik.",
+      "filesFound": "Fundne datafiler og hjælperegler",
+      "noFiles": "Der blev ikke fundet datafiler eller hjælperegler ved siden af politikkerne. Kontrollér politikstien."
     }
   },
   "slackLink": {

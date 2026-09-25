@@ -23,6 +23,8 @@ interface PolicySet {
     description: string
     'enforcement-level': string
     enabled: boolean
+    'shared-evaluation': boolean
+    'support-file-names': string[]
     'global-scope': boolean
     'allow-labels': Record<string, string | string[]>
     'allow-names': string[]
@@ -77,6 +79,8 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
   const [description, setDescription] = useState('')
   const [enforcement, setEnforcement] = useState('advisory')
   const [enabled, setEnabled] = useState(true)
+  const [sharedEvaluation, setSharedEvaluation] = useState(false)
+  const [supportFileNames, setSupportFileNames] = useState<string[]>([])
   const [globalScope, setGlobalScope] = useState(false)
   const [allowNames, setAllowNames] = useState('')
   const [denyNames, setDenyNames] = useState('')
@@ -107,6 +111,8 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
       setDescription(a.description || '')
       setEnforcement(a['enforcement-level'])
       setEnabled(a.enabled)
+      setSharedEvaluation(a['shared-evaluation'] || false)
+      setSupportFileNames(a['support-file-names'] || [])
       setGlobalScope(a['global-scope'])
       setAllowNames((a['allow-names'] || []).join('\n'))
       setDenyNames((a['deny-names'] || []).join('\n'))
@@ -143,6 +149,7 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
               description,
               'enforcement-level': enforcement,
               enabled,
+              'shared-evaluation': sharedEvaluation,
               'global-scope': globalScope,
               'allow-names': linesToList(allowNames),
               'deny-names': linesToList(denyNames),
@@ -254,6 +261,49 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
                 className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
               <span className="text-sm text-slate-300">{t('fields.globalScope')}</span>
             </label>
+          </div>
+
+          {/* Shared evaluation gets its own block rather than a third checkbox
+              beside Enabled and Global: it changes how RESULTS are reported,
+              not just what runs, and the support-file list beneath it is the
+              only way an operator can confirm their data files were picked up
+              — a `policy-path` typo otherwise looks identical to the feature
+              not working. */}
+          <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4 space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" checked={sharedEvaluation}
+                onChange={(e) => setSharedEvaluation(e.target.checked)}
+                className="mt-0.5 rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+              <span>
+                <span className="block text-sm font-medium text-slate-200">
+                  {t('shared.label')}
+                </span>
+                <span className="block text-xs text-slate-400 mt-0.5">
+                  {t('shared.help')}
+                </span>
+              </span>
+            </label>
+
+            {sharedEvaluation && (
+              <div className="pl-7 space-y-2">
+                <p className="text-xs text-amber-300/90">{t('shared.perSetResults')}</p>
+                {supportFileNames.length > 0 ? (
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">{t('shared.filesFound')}</p>
+                    <ul className="flex flex-wrap gap-1.5">
+                      {supportFileNames.map((f) => (
+                        <li key={f}
+                          className="px-2 py-0.5 rounded bg-slate-700 text-slate-200 text-xs font-mono">
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-300">{t('shared.noFiles')}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {!globalScope && (

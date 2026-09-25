@@ -3141,6 +3141,13 @@
       "savePolicyStatus": "保存策略失败（{status}）",
       "deletePolicy": "删除策略失败",
       "deletePolicyStatus": "删除失败（{status}）"
+    },
+    "shared": {
+      "label": "将整个策略集一起评估",
+      "help": "策略可以调用共享的辅助规则，并读取与其一同提交的数据文件。关闭时，每条策略单独评估。",
+      "perSetResults": "结果按整个策略集报告。一起评估时，OPA 无法将某次拒绝归因于单条策略。",
+      "filesFound": "找到的数据文件与辅助规则",
+      "noFiles": "未在策略旁找到数据文件或辅助规则。请检查策略路径。"
     }
   },
   "slackLink": {

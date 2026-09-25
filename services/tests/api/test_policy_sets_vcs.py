@@ -57,6 +57,8 @@ def _mock_policy_set(source="vcs", **overrides):
     ps.vcs_repo_url = "https://github.com/org/policies"
     ps.vcs_branch = "main"
     ps.policy_path = "policies"
+    ps.shared_evaluation = False
+    ps.support_files = {}
     ps.vcs_last_commit_sha = "abc123"
     ps.vcs_last_synced_at = datetime(2026, 5, 28, tzinfo=UTC)
     ps.vcs_last_error = None
