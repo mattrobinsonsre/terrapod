@@ -138,6 +138,17 @@ def _make_app(user, mock_db=None):
     app.dependency_overrides[get_current_user] = lambda: user
     if mock_db is None:
         mock_db = AsyncMock()
+        # Answer "nothing found" to any query rather than handing back a
+        # coroutine. `blocked_by` now looks for a pre_plan/pre_apply task
+        # stage on `queued` and `planned` runs (#1837), and these are
+        # serialization tests where no stage exists — which is also the
+        # overwhelmingly common reality.
+        empty = MagicMock()
+        empty.scalars.return_value.first.return_value = None
+        empty.scalars.return_value.all.return_value = []
+        empty.scalar_one_or_none.return_value = None
+        empty.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=empty)
     app.dependency_overrides[get_db] = lambda: mock_db
     return app, mock_db
 
@@ -1638,6 +1649,12 @@ class TestRetryRun:
 
         app, mock_db = _make_app(_user())
         mock_db.get.return_value = ws
+        # Retry resolves the workspace's latest CV and 422s without one.
+        # Previously satisfied by accident: a bare AsyncMock returned a
+        # truthy coroutine here. Say it explicitly.
+        cv_result = MagicMock()
+        cv_result.scalar_one_or_none.return_value = uuid.uuid4()
+        mock_db.execute.return_value = cv_result
 
         for is_destroy in (True, False):
             original.is_destroy = is_destroy
@@ -1683,6 +1700,12 @@ class TestRetryNeedsWhatCreatingTheRunNeeds:
         ):
             app, mock_db = _make_app(_user())
             mock_db.get.return_value = ws
+            # Retry resolves the workspace's latest CV and 422s without one.
+            # Previously satisfied by accident: a bare AsyncMock returned a
+            # truthy coroutine from scalar_one_or_none(). Say it explicitly.
+            cv_result = MagicMock()
+            cv_result.scalar_one_or_none.return_value = uuid.uuid4()
+            mock_db.execute.return_value = cv_result
             async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
                 resp = await c.post(
                     f"/api/terrapod/v1/runs/run-{original.id}/actions/retry", headers=_AUTH
