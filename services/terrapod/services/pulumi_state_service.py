@@ -103,6 +103,63 @@ def provider_of(deployment: dict[str, Any] | None) -> dict[str, Any] | None:
     return provider if isinstance(provider, dict) else None
 
 
+def with_canonical_service_url(
+    deployment: dict[str, Any] | None, canonical_url: str | None
+) -> dict[str, Any] | None:
+    """Serve a `service` provider block naming an address a client can reach.
+
+    **The stored URL is the one the CLI uses, and it does not check it against
+    the backend it is logged in to.** Verified against Pulumi's own source:
+    `NewServiceSecretsManagerFromState` unmarshals the stored state and passes
+    `s.URL` straight to `getServiceSecretsAccount`, which looks up the saved
+    credential *for that exact URL*. There is no comparison with the current
+    backend and no error on mismatch -- it simply fails later with
+    ``could not find access token for <url>, have you logged in?``.
+
+    That makes a stale URL unrecoverable rather than merely wrong. Agent runs
+    before #1576 wrote the runner's in-cluster API address into this block
+    (`http://terrapod-api:8000/...`), and `service_provider` keeps any prior
+    block as it is -- so those stacks name an address no laptop can resolve,
+    let alone hold a token for. The operator cannot log in to it to satisfy the
+    lookup, because it does not exist outside the cluster.
+
+    So the URL is normalised **on the way out**, not in storage:
+
+      * every stack is fixed at once, including one that never takes another
+        write -- a write-path fix alone would strand exactly the stacks that
+        are finished and therefore most likely to be read;
+      * nothing stored is altered, so this is reversible by configuration and
+        cannot lose an operator's data.
+
+    **Only when `external_url` is configured.** Without it the deployment has
+    not declared the address it is reached at, and the fallback is whichever
+    host the caller happened to use -- normalising to a guess could rewrite a
+    working block to a worse one, so an unset `external_url` leaves the block
+    exactly as stored.
+
+    The one case this changes for an operator: a stack whose block names some
+    *other* reachable address is normalised to `external_url`. They are not
+    stranded, because `external_url` is by definition where this deployment
+    answers, so `pulumi login` against it works. That is a far better failure
+    than the one it replaces.
+    """
+    if not canonical_url or not deployment:
+        return deployment
+    provider = provider_of(deployment)
+    if not provider or provider.get("type") != SERVICE_PROVIDER:
+        return deployment
+    state = provider.get("state")
+    if not isinstance(state, dict) or state.get("url") == canonical_url:
+        return deployment
+    return {
+        **deployment,
+        "secrets_providers": {
+            **provider,
+            "state": {**state, "url": canonical_url},
+        },
+    }
+
+
 #: Marks a value sealed byte-safely (#1573). The CLI encrypts binary values as
 #: well as text, and the envelope layer seals text, so the bytes are base64'd
 #: first and the envelope only ever sees ASCII. The marker sits OUTSIDE the
