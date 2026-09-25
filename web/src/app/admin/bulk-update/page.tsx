@@ -127,6 +127,7 @@ export default function BulkUpdatePage() {
   const [uDriftEnabled, setUDriftEnabled] = useState('')
   const [uDriftInterval, setUDriftInterval] = useState('')
   const [uPlanExpiry, setUPlanExpiry] = useState('')
+  const [uParallelism, setUParallelism] = useState('')
   const [uSlackChannel, setUSlackChannel] = useState('')
   const [uBindPlan, setUBindPlan] = useState('')
   const [uDebugMode, setUDebugMode] = useState('')
@@ -187,7 +188,10 @@ export default function BulkUpdatePage() {
 
   function buildUpdate(): Record<string, unknown> {
     const u: Record<string, unknown> = {}
-    if (uTfVersion.trim()) u['terraform-version'] = uTfVersion.trim()
+    // `engine-version` is the canonical name; `terraform-version` is the
+    // #1559 alias the endpoint still normalises. Sending the canonical one
+    // keeps the UI off a deprecated spelling.
+    if (uTfVersion.trim()) u['engine-version'] = uTfVersion.trim()
     if (uExecBackend) u['execution-backend'] = uExecBackend
     if (uExecMode) u['execution-mode'] = uExecMode
     // Send the mode, never the boolean — the endpoint 422s if both are set.
@@ -211,6 +215,7 @@ export default function BulkUpdatePage() {
     if (uDriftEnabled) u['drift-detection-enabled'] = uDriftEnabled === 'true'
     if (uDriftInterval.trim()) u['drift-detection-interval-seconds'] = Number(uDriftInterval)
     if (uPlanExpiry.trim()) u['plan-expiry-seconds'] = Number(uPlanExpiry)
+    if (uParallelism.trim()) u['parallelism'] = Number(uParallelism)
     if (uSlackChannel.trim()) u['slack-channel'] = uSlackChannel.trim()
     if (uBindPlan) u['pulumi-bind-plan'] = uBindPlan === 'true'
     if (uDebugMode) u['debug-mode'] = uDebugMode === 'true'
@@ -719,6 +724,20 @@ export default function BulkUpdatePage() {
                 min={0}
                 value={uPlanExpiry}
                 onChange={(e) => setUPlanExpiry(e.target.value)}
+                placeholder={t('unchanged')}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls} title={tWs('fields.parallelismTitle')}>
+                {tWs('fields.parallelism')}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={256}
+                value={uParallelism}
+                onChange={(e) => setUParallelism(e.target.value)}
                 placeholder={t('unchanged')}
                 className={inputCls}
               />

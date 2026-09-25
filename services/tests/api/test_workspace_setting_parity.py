@@ -248,17 +248,20 @@ _SURFACE_EXEMPT: dict[str, dict[str, str]] = {
 #: issue that will clear it, and clearing one means wiring the setting up and
 #: deleting the line. This should end empty.
 _SURFACE_DEBT: dict[str, dict[str, str]] = {
-    "bulk-update GUI": {
-        "engine-version": "#1813 -- settable through the API and the provider, not the UI",
-        "parallelism": "#1813 -- settable through the API and the provider, not the UI",
-    },
+    # `pulumi-bind-plan` is blocked on #1570, not merely unfinished, and the
+    # distinction decides what "clearing" it means. An `AutodiscoveryRule` has
+    # no `engine` column -- the model says so in its own comment -- so every
+    # workspace a rule materialises is Terraform/OpenTofu. Templating a
+    # Pulumi-only setting there would record a value that can never apply to
+    # anything the rule creates, which is precisely what the bulk path answers
+    # 422 for (`_reject_engine_specific_updates`). Wiring it up to empty this
+    # ledger would satisfy the gate by adding the defect the gate exists to
+    # catch. It clears when #1570 gives a rule an engine, and not before.
     "autodiscovery GUI": {
-        "engine-version": "#1813",
-        "parallelism": "#1813",
-        "pulumi-bind-plan": "#1813 -- the rule template cannot set it at all",
+        "pulumi-bind-plan": "#1570 -- a rule has no engine, so this could never apply",
     },
     "autodiscovery API": {
-        "pulumi-bind-plan": "#1813 -- bulk-settable, but a rule cannot template it",
+        "pulumi-bind-plan": "#1570 -- a rule has no engine, so this could never apply",
     },
 }
 
