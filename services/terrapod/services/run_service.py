@@ -18,8 +18,10 @@ from terrapod.api.metrics import (
 from terrapod.db.models import (
     ConfigurationVersion,
     Run,
+    RunTask,
     RunTrigger,
     StateVersion,
+    TaskStage,
     VCSConnection,
     Workspace,
     now_utc,
@@ -1087,6 +1089,41 @@ async def transition_run(
     return run
 
 
+async def pre_apply_gate(db: AsyncSession, run: Run) -> tuple[str, str]:
+    """Judge this run's `pre_apply` run task stage (#1837).
+
+    The single predicate behind BOTH routes into `confirmed` — the human
+    `confirm_run` and the automatic `_auto_apply_if_permitted`. It has to be
+    shared: `_auto_apply_if_permitted` transitions straight to `confirmed`
+    without going through `confirm_run`, so a gate written into `confirm_run`
+    alone would be silently absent on every auto-applying workspace — enforced
+    where a person is watching and skipped where nobody is. That is the defect
+    class this boundary exists to close, so `test_run_task_stages.py` pins
+    both call sites.
+
+    Returns `(verdict, message)`. The callers differ in what they do with a
+    non-passing verdict, which is why this returns rather than raises:
+    `confirm_run` surfaces it as a 409 to the person who asked, while the
+    auto-apply path records it and leaves the run `planned` — it must never
+    raise into a reconciler tick.
+
+    There is deliberately no override (see `run_task_service.OVERRIDABLE_STAGES`).
+    """
+    from terrapod.services import run_task_service
+
+    verdict = await run_task_service.evaluate_gate(db, run, "pre_apply")
+    if verdict == run_task_service.GATE_PASSED:
+        return verdict, ""
+    if verdict == run_task_service.GATE_RUNNING:
+        return verdict, "a pre-apply run task is still running"
+    names = await run_task_service.failed_task_summary(db, run.id, "pre_apply")
+    detail = f" ({names})" if names else ""
+    return verdict, (
+        f"a mandatory pre-apply run task failed{detail} — this verdict is final; "
+        "discard the run, fix the cause, and plan again"
+    )
+
+
 async def _auto_apply_if_permitted(db: AsyncSession, run: Run) -> Run:
     """Confirm a `planned` run on the auto-apply path, honouring the guards.
 
@@ -1108,7 +1145,51 @@ async def _auto_apply_if_permitted(db: AsyncSession, run: Run) -> Run:
     # `planned` for a human to apply after unlocking, rather than
     # auto-applying past the operator's lock.
     if locked_ws is None or not locked_ws.locked:
+        # Pre-apply run task gate (#1837). Last, so a run held here has already
+        # cleared staleness and the lock — the wait only ever happens for a run
+        # that would otherwise be about to apply.
+        verdict, reason = await pre_apply_gate(db, run)
+        if verdict != "passed":
+            # Stay `planned` and SAY WHY. Declining silently is how a run parks
+            # in `planned` forever with nothing to read, which is the failure
+            # `evaluate_conditional_auto_apply` already had to be fixed for
+            # once. A still-running gate re-drives from the callback; a failed
+            # one is final and waits for a human to discard it.
+            run.auto_apply_declined_reason = reason[:200]
+            await db.flush()
+            logger.info(
+                "Auto-apply held by pre-apply run task gate",
+                run_id=str(run.id),
+                verdict=verdict,
+            )
+            return run
         run = await transition_run(db, run, "confirmed")
+    return run
+
+
+async def redrive_auto_apply(db: AsyncSession, run: Run) -> Run:
+    """Re-decide auto-apply for a run already sitting in `planned` (#1837).
+
+    The re-drive the `pre_apply` boundary needs, and the reason it needs its
+    own: the reconciler only works runs in `planning`/`applying`, and
+    `_complete_plan` returns early once a run is `planned`. So nothing
+    re-enters the auto-apply decision after the plan has landed — a run held
+    by a pre-apply gate would sit in `planned` forever with no error, which is
+    the exact failure `evaluate_conditional_auto_apply` already had to be
+    fixed for once. The run task callback calls this when the gate clears.
+
+    Mirrors the two auto-apply calls at the tail of `_complete_plan` in the
+    same order, so a run reaching `confirmed` by this route has been judged by
+    the same guards as one reaching it the ordinary way. Idempotent and safe
+    on a run that should not apply: every exit that is not an unambiguous
+    "yes" leaves it `planned`.
+    """
+    if run.status != "planned" or run.plan_only:
+        return run
+    if resolve_auto_apply_mode(run) == "always":
+        run = await _auto_apply_if_permitted(db, run)
+    if run.status == "planned":
+        run = await evaluate_conditional_auto_apply(db, run)
     return run
 
 
@@ -1674,6 +1755,19 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
         await db.commit()
         raise ValueError(f"{stale} — re-plan required")
     await _check_mergeability_or_block(db, run)
+    # Pre-apply run task gate (#1837), last — so a run held here has cleared
+    # every other guard and the wait only ever happens for a run that would
+    # otherwise be about to apply. Mirrors the ordering in
+    # `_auto_apply_if_permitted`, which shares `pre_apply_gate` with us.
+    #
+    # The run stays `planned`: the plan is still good, only the go/no-go said
+    # no. `create_task_stage` has already committed the stage and dispatched
+    # its webhooks by this point, so the 409 the router raises from this
+    # ValueError does not roll the stage back — re-confirming re-reads the
+    # SAME stage rather than starting a second round of webhooks.
+    verdict, reason = await pre_apply_gate(db, run)
+    if verdict != "passed":
+        raise ValueError(reason)
     return await transition_run(db, run, "confirmed")
 
 
@@ -1888,6 +1982,86 @@ async def count_workspace_runs(db: AsyncSession, workspace_id: uuid.UUID) -> int
     return int(result.scalar_one())
 
 
+async def _open_pre_plan_stages(db: AsyncSession, pool_id: uuid.UUID) -> None:
+    """Open and judge the `pre_plan` stage of every queued run on this pool.
+
+    The counterpart to the dispatcher's SQL exclusion: that stops a gated run
+    being claimed, this is what gets it un-stopped. A mandatory failure errors
+    the run — there is no override at this boundary (#1837), and nothing has
+    executed yet, so the escape is simply to fix the cause and queue again.
+
+    **The listener's own poll loop is the re-drive here**, which is why this
+    sits in the dispatcher rather than at the point a run is queued. The three
+    boundaries each need a driver that will come back and ask again, and they
+    do not share one: `post_plan` has the reconciler (it re-enters the
+    idempotent `complete_plan` on every tick), `pre_apply` has the run task
+    callback, and `pre_plan` has this — a listener polling for work.
+    Re-entry is safe because `evaluate_gate` is idempotent per (run, stage).
+
+    Runs BEFORE any `FOR UPDATE SKIP LOCKED` is taken, deliberately:
+    `create_task_stage` commits internally (it must, so the row is visible to
+    the webhook consumer before the trigger fires), and a commit inside the
+    claim transaction would release the row locks that make the claim
+    exactly-once.
+    """
+    from terrapod.services import run_task_service
+
+    # Only runs that actually want a gate and have not cleared one. Without
+    # this filter the common case — no pre_plan tasks anywhere — would still
+    # walk every queued run on every poll from every listener.
+    wants = (
+        select(RunTask.id)
+        .where(
+            RunTask.workspace_id == Run.workspace_id,
+            RunTask.stage == "pre_plan",
+            RunTask.enabled.is_(True),
+        )
+        .exists()
+    )
+    cleared = (
+        select(TaskStage.id)
+        .where(
+            TaskStage.run_id == Run.id,
+            TaskStage.stage == "pre_plan",
+            TaskStage.status.in_(["passed", "overridden"]),
+        )
+        .exists()
+    )
+    candidates = await db.execute(
+        select(Run).where(
+            Run.status == "queued",
+            or_(
+                Run.pool_id == pool_id,
+                Run.pool_extra_ids.contains([str(pool_id)]),
+            ),
+            wants,
+            not_(cleared),
+        )
+    )
+
+    for run in candidates.scalars().all():
+        try:
+            verdict = await run_task_service.evaluate_gate(db, run, "pre_plan")
+        except Exception:
+            # Never let one run's gate stop the listener being given other
+            # work. The run stays `queued` and is retried on the next poll.
+            logger.exception("failed to evaluate pre-plan gate", run_id=str(run.id))
+            continue
+        if verdict == run_task_service.GATE_FAILED:
+            names = await run_task_service.failed_task_summary(db, run.id, "pre_plan")
+            detail = f" ({names})" if names else ""
+            await transition_run(
+                db,
+                run,
+                "errored",
+                error_message=(
+                    f"A mandatory pre-plan run task failed{detail}. This verdict is "
+                    "final — fix the cause and queue a new run."
+                ),
+            )
+            await db.commit()
+
+
 async def claim_next_run(
     db: AsyncSession,
     listener_id: uuid.UUID,
@@ -1918,6 +2092,12 @@ async def claim_next_run(
     # says the same thing in the vocabulary the caller already speaks.
     if not await ha_role.is_leader():
         return None
+
+    # Open the pre-plan gate for anything queued here before looking for work
+    # (#1837). Must precede the claim loop below: it commits, and the loop
+    # holds row locks. See `_open_pre_plan_stages`.
+    await _open_pre_plan_stages(db, pool_id)
+
     # Try queued runs first (plan phase), then confirmed runs (apply phase)
     for target_status, phase, next_status in [
         ("queued", "plan", "planning"),
@@ -1963,6 +2143,38 @@ async def claim_next_run(
                     and_(not_(ws_locked), not_(in_flight)),
                 )
             )
+
+            # Pre-plan run task gate (#1837). A run whose workspace has an
+            # enabled `pre_plan` task is claimable only once its stage has
+            # PASSED.
+            #
+            # Phrased as "the workspace wants a gate and this run has not
+            # cleared one" rather than "a stage row exists and is unresolved",
+            # because those differ in the window that matters: between a run
+            # becoming `queued` and `_open_pre_plan_stages` creating its stage
+            # there IS no stage row, so the row-based form would find nothing
+            # to exclude and hand the run straight to a listener — running the
+            # plan the gate exists to hold. This form is race-proof on its own
+            # and does not depend on the pre-pass below having run first.
+            wants_pre_plan = (
+                select(RunTask.id)
+                .where(
+                    RunTask.workspace_id == Run.workspace_id,
+                    RunTask.stage == "pre_plan",
+                    RunTask.enabled.is_(True),
+                )
+                .exists()
+            )
+            cleared_pre_plan = (
+                select(TaskStage.id)
+                .where(
+                    TaskStage.run_id == Run.id,
+                    TaskStage.stage == "pre_plan",
+                    TaskStage.status.in_(["passed", "overridden"]),
+                )
+                .exists()
+            )
+            conditions.append(or_(not_(wants_pre_plan), cleared_pre_plan))
 
         query = (
             select(Run)
