@@ -891,6 +891,16 @@ async def _settle_ai_policy_gate(
             await run_service.complete_plan(db, fresh)
             await db.commit()
     except Exception as exc:  # noqa: BLE001
+        # ROLL BACK FIRST. `complete_plan` transitions the run and then does
+        # post-transition work (auto-apply, notifications, the gate-hold
+        # status); an exception in that tail leaves the session dirty, and
+        # `get_db_session` COMMITS on normal exit -- so swallowing the
+        # exception without rolling back persists the transition with none of
+        # the work that must accompany it, or raises PendingRollbackError at
+        # the exit commit and reports a summary that succeeded as failed.
+        # Same shape as the fixes in `run_service._open_pre_plan_stages` and
+        # `vcs_command_dispatcher`.
+        await db.rollback()
         # Never let the re-drive take down the summary that produced the
         # verdict: the evaluation is committed above, so the reconciler and an
         # operator override both still have something to work with.

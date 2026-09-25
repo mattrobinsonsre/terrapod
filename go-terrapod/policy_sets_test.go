@@ -1,6 +1,7 @@
 package terrapod
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -308,5 +309,76 @@ func TestGetPolicyIsNotFoundWhenTheSetNoLongerHoldsIt(t *testing.T) {
 	}
 	if !IsNotFound(err) {
 		t.Fatalf("err = %v, want a NotFoundError", err)
+	}
+}
+
+func TestListRunPolicyEvaluations(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/terrapod/v1/runs/run-11111111-1111-1111-1111-111111111111/policy-evaluations" {
+			t.Errorf("unexpected path %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":[
+			{"id":"polev-1","type":"policy-evaluations","attributes":{
+				"policy-set-name":"prod-guardrails","enforcement-level":"mandatory",
+				"outcome":"failed","result":{"violations":["no public buckets"]}}},
+			{"id":"polev-2","type":"policy-evaluations","attributes":{
+				"policy-set-name":"style","enforcement-level":"advisory","outcome":"failed"}}
+		]}`))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	evals, err := c.ListRunPolicyEvaluations(context.Background(), "run-11111111-1111-1111-1111-111111111111")
+	if err != nil {
+		t.Fatalf("ListRunPolicyEvaluations: %v", err)
+	}
+	if len(evals) != 2 {
+		t.Fatalf("want 2 evaluations, got %d", len(evals))
+	}
+	if evals[0].PolicySetName != "prod-guardrails" || evals[0].Outcome != "failed" {
+		t.Errorf("first evaluation decoded wrong: %+v", evals[0])
+	}
+	if got := evals[0].Result["violations"]; got == nil {
+		t.Errorf("result payload was dropped: %+v", evals[0].Result)
+	}
+	// The distinction a caller comparing Outcome to "failed" gets wrong:
+	// both failed, only the mandatory one is holding the run.
+	if !evals[0].IsBlocking() {
+		t.Error("a failed MANDATORY set should block")
+	}
+	if evals[1].IsBlocking() {
+		t.Error("a failed ADVISORY set must never block")
+	}
+}
+
+func TestListRunPolicyEvaluationsEmpty(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	evals, err := c.ListRunPolicyEvaluations(context.Background(), "run-11111111-1111-1111-1111-111111111111")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(evals) != 0 {
+		t.Errorf("want none, got %d", len(evals))
+	}
+}
+
+func TestPolicyEvaluationIsBlockingOverridden(t *testing.T) {
+	e := &PolicyEvaluation{EnforcementLevel: "mandatory", Outcome: "failed", OverriddenBy: "admin"}
+	if e.IsBlocking() {
+		t.Error("an overridden evaluation must not block")
+	}
+	var nilEval *PolicyEvaluation
+	if nilEval.IsBlocking() {
+		t.Error("nil must not block")
 	}
 }

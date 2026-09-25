@@ -242,15 +242,30 @@ def _verdict_from_ai_policy(row: Any | None, enforcement: str, *, held: bool) ->
     return GateVerdict("ai-policy", name, not held, "mandatory")
 
 
-def _verdict_from_stage(status: str) -> GateVerdict:
-    """The post-plan run-task verdict for a stage that exists.
+# The three boundaries run tasks fire at (#1837), in the order a run meets
+# them. `post_plan` is the only one this comment used to know about, which is
+# why a run held at `pre_apply` was reported as having nothing wrong with it.
+_STAGE_LABELS = {
+    "pre_plan": "pre-plan tasks",
+    "post_plan": "post-plan tasks",
+    "pre_apply": "pre-apply tasks",
+}
+
+
+def _verdict_from_stage(status: str, stage: str = "post_plan") -> GateVerdict:
+    """The run-task verdict for a stage that exists.
 
     One verdict for the whole stage rather than one per task, because that is
     the granularity the gate works at: `run_task_service.resolve_stage` fails a
     stage only on a *mandatory* task failure, so a failed stage is by
     construction a mandatory failure and advisory tasks are already excluded.
     """
-    return GateVerdict("run-task", "post-plan tasks", status in _STAGE_PASS_STATUSES, "mandatory")
+    return GateVerdict(
+        "run-task",
+        _STAGE_LABELS.get(stage, stage),
+        status in _STAGE_PASS_STATUSES,
+        "mandatory",
+    )
 
 
 async def _collect_gates(db, run: Run) -> tuple[GateVerdict, ...]:
@@ -268,16 +283,29 @@ async def _collect_gates(db, run: Run) -> tuple[GateVerdict, ...]:
     run_id = run.id
     gates: list[GateVerdict] = []
 
-    stage = (
+    # ALL THREE boundaries, not just `post_plan`. Querying one of them is how
+    # a run held at `pre_apply` came back with no gates at all: `blocked` was
+    # then False, so the comment offered "Comment `terrapod apply`" for a run
+    # `confirm_run` would refuse — and the refusal posts nothing, so the
+    # reviewer commented, got a success reaction, and watched the same
+    # invitation re-render. `apply_then_merge` plus a mandatory `pre_apply`
+    # task is the headline use case for #1837, so that is the intended
+    # configuration, not a corner.
+    stages = (
         await db.execute(
-            select(TaskStage.status)
-            .where(TaskStage.run_id == run_id, TaskStage.stage == "post_plan")
+            select(TaskStage.stage, TaskStage.status)
+            .where(TaskStage.run_id == run_id, TaskStage.stage.in_(tuple(_STAGE_LABELS)))
             .order_by(TaskStage.created_at.asc(), TaskStage.id.asc())
-            .limit(1)
         )
-    ).first()
-    if stage is not None:
-        gates.append(_verdict_from_stage(stage[0]))
+    ).all()
+    seen_stages: set[str] = set()
+    for stage_name, stage_status in stages:
+        # One verdict per boundary: a re-driven run can accumulate more than
+        # one row for the same stage, and the earliest is the live one.
+        if stage_name in seen_stages:
+            continue
+        seen_stages.add(stage_name)
+        gates.append(_verdict_from_stage(stage_status, stage_name))
 
     evaluations = (
         await db.execute(

@@ -146,10 +146,14 @@ def _run_json(
             "type": "runs",
             "attributes": {
                 "status": run.status,
-                # Which post-plan gate holds the run (#1725): `run-task`,
-                # `policy`, `security-scan`, or null. A held run reports status
-                # `planning` although its plan has finished; this is how a client
-                # tells the two apart until 2.0 gives held runs their own
+                # Which gate holds the run (#1725): `run-task`, `policy`,
+                # `security-scan`, `ai-policy`, or null. A POST-PLAN hold
+                # reports status `planning` although its plan has finished;
+                # this is how a client tells the two apart until 2.0 gives held
+                # runs their own status. The two #1837 boundaries hold
+                # elsewhere -- `pre_plan` in `queued`, `pre_apply` in `planned`
+                # -- so this attribute being set does not imply `planning`, and
+                # a client that assumes it will misread both.
                 # statuses (#1704).
                 "blocked-by": blocked_by,
                 "message": run.message,
