@@ -30,6 +30,17 @@ A run held at any boundary is waiting, not failing. It moves on by itself as
 soon as the external service reports back — nothing needs to be re-triggered by
 hand.
 
+A held run keeps its ordinary status (`queued`, `planning` or `planned`), so
+the way to tell "waiting on a gate" from "waiting its turn" is to look at the
+stages:
+
+```
+GET /api/terrapod/v1/runs/{run_id}/task-stages
+```
+
+A stage still `running` there is what is holding the run, and its results name
+the task that has not answered yet.
+
 ---
 
 ## Enforcement Levels
