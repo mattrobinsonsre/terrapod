@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import pathlib
 
+import pytest
+
 from terrapod.api.routers.workspace_bulk import _FIELD_MAP, _FIELDS_HANDLED_SEPARATELY
 from terrapod.db.models import Workspace
 
@@ -275,3 +277,45 @@ class TestEverySettableAttributeReachesEverySurface:
         for surface, excused in _SURFACE_EXEMPT.items():
             stale = set(excused) - attrs
             assert not stale, f"{surface} excuses non-settable attribute(s): {sorted(stale)}"
+
+
+class TestBooleanSettingsAreCheckedNotCoerced:
+    """`bool()` coerces; it does not validate. `bool("false")` is True.
+
+    Every boolean the workspace write paths accept must go through
+    `validate_bool`, which rejects a string outright. The create path read
+    `auto-merge` with a bare `bool()` while using `validate_bool` on
+    `debug-mode` forty lines below — so a client that stringifies booleans
+    turned auto-merge ON while asking for it to be off, and got a 201.
+    """
+
+    def test_bool_would_have_accepted_the_string(self):
+        """The premise, pinned — so this test cannot quietly stop meaning
+        anything if someone decides the coercion was harmless."""
+        assert bool("false") is True
+
+    def test_the_shared_validator_refuses_a_stringified_boolean(self):
+        from terrapod.services import workspace_settings
+
+        for bad in ("false", "true", 0, 1, "0"):
+            with pytest.raises(ValueError):
+                workspace_settings.validate_bool(bad, "auto-merge")
+
+        assert workspace_settings.validate_bool(False, "auto-merge") is False
+        assert workspace_settings.validate_bool(True, "auto-merge") is True
+
+    def test_no_workspace_write_path_coerces_a_boolean_attribute(self):
+        """Source-introspection, because the failure is invisible at runtime:
+        a coerced boolean produces a 201 and the wrong stored value."""
+        import inspect
+        import re
+
+        from terrapod.api.routers import tfe_v2
+
+        src = inspect.getsource(tfe_v2)
+        offenders = re.findall(r"=\s*bool\(attrs\.get\(\"([a-z0-9-]+)\"", src)
+        offenders += re.findall(r"=\s*bool\(attrs\[\"([a-z0-9-]+)\"\]", src)
+        assert offenders == [], (
+            "these boolean attributes are coerced rather than validated, so a "
+            f"stringified 'false' would enable them: {sorted(set(offenders))}"
+        )

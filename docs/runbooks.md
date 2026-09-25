@@ -1108,7 +1108,11 @@ service=terrapod-api logger=terrapod.services.vcs_status_dispatcher
 
 **Symptom**: AI summary panels show "Summariser failed" with an upstream error (HTTP 401 / 403 / 5xx, timeout, or model-not-found). The `plan_summaries` table accumulates rows with `status='errored'` and `error_message` carrying the LiteLLM exception. The run lifecycle is unaffected **while the policy gate is off**. **Unless the policy gate is on** (`ai_summary.policy.enabled`): under `enforcement_level: mandatory` a budget exhaustion or a model fault records an `errored` verdict, and an errored verdict HOLDS the run — the gate fails closed, so an AI outage does stop applies. Check `blocked-by: ai-policy` on held runs before concluding the AI subsystem cannot be the cause.
 
-**Why**: the summariser's failure path is best-effort by design — every exception from `litellm.acompletion()` is caught, logged, and recorded as an `errored` row. The trigger handler never raises into the scheduler, so a sustained provider outage does NOT block plans, applies, VCS comments, or any other run state. Only the summary surface goes red.
+**Why**: the summariser's failure path is best-effort by design — every exception from `litellm.acompletion()` is caught, logged, and recorded as an `errored` row. The trigger handler never raises into the scheduler.
+
+**With the policy gate OFF** (the default) that is the whole story: a sustained provider outage does not block plans, applies, VCS comments, or any other run state, and only the summary surface goes red.
+
+**With the gate ON and `enforcement_level: mandatory` it is not.** The same `errored` row the summariser writes as a best-effort failure is a BLOCKING verdict to the gate — a verdict that could not be reached is not consent, so it fails closed and holds the run. A run held with no verdict at all is held too. During a provider outage that means applies stop fleet-wide, and the exit is a per-run override (`POST /runs/{id}/actions/override-ai-policy`) or setting `enforcement_level: advisory` until the provider recovers. Do not read the best-effort description above as covering this case.
 
 ### Diagnosis
 

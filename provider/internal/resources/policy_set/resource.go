@@ -335,7 +335,13 @@ func buildCreateRequest(m *policySetModel) terrapod.CreatePolicySetRequest {
 		Name:             m.Name.ValueString(),
 		Description:      m.Description.ValueString(),
 		EnforcementLevel: m.EnforcementLevel.ValueString(),
-		Enabled:          m.Enabled.IsNull() || m.Enabled.ValueBool(),
+		// Null AND unknown both mean "the config did not say", and the server
+		// default is true. Checking only IsNull() was the bug: an unset
+		// Optional+Computed attribute is planned UNKNOWN on create, not null,
+		// so ValueBool() returned false and the set was created DISABLED --
+		// silently, since a disabled set applies to nothing whatever its
+		// scope. The workspace resource checks both states for exactly this.
+		Enabled:          m.Enabled.IsNull() || m.Enabled.IsUnknown() || m.Enabled.ValueBool(),
 		SharedEvaluation: m.SharedEvaluation.ValueBool(),
 		GlobalScope:      m.GlobalScope.ValueBool(),
 		AllowLabels:      mapFromTFMap(m.AllowLabels),
@@ -357,7 +363,9 @@ func buildUpdateRequest(m *policySetModel) terrapod.UpdatePolicySetRequest {
 	// narrowed by deleting a line is a scope Terraform does not really own.
 	name := m.Name.ValueString()
 	desc := m.Description.ValueString()
-	enabled := m.Enabled.ValueBool()
+	// Same reasoning as create: unknown means "the config did not say", and
+	// the server default is true. Sending false there would disable the set.
+	enabled := m.Enabled.IsNull() || m.Enabled.IsUnknown() || m.Enabled.ValueBool()
 	sharedEvaluation := m.SharedEvaluation.ValueBool()
 	global := m.GlobalScope.ValueBool()
 

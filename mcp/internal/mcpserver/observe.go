@@ -581,6 +581,18 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	type runAIPolicyIn struct {
 		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose AI policy verdict to fetch"`
 	}
+	// The evaluation alone cannot answer "is this run held" — a mandatory gate
+	// holds a run with NO verdict recorded just as it holds one that denied,
+	// and the row is absent in the first case. So the meta rides alongside it:
+	// without this the tool returned a bare null for a run stuck indefinitely,
+	// and the agent had no way to learn that the override tool was the fix.
+	type runAIPolicyOut struct {
+		Evaluation         *terrapod.AIPolicyEvaluation `json:"evaluation"`
+		Blocking           bool                         `json:"blocking"`
+		NotEvaluatedReason string                       `json:"not_evaluated_reason,omitempty"`
+		EnforcementLevel   string                       `json:"enforcement_level,omitempty"`
+		RunStatus          string                       `json:"run_status,omitempty"`
+	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_run_ai_policy",
 		Description: "Get a run's AI policy gate verdict (#1766): the model's allow/deny ruling against the operator's " +
@@ -588,18 +600,28 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			"risk level, the enforcement level (advisory/mandatory), the outcome (passed/failed/errored) and any override. " +
 			"Note `errored` BLOCKS under a mandatory gate rather than passing: the gate fails closed, so a verdict that " +
 			"could not be reached is not consent, and `error` says why (a spent token budget reads differently from a model " +
-			"fault). Returns null when no verdict is recorded — the meta then says whether the gate is off " +
-			"or the verdict has simply not landed yet.",
+			"fault). `evaluation` is null when no verdict is recorded, which does NOT mean the run is free: " +
+			"read `blocking`, which is the server's own answer to whether this gate is holding the run and is " +
+			"true even with no verdict — that is the state a stuck run sits in, and terrapod_run_ai_policy_override " +
+			"is what releases it. `not_evaluated_reason` distinguishes \"waiting for a verdict\" from \"no verdict " +
+			"is coming\". `enforcement_level` here is the workspace's CURRENT setting, which can differ from the " +
+			"one inside `evaluation` — that one is snapshotted at evaluation time, deliberately.",
 		Annotations: readOnly,
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runAIPolicyIn) (*mcp.CallToolResult, *terrapod.AIPolicyEvaluation, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runAIPolicyIn) (*mcp.CallToolResult, *runAIPolicyOut, error) {
 		if in.RunID == "" {
 			return errText("run_id is required"), nil, nil
 		}
-		e, err := c.GetRunAIPolicy(ctx, in.RunID)
+		st, err := c.GetRunAIPolicyStatus(ctx, in.RunID)
 		if err != nil {
 			return errResult(err), nil, nil
 		}
-		return nil, e, nil
+		return nil, &runAIPolicyOut{
+			Evaluation:         st.Evaluation,
+			Blocking:           st.Blocking,
+			NotEvaluatedReason: st.NotEvaluatedReason,
+			EnforcementLevel:   st.EnforcementLevel,
+			RunStatus:          st.RunStatus,
+		}, nil
 	})
 
 	// ── terrapod_policy_set_list ─────────────────────────────────────
