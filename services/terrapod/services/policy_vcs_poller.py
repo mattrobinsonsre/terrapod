@@ -43,6 +43,14 @@ _MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
 
 _PACKAGE_RE = re.compile(r"(?m)^\s*package\s+terrapod\s*(#.*)?$")
 _DENY_RULE_RE = re.compile(r"(?m)^\s*deny\s+(contains|:=|=)")
+# `warn` counts as well: a set may be advisory-only, and a file that produces
+# warnings is a policy by any reading — the old filter dropped it silently.
+_WARN_RULE_RE = re.compile(r"(?m)^\s*warn\s+(contains|:=|=)")
+
+_POLICY_FILE_SUFFIXES = (".rego", ".yaml", ".yml", ".json")
+# Per file. Data files are small by nature; the cap is here so one pathological
+# file cannot be carried into every run's policy bundle.
+_MAX_POLICY_FILE_BYTES = 1024 * 1024
 
 
 def _parse_repo_url(conn: VCSConnection, repo_url: str) -> tuple[str, str] | None:
@@ -57,17 +65,28 @@ async def _get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: st
     return await _provider_get_branch_sha(conn, owner, repo, branch)
 
 
-def _extract_rego_files(archive_bytes: bytes, policy_path: str) -> dict[str, str]:
-    """Extract .rego files from a tarball at the given path.
+def _extract_policy_files(archive_bytes: bytes, policy_path: str) -> dict[str, str]:
+    """Extract a policy set's files from a tarball at the given path.
 
-    Returns {policy_name: rego_content} where policy_name is the filename
-    without extension. Only direct children of policy_path are included
-    (no recursive descent into subdirectories).
+    Returns {filename_with_extension: content}. The extension is kept — unlike
+    the old rego-only extractor, which stripped it — because it is what
+    distinguishes a policy from a data file, and what tells OPA how to load
+    each one (#1842).
+
+    `.rego`, `.yaml`, `.yml` and `.json` are taken; everything else is ignored,
+    so a README or a CI config in the same directory costs nothing. Only direct
+    children of policy_path are included (no recursive descent).
+
+    `*_test.rego` is skipped. OPA test files define no `deny`, so they would
+    land as support files and be loaded into a shared evaluation, where their
+    fixtures become part of the data the real policies see.
     """
-    policies: dict[str, str] = {}
+    files: dict[str, str] = {}
     with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:gz") as tar:
         for member in tar.getmembers():
-            if not member.isfile() or not member.name.endswith(".rego"):
+            if not member.isfile() or not member.name.endswith(_POLICY_FILE_SUFFIXES):
+                continue
+            if member.name.endswith("_test.rego"):
                 continue
 
             # Reject path traversal: absolute paths or .. components.
@@ -93,11 +112,55 @@ def _extract_rego_files(archive_bytes: bytes, policy_path: str) -> dict[str, str
             if "/" in remainder:
                 continue
 
-            name = os.path.splitext(remainder)[0]
             f = tar.extractfile(member)
-            if f is not None:
-                policies[name] = f.read().decode("utf-8")
-    return policies
+            if f is None:
+                continue
+            raw = f.read()
+            if len(raw) > _MAX_POLICY_FILE_BYTES:
+                logger.warning(
+                    "policy file skipped: too large",
+                    file=remainder,
+                    size=len(raw),
+                    cap=_MAX_POLICY_FILE_BYTES,
+                )
+                continue
+            try:
+                files[remainder] = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                # A binary file sharing the directory is not ours to carry.
+                logger.warning("policy file skipped: not UTF-8", file=remainder)
+    return files
+
+
+def _classify(files: dict[str, str]) -> tuple[dict[str, str], dict[str, str]]:
+    """Split a set's files into policies and support files (#1842).
+
+    A **policy** is a `.rego` file in `package terrapod` that produces a
+    verdict — it defines `deny` or `warn`. Its key drops the extension, because
+    that name is what the UI, the results and the API have always called a
+    policy, and renaming them would be a gratuitous break.
+
+    **Support files** are everything else the set carries: data (`.yaml`,
+    `.yml`, `.json`) and `.rego` helpers that define no verdict. Their keys
+    keep the extension, because OPA decides how to load a file by its suffix.
+
+    The split is what lets a helper stop being invisible without becoming a
+    policy: before this, a deny-less `.rego` was dropped at sync time, so a
+    shared helper could not exist at all and every policy inlined its own copy
+    of the same allowlist.
+    """
+    policies: dict[str, str] = {}
+    support: dict[str, str] = {}
+    for name, content in files.items():
+        if name.endswith(".rego"):
+            verdict = _DENY_RULE_RE.search(content) or _WARN_RULE_RE.search(content)
+            if _PACKAGE_RE.search(content) and verdict:
+                policies[os.path.splitext(name)[0]] = content
+            else:
+                support[name] = content
+        else:
+            support[name] = content
+    return policies, support
 
 
 def _resolve_tmpdir() -> str | None:
@@ -184,12 +247,9 @@ async def _sync_policy_set(db: AsyncSession, ps: PolicySet) -> None:
             return
 
         archive = await _download_archive(conn, owner, repo, sha)
-        rego_files = await asyncio.to_thread(_extract_rego_files, archive, ps.policy_path)
-        rego_files = {
-            name: rego
-            for name, rego in rego_files.items()
-            if _PACKAGE_RE.search(rego) and _DENY_RULE_RE.search(rego)
-        }
+        files = await asyncio.to_thread(_extract_policy_files, archive, ps.policy_path)
+        rego_files, support_files = _classify(files)
+        ps.support_files = support_files
 
         existing = {p.name: p for p in ps.policies}
 

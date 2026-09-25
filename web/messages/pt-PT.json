@@ -3141,6 +3141,13 @@
       "savePolicyStatus": "Falha ao guardar a política ({status})",
       "deletePolicy": "Falha ao eliminar a política",
       "deletePolicyStatus": "Falha ao eliminar ({status})"
+    },
+    "shared": {
+      "label": "Avaliar todo o conjunto em conjunto",
+      "help": "As políticas podem chamar regras auxiliares partilhadas e ler ficheiros de dados colocados ao lado. Quando desativado, cada política é avaliada isoladamente.",
+      "perSetResults": "Os resultados são reportados para o conjunto inteiro. Na avaliação conjunta, o OPA não consegue atribuir uma recusa a uma política específica.",
+      "filesFound": "Ficheiros de dados e regras auxiliares encontrados",
+      "noFiles": "Não foram encontrados ficheiros de dados nem regras auxiliares junto às políticas. Verifique o caminho das políticas."
     }
   },
   "slackLink": {

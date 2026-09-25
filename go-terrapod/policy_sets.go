@@ -15,8 +15,22 @@ type PolicySet struct {
 	Description      string `json:"description,omitempty"`
 	EnforcementLevel string `json:"enforcement-level"`
 	Enabled          bool   `json:"enabled"`
-	GlobalScope      bool   `json:"global-scope"`
-	PolicyCount      int64  `json:"policy-count"`
+
+	// SharedEvaluation loads the set's policies, helpers and data files into
+	// ONE opa eval so they can share (#1842). Opt-in: false keeps a set
+	// evaluating one policy at a time, which is what every set did before.
+	//
+	// Results become per-SET when it is on. Every file shares
+	// `package terrapod`, so evaluated together OPA cannot say which file
+	// produced which denial, and a per-policy breakdown would be invented.
+	SharedEvaluation bool `json:"shared-evaluation"`
+	// SupportFileNames are the data files and helpers the VCS sync found, so
+	// an operator can see their files were picked up. Read-only; the content
+	// is not served here, only the runner's policy bundle carries it.
+	SupportFileNames []string `json:"support-file-names"`
+
+	GlobalScope bool  `json:"global-scope"`
+	PolicyCount int64 `json:"policy-count"`
 
 	// AllowLabels/DenyLabels scope the set to workspaces when GlobalScope is
 	// false. They were settable through Create/Update from the start but never
@@ -62,6 +76,7 @@ type CreatePolicySetRequest struct {
 	Description      string
 	EnforcementLevel string
 	Enabled          bool
+	SharedEvaluation bool
 	GlobalScope      bool
 	AllowLabels      map[string]string
 	AllowNames       []string
@@ -82,6 +97,7 @@ type UpdatePolicySetRequest struct {
 	Description      *string
 	EnforcementLevel *string
 	Enabled          *bool
+	SharedEvaluation *bool
 	GlobalScope      *bool
 	AllowLabels      map[string]string
 	AllowNames       []string
@@ -168,6 +184,7 @@ func policySetCreateAttrs(req CreatePolicySetRequest) map[string]any {
 		"name":              req.Name,
 		"enforcement-level": req.EnforcementLevel,
 		"enabled":           req.Enabled,
+		"shared-evaluation": req.SharedEvaluation,
 		"global-scope":      req.GlobalScope,
 	}
 	if req.Description != "" {
@@ -210,6 +227,9 @@ func policySetUpdateAttrs(req UpdatePolicySetRequest) map[string]any {
 	}
 	if req.Description != nil {
 		attrs["description"] = *req.Description
+	}
+	if req.SharedEvaluation != nil {
+		attrs["shared-evaluation"] = *req.SharedEvaluation
 	}
 	if req.EnforcementLevel != nil {
 		attrs["enforcement-level"] = *req.EnforcementLevel
@@ -272,6 +292,8 @@ func policySetFromResource(res *Resource) *PolicySet {
 		Description:      GetStringAttr(res, "description"),
 		EnforcementLevel: GetStringAttr(res, "enforcement-level"),
 		Enabled:          GetBoolAttr(res, "enabled"),
+		SharedEvaluation: GetBoolAttr(res, "shared-evaluation"),
+		SupportFileNames: GetListAttr(res, "support-file-names"),
 		GlobalScope:      GetBoolAttr(res, "global-scope"),
 		PolicyCount:      GetIntAttr(res, "policy-count"),
 		AllowLabels:      labelRuleAttr(res, "allow-labels"),

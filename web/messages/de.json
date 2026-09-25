@@ -3141,6 +3141,13 @@
       "savePolicyStatus": "Richtlinie konnte nicht gespeichert werden ({status})",
       "deletePolicy": "Richtlinie konnte nicht gelöscht werden",
       "deletePolicyStatus": "Löschen fehlgeschlagen ({status})"
+    },
+    "shared": {
+      "label": "Gesamtes Set gemeinsam auswerten",
+      "help": "Richtlinien können gemeinsame Hilfsregeln aufrufen und daneben abgelegte Datendateien lesen. Ist dies deaktiviert, wird jede Richtlinie einzeln ausgewertet.",
+      "perSetResults": "Ergebnisse werden für das gesamte Set gemeldet. Bei gemeinsamer Auswertung kann OPA eine Ablehnung nicht einer einzelnen Richtlinie zuordnen.",
+      "filesFound": "Gefundene Datendateien und Hilfsregeln",
+      "noFiles": "Neben den Richtlinien wurden keine Datendateien oder Hilfsregeln gefunden. Prüfen Sie den Richtlinienpfad."
     }
   },
   "slackLink": {

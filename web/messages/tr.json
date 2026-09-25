@@ -3141,6 +3141,13 @@
       "savePolicyStatus": "Politika kaydedilemedi ({status})",
       "deletePolicy": "Politika silinemedi",
       "deletePolicyStatus": "Silinemedi ({status})"
+    },
+    "shared": {
+      "label": "Tüm kümeyi birlikte değerlendir",
+      "help": "Politikalar paylaşılan yardımcı kuralları çağırabilir ve yanlarına konan veri dosyalarını okuyabilir. Kapalıyken her politika tek başına değerlendirilir.",
+      "perSetResults": "Sonuçlar kümenin tamamı için bildirilir. Birlikte değerlendirmede OPA bir reddi tek bir politikaya atfedemez.",
+      "filesFound": "Bulunan veri dosyaları ve yardımcı kurallar",
+      "noFiles": "Politikaların yanında veri dosyası veya yardımcı kural bulunamadı. Politika yolunu kontrol edin."
     }
   },
   "slackLink": {
