@@ -172,6 +172,14 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
 }
 
 TERMINAL_STATES = {"applied", "errored", "discarded", "canceled"}
+
+# How many gated runs one pre-plan pass will open stages for (#1837). The pass
+# runs on every listener poll, so it needs a ceiling: a workspace whose gate
+# never resolves keeps accumulating `queued` runs (a gated run does not count
+# as runner-busy, so drift checks go on queueing), and without a bound every
+# listener re-walks that whole backlog on every poll. Anything past the limit
+# is picked up on a later poll, oldest first.
+_PRE_PLAN_SCAN_LIMIT = 50
 # Statuses that mean a Job has not yet started any infra mutation.
 # Cancelling from any of these can go straight to `canceled` — the
 # canceling-intermediate state is only required when an apply Job
@@ -473,14 +481,46 @@ def is_discardable_hold(run: Run) -> bool:
     return is_held_at_gate(run) and not run.plan_only
 
 
-async def blocked_by(db: AsyncSession, run: Run) -> str | None:
+async def blocked_by(
+    db: AsyncSession, run: Run, *, unresolved_gate: set | None = None
+) -> str | None:
     """Which gate holds a run: `run-task`, `policy`, `security-scan`, `ai-policy`.
 
     None when the run is not held. Read-only -- checked in the order
     `complete_plan` evaluates the gates, so it names the one actually holding
     the run. Returns None for a held run if no gate still blocks it (it is
     about to move on at the next re-drive).
+
+    **The two #1837 boundaries answer here too, and the `pre_apply` one is not
+    cosmetic.** A run held at `pre_apply` sits in `planned`, which every
+    consumer reads as "the plan succeeded, waiting for a human" — so the PR
+    check reported SUCCESS and a required check was satisfied while the run
+    was in fact held and would never apply. Someone could merge on the
+    strength of it. `pre_plan` is the milder version of the same thing: the
+    run sits `queued` looking like it is waiting its turn.
+
+    `is_held_at_gate` is deliberately NOT widened to cover them. It means
+    "a finished plan waiting for a decision" and governs discardability and
+    whether the CLI waits (#1725); a `queued` run has no plan yet and a
+    `planned` one is already discardable by the ordinary route.
     """
+    # Held before the plan (`queued`) or after confirm (`planned`) — #1837.
+    #
+    # `unresolved_gate` lets a list endpoint answer for a whole page from one
+    # query instead of one per run; without it we ask per run. Both boundaries
+    # are checked together because a run is only ever in one of these states.
+    if run.status in ("queued", "planned"):
+        if unresolved_gate is not None:
+            return "run-task" if run.id in unresolved_gate else None
+
+        from terrapod.services import run_task_service
+
+        boundary = "pre_plan" if run.status == "queued" else "pre_apply"
+        stage = await run_task_service._existing_stage(db, run.id, boundary)
+        if stage is not None and stage.status not in ("passed", "overridden"):
+            return "run-task"
+        return None
+
     if not is_held_at_gate(run):
         return None
 
@@ -2081,8 +2121,15 @@ async def _open_pre_plan_stages(db: AsyncSession, pool_id: uuid.UUID) -> None:
         )
         .exists()
     )
+    # Bounded and ordered. Unbounded, a workspace whose gate never resolves
+    # accumulates gated runs (drift checks in particular keep queueing, since
+    # `queued` does not count as runner-busy), and every listener then re-walks
+    # the entire backlog — two or three queries per run — on every poll.
+    # Oldest-first means a steady backlog still drains rather than starving its
+    # head, and anything not reached this poll is reached on the next one.
     candidates = await db.execute(
-        select(Run).where(
+        select(Run)
+        .where(
             Run.status == "queued",
             or_(
                 Run.pool_id == pool_id,
@@ -2091,29 +2138,62 @@ async def _open_pre_plan_stages(db: AsyncSession, pool_id: uuid.UUID) -> None:
             wants,
             not_(cleared),
         )
+        .order_by(Run.created_at.asc())
+        .limit(_PRE_PLAN_SCAN_LIMIT)
     )
 
     for run in candidates.scalars().all():
         try:
             verdict = await run_task_service.evaluate_gate(db, run, "pre_plan")
+            if verdict == run_task_service.GATE_FAILED:
+                names = await run_task_service.failed_task_summary(db, run.id, "pre_plan")
+                detail = f" ({names})" if names else ""
+                # Re-read under a row lock rather than trusting the candidate
+                # object. Sessions are `expire_on_commit=False` and
+                # `create_task_stage` commits internally, so this instance can
+                # be several seconds stale — long enough for a user to have
+                # cancelled the run, which `can_transition` would then happily
+                # overwrite with `errored`.
+                locked = await db.execute(
+                    select(Run).where(Run.id == run.id).with_for_update(skip_locked=True)
+                )
+                fresh = locked.scalar_one_or_none()
+                if fresh is None or fresh.status != "queued":
+                    await db.rollback()
+                    continue
+                await transition_run(
+                    db,
+                    fresh,
+                    "errored",
+                    error_message=(
+                        f"A mandatory pre-plan run task failed{detail}. This verdict is "
+                        "final — fix the cause and queue a new run."
+                    ),
+                )
+                await db.commit()
         except Exception:
             # Never let one run's gate stop the listener being given other
             # work. The run stays `queued` and is retried on the next poll.
+            #
+            # **The rollback is the load-bearing half.** `evaluate_gate` flushes
+            # and commits (`create_task_stage`), and `transition_run` fans out
+            # to notification enqueues — so a failure anywhere in here can leave
+            # the session needing a rollback. Without it the NEXT candidate's
+            # first query raises `PendingRollbackError`, and so does the claim
+            # query below, which means this endpoint 500s and NO listener in the
+            # pool is handed ANY work — including runs on workspaces that have
+            # no run tasks at all. A deterministic fault would be an
+            # estate-wide dispatch outage with no run-level signal.
+            #
+            # `vcs_command_dispatcher._replan_pr` carries the same rollback for
+            # the same reason; this loop is the other multi-candidate loop in
+            # the release and needs it just as much.
             logger.exception("failed to evaluate pre-plan gate", run_id=str(run.id))
+            try:
+                await db.rollback()
+            except Exception:
+                logger.exception("rollback after pre-plan gate failure also failed")
             continue
-        if verdict == run_task_service.GATE_FAILED:
-            names = await run_task_service.failed_task_summary(db, run.id, "pre_plan")
-            detail = f" ({names})" if names else ""
-            await transition_run(
-                db,
-                run,
-                "errored",
-                error_message=(
-                    f"A mandatory pre-plan run task failed{detail}. This verdict is "
-                    "final — fix the cause and queue a new run."
-                ),
-            )
-            await db.commit()
 
 
 async def claim_next_run(
@@ -2150,7 +2230,20 @@ async def claim_next_run(
     # Open the pre-plan gate for anything queued here before looking for work
     # (#1837). Must precede the claim loop below: it commits, and the loop
     # holds row locks. See `_open_pre_plan_stages`.
-    await _open_pre_plan_stages(db, pool_id)
+    #
+    # Belt and braces over the per-candidate handling inside: opening gates is
+    # a side errand, and NOTHING it can do should stop this listener being
+    # handed work. The failure being guarded against is not one run's gate
+    # failing — it is that this runs before the claim loop, so an escape here
+    # 500s the endpoint and starves the whole pool of every run, gated or not.
+    try:
+        await _open_pre_plan_stages(db, pool_id)
+    except Exception:
+        logger.exception("pre-plan gate pass failed; continuing to claim")
+        try:
+            await db.rollback()
+        except Exception:
+            logger.exception("rollback after pre-plan gate pass failure also failed")
 
     # Try queued runs first (plan phase), then confirmed runs (apply phase)
     for target_status, phase, next_status in [

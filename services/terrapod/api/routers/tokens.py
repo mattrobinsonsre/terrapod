@@ -267,14 +267,32 @@ async def list_user_tokens_endpoint(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List a user's own tokens (never includes detached tokens)."""
-    if user_id != _username(user) and not _is_admin(user):
+    """List the named user's tokens (never includes detached tokens).
+
+    The path segment names WHOSE tokens these are, exactly as it does on the
+    create endpoint (#1838). It used to gate authorization and then be
+    discarded, so an admin listing `/users/alice@example.com/…` got **their
+    own** tokens back under Alice's path — verbatim the defect #1838 fixed one
+    endpoint along, and the same mistake of treating `user_id` as a permission
+    check rather than as the subject.
+
+    It matters more now than it did: #1838 made it possible to CREATE a token
+    bound to another user, and this is the endpoint for finding them again.
+    Returning the caller's own tokens instead makes a delegated token look as
+    though it does not exist.
+    """
+    is_self = user_id == _username(user) or user_id == user.email
+    if not is_self and not _is_admin(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot list tokens for other users",
         )
 
-    tokens = await list_user_tokens(db, user.email)
+    # Accept the same identifiers create does, so a caller can list back what
+    # it just made using the identifier it used to make it.
+    subject_email = user.email if is_self else await _resolve_subject_email(db, user_id)
+
+    tokens = await list_user_tokens(db, subject_email)
     items = [_token_to_jsonapi(t) for t in tokens]
     page_items, meta = paginate(items, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
