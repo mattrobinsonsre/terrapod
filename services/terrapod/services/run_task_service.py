@@ -226,6 +226,70 @@ async def create_task_stage(
     return await db.get(TaskStage, ts_id)
 
 
+# Gate verdicts, shared by all three boundaries. `GATE_PASSED` covers the
+# no-applicable-tasks case as well as a stage that resolved clean: a boundary
+# nobody configured must not hold anything.
+GATE_PASSED = "passed"
+GATE_RUNNING = "running"
+GATE_FAILED = "failed"
+
+# Boundaries whose failed stage an admin may wave through.
+#
+# ONLY `post_plan`. The other two are deliberately final (#1837): the platform
+# already opens itself to human intervention between plan and apply — a run
+# sits `planned` for a person to confirm or discard — so a `pre_apply` verdict
+# is a go/no-go taken *before* any infrastructure moves, and once an apply has
+# started there is nothing an override could usefully release. The escape from
+# a failed pre-apply gate is the ordinary one: discard, fix the cause, re-plan.
+# See docs/run-tasks.md.
+OVERRIDABLE_STAGES = frozenset({"post_plan"})
+
+
+async def evaluate_gate(db: AsyncSession, run, stage_name: str) -> str:
+    """Open (or re-read) this run's stage at ``stage_name`` and judge it.
+
+    The single predicate behind all three boundaries, so their semantics
+    cannot drift apart. Safe to call repeatedly: `create_task_stage` is
+    idempotent per (run, stage), so re-entry re-resolves the SAME stage rather
+    than spawning a fresh webhook each time — which is what lets every caller
+    here be a re-drive rather than a one-shot.
+
+    Returns `GATE_PASSED` (proceed), `GATE_RUNNING` (hold, ask again later) or
+    `GATE_FAILED` (a mandatory task said no).
+    """
+    ts = await create_task_stage(db, run.id, run.workspace_id, stage_name)
+    if ts is None:
+        return GATE_PASSED
+    status = await resolve_stage(db, ts.id)
+    if status in ("passed", "overridden"):
+        return GATE_PASSED
+    if status == "failed":
+        return GATE_FAILED
+    return GATE_RUNNING
+
+
+async def failed_task_summary(db: AsyncSession, run_id: uuid.UUID, stage_name: str) -> str:
+    """Name the mandatory tasks that failed, for the operator-facing message.
+
+    A bare "a run task failed" sends someone to the API to find out which one;
+    the stage is right here, so say it.
+    """
+    stage = await _existing_stage(db, run_id, stage_name)
+    if stage is None:
+        return ""
+    stage = await get_task_stage(db, stage.id)
+    if stage is None:
+        return ""
+    names = [
+        r.run_task.name
+        for r in stage.results
+        if r.status in ("failed", "errored", "unreachable")
+        and r.run_task is not None
+        and r.run_task.enforcement_level == "mandatory"
+    ]
+    return ", ".join(sorted(names))
+
+
 async def get_task_stage(db: AsyncSession, ts_id: uuid.UUID) -> TaskStage | None:
     """Get a task stage by ID with results loaded."""
     result = await db.execute(
@@ -296,13 +360,33 @@ async def resolve_stage(db: AsyncSession, task_stage_id: uuid.UUID) -> str:
 
 
 async def override_stage(db: AsyncSession, task_stage_id: uuid.UUID) -> TaskStage | None:
-    """Override a failed task stage, allowing the run to proceed.
+    """Override a failed `post_plan` task stage, allowing the run to proceed.
 
-    Only applicable to stages in 'failed' status.
+    Only applicable to stages in 'failed' status, and only at a boundary in
+    `OVERRIDABLE_STAGES`.
+
+    The boundary check is enforced HERE rather than at the router, because
+    until #1837 `post_plan` was the only stage anything created — so this
+    function never needed to ask, and the endpoint would have started
+    accepting `pre_plan` and `pre_apply` stages the moment they began to
+    exist. That would have shipped an override path for both without anyone
+    deciding to add one, which is the opposite of the intent.
+
+    Overridability is a property the operator chooses by picking a boundary:
+    a gate that someone should be able to wave through belongs at
+    `post_plan`; one whose verdict is meant to be final belongs at
+    `pre_plan` or `pre_apply`. Nothing is lost by the restriction.
     """
     ts = await get_task_stage(db, task_stage_id)
     if ts is None:
         return None
+
+    if ts.stage not in OVERRIDABLE_STAGES:
+        raise ValueError(
+            f"A '{ts.stage}' task stage cannot be overridden — its verdict is final. "
+            "Fix the cause and queue a new run, or move the task to the 'post_plan' "
+            "stage, which supports an admin override."
+        )
 
     if ts.status != "failed":
         raise ValueError(f"Can only override stages in 'failed' status, got '{ts.status}'")
