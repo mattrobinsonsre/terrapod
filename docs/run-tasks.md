@@ -35,7 +35,7 @@ the way to tell "waiting on a gate" from "waiting its turn" is to look at the
 stages:
 
 ```
-GET /api/terrapod/v1/runs/{run_id}/task-stages
+GET /api/v1/runs/{run_id}/task-stages
 ```
 
 A stage still `running` there is what is holding the run, and its results name
@@ -58,7 +58,7 @@ A failed **mandatory** `post_plan` task can be waived by an admin, which lets
 the run continue:
 
 ```
-POST /api/v2/task-stages/{id}/actions/override
+POST /api/tfe/v2/task-stages/{id}/actions/override
 ```
 
 **`pre_plan` and `pre_apply` have no override.** The same endpoint refuses a
