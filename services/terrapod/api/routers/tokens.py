@@ -26,6 +26,7 @@ from datetime import UTC
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, effective_platform_roles, get_current_user
@@ -41,7 +42,9 @@ from terrapod.auth.api_tokens import (
     rotate_token,
     token_expires_at,
 )
+from terrapod.auth.recent_users import user_seen_within_window
 from terrapod.config import settings
+from terrapod.db.models import User
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
@@ -133,6 +136,62 @@ def _username(user: AuthenticatedUser) -> str:
     return user.email.split("@")[0] if user.email else ""
 
 
+async def _resolve_subject_email(db: AsyncSession, user_id: str) -> str:
+    """The email a delegated token should be bound to, or 403/404.
+
+    `bound_to` is an EMAIL -- `dependencies.py` resolves a token's roles with
+    `_resolve_user_roles(db, api_token.bound_to)`, and `_bound_token_owner_active`
+    matches it against `User.email`. The path segment is not: `_username()`
+    compares it against the local part, so `/users/planner/...` carries a
+    username. Binding the raw path value would store a username where an email
+    is expected.
+
+    That is not merely untidy. An unknown `bound_to` resolves to NO roles, and
+    for an SSO identity a missing `users` row is deliberately not a rejection
+    (#495) -- so a typo would mint a live token bound to nobody, whose
+    behaviour depends on whichever check notices first. Refuse instead.
+
+    A full email is required here, because a bare username cannot be turned
+    into one for an SSO identity that has no local row, and guessing a domain
+    is exactly how you mint a token for the wrong person.
+    """
+    if "@" not in user_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Creating a token for another user requires their full email "
+                "address in the path, not a username: the token is bound by "
+                "email and a username cannot be resolved to one for an "
+                "identity with no local account."
+            ),
+        )
+
+    # A local account is proof enough on its own.
+    row = (await db.execute(select(User).where(User.email == user_id))).scalar_one_or_none()
+    if row is not None:
+        if not row.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"User {user_id} is deactivated; a token for them would not authenticate.",
+            )
+        return user_id
+
+    # No local row: an SSO identity the deployment has actually seen is fine,
+    # anything else is a guess. This is the same evidence `bound_token_idle_days`
+    # already uses to decide a bound token's owner is still real.
+    if await user_seen_within_window(user_id):
+        return user_id
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=(
+            f"No known user {user_id}. A token can only be delegated to an "
+            "identity with a local account or one that has signed in recently "
+            "-- otherwise it would be bound to nobody and carry no roles."
+        ),
+    )
+
+
 @router.post("/users/{user_id}/authentication-tokens")
 async def create_user_token(
     user_id: str,
@@ -147,11 +206,19 @@ async def create_user_token(
     themselves). `service_detached` is admin-only and unbound — the admin
     pins its absolute scope.
     """
-    if user_id != _username(user) and not _is_admin(user):
+    is_self = user_id == _username(user) or user_id == user.email
+    if not is_self and not _is_admin(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot create tokens for other users",
         )
+
+    # The path segment decides who the token is FOR (#1838). It used to gate
+    # authorization and then be discarded, so an admin posting to another
+    # user's endpoint received an ordinary admin token while the path, the
+    # response and the audit trail all said otherwise. Every "this role must be
+    # denied" test written against it passed while exercising admin rights.
+    subject_email = user.email if is_self else await _resolve_subject_email(db, user_id)
 
     kind = body.data.attributes.kind
     if kind not in _ALL_KINDS:
@@ -171,10 +238,10 @@ async def create_user_token(
         bound_to = None
         pinned = body.data.attributes.pinned_roles or []
     elif kind == "service_bound":
-        bound_to = user.email
+        bound_to = subject_email
         pinned = body.data.attributes.pinned_roles
     else:  # interactive
-        bound_to = user.email
+        bound_to = subject_email
         pinned = None
 
     api_token, raw_token = await create_api_token(
