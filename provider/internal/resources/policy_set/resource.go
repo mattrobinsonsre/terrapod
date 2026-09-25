@@ -341,7 +341,7 @@ func buildCreateRequest(m *policySetModel) terrapod.CreatePolicySetRequest {
 		// so ValueBool() returned false and the set was created DISABLED --
 		// silently, since a disabled set applies to nothing whatever its
 		// scope. The workspace resource checks both states for exactly this.
-		Enabled: m.Enabled.IsNull() || m.Enabled.IsUnknown() || m.Enabled.ValueBool(),
+		Enabled:          m.Enabled.IsNull() || m.Enabled.IsUnknown() || m.Enabled.ValueBool(),
 		SharedEvaluation: m.SharedEvaluation.ValueBool(),
 		GlobalScope:      m.GlobalScope.ValueBool(),
 		AllowLabels:      mapFromTFMap(m.AllowLabels),
