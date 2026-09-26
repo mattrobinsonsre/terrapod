@@ -661,12 +661,25 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     cwd = working_dir.resolve_and_chdir(strip_dir, cfg.working_dir)
     log.info("chdir", cwd=str(cwd))
 
+    # The engine decides three things below -- this file, the state download
+    # and the plan-lock reuse -- so it is read once, here, rather than at each.
+    is_pulumi = os.environ.get("TP_ENGINE", "") == "pulumi"
+
     # 4b. Render terrapod.auto.tfvars from the mounted vars Secret (if any),
     # BEFORE init so it's part of the post-init baseline (the plan-artifacts
     # snapshot won't re-upload it). For terragrunt, cwd is the unit dir whose
     # contents terragrunt copies into its cache. The file is absent when the
     # workspace has no terraform variables.
-    if _VARS_FILE.exists():
+    #
+    # Terraform's alone, for the same reason as the state download at step 5 --
+    # and more sharply (#1869). Nothing in a Pulumi run reads a tfvars file, so
+    # writing one only drops the workspace's terraform variables into the
+    # directory the user's program runs in. `runs.py` applies no engine filter
+    # when it assembles `terraform-vars`, and that delivery is deliberately
+    # uniform -- sensitive and not -- because for Terraform the file IS the
+    # delivery mechanism. For Pulumi it is just plaintext secrets on disk that
+    # nothing consumes. Pulumi config arrives as `pulumi_config` (#1565).
+    if not is_pulumi and _VARS_FILE.exists():
         try:
             import json as _json
 
@@ -700,7 +713,6 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # Pulumi workspace's state would be the stored deployment with its secrets
     # still sealed, dropped into the working directory as terraform.tfstate for
     # nothing to read.
-    is_pulumi = os.environ.get("TP_ENGINE", "") == "pulumi"
     if not is_pulumi:
         state_present = download_state(cfg, strip_dir=cwd)
         if state_present:

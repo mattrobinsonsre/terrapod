@@ -15,7 +15,10 @@ pin the orchestrator-level invariants:
 
 from __future__ import annotations
 
+import ast
+import inspect
 import os
+import textwrap
 from unittest.mock import patch
 
 import pytest
@@ -656,3 +659,96 @@ class TestPulumiSkipsTerraformsSetup:
                 f"the Pulumi branch must come after {marker!r} — it is engine-neutral "
                 "and Pulumi depends on it"
             )
+
+
+def _callee_name(func) -> str:  # type: ignore[no-untyped-def]
+    """The called name, for both `f(...)` and `mod.f(...)`.
+
+    Both shapes appear here -- `download_state` is imported directly and
+    `tfvars.write_auto_tfvars` through its module -- and a matcher that knows
+    only one silently finds nothing for the other, which reads as "guarded".
+    """
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    if isinstance(func, ast.Name):
+        return func.id
+    return ""
+
+
+class TestPulumiRunsGetNoTerraformVariablesOnDisk:
+    """`terrapod.auto.tfvars` is Terraform's alone (#1869).
+
+    `runs.py` applies no engine filter when it assembles `terraform-vars`, so a
+    Pulumi workspace's run really does carry them and `_VARS_FILE` really does
+    exist in the Job. Nothing in a Pulumi run reads a tfvars file, so writing
+    one drops the workspace's variables -- sensitive ones included, because
+    that delivery is deliberately uniform -- into the directory the user's
+    program runs in, for nothing to consume.
+
+    Asserted over the AST rather than the text: a substring check would pass on
+    a comment mentioning `is_pulumi`, and would break on rewrapping that
+    changes nothing. What matters is that the call sits under a guard that is
+    false for Pulumi, wherever in the function it ends up.
+    """
+
+    def _body(self):
+
+        from terrapod.runner import job_entrypoint
+
+        src = textwrap.dedent(inspect.getsource(job_entrypoint._run_body))
+        return ast.parse(src).body[0]
+
+    def _guards_of(self, tree, callee: str) -> list[ast.AST]:
+        """Every `if` test that encloses a call to `callee`."""
+
+        found: list[ast.AST] = []
+
+        def walk(node, guards):  # type: ignore[no-untyped-def]
+            for child in ast.iter_child_nodes(node):
+                if isinstance(child, ast.If):
+                    walk_body(child.body, [*guards, child.test])
+                    walk_body(child.orelse, guards)
+                else:
+                    walk(child, guards)
+
+        def walk_body(stmts, guards):  # type: ignore[no-untyped-def]
+            for st in stmts:
+                for n in ast.walk(st):
+                    if isinstance(n, ast.Call) and _callee_name(n.func) == callee:
+                        found.extend(guards)
+                if isinstance(st, ast.If):
+                    walk_body(st.body, [*guards, st.test])
+                    walk_body(st.orelse, guards)
+                else:
+                    walk(st, guards)
+
+        walk_body(tree.body, [])
+        return found
+
+    def _mentions_not_pulumi(self, tests) -> bool:
+
+        for t in tests:
+            for n in ast.walk(t):
+                if isinstance(n, ast.Name) and n.id == "is_pulumi":
+                    # `not is_pulumi`, alone or as one side of a BoolOp.
+                    if any(
+                        isinstance(u, ast.UnaryOp) and isinstance(u.op, ast.Not)
+                        for u in ast.walk(t)
+                    ):
+                        return True
+        return False
+
+    def test_the_tfvars_write_is_behind_a_not_pulumi_guard(self):
+        guards = self._guards_of(self._body(), "write_auto_tfvars")
+        assert guards, "write_auto_tfvars is not called from _run_body at all"
+        assert self._mentions_not_pulumi(guards), (
+            "terrapod.auto.tfvars is rendered on a Pulumi run. Nothing reads it "
+            "there, so it is the workspace's terraform variables -- secrets "
+            "included -- written in plaintext into the program's directory."
+        )
+
+    def test_the_state_download_keeps_its_own_guard(self):
+        """The sibling invariant, pinned alongside so the two cannot drift: a
+        Pulumi run fetches its stack itself, in the shape its CLI imports."""
+        guards = self._guards_of(self._body(), "download_state")
+        assert guards and self._mentions_not_pulumi(guards)
