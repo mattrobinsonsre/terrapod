@@ -2680,6 +2680,14 @@ function WorkspaceDetailContent() {
                     </dd>
                   )}
                 </div>
+                {/* Terraform's alone (#1561): the rules are globs over
+                    Terraform attribute paths, and a Pulumi drift run's artifact
+                    is a preview digest the classifier cannot read. The server
+                    now declines to apply them for Pulumi, so offering the
+                    editor here would only invite rules that silently do
+                    nothing. Defining them in URN terms is the other half of
+                    #1561. */}
+                {!isPulumi && (
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-slate-500 mb-1">{t('fields.driftIgnoreRules')}</dt>
                   {editing && perms['can-update'] ? (
@@ -2748,6 +2756,7 @@ function WorkspaceDetailContent() {
                     </dd>
                   )}
                 </div>
+                )}
               </dl>
               {lockoutWarning && (
                 <div className="mt-4 p-3 bg-amber-900/30 border border-amber-700/50 rounded-lg">
