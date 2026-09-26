@@ -24,6 +24,7 @@ from terrapod.db.models import (
     now_utc,
 )
 from terrapod.db.session import get_db_session
+from terrapod.engines import honours_drift_ignore_rules
 from terrapod.logging_config import get_logger
 from terrapod.services import run_service, vcs_rate_limit
 
@@ -447,7 +448,22 @@ async def handle_drift_run_completed(payload: dict) -> None:
                 # "any change is drift" behaviour. Plan JSON has to be
                 # actually available (has_json_output=True) — runs that
                 # errored mid-upload are conservatively treated as drift.
-                if ws.drift_ignore_rules and run.has_json_output:
+                # The engine has to be one whose plan artifact the classifier can
+                # actually read (#1561). A Pulumi preview uploads a document to
+                # the same key, so `has_json_output` is True and this branch was
+                # taken -- but the document is the preview digest, not an
+                # OpenTofu-format plan, so the classifier found no
+                # `resource_changes`/`resource_drift`, concluded nothing was
+                # drifted, and marked a drifted workspace clean. That is the one
+                # direction this function is otherwise careful never to fail in:
+                # every explicit fallback below returns "drifted" so a hiccup
+                # never silences drift, and this slipped past all of them
+                # because nothing errored.
+                if (
+                    ws.drift_ignore_rules
+                    and run.has_json_output
+                    and honours_drift_ignore_rules(ws.engine)
+                ):
                     ws.drift_status = await _apply_drift_ignore_rules(
                         run, list(ws.drift_ignore_rules)
                     )

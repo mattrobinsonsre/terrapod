@@ -16,6 +16,9 @@ def _mock_workspace(**overrides):
     ws.drift_status = overrides.get("drift_status", "")
     ws.drift_latest_run_id = overrides.get("drift_latest_run_id", None)
     ws.drift_ignore_rules = overrides.get("drift_ignore_rules", [])
+    # The engine decides whether drift-ignore rules may be applied at all
+    # (#1561), so it is part of the fixture rather than a MagicMock.
+    ws.engine = overrides.get("engine", "terraform")
     ws.locked = overrides.get("locked", False)
     ws.vcs_connection_id = overrides.get("vcs_connection_id", None)
     ws.vcs_repo_url = overrides.get("vcs_repo_url", "")
@@ -586,3 +589,102 @@ class TestApplyDriftIgnoreRules:
 
         # A runtime hiccup must never SILENCE drift the operator wanted surfaced.
         assert await mod._apply_drift_ignore_rules(run, ["ignore_tags"]) == "drifted"
+
+
+class TestDriftIgnoreRulesAreOnlyAppliedToAnEngineThatUnderstandsThem:
+    """#1561 -- the rules are Terraform attribute paths, and applying them to
+    another engine's document failed OPEN.
+
+    A Pulumi preview uploads a document to the same plan-JSON key, so
+    `has_json_output` is True and the filtering branch was taken. But the
+    document is the preview DIGEST, not an OpenTofu-format plan, so
+    `drift_ignore_classifier` found no `resource_changes`/`resource_drift`,
+    concluded nothing was drifted, and a genuinely drifted workspace was marked
+    CLEAN.
+
+    None of `_apply_drift_ignore_rules`' fallbacks caught it -- every one of
+    them returns "drifted" precisely so a hiccup cannot silence drift, and this
+    was not a hiccup. The classifier ran cleanly and answered accurately about a
+    document it had not been given.
+    """
+
+    @patch("terrapod.services.drift_detection_service._enqueue_drift_notification")
+    @patch("terrapod.services.drift_detection_service.get_db_session")
+    @patch("terrapod.services.drift_detection_service.run_service")
+    @patch("terrapod.services.drift_detection_service._apply_drift_ignore_rules")
+    async def test_a_drifted_pulumi_workspace_with_rules_is_still_drifted(
+        self, mock_apply, mock_run_svc, mock_session, mock_notif
+    ):
+        from terrapod.services.drift_detection_service import handle_drift_run_completed
+
+        run = _mock_run(status="planned", has_changes=True)
+        run.has_json_output = True
+        ws = _mock_workspace(engine="pulumi", drift_ignore_rules=["tags.LastModified"])
+
+        mock_db = AsyncMock()
+        mock_run_svc.get_run = AsyncMock(return_value=run)
+        mock_db.get.return_value = ws
+        mock_session.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_session.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        await handle_drift_run_completed({"run_id": str(run.id), "workspace_id": str(ws.id)})
+
+        assert ws.drift_status == "drifted", (
+            "a drifted Pulumi workspace was reported clean because Terraform's "
+            "classifier could not read its preview digest"
+        )
+        mock_apply.assert_not_called()
+
+    @patch("terrapod.services.drift_detection_service._enqueue_drift_notification")
+    @patch("terrapod.services.drift_detection_service.get_db_session")
+    @patch("terrapod.services.drift_detection_service.run_service")
+    @patch("terrapod.services.drift_detection_service._apply_drift_ignore_rules")
+    async def test_terraform_still_gets_its_rules_applied(
+        self, mock_apply, mock_run_svc, mock_session, mock_notif
+    ):
+        """The other direction. #482 is the feature this must not disable, and
+        #753 is the bug that came from over-suppressing it."""
+        from terrapod.services.drift_detection_service import handle_drift_run_completed
+
+        mock_apply.return_value = "no_drift"
+        run = _mock_run(status="planned", has_changes=True)
+        run.has_json_output = True
+        ws = _mock_workspace(engine="terraform", drift_ignore_rules=["tags.LastModified"])
+
+        mock_db = AsyncMock()
+        mock_run_svc.get_run = AsyncMock(return_value=run)
+        mock_db.get.return_value = ws
+        mock_session.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_session.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        await handle_drift_run_completed({"run_id": str(run.id), "workspace_id": str(ws.id)})
+
+        mock_apply.assert_called_once()
+        assert ws.drift_status == "no_drift"
+
+
+class TestTheEngineCapabilityItself:
+    def test_terraform_and_opentofu_honour_the_rules(self):
+        from terrapod.engines import honours_drift_ignore_rules
+
+        assert honours_drift_ignore_rules("terraform") is True
+
+    def test_pulumi_does_not(self):
+        from terrapod.engines import honours_drift_ignore_rules
+
+        assert honours_drift_ignore_rules("pulumi") is False
+
+    def test_an_unknown_engine_does_not(self):
+        """Deliberately the opposite default from `evaluates_policy_sets` and
+        its siblings, which answer True for an unknown engine because gating is
+        their safe direction. Here the safe direction is reporting drift: being
+        unable to read a document looks exactly like "nothing drifted"."""
+        from terrapod.engines import honours_drift_ignore_rules
+
+        assert honours_drift_ignore_rules("something-new") is False
+
+    def test_an_unset_engine_falls_back_to_the_default_engine(self):
+        from terrapod.engines import honours_drift_ignore_rules
+
+        assert honours_drift_ignore_rules(None) is True
+        assert honours_drift_ignore_rules("") is True
