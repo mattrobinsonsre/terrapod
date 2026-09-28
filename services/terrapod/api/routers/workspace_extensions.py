@@ -691,7 +691,11 @@ async def show_workspace(
     answered differently for "exists" and "absent" would reveal the names of
     workspaces the caller has no access to.
     """
-    from terrapod.api.routers.tfe_v2 import _resolve_live_pools, _workspace_json
+    from terrapod.api.routers.tfe_v2 import (
+        _resolve_inert_var_ws,
+        _resolve_live_pools,
+        _workspace_json,
+    )
 
     ws = await _native_workspace(workspace_id, db)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
@@ -700,7 +704,16 @@ async def show_workspace(
     latest = await _latest_runs_any_engine([ws.id], db)
     return JSONResponse(
         content=_workspace_json(
-            ws, caps, latest_run=latest.get(ws.id), live_pool_ids=await _resolve_live_pools([ws])
+            ws,
+            caps,
+            latest_run=latest.get(ws.id),
+            live_pool_ids=await _resolve_live_pools([ws]),
+            # This route is the ONLY one a Pulumi workspace can be read on --
+            # the TFE route is pinned to Terraform -- so a health condition
+            # missing here is a health condition a Pulumi workspace never shows
+            # at all. The list beside it delegates to `_list_workspaces_impl`
+            # and so gets both resolvers for free; this one has to ask.
+            inert_var_ws=await _resolve_inert_var_ws(db, [ws]),
         )
     )
 
