@@ -454,23 +454,57 @@ async def list_stacks(
     rows = (await db.execute(query)).scalars().all()
 
     stacks = []
+    visible: list[Workspace] = []
     for ws in rows:
-        proj, _, stack = ws.name.partition("::")
+        proj, _, _stack = ws.name.partition("::")
         if project and proj != project:
             continue
         caps = await _caps_on(db, user, ws)
         if not has_capability(caps, cap.WORKSPACE_READ):
             continue
+        visible.append(ws)
+
+    counts = await _latest_resource_counts(db, [ws.id for ws in visible])
+    for ws in visible:
+        proj, _, stack = ws.name.partition("::")
         stacks.append(
             {
                 "orgName": DEFAULT_ORG,
                 "projectName": proj,
                 "stackName": stack,
                 "lastUpdate": int(ws.updated_at.timestamp()) if ws.updated_at else 0,
-                "resourceCount": 0,
+                # Real, where the stack's newest version recorded one (#1568).
+                # An uncounted version reports 0 as it always did — the CLI's
+                # field is an int, so there is no way to say "unknown" here.
+                "resourceCount": counts.get(ws.id) or 0,
             }
         )
     return {"stacks": stacks}
+
+
+async def _latest_resource_counts(
+    db: AsyncSession, workspace_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, int | None]:
+    """Each workspace's newest state version's resource count (#1568).
+
+    One query for the whole list rather than one per stack, and it reads a
+    stored number rather than the state itself: counting properly would mean
+    fetching, decrypting and parsing every stack's entire deployment to print
+    one integer in `pulumi stack ls`.
+    """
+    if not workspace_ids:
+        return {}
+    from terrapod.db.models import StateVersion
+
+    rows = (
+        await db.execute(
+            select(StateVersion.workspace_id, StateVersion.resource_count)
+            .where(StateVersion.workspace_id.in_(workspace_ids))
+            .order_by(StateVersion.workspace_id, StateVersion.serial.desc())
+            .distinct(StateVersion.workspace_id)
+        )
+    ).all()
+    return dict(rows)
 
 
 @router.post("/api/stacks/{org}/{project}", status_code=status.HTTP_200_OK)

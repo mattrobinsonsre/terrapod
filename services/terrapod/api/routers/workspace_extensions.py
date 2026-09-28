@@ -235,6 +235,31 @@ async def show_state_graph(
     )
 
 
+@router.get("/workspaces/{workspace_id}/state-outputs")
+async def show_state_outputs(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """A workspace's current state outputs, secrets masked (#1568).
+
+    Terrapod-native and engine-aware: a Pulumi stack's outputs live on the root
+    `pulumi:pulumi:Stack` resource inside its deployment, a Terraform state's at
+    the top level. Both are read here so the workspace has one place to show
+    them, which it has never had for either engine.
+
+    A sensitive value is reported as present but not revealed. Gated on
+    `state:read`, the same trust as the state graph, because both are derived
+    from the secret-bearing state blob.
+    """
+    from terrapod.services import state_graph_service
+
+    outputs = await state_graph_service.derive_state_outputs(db, user, workspace_id)
+    return JSONResponse(
+        content={"data": {"id": "state-outputs", "type": "state-outputs", "attributes": outputs}}
+    )
+
+
 # ── AI architecture critic (#1036 Part 2 / #963) ─────────────────────────────
 # State-based, whole-system critique. Read is gated on `state:read` (same trust
 # as the state-graph — derived from the secret-bearing state). The critique is

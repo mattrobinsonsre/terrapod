@@ -214,6 +214,29 @@ Two things follow that a backend private to the Job could not offer:
   workspace's remote-state consumer allowlist — the same grant that authorizes
   `terraform_remote_state`. See [Remote state](remote-state.md).
 
+## What the workspace shows about a stack's state
+
+A Pulumi workspace's state views work from the deployment Terrapod stores, so
+the state tab shows the stack's resources and its outputs.
+
+- **The resource graph** is built from the deployment's URNs: one node per
+  resource, wired by each resource's `dependencies` and by its `parent` where
+  that parent is a real resource. The root `pulumi:pulumi:Stack` is not drawn —
+  it is the stack itself rather than infrastructure, and since everything in the
+  stack parents to it, drawing it would produce a single hub every other node
+  points at.
+- **Stack outputs** are shown with secrets masked: an output sealed by the
+  stack's secrets provider is reported as present without being revealed, which
+  is the same treatment a sensitive Terraform output gets.
+- **`pulumi stack ls` reports real resource counts**, recorded when each state
+  version is written rather than by reading every stack's whole deployment to
+  print one number.
+
+**Cost estimation and the AI architecture critique are not shown on a Pulumi
+workspace.** Both read Terraform state and cannot interpret a deployment, so the
+tabs are absent rather than present-and-failing. #1569 is where they gain Pulumi
+support.
+
 ## Drift detection
 
 Drift detection works on a Pulumi workspace the same way it does on a Terraform
