@@ -185,12 +185,45 @@ zero-change run, and lets conditional auto-apply judge a preview. The digest
 deliberately carries no resource state — Pulumi's events include every
 resource's old and new values, which is where a stack's secrets are.
 
+### Where an agent run's state lives
+
+An agent-mode run points the CLI at Terrapod's own Pulumi service surface — the
+same surface a local `pulumi login` against Terrapod talks to — and drives the
+ordinary update lifecycle against it: begin, checkpoint, complete. The Job holds
+no backend of its own, and the runner is never handed the whole deployment with
+its secrets opened — the service seals and opens them a value at a time, as it
+does for a laptop.
+
+**State is written continuously and published once.** Pulumi checkpoints all the
+way through an update, and each checkpoint is stored durably the moment it
+arrives — nothing is buffered in the Job waiting for the end. What is deferred is
+*publication*: a checkpoint is held against its update and becomes a state
+version only when the update ends, so one update leaves one state version behind
+whatever its status, exactly as one Terraform apply does. An update that changed
+nothing leaves none, and a preview never checkpoints at all.
+
+Publication is deferred so that a reader never sees a half-applied state. That
+matters because another stack's `StackReference` resolves against Terrapod, and
+would otherwise build on outputs that are about to change.
+
+Two things follow that a backend private to the Job could not offer:
+
+- **A repository that commits `secure:` config values works.** Those values are
+  sealed by the service, and the CLI opens them through it.
+- **`StackReference` reads work across stacks**, authorized by the producer
+  workspace's remote-state consumer allowlist — the same grant that authorizes
+  `terraform_remote_state`. See [Remote state](remote-state.md).
+
 ## Where Pulumi is not coerced, and why
 
-- **State never lives in Terrapod's Pulumi service during an agent run.** The
-  stack is imported into the Job, worked on against a file backend, and handed
-  back once at the end — exactly as a Terraform run downloads and uploads its
-  state. The service surface (`pulumi login`) is for local-mode use.
+- **A Pulumi agent apply is coupled to API availability; a Terraform one is
+  not.** Pulumi has no defer-writes mode: the CLI checkpoints to its backend as
+  it goes, so an interruption in the middle of an apply can fail an update that a
+  Terraform run — holding `terraform.tfstate` in the Job and pushing it once at
+  the end — would have survived. That is a characteristic of Pulumi rather than
+  something Terrapod chooses, and it is accepted rather than worked around: the
+  alternative, a second state path private to the Job, cost more than it bought.
+  A Pulumi agent apply wants a stable path to the API.
 - **OPA policy sets apply; security scanning does not yet.** A preview produces
   no Terraform plan JSON, so Terrapod builds an OPA input from the engine event
   log instead: each resource's operation, type, URN, declared inputs and changed
@@ -205,7 +238,10 @@ resource's old and new values, which is where a stack's secrets are.
 ## See also
 
 - [`docs/pulumi-cli-surface.md`](pulumi-cli-surface.md) — the slice of Pulumi's
-  service protocol Terrapod implements, for `pulumi login` against it.
+  service protocol Terrapod implements, which serves both `pulumi login` from a
+  laptop and the CLI inside a runner Job.
+- [`docs/remote-state.md`](remote-state.md) — the consumer allowlist that
+  authorizes a `StackReference` between two stacks.
 - [`docs/policies.md`](policies.md) and
   [`docs/security-scanning.md`](security-scanning.md) — the gates, and what they
   currently do on a Pulumi workspace.
