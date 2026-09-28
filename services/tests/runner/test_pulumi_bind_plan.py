@@ -112,14 +112,12 @@ class TestThePhaseRunner:
             return True
 
         monkeypatch.setattr(job_entrypoint, "_fetch_pulumi_plan", fake_fetch)
-        # The stack set-up and hand-back have tests of their own
-        # (test_pulumi_local_state.py); here they only need to get out of the way.
-        monkeypatch.setattr(
-            pulumi_exec,
-            "prepare_local_stack",
-            lambda *a, **k: MagicMock(keys=pulumi_exec.StackKeys("v1:salt", "pw")),
-        )
-        monkeypatch.setattr(job_entrypoint, "_hand_back_pulumi_state", lambda *a, **k: 0)
+        # Selecting the run's stack on the service backend has tests of its own
+        # (test_pulumi_service_backend.py); here it only needs to get out of the
+        # way, since it would otherwise reach the faked CLI above and be taken
+        # for the phase's own command. There is no hand-back to stand aside for:
+        # the CLI checkpoints to Terrapod as it goes (#1881).
+        monkeypatch.setattr(pulumi_exec, "select_stack", lambda *a, **k: "default/p/d")
         cfg = _cfg()
         cfg.phase = phase
         cfg.plan_only = False

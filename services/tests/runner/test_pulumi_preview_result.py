@@ -474,9 +474,10 @@ class TestTheEventLogFlagIsUsable:
 
         with (
             patch("terrapod.runner.phases.platform_tool.ensure_tool", return_value="/bin/pulumi"),
-            patch(
-                "terrapod.runner.phases.pulumi_exec.prepare_local_stack", return_value=MagicMock()
-            ),
+            # Out of the way: the stack pre-flight would otherwise be the first
+            # thing `_run` sees, and its non-zero exit would stop the phase
+            # before the preview this test is watching for.
+            patch("terrapod.runner.phases.pulumi_exec.select_stack", return_value="default/p/dev"),
             patch("terrapod.runner.phases.pulumi_exec.bind_plan_enabled", return_value=False),
             patch("terrapod.runner.exec_subprocess.run", side_effect=_run),
         ):
