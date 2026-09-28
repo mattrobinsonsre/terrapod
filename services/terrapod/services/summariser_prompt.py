@@ -824,6 +824,42 @@ def render_prompt(
             "does not mean the run proceeds."
         )
 
+    if primary_input_label == "PULUMI_PREVIEW":
+        # Pulumi's vocabulary, appended rather than folded into the skill prompt
+        # (#1569). The prompt was tuned against Terraform plan JSON and keeps
+        # doing exactly that; for a Terraform run this block does not render and
+        # the request is byte-identical to one made before it existed.
+        #
+        # It is needed because the document genuinely is not a plan. This path
+        # was already reached for Pulumi runs — a preview digest is uploaded to
+        # the same key — and was read as Terraform, so the model was asked to
+        # find `resource_changes` in a document that has `steps`, and answered
+        # in a vocabulary the operator does not use on that workspace.
+        parts.append(
+            "PULUMI PREVIEW - the primary input is a Pulumi preview digest, "
+            "not a Terraform plan.\n\n"
+            "  It is shaped `{engine, change_summary, steps, has_changes}`. "
+            "`change_summary` counts operations by kind; `steps` describes "
+            "them. There is no `resource_changes`, no `prior_state` and no "
+            "`configuration` - do not look for them, and do not report their "
+            "absence as a finding.\n\n"
+            "  A resource is named by its URN, not a Terraform address. Quote "
+            "URNs verbatim; the last `::` segment is the name a person uses. "
+            "Where you would say resource address, say URN.\n\n"
+            "  The operations are Pulumi's: `create`, `update`, `delete`, "
+            "`replace`, `refresh` and `same`. `same` means unchanged - it is "
+            "the no-op, and a stack made entirely of `same` steps has nothing "
+            "to do. Terraform's add/change/destroy wording does not apply; use "
+            "Pulumi's.\n\n"
+            "  Call the operation a preview, and what it leads to an update - "
+            "never a plan and an apply. The person reading this ran "
+            "`pulumi preview`, and Terrapod's own UI says preview and update "
+            "on this workspace.\n\n"
+            "  A property Pulumi marked secret reads as the literal `[secret]`. "
+            "That is the engine redacting it before Terrapod ever saw it, not "
+            "a missing value and not a finding."
+        )
+
     system_message = "\n\n".join(parts)
 
     user_parts: list[str] = []
