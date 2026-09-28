@@ -737,6 +737,12 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByText('#1', { exact: true }).filter({ visible: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: 'Download' }).filter({ visible: true })).toBeVisible();
 
+    // Outputs (#1568) sit below the version list, for either engine, and are
+    // the first surface Terrapod has ever had for them. A seeded state
+    // declares none, so this asserts the section is present and says so —
+    // an empty state, never an error.
+    await expect(page.getByRole('heading', { name: 'Outputs' })).toBeVisible({ timeout: 15_000 });
+
     await expectNoHorizontalPageScroll(page);
   });
 
