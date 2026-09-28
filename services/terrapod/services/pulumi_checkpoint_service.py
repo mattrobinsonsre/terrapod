@@ -1,4 +1,4 @@
-"""Local-mode Pulumi state: one state version per update (#1564).
+"""Pulumi state: one state version per update (#1564).
 
 A `pulumi` CLI logged in to Terrapod checkpoints the stack many times during an
 update. Each of those used to become a state version, so one long update
@@ -14,8 +14,16 @@ ends. "Ends" covers every way an update can end:
 
 A failed or abandoned update keeps its last checkpoint for the same reason a
 failed Terraform apply keeps its partial state: it is the only record of what
-the update created. That is the shape agent runs have had since #1576 — one
-state version per state-changing update — and it is why local mode now matches.
+the update created.
+
+One state version per state-changing update is the shape agent runs have always
+had — #1576 got it from a single upload at the end of the Job — and this is
+where they get it now. #1881 points a runner's CLI at the same service surface a
+laptop uses, so an agent run checkpoints through here like any other client, and
+holding until the update ends is what keeps an apply's state from being
+published before the apply has finished producing it. That property is load
+bearing rather than tidiness: another stack's `StackReference` resolves against
+Terrapod, so a reader must never see a half-applied state.
 
 The held checkpoint lives outside `state/{workspace_id}/` on purpose. Restore
 treats every object under that prefix as a state version, and a checkpoint is

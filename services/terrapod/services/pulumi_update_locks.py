@@ -16,6 +16,15 @@ the update runs:
 Previews take no lock: they write no state, and taking one made concurrent
 previews collide.
 
+**An agent run's update does not take this lock either, although since #1881 it
+drives the same surface.** It would refuse itself — the check is "a run on this
+workspace is applying", and that run is the one asking — and it does not need
+to: the dispatcher already permits one apply-capable run per workspace, and
+`confirm_run` already refuses on a manual lock. What an agent update does take
+is the Redis stack mutex, which is what stops a local `pulumi up` starting
+alongside it. So the workspace lock stays what it is on the Terraform path: the
+CLI/manual lock, never something run activity sets.
+
 **Why a sweep.** The update's lease lives in Redis with a TTL, and an update
 whose CLI dies simply stops renewing it. The workspace lock is a database row
 and has no TTL, so something has to notice the lease is gone and release the

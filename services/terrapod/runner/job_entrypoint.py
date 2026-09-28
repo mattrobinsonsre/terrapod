@@ -708,11 +708,11 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         log.warning("git module auth setup skipped", error=str(exc))
 
     # 5. State download — AFTER chdir so terraform.tfstate lands beside
-    # the user's .tf files. Terraform's alone, like step 6: a Pulumi run fetches
-    # its stack itself, in the shape its CLI imports (#1576). Fetched here, a
-    # Pulumi workspace's state would be the stored deployment with its secrets
-    # still sealed, dropped into the working directory as terraform.tfstate for
-    # nothing to read.
+    # the user's .tf files. Terraform's alone, like step 6: a Pulumi run never
+    # holds its state as a file at all (#1881). The CLI reads and writes the
+    # stack through Terrapod's Pulumi service backend, so there is nothing to
+    # fetch here; a state file dropped into the working directory would be the
+    # stored deployment, secrets still sealed, for nothing to read.
     if not is_pulumi:
         state_present = download_state(cfg, strip_dir=cwd)
         if state_present:
@@ -748,10 +748,9 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # tarball, the chdir into the working directory, private-git-module auth, and
     # the operator's `pre_init` hooks — all engine-neutral. What it skips is
     # Terraform's alone: var-file argv, `init`, terragrunt relocation and the
-    # backstop. Pulumi's state is handled inside its own phase: a file backend in
-    # this Job, seeded from the stack's deployment and handed back after an
-    # update (#1576), so there is no terraform.tfstate to place and no backend
-    # block to neutralise.
+    # backstop. Pulumi's state is handled inside its own phase, which points the
+    # CLI at Terrapod's Pulumi service backend (#1881) — so there is no
+    # terraform.tfstate to place and no backend block to neutralise.
     if os.environ.get("TP_ENGINE", "") == "pulumi":
         return _run_pulumi_phase(cfg, child_grace=_child_grace_seconds(cfg))
 
@@ -827,10 +826,17 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
 def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyped-def]
     """Run one Pulumi phase.
 
-    `preview` then `up`, against a file backend in this Job (#1576): the stack's
-    deployment is imported at the start and, after an update, exported and handed
-    back once — the way a Terraform run downloads `terraform.tfstate` and uploads
-    it after apply. Pulumi never uses Terrapod as a live backend from here.
+    `preview` then `up`, against Terrapod's own Pulumi service backend (#1881).
+    The Job holds no backend of its own: the CLI is pointed at the API and drives
+    the ordinary update lifecycle against it — begin, checkpoint, complete — so
+    nothing here imports a deployment at the start or hands one back at the end.
+
+    That does not publish an apply's state before the apply has finished
+    producing it. A checkpoint is held against its update and becomes a state
+    version only when the update completes (#1564), and a preview's lease cannot
+    checkpoint at all (#1550) — state written continuously and published once,
+    which is the property a Terraform run gets from holding `terraform.tfstate`
+    in the Job and uploading it after apply.
 
     With the workspace's opt-in (#1553), `preview --save-plan` then `up --plan`
     makes an approved preview and its update the same decision, exactly as
@@ -859,11 +865,13 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     # environment, and `exec_subprocess.run` inherits this process's, so they are
     # set here rather than passed.
     #
-    # LAST, deliberately: the workspace's own variables are already in this
-    # environment, and agent mode owns the backend (#1881). A variable named
+    # AFTER the workspace's own variables, deliberately: those are already in
+    # this environment, and agent mode owns the backend (#1881). A variable named
     # `PULUMI_BACKEND_URL` must not be able to send a run's state somewhere
     # Terrapod does not know about — the same line the Terraform path holds with
-    # its backend override file.
+    # its backend override file. The one thing set later is the preview branch's
+    # `PULUMI_DEBUG_COMMANDS`, which the CLI reads for nothing but whether
+    # `--event-log` is a flag it recognises.
     os.environ.update(pulumi_exec.plugin_override_env(cfg.api_url, cfg.auth_token))
     os.environ.update(pulumi_exec.service_backend_env(cfg.api_url, cfg.auth_token))
 
