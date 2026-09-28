@@ -1370,6 +1370,19 @@ class AutodiscoveryRule(Base):
     repo_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
+    #: Which engine this rule discovers, and creates workspaces for (#1570).
+    #: A rule is pinned to exactly ONE engine: it matches only that engine's
+    #: files and ignores the rest, so a directory holding both a `Pulumi.yaml`
+    #: and `.tf` files is discovered by whichever rule is looking for it and
+    #: there is no tie to break. Discovering both means writing two rules.
+    #:
+    #: Defaults to `terraform`, which is what every rule written before this
+    #: column already produced -- so no existing rule changes what it finds or
+    #: what it creates.
+    engine: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="terraform", server_default="terraform"
+    )
+
     # Match
     pattern: Mapped[str] = mapped_column(String(1024), nullable=False)
     ignore_patterns: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
@@ -1416,9 +1429,13 @@ class AutodiscoveryRule(Base):
     # hundreds of directories could not opt them in at creation — which, with no
     # apply-to-existing path either, left no scalable way to set them at all.
     #
-    # No engine guard is needed here, unlike on a workspace: a rule has no
-    # `engine` column, so everything it materialises is Terraform/OpenTofu,
-    # which is exactly what can be scanned (#1567).
+    # These are Terraform's, and since #1570 a rule can be Pulumi, so they are
+    # guarded at the API rather than by the absence of an engine column. The
+    # old reasoning here -- "a rule has no engine, so everything it materialises
+    # is Terraform/OpenTofu, which is exactly what can be scanned" -- stopped
+    # being true the moment `engine` existed. A Pulumi run is not scanned at all
+    # (`evaluates_security_scans` is False), so templating an `enforced` scan
+    # onto Pulumi workspaces would record a gate that never runs (#1567).
     security_scan_enforcement: Mapped[str] = mapped_column(
         String(20), nullable=False, default="advisory", server_default="advisory"
     )

@@ -58,6 +58,12 @@ logger = get_logger(__name__)
 # Atlantis's default `when_modified: ["*.tf*"]` semantics.
 _TF_EXTENSIONS = (".tf", ".tfvars", ".tf.json", ".tfvars.json", ".hcl")
 
+#: A Pulumi project is declared by this file; the stacks beside it are
+#: `Pulumi.<stack>.yaml` (#1570). Both spellings, because Pulumi accepts
+#: either and a repository may use whichever.
+_PULUMI_PROJECT_FILES = ("Pulumi.yaml", "Pulumi.yml")
+_PULUMI_STACK_RE = re.compile(r"^Pulumi\.(?P<stack>[^.]+)\.ya?ml$")
+
 
 @lru_cache(maxsize=512)
 def _glob_to_regex(pattern: str) -> re.Pattern[str]:
@@ -129,6 +135,45 @@ def _is_terraform_file(path: str) -> bool:
     return any(path.endswith(ext) for ext in _TF_EXTENSIONS)
 
 
+def pulumi_stack_of(path: str) -> str | None:
+    """The stack a `Pulumi.<stack>.yaml` path names, or None.
+
+    `Pulumi.yaml` itself declares the PROJECT and names no stack, so it
+    returns None -- a project with no stack file has nothing to create a
+    workspace for, since a Terrapod workspace is one unit of state and a
+    Pulumi stack is that unit.
+    """
+    name = PurePosixPath(path).name
+    if name in _PULUMI_PROJECT_FILES:
+        return None
+    m = _PULUMI_STACK_RE.match(name)
+    return m.group("stack") if m else None
+
+
+def _is_pulumi_file(path: str) -> bool:
+    """True if the path is a Pulumi stack file this rule could act on."""
+    return pulumi_stack_of(path) is not None
+
+
+def _claims_file(engine: str, path: str) -> bool:
+    """Whether a rule for `engine` looks at this file at all (#1570).
+
+    A rule is pinned to one engine and **ignores every other engine's files**,
+    which is what removes the tie-break: a directory holding both a
+    `Pulumi.yaml` and `.tf` files is claimed by whichever rule is looking for
+    it, and a rule never has to decide what it is looking at.
+
+    An unrecognised engine claims nothing, rather than falling back to
+    Terraform. Silently discovering the wrong engine's files would create
+    workspaces that cannot run.
+    """
+    if engine == "pulumi":
+        return _is_pulumi_file(path)
+    if engine in ("terraform", "tofu", "opentofu", ""):
+        return _is_terraform_file(path)
+    return False
+
+
 def _is_ignored(path: str, ignore_patterns: list[str]) -> bool:
     """True if any ignore pattern matches the path."""
     return any(_match_glob(path, p) for p in ignore_patterns)
@@ -137,10 +182,10 @@ def _is_ignored(path: str, ignore_patterns: list[str]) -> bool:
 def rule_claims_path(rule: AutodiscoveryRule, path: str) -> bool:
     """Decide whether `rule` would auto-create a workspace for `path`.
 
-    Pure-logic; no I/O. Three checks: terraform file, matches the
-    rule's pattern, not ignored.
+    Pure-logic; no I/O. Three checks: the file belongs to the rule's
+    engine (#1570), matches the rule's pattern, and is not ignored.
     """
-    if not _is_terraform_file(path):
+    if not _claims_file(getattr(rule, "engine", "") or "terraform", path):
         return False
     if _is_ignored(path, rule.ignore_patterns or []):
         return False
@@ -168,6 +213,35 @@ def derive_root_directory(file_path: str) -> str:
 # Workspaces are 1..90 chars; legal set is letters/digits/`-`/`_`.
 # We map disallowed chars to `-` and trim to fit.
 _NAME_SANITISE_RE = re.compile(r"[^A-Za-z0-9_-]+")
+
+
+def derive_pulumi_workspace_name(root_directory: str, stack: str) -> str:
+    """`project::stack` for a discovered Pulumi stack (#1570).
+
+    **The project is the directory name, not the `name:` inside `Pulumi.yaml`.**
+    That is a deliberate constraint, not an oversight: everything in this module
+    is pure path logic with no I/O (`rule_claims_path` is called for every path
+    in a PR diff), and reading the project name would mean fetching and parsing
+    a file from the VCS inside the matching loop. The directory is also what
+    `derive_root_directory` already uses as the unit of work, so the two agree.
+
+    The consequence to know: a `Pulumi.yaml` whose `name:` differs from its
+    directory produces a workspace named after the directory. The stack half is
+    always exact -- it comes from the filename.
+
+    The `::` separator is the form the rest of Terrapod already uses for a
+    Pulumi workspace (`_run_pulumi_phase` splits it back into project and stack
+    with `ws.name.partition("::")`), so a discovered workspace is indistinguishable
+    from a hand-created one.
+    """
+    project = PurePosixPath(root_directory).name if root_directory else ""
+    project = _NAME_SANITISE_RE.sub("-", project).strip("-")
+    stack = _NAME_SANITISE_RE.sub("-", stack).strip("-")
+    if not project:
+        # A stack file at the repository root has no directory to name the
+        # project after. The stack alone is still a valid unit of state.
+        return stack[:90]
+    return f"{project}::{stack}"[:90]
 
 
 def derive_workspace_name(rule: AutodiscoveryRule, root_directory: str) -> str:

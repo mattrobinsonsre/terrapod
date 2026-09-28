@@ -30,6 +30,7 @@ def _rule(
     name: str = "monorepo",
     name_template: str = "",
     enabled: bool = True,
+    engine: str = "terraform",
 ):
     r = MagicMock()
     r.id = uuid.uuid4()
@@ -38,6 +39,11 @@ def _rule(
     r.name = name
     r.name_template = name_template
     r.enabled = enabled
+    # A real string, not the MagicMock attribute: matching now branches on the
+    # rule's engine (#1570), and a MagicMock is neither "terraform" nor
+    # "pulumi", so the rule would claim nothing and every assertion here would
+    # fail for a reason unrelated to what it is testing.
+    r.engine = engine
     return r
 
 
