@@ -2752,6 +2752,13 @@
       "runner": "מריץ",
       "latest": "אחרון"
     },
+    "stateOutputs": {
+      "title": "פלטים",
+      "fromSerial": "מספר סידורי #{serial}",
+      "empty": "מצב זה אינו מצהיר על פלטים.",
+      "sensitive": "רגיש",
+      "loadFailed": "טעינת הפלטים של סביבת עבודה זו נכשלה."
+    },
     "configurations": {
       "description": "ארכיוני מקור שהועלו לסביבת עבודה זו, החדש ביותר תחילה. בחרו שתי שורות להשוואה.",
       "selectedCount": "{count}/2 נבחרו",

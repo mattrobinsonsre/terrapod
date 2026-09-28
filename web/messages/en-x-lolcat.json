@@ -2752,6 +2752,13 @@
       "runner": "runnur",
       "latest": "latest"
     },
+    "stateOutputs": {
+      "title": "Outputz",
+      "fromSerial": "Serial #{serial}",
+      "empty": "Dis state declarez noes outputz.",
+      "sensitive": "Sensitiv",
+      "loadFailed": "Failz ta load teh outputz fer dis workspace."
+    },
     "configurations": {
       "description": "Uploadd sorce archivez fer dis workspace, newest furst. Pick too rowz ta compare.",
       "selectedCount": "{count}/2 selectd",

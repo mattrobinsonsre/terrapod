@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "senaste"
     },
+    "stateOutputs": {
+      "title": "Utdata",
+      "fromSerial": "Serienummer #{serial}",
+      "empty": "Detta tillstånd deklarerar inga utdata.",
+      "sensitive": "Känslig",
+      "loadFailed": "Det gick inte att läsa in utdata för denna arbetsyta."
+    },
     "configurations": {
       "description": "Uppladdade källarkiv för denna arbetsyta, nyaste först. Välj två rader för att jämföra.",
       "selectedCount": "{count}/2 valda",

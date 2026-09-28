@@ -2752,6 +2752,13 @@
       "runner": "kjører",
       "latest": "nyeste"
     },
+    "stateOutputs": {
+      "title": "Utdata",
+      "fromSerial": "Serienummer #{serial}",
+      "empty": "Denne tilstanden deklarerer ingen utdata.",
+      "sensitive": "Sensitiv",
+      "loadFailed": "Kunne ikke laste utdata for dette arbeidsområdet."
+    },
     "configurations": {
       "description": "Opplastede kildearkiv for dette arbeidsområdet, nyeste først. Velg to rader for å sammenligne.",
       "selectedCount": "{count}/2 valgt",

@@ -2760,6 +2760,13 @@
       "runner": "runner",
       "latest": "latest"
     },
+    "stateOutputs": {
+      "title": "Outputs",
+      "fromSerial": "Serial #{serial}",
+      "empty": "This state declares no outputs.",
+      "sensitive": "Sensitive",
+      "loadFailed": "Could not load the outputs for this workspace."
+    },
     "configurations": {
       "description": "Uploaded source archives for this workspace, newest first. Pick two rows to compare.",
       "selectedCount": "{count}/2 selected",

@@ -2752,6 +2752,13 @@
       "runner": "rhedwr",
       "latest": "diweddaraf"
     },
+    "stateOutputs": {
+      "title": "Allbynnau",
+      "fromSerial": "Rhif Cyfresol #{serial}",
+      "empty": "Nid yw'r cyflwr hwn yn datgan unrhyw allbynnau.",
+      "sensitive": "Sensitif",
+      "loadFailed": "Methwyd llwytho allbynnau'r weithfan hon."
+    },
     "configurations": {
       "description": "Archifau ffynhonnell a lwythwyd ar gyfer y weithfan hon, y diweddaraf yn gyntaf. Dewiswch ddwy res i'w cymharu.",
       "selectedCount": "{count}/2 wedi'u dewis",

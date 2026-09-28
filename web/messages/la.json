@@ -2752,6 +2752,13 @@
       "runner": "cursor",
       "latest": "novissima"
     },
+    "stateOutputs": {
+      "title": "Egressus",
+      "fromSerial": "Series #{serial}",
+      "empty": "Hic status nullos egressus declarat.",
+      "sensitive": "Sensibile",
+      "loadFailed": "Egressus huius loci operis onerari non potuerunt."
+    },
     "configurations": {
       "description": "Fontium archiva huic loco operis subdita, novissima primum. Elige duas lineas ad comparandum.",
       "selectedCount": "{count}/2 selectae",
