@@ -184,13 +184,14 @@ class TestTheHooksARunGets:
         with (
             patch("terrapod.runner.phases.execution_hooks.run_point", side_effect=_hook),
             patch("terrapod.runner.phases.platform_tool.ensure_tool", return_value="/bin/pulumi"),
-            patch(
-                "terrapod.runner.phases.pulumi_exec.prepare_local_stack", return_value=MagicMock()
-            ),
+            # The stack pre-flight is not what these tests are about, and left
+            # alone it would run against the faked CLI below. Nothing stands in
+            # for a hand-back: an update checkpoints to Terrapod as it goes and
+            # publishes on completion, so there is none (#1881).
+            patch("terrapod.runner.phases.pulumi_exec.select_stack", return_value="default/p/dev"),
             patch("terrapod.runner.phases.pulumi_exec.bind_plan_enabled", return_value=False),
             patch("terrapod.runner.exec_subprocess.run", return_value=MagicMock(exit_code=rc)),
             patch.object(job_entrypoint, "_finish_pulumi_preview", return_value=finish_rc),
-            patch.object(job_entrypoint, "_hand_back_pulumi_state", return_value=rc),
         ):
             code = job_entrypoint._run_pulumi_phase(
                 MagicMock(phase="plan", has_api=False, api_url="", auth_token="", plan_only=False),

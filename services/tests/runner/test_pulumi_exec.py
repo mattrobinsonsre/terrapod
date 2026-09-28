@@ -5,11 +5,14 @@ is wrong — the CLI carries on and does something plausible with a default — 
 is why they are worth pinning rather than left to the live smoke:
 
   * a plugin-override pattern that matches nothing falls back to get.pulumi.com
-  * a backend pointed anywhere but the Job's own directory puts an agent run on
-    a live backend, which #1576 forbids
   * a preview and its update disagreeing about the plan file surfaces as "no
     plan file" on the update, a long way from the preview that should have
     written it
+
+The backend itself is pinned next door in `test_pulumi_service_backend.py`:
+since #1881 an agent run speaks to Terrapod's Pulumi service surface, and what
+needs guarding there is the *absence* of the file-backend scaffolding rather
+than the argv this file is about.
 """
 
 from __future__ import annotations
@@ -48,26 +51,6 @@ def _clean_env(monkeypatch):
         "TP_DESTROY",
     ):
         monkeypatch.delenv(k, raising=False)
-
-
-class TestTheBackend:
-    """#1576: an agent run's backend is a directory in its own Job — never
-    Terrapod's service surface, which serves the CLI in local mode only."""
-
-    def test_it_is_a_file_backend(self, tmp_path) -> None:
-        env = pulumi_exec.local_backend_env(tmp_path, "pw")
-        assert env["PULUMI_BACKEND_URL"] == tmp_path.resolve().as_uri()
-        assert env["PULUMI_BACKEND_URL"].startswith("file://")
-        assert env["PULUMI_CONFIG_PASSPHRASE"] == "pw"
-
-    def test_nothing_points_the_cli_at_the_service_surface(self) -> None:
-        """The old runner exported `{api}/api/terrapod/v1/pulumi` as its backend.
-        A path like that reappearing here would put agent runs back on it."""
-        import inspect
-
-        src = inspect.getsource(pulumi_exec)
-        assert '_API_PREFIX}/pulumi"' not in src
-        assert not hasattr(pulumi_exec, "backend_env")
 
 
 class TestThePluginOverride:
@@ -133,12 +116,18 @@ class TestThePhaseArgv:
         assert argv[0] == "destroy"
         assert not any(a.startswith("--plan=") for a in argv)
 
-    def test_the_stack_is_passed_as_the_file_backend_names_it(self, monkeypatch) -> None:
-        """The API sends `default/<project>/<stack>`; the file backend accepts a
-        qualified name only under the literal organization `organization`."""
+    def test_the_stack_is_passed_as_terrapod_names_it(self, monkeypatch) -> None:
+        """The API sends `default/<project>/<stack>` and that is what the CLI is
+        given (#1881).
+
+        It used to be rewritten to `organization/proj/dev` on the way, because a
+        file backend accepts a qualified name only under the literal
+        organization `organization`. Against Terrapod the first segment is the
+        organization, so a rewrite here would name a stack that does not exist.
+        """
         monkeypatch.setenv("TP_PULUMI_STACK", "default/proj/dev")
         argv = pulumi_exec.preview_argv("p", _cfg())
-        assert argv[argv.index("--stack") + 1] == "organization/proj/dev"
+        assert argv[argv.index("--stack") + 1] == "default/proj/dev"
 
     def test_refresh_is_only_disabled_when_asked(self, monkeypatch) -> None:
         assert "--refresh=false" not in pulumi_exec.preview_argv("p", _cfg())
