@@ -214,6 +214,33 @@ Two things follow that a backend private to the Job could not offer:
   workspace's remote-state consumer allowlist — the same grant that authorizes
   `terraform_remote_state`. See [Remote state](remote-state.md).
 
+## A `pulumi up` from your own machine shows in run history
+
+When you `pulumi login` against Terrapod and run `pulumi up` from your own
+machine, the update becomes a run in the workspace's history: who ran it, when,
+what came of it, and the state version it produced.
+
+This is more than the Terraform path gives you, and the reason is the protocol
+rather than a preference. Pulumi's CLI drives its backend through a
+begin/checkpoint/complete lifecycle, so Terrapod knows when your update starts
+and when it ends. Terraform in local mode tells Terrapod nothing until it
+pushes the finished state, so there is no run to record — only a state version.
+
+Three things follow that are worth knowing:
+
+- **Previews are not recorded.** A `pulumi preview` changes nothing, writes no
+  state version, and cannot checkpoint. A preview also runs constantly while
+  you are working, so recording each one would bury the updates in noise.
+- **The run holds the workspace while it runs.** It is an apply in progress, so
+  Terrapod treats it as one: an agent run will not start against the stack
+  meanwhile, and drift checks are skipped until it finishes. That is the same
+  serialisation a Terraform CLI apply already gets from the workspace lock.
+- **If your CLI dies, the run ends with it.** There is no Kubernetes Job behind
+  this run, so what tells Terrapod you are still there is the update's lease,
+  which your CLI renews as it works. When the lease lapses the run is marked
+  errored and the stack is released — by the same sweep that already promotes
+  an abandoned update's last checkpoint.
+
 ## What the workspace shows about a stack's state
 
 A Pulumi workspace's state views work from the deployment Terrapod stores, so
@@ -236,6 +263,7 @@ the state tab shows the stack's resources and its outputs.
 workspace.** Both read Terraform state and cannot interpret a deployment, so the
 tabs are absent rather than present-and-failing. #1569 is where they gain Pulumi
 support.
+
 
 ## Drift detection
 
