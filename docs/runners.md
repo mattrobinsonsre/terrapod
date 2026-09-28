@@ -524,6 +524,7 @@ It holds:
 
 - a `terraform.tfvars.json` blob — every terraform-category variable (sensitive and not), with its `hcl` flag. The Secret is **mounted read-only** at `/var/run/terrapod/vars`; before `init` the runner renders a `terrapod.auto.tfvars` from it (`hcl=true` → raw HCL expression, otherwise → quoted string). A `.auto.tfvars` file parses **identically on terraform and tofu** for any variable type — which is why the runner uses a file rather than `TF_VAR_*` env (the env form diverges across engines for untyped complex values).
 - one key per env-category variable, each injected into the Job container via `secretKeyRef`.
+- on a Pulumi workspace that has any, a `pulumi-config.json` blob — every `pulumi_config` variable with its `secret` and `path` flags. Mounted read-only alongside the tfvars file; after the stack is selected the runner sets each with `pulumi config set`, passing the value on **stdin** so it never reaches a command line. See [Pulumi → Stack configuration](pulumi.md#stack-configuration).
 
 No variable value — sensitive or not — ever appears in the Job spec, the listener logs, or `kubectl describe` output. Sensitive terraform vars are protected by living only in this short-lived, cascade-GC'd Secret (mounted as the tfvars file), not by masking.
 

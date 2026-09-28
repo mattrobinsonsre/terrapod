@@ -671,6 +671,42 @@ Workspaces also expose a read-only `state-diverged` boolean. It is set to `true`
 "state-diverged": false
 ```
 
+### Health Conditions
+
+Every workspace response carries a read-only `health-conditions` array,
+recomputed on every request rather than stored, so a condition disappears as
+soon as whatever caused it does. An empty array means
+nothing is wrong. The UI renders it as banners on the workspace detail page and
+as badges on the workspace list.
+
+```json
+"health-conditions": [
+  {
+    "code": "variables_not_consumed",
+    "severity": "warning",
+    "title": "Some variables do not apply to this engine",
+    "detail": "This workspace holds variables in a category its engine never reads …"
+  }
+]
+```
+
+`code` is the stable identifier to match on; `title` and `detail` are prose for
+a person and may be reworded. `severity` is `error` or `warning`.
+
+| Code | Severity | Raised when |
+|---|---|---|
+| `variables_not_consumed` | `warning` | The workspace holds at least one variable of its own in a category its engine never reads — `pulumi_config` on a Terraform/OpenTofu workspace, or `terraform` on a Pulumi one. The variables are stored and editable; a run simply does not deliver them. See [Engine-Specific Categories](#engine-specific-categories) |
+| `state_diverged` | `error` | The last apply completed but the state upload failed, so the stored state may not match reality. Mirrors the `state-diverged` flag above |
+| `no_agent_pool` | `warning` | The workspace is in agent execution mode with no agent pool assigned, so runs queue indefinitely |
+| `no_live_agent_pool` | `error` | The workspace is in agent execution mode and none of its assigned pools currently has a listener sending heartbeats. Skipped rather than guessed when liveness cannot be determined — a false "no runner" banner is worse than a missing one |
+| `vcs_error` | `error` | The most recent VCS poll failed; `detail` is the error itself. Cleared by the next successful poll — see [VCS Polling Health Attributes](#vcs-polling-health-attributes) |
+| `drifted` | `warning` | Drift detection is enabled and the last drift run found changes between the stored state and the real infrastructure |
+| `drift_errored` | `warning` | Drift detection is enabled and the last drift run failed |
+
+New codes are added as new conditions are detected, so treat the list as open:
+match the codes you handle and pass anything else through with its `title` and
+`detail`.
+
 ### List VCS Refs (Terrapod Extension)
 
 ```
@@ -1841,7 +1877,9 @@ POST /api/tfe/v2/workspaces/{id}/vars
 }
 ```
 
-`category` is one of `terraform`, `env`, `git_http_auth`, or `git_ssh_auth`. In agent mode all are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec): `terraform` vars are rendered into a generated `terrapod.auto.tfvars` from a Secret-mounted blob (honouring `structured`), and `env` vars are injected via `secretKeyRef`. (In local execution mode the CLI handles variables itself.) The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly.
+`category` is one of `terraform`, `env`, `pulumi_config`, `git_http_auth`, or `git_ssh_auth`. In agent mode all are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec): `terraform` vars are rendered into a generated `terrapod.auto.tfvars` from a Secret-mounted blob (honouring `structured`), and `env` vars are injected via `secretKeyRef`. (In local execution mode the CLI handles variables itself.) The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly.
+
+`pulumi_config` is a Pulumi stack-config key, the engine's counterpart to `terraform` (Pulumi has no tfvars file). It is set with `pulumi config set` against the run's stack after the stack is selected and before the `pre_plan` hook, with the key passed through **verbatim** — an unqualified `region` is namespaced to the project by the CLI, and an explicit `aws:region` is left alone. `sensitive` makes it a real Pulumi secret (`--secret`), so the stack's secrets provider encrypts it and the engine renders it as `[secret]` in the preview, the event log and any state it reaches; `structured` becomes `--path`, so `outer.inner` sets a nested value. It overwrites a committed `Pulumi.<stack>.yaml` key of the same name and leaves keys it does not set alone, and a key that cannot be set **fails the run**. See [Pulumi → Stack configuration](pulumi.md#stack-configuration).
 
 `structured` marks a value as a typed expression rather than a plain string — for a
 `terraform` variable, a raw HCL expression (list, object, number, bool) rather than a
@@ -1852,6 +1890,19 @@ rather than a silent precedence rule — a client that disagrees with itself abo
 whether a value is typed has a bug worth surfacing.
 
 **Required permission:** `write` on the workspace.
+
+### Engine-Specific Categories
+
+`terraform` and `pulumi_config` are each consumed by one engine; `env` and the two `git_*_auth` categories apply whatever engine runs.
+
+A mismatch is **never refused on write**. Variables are data, and which of them apply is decided at run time by the engine that runs, so a `pulumi_config` variable on a Terraform workspace — or a `terraform` variable on a Pulumi one — is stored, returned and editable, and a run simply does not deliver it. It is reported instead, in two places:
+
+| Where | What it reports |
+|---|---|
+| `applies-to-engine` (read-only boolean, on a variable) | Whether a run on the owning workspace's engine would deliver this variable. `false` means it is stored and inert. Present on workspace variables; a variable-set variable has no single owning workspace and so does not carry it |
+| `variables_not_consumed` (in the workspace's `health-conditions`) | The workspace holds at least one variable **of its own** that its engine never reads — see [Health Conditions](#health-conditions) |
+
+Neither reports config that a program was handed and never read: no engine offers that signal.
 
 ### Update Variable
 

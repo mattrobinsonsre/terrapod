@@ -70,6 +70,120 @@ for a Pulumi run at the same four points, around the preview and the update. A
 hook that exits non-zero fails the run, so a `pre_apply` hook that refuses means
 nothing is applied.
 
+### Stack configuration
+
+A Pulumi program reads its settings from Pulumi's stack config, and a workspace
+supplies them with variables in the **`pulumi_config`** category — Pulumi's
+equivalent of the `terraform` category. They are ordinary workspace variables,
+set the same way as any other (see [Variables](api-reference.md#variables)), so
+they are encrypted at rest, can be delivered from a variable set, and can take
+their value from [OpenBao (or HashiCorp Vault)](vault.md) at run time.
+
+There is no tfvars file to render into, because Pulumi has none: config is a
+flat key/value namespace the program reads at will, and nothing declares it in
+advance. So Terrapod delivers it the way Pulumi's own users do — `pulumi config
+set` against the selected stack, run before anything reads it. That happens
+after the stack is selected and before the `pre_plan` hook, so a hook that
+inspects `pulumi config` sees what the run will actually use rather than only
+what the repository committed. The preview and the update run in different pods,
+so it happens once in each, exactly as dependency installation does.
+
+This is the agent-mode path. A `pulumi up` from your own machine uses the config
+in your own checkout; a workspace's variables are not delivered to it.
+
+**Keys pass through verbatim, and nothing is prefixed.** A variable keyed
+`region` is set as `region`, and one keyed `aws:region` as `aws:region`. The
+runner already executes in the project directory, so the CLI namespaces an
+unqualified key to the project named in `Pulumi.yaml` itself — `region` becomes
+`myproject:region` unaided — while the explicit `namespace:key` form, which is
+how provider config such as `aws:region` is written, survives untouched.
+Terrapod transforms neither, because a transformation here is a thing that can
+be wrong.
+
+Set `structured` on the variable and the key is set with `--path`, so
+`outer.inner` writes a nested value rather than a literal dotted key — the same
+distinction `structured` already draws for a `terraform` variable.
+
+A value never reaches a command line. Pulumi takes it on stdin, so the run log
+carries the key and the flags only — the same mechanism-rather-than-redaction
+guarantee [private module source auth](module-auth.md) holds, and for the same
+reason: the runner streams its output to the API and the UI. The value arrives
+byte-for-byte, including one that genuinely ends in a newline, which is what
+keeps a PEM key intact.
+
+#### A sensitive value becomes a real Pulumi secret
+
+A `pulumi_config` variable marked `sensitive` is set with `--secret`. The value
+is then encrypted by the stack's own secrets provider — in agent mode, the one
+Terrapod's service backend holds — and Pulumi's *engine* renders it as
+`[secret]` in the preview a reviewer reads, in the event log, and in any state it
+reaches. Delivered as ordinary config it would sit in plaintext in the stack
+config file and in the preview output, which is the wrong thing to arrive at by
+omission.
+
+Two things it does **not** buy:
+
+- **The masking is Pulumi's, not Terrapod redacting the log.** It covers what
+  the engine prints about the value. A program that reads the value and prints
+  it itself has printed it.
+- **It does not change how Terrapod holds the variable.** That is the ordinary
+  sensitive-variable path — encrypted at rest, never returned by the API.
+
+A stack whose secrets provider has been moved to a passphrase or cloud KMS
+cannot run on an agent at all, secrets or not; see
+[`docs/pulumi-cli-surface.md`](pulumi-cli-surface.md).
+
+#### Merging with a committed `Pulumi.<stack>.yaml`
+
+`pulumi config set` edits the stack's config file in place, so the merge is **per
+key, and Terrapod's value wins**. Given this in the repository:
+
+```yaml
+# Pulumi.dev.yaml
+config:
+  myproject:replicas: "2"
+  myproject:tier: standard
+```
+
+and one workspace variable keyed `replicas` with the value `5` — unqualified, so
+the CLI namespaces it to `myproject:replicas` — the run sees:
+
+| Key | Value | Where it came from |
+|---|---|---|
+| `myproject:replicas` | `5` | The workspace, overwriting the committed `2` |
+| `myproject:tier` | `standard` | The repository. The workspace sets no such key, so the committed one survives untouched |
+
+That is the right way round because a value held in Terrapod is rotatable,
+RBAC'd and audited, and a committed one is none of those.
+
+**A config failure fails the run.** If a key cannot be set, the run stops there
+rather than dropping the entry with a warning. A program running without config
+someone set deliberately is doing something nobody asked for: `config.get` with
+a default would quietly take the default, and only `config.require` would
+complain at all.
+
+#### What Terrapod cannot tell you about config
+
+**Pulumi reports nothing about config that was set and never read.** There is no
+unused-config signal in the CLI or the engine, so Terrapod cannot tell you that
+a key your program never looks at is doing nothing.
+
+What it can tell you is narrower, and worth not confusing with the above:
+whether a variable is in a category this workspace's engine reads **at all**.
+Every workspace variable reports `applies-to-engine`, and a workspace holding
+one its engine never consumes raises a `variables_not_consumed` health condition
+(severity `warning`). The rule is symmetric — a `pulumi_config` variable on a
+Terraform workspace and a `terraform` variable on a Pulumi one are equally inert
+and equally flagged. Both are computed from the workspace's own variables: a
+variable-set variable has no single owning workspace, so it carries no
+`applies-to-engine` and does not raise the condition.
+
+Writing one is never refused, and that is deliberate. Variables are data, and
+which of them apply is decided at run time by the engine that runs, so a
+category mismatch is **surfaced rather than rejected**: the failure worth naming
+is not the write, it is a variable an operator sets, sees stored, and watches do
+nothing.
+
 ### Which Pulumi version a run uses
 
 The workspace pins it, in the same `engine-version` attribute a Terraform
