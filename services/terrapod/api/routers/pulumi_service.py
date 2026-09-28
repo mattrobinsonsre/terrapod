@@ -81,7 +81,7 @@ from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
-from terrapod.db.models import Workspace
+from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.pulumi_checkpoint_service import (
@@ -98,6 +98,7 @@ from terrapod.services.pulumi_update_locks import (
 )
 from terrapod.services.pulumi_update_locks import stack_lock_key as _stack_lock_key
 from terrapod.services.pulumi_update_locks import update_key as _update_key
+from terrapod.services.remote_state_access import consumer_grant_id
 from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
 
@@ -147,19 +148,12 @@ async def pulumi_user(request: Request, db: AsyncSession = Depends(get_db)) -> A
         HTTPAuthorizationCredentials(scheme="Bearer", credentials=value),
         db,
     )
-    if user.auth_method == "runner_token":
-        # Agent runs never use Terrapod as a live Pulumi backend (#1576). They keep
-        # the stack in a file backend inside the Job and hand state over through
-        # the run's artifact API, as a Terraform run does. Refusing the token here,
-        # at the one door every call passes, keeps that true however a Job's
-        # environment ends up configured.
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Agent runs do not use the Pulumi service backend; a run's state is "
-                "handed over through its artifacts"
-            ),
-        )
+    # A runner token IS accepted here (#1880). It used to be refused at this door,
+    # because agent runs kept their stack in a file backend inside the Job (#1576);
+    # #1879 reverses that, so agent runs drive this surface like any other client.
+    # What a runner may do is decided in `_runner_caps_on`, not here: authentication
+    # says who is calling, and this surface has exactly one place that decides what
+    # a caller may do.
     return user
 
 
@@ -247,14 +241,91 @@ async def _find_stack(db: AsyncSession, stack_id: str) -> Workspace:
     return ws
 
 
+#: What a runner may do on the workspace its own run belongs to, before the run's
+#: own kind narrows it further. Read the stack, read its state, and preview.
+_RUNNER_OWN_BASE = frozenset({cap.WORKSPACE_READ, cap.RUN_READ, cap.STATE_READ, cap.RUN_PLAN})
+
+#: What a runner may do on somebody else's stack: read it, and nothing more. This
+#: is what serves a `StackReference`, and it is deliberately the smallest set that
+#: does — a consumer reads outputs, it does not operate the stack it reads.
+_RUNNER_CONSUMER = frozenset({cap.WORKSPACE_READ, cap.STATE_READ})
+
+
+async def _runner_caps_on(
+    db: AsyncSession, user: AuthenticatedUser, ws: Workspace
+) -> frozenset[str]:
+    """What a runner token may do on a stack (#1880).
+
+    **A runner token is a capability bound to one run, not a user.** It carries
+    `roles=["everyone"]`, so resolving it through role-based RBAC yields nothing
+    and every gate answers 404 — which is exactly how #1550 broke every
+    agent-mode Pulumi run while all of its tests passed. Every runner-reachable
+    surface therefore states its own allowance, keyed on `run_id`; this is the
+    Pulumi one, and `tfe_v2._runner_state_read_allowed` is its Terraform sibling.
+
+    Two cases, and the difference between them is the whole rule:
+
+    - **The run's own workspace.** It may read, preview, and — only if the run is
+      apply-capable — update. The narrowing matters: a plan-only run must not be
+      able to begin an update, or a speculative PR plan could apply from inside a
+      Job that runs the author's own code. `RUN_APPLY_DESTROY` is granted only to
+      a run that is actually a destroy, for the same reason.
+    - **Any other workspace.** Read only, and only where that workspace's #344
+      consumer allowlist names this run's workspace. That is what makes a Pulumi
+      `StackReference` authorized exactly as `terraform_remote_state` is, which
+      was the point of #1578.
+
+    `WORKSPACE_DELETE` is granted in neither case, so `pulumi stack rm` from
+    inside a Job is refused. The Job runs arbitrary program code; letting it
+    delete the workspace it is running in would be a capability nobody asked for.
+
+    Returns an empty set — never a partial one — when the run cannot be resolved,
+    so an unknown run reads as "no access" rather than falling through to
+    something more generous.
+    """
+    if not user.run_id:
+        return frozenset()
+    try:
+        run_uuid = uuid.UUID(user.run_id)
+    except (ValueError, TypeError):
+        return frozenset()
+    run = (await db.execute(select(Run).where(Run.id == run_uuid))).scalar_one_or_none()
+    if run is None:
+        return frozenset()
+
+    if run.workspace_id == ws.id:
+        caps = set(_RUNNER_OWN_BASE)
+        if not run.plan_only:
+            caps |= {cap.RUN_APPLY, cap.STATE_WRITE}
+            if run.is_destroy:
+                caps.add(cap.RUN_APPLY_DESTROY)
+        return frozenset(caps)
+
+    grant_id = await consumer_grant_id(
+        db, producer_workspace_id=ws.id, consumer_workspace_id=run.workspace_id
+    )
+    if grant_id is not None:
+        logger.info(
+            "pulumi_cross_stack_read_authorized",
+            producer_workspace_id=str(ws.id),
+            consumer_workspace_id=str(run.workspace_id),
+            grant_id=str(grant_id),
+            run_id=user.run_id,
+        )
+        return _RUNNER_CONSUMER
+    return frozenset()
+
+
 async def _caps_on(db: AsyncSession, user: AuthenticatedUser, ws: Workspace) -> frozenset[str]:
     """The caller's capabilities on a stack's workspace.
 
     The same RBAC resolution the Terraform routes use. Every gate on this surface
-    asks this, so no two handlers can decide it differently. A runner token never
-    gets this far: `pulumi_user` refuses it (#1576), because agent runs do not use
-    this surface at all.
+    asks this, so no two handlers can decide it differently — which is also why a
+    runner token is resolved here rather than per route: one function, one answer,
+    whatever the caller is.
     """
+    if user.auth_method == "runner_token":
+        return await _runner_caps_on(db, user, ws)
     return await resolve_workspace_capabilities_for(db, user, ws)
 
 

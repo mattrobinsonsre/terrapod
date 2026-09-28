@@ -69,7 +69,6 @@ from terrapod.db.models import (
     Run,
     StateVersion,
     Workspace,
-    WorkspaceRemoteStateConsumer,
     generate_uuid7,
 )
 from terrapod.db.session import get_db
@@ -84,6 +83,7 @@ from terrapod.services import (
 )
 from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
 from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
+from terrapod.services.remote_state_access import consumer_grant_id
 from terrapod.services.workspace_name import validate_workspace_name
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
@@ -1432,20 +1432,18 @@ async def _runner_state_read_allowed(
     consumer_ws_id = row[0]
     if consumer_ws_id == producer.id:
         return True  # self-read; runners already own their own state
-    grant = await db.execute(
-        select(WorkspaceRemoteStateConsumer.id).where(
-            WorkspaceRemoteStateConsumer.producer_workspace_id == producer.id,
-            WorkspaceRemoteStateConsumer.consumer_workspace_id == consumer_ws_id,
-        )
+    # The allowlist lookup itself lives in `services/remote_state_access.py`,
+    # because Pulumi's `StackReference` now asks the same question by a different
+    # route (#1880) and the two answers must not drift.
+    grant_id = await consumer_grant_id(
+        db, producer_workspace_id=producer.id, consumer_workspace_id=consumer_ws_id
     )
-    grant_id = grant.scalar_one_or_none()
     if grant_id is None:
         return False
     logger.info(
         "Cross-workspace state read authorized via consumer allowlist",
         producer_workspace_id=str(producer.id),
         consumer_workspace_id=str(consumer_ws_id),
-        grant_id=str(grant_id),
         run_id=user.run_id,
     )
     # Audit the cross-workspace state consumption explicitly (#344 Phase 2).
