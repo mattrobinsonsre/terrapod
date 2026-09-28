@@ -31,6 +31,16 @@ and has no TTL, so something has to notice the lease is gone and release the
 row. `sweep_abandoned_updates` is that something, run periodically by the
 scheduler.
 
+**Why more than a sweep.** The sweep infers death from a lapsed lease, which for
+a local CLI is the best available signal — nothing else knows the process is
+gone. An agent run is different: the listener reports its Job's outcome and the
+reconciler acts on it, so Terrapod *knows* the run is over rather than inferring
+it from silence. `handle_run_ended` ends that run's update at that moment
+instead of leaving it to the next sweep cycle (#1882). The difference is
+latency, not correctness — the sweep already promotes every abandoned
+checkpoint — but the workspace lock is what holds the next apply back, so the
+delay shows up as a stack that will not start.
+
 The lock id names the update (`pulumi-update:<id>`), so releasing is always
 conditional on the lock still being this update's. An operator can still clear
 it with Terrapod's force-unlock, as for any lock left behind by a crashed CLI.
@@ -55,6 +65,9 @@ LEASE_TTL_SECONDS = 30 * 60
 
 #: Every workspace lock a Pulumi update takes starts with this.
 LOCK_ID_PREFIX = "pulumi-update:"
+
+#: The triggered task that ends an agent run's update once the run is over.
+RUN_ENDED_TRIGGER = "pulumi_run_ended"
 
 #: Run statuses in which an agent apply is changing, or about to change, state.
 _APPLYING = ("confirmed", "applying")
@@ -190,6 +203,101 @@ async def release_workspace_lock(db: AsyncSession, workspace_id: uuid.UUID, upda
         "pulumi_update_released_workspace", workspace_id=str(workspace_id), update_id=update_id
     )
     return True
+
+
+def decode_record(raw: dict | None) -> dict[str, str]:
+    """A Redis hash as plain strings, whichever way the client returned it."""
+    return {
+        (k.decode() if isinstance(k, bytes) else str(k)): (
+            v.decode() if isinstance(v, bytes) else str(v)
+        )
+        for k, v in (raw or {}).items()
+    }
+
+
+async def handle_run_ended(payload: dict) -> None:
+    """End the update an agent run left behind, now that the run is over (#1882).
+
+    Registered as a triggered task when the Pulumi engine is on, and enqueued
+    from `run_service.transition_run` for every terminal state — cancelled,
+    OOM-killed, node preempted, errored by the reconciler, and applied too,
+    since a CLI that died just after its last checkpoint leaves exactly the same
+    residue as one that was killed.
+
+    **Which update is this run's.** The stack mutex names the update in flight
+    on the stack, and the update's record says which run began it (`run_id`,
+    written by `_begin_update` for a runner token). Both have to agree before
+    anything is released: a local `pulumi up` may perfectly well hold this stack
+    — it is refused only while an agent run is *applying*, so one that began
+    before this run reached that point is legitimate — and releasing its lock
+    would let a second update start alongside it. An update record that has
+    already lapsed is left alone too: that is precisely the sweep's case, and it
+    can promote what we no longer have the identity to claim.
+
+    A preview is found by neither, because it takes no mutex and no lock. It
+    leaves only its own record, which blocks nothing and expires on its own.
+
+    **Ordering.** The last checkpoint becomes a state version *before* anything
+    is released, for the reason the sweep gives: releasing first would leave the
+    checkpoint held against an update nothing will ever look at again. So on any
+    failure here nothing has been let go and the sweep, unchanged, is still the
+    backstop — which is also what makes this safe to race against it. While the
+    record still exists the sweep skips this update entirely; once we delete it
+    the checkpoint object is already gone, so a sweep arriving afterwards
+    promotes nothing and exactly one state version is written.
+    """
+    from terrapod.db.session import get_db_session
+    from terrapod.redis.client import get_redis_client
+    from terrapod.services.pulumi_checkpoint_service import promote_checkpoint
+
+    run_id = payload.get("run_id")
+    workspace_id = payload.get("workspace_id")
+    if not run_id or not workspace_id:
+        return
+
+    redis = get_redis_client()
+    update_id = text_of(await redis.get(stack_lock_key(workspace_id)))
+    if not update_id:
+        return
+    record = decode_record(await redis.hgetall(update_key(update_id)))
+    if not record or record.get("run_id") != str(run_id):
+        return
+
+    async with get_db_session() as db:
+        ws = (
+            await db.execute(select(Workspace).where(Workspace.id == uuid.UUID(workspace_id)))
+        ).scalar_one_or_none()
+        if ws is None:
+            return
+        try:
+            await promote_checkpoint(db, ws, update_id)
+        except Exception:  # noqa: BLE001 — the sweep retries; nothing is released yet
+            await db.rollback()
+            logger.warning(
+                "pulumi_run_ended_checkpoint_not_promoted",
+                workspace_id=workspace_id,
+                update_id=update_id,
+                run_id=run_id,
+                exc_info=True,
+            )
+            return
+
+        await redis.delete(update_key(update_id))
+        # Release only if this update still holds it, exactly as `complete_update`
+        # does: a lapsed lease may already have been replaced by a newer update,
+        # and deleting that one's lock would let a third start alongside it.
+        if text_of(await redis.get(stack_lock_key(workspace_id))) == update_id:
+            await redis.delete(stack_lock_key(workspace_id))
+        released = await release_workspace_lock(db, ws.id, update_id)
+
+    logger.info(
+        "pulumi_run_ended_update_released",
+        workspace_id=workspace_id,
+        update_id=update_id,
+        run_id=run_id,
+        kind=record.get("kind"),
+        workspace_lock_released=released,
+    )
 
 
 async def sweep_abandoned_updates() -> int:

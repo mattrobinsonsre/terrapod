@@ -92,6 +92,7 @@ from terrapod.services.pulumi_checkpoint_service import (
 from terrapod.services.pulumi_update_locks import (
     LEASE_TTL_SECONDS,
     LockRefused,
+    decode_record,
     release_workspace_lock,
     take_workspace_lock,
     text_of,
@@ -822,15 +823,9 @@ async def batch_decrypt(
 # apply does (#1562), so the rest of Terrapod — the UI, the run dispatcher —
 # sees the stack as busy. That lock is a row with no TTL, so a periodic sweep in
 # `services/pulumi_update_locks.py` releases it once the lease has lapsed. The
-# lease constants and keys live there too, shared with the sweep.
-
-
-def _decode_record(raw: dict | None) -> dict[str, str]:
-    """A Redis hash as plain strings, whichever way the client returned it."""
-    return {
-        (k.decode() if isinstance(k, bytes) else k): (v.decode() if isinstance(v, bytes) else v)
-        for k, v in (raw or {}).items()
-    }
+# lease constants, keys and record decoder live there too, shared with the sweep
+# and with the trigger that ends an agent run's update the moment its run does
+# (#1882) — one decoder, so nothing can disagree about how a record reads.
 
 
 async def _begin_update(
@@ -918,25 +913,34 @@ async def _begin_update(
                     status_code=status.HTTP_409_CONFLICT, detail=exc.message
                 ) from None
 
-    await redis.hset(
-        _update_key(update_id),
-        mapping={
-            "workspace_id": str(ws.id),
-            "kind": kind,
-            "status": "not-started",
-            "actor": user.email,
-            # Whether this update took the workspace lock, so the calls that end
-            # it release exactly what was taken. An agent run takes only the
-            # mutex (see the docstring), and a release it never took is not
-            # merely wasted: `release_workspace_lock` rolls back when the lock
-            # is not its own, and a rollback expires every ORM object on the
-            # session — so the caller's `ws` then raises `MissingGreenlet` on
-            # the next attribute read. Recorded rather than re-derived, because
-            # the calls that end an update authenticate by lease and have no
-            # user to ask.
-            "workspace_lock": "no" if (kind == "preview" or is_runner) else "yes",
-        },
-    )
+    record = {
+        "workspace_id": str(ws.id),
+        "kind": kind,
+        "status": "not-started",
+        "actor": user.email,
+        # Whether this update took the workspace lock, so the calls that end
+        # it release exactly what was taken (#1881). An agent run takes only the
+        # mutex (see the docstring), and a release it never took is not merely
+        # wasted: `release_workspace_lock` rolls back when the lock is not its
+        # own, and a rollback expires every ORM object on the session — so the
+        # caller's `ws` then raises `MissingGreenlet` on the next attribute
+        # read. Recorded rather than re-derived, because the calls that end an
+        # update authenticate by lease and have no user to ask.
+        "workspace_lock": "no" if (kind == "preview" or is_runner) else "yes",
+    }
+    # Whose update this is, when it is an agent run's (#1882). Terrapod learns
+    # from the listener that a Job is gone, and can then end that run's update
+    # itself instead of waiting up to a poll interval for the sweep to infer it
+    # from a lapsed lease. It can only do that if it can tell the run's update
+    # apart from a local CLI's on the same stack — releasing someone else's lock
+    # would be worse than the delay — so the binding is recorded here, at the one
+    # place an update is created, rather than guessed from the lock later.
+    #
+    # Same `is_runner` the line above uses: one answer to "is this an agent run",
+    # so the two fields cannot disagree about what kind of caller wrote them.
+    if is_runner and user.run_id:
+        record["run_id"] = user.run_id
+    await redis.hset(_update_key(update_id), mapping=record)
     await redis.expire(_update_key(update_id), LEASE_TTL_SECONDS)
     logger.info("pulumi_update_begun", stack=ws.name, kind=kind, update_id=update_id)
     return {"updateID": update_id}
@@ -974,7 +978,7 @@ async def _require_lease(
             detail="This endpoint requires an update-token lease",
         )
 
-    record = _decode_record(await get_redis_client().hgetall(_update_key(update_id)))
+    record = decode_record(await get_redis_client().hgetall(_update_key(update_id)))
     if not record:
         # Expired or never existed — the same answer either way, because a lease
         # that has timed out is exactly as invalid as one that was invented.
@@ -1066,7 +1070,7 @@ async def start_update(
     from terrapod.redis.client import get_redis_client
 
     redis = get_redis_client()
-    record = _decode_record(await redis.hgetall(_update_key(update_id)))
+    record = decode_record(await redis.hgetall(_update_key(update_id)))
     required = _KIND_CAPABILITY.get(record.get("kind", "")) if record else None
     if required is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown update")
@@ -1095,7 +1099,7 @@ async def get_update_status(
     from terrapod.redis.client import get_redis_client
 
     ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.RUN_READ)
-    record = _decode_record(await get_redis_client().hgetall(_update_key(update_id)))
+    record = decode_record(await get_redis_client().hgetall(_update_key(update_id)))
     if not record:
         # A completed update's record is gone, and the CLI reads "succeeded" as
         # done rather than erroring — which is the right answer for anything it
@@ -1274,7 +1278,7 @@ async def cancel_update(
     from terrapod.redis.client import get_redis_client
 
     redis = get_redis_client()
-    record = _decode_record(await redis.hgetall(_update_key(update_id)))
+    record = decode_record(await redis.hgetall(_update_key(update_id)))
     required = _KIND_CAPABILITY.get(record.get("kind", "")) if record else None
     if required is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown update")

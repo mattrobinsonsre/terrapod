@@ -384,6 +384,58 @@ async def _enqueue_drift_completed(run: Run) -> None:
         logger.warning("Failed to enqueue drift completion", error=str(e))
 
 
+async def _enqueue_pulumi_run_ended(db: AsyncSession, run: Run) -> None:
+    """Ask for this run's Pulumi update to be ended, now the run is over (#1882).
+
+    An agent-mode Pulumi run drives Terrapod's own Pulumi service surface, so it
+    holds an update lease and, once it is past preview, the stack. A run that
+    ends without its CLI completing the update leaves both held until the sweep
+    notices the lease has lapsed — up to a poll interval during which the
+    workspace lock holds the next apply back. Terrapod already knows the Job is
+    gone at this point, so it need not wait to be told again.
+
+    Three gates, cheapest first, so a Terraform-only deployment pays nothing:
+
+    - the **engine gate** (#1429), which also decides whether the handler is
+      registered at all — enqueuing while it is off would push items nothing
+      drains;
+    - **not plan-only**, because a preview takes neither the stack mutex nor the
+      workspace lock, and `_runner_caps_on` grants a plan-only run no capability
+      to begin anything else;
+    - the **workspace's engine**, which is where a run's engine is recorded
+      (#1536). `db.get` is identity-mapped, so this shares the row with the
+      blocks below rather than costing a second read.
+
+    Deliberately a triggered task rather than inline work: promoting a checkpoint
+    and releasing a lock both commit, and the not-ours path rolls back — on this
+    session that would commit the run transition early and, worse, could roll it
+    back mid-flight. The handler gets its own session, the same way every other
+    side effect enqueued from here does.
+
+    Best-effort by construction: a failed enqueue is logged and the run
+    transition carries on, with the sweep still the backstop.
+    """
+    from terrapod.services.engine_gating import engine_enabled
+    from terrapod.services.scheduler import enqueue_trigger
+
+    try:
+        if not engine_enabled("pulumi") or run.plan_only:
+            return
+        ws = await db.get(Workspace, run.workspace_id)
+        if ws is None or ws.engine != "pulumi":
+            return
+        from terrapod.services.pulumi_update_locks import RUN_ENDED_TRIGGER
+
+        await enqueue_trigger(
+            RUN_ENDED_TRIGGER,
+            {"run_id": str(run.id), "workspace_id": str(run.workspace_id)},
+            dedup_key=f"pulumi-run-ended:{run.id}",
+            dedup_ttl=60,
+        )
+    except Exception as e:  # noqa: BLE001 — never break the transition; the sweep still runs
+        logger.warning("Failed to enqueue pulumi run-ended", run_id=str(run.id), error=str(e))
+
+
 async def _publish_run_available(run: Run) -> None:
     """Publish a run_available event to every candidate pool's SSE channel.
 
@@ -1180,6 +1232,13 @@ async def transition_run(
             ws.lifecycle_state = "archived"
             kind = "autodiscovery" if run.source == "autodiscovery-lifecycle" else "catalog"
             ws.lifecycle_reason = f"{kind} destroy completed — archived"
+
+    # An agent Pulumi run that ended without its CLI completing the update leaves
+    # the stack held (#1882). Every terminal state, `applied` included: a CLI that
+    # died just after its last checkpoint leaves the same residue as one that was
+    # killed, and the handler is a no-op when the update was completed properly.
+    if target_status in TERMINAL_STATES:
+        await _enqueue_pulumi_run_ended(db, run)
 
     # Enqueue notification for this status change
     await _enqueue_notification(run, target_status)

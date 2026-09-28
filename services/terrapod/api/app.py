@@ -132,13 +132,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # releases the lock of one whose CLI died and stopped renewing its lease.
     # Registered only with the engine on, like every Pulumi surface (#1429).
     if _engine_enabled("pulumi"):
-        from terrapod.services.pulumi_update_locks import sweep_abandoned_updates
+        from terrapod.services.pulumi_update_locks import (
+            RUN_ENDED_TRIGGER,
+            handle_run_ended,
+            sweep_abandoned_updates,
+        )
 
         register_periodic_task(
             "pulumi_update_sweep",
             interval_seconds=60,
             handler=sweep_abandoned_updates,
             description="Release the workspace lock of an abandoned local Pulumi update",
+        )
+        # The sweep above infers an update's death from a lapsed lease. For an
+        # agent run Terrapod knows the Job is gone, so it ends that run's update
+        # at once rather than a poll interval later (#1882). Registered inside
+        # the same gate: with the engine off nothing enqueues these, and an
+        # unregistered type would only log "no handler".
+        register_trigger_handler(
+            RUN_ENDED_TRIGGER,
+            handler=handle_run_ended,
+            description="End the Pulumi update an agent run left behind when it ended",
         )
 
     if settings.vcs.enabled:
