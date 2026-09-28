@@ -513,8 +513,23 @@ class TestTheLeaseIsRenewed:
 
 
 class TestCompletingReleasesTheWorkspace:
-    @pytest.mark.parametrize("kind,releases", [("update", True), ("preview", False)])
-    async def test_the_workspace_lock_goes_with_the_update(self, kind, releases) -> None:
+    @pytest.mark.parametrize(
+        "record,releases",
+        [
+            # What `_begin_update` writes for each caller: a local update takes
+            # the workspace lock, a preview takes nothing, and an agent run takes
+            # only the mutex (#1881).
+            ({"kind": "update", "workspace_lock": "yes"}, True),
+            ({"kind": "preview", "workspace_lock": "no"}, False),
+            ({"kind": "update", "workspace_lock": "no"}, False),
+        ],
+        ids=["local-update", "preview", "agent-update"],
+    )
+    async def test_it_releases_exactly_what_the_update_took(self, record, releases) -> None:
+        """Releasing a lock this update never took is not merely wasted work:
+        `release_workspace_lock` rolls back when the lock is not its own, and a
+        rollback expires every ORM object on the session — so the `ws.name` read
+        just below would raise `MissingGreenlet`. That was a live 500."""
         from terrapod.api.routers.pulumi_service import complete_update
 
         ws = _stack_ws()
@@ -523,7 +538,7 @@ class TestCompletingReleasesTheWorkspace:
         release = AsyncMock(return_value=True)
         with (
             patch("terrapod.redis.client.get_redis_client", return_value=redis),
-            patch(f"{MOD}._require_lease", AsyncMock(return_value=({"kind": kind}, ws))),
+            patch(f"{MOD}._require_lease", AsyncMock(return_value=(record, ws))),
             patch(f"{MOD}.release_workspace_lock", release),
             patch(f"{MOD}.promote_checkpoint", AsyncMock(return_value=None)),
         ):
@@ -536,6 +551,34 @@ class TestCompletingReleasesTheWorkspace:
                 AsyncMock(),
             )
         assert release.called is releases
+
+    async def test_an_agent_update_still_promotes_its_checkpoint(self) -> None:
+        """Not taking the workspace lock must not mean not publishing state —
+        promoting the checkpoint is what turns an agent apply into a state
+        version."""
+        from terrapod.api.routers.pulumi_service import complete_update
+
+        redis = AsyncMock()
+        redis.get.return_value = b"u-1"
+        promote = AsyncMock(return_value=None)
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(
+                f"{MOD}._require_lease",
+                AsyncMock(return_value=({"kind": "update", "workspace_lock": "no"}, _stack_ws())),
+            ),
+            patch(f"{MOD}.release_workspace_lock", AsyncMock()),
+            patch(f"{MOD}.promote_checkpoint", promote),
+        ):
+            await complete_update(
+                "default",
+                "proj",
+                "dev",
+                "u-1",
+                _lease_request({"status": "succeeded"}),
+                AsyncMock(),
+            )
+        promote.assert_awaited_once()
 
 
 class TestCancel:
@@ -572,7 +615,14 @@ class TestCancel:
 
         ws = _stack_ws()
         redis = AsyncMock()
-        redis.hgetall.return_value = {"kind": "update", "workspace_id": str(ws.id), "lease": "l"}
+        redis.hgetall.return_value = {
+            "kind": "update",
+            "workspace_id": str(ws.id),
+            "lease": "l",
+            # A local update, so it took the workspace lock and cancelling gives
+            # it back. An agent run's record says "no" and this releases nothing.
+            "workspace_lock": "yes",
+        }
         redis.get.return_value = b"u-1"
         release = AsyncMock(return_value=True)
         with (

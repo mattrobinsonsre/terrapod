@@ -925,6 +925,16 @@ async def _begin_update(
             "kind": kind,
             "status": "not-started",
             "actor": user.email,
+            # Whether this update took the workspace lock, so the calls that end
+            # it release exactly what was taken. An agent run takes only the
+            # mutex (see the docstring), and a release it never took is not
+            # merely wasted: `release_workspace_lock` rolls back when the lock
+            # is not its own, and a rollback expires every ORM object on the
+            # session — so the caller's `ws` then raises `MissingGreenlet` on
+            # the next attribute read. Recorded rather than re-derived, because
+            # the calls that end an update authenticate by lease and have no
+            # user to ask.
+            "workspace_lock": "no" if (kind == "preview" or is_runner) else "yes",
         },
     )
     await redis.expire(_update_key(update_id), LEASE_TTL_SECONDS)
@@ -1172,6 +1182,12 @@ async def complete_update(
 
     record, ws = await _require_lease(request, update_id, db, f"{org}/{project}/{stack}")
     body = await read_body(request)
+    # Read before anything commits or rolls back. `release_workspace_lock` rolls
+    # back when the lock is not this update's, and a rollback expires every ORM
+    # object on the session — so a later `ws.name` would try to refresh it and
+    # raise `MissingGreenlet`. Holding the two values makes the rest of this
+    # function independent of the session's state.
+    ws_id, ws_name = ws.id, ws.name
     if record.get("kind") != "preview":
         await promote_checkpoint(db, ws, update_id)
 
@@ -1180,14 +1196,16 @@ async def complete_update(
     # Release only if this update still holds it: a lease that expired may have
     # been replaced by a newer update, and deleting that one's lock would let a
     # third start alongside it.
-    if text_of(await redis.get(_stack_lock_key(str(ws.id)))) == update_id:
-        await redis.delete(_stack_lock_key(str(ws.id)))
-    if record.get("kind") != "preview":
-        await release_workspace_lock(db, ws.id, update_id)
+    if text_of(await redis.get(_stack_lock_key(str(ws_id)))) == update_id:
+        await redis.delete(_stack_lock_key(str(ws_id)))
+    # Only what this update actually took (#1881): an agent run holds the mutex
+    # and not the workspace lock.
+    if record.get("workspace_lock") == "yes":
+        await release_workspace_lock(db, ws_id, update_id)
 
     logger.info(
         "pulumi_update_completed",
-        stack=ws.name,
+        stack=ws_name,
         update_id=update_id,
         status=body.get("status"),
         kind=record.get("kind"),
@@ -1264,16 +1282,21 @@ async def cancel_update(
     if record.get("workspace_id") != str(ws.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown update")
 
+    # Held before anything commits or rolls back, for the reason given in
+    # `complete_update`: a rollback inside the release expires every ORM object
+    # on the session, and a later `ws.name` would then raise `MissingGreenlet`.
+    ws_id, ws_name = ws.id, ws.name
     await redis.delete(_update_key(update_id))
     if record.get("kind") != "preview":
         await promote_checkpoint(db, ws, update_id)
-    if text_of(await redis.get(_stack_lock_key(str(ws.id)))) == update_id:
-        await redis.delete(_stack_lock_key(str(ws.id)))
-    if record.get("kind") != "preview":
-        await release_workspace_lock(db, ws.id, update_id)
+    if text_of(await redis.get(_stack_lock_key(str(ws_id)))) == update_id:
+        await redis.delete(_stack_lock_key(str(ws_id)))
+    # Only what this update actually took (#1881).
+    if record.get("workspace_lock") == "yes":
+        await release_workspace_lock(db, ws_id, update_id)
     logger.info(
         "pulumi_update_cancelled",
-        stack=ws.name,
+        stack=ws_name,
         update_id=update_id,
         kind=record.get("kind"),
         actor=user.email,
