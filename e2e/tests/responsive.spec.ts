@@ -193,6 +193,33 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
+  test('a variable this engine never reads is flagged at phone width (#1565)', async ({ page }) => {
+    // The whole point of `applies-to-engine` is that the mismatch is surfaced
+    // rather than refused (#1407 §6) — so the badge is primary signal, and
+    // dropping it on a phone would restore exactly the silence being fixed.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespvareng'))
+    // A Terraform workspace: the API stores pulumi_config here quite happily,
+    // and nothing at run time will ever read it.
+    const seed = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/vars`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        data: {
+          type: 'vars',
+          attributes: { key: 'aws:region', category: 'pulumi_config', value: 'eu-west-1' },
+        },
+      }),
+    })
+    expect(seed.status).toBe(201)
+
+    await page.goto(`/workspaces/${wsId}?tab=variables`)
+    const card = page.locator('li').filter({ hasText: 'aws:region' })
+    await expect(card).toBeVisible({ timeout: 15_000 })
+    await expect(card.getByTestId('var-not-consumed')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('variable-set variables adapt to mobile (#1439)', async ({ page }) => {
     // Seeded with a real variable: on an empty set the page renders an empty
     // state and there is no table in the DOM at all, so the assertion would

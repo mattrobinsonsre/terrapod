@@ -41,6 +41,7 @@ export function VariableEditPanel({
   onSave,
   onCancel,
   vaultCheckUrl,
+  engine,
 }: {
   idPrefix: string
   state: VariableEditState
@@ -50,6 +51,11 @@ export function VariableEditPanel({
   vaultDefaultInstance: string
   /** The reference-check endpoint for this workspace or variable set (#1663). */
   vaultCheckUrl?: string
+  /**
+   * The owning workspace's engine, which decides whether `pulumi_config` is
+   * offered (#1565). Absent for a variable set, which has no single engine.
+   */
+  engine?: string
   saving: boolean
   onSave: () => void
   onCancel: () => void
@@ -62,6 +68,14 @@ export function VariableEditPanel({
   // than only in the caller's gate.
   const isGitCat = state.category === 'git_http_auth' || state.category === 'git_ssh_auth'
   const isVault = state.source === 'vault' && !isGitCat
+  // The API accepts pulumi_config on any workspace — engine mismatch is
+  // deliberately permissive (#1407 §6) — but offering it on a Terraform
+  // workspace only invites a variable that is stored and never read. A variable
+  // set has no single engine, so `engine` is absent there and the option
+  // stands. An existing pulumi_config variable always keeps its option, or the
+  // select would silently display a category other than the one stored.
+  const offerPulumiConfig =
+    engine === undefined || engine === 'pulumi' || state.category === 'pulumi_config'
 
   return (
     <div className="space-y-4">
@@ -88,6 +102,9 @@ export function VariableEditPanel({
           >
             <option value="terraform">terraform{/* i18n-ignore: category value */}</option>
             <option value="env">env{/* i18n-ignore: category value */}</option>
+            {offerPulumiConfig && (
+              <option value="pulumi_config">{t('categoryPulumiConfig')}</option>
+            )}
             <option value="git_http_auth">Git HTTPS credential{/* i18n-ignore: category value */}</option>
             <option value="git_ssh_auth">Git SSH credential{/* i18n-ignore: category value */}</option>
           </select>

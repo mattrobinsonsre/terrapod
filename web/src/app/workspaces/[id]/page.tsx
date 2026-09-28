@@ -146,6 +146,13 @@ interface Variable {
     description: string
     /** "static" or "vault" (#1439). */
     'value-source'?: string
+    /**
+     * False when this workspace's engine never reads this category — a
+     * pulumi_config variable on a Terraform workspace, or the reverse (#1565).
+     * Absent from an older API, which is why the check below is `=== false`
+     * rather than falsy: unknown must not read as "not used".
+     */
+    'applies-to-engine'?: boolean
   }
 }
 
@@ -3361,6 +3368,10 @@ function WorkspaceDetailContent() {
                     <select id="var-cat" value={varCategory} onChange={(e) => { setVarCategory(e.target.value); if (e.target.value === 'git_http_auth') ensureVcsConnections() }} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="terraform">Terraform</option>
                       <option value="env">{t('variables.categoryEnv')}</option>
+                      {/* Pulumi stack config. Only offered on a Pulumi
+                          workspace: the API would accept it anywhere (#1407 §6)
+                          but nothing would ever read it. */}
+                      {isPulumi && <option value="pulumi_config">{t('variables.categoryPulumiConfig')}</option>}
                       <option value="git_http_auth">Git HTTPS credential</option>
                       <option value="git_ssh_auth">Git SSH credential</option>
                     </select>
@@ -3520,6 +3531,7 @@ function WorkspaceDetailContent() {
                             <VariableEditPanel
                               idPrefix={`edit-${v.id}`}
                               vaultCheckUrl={vaultCheckUrl}
+                              engine={attrs.engine || 'terraform'}
                               state={editPanelState}
                               onChange={patchEditPanel}
                               vaultAvailable={vaultOfferable}
@@ -3540,11 +3552,18 @@ function WorkspaceDetailContent() {
                             : v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              v.attributes.category === 'terraform' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
-                            }`}>
-                              {v.attributes.category}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                v.attributes.category === 'terraform' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
+                              }`}>
+                                {v.attributes.category}
+                              </span>
+                              {v.attributes['applies-to-engine'] === false && (
+                                <span data-testid="var-not-consumed" className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/40 text-amber-300">
+                                  {t('variables.notUsedByEngine')}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           {perms['can-update-variable'] && (
                             <td className="px-4 py-3 text-end">
@@ -3572,6 +3591,7 @@ function WorkspaceDetailContent() {
                       <VariableEditPanel
                           idPrefix={`medit-${v.id}`}
                           vaultCheckUrl={vaultCheckUrl}
+                          engine={attrs.engine || 'terraform'}
                           state={editPanelState}
                           onChange={patchEditPanel}
                           vaultAvailable={vaultOfferable}
@@ -3591,6 +3611,16 @@ function WorkspaceDetailContent() {
                             {v.attributes.category}
                           </span>
                         </div>
+                        {/* On its own line rather than beside the category
+                            pill: at phone width a long key already crowds that
+                            row, and this is signal that must not be dropped. */}
+                        {v.attributes['applies-to-engine'] === false && (
+                          <div className="mb-1.5">
+                            <span data-testid="var-not-consumed" className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/40 text-amber-300">
+                              {t('variables.notUsedByEngine')}
+                            </span>
+                          </div>
+                        )}
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">
                           {v.attributes['value-source'] === 'vault'
                             ? <VaultValueDisplay value={v.attributes.value} varKey={v.attributes.key} />

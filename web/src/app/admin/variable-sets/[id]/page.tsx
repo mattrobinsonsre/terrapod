@@ -690,6 +690,11 @@ export default function VariableSetDetailPage() {
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="terraform">{t('detail.categoryTerraform')}</option>
                       <option value="env">{t('detail.categoryEnv')}</option>
+                      {/* Unconditional here: a set is org-scoped and reaches
+                          workspaces on either engine, so there is no single
+                          engine to gate on (#1565). Which variables a run
+                          actually reads is decided by the engine that runs. */}
+                      <option value="pulumi_config">{t('detail.categoryPulumiConfig')}</option>
                       <option value="git_http_auth">Git HTTPS credential</option>
                       <option value="git_ssh_auth">Git SSH credential</option>
                     </select>
