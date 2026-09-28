@@ -99,6 +99,10 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "terragrunt_enabled": ws.terragrunt_enabled,
         "terragrunt_version": ws.terragrunt_version,
         "working_directory": ws.working_directory,
+        # Identity, not decoration (#1570): a restored Pulumi workspace without
+        # its stack addresses different state, and would collide with its own
+        # siblings in the same directory on the (directory, stack) lookup.
+        "stack": ws.stack,
         "var_files": list(ws.var_files or []),
         "resource_cpu": ws.resource_cpu,
         "parallelism": ws.parallelism,
@@ -562,6 +566,7 @@ async def restore_workspace(
         terragrunt_enabled=bool(settings.get("terragrunt_enabled")),
         terragrunt_version=settings.get("terragrunt_version") or "1.0",
         working_directory=settings.get("working_directory") or "",
+        stack=settings.get("stack"),
         var_files=list(settings.get("var_files") or []),
         resource_cpu=settings.get("resource_cpu") or "1",
         parallelism=settings.get("parallelism") or DEFAULT_PARALLELISM,
