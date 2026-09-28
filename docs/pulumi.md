@@ -214,6 +214,38 @@ Two things follow that a backend private to the Job could not offer:
   workspace's remote-state consumer allowlist — the same grant that authorizes
   `terraform_remote_state`. See [Remote state](remote-state.md).
 
+## Drift detection
+
+Drift detection works on a Pulumi workspace the same way it does on a Terraform
+one: enable it per workspace, and Terrapod queues a plan-only run on the
+interval, then sets the workspace's drift status from what that run found.
+
+The check is **`pulumi preview --refresh`**. The refresh is the whole point:
+`pulumi preview` on its own compares your program against the state Pulumi has
+stored, so a resource someone changed in the cloud console still matches that
+stored state and the preview reports nothing. `--refresh` reads each resource
+back from its provider first, so the comparison is against the world. Refresh is
+already Terrapod's default for every run, so a drift run gets it without asking.
+
+`--expect-no-changes` is deliberately not used, though it is the more obvious
+flag. It makes the CLI exit non-zero when anything differs, which would file
+every drifted workspace as an **errored** run rather than a **drifted** one, and
+the badge exists to tell those apart. The preview's own change report is the
+signal instead.
+
+Two consequences worth knowing:
+
+- **Drift-ignore rules do not apply to Pulumi workspaces**, and the field is
+  hidden on them. The rules are globs over Terraform attribute paths
+  (`aws_instance.web.tags.LastScanned`), and a Pulumi preview produces no such
+  document — so a rule written there would silently match nothing. Until they
+  are defined in URN terms, a Pulumi workspace reports drift unfiltered.
+- **Refresh noise counts as drift.** On Terraform, a provider that rewrites a
+  timestamp on every read is what drift-ignore rules exist to suppress; without
+  them, a Pulumi stack whose provider does that reads as permanently drifted.
+  If that is your stack, the honest answer today is to leave drift detection off
+  on it rather than to learn to ignore the badge.
+
 ## Where Pulumi is not coerced, and why
 
 - **A Pulumi agent apply is coupled to API availability; a Terraform one is

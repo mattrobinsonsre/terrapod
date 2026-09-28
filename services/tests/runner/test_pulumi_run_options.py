@@ -154,6 +154,44 @@ class TestRefresh:
         assert "--refresh=false" in _argv(_env({"refresh": False}, "apply"), clean_env, update=True)
 
 
+class TestADriftRunComparesAgainstRealInfrastructure:
+    """#1561: refresh is what makes a Pulumi drift check mean anything.
+
+    `pulumi preview` on its own compares the program against the stack's STORED
+    state, so a resource changed out of band matches the state Pulumi holds and
+    the preview reports no changes — a drifted workspace reading clean, which is
+    the one direction drift detection must never fail in. `--refresh` reads each
+    resource back from its provider first, so the comparison is against the
+    world. That is the decision this issue asked for: `preview --refresh`, not
+    `refresh --preview-only`, because the preview is also what reports resource
+    counts and the digest the run page shows.
+
+    `drift_detection_service` creates its run without mentioning refresh, so the
+    run carries `Run.refresh`'s default of True and lands here as an empty attrs
+    dict. These pin the whole path from that silence to the flag.
+    """
+
+    def test_a_drift_run_refreshes_without_being_asked(self, clean_env):
+        drift_attrs = {"plan-only": True}
+        assert "--refresh=true" in _argv(_env(drift_attrs), clean_env)
+
+    def test_nothing_about_being_plan_only_turns_it_off(self, clean_env):
+        # Belt and braces: a plan-only run is the shape every drift check takes,
+        # so an optimisation that skipped refresh for "read-only" runs would
+        # silently blind drift detection while every test above still passed.
+        assert "--refresh=false" not in _argv(_env({"plan-only": True}), clean_env)
+
+    def test_the_signal_is_the_previews_own_change_report(self, clean_env):
+        """No `--expect-no-changes`, deliberately.
+
+        It makes the CLI exit non-zero when anything differs, which would turn
+        every drifted workspace into an `errored` run rather than a `drifted`
+        one — losing the distinction the badge exists to draw. `has_changes`
+        from the event log (#1560) already carries the answer.
+        """
+        assert "--expect-no-changes" not in _argv(_env({"plan-only": True}), clean_env)
+
+
 class TestTheHooksARunGets:
     """A workspace's hooks are the workspace's, whatever engine it uses."""
 
