@@ -316,6 +316,18 @@ class Workspace(Base):
     terragrunt_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     terragrunt_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.0")
     working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
+    #: The Pulumi stack this workspace is, when it is one (#1570). NULL for
+    #: Terraform, and for any Pulumi workspace created before this column.
+    #:
+    #: Stored rather than parsed out of the `project::stack` name because the
+    #: lookups that need it are SQL `WHERE` clauses -- autodiscovery's
+    #: reuse-by-directory and the lifecycle service's resolve-directory-to-
+    #: workspace. A Pulumi directory normally holds several stacks, so those
+    #: queries match several rows on the directory alone; splitting a name in
+    #: SQL is neither portable nor safe, and a rename would silently change
+    #: what the destroy path believes it is looking at.
+    stack: Mapped[str | None] = mapped_column(String(255), nullable=True)
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     lock_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Why the workspace is locked and who locked it (#1705). Set when a lock is
@@ -1381,6 +1393,13 @@ class AutodiscoveryRule(Base):
     #: what it creates.
     engine: Mapped[str] = mapped_column(
         String(32), nullable=False, default="terraform", server_default="terraform"
+    )
+
+    #: Pulumi's bind-plan setting, templated onto every workspace this rule
+    #: creates (#1813). Meaningful only on a Pulumi rule; the API refuses it on
+    #: a Terraform one rather than storing a value that could never apply.
+    pulumi_bind_plan: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa.false()
     )
 
     # Match

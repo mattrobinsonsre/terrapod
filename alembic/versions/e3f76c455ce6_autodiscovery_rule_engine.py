@@ -53,8 +53,22 @@ def upgrade() -> None:
         "workspaces",
         sa.Column("stack", sa.String(length=255), nullable=True),
     )
+    # A rule can now be Pulumi, so it can template Pulumi's own setting. This
+    # is what clears the last of #1813: before the engine column, templating it
+    # would have stored a value that could never apply to anything the rule
+    # created, which is what the bulk path answers 422 for.
+    op.add_column(
+        "autodiscovery_rules",
+        sa.Column(
+            "pulumi_bind_plan",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.false(),
+        ),
+    )
 
 
 def downgrade() -> None:
+    op.drop_column("autodiscovery_rules", "pulumi_bind_plan")
     op.drop_column("workspaces", "stack")
     op.drop_column("autodiscovery_rules", "engine")

@@ -503,6 +503,13 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
     #: template column means adding it here and passing it through; that is the
     #: point of the test.
     TEMPLATED = (
+        # The engine the rule discovers is the engine its workspaces run
+        # (#1570) -- a rule that found `Pulumi.<stack>.yaml` and created a
+        # Terraform workspace would produce something that cannot run it.
+        "engine",
+        # Pulumi's own setting, templatable now that a rule has an engine
+        # (#1813). On a Terraform rule the API refuses it.
+        "pulumi_bind_plan",
         "execution_mode",
         "execution_backend",
         "engine_version",
@@ -575,10 +582,12 @@ class TestEveryWorkspaceSettingIsTemplatedOrLedgered:
             "computed at materialisation — scoped to the discovered directory, so a "
             "templated value would break the poller's targeting"
         ),
-        "pulumi_bind_plan": "a rule has no engine; everything it creates is Terraform/OpenTofu",
         "working_directory": "the discovered directory itself",
+        "stack": (
+            "derived at materialisation from the discovered `Pulumi.<stack>.yaml`, "
+            "not templated — one rule discovers many stacks (#1570)"
+        ),
         "name": "derived from the rule's name template and the directory",
-        "engine": "a rule has no engine",
         "vcs_connection_id": "the rule's own connection",
         "vcs_repo_url": "the rule's own repo",
         "vcs_branch": "the rule's own branch",

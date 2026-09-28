@@ -47,6 +47,12 @@ NEVER_BULK_SETTABLE: dict[str, str] = {
         "identity, not a setting — a workspace holds state produced by its engine, "
         "so changing it is a migration rather than a settings write"
     ),
+    "stack": (
+        "identity, not a setting — the Pulumi stack this workspace IS (#1570). "
+        "Like `name`, it is unique per workspace, so one value across a match "
+        "set cannot be written; and it addresses the state, so changing it "
+        "would point the workspace at different infrastructure"
+    ),
     "owner_email": "ownership grants workspace admin; platform-admin only, via the workspace API",
     # Where this workspace's code lives. Necessarily per-workspace: pointing a
     # match set at one repo, branch or subdirectory would make every one of them

@@ -215,6 +215,21 @@ def derive_root_directory(file_path: str) -> str:
 _NAME_SANITISE_RE = re.compile(r"[^A-Za-z0-9_-]+")
 
 
+def candidate_of(rule: AutodiscoveryRule, path: str) -> tuple[str, str | None]:
+    """The (directory, stack) unit this path belongs to, for `rule` (#1570).
+
+    One place, because the preview and the create loop MUST agree: a preview
+    that groups by directory while creation groups by (directory, stack) would
+    show one workspace and make several.
+
+    `stack` is None for Terraform, where the directory is the whole unit.
+    """
+    root = derive_root_directory(path)
+    if (getattr(rule, "engine", "") or "terraform") == "pulumi":
+        return root, pulumi_stack_of(path)
+    return root, None
+
+
 def derive_pulumi_workspace_name(root_directory: str, stack: str) -> str:
     """`project::stack` for a discovered Pulumi stack (#1570).
 
@@ -277,6 +292,7 @@ async def find_or_autocreate_workspace(
     root_directory: str,
     baseline_sha: str | None = None,
     pr_number: int | None = None,
+    stack: str | None = None,
 ) -> tuple[Workspace, bool]:
     """Look up the workspace this rule + directory should map to, or
     create it if it doesn't exist.
@@ -304,18 +320,30 @@ async def find_or_autocreate_workspace(
     # working_directory) tuple? If so we reuse it regardless of how it
     # was created (rule, manual, etc.) — autodiscovery never replaces
     # an explicit workspace.
+    #
+    # The stack is part of that tuple, not an afterthought (#1570). A Pulumi
+    # directory normally holds several stacks, so filtering on the directory
+    # alone would match every sibling stack at once and `scalar_one_or_none`
+    # would RAISE rather than reuse. `stack IS NULL` is the Terraform case and
+    # every workspace that predates the column.
+    stack_filter = Workspace.stack.is_(None) if stack is None else Workspace.stack == stack
     existing = await db.execute(
         select(Workspace).where(
             Workspace.vcs_connection_id == rule.vcs_connection_id,
             Workspace.vcs_repo_url == rule.repo_url,
             Workspace.working_directory == root_directory,
+            stack_filter,
         )
     )
     ws = existing.scalar_one_or_none()
     if ws is not None:
         return ws, False
 
-    name = derive_workspace_name(rule, root_directory)
+    name = (
+        derive_pulumi_workspace_name(root_directory, stack)
+        if stack is not None
+        else derive_workspace_name(rule, root_directory)
+    )
 
     # Lookup #2: the derived name might collide with an unrelated
     # workspace (different repo or working_directory) — refuse and let
@@ -350,6 +378,16 @@ async def find_or_autocreate_workspace(
     ws = Workspace(
         id=uuid.uuid4(),  # generate_uuid7 default also fine; explicit for log clarity
         name=name,
+        # The engine the rule discovers is the engine the workspace runs. A
+        # rule that finds `Pulumi.<stack>.yaml` and then created a Terraform
+        # workspace would produce something that cannot run what was found.
+        engine=getattr(rule, "engine", "") or "terraform",
+        # NULL for Terraform, so the (connection, repo, directory, stack)
+        # lookup above keeps matching exactly one workspace per directory.
+        stack=stack,
+        # Pulumi's own setting (#1813). A Terraform rule cannot set it -- the
+        # API refuses -- so the default carries through untouched there.
+        pulumi_bind_plan=getattr(rule, "pulumi_bind_plan", False),
         execution_mode=rule.execution_mode,
         execution_backend=rule.execution_backend,
         engine_version=rule.engine_version,
@@ -519,16 +557,23 @@ async def preview_for_paths(
     in the same directory only appear once, matching the materialise path.
     """
     # Same grouping rule as autodiscover_for_paths.
-    roots: dict[str, str] = {}  # root_directory -> workspace_name
+    # Keyed by (root, stack), not root: a Pulumi directory holding
+    # `Pulumi.dev.yaml` and `Pulumi.prod.yaml` is TWO workspaces, and keying by
+    # directory alone would preview one and create two (#1570).
+    roots: dict[tuple[str, str | None], str] = {}
     for path in file_paths:
         if not rule.enabled:
             break
         if not rule_claims_path(rule, path):
             continue
-        root = derive_root_directory(path)
-        if root in roots:
+        root, stack = candidate_of(rule, path)
+        if (root, stack) in roots:
             continue
-        roots[root] = derive_workspace_name(rule, root)
+        roots[(root, stack)] = (
+            derive_pulumi_workspace_name(root, stack)
+            if stack is not None
+            else derive_workspace_name(rule, root)
+        )
 
     if not roots:
         return []
@@ -541,7 +586,7 @@ async def preview_for_paths(
         select(Workspace.working_directory, Workspace.autodiscovery_rule_id).where(
             Workspace.vcs_connection_id == rule.vcs_connection_id,
             Workspace.vcs_repo_url == rule.repo_url,
-            Workspace.working_directory.in_(list(roots.keys())),
+            Workspace.working_directory.in_([r for r, _ in roots]),
         )
     )
     dir_bound: dict[str, uuid.UUID | None] = {row[0]: row[1] for row in dir_bound_result.all()}
@@ -552,7 +597,7 @@ async def preview_for_paths(
     name_taken: set[str] = {row[0] for row in name_taken_result.all()}
 
     preview: list[dict[str, Any]] = []
-    for root, name in roots.items():
+    for (root, _stack), name in roots.items():
         if root in dir_bound:
             # Reuse-by-directory: scan no-ops, no workspace created.
             collision = True
@@ -609,28 +654,28 @@ async def autodiscover_for_paths(
     skip_roots = skip_roots or set()
     # Group `(rule, root_directory)` so multiple files in the same
     # directory only fire once.
-    matches: dict[tuple[uuid.UUID, str], AutodiscoveryRule] = {}
+    matches: dict[tuple[uuid.UUID, str, str | None], AutodiscoveryRule] = {}
     for path in changed_files:
         for rule in rules:
             if not rule.enabled:
                 continue
             if not rule_claims_path(rule, path):
                 continue
-            root = derive_root_directory(path)
+            root, stack = candidate_of(rule, path)
             if root in skip_roots:
                 # Rename target — handled by the merge-time in-place
                 # move, not by speculative creation (#314).
                 break
-            matches[(rule.id, root)] = rule
+            matches[(rule.id, root, stack)] = rule
             # First matching rule wins — don't fan out to multiple
             # rules for the same file.
             break
 
     created: list[Workspace] = []
-    for (_rule_id, root), rule in matches.items():
+    for (_rule_id, root, stack), rule in matches.items():
         try:
             ws, was_created = await find_or_autocreate_workspace(
-                db, rule, root, baseline_sha=baseline_sha, pr_number=pr_number
+                db, rule, root, baseline_sha=baseline_sha, pr_number=pr_number, stack=stack
             )
             if was_created:
                 created.append(ws)
