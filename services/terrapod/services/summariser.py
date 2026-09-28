@@ -627,7 +627,9 @@ async def _load_cost_estimate(run: Run) -> str:
         return ""
 
 
-async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, str, str, str, str]:
+async def _gather_inputs(
+    db: AsyncSession, run: Run, kind: str, ws: Workspace | None = None
+) -> tuple[str, str, str, str, str]:
     """Return ``(primary_input, primary_label, primary_lang, code_context, code_diff)``.
 
     primary_input is the (cleaned) plan JSON for ``plan_summary`` or
@@ -654,8 +656,10 @@ async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, st
         # Terraform plan (#1569). The label is what the prompt shows the model,
         # so getting it wrong asks for a reading of a format the document is
         # not in, and invites Terraform vocabulary for Pulumi work.
-        summary_ws = await db.get(Workspace, run.workspace_id)
-        is_pulumi = ((summary_ws.engine if summary_ws else "") or "").strip().lower() == "pulumi"
+        # The workspace comes from the caller, which already has it — a second
+        # `db.get` here would be a round-trip for a field the caller is holding.
+        engine = getattr(ws, "engine", "") or ""
+        is_pulumi = isinstance(engine, str) and engine.strip().lower() == "pulumi"
         primary_label = "PULUMI_PREVIEW" if is_pulumi else "PLAN_JSON"
         primary_lang = "json"
         try:
@@ -1659,7 +1663,7 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             await _settle_ai_policy_gate(db, run, ws, kind=kind, error=BUDGET_EXHAUSTED_ERROR)
             return
 
-        primary, label, lang, code_context, code_diff = await _gather_inputs(db, run, kind)
+        primary, label, lang, code_context, code_diff = await _gather_inputs(db, run, kind, ws)
         if not primary:
             await _upsert_summary(
                 db,
@@ -2116,7 +2120,9 @@ async def post_followup(
 
     # Build the cacheable prefix — SAME inputs the initial summary
     # used, so the provider's prompt cache serves the prefix hit.
-    primary, label, lang, code_context, code_diff = await _gather_inputs(db, run, plan_summary.kind)
+    primary, label, lang, code_context, code_diff = await _gather_inputs(
+        db, run, plan_summary.kind, workspace
+    )
     if not primary:
         # The CV/log was GC'd or never existed. Record an errored
         # assistant row so the transcript is uniform, commit, surface.

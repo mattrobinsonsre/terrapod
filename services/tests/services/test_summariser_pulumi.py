@@ -76,7 +76,9 @@ class TestTheDigestIsNotPutThroughTerraformsPasses:
         run.workspace_id = "w1"
         run.configuration_version_id = None
         db = AsyncMock()
-        db.get.return_value = MagicMock(engine=engine)
+        # The workspace is passed in by the caller, which already holds it —
+        # `_gather_inputs` does not look it up.
+        ws = MagicMock(engine=engine)
         storage = MagicMock()
         storage.get = AsyncMock(return_value=raw)
         with (
@@ -86,7 +88,7 @@ class TestTheDigestIsNotPutThroughTerraformsPasses:
             patch(f"{MOD}.redact_plan_json", MagicMock(return_value=raw)) as redact,
             patch(f"{MOD}._sensitive_literals", AsyncMock(return_value=[])),
         ):
-            out = await summariser._gather_inputs(db, run, "plan_summary")
+            out = await summariser._gather_inputs(db, run, "plan_summary", ws)
         return out, clean, marked, redact
 
     async def test_a_pulumi_run_skips_them_and_is_labelled_a_preview(self) -> None:
