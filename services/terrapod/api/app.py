@@ -1467,8 +1467,12 @@ def create_application() -> FastAPI:
         )
 
         include_terrapod(pulumi_router)
-        # How an agent-mode Pulumi run hands its stack over (#1576) — gated with
-        # the engine, like the surface above, which such a run never uses.
+        # The stack-handover artifact routes, gated with the engine like the
+        # surface above. An agent run no longer uses them: since #1881 it drives
+        # the service surface directly and its state is checkpointed there, so
+        # nothing fetches or uploads a deployment through these. They are kept
+        # because retiring an API surface is its own decision, not a side effect
+        # of changing where the runner puts its state.
         include_terrapod(pulumi_run_artifacts_router)
 
     # Audit log query endpoint — Terrapod-specific.
