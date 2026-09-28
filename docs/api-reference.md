@@ -1196,6 +1196,24 @@ Returns the **single-workspace resource dependency graph** behind the [State Res
 
 **Required permission:** `state:read` on the workspace (the graph is derived from the secret-bearing state blob, so it requires the same access as downloading raw state).
 
+**Engine-aware (#1568).** A Pulumi workspace's graph is built from its deployment: one node per resource, addressed by URN, carrying the resource `type`, its package as `provider`, and `mode` of `managed` (a provider resource) or `component` (a grouping the program declares). Edges come from each resource's `dependencies`, plus its `parent` where that parent is a real resource — the root `pulumi:pulumi:Stack` is neither drawn nor linked, being the stack itself rather than infrastructure and the parent of everything in it. The response shape is identical for both engines.
+
+### State Outputs
+
+```
+GET /api/v1/workspaces/{workspace_id}/state-outputs
+```
+
+Returns the workspace's **current state outputs**, for either engine: a Pulumi stack's live on the root `pulumi:pulumi:Stack` resource inside its deployment, a Terraform state's at the top level.
+
+**Sensitive values are masked**, arriving as the literal string `"(sensitive)"` — the reader learns the output exists without this becoming a way to read secrets. Pulumi's are recognised by its own ciphertext envelope; Terraform's by the `sensitive` flag the state records.
+
+A workspace with no state yet, a version whose content was never uploaded, or a state declaring no outputs returns `{"outputs": {}}` — not an error.
+
+**Response:** `{"data": {"type": "state-outputs", "attributes": {"outputs": {"<name>": <value>}, "state_version": "sv-...", "serial": N}}}`
+
+**Required permission:** `state:read` on the workspace, the same trust as the state graph and for the same reason.
+
 ### AI Architecture Critique (Terrapod Extension)
 
 State-based, whole-system critique (#1036 Part 2). Reviews the workspace's deployed system **as it exists** — inferred from its current Terraform state (+ the resource graph, the deterministic cost estimate, and the deterministic security-scan findings) and critiqued across resilience / security / cost / well-architected. Distinct from the per-run [Plan Summary](#plan-summary), which reviews a *change*. Enabled by the independent `ai_architecture` config (off by default).

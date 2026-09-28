@@ -58,6 +58,22 @@ def _encode(deployment: Any) -> tuple[bytes, str, str]:
     return payload, md5, hashlib.sha256(payload).hexdigest()
 
 
+def _resource_count(deployment: Any) -> int | None:
+    """How many resources this deployment records (#1568).
+
+    Counted here because this is the one place a deployment is already parsed
+    and about to be written — the alternative is decrypting every stack's whole
+    state later just to print a number in `pulumi stack ls`.
+
+    None for anything that is not a deployment with a resource list, so an
+    unknown count stays distinguishable from a counted zero.
+    """
+    if not isinstance(deployment, dict):
+        return None
+    resources = deployment.get("resources")
+    return len(resources) if isinstance(resources, list) else None
+
+
 async def write_deployment(
     db: AsyncSession,
     ws: Workspace,
@@ -102,6 +118,7 @@ async def write_deployment(
         state_size=len(payload),
         created_by=created_by,
         run_id=run_id,
+        resource_count=_resource_count(deployment),
     )
     db.add(sv)
     await db.flush()

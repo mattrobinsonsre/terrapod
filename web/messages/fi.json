@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "uusin"
     },
+    "stateOutputs": {
+      "title": "Tulosteet",
+      "fromSerial": "Sarjanumero #{serial}",
+      "empty": "Tämä tila ei määrittele tulosteita.",
+      "sensitive": "Arkaluonteinen",
+      "loadFailed": "Tämän työtilan tulosteiden lataaminen epäonnistui."
+    },
     "configurations": {
       "description": "Ladatut lähdearkistot tälle työtilalle, uusimmat ensin. Valitse kaksi riviä vertailua varten.",
       "selectedCount": "{count}/2 valittu",

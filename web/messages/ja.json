@@ -2752,6 +2752,13 @@
       "runner": "ランナー",
       "latest": "最新"
     },
+    "stateOutputs": {
+      "title": "出力",
+      "fromSerial": "シリアル #{serial}",
+      "empty": "この状態には出力が宣言されていません。",
+      "sensitive": "機密",
+      "loadFailed": "このワークスペースの出力の読み込みに失敗しました。"
+    },
     "configurations": {
       "description": "このワークスペースにアップロードされたソースアーカイブ（新しい順）です。2つの行を選択して比較できます。",
       "selectedCount": "{count}/2 選択中",

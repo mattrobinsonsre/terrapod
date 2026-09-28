@@ -2752,6 +2752,13 @@
       "runner": "marklar",
       "latest": "latest"
     },
+    "stateOutputs": {
+      "title": "Marklars",
+      "fromSerial": "Marklar #{serial}",
+      "empty": "This marklar declares no marklars.",
+      "sensitive": "Sensitive",
+      "loadFailed": "Could not load the marklars for this marklar."
+    },
     "configurations": {
       "description": "Uploaded marklar marklars for this marklar, newest first. Pick two marklars to compare.",
       "selectedCount": "{count}/2 selected",

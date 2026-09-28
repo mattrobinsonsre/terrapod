@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "seneste"
     },
+    "stateOutputs": {
+      "title": "Output",
+      "fromSerial": "Serienr. #{serial}",
+      "empty": "Denne tilstand erklærer intet output.",
+      "sensitive": "Følsom",
+      "loadFailed": "Kunne ikke indlæse output for dette arbejdsområde."
+    },
     "configurations": {
       "description": "Uploadede kildearkiver for dette arbejdsområde, nyeste først. Vælg to rækker for at sammenligne.",
       "selectedCount": "{count}/2 valgt",

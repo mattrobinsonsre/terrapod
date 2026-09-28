@@ -645,6 +645,14 @@ class StateVersion(Base):
     md5: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     sha256: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default="")
     state_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: How many resources this version records, when the writer counted them
+    #: (#1568). NULL means "not counted", which is every version written before
+    #: this existed and every Terraform one — distinct from a genuine zero, so
+    #: `pulumi stack ls` can say nothing rather than claim an empty stack.
+    #:
+    #: Stored rather than derived because the alternative is decrypting and
+    #: parsing every stack's whole deployment to print one number in a list.
+    resource_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     run_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("runs.id", ondelete="SET NULL"),

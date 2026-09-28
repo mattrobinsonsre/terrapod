@@ -2752,6 +2752,13 @@
       "runner": "vangwI'",
       "latest": "ram"
     },
+    "stateOutputs": {
+      "title": "chelmey",
+      "fromSerial": "mI'Hom #{serial}",
+      "empty": "Dotlhvam chelmey maQbe'.",
+      "sensitive": "pegh",
+      "loadFailed": "Qumwo'vam chelmey ghelmeH lujpu'."
+    },
     "configurations": {
       "description": "Qumwo'vamvaD lI'lu'pu'bogh mung teywI'mey, chu' wa'DIch. rItlhmeH cha' tlhegh wIv.",
       "selectedCount": "{count}/2 wIvlu'",

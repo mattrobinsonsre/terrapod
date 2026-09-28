@@ -2752,6 +2752,13 @@
       "runner": "러너",
       "latest": "최신"
     },
+    "stateOutputs": {
+      "title": "출력",
+      "fromSerial": "시리얼 #{serial}",
+      "empty": "이 상태는 출력을 선언하지 않습니다.",
+      "sensitive": "민감",
+      "loadFailed": "이 워크스페이스의 출력을 불러오지 못했습니다."
+    },
     "configurations": {
       "description": "이 워크스페이스에 업로드된 소스 아카이브로, 최신순입니다. 비교할 두 행을 선택하세요.",
       "selectedCount": "{count}/2 선택됨",

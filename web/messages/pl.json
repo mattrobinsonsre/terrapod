@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "najnowsza"
     },
+    "stateOutputs": {
+      "title": "Wyjścia",
+      "fromSerial": "Numer seryjny #{serial}",
+      "empty": "Ten stan nie deklaruje żadnych wyjść.",
+      "sensitive": "Wrażliwe",
+      "loadFailed": "Nie udało się wczytać wyjść tego obszaru roboczego."
+    },
     "configurations": {
       "description": "Przesłane archiwa źródłowe dla tego obszaru roboczego, najnowsze na górze. Wybierz dwa wiersze, aby porównać.",
       "selectedCount": "{count}/2 wybrano",

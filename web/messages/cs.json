@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "nejnovější"
     },
+    "stateOutputs": {
+      "title": "Výstupy",
+      "fromSerial": "Serial #{serial}",
+      "empty": "Tento stav nedeklaruje žádné výstupy.",
+      "sensitive": "Citlivé",
+      "loadFailed": "Nepodařilo se načíst výstupy tohoto pracovního prostoru."
+    },
     "configurations": {
       "description": "Nahrané zdrojové archivy pro tento pracovní prostor, nejnovější první. Pro porovnání vyberte dva řádky.",
       "selectedCount": "{count}/2 vybráno",

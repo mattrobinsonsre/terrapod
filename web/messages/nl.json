@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "nieuwste"
     },
+    "stateOutputs": {
+      "title": "Outputs",
+      "fromSerial": "Serienummer #{serial}",
+      "empty": "Deze state declareert geen outputs.",
+      "sensitive": "Gevoelig",
+      "loadFailed": "Kan de outputs van deze workspace niet laden."
+    },
     "configurations": {
       "description": "Geüploade bronarchieven voor deze workspace, nieuwste eerst. Kies twee rijen om te vergelijken.",
       "selectedCount": "{count}/2 geselecteerd",
