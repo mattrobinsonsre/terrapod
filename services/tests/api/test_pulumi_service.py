@@ -581,6 +581,137 @@ class TestCompletingReleasesTheWorkspace:
         promote.assert_awaited_once()
 
 
+class TestAFailureEndingAnUpdateIsNotAnExpiredLease:
+    """#1885. Deleting the update record is what invalidates the lease, so any
+    fallible step after it turns its own failure into `401 Unknown or expired
+    update` on the CLI's retry — naming nothing, and untrue besides. The record
+    therefore dies last.
+
+    The other half of the acceptance, that a lease which really has lapsed still
+    reads as one, is `TestTheSecondAuthScheme.test_an_expired_lease_reads_as_invalid`:
+    that is `_require_lease`'s own behaviour and this change does not touch it.
+    """
+
+    @staticmethod
+    def _deleted(redis: AsyncMock) -> list[str]:
+        return [call.args[0] for call in redis.delete.await_args_list]
+
+    async def test_a_failing_release_leaves_the_lease_intact(self) -> None:
+        """The property the fix turns on: the caller sees `boom`, and because the
+        record survives, its retry is answered by the same real failure rather
+        than by a 401 about a lease that was valid when it arrived."""
+        from terrapod.api.routers.pulumi_service import _update_key, complete_update
+
+        redis = AsyncMock()
+        redis.get.return_value = b"u-1"
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(
+                f"{MOD}._require_lease",
+                AsyncMock(return_value=({"kind": "update", "workspace_lock": "yes"}, _stack_ws())),
+            ),
+            patch(f"{MOD}.promote_checkpoint", AsyncMock(return_value=None)),
+            patch(f"{MOD}.release_workspace_lock", AsyncMock(side_effect=RuntimeError("boom"))),
+        ):
+            with pytest.raises(RuntimeError, match="boom"):
+                await complete_update(
+                    "default",
+                    "proj",
+                    "dev",
+                    "u-1",
+                    _lease_request({"status": "succeeded"}),
+                    AsyncMock(),
+                )
+        assert _update_key("u-1") not in self._deleted(redis)
+
+    async def test_a_failing_promotion_leaves_it_intact_too(self) -> None:
+        """Promotion was always before the delete; this pins it there, since the
+        checkpoint is the only record of what a failed update created (#1564)."""
+        from terrapod.api.routers.pulumi_service import _update_key, complete_update
+
+        redis = AsyncMock()
+        redis.get.return_value = b"u-1"
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(
+                f"{MOD}._require_lease",
+                AsyncMock(return_value=({"kind": "update", "workspace_lock": "yes"}, _stack_ws())),
+            ),
+            patch(f"{MOD}.promote_checkpoint", AsyncMock(side_effect=RuntimeError("nope"))),
+            patch(f"{MOD}.release_workspace_lock", AsyncMock()),
+        ):
+            with pytest.raises(RuntimeError, match="nope"):
+                await complete_update(
+                    "default",
+                    "proj",
+                    "dev",
+                    "u-1",
+                    _lease_request({"status": "succeeded"}),
+                    AsyncMock(),
+                )
+        assert _update_key("u-1") not in self._deleted(redis)
+
+    async def test_the_record_goes_last_of_all_on_the_happy_path(self) -> None:
+        """Ordering, not merely presence: the record must outlive the stack mutex
+        as well, or a failure between the two lands in the same 401."""
+        from terrapod.api.routers.pulumi_service import (
+            _stack_lock_key,
+            _update_key,
+            complete_update,
+        )
+
+        ws = _stack_ws()
+        redis = AsyncMock()
+        redis.get.return_value = b"u-1"
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(
+                f"{MOD}._require_lease",
+                AsyncMock(return_value=({"kind": "update", "workspace_lock": "yes"}, ws)),
+            ),
+            patch(f"{MOD}.promote_checkpoint", AsyncMock(return_value=None)),
+            patch(f"{MOD}.release_workspace_lock", AsyncMock(return_value=True)),
+        ):
+            await complete_update(
+                "default",
+                "proj",
+                "dev",
+                "u-1",
+                _lease_request({"status": "succeeded"}),
+                AsyncMock(),
+            )
+        deleted = self._deleted(redis)
+        assert deleted[-1] == _update_key("u-1")
+        assert _stack_lock_key(str(ws.id)) in deleted
+
+    async def test_cancel_deletes_the_record_first_and_must_keep_doing_so(self) -> None:
+        """The opposite order, deliberately (#1885). `cancel` runs against an
+        update that is still going, and `checkpoint` authenticates through
+        `_require_lease` — so the record is the only thing stopping a checkpoint
+        written after `promote_checkpoint` has run, which nothing would ever
+        promote. Losing state beats a poor error message, and a failure here is
+        collected by the sweep rather than stranded.
+        """
+        from terrapod.api.routers.pulumi_service import _update_key, cancel_update
+
+        ws = _stack_ws()
+        redis = AsyncMock()
+        redis.get.return_value = b"u-1"
+        redis.hgetall.return_value = {
+            "kind": "update",
+            "workspace_id": str(ws.id),
+            "workspace_lock": "yes",
+        }
+        with (
+            patch("terrapod.redis.client.get_redis_client", return_value=redis),
+            patch(f"{MOD}._authorized_stack", AsyncMock(return_value=ws)),
+            patch(f"{MOD}.promote_checkpoint", AsyncMock(return_value=None)),
+            patch(f"{MOD}.release_workspace_lock", AsyncMock(return_value=True)),
+        ):
+            await cancel_update("default", "proj", "dev", "u-1", _user(), AsyncMock())
+        assert self._deleted(redis)[0] == _update_key("u-1")
+
+
 class TestCancel:
     """`pulumi cancel` reads `activeUpdate`, then posts to the update's cancel
     route with the user's token (#1571)."""

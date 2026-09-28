@@ -1223,6 +1223,13 @@ async def complete_update(
     it created (#1564). That happens before the lease is dropped, so if it
     fails the update is still findable, and the sweep promotes it once the
     lease lapses.
+
+    **Nothing fallible happens after the update record is deleted** (#1885).
+    Deleting it is what invalidates the lease, so it is the one step that turns
+    any later failure into `401 Unknown or expired update` on the CLI's retry —
+    a message that names neither what broke nor where, and is false besides.
+    Keeping it last costs nothing: the sweep collects an update abandoned this
+    way once its lease lapses, exactly as it collects one whose CLI died.
     """
     from terrapod.redis.client import get_redis_client
 
@@ -1238,7 +1245,6 @@ async def complete_update(
         await promote_checkpoint(db, ws, update_id)
 
     redis = get_redis_client()
-    await redis.delete(_update_key(update_id))
     # Release only if this update still holds it: a lease that expired may have
     # been replaced by a newer update, and deleting that one's lock would let a
     # third start alongside it.
@@ -1248,6 +1254,15 @@ async def complete_update(
     # and not the workspace lock.
     if record.get("workspace_lock") == "yes":
         await release_workspace_lock(db, ws_id, update_id)
+    # The record dies LAST, and that ordering is the whole of #1885. Every line
+    # above can fail, and while the record stands a failure is reportable: the
+    # 500 names it, and the CLI's retry re-authenticates and is told the same
+    # thing again. Delete it first — as this once did — and the retry finds no
+    # record, so `_require_lease` answers `401 Unknown or expired update`. That
+    # is unhelpful and also untrue, the lease having been valid when the call
+    # arrived; and because it is the last thing the CLI prints, the real error
+    # survives only in the API log. It masked three separate bugs during #1881.
+    await redis.delete(_update_key(update_id))
 
     logger.info(
         "pulumi_update_completed",
@@ -1316,6 +1331,19 @@ async def cancel_update(
     Deleting the record invalidates the lease, so the running CLI's next call is
     a 401 and it stops. Whatever it had checkpointed is kept, as a failed
     update's is (#1564).
+
+    **The delete stays first here, unlike `complete_update` (#1885).** There it
+    moved last so a late failure could not be reported as an expired lease; the
+    same move would be wrong here, for two reasons. The update is still running,
+    and `checkpoint` authenticates through `_require_lease` — so the record is
+    the only thing stopping it writing another checkpoint, and one written after
+    `promote_checkpoint` had already run would be staged against an update
+    nothing will ever promote, which is lost state rather than a bad message. A
+    failure after the delete is also not a dead end: the sweep finds the stack
+    by its `pulumi-update:` lock with no record behind it, promotes, and lets
+    go. Cancel is a person's own command rather than a loop, so that person sees
+    the real 500 on the call they made — the masking `complete_update` suffered
+    needs a retrying caller, and there isn't one.
     """
     from terrapod.redis.client import get_redis_client
 
