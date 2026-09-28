@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Quante operazioni vengono eseguite contemporaneamente (1-256). Predefinito: 10.",
       "engine": "Motore",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Due parti separate da '::' — project::stack. Solo lettere, numeri, trattini e trattini bassi; ogni parte deve iniziare con una lettera o un numero.",
       "bindPlan": "Vincola l''aggiornamento all''anteprima approvata",
       "bindPlanHelp": "Se attivo, l''aggiornamento applica esattamente il piano salvato dall''anteprima, quindi qualsiasi cosa cambiata dopo l''anteprima fa fallire l''aggiornamento invece di essere applicata. Si basa sui piani di aggiornamento di Pulumi, ancora sperimentali. Se disattivo, l''aggiornamento determina da sé le proprie modifiche, come un semplice pulumi up. <docs>Come funzionano le esecuzioni Pulumi</docs>"

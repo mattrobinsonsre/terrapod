@@ -2538,6 +2538,7 @@
       "parallelismTitle": "How many deeds be done at once (1-256). Ten be the default, arr.",
       "engine": "Engine",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Two parts split by '::' — project::stack, matey. Letters, numbers, hyphens and underscores only; each part must start with a letter or number.",
       "bindPlan": "Lash the update to the approved preview",
       "bindPlanHelp": "When she be on, the update hoists exactly the plan the preview stowed away, so anythin'' that shifted since the preview scuttles the update instead o'' bein'' applied. This rests on Pulumi update plans, which be still experimental. When she be off, the update charts its own course, as a plain pulumi up does. <docs>How Pulumi voyages work</docs>"

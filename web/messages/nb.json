@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Hvor mange operasjoner som kjøres samtidig (1-256). Standard 10.",
       "engine": "Motor",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "To deler atskilt av '::' — project::stack. Bare bokstaver, tall, bindestreker og understreker; hver del må begynne med en bokstav eller et tall.",
       "bindPlan": "Lås oppdateringen til den godkjente forhåndsvisningen",
       "bindPlanHelp": "Når dette er på, bruker oppdateringen nøyaktig planen forhåndsvisningen lagret, så alt som har endret seg siden forhåndsvisningen får oppdateringen til å feile i stedet for å bli tatt i bruk. Dette bygger på Pulumis oppdateringsplaner, som fortsatt er eksperimentelle. Når dette er av, finner oppdateringen selv ut av endringene sine, slik en vanlig pulumi up gjør. <docs>Slik fungerer Pulumi-kjøringer</docs>"

@@ -41,6 +41,7 @@ from terrapod.api.routers.workspace_bulk import (
 from terrapod.api.serialization import engine_version_attr
 from terrapod.db.models import AgentPool, AutodiscoveryRule, VCSConnection
 from terrapod.db.session import get_db
+from terrapod.engines import known_engines
 from terrapod.logging_config import get_logger
 from terrapod.services import run_service, workspace_settings
 from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
@@ -74,6 +75,11 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "enabled": rule.enabled,
             "execution-mode": rule.execution_mode,
             "execution-backend": rule.execution_backend,
+            # Which engine this rule discovers, and creates workspaces for
+            # (#1570). A rule is pinned to one; discovering both means two
+            # rules.
+            "engine": getattr(rule, "engine", "") or "terraform",
+            "pulumi-bind-plan": bool(getattr(rule, "pulumi_bind_plan", False)),
             "agent-pool-id": str(rule.agent_pool_id) if rule.agent_pool_id else None,
             "engine-version": rule.engine_version,
             "terraform-version": rule.engine_version,
@@ -260,6 +266,14 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
                 out["agent_pool_id"] = _strip_uuid_prefix(str(v), "apool-")
             except ValueError as e:
                 raise HTTPException(status_code=422, detail="agent-pool-id is not a UUID") from e
+    if "engine" in attrs:
+        eng = str(attrs["engine"] or "").strip().lower()
+        if eng not in known_engines():
+            raise HTTPException(
+                status_code=422,
+                detail="engine must be one of: " + ", ".join(sorted(known_engines())),
+            )
+        out["engine"] = eng
     if "engine-version" in attrs or "terraform-version" in attrs:
         out["engine_version"] = engine_version_attr(attrs, "")
     if "parallelism" in attrs:
@@ -451,6 +465,44 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
                 ),
             )
         out["security_scan_enforcement"] = raw
+
+    # Engine-specific settings, refused rather than stored inert (#1570/#1813).
+    #
+    # The effective engine is the one being set, or the rule's existing one on a
+    # partial update -- reading only `attrs` would let a PATCH that supplies
+    # `pulumi-bind-plan` alone sail past on a Terraform rule.
+    effective_engine = out.get(
+        "engine", (getattr(existing, "engine", "") or "terraform") if existing else "terraform"
+    )
+    if "pulumi-bind-plan" in attrs:
+        if effective_engine != "pulumi":
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "pulumi-bind-plan applies only to a Pulumi rule; this rule's "
+                    f"engine is '{effective_engine}'"
+                ),
+            )
+        out["pulumi_bind_plan"] = workspace_settings.validate_bool(
+            attrs["pulumi-bind-plan"], "pulumi-bind-plan"
+        )
+    if effective_engine == "pulumi":
+        # A Pulumi run is not security-scanned at all (`evaluates_security_scans`
+        # is False), so templating an enforced scan would record a gate that
+        # never runs -- the same reason the bulk path refuses it.
+        scan_attr = next(
+            (k for k in ("security-scan-enforcement", "security-scan-engine") if k in attrs),
+            None,
+        )
+        if scan_attr is not None:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"{scan_attr} applies only to a Terraform rule: a Pulumi run is "
+                    "not security-scanned, so a scan setting here would never apply"
+                ),
+            )
+        out.setdefault("security_scan_enforcement", "off")
 
     return out
 

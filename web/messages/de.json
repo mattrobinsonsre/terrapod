@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Wie viele Vorgänge gleichzeitig ausgeführt werden (1-256). Standard: 10.",
       "engine": "Engine",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Zwei durch '::' getrennte Teile — project::stack. Nur Buchstaben, Zahlen, Bindestriche und Unterstriche; jeder Teil muss mit einem Buchstaben oder einer Zahl beginnen.",
       "bindPlan": "Update an die genehmigte Vorschau binden",
       "bindPlanHelp": "Wenn aktiviert, wendet das Update genau den Plan an, den die Vorschau gespeichert hat. Was sich seit der Vorschau geändert hat, lässt das Update fehlschlagen, statt angewendet zu werden. Das beruht auf Pulumi-Update-Plänen, die noch experimentell sind. Wenn deaktiviert, ermittelt das Update seine Änderungen selbst, wie ein einfaches pulumi up. <docs>So funktionieren Pulumi-Läufe</docs>"

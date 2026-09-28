@@ -253,23 +253,7 @@ _SURFACE_EXEMPT: dict[str, dict[str, str]] = {
 #: which is the failure this gate exists to prevent. Every entry names the
 #: issue that will clear it, and clearing one means wiring the setting up and
 #: deleting the line. This should end empty.
-_SURFACE_DEBT: dict[str, dict[str, str]] = {
-    # `pulumi-bind-plan` is blocked on #1570, not merely unfinished, and the
-    # distinction decides what "clearing" it means. An `AutodiscoveryRule` has
-    # no `engine` column -- the model says so in its own comment -- so every
-    # workspace a rule materialises is Terraform/OpenTofu. Templating a
-    # Pulumi-only setting there would record a value that can never apply to
-    # anything the rule creates, which is precisely what the bulk path answers
-    # 422 for (`_reject_engine_specific_updates`). Wiring it up to empty this
-    # ledger would satisfy the gate by adding the defect the gate exists to
-    # catch. It clears when #1570 gives a rule an engine, and not before.
-    "autodiscovery GUI": {
-        "pulumi-bind-plan": "#1570 -- a rule has no engine, so this could never apply",
-    },
-    "autodiscovery API": {
-        "pulumi-bind-plan": "#1570 -- a rule has no engine, so this could never apply",
-    },
-}
+_SURFACE_DEBT: dict[str, dict[str, str]] = {}
 
 
 def _surface_sources() -> dict[str, str]:

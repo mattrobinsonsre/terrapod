@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Aynı anda kaç işlemin çalıştırılacağı (1-256). Varsayılan 10.",
       "engine": "Motor",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "'::' ile ayrılmış iki bölüm — project::stack. Yalnızca harf, rakam, tire ve alt çizgi; her bölüm bir harf veya rakamla başlamalıdır.",
       "bindPlan": "Güncellemeyi onaylanan önizlemeye kilitle",
       "bindPlanHelp": "Açıkken güncelleme, önizlemenin kaydettiği planı birebir uygular; önizlemeden bu yana değişen her şey uygulanmak yerine güncellemenin başarısız olmasına yol açar. Bu, hâlâ deneysel olan Pulumi güncelleme planlarına dayanır. Kapalıyken güncelleme, sıradan bir pulumi up gibi değişikliklerini kendisi belirler. <docs>Pulumi çalıştırmaları nasıl işler</docs>"

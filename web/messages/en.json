@@ -2546,6 +2546,7 @@
       "parallelismTitle": "How many operations run at once (1-256). Default 10.",
       "engine": "Engine",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Two parts separated by '::' — project::stack. Letters, numbers, hyphens and underscores only; each part must start with a letter or number.",
       "bindPlan": "Lock the update to the approved preview",
       "bindPlanHelp": "When on, the update applies exactly the plan the preview saved, so anything that changed since the preview fails the update instead of being applied. This rests on Pulumi update plans, which are still experimental. When off, the update works out its own changes, as a plain pulumi up does. <docs>How Pulumi runs work</docs>"

@@ -45,6 +45,11 @@ def _mock_rule(
     r.execution_mode = "agent"
     r.execution_backend = "tofu"
     r.agent_pool_id = None
+    # Real values, not MagicMock attributes: both are serialized (#1570), and a
+    # MagicMock is not JSON-serialisable, so every response assertion in this
+    # file would fail for a reason unrelated to what it tests.
+    r.engine = "terraform"
+    r.pulumi_bind_plan = False
     r.engine_version = "1.11"
     r.resource_cpu = "1"
     r.parallelism = 10
@@ -1146,3 +1151,98 @@ class TestApplyThenMergeCannotBeTemplatedWithAutoApply:
 
         stored = SimpleNamespace(vcs_workflow="merge_then_apply", auto_apply=False)
         assert self._coerce({"name": "x"}, existing=stored, on_create=False) is not None
+
+
+# ── engine on a rule (#1570) ─────────────────────────────────────────────
+
+
+class TestRuleEngine:
+    """A rule is pinned to one engine, and engine-specific settings are refused
+    rather than stored inert.
+
+    The refusal matters more than it looks. A setting that is accepted and can
+    never apply is the exact defect #1813's ledger exists to catch -- it reads
+    as configured, and nothing ever happens.
+    """
+
+    async def _create(self, attrs: dict):
+        conn_id = uuid.uuid4()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[MagicMock(id=conn_id)])
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        body = {
+            "data": {
+                "type": "autodiscovery-rules",
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{conn_id}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "execution-mode": "agent",
+                    **attrs,
+                },
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            return await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_rule_defaults_to_terraform(self, *_mocks):
+        resp = await self._create({})
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["data"]["attributes"]["engine"] == "terraform"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_pulumi_rule_is_accepted(self, *_mocks):
+        resp = await self._create({"engine": "pulumi", "pattern": "stacks/**/Pulumi.*.yaml"})
+        assert resp.status_code == 201, resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unknown_engine_is_refused(self, *_mocks):
+        resp = await self._create({"engine": "cloudformation"})
+        assert resp.status_code == 422
+        assert "engine must be one of" in resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_bind_plan_is_refused_on_a_terraform_rule(self, *_mocks):
+        """#1813's last two entries only clear because this is enforced: the
+        setting becomes templatable, and meaningless combinations are refused
+        rather than silently stored."""
+        resp = await self._create({"pulumi-bind-plan": True})
+        assert resp.status_code == 422
+        assert "pulumi-bind-plan applies only to a Pulumi rule" in resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_bind_plan_is_accepted_on_a_pulumi_rule(self, *_mocks):
+        resp = await self._create(
+            {"engine": "pulumi", "pattern": "stacks/**/Pulumi.*.yaml", "pulumi-bind-plan": True}
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["data"]["attributes"]["pulumi-bind-plan"] is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_scan_setting_is_refused_on_a_pulumi_rule(self, *_mocks):
+        """A Pulumi run is not security-scanned at all, so templating a scan
+        would record a gate that never runs."""
+        resp = await self._create(
+            {
+                "engine": "pulumi",
+                "pattern": "stacks/**/Pulumi.*.yaml",
+                "security-scan-enforcement": "enforced",
+            }
+        )
+        assert resp.status_code == 422
+        assert "not security-scanned" in resp.text

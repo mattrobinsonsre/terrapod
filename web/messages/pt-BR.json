@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Quantas operações são executadas ao mesmo tempo (1-256). Padrão: 10.",
       "engine": "Motor",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Duas partes separadas por '::' — project::stack. Apenas letras, números, hífens e sublinhados; cada parte deve começar com uma letra ou número.",
       "bindPlan": "Vincular a atualização à prévia aprovada",
       "bindPlanHelp": "Quando ativado, a atualização aplica exatamente o plano que a prévia salvou, então qualquer coisa que tenha mudado desde a prévia faz a atualização falhar em vez de ser aplicada. Isso depende dos planos de atualização do Pulumi, que ainda são experimentais. Quando desativado, a atualização determina as próprias mudanças, como um pulumi up comum. <docs>Como funcionam as execuções do Pulumi</docs>"

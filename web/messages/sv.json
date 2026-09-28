@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Hur många åtgärder som körs samtidigt (1-256). Standard 10.",
       "engine": "Motor",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Två delar åtskilda av '::' — project::stack. Endast bokstäver, siffror, bindestreck och understreck; varje del måste börja med en bokstav eller siffra.",
       "bindPlan": "Lås uppdateringen till den godkända förhandsgranskningen",
       "bindPlanHelp": "När det är på tillämpar uppdateringen exakt den plan som förhandsgranskningen sparade, så allt som har ändrats sedan förhandsgranskningen får uppdateringen att misslyckas i stället för att tillämpas. Det bygger på Pulumis uppdateringsplaner, som fortfarande är experimentella. När det är av räknar uppdateringen själv ut sina ändringar, precis som en vanlig pulumi up. <docs>Så fungerar Pulumi-körningar</docs>"

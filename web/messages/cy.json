@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Sawl gweithred sy''n rhedeg ar yr un pryd (1-256). Rhagosodiad 10.",
       "engine": "Peiriant",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Dwy ran wedi'u gwahanu gan '::' — project::stack. Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig; rhaid i bob rhan ddechrau â llythyren neu rif.",
       "bindPlan": "Cloi''r diweddariad i''r rhagolwg a gymeradwywyd",
       "bindPlanHelp": "Pan fydd ymlaen, mae''r diweddariad yn gweithredu''r union gynllun a gadwodd y rhagolwg, felly mae unrhyw beth a newidiodd ers y rhagolwg yn methu''r diweddariad yn hytrach na chael ei weithredu. Mae hyn yn dibynnu ar gynlluniau diweddaru Pulumi, sy''n dal yn arbrofol. Pan fydd i ffwrdd, mae''r diweddariad yn cyfrifo ei newidiadau ei hun, fel y mae pulumi up plaen yn ei wneud. <docs>Sut mae rhediadau Pulumi yn gweithio</docs>"

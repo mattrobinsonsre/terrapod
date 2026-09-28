@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Quot operationes simul exercentur (1-256). Praedefinitum 10.",
       "engine": "Machina",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Duae partes signo '::' divisae — project::stack. Tantum litterae, numeri, lineolae et lineolae subscriptae; utraque pars littera vel numero incipiat.",
       "bindPlan": "Renovationem ad praevisionem probatam alliga",
       "bindPlanHelp": "Cum activatum est, renovatio ipsum consilium quod praevisio servavit adhibet, ita ut quidquid post praevisionem mutatum est renovationem deficere faciat potius quam adhibeatur. Hoc consiliis renovationis Pulumi nititur, quae adhuc experimentalia sunt. Cum inactivatum est, renovatio mutationes suas ipsa invenit, sicut simplex pulumi up facit. <docs>Quomodo cursus Pulumi operantur</docs>"

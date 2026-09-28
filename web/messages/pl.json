@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Ile operacji wykonuje się jednocześnie (1-256). Domyślnie 10.",
       "engine": "Silnik",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Dwie części oddzielone '::' — project::stack. Tylko litery, cyfry, myślniki i podkreślenia; każda część musi zaczynać się od litery lub cyfry.",
       "bindPlan": "Zablokuj aktualizację na zatwierdzonym podglądzie",
       "bindPlanHelp": "Gdy włączone, aktualizacja stosuje dokładnie plan zapisany przez podgląd, więc wszystko, co zmieniło się od podglądu, powoduje niepowodzenie aktualizacji zamiast zostać zastosowane. Opiera się to na planach aktualizacji Pulumi, które wciąż są eksperymentalne. Gdy wyłączone, aktualizacja sama ustala swoje zmiany, tak jak zwykłe pulumi up. <docs>Jak działają uruchomienia Pulumi</docs>"

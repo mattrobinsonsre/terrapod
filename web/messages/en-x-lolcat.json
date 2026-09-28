@@ -2538,6 +2538,7 @@
       "parallelismTitle": "How many fingz runz at teh same tiem (1-256). Defawlt 10. srsly",
       "engine": "Enginz",
       "enginePulumi": "Pulumiz",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Two partz separatd by '::' — projekt::stak. Letterz, numberz, hyfenz an underskorez only; each part gotta start wif a letter or number. KTHX",
       "bindPlan": "Lok teh updayt 2 teh approvd preview",
       "bindPlanHelp": "Wen on, teh updayt applyz exakly teh plan teh preview savd, so anyfin dat changd sinse teh preview failz teh updayt insted ov gettin applyd. Dis sitz on Pulumi updayt planz, wich r stil experimentul. Wen off, teh updayt werkz out itz own changez, liek a plain pulumi up duz. <docs>How Pulumi runz werk</docs>"

@@ -2538,6 +2538,7 @@
       "parallelismTitle": "wa'' poH Qu''mey mI''. 10 ''oH.",
       "engine": "QuQ",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "cha' 'ay' '::' Sepbogh — project::stack. ghItlh mI' je neH; ghItlh mI' joq taghnIS 'ay' Hoch.",
       "bindPlan": "chovnatlh lulaj''pu''bogh yIbagh",
       "bindPlanHelp": "chu''lu''DI'' chovnatlh nab lulaj''pu''bogh ta''. chovnatlh ret choHmoHlu''chugh, Qapbe'' ta''. Pulumi nab ghun ''oH, chu''qu''be''. chu''be''lu''DI'' pulumi up rur. <docs>Pulumi Qu'' mIw</docs>"

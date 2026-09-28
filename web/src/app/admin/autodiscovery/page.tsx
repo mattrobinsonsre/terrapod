@@ -35,6 +35,8 @@ interface AutodiscoveryRule {
     enabled: boolean
     'execution-mode': string
     'execution-backend': string
+    engine?: string
+    'pulumi-bind-plan'?: boolean
     'agent-pool-id': string | null
     'terraform-version': string
     'resource-cpu': string
@@ -95,6 +97,8 @@ export default function AutodiscoveryPage() {
   // Reuses the workspace page's own labels (#1763) so a rule's template and the
   // setting it produces are described in the same words, in every locale.
   const tWs = useTranslations('workspaceDetail')
+  // A generic yes/no pair that already exists in every locale.
+  const tCommon = useTranslations('runDetail.common')
   const fmt = useFormat()
   const [rules, setRules] = useState<AutodiscoveryRule[]>([])
   const [connections, setConnections] = useState<VCSConnection[]>([])
@@ -120,6 +124,8 @@ export default function AutodiscoveryPage() {
   const [executionBackend, setExecutionBackend] = useState<'tofu' | 'terraform'>('tofu')
   const [terraformVersion, setTerraformVersion] = useState('1.11')
   const [resourceCpu, setResourceCpu] = useState('1')
+  const [engine, setEngine] = useState('terraform')
+  const [bindPlan, setBindPlan] = useState(false)
   const [parallelism, setParallelism] = useState('10')
   const [resourceMemory, setResourceMemory] = useState('2Gi')
   const [autoApplyMode, setAutoApplyMode] = useState('never')
@@ -279,6 +285,8 @@ export default function AutodiscoveryPage() {
     setTerraformVersion(a['terraform-version'])
     setResourceCpu(a['resource-cpu'])
     setParallelism(String(a.parallelism ?? 10))
+    setEngine(a.engine || 'terraform')
+    setBindPlan(Boolean(a['pulumi-bind-plan']))
     setResourceMemory(a['resource-memory'])
     // Fall back to the boolean for a rule created before #1274.
     setAutoApplyMode(a['auto-apply-mode'] || (a['auto-apply'] ? 'always' : 'never'))
@@ -335,6 +343,8 @@ export default function AutodiscoveryPage() {
       'engine-version': terraformVersion,
       'resource-cpu': resourceCpu,
       'parallelism': Number(parallelism),
+      engine,
+      ...(engine === 'pulumi' ? { 'pulumi-bind-plan': bindPlan } : {}),
       'resource-memory': resourceMemory,
       'auto-apply-mode': autoApplyMode,
       'on-directory-delete': onDirectoryDelete,
@@ -693,6 +703,35 @@ export default function AutodiscoveryPage() {
                     className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">{tWs('fields.engine')}</label>
+                  <select
+                    value={engine}
+                    onChange={e => setEngine(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                  >
+                    <option value="terraform">{tWs('fields.engineTerraform')}</option>
+                    <option value="pulumi">{tWs('fields.enginePulumi')}</option>
+                  </select>
+                </div>
+                {/* Pulumi's own setting. Hidden on a Terraform rule because the
+                    API refuses it there (#1813) — offering it would invite a
+                    422, or worse a value that looks saved and never applies. */}
+                {engine === 'pulumi' && (
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1" title={tWs('fields.bindPlanHelp')}>
+                    {tWs('fields.bindPlan')}
+                  </label>
+                  <select
+                    value={bindPlan ? 'true' : 'false'}
+                    onChange={e => setBindPlan(e.target.value === 'true')}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                  >
+                    <option value="false">{tCommon('no')}</option>
+                    <option value="true">{tCommon('yes')}</option>
+                  </select>
+                </div>
+                )}
                 <div>
                   <label className="block text-sm text-slate-300 mb-1">{t('form.parallelism')}</label>
                   <input

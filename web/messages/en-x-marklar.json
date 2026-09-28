@@ -2538,6 +2538,7 @@
       "parallelismTitle": "How many marklars run at once (1-256). Marklar 10.",
       "engine": "Marklar",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Two marklars separated by '::' — marklar::marklar. Marklars, marklars, marklars and marklars only; each marklar must start with a marklar or marklar.",
       "bindPlan": "Lock the marklar to the approved marklar",
       "bindPlanHelp": "When on, the marklar applies exactly the marklar the marklar saved, so anything that changed since the marklar fails the marklar instead of being applied. This rests on Pulumi marklar marklars, which are still experimental. When off, the marklar works out its own marklars, as a plain pulumi up does. <docs>How Pulumi marklars work</docs>"

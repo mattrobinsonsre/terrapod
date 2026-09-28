@@ -2538,6 +2538,7 @@
       "parallelismTitle": "同時執行的作業數 (1-256)。預設值為 10。",
       "engine": "引擎",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "由 '::' 分隔的兩部分 — project::stack。僅限字母、數字、連字號與底線；每部分必須以字母或數字開頭。",
       "bindPlan": "將更新鎖定至已核准的預覽",
       "bindPlanHelp": "開啟後，更新會嚴格套用預覽儲存的計畫，因此自預覽以來的任何變化都會使更新失敗，而不會被套用。此功能仰賴 Pulumi 的更新計畫，目前仍屬實驗性質。關閉後，更新會像一般的 pulumi up 一樣自行判斷變更。<docs>Pulumi 執行的運作方式</docs>"

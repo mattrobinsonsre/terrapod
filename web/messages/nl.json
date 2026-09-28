@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Hoeveel bewerkingen tegelijk worden uitgevoerd (1-256). Standaard: 10.",
       "engine": "Engine",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Twee delen gescheiden door '::' — project::stack. Alleen letters, cijfers, koppeltekens en underscores; elk deel moet met een letter of cijfer beginnen.",
       "bindPlan": "Update vastleggen op de goedgekeurde preview",
       "bindPlanHelp": "Als dit aan staat, past de update precies het plan toe dat de preview heeft opgeslagen, zodat alles wat sinds de preview is veranderd de update laat mislukken in plaats van te worden toegepast. Dit steunt op Pulumi-updateplannen, die nog experimenteel zijn. Als dit uit staat, bepaalt de update zelf zijn wijzigingen, zoals een gewone pulumi up doet. <docs>Hoe Pulumi-runs werken</docs>"

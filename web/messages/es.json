@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Cuántas operaciones se ejecutan a la vez (1-256). Predeterminado: 10.",
       "engine": "Motor",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Dos partes separadas por '::' — project::stack. Solo letras, números, guiones y guiones bajos; cada parte debe empezar por una letra o un número.",
       "bindPlan": "Vincular la actualización a la vista previa aprobada",
       "bindPlanHelp": "Si está activado, la actualización aplica exactamente el plan que guardó la vista previa, así que cualquier cambio desde la vista previa hace fallar la actualización en lugar de aplicarse. Se basa en los planes de actualización de Pulumi, que siguen siendo experimentales. Si está desactivado, la actualización calcula sus propios cambios, como hace un pulumi up normal. <docs>Cómo funcionan las ejecuciones de Pulumi</docs>"

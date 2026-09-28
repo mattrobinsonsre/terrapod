@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Kolik operací běží současně (1-256). Výchozí hodnota 10.",
       "engine": "Engine",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Dvě části oddělené '::' — project::stack. Pouze písmena, číslice, pomlčky a podtržítka; každá část musí začínat písmenem nebo číslicí.",
       "bindPlan": "Uzamknout aktualizaci na schválený náhled",
       "bindPlanHelp": "Když je zapnuto, aktualizace použije přesně plán uložený náhledem, takže cokoli, co se od náhledu změnilo, aktualizaci zastaví, místo aby se to použilo. Opírá se to o plány aktualizací Pulumi, které jsou stále experimentální. Když je vypnuto, aktualizace si změny určí sama, stejně jako prosté pulumi up. <docs>Jak fungují běhy Pulumi</docs>"

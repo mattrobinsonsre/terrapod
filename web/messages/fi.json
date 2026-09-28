@@ -2538,6 +2538,7 @@
       "parallelismTitle": "Kuinka monta toimintoa suoritetaan samanaikaisesti (1-256). Oletus 10.",
       "engine": "Moottori",
       "enginePulumi": "Pulumi",
+      "engineTerraform": "Terraform",
       "nameTitlePulumi": "Kaksi osaa erotettuna merkeillä '::' — project::stack. Vain kirjaimia, numeroita, väliviivoja ja alaviivoja; kummankin osan on alettava kirjaimella tai numerolla.",
       "bindPlan": "Lukitse päivitys hyväksyttyyn esikatseluun",
       "bindPlanHelp": "Kun asetus on päällä, päivitys soveltaa täsmälleen esikatselun tallentamaa suunnitelmaa, joten kaikki esikatselun jälkeen muuttunut kaataa päivityksen sen sijaan, että se sovellettaisiin. Tämä perustuu Pulumin päivityssuunnitelmiin, jotka ovat vielä kokeellisia. Kun asetus on pois päältä, päivitys selvittää muutoksensa itse, kuten tavallinen pulumi up. <docs>Näin Pulumi-ajot toimivat</docs>"
