@@ -373,10 +373,17 @@ the state tab shows the stack's resources and its outputs.
   version is written rather than by reading every stack's whole deployment to
   print one number.
 
-**Cost estimation and the AI architecture critique are not shown on a Pulumi
-workspace.** Both read Terraform state and cannot interpret a deployment, so the
-tabs are absent rather than present-and-failing. #1569 is where they gain Pulumi
-support.
+**Cost estimation and the AI run summary work on a Pulumi run.** A preview's
+steps are translated into the shape the pricing engine reads, so a previewed
+resource is priced wherever its type maps to one the sheet knows, and the
+summary is given the preview as a preview — it talks about URNs and updates
+rather than hunting for a Terraform plan's `resource_changes`. Resources whose
+Pulumi type has no Terraform equivalent are reported unpriced rather than
+guessed at.
+
+**The AI architecture critique is still not shown on a Pulumi workspace.** It
+reasons over Terraform state, which a Pulumi deployment is not, so the tab is
+absent rather than present-and-failing.
 
 
 ## Drift detection

@@ -160,11 +160,10 @@ content you put in it: nothing here expires a pushed image because it has gone
 quiet, any more than a registry you pay for would. Reclaiming that space is a
 deliberate act, not a background sweep.
 
-Removing a pushed image is **not yet possible** — there is no delete API — so a
-pushed image is currently permanent. That is the honest position and it is
-tracked in [#1423](https://github.com/mattrobinsonsre/terrapod/issues/1423); the
-collector below is the half that already exists, and deletion is the half that
-will use it.
+Removing one is a delete against the registry's own API —
+`DELETE /v2/{name}/manifests/{reference}` for a tag or a manifest digest, and
+`DELETE /v2/{name}/blobs/{digest}` for a blob — which is the spec's own shape, so
+the tools you already have speak it.
 
 Deleting a manifest reclaims nothing on its own, incidentally, because its layers
 are usually shared with other images. That is why the two are separate: deletion
