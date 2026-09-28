@@ -2320,6 +2320,31 @@ async def next_run(
         if v.category == "terraform"
     ]
 
+    # Pulumi stack config (#1565). Its own list rather than a reuse of
+    # `terraform-vars`, because the two are delivered differently: a terraform
+    # var is written into a generated tfvars file, while this is set on the
+    # stack with `pulumi config set` before the preview runs.
+    #
+    # `secret` carries the workspace variable's own `sensitive`, and the runner
+    # passes `--secret` for it. That is Pulumi secrecy, not merely careful
+    # delivery: the engine then renders the value as `[secret]` in the preview a
+    # reviewer reads, in the event log, and in any state it reaches. Delivering
+    # it as ordinary config would put a sensitive value in the preview output.
+    #
+    # `path` carries `structured`, which the runner turns into `--path` so a
+    # key like `outer.inner` sets a nested value rather than a literal dotted
+    # key -- the same distinction `structured` already draws for terraform.
+    pulumi_config = [
+        {
+            "key": v.key,
+            "value": v.value,
+            "secret": bool(v.sensitive),
+            "path": bool(v.structured),
+        }
+        for v in resolved
+        if v.category == "pulumi_config"
+    ]
+
     # Private-git-module auth (#1028): git_http_auth / git_ssh_auth vars are
     # resolved into concrete credentials here (a `vcs_connection` source mints a
     # short-lived git-HTTPS token from the referenced VCS connection), then
@@ -2358,6 +2383,10 @@ async def next_run(
     run_data["data"]["attributes"]["engine"] = ws.engine
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
+    # Pulumi stack config (#1565). A listener too old to read it delivers
+    # nothing, and the run's config is simply whatever the repository committed
+    # — the same degradation every other field on this wire makes.
+    run_data["data"]["attributes"]["pulumi-config"] = pulumi_config
     run_data["data"]["attributes"]["execution-hooks"] = execution_hooks
     run_data["data"]["attributes"]["git-auth"] = git_auth
     # Vault file delivery (#1619): [{key, name, value}]. The listener writes

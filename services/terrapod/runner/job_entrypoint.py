@@ -848,7 +848,7 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     import structlog
 
     from terrapod.runner import exec_subprocess
-    from terrapod.runner.phases import platform_tool, pulumi_deps, pulumi_exec
+    from terrapod.runner.phases import platform_tool, pulumi_config, pulumi_deps, pulumi_exec
 
     log = structlog.get_logger("runner.job_entrypoint")
     plan_file = os.environ.get("TP_PULUMI_PLAN_FILE", "/workspace/plan.json")
@@ -953,9 +953,22 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
         return exc.exit_code
 
     try:
-        pulumi_exec.select_stack(binary, child_grace=float(child_grace))
+        stack_ref = pulumi_exec.select_stack(binary, child_grace=float(child_grace))
     except pulumi_exec.StackError as exc:
         log.error("could not select the run's stack", error=str(exc))
+        return 1
+
+    # The workspace's Pulumi config, set on the stack before anything reads it
+    # (#1565). After select, because it writes to the selected stack; before the
+    # hooks, so a pre_plan hook inspecting `pulumi config` sees what the run will
+    # actually use rather than only what the repository committed.
+    try:
+        pulumi_config.apply(binary, stack=stack_ref)
+    except pulumi_config.ConfigError as exc:
+        # Fatal, deliberately: a program running without config the operator set
+        # is doing something nobody asked for, and `config.get` with a default
+        # would take the default without a word. See the phase's docstring.
+        log.error("could not set the workspace's Pulumi config", error=str(exc))
         return 1
 
     # The same execution hooks a Terraform run gets, at the same points (#1559).

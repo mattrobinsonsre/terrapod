@@ -47,8 +47,44 @@ def _version_hash(key: str, value: str, category: str) -> str:
 # The categories a variable may carry. `git_http_auth`/`git_ssh_auth` (#1028)
 # hold private-git-module credentials — always sensitive, materialized by the
 # runner's git_auth phase, never rendered into terraform inputs.
-VALID_CATEGORIES = frozenset({"terraform", "env", "git_http_auth", "git_ssh_auth"})
+VALID_CATEGORIES = frozenset({"terraform", "env", "git_http_auth", "git_ssh_auth", "pulumi_config"})
 GIT_AUTH_CATEGORIES = frozenset({"git_http_auth", "git_ssh_auth"})
+
+#: Stack configuration for a Pulumi workspace (#1565, #1407 §6).
+#:
+#: Its own category rather than a reuse of `terraform`, because the two do not
+#: mean the same thing. A Terraform variable is declared by the configuration
+#: and typed by it; Pulumi config is a flat key/value namespace the program
+#: reads at will, keys pass through **verbatim** including `project:key`
+#: namespacing, and nothing declares them in advance.
+PULUMI_CONFIG_CATEGORY = "pulumi_config"
+
+#: Which engine consumes each engine-specific category. A category absent from
+#: this map applies to every engine — `env` reaches the environment and the two
+#: `git_*_auth` categories are materialized before init, whatever runs after.
+#:
+#: `terraform` covers OpenTofu too: the engine names the *family*, and tofu vs
+#: terraform is `execution_backend` within it.
+CATEGORY_ENGINE: dict[str, str] = {
+    "terraform": "terraform",
+    PULUMI_CONFIG_CATEGORY: "pulumi",
+}
+
+
+def consumed_by_engine(category: str, engine: str) -> bool:
+    """Whether a run on `engine` would deliver a variable of this category.
+
+    A write is never refused on this (#1407 §6: "engine mismatch is permissive"
+    — variables are data, and which of them apply is decided at run time by the
+    engine that runs). It is answered here so the mismatch can be **surfaced**
+    on the workspace instead, which is what that paragraph asks for in place of
+    a write-time check: a variable that is stored, visible and silently does
+    nothing is the failure worth naming.
+    """
+    wanted = CATEGORY_ENGINE.get(category)
+    if wanted is None:
+        return True
+    return (engine or "terraform").strip().lower() == wanted
 
 
 def _validated_category(category: str) -> str:

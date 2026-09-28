@@ -244,8 +244,13 @@ def _apply_value_source(
     return src, True
 
 
-def _var_json(var: Variable) -> dict:
-    """Serialize a Variable to TFE V2 JSON:API format."""
+def _var_json(var: Variable, engine: str = "") -> dict:
+    """Serialize a Variable to TFE V2 JSON:API format.
+
+    ``engine`` is the owning workspace's engine, which every caller here already
+    holds. It decides `applies-to-engine` only; passing nothing reads as
+    terraform, which is what a workspace with no engine set is.
+    """
     return {
         "id": f"var-{var.id}",
         "type": "vars",
@@ -259,6 +264,13 @@ def _var_json(var: Variable) -> dict:
             "value": _visible_value(var),
             "sensitive": var.sensitive,
             "category": var.category,
+            # Engine mismatch is permissive (#1407 §6): a category the running
+            # engine does not consume is stored and returned, never refused —
+            # variables are data, and which of them apply is decided at run time
+            # by the engine that runs. It is reported here instead, because the
+            # thing §6 asks to avoid is not the write but the *silence*: a
+            # variable an operator sets, sees stored, and watches do nothing.
+            "applies-to-engine": variable_service.consumed_by_engine(var.category, engine),
             # Both names, always equal. `hcl` is what go-tfe reads (#1435).
             "structured": var.structured,
             "hcl": var.structured,
@@ -333,7 +345,7 @@ async def list_workspace_vars(
             status_code=status.HTTP_403_FORBIDDEN, detail="Requires read permission on workspace"
         )
     variables = await variable_service.list_variables(db, ws.id)
-    items = [_var_json(v) for v in variables]
+    items = [_var_json(v, ws.engine) for v in variables]
     page_items, meta = paginate(items, request)
     return JSONResponse(content={"data": page_items, "meta": meta})
 
@@ -389,7 +401,7 @@ async def create_workspace_var(
 
     await publish_workspace_event(str(ws.id), "workspace_variable_change")
 
-    return JSONResponse(content={"data": _var_json(var)}, status_code=201)
+    return JSONResponse(content={"data": _var_json(var, ws.engine)}, status_code=201)
 
 
 @router.patch("/workspaces/{workspace_id}/vars/{var_id}")
@@ -446,7 +458,7 @@ async def update_workspace_var(
 
     await publish_workspace_event(str(ws.id), "workspace_variable_change")
 
-    return JSONResponse(content={"data": _var_json(var)})
+    return JSONResponse(content={"data": _var_json(var, ws.engine)})
 
 
 @router.delete("/workspaces/{workspace_id}/vars/{var_id}", status_code=204)
