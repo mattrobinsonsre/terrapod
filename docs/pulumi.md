@@ -27,6 +27,13 @@ recovers Pulumi's `{org}/{project}/{stack}` without growing a "project" concept
 of its own. The organization is always `default`, as everywhere else in
 Terrapod.
 
+A stack can be created by hand, or discovered. **Autodiscovery understands
+Pulumi**: a rule with `engine: pulumi` watches a monorepo for
+`Pulumi.<stack>.yaml` files and creates a workspace per stack, so one directory
+holding `Pulumi.dev.yaml` and `Pulumi.prod.yaml` yields two — the project half
+of the name coming from the directory, the stack half from the filename. See
+[Workspace Autodiscovery](autodiscovery.md).
+
 ## What a run does
 
 | Phase | Terraform | Pulumi |
@@ -202,3 +209,6 @@ resource's old and new values, which is where a stack's secrets are.
 - [`docs/policies.md`](policies.md) and
   [`docs/security-scanning.md`](security-scanning.md) — the gates, and what they
   currently do on a Pulumi workspace.
+- [`docs/autodiscovery.md`](autodiscovery.md) — discovering stacks from a
+  monorepo, and how the rename/delete lifecycle reasons per stack rather than
+  per directory.

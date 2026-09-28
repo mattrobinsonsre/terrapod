@@ -50,6 +50,8 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `branch` | string | no | Branch the rule scopes to. Empty = default branch. |
 | `pattern` | string | yes | Glob matched against changed file paths (gitignore-style with `**` support). |
 | `ignore-patterns` | string[] | no | Globs filtered out before pattern matching. |
+| `engine` | enum | no | `terraform` (default) or `pulumi`. A rule discovers one engine and ignores the other's files; write two rules to cover both. |
+| `pulumi-bind-plan` | bool | no | Templated onto created workspaces. **Pulumi rules only** — a `422` on a Terraform rule. |
 | `name-template` | string | no | Template for derived workspace names. Default: directory path with `/` replaced by `-`. |
 | `enabled` | bool | no | Default `true`. |
 | `execution-mode` | enum | no | Must be `agent` (default). Autodiscovery is VCS-driven; `local` mode would create workspaces with queued runs and no executor. |
@@ -96,6 +98,47 @@ Rules use gitignore-style globs. Patterns are matched against the **full file pa
 
 Only terraform configuration files (`*.tf`, `*.tfvars`, `*.tf.json`, `*.tfvars.json`, `*.hcl`) trigger autodiscovery. README/CI/script changes are filtered out before pattern matching.
 
+## Engines: Terraform or Pulumi (#1570)
+
+A rule discovers **one engine**, set by its `engine` field and defaulting to
+`terraform`. A rule matches only that engine's files and ignores the rest, so a
+directory holding both a `Pulumi.yaml` and `.tf` files is claimed by whichever
+rule is looking for it.
+
+**To discover both, write two rules.** There is deliberately no "both" setting:
+one rule, one engine, so the template fields and the workspaces it creates have
+a single unambiguous meaning.
+
+| `engine` | Files it matches | Unit of discovery |
+|---|---|---|
+| `terraform` (default) | `*.tf`, `*.tfvars`, `*.tf.json`, `*.tfvars.json`, `*.hcl` | the directory |
+| `pulumi` | `Pulumi.<stack>.yaml` / `.yml` | the **(directory, stack)** pair |
+
+That last column is the difference that matters. A Pulumi project normally
+declares several stacks side by side:
+
+```
+infra/payments/
+  Pulumi.yaml          <- the project. Declares no stack, so creates no workspace.
+  Pulumi.dev.yaml      <- one workspace
+  Pulumi.prod.yaml     <- a second workspace, same directory
+```
+
+So one directory yields **as many workspaces as it has stack files**, where a
+Terraform directory yields exactly one. `Pulumi.yaml` itself is not a unit of
+state and never creates a workspace on its own.
+
+### Engine-specific template fields
+
+A rule may only template what its engine can use, and is refused with a `422`
+otherwise rather than storing a value that could never apply:
+
+- `pulumi-bind-plan` is accepted **only** on a Pulumi rule.
+- `security-scan-enforcement` and `security-scan-engine` are accepted **only**
+  on a Terraform rule, and a Pulumi rule defaults enforcement to `off`. A Pulumi
+  run is not security-scanned, so templating a scan would record a gate that
+  never runs.
+
 ## How the workspace is named
 
 The created workspace's `working-directory` is the directory containing the matched terraform file. The default name is that directory with `/` replaced by `-`:
@@ -112,6 +155,30 @@ name-template: "ws-{root}"         →  ws-accounts-alpha-network  ({root} prese
 ```
 
 `{path}` is the dashed directory; `{root}` is the directory with `/` preserved. Names are sanitised to `[A-Za-z0-9_-]` and capped at 90 chars (the workspaces.name column limit).
+
+### Pulumi workspaces are named `project::stack`
+
+A discovered Pulumi stack is named in the form the rest of Terrapod already uses
+for a Pulumi workspace, so a discovered one is indistinguishable from a
+hand-created one:
+
+```
+infra/payments/Pulumi.dev.yaml  →  workspace `payments::dev`  (working_directory = `infra/payments`, stack = `dev`)
+```
+
+**The project half is the DIRECTORY name, not the `name:` field inside
+`Pulumi.yaml`.** Matching is pure path logic — it runs over every path in every
+PR diff — so honouring the declared name would mean fetching and parsing a file
+from the VCS inside that loop. The stack half is always exact, because it comes
+from the filename.
+
+The consequence worth knowing: a project declared `name: payments-api` in a
+directory called `infra/payments` is discovered as `payments::dev`, not
+`payments-api::dev`. If you want the two to agree, name the directory after the
+project.
+
+`name-template` does not apply to Pulumi rules — the `project::stack` form is
+what addresses the stack.
 
 ## Created workspace properties
 
@@ -136,6 +203,33 @@ Autodiscovered workspaces are reconciled as the repo evolves. **Safe by default 
   - `flag` (default, safe): the workspace is marked `pending_deletion` and **requires an explicit operator action**. Never auto-destroyed.
   - `destroy` (opt-in, for ephemeral envs): a real destroy run is queued; on success the workspace is **archived** (soft-deleted, retained for audit). A *failed* destroy is auto-retried a bounded number of times (`runners.lifecycleDestroyRetries`, default 2) — `terraform destroy` is transiently flaky and re-running is safe (incremental) — and the workspace is archived only on a **successful** destroy, so retries never lose data.
 - **Origin PR closed unmerged / no longer matching**: the workspace is an orphan (its directory never reached the tracked branch). If it **never applied state** (zero state versions) it is **auto-archived**; if it **has state** it is flagged `pending_deletion` for a human. Never silently destroyed.
+
+### On a Pulumi rule the unit is the stack, not the directory
+
+Everything above applies per **stack file**, because a Pulumi workspace is one
+stack:
+
+- Removing `Pulumi.dev.yaml` while `Pulumi.prod.yaml` stays is **one workspace
+  deleted**, and the directory is untouched. Read as a directory change it would
+  look like nothing was deleted at all, and the policy would never fire.
+- Before any flag or destroy, the re-verification checks that **that stack's own
+  file** is gone from the tracked-branch tree — not the directory, which its
+  siblings keep alive.
+- A rename carries the stack with it, and the workspace is renamed to match the
+  new `project::stack`.
+
+**Rename detection is deliberately stricter for Pulumi.** For Terraform, a
+rename can be inferred when a directory's files disappear and exactly the same
+basenames appear in one other directory — which is what survives a squash merge,
+where per-file rename information is lost. A stack is a *single* file, so there
+is no such set to compare: a removed stack alongside an added one is
+indistinguishable from a delete plus an unrelated create.
+
+So for a Pulumi rule a rename is recognised **only** from explicit rename
+information, and a removal that coincides with any addition in the same
+directory is treated as **ambiguous — flagged for a human, never deleted**. The
+asymmetry is on purpose: a missed rename costs you a flagged workspace, and a
+missed ambiguity costs you a destroyed one.
 
 `lifecycle-state` (`active` | `pending_deletion` | `archived`) and `lifecycle-reason` are exposed on the workspace and surfaced in the UI. All transitions are audited (`autodiscovery.workspace_moved` / `.pending_deletion` / `.destroy_queued` / `.archived` / `.rename_conflict`).
 
@@ -178,6 +272,42 @@ Outcome:
 | `accounts/gamma/dns/main.tf` | New workspace `accounts-gamma-dns` auto-created |
 | `modules/vpc/main.tf` | No workspace created (matches ignore pattern) |
 | `README.md` | No workspace created (not a terraform file) |
+
+### A Pulumi monorepo
+
+```
+infra/
+  payments/
+    Pulumi.yaml          # project — creates no workspace on its own
+    Pulumi.dev.yaml
+    Pulumi.prod.yaml
+  search/
+    Pulumi.yaml
+    Pulumi.dev.yaml
+```
+
+Rule:
+
+```json
+{
+  "data": {
+    "type": "autodiscovery-rules",
+    "attributes": {
+      "name": "pulumi-infra",
+      "vcs-connection-id": "vcs-<uuid>",
+      "repo-url": "https://github.com/myorg/monorepo",
+      "engine": "pulumi",
+      "pattern": "infra/*/Pulumi.*.yaml",
+      "execution-mode": "agent",
+      "agent-pool-id": "apool-<uuid>"
+    }
+  }
+}
+```
+
+Discovers **three** workspaces — `payments::dev`, `payments::prod` and
+`search::dev` — two of them from the same directory. Add a second rule with
+`engine: terraform` if the same repo also holds Terraform roots.
 
 ## API
 

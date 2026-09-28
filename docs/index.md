@@ -58,7 +58,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Binary Caching** | Pull-through cache for terraform/tofu/terragrunt CLI binaries; download base + version-index sources are operator-overridable to an internal mirror (restricted-network / air-gapped) and honour the forward proxy/CA |
 | **Supply-chain Verification** | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS with pinned keys; the runner re-verifies the executable (visible in the run log) before running it |
 | **Terragrunt** | Per-workspace Terragrunt for agent-mode runs (flag + version, pull-through binary cache, local-backend reconciliation); CLI-driven runs work with zero config |
-| **Workspace Autodiscovery** | Atlantis-style monorepo autodiscovery with rule templating; safe-by-default rename/delete/orphan lifecycle (opt-in destroy) |
+| **Workspace Autodiscovery** | Atlantis-style monorepo autodiscovery with rule templating, for Terraform/OpenTofu or Pulumi (one engine per rule; a Pulumi rule's unit is the stack, so one directory can yield several workspaces); safe-by-default rename/delete/orphan lifecycle (opt-in destroy) |
 | **Module Autodiscovery** | [Rules](registry.md#module-autodiscovery) that find the modules (root and submodules) in a repository, or across an org, group or name pattern: preview, register all or a picked subset, and register new directories and new repositories automatically; never deletes a module |
 | **Registry Submodules** | Publish a module from a [subdirectory](registry.md#submodules-a-module-in-a-subdirectory) of its repository — `subdirectory` on a VCS-sourced module, re-rooted so consumers need no `//subdir` suffix; one repository can hold many modules |
 | **Bulk Workspace Operations** | Server-side workspace search + all-or-nothing bulk settings update (dry-run by default; never triggers runs) |
@@ -139,7 +139,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [RBAC](rbac.md) | Permission model, label-based access control, custom roles |
 | [VCS Integration](vcs-integration.md) | GitHub and GitLab setup, polling, webhooks, API-budget saturation and consumer breakdown |
 | [VCS Workflows](vcs-workflows.md) | merge_then_apply (default) vs apply_then_merge (Atlantis-style, opt-in) |
-| [Autodiscovery](autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |
+| [Autodiscovery](autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery, Terraform or Pulumi |
 | [Drift Detection](drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
 | [Drift Ignore Rules](drift-ignore-rules.md) | Per-workspace allowlist that suppresses known-noisy attributes from the drift signal (e.g. provider-rotated certs, externally co-managed replicas) |
 | [Supply-chain Verification](supply-chain-verification.md) | How cached binaries/providers and runner executables are verified against publisher signatures (pinned keys, `verify` knobs, air-gap) |

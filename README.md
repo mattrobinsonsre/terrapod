@@ -183,7 +183,7 @@ Everything below is implemented and shipped today.
 | Feature | Description |
 |---|---|
 | VCS integration | GitHub App + GitLab token; inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, with outbound polling as the resilient default — so webhooks are optional, never required |
-| Workspace autodiscovery | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories |
+| Workspace autodiscovery | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories, for Terraform/OpenTofu or Pulumi (one engine per rule; a Pulumi rule discovers each stack in a directory as its own workspace) |
 | Module autodiscovery | Rules that find the modules — the root and any submodules — in a repository, or across an org, group or repository-name pattern; preview them, register all or a picked subset, and automatically register directories and repositories that appear later ([docs](docs/registry.md#module-autodiscovery)) |
 | Registry submodules | Publish a module from a subdirectory of its repository — `subdirectory` on a VCS-sourced registry module, re-rooted so consumers need no `//subdir` suffix; one repository can hold many modules ([docs](docs/registry.md#submodules-a-module-in-a-subdirectory)) |
 | Terragrunt | Per-workspace Terragrunt for agent-mode runs (a flag + pinned version, pull-through binary cache, local-backend reconciliation so Terrapod still owns state); CLI-driven runs need no extra config |
