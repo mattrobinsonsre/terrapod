@@ -791,16 +791,27 @@ async def _persist_runner_state(
 
 
 # ── Pulumi deployments (#1576) ───────────────────────────────────────────
-# An agent-mode Pulumi run keeps its stack in a file backend inside the Job, the
-# way a Terraform run keeps terraform.tfstate in its working directory. It never
-# uses Terrapod as a live Pulumi backend: the deployment comes in through the
-# first endpoint below at the start of the run and goes back through the second,
-# once, after an update. Previews write nothing.
+# The hand-over pair an agent-mode Pulumi run used to be built on: the stack
+# lived in a file backend inside the Job, came in through the first endpoint
+# below at the start of the run, and went back through the second, once, after
+# an update.
+#
+# **No agent run calls either of them any more.** #1881 points the runner at
+# Terrapod's own Pulumi service backend, so the CLI reads and writes the stack
+# through that surface as it goes and there is no hand-over left to make. They
+# are kept all the same: retiring a published API surface is its own decision,
+# with its own deprecation window, and is not something reversing the runner's
+# backend gets to make on the way past. They remain a working way to lift a
+# deployment out of a run and put one back, gated on the runner token for that
+# run as they always were.
 
-#: The serial of the state version a deployment download was read from. The
-#: runner quotes it back on upload, so a state that moved while the run held it
-#: is refused rather than silently overwritten. Mirrored in the runner's
-#: `phases/state.py`, which cannot import this module; a test pins the two.
+#: The serial of the state version a deployment download was read from. Whoever
+#: downloaded it quotes it back on upload, so a state that moved meanwhile is
+#: refused rather than silently overwritten. The runner used to mirror the
+#: literal in its own `phases/state.py`, which cannot import this module, and a
+#: test pinned the two; since #1881 there is no second copy, and the test pins
+#: the name alone — a rename would break exactly the pre-#1881 runner images the
+#: N-2 skew guarantee keeps working.
 PULUMI_STATE_SERIAL_HEADER = "X-Terrapod-State-Serial"
 
 #: The deployment-schema version `pulumi stack import` expects alongside a body.
@@ -874,13 +885,18 @@ async def download_pulumi_deployment(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """The run's stack, with its secrets opened, for the runner to import.
+    """The run's stack, with its secrets opened, ready for `pulumi stack import`.
 
     The body is `{"version": 3, "deployment": ...}`, the shape
-    `pulumi stack import` reads, with no `secrets_providers` block: the runner
-    supplies its own. Always 200 — a stack with no state answers
-    `deployment: null` — so "nothing yet" can never be confused with a failed
-    download.
+    `pulumi stack import` reads, with no `secrets_providers` block — whoever
+    imports it seals the stack under their own. Always 200 — a stack with no
+    state answers `deployment: null` — so "nothing yet" can never be confused
+    with a failed download.
+
+    **The runner no longer calls this** (#1881): an agent run reads the stack
+    through Terrapod's Pulumi service backend, one value at a time, and is never
+    handed the whole deployment with its secrets opened. The route is kept
+    because retiring it is a separate decision; see the section comment above.
     """
     from terrapod.crypto.service import get_encryption
     from terrapod.services.pulumi_state_service import UnreadableSecretsError, reveal_secrets
@@ -935,6 +951,11 @@ async def upload_pulumi_deployment(
     stack meanwhile: the Terraform upload's divergence check, keyed on the serial
     Terrapod issued because a Pulumi deployment carries none of its own. A retry
     of an upload that already landed is answered 200.
+
+    **The runner no longer calls this** (#1881): an agent update checkpoints to
+    the Pulumi service backend as it goes, and completing the update is what
+    publishes the state version. See the section comment above for why the route
+    is kept.
     """
     from terrapod.crypto.service import get_encryption
     from terrapod.services import run_service

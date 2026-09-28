@@ -271,13 +271,17 @@ class PulumiStrategy:
     ) -> TerminalOutcome:
         """What a finished Job means for Pulumi.
 
-        The same answer as Terraform's, because the Job has the same shape. An
-        agent-mode Pulumi run keeps its stack in a file backend inside the Job and
-        hands the deployment back through the run's artifacts before it exits
-        (#1576) — as a Terraform apply uploads its state — so by the time a Job
-        succeeds its state is already stored, and completion is a state
-        transition and nothing more. Pulumi never writes checkpoints to Terrapod
-        from an agent run; that surface serves local mode.
+        The same answer as Terraform's, because the Job has the same shape.
+
+        An agent-mode Pulumi run drives Terrapod's own Pulumi service surface
+        (#1881): the CLI checkpoints to it as the update proceeds, and the
+        `complete` call that ends the update is what turns the last checkpoint
+        into the workspace's one new state version (#1564). So by the time a Job
+        succeeds its state is already stored — completion here is a run-state
+        transition and nothing more — but it is stored by the update completing,
+        not by anything this method does or by an upload on the way out. Someone
+        auditing where a Pulumi stack's state is published should be looking at
+        `pulumi_checkpoint_service.promote_checkpoint` and its caller, not here.
 
         A failed or deleted Job errors the run, as for Terraform. Pulumi has no
         equivalent of Ansible's `ignore_errors`, so a non-zero exit means the
@@ -290,8 +294,8 @@ class PulumiStrategy:
                 return TerminalOutcome(action="complete_plan", phase=phase)
             if run_status == "applying":
                 return TerminalOutcome(action="complete_apply", phase=phase)
-            # Neither planning nor applying: the checkpoint already drove the
-            # transition. The completion helpers are idempotent, but there is
+            # Neither planning nor applying: the runner's own POST already drove
+            # the transition. The completion helpers are idempotent, but there is
             # nothing left to complete, so say so rather than calling one anyway.
             return TerminalOutcome(action="none", phase=phase)
 

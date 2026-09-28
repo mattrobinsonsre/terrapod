@@ -1,24 +1,26 @@
-"""A Pulumi stack's deployment, as Terrapod stores it and hands it to a runner (#1576).
+"""A Pulumi stack's deployment, as Terrapod stores it and opens it (#1522, #1576).
 
 Terrapod keeps a Pulumi stack's state as a state version holding the bare
 deployment — the `deployment` object of `pulumi stack export`, with every secret
-sealed by Terrapod's own encryption (the `service` secrets provider). Two
-consumers read and write it:
+sealed by Terrapod's own encryption (the `service` secrets provider). The helpers
+here are the pure half of reading and writing that, and they serve two callers:
 
-- **local mode** — the CLI on an operator's machine, through the service surface
-  (`routers/pulumi_service.py`), which seals and opens secrets one call at a time;
-- **agent runs** — a runner Job, which does NOT use that surface. It runs Pulumi
-  against a file backend inside the Job, exactly as a Terraform run keeps
-  `terraform.tfstate` in its working directory: the deployment is handed over at
-  the start through the run's artifact API and handed back once at the end.
+- **the Pulumi service surface** (`routers/pulumi_service.py`), which seals and
+  opens secrets **one value at a time** as the CLI asks — `seal_bytes` and
+  `open_sealed` — and normalises the stored provider's URL on the way out
+  (`with_canonical_service_url`). Every CLI reaches Terrapod this way: an
+  operator's laptop after `pulumi login`, and, since #1881, the CLI inside a
+  runner Job. Neither is ever handed the whole deployment with its secrets open;
+- **the deployment hand-over routes** (`routers/run_artifacts.py`), which move a
+  **whole** deployment in and out of a run — `reveal_secrets` opening every
+  secret on the way out, `seal_secrets` sealing them again on the way back. That
+  pair is what an agent run was built on before #1881, and is kept because
+  retiring an API surface is its own decision; nothing in a run calls it now.
 
-This module is the API half of that handover. The runner imports a deployment
-into a stack it has just created with a throwaway passphrase, so the secrets it
-receives must be **plaintext** — the passphrase stack cannot open service
-ciphertext — and what it sends back is `stack export --show-secrets`, which this
-module seals again before it is stored. The provider block is replaced on the way
-out and restored on the way in: the runner substitutes its own, and what is
-stored must name the provider that can actually open the stored ciphertext.
+Whole-deployment transfer is what needs the provider block swapped: it is removed
+on the way out, because the importer seals the stack under its own provider, and
+set on the way in, because what is stored must name the provider that can
+actually open the stored ciphertext.
 
 Deliberately free of I/O, so it can run in a worker thread (CLAUDE.md #13) over a
 multi-MB deployment without touching the event loop.
@@ -44,8 +46,9 @@ class UnreadableSecretsError(Exception):
 
     A stack moved to a passphrase or cloud-KMS provider with
     `pulumi stack change-secrets-provider` keeps its secrets sealed under a key
-    only the operator's CLI holds. An agent run cannot open them, and handing it
-    ciphertext it cannot open would only move the failure somewhere less clear.
+    only the operator's CLI holds. Terrapod cannot open them on a caller's
+    behalf, and handing over ciphertext it cannot open would only move the
+    failure somewhere less clear.
     """
 
     def __init__(self, provider: str) -> None:
@@ -56,9 +59,11 @@ class UnreadableSecretsError(Exception):
 class SealedSecretInUploadError(ValueError):
     """An uploaded deployment still carries ciphertext.
 
-    The runner's passphrase dies with its Pod, so a secret sealed under it is
-    unrecoverable once stored. An export without `--show-secrets` is refused
-    rather than silently destroying every secret in the stack.
+    An uploaded deployment is sealed again under Terrapod's own provider, so
+    ciphertext arriving from somewhere else is sealed under a key Terrapod has
+    no way to reach — unrecoverable once stored. An export made without
+    `--show-secrets` is refused rather than silently destroying every secret in
+    the stack.
     """
 
 
@@ -116,12 +121,16 @@ def with_canonical_service_url(
     backend and no error on mismatch -- it simply fails later with
     ``could not find access token for <url>, have you logged in?``.
 
-    That makes a stale URL unrecoverable rather than merely wrong. Agent runs
-    before #1576 wrote the runner's in-cluster API address into this block
-    (`http://terrapod-api:8000/...`), and `service_provider` keeps any prior
-    block as it is -- so those stacks name an address no laptop can resolve,
-    let alone hold a token for. The operator cannot log in to it to satisfy the
-    lookup, because it does not exist outside the cluster.
+    That makes a stale URL unrecoverable rather than merely wrong, and an agent
+    run is how a stack acquires one. A runner reaches the API at its in-cluster
+    address, so a stack it writes names `http://terrapod-api:8000/...` in this
+    block -- an address no laptop can resolve, let alone hold a token for, and
+    one the operator cannot log in to to satisfy the lookup because it does not
+    exist outside the cluster. That was true of the agent runs before #1576,
+    which is what this was written for (#1580), and it is true again of the
+    service-backed ones #1881 restored; nothing on the write path rewrites it,
+    because `service_provider`
+    keeps any prior block as it is and a checkpoint is stored as the CLI sent it.
 
     So the URL is normalised **on the way out**, not in storage:
 
@@ -218,8 +227,8 @@ def seal_secrets(
     """The deployment with every plaintext secret sealed and `provider` set.
 
     The inverse of `reveal_secrets`, and the only form Terrapod stores: whatever
-    provider block arrived is discarded, because it names the runner's
-    passphrase, which no longer exists.
+    provider block arrived is discarded, because it names the uploader's own
+    provider and what is stored is sealed by Terrapod's.
     """
 
     def _seal(secret: dict[str, Any]) -> dict[str, Any]:
@@ -244,11 +253,12 @@ def service_provider(
 ) -> dict[str, Any]:
     """The provider block to store alongside a deployment sealed by Terrapod.
 
-    The prior block is kept when it already names the service provider: a local
-    CLI reads it to find the backend that can open the secrets, so changing it
-    under an operator who is logged in to that URL would break their next read.
-    Only a stack with no service block yet — a first deployment, written by an
-    agent run — gets a fresh one, pointing at the deployment's canonical surface.
+    The prior block is kept when it already names the service provider: a CLI
+    reads it to find the backend that can open the secrets, so changing it under
+    an operator who is logged in to that URL would break their next read. Only a
+    stack with no service block yet — a first deployment, arriving through the
+    hand-over upload route — gets a fresh one, pointing at the deployment's
+    canonical surface.
     """
     if prior and prior.get("type") == SERVICE_PROVIDER:
         return prior
