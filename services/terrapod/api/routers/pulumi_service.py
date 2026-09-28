@@ -848,8 +848,35 @@ async def _begin_update(
     - the Redis stack mutex, SET NX, so a second Pulumi update loses atomically;
     - the workspace lock, as a Terraform CLI apply does, so the dispatcher holds
       agent applies back and a manual lock is respected.
+
+    **An agent run takes the mutex and NOT the workspace lock (#1881), and both
+    of the refusals below are for local callers only.** Every guard here was
+    written when this surface served local CLIs alone, so each one reads an agent
+    run as the thing to protect the stack *from*:
+
+    - `take_workspace_lock` refuses while a run on this workspace is applying.
+      An agent apply IS that run, so it would refuse itself — every agent-mode
+      Pulumi apply would 409 on begin.
+    - the VCS refusal exists because a VCS-connected agent workspace's changes
+      come from the repository rather than someone's laptop. An agent run is the
+      repository's change arriving, so refusing it refuses the only update such a
+      workspace is ever supposed to get.
+
+    Nothing is given up by skipping them. `run_service.get_next_run` already
+    permits one apply-capable run per workspace, and `confirm_run` already 409s
+    on a manual lock, so an agent apply is serialised and lock-respecting before
+    it reaches this surface. The workspace lock stays what it is on the Terraform
+    path — the CLI/manual lock — rather than becoming something run activity sets.
+
+    Branching on the runner token alone is sufficient, and deliberately so: a
+    runner is granted `RUN_APPLY` only on the workspace its own run belongs to
+    (`_runner_caps_on`), and `_authorized_stack` has already required it. So by
+    the time execution reaches here, a runner caller has been proven to be this
+    stack's own apply-capable run.
     """
     from terrapod.redis.client import get_redis_client
+
+    is_runner = user.auth_method == "runner_token"
 
     redis = get_redis_client()
     update_id = str(uuid.uuid4())
@@ -857,7 +884,9 @@ async def _begin_update(
     if kind != "preview":
         # Terraform's rule for a VCS-connected agent workspace: its changes come
         # from the repository, through Terrapod, not from someone's local CLI.
-        if ws.execution_mode == "agent" and ws.vcs_connection_id is not None:
+        # An agent run IS that repository change, so it is not the caller this
+        # refuses (see the docstring).
+        if not is_runner and ws.execution_mode == "agent" and ws.vcs_connection_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
@@ -868,6 +897,8 @@ async def _begin_update(
 
         # SET NX serialises Pulumi updates: the first begin wins, the rest are
         # told why. Same pattern the scheduler uses for its periodic-task mutex.
+        # Taken by an agent run too — this is what keeps a local `pulumi up` from
+        # starting alongside one.
         acquired = await redis.set(
             _stack_lock_key(str(ws.id)), update_id, nx=True, ex=LEASE_TTL_SECONDS
         )
@@ -876,11 +907,16 @@ async def _begin_update(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="another update is currently in progress",
             )
-        try:
-            await take_workspace_lock(db, ws.id, update_id)
-        except LockRefused as exc:
-            await redis.delete(_stack_lock_key(str(ws.id)))
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.message) from None
+        # Not for an agent run: it would refuse itself, since the check is "a run
+        # on this workspace is applying" and that run is this one.
+        if not is_runner:
+            try:
+                await take_workspace_lock(db, ws.id, update_id)
+            except LockRefused as exc:
+                await redis.delete(_stack_lock_key(str(ws.id)))
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail=exc.message
+                ) from None
 
     await redis.hset(
         _update_key(update_id),
