@@ -3,6 +3,7 @@
 import asyncio
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest  # noqa: F401  # used by tests appended later via @pytest.mark.asyncio
@@ -1916,3 +1917,117 @@ class TestClosedPRSessionsAreReconciledInBothModes:
         reconcile.assert_awaited_once()
         # Comment-command polling drives applies, so it stays apply-then-merge only.
         comments.assert_not_awaited()
+
+
+class TestTheMergeCommitIsAttributedToItsPR:
+    """#1878. A post-merge plan+apply is a BRANCH run and carries no PR number.
+
+    That is deliberate rather than an oversight: three separate places in this
+    poller read `vcs_pull_request_number` as "this is a speculative PR run", so
+    writing the number onto these runs would make the commit look unhandled,
+    break the branch-run dedup, and get the run force-cancelled the moment the
+    PR left the open list. The merge commit is therefore the only honest join,
+    and only the provider can make it.
+    """
+
+    def _conn(self):
+        return SimpleNamespace(id=uuid.uuid4(), provider="github")
+
+    def _session(self, pr_number=7):
+        return SimpleNamespace(pr_number=pr_number, merge_commit_sha=None, state="open")
+
+    def _db(self, sessions):
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = sessions
+        db.execute.return_value = result
+        return db
+
+    async def _attribute(self, db, conn, sessions_returned, pulls):
+        from terrapod.services import vcs_poller
+
+        meta = MagicMock()
+
+        async def _get_or_fetch(_key, fetch):
+            return await fetch()
+
+        meta.get_or_fetch = _get_or_fetch
+        with patch.object(vcs_poller, "_provider_pulls_for_commit", AsyncMock(return_value=pulls)):
+            await vcs_poller._attribute_merge_commit(
+                db, conn, "acme", "infra", "cafe1234", meta=meta
+            )
+
+    async def test_the_session_learns_its_merge_commit(self):
+        sess = self._session()
+        db = self._db([sess])
+        await self._attribute(db, self._conn(), [sess], [7])
+        assert sess.merge_commit_sha == "cafe1234"
+
+    async def test_it_is_recorded_as_merged_not_merely_closed(self):
+        """`_reconcile_closed_pr_sessions` stamps `closed` by set difference
+        against the open-PR list and never asks the provider WHY a PR left it,
+        so a PR merged by a human has been indistinguishable from an abandoned
+        one. The provider has now said which this was."""
+        sess = self._session()
+        db = self._db([sess])
+        await self._attribute(db, self._conn(), [sess], [7])
+        assert sess.state == "merged"
+
+    async def test_a_commit_that_closed_no_pr_changes_nothing(self):
+        """The ordinary case for a commit pushed straight at the branch."""
+        sess = self._session()
+        db = self._db([sess])
+        await self._attribute(db, self._conn(), [sess], [])
+        assert sess.merge_commit_sha is None
+        assert sess.state == "open"
+
+    async def test_another_repos_pr_number_is_not_claimed(self):
+        """PR numbers are small and collide across repos, so a number with no
+        session of ours behind it must not be attributed to anything."""
+        sess = self._session(pr_number=7)
+        db = self._db([sess])
+        await self._attribute(db, self._conn(), [sess], [99])
+        assert sess.merge_commit_sha is None
+
+    async def test_the_provider_is_not_asked_when_no_session_could_match(self):
+        """The bound that matters: this is a per-commit API call on the poll
+        path, and most commits belong to repos with nothing to update."""
+        from terrapod.services import vcs_poller
+
+        db = self._db([])
+        meta = MagicMock()
+        called = False
+
+        async def _get_or_fetch(_key, fetch):
+            nonlocal called
+            called = True
+            return await fetch()
+
+        meta.get_or_fetch = _get_or_fetch
+        with patch.object(vcs_poller, "_provider_pulls_for_commit", AsyncMock(return_value=[7])):
+            await vcs_poller._attribute_merge_commit(
+                db, self._conn(), "acme", "infra", "cafe1234", meta=meta
+            )
+        assert called is False
+
+    async def test_it_is_memoised_per_commit_so_a_monorepo_asks_once(self):
+        """Every workspace on a monorepo sees the same new commit, and they are
+        polled independently — without the cycle's cache that is one API call
+        per workspace for one answer."""
+        from terrapod.services import vcs_poller
+
+        sess = self._session()
+        db = self._db([sess])
+        meta = MagicMock()
+        keys: list = []
+
+        async def _get_or_fetch(key, fetch):
+            keys.append(key)
+            return await fetch()
+
+        meta.get_or_fetch = _get_or_fetch
+        with patch.object(vcs_poller, "_provider_pulls_for_commit", AsyncMock(return_value=[7])):
+            await vcs_poller._attribute_merge_commit(
+                db, self._conn(), "acme", "infra", "cafe1234", meta=meta
+            )
+        assert keys and "cafe1234" in keys[0][3]

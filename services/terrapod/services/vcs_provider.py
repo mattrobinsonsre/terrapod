@@ -373,3 +373,23 @@ async def download_archive(conn: VCSConnection, owner: str, repo: str, ref: str)
     if conn.provider == "gitlab":
         return await gitlab_service.download_archive(conn, owner, repo, ref)
     return await github_service.download_repo_archive(conn, owner, repo, ref)
+
+
+async def pull_requests_for_commit(
+    conn: VCSConnection, owner: str, repo: str, sha: str
+) -> list[int]:
+    """The PR/MR numbers a commit belongs to (#1878).
+
+    Unknown providers answer an empty list rather than falling through to
+    GitHub, unlike the four helpers above. Those answer a question every
+    provider has (what is this branch's HEAD); this one exists to attribute a
+    merge, and attributing it to the wrong PR is worse than not attributing it.
+    """
+    from terrapod.services import github_service, gitlab_service
+
+    if conn.provider == "gitlab":
+        return await gitlab_service.pull_requests_for_commit(conn, owner, repo, sha)
+    if conn.provider == "github":
+        return await github_service.pull_requests_for_commit(conn, owner, repo, sha)
+    _logger.warning("pull_requests_for_commit: unknown provider", provider=conn.provider)
+    return []

@@ -566,6 +566,8 @@ class TestCollectRowsEnrichment:
             pr_number = 7
             vcs_connection_id = _uuid.uuid4()
             repo = "acme/infra"
+            # Not merged yet, so no post-merge run to look for (#1878).
+            merge_commit_sha = None
 
         from terrapod.services import ai_policy_service
 
@@ -887,3 +889,107 @@ class TestAllThreeRunTaskBoundariesReachTheComment:
         task_gates = [g for g in gates if g.gate == "run-task"]
         assert len(task_gates) == 1
         assert task_gates[0].passed is False
+
+
+class TestThePostMergeRunReachesTheComment:
+    """#1878: the PR's last word on its own change was a prediction.
+
+    A `merge_then_apply` row renders "will apply on merge" — and then the merge
+    happens, the apply runs, and the comment goes on saying "will apply on
+    merge" for ever, because the session is no longer open and nothing refreshes
+    it. Whoever reviewed the change has to go and find the run themselves to
+    learn whether the thing they approved actually landed.
+    """
+
+    def _row(self, **over):
+        from terrapod.services.vcs_status_comment import _Row
+
+        base = {
+            "workspace_name": "prod",
+            "mode": "merge_then_apply",
+            "plan_summary": "+3 ~1",
+            "apply_summary": "—",
+            "mergeable_summary": "yes",
+        }
+        return _Row(**{**base, **over})
+
+    def test_before_the_merge_it_still_promises(self):
+        from terrapod.services.vcs_status_comment import render_comment
+
+        out = render_comment([self._row()])
+        assert "will apply on merge" in out
+
+    def test_after_the_merge_it_reports(self):
+        from terrapod.services.vcs_status_comment import render_comment
+
+        out = render_comment([self._row(post_merge_summary="applied")])
+        assert "applied" in out
+        # The promise is REPLACED, not joined by the outcome — leaving both
+        # would be the comment asserting a future that has already happened.
+        assert "will apply on merge" not in out
+
+    def test_the_outcome_links_to_the_run_that_produced_it(self):
+        from terrapod.services.vcs_status_comment import render_comment
+
+        out = render_comment(
+            [self._row(post_merge_summary="errored", post_merge_url="https://tp/runs/r1")]
+        )
+        assert "[errored](https://tp/runs/r1)" in out
+
+    def test_an_apply_then_merge_row_gains_the_outcome_too(self):
+        """Additive detail there rather than a correction: that row already
+        showed an apply, but it showed the PR-head one."""
+        from terrapod.services.vcs_status_comment import render_comment
+
+        out = render_comment(
+            [
+                self._row(
+                    mode="apply_then_merge", apply_summary="applied", post_merge_summary="errored"
+                )
+            ]
+        )
+        assert "errored" in out
+
+    def test_a_failure_after_merge_is_not_reported_as_success(self):
+        from terrapod.services.vcs_status_comment import _post_merge_summary
+
+        assert _post_merge_summary(SimpleNamespace(status="errored")) == "errored"
+        assert _post_merge_summary(SimpleNamespace(status="applied")) == "applied"
+
+    def test_a_run_still_going_says_so(self):
+        from terrapod.services.vcs_status_comment import _post_merge_summary
+
+        assert _post_merge_summary(SimpleNamespace(status="applying")) == "applying"
+        assert _post_merge_summary(SimpleNamespace(status="planning")) == "running"
+
+    def test_a_held_apply_is_not_mistaken_for_a_finished_one(self):
+        """`planned` means the apply did not happen — a gate is holding it, or
+        the workspace does not auto-apply. Reporting that as `applied` would be
+        the exact failure this issue exists to fix, one state further on."""
+        from terrapod.services.vcs_status_comment import _post_merge_summary
+
+        assert _post_merge_summary(SimpleNamespace(status="planned")) == "awaiting apply"
+
+    def test_no_run_yet_leaves_the_row_exactly_as_it_was(self):
+        from terrapod.services.vcs_status_comment import _post_merge_summary
+
+        assert _post_merge_summary(None) == ""
+
+
+class TestAMergedSessionIsStillEditable:
+    """The guard that froze the comment (#1878).
+
+    `handle_vcs_status_comment_update` returned on any session that was not
+    `open`, and the poller closes the session the moment the PR leaves the open
+    list — which is strictly before the post-merge run finishes. So the one
+    update this feature exists to make was the one the handler refused.
+    """
+
+    def test_open_and_merged_are_live_and_closed_is_not(self):
+        from terrapod.services.vcs_status_comment import _LIVE_SESSION_STATES
+
+        assert "open" in _LIVE_SESSION_STATES
+        assert "merged" in _LIVE_SESSION_STATES
+        # A PR abandoned without merging sets off no runs; there is nothing
+        # further to learn, so its comment is left alone.
+        assert "closed" not in _LIVE_SESSION_STATES

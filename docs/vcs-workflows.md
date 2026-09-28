@@ -78,6 +78,12 @@ Each workspace name links to its run. The comment ends with an `*Updated <timest
 - **Cost Δ** — the **monthly delta this run introduces**, not the workspace's projected total: what merging costs, positive or negative. A priced plan that changes no spend says `no change`; `—` means the run produced no cost estimate (cost estimation off, or the plan never finished). The same figures are in the run's `cost-estimate` artifact.
 - **Apply** / **Mergeable** — where the run stands, and whether the VCS side will let it merge (see *Troubleshooting* for a blocked mergeability check).
 
+**After the merge, the Apply column reports what actually happened.** Merging sets off a plan+apply on every affected workspace, and the comment picks those runs up and replaces the prediction with the outcome — `applied`, `errored`, `applying`, or `awaiting apply` when something is holding the apply back — each linked to the run that produced it. A five-workspace PR converges over a few refreshes, one per workspace, the same way the pre-merge rows do.
+
+So a `merge_then_apply` row reads `will apply on merge` while the PR is open, and then reports whether it did. Before this, it said `will apply on merge` for ever, and whoever reviewed the change had to go and find the runs themselves to learn whether what they approved had landed.
+
+Terrapod asks the provider which pull request a merge commit came from, so this works however the merge was performed — including a human clicking Merge in the web UI, which is the case Terrapod has no other record of. A commit pushed straight to the tracked branch belongs to no PR, gets no comment, and costs one cached lookup.
+
 Below the table, each workspace with gates that can actually block gets a collapsed block naming every one of them and how it ruled:
 
 ```
