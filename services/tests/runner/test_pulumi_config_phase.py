@@ -261,3 +261,40 @@ class TestNothingSensitiveIsLogged:
         assert 'e.get("key")' in src
         assert 'e.get("value")' not in src
         assert "entry.get('value')" not in src
+
+
+class TestTheMergeWithACommittedStackFileIsPerKey:
+    """The decided rule is that Terrapod's config overrides a committed
+    `Pulumi.<stack>.yaml` key of the same name and leaves every other key in
+    that file alone (#1565).
+
+    That is not something this code implements — it is what `pulumi config set`
+    does, verified against the CLI: setting a key that already exists in the
+    file replaces just that entry, and keys never set survive. What this code
+    must do is keep *using* that mechanism, so the guard is on the mechanism.
+    """
+
+    def test_it_never_replaces_the_stack_config_file(self, tmp_path, fake_pulumi) -> None:
+        """`--config-file` does not merge — it tells pulumi to use the named file
+        *instead of* the detected one. Collapsing these calls into one write of a
+        generated file would look like a tidy-up and would silently discard every
+        committed key the workspace does not set, which is the opposite of the
+        rule. `set-all` is the same trap in a smaller package.
+        """
+        path = _write(tmp_path, [{"key": "a", "value": "1"}, {"key": "b", "value": "2"}])
+        pulumi_config.apply(str(fake_pulumi), stack="s", path=path)
+        for argv in _argv_calls(tmp_path):
+            assert "--config-file" not in argv
+            assert "set-all" not in argv
+
+    def test_each_key_is_set_on_its_own(self, tmp_path, fake_pulumi) -> None:
+        """One invocation per key is what keeps the write per-key. It also keeps
+        the values on separate stdin writes, which is what lets each one carry a
+        value containing anything at all."""
+        path = _write(tmp_path, [{"key": "a", "value": "1"}, {"key": "b", "value": "2"}])
+        pulumi_config.apply(str(fake_pulumi), stack="s", path=path)
+        calls = _argv_calls(tmp_path)
+        assert len(calls) == 2
+        for argv in calls:
+            # The fake records "$@", so argv[0] (the binary) is not in it.
+            assert argv[:2] == ["config", "set"]
