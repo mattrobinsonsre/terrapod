@@ -63,7 +63,10 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only.",
 			},
 			"category": schema.StringAttribute{
-				Required: true, Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.",
+				Required: true, Description: "Category: terraform, env, pulumi_config, git_http_auth, or git_ssh_auth. " +
+					"pulumi_config is Pulumi stack config, set on the stack before the " +
+					"preview; on it, `sensitive` makes a real Pulumi secret and " +
+					"`structured` sets a nested value rather than a literal dotted key.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"structured": schema.BoolAttribute{

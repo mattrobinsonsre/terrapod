@@ -436,3 +436,86 @@ func mustVarClient(t *testing.T, srv *httptest.Server) *Client {
 	}
 	return c
 }
+
+func TestCreateVariable_PulumiConfigCategory(t *testing.T) {
+	// Pulumi stack config (#1565). Pass-through on the SDK side like the
+	// git-auth categories, but the two flags it rides on mean something
+	// specific downstream, so the contract is that they are transmitted
+	// unchanged: `sensitive` becomes `pulumi config set --secret` (a real
+	// Pulumi secret, encrypted by the stack's secrets provider), and
+	// `structured` becomes `--path` (a nested config value rather than a
+	// literal dotted key).
+	c, _, lastBody := newVarFixture(t)
+	_, err := c.CreateVariable(t.Context(), "ws-aaa", CreateVariableRequest{
+		Key:        "aws:region",
+		Value:      "eu-west-1",
+		Category:   "pulumi_config",
+		Sensitive:  true,
+		Structured: true,
+	})
+	if err != nil {
+		t.Fatalf("CreateVariable: %v", err)
+	}
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(*lastBody, &req); err != nil {
+		t.Fatal(err)
+	}
+	if got := req.Data.Attributes["category"]; got != "pulumi_config" {
+		t.Errorf("category = %v, want pulumi_config", got)
+	}
+	// Verbatim: Pulumi namespaces an unqualified key to the project itself and
+	// the explicit `aws:region` form must survive untouched, so the SDK must
+	// not normalise, split or prefix it (#1407 §6).
+	if got := req.Data.Attributes["key"]; got != "aws:region" {
+		t.Errorf("key = %v, want aws:region verbatim", got)
+	}
+	if v, _ := req.Data.Attributes["sensitive"].(bool); !v {
+		t.Errorf("sensitive should be true: %+v", req.Data.Attributes)
+	}
+	if v, _ := req.Data.Attributes["structured"].(bool); !v {
+		t.Errorf("structured should be true: %+v", req.Data.Attributes)
+	}
+}
+
+func TestVariable_AppliesToEngine(t *testing.T) {
+	// False is the meaningful value -- it is what says the variable does
+	// nothing on this workspace's engine -- so it must survive a decode rather
+	// than being indistinguishable from an absent field on a struct that
+	// defaults it to false anyway. Decoding both ways is what proves the tag is
+	// right; a single false case would pass with no tag at all.
+	for _, tc := range []struct {
+		name string
+		body string
+		want bool
+	}{
+		{"engine reads it", `{"data":[{"id":"var-a","type":"vars","attributes":{"key":"k","category":"pulumi_config","applies-to-engine":true}}]}`, true},
+		{"engine never reads it", `{"data":[{"id":"var-a","type":"vars","attributes":{"key":"k","category":"pulumi_config","applies-to-engine":false}}]}`, false},
+		// An older server does not send it at all. False is the safe decode:
+		// a consumer acting on it is told to read the workspace's engine too,
+		// so an absent field cannot be mistaken for an authoritative verdict.
+		{"older server omits it", `{"data":[{"id":"var-a","type":"vars","attributes":{"key":"k","category":"pulumi_config"}}]}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/vnd.api+json")
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			t.Cleanup(srv.Close)
+			c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, err := c.GetVariable(t.Context(), "ws-aaa", "var-a")
+			if err != nil {
+				t.Fatalf("GetVariable: %v", err)
+			}
+			if v.AppliesToEngine != tc.want {
+				t.Errorf("AppliesToEngine = %v, want %v", v.AppliesToEngine, tc.want)
+			}
+		})
+	}
+}

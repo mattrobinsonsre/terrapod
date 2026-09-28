@@ -18,7 +18,7 @@ type Variable struct {
 	ID       string `json:"id"`
 	Key      string `json:"key"`
 	Value    string `json:"value,omitempty"`
-	Category string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
+	Category string `json:"category"` // "terraform" | "env" | "pulumi_config" | "git_http_auth" | "git_ssh_auth"
 	// Structured reports whether the value is a typed expression rather than a
 	// plain string. HCL is the same flag under its original name — /api/v2
 	// returns both, always equal, because tfci and go-tfe read "hcl" (#1435).
@@ -44,6 +44,25 @@ type Variable struct {
 	// or non-Vault variable.
 	ValueSource string `json:"value-source,omitempty"`
 
+	// AppliesToEngine reports whether a run on the owning workspace's engine
+	// would deliver this variable at all (#1565). It is false for a category
+	// the engine never reads -- `pulumi_config` on a Terraform workspace, or
+	// `terraform` on a Pulumi one.
+	//
+	// Such a variable is NOT refused at write time: variables are data, and
+	// which of them apply is decided at run time by the engine that runs
+	// (#1407 §6). This field is how the mismatch is surfaced instead, so a
+	// value an operator set and watched do nothing is visible rather than
+	// silent. The owning workspace also raises a `variables_not_consumed`
+	// health condition while it holds one.
+	//
+	// Absent from an older server's response, where it decodes as false. A
+	// consumer that would act on it should read it alongside the workspace's
+	// engine rather than treating false as authoritative on its own.
+	// No omitempty: false is the meaningful value here -- it is what says the
+	// variable does nothing -- and omitting it would erase the signal.
+	AppliesToEngine bool `json:"applies-to-engine"`
+
 	VersionID string `json:"version-id,omitempty"`
 	CreatedAt string `json:"created-at,omitempty"`
 	UpdatedAt string `json:"updated-at,omitempty"`
@@ -55,7 +74,7 @@ type Variable struct {
 type CreateVariableRequest struct {
 	Key      string `json:"key"`
 	Value    string `json:"value"`
-	Category string `json:"category"` // "terraform" | "env" | "git_http_auth" | "git_ssh_auth"
+	Category string `json:"category"` // "terraform" | "env" | "pulumi_config" | "git_http_auth" | "git_ssh_auth"
 	// Set either; Structured is preferred. Setting both to different values is
 	// rejected by the server rather than silently resolved (#1435).
 	Structured  bool   `json:"structured,omitempty"`
@@ -310,8 +329,11 @@ func variableFromResource(res *Resource) *Variable {
 		Sensitive:   GetBoolAttr(res, "sensitive"),
 		Description: GetStringAttr(res, "description"),
 		ValueSource: GetStringAttr(res, "value-source"),
-		VersionID:   GetStringAttr(res, "version-id"),
-		CreatedAt:   GetStringAttr(res, "created-at"),
-		UpdatedAt:   GetStringAttr(res, "updated-at"),
+		// #1565. Absent on an older server, where it reads as false -- see the
+		// field's own comment for why that is the safe default.
+		AppliesToEngine: GetBoolAttr(res, "applies-to-engine"),
+		VersionID:       GetStringAttr(res, "version-id"),
+		CreatedAt:       GetStringAttr(res, "created-at"),
+		UpdatedAt:       GetStringAttr(res, "updated-at"),
 	}
 }

@@ -800,7 +800,7 @@
       "additionalProperties": false,
       "properties": {
         "category": {
-          "description": "terraform, env, git_http_auth, or git_ssh_auth (default terraform); the git_* categories carry private-git-module credentials as a JSON value and are always sensitive",
+          "description": "terraform, env, pulumi_config, git_http_auth, or git_ssh_auth (default terraform); the git_* categories carry private-git-module credentials as a JSON value and are always sensitive; pulumi_config is Pulumi stack config, valid on any workspace but only delivered by a Pulumi run",
           "type": "string"
         },
         "description": {

@@ -215,7 +215,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...)"`
 		Key         string `json:"key" jsonschema:"the variable key"`
 		Value       string `json:"value,omitempty" jsonschema:"the value (empty is legal, e.g. flag-shaped env vars)"`
-		Category    string `json:"category,omitempty" jsonschema:"terraform, env, git_http_auth, or git_ssh_auth (default terraform); the git_* categories carry private-git-module credentials as a JSON value and are always sensitive"`
+		Category    string `json:"category,omitempty" jsonschema:"terraform, env, pulumi_config, git_http_auth, or git_ssh_auth (default terraform); the git_* categories carry private-git-module credentials as a JSON value and are always sensitive; pulumi_config is Pulumi stack config, valid on any workspace but only delivered by a Pulumi run"`
 		Structured  *bool  `json:"structured,omitempty" jsonschema:"the value is a typed expression rather than a plain string (lists/objects/numbers/bools); default false"`
 		HCL         *bool  `json:"hcl,omitempty" jsonschema:"deprecated alias for structured; both are the same flag"`
 		Sensitive   *bool  `json:"sensitive,omitempty" jsonschema:"mark sensitive — masked at rest and in responses; default false"`
@@ -226,6 +226,8 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Name: "terrapod_variable_set",
 		Description: "Set a workspace variable — creates it if the key is new, updates it in place if it exists (an upsert keyed on `key`). " +
 			"category defaults to terraform; set category=env for an environment variable, or git_http_auth/git_ssh_auth for private-git-module credentials (JSON value, always sensitive — see the module-auth docs). Set structured=true for non-string values (lists/objects/numbers); `hcl` is its deprecated alias. " +
+			"On a Pulumi workspace use category=pulumi_config for stack config: the key passes through verbatim (including a namespaced form such as aws:region), sensitive=true makes it a real Pulumi secret so the engine renders it as [secret] in previews and state, and structured=true sets a nested value rather than a literal dotted key. It overrides a committed Pulumi.<stack>.yaml key of the same name and leaves the rest of that file alone. " +
+			"A category the workspace's engine never reads is accepted rather than refused, and reported back with applies-to-engine=false. " +
 			"Set value_source=vault to store a reference to an OpenBao (or HashiCorp Vault) secret instead of a literal, so the secret stays in OpenBao/Vault and is read per run — an unresolvable reference fails the run rather than delivering nothing. " +
 			"A reference with a \"file\" object delivers the secret as a file and the variable holds its path, for providers and tools that only read credentials from a file. Returns the variable.",
 		Annotations: mutating,

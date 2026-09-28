@@ -76,7 +76,7 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 			"varset_id": schema.StringAttribute{Required: true, Description: "Variable set ID this variable belongs to.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"key":       schema.StringAttribute{Required: true, Description: "Variable name."},
 			"value":     schema.StringAttribute{Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only."},
-			"category":  schema.StringAttribute{Required: true, Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"category":  schema.StringAttribute{Required: true, Description: "Category: terraform, env, pulumi_config, git_http_auth, or git_ssh_auth.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"structured": schema.BoolAttribute{
 				Optional: true, Computed: true,
 				Description:   "Whether the value is a typed expression rather than a plain string.",
