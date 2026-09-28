@@ -35,6 +35,7 @@ from terrapod.db.models import (
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service
 from terrapod.services.workspace_autodiscovery_service import (
+    derive_pulumi_workspace_name,
     derive_root_directory,
     derive_workspace_name,
 )
@@ -42,6 +43,105 @@ from terrapod.services.workspace_autodiscovery_service import (
 logger = get_logger(__name__)
 
 LIFECYCLE_SOURCE = "autodiscovery-lifecycle"
+
+
+def classify_for_rule(
+    rule: AutodiscoveryRule, file_changes: list[dict[str, str | None]]
+) -> dict[str, Any]:
+    """Change intent in this rule's own units (#1570).
+
+    Normalises BOTH engines to `(root, stack | None)` so every reconciler below
+    works on one shape. Terraform's unit is the directory, carried as
+    `(root, None)` -- which is also exactly what `_autodiscovered_ws` wants for
+    a workspace whose `stack` is NULL, so the two agree without a special case
+    at each call site.
+    """
+    if (getattr(rule, "engine", "") or "terraform") == "pulumi":
+        return classify_stack_changes(file_changes)
+    cls = classify_dir_changes(file_changes)
+    return {
+        "deleted": {(d, None) for d in cls["deleted"]},
+        "renamed": [((o, None), (n, None)) for o, n in cls["renamed"]],
+        "ambiguous": {(a, None) for a in cls["ambiguous"]},
+    }
+
+
+def classify_stack_changes(
+    file_changes: list[dict[str, str | None]],
+) -> dict[str, Any]:
+    """Pure: the same reduction as `classify_dir_changes`, over (dir, stack).
+
+    A Pulumi workspace is one stack, so the intent that matters is per stack
+    file, not per directory: removing `Pulumi.dev.yaml` while `Pulumi.prod.yaml`
+    stays is one workspace gone and the directory very much alive. Feeding that
+    to the directory classifier answers "nothing was deleted", so the flag never
+    fires -- and, in the other direction, a directory whose stacks were ALL
+    removed would read as one deletion rather than several.
+
+    Returns the same shape, keyed by `(root, stack)` instead of `root`:
+    ``{"deleted": set[(root, stack)], "renamed": list[((root,stack),(root,stack))],
+    "ambiguous": set[(root, stack)]}``.
+
+    **Deliberately stricter than the directory classifier.** That one infers a
+    rename from add/remove symmetry across basenames, because a squash merge
+    loses per-file `renamed` status. A stack has exactly one file, so there is
+    no set to compare and no symmetry to lean on -- a removed stack and an
+    added one in the same push are indistinguishable from a delete plus an
+    unrelated create. So a rename is recognised ONLY from an explicit
+    `renamed` status, and a removal that coincides with any addition in the
+    same directory is **ambiguous, never deleted**. Ambiguous is surfaced for a
+    human and never auto-acted on (#314), which is the safe direction: the cost
+    of a missed rename is a flagged workspace, the cost of a missed ambiguity
+    is a destroyed one.
+    """
+    from terrapod.services.workspace_autodiscovery_service import (
+        derive_root_directory,
+        pulumi_stack_of,
+    )
+
+    def unit(path: str | None) -> tuple[str, str] | None:
+        if not path:
+            return None
+        stack = pulumi_stack_of(path)
+        return (derive_root_directory(path), stack) if stack else None
+
+    removed: set[tuple[str, str]] = set()
+    added: set[tuple[str, str]] = set()
+    renamed: list[tuple[tuple[str, str], tuple[str, str]]] = []
+
+    for ch in file_changes:
+        status = (ch.get("status") or "").lower()
+        path = ch.get("path") or ch.get("filename")
+        previous = ch.get("previous_path") or ch.get("previous_filename")
+        if status == "renamed":
+            src, dst = unit(previous), unit(path)
+            if src and dst and src != dst:
+                renamed.append((src, dst))
+            elif dst:
+                added.add(dst)
+            elif src:
+                removed.add(src)
+            continue
+        u = unit(path)
+        if u is None:
+            continue
+        if status in ("removed", "deleted"):
+            removed.add(u)
+        else:
+            added.add(u)
+
+    renamed_sources = {src for src, _ in renamed}
+    renamed_targets = {dst for _, dst in renamed}
+
+    # A removal in a directory that also gained a stack is not a clean delete:
+    # it could be the rename a squash merge flattened. Never auto-acted on.
+    added_dirs = {root for root, _ in added | renamed_targets}
+    deleted: set[tuple[str, str]] = set()
+    ambiguous: set[tuple[str, str]] = set()
+    for u in removed - renamed_sources:
+        (ambiguous if u[0] in added_dirs else deleted).add(u)
+
+    return {"deleted": deleted, "renamed": renamed, "ambiguous": ambiguous}
 
 
 def classify_dir_changes(
@@ -141,15 +241,24 @@ def classify_dir_changes(
 
 
 async def _autodiscovered_ws(
-    db: AsyncSession, rule: AutodiscoveryRule, root: str
+    db: AsyncSession, rule: AutodiscoveryRule, root: str, stack: str | None = None
 ) -> Workspace | None:
-    """The active autodiscovered workspace this rule owns at `root`."""
+    """The active autodiscovered workspace this rule owns at `root`.
+
+    `stack` completes the address for a Pulumi rule (#1570). A Pulumi directory
+    normally holds several stacks, so filtering on the directory alone matches
+    every sibling and `scalar_one_or_none` RAISES rather than answering -- and
+    this is the lookup every flag and destroy decision is made from. `None`
+    means "not stack-scoped", which is every Terraform workspace.
+    """
+    stack_filter = Workspace.stack.is_(None) if stack is None else Workspace.stack == stack
     res = await db.execute(
         select(Workspace).where(
             Workspace.autodiscovery_rule_id == rule.id,
             Workspace.vcs_connection_id == rule.vcs_connection_id,
             Workspace.vcs_repo_url == rule.repo_url,
             Workspace.working_directory == root,
+            stack_filter,
             Workspace.lifecycle_state == "active",
         )
     )
@@ -224,13 +333,18 @@ async def rename_target_dirs_to_suppress(
     """
     if file_changes is None:
         return set()
-    cls = classify_dir_changes(file_changes)
     out: set[str] = set()
-    for old, new in cls["renamed"]:
-        for rule in rules:
-            if await _autodiscovered_ws(db, rule, old) is not None:
+    for rule in rules:
+        cls = classify_for_rule(rule, file_changes)
+        for (old, old_stack), (new, _new_stack) in cls["renamed"]:
+            if await _autodiscovered_ws(db, rule, old, old_stack) is not None:
+                # Deliberately the DIRECTORY, not the unit: the caller uses this
+                # as `skip_roots`, which suppresses speculative creation by
+                # directory. For a Pulumi rename that suppresses the renamed
+                # stack's siblings too -- broader than necessary, and in the
+                # safe direction, since the merge path re-classifies and moves
+                # the workspace in place rather than creating a duplicate.
                 out.add(new)
-                break
     return out
 
 
@@ -327,10 +441,10 @@ async def reconcile_open_pr(
     """
     if file_changes is None:
         return
-    cls = classify_dir_changes(file_changes)
+    cls = classify_for_rule(rule, file_changes)
 
-    for d in sorted(cls["deleted"]):
-        ws = await _autodiscovered_ws(db, rule, d)
+    for d, d_stack in sorted(cls["deleted"]):
+        ws = await _autodiscovered_ws(db, rule, d, d_stack)
         if ws is None:
             continue
         # Dedupe: one speculative destroy plan per (workspace, head_sha).
@@ -374,8 +488,8 @@ async def reconcile_open_pr(
             ),
         )
 
-    for old, new in cls["renamed"]:
-        ws = await _autodiscovered_ws(db, rule, old)
+    for (old, old_stack), (new, _new_stack) in cls["renamed"]:
+        ws = await _autodiscovered_ws(db, rule, old, old_stack)
         if ws is None:
             continue
         await _notify_once(
@@ -392,8 +506,8 @@ async def reconcile_open_pr(
             f"(state & history preserved — no destroy).",
         )
 
-    for amb in sorted(cls["ambiguous"]):
-        ws = await _autodiscovered_ws(db, rule, amb)
+    for amb, amb_stack in sorted(cls["ambiguous"]):
+        ws = await _autodiscovered_ws(db, rule, amb, amb_stack)
         if ws is None:
             continue
         await _notify_once(
@@ -413,11 +527,15 @@ async def reconcile_open_pr(
 
 
 async def _dir_absent_on_branch(
-    conn: VCSConnection, owner: str, repo: str, branch: str, root: str
+    conn: VCSConnection, owner: str, repo: str, branch: str, root: str, stack: str | None = None
 ) -> bool:
-    """Re-verify a directory really is gone from the tracked branch
-    before any flag/destroy. Returns False (do NOT act) if the tree
-    can't be listed or is truncated — fail safe.
+    """Re-verify the unit really is gone from the tracked branch before any
+    flag/destroy. Returns False (do NOT act) if the tree can't be listed or is
+    truncated — fail safe.
+
+    For a Pulumi workspace the unit is the STACK FILE, not the directory
+    (#1570): its siblings keep the directory alive, so a directory check would
+    answer "still there" for a stack that has genuinely gone.
     """
     try:
         if conn.provider == "gitlab":
@@ -428,6 +546,16 @@ async def _dir_absent_on_branch(
         return False
     if tree is None:  # truncated — never act on incomplete data
         return False
+    if stack is not None:
+        # A Pulumi workspace is one stack, so what has to be gone is that
+        # stack's own file -- not the directory, which its siblings still
+        # occupy. Checking the directory here would answer "still present" for
+        # a genuinely removed stack, and the flag would never fire.
+        candidates = {
+            f"{root.rstrip('/')}/Pulumi.{stack}.yaml" if root else f"Pulumi.{stack}.yaml",
+            f"{root.rstrip('/')}/Pulumi.{stack}.yml" if root else f"Pulumi.{stack}.yml",
+        }
+        return not any(p in candidates for p in tree)
     prefix = root.rstrip("/") + "/"
     return not any(p == root or p.startswith(prefix) for p in tree)
 
@@ -447,11 +575,11 @@ async def reconcile_branch_advance(
     """
     if file_changes is None:
         return
-    cls = classify_dir_changes(file_changes)
+    cls = classify_for_rule(rule, file_changes)
 
     # Renames: move the existing workspace in place (state preserved).
-    for old, new in cls["renamed"]:
-        ws = await _autodiscovered_ws(db, rule, old)
+    for (old, old_stack), (new, new_stack) in cls["renamed"]:
+        ws = await _autodiscovered_ws(db, rule, old, old_stack)
         if ws is None:
             continue
         # The open-PR autodiscovery will already have created a
@@ -497,7 +625,13 @@ async def reconcile_branch_advance(
                 continue
         ws.working_directory = new
         ws.trigger_prefixes = [new] if new else []
-        if rule.name_template:
+        if new_stack is not None:
+            # The stack moved with it, and the name follows the stack rather
+            # than the rule's template -- a Pulumi workspace IS `project::stack`
+            # and a stale half would address different state.
+            ws.stack = new_stack
+            ws.name = derive_pulumi_workspace_name(new, new_stack)
+        elif rule.name_template:
             ws.name = derive_workspace_name(rule, new)
         _audit(db, "autodiscovery.workspace_moved", ws, f"{old} -> {new}")
         logger.info(
@@ -507,12 +641,12 @@ async def reconcile_branch_advance(
             new=new,
         )
 
-    # Deletes + ambiguous: only after re-verifying the dir is truly gone.
-    for d in sorted(cls["deleted"] | cls["ambiguous"]):
-        ws = await _autodiscovered_ws(db, rule, d)
+    # Deletes + ambiguous: only after re-verifying the unit is truly gone.
+    for d, d_stack in sorted(cls["deleted"] | cls["ambiguous"]):
+        ws = await _autodiscovered_ws(db, rule, d, d_stack)
         if ws is None:
             continue
-        if not await _dir_absent_on_branch(conn, owner, repo, branch, d):
+        if not await _dir_absent_on_branch(conn, owner, repo, branch, d, d_stack):
             continue  # still present (or unverifiable) — do nothing
         if d in cls["ambiguous"] or rule.on_directory_delete != "destroy":
             ws.lifecycle_state = "pending_deletion"
@@ -633,7 +767,9 @@ async def reconcile_orphans(
             continue  # reopened since we listed PRs — leave it alone
 
         # Origin PR closed WITHOUT merging → genuine orphan.
-        if not await _dir_absent_on_branch(conn, owner, repo, branch, ws.working_directory):
+        if not await _dir_absent_on_branch(
+            conn, owner, repo, branch, ws.working_directory, ws.stack
+        ):
             continue  # dir somehow present — legitimate, do nothing
         if await _has_state(db, ws.id):
             ws.lifecycle_state = "pending_deletion"

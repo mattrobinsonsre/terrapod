@@ -740,3 +740,101 @@ class TestReconcileOrphans:
 
         assert ws.lifecycle_state == "active"
         m_state.assert_not_awaited()
+
+
+class TestStackLevelClassification:
+    """A Pulumi workspace is one stack, so intent is per stack file (#1570).
+
+    The directory classifier cannot express this. Removing `Pulumi.dev.yaml`
+    while `Pulumi.prod.yaml` stays is one workspace gone and a directory very
+    much alive — which that classifier reads as "nothing deleted", so the flag
+    never fires. In the other direction, a directory whose stacks were all
+    removed reads as one deletion rather than several.
+    """
+
+    def _c(self, changes):
+        from terrapod.services.autodiscovery_lifecycle_service import classify_stack_changes
+
+        return classify_stack_changes(changes)
+
+    def test_a_removed_stack_is_deleted_even_though_its_directory_survives(self):
+        out = self._c([{"status": "removed", "path": "infra/app/Pulumi.dev.yaml"}])
+        assert out["deleted"] == {("infra/app", "dev")}
+        assert out["ambiguous"] == set()
+
+    def test_a_removal_beside_an_addition_is_ambiguous_never_deleted(self):
+        """The squash-merge case, and the reason this classifier is stricter
+        than the directory one.
+
+        A stack is a single file, so there is no basename set to compare and no
+        add/remove symmetry to infer a rename from — a removed stack and an
+        added one are indistinguishable from a delete plus an unrelated create.
+        Ambiguous is surfaced for a human and never auto-acted on: the cost of
+        a missed rename is a flagged workspace, the cost of a missed ambiguity
+        is a destroyed one.
+        """
+        out = self._c(
+            [
+                {"status": "removed", "path": "infra/app/Pulumi.dev.yaml"},
+                {"status": "added", "path": "infra/app/Pulumi.staging.yaml"},
+            ]
+        )
+        assert out["deleted"] == set(), "a possible squashed rename was treated as a delete"
+        assert out["ambiguous"] == {("infra/app", "dev")}
+
+    def test_an_explicit_rename_is_a_rename(self):
+        out = self._c(
+            [
+                {
+                    "status": "renamed",
+                    "path": "infra/app/Pulumi.staging.yaml",
+                    "previous_path": "infra/app/Pulumi.dev.yaml",
+                }
+            ]
+        )
+        assert out["renamed"] == [(("infra/app", "dev"), ("infra/app", "staging"))]
+        assert out["deleted"] == set()
+
+    def test_terraform_files_are_not_stacks(self):
+        out = self._c([{"status": "removed", "path": "infra/app/main.tf"}])
+        assert out == {"deleted": set(), "renamed": [], "ambiguous": set()}
+
+    def test_the_project_file_names_no_stack(self):
+        """`Pulumi.yaml` declares the project. It is not a unit of state, so
+        removing it is not a workspace deletion on its own."""
+        out = self._c([{"status": "removed", "path": "infra/app/Pulumi.yaml"}])
+        assert out["deleted"] == set()
+
+    def test_sibling_stacks_are_independent_units(self):
+        out = self._c(
+            [
+                {"status": "removed", "path": "infra/app/Pulumi.dev.yaml"},
+                {"status": "removed", "path": "infra/app/Pulumi.prod.yaml"},
+            ]
+        )
+        assert out["deleted"] == {("infra/app", "dev"), ("infra/app", "prod")}
+
+
+class TestTheStackAwareLookupAndReverification:
+    def test_the_lookup_filters_on_the_stack(self):
+        """Without this the query matches every sibling stack in the directory
+        and `scalar_one_or_none` RAISES — and this is the lookup every flag and
+        destroy decision is made from."""
+        import inspect
+
+        from terrapod.services import autodiscovery_lifecycle_service as mod
+
+        src = inspect.getsource(mod._autodiscovered_ws)
+        assert "stack_filter" in src
+        assert "Workspace.stack.is_(None)" in src
+
+    def test_absence_is_re_verified_against_the_stack_file(self):
+        """A Pulumi stack's siblings keep its directory alive, so a directory
+        check would answer 'still present' for a stack that has genuinely gone
+        and the flag would never fire."""
+        import inspect
+
+        from terrapod.services import autodiscovery_lifecycle_service as mod
+
+        src = inspect.getsource(mod._dir_absent_on_branch)
+        assert "Pulumi." in src and "stack is not None" in src
