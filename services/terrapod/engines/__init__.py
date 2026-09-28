@@ -80,6 +80,17 @@ class EngineStrategy(Protocol):
     #: failure than not gating at all.
     evaluates_ai_policy: bool
 
+    #: Whether `drift_ignore_rules` may be applied to this engine's drift run
+    #: (#1561). The rules are globs over Terraform attribute PATHS, matched by
+    #: `drift_ignore_classifier` against `resource_changes`/`resource_drift` in
+    #: an OpenTofu-format plan. An engine whose uploaded plan artifact is not
+    #: that document must answer False -- and this one fails OPEN, which is why
+    #: it needs its own flag rather than reusing one above. Handed a document it
+    #: cannot read, the classifier finds nothing drifted and reports the
+    #: workspace CLEAN; none of `_apply_drift_ignore_rules`' conservative
+    #: fallbacks fire, because nothing errored.
+    honours_drift_ignore_rules: bool
+
     def build_job_spec(self, **kwargs: Any) -> dict:
         """Build the Kubernetes Job spec for one phase of a run."""
         ...
@@ -159,6 +170,21 @@ def evaluates_ai_policy(engine: str | None) -> bool:
     """
     strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
     return True if strategy is None else strategy.evaluates_ai_policy
+
+
+def honours_drift_ignore_rules(engine: str | None) -> bool:
+    """Whether a drift run of this engine may be filtered by `drift_ignore_rules`.
+
+    **An unknown engine answers False, unlike the three predicates above.** They
+    fail closed by answering True because gating is the safe direction for them.
+    Here the safe direction is the opposite: answering True hands the classifier
+    a document it may not understand, and being unable to read it looks exactly
+    like "nothing drifted". For a row nobody can vouch for, reporting drift is
+    the conservative answer -- the same choice `_apply_drift_ignore_rules`
+    already makes on every one of its own failure paths.
+    """
+    strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
+    return False if strategy is None else strategy.honours_drift_ignore_rules
 
 
 def known_engines() -> tuple[str, ...]:

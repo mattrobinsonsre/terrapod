@@ -98,6 +98,10 @@ class TerraformStrategy:
     #: resource the plan touches (#1766).
     evaluates_ai_policy = True
 
+    #: The rules are Terraform attribute paths and this is the plan they were
+    #: written against (#482).
+    honours_drift_ignore_rules = True
+
     def container_env(
         self, options: TerraformRunOptions, runner_config: RunnerConfig
     ) -> list[dict[str, Any]]:

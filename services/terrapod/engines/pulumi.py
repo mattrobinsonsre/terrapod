@@ -106,6 +106,23 @@ class PulumiStrategy:
     #: a result that never comes.
     evaluates_security_scans = False
 
+    #: Drift-ignore rules, no -- and this one failed OPEN, which is why it is
+    #: called out separately (#1561). A preview uploads a document to the plan
+    #: JSON key, so `has_json_output` is True and `handle_drift_run_completed`
+    #: took the filtering branch. But the document is the preview DIGEST, not an
+    #: OpenTofu-format plan, so `drift_ignore_classifier` found no
+    #: `resource_changes`/`resource_drift`, concluded nothing was drifted, and
+    #: marked a genuinely drifted workspace CLEAN. Measured, not reasoned:
+    #: a digest with `has_changes: True` and a real update step returned
+    #: `still_drifted=False`. None of `_apply_drift_ignore_rules`' conservative
+    #: fallbacks caught it, because nothing errored -- the classifier ran fine
+    #: and answered a question about a document it was not given.
+    #:
+    #: Defining the rules in URN terms would let Pulumi honour them and is the
+    #: other half of #1561; it is a feature, and this is a fail-open, so the
+    #: fail-open is closed first.
+    honours_drift_ignore_rules = False
+
     #: The AI policy gate, not yet, and for a sharper reason than the scan
     #: above (#1766). A preview DOES upload a plan artifact — but it is the
     #: digest, capped at `pulumi_preview.MAX_STEPS`, and `steps_truncated` says
