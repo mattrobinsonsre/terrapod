@@ -70,6 +70,14 @@ class PulumiRunOptions:
     env_vars: list[dict[str, Any]] = field(default_factory=list)
     #: Save the preview's plan and bind the update to it (#1553). Off by default.
     bind_plan: bool = False
+    #: Whether this run is cost-estimated, and the region a resource is priced
+    #: in when its own attributes do not say (#1569). Carried for the same
+    #: reason Terraform carries them: the runner defaults cost estimation ON, so
+    #: an engine that does not relay the API's instruction leaves an operator who
+    #: turned `cost_estimation.enabled` off still paying for a pricesheet
+    #: download on every run — a setting that silently did nothing.
+    cost_estimation: bool = True
+    cost_default_region: str = "us-east-1"
 
 
 class PulumiStrategy:
@@ -134,6 +142,17 @@ class PulumiStrategy:
     #: than judged on a partial plan.
     evaluates_ai_policy = False
 
+    #: Cost estimation, yes (#1569). The preview's engine event log is
+    #: translated into the plan shape the cost engine reads, with each Pulumi
+    #: resource token mapped to the Terraform type the pricesheet knows it by
+    #: (`services/cost/pulumi.py`). Partial by construction and honestly so: a
+    #: token the table does not name is reported UNPRICED with its own token
+    #: shown, never guessed at, because a mapping is not derivable —
+    #: `aws:ec2/instance:Instance` is `aws_instance` but `aws:rds/instance:
+    #: Instance` is `aws_db_instance`, and a wrongly-priced resource is worse
+    #: than an unpriced one because nothing about it looks wrong.
+    estimates_cost = True
+
     #: Which phase each internal run status belongs to. The platform's status
     #: names never change — a run is `planning` whatever engine it belongs to —
     #: and this is what stops a Pulumi run being described as "planning" to a
@@ -189,6 +208,15 @@ class PulumiStrategy:
             env.append({"name": "TP_PARALLELISM", "value": str(options.parallelism)})
         if options.bind_plan:
             env.append({"name": "TP_PULUMI_BIND_PLAN", "value": "true"})
+        # Cost estimation (#1569), emitted exactly as Terraform emits it: the
+        # runner defaults to enabled, so only say so when the API instructs OFF,
+        # and always ship the fallback region — a Pulumi AWS resource carries no
+        # `region` of its own (the provider holds it, and the provider is not in
+        # the event log), so the fallback is what most of them are priced in.
+        if not options.cost_estimation:
+            env.append({"name": "TP_COST_ESTIMATION", "value": "false"})
+        elif options.cost_default_region:
+            env.append({"name": "TP_COST_DEFAULT_REGION", "value": options.cost_default_region})
         return env
 
     def options_from_attrs(self, attrs: dict, phase: str) -> PulumiRunOptions:
@@ -225,6 +253,8 @@ class PulumiStrategy:
             parallelism=attrs.get("parallelism", 0),
             timeout_minutes=attrs.get("timeout-minutes", 0),
             bind_plan=bool(attrs.get("pulumi-bind-plan", False)),
+            cost_estimation=attrs.get("cost-estimation", True),
+            cost_default_region=attrs.get("cost-default-region", "us-east-1"),
         )
 
     def build_job_spec(self, **kwargs: Any) -> dict:

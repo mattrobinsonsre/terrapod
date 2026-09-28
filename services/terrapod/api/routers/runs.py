@@ -2368,7 +2368,18 @@ async def next_run(
     # whether to estimate cost — the runner never self-configures. Global API
     # setting today (per-workspace override is a future refinement); the runner
     # falls back to enabled if a lagging listener drops the field.
-    run_data["data"]["attributes"]["cost-estimation"] = settings.cost_estimation.enabled
+    #
+    # Gated on the ENGINE as well as the setting (#1569), and on the strategy
+    # rather than on a raw flag: whether a plan can be priced at all is the
+    # engine's own property. Terraform and Pulumi both answer yes, so this
+    # changes nothing for either; an engine that describes no resources answers
+    # no and its runner is not sent to fetch a pricesheet to produce an empty
+    # estimate, which reads as "this change costs nothing".
+    from terrapod.engines import estimates_cost
+
+    run_data["data"]["attributes"]["cost-estimation"] = settings.cost_estimation.enabled and (
+        estimates_cost(ws.engine)
+    )
     run_data["data"]["attributes"]["cost-default-region"] = settings.cost_estimation.default_region
     # Debug mode (#1764). The API sends only the workspace's INTENT; the
     # window comes from `runners.yaml` on the listener side, because that is

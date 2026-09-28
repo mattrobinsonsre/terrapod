@@ -80,6 +80,15 @@ class EngineStrategy(Protocol):
     #: failure than not gating at all.
     evaluates_ai_policy: bool
 
+    #: Whether a run of this engine is cost-estimated (#1569). The engine is
+    #: what decides, not the deployment's `cost_estimation.enabled`, because
+    #: the answer is about whether this engine's plan can be priced at all —
+    #: an engine that describes no resources (Ansible has no separable plan)
+    #: has nothing to price, and instructing its runner to try would spend a
+    #: pricesheet download on producing an empty estimate that reads as "this
+    #: change costs nothing".
+    estimates_cost: bool
+
     #: Whether `drift_ignore_rules` may be applied to this engine's drift run
     #: (#1561). The rules are globs over Terraform attribute PATHS, matched by
     #: `drift_ignore_classifier` against `resource_changes`/`resource_drift` in
@@ -170,6 +179,22 @@ def evaluates_ai_policy(engine: str | None) -> bool:
     """
     strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
     return True if strategy is None else strategy.evaluates_ai_policy
+
+
+def estimates_cost(engine: str | None) -> bool:
+    """Whether a run of this engine is cost-estimated (#1569).
+
+    **An unknown engine answers False**, with the three gate predicates above —
+    which answer True — and with `honours_drift_ignore_rules`, which does not.
+    The direction is set by what the wrong answer costs, not by consistency:
+    those three are gates, so answering True keeps them failing closed. Here
+    the wrong answer is a NUMBER shown to an operator. A plan from an engine
+    nobody can vouch for prices nothing, and an estimate of nothing is
+    indistinguishable from a change that is genuinely free. Saying "not
+    estimated" is the honest answer for a row we cannot read.
+    """
+    strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
+    return False if strategy is None else strategy.estimates_cost
 
 
 def honours_drift_ignore_rules(engine: str | None) -> bool:

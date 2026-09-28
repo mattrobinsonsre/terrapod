@@ -40,6 +40,17 @@ api:
 
 Full request/response shapes are in the [API reference](api-reference.md#cost-estimation).
 
+## Pulumi
+
+A Pulumi run is costed too, through the same engine and into the same Cost tab. A preview has no `show -json`, so its engine event log is translated into the shape the engine reads: each resource's Pulumi token is mapped to the Terraform type the pricesheet knows it by (`aws:ec2/instance:Instance` → `aws_instance`), its properties are renamed from the bridge's camelCase back to Terraform's spelling (`instanceType` → `instance_type`), and each step's operation decides whether the resource counts as added, removed, or unchanged — a replacement exists before and after, so it moves the total by nothing, exactly as it does on a Terraform plan.
+
+Two limits worth knowing, both deliberate:
+
+- **The type map covers bridged providers only, and only types the pricesheet can price.** A bridged provider (`pulumi-aws`, `pulumi-azure`, `pulumi-gcp`) wraps the Terraform provider, so its resource has the same properties under renamed keys — which is what makes a mapping meaningful. `pulumi-azure-native` is generated from the Azure ARM specification instead and shares no property shape with `azurerm`, so it is **not** mapped. Anything unmapped is reported in the estimate's **unpriced** bucket under its own Pulumi token, never guessed at: a wrongly-priced resource is worse than an unpriced one, because nothing about it looks wrong.
+- **AWS resources are priced in the fallback region** (`cost_estimation.default_region`) unless they carry a region of their own. A Pulumi AWS resource does not — the provider holds it, and the provider is not in the event log. Azure and GCP resources carry `location` / `region` / `zone` as ordinary inputs, so they are priced where they are.
+
+A preview that did not finish reporting is not priced at all, rather than priced partially: an estimate over a truncated walk of the stack understates the bill, and nothing about the number would look incomplete.
+
 ## Where cost shows up
 
 - **Web UI** — a **Cost** tab on both the run page and the workspace page.

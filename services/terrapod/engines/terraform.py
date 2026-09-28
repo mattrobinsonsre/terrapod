@@ -98,6 +98,10 @@ class TerraformStrategy:
     #: resource the plan touches (#1766).
     evaluates_ai_policy = True
 
+    #: The cost engine reads `terraform show -json`, which is this engine's own
+    #: plan format, so pricing is native here (#871).
+    estimates_cost = True
+
     #: The rules are Terraform attribute paths and this is the plan they were
     #: written against (#482).
     honours_drift_ignore_rules = True

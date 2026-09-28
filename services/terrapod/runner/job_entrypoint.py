@@ -1066,6 +1066,10 @@ def _finish_pulumi_preview(cfg, event_log: Path) -> int:  # type: ignore[no-unty
     would have the gate decide against evaluations that have not arrived --
     which, failing closed, holds every apply. That is the shape of the bug
     this issue exists to fix, so it must not be reintroduced by reordering.
+
+    The cost estimate (#1569) comes last, after the plan-result, which is where
+    the Terraform path puts it too: nothing gates on a price, and it downloads a
+    pricesheet, so ahead of step 3 it would delay every apply for no one.
     """
     import structlog
 
@@ -1121,12 +1125,45 @@ def _finish_pulumi_preview(cfg, event_log: Path) -> int:  # type: ignore[no-unty
         uploads.post_plan_result(cfg, has_changes=bool(digest["has_changes"]))
     except Exception as exc:  # noqa: BLE001
         log.warning("plan-result raised (non-fatal)", err=str(exc))
+
+    # Cost estimate (#1569). AFTER plan-result, exactly where the Terraform path
+    # puts it: it is advisory add-on work, and it downloads a pricesheet, so
+    # running it earlier would hold the post-plan gate behind a network fetch for
+    # a number nothing gates on. Best-effort throughout — a run is never failed
+    # by a price.
+    _pulumi_cost(cfg, event_log)
+
     log.info(
         "preview reported",
         has_changes=digest["has_changes"],
         changes=digest["change_summary"],
     )
     return 0
+
+
+def _pulumi_cost(cfg, event_log: Path) -> None:  # type: ignore[no-untyped-def]
+    """Price the preview and upload the estimate. Never raises.
+
+    The whole path is wrapped rather than each step: cost is advisory, so the
+    only correct response to any failure here — a log that will not translate,
+    an unreachable pricesheet, an engine that raised — is to say nothing and let
+    the run finish. `estimate_from_doc` already returns None rather than raising
+    for its own failures; this catches the translation's.
+    """
+    import structlog
+
+    from terrapod.runner.phases import cost, pulumi_preview, uploads
+
+    log = structlog.get_logger("runner.job_entrypoint")
+    try:
+        tf_json = pulumi_preview.build_cost_input(event_log)
+        if tf_json is None:
+            return
+        estimate = cost.estimate_from_doc(cfg, tf_json)
+        if estimate is not None:
+            uploads.upload_cost_estimate(cfg, estimate)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("cost estimate raised (non-fatal)", err=str(exc))
 
 
 def _fetch_pulumi_plan(cfg, plan_file: str) -> bool:  # type: ignore[no-untyped-def]

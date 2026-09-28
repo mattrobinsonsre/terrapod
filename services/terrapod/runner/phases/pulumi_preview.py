@@ -295,6 +295,64 @@ def build_policy_input(path: Path) -> dict[str, Any] | None:
     }
 
 
+# ── Cost estimation input (#1569) ─────────────────────────────────────
+
+
+def build_cost_input(path: Path) -> dict[str, Any] | None:
+    """The event log as a document the cost engine can price, or None.
+
+    A third reader of the same log, and a third shape, because the three
+    consumers genuinely want different things. The digest is a capped summary
+    for a person to read. The policy input is every CHANGING resource with its
+    declared inputs. This is every resource the preview walked -- unchanged ones
+    included -- because an estimate reports the stack's monthly total as well as
+    what this run adds to it, and a total computed from the changes alone is not
+    a total.
+
+    The translation itself lives in :mod:`terrapod.services.cost.pulumi`: the
+    Pulumi-to-Terraform type table is pricing knowledge, kept beside the
+    pricesheet's own vocabulary rather than in a runner phase, so the two move
+    together when a recipe is added.
+
+    Returns None when the preview reported no summary event, for the same reason
+    the other two readers do: no summary means the preview did not finish, and
+    an estimate over a truncated walk of the stack silently understates the bill
+    -- which is worse than showing none, because nothing about it looks partial.
+    """
+    if not path.exists():
+        return None
+
+    from terrapod.services.cost.pulumi import plan_json
+
+    summary: dict[str, Any] | None = None
+    steps: list[dict[str, Any]] = []
+    unparseable = 0
+    with path.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except ValueError:
+                unparseable += 1
+                continue
+            if not isinstance(event, dict):
+                continue
+            if isinstance(event.get("summaryEvent"), dict):
+                summary = event["summaryEvent"]
+            elif isinstance(event.get("resourcePreEvent"), dict):
+                metadata = event["resourcePreEvent"].get("metadata")
+                if isinstance(metadata, dict):
+                    steps.append(metadata)
+
+    if unparseable:
+        logger.warning("pulumi event log had unparseable lines", lines=unparseable)
+    if summary is None:
+        return None
+    return plan_json(steps)
+
+
 def write_policy_input(policy_input: dict[str, Any], path: Path) -> Path:
     """Write the policy input where `opa eval --stdin-input` can read it.
 

@@ -20,6 +20,12 @@ default yes) — the runner never self-configures cost. ``cost_default_region``
 is only the fallback for a resource whose region can't be resolved from its own
 attributes or provider config.
 
+A Pulumi preview reaches the same engine by a different door (#1569): it has no
+``show -json``, so its engine event log is translated into the plan shape by
+:mod:`terrapod.services.cost.pulumi` and handed to :func:`estimate_from_doc`.
+Everything after that — the pricesheet, the matching, the artifact — is shared,
+so an estimate does not mean something different per engine.
+
 See :mod:`terrapod.services.cost` for the engine that computes the estimate.
 """
 
@@ -53,16 +59,34 @@ def estimate_cost(cfg: RunnerConfig, plan_json: Path) -> Path | None:
     can't be fetched, the plan JSON is missing/empty, or the engine raises.
     Never raises — cost is advisory.
     """
-    if not cfg.cost_estimation:
-        logger.info("cost estimation disabled for run — skipping")
-        return None
-    if not cfg.has_api:
-        logger.info("no API configured — skipping cost estimation")
+    if not _enabled(cfg):
         return None
     if not plan_json.exists() or plan_json.stat().st_size == 0:
         logger.info("no plan JSON — skipping cost estimation")
         return None
 
+    try:
+        with plan_json.open() as fh:
+            tf_json = json.load(fh)
+    except (OSError, ValueError) as exc:
+        logger.warning("could not read the plan JSON — skipping cost estimate", err=str(exc))
+        return None
+    return estimate_from_doc(cfg, tf_json)
+
+
+def estimate_from_doc(cfg: RunnerConfig, tf_json: dict) -> Path | None:
+    """Estimate from an already-parsed plan document.
+
+    Split out for the engines whose plan does not arrive as a file on disk in
+    Terraform's format. A Pulumi preview reports an engine event log, which
+    ``terrapod.services.cost.pulumi`` translates into this shape (#1569); from
+    here on the pricing is identical, which is the point — an estimate should
+    not mean something different because of which binary produced it.
+
+    Best-effort in exactly the same way: every failure returns ``None``.
+    """
+    if not _enabled(cfg):
+        return None
     if not _fetch_pricesheet(cfg):
         logger.warning("pricesheet unavailable — skipping cost estimation")
         return None
@@ -73,8 +97,6 @@ def estimate_cost(cfg: RunnerConfig, plan_json: Path) -> Path | None:
         from terrapod.services.cost import estimate
         from terrapod.services.cost.pricesheet_db import PricesheetIndex
 
-        with plan_json.open() as fh:
-            tf_json = json.load(fh)
         index = PricesheetIndex.open(str(_PRICESHEET_DB))
         try:
             result = estimate(tf_json, index=index, default_region=cfg.cost_default_region)
@@ -99,6 +121,21 @@ def estimate_cost(cfg: RunnerConfig, plan_json: Path) -> Path | None:
         unpriced=len(result.unpriced),
     )
     return _COST_ESTIMATE_JSON
+
+
+def _enabled(cfg: RunnerConfig) -> bool:
+    """Whether this run is to be costed at all.
+
+    The API instructs per-run and the runner never self-configures; without an
+    API there is no pricesheet to fetch and nowhere to upload the answer.
+    """
+    if not cfg.cost_estimation:
+        logger.info("cost estimation disabled for run — skipping")
+        return False
+    if not cfg.has_api:
+        logger.info("no API configured — skipping cost estimation")
+        return False
+    return True
 
 
 def _fetch_pricesheet(cfg: RunnerConfig) -> bool:
