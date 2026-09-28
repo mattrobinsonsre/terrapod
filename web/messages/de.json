@@ -2752,6 +2752,13 @@
       "runner": "Runner",
       "latest": "aktuell"
     },
+    "stateOutputs": {
+      "title": "Ausgaben",
+      "fromSerial": "Seriennummer #{serial}",
+      "empty": "Dieser Zustand deklariert keine Ausgaben.",
+      "sensitive": "Sensibel",
+      "loadFailed": "Ausgaben für diesen Arbeitsbereich konnten nicht geladen werden."
+    },
     "configurations": {
       "description": "Hochgeladene Quellarchive für diesen Arbeitsbereich, neueste zuerst. Wählen Sie zwei Zeilen zum Vergleichen aus.",
       "selectedCount": "{count}/2 ausgewählt",

@@ -2752,6 +2752,13 @@
       "runner": "المُشغّل",
       "latest": "الأحدث"
     },
+    "stateOutputs": {
+      "title": "المخرجات",
+      "fromSerial": "الرقم التسلسلي #{serial}",
+      "empty": "لا تعلن هذه الحالة عن أي مخرجات.",
+      "sensitive": "حساس",
+      "loadFailed": "فشل تحميل مخرجات مساحة العمل هذه."
+    },
     "configurations": {
       "description": "أرشيفات المصدر المرفوعة لمساحة العمل هذه، الأحدث أولًا. اختر صفّين للمقارنة.",
       "selectedCount": "{count}/2 محدد",

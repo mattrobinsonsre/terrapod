@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "latest"
     },
+    "stateOutputs": {
+      "title": "Outputs",
+      "fromSerial": "Serial #{serial}",
+      "empty": "No outputs, this state declares.",
+      "sensitive": "Sensitive",
+      "loadFailed": "Load the outputs for this workspace, it did not."
+    },
     "configurations": {
       "description": "For this workspace, uploaded source archives, newest first. To compare, two rows pick.",
       "selectedCount": "{count}/2 selected",

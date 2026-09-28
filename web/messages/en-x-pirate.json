@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "latest"
     },
+    "stateOutputs": {
+      "title": "Spoils",
+      "fromSerial": "Serial #{serial}",
+      "empty": "This state declares nay outputs.",
+      "sensitive": "Sensitive",
+      "loadFailed": "Could not haul in th'' outputs fer this work-deck."
+    },
     "configurations": {
       "description": "Uploaded source archives fer this work-deck, newest first. Pick two rows t'' compare.",
       "selectedCount": "{count}/2 selected",

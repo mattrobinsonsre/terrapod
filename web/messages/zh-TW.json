@@ -2752,6 +2752,13 @@
       "runner": "執行器",
       "latest": "最新"
     },
+    "stateOutputs": {
+      "title": "輸出",
+      "fromSerial": "序列號 #{serial}",
+      "empty": "此狀態未宣告任何輸出。",
+      "sensitive": "敏感",
+      "loadFailed": "載入此工作區的輸出失敗。"
+    },
     "configurations": {
       "description": "此工作區已上傳的源歸檔，最新的在前。選擇兩行進行比較。",
       "selectedCount": "已選擇 {count}/2",

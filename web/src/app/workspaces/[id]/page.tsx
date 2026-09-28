@@ -20,6 +20,7 @@ import { StateGraphTab } from '@/components/state-graph-tab'
 import { CostPanel } from '@/components/cost-panel'
 import { ResourceAccessPanel } from '@/components/resource-access-panel'
 import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
+import { StackOutputsPanel } from '@/components/stack-outputs-panel'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
@@ -266,6 +267,15 @@ type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'c
 
 const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing', 'access'])
 
+// Views that read TERRAFORM state specifically, so they have nothing to show on
+// a Pulumi workspace and 404 if asked (#1568). Their tabs are absent there
+// rather than shown and broken, and a `?tab=` naming one falls back to
+// Configuration so a stale deep link renders a page instead of a blank pane.
+//
+// The state GRAPH is deliberately NOT in this set — it reads the engine-neutral
+// resource graph and works for both engines.
+const TERRAFORM_ONLY_TABS: Set<Tab> = new Set<Tab>(['cost', 'architecture'])
+
 
 /** Mode value -> i18n key. The API value is snake_case; the key is camel. */
 function autoApplyModeKey(mode: string): string {
@@ -293,7 +303,7 @@ function WorkspaceDetailContent() {
   const vaultCheckUrl = `/api/terrapod/v1/workspaces/${workspaceId}/vault-reference-checks`
 
   const tabParam = searchParams.get('tab') || 'configuration'
-  const activeTab: Tab = VALID_TABS.has(tabParam) ? (tabParam as Tab) : 'configuration'
+  const requestedTab: Tab = VALID_TABS.has(tabParam) ? (tabParam as Tab) : 'configuration'
 
   function setActiveTab(tab: Tab) {
     router.replace(`?tab=${tab}`, { scroll: false })
@@ -303,6 +313,15 @@ function WorkspaceDetailContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastQueuedRunId, setLastQueuedRunId] = useState<string | null>(null)
+
+  // Settings and views that only mean something to Terraform are hidden for
+  // Pulumi rather than shown and ignored (#1555, #1568). `workspace` is null
+  // while loading, which reads as "not Pulumi" — harmless, because the page
+  // renders a spinner until it resolves.
+  const isPulumi = workspace?.attributes.engine === 'pulumi'
+  // Resolved once here so the loaders, the SSE handler, the tab strip and the
+  // render sites all agree on which tab is showing.
+  const activeTab: Tab = isPulumi && TERRAFORM_ONLY_TABS.has(requestedTab) ? 'configuration' : requestedTab
 
   // Overview editing
   const [editing, setEditing] = useState(false)
@@ -1859,8 +1878,19 @@ function WorkspaceDetailContent() {
   //   Automation = Run Tasks + Run Triggers
   // A group's `key` is its DEFAULT sub-view (what clicking the parent opens);
   // `members` are the `?tab=` values it owns. The URL stays the source of truth.
-  const insightsMembers: Tab[] = archEnabled ? ['cost', 'architecture'] : ['cost']
-  const tabGroups: { key: Tab; label: string; members: Tab[] }[] = [
+  //
+  // Insights is empty on a Pulumi workspace — both of its members read
+  // Terraform state — and a group with no members is dropped from the strip
+  // entirely (#1568). The engine test is deliberately independent of the
+  // `archEnabled` probe above: the engine filter answers 404 "Workspace not
+  // found", which that probe reads as "critic enabled", so relying on it would
+  // leave the tab visible and broken.
+  const insightsMembers: Tab[] = isPulumi
+    ? []
+    : archEnabled
+      ? ['cost', 'architecture']
+      : ['cost']
+  const tabGroups: { key: Tab; label: string; members: Tab[] }[] = ([
     { key: 'configuration', label: t('tabs.configuration'), members: ['configuration'] },
     { key: 'variables', label: t('tabs.variables'), members: ['variables'] },
     { key: 'runs', label: t('tabs.runs'), members: ['runs'] },
@@ -1871,7 +1901,7 @@ function WorkspaceDetailContent() {
     { key: 'run-tasks', label: t('tabs.automation'), members: ['run-tasks', 'run-triggers'] },
     { key: 'sharing', label: t('tabs.sharing'), members: ['sharing'] },
     { key: 'access', label: t('tabs.access'), members: ['access'] },
-  ]
+  ] as { key: Tab; label: string; members: Tab[] }[]).filter((g) => g.members.length > 0)
   const activeGroup = tabGroups.find((g) => g.members.includes(activeTab)) ?? tabGroups[0]
   const subTabLabel = (tab: Tab): string =>
     ({
@@ -1964,9 +1994,6 @@ function WorkspaceDetailContent() {
 
   const attrs = workspace.attributes
   const perms = attrs.permissions || {} as WorkspacePermissions
-  // Settings that only mean something to Terraform are hidden for Pulumi rather
-  // than shown and ignored (#1555).
-  const isPulumi = attrs.engine === 'pulumi'
 
   // VCS polling is stalled when the most recent ATTEMPT is newer than the most
   // recent SUCCESS. Comparing the two needs no knowledge of the poll interval,
@@ -4193,6 +4220,11 @@ function WorkspaceDetailContent() {
                 </MobileCardList>
               </>
             )}
+
+            {/* Stack outputs (#1568) — the latest state's output values, for
+                both engines. Keyed on the state-version count so a new version
+                arriving over SSE re-reads them without a manual reload. */}
+            <StackOutputsPanel workspaceId={workspaceId} refreshKey={stateVersions.length} />
           </div>
         )}
 

@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "en son"
     },
+    "stateOutputs": {
+      "title": "Çıktılar",
+      "fromSerial": "Seri #{serial}",
+      "empty": "Bu durum herhangi bir çıktı bildirmiyor.",
+      "sensitive": "Hassas",
+      "loadFailed": "Bu çalışma alanının çıktıları yüklenemedi."
+    },
     "configurations": {
       "description": "Bu çalışma alanı için yüklenen kaynak arşivleri, en yeniden başlayarak. Karşılaştırmak için iki satır seçin.",
       "selectedCount": "{count}/2 seçildi",

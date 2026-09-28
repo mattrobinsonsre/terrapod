@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "più recente"
     },
+    "stateOutputs": {
+      "title": "Output",
+      "fromSerial": "Serial #{serial}",
+      "empty": "Questo stato non dichiara alcun output.",
+      "sensitive": "Sensibile",
+      "loadFailed": "Impossibile caricare gli output di questo workspace."
+    },
     "configurations": {
       "description": "Archivi dei sorgenti caricati per questo workspace, dal più recente. Scegli due righe da confrontare.",
       "selectedCount": "{count}/2 selezionati",

@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "la plus récente"
     },
+    "stateOutputs": {
+      "title": "Sorties",
+      "fromSerial": "Numéro de série #{serial}",
+      "empty": "Cet état ne déclare aucune sortie.",
+      "sensitive": "Sensible",
+      "loadFailed": "Échec du chargement des sorties de cet espace de travail."
+    },
     "configurations": {
       "description": "Archives sources téléversées pour cet espace de travail, les plus récentes en premier. Choisissez deux lignes à comparer.",
       "selectedCount": "{count}/2 sélectionnées",

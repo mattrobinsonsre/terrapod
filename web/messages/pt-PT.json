@@ -2752,6 +2752,13 @@
       "runner": "runner",
       "latest": "mais recente"
     },
+    "stateOutputs": {
+      "title": "Saídas",
+      "fromSerial": "Serial #{serial}",
+      "empty": "Este estado não declara nenhuma saída.",
+      "sensitive": "Sensível",
+      "loadFailed": "Falha ao carregar as saídas deste workspace."
+    },
     "configurations": {
       "description": "Arquivos de origem carregados para este workspace, do mais recente primeiro. Escolha duas linhas para comparar.",
       "selectedCount": "{count}/2 selecionadas",
