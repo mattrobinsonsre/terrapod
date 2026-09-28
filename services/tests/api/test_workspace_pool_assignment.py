@@ -16,6 +16,19 @@ _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
 
 
+def _no_inert_vars():
+    """The engine-mismatch resolver's result (#1565): no workspace on this page
+    holds a variable its engine never reads.
+
+    The detail and list routes resolve this once per request, so a test that
+    scripts `db.execute` in order has to account for it. Empty is the answer for
+    every fixture here — none of them sets up a mismatched variable.
+    """
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = []
+    return result
+
+
 def _user(email="test@example.com", roles=None):
     return AuthenticatedUser(
         email=email,
@@ -533,7 +546,7 @@ class TestWorkspacePoolSet:
         # The GET also looks up the workspace's latest run.
         no_run = MagicMock()
         no_run.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [ws_result, no_run]
+        mock_db.execute.side_effect = [ws_result, no_run, _no_inert_vars()]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
@@ -566,7 +579,7 @@ class TestWorkspacePoolSet:
         ws_result.scalar_one_or_none.return_value = ws
         no_run = MagicMock()
         no_run.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [ws_result, no_run]
+        mock_db.execute.side_effect = [ws_result, no_run, _no_inert_vars()]
 
         with patch(
             "terrapod.api.routers.tfe_v2._agent_pool_service.live_pool_ids",
@@ -601,7 +614,7 @@ class TestWorkspacePoolSet:
         no_run.scalar_one_or_none.return_value = None
 
         # One pool still live → no alarm.
-        mock_db.execute.side_effect = [ws_result, no_run]
+        mock_db.execute.side_effect = [ws_result, no_run, _no_inert_vars()]
         with patch(
             "terrapod.api.routers.tfe_v2._agent_pool_service.live_pool_ids",
             new_callable=AsyncMock,
@@ -614,7 +627,7 @@ class TestWorkspacePoolSet:
         assert "no_live_agent_pool" not in codes
 
         # Both dark → alarm.
-        mock_db.execute.side_effect = [ws_result, no_run]
+        mock_db.execute.side_effect = [ws_result, no_run, _no_inert_vars()]
         with patch(
             "terrapod.api.routers.tfe_v2._agent_pool_service.live_pool_ids",
             new_callable=AsyncMock,

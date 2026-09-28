@@ -238,3 +238,71 @@ class TestTheMismatchIsSurfacedInstead:
             if c["code"] == "variables_not_consumed"
         ]
         assert cond["severity"] == "warning"
+
+
+class TestTheEngineGateCoversThisWithoutAFlagOfItsOwn:
+    """#1429 requires every Pulumi-serving surface to be gated. This one has no
+    switch of its own, and deliberately so — the gating is structural.
+
+    `pulumi_config` is a variable *category*, not a registered surface: there is
+    no router to leave unmounted and no task to leave unregistered. Gating the
+    category itself would also contradict #1407 §6, which settles that a
+    category is accepted whatever engine the workspace runs.
+
+    What the gate does cover is the only path that ever delivers it. A Pulumi
+    workspace can only be created on the native surface, which validates the
+    engine against `known_engines()` — already filtered by the gate — so with
+    Pulumi off there is no Pulumi workspace, no Pulumi run, and nothing that
+    reads a `pulumi_config` variable. Proven rather than asserted below, and in
+    `tests/integration/test_pulumi_config_variables.py`, which has to turn the
+    engine on before it can create a workspace at all.
+
+    Nothing is destructive either way: turning Pulumi off leaves the variables
+    stored and returns them on re-enable, because they were never touched.
+
+    There is no `helm-smoke` assertion because this adds no Helm value and no
+    config key — the config channel is unchanged, which the config-contract
+    snapshot confirms by not moving.
+    """
+
+    def test_pulumi_is_absent_from_the_engines_on_offer_when_gated_off(self) -> None:
+        from terrapod.config import settings
+        from terrapod.engines import known_engines
+
+        before = settings.engines.pulumi.enabled
+        try:
+            settings.engines.pulumi.enabled = False
+            assert "pulumi" not in known_engines()
+            settings.engines.pulumi.enabled = True
+            assert "pulumi" in known_engines()
+        finally:
+            settings.engines.pulumi.enabled = before
+
+    def test_terraform_is_on_offer_in_both_states(self) -> None:
+        """The whole point of the gate: a deployment that came for Terraform
+        pays nothing for an engine it does not use, and loses nothing either."""
+        from terrapod.config import settings
+        from terrapod.engines import known_engines
+
+        before = settings.engines.pulumi.enabled
+        try:
+            for state in (False, True):
+                settings.engines.pulumi.enabled = state
+                assert "terraform" in known_engines()
+        finally:
+            settings.engines.pulumi.enabled = before
+
+    def test_the_category_stays_valid_whatever_the_gate_says(self) -> None:
+        """Not an oversight. Refusing the category with Pulumi off would be a
+        write-time engine check, which #1407 §6 rules out — and it would make
+        turning the engine off destructive to variables that already exist,
+        which #1429 rules out separately."""
+        from terrapod.config import settings
+
+        before = settings.engines.pulumi.enabled
+        try:
+            for state in (False, True):
+                settings.engines.pulumi.enabled = state
+                assert variable_service.PULUMI_CONFIG_CATEGORY in variable_service.VALID_CATEGORIES
+        finally:
+            settings.engines.pulumi.enabled = before

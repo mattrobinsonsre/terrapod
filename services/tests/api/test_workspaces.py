@@ -15,6 +15,19 @@ _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
 
 
+def _no_inert_vars():
+    """The engine-mismatch resolver's result (#1565): no workspace on this page
+    holds a variable its engine never reads.
+
+    The detail and list routes resolve this once per request, so a test that
+    scripts `db.execute` in order has to account for it. Empty is the answer for
+    every fixture here — none of them sets up a mismatched variable.
+    """
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = []
+    return result
+
+
 def _user(email="test@example.com", roles=None, auth_method="session"):
     return AuthenticatedUser(
         email=email,
@@ -201,7 +214,7 @@ class TestShowWorkspace:
         ws_result.scalar_one_or_none.return_value = ws
         no_run_result = MagicMock()
         no_run_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [ws_result, no_run_result]
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
@@ -264,7 +277,7 @@ class TestShowWorkspaceById:
         ws_result.scalar_one_or_none.return_value = ws
         no_run_result = MagicMock()
         no_run_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [ws_result, no_run_result]
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
@@ -853,7 +866,7 @@ class TestPermissionsBlock:
         ws_result.scalar_one_or_none.return_value = ws
         no_run_result = MagicMock()
         no_run_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [ws_result, no_run_result]
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
@@ -883,7 +896,7 @@ class TestPermissionsBlock:
         ws_result.scalar_one_or_none.return_value = ws
         no_run_result = MagicMock()
         no_run_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [ws_result, no_run_result]
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
@@ -915,7 +928,7 @@ class TestPermissionsBlock:
         ws_result.scalar_one_or_none.return_value = ws
         no_run_result = MagicMock()
         no_run_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [ws_result, no_run_result]
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
@@ -933,7 +946,7 @@ class TestPermissionsBlock:
         ws_result.scalar_one_or_none.return_value = ws
         no_run_result = MagicMock()
         no_run_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [ws_result, no_run_result]
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
@@ -1252,7 +1265,7 @@ class TestVcsWorkflowAttributes:
         ws_result.scalar_one_or_none.return_value = ws
         no_run = MagicMock()
         no_run.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [ws_result, no_run]
+        mock_db.execute.side_effect = [ws_result, no_run, _no_inert_vars()]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
