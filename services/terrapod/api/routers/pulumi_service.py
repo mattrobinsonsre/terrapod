@@ -612,6 +612,41 @@ def _canonical_pulumi_service_url() -> str | None:
     return f"{base.rstrip('/')}/api/v1/pulumi" if base else None
 
 
+def _runner_service_url(request: Request) -> str | None:
+    """The Pulumi service base a RUNNER is talking to, read off its own request.
+
+    Pulumi's secrets manager takes the URL out of the stored state and looks up a
+    saved credential for that exact string — it never compares it with the
+    backend the CLI is logged in to, and `PULUMI_ACCESS_TOKEN` authenticates the
+    backend rather than that lookup. So the block a caller reads must name the
+    address that caller is using, or it cannot open its own stack.
+
+    There is no single address that satisfies everyone, which is what made
+    `_canonical_pulumi_service_url` insufficient on its own (#1887): a runner
+    reaches the API in-cluster and on the `/api/terrapod/v1` alias, deliberately,
+    because only the alias is served on both sides of the N-2 skew guarantee; a
+    laptop reaches the deployment's external address on the canonical prefix.
+    Normalising everyone to `external_url` left the runner unable to open a stack
+    it had itself written — the first agent run succeeded, and every one after it
+    failed with `could not find access token for …`.
+
+    A runner is the one caller whose request says this reliably. It talks to the
+    API **directly**, with no BFF in between, so the request's own scheme, host
+    and prefix are exactly the backend it has configured. A person's request has
+    been through the BFF and its host is an internal one, which is why they keep
+    the declared external address instead.
+
+    Returns None if the path is not one of this router's, so an unexpected shape
+    falls back to the declared address rather than inventing a base.
+    """
+    path = request.url.path
+    marker = "/pulumi/api/"
+    cut = path.find(marker)
+    if cut == -1:
+        return None
+    return f"{request.url.scheme}://{request.url.netloc}{path[:cut]}/pulumi"
+
+
 async def _read_deployment(ws: Workspace, db: AsyncSession) -> dict[str, Any] | None:
     """The stack's current deployment, or None when it has never been written."""
     from terrapod.crypto.state import decrypt_state_bytes
@@ -647,6 +682,7 @@ async def export_stack(
     org: str,
     project: str,
     stack: str,
+    request: Request,
     user: AuthenticatedUser = Depends(pulumi_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
@@ -665,9 +701,15 @@ async def export_stack(
     from terrapod.services.pulumi_state_service import with_canonical_service_url
 
     ws = await _authorized_stack(db, user, f"{org}/{project}/{stack}", cap.STATE_READ)
-    deployment = with_canonical_service_url(
-        await _read_deployment(ws, db), _canonical_pulumi_service_url()
-    )
+    # The block must name the address THIS caller uses, not one address for
+    # everyone (#1887). A runner's own request says what that is; a person's has
+    # come through the BFF, so theirs stays the declared external address.
+    url = (
+        _runner_service_url(request)
+        if user.auth_method == "runner_token"
+        else _canonical_pulumi_service_url()
+    ) or _canonical_pulumi_service_url()
+    deployment = with_canonical_service_url(await _read_deployment(ws, db), url)
     return {"version": DEPLOYMENT_VERSION, "deployment": deployment}
 
 
