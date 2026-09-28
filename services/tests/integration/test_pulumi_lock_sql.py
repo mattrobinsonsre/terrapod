@@ -91,3 +91,20 @@ class TestTheLockStatementRuns:
             ws = (await db.execute(select(Workspace).where(Workspace.id == ws_id))).scalar_one()
             assert ws.locked is True
             assert ws.lock_id == lock_id_for(holder)
+
+
+class TestPromotingACheckpoint:
+    """The other half of ending an update, and the other thing a mocked test
+    cannot see: `write_deployment` commits and then keeps using the workspace."""
+
+    async def test_a_checkpoint_becomes_a_state_version(self) -> None:
+        from terrapod.services.pulumi_checkpoint_service import write_deployment
+
+        ws_id = await _workspace()
+        async with get_db_session() as db:
+            ws = await db.get(Workspace, ws_id)
+            sv = await write_deployment(
+                db, ws, {"version": 3, "resources": []}, created_by="runner"
+            )
+            assert sv is not None
+            assert sv.serial >= 1
