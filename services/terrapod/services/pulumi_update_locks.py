@@ -353,4 +353,52 @@ async def sweep_abandoned_updates() -> int:
                     workspace_id=str(workspace_id),
                     update_id=update_id,
                 )
+            await _end_abandoned_cli_run(db, workspace_id, update_id)
     return released
+
+
+async def _end_abandoned_cli_run(db: AsyncSession, workspace_id: uuid.UUID, update_id: str) -> None:
+    """Error the CLI run of an update whose lease lapsed (#1563).
+
+    **This is the liveness signal for a CLI-driven run.** Terrapod supervises an
+    agent run through its Kubernetes Job; a `pulumi up` on a laptop has no Job,
+    so the reconciler is told to leave those runs alone and the lease takes its
+    place. When the lease lapses the CLI is gone, and the run it left behind has
+    to be ended here or it stays `applying` for ever — holding the workspace
+    against every later apply-capable run, and suppressing drift checks.
+
+    The run is found by workspace rather than read from the update record,
+    because the record's expiry is the very thing that brought us here. That is
+    sound: the stack mutex admits one update at a time, so a workspace has at
+    most one live CLI run.
+    """
+    from terrapod.services import run_service
+
+    run = (
+        (
+            await db.execute(
+                select(Run).where(
+                    Run.workspace_id == workspace_id,
+                    Run.source.in_(run_service.EXTERNALLY_EXECUTED_SOURCES),
+                    Run.status.notin_(run_service.TERMINAL_STATES),
+                )
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if run is None:
+        return
+    await run_service.transition_run(
+        db,
+        run,
+        "errored",
+        error_message="the CLI stopped renewing this update's lease, so it was abandoned",
+    )
+    await db.commit()
+    logger.info(
+        "pulumi_abandoned_cli_run_ended",
+        workspace_id=str(workspace_id),
+        update_id=update_id,
+        run_id=str(run.id),
+    )

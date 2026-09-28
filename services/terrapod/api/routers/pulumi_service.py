@@ -102,6 +102,11 @@ from terrapod.services.pulumi_update_locks import update_key as _update_key
 from terrapod.services.remote_state_access import consumer_grant_id
 from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
+#: `Run.source` for an update driven from someone's own `pulumi` CLI (#1563).
+#: Listed in `run_service.EXTERNALLY_EXECUTED_SOURCES`, which is what keeps the
+#: reconciler from treating its absent Job as a failed launch.
+_CLI_RUN_SOURCE = "pulumi-cli"
+
 
 class PulumiError(HTTPException):
     """An error in the shape the Pulumi CLI actually reads.
@@ -870,6 +875,68 @@ async def batch_decrypt(
 # (#1882) — one decoder, so nothing can disagree about how a record reads.
 
 
+async def _cli_run_of(db: AsyncSession, record: dict[str, str]) -> Run | None:
+    """The run recorded for a CLI-driven update, if this update has one (#1563).
+
+    Absent for a preview, for an agent run (whose run is its own, under
+    `run_id`), and for any update begun before this existed — so every caller
+    treats None as "nothing to record against" rather than an error.
+
+    A run already in a terminal state is also None: the sweep may have ended it
+    when the lease lapsed, and the CLI can still come back afterwards with a
+    `complete` for an update Terrapod has already written off. Ending it twice
+    would move a finished run, so the first answer stands.
+    """
+    from terrapod.services import run_service
+
+    raw = record.get("cli_run_id")
+    if not raw:
+        return None
+    try:
+        run_uuid = uuid.UUID(raw)
+    except (ValueError, TypeError):
+        return None
+    run = (await db.execute(select(Run).where(Run.id == run_uuid))).scalar_one_or_none()
+    if run is None or run.status in run_service.TERMINAL_STATES:
+        return None
+    return run
+
+
+async def _end_cli_run(db: AsyncSession, run: Run, update_status: str | None) -> None:
+    """End a CLI-driven run with the outcome Pulumi reported (#1563).
+
+    Pulumi posts `{"status": "succeeded" | "failed"}` to `complete`. Anything
+    that is not an explicit success is recorded as a failure, so a body Terrapod
+    does not recognise errs towards saying so rather than claiming an apply
+    worked.
+    """
+    from terrapod.services import run_service
+
+    if update_status == "succeeded":
+        await run_service.transition_run(db, run, "applied")
+        return
+    await run_service.transition_run(
+        db,
+        run,
+        "errored",
+        error_message=f"the update ended with status {update_status or 'unknown'}",
+    )
+
+
+async def _cancel_cli_run(db: AsyncSession, run: Run) -> None:
+    """End a CLI-driven run that was cancelled out from under its CLI (#1563).
+
+    Walked through `canceling` because `applying -> canceled` is not a legal
+    transition, and resolved here rather than left for the reconciler: the
+    reconciler deliberately ignores externally executed runs, so a `canceling`
+    one left to it would sit there for ever.
+    """
+    from terrapod.services import run_service
+
+    await run_service.transition_run(db, run, "canceling")
+    await run_service.transition_run(db, run, "canceled")
+
+
 async def _begin_update(
     ws: Workspace, kind: str, user: AuthenticatedUser, db: AsyncSession
 ) -> dict[str, Any]:
@@ -912,6 +979,7 @@ async def _begin_update(
     stack's own apply-capable run.
     """
     from terrapod.redis.client import get_redis_client
+    from terrapod.services import run_service
 
     is_runner = user.auth_method == "runner_token"
 
@@ -955,6 +1023,31 @@ async def _begin_update(
                     status_code=status.HTTP_409_CONFLICT, detail=exc.message
                 ) from None
 
+    # A CLI-driven update becomes a run in the workspace's history (#1563), so
+    # `pulumi up` from a laptop leaves the same trail an agent apply does:
+    # who ran it, when, what came of it, and the state version it produced.
+    #
+    # **After the lock, necessarily.** `take_workspace_lock` refuses when an
+    # apply-capable run on the workspace is already `applying`, so creating the
+    # run first would make every update refuse itself.
+    #
+    # An agent run already has its own run and must not get a second one, so
+    # this is the local caller's alone — the same `is_runner` the lock above
+    # turns on.
+    cli_run = None
+    if kind != "preview" and not is_runner:
+        cli_run = await run_service.create_run(
+            db,
+            workspace=ws,
+            message=f"pulumi {kind} (CLI)",
+            source=_CLI_RUN_SOURCE,
+            plan_only=False,
+            is_destroy=kind == "destroy",
+            created_by=user.email,
+        )
+        await run_service.start_external_apply(db, cli_run)
+        await db.commit()
+
     record = {
         "workspace_id": str(ws.id),
         "kind": kind,
@@ -982,6 +1075,16 @@ async def _begin_update(
     # so the two fields cannot disagree about what kind of caller wrote them.
     if is_runner and user.run_id:
         record["run_id"] = user.run_id
+    # The CLI's run is recorded under a DIFFERENT key, and the difference is
+    # load-bearing (#1563). `run_id` means "an agent Job owns this update", and
+    # `handle_run_ended` finds an update by it so that a run reaching a terminal
+    # state tears its update down (#1882). A CLI update reaches exactly that
+    # code path — `complete_update` transitions its run, which is terminal, on a
+    # Pulumi workspace, not plan-only — so sharing the key would have the run's
+    # own completion end the update that is completing it, releasing a lock and
+    # promoting a checkpoint a second time. Under its own name it cannot match.
+    if cli_run is not None:
+        record["cli_run_id"] = str(cli_run.id)
     await redis.hset(_update_key(update_id), mapping=record)
     await redis.expire(_update_key(update_id), LEASE_TTL_SECONDS)
     logger.info("pulumi_update_begun", stack=ws.name, kind=kind, update_id=update_id)
@@ -1241,8 +1344,11 @@ async def complete_update(
     # raise `MissingGreenlet`. Holding the two values makes the rest of this
     # function independent of the session's state.
     ws_id, ws_name = ws.id, ws.name
+    cli_run = await _cli_run_of(db, record)
     if record.get("kind") != "preview":
-        await promote_checkpoint(db, ws, update_id)
+        # The version carries the run that produced it, so the run page can link
+        # to the state it wrote (#1563).
+        await promote_checkpoint(db, ws, update_id, run_id=cli_run.id if cli_run else None)
 
     redis = get_redis_client()
     # Release only if this update still holds it: a lease that expired may have
@@ -1262,6 +1368,15 @@ async def complete_update(
     # is unhelpful and also untrue, the lease having been valid when the call
     # arrived; and because it is the last thing the CLI prints, the real error
     # survives only in the API log. It masked three separate bugs during #1881.
+    #
+    # The CLI's own run ends with the update too (#1563), and for the same
+    # reason sits above the delete rather than below it. Pulumi reports the
+    # outcome in the body it posts here, so the run says what actually happened
+    # rather than assuming success: a failed `pulumi up` leaves an `errored` run
+    # whose checkpoint was still promoted, the same bargain #1564 struck for
+    # state — a failed update's partial work is real, and is recorded.
+    if cli_run is not None:
+        await _end_cli_run(db, cli_run, body.get("status"))
     await redis.delete(_update_key(update_id))
 
     logger.info(
@@ -1360,14 +1475,19 @@ async def cancel_update(
     # `complete_update`: a rollback inside the release expires every ORM object
     # on the session, and a later `ws.name` would then raise `MissingGreenlet`.
     ws_id, ws_name = ws.id, ws.name
+    cli_run = await _cli_run_of(db, record)
     await redis.delete(_update_key(update_id))
     if record.get("kind") != "preview":
-        await promote_checkpoint(db, ws, update_id)
+        await promote_checkpoint(db, ws, update_id, run_id=cli_run.id if cli_run else None)
     if text_of(await redis.get(_stack_lock_key(str(ws_id)))) == update_id:
         await redis.delete(_stack_lock_key(str(ws_id)))
     # Only what this update actually took (#1881).
     if record.get("workspace_lock") == "yes":
         await release_workspace_lock(db, ws_id, update_id)
+    # The run the cancelled update was recorded as (#1563). Cancelled, not
+    # errored: someone chose to stop this, which is not the same as it failing.
+    if cli_run is not None:
+        await _cancel_cli_run(db, cli_run)
     logger.info(
         "pulumi_update_cancelled",
         stack=ws_name,

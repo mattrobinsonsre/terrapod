@@ -31,6 +31,8 @@ def _result(*, first=None, scalar=None, scalars=None) -> MagicMock:
     r.first.return_value = first
     r.scalar_one_or_none.return_value = scalar
     r.scalars.return_value.all.return_value = scalars or []
+    # The CLI-run lookup the sweep makes reads `.scalars().first()` (#1563).
+    r.scalars.return_value.first.return_value = scalars[0] if scalars else None
     return r
 
 
@@ -160,7 +162,9 @@ class TestTheSweep:
         """Its last checkpoint is the only record of what it created (#1564)."""
         gone = _ws(locked=True, lock_id="pulumi-update:gone")
         alive = SimpleNamespace(id=uuid.uuid4(), locked=True, lock_id="pulumi-update:alive")
-        db = _db(_result(scalars=[gone, alive]), _result(scalar=gone))
+        # Third result: the sweep now also looks for a CLI run to end (#1563).
+        # None here — this abandoned update has no run recorded against it.
+        db = _db(_result(scalars=[gone, alive]), _result(scalar=gone), _result())
         redis = self._redis("alive")
         promote = AsyncMock()
         assert await self._sweep(db, redis, promote) == 1

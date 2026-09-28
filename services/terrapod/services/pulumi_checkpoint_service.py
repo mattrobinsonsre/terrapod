@@ -59,12 +59,22 @@ def _encode(deployment: Any) -> tuple[bytes, str, str]:
 
 
 async def write_deployment(
-    db: AsyncSession, ws: Workspace, deployment: Any, *, created_by: str | None
+    db: AsyncSession,
+    ws: Workspace,
+    deployment: Any,
+    *,
+    created_by: str | None,
+    run_id: uuid.UUID | None = None,
 ) -> StateVersion:
     """Store a deployment as the stack's next state version, and commit.
 
     Used for a promoted checkpoint and for `pulumi stack import`. The digests
     and size are over the stored plaintext, as they are for Terraform state.
+
+    `run_id` attributes the version to the run that produced it, as the
+    Terraform upload paths already do (#1563) — without it a Pulumi state
+    version has no run, and the run page has nothing to link to. It stays
+    optional because `pulumi stack import` has no run behind it.
     """
     from terrapod.crypto.state import encrypt_state_bytes
     from terrapod.storage import get_storage
@@ -91,6 +101,7 @@ async def write_deployment(
         sha256=sha256,
         state_size=len(payload),
         created_by=created_by,
+        run_id=run_id,
     )
     db.add(sv)
     await db.flush()
@@ -130,7 +141,7 @@ async def hold_checkpoint(
 
 
 async def promote_checkpoint(
-    db: AsyncSession, ws: Workspace, update_id: str
+    db: AsyncSession, ws: Workspace, update_id: str, *, run_id: uuid.UUID | None = None
 ) -> StateVersion | None:
     """Turn an update's last checkpoint into a state version.
 
@@ -152,7 +163,11 @@ async def promote_checkpoint(
         return None
     envelope = await asyncio.to_thread(json.loads, await decrypt_state_bytes(raw))
     sv = await write_deployment(
-        db, ws, envelope.get("deployment"), created_by=envelope.get("created_by")
+        db,
+        ws,
+        envelope.get("deployment"),
+        created_by=envelope.get("created_by"),
+        run_id=run_id,
     )
     try:
         await storage.delete(key)

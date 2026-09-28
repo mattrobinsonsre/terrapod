@@ -190,6 +190,59 @@ _PRE_PLAN_SCAN_LIMIT = 50
 # the Job (that's atomic in claim_next_run).
 PRE_EXECUTION_STATES = frozenset({"pending", "queued", "planning", "planned", "confirmed"})
 
+#: Sources whose runs Terrapod RECORDS but does not EXECUTE (#1563).
+#:
+#: A `pulumi up` from a laptop runs on that laptop. Terrapod sees it only
+#: because Pulumi's CLI drives its backend through a begin/checkpoint/complete
+#: lifecycle, which is enough to write the run down — but there is no
+#: configuration version, no agent pool, and above all **no Kubernetes Job**.
+#:
+#: That last point is why this set has to exist rather than being inferred.
+#: Everything that supervises a running run keys off the Job: the reconciler
+#: treats `job_name IS NULL` as "the Job failed to launch" and errors the run
+#: after `launch_timeout_seconds` (five minutes by default), which would kill
+#: any `pulumi up` slower than that, mid-apply, while it was going perfectly
+#: well. For these runs the liveness signal is the Pulumi **lease** instead:
+#: it is renewed while the CLI lives, and `sweep_abandoned_updates` ends the
+#: run when it lapses. One heartbeat per kind of run, and this names which is
+#: which.
+EXTERNALLY_EXECUTED_SOURCES = frozenset({"pulumi-cli"})
+
+
+def is_externally_executed(run: Run) -> bool:
+    """Whether this run is executing somewhere Terrapod cannot see (#1563)."""
+    return run.source in EXTERNALLY_EXECUTED_SOURCES
+
+
+async def start_external_apply(db: AsyncSession, run: Run) -> Run:
+    """Record that an externally executed run is already applying (#1563).
+
+    **Deliberately not a `transition_run` call, and `pending -> applying` is
+    deliberately not added to `VALID_TRANSITIONS`.** That table models a run
+    Terrapod drives, where each state is something Terrapod is waiting to do
+    next. An externally executed run has none of those states to be in: by the
+    time Terrapod hears of it at all, the CLI holds the stack's lock and is
+    changing infrastructure. There is nothing to queue, nothing to plan, and
+    nothing to confirm.
+
+    Walking it through the real states to reach the same place would be worse
+    than inaccurate. `queued` publishes `run_available` to every candidate
+    pool, and `claim_next_run` claims exactly `queued` and `confirmed` — so for
+    as long as that hop lasted, a listener could pick the run up and execute
+    someone's laptop apply a second time on a runner.
+
+    So the row is placed directly in the state it is genuinely in, and the two
+    things `transition_run` would have done for a real apply are done here: the
+    phase clock starts, and the UI is told.
+    """
+    run.status = "applying"
+    run.apply_started_at = now_utc()
+    await db.flush()
+    RUNS_TRANSITIONED.labels(from_status="pending", to_status="applying").inc()
+    await _publish_run_event(run, "pending", "applying")
+    await _enqueue_notification(run, "applying")
+    return run
+
 
 async def _enqueue_notification(run: Run, target_status: str) -> None:
     """Enqueue a notification trigger for a run status change.

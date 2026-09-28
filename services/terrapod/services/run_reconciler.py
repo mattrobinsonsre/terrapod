@@ -275,6 +275,16 @@ async def _reconcile_one(db: AsyncSession, run: Run, engine: str) -> None:
         await _reconcile_held(db, run)
         return
 
+    # A run Terrapod records but does not execute has no Job and never will, so
+    # every rule below is the wrong one to apply to it (#1563). `_check_stale`
+    # in particular reads a missing Job as "stuck pre-launch" and errors the run
+    # after `launch_timeout_seconds` — five minutes by default — which would
+    # kill a perfectly healthy `pulumi up` from a laptop, mid-apply, for the
+    # crime of taking longer than that. Its liveness is the Pulumi lease, and
+    # `sweep_abandoned_updates` is what ends it when that lapses.
+    if run_service.is_externally_executed(run):
+        return
+
     # If no Job has been launched yet (listener never POSTed job-launched),
     # there's nothing for listeners to query — skip the SSE round-trip and
     # rely on the launch_timeout in _check_stale.

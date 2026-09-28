@@ -1092,7 +1092,9 @@ class TestOneStateVersionPerUpdate:
             patch(f"{MOD}.release_workspace_lock", AsyncMock()),
         ):
             await cancel_update("default", "proj", "dev", "u-1", _user(), db)
-        promote.assert_awaited_once_with(db, ws, "u-1")
+        # `run_id=None` because this update has no CLI run recorded against it
+        # (#1563); the version is attributed when one exists.
+        promote.assert_awaited_once_with(db, ws, "u-1", run_id=None)
 
     async def test_stack_rm_is_the_recoverable_delete(self) -> None:
         from terrapod.api.routers.pulumi_service import delete_stack
