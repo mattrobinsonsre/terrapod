@@ -1742,12 +1742,18 @@ class ModuleAutodiscoveryRepository(Base):
 
 
 class PRSession(Base):
-    """Conversation state for one PR/MR in apply-then-merge mode (#282).
+    """Conversation state for one PR/MR (#282).
 
-    Tracks the edit-in-place status comment, the current head SHA, the
-    poll cursors for comments/reviews, and the lifecycle state of the PR.
-    One row per (connection, repo, pr_number). Created lazily when the
-    first apply-then-merge workspace plans against the PR.
+    Tracks the edit-in-place status comment, the current head SHA, the poll
+    cursors for comments/reviews, the lifecycle state of the PR, and the commit
+    it merged as. One row per (connection, repo, pr_number).
+
+    Created lazily by the poller the first time a workspace gets a run for the
+    PR, in **either** workflow mode. The mode does not gate it, and that is
+    deliberate: without a session there is no trigger, so a `merge_then_apply`
+    PR got no status comment at all. This docstring said "apply-then-merge
+    mode" long after that was fixed, and #1878 was written from it — a
+    reminder that a stale docstring is read as the specification.
     """
 
     __tablename__ = "pr_sessions"
@@ -1783,6 +1789,19 @@ class PRSession(Base):
     # historical audit but don't dispatch commands.
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
 
+    # The commit this PR merged as, once the poller has asked the provider
+    # (#1878). It is what ties the post-merge plan+apply back to the PR that
+    # caused it: those runs are branch runs, carrying `vcs_pull_request_number
+    # IS NULL` — deliberately, since three places in the poller read that field
+    # as "this is a speculative PR run" — so the commit is the only honest join.
+    #
+    # `state` alone cannot stand in for this. `merged` is only ever written when
+    # Terrapod performed the merge itself (`vcs_auto_merge`); a PR merged by a
+    # human in the web UI, which is the common case, is stamped `closed` by
+    # `_reconcile_closed_pr_sessions` on set difference against the open list,
+    # which never asks the provider why the PR left it.
+    merge_commit_sha: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
@@ -1793,6 +1812,7 @@ class PRSession(Base):
     __table_args__ = (
         sa.UniqueConstraint("vcs_connection_id", "repo", "pr_number", name="uq_pr_session"),
         sa.Index("ix_pr_sessions_open", "vcs_connection_id", "state"),
+        sa.Index("ix_pr_sessions_merge_commit_sha", "vcs_connection_id", "merge_commit_sha"),
     )
 
 

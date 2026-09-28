@@ -43,6 +43,15 @@ from terrapod.services.scheduler import enqueue_trigger
 logger = get_logger(__name__)
 
 
+#: Session states whose comment is still worth editing.
+#:
+#: `merged` is here for #1878: the post-merge plan+apply happens strictly after
+#: the PR is merged, so refusing to touch a merged session would refuse exactly
+#: the updates that turn "will apply on merge" into what actually happened.
+#: `closed` is NOT here — a PR abandoned without merging sets off no runs, and
+#: nothing more will ever be learned about it.
+_LIVE_SESSION_STATES = ("open", "merged")
+
 # Marker hidden in the comment body so we can find our own comment on a
 # PR even if the status_comment_id isn't recorded (e.g. comment created
 # manually, or PRSession was rebuilt). The HTML-comment form is invisible
@@ -95,6 +104,11 @@ class _Row:
     #: Run page for this row. None when `external_url` is unset, in which case
     #: the workspace name renders unlinked rather than as a broken link.
     run_url: str | None = None
+    #: What became of the plan+apply the merge set off (#1878), and where to
+    #: read it. Empty until that run exists, which is every render before the
+    #: PR is merged — so an open PR's table is exactly what it was.
+    post_merge_summary: str = ""
+    post_merge_url: str | None = None
 
 
 def _plan_summary(run: Run | None) -> str:
@@ -436,9 +450,22 @@ def render_comment(rows: list[_Row], *, force_merge_hint: bool = False) -> str:
     detail_blocks: list[str] = []
     pending_apply: list[str] = []
     for r in rows:
-        # merge_then_apply rows annotate the apply column to make the
-        # mode-distinction explicit; apply_then_merge rows pass through.
-        apply_cell = "will apply on merge" if r.mode == "merge_then_apply" else r.apply_summary
+        # Once the merge has actually happened, the Apply cell reports it (#1878).
+        # This is the whole point of that issue in one line: a `merge_then_apply`
+        # row used to read "will apply on merge" for ever — including long after
+        # the merge, the apply, and whatever came of it — so the PR's last word
+        # on its own change was a prediction. Now the prediction is replaced by
+        # the outcome, linked to the run that produced it.
+        if r.post_merge_summary:
+            apply_cell = r.post_merge_summary
+            if r.post_merge_url:
+                apply_cell = f"[{apply_cell}]({r.post_merge_url})"
+        elif r.mode == "merge_then_apply":
+            # merge_then_apply rows annotate the apply column to make the
+            # mode-distinction explicit; apply_then_merge rows pass through.
+            apply_cell = "will apply on merge"
+        else:
+            apply_cell = r.apply_summary
         name_cell = f"`{_escape(r.workspace_name)}`"
         if r.run_url:
             name_cell = f"[{name_cell}]({r.run_url})"
@@ -511,8 +538,21 @@ async def _collect_rows(db, sess: PRSession) -> list[_Row]:
     for run, ws in result.all():
         latest_per_ws.setdefault(ws.id, (ws, run))
 
+    post_merge = await _post_merge_runs(db, sess)
+
     rows: list[_Row] = []
-    for ws, run in sorted(latest_per_ws.values(), key=lambda pair: pair[0].name):
+    # Every workspace this PR touched, whether it was seen before the merge or
+    # only after it (#1878) — a workspace whose first run for this change is the
+    # post-merge one still belongs in the table.
+    seen: dict[uuid.UUID, Workspace] = {ws.id: ws for ws, _ in latest_per_ws.values()}
+    seen.update({ws.id: ws for ws, _ in post_merge.values()})
+    for ws in sorted(seen.values(), key=lambda w: w.name):
+        pair = latest_per_ws.get(ws.id)
+        merged_pair = post_merge.get(ws.id)
+        # The speculative run is the row's basis where there is one; otherwise
+        # the post-merge run is all there is to report.
+        run = pair[1] if pair else merged_pair[1]  # type: ignore[index]
+        merged_run = merged_pair[1] if merged_pair else None
         rows.append(
             _Row(
                 workspace_name=ws.name,
@@ -523,9 +563,67 @@ async def _collect_rows(db, sess: PRSession) -> list[_Row]:
                 cost_delta=_cost_delta(run),
                 gates=await _collect_gates(db, run),
                 run_url=run_links.run_url(ws.id, run.id),
+                post_merge_summary=_post_merge_summary(merged_run),
+                post_merge_url=(run_links.run_url(ws.id, merged_run.id) if merged_run else None),
             )
         )
     return rows
+
+
+async def _post_merge_runs(db, sess: PRSession) -> dict[uuid.UUID, tuple[Workspace, Run]]:
+    """The latest run per workspace that this PR's merge set off (#1878).
+
+    Empty until the poller has attributed a merge commit to the session, which
+    is every call before the PR is merged.
+
+    Matched on the commit, not on a PR number: these are branch runs and carry
+    `vcs_pull_request_number IS NULL`. That is load-bearing rather than
+    incidental — the poller reads a non-null value there as "this is a
+    speculative PR run" in three places, so writing the number onto these runs
+    would make the commit look unhandled, break the branch-run dedup, and get
+    the run force-cancelled when the PR left the open list.
+    """
+    if not sess.merge_commit_sha:
+        return {}
+    result = await db.execute(
+        select(Run, Workspace)
+        .join(Workspace, Workspace.id == Run.workspace_id)
+        .where(
+            Run.vcs_commit_sha == sess.merge_commit_sha,
+            Run.vcs_pull_request_number.is_(None),
+            Workspace.vcs_connection_id == sess.vcs_connection_id,
+            (Workspace.vcs_repo_url.endswith(sess.repo)),
+        )
+        .order_by(Workspace.name, Run.created_at.desc())
+    )
+    latest: dict[uuid.UUID, tuple[Workspace, Run]] = {}
+    for run, ws in result.all():
+        latest.setdefault(ws.id, (ws, run))
+    return latest
+
+
+def _post_merge_summary(run: Run | None) -> str:
+    """What became of the run the merge set off (#1878).
+
+    Deliberately says `applied` / `errored` and not much else: the row already
+    carries what the change was, and this column answers the one question the
+    reviewer is left with after approving it — did it land?
+    """
+    if run is None:
+        return ""
+    if run.status == "applied":
+        return "applied"
+    if run.status == "errored":
+        return "errored"
+    if run.status in ("applying", "confirmed"):
+        return "applying"
+    if run.status in ("planning", "queued", "pending"):
+        return "running"
+    if run.status == "planned":
+        # Reached `planned` and stopped: something is holding the apply — an
+        # unmet gate, or a workspace that does not auto-apply.
+        return "awaiting apply"
+    return run.status
 
 
 async def _post_or_update(
@@ -595,18 +693,26 @@ async def refresh_for_run(db, run: Run, reason: str) -> None:
     missing comment must never fail a plan — the next input re-enqueues, and
     the handler is idempotent.
     """
-    if run.vcs_pull_request_number is None:
-        return
     try:
         ws = await db.get(Workspace, run.workspace_id)
         if ws is None or ws.vcs_connection_id is None:
             return
-        result = await db.execute(
-            select(PRSession).where(
-                PRSession.vcs_connection_id == ws.vcs_connection_id,
+        if run.vcs_pull_request_number is not None:
+            # A speculative run on the PR: found by the PR it belongs to.
+            where = [
                 PRSession.pr_number == run.vcs_pull_request_number,
-                PRSession.state == "open",
-            )
+                PRSession.state.in_(_LIVE_SESSION_STATES),
+            ]
+        elif run.vcs_commit_sha:
+            # A branch run — the plan+apply a merge set off (#1878). It carries
+            # no PR number, so the merge commit the poller attributed is the
+            # join. A commit that closed no PR matches nothing and this is a
+            # cheap miss, which is the common case for a direct push.
+            where = [PRSession.merge_commit_sha == run.vcs_commit_sha]
+        else:
+            return
+        result = await db.execute(
+            select(PRSession).where(PRSession.vcs_connection_id == ws.vcs_connection_id, *where)
         )
         sess = result.scalars().first()
         if sess is None:
@@ -639,7 +745,7 @@ async def handle_vcs_status_comment_update(payload: dict[str, Any]) -> None:
         return
     async with get_db_session() as db:
         sess = await db.get(PRSession, uuid.UUID(session_id))
-        if sess is None or sess.state != "open":
+        if sess is None or sess.state not in _LIVE_SESSION_STATES:
             return
         conn = await db.get(VCSConnection, sess.vcs_connection_id)
         if conn is None:

@@ -68,6 +68,9 @@ from terrapod.services.vcs_provider import (
 from terrapod.services.vcs_provider import (
     parse_repo_url as _provider_parse_repo_url,
 )
+from terrapod.services.vcs_provider import (
+    pull_requests_for_commit as _provider_pulls_for_commit,
+)
 from terrapod.services.workspace_autodiscovery_service import autodiscover_for_paths
 from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key
@@ -707,6 +710,84 @@ async def _poll_workspace_branch(
             commit_sha=sha[:8],
             branch=branch,
         )
+        # Tie this run back to the PR whose merge produced the commit (#1878).
+        # Best-effort: the run is already made, and failing to attribute it must
+        # not fail the poll cycle that made it.
+        try:
+            await _attribute_merge_commit(db, conn, owner, repo, sha, meta=meta)
+        except Exception as e:  # noqa: BLE001 — attribution is not worth a cycle
+            logger.debug(
+                "Could not attribute commit to a PR",
+                repo=f"{owner}/{repo}",
+                commit_sha=sha[:8],
+                error=str(e),
+            )
+
+
+async def _attribute_merge_commit(
+    db: AsyncSession,
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    sha: str,
+    *,
+    meta: VCSMetadataCache,
+) -> None:
+    """Record that `sha` is the merge commit of one of this repo's PRs (#1878).
+
+    The post-merge plan+apply is a branch run, so it carries no PR number —
+    deliberately, since three separate places in this poller read that field as
+    "this is a speculative PR run" and would queue the run again, dedupe it
+    wrongly, or force-cancel it. The commit is therefore the only honest join
+    back to the PR, and the provider is the only thing that can make it.
+
+    **Bounded three ways**, because this is a per-commit API call on the poll
+    path. It is memoised per repo per commit through the cycle's metadata cache,
+    so a monorepo's many workspaces share one call; it is skipped entirely
+    unless a session for this repo could plausibly match; and the answer is
+    immutable once written, so it is asked once and never again.
+    """
+    repo_path = f"{owner}/{repo}"
+    open_sessions = (
+        (
+            await db.execute(
+                select(PRSession).where(
+                    PRSession.vcs_connection_id == conn.id,
+                    PRSession.repo == repo_path,
+                    PRSession.merge_commit_sha.is_(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not open_sessions:
+        return
+    by_number = {sess.pr_number: sess for sess in open_sessions}
+
+    numbers = await meta.get_or_fetch(
+        (str(conn.id), owner, repo, f"pulls-for:{sha}"),
+        lambda: _provider_pulls_for_commit(conn, owner, repo, sha),
+    )
+    for number in numbers:
+        sess = by_number.get(number)
+        if sess is None:
+            continue
+        sess.merge_commit_sha = sha
+        # `merged` at last, and truthfully. `_reconcile_closed_pr_sessions`
+        # stamps `closed` by set difference against the open-PR list and never
+        # asks the provider why a PR left it, so a PR merged by a human in the
+        # web UI has been indistinguishable from an abandoned one. The provider
+        # has now told us which this was.
+        sess.state = "merged"
+        await db.commit()
+        logger.info(
+            "Attributed merge commit to PR",
+            repo=repo_path,
+            pr_number=number,
+            commit_sha=sha[:8],
+        )
+        return
 
 
 async def _upsert_pr_session(

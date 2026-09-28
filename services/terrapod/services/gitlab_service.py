@@ -210,6 +210,29 @@ async def get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: str
     return resp.json()["commit"]["id"]
 
 
+async def pull_requests_for_commit(
+    conn: VCSConnection, owner: str, repo: str, sha: str
+) -> list[int]:
+    """The MR iids a commit belongs to (#1878). GitLab's half of the same idea.
+
+    `iid` rather than `id`: the project-scoped number is what the UI shows, what
+    `PRSession.pr_number` holds, and what every other MR call here addresses.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+
+    resp = await _gitlab_request(
+        "GET",
+        f"{api}/projects/{project}/repository/commits/{url_quote(sha, safe='')}/merge_requests",
+        conn,
+        params={"per_page": 100},
+    )
+    if resp.status_code == 404:
+        return []
+    resp.raise_for_status()
+    return [mr["iid"] for mr in resp.json() if mr.get("iid") is not None]
+
+
 async def get_default_branch(conn: VCSConnection, owner: str, repo: str) -> str | None:
     """Get the repository's default branch name."""
     api = _api_url(conn)

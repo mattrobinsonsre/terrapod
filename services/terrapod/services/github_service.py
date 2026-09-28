@@ -320,6 +320,40 @@ async def get_repo_branch_sha(
     return resp.json()["commit"]["sha"]
 
 
+async def pull_requests_for_commit(
+    conn: VCSConnection, owner: str, repo: str, sha: str
+) -> list[int]:
+    """The PR numbers a commit belongs to, newest first (#1878).
+
+    Used to tie the plan+apply that a merge sets off back to the PR that caused
+    it. It answers for a merge performed by anyone, by any route — including a
+    human clicking Merge in the web UI, which is the common case and the one
+    Terrapod has no other record of.
+
+    Two alternatives were considered and are not this. Remembering the SHA when
+    Terrapod itself merges covers only auto-merge. Parsing `(#N)` off a squash
+    commit message is conventional rather than guaranteed, and a rebase merge
+    produces no such suffix at all.
+
+    Returns an empty list when the commit belongs to no PR, which is the
+    ordinary answer for a commit pushed straight to the branch.
+    """
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/commits/{sha}/pulls",
+        token,
+        conn=conn,
+        params={"per_page": 100},
+    )
+    if resp.status_code == 404:
+        return []
+    resp.raise_for_status()
+    return [pr["number"] for pr in resp.json() if pr.get("number") is not None]
+
+
 async def get_repo_default_branch(conn: VCSConnection, owner: str, repo: str) -> str | None:
     """Get the default branch name for a repository.
 

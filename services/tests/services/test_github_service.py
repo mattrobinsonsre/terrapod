@@ -512,3 +512,60 @@ class TestParseRetryDelay:
 
         resp = MagicMock(headers={})
         assert _parse_retry_delay(resp) == _DEFAULT_BACKOFF_SECONDS
+
+
+class TestPullRequestsForCommit:
+    """#1878: which PR did this merge commit come from?
+
+    The provider is asked because it is the only source correct in general — it
+    answers for a merge performed by anyone, by any route, including a human
+    clicking Merge in the web UI, which Terrapod has no other record of.
+    """
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service.get_installation_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_it_returns_the_pr_numbers(self, mock_request, mock_token):
+        mock_token.return_value = "fake-token"
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = [{"number": 7}, {"number": 9}]
+        resp.raise_for_status = MagicMock()
+        mock_request.return_value = resp
+
+        from terrapod.services.github_service import pull_requests_for_commit
+
+        assert await pull_requests_for_commit(_mock_conn(), "acme", "infra", "deadbeef") == [7, 9]
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service.get_installation_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_a_commit_belonging_to_no_pr_is_empty_not_an_error(
+        self, mock_request, mock_token
+    ):
+        """The ordinary answer for a commit pushed straight at the branch."""
+        mock_token.return_value = "fake-token"
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = []
+        resp.raise_for_status = MagicMock()
+        mock_request.return_value = resp
+
+        from terrapod.services.github_service import pull_requests_for_commit
+
+        assert await pull_requests_for_commit(_mock_conn(), "acme", "infra", "deadbeef") == []
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service.get_installation_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_a_404_is_empty_rather_than_a_raise(self, mock_request, mock_token):
+        """Attribution is decoration on a run that already exists, so a repo the
+        token cannot see must not become an exception on the poll path."""
+        mock_token.return_value = "fake-token"
+        resp = MagicMock()
+        resp.status_code = 404
+        mock_request.return_value = resp
+
+        from terrapod.services.github_service import pull_requests_for_commit
+
+        assert await pull_requests_for_commit(_mock_conn(), "acme", "infra", "deadbeef") == []
