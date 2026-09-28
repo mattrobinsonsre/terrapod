@@ -95,6 +95,24 @@ async def _publish(workspace_id: uuid.UUID, *, locked: bool) -> None:
         logger.debug("Failed to publish workspace_lock_change", workspace_id=str(workspace_id))
 
 
+def _lock_row(workspace_id: uuid.UUID):  # type: ignore[no-untyped-def]
+    """The workspace row, locked `FOR UPDATE OF workspaces`.
+
+    **`of=` is load-bearing, and its absence was a live 500.** `Workspace` eagerly
+    joins `vcs_connection` (`lazy="joined"`) on a nullable foreign key, so the ORM
+    renders a LEFT OUTER JOIN — and Postgres refuses a bare `FOR UPDATE` over one:
+
+        FOR UPDATE cannot be applied to the nullable side of an outer join
+
+    Naming the entity locks only the `workspaces` row, which is the row these
+    functions actually contend for, and leaves the join alone.
+
+    This is the one place the lock row is read, so both the taker and the releaser
+    are fixed by it and neither can drift back.
+    """
+    return select(Workspace).where(Workspace.id == workspace_id).with_for_update(of=Workspace)
+
+
 async def take_workspace_lock(db: AsyncSession, workspace_id: uuid.UUID, update_id: str) -> None:
     """Lock the workspace for a local update, or raise `LockRefused` saying why.
 
@@ -121,9 +139,7 @@ async def take_workspace_lock(db: AsyncSession, workspace_id: uuid.UUID, update_
             "update again"
         )
 
-    ws = (
-        await db.execute(select(Workspace).where(Workspace.id == workspace_id).with_for_update())
-    ).scalar_one_or_none()
+    ws = (await db.execute(_lock_row(workspace_id))).scalar_one_or_none()
     if ws is None:
         raise LockRefused("the stack's workspace no longer exists")
     if ws.locked:
@@ -151,9 +167,7 @@ async def release_workspace_lock(db: AsyncSession, workspace_id: uuid.UUID, upda
     Returns whether it did. A lock that has since been force-unlocked, or taken
     by something else, is left alone.
     """
-    ws = (
-        await db.execute(select(Workspace).where(Workspace.id == workspace_id).with_for_update())
-    ).scalar_one_or_none()
+    ws = (await db.execute(_lock_row(workspace_id))).scalar_one_or_none()
     if ws is None or ws.lock_id != lock_id_for(update_id):
         await db.rollback()
         return False
