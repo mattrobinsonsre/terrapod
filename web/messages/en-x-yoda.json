@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64-decode it, you will",
       "vaultFileEncodingHint": "Before it is written, the field decoded is. Text, the result must be; supported, binary files are not.",
       "categoryNative": "Native it is",
-      "structured": "Structured"
+      "structured": "Structured",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Config, Pulumi"
     },
     "runs": {
       "options": "Options",

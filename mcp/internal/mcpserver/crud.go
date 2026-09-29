@@ -217,7 +217,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...)"`
 		Key         string `json:"key" jsonschema:"the variable key"`
 		Value       string `json:"value,omitempty" jsonschema:"the value (empty is legal, e.g. flag-shaped env vars)"`
-		Category    string `json:"category,omitempty" jsonschema:"terraform, env, git_http_auth, or git_ssh_auth (default terraform). terraform is the engine's own parameter channel -- Terraform input variables, Pulumi stack config, Ansible extra vars -- one category, delivered by whichever engine the workspace runs; Terrapod's own API calls it native, and this tool reads the compatibility surface, which calls it terraform. The git_* categories carry private-git-module credentials as a JSON value and are always sensitive"`
+		Category    string `json:"category,omitempty" jsonschema:"terraform, env, git_http_auth, or git_ssh_auth (default terraform); native is accepted as an equivalent name for terraform. terraform is the engine's own parameter channel -- Terraform input variables, Pulumi stack config, Ansible extra vars -- one category, delivered by whichever engine the workspace runs; Terrapod's own API calls it native, and this tool reads the compatibility surface, which calls it terraform. The git_* categories carry private-git-module credentials as a JSON value and are always sensitive"`
 		Structured  *bool  `json:"structured,omitempty" jsonschema:"the value is a typed expression rather than a plain string (lists/objects/numbers/bools); default false"`
 		HCL         *bool  `json:"hcl,omitempty" jsonschema:"deprecated alias for structured; both are the same flag"`
 		Sensitive   *bool  `json:"sensitive,omitempty" jsonschema:"mark sensitive — masked at rest and in responses; default false"`
@@ -285,7 +285,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 	type variableDeleteIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...)"`
 		Key         string `json:"key" jsonschema:"the variable key to delete"`
-		Category    string `json:"category,omitempty" jsonschema:"which category to delete the key from (terraform, env, git_http_auth, git_ssh_auth). Optional: needed only when the same key exists in more than one category, which is refused rather than guessed"`
+		Category    string `json:"category,omitempty" jsonschema:"which category to delete the key from (terraform, env, git_http_auth, git_ssh_auth; native is accepted for terraform). Optional: needed only when the same key exists in more than one category, which is refused rather than guessed"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_variable_delete",

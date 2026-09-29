@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "B45364-d3c0d3",
       "vaultFileEncodingHint": "D3c0d35 7h3 f13ld b3f0r3 17 15 wr1773n. 7h3 r35ul7 mu57 b3 73x7; b1n4ry f1l35 4r3 n07 5upp0r73d.",
       "categoryNative": "N471v3",
-      "structured": "57ruc7ur3d"
+      "structured": "57ruc7ur3d",
+      "categoryTerraform": "73rr4f0rm",
+      "categoryPulumiConfig": "Pulum1 c0nf1g"
     },
     "runs": {
       "options": "0p710n5",

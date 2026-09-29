@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64 解码",
       "vaultFileEncodingHint": "在写入前解码该字段。结果必须是文本；不支持二进制文件。",
       "categoryNative": "原生",
-      "structured": "结构化"
+      "structured": "结构化",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Pulumi 配置"
     },
     "runs": {
       "options": "选项",

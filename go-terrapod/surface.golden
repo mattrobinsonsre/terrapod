@@ -1,6 +1,11 @@
 const AssignmentExplicit
 const AssignmentGlobal
 const AssignmentRuleBased
+const CategoryEnv
+const CategoryGitHTTP
+const CategoryGitSSH
+const CategoryNative
+const CategoryTerraform
 const DiscoveryPath
 const ModuleAutodiscoveryTargetNamespace
 const ModuleAutodiscoveryTargetPattern
@@ -1364,6 +1369,7 @@ func MarshalResourceWithIDAndRels(id, resourceType string, attributes, relations
 func NewClient(opts Options) (*Client, error)
 func ParseResource(body []byte) (*Resource, error)
 func ParseResourceList(body []byte) ([]Resource, error)
+func SameCategory(a, b string) bool
 func StripPrefix(id, prefix string) string
 method (*AIPolicyEvaluation) IsBlocking() bool
 method (*AIPolicyStatus) IsBlocking() bool

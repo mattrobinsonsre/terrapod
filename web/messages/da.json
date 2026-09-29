@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64-afkod",
       "vaultFileEncodingHint": "Afkoder feltet, før det skrives. Resultatet skal være tekst; binære filer understøttes ikke.",
       "categoryNative": "Native",
-      "structured": "Struktureret"
+      "structured": "Struktureret",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Pulumi-konfiguration"
     },
     "runs": {
       "options": "Indstillinger",

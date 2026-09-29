@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64-dekodieren",
       "vaultFileEncodingHint": "Dekodiert das Feld, bevor es geschrieben wird. Das Ergebnis muss Text sein; Binärdateien werden nicht unterstützt.",
       "categoryNative": "Nativ",
-      "structured": "Strukturiert"
+      "structured": "Strukturiert",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Pulumi-Konfiguration"
     },
     "runs": {
       "options": "Optionen",

@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64 decodere",
       "vaultFileEncodingHint": "Campum decodit antequam scribitur. Exitus textus esse debet; fasciculi binarii non sustinentur.",
       "categoryNative": "Nativa",
-      "structured": "Structa"
+      "structured": "Structa",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Configuratio Pulumi"
     },
     "runs": {
       "options": "Optiones",

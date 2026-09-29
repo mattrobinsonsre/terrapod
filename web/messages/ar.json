@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "فك ترميز Base64",
       "vaultFileEncodingHint": "يفك ترميز الحقل قبل كتابته. يجب أن تكون النتيجة نصًا؛ الملفات الثنائية غير مدعومة.",
       "categoryNative": "أصلي",
-      "structured": "منظّم"
+      "structured": "منظّم",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "إعدادات Pulumi"
     },
     "runs": {
       "options": "الخيارات",

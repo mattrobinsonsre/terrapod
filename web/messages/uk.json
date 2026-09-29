@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Декодувати Base64",
       "vaultFileEncodingHint": "Декодує поле перед записом. Результат має бути текстом; двійкові файли не підтримуються.",
       "categoryNative": "Нативна",
-      "structured": "Структурована"
+      "structured": "Структурована",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Конфігурація Pulumi"
     },
     "runs": {
       "options": "Опції",

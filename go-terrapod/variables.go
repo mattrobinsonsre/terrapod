@@ -152,6 +152,50 @@ func (c *Client) GetVariable(ctx context.Context, workspaceID, id string) (*Vari
 	return nil, &NotFoundError{Resource: "variable", ID: id}
 }
 
+// CategoryNative and CategoryTerraform are the two names for the ONE
+// category holding an engine's own parameters -- Terraform's input
+// variables, Pulumi's stack config, Ansible's extra vars (#1898).
+//
+// The TFE-compatible surface (/api/tfe/v2 and its /api/v2 alias) returns
+// CategoryTerraform and always will, because tfci and go-tfe hold that as
+// a constant; Terrapod's own /api/v1 returns CategoryNative. Both are
+// accepted on input anywhere, as is the short-lived "pulumi_config".
+//
+// This SDK reads the compatibility surface, so CategoryTerraform is what
+// comes back today. Compare with SameCategory rather than == so code
+// keeps working whichever name it is handed.
+const (
+	CategoryNative    = "native"
+	CategoryTerraform = "terraform"
+	CategoryEnv       = "env"
+	CategoryGitHTTP   = "git_http_auth"
+	CategoryGitSSH    = "git_ssh_auth"
+)
+
+// canonicalCategory folds every accepted spelling of the native category
+// onto one name. Anything else is returned unchanged -- folding must not
+// reach past its own aliases, or "env" would quietly become native.
+func canonicalCategory(category string) string {
+	switch category {
+	case CategoryTerraform, CategoryNative, "pulumi_config":
+		return CategoryNative
+	default:
+		return category
+	}
+}
+
+// SameCategory reports whether two category names mean the same thing.
+//
+// Use it instead of == anywhere a category is compared. "terraform",
+// "native" and "pulumi_config" are three spellings of one category, and
+// which one you hold depends on the surface it came from and the version
+// of the server that answered -- so an equality check is right until the
+// day something reads from the other prefix, and then it is silently
+// wrong in the direction of "no such variable".
+func SameCategory(a, b string) bool {
+	return canonicalCategory(a) == canonicalCategory(b)
+}
+
 // GetVariableByKey looks up a variable by workspace + category + key
 // (the human-typed name, e.g. "AWS_REGION"). Most operator-facing
 // tools reason in names rather than UUIDs; this is the lookup they
@@ -164,9 +208,11 @@ func (c *Client) GetVariable(ctx context.Context, workspaceID, id string) (*Vari
 // pick one, which is the ambiguity this signature exists to remove --
 // it previously returned whichever the server happened to list first.
 //
-// Pass the category as the surface you are reading spells it: this
-// compares against what the server returned, so a `native` argument
-// finds nothing in a list fetched from /api/v2.
+// The category is matched with SameCategory, so "terraform", "native"
+// and "pulumi_config" all find the same variable whichever name the
+// server returned. A caller reading /api/v1 and one reading /api/v2 hold
+// different spellings of one row; an equality check would have made this
+// lookup depend on which.
 //
 // Returns *NotFoundError when that workspace has no variable with the
 // given key in the given category.
@@ -176,7 +222,7 @@ func (c *Client) GetVariableByKey(ctx context.Context, workspaceID, category, ke
 		return nil, err
 	}
 	for i := range list {
-		if list[i].Key == key && list[i].Category == category {
+		if list[i].Key == key && SameCategory(list[i].Category, category) {
 			return &list[i], nil
 		}
 	}

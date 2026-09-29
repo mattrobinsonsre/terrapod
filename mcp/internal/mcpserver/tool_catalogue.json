@@ -762,7 +762,7 @@
       "additionalProperties": false,
       "properties": {
         "category": {
-          "description": "which category to delete the key from (terraform, env, git_http_auth, git_ssh_auth). Optional: needed only when the same key exists in more than one category, which is refused rather than guessed",
+          "description": "which category to delete the key from (terraform, env, git_http_auth, git_ssh_auth; native is accepted for terraform). Optional: needed only when the same key exists in more than one category, which is refused rather than guessed",
           "type": "string"
         },
         "key": {
@@ -804,7 +804,7 @@
       "additionalProperties": false,
       "properties": {
         "category": {
-          "description": "terraform, env, git_http_auth, or git_ssh_auth (default terraform). terraform is the engine's own parameter channel -- Terraform input variables, Pulumi stack config, Ansible extra vars -- one category, delivered by whichever engine the workspace runs; Terrapod's own API calls it native, and this tool reads the compatibility surface, which calls it terraform. The git_* categories carry private-git-module credentials as a JSON value and are always sensitive",
+          "description": "terraform, env, git_http_auth, or git_ssh_auth (default terraform); native is accepted as an equivalent name for terraform. terraform is the engine's own parameter channel -- Terraform input variables, Pulumi stack config, Ansible extra vars -- one category, delivered by whichever engine the workspace runs; Terrapod's own API calls it native, and this tool reads the compatibility surface, which calls it terraform. The git_* categories carry private-git-module credentials as a JSON value and are always sensitive",
           "type": "string"
         },
         "description": {

@@ -219,7 +219,8 @@ test.describe('Responsive harness (phone viewport)', () => {
     await page.goto(`/workspaces/${wsId}?tab=variables`)
     const card = page.locator('li').filter({ hasText: 'aws:region' })
     await expect(card).toBeVisible({ timeout: 15_000 })
-    await expect(card).toContainText('native')
+    // The engine's own word for the category, not the API value (#1898).
+    await expect(card).toContainText('Terraform')
     await expect(card).toContainText('eu-west-1')
     await expectNoHorizontalPageScroll(page)
   })

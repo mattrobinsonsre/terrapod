@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Dekoduj Base64",
       "vaultFileEncodingHint": "Dekoduje pole przed zapisaniem. Wynik musi być tekstem; pliki binarne nie są obsługiwane.",
       "categoryNative": "Natywna",
-      "structured": "Strukturalna"
+      "structured": "Strukturalna",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Konfiguracja Pulumi"
     },
     "runs": {
       "options": "Opcje",

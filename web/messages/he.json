@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "פענוח Base64",
       "vaultFileEncodingHint": "מפענח את השדה לפני שהוא נכתב. התוצאה חייבת להיות טקסט; קבצים בינאריים אינם נתמכים.",
       "categoryNative": "מקורי",
-      "structured": "מובנה"
+      "structured": "מובנה",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "תצורת Pulumi"
     },
     "runs": {
       "options": "אפשרויות",

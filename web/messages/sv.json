@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64-avkoda",
       "vaultFileEncodingHint": "Avkodar fältet innan det skrivs. Resultatet måste vara text; binära filer stöds inte.",
       "categoryNative": "Nativ",
-      "structured": "Strukturerad"
+      "structured": "Strukturerad",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Pulumi-konfiguration"
     },
     "runs": {
       "options": "Alternativ",

@@ -435,10 +435,10 @@ purely additive. Nothing moved; `/api/v2` serves them as it always did.
 **`pulumi_config` is gone as a stored category.** It existed only in
 pre-release builds of 2.0 and never shipped. The migration folds every such
 variable into `native`, and the name is still accepted on input, so a script or
-`terrapod_variable` resource written against it keeps applying — but it will read
-back as `terraform`, which in a Terraform configuration means a perpetual diff on
-an attribute that forces replacement. **Change `category = "pulumi_config"` to
-`category = "terraform"` in any provider configuration before upgrading.**
+`terrapod_variable` resource written against it keeps applying. The provider
+treats `terraform`, `native` and `pulumi_config` as one value and keeps whichever
+you wrote, so none of them drifts — you need change nothing, though `terraform`
+is the clearest thing to settle on.
 
 **If a workspace held both**, the migration keeps the **oldest** row per key and
 deletes the rest, printing each removal — two rows that were `terraform:region`
@@ -453,7 +453,10 @@ Neither was ever in a release. If you match on health-condition codes, drop
 `variables_not_consumed` from the list.
 
 **If you use `go-terrapod` directly**, `Variable.AppliesToEngine` is removed for
-the same reason.
+the same reason. Compare categories with the new `SameCategory` rather than `==`:
+`GetVariableByKey` already does, so it finds the same row whichever name you pass,
+but your own comparisons are right only until something reads from the other
+prefix.
 
 ## Before you upgrade
 

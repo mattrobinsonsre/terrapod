@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64 çöz",
       "vaultFileEncodingHint": "Alanı yazmadan önce çözer. Sonuç metin olmalıdır; ikili dosyalar desteklenmez.",
       "categoryNative": "Yerel",
-      "structured": "Yapılandırılmış"
+      "structured": "Yapılandırılmış",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Pulumi yapılandırması"
     },
     "runs": {
       "options": "Seçenekler",

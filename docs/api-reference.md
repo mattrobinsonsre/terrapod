@@ -1882,6 +1882,10 @@ POST /api/tfe/v2/workspaces/{id}/vars
 
 **Two names, one category.** It is stored as `native` — the honest name for a channel that is not Terraform's alone — and the surface you ask decides how it comes back. The TFE-compatible surface (`/api/tfe/v2` and its `/api/v2` alias) returns `terraform` and always will, because `tfci` and `go-tfe` hold that as a constant; `/api/v1` returns `native`. On input, `terraform`, `native` and `pulumi_config` are all accepted anywhere and mean the same thing, so a request written against any of them keeps working. This is the arrangement `structured` already has with `hcl`.
 
+The consumers accept both too, so which name you hold never has to depend on which prefix you read. `go-terrapod` exposes `SameCategory` and uses it wherever a category is compared — `GetVariableByKey` finds the same row whether you ask for `terraform` or `native`. The `terrapod_variable` and `terrapod_variable_set_variable` provider resources accept either and keep the spelling you wrote, so a configuration saying `native` does not drift against a server answering `terraform` (which, on an attribute that forces replacement, would propose destroying and recreating the variable on every plan). Only a genuine change of category — to `env`, say — is reported as drift.
+
+The **UI** names it in the words of the engine you are looking at: a Terraform or OpenTofu workspace shows **Terraform**, a Pulumi workspace shows **Pulumi config**, and a variable set — which is org-scoped and reaches workspaces of either kind — shows **Native**, because there is no single engine whose word would be right. The stored value is the same in all three.
+
 `env` vars are injected via `secretKeyRef`. The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly.
 
 `structured` marks a value as a typed expression rather than a plain string. What that

@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64-dekode",
       "vaultFileEncodingHint": "Dekodez da feeld b4 ritin it. Hafta be textz; binaree fielz not supportd.",
       "categoryNative": "Naytiv",
-      "structured": "Strukchurd"
+      "structured": "Strukchurd",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Pulumiz confg"
     },
     "runs": {
       "options": "Opshunz",

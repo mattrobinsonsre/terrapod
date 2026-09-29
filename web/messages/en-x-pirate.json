@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64-decode, arr",
       "vaultFileEncodingHint": "Decodes the field afore it be written. What comes out must be text; binary scrolls be not supported.",
       "categoryNative": "Ship''s own",
-      "structured": "Rigged"
+      "structured": "Rigged",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Pulumi riggin''"
     },
     "runs": {
       "options": "Options",

@@ -520,3 +520,98 @@ func TestVariable_CategoryIsWhateverTheSurfaceSaid(t *testing.T) {
 		})
 	}
 }
+
+func TestSameCategory(t *testing.T) {
+	// One category, several spellings (#1898). Which one a caller holds
+	// depends on the surface it came from and the server version that
+	// answered, so == is right until something reads from the other prefix
+	// and then silently wrong in the direction of "no such variable".
+	for _, tc := range []struct {
+		a, b string
+		want bool
+	}{
+		{"terraform", "native", true},
+		{"native", "terraform", true},
+		{"pulumi_config", "terraform", true},
+		{"pulumi_config", "native", true},
+		{"terraform", "terraform", true},
+		{"native", "native", true},
+		// The fold must not reach past its own aliases.
+		{"env", "native", false},
+		{"env", "terraform", false},
+		{"git_http_auth", "native", false},
+		{"git_ssh_auth", "git_http_auth", false},
+		{"env", "env", true},
+		{"nonsense", "native", false},
+		{"nonsense", "nonsense", true},
+	} {
+		if got := SameCategory(tc.a, tc.b); got != tc.want {
+			t.Errorf("SameCategory(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.want)
+		}
+	}
+}
+
+func TestGetVariableByKey_AcceptsEitherSpelling(t *testing.T) {
+	// The server returns `terraform` on the compatibility surface this SDK
+	// reads and `native` on /api/v1. A caller that learned the name from
+	// either must find the row, or moving a tool between prefixes turns
+	// every lookup into a NotFoundError with nothing to explain it.
+	for _, served := range []string{"terraform", "native"} {
+		for _, asked := range []string{"terraform", "native", "pulumi_config"} {
+			t.Run(served+"/"+asked, func(t *testing.T) {
+				body := `{"data":[{"id":"var-a","type":"vars","attributes":{"key":"region","category":"` + served + `"}}]}`
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/vnd.api+json")
+					_, _ = w.Write([]byte(body))
+				}))
+				t.Cleanup(srv.Close)
+				c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := c.GetVariableByKey(t.Context(), "ws-aaa", asked, "region")
+				if err != nil {
+					t.Fatalf("served %q, asked %q: %v", served, asked, err)
+				}
+				if got.ID != "var-a" {
+					t.Errorf("got %q", got.ID)
+				}
+			})
+		}
+	}
+}
+
+func TestGetVariableByKey_StillSeparatesRealCategories(t *testing.T) {
+	// Accepting the aliases must not collapse the identity the widened
+	// constraint exists to hold: `native:region` and `env:region` are two
+	// variables, and asking for one must not return the other.
+	body := `{"data":[
+		{"id":"var-env","type":"vars","attributes":{"key":"region","category":"env"}},
+		{"id":"var-tf","type":"vars","attributes":{"key":"region","category":"terraform"}}
+	]}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ asked, want string }{
+		{"env", "var-env"},
+		{"terraform", "var-tf"},
+		{"native", "var-tf"},
+	} {
+		got, err := c.GetVariableByKey(t.Context(), "ws-aaa", tc.asked, "region")
+		if err != nil {
+			t.Fatalf("asked %q: %v", tc.asked, err)
+		}
+		if got.ID != tc.want {
+			t.Errorf("asked %q: got %q, want %q", tc.asked, got.ID, tc.want)
+		}
+	}
+	if _, err := c.GetVariableByKey(t.Context(), "ws-aaa", "git_http_auth", "region"); err == nil {
+		t.Error("a category with no such row should be a NotFoundError")
+	}
+}

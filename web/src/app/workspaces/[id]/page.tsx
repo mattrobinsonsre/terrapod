@@ -11,6 +11,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { LabelsEditor } from '@/components/labels-editor'
+import { categoryKey, nativeCategoryKey } from '@/lib/variable-category'
 import { HealthConditions } from '@/components/health-conditions'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
 import { WorkspacePicker } from '@/components/workspace-picker'
@@ -400,6 +401,11 @@ function WorkspaceDetailContent() {
   const [gitKnownHosts, setGitKnownHosts] = useState('')
   const [gitRewrite, setGitRewrite] = useState<'none' | 'to_https' | 'to_ssh'>('none')
   const isGitCat = varCategory === 'git_http_auth' || varCategory === 'git_ssh_auth'
+  /** The category as a person reads it, in this workspace's engine's words. */
+  const categoryLabel = (category: string, engine?: string) => {
+    const key = categoryKey(category, engine)
+    return key ? t(`variables.${key}`) : category
+  }
 
   // Vault value source (#1439): the variable holds a *reference*, resolved
   // server-side at run time. Discrete fields, never raw JSON.
@@ -3365,7 +3371,7 @@ function WorkspaceDetailContent() {
                           one role with three deliveries, and the runner
                           dispatches on the engine. An engine-specific option
                           here would be the mechanism showing through. */}
-                      <option value="native">{t('variables.categoryNative')}</option>
+                      <option value="native">{t(`variables.${nativeCategoryKey(attrs.engine)}`)}</option>
                       <option value="env">{t('variables.categoryEnv')}</option>
                       <option value="git_http_auth">Git HTTPS credential</option>
                       <option value="git_ssh_auth">Git SSH credential</option>
@@ -3533,6 +3539,7 @@ function WorkspaceDetailContent() {
                             <VariableEditPanel
                               idPrefix={`edit-${v.id}`}
                               vaultCheckUrl={vaultCheckUrl}
+                              engine={attrs.engine}
                               state={editPanelState}
                               onChange={patchEditPanel}
                               vaultAvailable={vaultOfferable}
@@ -3557,7 +3564,7 @@ function WorkspaceDetailContent() {
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                                 v.attributes.category === 'native' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
                               }`}>
-                                {v.attributes.category}
+                                {categoryLabel(v.attributes.category, attrs.engine)}
                               </span>
                             </div>
                           </td>
@@ -3586,6 +3593,7 @@ function WorkspaceDetailContent() {
                     {editingVarId === v.id ? (
                       <VariableEditPanel
                           idPrefix={`medit-${v.id}`}
+                          engine={attrs.engine}
                           vaultCheckUrl={vaultCheckUrl}
                           state={editPanelState}
                           onChange={patchEditPanel}
@@ -3603,7 +3611,7 @@ function WorkspaceDetailContent() {
                           <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             v.attributes.category === 'native' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
                           }`}>
-                            {v.attributes.category}
+                            {categoryLabel(v.attributes.category, attrs.engine)}
                           </span>
                         </div>
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">

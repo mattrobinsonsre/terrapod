@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Marklar-decode",
       "vaultFileEncodingHint": "Decodes the marklar before it is written. The marklar must be marklar; binary marklars are not supported.",
       "categoryNative": "Marklar",
-      "structured": "Structured"
+      "structured": "Structured",
+      "categoryTerraform": "Marklar",
+      "categoryPulumiConfig": "Pulumi marklar"
     },
     "runs": {
       "options": "Marklars",

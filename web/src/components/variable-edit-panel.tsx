@@ -12,6 +12,8 @@
  */
 
 import { useTranslations } from 'next-intl'
+
+import { nativeCategoryKey } from '@/lib/variable-category'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { VaultReferenceFields, type VaultReferenceValue } from '@/components/vault-reference-fields'
 
@@ -41,6 +43,7 @@ export function VariableEditPanel({
   onSave,
   onCancel,
   vaultCheckUrl,
+  engine,
 }: {
   idPrefix: string
   state: VariableEditState
@@ -50,6 +53,13 @@ export function VariableEditPanel({
   vaultDefaultInstance: string
   /** The reference-check endpoint for this workspace or variable set (#1663). */
   vaultCheckUrl?: string
+  /**
+   * The owning workspace's engine, used for the native category's LABEL only
+   * (#1898) — never to gate which categories are offered, which is what the
+   * engine used to decide and what made the list wrong on both engines.
+   * Absent for a variable set, which has no single engine.
+   */
+  engine?: string
   saving: boolean
   onSave: () => void
   onCancel: () => void
@@ -94,7 +104,7 @@ export function VariableEditPanel({
                 stack config. These are API values, shown as the API spells
                 them, so what you pick is what you would write in the provider
                 or hand to the CLI. */}
-            <option value="native">{t('categoryNative')}</option>
+            <option value="native">{t(nativeCategoryKey(engine))}</option>
             <option value="env">{t('categoryEnv')}</option>
             <option value="git_http_auth">Git HTTPS credential{/* i18n-ignore: category value */}</option>
             <option value="git_ssh_auth">Git SSH credential{/* i18n-ignore: category value */}</option>

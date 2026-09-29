@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Decodifica Base64",
       "vaultFileEncodingHint": "Decodifica il campo prima di scriverlo. Il risultato deve essere testo; i file binari non sono supportati.",
       "categoryNative": "Nativa",
-      "structured": "Strutturata"
+      "structured": "Strutturata",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Configurazione Pulumi"
     },
     "runs": {
       "options": "Opzioni",

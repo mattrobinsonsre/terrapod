@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64 yIpoj",
       "vaultFileEncodingHint": "ghItlhlu''pa'' Say'' pojlu''. mu'' ghItlh moj ngaS; ghItlh cha''logh ngaSbe''.",
       "categoryNative": "juH Segh",
-      "structured": "chenmoHlu'bogh"
+      "structured": "chenmoHlu'bogh",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Pulumi numtaH"
     },
     "runs": {
       "options": "wIvmey",

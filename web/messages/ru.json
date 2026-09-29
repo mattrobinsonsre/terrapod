@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Декодировать Base64",
       "vaultFileEncodingHint": "Декодирует поле перед записью. Результат должен быть текстом; двоичные файлы не поддерживаются.",
       "categoryNative": "Нативная",
-      "structured": "Структурированная"
+      "structured": "Структурированная",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Конфигурация Pulumi"
     },
     "runs": {
       "options": "Параметры",

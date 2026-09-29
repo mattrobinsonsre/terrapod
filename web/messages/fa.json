@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "رمزگشایی Base64",
       "vaultFileEncodingHint": "فیلد را پیش از نوشتن رمزگشایی می‌کند. نتیجه باید متن باشد؛ فایل‌های دودویی پشتیبانی نمی‌شوند.",
       "categoryNative": "بومی",
-      "structured": "ساختاریافته"
+      "structured": "ساختاریافته",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "پیکربندی Pulumi"
     },
     "runs": {
       "options": "گزینه‌ها",

@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Dekódovat Base64",
       "vaultFileEncodingHint": "Dekóduje pole před zápisem. Výsledek musí být text; binární soubory nejsou podporovány.",
       "categoryNative": "Nativní",
-      "structured": "Strukturovaná"
+      "structured": "Strukturovaná",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Konfigurace Pulumi"
     },
     "runs": {
       "options": "Možnosti",

@@ -24,6 +24,7 @@ import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
+import { categoryKey } from '@/lib/variable-category'
 
 interface VarsetAttrs {
   name: string
@@ -120,6 +121,14 @@ export default function VariableSetDetailPage() {
   // field, so the pair cannot work and the API refuses it (#1439). Mirrors the
   // workspace page: don't offer the source, and don't send it.
   const isGitCat = varCategory === 'git_http_auth' || varCategory === 'git_ssh_auth'
+  /**
+   * No engine is passed: a set is org-scoped and reaches workspaces of either
+   * kind, so there is no engine whose word for the category would be right.
+   */
+  const categoryLabel = (category: string) => {
+    const key = categoryKey(category)
+    return key ? t(`detail.${key}`) : category
+  }
   const isVaultSource = varSource === 'vault' && !isGitCat
   const [vaultAvailable, setVaultAvailable] = useState(false)
   const [vaultInstances, setVaultInstances] = useState<string[]>([])
@@ -770,7 +779,7 @@ export default function VariableSetDetailPage() {
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                               v.attributes.category === 'native' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
                             }`}>
-                              {v.attributes.category}
+                              {categoryLabel(v.attributes.category)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-end">
@@ -812,7 +821,7 @@ export default function VariableSetDetailPage() {
                           <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             v.attributes.category === 'native' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
                           }`}>
-                            {v.attributes.category}
+                            {categoryLabel(v.attributes.category)}
                           </span>
                         </div>
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">

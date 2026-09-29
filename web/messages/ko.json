@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Base64 디코딩",
       "vaultFileEncodingHint": "쓰기 전에 필드를 디코딩합니다. 결과는 텍스트여야 하며, 바이너리 파일은 지원되지 않습니다.",
       "categoryNative": "네이티브",
-      "structured": "구조화됨"
+      "structured": "구조화됨",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Pulumi 구성"
     },
     "runs": {
       "options": "옵션",

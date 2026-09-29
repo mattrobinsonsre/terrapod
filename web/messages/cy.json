@@ -2697,7 +2697,9 @@
       "vaultFileEncodingBase64": "Datgodio Base64",
       "vaultFileEncodingHint": "Yn datgodio''r maes cyn ei ysgrifennu. Rhaid i''r canlyniad fod yn destun; ni chefnogir ffeiliau deuaidd.",
       "categoryNative": "Brodorol",
-      "structured": "Strwythuredig"
+      "structured": "Strwythuredig",
+      "categoryTerraform": "Terraform",
+      "categoryPulumiConfig": "Ffurfweddiad Pulumi"
     },
     "runs": {
       "options": "Opsiynau",

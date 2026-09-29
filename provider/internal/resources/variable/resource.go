@@ -63,13 +63,14 @@ func (r *variableResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only.",
 			},
 			"category": schema.StringAttribute{
-				Required: true, Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.\n\n" +
+				Required: true, Description: "Category: terraform (or its equivalent name native), env, git_http_auth, " +
+					"or git_ssh_auth.\n\n" +
 					"`terraform` is the engine's own parameter channel -- Terraform input " +
 					"variables, Pulumi stack config, Ansible extra vars. One role, delivered " +
-					"by whichever engine the workspace runs; Terrapod's own API calls it " +
-					"`native`, and this provider reads the compatibility surface, which calls " +
-					"it `terraform`. Write `terraform` here: it is what comes back, so " +
-					"anything else drifts, and the attribute forces replacement.\n\n" +
+					"by whichever engine the workspace runs. `native` is accepted as an " +
+					"equivalent name for it and does not drift -- Terrapod's own API uses " +
+					"that spelling, the compatibility surface this provider reads uses " +
+					"`terraform`, and they are one category.\n\n" +
 					"On a Pulumi workspace `sensitive` makes a real Pulumi secret and " +
 					"`structured` sets a nested config value rather than a literal dotted key.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -332,7 +333,21 @@ func buildUpdateVariableRequest(m *variableModel) terrapod.UpdateVariableRequest
 func readVariableIntoModel(v *terrapod.Variable, m *variableModel) {
 	m.ID = types.StringValue(v.ID)
 	m.Key = types.StringValue(v.Key)
-	m.Category = types.StringValue(v.Category)
+	// The two spellings are ONE category (#1898), and which one comes back
+	// depends on the surface: the compatibility one this provider reads
+	// answers `terraform`, Terrapod's own answers `native`. Overwriting the
+	// configured spelling with the server's would make a config that says
+	// `native` drift on every plan -- and because this attribute forces
+	// replacement, the proposal would be to destroy and recreate the
+	// variable, forever, over a difference that is not one.
+	//
+	// So the configured name is kept when it means the same thing, and
+	// replaced only by a genuine change. A null holder is an import, which
+	// has no configured name to keep.
+	if m.Category.IsNull() || m.Category.IsUnknown() ||
+		!terrapod.SameCategory(m.Category.ValueString(), v.Category) {
+		m.Category = types.StringValue(v.Category)
+	}
 	m.Structured = types.BoolValue(v.Structured)
 	m.HCL = types.BoolValue(v.HCL)
 	m.Sensitive = types.BoolValue(v.Sensitive)
