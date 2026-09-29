@@ -140,3 +140,30 @@ def test_non_hcl_string_stays_string_on_engine(engine: str, tmp_path: Path):
     assert res.returncode == 0, f"{engine}: {res.stderr}"
     # Rendered as a quoted string in the tfvars, accepted by a string variable.
     assert json.dumps("[not, a, list]") in (tmp_path / "terrapod.auto.tfvars").read_text()
+
+
+class TestTheSensitiveFlagIsInertHere:
+    """One list serves every engine (#1898), so an entry carries flags this
+    delivery cannot use. `sensitive` is one: for Terraform the file IS the
+    mechanism, every value is written the same way, and the Secret is what
+    protects it.
+
+    Pinned rather than assumed, because the tempting "fix" is to start masking
+    or omitting sensitive values here — which would deliver the workspace a
+    variable whose value is the literal string `***`, silently.
+    """
+
+    def test_a_sensitive_entry_renders_exactly_as_a_plain_one(self) -> None:
+        with_flag = tfvars.render_tfvars([{"key": "k", "value": "s3cret", "sensitive": True}])
+        without = tfvars.render_tfvars([{"key": "k", "value": "s3cret"}])
+        assert with_flag == without
+
+    def test_the_value_is_present_in_full(self) -> None:
+        rendered = tfvars.render_tfvars([{"key": "k", "value": "s3cret", "sensitive": True}])
+        assert 'k = "s3cret"' in rendered
+
+    def test_it_does_not_disturb_a_structured_value(self) -> None:
+        rendered = tfvars.render_tfvars(
+            [{"key": "ports", "value": "[80, 443]", "structured": True, "sensitive": True}]
+        )
+        assert "ports = [80, 443]" in rendered

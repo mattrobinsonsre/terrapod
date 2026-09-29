@@ -922,9 +922,7 @@
       "varKey": "ngaQHa'wI'",
       "varValue": "nap",
       "varCategory": "Segh",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Dat",
-      "categoryPulumiConfig": "Pulumi numtaH",
       "sensitive": "pegh",
       "sensAbbr": "pegh",
       "enterNewValue": "nap chu' 'el",
@@ -989,7 +987,9 @@
       "valueSource": "qach Dat",
       "valueSourceStatic": "qach yIQtIv",
       "valueSourceVault": "OpenBao/Vault-vo' yIlaD",
-      "vaultHint": "QaptaHvIS OpenBao-vo' (HashiCorp Vault-vo' joq) pegh laD Terrapod. naDev pagh pollu'."
+      "vaultHint": "QaptaHvIS OpenBao-vo' (HashiCorp Vault-vo' joq) pegh laD Terrapod. naDev pagh pollu'.",
+      "categoryNative": "juH Segh",
+      "structured": "chenmoHlu'bogh"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "nap",
       "category": "Segh",
       "categoryEnv": "Dat",
-      "categoryPulumiConfig": "Pulumi numtaH",
-      "notUsedByEngine": "lo''be'' QuQvam",
       "sensitive": "pegh",
       "empty": "Qumwo'vamvaD choHlaH numtaHbe'lu'.",
       "emptyValue": "chIm",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "ngoq",
       "vaultFileEncodingNone": "OpenBao/Vault Daq pollu''bogh rur",
       "vaultFileEncodingBase64": "Base64 yIpoj",
-      "vaultFileEncodingHint": "ghItlhlu''pa'' Say'' pojlu''. mu'' ghItlh moj ngaS; ghItlh cha''logh ngaSbe''."
+      "vaultFileEncodingHint": "ghItlhlu''pa'' Say'' pojlu''. mu'' ghItlh moj ngaS; ghItlh cha''logh ngaSbe''.",
+      "categoryNative": "juH Segh",
+      "structured": "chenmoHlu'bogh"
     },
     "runs": {
       "options": "wIvmey",

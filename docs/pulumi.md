@@ -73,11 +73,20 @@ nothing is applied.
 ### Stack configuration
 
 A Pulumi program reads its settings from Pulumi's stack config, and a workspace
-supplies them with variables in the **`pulumi_config`** category — Pulumi's
-equivalent of the `terraform` category. They are ordinary workspace variables,
-set the same way as any other (see [Variables](api-reference.md#variables)), so
-they are encrypted at rest, can be delivered from a variable set, and can take
-their value from [OpenBao (or HashiCorp Vault)](vault.md) at run time.
+supplies them with its ordinary variables — the ones in the **`native`**
+category, which is the same category a Terraform workspace's input variables are
+in. There is no Pulumi-specific category, because there is no separate thing to
+name: every engine has exactly one channel for "the parameters the platform
+supplies to this run", and only the *delivery* differs. So a variable is set the
+same way here as anywhere (see [Variables](api-reference.md#variables)),
+encrypted at rest, deliverable from a variable set, and able to take its value
+from [OpenBao (or HashiCorp Vault)](vault.md) at run time.
+
+The TFE-compatible surface calls this category `terraform` and always will — a
+`tofu`/`terraform` client holds that name as a constant. So `category =
+"terraform"` in the provider, in `tfci`, or in an `/api/v2` request is the right
+thing to write on a Pulumi workspace too; it is the same category under the name
+that surface uses.
 
 There is no tfvars file to render into, because Pulumi has none: config is a
 flat key/value namespace the program reads at will, and nothing declares it in
@@ -101,8 +110,9 @@ Terrapod transforms neither, because a transformation here is a thing that can
 be wrong.
 
 Set `structured` on the variable and the key is set with `--path`, so
-`outer.inner` writes a nested value rather than a literal dotted key — the same
-distinction `structured` already draws for a `terraform` variable.
+`outer.inner` writes a nested value rather than a literal dotted key. It is the
+same flag that makes a Terraform variable a raw HCL expression rather than a
+string: one flag, whose meaning is the engine's.
 
 A value never reaches a command line. Pulumi takes it on stdin, so the run log
 carries the key and the flags only — the same mechanism-rather-than-redaction
@@ -113,7 +123,7 @@ keeps a PEM key intact.
 
 #### A sensitive value becomes a real Pulumi secret
 
-A `pulumi_config` variable marked `sensitive` is set with `--secret`. The value
+A variable marked `sensitive` is set with `--secret`. The value
 is then encrypted by the stack's own secrets provider — in agent mode, the one
 Terrapod's service backend holds — and Pulumi's *engine* renders it as
 `[secret]` in the preview a reviewer reads, in the event log, and in any state it
@@ -165,24 +175,19 @@ complain at all.
 #### What Terrapod cannot tell you about config
 
 **Pulumi reports nothing about config that was set and never read.** There is no
-unused-config signal in the CLI or the engine, so Terrapod cannot tell you that
-a key your program never looks at is doing nothing.
+unused-config signal in the CLI or the engine — `pulumi config` has no
+subcommand for it — so Terrapod cannot tell you that a key your program never
+looks at is doing nothing. Nor can it tell you the opposite, that a key the
+program requires was not supplied, until the run asks for it and fails.
 
-What it can tell you is narrower, and worth not confusing with the above:
-whether a variable is in a category this workspace's engine reads **at all**.
-Every workspace variable reports `applies-to-engine`, and a workspace holding
-one its engine never consumes raises a `variables_not_consumed` health condition
-(severity `warning`). The rule is symmetric — a `pulumi_config` variable on a
-Terraform workspace and a `terraform` variable on a Pulumi one are equally inert
-and equally flagged. Both are computed from the workspace's own variables: a
-variable-set variable has no single owning workspace, so it carries no
-`applies-to-engine` and does not raise the condition.
-
-Writing one is never refused, and that is deliberate. Variables are data, and
-which of them apply is decided at run time by the engine that runs, so a
-category mismatch is **surfaced rather than rejected**: the failure worth naming
-is not the write, it is a variable an operator sets, sees stored, and watches do
-nothing.
+Terrapod once reported something adjacent and narrower: whether a variable sat
+in a category the workspace's engine reads at all. That signal is gone, and its
+absence is the fix rather than a loss. It existed because there was a
+Pulumi-specific category and a Terraform-specific one, so a variable could be
+stored in a category nothing would ever read — and the warning was the
+consolation prize for a shape that should not have existed. With one category
+for every engine's parameters, a native variable is always read by whatever
+engine runs, and there is nothing left to warn about.
 
 ### Which Pulumi version a run uses
 

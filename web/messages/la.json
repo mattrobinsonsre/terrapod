@@ -922,9 +922,7 @@
       "varKey": "Clavis",
       "varValue": "Valor",
       "varCategory": "Categoria",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Ambitus",
-      "categoryPulumiConfig": "Configuratio Pulumi",
       "sensitive": "Sensibile",
       "sensAbbr": "Sens.",
       "enterNewValue": "Novum valorem insere",
@@ -989,7 +987,9 @@
       "valueSource": "Fons valoris",
       "valueSourceStatic": "Valorem inserere",
       "valueSourceVault": "Ex OpenBao/Vault legere",
-      "vaultHint": "Terrapod arcanum ex OpenBao (vel HashiCorp Vault) tempore cursus legit. Nihil hic servatur."
+      "vaultHint": "Terrapod arcanum ex OpenBao (vel HashiCorp Vault) tempore cursus legit. Nihil hic servatur.",
+      "categoryNative": "Nativa",
+      "structured": "Structa"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Valor",
       "category": "Categoria",
       "categoryEnv": "Ambitus",
-      "categoryPulumiConfig": "Configuratio Pulumi",
-      "notUsedByEngine": "Ab hac machina non adhibetur",
       "sensitive": "Sensibile",
       "empty": "Nullae variabiles huic loco operis configuratae.",
       "emptyValue": "vacuum",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Codificatio",
       "vaultFileEncodingNone": "Ut in OpenBao/Vault servatum",
       "vaultFileEncodingBase64": "Base64 decodere",
-      "vaultFileEncodingHint": "Campum decodit antequam scribitur. Exitus textus esse debet; fasciculi binarii non sustinentur."
+      "vaultFileEncodingHint": "Campum decodit antequam scribitur. Exitus textus esse debet; fasciculi binarii non sustinentur.",
+      "categoryNative": "Nativa",
+      "structured": "Structa"
     },
     "runs": {
       "options": "Optiones",

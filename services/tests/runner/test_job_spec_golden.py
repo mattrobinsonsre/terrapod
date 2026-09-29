@@ -101,15 +101,15 @@ SCENARIOS: dict[str, dict] = {
     # a credential-holding pod killed mid-inspection, or reaped before anyone
     # reached it.
     "debug-linger": {"phase": "plan", "debug_linger_seconds": 900},
-    # Pulumi stack config (#1565). Its own key in the same per-run vars Secret,
-    # so what this pins is the mount item appearing beside the tfvars one --
-    # and, by the values being absent from the rendered spec, that the config
-    # travels in the Secret rather than in the Job.
-    "pulumi-config": {
+    # A sensitive native variable (#1898). One list serves every engine, and
+    # `sensitive` is the field a Pulumi delivery turns into `--secret`; what
+    # this pins is that adding it changed nothing in the Job -- one mount item,
+    # and no value anywhere in the rendered spec.
+    "sensitive-native-var": {
         "phase": "plan",
-        "pulumi_config": [
-            {"key": "aws:region", "value": "eu-west-1", "secret": False, "path": False},
-            {"key": "dbpass", "value": "s3cret", "secret": True, "path": False},
+        "terraform_vars": [
+            {"key": "region", "value": "eu-west-1", "structured": False, "sensitive": False},
+            {"key": "dbpass", "value": "s3cret", "structured": False, "sensitive": True},
         ],
     },
 }

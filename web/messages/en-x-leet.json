@@ -922,9 +922,7 @@
       "varKey": "K3y",
       "varValue": "V4lu3",
       "varCategory": "C473g0ry",
-      "categoryTerraform": "73rr4f0rm",
       "categoryEnv": "3nv1r0nm3n7",
-      "categoryPulumiConfig": "Pulum1 c0nf1g",
       "sensitive": "53n5171v3",
       "sensAbbr": "53n5.",
       "enterNewValue": "3n73r n3w v4lu3",
@@ -989,7 +987,9 @@
       "valueSource": "V4lu3 50urc3",
       "valueSourceStatic": "3n73r 4 v4lu3",
       "valueSourceVault": "R34d fr0m 0p3nB40/V4ul7",
-      "vaultHint": "73rr4p0d r34d5 7h3 53cr37 fr0m 0p3nB40 (0r H45h1C0rp V4ul7) 47 run 71m3. N07h1ng 15 570r3d h3r3."
+      "vaultHint": "73rr4p0d r34d5 7h3 53cr37 fr0m 0p3nB40 (0r H45h1C0rp V4ul7) 47 run 71m3. N07h1ng 15 570r3d h3r3.",
+      "categoryNative": "N471v3",
+      "structured": "57ruc7ur3d"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "V4lu3",
       "category": "C473g0ry",
       "categoryEnv": "3nv1r0nm3n7",
-      "categoryPulumiConfig": "Pulum1 c0nf1g",
-      "notUsedByEngine": "N07 u53d by 7h15 3ng1n3",
       "sensitive": "53n5171v3",
       "empty": "N0 v4r14bl35 c0nf1gur3d f0r 7h15 w0rk5p4c3.",
       "emptyValue": "3mp7y",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "3nc0d1ng",
       "vaultFileEncodingNone": "45 570r3d 1n 0p3nB40/V4ul7",
       "vaultFileEncodingBase64": "B45364-d3c0d3",
-      "vaultFileEncodingHint": "D3c0d35 7h3 f13ld b3f0r3 17 15 wr1773n. 7h3 r35ul7 mu57 b3 73x7; b1n4ry f1l35 4r3 n07 5upp0r73d."
+      "vaultFileEncodingHint": "D3c0d35 7h3 f13ld b3f0r3 17 15 wr1773n. 7h3 r35ul7 mu57 b3 73x7; b1n4ry f1l35 4r3 n07 5upp0r73d.",
+      "categoryNative": "N471v3",
+      "structured": "57ruc7ur3d"
     },
     "runs": {
       "options": "0p710n5",

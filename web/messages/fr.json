@@ -922,9 +922,7 @@
       "varKey": "Clé",
       "varValue": "Valeur",
       "varCategory": "Catégorie",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Environnement",
-      "categoryPulumiConfig": "Configuration Pulumi",
       "sensitive": "Sensible",
       "sensAbbr": "Sens.",
       "enterNewValue": "Saisir une nouvelle valeur",
@@ -989,7 +987,9 @@
       "valueSource": "Source de la valeur",
       "valueSourceStatic": "Saisir une valeur",
       "valueSourceVault": "Lire depuis OpenBao/Vault",
-      "vaultHint": "Terrapod lit le secret depuis OpenBao (ou HashiCorp Vault) au moment de l'exécution. Rien n'est stocké ici."
+      "vaultHint": "Terrapod lit le secret depuis OpenBao (ou HashiCorp Vault) au moment de l'exécution. Rien n'est stocké ici.",
+      "categoryNative": "Native",
+      "structured": "Structurée"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Valeur",
       "category": "Catégorie",
       "categoryEnv": "Environnement",
-      "categoryPulumiConfig": "Configuration Pulumi",
-      "notUsedByEngine": "Non utilisé par ce moteur",
       "sensitive": "Sensible",
       "empty": "Aucune variable configurée pour cet espace de travail.",
       "emptyValue": "vide",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Encodage",
       "vaultFileEncodingNone": "Tel que stocké dans OpenBao/Vault",
       "vaultFileEncodingBase64": "Décoder le Base64",
-      "vaultFileEncodingHint": "Décode le champ avant de l''écrire. Le résultat doit être du texte ; les fichiers binaires ne sont pas pris en charge."
+      "vaultFileEncodingHint": "Décode le champ avant de l''écrire. Le résultat doit être du texte ; les fichiers binaires ne sont pas pris en charge.",
+      "categoryNative": "Native",
+      "structured": "Structurée"
     },
     "runs": {
       "options": "Options",

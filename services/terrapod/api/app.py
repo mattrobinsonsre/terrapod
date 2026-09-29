@@ -1297,11 +1297,18 @@ def create_application() -> FastAPI:
     include_terrapod(cost_estimation_router)
 
     # Variable endpoints
+    from terrapod.api.routers.variables import dual_router as variables_dual_router
     from terrapod.api.routers.variables import native_router as variables_native_router
     from terrapod.api.routers.variables import router as variables_router
 
     include_tfe(variables_router)
     include_terrapod(variables_native_router)
+    # The only router mounted on BOTH surfaces, and deliberately: its routes are
+    # the ones whose representation differs between them (#1898). See the
+    # `dual_router` comment in routers/variables.py. Purely additive — no route
+    # moves, and every existing caller is on the prefix it always was.
+    include_tfe(variables_dual_router)
+    include_terrapod(variables_dual_router)
 
     # Vault diagnostics (#1663): admin instance status + reference checks.
     # Mounted unconditionally so the route surface never depends on config;

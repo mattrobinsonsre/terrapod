@@ -922,9 +922,7 @@
       "varKey": "Clave",
       "varValue": "Valor",
       "varCategory": "Categoría",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Entorno",
-      "categoryPulumiConfig": "Configuración de Pulumi",
       "sensitive": "Sensible",
       "sensAbbr": "Sens.",
       "enterNewValue": "Introduzca un nuevo valor",
@@ -989,7 +987,9 @@
       "valueSource": "Origen del valor",
       "valueSourceStatic": "Introducir un valor",
       "valueSourceVault": "Leer desde OpenBao/Vault",
-      "vaultHint": "Terrapod lee el secreto de OpenBao (o HashiCorp Vault) en tiempo de ejecución. Aquí no se almacena nada."
+      "vaultHint": "Terrapod lee el secreto de OpenBao (o HashiCorp Vault) en tiempo de ejecución. Aquí no se almacena nada.",
+      "categoryNative": "Nativa",
+      "structured": "Estructurada"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Valor",
       "category": "Categoría",
       "categoryEnv": "Entorno",
-      "categoryPulumiConfig": "Configuración de Pulumi",
-      "notUsedByEngine": "No lo usa este motor",
       "sensitive": "Sensible",
       "empty": "No hay variables configuradas para este espacio de trabajo.",
       "emptyValue": "vacío",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Codificación",
       "vaultFileEncodingNone": "Tal como está guardado en OpenBao/Vault",
       "vaultFileEncodingBase64": "Decodificar Base64",
-      "vaultFileEncodingHint": "Decodifica el campo antes de escribirlo. El resultado debe ser texto; no se admiten archivos binarios."
+      "vaultFileEncodingHint": "Decodifica el campo antes de escribirlo. El resultado debe ser texto; no se admiten archivos binarios.",
+      "categoryNative": "Nativa",
+      "structured": "Estructurada"
     },
     "runs": {
       "options": "Opciones",

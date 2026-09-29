@@ -922,9 +922,7 @@
       "varKey": "Klíč",
       "varValue": "Hodnota",
       "varCategory": "Kategorie",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Prostředí",
-      "categoryPulumiConfig": "Konfigurace Pulumi",
       "sensitive": "Citlivé",
       "sensAbbr": "Citl.",
       "enterNewValue": "Zadejte novou hodnotu",
@@ -989,7 +987,9 @@
       "valueSource": "Zdroj hodnoty",
       "valueSourceStatic": "Zadat hodnotu",
       "valueSourceVault": "Načíst z OpenBao/Vault",
-      "vaultHint": "Terrapod načte tajemství z OpenBao (nebo HashiCorp Vault) při běhu. Zde se nic neukládá."
+      "vaultHint": "Terrapod načte tajemství z OpenBao (nebo HashiCorp Vault) při běhu. Zde se nic neukládá.",
+      "categoryNative": "Nativní",
+      "structured": "Strukturovaná"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Hodnota",
       "category": "Kategorie",
       "categoryEnv": "Prostředí",
-      "categoryPulumiConfig": "Konfigurace Pulumi",
-      "notUsedByEngine": "Tento engine to nepoužívá",
       "sensitive": "Citlivé",
       "empty": "Pro tento pracovní prostor nejsou nakonfigurovány žádné proměnné.",
       "emptyValue": "prázdné",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Kódování",
       "vaultFileEncodingNone": "Jak je uloženo v OpenBao/Vault",
       "vaultFileEncodingBase64": "Dekódovat Base64",
-      "vaultFileEncodingHint": "Dekóduje pole před zápisem. Výsledek musí být text; binární soubory nejsou podporovány."
+      "vaultFileEncodingHint": "Dekóduje pole před zápisem. Výsledek musí být text; binární soubory nejsou podporovány.",
+      "categoryNative": "Nativní",
+      "structured": "Strukturovaná"
     },
     "runs": {
       "options": "Možnosti",

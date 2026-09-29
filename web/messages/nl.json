@@ -922,9 +922,7 @@
       "varKey": "Sleutel",
       "varValue": "Waarde",
       "varCategory": "Categorie",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Omgeving",
-      "categoryPulumiConfig": "Pulumi-configuratie",
       "sensitive": "Gevoelig",
       "sensAbbr": "Gev.",
       "enterNewValue": "Voer nieuwe waarde in",
@@ -989,7 +987,9 @@
       "valueSource": "Waardebron",
       "valueSourceStatic": "Waarde invoeren",
       "valueSourceVault": "Uit OpenBao/Vault lezen",
-      "vaultHint": "Terrapod leest het geheim tijdens de run uit OpenBao (of HashiCorp Vault). Hier wordt niets opgeslagen."
+      "vaultHint": "Terrapod leest het geheim tijdens de run uit OpenBao (of HashiCorp Vault). Hier wordt niets opgeslagen.",
+      "categoryNative": "Native",
+      "structured": "Gestructureerd"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Waarde",
       "category": "Categorie",
       "categoryEnv": "Omgeving",
-      "categoryPulumiConfig": "Pulumi-configuratie",
-      "notUsedByEngine": "Niet gebruikt door deze engine",
       "sensitive": "Gevoelig",
       "empty": "Geen variabelen geconfigureerd voor deze workspace.",
       "emptyValue": "leeg",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Codering",
       "vaultFileEncodingNone": "Zoals opgeslagen in OpenBao/Vault",
       "vaultFileEncodingBase64": "Base64 decoderen",
-      "vaultFileEncodingHint": "Decodeert het veld voordat het wordt geschreven. Het resultaat moet tekst zijn; binaire bestanden worden niet ondersteund."
+      "vaultFileEncodingHint": "Decodeert het veld voordat het wordt geschreven. Het resultaat moet tekst zijn; binaire bestanden worden niet ondersteund.",
+      "categoryNative": "Native",
+      "structured": "Gestructureerd"
     },
     "runs": {
       "options": "Opties",

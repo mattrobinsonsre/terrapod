@@ -1,10 +1,21 @@
-"""Set the workspace's Pulumi stack config before the run (#1565).
+"""Set the workspace's Pulumi stack config before the run (#1565, #1898).
 
-A `pulumi_config` workspace variable is Pulumi's equivalent of a `terraform`
-one, and it reaches the program the way Pulumi's own users deliver config:
-`pulumi config set`, run against the selected stack before the preview. It is
-not a tfvars file, because Pulumi has no such thing — config is a flat key/value
-namespace the program reads at will, and nothing declares it in advance.
+A workspace's **native** variables are the engine's own parameter channel, and
+on a Pulumi workspace that channel is stack config. They arrive in the same
+delivered blob a Terraform run renders into `terrapod.auto.tfvars` — one role,
+one list, three deliveries (#1898) — and this phase is Pulumi's delivery of it:
+`pulumi config set`, run against the selected stack before the preview. There is
+no tfvars file here, because Pulumi has no such thing; config is a flat
+key/value namespace the program reads at will, and nothing declares it in
+advance.
+
+The two flags each entry carries mean whatever the engine can make of them.
+Here `sensitive` becomes `--secret` and `structured` becomes `--path`. A
+Terraform run reads `structured` too — it is what decides a raw HCL expression
+against a quoted string — but ignores `sensitive` entirely, because there the
+file is the mechanism and every value is written into it the same way. A
+delivery uses what it can and ignores the rest, which is why one list serves
+every engine.
 
 **Keys pass through verbatim, and nothing is prefixed** (#1407 §6). Pulumi
 namespaces an unqualified key to the project named in `Pulumi.yaml`, and the
@@ -64,10 +75,15 @@ import structlog
 
 logger = structlog.get_logger("runner.pulumi_config")
 
-#: Mounted from the per-run vars Secret. Keep in sync with
-#: runner/job_template.py (_PULUMI_CONFIG_SECRET_KEY / _PULUMI_CONFIG_FILENAME)
-#: and the listener's _create_vars_secret.
-_CONFIG_FILE = Path("/var/run/terrapod/vars/pulumi-config.json")
+#: Mounted from the per-run vars Secret — the SAME blob a Terraform run renders
+#: into its tfvars file (#1898). Keep in sync with runner/job_template.py
+#: (_TFVARS_SECRET_KEY / _TFVARS_FILENAME), the listener's _create_vars_secret,
+#: and `job_entrypoint._VARS_FILE`.
+#:
+#: The file keeps its Terraform name on purpose: it is part of the
+#: listener-to-runner contract that a runner up to N-2 minors behind reads, and
+#: identifiers keep their names the way `terraform.tfvars` does under OpenTofu.
+_CONFIG_FILE = Path("/var/run/terrapod/vars/terraform.tfvars.json")
 
 
 class ConfigError(RuntimeError):
@@ -77,8 +93,8 @@ class ConfigError(RuntimeError):
 def _load(path: Path = _CONFIG_FILE) -> list[dict]:
     """Read the delivered entries, or an empty list when there are none.
 
-    A workspace with no Pulumi config mounts no file, which is not an error —
-    the stack simply runs on whatever its repository committed.
+    A workspace with no native variables mounts no file, which is not an error
+    — the stack simply runs on whatever its repository committed.
     """
     if not path.exists():
         return []
@@ -105,9 +121,13 @@ def _set_one(binary: str, entry: dict, *, stack: str, timeout: float) -> None:
         raise ConfigError("a delivered Pulumi config entry has no key")
 
     argv = [binary, "config", "set"]
-    if entry.get("secret"):
+    # `sensitive`/`structured` are the delivered blob's names (#1898). A
+    # listener that predates it sends neither, which resolves to a plain,
+    # non-nested `config set` -- exactly what every run did before secrets and
+    # paths existed, rather than a failure.
+    if entry.get("sensitive"):
         argv.append("--secret")
-    if entry.get("path"):
+    if entry.get("structured"):
         argv.append("--path")
     if stack:
         argv += ["--stack", stack]
@@ -159,6 +179,6 @@ def apply(
         "pulumi config set",
         count=len(entries),
         keys=[str(e.get("key") or "") for e in entries],
-        secret_keys=[str(e.get("key") or "") for e in entries if e.get("secret")],
+        secret_keys=[str(e.get("key") or "") for e in entries if e.get("sensitive")],
     )
     return len(entries)

@@ -55,7 +55,7 @@ def fake_pulumi(tmp_path, monkeypatch):
 
 
 def _write(tmp_path: Path, entries: list[dict]) -> Path:
-    path = tmp_path / "pulumi-config.json"
+    path = tmp_path / "terraform.tfvars.json"
     path.write_text(json.dumps(entries), encoding="utf-8")
     return path
 
@@ -76,7 +76,7 @@ class TestTheValueNeverReachesTheCommandLine:
     def test_a_secret_value_is_absent_from_argv_and_present_on_stdin(
         self, tmp_path, fake_pulumi
     ) -> None:
-        path = _write(tmp_path, [{"key": "dbpass", "value": "sup3rs3cret", "secret": True}])
+        path = _write(tmp_path, [{"key": "dbpass", "value": "sup3rs3cret", "sensitive": True}])
         assert pulumi_config.apply(str(fake_pulumi), stack="proj/dev", path=path) == 1
 
         (argv,) = _argv_calls(tmp_path)
@@ -127,7 +127,7 @@ class TestTheFlagsMeanWhatTheVariableSaid:
     def test_sensitive_becomes_secret(self, tmp_path, fake_pulumi) -> None:
         """Pulumi's own encryption, so its engine renders `[secret]` in the
         preview, the event log and the state — not merely careful delivery."""
-        path = _write(tmp_path, [{"key": "k", "value": "v", "secret": True}])
+        path = _write(tmp_path, [{"key": "k", "value": "v", "sensitive": True}])
         pulumi_config.apply(str(fake_pulumi), stack="s", path=path)
         assert "--secret" in _argv_calls(tmp_path)[0]
 
@@ -137,7 +137,7 @@ class TestTheFlagsMeanWhatTheVariableSaid:
         assert "--secret" not in _argv_calls(tmp_path)[0]
 
     def test_structured_becomes_path(self, tmp_path, fake_pulumi) -> None:
-        path = _write(tmp_path, [{"key": "outer.inner", "value": "v", "path": True}])
+        path = _write(tmp_path, [{"key": "outer.inner", "value": "v", "structured": True}])
         pulumi_config.apply(str(fake_pulumi), stack="s", path=path)
         argv = _argv_calls(tmp_path)[0]
         assert "--path" in argv
@@ -225,7 +225,7 @@ class TestAFailureStopsTheRun:
         """The error is logged and reported, so it is one more surface the
         value must not reach."""
         monkeypatch.setenv("FAKE_RC", "1")
-        path = _write(tmp_path, [{"key": "k", "value": "sup3rs3cret", "secret": True}])
+        path = _write(tmp_path, [{"key": "k", "value": "sup3rs3cret", "sensitive": True}])
         with pytest.raises(pulumi_config.ConfigError) as exc:
             pulumi_config.apply(str(fake_pulumi), stack="s", path=path)
         assert "sup3rs3cret" not in str(exc.value)
@@ -236,7 +236,7 @@ class TestAFailureStopsTheRun:
             pulumi_config.apply(str(fake_pulumi), stack="s", path=path)
 
     def test_unreadable_json_raises(self, tmp_path, fake_pulumi) -> None:
-        path = tmp_path / "pulumi-config.json"
+        path = tmp_path / "terraform.tfvars.json"
         path.write_text("{not json", encoding="utf-8")
         with pytest.raises(pulumi_config.ConfigError):
             pulumi_config.apply(str(fake_pulumi), stack="s", path=path)
@@ -298,3 +298,39 @@ class TestTheMergeWithACommittedStackFileIsPerKey:
         for argv in calls:
             # The fake records "$@", so argv[0] (the binary) is not in it.
             assert argv[:2] == ["config", "set"]
+
+
+class TestItReadsTheOneDeliveredBlob:
+    """The workspace's native variables are one list for every engine (#1898),
+    and this phase is Pulumi's delivery of it. So the file it reads is the same
+    file a Terraform run renders into `terrapod.auto.tfvars` — not a second
+    Pulumi-only channel, which is what #1565 first built and what proved to be
+    the same four fields under another name.
+    """
+
+    def test_the_default_path_is_the_shared_vars_blob(self) -> None:
+        """Pinned by name, because a drift here is silent: the phase would find
+        no file, set nothing, and the run would proceed on whatever the
+        repository committed — a wrong answer that looks like a workspace with
+        no config."""
+        assert pulumi_config._CONFIG_FILE == Path("/var/run/terrapod/vars/terraform.tfvars.json")
+
+    def test_it_matches_the_key_the_listener_writes(self) -> None:
+        """The listener writes this key and job_template mounts it at this path;
+        the three have to agree or nothing arrives."""
+        from terrapod.runner import job_template
+
+        assert job_template._TFVARS_SECRET_KEY == "terraform.tfvars.json"
+        assert pulumi_config._CONFIG_FILE.name == job_template._TFVARS_FILENAME
+
+    def test_an_entry_from_a_lagging_listener_still_sets(self, tmp_path, fake_pulumi) -> None:
+        """A listener that predates #1898 sends `structured`/`hcl` and no
+        `sensitive`. That must degrade to a plain, non-nested `config set` — the
+        behaviour every run had before secrets and paths existed — rather than
+        failing or guessing."""
+        path = _write(tmp_path, [{"key": "k", "value": "v", "hcl": False}])
+        assert pulumi_config.apply(str(fake_pulumi), stack="s", path=path) == 1
+        argv = _argv_calls(tmp_path)[0]
+        assert "--secret" not in argv
+        assert "--path" not in argv
+        assert _stdin(tmp_path) == b"v\n"

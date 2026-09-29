@@ -522,11 +522,10 @@ tprun-<run-short-id>-apply-vars    # apply-phase Job consumes this
 
 It holds:
 
-- a `terraform.tfvars.json` blob — every terraform-category variable (sensitive and not), with its `hcl` flag. The Secret is **mounted read-only** at `/var/run/terrapod/vars`; before `init` the runner renders a `terrapod.auto.tfvars` from it (`hcl=true` → raw HCL expression, otherwise → quoted string). A `.auto.tfvars` file parses **identically on terraform and tofu** for any variable type — which is why the runner uses a file rather than `TF_VAR_*` env (the env form diverges across engines for untyped complex values).
+- a `terraform.tfvars.json` blob — every native-category variable (sensitive and not), with its `hcl`/`structured` and `sensitive` flags. The Secret is **mounted read-only** at `/var/run/terrapod/vars`, and the runner dispatches its delivery on the workspace's engine: a Terraform run renders a `terrapod.auto.tfvars` from it before `init` (`hcl=true` → raw HCL expression, otherwise → quoted string), while a Pulumi run sets each key with `pulumi config set` on the selected stack (`sensitive` → `--secret`, `structured` → `--path`) and renders no file at all. One blob for every engine, because they carry one role; only the delivery differs. A `.auto.tfvars` file parses **identically on terraform and tofu** for any variable type — which is why the Terraform delivery uses a file rather than `TF_VAR_*` env (the env form diverges across engines for untyped complex values). The key keeps its Terraform name because a runner up to N-2 minors behind reads exactly this one.
 - one key per env-category variable, each injected into the Job container via `secretKeyRef`.
-- on a Pulumi workspace that has any, a `pulumi-config.json` blob — every `pulumi_config` variable with its `secret` and `path` flags. Mounted read-only alongside the tfvars file; after the stack is selected the runner sets each with `pulumi config set`, passing the value on **stdin** so it never reaches a command line. See [Pulumi → Stack configuration](pulumi.md#stack-configuration).
 
-No variable value — sensitive or not — ever appears in the Job spec, the listener logs, or `kubectl describe` output. Sensitive terraform vars are protected by living only in this short-lived, cascade-GC'd Secret (mounted as the tfvars file), not by masking.
+No variable value — sensitive or not — ever appears in the Job spec, the listener logs, or `kubectl describe` output. Sensitive variables are protected by living only in this short-lived, cascade-GC'd Secret, not by masking.
 
 ---
 

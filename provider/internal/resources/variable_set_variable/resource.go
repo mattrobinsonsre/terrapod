@@ -76,7 +76,19 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 			"varset_id": schema.StringAttribute{Required: true, Description: "Variable set ID this variable belongs to.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"key":       schema.StringAttribute{Required: true, Description: "Variable name."},
 			"value":     schema.StringAttribute{Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only."},
-			"category":  schema.StringAttribute{Required: true, Description: "Category: terraform, env, pulumi_config, git_http_auth, or git_ssh_auth.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"category": schema.StringAttribute{
+				Required: true,
+				Description: "Category: terraform, env, git_http_auth, or git_ssh_auth.\n\n" +
+					"`terraform` is the engine's own parameter channel -- Terraform input " +
+					"variables, Pulumi stack config, Ansible extra vars. One role, delivered " +
+					"by whichever engine the workspace runs; Terrapod's own API calls it " +
+					"`native`, and this provider reads the compatibility surface, which calls " +
+					"it `terraform`. Write `terraform` here: it is what comes back, so " +
+					"anything else drifts, and the attribute forces replacement.\n\n" +
+					"On a Pulumi workspace `sensitive` makes a real Pulumi secret and " +
+					"`structured` sets a nested config value rather than a literal dotted key.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
 			"structured": schema.BoolAttribute{
 				Optional: true, Computed: true,
 				Description:   "Whether the value is a typed expression rather than a plain string.",

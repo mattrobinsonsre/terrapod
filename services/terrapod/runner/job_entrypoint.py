@@ -671,14 +671,19 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # contents terragrunt copies into its cache. The file is absent when the
     # workspace has no terraform variables.
     #
-    # Terraform's alone, for the same reason as the state download at step 5 --
-    # and more sharply (#1869). Nothing in a Pulumi run reads a tfvars file, so
-    # writing one only drops the workspace's terraform variables into the
-    # directory the user's program runs in. `runs.py` applies no engine filter
-    # when it assembles `terraform-vars`, and that delivery is deliberately
-    # uniform -- sensitive and not -- because for Terraform the file IS the
-    # delivery mechanism. For Pulumi it is just plaintext secrets on disk that
-    # nothing consumes. Pulumi config arrives as `pulumi_config` (#1565).
+    # THIS is where the one delivered list becomes an engine's own delivery
+    # (#1898). The blob holds the workspace's native variables for every engine
+    # -- one role, one list -- and each engine takes it the way its own users
+    # deliver parameters: Terraform renders a tfvars file here, and Pulumi runs
+    # `pulumi config set` further down. So the dispatch is on the run's engine,
+    # in one place, rather than on a category the API filtered by.
+    #
+    # Rendering the file on a Pulumi run would be worse than useless (#1869):
+    # nothing reads it, so it only drops the workspace's values -- sensitive
+    # ones included -- into the directory the user's program runs in. The
+    # delivery is deliberately uniform, sensitive and not, because for Terraform
+    # the file IS the mechanism; that is exactly why it must not be written for
+    # an engine that has another one.
     if not is_pulumi and _VARS_FILE.exists():
         try:
             import json as _json

@@ -265,7 +265,7 @@ func TestGetVariableByKey(t *testing.T) {
 
 // TestGetVariableByKey_SameKeyDifferentCategories is the case the category
 // argument exists for (#1898). A workspace may hold `terraform:region` and
-// `pulumi_config:region` at once -- that is what moving between engines looks
+// `env:region` at once -- an input variable and an environment
 // like -- and a key-only lookup had to pick one, silently returning whichever
 // the server listed first. Each category must find its own.
 func TestGetVariableByKey_SameKeyDifferentCategories(t *testing.T) {
@@ -273,7 +273,7 @@ func TestGetVariableByKey_SameKeyDifferentCategories(t *testing.T) {
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		_, _ = w.Write([]byte(`{"data":[
             {"id":"var-tf","type":"vars","attributes":{"key":"region","value":"eu-west-1","category":"terraform"}},
-            {"id":"var-pu","type":"vars","attributes":{"key":"region","value":"us-east-1","category":"pulumi_config"}}
+            {"id":"var-pu","type":"vars","attributes":{"key":"region","value":"us-east-1","category":"env"}}
         ]}`))
 	}))
 	defer srv.Close()
@@ -281,10 +281,10 @@ func TestGetVariableByKey_SameKeyDifferentCategories(t *testing.T) {
 
 	for _, tc := range []struct{ category, wantID, wantValue string }{
 		// The terraform one is listed FIRST, so a key-only lookup returned it
-		// for both -- which is why the pulumi_config case is the one that fails
+		// for both -- which is why the second case is the one that fails
 		// if the category is ever dropped from the match.
 		{"terraform", "var-tf", "eu-west-1"},
-		{"pulumi_config", "var-pu", "us-east-1"},
+		{"env", "var-pu", "us-east-1"},
 	} {
 		t.Run(tc.category, func(t *testing.T) {
 			got, err := c.GetVariableByKey(t.Context(), "ws-a", tc.category, "region")

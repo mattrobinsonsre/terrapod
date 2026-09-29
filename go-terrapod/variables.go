@@ -15,10 +15,29 @@ import (
 // provider's resource layer does this; the migration tool's report
 // flags every sensitive variable for operator re-entry.
 type Variable struct {
-	ID       string `json:"id"`
-	Key      string `json:"key"`
-	Value    string `json:"value,omitempty"`
-	Category string `json:"category"` // "terraform" | "env" | "pulumi_config" | "git_http_auth" | "git_ssh_auth"
+	ID    string `json:"id"`
+	Key   string `json:"key"`
+	Value string `json:"value,omitempty"`
+	// Category is the variable's kind. Four are stored:
+	//
+	//   native         the engine's own parameter channel -- Terraform input
+	//                  variables, Pulumi stack config, Ansible extra vars.
+	//                  One role, delivered by whichever engine runs (#1898).
+	//   env            an environment variable for the run's process.
+	//   git_http_auth  private-git-module credentials, materialized before
+	//   git_ssh_auth   init. Always sensitive; a JSON value (#1028).
+	//
+	// The TFE-compatible surface (/api/tfe/v2 and its /api/v2 alias) calls
+	// `native` **terraform**, for ever: tfci and go-tfe hold that as a
+	// constant. Terrapod's own surface (/api/v1) says `native`. So what you
+	// read back here depends on the door you came through -- the same
+	// arrangement Structured has with HCL.
+	//
+	// On input, `terraform`, `pulumi_config` and `native` are all accepted
+	// anywhere and mean the same thing. Send whichever suits; to write code
+	// that does not depend on the surface, send `terraform`, which every
+	// version of the server has accepted.
+	Category string `json:"category"`
 	// Structured reports whether the value is a typed expression rather than a
 	// plain string. HCL is the same flag under its original name — /api/v2
 	// returns both, always equal, because tfci and go-tfe read "hcl" (#1435).
@@ -44,25 +63,6 @@ type Variable struct {
 	// or non-Vault variable.
 	ValueSource string `json:"value-source,omitempty"`
 
-	// AppliesToEngine reports whether a run on the owning workspace's engine
-	// would deliver this variable at all (#1565). It is false for a category
-	// the engine never reads -- `pulumi_config` on a Terraform workspace, or
-	// `terraform` on a Pulumi one.
-	//
-	// Such a variable is NOT refused at write time: variables are data, and
-	// which of them apply is decided at run time by the engine that runs
-	// (#1407 §6). This field is how the mismatch is surfaced instead, so a
-	// value an operator set and watched do nothing is visible rather than
-	// silent. The owning workspace also raises a `variables_not_consumed`
-	// health condition while it holds one.
-	//
-	// Absent from an older server's response, where it decodes as false. A
-	// consumer that would act on it should read it alongside the workspace's
-	// engine rather than treating false as authoritative on its own.
-	// No omitempty: false is the meaningful value here -- it is what says the
-	// variable does nothing -- and omitting it would erase the signal.
-	AppliesToEngine bool `json:"applies-to-engine"`
-
 	VersionID string `json:"version-id,omitempty"`
 	CreatedAt string `json:"created-at,omitempty"`
 	UpdatedAt string `json:"updated-at,omitempty"`
@@ -72,9 +72,12 @@ type Variable struct {
 // Key + Category are required. Value defaults to empty (legal — many
 // env vars are flag-shaped). Sensitive + HCL default to false.
 type CreateVariableRequest struct {
-	Key      string `json:"key"`
-	Value    string `json:"value"`
-	Category string `json:"category"` // "terraform" | "env" | "pulumi_config" | "git_http_auth" | "git_ssh_auth"
+	Key   string `json:"key"`
+	Value string `json:"value"`
+	// Category takes `terraform`, `native`, `env`, `git_http_auth` or
+	// `git_ssh_auth`; `pulumi_config` is also accepted and means `terraform`.
+	// See Variable.Category for which name comes back.
+	Category string `json:"category"`
 	// Set either; Structured is preferred. Setting both to different values is
 	// rejected by the server rather than silently resolved (#1435).
 	Structured  bool   `json:"structured,omitempty"`
@@ -155,11 +158,15 @@ func (c *Client) GetVariable(ctx context.Context, workspaceID, id string) (*Vari
 // want. Same per-workspace list cost as GetVariable.
 //
 // The category is required because a variable is identified by
-// (category, key), not by key alone (#1898): a workspace may hold a
-// `terraform` and a `pulumi_config` variable both keyed "region", and
+// (category, key), not by key alone (#1898): a workspace may hold an
+// input variable and an environment variable both keyed "region", and
 // they are two different variables. A key-only lookup would have to
 // pick one, which is the ambiguity this signature exists to remove --
 // it previously returned whichever the server happened to list first.
+//
+// Pass the category as the surface you are reading spells it: this
+// compares against what the server returned, so a `native` argument
+// finds nothing in a list fetched from /api/v2.
 //
 // Returns *NotFoundError when that workspace has no variable with the
 // given key in the given category.
@@ -338,9 +345,8 @@ func variableFromResource(res *Resource) *Variable {
 		ValueSource: GetStringAttr(res, "value-source"),
 		// #1565. Absent on an older server, where it reads as false -- see the
 		// field's own comment for why that is the safe default.
-		AppliesToEngine: GetBoolAttr(res, "applies-to-engine"),
-		VersionID:       GetStringAttr(res, "version-id"),
-		CreatedAt:       GetStringAttr(res, "created-at"),
-		UpdatedAt:       GetStringAttr(res, "updated-at"),
+		VersionID: GetStringAttr(res, "version-id"),
+		CreatedAt: GetStringAttr(res, "created-at"),
+		UpdatedAt: GetStringAttr(res, "updated-at"),
 	}
 }

@@ -91,10 +91,22 @@ class TestCreateVariable:
 
     @patch("terrapod.services.variable_service.Variable")
     async def test_version_id_set(self, MockVar):
+        """Hashed over the CANONICAL category, so `terraform` and `native` on
+        input produce one identity (#1898). It is written, never compared, so a
+        row stamped before the rename keeps its old hash and nothing notices."""
         db = AsyncMock(spec=AsyncSession)
         await create_variable(db, uuid.uuid4(), key="k", value="v")
         call_kwargs = MockVar.call_args[1]
-        assert call_kwargs["version_id"] == _version_hash("k", "v", "terraform")
+        assert call_kwargs["version_id"] == _version_hash("k", "v", "native")
+
+    @patch("terrapod.services.variable_service.Variable")
+    async def test_an_aliased_category_hashes_the_same(self, MockVar):
+        db = AsyncMock(spec=AsyncSession)
+        seen = []
+        for written_as in ("native", "terraform", "pulumi_config"):
+            await create_variable(db, uuid.uuid4(), key="k", value="v", category=written_as)
+            seen.append(MockVar.call_args[1]["version_id"])
+        assert len(set(seen)) == 1, "the alias must not produce a different version id"
 
 
 # ── update_variable ───────────────────────────────────────────────────

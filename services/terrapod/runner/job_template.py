@@ -22,14 +22,6 @@ _HOOKS_FILENAME = "execution-hooks.json"
 # mounted alongside the tfvars file; read by runner/phases/git_auth.py.
 _GIT_AUTH_SECRET_KEY = "git-auth.json"
 _GIT_AUTH_FILENAME = "git-auth.json"
-# Pulumi stack config (#1565) — another key in the same per-run vars Secret,
-# mounted alongside the tfvars file; read by runner/phases/pulumi_config.py.
-# Its own key rather than a reuse of the tfvars blob, because the two are
-# delivered by different mechanisms: a terraform var is written into a file the
-# engine reads, while this is set on the stack with `pulumi config set` before
-# the preview runs.
-_PULUMI_CONFIG_SECRET_KEY = "pulumi-config.json"
-_PULUMI_CONFIG_FILENAME = "pulumi-config.json"
 # Vault file delivery (#1619) — more keys of the same per-run vars Secret, each
 # mounted read-only at its own path. See runner/vault_files.py.
 _VAULT_FILES_VOLUME = "vault-files"
@@ -184,7 +176,6 @@ def build_job_spec(
     terraform_vars: list[dict[str, str]],
     execution_hooks: list[dict] | None = None,
     git_auth: list[dict] | None = None,
-    pulumi_config: list[dict] | None = None,
     vault_files: list[dict] | None = None,
     vars_secret_name: str = "",
     resource_cpu: str = "1",
@@ -216,11 +207,13 @@ def build_job_spec(
             variable value is plaintext in the Job spec.
         env_vars: Workspace env vars [{key, value}] — keys referenced via
             secretKeyRef into vars_secret_name.
-        terraform_vars: Terraform vars [{key, value, structured}] — presence triggers
-            the mounted tfvars volume; the entrypoint renders the file.
-        pulumi_config: Pulumi stack config [{key, value, secret, path}] (#1565) —
-            presence adds a `pulumi-config.json` key to the same mounted volume;
-            the pulumi_config phase sets each on the stack before the preview.
+        terraform_vars: The engine's own parameter channel (#1898),
+            [{key, value, structured, sensitive}] — presence triggers the
+            mounted tfvars volume. One list for every engine, because they are
+            one role with three deliveries; the entrypoint dispatches on the
+            run's engine (a tfvars file for Terraform, `pulumi config set` for
+            Pulumi). The name keeps its Terraform spelling because a runner up
+            to N-2 minors behind reads this exact key.
         resource_cpu: CPU request (e.g. "1", "500m").
         parallelism: How many operations the engine runs at once (#1431).
         resource_memory: Memory request (e.g. "2Gi", "256Mi").
@@ -530,8 +523,6 @@ def build_job_spec(
         secret_items.append({"key": _HOOKS_SECRET_KEY, "path": _HOOKS_FILENAME})
     if git_auth:
         secret_items.append({"key": _GIT_AUTH_SECRET_KEY, "path": _GIT_AUTH_FILENAME})
-    if pulumi_config:
-        secret_items.append({"key": _PULUMI_CONFIG_SECRET_KEY, "path": _PULUMI_CONFIG_FILENAME})
     if vars_secret_name and secret_items:
         pod = job_spec["spec"]["template"]["spec"]
         pod["volumes"].append(

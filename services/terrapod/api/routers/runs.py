@@ -69,7 +69,13 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import agent_pool_service, plan_graph_service, pool_set, run_service
+from terrapod.services import (
+    agent_pool_service,
+    plan_graph_service,
+    pool_set,
+    run_service,
+    variable_service,
+)
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
@@ -2312,37 +2318,35 @@ async def next_run(
     # per-run vars Secret (mounted as the tfvars file), never as plaintext env;
     # there is no sensitivity split. See runner/phases/tfvars.py + the listener
     # vars Secret.
-    terraform_vars = [
-        # Both names on the wire (#1435): a runner up to N-2 minors behind
-        # reads `hcl` and knows nothing of `structured`.
-        {"key": v.key, "value": v.value, "structured": v.structured, "hcl": v.structured}
-        for v in resolved
-        if v.category == "terraform"
-    ]
-
-    # Pulumi stack config (#1565). Its own list rather than a reuse of
-    # `terraform-vars`, because the two are delivered differently: a terraform
-    # var is written into a generated tfvars file, while this is set on the
-    # stack with `pulumi config set` before the preview runs.
+    # The engine's own parameter channel (#1898). One list for every engine,
+    # because they are one role with three deliveries -- a tfvars file, `pulumi
+    # config set`, `-e @file.json` -- and the runner dispatches on the
+    # workspace's engine.
     #
-    # `secret` carries the workspace variable's own `sensitive`, and the runner
-    # passes `--secret` for it. That is Pulumi secrecy, not merely careful
-    # delivery: the engine then renders the value as `[secret]` in the preview a
-    # reviewer reads, in the event log, and in any state it reaches. Delivering
-    # it as ordinary config would put a sensitive value in the preview output.
+    # `sensitive` rides along because Pulumi needs it (`--secret` makes the
+    # engine itself render the value as `[secret]` in previews and state) while
+    # Terraform does not: there the file is the mechanism and every value is
+    # delivered the same way. A delivery uses what it can honour and ignores the
+    # rest, which is why one list serves all three.
     #
-    # `path` carries `structured`, which the runner turns into `--path` so a
-    # key like `outer.inner` sets a nested value rather than a literal dotted
-    # key -- the same distinction `structured` already draws for terraform.
-    pulumi_config = [
+    # The wire name stays `terraform-vars` and both flag spellings stay on each
+    # entry: a runner up to N-2 minors behind reads them, and identifiers keep
+    # their names the way `terraform.tfvars` does under OpenTofu.
+    native_vars = [
         {
             "key": v.key,
             "value": v.value,
-            "secret": bool(v.sensitive),
-            "path": bool(v.structured),
+            "structured": v.structured,
+            "hcl": v.structured,
+            "sensitive": bool(v.sensitive),
         }
         for v in resolved
-        if v.category == "pulumi_config"
+        # Folded rather than compared, so a row in either spelling is delivered.
+        # During a rolling upgrade an older API replica can still WRITE
+        # `terraform` while this one reads it, and a bare equality check would
+        # drop that variable from the run in silence -- the exact failure mode
+        # #1898 exists to remove, reintroduced by the fix for it.
+        if variable_service.canonical_category(v.category) == variable_service.NATIVE_CATEGORY
     ]
 
     # Private-git-module auth (#1028): git_http_auth / git_ssh_auth vars are
@@ -2382,11 +2386,7 @@ async def next_run(
     # its absence resolves to terraform on the far side.
     run_data["data"]["attributes"]["engine"] = ws.engine
     run_data["data"]["attributes"]["env-vars"] = env_vars
-    run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
-    # Pulumi stack config (#1565). A listener too old to read it delivers
-    # nothing, and the run's config is simply whatever the repository committed
-    # — the same degradation every other field on this wire makes.
-    run_data["data"]["attributes"]["pulumi-config"] = pulumi_config
+    run_data["data"]["attributes"]["terraform-vars"] = native_vars
     run_data["data"]["attributes"]["execution-hooks"] = execution_hooks
     run_data["data"]["attributes"]["git-auth"] = git_auth
     # Vault file delivery (#1619): [{key, name, value}]. The listener writes

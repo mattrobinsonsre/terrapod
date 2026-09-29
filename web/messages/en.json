@@ -922,9 +922,7 @@
       "varKey": "Key",
       "varValue": "Value",
       "varCategory": "Category",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Environment",
-      "categoryPulumiConfig": "Pulumi config",
       "sensitive": "Sensitive",
       "sensAbbr": "Sens.",
       "enterNewValue": "Enter new value",
@@ -989,7 +987,9 @@
       "valueSource": "Value source",
       "valueSourceStatic": "Enter a value",
       "valueSourceVault": "Read from OpenBao/Vault",
-      "vaultHint": "Terrapod reads the secret from OpenBao (or HashiCorp Vault) at run time. Nothing is stored here."
+      "vaultHint": "Terrapod reads the secret from OpenBao (or HashiCorp Vault) at run time. Nothing is stored here.",
+      "categoryNative": "Native",
+      "structured": "Structured"
     }
   },
   "adminAutodiscovery": {
@@ -2645,8 +2645,6 @@
       "value": "Value",
       "category": "Category",
       "categoryEnv": "Environment",
-      "categoryPulumiConfig": "Pulumi config",
-      "notUsedByEngine": "Not used by this engine",
       "sensitive": "Sensitive",
       "empty": "No variables configured for this workspace.",
       "emptyValue": "empty",
@@ -2705,7 +2703,9 @@
       "vaultFileEncoding": "Encoding",
       "vaultFileEncodingNone": "As stored in OpenBao/Vault",
       "vaultFileEncodingBase64": "Base64-decode",
-      "vaultFileEncodingHint": "Decodes the field before it is written. The result must be text; binary files are not supported."
+      "vaultFileEncodingHint": "Decodes the field before it is written. The result must be text; binary files are not supported.",
+      "categoryNative": "Native",
+      "structured": "Structured"
     },
     "runs": {
       "options": "Options",

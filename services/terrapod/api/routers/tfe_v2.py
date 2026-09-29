@@ -68,7 +68,6 @@ from terrapod.db.models import (
     AuditLog,
     Run,
     StateVersion,
-    Variable,
     Workspace,
     generate_uuid7,
 )
@@ -80,7 +79,6 @@ from terrapod.services import (
     ha_role,  # noqa: F401
     pool_set,
     run_service,
-    variable_service,
     workspace_settings,
 )
 from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
@@ -499,8 +497,6 @@ async def create_project_unsupported(
 def _compute_health_conditions(
     ws: Workspace,
     live_pool_ids: frozenset[uuid.UUID] | None = None,
-    *,
-    has_inert_vars: bool = False,
 ) -> list[dict]:
     """Compute all active health conditions from workspace DB fields.
 
@@ -510,25 +506,8 @@ def _compute_health_conditions(
     information available, and the liveness condition is skipped rather than
     guessed — a false "no runner" banner is worse than a missing one.
 
-    ``has_inert_vars`` comes from ``_resolve_inert_var_ws``, resolved the same
-    way and for the same reason.
     """
     conditions: list[dict] = []
-
-    if has_inert_vars:
-        conditions.append(
-            {
-                "code": "variables_not_consumed",
-                "severity": "warning",
-                "title": "Some variables do not apply to this engine",
-                "detail": (
-                    "This workspace holds variables in a category its engine never "
-                    "reads — `pulumi_config` on a Terraform workspace, or `terraform` "
-                    "on a Pulumi one. They are stored and editable, and a run simply "
-                    "does not deliver them. The variables tab marks which."
-                ),
-            }
-        )
 
     if ws.state_diverged:
         conditions.append(
@@ -635,47 +614,11 @@ async def _resolve_live_pools(workspaces: list[Workspace]) -> frozenset[uuid.UUI
     return None if live is None else frozenset(live)
 
 
-async def _resolve_inert_var_ws(
-    db: AsyncSession, workspaces: list[Workspace]
-) -> frozenset[uuid.UUID]:
-    """Which of these workspaces hold a variable their engine never consumes.
-
-    One query for the whole page, threaded into every ``_workspace_json`` on it
-    — the same shape as ``_resolve_live_pools``, and for the same reason: doing
-    it per workspace would put a query on every row of the workspace list and
-    undo the paged fast path (#1056).
-
-    This is what #1407 §6 asks for in place of a write-time check. A
-    `pulumi_config` variable on a Terraform workspace is stored and returned
-    without complaint, because variables are data and which of them apply is
-    decided at run time by the engine that runs — but it does nothing, and an
-    operator who set it has no way to find that out. So the workspace says so.
-    """
-    ids = [ws.id for ws in workspaces]
-    if not ids:
-        return frozenset()
-    engine = func.lower(func.coalesce(func.nullif(Workspace.engine, ""), "terraform"))
-    mismatched = or_(
-        *[
-            and_(Variable.category == category, engine != wanted)
-            for category, wanted in sorted(variable_service.CATEGORY_ENGINE.items())
-        ]
-    )
-    rows = await db.execute(
-        select(Variable.workspace_id)
-        .join(Workspace, Workspace.id == Variable.workspace_id)
-        .where(Variable.workspace_id.in_(ids), mismatched)
-        .distinct()
-    )
-    return frozenset(rows.scalars().all())
-
-
 def _workspace_json(
     ws: Workspace,
     caps: frozenset[str] | None = None,
     latest_run: Run | None = None,
     live_pool_ids: frozenset[uuid.UUID] | None = None,
-    inert_var_ws: frozenset[uuid.UUID] | None = None,
 ) -> dict:
     """Serialize a Workspace to TFE V2 JSON:API format.
 
@@ -684,8 +627,7 @@ def _workspace_json(
     capabilities. Otherwise defaults to no access (empty set).
 
     ``live_pool_ids`` feeds the pool-liveness health condition — see
-    ``_resolve_live_pools``; ``inert_var_ws`` feeds the engine-mismatch one —
-    see ``_resolve_inert_var_ws``. Both are resolved once per request.
+    ``_resolve_live_pools``, resolved once per request.
     """
     caps = caps or frozenset()
     ws_pools = pool_set.workspace_pool_ids(ws)
@@ -773,9 +715,7 @@ def _workspace_json(
                 "state-diverged": ws.state_diverged,
                 "lifecycle-state": ws.lifecycle_state,
                 "lifecycle-reason": ws.lifecycle_reason,
-                "health-conditions": _compute_health_conditions(
-                    ws, live_pool_ids, has_inert_vars=ws.id in (inert_var_ws or frozenset())
-                ),
+                "health-conditions": _compute_health_conditions(ws, live_pool_ids),
                 "vcs-last-polled-at": _rfc3339(ws.vcs_last_polled_at),
                 # Advances on every poll ATTEMPT, where `vcs-last-polled-at`
                 # advances only on success. The gap between the two is what
@@ -1033,7 +973,6 @@ async def _list_workspaces_impl(query, user, db, request, latest_runs_for) -> JS
         )
         latest_runs = await latest_runs_for([ws.id for ws in page_ws], db)
         live_pools = await _resolve_live_pools(list(page_ws))
-        inert_vars = await _resolve_inert_var_ws(db, list(page_ws))
         data = []
         for ws in page_ws:
             caps = await resolve_workspace_capabilities_for(db, user, ws)
@@ -1043,7 +982,6 @@ async def _list_workspaces_impl(query, user, db, request, latest_runs_for) -> JS
                     caps,
                     latest_run=latest_runs.get(ws.id),
                     live_pool_ids=live_pools,
-                    inert_var_ws=inert_vars,
                 )["data"]
             )
         return JSONResponse(
@@ -1059,7 +997,6 @@ async def _list_workspaces_impl(query, user, db, request, latest_runs_for) -> JS
 
     # Filter to workspaces user has at least read access to
     live_pools = await _resolve_live_pools(list(workspaces))
-    inert_vars = await _resolve_inert_var_ws(db, list(workspaces))
     visible = []
     for ws in workspaces:
         caps = await resolve_workspace_capabilities_for(db, user, ws)
@@ -1070,7 +1007,6 @@ async def _list_workspaces_impl(query, user, db, request, latest_runs_for) -> JS
                     caps,
                     latest_run=latest_runs.get(ws.id),
                     live_pool_ids=live_pools,
-                    inert_var_ws=inert_vars,
                 )["data"]
             )
 
@@ -1129,7 +1065,6 @@ async def show_workspace(
             caps,
             latest_run=latest_run,
             live_pool_ids=await _resolve_live_pools([ws]),
-            inert_var_ws=await _resolve_inert_var_ws(db, [ws]),
         ),
         headers=_tfe_headers(),
     )
@@ -1588,7 +1523,6 @@ async def show_workspace_by_id(
             caps,
             latest_run=latest_run,
             live_pool_ids=await _resolve_live_pools([ws]),
-            inert_var_ws=await _resolve_inert_var_ws(db, [ws]),
         ),
         headers=_tfe_headers(),
     )
@@ -2097,7 +2031,6 @@ async def update_workspace(
             ws,
             old_caps,
             live_pool_ids=await _resolve_live_pools([ws]),
-            inert_var_ws=await _resolve_inert_var_ws(db, [ws]),
         ),
         headers=_tfe_headers(),
     )

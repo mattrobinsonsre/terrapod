@@ -922,9 +922,7 @@
       "varKey": "Key",
       "varValue": "Valyoo",
       "varCategory": "Categoreh",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Enviromint",
-      "categoryPulumiConfig": "Pulumiz confg",
       "sensitive": "Sensitiv",
       "sensAbbr": "Sens.",
       "enterNewValue": "Entr noo value",
@@ -989,7 +987,9 @@
       "valueSource": "Valyoo Sors",
       "valueSourceStatic": "Typ a valyoo",
       "valueSourceVault": "Reed frum OpenBao/Vault",
-      "vaultHint": "Terrapod reedz da sekrit frum OpenBao (or HashiCorp Vault, u pick) at run tiem. Nuffin iz kept heer."
+      "vaultHint": "Terrapod reedz da sekrit frum OpenBao (or HashiCorp Vault, u pick) at run tiem. Nuffin iz kept heer.",
+      "categoryNative": "Naytiv",
+      "structured": "Strukchurd"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Valyoo",
       "category": "Categoreh",
       "categoryEnv": "Enviromint",
-      "categoryPulumiConfig": "Pulumiz confg",
-      "notUsedByEngine": "Not uzed by dis enginz",
       "sensitive": "Sensitiv",
       "empty": "Noes variabulz configurd fer dis workspace.",
       "emptyValue": "empteh",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Enkodin",
       "vaultFileEncodingNone": "Liek it waz stord in OpenBao/Vault",
       "vaultFileEncodingBase64": "Base64-dekode",
-      "vaultFileEncodingHint": "Dekodez da feeld b4 ritin it. Hafta be textz; binaree fielz not supportd."
+      "vaultFileEncodingHint": "Dekodez da feeld b4 ritin it. Hafta be textz; binaree fielz not supportd.",
+      "categoryNative": "Naytiv",
+      "structured": "Strukchurd"
     },
     "runs": {
       "options": "Opshunz",

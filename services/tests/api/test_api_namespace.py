@@ -69,6 +69,35 @@ class TestOpenAPIVisibility:
 
 
 class TestRouteTopology:
+    def test_no_native_route_anywhere_carries_an_org_segment(self) -> None:
+        """The general form of the rule below, which lists paths and so can only
+        catch the mistakes someone thought of.
+
+        Worth having because the cheapest way to give the native surface a route
+        is to mount a TFE router there, and a TFE router may carry
+        `organizations/default/` quite legitimately — so the violation arrives
+        as a side effect of a mount rather than as a path anyone wrote. That is
+        exactly how it happened: mounting the whole variables router natively to
+        reach one field put `/api/v1/organizations/default/varsets` on the
+        native surface (#1898).
+        """
+        # Pulumi's service-backend routes are exempt: `organizations/{org}` is
+        # a segment of *Pulumi's* wire protocol, which we implement, not a
+        # Terrapod org. The same distinction the TFE surface's
+        # `organizations/default/` rests on — a foreign protocol's shape is not
+        # ours to flatten. Narrow on purpose, so anything else still trips.
+        offenders = sorted(
+            path
+            for r in app.routes
+            if (path := getattr(r, "path", "")).startswith(("/api/v1/", "/api/terrapod/v1/"))
+            and "/organizations/" in path
+            and "/pulumi/" not in path
+        )
+        assert not offenders, (
+            "the Terrapod-native surface is single-organization by design "
+            f"(architecture principle 9), but these carry an org segment: {offenders}"
+        )
+
     def test_terrapod_native_paths_have_no_org_segment(self) -> None:
         """Per CLAUDE.md rule #9, the Terrapod-native surface must never
         carry an `organizations/default/` segment.

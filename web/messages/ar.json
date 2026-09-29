@@ -922,9 +922,7 @@
       "varKey": "المفتاح",
       "varValue": "القيمة",
       "varCategory": "الفئة",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "البيئة",
-      "categoryPulumiConfig": "إعدادات Pulumi",
       "sensitive": "حساس",
       "sensAbbr": "حساس",
       "enterNewValue": "أدخل قيمة جديدة",
@@ -989,7 +987,9 @@
       "valueSource": "مصدر القيمة",
       "valueSourceStatic": "إدخال قيمة",
       "valueSourceVault": "القراءة من OpenBao/Vault",
-      "vaultHint": "يقرأ Terrapod السر من OpenBao (أو HashiCorp Vault) وقت التشغيل. لا يُخزَّن شيء هنا."
+      "vaultHint": "يقرأ Terrapod السر من OpenBao (أو HashiCorp Vault) وقت التشغيل. لا يُخزَّن شيء هنا.",
+      "categoryNative": "أصلي",
+      "structured": "منظّم"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "القيمة",
       "category": "الفئة",
       "categoryEnv": "بيئة",
-      "categoryPulumiConfig": "إعدادات Pulumi",
-      "notUsedByEngine": "غير مستخدَم بواسطة هذا المحرك",
       "sensitive": "حساس",
       "empty": "لا توجد متغيرات مُهيّأة لمساحة العمل هذه.",
       "emptyValue": "فارغ",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "الترميز",
       "vaultFileEncodingNone": "كما هو مخزّن في OpenBao/Vault",
       "vaultFileEncodingBase64": "فك ترميز Base64",
-      "vaultFileEncodingHint": "يفك ترميز الحقل قبل كتابته. يجب أن تكون النتيجة نصًا؛ الملفات الثنائية غير مدعومة."
+      "vaultFileEncodingHint": "يفك ترميز الحقل قبل كتابته. يجب أن تكون النتيجة نصًا؛ الملفات الثنائية غير مدعومة.",
+      "categoryNative": "أصلي",
+      "structured": "منظّم"
     },
     "runs": {
       "options": "الخيارات",

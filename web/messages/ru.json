@@ -922,9 +922,7 @@
       "varKey": "Ключ",
       "varValue": "Значение",
       "varCategory": "Категория",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Окружение",
-      "categoryPulumiConfig": "Конфигурация Pulumi",
       "sensitive": "Секретное",
       "sensAbbr": "Секр.",
       "enterNewValue": "Введите новое значение",
@@ -989,7 +987,9 @@
       "valueSource": "Источник значения",
       "valueSourceStatic": "Ввести значение",
       "valueSourceVault": "Читать из OpenBao/Vault",
-      "vaultHint": "Terrapod читает секрет из OpenBao (или HashiCorp Vault) во время запуска. Здесь ничего не хранится."
+      "vaultHint": "Terrapod читает секрет из OpenBao (или HashiCorp Vault) во время запуска. Здесь ничего не хранится.",
+      "categoryNative": "Нативная",
+      "structured": "Структурированная"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Значение",
       "category": "Категория",
       "categoryEnv": "Окружение",
-      "categoryPulumiConfig": "Конфигурация Pulumi",
-      "notUsedByEngine": "Не используется этим движком",
       "sensitive": "Секретное",
       "empty": "Для этой рабочей области переменные не настроены.",
       "emptyValue": "пусто",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Кодировка",
       "vaultFileEncodingNone": "Как хранится в OpenBao/Vault",
       "vaultFileEncodingBase64": "Декодировать Base64",
-      "vaultFileEncodingHint": "Декодирует поле перед записью. Результат должен быть текстом; двоичные файлы не поддерживаются."
+      "vaultFileEncodingHint": "Декодирует поле перед записью. Результат должен быть текстом; двоичные файлы не поддерживаются.",
+      "categoryNative": "Нативная",
+      "structured": "Структурированная"
     },
     "runs": {
       "options": "Параметры",

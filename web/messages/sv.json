@@ -922,9 +922,7 @@
       "varKey": "Nyckel",
       "varValue": "Värde",
       "varCategory": "Kategori",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Miljö",
-      "categoryPulumiConfig": "Pulumi-konfiguration",
       "sensitive": "Känslig",
       "sensAbbr": "Känsl.",
       "enterNewValue": "Ange nytt värde",
@@ -989,7 +987,9 @@
       "valueSource": "Värdekälla",
       "valueSourceStatic": "Ange ett värde",
       "valueSourceVault": "Läs från OpenBao/Vault",
-      "vaultHint": "Terrapod läser hemligheten från OpenBao (eller HashiCorp Vault) vid körning. Inget lagras här."
+      "vaultHint": "Terrapod läser hemligheten från OpenBao (eller HashiCorp Vault) vid körning. Inget lagras här.",
+      "categoryNative": "Nativ",
+      "structured": "Strukturerad"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Värde",
       "category": "Kategori",
       "categoryEnv": "Miljö",
-      "categoryPulumiConfig": "Pulumi-konfiguration",
-      "notUsedByEngine": "Används inte av denna motor",
       "sensitive": "Känslig",
       "empty": "Inga variabler konfigurerade för denna arbetsyta.",
       "emptyValue": "tomt",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Kodning",
       "vaultFileEncodingNone": "Som lagrad i OpenBao/Vault",
       "vaultFileEncodingBase64": "Base64-avkoda",
-      "vaultFileEncodingHint": "Avkodar fältet innan det skrivs. Resultatet måste vara text; binära filer stöds inte."
+      "vaultFileEncodingHint": "Avkodar fältet innan det skrivs. Resultatet måste vara text; binära filer stöds inte.",
+      "categoryNative": "Nativ",
+      "structured": "Strukturerad"
     },
     "runs": {
       "options": "Alternativ",

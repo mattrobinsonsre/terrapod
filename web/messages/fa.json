@@ -922,9 +922,7 @@
       "varKey": "کلید",
       "varValue": "مقدار",
       "varCategory": "دسته‌بندی",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "محیط",
-      "categoryPulumiConfig": "پیکربندی Pulumi",
       "sensitive": "حساس",
       "sensAbbr": "حساس",
       "enterNewValue": "مقدار جدید را وارد کنید",
@@ -989,7 +987,9 @@
       "valueSource": "منبع مقدار",
       "valueSourceStatic": "یک مقدار وارد کنید",
       "valueSourceVault": "خواندن از OpenBao/Vault",
-      "vaultHint": "Terrapod راز را هنگام اجرا از OpenBao (یا HashiCorp Vault) می‌خواند. چیزی اینجا ذخیره نمی‌شود."
+      "vaultHint": "Terrapod راز را هنگام اجرا از OpenBao (یا HashiCorp Vault) می‌خواند. چیزی اینجا ذخیره نمی‌شود.",
+      "categoryNative": "بومی",
+      "structured": "ساختاریافته"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "مقدار",
       "category": "دسته",
       "categoryEnv": "محیط",
-      "categoryPulumiConfig": "پیکربندی Pulumi",
-      "notUsedByEngine": "این موتور از آن استفاده نمی‌کند",
       "sensitive": "حساس",
       "empty": "هیچ متغیری برای این فضای کاری پیکربندی نشده است.",
       "emptyValue": "خالی",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "رمزگذاری",
       "vaultFileEncodingNone": "همان‌طور که در OpenBao/Vault ذخیره شده",
       "vaultFileEncodingBase64": "رمزگشایی Base64",
-      "vaultFileEncodingHint": "فیلد را پیش از نوشتن رمزگشایی می‌کند. نتیجه باید متن باشد؛ فایل‌های دودویی پشتیبانی نمی‌شوند."
+      "vaultFileEncodingHint": "فیلد را پیش از نوشتن رمزگشایی می‌کند. نتیجه باید متن باشد؛ فایل‌های دودویی پشتیبانی نمی‌شوند.",
+      "categoryNative": "بومی",
+      "structured": "ساختاریافته"
     },
     "runs": {
       "options": "گزینه‌ها",

@@ -41,7 +41,6 @@ export function VariableEditPanel({
   onSave,
   onCancel,
   vaultCheckUrl,
-  engine,
 }: {
   idPrefix: string
   state: VariableEditState
@@ -51,11 +50,6 @@ export function VariableEditPanel({
   vaultDefaultInstance: string
   /** The reference-check endpoint for this workspace or variable set (#1663). */
   vaultCheckUrl?: string
-  /**
-   * The owning workspace's engine, which decides whether `pulumi_config` is
-   * offered (#1565). Absent for a variable set, which has no single engine.
-   */
-  engine?: string
   saving: boolean
   onSave: () => void
   onCancel: () => void
@@ -68,15 +62,6 @@ export function VariableEditPanel({
   // than only in the caller's gate.
   const isGitCat = state.category === 'git_http_auth' || state.category === 'git_ssh_auth'
   const isVault = state.source === 'vault' && !isGitCat
-  // The API accepts pulumi_config on any workspace — engine mismatch is
-  // deliberately permissive (#1407 §6) — but offering it on a Terraform
-  // workspace only invites a variable that is stored and never read. A variable
-  // set has no single engine, so `engine` is absent there and the option
-  // stands. An existing pulumi_config variable always keeps its option, or the
-  // select would silently display a category other than the one stored.
-  const offerPulumiConfig =
-    engine === undefined || engine === 'pulumi' || state.category === 'pulumi_config'
-
   return (
     <div className="space-y-4">
       {/* Identity and shape first — what the variable is, before where its
@@ -100,11 +85,17 @@ export function VariableEditPanel({
             value={state.category}
             onChange={(e) => onChange({ category: e.target.value })}
           >
-            <option value="terraform">terraform{/* i18n-ignore: category value */}</option>
-            <option value="env">env{/* i18n-ignore: category value */}</option>
-            {offerPulumiConfig && (
-              <option value="pulumi_config">{t('categoryPulumiConfig')}</option>
-            )}
+            {/* One category for the engine's own parameters, whatever the
+                workspace runs (#1898): Terraform input variables, Pulumi stack
+                config, Ansible extra vars are one role with three deliveries.
+                There is deliberately no engine-specific option — an engine here
+                would be the mechanism showing through, which is what made a
+                Pulumi workspace offer "terraform" and a Terraform one offer
+                stack config. These are API values, shown as the API spells
+                them, so what you pick is what you would write in the provider
+                or hand to the CLI. */}
+            <option value="native">{t('categoryNative')}</option>
+            <option value="env">{t('categoryEnv')}</option>
             <option value="git_http_auth">Git HTTPS credential{/* i18n-ignore: category value */}</option>
             <option value="git_ssh_auth">Git SSH credential{/* i18n-ignore: category value */}</option>
           </select>
@@ -165,15 +156,27 @@ export function VariableEditPanel({
             />
             <span className="text-xs text-slate-400">{t('sensitive')}</span>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={state.hcl}
-              onChange={(e) => onChange({ hcl: e.target.checked })}
-              className="rounded border-slate-600 bg-slate-700 text-brand-600"
-            />
-            <span className="text-xs text-slate-400">HCL{/* i18n-ignore: HCL is the language name */}</span>
-          </label>
+          {/* Only where a value can be typed at all. An environment variable
+              is a string by definition and a git credential is a JSON
+              envelope, so the flag meant nothing there and the API refuses it
+              on both — offering it invited a 422 (#1435).
+
+              "Structured", not "HCL": one flag whose meaning is the engine's
+              (#1898) — a raw HCL expression for Terraform, a nested config
+              value for Pulumi. Gating on the old `terraform` name would have
+              left it unreachable on a Pulumi workspace, where it is what sets
+              a nested key. */}
+          {state.category === 'native' && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={state.hcl}
+                onChange={(e) => onChange({ hcl: e.target.checked })}
+                className="rounded border-slate-600 bg-slate-700 text-brand-600"
+              />
+              <span className="text-xs text-slate-400">{t('structured')}</span>
+            </label>
+          )}
         </div>
         <div className="flex gap-2">
           <button

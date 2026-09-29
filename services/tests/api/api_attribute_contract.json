@@ -1079,7 +1079,6 @@
     "updated-at"
   ],
   "variables._var_json": [
-    "applies-to-engine",
     "category",
     "created-at",
     "description",

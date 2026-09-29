@@ -922,9 +922,7 @@
       "varKey": "Allwedd",
       "varValue": "Gwerth",
       "varCategory": "Categori",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Amgylchedd",
-      "categoryPulumiConfig": "Ffurfweddiad Pulumi",
       "sensitive": "Sensitif",
       "sensAbbr": "Sens.",
       "enterNewValue": "Rhowch werth newydd",
@@ -989,7 +987,9 @@
       "valueSource": "Ffynhonnell gwerth",
       "valueSourceStatic": "Rhowch werth",
       "valueSourceVault": "Darllen o OpenBao/Vault",
-      "vaultHint": "Mae Terrapod yn darllen y gyfrinach o OpenBao (neu HashiCorp Vault) adeg rhedeg. Ni chedwir dim yma."
+      "vaultHint": "Mae Terrapod yn darllen y gyfrinach o OpenBao (neu HashiCorp Vault) adeg rhedeg. Ni chedwir dim yma.",
+      "categoryNative": "Brodorol",
+      "structured": "Strwythuredig"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Gwerth",
       "category": "Categori",
       "categoryEnv": "Amgylchedd",
-      "categoryPulumiConfig": "Ffurfweddiad Pulumi",
-      "notUsedByEngine": "Heb ei ddefnyddio gan y peiriant hwn",
       "sensitive": "Sensitif",
       "empty": "Dim newidynnau wedi'u ffurfweddu ar gyfer y weithfan hon.",
       "emptyValue": "gwag",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Amgodio",
       "vaultFileEncodingNone": "Fel y''i storiwyd yn OpenBao/Vault",
       "vaultFileEncodingBase64": "Datgodio Base64",
-      "vaultFileEncodingHint": "Yn datgodio''r maes cyn ei ysgrifennu. Rhaid i''r canlyniad fod yn destun; ni chefnogir ffeiliau deuaidd."
+      "vaultFileEncodingHint": "Yn datgodio''r maes cyn ei ysgrifennu. Rhaid i''r canlyniad fod yn destun; ni chefnogir ffeiliau deuaidd.",
+      "categoryNative": "Brodorol",
+      "structured": "Strwythuredig"
     },
     "runs": {
       "options": "Opsiynau",

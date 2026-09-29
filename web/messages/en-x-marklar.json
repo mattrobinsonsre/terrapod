@@ -922,9 +922,7 @@
       "varKey": "Marklar",
       "varValue": "Marklar",
       "varCategory": "Marklar",
-      "categoryTerraform": "Marklar",
       "categoryEnv": "Marklar",
-      "categoryPulumiConfig": "Pulumi marklar",
       "sensitive": "Sensitive",
       "sensAbbr": "Marklar.",
       "enterNewValue": "Enter new marklar",
@@ -989,7 +987,9 @@
       "valueSource": "Marklar marklar",
       "valueSourceStatic": "Enter a marklar",
       "valueSourceVault": "Read from Marklar/Marklar",
-      "vaultHint": "Marklar reads the marklar from Marklar (or Marklar Marklar) at marklar. No marklar is stored here."
+      "vaultHint": "Marklar reads the marklar from Marklar (or Marklar Marklar) at marklar. No marklar is stored here.",
+      "categoryNative": "Marklar",
+      "structured": "Structured"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Marklar",
       "category": "Marklar",
       "categoryEnv": "Marklar",
-      "categoryPulumiConfig": "Pulumi marklar",
-      "notUsedByEngine": "Not used by this marklar",
       "sensitive": "Sensitive",
       "empty": "No marklars configured for this marklar.",
       "emptyValue": "empty",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Marklar",
       "vaultFileEncodingNone": "As stored in Marklar/Marklar",
       "vaultFileEncodingBase64": "Marklar-decode",
-      "vaultFileEncodingHint": "Decodes the marklar before it is written. The marklar must be marklar; binary marklars are not supported."
+      "vaultFileEncodingHint": "Decodes the marklar before it is written. The marklar must be marklar; binary marklars are not supported.",
+      "categoryNative": "Marklar",
+      "structured": "Structured"
     },
     "runs": {
       "options": "Marklars",

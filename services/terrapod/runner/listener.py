@@ -701,31 +701,21 @@ class RunnerListener:
             return
 
         env_vars = [{"key": v["key"], "value": v["value"]} for v in attrs.get("env-vars", [])]
-        terraform_vars = [
+        native_vars = [
             # Either name, from either side of a version skew (#1435).
+            #
+            # `sensitive` rides along for the engines that can honour it (#1898):
+            # Pulumi turns it into `pulumi config set --secret`. An API too old
+            # to send it resolves to false, which is what every pre-#1898 run
+            # did, so a lagging pair degrades to exactly its old behaviour.
             {
                 "key": v["key"],
                 "value": v["value"],
                 "structured": bool(v.get("structured", v.get("hcl"))),
                 "hcl": bool(v.get("structured", v.get("hcl"))),
+                "sensitive": bool(v.get("sensitive")),
             }
             for v in attrs.get("terraform-vars", [])
-        ]
-        # Pulumi stack config (#1565). Its own list rather than a reuse of
-        # `terraform-vars`, because the two are delivered differently: a
-        # terraform var is written into a generated tfvars file, while this is
-        # set on the stack with `pulumi config set` before the preview runs.
-        # An API too old to send it simply sends nothing, and the stack's config
-        # is whatever the repository committed -- the same degradation every
-        # other field on this wire makes.
-        pulumi_config = [
-            {
-                "key": v["key"],
-                "value": v["value"],
-                "secret": bool(v.get("secret")),
-                "path": bool(v.get("path")),
-            }
-            for v in attrs.get("pulumi-config", [])
         ]
         # Execution hooks (#619). The kill-switch (runners.hooks.enabled) is
         # enforced HERE at the Job-build boundary: when disabled, drop all hooks
@@ -781,14 +771,7 @@ class RunnerListener:
         # mirrors the auth Secret; ownerReference GCs it with the Job.
         vars_secret_name = (
             f"tprun-{run_short}-{phase}-vars"
-            if (
-                env_vars
-                or terraform_vars
-                or pulumi_config
-                or execution_hooks
-                or git_auth
-                or vault_file_mounts
-            )
+            if (env_vars or native_vars or execution_hooks or git_auth or vault_file_mounts)
             else ""
         )
         # Per-run CA Secret (#592): ships the custom outbound CA into the runner
@@ -826,8 +809,7 @@ class RunnerListener:
                 auth_secret_name=auth_secret_name,
                 vars_secret_name=vars_secret_name,
                 env_vars=env_vars,
-                terraform_vars=terraform_vars,
-                pulumi_config=pulumi_config,
+                terraform_vars=native_vars,
                 execution_hooks=execution_hooks,
                 git_auth=git_auth,
                 vault_files=vault_file_mounts,
@@ -887,13 +869,12 @@ class RunnerListener:
                 await self._create_vars_secret(
                     vars_secret_name,
                     run_id,
-                    terraform_vars,
+                    native_vars,
                     env_vars,
                     job_name,
                     job_uid,
                     execution_hooks=execution_hooks,
                     git_auth=git_auth,
-                    pulumi_config=pulumi_config,
                     vault_file_values=vault_file_values,
                 )
             except Exception as e:
@@ -1245,7 +1226,6 @@ class RunnerListener:
         job_uid: str,
         execution_hooks: list[dict] | None = None,
         git_auth: list[dict] | None = None,
-        pulumi_config: list[dict] | None = None,
         vault_file_values: dict[str, str] | None = None,
     ) -> None:
         """Create a K8s Secret holding all workspace variable values, with an
@@ -1255,15 +1235,17 @@ class RunnerListener:
         file's content (#1619); the Job mounts each key read-only at its path.
 
         Data keys:
-          - `terraform.tfvars.json`: JSON blob [{key, value, structured}] — mounted as
-            a file; the entrypoint renders terrapod.auto.tfvars from it.
+          - `terraform.tfvars.json`: JSON blob [{key, value, structured,
+            sensitive}] — mounted as a file. It carries the engine's own
+            parameter channel for every engine (#1898); the entrypoint
+            dispatches on the run's engine, rendering terrapod.auto.tfvars for
+            Terraform or running `pulumi config set` for Pulumi. The key keeps
+            its Terraform name because a runner up to N-2 minors behind reads
+            it, the way `terraform.tfvars` keeps its name under OpenTofu.
           - `execution-hooks.json`: JSON blob [{hook_point, name, script}] (#619)
             — mounted as a file; the entrypoint runs each hook at its boundary.
           - `git-auth.json`: JSON blob [{category, key, value}] (#1028) — mounted
             as a file; the git_auth phase materializes git credentials before init.
-          - `pulumi-config.json`: JSON blob [{key, value, secret, path}] (#1565) —
-            mounted as a file; the pulumi_config phase sets each on the stack
-            before the preview.
           - one key per env-category var — sourced via secretKeyRef in the Job.
 
         Values never appear in the Job spec, so they aren't readable via
@@ -1285,6 +1267,7 @@ class RunnerListener:
                         "value": v["value"],
                         "structured": bool(v.get("structured", v.get("hcl"))),
                         "hcl": bool(v.get("structured", v.get("hcl"))),
+                        "sensitive": bool(v.get("sensitive")),
                     }
                     for v in terraform_vars
                 ]
@@ -1311,18 +1294,6 @@ class RunnerListener:
                     for g in git_auth
                 ]
             )
-        if pulumi_config:
-            string_data["pulumi-config.json"] = json.dumps(
-                [
-                    {
-                        "key": c["key"],
-                        "value": c["value"],
-                        "secret": bool(c.get("secret")),
-                        "path": bool(c.get("path")),
-                    }
-                    for c in pulumi_config
-                ]
-            )
         for var in env_vars:
             string_data[var["key"]] = var["value"]
         # _plan_vault_files already refused a clash with an env key, so this
@@ -1339,7 +1310,6 @@ class RunnerListener:
             "terraform vars": len(string_data.get("terraform.tfvars.json", "").encode()),
             "execution hooks": len(string_data.get("execution-hooks.json", "").encode()),
             "git auth": len(string_data.get("git-auth.json", "").encode()),
-            "Pulumi config": len(string_data.get("pulumi-config.json", "").encode()),
             "env vars": sum(
                 len(str(v["key"]).encode()) + len(str(v["value"]).encode()) for v in env_vars
             ),

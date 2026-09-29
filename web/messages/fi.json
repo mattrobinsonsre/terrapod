@@ -922,9 +922,7 @@
       "varKey": "Avain",
       "varValue": "Arvo",
       "varCategory": "Kategoria",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Ympäristö",
-      "categoryPulumiConfig": "Pulumi-määritys",
       "sensitive": "Arkaluonteinen",
       "sensAbbr": "Ark.",
       "enterNewValue": "Syötä uusi arvo",
@@ -989,7 +987,9 @@
       "valueSource": "Arvon lähde",
       "valueSourceStatic": "Syötä arvo",
       "valueSourceVault": "Lue OpenBao/Vaultista",
-      "vaultHint": "Terrapod lukee salaisuuden OpenBaosta (tai HashiCorp Vaultista) ajon aikana. Mitään ei tallenneta tänne."
+      "vaultHint": "Terrapod lukee salaisuuden OpenBaosta (tai HashiCorp Vaultista) ajon aikana. Mitään ei tallenneta tänne.",
+      "categoryNative": "Natiivi",
+      "structured": "Rakenteinen"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Arvo",
       "category": "Kategoria",
       "categoryEnv": "Ympäristö",
-      "categoryPulumiConfig": "Pulumi-määritys",
-      "notUsedByEngine": "Tämä moottori ei käytä",
       "sensitive": "Arkaluonteinen",
       "empty": "Tälle työtilalle ei ole määritetty muuttujia.",
       "emptyValue": "tyhjä",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Koodaus",
       "vaultFileEncodingNone": "Kuten OpenBao/Vaultiin tallennettu",
       "vaultFileEncodingBase64": "Base64-dekoodaus",
-      "vaultFileEncodingHint": "Dekoodaa kentän ennen kirjoittamista. Tuloksen on oltava tekstiä; binääritiedostoja ei tueta."
+      "vaultFileEncodingHint": "Dekoodaa kentän ennen kirjoittamista. Tuloksen on oltava tekstiä; binääritiedostoja ei tueta.",
+      "categoryNative": "Natiivi",
+      "structured": "Rakenteinen"
     },
     "runs": {
       "options": "Vaihtoehdot",

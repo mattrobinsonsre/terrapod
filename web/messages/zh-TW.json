@@ -922,9 +922,7 @@
       "varKey": "鍵",
       "varValue": "值",
       "varCategory": "類別",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "環境",
-      "categoryPulumiConfig": "Pulumi 配置",
       "sensitive": "敏感",
       "sensAbbr": "敏感",
       "enterNewValue": "輸入新值",
@@ -989,7 +987,9 @@
       "valueSource": "值來源",
       "valueSourceStatic": "直接輸入值",
       "valueSourceVault": "從 OpenBao/Vault 讀取",
-      "vaultHint": "Terrapod 於執行時從 OpenBao（或 HashiCorp Vault）讀取密鑰，此處不會儲存任何內容。"
+      "vaultHint": "Terrapod 於執行時從 OpenBao（或 HashiCorp Vault）讀取密鑰，此處不會儲存任何內容。",
+      "categoryNative": "原生",
+      "structured": "結構化"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "值",
       "category": "類別",
       "categoryEnv": "環境",
-      "categoryPulumiConfig": "Pulumi 配置",
-      "notUsedByEngine": "此引擎不使用",
       "sensitive": "敏感",
       "empty": "此工作區未配置任何變數。",
       "emptyValue": "空",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "編碼",
       "vaultFileEncodingNone": "依 OpenBao/Vault 中儲存的原樣",
       "vaultFileEncodingBase64": "Base64 解碼",
-      "vaultFileEncodingHint": "在寫入前解碼該欄位。結果必須是文字；不支援二進位檔案。"
+      "vaultFileEncodingHint": "在寫入前解碼該欄位。結果必須是文字；不支援二進位檔案。",
+      "categoryNative": "原生",
+      "structured": "結構化"
     },
     "runs": {
       "options": "選項",

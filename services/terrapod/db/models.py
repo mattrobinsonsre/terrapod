@@ -1878,8 +1878,9 @@ class Variable(Base):
 
     __table_args__ = (
         # A variable is identified by (key, category), not key alone (#1898): a
-        # workspace may hold `terraform:region` and `pulumi_config:region` at
-        # once, which is what moving between engines looks like.
+        # workspace may hold `native:region` and `env:region` at once -- an input
+        # variable and an environment variable of the same name, which is
+        # ordinary and which the older constraint silently refused.
         sa.UniqueConstraint("workspace_id", "key", "category", name="uq_variables_workspace_key"),
         Index("ix_variables_workspace_id", "workspace_id"),
     )

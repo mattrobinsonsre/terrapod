@@ -922,9 +922,7 @@
       "varKey": "Key",
       "varValue": "Value",
       "varCategory": "Category",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Environment",
-      "categoryPulumiConfig": "Config, Pulumi",
       "sensitive": "Sensitive",
       "sensAbbr": "Sens.",
       "enterNewValue": "value, Enter new",
@@ -989,7 +987,9 @@
       "valueSource": "Source, value",
       "valueSourceStatic": "A value, enter",
       "valueSourceVault": "From OpenBao/Vault, read",
-      "vaultHint": "From OpenBao (or HashiCorp Vault) at run time, the secret Terrapod reads. Stored here, nothing is."
+      "vaultHint": "From OpenBao (or HashiCorp Vault) at run time, the secret Terrapod reads. Stored here, nothing is.",
+      "categoryNative": "Native it is",
+      "structured": "Structured"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Value",
       "category": "Category",
       "categoryEnv": "Environment",
-      "categoryPulumiConfig": "Config, Pulumi",
-      "notUsedByEngine": "Used by this engine, it is not",
       "sensitive": "Sensitive",
       "empty": "For this workspace, no variables configured there are.",
       "emptyValue": "empty",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "The encoding, it is",
       "vaultFileEncodingNone": "As in OpenBao/Vault stored, it stays",
       "vaultFileEncodingBase64": "Base64-decode it, you will",
-      "vaultFileEncodingHint": "Before it is written, the field decoded is. Text, the result must be; supported, binary files are not."
+      "vaultFileEncodingHint": "Before it is written, the field decoded is. Text, the result must be; supported, binary files are not.",
+      "categoryNative": "Native it is",
+      "structured": "Structured"
     },
     "runs": {
       "options": "Options",

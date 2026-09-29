@@ -156,7 +156,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Run Tasks](run-tasks.md) | Webhook hooks for external validation at `pre_plan`, `post_plan` and `pre_apply`; only `post_plan` failures are overridable |
 | [Execution Hooks](execution-hooks.md) | Custom shell steps in the runner Job at five lifecycle points |
 | [Policy-as-Code](policies.md) | OPA/Rego policy sets, advisory/mandatory enforcement, label scoping, shared data files and helpers |
-| [Pulumi](pulumi.md) | Pulumi workspaces and runs: the stack a workspace names, what each run option maps to, hooks, stack configuration from `pulumi_config` variables, binding an update to its preview, and where Pulumi is not coerced into the Terraform flow |
+| [Pulumi](pulumi.md) | Pulumi workspaces and runs: the stack a workspace names, what each run option maps to, hooks, stack configuration from the workspace's ordinary variables, binding an update to its preview, and where Pulumi is not coerced into the Terraform flow |
 | [Post-plan Decisions](post-plan-decisions.md) | How a run held by a run task, policy set or security scan is reported, and how `tofu apply` shows and overrides it |
 | [Security Scanning](security-scanning.md) | Checkov/Trivy IaC scanning, advisory/enforced, severity threshold, skip rules, admin override |
 | [Audit Logging](audit-logging.md) | Immutable event log, query API, retention |

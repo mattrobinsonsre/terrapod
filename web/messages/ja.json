@@ -922,9 +922,7 @@
       "varKey": "キー",
       "varValue": "値",
       "varCategory": "カテゴリ",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "環境",
-      "categoryPulumiConfig": "Pulumi 設定",
       "sensitive": "機密",
       "sensAbbr": "機密",
       "enterNewValue": "新しい値を入力",
@@ -989,7 +987,9 @@
       "valueSource": "値のソース",
       "valueSourceStatic": "値を入力",
       "valueSourceVault": "OpenBao/Vault から読み取る",
-      "vaultHint": "Terrapod は実行時に OpenBao（または HashiCorp Vault）からシークレットを読み取ります。ここには保存されません。"
+      "vaultHint": "Terrapod は実行時に OpenBao（または HashiCorp Vault）からシークレットを読み取ります。ここには保存されません。",
+      "categoryNative": "ネイティブ",
+      "structured": "構造化"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "値",
       "category": "カテゴリ",
       "categoryEnv": "環境",
-      "categoryPulumiConfig": "Pulumi 設定",
-      "notUsedByEngine": "このエンジンでは使用されません",
       "sensitive": "機密",
       "empty": "このワークスペースには変数が設定されていません。",
       "emptyValue": "空",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "エンコーディング",
       "vaultFileEncodingNone": "OpenBao/Vault に保存されたまま",
       "vaultFileEncodingBase64": "Base64 デコード",
-      "vaultFileEncodingHint": "書き込む前にフィールドをデコードします。結果はテキストである必要があります。バイナリファイルには対応していません。"
+      "vaultFileEncodingHint": "書き込む前にフィールドをデコードします。結果はテキストである必要があります。バイナリファイルには対応していません。",
+      "categoryNative": "ネイティブ",
+      "structured": "構造化"
     },
     "runs": {
       "options": "オプション",

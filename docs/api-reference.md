@@ -682,10 +682,10 @@ as badges on the workspace list.
 ```json
 "health-conditions": [
   {
-    "code": "variables_not_consumed",
-    "severity": "warning",
-    "title": "Some variables do not apply to this engine",
-    "detail": "This workspace holds variables in a category its engine never reads …"
+    "code": "state_diverged",
+    "severity": "error",
+    "title": "State may not match reality",
+    "detail": "The last apply completed but the state upload failed …"
   }
 ]
 ```
@@ -695,7 +695,6 @@ a person and may be reworded. `severity` is `error` or `warning`.
 
 | Code | Severity | Raised when |
 |---|---|---|
-| `variables_not_consumed` | `warning` | The workspace holds at least one variable of its own in a category its engine never reads — `pulumi_config` on a Terraform/OpenTofu workspace, or `terraform` on a Pulumi one. The variables are stored and editable; a run simply does not deliver them. See [Engine-Specific Categories](#engine-specific-categories) |
 | `state_diverged` | `error` | The last apply completed but the state upload failed, so the stored state may not match reality. Mirrors the `state-diverged` flag above |
 | `no_agent_pool` | `warning` | The workspace is in agent execution mode with no agent pool assigned, so runs queue indefinitely |
 | `no_live_agent_pool` | `error` | The workspace is in agent execution mode and none of its assigned pools currently has a listener sending heartbeats. Skipped rather than guessed when liveness cannot be determined — a false "no runner" banner is worse than a missing one |
@@ -1877,13 +1876,17 @@ POST /api/tfe/v2/workspaces/{id}/vars
 }
 ```
 
-`category` is one of `terraform`, `env`, `pulumi_config`, `git_http_auth`, or `git_ssh_auth`. In agent mode all are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec): `terraform` vars are rendered into a generated `terrapod.auto.tfvars` from a Secret-mounted blob (honouring `structured`), and `env` vars are injected via `secretKeyRef`. (In local execution mode the CLI handles variables itself.) The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly.
+`category` is one of `terraform`, `env`, `git_http_auth`, or `git_ssh_auth`. In agent mode all are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec), and the runner dispatches the delivery on the workspace's engine. (In local execution mode the CLI handles variables itself.)
 
-`pulumi_config` is a Pulumi stack-config key, the engine's counterpart to `terraform` (Pulumi has no tfvars file). It is set with `pulumi config set` against the run's stack after the stack is selected and before the `pre_plan` hook, with the key passed through **verbatim** — an unqualified `region` is namespaced to the project by the CLI, and an explicit `aws:region` is left alone. `sensitive` makes it a real Pulumi secret (`--secret`), so the stack's secrets provider encrypts it and the engine renders it as `[secret]` in the preview, the event log and any state it reaches; `structured` becomes `--path`, so `outer.inner` sets a nested value. It overwrites a committed `Pulumi.<stack>.yaml` key of the same name and leaves keys it does not set alone, and a key that cannot be set **fails the run**. See [Pulumi → Stack configuration](pulumi.md#stack-configuration).
+`terraform` is **the engine's own parameter channel**, not Terraform's alone. Every engine has exactly one — Terraform's input variables, Pulumi's stack config, Ansible's extra vars — and they are the same role, so they are the same category; only the delivery differs. A Terraform run renders the values into a generated `terrapod.auto.tfvars` (honouring `structured`); a Pulumi run sets each with `pulumi config set` against the run's stack, after the stack is selected and before the `pre_plan` hook, with the key passed through **verbatim** — an unqualified `region` is namespaced to the project by the CLI, and an explicit `aws:region` is left alone. On Pulumi, `sensitive` makes it a real secret (`--secret`), so the stack's secrets provider encrypts it and the engine renders it as `[secret]` in the preview, the event log and any state it reaches; `structured` becomes `--path`, so `outer.inner` sets a nested value. It overwrites a committed `Pulumi.<stack>.yaml` key of the same name, leaves keys it does not set alone, and a key that cannot be set **fails the run**. See [Pulumi → Stack configuration](pulumi.md#stack-configuration).
 
-`structured` marks a value as a typed expression rather than a plain string — for a
-`terraform` variable, a raw HCL expression (list, object, number, bool) rather than a
-quoted string. **`hcl` is the same flag under its original name and is accepted and
+**Two names, one category.** It is stored as `native` — the honest name for a channel that is not Terraform's alone — and the surface you ask decides how it comes back. The TFE-compatible surface (`/api/tfe/v2` and its `/api/v2` alias) returns `terraform` and always will, because `tfci` and `go-tfe` hold that as a constant; `/api/v1` returns `native`. On input, `terraform`, `native` and `pulumi_config` are all accepted anywhere and mean the same thing, so a request written against any of them keeps working. This is the arrangement `structured` already has with `hcl`.
+
+`env` vars are injected via `secretKeyRef`. The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly.
+
+`structured` marks a value as a typed expression rather than a plain string. What that
+means is the engine's: for a Terraform run a raw HCL expression (list, object, number,
+bool) rather than a quoted string; for a Pulumi run a nested config path. **`hcl` is the same flag under its original name and is accepted and
 returned indefinitely**, because `tfci` and `go-tfe` send and read it; responses carry
 both keys and they always agree. Supplying both with *different* values is a `422`
 rather than a silent precedence rule — a client that disagrees with itself about
@@ -1891,18 +1894,18 @@ whether a value is typed has a bug worth surfacing.
 
 **Required permission:** `write` on the workspace.
 
-### Engine-Specific Categories
+### One category, whatever the engine
 
-`terraform` and `pulumi_config` are each consumed by one engine; `env` and the two `git_*_auth` categories apply whatever engine runs.
+There is no engine-specific variable category, and there used to be. `terraform`
+(stored as `native`) is every engine's parameter channel; `env` and the two
+`git_*_auth` categories apply whatever engine runs. So a variable cannot sit in
+a category its workspace's engine will never read, and the two signals that
+reported that state — a variable's `applies-to-engine` attribute and the
+workspace's `variables_not_consumed` health condition — are **gone**. Both were
+consolation for a shape that should not have existed.
 
-A mismatch is **never refused on write**. Variables are data, and which of them apply is decided at run time by the engine that runs, so a `pulumi_config` variable on a Terraform workspace — or a `terraform` variable on a Pulumi one — is stored, returned and editable, and a run simply does not deliver it. It is reported instead, in two places:
-
-| Where | What it reports |
-|---|---|
-| `applies-to-engine` (read-only boolean, on a variable) | Whether a run on the owning workspace's engine would deliver this variable. `false` means it is stored and inert. Present on workspace variables; a variable-set variable has no single owning workspace and so does not carry it |
-| `variables_not_consumed` (in the workspace's `health-conditions`) | The workspace holds at least one variable **of its own** that its engine never reads — see [Health Conditions](#health-conditions) |
-
-Neither reports config that a program was handed and never read: no engine offers that signal.
+Nothing reports config that a program was handed and never read: no engine
+offers that signal.
 
 ### Update Variable
 

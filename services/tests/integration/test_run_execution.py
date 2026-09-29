@@ -376,15 +376,20 @@ class TestClaimRun:
         assert await _claim_run(client, listener_id) is None
 
     async def test_claim_run_delivers_vars_payload(self, app, client, setup):
-        """next_run returns terraform-vars carrying the typed flag under BOTH
-        names (never `sensitive`), plus env-vars.
+        """next_run returns the native-variable list carrying the typed flag
+        under BOTH names, plus `sensitive`, plus env-vars.
 
-        The runner consumes it to render terrapod.auto.tfvars (raw expression
-        vs quoted string). Sensitivity is NOT part of the runner contract — all
-        terraform vars, sensitive or not, are delivered uniformly via the per-run
-        vars Secret — so `sensitive` must not leak into this payload, and the
-        sensitive value IS delivered (the runner needs it; the Secret, not
-        masking, is what protects it).
+        The value of a sensitive variable IS delivered — the runner needs it,
+        and what protects it is the per-run Secret, not masking. For a Terraform
+        run the flag then changes nothing: every value is written into
+        terrapod.auto.tfvars the same way, so delivery there is uniform,
+        sensitive or not.
+
+        The flag rides along anyway because a second delivery can honour it
+        (#1898): a Pulumi run turns it into `pulumi config set --secret`, which
+        makes Pulumi's own engine render the value as `[secret]` in previews and
+        state. One list for every engine; each uses what it can and ignores the
+        rest.
         """
         pool_id, listener_id = setup
         ws_id = await _create_remote_workspace(client, pool_id, "vars-payload-ws")
@@ -410,6 +415,8 @@ class TestClaimRun:
             )
             assert resp.status_code == 201, resp.text
 
+        # Written under the TFE-compatible name, which is what this surface
+        # takes and what every existing client sends (#1898).
         await _add_var("ports", "[80, 443]", "terraform", structured=True)
         await _add_var("secret", "s3cr3t", "terraform", sensitive=True)
         await _add_var("MY_ENV", "envval", "env")
@@ -426,10 +433,12 @@ class TestClaimRun:
             assert "hcl" in v
             assert "structured" in v
             assert v["hcl"] == v["structured"]
-            assert "sensitive" not in v  # dead field removed
         assert tvars["ports"]["hcl"] is True
         assert tvars["secret"]["hcl"] is False
         assert tvars["secret"]["value"] == "s3cr3t"  # sensitive value delivered
+        # Carried, not masked, and only where it was set.
+        assert tvars["secret"]["sensitive"] is True
+        assert tvars["ports"]["sensitive"] is False
 
         env = {v["key"]: v for v in data["attributes"]["env-vars"]}
         assert env["MY_ENV"]["value"] == "envval"

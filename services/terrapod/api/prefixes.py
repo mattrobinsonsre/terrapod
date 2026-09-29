@@ -140,6 +140,29 @@ def on_native_surface(path: str) -> bool:
     return any(path.startswith(p + "/") or path == p for p in NATIVE_PREFIXES)
 
 
+#: The TFE compatibility surface's prefixes, longest first.
+TFE_PREFIXES: tuple[str, ...] = tuple(
+    sorted((TFE_PREFIX, TFE_LEGACY_PREFIX), key=len, reverse=True)
+)
+
+
+def is_tfe_path(path: str) -> bool:
+    """Whether a request arrived on the TFE compatibility surface.
+
+    Both surfaces serve some of the same routes, and a field can legitimately
+    differ between them: a variable's `category` goes out as `terraform` here
+    and `native` on Terrapod's own surface (#1898), because `tfci` and `go-tfe`
+    hold `terraform` as a constant.
+
+    A decision, so it matches rather than mirrors — and it cannot be expressed
+    as `prefix_of(...) in (TFE_PREFIX, TFE_LEGACY_PREFIX)`, which is the mistake
+    worth naming: `prefix_of` answers "which *native* prefix" and falls back to
+    the canonical native one, so it never returns a TFE prefix and that test is
+    false for every request. Silently, and in the direction that breaks a CLI.
+    """
+    return any(path == p or path.startswith(p + "/") for p in TFE_PREFIXES)
+
+
 def prefix_of(path: str) -> str:
     """The native prefix a request arrived on — canonical if it is neither.
 

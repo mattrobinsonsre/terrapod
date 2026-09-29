@@ -362,11 +362,10 @@ it; no values move and nothing is deleted. What changes is what becomes possible
 and one behaviour you may have been relying on without knowing.
 
 **You can now hold the same key in two categories.** Previously a workspace could
-have only one variable named `region` whatever its category, so you could not add
-a `pulumi_config` variable alongside the `terraform` one of the same name — which
-is exactly what moving a workspace between engines looks like. You had to delete
-the old one first, on a live workspace, with no way to stage the change. Both can
-now exist.
+have only one variable named `region` whatever its category, so an input variable
+and an environment variable could not share a name — an ordinary thing to want,
+and refused. You had to delete one first, on a live workspace, with no way to
+stage the change. Both can now exist.
 
 **A variable set variable is no longer silently dropped by a workspace variable
 of the same key in a different category.** This is the part worth checking. When
@@ -409,6 +408,52 @@ first. Pass `category` to choose. `terrapod_variable_set` upserts on
 `(category, key)`, which also fixes a quieter bug: setting a key with
 `category=env` on a workspace that already had that key as `terraform` used to
 re-categorise the existing variable instead of creating a new one.
+
+### One variable category for every engine's parameters
+
+**Nothing you have breaks, and you need change nothing to upgrade.** If you set
+`category = "terraform"` — in the provider, through `tfci`, in an `/api/v2`
+request, or in the UI — it keeps working and keeps reading back as `terraform`.
+That is the overwhelming majority of configurations and it is unaffected.
+
+**What changed.** Each engine has exactly one channel for "the parameters the
+platform supplies to this run": Terraform's input variables, Pulumi's stack
+config, Ansible's extra vars. They are the same role and only the delivery
+differs, so they are now one category rather than one per engine. It is stored as
+`native`, and the runner decides the delivery from the workspace's engine.
+
+**The name you see depends on the surface you ask.** The TFE-compatible surface
+(`/api/tfe/v2` and its `/api/v2` alias) returns `terraform` and always will —
+`tofu`, `terraform` and `tfci` hold that as a constant, so changing it would be a
+compatibility break. Terrapod's own `/api/v1` returns `native`. On input,
+`terraform`, `native` and `pulumi_config` are all accepted on either surface.
+This is exactly the arrangement `structured` already has with `hcl`.
+
+**The variable routes are now served on `/api/v1` as well**, which is new and
+purely additive. Nothing moved; `/api/v2` serves them as it always did.
+
+**`pulumi_config` is gone as a stored category.** It existed only in
+pre-release builds of 2.0 and never shipped. The migration folds every such
+variable into `native`, and the name is still accepted on input, so a script or
+`terrapod_variable` resource written against it keeps applying — but it will read
+back as `terraform`, which in a Terraform configuration means a perpetual diff on
+an attribute that forces replacement. **Change `category = "pulumi_config"` to
+`category = "terraform"` in any provider configuration before upgrading.**
+
+**If a workspace held both**, the migration keeps the **oldest** row per key and
+deletes the rest, printing each removal — two rows that were `terraform:region`
+and `pulumi_config:region` become one `native:region`. This can only affect a
+deployment that ran a pre-release build.
+
+**Two read-only signals are removed**, and their absence is the point rather than
+a loss: a variable's `applies-to-engine` attribute, and the workspace's
+`variables_not_consumed` health condition. Both reported that a variable sat in a
+category its engine would never read. With one category that state cannot arise.
+Neither was ever in a release. If you match on health-condition codes, drop
+`variables_not_consumed` from the list.
+
+**If you use `go-terrapod` directly**, `Variable.AppliesToEngine` is removed for
+the same reason.
 
 ## Before you upgrade
 

@@ -68,44 +68,44 @@ class TestTwoCategoriesSharingAKeyAreTwoVariables:
         workspace's. The set's env var was gone — not lower precedence, absent."""
         resolved = await _resolve(
             non_priority=[_set(_var("region", "from-set", "env"))],
-            workspace=[_var("region", "from-workspace", "terraform")],
+            workspace=[_var("region", "from-workspace", "native")],
         )
         assert _by_category(resolved) == {
             "env": "from-set",
-            "terraform": "from-workspace",
+            "native": "from-workspace",
         }
 
-    async def test_the_engine_pair_that_motivated_this(self) -> None:
-        """A workspace mid-migration between engines holds both. Pulumi config
-        keys are lowercase and unqualified by convention, so `region` colliding
-        with a terraform variable of the same name is the common case, not a
-        contrived one."""
+    async def test_the_pair_that_motivated_this(self) -> None:
+        """An input variable and an environment variable of the same name. Not
+        a multi-engine case at all: `region` as both a `native` variable and an
+        `env` one is ordinary, and before the fix one silently deleted the
+        other on the way to the runner."""
         resolved = await _resolve(
             workspace=[
-                _var("region", "eu-west-1", "terraform"),
-                _var("region", "us-east-1", "pulumi_config"),
+                _var("region", "eu-west-1", "native"),
+                _var("region", "us-east-1", "env"),
             ]
         )
         assert _by_category(resolved) == {
-            "terraform": "eu-west-1",
-            "pulumi_config": "us-east-1",
+            "native": "eu-west-1",
+            "env": "us-east-1",
         }
 
     async def test_every_category_sharing_one_key_survives(self) -> None:
         resolved = await _resolve(
             workspace=[
-                _var("shared", "a", "terraform"),
+                _var("shared", "a", "native"),
                 _var("shared", "b", "env"),
-                _var("shared", "c", "pulumi_config"),
-                _var("shared", "d", "git_http_auth"),
+                _var("shared", "c", "git_http_auth"),
+                _var("shared", "d", "git_ssh_auth"),
             ]
         )
         assert len(resolved) == 4
         assert _by_category(resolved) == {
-            "terraform": "a",
+            "native": "a",
             "env": "b",
-            "pulumi_config": "c",
-            "git_http_auth": "d",
+            "git_http_auth": "c",
+            "git_ssh_auth": "d",
         }
 
 
@@ -116,15 +116,15 @@ class TestPrecedenceIsUnchangedWithinACategory:
 
     async def test_a_workspace_variable_still_beats_a_non_priority_set(self) -> None:
         resolved = await _resolve(
-            non_priority=[_set(_var("region", "from-set", "terraform"))],
-            workspace=[_var("region", "from-workspace", "terraform")],
+            non_priority=[_set(_var("region", "from-set", "native"))],
+            workspace=[_var("region", "from-workspace", "native")],
         )
         assert [r.value for r in resolved] == ["from-workspace"]
 
     async def test_a_priority_set_still_beats_a_workspace_variable(self) -> None:
         resolved = await _resolve(
-            workspace=[_var("region", "from-workspace", "terraform")],
-            priority=[_set(_var("region", "from-priority", "terraform"))],
+            workspace=[_var("region", "from-workspace", "native")],
+            priority=[_set(_var("region", "from-priority", "native"))],
         )
         assert [r.value for r in resolved] == ["from-priority"]
 
@@ -140,12 +140,12 @@ class TestPrecedenceIsUnchangedWithinACategory:
         """The two rules meeting: one key, two categories, each resolved on its
         own ladder. A single dict keyed on `key` cannot express this at all."""
         resolved = await _resolve(
-            non_priority=[_set(_var("k", "env-low", "env"), _var("k", "tf-low", "terraform"))],
+            non_priority=[_set(_var("k", "env-low", "env"), _var("k", "tf-low", "native"))],
             priority=[_set(_var("k", "env-high", "env"))],
         )
         assert _by_category(resolved) == {
             "env": "env-high",
-            "terraform": "tf-low",
+            "native": "tf-low",
         }
 
 

@@ -922,9 +922,7 @@
       "varKey": "키",
       "varValue": "값",
       "varCategory": "카테고리",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "환경",
-      "categoryPulumiConfig": "Pulumi 구성",
       "sensitive": "민감",
       "sensAbbr": "민감",
       "enterNewValue": "새 값 입력",
@@ -989,7 +987,9 @@
       "valueSource": "값 출처",
       "valueSourceStatic": "값 입력",
       "valueSourceVault": "OpenBao/Vault에서 읽기",
-      "vaultHint": "Terrapod가 실행 시 OpenBao(또는 HashiCorp Vault)에서 시크릿을 읽습니다. 여기에는 저장되지 않습니다."
+      "vaultHint": "Terrapod가 실행 시 OpenBao(또는 HashiCorp Vault)에서 시크릿을 읽습니다. 여기에는 저장되지 않습니다.",
+      "categoryNative": "네이티브",
+      "structured": "구조화됨"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "값",
       "category": "카테고리",
       "categoryEnv": "환경",
-      "categoryPulumiConfig": "Pulumi 구성",
-      "notUsedByEngine": "이 엔진에서 사용되지 않음",
       "sensitive": "민감",
       "empty": "이 워크스페이스에 구성된 변수가 없습니다.",
       "emptyValue": "비어 있음",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "인코딩",
       "vaultFileEncodingNone": "OpenBao/Vault에 저장된 그대로",
       "vaultFileEncodingBase64": "Base64 디코딩",
-      "vaultFileEncodingHint": "쓰기 전에 필드를 디코딩합니다. 결과는 텍스트여야 하며, 바이너리 파일은 지원되지 않습니다."
+      "vaultFileEncodingHint": "쓰기 전에 필드를 디코딩합니다. 결과는 텍스트여야 하며, 바이너리 파일은 지원되지 않습니다.",
+      "categoryNative": "네이티브",
+      "structured": "구조화됨"
     },
     "runs": {
       "options": "옵션",

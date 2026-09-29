@@ -922,9 +922,7 @@
       "varKey": "Nøgle",
       "varValue": "Værdi",
       "varCategory": "Kategori",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Miljø",
-      "categoryPulumiConfig": "Pulumi-konfiguration",
       "sensitive": "Følsom",
       "sensAbbr": "Føls.",
       "enterNewValue": "Indtast ny værdi",
@@ -989,7 +987,9 @@
       "valueSource": "Værdikilde",
       "valueSourceStatic": "Indtast en værdi",
       "valueSourceVault": "Læs fra OpenBao/Vault",
-      "vaultHint": "Terrapod læser hemmeligheden fra OpenBao (eller HashiCorp Vault) ved kørsel. Intet gemmes her."
+      "vaultHint": "Terrapod læser hemmeligheden fra OpenBao (eller HashiCorp Vault) ved kørsel. Intet gemmes her.",
+      "categoryNative": "Native",
+      "structured": "Struktureret"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Værdi",
       "category": "Kategori",
       "categoryEnv": "Miljø",
-      "categoryPulumiConfig": "Pulumi-konfiguration",
-      "notUsedByEngine": "Bruges ikke af denne motor",
       "sensitive": "Følsom",
       "empty": "Ingen variabler konfigureret for dette arbejdsområde.",
       "emptyValue": "tom",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Kodning",
       "vaultFileEncodingNone": "Som gemt i OpenBao/Vault",
       "vaultFileEncodingBase64": "Base64-afkod",
-      "vaultFileEncodingHint": "Afkoder feltet, før det skrives. Resultatet skal være tekst; binære filer understøttes ikke."
+      "vaultFileEncodingHint": "Afkoder feltet, før det skrives. Resultatet skal være tekst; binære filer understøttes ikke.",
+      "categoryNative": "Native",
+      "structured": "Struktureret"
     },
     "runs": {
       "options": "Indstillinger",

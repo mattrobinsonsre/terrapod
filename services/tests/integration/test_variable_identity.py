@@ -3,9 +3,9 @@
 The service tier proves how `resolve_variables` keys its accumulator. Only a
 real database proves the other half — the unique constraints — and the two have
 to agree. They did not before: the schema permitted one variable per key
-whatever the category, so an operator could not add `pulumi_config:region`
-beside an existing `terraform:region`, which is what moving a workspace between
-engines looks like.
+whatever the category, so an operator could not hold an input variable and an
+environment variable of the same name — which is ordinary, and which silently
+lost one of the two.
 
 The migration widens, so what is asserted here is that the newly-permitted pair
 is actually accepted and that the narrower guarantee still holds within a
@@ -46,16 +46,17 @@ async def _put_var(client, ws_id: str, key: str, category: str, value: str = "v"
 
 
 class TestAWorkspaceMayHoldAKeyInTwoCategories:
-    async def test_the_engine_pair_is_accepted(self, app, client):
-        """The case that motivated the change: staging a Pulumi equivalent
-        alongside the Terraform variable it will replace, on a live workspace,
-        instead of deleting the old one first and hoping."""
+    async def test_the_pair_that_motivated_this_is_accepted(self, app, client):
+        """An input variable and an environment variable of the same name, on
+        one workspace. Refused by the schema before the change, and the API
+        answered 409 — so the fix has to show up as two rows, not merely as an
+        accumulator that keeps both."""
         set_auth(app, admin_user())
-        ws = await _workspace(client, "vi-engine-pair")
+        ws = await _workspace(client, "vi-native-and-env")
 
         first = await _put_var(client, ws, "region", "terraform", "eu-west-1")
         assert first.status_code == 201, first.text
-        second = await _put_var(client, ws, "region", "pulumi_config", "us-east-1")
+        second = await _put_var(client, ws, "region", "env", "us-east-1")
         assert second.status_code == 201, second.text
 
         resp = await client.get(f"/api/v2/workspaces/{ws}/vars", headers=AUTH)
@@ -64,15 +65,42 @@ class TestAWorkspaceMayHoldAKeyInTwoCategories:
             for v in resp.json()["data"]
             if v["attributes"]["key"] == "region"
         }
-        assert by_cat == {"terraform": "eu-west-1", "pulumi_config": "us-east-1"}
+        assert by_cat == {"terraform": "eu-west-1", "env": "us-east-1"}
 
-    async def test_a_terraform_and_an_env_variable_may_share_a_name(self, app, client):
-        """Not a multi-engine case at all — this was refused for every operator,
-        on every workspace, since the schema was written."""
+    async def test_an_aliased_category_lands_on_the_row_it_names(self, app, client):
+        """`terraform` and `pulumi_config` both fold onto `native` (#1898), so
+        a second write under another of its names is an UPDATE of the same row,
+        not a second one. If folding happened after the lookup instead of
+        before it, this would create a duplicate the constraint could not catch
+        — both rows being `native:region` is exactly what it forbids. The 409
+        here is the *create* path correctly refusing a duplicate; folding late
+        would reach the same status by accident, from a database error on a
+        path that believed it was creating something new."""
         set_auth(app, admin_user())
-        ws = await _workspace(client, "vi-tf-and-env")
-        assert (await _put_var(client, ws, "region", "terraform")).status_code == 201
-        assert (await _put_var(client, ws, "region", "env")).status_code == 201
+        ws = await _workspace(client, "vi-alias-folds")
+
+        assert (await _put_var(client, ws, "region", "terraform", "eu-west-1")).status_code == 201
+        second = await _put_var(client, ws, "region", "pulumi_config", "us-east-1")
+        assert second.status_code == 409, second.text
+
+        resp = await client.get(f"/api/v2/workspaces/{ws}/vars", headers=AUTH)
+        rows = [v for v in resp.json()["data"] if v["attributes"]["key"] == "region"]
+        assert len(rows) == 1
+        assert rows[0]["attributes"]["category"] == "terraform"
+
+    async def test_each_surface_names_the_category_its_clients_know(self, app, client):
+        """One row, two spellings (#1898). `tfci` and `go-tfe` hold `terraform`
+        as a constant, so the compatibility surface keeps it for ever; Terrapod's
+        own surface says what the thing is."""
+        set_auth(app, admin_user())
+        ws = await _workspace(client, "vi-two-spellings")
+        assert (await _put_var(client, ws, "region", "terraform", "eu-west-1")).status_code == 201
+
+        for prefix, expected in (("/api/v2", "terraform"), ("/api/v1", "native")):
+            resp = await client.get(f"{prefix}/workspaces/{ws}/vars", headers=AUTH)
+            assert resp.status_code == 200, resp.text
+            (row,) = [v for v in resp.json()["data"] if v["attributes"]["key"] == "region"]
+            assert row["attributes"]["category"] == expected
 
 
 class TestTheNarrowerGuaranteeStillHolds:

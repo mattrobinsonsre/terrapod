@@ -75,7 +75,7 @@ class _Claim:
         return json.loads(self.resp.body)["data"]["attributes"]
 
 
-async def _claim(resolved, *, read=None, engine="terraform", phase="plan") -> _Claim:
+async def _claim(resolved, *, read=None, engine="native", phase="plan") -> _Claim:
     lid = uuid.uuid4()
     run = MagicMock()
     run.id = uuid.uuid4()
@@ -135,9 +135,7 @@ class TestDelivery:
         c = await _claim(
             [
                 _rv("GOOGLE_APPLICATION_CREDENTIALS", _ref(file={"name": "gcp/adc.json"})),
-                _rv(
-                    "sa_file", _ref(file={"name": "~/.config/gcloud/sa.json"}), category="terraform"
-                ),
+                _rv("sa_file", _ref(file={"name": "~/.config/gcloud/sa.json"}), category="native"),
                 _rv("PLAIN", "literal", value_source="static"),
             ]
         )
@@ -153,6 +151,9 @@ class TestDelivery:
                 "value": "/home/runner/.config/gcloud/sa.json",
                 "structured": False,
                 "hcl": False,
+                # A Vault-sourced variable is forced sensitive; the flag rides
+                # the wire for the engines that can honour it (#1898).
+                "sensitive": True,
             }
         ]
         assert attrs["vault-files"] == [
@@ -192,7 +193,7 @@ class TestDelivery:
         c = await _claim(
             [
                 _rv("ENV_FILE", _ref(file={})),
-                _rv("tf_file", _ref(file={"name": "tf.json"}), category="terraform"),
+                _rv("tf_file", _ref(file={"name": "tf.json"}), category="native"),
             ]
         )
         assert SECRET in json.dumps(c.attrs["vault-files"])
@@ -205,7 +206,7 @@ class TestDelivery:
         c = await _claim(
             [
                 _rv("ENV_FILE", _ref(file={})),
-                _rv("tf_file", _ref(file={}), category="terraform"),
+                _rv("tf_file", _ref(file={}), category="native"),
             ]
         )
         attrs = c.attrs
@@ -418,7 +419,7 @@ class TestTheRunFailsOrWaits:
         )
 
     async def test_structured_on_a_file_variable_errors_the_run(self):
-        c = await _claim([_rv("f", _ref(file={}), category="terraform", structured=True)])
+        c = await _claim([_rv("f", _ref(file={}), category="native", structured=True)])
         msg = await self._errored_with(c)
         assert "structured (formerly hcl) enabled" in msg
 

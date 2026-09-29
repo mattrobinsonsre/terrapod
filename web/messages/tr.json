@@ -922,9 +922,7 @@
       "varKey": "Anahtar",
       "varValue": "Değer",
       "varCategory": "Kategori",
-      "categoryTerraform": "Terraform",
       "categoryEnv": "Ortam",
-      "categoryPulumiConfig": "Pulumi yapılandırması",
       "sensitive": "Hassas",
       "sensAbbr": "Hass.",
       "enterNewValue": "Yeni değer girin",
@@ -989,7 +987,9 @@
       "valueSource": "Değer kaynağı",
       "valueSourceStatic": "Bir değer girin",
       "valueSourceVault": "OpenBao/Vault'tan oku",
-      "vaultHint": "Terrapod gizli değeri çalıştırma sırasında OpenBao'dan (veya HashiCorp Vault'tan) okur. Burada hiçbir şey saklanmaz."
+      "vaultHint": "Terrapod gizli değeri çalıştırma sırasında OpenBao'dan (veya HashiCorp Vault'tan) okur. Burada hiçbir şey saklanmaz.",
+      "categoryNative": "Yerel",
+      "structured": "Yapılandırılmış"
     }
   },
   "adminAutodiscovery": {
@@ -2637,8 +2637,6 @@
       "value": "Değer",
       "category": "Kategori",
       "categoryEnv": "Ortam",
-      "categoryPulumiConfig": "Pulumi yapılandırması",
-      "notUsedByEngine": "Bu motor tarafından kullanılmıyor",
       "sensitive": "Hassas",
       "empty": "Bu çalışma alanı için yapılandırılmış değişken yok.",
       "emptyValue": "boş",
@@ -2697,7 +2695,9 @@
       "vaultFileEncoding": "Kodlama",
       "vaultFileEncodingNone": "OpenBao/Vault içinde saklandığı gibi",
       "vaultFileEncodingBase64": "Base64 çöz",
-      "vaultFileEncodingHint": "Alanı yazmadan önce çözer. Sonuç metin olmalıdır; ikili dosyalar desteklenmez."
+      "vaultFileEncodingHint": "Alanı yazmadan önce çözer. Sonuç metin olmalıdır; ikili dosyalar desteklenmez.",
+      "categoryNative": "Yerel",
+      "structured": "Yapılandırılmış"
     },
     "runs": {
       "options": "Seçenekler",
