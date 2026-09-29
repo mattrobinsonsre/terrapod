@@ -104,7 +104,7 @@ export default function ExecutionHookDetailPage() {
     setWsLoading(true)
     try {
       // Page through the whole list so every workspace is attachable.
-      setAllWorkspaces(await fetchAllPages<WorkspaceRef>('/api/v2/organizations/default/workspaces'))
+      setAllWorkspaces(await fetchAllPages<WorkspaceRef>('/api/v1/workspaces'))
     } catch {
       // Non-critical
     } finally {

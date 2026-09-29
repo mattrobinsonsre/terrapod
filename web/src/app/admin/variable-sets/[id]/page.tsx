@@ -259,7 +259,7 @@ export default function VariableSetDetailPage() {
   async function loadAllWorkspaces() {
     try {
       // Page through the whole list so every workspace is assignable.
-      setAllWorkspaces(await fetchAllPages<WorkspaceRef>('/api/v2/organizations/default/workspaces'))
+      setAllWorkspaces(await fetchAllPages<WorkspaceRef>('/api/v1/workspaces'))
     } catch {
       // Non-critical
     }

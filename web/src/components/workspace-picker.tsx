@@ -54,7 +54,7 @@ export function WorkspacePicker({
         // Page through the whole list so the picker can find any workspace,
         // not just the first server page.
         const items = await fetchAllPages<{ id: string; attributes: { name: string } }>(
-          '/api/v2/organizations/default/workspaces'
+          '/api/v1/workspaces'
         )
         if (active) {
           setAll(items.map((ws) => ({ id: ws.id, name: ws.attributes.name })))

@@ -1229,12 +1229,15 @@ function RunDetailPageInner() {
     setActionLoading(action)
     setError('')
     try {
-      // TFE V2 API uses "apply" to confirm a planned run.
-      // confirm / discard / cancel are on the TFE V2 CLI contract surface
-      // (terraform/go-tfe call them) and live permanently at /api/v2/.
-      // retry is a Terrapod extension and lives at /api/terrapod/v1/.
+      // "apply" is what confirms a planned run — the TFE V2 verb, kept.
+      //
+      // The PREFIX is native for all four. These endpoints are served on both
+      // surfaces, and the TFE one answers 404 for any workspace that is not
+      // Terraform (#1904) — so on /api/v2 the primary apply gate was
+      // unreachable for a Pulumi run, from the page that is its only UI.
+      // A person operating a Pulumi stack is not a `go-tfe` client.
       const apiAction = action === 'confirm' ? 'apply' : action
-      const prefix = action === 'retry' ? '/api/terrapod/v1' : '/api/v2'
+      const prefix = '/api/v1'
       const res = await apiFetch(`${prefix}/runs/${runId}/actions/${apiAction}`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -1522,7 +1525,7 @@ function RunDetailPageInner() {
     if (isTouch && !window.confirm(t('drift.remediateConfirm'))) return
     setActionLoading('remediate')
     try {
-      const res = await apiFetch('/api/v2/runs', {
+      const res = await apiFetch('/api/v1/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
