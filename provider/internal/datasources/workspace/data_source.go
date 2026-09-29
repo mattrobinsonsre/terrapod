@@ -96,13 +96,17 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 	resp.Schema = schema.Schema{
 		Description: "Look up a Terrapod workspace by name.",
 		Attributes: map[string]schema.Attribute{
-			"id":                               computedString("Workspace ID."),
-			"name":                             requiredString("Workspace name to look up."),
-			"execution_mode":                   computedString("Execution mode."),
-			"auto_apply":                       computedBool("Auto-apply setting."),
-			"auto_apply_mode":                  computedString("Conditional auto-apply mode: never, always, create or create_update."),
-			"execution_backend":                computedString("Execution backend."),
-			"engine":                           computedString("The execution engine family (\"terraform\")."),
+			"id":                computedString("Workspace ID."),
+			"name":              requiredString("Workspace name to look up."),
+			"execution_mode":    computedString("Execution mode."),
+			"auto_apply":        computedBool("Auto-apply setting."),
+			"auto_apply_mode":   computedString("Conditional auto-apply mode: never, always, create or create_update."),
+			"execution_backend": computedString("Execution backend."),
+			"engine": computedString(
+				"The execution engine family this workspace belongs to — " +
+					"\"terraform\" or \"pulumi\", or another engine the deployment " +
+					"enables. Distinct from execution_backend, which picks the " +
+					"binary within the Terraform engine."),
 			"pulumi_bind_plan":                 computedBool("Pulumi only: whether the update is bound to the approved preview."),
 			"engine_version":                   computedString("Version of the engine this workspace runs (OpenTofu/Terraform, or Pulumi)."),
 			"terraform_version":                computedString("The same version under its original name; `engine_version` is the current one."),
