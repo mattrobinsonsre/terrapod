@@ -307,6 +307,18 @@ Routing rules of thumb:
   outage shipped in v1.3.0 (#1244): the per-cycle metadata cache was reached
   through an optional `meta`, every poll-cycle test omitted it, and the wrapper
   was never once executed through the caller that uses it.
+- **Configuration an external tool consumes** — an environment variable, a
+  config file, a URL an external binary is pointed at — → a test that **drives
+  the tool**, or the nearest stand-in for it, and asserts the effect. Asserting
+  the string's shape is not the same thing and repeatedly reads as if it were:
+  the value can be perfectly well-formed, agree with every neighbouring setting,
+  and still configure something that cannot work. Terrapod pointed Pulumi's
+  plugin downloader at an authenticated cache the downloader never sends a
+  credential to (#1906); the tests pinned the prefix, the catch-all pattern and
+  that two helpers agreed on the token, and every provider download answered 401.
+  Only a program using no provider at all worked, so nothing caught it. Where the
+  tool genuinely cannot run in CI, drive the *boundary it talks to* — start the
+  proxy, make a real request through it, assert what the upstream saw.
 - A **new replicated entity class** (registered in
   `services/terrapod/services/replication_registry.py`) → the **full per-class test matrix**,
   claimed with `@pytest.mark.replication_matrix("<class>", "<row>")`. Registering
