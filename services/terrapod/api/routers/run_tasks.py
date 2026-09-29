@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
 from terrapod.api.post_plan_decisions import reports_tfe_post_plan
@@ -227,13 +228,11 @@ def tfe_task_stage_json(ts: TaskStage, run: Run | None, *, can_override: bool) -
 # ── Helpers ───────────────────────────────────────────────────────────
 
 
-async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
-    ws_uuid = workspace_id.removeprefix("ws-")
-    result = await db.execute(select(Workspace).where(Workspace.id == ws_uuid))
-    ws = result.scalar_one_or_none()
-    if ws is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-    return ws
+async def _get_workspace(
+    workspace_id: str, db: AsyncSession, *, request: Request | None = None
+) -> Workspace:
+    """Load the workspace, scoped to the surface the request arrived on (#1572)."""
+    return await load_workspace_scoped(workspace_id, db, request=request)
 
 
 async def _require_ws_capability(
@@ -263,13 +262,14 @@ async def _get_run_task(rt_id: str, db: AsyncSession) -> RunTask:
 
 @extensions_router.post("/workspaces/{workspace_id}/run-tasks", status_code=201)
 async def create_run_task(
+    request: Request,
     workspace_id: str = Path(...),
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a run task. Requires admin on the workspace."""
-    ws = await _get_workspace(workspace_id, db)
+    ws = await _get_workspace(workspace_id, db, request=request)
     await _require_ws_capability(ws, cap.RUN_TASK_MANAGE, user, db)
 
     attrs = body.get("data", {}).get("attributes", {})
@@ -328,7 +328,7 @@ async def list_run_tasks(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List run tasks for a workspace. Requires read."""
-    ws = await _get_workspace(workspace_id, db)
+    ws = await _get_workspace(workspace_id, db, request=request)
     await _require_ws_capability(ws, cap.RUN_TASK_READ, user, db)
 
     result = await db.execute(

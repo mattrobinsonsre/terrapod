@@ -378,6 +378,83 @@ For managing variables across multiple workspaces, see variable sets (admin-only
 
 ---
 
+## Your first Pulumi workspace
+
+Everything above uses Terraform or OpenTofu, which is what most people arrive
+for. Pulumi is the same platform — same workspaces, runs, variables, RBAC,
+policy sets, notifications and audit trail — so this section is short by design:
+it covers only what differs.
+
+**The engine is on by default** — `api.config.engines.pulumi.enabled` ships
+`true`, so there is nothing to turn on. Turn it *off* if you do not want it:
+
+```yaml
+# values.yaml
+api:
+  config:
+    engines:
+      pulumi:
+        enabled: false
+```
+
+With it off there is no Pulumi surface at all — no routes, no workspaces, no
+mention in the UI. Off means absent, not present-and-refusing. That is
+deliberate: a deployment that came for Terraform pays nothing for an engine it
+does not use, and an auditor can see the difference.
+
+**A workspace is one stack, and its name says so.** Pulumi identifies a stack as
+`organization/project/stack`; a Terrapod workspace has one flat name, so the two
+halves are joined with `::`:
+
+```zsh
+curl -s -X POST https://terrapod.example.com/api/v1/workspaces \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{
+    "data": {
+      "type": "workspaces",
+      "attributes": {
+        "name": "my-project::dev",
+        "engine": "pulumi",
+        "execution-mode": "agent"
+      }
+    }
+  }' | jq .
+```
+
+Note `/api/v1`, not `/api/tfe/v2`. The TFE-compatible surface exists for
+`terraform`, `tofu` and `tfci`, and it only ever serves Terraform workspaces —
+a Pulumi workspace is not visible there at all, by design. Use Terrapod's own
+API, which serves every engine.
+
+**Point your machine at it:**
+
+```zsh
+pulumi login https://terrapod.example.com
+```
+
+`pulumi up` from your own machine then uses Terrapod as its state backend, and
+the update appears in the workspace's run history like any other.
+
+**Variables are the ordinary ones.** There is no Pulumi-specific category: a
+workspace's `terraform` variables *are* its stack config, delivered with
+`pulumi config set` instead of a tfvars file. `sensitive` becomes a real Pulumi
+secret, and keys pass through verbatim — `aws:region` stays `aws:region`.
+
+```zsh
+curl -s -X POST https://terrapod.example.com/api/v1/workspaces/$WS/vars \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{"data":{"type":"vars","attributes":{
+        "key":"aws:region","value":"eu-west-1","category":"terraform"}}}' | jq .
+```
+
+**What to read next:** [Pulumi](pulumi.md) covers the run lifecycle, binding an
+update to its preview, version pinning, execution hooks, and — importantly — the
+places where Pulumi is *not* coerced into the Terraform flow, and why.
+
+---
+
 ## Setting Up the Private Registry
 
 ![Module Registry](images/registry-modules.png)

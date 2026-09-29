@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
+from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
 from terrapod.api.prefixes import is_tfe_path
@@ -321,13 +322,16 @@ def _var_json(var: Variable, *, tfe_surface: bool = True) -> dict:
     }
 
 
-async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
-    ws_uuid = workspace_id.removeprefix("ws-")
-    result = await db.execute(select(Workspace).where(Workspace.id == ws_uuid))
-    ws = result.scalar_one_or_none()
-    if ws is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-    return ws
+async def _get_workspace(
+    workspace_id: str, db: AsyncSession, *, request: Request | None = None
+) -> Workspace:
+    """Load the workspace, scoped to the surface the request arrived on (#1572).
+
+    This router serves both surfaces, so the scoping is a property of the
+    request, not of the router. On `/api/tfe/v2` a workspace belonging to
+    another engine does not exist; on `/api/v1` it does.
+    """
+    return await load_workspace_scoped(workspace_id, db, request=request)
 
 
 # ── Workspace Variables ──────────────────────────────────────────────────
@@ -368,7 +372,7 @@ async def list_workspace_vars(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all variables for a workspace. Requires read."""
-    ws = await _get_workspace(workspace_id, db)
+    ws = await _get_workspace(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.VAR_READ):
         raise HTTPException(
@@ -389,7 +393,7 @@ async def create_workspace_var(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a variable for a workspace. Requires write."""
-    ws = await _get_workspace(workspace_id, db)
+    ws = await _get_workspace(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.VAR_WRITE):
         raise HTTPException(
@@ -447,7 +451,7 @@ async def update_workspace_var(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Update a workspace variable. Requires write."""
-    ws = await _get_workspace(workspace_id, db)
+    ws = await _get_workspace(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.VAR_WRITE):
         raise HTTPException(
@@ -497,13 +501,14 @@ async def update_workspace_var(
 
 @dual_router.delete("/workspaces/{workspace_id}/vars/{var_id}", status_code=204)
 async def delete_workspace_var(
+    request: Request,
     workspace_id: str = Path(...),
     var_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a workspace variable. Requires write."""
-    ws = await _get_workspace(workspace_id, db)
+    ws = await _get_workspace(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.VAR_WRITE):
         raise HTTPException(
@@ -1079,7 +1084,7 @@ async def list_workspace_varsets(
     Uses the same resolver as injection, so what is listed here is what the run
     will actually receive.
     """
-    ws = await _get_workspace(workspace_id, db)
+    ws = await _get_workspace(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.WORKSPACE_READ):
         raise HTTPException(status_code=404, detail="Workspace not found")

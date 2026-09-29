@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.capability_access import resolve_capability_or_authenticate
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta
 from terrapod.auth import capabilities as cap
@@ -125,13 +126,16 @@ def _cv_json(
     }
 
 
-async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
-    ws_uuid = workspace_id.removeprefix("ws-")
-    result = await db.execute(select(Workspace).where(Workspace.id == ws_uuid))
-    ws = result.scalar_one_or_none()
-    if ws is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-    return ws
+async def _get_workspace(
+    workspace_id: str, db: AsyncSession, *, request: Request | None = None
+) -> Workspace:
+    """Load the workspace, scoped to the surface the request arrived on (#1572).
+
+    This router serves both surfaces, so the scoping is a property of the
+    request, not of the router. On `/api/tfe/v2` a workspace belonging to
+    another engine does not exist; on `/api/v1` it does.
+    """
+    return await load_workspace_scoped(workspace_id, db, request=request)
 
 
 @router.post("/workspaces/{workspace_id}/configuration-versions", status_code=201)
@@ -143,7 +147,7 @@ async def create_configuration_version(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a configuration version. Requires write on workspace."""
-    ws = await _get_workspace(workspace_id, db)
+    ws = await _get_workspace(workspace_id, db, request=request)
     # Config-managed guardrail (#535): catalog-managed workspaces run a
     # server-generated wrapper config. Direct CV uploads would diverge the
     # workspace from its catalog item — reject. Re-provisioning goes through
@@ -205,7 +209,7 @@ async def list_configuration_versions(
     Supports TFE-style pagination via `page[size]` + `page[number]`.
     RBAC: requires `read` on the workspace.
     """
-    ws = await _get_workspace(workspace_id, db)
+    ws = await _get_workspace(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.CONFIG_READ):
         raise HTTPException(status_code=404, detail="Workspace not found")

@@ -974,7 +974,7 @@ function RunDetailPageInner() {
 
   const loadRun = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/v2/runs/${runId}`)
+      const res = await apiFetch(`/api/v1/runs/${runId}`)
       if (!res.ok) throw new Error(t('errors.loadRun'))
       const data = await res.json()
       setRun(data.data)

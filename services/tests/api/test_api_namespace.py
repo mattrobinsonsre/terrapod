@@ -57,15 +57,34 @@ class TestOpenAPIVisibility:
             "/api/tfe/v2/varsets/{varset_id}",
         ):
             assert path in schema["paths"], f"CLI surface path {path} missing from OpenAPI"
-        # These are CLI-surface paths; they must not also appear on the native
-        # surface. Checked at the canonical prefix, since that is what the schema
-        # documents post-#1529.
+        # CLI-surface paths do not appear on the native surface unless Terrapod's
+        # own consumers need them for a workspace the TFE surface cannot serve.
+        #
+        # `/api/v1/runs` is such an exception (#1572). The TFE surface correctly
+        # 404s a non-Terraform workspace, so with runs mounted only there the UI
+        # could not list or create a run for a Pulumi workspace at all. The two
+        # paths are NOT the same endpoint documented twice — they answer
+        # differently by design, one scoped to Terraform and one not — which is
+        # why both are in the schema rather than one being hidden.
+        #
+        # The two below stay forbidden and for different reasons: a varset is
+        # reached through an `organizations/default/` collection, which the
+        # native surface must never carry (architecture principle 9); the
+        # registry paths are the CLI download protocol, which has no native
+        # consumer at all.
         for path in (
-            "/api/v1/runs",
             "/api/v1/varsets/{varset_id}",
             "/api/v1/registry/modules/{namespace}/{name}/{provider}/versions",
         ):
             assert path not in schema["paths"], f"{path} should not exist"
+
+        # The exception is deliberate, so pin it: if runs stop being served
+        # natively, the Pulumi UI breaks and this says so rather than the
+        # workspace page going blank.
+        assert "/api/v1/runs" in schema["paths"], (
+            "runs must stay on the native surface — the TFE surface 404s a "
+            "Pulumi workspace, so this is the only door its runs have"
+        )
 
 
 class TestRouteTopology:

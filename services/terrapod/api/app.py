@@ -1346,7 +1346,14 @@ def create_application() -> FastAPI:
         router as runs_router,
     )
 
+    # Mounted on BOTH surfaces (#1572), like the variables router (#1898).
+    # `tfci` and the `cloud` block drive these routes, so they cannot move off
+    # the compatibility surface — but Terrapod's own UI has to reach them for a
+    # workspace of ANY engine, and on the compatibility surface a non-Terraform
+    # workspace correctly does not exist. One handler, two answers, decided by
+    # `load_workspace_scoped` from the request's own prefix.
     include_tfe(runs_router)
+    include_terrapod(runs_router)
     include_terrapod(runs_extensions_router)
 
     # Run artifact endpoints (runner token auth) — Terrapod runner protocol.
@@ -1365,6 +1372,7 @@ def create_application() -> FastAPI:
     )
 
     include_tfe(config_versions_router)
+    include_terrapod(config_versions_router)
     include_terrapod(config_version_extensions_router)
 
     # VCS connection endpoints — Terrapod-native. Canonical paths at

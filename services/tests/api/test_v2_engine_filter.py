@@ -1,8 +1,19 @@
-"""The `/api/v2/` surface never serves a non-Terraform row (#1407 §2, #1487).
+"""The TFE surface never serves a non-Terraform row (#1407 §2, #1487, #1572).
 
 A source-introspection test, which is the right shape here: the invariant is
-"every workspace/run lookup in `tfe_v2.py` carries the engine filter", and that is
-a property of the *source*, not of any one response. A future edit that adds a
+"every workspace/run lookup reachable from the TFE surface carries the engine
+filter", and that is a property of the *source*, not of any one response.
+
+**This test used to read one file, while the property spans nine router mounts.**
+`tfe_v2.py` was scoped and the other eight were not, so one workspace answered two
+ways — `GET /api/tfe/v2/workspaces/{id}` said 404 for a Pulumi workspace and
+`GET /api/tfe/v2/workspaces/{id}/runs` said 200. The guard was well built and
+pointed at a quarter of its own subject.
+
+So the file list is now **derived from `app.py`'s `include_tfe(...)` calls**
+rather than written down here. A router mounted on that surface in future is
+covered without anyone remembering to add it, which is the only version of this
+that stays true. A future edit that adds a
 query without the filter is exactly what this catches, and nothing else would —
 with Terraform the only engine, every runtime assertion passes either way.
 
@@ -23,7 +34,41 @@ import pathlib
 
 import pytest
 
-ROUTER = pathlib.Path(__file__).resolve().parents[2] / "terrapod/api/routers/tfe_v2.py"
+API = pathlib.Path(__file__).resolve().parents[2] / "terrapod/api"
+ROUTER = API / "routers/tfe_v2.py"
+
+
+def _tfe_mounted_modules() -> list[pathlib.Path]:
+    """Every router module mounted on the TFE surface, read from `app.py`.
+
+    Derived rather than listed: a hand-maintained list is exactly what was
+    missing before, and it would go stale the first time someone mounted a
+    router without reading this file.
+
+    `engine_scope.py` joins them because the shared loader lives there — the
+    routers delegate their workspace lookup to it, so its query is the one that
+    has to carry the filter. Without it the guard would pass trivially for every
+    router that delegates, which is the shape of "green for the wrong reason".
+    """
+    tree = ast.parse((API / "app.py").read_text())
+    mounted = {
+        n.args[0].id
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Call)
+        and getattr(n.func, "id", "") == "include_tfe"
+        and n.args
+        and isinstance(n.args[0], ast.Name)
+    }
+    modules = set()
+    for n in ast.walk(tree):
+        if isinstance(n, ast.ImportFrom) and n.module and ".routers." in f"{n.module}.":
+            for a in n.names:
+                if (a.asname or a.name) in mounted:
+                    modules.add(n.module.rsplit(".", 1)[-1])
+    paths = [API / "routers" / f"{m}.py" for m in sorted(modules)]
+    assert paths, "no TFE-mounted routers found — the app.py parse has drifted"
+    return [*paths, API / "engine_scope.py"]
+
 
 #: Models whose rows are engine-scoped, so a V2 query must not return another
 #: engine's.
@@ -33,14 +78,36 @@ GUARDED = {"Workspace", "Run", "ConfigurationVersion"}
 #: is asking "is this name taken anywhere", which is what the database constraint
 #: enforces; scoping it to one engine would make it answer a different question
 #: from the one the constraint asks.
-UNSCOPED_BY_DESIGN = {
-    # The create body moved here when the native surface gained an `engine`
-    # (#1535); the route above it is now a thin wrapper holding no query. The
-    # reasoning is unchanged and is now more load-bearing, not less: this
-    # function creates workspaces for EVERY engine, so a name taken by a Pulumi
-    # workspace has to conflict here too.
-    "_create_workspace_impl": "name-uniqueness guard against a globally unique constraint",
-    "update_workspace": "rename uniqueness guard against a globally unique constraint",
+#: Keyed by module, because the exceptions are specific to the file they sit in
+#: and a flat set would silently excuse a same-named function elsewhere.
+UNSCOPED_BY_DESIGN: dict[str, dict[str, str]] = {
+    "config_versions.py": {
+        # Both hang off a workspace that `_get_workspace` already scoped, so the
+        # rows reachable here belong to a workspace this surface may see. Listed
+        # rather than given a redundant filter: a second filter on a derived
+        # query reads as though the parent were untrusted, and the next person
+        # would wonder which one is load-bearing.
+        "list_configuration_versions": "rows of an already-scoped workspace",
+        "upload_configuration": "runs of an already-scoped configuration version",
+    },
+    "runs.py": {
+        # Loads the owning workspace of a run that has already been resolved and
+        # authorized. Filtering here would 404 the workspace of a run the caller
+        # was just allowed to read, which is a worse answer than the one it
+        # replaces. The scoping that matters for these is on the RUN lookup —
+        # see the blind spot noted above.
+        "_resolve_cost_summary_for_chat": "workspace of an already-authorized run",
+        "_resolve_plan_summary_for_chat": "workspace of an already-authorized run",
+    },
+    "tfe_v2.py": {
+        # The create body moved here when the native surface gained an `engine`
+        # (#1535); the route above it is now a thin wrapper holding no query. The
+        # reasoning is unchanged and is now more load-bearing, not less: this
+        # function creates workspaces for EVERY engine, so a name taken by a
+        # Pulumi workspace has to conflict here too.
+        "_create_workspace_impl": "name-uniqueness guard against a globally unique constraint",
+        "update_workspace": "rename uniqueness guard against a globally unique constraint",
+    },
 }
 
 
@@ -89,42 +156,63 @@ def _statement_source(src: str, tree: ast.AST, call: ast.Call) -> str:
     return "\n".join(lines[best.lineno - 1 : best.end_lineno])
 
 
-def test_every_v2_lookup_is_engine_scoped():
-    src = ROUTER.read_text()
-    tree = ast.parse(src)
+def test_every_tfe_surface_lookup_is_engine_scoped():
+    """Across every module mounted on the TFE surface, not just `tfe_v2.py`.
 
+    The marker is the substring `engine_filter`, which matches both the local
+    `_engine_filter` in `tfe_v2.py` and the shared `engine_filter` imported from
+    `engine_scope`. A router that delegates its lookup to `load_workspace_scoped`
+    has no `select(Workspace)` of its own and so has nothing to flag — and that
+    is sound, because `engine_scope.py` is itself in the walked set and its query
+    must carry the filter.
+    """
     unfiltered: list[str] = []
-    for call, model in _select_calls(tree):
-        func = _enclosing_function(tree, call.lineno)
-        stmt = _statement_source(src, tree, call)
-        if "_engine_filter" in stmt:
-            continue
-        if func in UNSCOPED_BY_DESIGN:
-            continue
-        unfiltered.append(f"{func}() line {call.lineno}: select({model}) has no _engine_filter")
+    for path in _tfe_mounted_modules():
+        src = path.read_text()
+        tree = ast.parse(src)
+        allowed = UNSCOPED_BY_DESIGN.get(path.name, {})
+        for call, model in _select_calls(tree):
+            func = _enclosing_function(tree, call.lineno)
+            stmt = _statement_source(src, tree, call)
+            if "engine_filter" in stmt:
+                continue
+            if func in allowed:
+                continue
+            unfiltered.append(f"{path.name}:{call.lineno} {func}(): select({model}) is unscoped")
 
     assert not unfiltered, (
-        "every workspace/run lookup on the /api/v2/ surface must be scoped to the "
-        "Terraform engine, or a `terraform` CLI can be handed a row it cannot "
-        "parse:\n  " + "\n  ".join(unfiltered)
+        "every workspace/run lookup reachable from the TFE surface must be scoped "
+        "to the Terraform engine, or a `terraform` CLI can be handed a row it "
+        "cannot parse — and the failure is silent, not an error:\n  "
+        + "\n  ".join(unfiltered)
+        + "\n\nEither carry `engine_filter(...)` in the statement, or delegate "
+        "the lookup to `engine_scope.load_workspace_scoped`, which scopes on the "
+        "prefix the request arrived on."
     )
 
 
-@pytest.mark.parametrize("func", sorted(UNSCOPED_BY_DESIGN))
-def test_the_allow_listed_guards_still_exist(func: str):
+@pytest.mark.parametrize(
+    "module,func",
+    sorted((m, f) for m, funcs in UNSCOPED_BY_DESIGN.items() for f in funcs),
+)
+def test_the_allow_listed_guards_still_exist(module: str, func: str):
     """An allow-list entry for a function that no longer exists is a silent hole.
 
-    If `create_workspace` is renamed, its entry stops matching anything and the
+    If `update_workspace` is renamed, its entry stops matching anything and the
     real query underneath it is no longer excused — but nothing would say so, and
     the entry would sit there looking like it still meant something.
+
+    Now keyed by module too, so an entry cannot drift onto a same-named function
+    in a different file and quietly excuse the wrong query.
     """
-    tree = ast.parse(ROUTER.read_text())
+    path = API / "routers" / module
+    tree = ast.parse(path.read_text())
     names = {
         n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
     assert func in names, (
-        f"{func}() is allow-listed as intentionally engine-unscoped but no longer "
-        "exists — remove the entry, or point it at the function that replaced it"
+        f"{module}:{func}() is allow-listed as intentionally engine-unscoped but no "
+        "longer exists — remove the entry, or point it at the function that replaced it"
     )
 
 

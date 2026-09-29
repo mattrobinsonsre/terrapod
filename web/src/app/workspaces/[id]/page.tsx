@@ -635,7 +635,7 @@ function WorkspaceDetailContent() {
 
   const loadRuns = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/runs`)
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/runs`)
       if (!res.ok) throw new Error(await parseApiError(res, t('errors.loadRuns')))
       const data = await res.json()
       setRuns(data.data || [])
@@ -773,7 +773,7 @@ function WorkspaceDetailContent() {
     setCvDiffError('')
     try {
       const res = await apiFetch(
-        `/api/v2/workspaces/${workspaceId}/configuration-versions?page%5Bsize%5D=100`,
+        `/api/v1/workspaces/${workspaceId}/configuration-versions?page%5Bsize%5D=100`,
       )
       if (!res.ok) throw new Error(await parseApiError(res, t('errors.loadConfigurations')))
       const data = await res.json()
@@ -1415,7 +1415,7 @@ function WorkspaceDetailContent() {
     setCheckingDrift(true)
     setError('')
     try {
-      const res = await apiFetch(`/api/v2/runs`, {
+      const res = await apiFetch(`/api/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -1644,7 +1644,7 @@ function WorkspaceDetailContent() {
       if (planAllowEmpty) attrs['allow-empty-apply'] = true
       if (vcsRef) attrs['vcs-ref'] = vcsRef
 
-      const res = await apiFetch(`/api/v2/runs`, {
+      const res = await apiFetch(`/api/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -1686,7 +1686,7 @@ function WorkspaceDetailContent() {
     setQueueingDestroy(true)
     setError('')
     try {
-      const res = await apiFetch(`/api/v2/runs`, {
+      const res = await apiFetch(`/api/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({

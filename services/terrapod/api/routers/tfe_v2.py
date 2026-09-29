@@ -55,6 +55,7 @@ from terrapod.api.dependencies import (
     get_current_user,
     require_non_runner,
 )
+from terrapod.api.engine_scope import engine_filter
 from terrapod.api.ids import parse_id
 from terrapod.api.labels import validate_labels
 from terrapod.api.pagination import MAX_PAGE_SIZE, build_meta, paginate, parse_page_params
@@ -125,14 +126,13 @@ def _engine_filter(model):
     globally, across engines, so a guard that filtered by engine would decide a
     name was free and then hit an IntegrityError — turning a clean 422 into a 500.
     The introspection test knows about that exception by name.
+
+    Delegates to `api/engine_scope.engine_filter`, which is the one
+    implementation (#1572). It used to live here, and living here is what let the
+    rule hold in this file while eight other router mounts on the same surface
+    served other engines' rows unfiltered.
     """
-    if model is Run:
-        # Runs store no engine (#1536); a run's is its workspace's. Every call
-        # site already reaches runs through engine-filtered workspaces, so this
-        # is defence in depth, kept because handing a non-Terraform row to a
-        # `terraform` client is a silent wrong answer.
-        return Run.workspace_id.in_(select(Workspace.id).where(Workspace.engine == TERRAFORM))
-    return model.engine == TERRAFORM
+    return engine_filter(model)
 
 
 def _primary_run_filter():

@@ -47,6 +47,7 @@ from terrapod.api.dependencies import (
     get_listener_identity,
     require_runner_for_run,
 )
+from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.errors import vcs_unavailable
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta
@@ -417,13 +418,20 @@ async def _get_run(run_id: str, db: AsyncSession) -> Run:
     return run
 
 
-async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
-    ws_uuid = workspace_id.removeprefix("ws-")
-    result = await db.execute(select(Workspace).where(Workspace.id == ws_uuid))
-    ws = result.scalar_one_or_none()
-    if ws is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-    return ws
+async def _get_workspace(
+    workspace_id: str, db: AsyncSession, *, request: Request | None = None
+) -> Workspace:
+    """Load the workspace, scoped to the surface the request arrived on (#1572).
+
+    This router is mounted on BOTH surfaces, so the scoping cannot be a property
+    of the router: on `/api/tfe/v2` a workspace belonging to another engine does
+    not exist, and on `/api/v1` it does. Before this, the lookup was unscoped
+    either way, so `GET /api/tfe/v2/workspaces/{id}/runs` answered 200 for a
+    Pulumi workspace whose own `GET .../workspaces/{id}` answered 404 — one
+    object, two answers, on the surface whose whole purpose is `terraform` /
+    `tofu` / `tfci` compatibility.
+    """
+    return await load_workspace_scoped(workspace_id, db, request=request)
 
 
 async def _require_run_ws_capability(
@@ -465,6 +473,7 @@ async def _fetch_vcs_config(
 
 @router.post("/runs", status_code=201)
 async def create_run(
+    request: Request,
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -478,7 +487,7 @@ async def create_run(
     if not ws_id:
         raise HTTPException(status_code=422, detail="Workspace relationship is required")
 
-    ws = await _get_workspace(ws_id, db)
+    ws = await _get_workspace(ws_id, db, request=request)
 
     # CLI-initiated runs on VCS-connected agent workspaces: plan is allowed,
     # apply is not — VCS is the source of truth. Non-VCS ("CLI-driven") agent
@@ -745,7 +754,7 @@ async def list_workspace_runs(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List runs for a workspace. Requires read."""
-    ws = await _get_workspace(workspace_id, db)
+    ws = await _get_workspace(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.RUN_READ):
         raise HTTPException(
@@ -2139,7 +2148,7 @@ async def run_events_stream(
     user = await authenticate_request(request)
 
     async with get_db_session() as db:
-        ws = await _get_workspace(workspace_id, db)
+        ws = await _get_workspace(workspace_id, db, request=request)
         caps = await resolve_workspace_capabilities_for(db, user, ws)
         if not has_capability(caps, cap.RUN_READ):
             raise HTTPException(
