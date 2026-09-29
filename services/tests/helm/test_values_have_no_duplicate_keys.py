@@ -30,7 +30,13 @@ import pathlib
 import pytest
 import yaml
 
-CHART = pathlib.Path(__file__).resolve().parents[3] / "helm/terrapod"
+# The test image copies the chart to /app/helm; a local checkout has it three
+# levels up from here. Same resolution as the other tests in this directory —
+# `parents[3]` alone silently becomes `/helm/terrapod` inside the image, and an
+# empty glob then reports every profile as clean.
+CHART = pathlib.Path("/app/helm/terrapod")
+if not CHART.is_dir():
+    CHART = pathlib.Path(__file__).resolve().parents[3] / "helm" / "terrapod"
 VALUES = sorted(CHART.glob("values*.yaml"))
 
 
