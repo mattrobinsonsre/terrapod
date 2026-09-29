@@ -381,6 +381,15 @@ category across a workspace and the variable sets reaching it. Precedence itself
 is unchanged — priority sets beat workspace variables beat non-priority sets — it
 simply now applies within a category rather than across all of them.
 
+**If you roll back, variables that only the new identity could hold are
+deleted.** A 1.x schema cannot represent two categories sharing a key, so the
+downgrade removes the surplus rather than refusing — a rollback you cannot rely
+on is worse than one that costs something. The rule is that the **oldest row per
+key survives**: a collision can only exist because the second variable was added
+after upgrading, so what remains is exactly what you had before. Each removal is
+printed by the migration. If you have staged an engine migration this way and
+then roll back, you will need to add those variables again.
+
 **If you use `go-terrapod` directly**, `GetVariableByKey` takes a category:
 
 ```go

@@ -28,11 +28,26 @@ touched. An old replica running against the new schema keeps working -- it
 simply never creates a colliding row itself, which is why dropping a *unique*
 constraint is safe under expand/contract in a way that dropping a column is not.
 
-The downgrade is real and is the interesting half: it can only succeed while no
-colliding pair exists. It checks first and raises with the offending rows named,
-rather than letting Postgres fail with a constraint violation that says nothing
-about which variables to reconcile. Deleting a "loser" to force it through would
-be silent data loss, so it refuses instead.
+The downgrade **deletes** colliding rows rather than refusing, and that is a
+deliberate call: a downgrade you cannot rely on is not a downgrade. A rollback
+happens in an incident, and one that can refuse mid-way -- because of data an
+operator added perfectly legitimately after upgrading -- leaves them stuck on a
+release they are trying to escape. The point of the reversibility invariant
+(#550) is that a bad release can always be rolled back.
+
+The loss is bounded and the rule is not arbitrary: **the oldest row per
+(owner, key) survives and the rest are deleted.** A collision can only exist
+because a second variable was added *after* the upgrade -- the older constraint
+forbade it -- so the oldest is precisely the row that existed before, and keeping
+it restores the pre-upgrade state exactly. The rows removed are the ones the old
+release could not represent at all.
+
+Ordering is by `id`, which is a uuid7 and therefore time-ordered: byte order is
+creation order, verified rather than assumed. `variables` also carries
+`created_at` but `variable_set_variables` does not, so one rule covers both.
+
+What is deleted is printed, because a migration that removes rows in an incident
+should say which.
 """
 
 import sqlalchemy as sa
@@ -62,23 +77,28 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
     for table, constraint, owner in _SCOPES:
-        # Name the rows that block the narrowing, so an operator can reconcile
-        # them deliberately. Dropping one for them would be data loss.
-        collisions = conn.execute(
+        # Keep the oldest per (owner, key); the rest cannot exist under the
+        # narrower constraint. uuid7 ids sort by creation time.
+        losers = conn.execute(
             sa.text(
-                f"SELECT {owner}, key, COUNT(*) AS n "  # noqa: S608 - identifiers are literals above
-                f"FROM {table} GROUP BY {owner}, key HAVING COUNT(*) > 1"  # noqa: S608
+                f"SELECT id, {owner} AS owner, key, category FROM ("  # noqa: S608 - identifiers are literals above
+                f"  SELECT id, {owner}, key, category, ROW_NUMBER() OVER ("  # noqa: S608
+                f"    PARTITION BY {owner}, key ORDER BY id"  # noqa: S608
+                f"  ) AS rn FROM {table}"  # noqa: S608
+                f") ranked WHERE rn > 1"
             )
         ).fetchall()
-        if collisions:
-            detail = ", ".join(
-                f"{owner}={row[0]} key={row[1]!r} ({row[2]} rows)" for row in collisions
+
+        if losers:
+            for row in losers:
+                print(
+                    f"  downgrade: removing {table} {row.category}:{row.key!r} "
+                    f"({owner}={row.owner}) -- the older constraint cannot hold it"
+                )
+            conn.execute(
+                sa.text(f"DELETE FROM {table} WHERE id = ANY(:ids)"),  # noqa: S608
+                {"ids": [row.id for row in losers]},
             )
-            raise RuntimeError(
-                f"Cannot narrow {constraint}: {len(collisions)} key(s) in {table} exist in more "
-                f"than one category, which the older constraint forbids. Reconcile them first "
-                f"by removing the category you no longer want -- this migration will not choose "
-                f"for you. Offending: {detail}"
-            )
+
         op.drop_constraint(constraint, table, type_="unique")
         op.create_unique_constraint(constraint, table, [owner, "key"])
