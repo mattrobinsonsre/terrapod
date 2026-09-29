@@ -666,6 +666,30 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, out, nil
 	})
 
+	// ── terrapod_run_compliance_report ──────────────────────────────
+	type runComplianceReportIn struct {
+		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose compliance report to fetch"`
+	}
+	type runComplianceReportOut struct {
+		Report *terrapod.RunComplianceReport `json:"compliance_report"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_run_compliance_report",
+		Description: "Fetch an audit-ready compliance report for a run, combining OPA policy set evaluations, " +
+			"security scanning (Checkov/Trivy) findings, post-plan decision verdicts, and overall compliance verdict " +
+			"(COMPLIANT, NON_COMPLIANT, OVERRIDDEN, PENDING_REVIEW).",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runComplianceReportIn) (*mcp.CallToolResult, *runComplianceReportOut, error) {
+		if in.RunID == "" {
+			return errText("run_id is required"), nil, nil
+		}
+		report, err := c.GetRunComplianceReport(ctx, in.RunID)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, &runComplianceReportOut{Report: report}, nil
+	})
+
 	// ── terrapod_policy_set_list ─────────────────────────────────────
 	type policySetsIn struct{}
 	type policySetsOut struct {

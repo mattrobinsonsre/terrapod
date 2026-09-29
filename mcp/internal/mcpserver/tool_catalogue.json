@@ -491,6 +491,23 @@
     }
   },
   {
+    "name": "terrapod_run_compliance_report",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "description": "the run id (run-... or a bare uuid) whose compliance report to fetch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_run_cost",
     "read_only": true,
     "input_schema": {

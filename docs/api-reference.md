@@ -1164,6 +1164,26 @@ GET /api/v1/runs/{run_id}/impact-graph
 
 Returns a compact plan **dependency + blast-radius graph** derived server-side from the run's stored JSON plan output — the data behind the run page's **Impact graph** tab. Nodes are the resources in the plan (coloured by planned action: create / update / replace / delete / no-op); edges are the dependencies between them, reconstructed by walking the plan's configuration module tree with cross-module `var`/output binding (so edges span module boundaries, and per-instance `for_each` fan-out is captured). Each node carries its module path so the UI can cluster and label by module.
 
+### Run Compliance Report
+
+```
+GET /api/v1/runs/{run_id}/compliance-report
+```
+
+Returns an audit-ready compliance report for a single run. Combines OPA policy set evaluation outcomes, security scanning findings (Checkov/Trivy), post-plan decisions, and calculates an overall compliance verdict (`COMPLIANT`, `NON_COMPLIANT`, `OVERRIDDEN`, or `PENDING_REVIEW`).
+
+Requires `run:read` capability on the run's workspace.
+
+### Workspace Compliance Report
+
+```
+GET /api/v1/workspaces/{workspace_id}/compliance-report[?limit=50&format=json|csv]
+```
+
+Returns an aggregate compliance report across recent runs for a workspace, including total runs evaluated, compliance rate percentage, and breakdown by verdict. Supports CSV export when `format=csv` is supplied.
+
+Requires `run:read` capability on the workspace.
+
 Deriving the graph on the server (rather than shipping the raw, possibly multi-MB plan JSON to the browser) keeps the payload small and works uniformly through the BFF in every storage backend — unlike `json-output`, whose presigned redirect isn't browser-reachable with the filesystem backend.
 
 **Response:** `{"data": {"type": "impact-graphs", "attributes": {"nodes": [...], "edges": [...], "meta": {"terraform_version": "...", "counts": {...}}}}}`

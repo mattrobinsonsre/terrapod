@@ -2048,6 +2048,55 @@ async def post_plan_summary_message(
     )
 
 
+@extensions_router.get("/runs/{run_id}/compliance-report")
+async def show_run_compliance_report(
+    run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Show audit-ready compliance report for a single run."""
+    from terrapod.services import compliance_report_service
+
+    run = await _get_run(run_id, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    report = await compliance_report_service.generate_run_compliance_report(db, run)
+    return JSONResponse(content={"data": report})
+
+
+@extensions_router.get("/workspaces/{workspace_id}/compliance-report")
+async def show_workspace_compliance_report(
+    workspace_id: str = Path(...),
+    limit: int = Query(50, ge=1, le=500),
+    format: str = Query("json", regex="^(json|csv)$"),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Show aggregate compliance report or CSV export across recent runs for a workspace."""
+    from terrapod.services import compliance_report_service
+
+    ws = await _get_workspace(workspace_id, db)
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.RUN_READ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires 'run:read' capability on workspace",
+        )
+
+    report = await compliance_report_service.generate_workspace_compliance_report(
+        db, ws.id, limit=limit
+    )
+
+    if format == "csv":
+        csv_content = compliance_report_service.format_workspace_compliance_csv(report)
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=compliance-{ws.id}.csv"},
+        )
+
+    return JSONResponse(content={"data": report})
+
+
 @extensions_router.get("/runs/{run_id}/plan")
 async def show_plan(
     request: Request,
