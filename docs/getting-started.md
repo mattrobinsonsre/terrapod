@@ -404,7 +404,11 @@ does not use, and an auditor can see the difference.
 
 **A workspace is one stack, and its name says so.** Pulumi identifies a stack as
 `organization/project/stack`; a Terrapod workspace has one flat name, so the two
-halves are joined with `::`:
+halves are joined with `::`.
+
+**The project half has to match `name:` in your `Pulumi.yaml`** — Pulumi takes
+the project from the program itself, so a workspace called `billing::dev` in
+front of a program named `payments` is refused when the run starts.
 
 ```zsh
 curl -s -X POST https://terrapod.example.com/api/v1/workspaces \
@@ -437,17 +441,28 @@ pulumi login https://terrapod.example.com
 the update appears in the workspace's run history like any other.
 
 **Variables are the ordinary ones.** There is no Pulumi-specific category: a
-workspace's `terraform` variables *are* its stack config, delivered with
+workspace's `native` variables *are* its stack config, delivered with
 `pulumi config set` instead of a tfvars file. `sensitive` becomes a real Pulumi
 secret, and keys pass through verbatim — `aws:region` stays `aws:region`.
+
+(`native` is the one category for a workspace's own engine-facing variables,
+whatever the engine. The TFE-compatible surface still calls it `terraform`,
+because that is the name `tfci` and `go-tfe` send, and both spellings are
+accepted on input.)
 
 ```zsh
 curl -s -X POST https://terrapod.example.com/api/v1/workspaces/$WS/vars \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{"data":{"type":"vars","attributes":{
-        "key":"aws:region","value":"eu-west-1","category":"terraform"}}}' | jq .
+        "key":"aws:region","value":"eu-west-1","category":"native"}}}' | jq .
 ```
+
+**Pin your provider versions.** Terrapod serves provider plugins from its own
+cache, and a plugin host reached over HTTP cannot answer "what is the newest
+release" — so an unversioned provider reference fails on the platform even
+though it resolves on a laptop. Pin it where your language puts it: the
+dependency manifest for an SDK, or `options.version` in Pulumi YAML.
 
 **What to read next:** [Pulumi](pulumi.md) covers the run lifecycle, binding an
 update to its preview, version pinning, execution hooks, and — importantly — the
