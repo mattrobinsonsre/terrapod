@@ -18,9 +18,11 @@ than the argv this file is about.
 from __future__ import annotations
 
 import dataclasses
+from types import SimpleNamespace
 
 import pytest
 
+from terrapod.runner import exec_subprocess
 from terrapod.runner.phases import pulumi_exec
 from terrapod.runner.runner_config import RunnerConfig
 
@@ -93,6 +95,86 @@ class TestThePluginOverride:
 
         params = inspect.signature(pulumi_exec.plugin_override_env).parameters
         assert params["proxy_port"].default is inspect.Parameter.empty
+
+
+class TestASetupFailureSaysWhatThePulumiSaid:
+    """The pre-flight exists to fail early *with the CLI's own message*.
+
+    It did not deliver one. The phase log is assembled from the runner's own log
+    file rather than the pod's stdout, so a bad `Pulumi.yaml` reached the run as
+    a bare "pulumi exited 255" while the sentence naming the file and the line
+    stayed in a Job pod that is deleted shortly afterwards.
+    """
+
+    def test_the_clis_words_reach_the_error(self, monkeypatch) -> None:
+        import pathlib as _p
+
+        def fake_run(argv, *, log_file=None, child_grace_seconds=25.0, tee_to_stdout=True):
+            _p.Path(log_file).write_text(
+                "error: could not unmarshal '/workspace/Pulumi.yaml': "
+                "invalid YAML file: yaml: line 3: mapping values are not allowed\n"
+            )
+            return SimpleNamespace(exit_code=255, signalled=False, killed_by_watchdog=False)
+
+        monkeypatch.setattr(exec_subprocess, "run", fake_run)
+        monkeypatch.setenv("TP_PULUMI_STACK", "default/proj/dev")
+        with pytest.raises(pulumi_exec.StackError) as e:
+            pulumi_exec.select_stack("/bin/pulumi")
+        assert "could not unmarshal" in str(e.value), (
+            "the operator gets an exit code and no reason — the whole point of "
+            "the pre-flight is the CLI's own message"
+        )
+        assert "255" in str(e.value)
+
+    def test_only_the_tail_is_carried(self, monkeypatch) -> None:
+        """Pulumi puts the diagnosis last; a command that printed pages of
+        progress would bury it in the run log."""
+        import pathlib as _p
+
+        def fake_run(argv, *, log_file=None, child_grace_seconds=25.0, tee_to_stdout=True):
+            noise = "\n".join(f"progress {i}" for i in range(200))
+            _p.Path(log_file).write_text(noise + "\nerror: the actual reason\n")
+            return SimpleNamespace(exit_code=1, signalled=False, killed_by_watchdog=False)
+
+        monkeypatch.setattr(exec_subprocess, "run", fake_run)
+        monkeypatch.setenv("TP_PULUMI_STACK", "default/proj/dev")
+        with pytest.raises(pulumi_exec.StackError) as e:
+            pulumi_exec.select_stack("/bin/pulumi")
+        assert "error: the actual reason" in str(e.value)
+        assert "progress 0" not in str(e.value)
+
+    def test_it_does_not_truncate_the_phase_log(self, monkeypatch, tmp_path) -> None:
+        """Its own scratch file: `exec_subprocess.run` truncates the log it is
+        given, so sharing the phase's would erase what is about to be uploaded."""
+        phase_log = tmp_path / "plan.log"
+        phase_log.write_text("everything the phase has said so far\n")
+        seen: dict[str, object] = {}
+
+        def fake_run(argv, *, log_file=None, child_grace_seconds=25.0, tee_to_stdout=True):
+            seen["log_file"] = log_file
+            return SimpleNamespace(exit_code=0, signalled=False, killed_by_watchdog=False)
+
+        monkeypatch.setattr(exec_subprocess, "run", fake_run)
+        monkeypatch.setenv("TP_PULUMI_STACK", "default/proj/dev")
+        pulumi_exec.select_stack("/bin/pulumi")
+        assert seen["log_file"] != str(phase_log)
+        assert phase_log.read_text() == "everything the phase has said so far\n"
+
+    def test_a_successful_setup_leaves_no_scratch_file(self, monkeypatch) -> None:
+        """One per setup command per Job is small, but the Job's writable mounts
+        are small too, and nothing else would ever clean them up."""
+        import pathlib as _p
+
+        kept: list[str] = []
+
+        def fake_run(argv, *, log_file=None, child_grace_seconds=25.0, tee_to_stdout=True):
+            kept.append(log_file)
+            return SimpleNamespace(exit_code=0, signalled=False, killed_by_watchdog=False)
+
+        monkeypatch.setattr(exec_subprocess, "run", fake_run)
+        monkeypatch.setenv("TP_PULUMI_STACK", "default/proj/dev")
+        pulumi_exec.select_stack("/bin/pulumi")
+        assert not _p.Path(kept[0]).exists()
 
 
 class TestThePluginProxyAuthenticates:

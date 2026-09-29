@@ -41,8 +41,10 @@ rather than a Terrapod defect, and `docs/pulumi.md` says so plainly.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import pathlib
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -58,6 +60,11 @@ logger = structlog.get_logger("runner.pulumi_exec")
 #: repeated rather than imported because the runner image ships no `api/` package
 #: to import `prefixes` from.
 _API_PREFIX = "/api/terrapod/v1"
+
+
+#: How much of a failed setup command's output to carry into the error. Enough
+#: for Pulumi's message and the line it points at, not enough to bury it.
+_SETUP_ERROR_LINES = 12
 
 
 class StackError(RuntimeError):
@@ -243,19 +250,50 @@ def stack_ref() -> str:
 
 
 def _pulumi(binary: str, args: list[str], *, child_grace: float, what: str) -> None:
-    """Run a setup command, raising `StackError` if it fails.
+    """Run a setup command, raising `StackError` carrying what the CLI said.
 
-    No log file: `exec_subprocess.run` truncates the one it is given, and these
-    run beside the phase's own command. Teeing to stdout puts them in the combined
-    log all the same.
+    **The CLI's own message is read back and put in the error**, because teeing
+    to stdout does not deliver it where anyone will look. The phase log is
+    assembled from the runner's own log file, not from the pod's stdout, so a
+    failure here reached the run as a bare *"pulumi exited 255"* while the
+    sentence that explained it — `could not unmarshal '/workspace/Pulumi.yaml':
+    invalid YAML file` — stayed in a Job pod that is deleted shortly after. An
+    operator reading the run could not see it at all.
+
+    That defeats the point of the pre-flight, which exists to fail early *with
+    the CLI's own message*. Its own scratch file rather than the phase's:
+    `exec_subprocess.run` truncates the log it is given, so sharing one would
+    erase the phase log that is about to be uploaded.
     """
+    import tempfile
+
     from terrapod.runner import exec_subprocess
 
-    result = exec_subprocess.run(
-        [binary, *args], log_file=None, child_grace_seconds=child_grace, tee_to_stdout=True
-    )
-    if result.exit_code != 0:
-        raise StackError(f"could not {what} (pulumi exited {result.exit_code})")
+    with tempfile.NamedTemporaryFile(suffix=".log", delete=False) as fh:
+        scratch = fh.name
+    try:
+        result = exec_subprocess.run(
+            [binary, *args],
+            log_file=scratch,
+            child_grace_seconds=child_grace,
+            tee_to_stdout=True,
+        )
+        if result.exit_code == 0:
+            return
+        said = ""
+        try:
+            said = pathlib.Path(scratch).read_text(errors="replace").strip()
+        except OSError:  # pragma: no cover - the message is a bonus, not the error
+            pass
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(scratch)
+
+    # The tail, not the whole thing: Pulumi puts the diagnosis last, and a setup
+    # command that printed pages of progress would bury it.
+    tail = "\n".join(said.splitlines()[-_SETUP_ERROR_LINES:])
+    detail = f": {tail}" if tail else ""
+    raise StackError(f"could not {what} (pulumi exited {result.exit_code}){detail}")
 
 
 def select_stack(binary: str, *, child_grace: float = 25.0) -> str:

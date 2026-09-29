@@ -27,6 +27,20 @@ recovers Pulumi's `{org}/{project}/{stack}` without growing a "project" concept
 of its own. The organization is always `default`, as everywhere else in
 Terrapod.
 
+**The project half must match `name:` in `Pulumi.yaml`.** Pulumi resolves a
+stack as `{org}/{project}/{stack}` and takes the project from the program's own
+`Pulumi.yaml`, so a workspace called `billing::dev` in front of a program named
+`payments` is refused outright:
+
+```
+error: provided project name "billing" doesn't match Pulumi.yaml
+```
+
+Nothing checks this before the run, so it surfaces at `pulumi preview` after a
+Job has started. It applies to autodiscovered workspaces too, where the project
+half comes from the *directory* — a directory whose name differs from the
+program's is the same mismatch.
+
 A stack can be created by hand, or discovered. **Autodiscovery understands
 Pulumi**: a rule with `engine: pulumi` watches a monorepo for
 `Pulumi.<stack>.yaml` files and creates a workspace per stack, so one directory
@@ -214,6 +228,45 @@ With the Pulumi engine switched off, none of this is reachable — asking the
 cache to list Pulumi versions is refused rather than answered, so a
 Terraform-only deployment makes no requests on Pulumi's behalf and warms no
 Pulumi binary.
+
+### Where a program's providers come from
+
+A Pulumi program needs two things from the network: its language dependencies,
+below, and its **provider plugins**. Both come from Terrapod.
+
+Plugin downloads are pointed at Terrapod's package cache with
+`PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES`, which is set for every run and matches
+every provider — an anchored pattern that failed to match would not error, it
+would silently fall back to `get.pulumi.com`, so a deployment with egress would
+keep working while a sealed one hung on a download nobody could see.
+
+**Pin your provider versions.** An unversioned reference makes Pulumi ask its
+plugin host for the newest release, and a plugin host reached over HTTP cannot
+answer that question:
+
+```
+error: internal error loading package "random": could not find latest version
+for provider random: GetLatestVersion is not supported for plugins from http sources
+```
+
+A program that resolves "latest" on a laptop therefore fails here, and pinning
+is the fix — which is what you want in a platform anyway, since it is the
+difference between a run that is reproducible and one that is not. In a language
+SDK the version is in the dependency manifest; in Pulumi YAML it is
+`options.version` on the resource:
+
+```yaml
+resources:
+  greeting:
+    type: random:RandomPet
+    options:
+      version: "4.21.2"
+```
+
+The credential is carried by a loopback shim inside the Job, not by the CLI —
+the same arrangement Go's module downloads use, and for the same two reasons:
+the client will not send one, and Pulumi prints the URL it fetched from in its
+own warnings, which the runner streams to the API and the UI.
 
 ### What language a program can be written in
 
