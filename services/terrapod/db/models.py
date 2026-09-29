@@ -1877,7 +1877,10 @@ class Variable(Base):
     workspace: Mapped[Workspace] = relationship(back_populates="variables")
 
     __table_args__ = (
-        sa.UniqueConstraint("workspace_id", "key", name="uq_variables_workspace_key"),
+        # A variable is identified by (key, category), not key alone (#1898): a
+        # workspace may hold `terraform:region` and `pulumi_config:region` at
+        # once, which is what moving between engines looks like.
+        sa.UniqueConstraint("workspace_id", "key", "category", name="uq_variables_workspace_key"),
         Index("ix_variables_workspace_id", "workspace_id"),
     )
 
@@ -1958,7 +1961,8 @@ class VariableSetVariable(Base):
     variable_set: Mapped[VariableSet] = relationship(back_populates="variables")
 
     __table_args__ = (
-        sa.UniqueConstraint("variable_set_id", "key", name="uq_variable_set_variables"),
+        # Same identity as a workspace variable (#1898).
+        sa.UniqueConstraint("variable_set_id", "key", "category", name="uq_variable_set_variables"),
         Index("ix_variable_set_variables_set_id", "variable_set_id"),
     )
 

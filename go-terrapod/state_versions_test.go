@@ -242,7 +242,7 @@ func TestGetVariableByKey(t *testing.T) {
 	defer srv.Close()
 	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
 
-	got, err := c.GetVariableByKey(t.Context(), "ws-a", "AWS_REGION")
+	got, err := c.GetVariableByKey(t.Context(), "ws-a", "env", "AWS_REGION")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,8 +250,50 @@ func TestGetVariableByKey(t *testing.T) {
 		t.Errorf("variable: %+v", got)
 	}
 
-	missing, err := c.GetVariableByKey(t.Context(), "ws-a", "NOPE")
+	missing, err := c.GetVariableByKey(t.Context(), "ws-a", "env", "NOPE")
 	if !IsNotFound(err) {
 		t.Errorf("expected NotFoundError, got %v (missing=%+v)", err, missing)
+	}
+
+	// The key exists, but not in this category. Identity is (category, key), so
+	// this is genuinely absent rather than a near-miss to be helpful about.
+	wrongCat, err := c.GetVariableByKey(t.Context(), "ws-a", "terraform", "AWS_REGION")
+	if !IsNotFound(err) {
+		t.Errorf("expected NotFoundError for wrong category, got %v (%+v)", err, wrongCat)
+	}
+}
+
+// TestGetVariableByKey_SameKeyDifferentCategories is the case the category
+// argument exists for (#1898). A workspace may hold `terraform:region` and
+// `pulumi_config:region` at once -- that is what moving between engines looks
+// like -- and a key-only lookup had to pick one, silently returning whichever
+// the server listed first. Each category must find its own.
+func TestGetVariableByKey_SameKeyDifferentCategories(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":[
+            {"id":"var-tf","type":"vars","attributes":{"key":"region","value":"eu-west-1","category":"terraform"}},
+            {"id":"var-pu","type":"vars","attributes":{"key":"region","value":"us-east-1","category":"pulumi_config"}}
+        ]}`))
+	}))
+	defer srv.Close()
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+
+	for _, tc := range []struct{ category, wantID, wantValue string }{
+		// The terraform one is listed FIRST, so a key-only lookup returned it
+		// for both -- which is why the pulumi_config case is the one that fails
+		// if the category is ever dropped from the match.
+		{"terraform", "var-tf", "eu-west-1"},
+		{"pulumi_config", "var-pu", "us-east-1"},
+	} {
+		t.Run(tc.category, func(t *testing.T) {
+			got, err := c.GetVariableByKey(t.Context(), "ws-a", tc.category, "region")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.ID != tc.wantID || got.Value != tc.wantValue {
+				t.Errorf("got %s=%q, want %s=%q", got.ID, got.Value, tc.wantID, tc.wantValue)
+			}
+		})
 	}
 }

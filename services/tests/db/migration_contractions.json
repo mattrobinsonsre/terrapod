@@ -15,6 +15,9 @@
   "2b369cd58093_widen_webhook_secret_for_encryption": [
     "alter_column(vcs_connections, webhook_secret)"
   ],
+  "2ff6b78f7163_variable_identity_includes_category": [
+    "drop_constraint()"
+  ],
   "3fbcb2885b93_service_token_kind_columns": [
     "alter_column(api_tokens, created_by)",
     "alter_column(api_tokens, user_email)"

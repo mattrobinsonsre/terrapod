@@ -234,15 +234,22 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
     2. Workspace-level variables
     3. Non-priority variable set vars
 
+    Precedence applies within a `(category, key)`, never across categories
+    (#1898). Keying on `key` alone made a workspace `terraform:region` *remove* a
+    variable-set `env:region` from the run -- not deprioritise it, remove it,
+    because the later layer overwrote the entry whatever its category. Two
+    variables that mean different things are two variables, and both are
+    delivered.
+
     Returns values ready for runner injection.
     """
-    resolved: dict[str, ResolvedVariable] = {}
+    resolved: dict[tuple[str, str], ResolvedVariable] = {}
 
     # Layer 1: Non-priority variable sets (global + assigned)
     varsets = await _get_applicable_varsets(db, workspace_id, priority=False)
     for vs in varsets:
         for vsv in vs.variables:
-            resolved[vsv.key] = ResolvedVariable(
+            resolved[(vsv.category, vsv.key)] = ResolvedVariable(
                 key=vsv.key,
                 value=vsv.value,
                 category=vsv.category,
@@ -254,7 +261,7 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
     # Layer 2: Workspace variables (override non-priority sets)
     ws_vars = await list_variables(db, workspace_id)
     for var in ws_vars:
-        resolved[var.key] = ResolvedVariable(
+        resolved[(var.category, var.key)] = ResolvedVariable(
             key=var.key,
             value=var.value,
             category=var.category,
@@ -267,7 +274,7 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
     priority_varsets = await _get_applicable_varsets(db, workspace_id, priority=True)
     for vs in priority_varsets:
         for vsv in vs.variables:
-            resolved[vsv.key] = ResolvedVariable(
+            resolved[(vsv.category, vsv.key)] = ResolvedVariable(
                 key=vsv.key,
                 value=vsv.value,
                 category=vsv.category,

@@ -349,6 +349,58 @@ gone as of 1.99.0, so the floor moved with it, and 3.14 brings
 [PEP 649](https://peps.python.org/pep-0649/) deferred annotation evaluation to a
 codebase that leans heavily on typed models.
 
+### A variable is identified by its category and key together
+
+A variable used to be identified by its **key alone**, enforced by a unique
+constraint on `(workspace_id, key)` and again when variables were resolved for a
+run. Category was an attribute hanging off the variable rather than part of its
+name. Identity is now `(category, key)`.
+
+**Nothing you have breaks, and you need change nothing to upgrade.** The database
+constraint is widened, not narrowed, so every existing variable already satisfies
+it; no values move and nothing is deleted. What changes is what becomes possible,
+and one behaviour you may have been relying on without knowing.
+
+**You can now hold the same key in two categories.** Previously a workspace could
+have only one variable named `region` whatever its category, so you could not add
+a `pulumi_config` variable alongside the `terraform` one of the same name — which
+is exactly what moving a workspace between engines looks like. You had to delete
+the old one first, on a live workspace, with no way to stage the change. Both can
+now exist.
+
+**A variable set variable is no longer silently dropped by a workspace variable
+of the same key in a different category.** This is the part worth checking. When
+a variable set supplied `env:region` and the workspace also had `terraform:region`,
+the workspace one replaced the set's entry entirely — the environment variable was
+*absent from the run*, not merely lower precedence. After the upgrade both are
+delivered. If a run of yours depended on that disappearance, it will now see an
+environment variable it did not see before.
+
+To find out whether this affects you, look for a key that exists in more than one
+category across a workspace and the variable sets reaching it. Precedence itself
+is unchanged — priority sets beat workspace variables beat non-priority sets — it
+simply now applies within a category rather than across all of them.
+
+**If you use `go-terrapod` directly**, `GetVariableByKey` takes a category:
+
+```go
+// before
+v, err := client.GetVariableByKey(ctx, workspaceID, "region")
+// after
+v, err := client.GetVariableByKey(ctx, workspaceID, "terraform", "region")
+```
+
+A key-only lookup could not stay: under the new identity it would have to choose
+between two real variables, and it chose by list order. The provider, the
+migration tool and the MCP server are updated; only your own code needs this.
+
+**`terrapod_variable_delete` in the MCP server** now refuses a key that names more
+than one variable, listing the categories, rather than deleting whichever it found
+first. Pass `category` to choose. `terrapod_variable_set` upserts on
+`(category, key)`, which also fixes a quieter bug: setting a key with
+`category=env` on a workspace that already had that key as `terraform` used to
+re-categorise the existing variable instead of creating a new one.
+
 ## Before you upgrade
 
 1. Read the sections above and make the edits they name.

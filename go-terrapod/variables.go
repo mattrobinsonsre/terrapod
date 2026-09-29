@@ -149,24 +149,31 @@ func (c *Client) GetVariable(ctx context.Context, workspaceID, id string) (*Vari
 	return nil, &NotFoundError{Resource: "variable", ID: id}
 }
 
-// GetVariableByKey looks up a variable by workspace + key (the
-// human-typed name, e.g. "AWS_REGION"). Most operator-facing tools
-// reason in keys rather than UUIDs; this is the lookup they want.
-// Same per-workspace list cost as GetVariable.
+// GetVariableByKey looks up a variable by workspace + category + key
+// (the human-typed name, e.g. "AWS_REGION"). Most operator-facing
+// tools reason in names rather than UUIDs; this is the lookup they
+// want. Same per-workspace list cost as GetVariable.
 //
-// Returns *NotFoundError when no variable with the given key exists
-// on the workspace.
-func (c *Client) GetVariableByKey(ctx context.Context, workspaceID, key string) (*Variable, error) {
+// The category is required because a variable is identified by
+// (category, key), not by key alone (#1898): a workspace may hold a
+// `terraform` and a `pulumi_config` variable both keyed "region", and
+// they are two different variables. A key-only lookup would have to
+// pick one, which is the ambiguity this signature exists to remove --
+// it previously returned whichever the server happened to list first.
+//
+// Returns *NotFoundError when that workspace has no variable with the
+// given key in the given category.
+func (c *Client) GetVariableByKey(ctx context.Context, workspaceID, category, key string) (*Variable, error) {
 	list, err := c.ListVariables(ctx, workspaceID)
 	if err != nil {
 		return nil, err
 	}
 	for i := range list {
-		if list[i].Key == key {
+		if list[i].Key == key && list[i].Category == category {
 			return &list[i], nil
 		}
 	}
-	return nil, &NotFoundError{Resource: "variable", ID: key}
+	return nil, &NotFoundError{Resource: "variable", ID: category + ":" + key}
 }
 
 // ListVariables returns every variable on a workspace. Terrapod

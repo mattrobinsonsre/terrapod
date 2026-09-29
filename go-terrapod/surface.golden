@@ -1490,7 +1490,7 @@ method (*Client) GetStateGraph(ctx context.Context, workspaceID, stateVersionID 
 method (*Client) GetUser(ctx context.Context, email string) (*User, error)
 method (*Client) GetVCSConnection(ctx context.Context, id string) (*VCSConnection, error)
 method (*Client) GetVariable(ctx context.Context, workspaceID, id string) (*Variable, error)
-method (*Client) GetVariableByKey(ctx context.Context, workspaceID, key string) (*Variable, error)
+method (*Client) GetVariableByKey(ctx context.Context, workspaceID, category, key string) (*Variable, error)
 method (*Client) GetVariableSet(ctx context.Context, id string) (*VariableSet, error)
 method (*Client) GetVarsetVariable(ctx context.Context, varsetID, varID string) (*VariableSetVariable, error)
 method (*Client) GetVaultStatus(ctx context.Context) (*VaultStatus, error)

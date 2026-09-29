@@ -761,6 +761,10 @@
     "input_schema": {
       "additionalProperties": false,
       "properties": {
+        "category": {
+          "description": "which category to delete the key from (terraform, env, pulumi_config, git_http_auth, git_ssh_auth). Optional: needed only when the same key exists in more than one category, which is refused rather than guessed",
+          "type": "string"
+        },
         "key": {
           "description": "the variable key to delete",
           "type": "string"

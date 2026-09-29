@@ -835,9 +835,13 @@ func (w *Writer) applyVariable(ctx context.Context, workspaceID, workspaceSource
 //     non-sensitive value would silently overwrite the operator's
 //     secret. Surfaced as a clear error so the operator can decide.
 func (w *Writer) reconcileVariable(ctx context.Context, workspaceID string, req terrapod.CreateVariableRequest) error {
-	existing, err := w.client.GetVariableByKey(ctx, workspaceID, req.Key)
+	// Located by (category, key), which is the identity (#1898). Locating by
+	// key alone found a variable in ANY category and then PATCHed it with
+	// req.Category below, so reconciling an env variable could silently
+	// re-categorise a terraform one of the same name.
+	existing, err := w.client.GetVariableByKey(ctx, workspaceID, req.Category, req.Key)
 	if err != nil {
-		return fmt.Errorf("locate existing %q: %w", req.Key, err)
+		return fmt.Errorf("locate existing %s %q: %w", req.Category, req.Key, err)
 	}
 	if existing.Sensitive {
 		return fmt.Errorf("destination variable %q is flagged sensitive — refusing to overwrite an operator-entered value with the source's non-sensitive value", req.Key)

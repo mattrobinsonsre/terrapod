@@ -3,6 +3,8 @@ package mcpserver
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -239,9 +241,15 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		if category == "" {
 			category = "terraform"
 		}
-		// Upsert: look the key up; update if present, else create. A NotFound on
-		// the lookup is the create path, not an error.
-		existing, err := c.GetVariableByKey(ctx, in.WorkspaceID, in.Key)
+		// Upsert: look up (category, key); update if present, else create. A
+		// NotFound on the lookup is the create path, not an error.
+		//
+		// The category is part of the identity (#1898). Looking up by key alone
+		// found a variable in ANY category and then PATCHed it with this
+		// category -- so setting category=env on a workspace that already had a
+		// terraform variable of the same key silently re-categorised the
+		// terraform one instead of creating the env one.
+		existing, err := c.GetVariableByKey(ctx, in.WorkspaceID, category, in.Key)
 		switch {
 		case err == nil && existing != nil:
 			v, uerr := c.UpdateVariable(ctx, in.WorkspaceID, existing.ID, terrapod.UpdateVariableRequest{
@@ -278,19 +286,45 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 	type variableDeleteIn struct {
 		WorkspaceID string `json:"workspace_id" jsonschema:"the workspace id (ws-...)"`
 		Key         string `json:"key" jsonschema:"the variable key to delete"`
+		Category    string `json:"category,omitempty" jsonschema:"which category to delete the key from (terraform, env, pulumi_config, git_http_auth, git_ssh_auth). Optional: needed only when the same key exists in more than one category, which is refused rather than guessed"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_variable_delete",
-		Description: "Delete a workspace variable by key. Irreversible (the value, if not sensitive, is gone) and it changes what the next run sees — confirm with the user.",
+		Description: "Delete a workspace variable by key. Irreversible (the value, if not sensitive, is gone) and it changes what the next run sees — confirm with the user. A variable is identified by category and key together, so if the key exists in more than one category the delete is refused and the categories listed; pass category to choose.",
 		Annotations: destructive,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in variableDeleteIn) (*mcp.CallToolResult, *deleteOut, error) {
 		if in.WorkspaceID == "" || in.Key == "" {
 			return errText("workspace_id and key are required"), nil, nil
 		}
-		existing, err := c.GetVariableByKey(ctx, in.WorkspaceID, in.Key)
+		// A variable is identified by (category, key), so a bare key can name
+		// more than one (#1898). This is a destructive tool, so an ambiguous key
+		// is refused with the categories listed rather than resolved by a
+		// default -- deleting the wrong variable is not recoverable, and an
+		// agent that meant the other one has no way to tell afterwards.
+		all, err := c.ListVariables(ctx, in.WorkspaceID)
 		if err != nil {
 			return errResult(err), nil, nil
 		}
+		var matches []terrapod.Variable
+		for _, v := range all {
+			if v.Key == in.Key && (in.Category == "" || v.Category == in.Category) {
+				matches = append(matches, v)
+			}
+		}
+		switch {
+		case len(matches) == 0:
+			return errResult(&terrapod.NotFoundError{Resource: "variable", ID: in.Key}), nil, nil
+		case len(matches) > 1:
+			cats := make([]string, 0, len(matches))
+			for _, v := range matches {
+				cats = append(cats, v.Category)
+			}
+			return errText(fmt.Sprintf(
+				"%q names %d variables on this workspace, in categories: %s. "+
+					"Pass category to say which one to delete.",
+				in.Key, len(matches), strings.Join(cats, ", "))), nil, nil
+		}
+		existing := matches[0]
 		if err := c.DeleteVariable(ctx, in.WorkspaceID, existing.ID); err != nil {
 			return errResult(err), nil, nil
 		}
