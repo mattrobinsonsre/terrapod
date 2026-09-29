@@ -16,6 +16,18 @@ _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
 
 
+def _no_inert_vars():
+    """The engine-mismatch resolver's result (#1565): no workspace here holds a
+    variable its engine never reads.
+
+    The detail route resolves this once per request, so a test that scripts
+    `db.execute` in order has to account for it.
+    """
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = []
+    return result
+
+
 def _user(email="test@example.com", roles=None):
     return AuthenticatedUser(
         email=email,
@@ -117,7 +129,7 @@ class TestWorkspaceDriftAttributes:
         ws_result.scalar_one_or_none.return_value = ws
         no_run_result = MagicMock()
         no_run_result.scalar_one_or_none.return_value = None
-        mock_db.execute.side_effect = [ws_result, no_run_result]
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)

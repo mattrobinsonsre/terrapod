@@ -101,6 +101,17 @@ SCENARIOS: dict[str, dict] = {
     # a credential-holding pod killed mid-inspection, or reaped before anyone
     # reached it.
     "debug-linger": {"phase": "plan", "debug_linger_seconds": 900},
+    # Pulumi stack config (#1565). Its own key in the same per-run vars Secret,
+    # so what this pins is the mount item appearing beside the tfvars one --
+    # and, by the values being absent from the rendered spec, that the config
+    # travels in the Secret rather than in the Job.
+    "pulumi-config": {
+        "phase": "plan",
+        "pulumi_config": [
+            {"key": "aws:region", "value": "eu-west-1", "secret": False, "path": False},
+            {"key": "dbpass", "value": "s3cret", "secret": True, "path": False},
+        ],
+    },
 }
 
 #: Values held fixed so a diff can only come from the scenario or the code.
