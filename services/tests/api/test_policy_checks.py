@@ -18,6 +18,23 @@ from terrapod.auth import capabilities as cap
 from terrapod.services import policy_check_service
 from terrapod.services.policy_check_service import PolicyCheck
 
+
+def _tfe_request(path: str = "/api/tfe/v2/runs/run-x/policy-checks"):
+    """A stand-in Request carrying only what the handlers read: its path.
+
+    They are called directly here rather than over HTTP, so nothing injects one
+    — and the path is not incidental. It decides which engines the surface may
+    serve (#1904), so a test that omitted it would be exercising a different
+    code path from the one the app runs.
+    """
+    req = MagicMock()
+    req.url.path = path
+    # A real dict: the list handler iterates its query params, and a MagicMock
+    # attribute would be an object that quietly is not empty.
+    req.query_params = {}
+    return req
+
+
 STAMP = datetime(2026, 9, 17, 12, 30, tzinfo=UTC)
 READ = {cap.RUN_READ}
 ADMIN = {cap.RUN_READ, cap.WORKSPACE_SETTINGS}
@@ -34,7 +51,11 @@ def _user() -> AuthenticatedUser:
 
 
 def _setup(status="planning"):
-    ws = MagicMock(id=uuid.uuid4())
+    # A REAL engine string, not a bare MagicMock attribute: the run handlers
+    # refuse a run whose workspace belongs to another engine on the TFE surface
+    # (#1904), and a MagicMock compares unequal to "terraform", so every test
+    # would 404 for a reason that exists only in the fixture.
+    ws = MagicMock(id=uuid.uuid4(), engine="terraform")
     run = MagicMock(id=uuid.uuid4(), workspace_id=ws.id, status=status)
 
     async def _get(model, key):
@@ -71,7 +92,6 @@ def _caps(value):
 class TestReading:
     async def test_lists_a_runs_checks_in_the_shape_the_cli_reads(self):
         db, run = _setup()
-        request = MagicMock(query_params={})
         with (
             _caps(READ),
             patch.object(
@@ -81,7 +101,7 @@ class TestReading:
             ),
         ):
             resp = await router.list_policy_checks(
-                request, run_id=f"run-{run.id}", user=_user(), db=db
+                request=_tfe_request(), run_id=f"run-{run.id}", user=_user(), db=db
             )
         import json
 
@@ -106,7 +126,7 @@ class TestReading:
             patch.object(policy_check_service, "get_check", AsyncMock(return_value=_check(run))),
         ):
             resp = await router.policy_check_output(
-                check_id=f"polchk-opa-{run.id}", user=_user(), db=db
+                request=_tfe_request(), check_id=f"polchk-opa-{run.id}", user=_user(), db=db
             )
         assert resp.media_type == "text/plain"
         assert b"(mandatory): failed" in resp.body
@@ -118,13 +138,17 @@ class TestReading:
     async def test_an_unknown_check_is_404(self, check_id):
         db, _ = _setup()
         with _caps(READ), pytest.raises(HTTPException) as exc:
-            await router.show_policy_check(check_id=check_id, user=_user(), db=db)
+            await router.show_policy_check(
+                request=_tfe_request(), check_id=check_id, user=_user(), db=db
+            )
         assert exc.value.status_code == 404
 
     async def test_a_caller_who_cannot_read_the_workspace_gets_404_not_403(self):
         db, run = _setup()
         with _caps(set()), pytest.raises(HTTPException) as exc:
-            await router.show_policy_check(check_id=f"polchk-opa-{run.id}", user=_user(), db=db)
+            await router.show_policy_check(
+                request=_tfe_request(), check_id=f"polchk-opa-{run.id}", user=_user(), db=db
+            )
         assert exc.value.status_code == 404
 
     async def test_a_gate_that_recorded_nothing_has_no_check(self):
@@ -134,7 +158,9 @@ class TestReading:
             patch.object(policy_check_service, "get_check", AsyncMock(return_value=None)),
             pytest.raises(HTTPException) as exc,
         ):
-            await router.show_policy_check(check_id=f"polchk-scan-{run.id}", user=_user(), db=db)
+            await router.show_policy_check(
+                request=_tfe_request(), check_id=f"polchk-scan-{run.id}", user=_user(), db=db
+            )
         assert exc.value.status_code == 404
 
 
@@ -151,7 +177,7 @@ class TestOverriding:
             patch.object(router.run_service, "complete_plan", AsyncMock(return_value=run)) as cp,
         ):
             resp = await router.override_policy_check(
-                check_id=f"polchk-opa-{run.id}", user=_user(), db=db
+                request=_tfe_request(), check_id=f"polchk-opa-{run.id}", user=_user(), db=db
             )
         ov.assert_awaited_once_with(db, run, "opa", "user@example.com")
         cp.assert_awaited_once_with(db, run)
@@ -165,7 +191,9 @@ class TestOverriding:
             patch.object(policy_check_service, "override_check", AsyncMock()) as ov,
             pytest.raises(HTTPException) as exc,
         ):
-            await router.override_policy_check(check_id=f"polchk-opa-{run.id}", user=_user(), db=db)
+            await router.override_policy_check(
+                request=_tfe_request(), check_id=f"polchk-opa-{run.id}", user=_user(), db=db
+            )
         assert exc.value.status_code == 403
         ov.assert_not_awaited()
 
@@ -182,7 +210,9 @@ class TestOverriding:
             patch.object(policy_check_service, "override_check", AsyncMock()) as ov,
             pytest.raises(HTTPException) as exc,
         ):
-            await router.override_policy_check(check_id=f"polchk-opa-{run.id}", user=_user(), db=db)
+            await router.override_policy_check(
+                request=_tfe_request(), check_id=f"polchk-opa-{run.id}", user=_user(), db=db
+            )
         assert exc.value.status_code == 409
         ov.assert_not_awaited()
 
@@ -198,7 +228,9 @@ class TestOverriding:
             patch.object(policy_check_service, "override_check", AsyncMock(return_value=1)),
             patch.object(router.run_service, "complete_plan", AsyncMock()) as cp,
         ):
-            await router.override_policy_check(check_id=f"polchk-opa-{run.id}", user=_user(), db=db)
+            await router.override_policy_check(
+                request=_tfe_request(), check_id=f"polchk-opa-{run.id}", user=_user(), db=db
+            )
         cp.assert_not_awaited()
 
 

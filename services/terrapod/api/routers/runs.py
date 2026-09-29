@@ -51,6 +51,7 @@ from terrapod.api.engine_scope import load_workspace_scoped
 from terrapod.api.errors import vcs_unavailable
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import build_meta
+from terrapod.api.prefixes import is_tfe_path
 from terrapod.api.serialization import engine_version_attr
 from terrapod.auth import capabilities as cap
 from terrapod.auth import capability_urls
@@ -69,6 +70,7 @@ from terrapod.db.models import (
     now_utc,
 )
 from terrapod.db.session import get_db
+from terrapod.engines import TERRAFORM
 from terrapod.logging_config import get_logger
 from terrapod.services import (
     agent_pool_service,
@@ -435,12 +437,44 @@ async def _get_workspace(
 
 
 async def _require_run_ws_capability(
-    run: Run, required: str, user: AuthenticatedUser, db: AsyncSession
+    run: Run,
+    required: str,
+    user: AuthenticatedUser,
+    db: AsyncSession,
+    *,
+    request: Request,
 ) -> None:
-    """Check that user holds the required capability on the run's workspace."""
+    """Check that the user holds the required capability on the run's workspace,
+    and that the run belongs to an engine this surface may serve (#1904).
+
+    **The engine check lives here rather than in `_get_run`** because every run
+    handler already calls this one, and a handler that skipped it would have a
+    far louder problem than an engine leak. Putting it in the loader would have
+    meant threading the request through twenty-six call sites; putting it here
+    means one.
+
+    What it fixes: `GET /api/tfe/v2/runs/{id}` returned a Pulumi run with 200,
+    on the surface whose only purpose is `terraform` / `tofu` / `tfci`
+    compatibility — while that run's own workspace answered 404 on the same
+    surface. A CLI handed a run it cannot parse gets no error saying so.
+
+    404, not 403: on the compatibility surface a run belonging to another engine
+    does not exist as far as that client is concerned, and "forbidden" would
+    confirm it exists to a client with no business knowing.
+
+    `request` is **required, not defaulted**, because there is no safe default.
+    Defaulting it to None and reading "no request" as "apply the check" makes a
+    handler that forgets to pass it 404 every Pulumi run on the *native*
+    surface, where they are perfectly legal — `confirm_run` did exactly that
+    for the length of one commit. Defaulting the other way would silently
+    reopen the leak this exists to close. Required means forgetting is a
+    TypeError.
+    """
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
+    if is_tfe_path(request.url.path) and ws.engine != TERRAFORM:
+        raise HTTPException(status_code=404, detail="Run not found")
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, required):
         raise HTTPException(
@@ -716,7 +750,7 @@ async def show_run(
 ) -> JSONResponse:
     """Show a run. Requires read on workspace."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
     ws = await db.get(Workspace, run.workspace_id)
 
     # Look up state version created by this run (detail endpoint only)
@@ -800,6 +834,7 @@ async def list_workspace_runs(
 
 @router.post("/runs/{run_id}/actions/apply")
 async def confirm_run(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -807,7 +842,11 @@ async def confirm_run(
     """Confirm a planned run for apply. Requires write."""
     run = await _get_run(run_id, db)
     await _require_run_ws_capability(
-        run, cap.RUN_APPLY_DESTROY if run.is_destroy else cap.RUN_APPLY, user, db
+        run,
+        cap.RUN_APPLY_DESTROY if run.is_destroy else cap.RUN_APPLY,
+        user,
+        db,
+        request=request,
     )
 
     # No-op apply guard: a plan with has_changes=False has nothing to apply.
@@ -871,13 +910,14 @@ async def confirm_run(
 
 @router.post("/runs/{run_id}/actions/discard")
 async def discard_run(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Discard a planned run. Requires plan."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_CANCEL, user, db)
+    await _require_run_ws_capability(run, cap.RUN_CANCEL, user, db, request=request)
     try:
         run = await run_service.discard_run(db, run)
         await db.commit()
@@ -888,13 +928,14 @@ async def discard_run(
 
 @router.post("/runs/{run_id}/actions/cancel")
 async def cancel_run(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Cancel a run. Requires plan."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_CANCEL, user, db)
+    await _require_run_ws_capability(run, cap.RUN_CANCEL, user, db, request=request)
     try:
         run = await run_service.cancel_run(db, run)
         await db.commit()
@@ -920,6 +961,7 @@ def _retry_capability(run: Run) -> str:
 
 @extensions_router.post("/runs/{run_id}/actions/retry")
 async def retry_run(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -933,7 +975,7 @@ async def retry_run(
     `run:apply` for an apply-capable one, `run:apply-destroy` for a destroy.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, _retry_capability(run), user, db)
+    await _require_run_ws_capability(run, _retry_capability(run), user, db, request=request)
 
     is_terminal = run.status in run_service.TERMINAL_STATES or (
         run.plan_only and run.status == "planned"
@@ -1064,6 +1106,7 @@ def _apply_status(run: Run) -> str:
 
 @router.get("/runs/{run_id}/run-events")
 async def list_run_events(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1074,7 +1117,7 @@ async def list_run_events(
     We synthesize events from the run's status timestamps.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
 
     events = []
     event_pairs = [
@@ -1171,12 +1214,13 @@ async def show_plan_by_id(
     Plan IDs use the same UUID as the run with a 'plan-' prefix.
     """
     run = await _get_run(plan_id.replace("plan-", "run-"), db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
     return JSONResponse(content=_plan_json(run, request))
 
 
 @extensions_router.get("/runs/{run_id}/plan-summary")
 async def show_plan_summary(
+    request: Request,
     run_id: str = Path(...),
     locale: str | None = Query(None),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -1201,7 +1245,7 @@ async def show_plan_summary(
     served with ``translated=false``.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
 
     summary = (
         await db.execute(select(PlanSummary).where(PlanSummary.run_id == run.id))
@@ -1258,6 +1302,7 @@ async def show_plan_summary(
 
 @extensions_router.get("/runs/{run_id}/impact-graph")
 async def show_impact_graph(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1272,7 +1317,7 @@ async def show_impact_graph(
     no JSON plan output.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
 
     graph = await plan_graph_service.get_impact_graph(run)
     if graph is None:
@@ -1294,6 +1339,7 @@ async def show_impact_graph(
 
 @extensions_router.get("/runs/{run_id}/cost-estimate")
 async def show_cost_estimate(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1308,7 +1354,7 @@ async def show_cost_estimate(
     Every figure here is **data** (engine-derived); no AI is involved.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
 
     if not run.has_cost_estimate:
         raise HTTPException(status_code=404, detail="no cost estimate for this run")
@@ -1395,6 +1441,7 @@ def _cost_summary_json(
 
 @extensions_router.get("/runs/{run_id}/cost-summary")
 async def show_cost_summary(
+    request: Request,
     run_id: str = Path(...),
     locale: str | None = Query(None),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -1418,7 +1465,7 @@ async def show_cost_summary(
     with `translated=false`.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
 
     summary = (
         await db.execute(select(CostSummary).where(CostSummary.run_id == run.id))
@@ -1455,6 +1502,7 @@ async def show_cost_summary(
 
 @extensions_router.post("/runs/{run_id}/cost-summary/regenerate")
 async def regenerate_cost_summary(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1475,7 +1523,7 @@ async def regenerate_cost_summary(
         raise HTTPException(status_code=503, detail="AI summary is disabled globally")
 
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
 
     if not run.has_cost_estimate:
         raise HTTPException(status_code=409, detail="run has no cost estimate to narrate")
@@ -1536,12 +1584,16 @@ def _cost_summary_message_attr(msg: CostSummaryMessage) -> dict:
 
 
 async def _resolve_cost_summary_for_chat(
-    run_id: str, user: AuthenticatedUser, db: AsyncSession
+    run_id: str,
+    user: AuthenticatedUser,
+    db: AsyncSession,
+    *,
+    request: Request,
 ) -> tuple[Run, CostSummary, Workspace]:
     """Shared header for both cost-chat endpoints — run exists, user has
     workspace `read`, a ready cost summary exists (404/409 otherwise)."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
     summary = (
         await db.execute(select(CostSummary).where(CostSummary.run_id == run.id))
     ).scalar_one_or_none()
@@ -1562,6 +1614,7 @@ async def _resolve_cost_summary_for_chat(
 
 @extensions_router.get("/runs/{run_id}/cost-summary/messages")
 async def list_cost_summary_messages(
+    request: Request,
     run_id: str = Path(...),
     locale: str | None = Query(None),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -1575,7 +1628,7 @@ async def list_cost_summary_messages(
     language, each message is translated on view (best-effort; ``translated``
     per row).
     """
-    _run, summary, _ws = await _resolve_cost_summary_for_chat(run_id, user, db)
+    _run, summary, _ws = await _resolve_cost_summary_for_chat(run_id, user, db, request=request)
     rows = (
         (
             await db.execute(
@@ -1624,6 +1677,7 @@ async def list_cost_summary_messages(
 
 @extensions_router.post("/runs/{run_id}/cost-summary/messages")
 async def post_cost_summary_message(
+    request: Request,
     run_id: str = Path(...),
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -1656,7 +1710,9 @@ async def post_cost_summary_message(
     except AttributeError:
         raise HTTPException(status_code=400, detail="malformed body") from None
 
-    run, summary, workspace = await _resolve_cost_summary_for_chat(run_id, user, db)
+    run, summary, workspace = await _resolve_cost_summary_for_chat(
+        run_id, user, db, request=request
+    )
 
     if locale:
         content = await summary_translation.normalize_to_system_language(content, locale)
@@ -1719,6 +1775,7 @@ def _summary_kind_for_run(run: Run) -> str | None:
 
 @extensions_router.post("/runs/{run_id}/plan-summary/regenerate")
 async def regenerate_plan_summary(
+    request: Request,
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1746,7 +1803,7 @@ async def regenerate_plan_summary(
         raise HTTPException(status_code=503, detail="AI summary is disabled globally")
 
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
 
     kind = _summary_kind_for_run(run)
     if kind is None:
@@ -1860,7 +1917,11 @@ def _plan_summary_message_attr(msg: PlanSummaryMessage) -> dict:
 
 
 async def _resolve_plan_summary_for_chat(
-    run_id: str, user: AuthenticatedUser, db: AsyncSession
+    run_id: str,
+    user: AuthenticatedUser,
+    db: AsyncSession,
+    *,
+    request: Request,
 ) -> tuple[Run, PlanSummary, Workspace]:
     """Shared header for both chat endpoints.
 
@@ -1869,7 +1930,7 @@ async def _resolve_plan_summary_for_chat(
     plan that hasn't been summarised), and returns the joined rows.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
     summary = (
         await db.execute(select(PlanSummary).where(PlanSummary.run_id == run.id))
     ).scalar_one_or_none()
@@ -1890,6 +1951,7 @@ async def _resolve_plan_summary_for_chat(
 
 @extensions_router.get("/runs/{run_id}/plan-summary/messages")
 async def list_plan_summary_messages(
+    request: Request,
     run_id: str = Path(...),
     locale: str | None = Query(None),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -1911,7 +1973,7 @@ async def list_plan_summary_messages(
     (Redis-cached, best-effort — canonical on failure); the per-message
     ``translated`` flag reflects whether that turn was translated.
     """
-    _run, summary, _ws = await _resolve_plan_summary_for_chat(run_id, user, db)
+    _run, summary, _ws = await _resolve_plan_summary_for_chat(run_id, user, db, request=request)
     rows = (
         (
             await db.execute(
@@ -1964,6 +2026,7 @@ async def list_plan_summary_messages(
 
 @extensions_router.post("/runs/{run_id}/plan-summary/messages")
 async def post_plan_summary_message(
+    request: Request,
     run_id: str = Path(...),
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -2010,7 +2073,9 @@ async def post_plan_summary_message(
     except AttributeError:
         raise HTTPException(status_code=400, detail="malformed body") from None
 
-    run, summary, workspace = await _resolve_plan_summary_for_chat(run_id, user, db)
+    run, summary, workspace = await _resolve_plan_summary_for_chat(
+        run_id, user, db, request=request
+    )
 
     # Normalise the prompt into the system language so the stored thread
     # stays monolingual/authoritative (no-op when reader == system language).
@@ -2072,7 +2137,7 @@ async def show_plan(
 ) -> JSONResponse:
     """Show plan details including log URL."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
     return JSONResponse(content=_plan_json(run, request))
 
 
@@ -2110,7 +2175,7 @@ async def show_apply_by_id(
     Apply IDs use the same UUID as the run with an 'apply-' prefix.
     """
     run = await _get_run(apply_id.replace("apply-", "run-"), db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
     return JSONResponse(content=_apply_json(run, request))
 
 
@@ -2123,7 +2188,7 @@ async def show_apply(
 ) -> JSONResponse:
     """Show apply details including log URL."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
     return JSONResponse(content=_apply_json(run, request))
 
 
@@ -2873,7 +2938,7 @@ async def plan_log(
     if run is None:
         raise HTTPException(status_code=404, detail="Plan not found")
     if user is not None:
-        await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+        await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
 
     return await _serve_log(
         run=run,
@@ -2887,6 +2952,7 @@ async def plan_log(
 
 @router.get("/plans/{plan_id}/json-output")
 async def plan_json_output(
+    request: Request,
     plan_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -2908,7 +2974,7 @@ async def plan_json_output(
     run = await run_service.get_run(db, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Plan not found")
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
 
     # Fast path: the flag is the source of truth. Avoid a storage call
     # for runs that never produced JSON (errored, older, upload failed).
@@ -2950,7 +3016,7 @@ async def apply_log(
     if run is None:
         raise HTTPException(status_code=404, detail="Apply not found")
     if user is not None:
-        await _require_run_ws_capability(run, cap.RUN_READ, user, db)
+        await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
 
     return await _serve_log(
         run=run,

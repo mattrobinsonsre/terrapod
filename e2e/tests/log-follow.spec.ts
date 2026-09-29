@@ -48,7 +48,7 @@ test.describe('Run log follow', () => {
     let status = 'planned';
 
     // Rewrite only the status/actionability on the real run payload.
-    await page.route(`**/api/v2/runs/${runId}`, async (route) => {
+    await page.route(`**/api/*/runs/${runId}`, async (route) => {
       const res = await route.fetch();
       const body = await res.json();
       body.data.attributes.status = status;
@@ -59,7 +59,7 @@ test.describe('Run log follow', () => {
 
     // Swallow the confirm — this is a UI test, not a state mutation. (TFE V2
     // confirms a planned run with `actions/apply`.)
-    await page.route(`**/api/v2/runs/${runId}/actions/apply`, async (route) => {
+    await page.route(`**/api/*/runs/${runId}/actions/apply`, async (route) => {
       status = 'confirmed';
       await route.fulfill({
         status: 200,

@@ -43,6 +43,27 @@ api:
   config:
     # Browser-facing URL via `kubectl port-forward svc/terrapod-web 8080:3000`.
     external_url: "http://localhost:8080"
+    # Engines, stated rather than inherited (#1572).
+    #
+    # The plan said both things: "#1407 §2 — both engines are on by default" and
+    # "§14 — eval has new engines defaulting off". This file overrode neither, so
+    # §2 won silently and nobody reading it could tell which engines an eval
+    # stack would have.
+    #
+    # Resolved in favour of §2, and written down. §14 described a period when the
+    # engines were experimental; Pulumi now ships as a supported engine, and an
+    # evaluation stack that hides a supported engine misrepresents the product to
+    # exactly the person trying to evaluate it.
+    #
+    # It costs a Terraform evaluator nothing: the gate filters `known_engines()`
+    # and leaves routers unmounted, so it deploys nothing extra and an engine's
+    # CLI is fetched only when a run of that engine happens. Set either to
+    # `false` for a Terraform-only eval stack.
+    engines:
+      pulumi:
+        enabled: true
+      ansible:
+        enabled: true
     auth:
       local_enabled: true
       # Don't expire CLI/automation API tokens after 7 idle days without an
@@ -98,27 +119,3 @@ bootstrap:
   # screen after `make eval` shows a populated, real-looking UI instead of an
   # empty workspace list. Eval-only demo data — never enabled in production.
   sampleWorkspace: true
-
-# Engines, stated rather than inherited (#1572).
-#
-# The plan said both things: "#1407 §2 — both engines are on by default" and
-# "§14 — eval has new engines defaulting off". This file overrode neither, so §2
-# won silently and nobody reading it could tell which engines an eval stack
-# would have.
-#
-# Resolved in favour of §2, and written down. §14 described a period when the
-# engines were experimental; Pulumi now ships as a supported engine, and an
-# evaluation stack that hides a supported engine misrepresents the product to
-# exactly the person trying to evaluate it.
-#
-# It costs a Terraform evaluator nothing. The gate filters `known_engines()` and
-# leaves routers unmounted — it deploys nothing extra, and an engine's CLI is
-# fetched only when a run of that engine actually happens. Set either to `false`
-# for a Terraform-only eval stack.
-api:
-  config:
-    engines:
-      pulumi:
-        enabled: true
-      ansible:
-        enabled: true

@@ -20,7 +20,7 @@ import { getStoredToken, createWorkspace, seedRun, uniqueName } from '../helpers
 const LOG_URL = '/__e2e_reserve_log';
 
 async function stubRun(page: Page, runId: string, status: string, log: string) {
-  await page.route(`**/api/v2/runs/${runId}`, async (route) => {
+  await page.route(`**/api/*/runs/${runId}`, async (route) => {
     const res = await route.fetch();
     const body = await res.json();
     body.data.attributes.status = status;

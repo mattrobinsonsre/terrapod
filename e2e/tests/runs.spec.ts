@@ -84,7 +84,7 @@ test.describe('Run lifecycle UI', () => {
     // Assert on what is actually sent: "plan-only" true is the behaviour the
     // issue promised to leave untouched, and a label alone cannot prove it.
     let body: string | null = null;
-    await page.route('**/api/v2/runs', async (route: Route) => {
+    await page.route('**/api/*/runs', async (route: Route) => {
       if (route.request().method() === 'POST') body = route.request().postData();
       await route.continue();
     });
@@ -103,7 +103,7 @@ test.describe('Run lifecycle UI', () => {
     // The API cannot create a drift run — only the drift checker does, and the
     // E2E stack has no runner. So the run payload is stubbed: this pins the UI
     // gate (drift + has-changes ⇒ offer), not the detection itself.
-    await page.route('**/api/v2/runs/run-*', async (route: Route) => {
+    await page.route('**/api/*/runs/run-*', async (route: Route) => {
       const res = await route.fetch();
       const json = await res.json().catch(() => null);
       if (!json?.data?.attributes) return route.fulfill({ response: res });
@@ -150,7 +150,7 @@ test.describe('Run lifecycle UI', () => {
     const runId = await seedRun(token, wsId);
 
     let engine: unknown;
-    await page.route(`**/api/v2/runs/${runId}`, async (route: Route) => {
+    await page.route(`**/api/*/runs/${runId}`, async (route: Route) => {
       const response = await route.fetch();
       const json = await response.json();
       engine = json?.data?.attributes?.engine;

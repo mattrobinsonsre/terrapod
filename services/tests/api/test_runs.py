@@ -156,6 +156,18 @@ def _make_app(user, mock_db=None):
         empty.scalar_one_or_none.return_value = None
         empty.all.return_value = []
         mock_db.execute = AsyncMock(return_value=empty)
+
+        # `db.get(...)` must hand back a workspace with a REAL engine string.
+        # `_require_run_ws_capability` now refuses a run whose workspace belongs
+        # to another engine (#1904), and a bare MagicMock attribute compares
+        # unequal to "terraform" — so every run handler would 404 for a reason
+        # that exists only in the fixture.
+        #
+        # A plain `return_value`, NOT a `side_effect`: a side_effect wins over
+        # `return_value`, so it would silently ignore the several tests that
+        # configure their own workspace with `mock_db.get.return_value = ws`
+        # and hand them this generic one instead.
+        mock_db.get = AsyncMock(return_value=_mock_workspace())
     app.dependency_overrides[get_db] = lambda: mock_db
     return app, mock_db
 

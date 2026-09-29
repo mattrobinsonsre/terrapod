@@ -56,6 +56,44 @@ async def _workspace(client, name: str, engine: str) -> str:
     return resp.json()["data"]["id"]
 
 
+async def _runnable(client, name: str, engine: str) -> str:
+    """A workspace with an uploaded configuration version, so a run can exist.
+
+    Created on the NATIVE surface throughout — the compatibility one refuses a
+    Pulumi workspace, which is the property under test.
+    """
+    ws = await _workspace(client, name, engine)
+    resp = await client.post(
+        f"/api/v1/workspaces/{ws}/configuration-versions",
+        json={"data": {"type": "configuration-versions", "attributes": {"auto-queue-runs": False}}},
+        headers=AUTH,
+    )
+    assert resp.status_code == 201, resp.text
+    upload = await client.put(
+        resp.json()["data"]["attributes"]["upload-url"],
+        content=b"placeholder-tarball-for-tests",
+        headers={"Content-Type": "application/x-tar"},
+    )
+    assert upload.status_code in (200, 204), upload.text
+    return ws
+
+
+async def _run_on(client, ws: str) -> str:
+    resp = await client.post(
+        "/api/v1/runs",
+        json={
+            "data": {
+                "type": "runs",
+                "attributes": {"plan-only": True},
+                "relationships": {"workspace": {"data": {"type": "workspaces", "id": ws}}},
+            }
+        },
+        headers=AUTH,
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["data"]["id"]
+
+
 class TestAPulumiWorkspaceIsInvisibleOnTheCompatibilitySurface:
     @pytest.mark.parametrize("prefix", TFE_PREFIXES)
     @pytest.mark.parametrize("sub", ["", "/runs", "/configuration-versions", "/vars"])
@@ -103,3 +141,73 @@ class TestTerraformIsUnaffectedEverywhere:
         ws = await _workspace(client, f"scoped-tf{sub.replace('/', '-') or '-self'}", "terraform")
         resp = await client.get(f"{prefix}/workspaces/{ws}{sub}", headers=AUTH)
         assert resp.status_code == 200, f"{prefix}{sub}: {resp.text}"
+
+
+class TestARunIsScopedLikeItsWorkspace:
+    """#1904. The workspace fix did not cover runs: the guard sees
+    `select(Model)`, and a run is reached by primary key through the service
+    layer, so `GET /api/tfe/v2/runs/{id}` went on answering 200 for a Pulumi run
+    whose own workspace answered 404 on the same surface.
+
+    The check lives at `_require_run_ws_capability`, which every run handler
+    already calls — one place rather than twenty-six, and a handler that skipped
+    it would have a far louder problem than an engine leak.
+    """
+
+    @pytest.mark.parametrize("prefix", TFE_PREFIXES)
+    async def test_a_pulumi_run_is_not_served_to_the_compatibility_surface(
+        self, app, client, prefix
+    ):
+        set_auth(app, admin_user())
+        ws = await _runnable(client, f"scoped-run{len(prefix)}::dev", "pulumi")
+        run = await _run_on(client, ws)
+        resp = await client.get(f"{prefix}/runs/{run}", headers=AUTH)
+        assert resp.status_code == 404, (
+            f"{prefix}/runs/{{id}} served a Pulumi run ({resp.status_code}) — a "
+            f"`terraform` client will try to parse it and gets no error saying so"
+        )
+
+    @pytest.mark.parametrize("prefix", NATIVE_PREFIXES)
+    async def test_but_terrapods_own_surface_serves_it(self, app, client, prefix):
+        set_auth(app, admin_user())
+        ws = await _runnable(client, f"scoped-nrun{len(prefix)}::dev", "pulumi")
+        run = await _run_on(client, ws)
+        resp = await client.get(f"{prefix}/runs/{run}", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+
+    @pytest.mark.parametrize("prefix", TFE_PREFIXES + NATIVE_PREFIXES)
+    async def test_a_terraform_run_is_served_everywhere(self, app, client, prefix):
+        set_auth(app, admin_user())
+        ws = await _runnable(client, f"scoped-tfrun{len(prefix)}", "terraform")
+        run = await _run_on(client, ws)
+        assert (await client.get(f"{prefix}/runs/{run}", headers=AUTH)).status_code == 200
+
+    @pytest.mark.parametrize("prefix", NATIVE_PREFIXES)
+    @pytest.mark.parametrize("action", ["apply", "cancel"])
+    async def test_a_mutating_route_still_works_on_the_native_surface(
+        self, app, client, prefix, action
+    ):
+        """A read is not enough to prove the check reads the surface.
+
+        The check is keyed on the request's path, so a handler that takes a
+        `Request` and forgets to hand it over falls into the "no request" case —
+        and the only safe reading of that is "apply the check", which 404s a
+        Pulumi run on the surface that exists to serve it. `confirm_run` did
+        precisely this: it grew the parameter and never passed it, which no read
+        test could see because reads were already threaded.
+
+        Asserted as a bound rather than an exact status, because what these
+        answer depends on the run's state — the point is only that the engine
+        check let them through to find out. 5xx is excluded because `request` is
+        now a required keyword there, so the other shape of the same mistake —
+        omitting it entirely — surfaces as a TypeError rather than a 404.
+        """
+        set_auth(app, admin_user())
+        ws = await _runnable(client, f"scoped-mut{action}{len(prefix)}::dev", "pulumi")
+        run = await _run_on(client, ws)
+        resp = await client.post(f"{prefix}/runs/{run}/actions/{action}", headers=AUTH)
+        assert resp.status_code != 404 and resp.status_code < 500, (
+            f"{prefix}/runs/{{id}}/actions/{action} answered {resp.status_code} "
+            f"for a Pulumi run on Terrapod's own surface — the handler is not "
+            f"telling the engine check which surface asked: {resp.text}"
+        )

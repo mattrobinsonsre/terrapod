@@ -178,7 +178,10 @@ class TestTheRoutesPassTheRequest:
         mock_get_run.return_value = run
         mock_caps.return_value = caps_for_level("read")
         db = AsyncMock()
-        db.get.return_value = MagicMock()
+        # A real engine string: on the TFE surface a run whose workspace belongs
+        # to another engine is 404 (#1904), and a bare MagicMock attribute is
+        # never equal to "terraform".
+        db.get.return_value = MagicMock(engine="terraform")
         app = create_app()
         app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
             email="u@example.com",

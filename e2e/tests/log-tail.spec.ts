@@ -42,7 +42,7 @@ test.describe('Run log tail', () => {
     // Reads at offset 0 after the phase ended — the first is in the gap.
     let finishedReads = 0;
 
-    await page.route(`**/api/v2/runs/${runId}`, async (route) => {
+    await page.route(`**/api/*/runs/${runId}`, async (route) => {
       const res = await route.fetch();
       const body = await res.json();
       body.data.attributes.status = status;

@@ -68,7 +68,7 @@ const PADDING = Array.from({ length: 120 }, (_, i) =>
 
 /** Serve the run, its plan object, and the log — framed, or still arriving. */
 async function stubRun(page: import('@playwright/test').Page, { complete }: { complete: boolean }) {
-  await page.route(`**/api/v2/runs/${RUN_ID}`, async route => {
+  await page.route(`**/api/*/runs/${RUN_ID}`, async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/vnd.api+json',

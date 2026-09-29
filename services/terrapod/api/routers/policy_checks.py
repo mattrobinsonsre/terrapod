@@ -27,10 +27,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.api.ids import parse_id
 from terrapod.api.pagination import paginate
+from terrapod.api.prefixes import is_tfe_path
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db
+from terrapod.engines import TERRAFORM
 from terrapod.logging_config import get_logger
 from terrapod.services import policy_check_service, run_service
 from terrapod.services.policy_check_service import PolicyCheck
@@ -80,12 +82,31 @@ def _check_json(check: PolicyCheck, *, can_override: bool) -> dict:
     }
 
 
-async def _run_and_caps(db: AsyncSession, user: AuthenticatedUser, run_uuid) -> tuple[Run, set]:
+async def _run_and_caps(
+    db: AsyncSession,
+    user: AuthenticatedUser,
+    run_uuid,
+    *,
+    request: Request,
+) -> tuple[Run, set]:
+    """Resolve a run and the caller's capabilities on its workspace.
+
+    Engine-scoped for the same reason `runs._require_run_ws_capability` is
+    (#1904): the run id comes from the client, and on the TFE surface a run
+    belonging to another engine does not exist. Without this a `terraform`
+    client could read the policy checks of a Pulumi run.
+
+    `request` is required rather than defaulted for the reason spelled out on
+    `runs._require_run_ws_capability`: neither default is safe, so the language
+    should make forgetting it a TypeError.
+    """
     run = await db.get(Run, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if is_tfe_path(request.url.path) and ws.engine != TERRAFORM:
         raise HTTPException(status_code=404, detail="Run not found")
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.RUN_READ):
@@ -96,14 +117,18 @@ async def _run_and_caps(db: AsyncSession, user: AuthenticatedUser, run_uuid) -> 
 
 
 async def _check_for(
-    db: AsyncSession, user: AuthenticatedUser, value: str
+    db: AsyncSession,
+    user: AuthenticatedUser,
+    value: str,
+    *,
+    request: Request,
 ) -> tuple[Run, set, PolicyCheck]:
     parsed = policy_check_service.parse_check_id(value)
     if parsed is None:
         raise HTTPException(status_code=404, detail="Policy check not found")
     kind, run_uuid = parsed
     try:
-        run, caps = await _run_and_caps(db, user, run_uuid)
+        run, caps = await _run_and_caps(db, user, run_uuid, request=request)
     except HTTPException as exc:
         raise HTTPException(status_code=404, detail="Policy check not found") from exc
     check = await policy_check_service.get_check(db, run, kind)
@@ -126,7 +151,7 @@ async def list_policy_checks(
 ) -> JSONResponse:
     """A run's policy checks: OPA first, then the security scan."""
     run_uuid = parse_id(run_id, "run-", detail="Run not found")
-    run, caps = await _run_and_caps(db, user, run_uuid)
+    run, caps = await _run_and_caps(db, user, run_uuid, request=request)
     checks = await policy_check_service.list_checks(db, run)
     can_override = _can_override(caps)
     data = [_check_json(c, can_override=can_override) for c in checks]
@@ -136,27 +161,30 @@ async def list_policy_checks(
 
 @router.get("/policy-checks/{check_id}")
 async def show_policy_check(
+    request: Request,
     check_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    _, caps, check = await _check_for(db, user, check_id)
+    _, caps, check = await _check_for(db, user, check_id, request=request)
     return JSONResponse(content={"data": _check_json(check, can_override=_can_override(caps))})
 
 
 @router.get("/policy-checks/{check_id}/output")
 async def policy_check_output(
+    request: Request,
     check_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PlainTextResponse:
     """What the check found, as the CLI prints it."""
-    _, _, check = await _check_for(db, user, check_id)
+    _, _, check = await _check_for(db, user, check_id, request=request)
     return PlainTextResponse(check.output + "\n")
 
 
 @router.post("/policy-checks/{check_id}/actions/override")
 async def override_policy_check(
+    request: Request,
     check_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -167,7 +195,7 @@ async def override_policy_check(
     straight after overriding it reads the run and applies only if the run is
     confirmable by then.
     """
-    run, caps, check = await _check_for(db, user, check_id)
+    run, caps, check = await _check_for(db, user, check_id, request=request)
     if not _can_override(caps):
         raise HTTPException(status_code=403, detail="Requires admin permission on workspace")
     if not check.is_overridable:

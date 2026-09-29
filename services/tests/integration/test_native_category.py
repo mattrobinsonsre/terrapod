@@ -57,9 +57,18 @@ async def _workspace(client, name: str, engine: str = "terraform") -> str:
     return resp.json()["data"]["id"]
 
 
-async def _var(client, ws_id: str, key: str, category: str, value: str = "v"):
+async def _var(
+    client, ws_id: str, key: str, category: str, value: str = "v", prefix: str = "/api/v2"
+):
+    """Write a variable. `prefix` matters for a PULUMI workspace (#1572).
+
+    The TFE-compatible surface serves Terraform only, so a Pulumi workspace is
+    not reachable through it at all — its variables are written on Terrapod's own
+    surface. Defaults to `/api/v2` because most of this file is about the two
+    names one category wears, which is a Terraform-workspace question.
+    """
     return await client.post(
-        f"/api/v2/workspaces/{ws_id}/vars",
+        f"{prefix}/workspaces/{ws_id}/vars",
         json={
             "data": {
                 "type": "vars",
@@ -142,8 +151,8 @@ class TestEachSurfaceServesTheNameItsClientsHold:
         means a provider setting. Nothing here splits or prefixes it."""
         set_auth(app, admin_user())
         ws = await _workspace(client, "nc-verbatim::dev", engine="pulumi")
-        assert (await _var(client, ws, "aws:region", "native")).status_code == 201
-        assert "aws:region" in await _vars(client, ws)
+        assert (await _var(client, ws, "aws:region", "native", prefix="/api/v1")).status_code == 201
+        assert "aws:region" in await _vars(client, ws, "/api/v1")
 
 
 class TestTheCategoryIsTheSameOnEveryEngine:
@@ -157,7 +166,9 @@ class TestTheCategoryIsTheSameOnEveryEngine:
         # Pulumi names a workspace `project::stack`; Terraform does not.
         name = "nc-engine-pulumi::dev" if engine == "pulumi" else "nc-engine-terraform"
         ws = await _workspace(client, name, engine=engine)
-        assert (await _var(client, ws, "region", "native")).status_code == 201
+        # Native surface for both: it is the one that serves every engine, which
+        # is the point of the test.
+        assert (await _var(client, ws, "region", "native", prefix="/api/v1")).status_code == 201
         assert (await _vars(client, ws, "/api/v1"))["region"]["category"] == "native"
 
     async def test_env_is_untouched_by_the_collapse(self, app, client) -> None:
@@ -165,6 +176,7 @@ class TestTheCategoryIsTheSameOnEveryEngine:
         whatever engine runs — and must keep its own name on both surfaces."""
         set_auth(app, admin_user())
         ws = await _workspace(client, "nc-env::dev", engine="pulumi")
-        assert (await _var(client, ws, "AWS_REGION", "env")).status_code == 201
-        for prefix in ("/api/v2", "/api/v1"):
-            assert (await _vars(client, ws, prefix))["AWS_REGION"]["category"] == "env"
+        assert (await _var(client, ws, "AWS_REGION", "env", prefix="/api/v1")).status_code == 201
+        # Only the native surface — a Pulumi workspace is not on the other one
+        # (#1572), so reading it there would be asserting the leak.
+        assert (await _vars(client, ws, "/api/v1"))["AWS_REGION"]["category"] == "env"

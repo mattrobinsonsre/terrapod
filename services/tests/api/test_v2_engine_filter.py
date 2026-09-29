@@ -81,6 +81,37 @@ GUARDED = {"Workspace", "Run", "ConfigurationVersion"}
 #: Keyed by module, because the exceptions are specific to the file they sit in
 #: and a flat set would silently excuse a same-named function elsewhere.
 UNSCOPED_BY_DESIGN: dict[str, dict[str, str]] = {
+    "policy_checks.py": {
+        # A Run carries no engine column — `_engine_filter(Run)` is a subquery
+        # through its workspace for exactly that reason — so a run lookup cannot
+        # be filtered in place. The check is two lines below, on the workspace,
+        # and `test_run_lookups_are_scoped_at_their_chokepoint` asserts it is
+        # really there rather than letting this entry excuse nothing.
+        "_run_and_caps": "runs have no engine column; scoped via the workspace below",
+    },
+    "registry_modules.py": {
+        # Links a registry module to a client-named workspace. It writes a
+        # relationship and returns no workspace data, so nothing about another
+        # engine's row reaches the caller — the operation is merely reachable
+        # from a door it has no business being behind, which is a tidiness
+        # question rather than a leak.
+        "create_workspace_link": "write that references a workspace, returns none of it",
+    },
+    "variables.py": {
+        "add_varset_workspaces": "write that references a workspace, returns none of it",
+    },
+    "runs.py": {
+        # The CV id comes from the run-create body, and the run is created on a
+        # workspace that IS scoped just above. Neither lookup returns CV data;
+        # they decide `plan_only` and whether to queue. Worth noting that
+        # ownership of the CV is not checked against the workspace either — a
+        # separate concern from engine scoping, and not one this guard is about.
+        "create_run": "decides queueing from a CV; returns no CV data",
+        # Loads the owning workspace of a run that has already been resolved and
+        # authorized, which is where the engine check itself now lives.
+        "_resolve_cost_summary_for_chat": "workspace of an already-authorized run",
+        "_resolve_plan_summary_for_chat": "workspace of an already-authorized run",
+    },
     "config_versions.py": {
         # Both hang off a workspace that `_get_workspace` already scoped, so the
         # rows reachable here belong to a workspace this surface may see. Listed
@@ -89,15 +120,6 @@ UNSCOPED_BY_DESIGN: dict[str, dict[str, str]] = {
         # would wonder which one is load-bearing.
         "list_configuration_versions": "rows of an already-scoped workspace",
         "upload_configuration": "runs of an already-scoped configuration version",
-    },
-    "runs.py": {
-        # Loads the owning workspace of a run that has already been resolved and
-        # authorized. Filtering here would 404 the workspace of a run the caller
-        # was just allowed to read, which is a worse answer than the one it
-        # replaces. The scoping that matters for these is on the RUN lookup —
-        # see the blind spot noted above.
-        "_resolve_cost_summary_for_chat": "workspace of an already-authorized run",
-        "_resolve_plan_summary_for_chat": "workspace of an already-authorized run",
     },
     "tfe_v2.py": {
         # The create body moved here when the native surface gained an `engine`
@@ -124,12 +146,29 @@ def _enclosing_function(tree: ast.AST, lineno: int) -> str:
 
 
 def _select_calls(tree: ast.AST):
-    """Every `select(Model)` whose model is engine-scoped, with its statement."""
+    """Every engine-scoped lookup: `select(Model)` AND `db.get(Model, pk)`.
+
+    `db.get` was the gap that let #1904 through. A primary-key load reads no more
+    safely than a query — it just reads shorter, and the guard could not see it.
+    """
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
-        if not (isinstance(node.func, ast.Name) and node.func.id == "select"):
+        is_select = isinstance(node.func, ast.Name) and node.func.id == "select"
+        is_get = isinstance(node.func, ast.Attribute) and node.func.attr == "get"
+        if not (is_select or is_get):
             continue
+
+        # `db.get(Model, X)` is only interesting when X came from the CLIENT.
+        # `db.get(Workspace, run.workspace_id)` derives from a row that has
+        # already been loaded and authorized, so it inherits that row's scoping —
+        # flagging it would mean twenty allow-list entries saying the same thing,
+        # which trains people to add entries instead of thinking. A bare name is
+        # the dangerous shape: it is a path parameter, and nothing has vouched
+        # for it yet.
+        if is_get and len(node.args) > 1 and isinstance(node.args[1], ast.Attribute):
+            continue
+
         for arg in node.args:
             if isinstance(arg, ast.Name) and arg.id in GUARDED:
                 yield node, arg.id
@@ -233,3 +272,84 @@ def test_the_filter_helper_is_not_the_auxiliary_run_filter():
     body = ast.dump(engine_fn)
     assert "engine" in body, "_engine_filter must actually compare the engine column"
     assert "source" not in body, "_engine_filter must not have absorbed run-source logic"
+
+
+@pytest.mark.parametrize(
+    "module,func",
+    [
+        ("runs.py", "_require_run_ws_capability"),
+        ("policy_checks.py", "_run_and_caps"),
+    ],
+)
+def test_run_lookups_are_scoped_at_their_chokepoint(module: str, func: str):
+    """A run is scoped through its workspace, at the one function every handler
+    for that surface already calls.
+
+    This is the other half of the `policy_checks._run_and_caps` allow-list entry.
+    A `Run` has no engine column, so the filter cannot sit on the run query; the
+    protection is a check on the run's workspace instead. Without this test the
+    allow-list entry would be a promise nobody verifies — which is how #1904
+    happened in the first place, a rule believed to hold in files nobody checked.
+
+    Asserted on the source rather than a response because the point is
+    structural: the check must be at the chokepoint, not in whichever handler
+    someone remembered.
+    """
+    src = (API / "routers" / module).read_text()
+    tree = ast.parse(src)
+    fn = next(
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func
+    )
+    body = ast.get_source_segment(src, fn) or ""
+    assert "is_tfe_path" in body, (
+        f"{module}:{func}() no longer decides on the request's surface — a run "
+        "belonging to another engine would be served to a `terraform` client"
+    )
+    assert "TERRAFORM" in body, f"{module}:{func}() no longer compares the engine"
+    assert "404" in body, (
+        f"{module}:{func}() should answer 404, not 403 — on the compatibility "
+        "surface the run does not exist, and 403 would confirm that it does"
+    )
+
+
+@pytest.mark.parametrize(
+    ("module", "func"),
+    [("runs.py", "_require_run_ws_capability"), ("policy_checks.py", "_run_and_caps")],
+)
+def test_every_caller_of_the_chokepoint_hands_it_the_request(module: str, func: str):
+    """The chokepoint decides on the request's surface, so every caller must
+    give it one.
+
+    `request` is a required keyword there, so a caller that forgets is a
+    TypeError — but only on the line that runs, and a route no test exercises
+    would ship broken. `confirm_run` shipped exactly that for one commit: it
+    took a `Request`, never passed it, and every Pulumi apply on the *native*
+    surface would have answered 404 for a run that is perfectly legal there.
+
+    Static, therefore, rather than relying on coverage to find it.
+    """
+    src = (API / "routers" / module).read_text()
+    tree = ast.parse(src)
+    missing = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if getattr(node.func, "id", None) != func:
+            continue
+        if not any(kw.arg == "request" for kw in node.keywords):
+            enclosing = next(
+                (
+                    f.name
+                    for f in ast.walk(tree)
+                    if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and f.lineno <= node.lineno <= (f.end_lineno or f.lineno)
+                ),
+                "<module>",
+            )
+            missing.append(f"{enclosing} (line {node.lineno})")
+    assert not missing, (
+        f"{module}: these call {func}() without passing `request=`, so the "
+        f"engine check cannot tell which surface asked: {', '.join(missing)}"
+    )

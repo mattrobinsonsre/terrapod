@@ -606,7 +606,7 @@ test.describe('Responsive harness (phone viewport)', () => {
       '  + resource "aws_s3_bucket" "assets" {\n    }\n\n' +
       'Plan: 1 to add, 1 to change, 0 to destroy.\n\x03';
 
-    await page.route(`**/api/v2/runs/${runId}`, async (route: Route) => {
+    await page.route(`**/api/*/runs/${runId}`, async (route: Route) => {
       const res = await route.fetch();
       const json = await res.json();
       json.data.attributes.status = 'planned';
@@ -648,7 +648,7 @@ test.describe('Responsive harness (phone viewport)', () => {
     const runId = await seedRun(token, wsId);
     const body = Array.from({ length: 40 }, (_, i) => `plan ${i}  Still reading...`).join('\n') + '\n';
 
-    await page.route(`**/api/v2/runs/${runId}`, async (route: Route) => {
+    await page.route(`**/api/*/runs/${runId}`, async (route: Route) => {
       const res = await route.fetch();
       const json = await res.json();
       json.data.attributes.status = 'planning';
