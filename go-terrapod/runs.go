@@ -69,6 +69,20 @@ type Run struct {
 	PlanOnly                bool   `json:"plan-only"`
 	Source                  string `json:"source,omitempty"`
 	ExecutionBackend        string `json:"execution-backend,omitempty"`
+	// Engine names which engine produced this run — "terraform" or "pulumi".
+	// The server sets it on every run, derived from the workspace, because a run
+	// stores no copy (#1536). Without it a Run is not self-describing: a caller
+	// holding one cannot tell which vocabulary its phases use, nor which of the
+	// fields below mean anything.
+	Engine string `json:"engine,omitempty"`
+	// PulumiStack is the `{org}/{project}/{stack}` triple this run drives, and
+	// is set only on a Pulumi run.
+	PulumiStack string `json:"pulumi-stack,omitempty"`
+	// PulumiBindPlan records whether this run bound its update to the plan its
+	// preview saved. A pointer, because the server sends null on every engine
+	// but Pulumi — "does not apply" and "switched off" are different answers,
+	// and a plain bool reports the second for both.
+	PulumiBindPlan *bool `json:"pulumi-bind-plan,omitempty"`
 	// EngineVersion is the version of whichever engine this run used.
 	// TerraformVersion is the same version under its original name — the API
 	// returns both, always equal, because go-tfe reads "terraform-version"
@@ -376,6 +390,9 @@ func runFromResource(res *Resource) *Run {
 		PlanOnly:                GetBoolAttr(res, "plan-only"),
 		Source:                  GetStringAttr(res, "source"),
 		ExecutionBackend:        GetStringAttr(res, "execution-backend"),
+		Engine:                  GetStringAttr(res, "engine"),
+		PulumiStack:             GetStringAttr(res, "pulumi-stack"),
+		PulumiBindPlan:          GetBoolPtrAttr(res, "pulumi-bind-plan"),
 		// Both carry the resolved value, whichever name the server used (#1559).
 		EngineVersion:     engineVersionAttr(res),
 		TerraformVersion:  engineVersionAttr(res),

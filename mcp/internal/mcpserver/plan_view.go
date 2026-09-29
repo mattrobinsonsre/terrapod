@@ -165,6 +165,28 @@ func isReplace(actions []string) bool {
 }
 
 // parsePlan decodes a `tofu show -json` document.
+// planDocumentEngine returns the engine that produced a plan document, where
+// the document says so.
+//
+// A Pulumi preview produces no Terraform plan JSON. What lands in the same
+// artifact slot is a preview digest — `{"engine":"pulumi","change_summary":…,
+// "steps":[…]}` — which shares not one field with `tofu show -json`. Unmarshalled
+// into `tfPlan` it parses cleanly and yields nothing: no `resource_changes`, so
+// the compact view reported `0 to add, 0 to change, 0 to destroy` for a preview
+// creating any number of resources, with no error and no hint. A wrong answer
+// given confidently is worse than a refusal, so the caller checks this first.
+//
+// Empty for a Terraform plan, which carries no `engine` field.
+func planDocumentEngine(raw []byte) string {
+	var probe struct {
+		Engine string `json:"engine"`
+	}
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		return ""
+	}
+	return probe.Engine
+}
+
 func parsePlan(raw []byte) (*tfPlan, error) {
 	var p tfPlan
 	if err := json.Unmarshal(raw, &p); err != nil {

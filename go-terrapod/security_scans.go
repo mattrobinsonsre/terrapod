@@ -61,6 +61,66 @@ func (c *Client) GetRunSecurityScan(ctx context.Context, runID string) (*Securit
 	return securityScanFromBody(data, runID)
 }
 
+// SecurityScanStatus is a run's scan together with the meta that explains a
+// missing one.
+//
+// The endpoint answers 200 with a null data body in three quite different
+// situations — scanning is off, the run has not been scanned yet, and the run's
+// engine cannot be scanned at all — and the server sends
+// `meta.not-evaluated-reason` precisely so the third is not an unexplained null
+// (#1567). GetRunSecurityScan discards it, so a caller asking about a Pulumi run
+// is told "no scan" with no way to learn that none is coming.
+type SecurityScanStatus struct {
+	// Scan is the recorded result, or nil when there is none.
+	Scan *SecurityScan
+
+	// NotEvaluatedReason says why no scan is coming, in the server's own words.
+	// Empty when a scan exists, and also when one is simply not recorded yet —
+	// so it distinguishes "never" from "not yet", which Scan == nil does not.
+	NotEvaluatedReason string
+
+	// Summary is the run's scan summary (total and blocking counts) as the
+	// server computes it, which is populated whether or not Scan is set.
+	Summary map[string]any
+}
+
+// GetRunSecurityScanStatus fetches a run's security scan along with the reason
+// there is not one, where the server gives a reason.
+//
+// Prefer this to GetRunSecurityScan anywhere the answer is shown to a person or
+// an agent: a bare nil reads as "clean" and can mean "this engine is never
+// scanned".
+func (c *Client) GetRunSecurityScanStatus(
+	ctx context.Context, runID string,
+) (*SecurityScanStatus, error) {
+	id, err := runIDPath(runID)
+	if err != nil {
+		return nil, err
+	}
+	data, err := c.Get(ctx, "/api/terrapod/v1/runs/"+id+"/security-scan")
+	if err != nil {
+		return nil, err
+	}
+	var envelope struct {
+		Meta struct {
+			NotEvaluatedReason string         `json:"not-evaluated-reason"`
+			Summary            map[string]any `json:"summary"`
+		} `json:"meta"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return nil, fmt.Errorf("parse security-scan response: %w", err)
+	}
+	scan, err := securityScanFromBody(data, runID)
+	if err != nil {
+		return nil, err
+	}
+	return &SecurityScanStatus{
+		Scan:               scan,
+		NotEvaluatedReason: envelope.Meta.NotEvaluatedReason,
+		Summary:            envelope.Meta.Summary,
+	}, nil
+}
+
 // OverrideRunSecurityScan overrides a blocking security scan for a run (requires
 // workspace admin). A run still held in planning by the scan gate is re-driven
 // immediately. Returns the (now overridden) scan, or (nil, nil) if none was

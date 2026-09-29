@@ -244,6 +244,21 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			}
 			return errResult(err), planJSONOut{}, nil
 		}
+		// A Pulumi preview writes a digest into this slot, not a Terraform plan
+		// (#1572). It shares no field with `tofu show -json`, so it unmarshals
+		// cleanly into tfPlan and yields nothing — the compact view reported
+		// "0 to add, 0 to change, 0 to destroy" for a preview creating any
+		// number of resources. Refuse the question rather than answer it wrongly,
+		// and name the view that does have the answer.
+		if engine := planDocumentEngine(raw); view == "changes" && engine != "" && engine != "terraform" {
+			return errText(fmt.Sprintf(
+				"run %s was produced by the %s engine, which writes a preview digest "+
+					"rather than a Terraform plan. This view reads `tofu show -json` and "+
+					"would report no changes for it. Use view=\"full\" to read the digest "+
+					"(its change_summary and steps), or terrapod_run_logs for the preview "+
+					"as a person sees it.", in.RunID, engine)), planJSONOut{}, nil
+		}
+
 		plan, err := parsePlan(raw)
 		if err != nil {
 			// Never echo the body: it can be megabytes.
@@ -562,22 +577,35 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	})
 
 	// ── terrapod_run_security_scan ───────────────────────────────────
+	// A bare scan cannot answer "why is there none". The server sends a reason
+	// precisely so a null is not unexplained (#1567) — a Pulumi run is never
+	// scanned, and an agent told only "null" reads that as "nothing found".
+	type runScanOut struct {
+		Scan               *terrapod.SecurityScan `json:"scan"`
+		NotEvaluatedReason string                 `json:"not_evaluated_reason,omitempty"`
+		Summary            map[string]any         `json:"summary,omitempty"`
+	}
+
 	type runScanIn struct {
 		RunID string `json:"run_id" jsonschema:"the run id (run-... or a bare uuid) whose IaC security-scan result to fetch"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_security_scan",
-		Description: "Get a run's deterministic IaC security-scan result (Checkov/Trivy misconfiguration scan). Returns the engine, enforcement level (off/advisory/enforced), severity threshold, outcome (passed/failed/errored), the normalised findings (rule id, severity, resource, file:line), a summary (total + blocking counts), and any override. Returns null when the workspace has scanning off or the run wasn't scanned.",
+		Description: "Get a run's deterministic IaC security-scan result (Checkov/Trivy misconfiguration scan). Returns the engine, enforcement level (off/advisory/enforced), severity threshold, outcome (passed/failed/errored), the normalised findings (rule id, severity, resource, file:line), a summary (total + blocking counts), and any override. When there is no scan, `not_evaluated_reason` says why — a run whose engine is never scanned is not the same as a clean one.",
 		Annotations: readOnly,
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runScanIn) (*mcp.CallToolResult, *terrapod.SecurityScan, error) {
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runScanIn) (*mcp.CallToolResult, *runScanOut, error) {
 		if in.RunID == "" {
 			return errText("run_id is required"), nil, nil
 		}
-		sc, err := c.GetRunSecurityScan(ctx, in.RunID)
+		st, err := c.GetRunSecurityScanStatus(ctx, in.RunID)
 		if err != nil {
 			return errResult(err), nil, nil
 		}
-		return nil, sc, nil
+		return nil, &runScanOut{
+			Scan:               st.Scan,
+			NotEvaluatedReason: st.NotEvaluatedReason,
+			Summary:            st.Summary,
+		}, nil
 	})
 
 	// ── terrapod_run_ai_policy ───────────────────────────────────────

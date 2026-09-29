@@ -151,6 +151,25 @@ func GetBoolAttr(r *Resource, key string) bool {
 	return b
 }
 
+// GetBoolPtrAttr returns a bool-typed attribute from r, or nil where the
+// attribute is absent or JSON null.
+//
+// The distinction matters where the server uses null to mean "does not apply to
+// this row" rather than "false". A run's `pulumi-bind-plan` is null on every
+// engine but Pulumi, and collapsing that to false would report a setting as
+// switched off on a run that cannot have it at all.
+func GetBoolPtrAttr(r *Resource, key string) *bool {
+	raw, ok := r.Attributes[key]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var b bool
+	if err := json.Unmarshal(raw, &b); err != nil {
+		return nil
+	}
+	return &b
+}
+
 // GetIntAttr returns an int64-typed attribute from r. Floats from
 // the wire (Terrapod's API sometimes returns ints as JSON numbers
 // without fractional parts) are coerced to int64.
