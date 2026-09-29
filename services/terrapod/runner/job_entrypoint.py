@@ -829,6 +829,34 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
 
 
 def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyped-def]
+    """Run the phase with a loopback plugin proxy alive for the whole of it.
+
+    The proxy is started here rather than beside the env var it serves because
+    plugins download during `preview` and `up` themselves, not in a dependency
+    step — and because this function returns from a dozen places, so only a
+    `finally` around all of them can promise the thread is stopped.
+
+    One per Job, which is one per phase: preview and update run in different
+    pods and neither can see the other's.
+    """
+    from terrapod.runner.phases import pulumi_exec
+
+    proxy = None
+    if cfg.api_url:
+        proxy = pulumi_exec.CacheProxy(cfg.api_url, cfg.auth_token, "pulumi")
+        proxy.start()
+    try:
+        return _run_pulumi_phase_inner(
+            cfg, child_grace=child_grace, plugin_proxy_port=proxy.port if proxy else 0
+        )
+    finally:
+        if proxy is not None:
+            proxy.stop()
+
+
+def _run_pulumi_phase_inner(  # type: ignore[no-untyped-def]
+    cfg, *, child_grace: int, plugin_proxy_port: int
+) -> int:
     """Run one Pulumi phase.
 
     `preview` then `up`, against Terrapod's own Pulumi service backend (#1881).
@@ -877,7 +905,9 @@ def _run_pulumi_phase(cfg, *, child_grace: int) -> int:  # type: ignore[no-untyp
     # its backend override file. The one thing set later is the preview branch's
     # `PULUMI_DEBUG_COMMANDS`, which the CLI reads for nothing but whether
     # `--event-log` is a flag it recognises.
-    os.environ.update(pulumi_exec.plugin_override_env(cfg.api_url, cfg.auth_token))
+    os.environ.update(
+        pulumi_exec.plugin_override_env(cfg.api_url, cfg.auth_token, plugin_proxy_port)
+    )
     os.environ.update(pulumi_exec.service_backend_env(cfg.api_url, cfg.auth_token))
 
     # Decide what to run before fetching what runs it, so an unrecognised phase

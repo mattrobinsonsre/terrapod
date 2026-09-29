@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from terrapod.runner.phases import pulumi_deps
+from terrapod.runner.phases import pulumi_deps, pulumi_exec
 
 
 def _program(tmp_path: Path, pulumi_yaml: str | None = None, **files: str) -> Path:
@@ -375,6 +375,9 @@ class TestGo:
 
         class _Resp:
             status_code = 200
+            # A real httpx response always has these; the shim reads them
+            # to decide what to forward.
+            headers: dict[str, str] = {}
 
             def iter_bytes(self):
                 yield b"module-bytes"
@@ -391,8 +394,8 @@ class TestGo:
             seen["follow"] = follow_redirects
             return _Resp()
 
-        with patch.object(pulumi_deps.httpx, "stream", fake_stream):
-            proxy = pulumi_deps._ModuleProxy("http://terrapod-api:8000", self.SECRET)
+        with patch.object(pulumi_exec.httpx, "stream", fake_stream):
+            proxy = pulumi_exec.CacheProxy("http://terrapod-api:8000", self.SECRET, "go")
             proxy.start()
             try:
                 got = urllib.request.urlopen(
@@ -410,7 +413,7 @@ class TestGo:
         assert seen["follow"] is True
 
     def test_the_shim_binds_loopback_only(self):
-        proxy = pulumi_deps._ModuleProxy("http://x", "t")
+        proxy = pulumi_exec.CacheProxy("http://x", "t", "go")
         try:
             assert proxy._server.server_address[0] == "127.0.0.1"
         finally:
@@ -420,7 +423,7 @@ class TestGo:
         # `shutdown()` waits for a serve loop to acknowledge it, so on a server
         # that never served it blocks for ever — and `stop()` is called from the
         # `finally` that is supposed to guarantee cleanup.
-        proxy = pulumi_deps._ModuleProxy("http://x", "t")
+        proxy = pulumi_exec.CacheProxy("http://x", "t", "go")
         proxy.stop()
 
     def test_an_upstream_failure_becomes_a_502_not_a_crash(self):
@@ -430,8 +433,8 @@ class TestGo:
         def boom(*a, **k):
             raise RuntimeError("upstream is down")
 
-        with patch.object(pulumi_deps.httpx, "stream", boom):
-            proxy = pulumi_deps._ModuleProxy("http://terrapod-api:8000", "t")
+        with patch.object(pulumi_exec.httpx, "stream", boom):
+            proxy = pulumi_exec.CacheProxy("http://terrapod-api:8000", "t", "go")
             proxy.start()
             try:
                 with pytest.raises(urllib.error.HTTPError) as e:
@@ -457,9 +460,9 @@ class TestGo:
         monkeypatch.setattr(
             pulumi_deps.exec_subprocess, "run", lambda *a, **k: MagicMock(exit_code=1)
         )
-        real_stop = pulumi_deps._ModuleProxy.stop
+        real_stop = pulumi_exec.CacheProxy.stop
         monkeypatch.setattr(
-            pulumi_deps._ModuleProxy,
+            pulumi_exec.CacheProxy,
             "stop",
             lambda self: (stopped.append(1), real_stop(self))[1],
         )

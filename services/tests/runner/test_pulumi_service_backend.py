@@ -61,13 +61,23 @@ class TestTheBackendEnv:
         assert url == f"{API}/api/terrapod/v1/pulumi"
         assert "/api/v1/pulumi" not in url
 
-    def test_the_plugin_override_uses_the_same_prefix(self) -> None:
-        """The two reach one API; a run whose backend and plugin host disagreed
-        about the prefix would fail in whichever half was wrong."""
-        override = pulumi_exec.plugin_override_env(API, TOKEN)[
+    def test_the_plugin_override_goes_through_the_shim(self) -> None:
+        """The prefix the two once had to agree on is now the shim's business.
+
+        The CLI is pointed at loopback (#1906) and `CacheProxy` builds the
+        upstream URL itself, so the backend is the only half of this pair that
+        still names a path on the API.
+        """
+        override = pulumi_exec.plugin_override_env(API, TOKEN, 7777)[
             "PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES"
         ]
-        assert override == f".*={API}{ALIAS_PREFIX}/package-cache/pulumi"
+        assert override == ".*=http://127.0.0.1:7777"
+
+        proxy = pulumi_exec.CacheProxy(API, TOKEN, "pulumi")
+        try:
+            assert proxy._upstream == f"{API}{ALIAS_PREFIX}/package-cache/pulumi"
+        finally:
+            proxy.stop()
 
     def test_a_trailing_slash_does_not_double_up(self) -> None:
         env = pulumi_exec.service_backend_env(f"{API}/", TOKEN)
@@ -92,7 +102,7 @@ class TestTheBackendEnv:
         after the other — so a disagreement would be won silently by whichever
         ran last."""
         backend = pulumi_exec.service_backend_env(API, TOKEN)
-        plugins = pulumi_exec.plugin_override_env(API, TOKEN)
+        plugins = pulumi_exec.plugin_override_env(API, TOKEN, 1)
         assert backend["PULUMI_ACCESS_TOKEN"] == plugins["PULUMI_ACCESS_TOKEN"] == TOKEN
 
 

@@ -61,18 +61,179 @@ class TestThePluginOverride:
         uses its default host. So it works for anyone with egress and hangs for
         anyone air-gapped, which is the failure this asserts away.
         """
-        value = pulumi_exec.plugin_override_env(API, "tok")["PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES"]
+        value = pulumi_exec.plugin_override_env(API, "tok", 9999)[
+            "PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES"
+        ]
         assert value.startswith(".*=")
 
-    def test_it_points_at_the_package_cache_on_the_alias_prefix(self) -> None:
-        value = pulumi_exec.plugin_override_env(API, "tok")["PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES"]
-        assert value == f".*={API}/api/terrapod/v1/package-cache/pulumi"
+    def test_it_points_at_the_loopback_shim_not_the_api(self) -> None:
+        """#1906. Straight at the API, every download answered 401.
+
+        The cache requires a credential and Pulumi's plugin downloader sends
+        none — `PULUMI_ACCESS_TOKEN` is the service backend's and is not carried
+        to a plugin host — so no program using any provider could run. The shim
+        holds the token; the CLI carries nothing and has nothing to refuse.
+        """
+        value = pulumi_exec.plugin_override_env(API, "tok", 5432)[
+            "PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES"
+        ]
+        assert value == ".*=http://127.0.0.1:5432"
+        assert API not in value, "the CLI must not be pointed at a host it cannot authenticate to"
 
     def test_the_token_is_carried(self) -> None:
-        assert pulumi_exec.plugin_override_env(API, "tok")["PULUMI_ACCESS_TOKEN"] == "tok"
+        assert pulumi_exec.plugin_override_env(API, "tok", 1)["PULUMI_ACCESS_TOKEN"] == "tok"
 
     def test_no_api_url_sets_nothing(self) -> None:
-        assert pulumi_exec.plugin_override_env("", "tok") == {}
+        assert pulumi_exec.plugin_override_env("", "tok", 1) == {}
+
+    def test_the_port_is_required(self) -> None:
+        """Not defaulted, because the only default is the broken direct URL —
+        a caller that forgot would silently get back the 401."""
+        import inspect
+
+        params = inspect.signature(pulumi_exec.plugin_override_env).parameters
+        assert params["proxy_port"].default is inspect.Parameter.empty
+
+
+class TestThePluginProxyAuthenticates:
+    """The behaviour, not the spelling of the env var.
+
+    Every test above this asserted the shape of a string. That is exactly what
+    let #1906 ship: the override was well-formed, agreed with the backend on its
+    prefix and carried a token nobody sent — and no provider could be downloaded.
+    """
+
+    SECRET = "runtok:abc"  # noqa: S105 - a fixture, not a credential
+
+    def test_a_plugin_download_reaches_the_cache_with_the_runs_token(self) -> None:
+        import urllib.request
+        from unittest.mock import patch
+
+        seen: dict[str, object] = {}
+
+        class _Resp:
+            status_code = 200
+            # A real httpx response always has these; the shim reads them
+            # to decide what to forward.
+            headers: dict[str, str] = {}
+
+            def iter_bytes(self):
+                yield b"plugin-tarball"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def fake_stream(method, url, headers=None, timeout=None, follow_redirects=False):
+            seen["url"] = url
+            seen["auth"] = (headers or {}).get("Authorization")
+            return _Resp()
+
+        with patch.object(pulumi_exec.httpx, "stream", fake_stream):
+            proxy = pulumi_exec.CacheProxy(API, self.SECRET, "pulumi")
+            proxy.start()
+            try:
+                env = pulumi_exec.plugin_override_env(API, self.SECRET, proxy.port)
+                base = env["PULUMI_PLUGIN_DOWNLOAD_URL_OVERRIDES"].removeprefix(".*=")
+                got = urllib.request.urlopen(
+                    f"{base}/pulumi-resource-random-v4.21.2-linux-arm64.tar.gz", timeout=10
+                ).read()
+            finally:
+                proxy.stop()
+
+        assert got == b"plugin-tarball"
+        assert seen["auth"] == f"Bearer {self.SECRET}", (
+            "the shim did not carry the run's token — this is the 401 the CLI got"
+        )
+        assert seen["url"] == (
+            f"{API}/api/terrapod/v1/package-cache/pulumi"
+            "/pulumi-resource-random-v4.21.2-linux-arm64.tar.gz"
+        )
+
+    def test_the_body_length_is_forwarded(self) -> None:
+        """Pulumi refuses a download whose length it cannot confirm.
+
+        It compares what it copied against Content-Length, and an absent header
+        reads as -1, so it never matches: *"expected -1 bytes but copied
+        19525050"*. The plugin arrived intact and was thrown away. The go
+        command does not check, which is how the shim ran without this.
+        """
+        import urllib.request
+        from unittest.mock import patch
+
+        body = b"x" * 4096
+
+        class _Resp:
+            status_code = 200
+            headers = {"content-length": str(len(body)), "content-type": "application/gzip"}
+
+            def iter_bytes(self):
+                yield body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        with patch.object(pulumi_exec.httpx, "stream", lambda *a, **k: _Resp()):
+            proxy = pulumi_exec.CacheProxy(API, "t", "pulumi")
+            proxy.start()
+            try:
+                resp = urllib.request.urlopen(f"http://127.0.0.1:{proxy.port}/p.tar.gz", timeout=10)
+                got = resp.read()
+            finally:
+                proxy.stop()
+
+        assert resp.headers["Content-Length"] == str(len(body))
+        assert resp.headers["Content-Type"] == "application/gzip"
+        assert got == body
+
+    def test_an_encoded_body_forwards_no_length(self) -> None:
+        """httpx decompresses on the way through, so the upstream's length
+        describes bytes the shim no longer has. Sending it would swap one
+        mismatch for another."""
+        import urllib.request
+        from unittest.mock import patch
+
+        class _Resp:
+            status_code = 200
+            headers = {"content-length": "11", "content-encoding": "gzip"}
+
+            def iter_bytes(self):
+                yield b"decompressed-and-longer"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        with patch.object(pulumi_exec.httpx, "stream", lambda *a, **k: _Resp()):
+            proxy = pulumi_exec.CacheProxy(API, "t", "pulumi")
+            proxy.start()
+            try:
+                resp = urllib.request.urlopen(f"http://127.0.0.1:{proxy.port}/p", timeout=10)
+                got = resp.read()
+            finally:
+                proxy.stop()
+
+        assert resp.headers.get("Content-Length") is None
+        assert got == b"decompressed-and-longer"
+
+    def test_the_two_segments_do_not_share_an_upstream(self) -> None:
+        """One class, two caches. A segment that leaked would send plugin
+        requests to the Go proxy, which answers 404 for every one of them."""
+        pulumi = pulumi_exec.CacheProxy(API, "t", "pulumi")
+        go = pulumi_exec.CacheProxy(API, "t", "go")
+        try:
+            assert pulumi._upstream.endswith("/package-cache/pulumi")
+            assert go._upstream.endswith("/package-cache/go")
+        finally:
+            pulumi.stop()
+            go.stop()
 
 
 class TestThePhaseArgv:

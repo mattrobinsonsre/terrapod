@@ -30,16 +30,12 @@ import os
 import re
 import shutil
 import sys
-import threading
 import urllib.parse
 from dataclasses import dataclass
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-import httpx
-
 from terrapod.runner import exec_subprocess
-from terrapod.runner.phases import platform_tool
+from terrapod.runner.phases import platform_tool, pulumi_exec
 
 #: Where npm is told to keep its cache. `$HOME/.npm` would also work -- $HOME is
 #: an emptyDir -- but /tmp is the larger of the two by convention here and npm's
@@ -387,89 +383,6 @@ def pip_env(api_url: str) -> dict[str, str]:
     return env
 
 
-class _ModuleProxy(threading.Thread):
-    """A loopback shim that holds the run's token so the go command need not.
-
-    The go command will talk plain HTTP to a module proxy quite happily -- but it
-    will **never** carry a credential over one. Not in the URL ("refusing to pass
-    credentials to insecure URL"), not from a netrc, and not from a `GOAUTH`
-    helper either: the header is dropped in silence and the fetch comes back 401.
-    All three were tried against a real proxy before this was written.
-
-    The runner reaches the API over an in-cluster HTTP URL in many deployments,
-    and every Terrapod package-cache route requires authentication -- so on that
-    path Go can reach the proxy and can never use it.
-
-    This closes the gap without weakening anything. It listens on 127.0.0.1,
-    forwards to the API with the run's own token, and `GOPROXY` points at it: Go
-    carries no credential, so it has nothing to refuse. The token travels exactly
-    the hop it already travels for this run's artifacts, its state and its
-    binaries -- Go's blanket rule is simply stricter than the one the rest of the
-    Job lives by.
-
-    It exists only for the length of the install and serves GET alone.
-    """
-
-    def __init__(self, api_url: str, token: str) -> None:
-        super().__init__(daemon=True)
-        self._upstream = f"{api_url.rstrip('/')}{_API_PREFIX}/package-cache/go"
-        self._token = token
-        self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
-        self.port = self._server.server_address[1]
-
-    def _handler(self):  # type: ignore[no-untyped-def]
-        upstream, token = self._upstream, self._token
-
-        class Handler(BaseHTTPRequestHandler):
-            # The runner's log is the run's log; the proxy's own chatter would
-            # bury the go command's output in it.
-            def log_message(self, *args: object) -> None:  # noqa: A003
-                return
-
-            def do_GET(self) -> None:  # noqa: N802
-                headers = {"Authorization": f"Bearer {token}"}
-                try:
-                    # Redirects are followed HERE, not handed to Go. The proxy
-                    # answers a module download with a 302 to presigned storage,
-                    # and the go command does not follow one -- it reports the
-                    # 302 as the error. The target needs no credential, so
-                    # following it costs nothing and keeps Go out of it.
-                    with httpx.stream(
-                        "GET",
-                        upstream + self.path,
-                        headers=headers,
-                        timeout=120.0,
-                        follow_redirects=True,
-                    ) as r:
-                        self.send_response(r.status_code)
-                        self.end_headers()
-                        # Streamed, not buffered: a module zip runs to tens of
-                        # megabytes and this is in the runner's own process.
-                        for chunk in r.iter_bytes():
-                            self.wfile.write(chunk)
-                except Exception as exc:  # noqa: BLE001 - reported to the client
-                    self.send_response(502)
-                    self.end_headers()
-                    self.wfile.write(str(exc).encode())
-
-        return Handler
-
-    def run(self) -> None:
-        self._server.serve_forever(poll_interval=0.2)
-
-    def stop(self) -> None:
-        """Stop serving. Safe to call whether or not the thread ever started.
-
-        `shutdown()` waits for the serve loop to acknowledge it, so on a server
-        that never began serving it blocks for ever -- which, called from the
-        `finally` that guarantees cleanup, would hang the run instead of ending
-        it. The liveness check is what makes the guarantee safe to make.
-        """
-        if self.is_alive():
-            self._server.shutdown()
-        self._server.server_close()
-
-
 def nuget_source_url(api_url: str) -> str:
     """Terrapod's NuGet service index."""
     return f"{api_url.rstrip('/')}{_API_PREFIX}/package-cache/nuget/index.json"
@@ -603,7 +516,7 @@ def _install_go(cfg, program_dir: Path, *, child_grace: float, log_file: str, lo
     # the modules are safely on disk.
     os.environ["PATH"] = f"{go.parent}{os.pathsep}{os.environ.get('PATH', '')}"
 
-    proxy = _ModuleProxy(cfg.api_url, cfg.auth_token)
+    proxy = pulumi_exec.CacheProxy(cfg.api_url, cfg.auth_token, "go")
     proxy.start()
     log.info("module proxy listening", port=proxy.port)
     try:
