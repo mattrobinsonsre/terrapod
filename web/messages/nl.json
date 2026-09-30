@@ -3503,7 +3503,7 @@
         "logApplySkipped": "Er is niets bijgewerkt: het preview bevatte geen wijzigingen, dus er was niets bij te werken.",
         "logIndexSummary": "Previewsamenvatting",
         "logIndexTitle": "Ga naar een resourcewijziging of naar de previewsamenvatting",
-        "logPlanEmpty": "Nog geen previewuitvoer beschikbaar.",
+        "logPlanEmpty": "Nog geen preview-uitvoer beschikbaar.",
         "nonDefaultRefNote": "Niet-standaard ref geselecteerd — uitvoering is alleen preview",
         "planExpiryDescription": "Verwerp een onbevestigd preview automatisch zodra het ouder is dan dit, zodat een verouderd preview niet kan worden doorgevoerd in een veranderde wereld. Standaard uit; het preview moet dan opnieuw worden uitgevoerd. (Alleen van toepassing op uitvoeringen die kunnen bijwerken.)",
         "planExpiryTitle": "Previewverval",

@@ -3458,15 +3458,15 @@
         "applying": "A executar pulumi up"
       },
       "runStatus": {
-        "planning": "A previewear",
-        "planned": "Previeweado",
+        "planning": "A gerar preview",
+        "planned": "Preview gerado",
         "applying": "A atualizar",
         "applied": "Atualizado"
       },
       "status": {
-        "planning": "A previewear",
+        "planning": "A gerar preview",
         "applying": "A atualizar",
-        "planned": "Previeweado",
+        "planned": "Preview gerado",
         "applied": "Atualizado"
       },
       "words": {
@@ -3483,13 +3483,13 @@
         "aiSummaryTitle": "Resumo do Preview por IA",
         "badgePlanOnly": "apenas preview",
         "bannerPlanOnlyCli": "Esta é uma execução <strong>apenas preview</strong> iniciada a partir da CLI num workspace ligado ao VCS. O update não está disponível para código carregado pela CLI — apenas código gerido pelo VCS pode ser atualizado.",
-        "changesPlanning": "A previewear…",
+        "changesPlanning": "A gerar preview…",
         "configurationsEmpty": "Ainda não há versões de configuração. Aparecem aqui assim que um push de VCS aciona uma execução.",
         "confirmApply": "Atualizar esta execução? Isto executa o preview e altera a infraestrutura.",
         "confirmDiscard": "Descartar este preview?",
         "costNoState": "Ainda sem custo — aparece após a primeira atualização.",
         "detailsPlanOnly": "Apenas Preview",
-        "discardedHeading": "Descartado — reprevieweamento necessário",
+        "discardedHeading": "Descartado — é necessário um novo preview",
         "driftCheckNowTitle": "Colocar na fila uma execução apenas de preview para verificar o drift",
         "driftRemediate": "Preview + update",
         "driftRemediateConfirm": "Colocar em fila uma execução preview + update para esta área de trabalho?",
@@ -3531,7 +3531,7 @@
         "timelineApplied": "Atualizado",
         "timelineApplyingStarted": "Atualização iniciada",
         "timelinePlanComplete": "Preview concluído",
-        "timelinePlanningStarted": "Previeweamento iniciado",
+        "timelinePlanningStarted": "Preview iniciado",
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Qualquer pessoa que possa fazer merge do PR pode atualizar. As regras de proteção de branch (revisões obrigatórias, verificações de estado, aprovação de code owner) passam a ser a barreira. O RBAC de função/etiqueta do Terrapod<em>não</em> se aplica a ações acionadas por comentários neste modo.",
         "vcsWorkflowWarningRecommended": "<strong>Recomendado:</strong> exija histórico linear (rebase/squash antes do merge) para que o commit a partir do qual atualiza seja o commit que fica.",

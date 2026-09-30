@@ -3458,15 +3458,15 @@
         "applying": "pulumi up çalıştırılıyor"
       },
       "runStatus": {
-        "planning": "Previewlanıyor",
-        "planned": "Previewlandı",
+        "planning": "Preview oluşturuluyor",
+        "planned": "Preview oluşturuldu",
         "applying": "Güncelleniyor",
         "applied": "Güncellendi"
       },
       "status": {
-        "planning": "Previewlanıyor",
+        "planning": "Preview oluşturuluyor",
         "applying": "Güncelleniyor",
-        "planned": "Previewlandı",
+        "planned": "Preview oluşturuldu",
         "applied": "Güncellendi"
       },
       "words": {
@@ -3483,13 +3483,13 @@
         "aiSummaryTitle": "AI Preview Özeti",
         "badgePlanOnly": "yalnızca preview",
         "bannerPlanOnlyCli": "Bu, VCS bağlı bir çalışma alanında CLI''den başlatılan <strong>yalnızca preview</strong> çalıştırmasıdır. CLI ile yüklenen kod için güncelleme kullanılamaz — yalnızca VCS ile yönetilen kod güncellenebilir.",
-        "changesPlanning": "Previewlanıyor…",
+        "changesPlanning": "Preview oluşturuluyor…",
         "configurationsEmpty": "Henüz yapılandırma sürümü yok. Bir VCS gönderimi bir çalıştırmayı tetiklediğinde burada görünürler.",
         "confirmApply": "Bu çalıştırmada güncelleme yapılsın mı? Bu, previewı yürütür ve altyapıyı değiştirir.",
         "confirmDiscard": "Bu preview iptal edilsin mi?",
         "costNoState": "Henüz maliyet yok — ilk güncellemeden sonra görünür.",
         "detailsPlanOnly": "Yalnızca Preview",
-        "discardedHeading": "İptal edildi — yeniden previewlama gerekli",
+        "discardedHeading": "İptal edildi — yeniden preview gerekli",
         "driftCheckNowTitle": "Sürüklenmeyi denetlemek için yalnızca preview çalıştırması sıraya al",
         "driftRemediate": "Preview + update",
         "driftRemediateConfirm": "Bu çalışma alanı için preview + update çalıştırması kuyruğa alınsın mı?",
@@ -3531,7 +3531,7 @@
         "timelineApplied": "Güncellendi",
         "timelineApplyingStarted": "Güncelleme başladı",
         "timelinePlanComplete": "Preview tamamlandı",
-        "timelinePlanningStarted": "Previewlama başladı",
+        "timelinePlanningStarted": "Preview başladı",
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "PR''ı birleştirebilen herkes güncelleyebilir. Dal koruma kuralları (gerekli incelemeler, durum denetimleri, kod sahibi onayı) kapı haline gelir. Terrapod rol/etiket RBAC''si bu modda yorum güdümlü eylemlere<em>uygulanmaz</em>.",
         "vcsWorkflowWarningRecommended": "<strong>Önerilir:</strong> güncellemeyi yaptığınız commit''in yerleşen commit olması için doğrusal geçmiş gerektirin (birleştirmeden önce rebase/squash yapın).",

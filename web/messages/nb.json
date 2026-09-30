@@ -3458,15 +3458,15 @@
         "applying": "Kjører pulumi up"
       },
       "runStatus": {
-        "planning": "Previewlegger",
-        "planned": "Previewlagt",
+        "planning": "Previewer",
+        "planned": "Previewet",
         "applying": "Oppdaterer",
         "applied": "Oppdatert"
       },
       "status": {
-        "planning": "Previewlegger",
+        "planning": "Previewer",
         "applying": "Oppdaterer",
-        "planned": "Previewlagt",
+        "planned": "Previewet",
         "applied": "Oppdatert"
       },
       "words": {
@@ -3483,13 +3483,13 @@
         "aiSummaryTitle": "AI-previewsammendrag",
         "badgePlanOnly": "kun preview",
         "bannerPlanOnlyCli": "Dette er en <strong>kun-preview</strong>-kjøring startet fra CLI-en på et VCS-tilkoblet arbeidsområde. Oppdatering er ikke tilgjengelig for CLI-opplastet kode – kun VCS-administrert kode kan oppdateres.",
-        "changesPlanning": "Previewlegger …",
+        "changesPlanning": "Previewer …",
         "configurationsEmpty": "Ingen konfigurasjonsversjoner ennå. De vises her så snart en VCS-push utløser en kjøring.",
         "confirmApply": "Oppdatere denne kjøringen? Dette gjennomfører previewen og endrer infrastruktur.",
         "confirmDiscard": "Forkaste denne previewen?",
         "costNoState": "Ingen kostnad ennå — vises etter første oppdatering.",
         "detailsPlanOnly": "Kun preview",
-        "discardedHeading": "Forkastet – ny previewlegging kreves",
+        "discardedHeading": "Forkastet – ny preview kreves",
         "driftCheckNowTitle": "Legg en kun-preview-kjøring i kø for å kontrollere avdrift",
         "driftRemediate": "Preview + update",
         "driftRemediateConfirm": "Legge en preview + update-kjøring i kø for dette arbeidsområdet?",
@@ -3531,7 +3531,7 @@
         "timelineApplied": "Oppdatert",
         "timelineApplyingStarted": "Oppdatering startet",
         "timelinePlanComplete": "Preview fullført",
-        "timelinePlanningStarted": "Previewlegging startet",
+        "timelinePlanningStarted": "Preview startet",
         "typePlanApply": "preview + oppdater",
         "vcsWorkflowWarningRbac": "Alle som kan slå sammen PR-en kan oppdatere. Grenbeskyttelsesregler (påkrevde gjennomganger, statuskontroller, kodeierens godkjenning) blir porten. Terrapod rolle-/etikett-RBAC gjelder<em>ikke</em> for kommentardrevne handlinger i denne modusen.",
         "vcsWorkflowWarningRecommended": "<strong>Anbefalt:</strong> krev lineær historikk (rebase/squash før sammenslåing) slik at kommitteringen du oppdaterer fra er den kommitteringen som lander.",

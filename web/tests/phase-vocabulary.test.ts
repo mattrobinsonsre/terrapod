@@ -517,3 +517,66 @@ test('no locale carries a stem that only parsed as "plan" or "apply"', () => {
       'same file (for example its timelinePlanningStarted).',
   )
 })
+
+// A phase VERB is never the Terraform verb with the stem swapped (#1920).
+//
+// #1919 cleared five English-derived locales; eleven more carried the same blind
+// `Plan`->`Preview` substitution in languages that build the verb with native
+// morphology, so it produced non-words: `Previewlægger` (da), `Previewerar` (sv),
+// `Previewificando` (es), `Previewification` (fr), `Previewejando` (pt-BR),
+// `Previewowanie` (pl), `Previewlanıyor` (tr), `Previewung` (de).
+//
+// Scoped to the keys whose value IS a verb form, and derived from each locale's own
+// Terraform string rather than deny-listing shapes. That scoping is what makes it
+// precise: a blanket derived rule flags every locale whose *correct* form happens to
+// be the naive substitution, which is common and right for compound nouns and loan
+// declension — Polish `previewu` is the genuine genitive, Norwegian
+// `Previewsammendrag` a genuine compound, and ~55 such values are deliberately kept.
+// Those all live in other keys.
+const VERB_KEYS = [
+  ['runStatus', 'planning'], ['runStatus', 'planned'],
+  ['status', 'planning'], ['status', 'planned'],
+  ['words', 'changesPlanning'], ['words', 'timelinePlanningStarted'],
+  ['words', 'discardedHeading'],
+] as const
+
+/** Where the naive substitution happens to BE the correct form, with the reason. */
+const NAIVE_IS_CORRECT: Record<string, string> = {
+  'nl.json:status.planned':
+    '`previewen` is a real Dutch verb (cf. downloaden); its weak participle is ' +
+    '`gepreviewd` because the stem ends voiced, so it falls outside ’t kofschip',
+  'nl.json:runStatus.planned': 'same participle as status.planned',
+}
+
+test('a phase verb is never the Terraform verb with the stem swapped', () => {
+  const dir = join(import.meta.dirname, '../messages')
+  const naive = (s: string) =>
+    s
+      .replace(/Plan(?=\p{L})/gu, 'Preview')
+      .replace(/plan(?=\p{L})/gu, 'preview')
+      .replace(/Apply(?=\p{L})/gu, 'Up')
+      .replace(/apply(?=\p{L})/gu, 'up')
+
+  const offenders: string[] = []
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const phases = JSON.parse(readFileSync(join(dir, file), 'utf8')).phases
+    if (!phases?.terraform || !phases?.pulumi) continue
+    for (const [group, key] of VERB_KEYS) {
+      const before = phases.terraform[group]?.[key]
+      const after = phases.pulumi[group]?.[key]
+      if (typeof before !== 'string' || typeof after !== 'string') continue
+      const mangled = naive(before)
+      if (mangled === before) continue // no word-internal substitution to make
+      if (after === mangled && !NAIVE_IS_CORRECT[`${file}:${group}.${key}`]) {
+        offenders.push(`${file}:${group}.${key} = ${JSON.stringify(after)}`)
+      }
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    'these phase verbs are the Terraform verb with the stem substituted, which in a ' +
+      'language that inflects natively leaves a non-word. Build the form from this ' +
+      "locale's own Pulumi vocabulary — its apply-phase badge shows the construction.",
+  )
+})

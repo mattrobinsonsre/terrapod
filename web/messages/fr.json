@@ -3458,15 +3458,15 @@
         "applying": "Exécution de pulumi up"
       },
       "runStatus": {
-        "planning": "Previewification",
-        "planned": "Previewifié",
+        "planning": "Preview en cours",
+        "planned": "Preview généré",
         "applying": "Mise à jour en cours",
         "applied": "Mis à jour"
       },
       "status": {
-        "planning": "Previewification",
+        "planning": "Preview en cours",
         "applying": "Mise à jour en cours",
-        "planned": "Previewifié",
+        "planned": "Preview généré",
         "applied": "Mis à jour"
       },
       "words": {
@@ -3483,13 +3483,13 @@
         "aiSummaryTitle": "Résumé de preview IA",
         "badgePlanOnly": "preview uniquement",
         "bannerPlanOnlyCli": "Ceci est une exécution en <strong>preview uniquement</strong> initiée depuis la CLI sur un espace de travail connecté au VCS. La mise à jour n''est pas disponible pour le code téléversé depuis la CLI — seul le code géré par le VCS peut être mis à jour.",
-        "changesPlanning": "Previewification…",
+        "changesPlanning": "Preview en cours…",
         "configurationsEmpty": "Aucune version de configuration pour l''instant. Elles apparaissent ici dès qu''un push VCS déclenche une exécution.",
         "confirmApply": "Mettre à jour cette exécution ? Cela exécute le preview et modifie l''infrastructure.",
         "confirmDiscard": "Abandonner ce preview ?",
         "costNoState": "Aucun coût pour l''instant — apparaît après la première mise à jour.",
         "detailsPlanOnly": "Preview uniquement",
-        "discardedHeading": "Abandonné — nouvelle previewification requise",
+        "discardedHeading": "Abandonné — nouveau preview requis",
         "driftCheckNowTitle": "Mettre en file d'attente une exécution en preview uniquement pour vérifier la dérive",
         "driftRemediate": "Preview + update",
         "driftRemediateConfirm": "Mettre en file un run preview + update pour cet espace de travail ?",
@@ -3531,7 +3531,7 @@
         "timelineApplied": "Mis à jour",
         "timelineApplyingStarted": "Mise à jour démarrée",
         "timelinePlanComplete": "Preview terminé",
-        "timelinePlanningStarted": "Previewification démarrée",
+        "timelinePlanningStarted": "Preview démarré",
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Quiconque peut fusionner la PR peut mettre à jour. Les règles de protection de branche (revues requises, vérifications de statut, approbation des propriétaires de code) deviennent le point de contrôle. Le RBAC par rôle/label de Terrapod ne s''applique <em>pas</em> aux actions pilotées par commentaire dans ce mode.",
         "vcsWorkflowWarningRecommended": "<strong>Recommandé :</strong> exigez un historique linéaire (rebase/squash avant fusion) pour que le commit depuis lequel vous mettez à jour soit le commit qui arrive.",

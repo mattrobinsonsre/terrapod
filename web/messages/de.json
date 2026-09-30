@@ -3458,15 +3458,15 @@
         "applying": "pulumi up wird ausgeführt"
       },
       "runStatus": {
-        "planning": "Previewt",
-        "planned": "Gepreviewt",
+        "planning": "Preview läuft",
+        "planned": "Preview abgeschlossen",
         "applying": "Wird aktualisiert",
         "applied": "Aktualisiert"
       },
       "status": {
-        "planning": "Wird gepreviewt",
+        "planning": "Preview läuft",
         "applying": "Wird aktualisiert",
-        "planned": "Gepreviewt",
+        "planned": "Preview abgeschlossen",
         "applied": "Aktualisiert"
       },
       "words": {
@@ -3483,7 +3483,7 @@
         "aiSummaryTitle": "KI-Preview-Zusammenfassung",
         "badgePlanOnly": "Nur Preview",
         "bannerPlanOnlyCli": "Dies ist eine <strong>Nur-Preview</strong>-Ausführung, die über die Befehlszeilenschnittstelle in einem mit einem VCS verbundenen Arbeitsbereich gestartet wurde. Für über die Befehlszeilenschnittstelle hochgeladenen Code ist keine Aktualisierung möglich — nur über das VCS verwalteter Code kann aktualisiert werden.",
-        "changesPlanning": "Previewt…",
+        "changesPlanning": "Preview läuft…",
         "configurationsEmpty": "Noch keine Konfigurationsversionen. Sie erscheinen hier, sobald ein VCS-Push eine Ausführung auslöst.",
         "confirmApply": "Diese Ausführung aktualisieren? Dadurch wird der Preview durchgeführt und die Infrastruktur verändert.",
         "confirmDiscard": "Diesen Preview verwerfen?",
@@ -3501,8 +3501,8 @@
         "lockLockedDesc": "Dieser Arbeitsbereich ist gesperrt. Es können keine Previews oder Updates ausgeführt werden.",
         "logApplyEmpty": "Noch keine Aktualisierungs-Ausgabe verfügbar.",
         "logApplySkipped": "Es wurde nichts aktualisiert: Der Preview enthielt keine Änderungen, daher gab es nichts zu aktualisieren.",
-        "logIndexSummary": "Previewübersicht",
-        "logIndexTitle": "Zu einer Ressourcenänderung oder zur Previewübersicht springen",
+        "logIndexSummary": "Preview-Übersicht",
+        "logIndexTitle": "Zu einer Ressourcenänderung oder zur Preview-Übersicht springen",
         "logPlanEmpty": "Noch keine Preview-Ausgabe verfügbar.",
         "nonDefaultRefNote": "Nicht-Standard-Ref ausgewählt — Ausführung erfolgt nur als Preview",
         "planExpiryDescription": "Verwirft einen unbestätigten Preview automatisch, sobald er älter als dieser Wert ist, damit ein veralteter Preview nicht gegen eine veränderte Umgebung durchgeführt werden kann. Standardmäßig deaktiviert; der Preview muss dann erneut ausgeführt werden. (Gilt nur für aktualisierungsfähige Ausführungen.)",
@@ -3531,7 +3531,7 @@
         "timelineApplied": "Aktualisiert",
         "timelineApplyingStarted": "Aktualisierung gestartet",
         "timelinePlanComplete": "Preview abgeschlossen",
-        "timelinePlanningStarted": "Previewung gestartet",
+        "timelinePlanningStarted": "Preview gestartet",
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Jeder, der den PR zusammenführen kann, kann aktualisieren. Branch-Schutzregeln (erforderliche Reviews, Statusprüfungen, Code-Owner-Freigabe) werden zur Kontrollinstanz. Die Rollen-/Label-RBAC von Terrapod gilt in diesem Modus <em>nicht</em> für kommentargesteuerte Aktionen.",
         "vcsWorkflowWarningRecommended": "<strong>Empfohlen:</strong> Erzwingen Sie eine lineare Historie (rebase/squash vor dem Zusammenführen), damit der Commit, von dem aus Sie aktualisieren, auch der Commit ist, der landet.",

@@ -3458,15 +3458,15 @@
         "applying": "Kører pulumi up"
       },
       "runStatus": {
-        "planning": "Previewlægger",
-        "planned": "Previewlagt",
+        "planning": "Previewer",
+        "planned": "Previewet",
         "applying": "Opdaterer",
         "applied": "Opdateret"
       },
       "status": {
-        "planning": "Previewlægger",
+        "planning": "Previewer",
         "applying": "Opdaterer",
-        "planned": "Previewlagt",
+        "planned": "Previewet",
         "applied": "Opdateret"
       },
       "words": {
@@ -3483,13 +3483,13 @@
         "aiSummaryTitle": "AI-previewoversigt",
         "badgePlanOnly": "kun preview",
         "bannerPlanOnlyCli": "Dette er en <strong>kun-preview</strong>-kørsel startet fra CLI'en på et VCS-forbundet arbejdsområde. Update er ikke tilgængelig for CLI-uploadet kode — kun VCS-styret kode kan opdateres.",
-        "changesPlanning": "Previewlægger…",
+        "changesPlanning": "Previewer…",
         "configurationsEmpty": "Ingen konfigurationsversioner endnu. De vises her, så snart et VCS-push udløser en kørsel.",
         "confirmApply": "Opdater denne kørsel? Dette gennemfører previewen og ændrer infrastrukturen.",
         "confirmDiscard": "Kassér denne preview?",
         "costNoState": "Ingen omkostning endnu — vises efter første opdatering.",
         "detailsPlanOnly": "Kun preview",
-        "discardedHeading": "Kasseret — genpreviewlægning påkrævet",
+        "discardedHeading": "Kasseret — ny preview påkrævet",
         "driftCheckNowTitle": "Sæt en kun-preview-kørsel i kø for at tjekke for afdrift",
         "driftRemediate": "Preview + update",
         "driftRemediateConfirm": "Sæt en preview + update-kørsel i kø for dette workspace?",
@@ -3531,7 +3531,7 @@
         "timelineApplied": "Opdateret",
         "timelineApplyingStarted": "Opdatering startet",
         "timelinePlanComplete": "Preview fuldført",
-        "timelinePlanningStarted": "Previewlægning startet",
+        "timelinePlanningStarted": "Preview startet",
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Enhver, der kan merge PR'en, kan opdatere. Branch-beskyttelsesregler (påkrævede reviews, statustjek, code owner-godkendelse) bliver porten. Terrapods rolle-/label-RBAC gælder<em>ikke</em> for kommentar-drevne handlinger i denne tilstand.",
         "vcsWorkflowWarningRecommended": "<strong>Anbefalet:</strong> kræv lineær historik (rebase/squash før merge), så den commit, du opdaterer fra, er den commit, der lander.",

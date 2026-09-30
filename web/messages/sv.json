@@ -3458,15 +3458,15 @@
         "applying": "Kör pulumi up"
       },
       "runStatus": {
-        "planning": "Previewerar",
-        "planned": "Previewerad",
+        "planning": "Previewar",
+        "planned": "Previewad",
         "applying": "Uppdaterar",
         "applied": "Uppdaterad"
       },
       "status": {
-        "planning": "Previewerar",
+        "planning": "Previewar",
         "applying": "Uppdaterar",
-        "planned": "Previewerad",
+        "planned": "Previewad",
         "applied": "Uppdaterad"
       },
       "words": {
@@ -3483,13 +3483,13 @@
         "aiSummaryTitle": "AI-previewsammanfattning",
         "badgePlanOnly": "endast preview",
         "bannerPlanOnlyCli": "Detta är en <strong>endast-preview</strong>-körning initierad från CLI på en VCS-ansluten arbetsyta. Uppdatering är inte tillgänglig för CLI-uppladdad kod — endast VCS-hanterad kod kan uppdateras.",
-        "changesPlanning": "Previewerar…",
+        "changesPlanning": "Previewar…",
         "configurationsEmpty": "Inga konfigurationsversioner ännu. De visas här så snart en VCS-push utlöser en körning.",
         "confirmApply": "Uppdatera denna körning? Detta genomför previewen och ändrar infrastruktur.",
         "confirmDiscard": "Kassera denna preview?",
         "costNoState": "Ingen kostnad ännu — visas efter första uppdateringen.",
         "detailsPlanOnly": "Endast preview",
-        "discardedHeading": "Kasserad — ompreviewering krävs",
+        "discardedHeading": "Kasserad — ny preview krävs",
         "driftCheckNowTitle": "Köa en endast-preview-körning för att kontrollera drift",
         "driftRemediate": "Preview + update",
         "driftRemediateConfirm": "Köa en preview + update-körning för denna arbetsyta?",
@@ -3531,7 +3531,7 @@
         "timelineApplied": "Uppdaterad",
         "timelineApplyingStarted": "Uppdatering startad",
         "timelinePlanComplete": "Preview klar",
-        "timelinePlanningStarted": "Previewering startad",
+        "timelinePlanningStarted": "Preview startad",
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Alla som kan merga PR:en kan uppdatera. Grenskyddsregler (obligatoriska granskningar, statuskontroller, godkännande av kodägare) blir grinden. Terrapods roll-/etikett-RBAC gäller<em>inte</em> för kommentarsdrivna åtgärder i detta läge.",
         "vcsWorkflowWarningRecommended": "<strong>Rekommenderat:</strong> kräv linjär historik (rebase/squash före merge) så att den commit du uppdaterar från är den commit som landar.",
