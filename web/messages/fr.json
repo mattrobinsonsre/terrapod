@@ -3482,7 +3482,7 @@
         "planSummarySummarising": "Résumé du plan en cours…",
         "policyBlockedMessage": "Cette exécution est <strong>bloquée par un ensemble de politiques obligatoire</strong>. Elle ne s'appliquera pas tant que l'échec n'est pas résolu ou qu'un administrateur ne le contourne pas.",
         "queueApplyConfirm": "Mettre en file d'attente une exécution plan + apply ? Cela peut modifier l'infrastructure.",
-        "queueApplyRefBlocked": "Apply est indisponible tant quune branche, une étiquette ou un commit est sélectionné — ces runs sont toujours plan-only",
+        "queueApplyRefBlocked": "Apply est indisponible tant qu''une branche, une étiquette ou un commit est sélectionné — ces runs sont toujours plan-only",
         "queueApplyTitle": "Mettre en file un run plan + apply",
         "queueDestroyTitle": "Mettre en file d'attente un plan de destruction",
         "queuePlan": "Plan",
