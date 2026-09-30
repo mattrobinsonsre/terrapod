@@ -298,10 +298,17 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"execution_backend": schema.StringAttribute{
-				Description: "Execution backend: terraform or tofu.",
-				Optional:    true,
-				Computed:    true,
-				Default:     stringdefault.StaticString("terraform"),
+				Description: "Which binary runs a Terraform-engine workspace: `terraform` or " +
+					"`tofu`. Defaults to `terraform`. This is a choice WITHIN the Terraform " +
+					"engine — Pulumi has one binary, so the attribute has no meaning on a " +
+					"`pulumi` workspace and is left to the server there rather than defaulted.",
+				Optional: true,
+				Computed: true,
+				// Not a `Default`: the default depends on `engine`, which a
+				// default cannot see. See execution_backend.go.
+				PlanModifiers: []planmodifier.String{
+					engineAwareBackendDefault{},
+				},
 			},
 			"engine": schema.StringAttribute{
 				Description: "The execution engine family this workspace belongs to " +
