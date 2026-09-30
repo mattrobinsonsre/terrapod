@@ -13,6 +13,8 @@
 
 import { useTranslations } from 'next-intl'
 
+import { engineWord } from '@/lib/phase-vocabulary'
+
 interface PlanSummary {
   add: number
   change: number
@@ -24,10 +26,14 @@ interface PlanSummary {
 interface Props {
   summary: PlanSummary
   size?: 'sm' | 'md'
+  /** The run's engine, so the no-changes tooltip names its phase (#1911). */
+  engine?: string
 }
 
-export function PlanSummaryBadges({ summary, size = 'md' }: Props) {
+export function PlanSummaryBadges({ summary, size = 'md', engine }: Props) {
   const t = useTranslations('planSummary')
+  const tRoot = useTranslations()
+  const noChangesTitle = engineWord(tRoot, engine, 'planSummaryNoChangesTitle')
   const { add, change, destroy, replace, import: imports } = summary
   const total = add + change + destroy + replace + imports
 
@@ -40,7 +46,7 @@ export function PlanSummaryBadges({ summary, size = 'md' }: Props) {
       return (
         <span
           className="inline-flex items-center rounded-full bg-slate-700/40 text-slate-300 px-2 py-0.5 text-xs"
-          title={t('badges.noChangesTitle')}
+          title={noChangesTitle}
         >
           {t('badges.noChangesLower')}
         </span>
@@ -50,7 +56,7 @@ export function PlanSummaryBadges({ summary, size = 'md' }: Props) {
       <div className={containerCls}>
         <span
           className="inline-flex items-center rounded-full bg-slate-700/40 text-slate-300 px-2.5 py-1 text-sm"
-          title={t('badges.noChangesTitle')}
+          title={noChangesTitle}
         >
           {t('badges.noChanges')}
         </span>

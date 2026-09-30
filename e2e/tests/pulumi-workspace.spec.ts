@@ -8,7 +8,15 @@
  * Pulumi engine, so this runs through the real BFF chain end to end.
  */
 import { test, expect } from '@playwright/test';
-import { API_URL, getStoredToken, createPulumiWorkspace, createWorkspace, uniqueName } from '../helpers/api';
+import {
+  API_URL,
+  getStoredToken,
+  createPulumiWorkspace,
+  createWorkspace,
+  seedPulumiRun,
+  seedRun,
+  uniqueName,
+} from '../helpers/api';
 import { expectNoHorizontalPageScroll } from '../helpers/responsive.js';
 
 test.describe('Pulumi workspace', () => {
@@ -125,6 +133,145 @@ test.describe('Pulumi workspace', () => {
     await expectNoHorizontalPageScroll(page);
     await page.goto('/workspaces?engine=pulumi');
     await expect(page.getByTestId('ws-engine-filter')).toBeVisible({ timeout: 20_000 });
+    await expectNoHorizontalPageScroll(page);
+  });
+});
+
+/**
+ * The surfaces a Pulumi workspace should not be offered, and the words it
+ * should be described in (#1911).
+ *
+ * Three separate defects with one shape: a page built when every workspace was
+ * Terraform. Security scanning was offered where the API accepts only `off`;
+ * `-allow-empty-apply` was offered where nothing reads it; and the phase
+ * vocabulary had been threaded into two places out of a dozen, so one screen
+ * showed "Previewed" in the status card and "Planned" in the pill beside it.
+ */
+test.describe('Pulumi run vocabulary and Terraform-only surfaces', () => {
+  test('security scanning is absent on Pulumi and present on Terraform', async ({ page }) => {
+    const token = getStoredToken();
+    const pulumiId = await createPulumiWorkspace(token, `${uniqueName('e2e-pulumi-sec')}::dev`);
+    const tfId = await createWorkspace(token, uniqueName('e2e-tf-sec'));
+
+    // Terraform: the block is there, and so are its three controls.
+    await page.goto(`/workspaces/${tfId}`);
+    await expect(page.getByRole('heading', { name: 'Security Scanning' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // Pulumi: gone entirely, not rendered-and-disabled. The API refuses any
+    // enforcement but `off` there (#1567), so a control whose only accepted
+    // value is the one already shown is a control that can only 422.
+    await page.goto(`/workspaces/${pulumiId}`);
+    await expect(page.getByTestId('ws-engine')).toHaveText('Pulumi', { timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'Security Scanning' })).toHaveCount(0);
+    await expect(page.getByText('Block apply on findings')).toHaveCount(0);
+  });
+
+  test('the queue buttons and run options speak the engine', async ({ page }) => {
+    const token = getStoredToken();
+    const pulumiId = await createPulumiWorkspace(token, `${uniqueName('e2e-pulumi-q')}::dev`);
+    const tfId = await createWorkspace(token, uniqueName('e2e-tf-q'));
+
+    await page.goto(`/workspaces/${tfId}?tab=runs`);
+    await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByRole('button', { name: 'Plan + apply', exact: true })).toBeVisible();
+
+    await page.goto(`/workspaces/${pulumiId}?tab=runs`);
+    await expect(page.getByRole('button', { name: 'Preview', exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByRole('button', { name: 'Preview + update', exact: true })).toBeVisible();
+    // The Terraform words are not merely additional — they are gone.
+    await expect(page.getByRole('button', { name: 'Plan', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Plan + apply', exact: true })).toHaveCount(0);
+  });
+
+  test('allow-empty-apply is offered on Terraform and withheld on Pulumi', async ({ page }) => {
+    const token = getStoredToken();
+    const pulumiId = await createPulumiWorkspace(token, `${uniqueName('e2e-pulumi-opt')}::dev`);
+    const tfId = await createWorkspace(token, uniqueName('e2e-tf-opt'));
+
+    await page.goto(`/workspaces/${tfId}?tab=runs`);
+    await page.getByRole('button', { name: 'Options', exact: true }).click();
+    await expect(page.getByText('Allow Empty Apply')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'Plan Options' })).toBeVisible();
+    // Terraform limits a run by resource address.
+    await expect(page.getByPlaceholder('e.g. aws_instance.web, aws_s3_bucket.data')).toBeVisible();
+
+    await page.goto(`/workspaces/${pulumiId}?tab=runs`);
+    await page.getByRole('button', { name: 'Options', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Preview Options' })).toBeVisible({
+      timeout: 15_000,
+    });
+    // `-allow-empty-apply` has no Pulumi equivalent — `PulumiRunOptions` has no
+    // such field, so a ticked box would have been stored and silently dropped.
+    await expect(page.getByText('Allow Empty Apply')).toHaveCount(0);
+    // Target and replace DO reach Pulumi (as `--target`/`--replace`), so they
+    // stay — addressed by URN, which is what the example has to show.
+    await expect(page.getByText('Target resources')).toBeVisible();
+    await expect(page.getByText('Replace resources')).toBeVisible();
+    await expect(page.locator('input[placeholder^="e.g. urn:pulumi:"]')).toHaveCount(2);
+    // Refresh-only and skip-refresh reach Pulumi too.
+    await expect(page.getByText('Refresh Only')).toBeVisible();
+    await expect(page.getByText('Skip Refresh')).toBeVisible();
+  });
+
+  test('the run page never shows two words for one run', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createPulumiWorkspace(token, `${uniqueName('e2e-pulumi-run')}::dev`);
+    const runId = await seedPulumiRun(token, wsId);
+
+    await page.goto(`/workspaces/${wsId}/runs/${runId}`);
+    await expect(page.getByText(/Failed to load/i)).toHaveCount(0);
+
+    // The tab strip is the loudest place the old wording survived.
+    await expect(page.getByRole('button', { name: /^Preview\b/ })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('button', { name: /^Plan\b/ })).toHaveCount(0);
+
+    // The speculative badge, and the Details field that mirrors it.
+    await expect(page.getByText('preview only', { exact: true })).toBeVisible();
+    await expect(page.getByText('plan only', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Details', exact: true }).click();
+    await expect(page.getByText('Preview Only', { exact: true })).toBeVisible();
+    await expect(page.getByText('Plan Only', { exact: true })).toHaveCount(0);
+
+    // A missing `words` key renders as the raw key rather than throwing, so it
+    // would otherwise pass type-check, the catalogue gate and a "no errors" test.
+    await expect(page.getByText(/phases\.[a-z]+\.words\./)).toHaveCount(0);
+  });
+
+  test('a Terraform run page keeps every Terraform word', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-tf-run'));
+    const runId = await seedRun(token, wsId);
+
+    await page.goto(`/workspaces/${wsId}/runs/${runId}`);
+    await expect(page.getByRole('button', { name: /^Plan\b/ })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('plan only', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Preview\b/ })).toHaveCount(0);
+  });
+
+  test('neither surface pushes the page sideways on a phone', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createPulumiWorkspace(token, `${uniqueName('e2e-pulumi-rm')}::dev`);
+    const runId = await seedPulumiRun(token, wsId);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`);
+    await expect(page.getByRole('button', { name: 'Preview', exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+    await page.getByRole('button', { name: 'Options', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Preview Options' })).toBeVisible();
+    await expectNoHorizontalPageScroll(page);
+
+    await page.goto(`/workspaces/${wsId}/runs/${runId}`);
+    // The run page's mobile view picker is a native <select>, not the tab bar.
+    await expect(page.locator('#run-view-select')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('#run-view-select option', { hasText: 'Preview log' })).toHaveCount(1);
     await expectNoHorizontalPageScroll(page);
   });
 });

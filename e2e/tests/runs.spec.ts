@@ -137,7 +137,9 @@ test.describe('Run lifecycle UI', () => {
 
     // A raw key anywhere on the page is the failure. Matching the prefix rather
     // than one exact key keeps this honest whichever phase the seeded run is in.
-    await expect(page.getByText(/phases\.[a-z]+\.(runStatus|activity|status)\./)).toHaveCount(0);
+    await expect(
+      page.getByText(/phases\.[a-z]+\.(runStatus|activity|status|words)\./),
+    ).toHaveCount(0);
   });
 
   test('the run page carries its engine through to the API response', async ({ page }) => {

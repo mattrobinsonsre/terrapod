@@ -86,8 +86,6 @@
   "src/app/registry/providers/[name]/page.tsx:text:SHASUMS.sig",
   "src/app/registry/providers/page.tsx:attr:placeholder:aws",
   "src/app/workspaces/[id]/page.tsx:attr:placeholder:-----BEGIN OPENSSH PRIVATE KEY-----",
-  "src/app/workspaces/[id]/page.tsx:attr:placeholder:e.g. aws_instance.web",
-  "src/app/workspaces/[id]/page.tsx:attr:placeholder:e.g. aws_instance.web, aws_s3_bucket.data",
   "src/app/workspaces/[id]/page.tsx:attr:placeholder:e.g. module.eks*.argocd_cluster.*.config.tls_client_config.ca_data",
   "src/app/workspaces/[id]/page.tsx:attr:placeholder:ghp_xxx",
   "src/app/workspaces/[id]/page.tsx:attr:placeholder:github.com ssh-ed25519 AAAA...",

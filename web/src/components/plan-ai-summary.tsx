@@ -25,6 +25,7 @@ import { apiFetch } from '@/lib/api'
 import { useIsTouch } from '@/lib/use-media-query'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { PlanSummaryChat } from '@/components/plan-summary-chat'
+import { engineWord } from '@/lib/phase-vocabulary'
 
 type Severity = 'low' | 'medium' | 'high' | 'critical' | ''
 
@@ -86,6 +87,11 @@ interface Props {
   runId: string
   /** Bump to force refetch (typically from SSE plan_summary_ready). */
   refreshKey?: number
+  /**
+   * The run's engine, so the panel names the artifact it is summarising the way
+   * the rest of the page does — a Pulumi run has a preview, not a plan (#1911).
+   */
+  engine?: string
 }
 
 const RISK_STYLES: Record<Severity, { pill: string; icon: typeof AlertTriangle }> = {
@@ -96,8 +102,9 @@ const RISK_STYLES: Record<Severity, { pill: string; icon: typeof AlertTriangle }
   critical: { pill: 'bg-red-900/40 text-red-300 border border-red-800/50', icon: ShieldX },
 }
 
-export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
+export function PlanAiSummary({ runId, refreshKey = 0, engine }: Props) {
   const t = useTranslations('planSummary')
+  const tRoot = useTranslations()
   const locale = useLocale()
   const [summary, setSummary] = useState<PlanSummary | null>(null)
   const [missing, setMissing] = useState(false)
@@ -197,7 +204,10 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
 
   const attrs = summary?.attributes
   const kind = attrs?.kind ?? 'plan_summary'
-  const heading = kind === 'failure_analysis' ? t('heading.failureAnalysis') : t('heading.planSummary')
+  const heading =
+    kind === 'failure_analysis'
+      ? t('heading.failureAnalysis')
+      : engineWord(tRoot, engine, 'planSummaryHeading')
 
   return (
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 mb-6">
@@ -228,7 +238,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
               onClick={regenerate}
               disabled={regenerating}
               className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded border border-slate-700/50 hover:border-slate-600"
-              title={t('regenerate.tooltip')}
+              title={engineWord(tRoot, engine, 'planSummaryRegenerateTooltip')}
               aria-label={t('regenerate.ariaLabel')}
             >
               <RefreshCw className={`w-3 h-3 ${regenerating ? 'animate-spin' : ''}`} />
@@ -252,7 +262,9 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
         <div className="flex items-center gap-3 text-sm text-slate-400">
           <LoadingSpinner />
           <span>
-            {kind === 'failure_analysis' ? t('pending.analysingFailure') : t('pending.summarisingPlan')}
+            {kind === 'failure_analysis'
+              ? t('pending.analysingFailure')
+              : engineWord(tRoot, engine, 'planSummarySummarising')}
           </span>
         </div>
       )}
@@ -318,7 +330,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
               `plan_summary_message_posted` event in the workspace's
               run-events channel bumps refreshKey, which we pass
               through so other tabs see new turns. */}
-          <PlanSummaryChat runId={runId} refreshKey={refreshKey} />
+          <PlanSummaryChat runId={runId} refreshKey={refreshKey} engine={engine} />
         </>
       )}
     </div>

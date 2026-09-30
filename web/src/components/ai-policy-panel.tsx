@@ -24,6 +24,7 @@ import { useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api'
 import { isAdmin } from '@/lib/auth'
 import { useIsTouch } from '@/lib/use-media-query'
+import { engineWord } from '@/lib/phase-vocabulary'
 
 interface VerdictReason {
   criterion?: string
@@ -74,12 +75,16 @@ export function AIPolicyPanel({
   runId,
   runStatus,
   onChanged,
+  engine,
 }: {
   runId: string
   runStatus: string
   onChanged: () => void
+  /** The run's engine, so the override prompt names its phase (#1911). */
+  engine?: string
 }) {
   const t = useTranslations('runDetail')
+  const tRoot = useTranslations()
   const isTouch = useIsTouch()
   const [attrs, setAttrs] = useState<AIPolicyAttrs | null>(null)
   const [meta, setMeta] = useState<AIPolicyMeta | null>(null)
@@ -161,7 +166,7 @@ export function AIPolicyPanel({
   const riskLevel = attrs['risk-level']
 
   async function override() {
-    if (isTouch && !window.confirm(t('aiPolicyPanel.overrideConfirm'))) return
+    if (isTouch && !window.confirm(engineWord(tRoot, engine, 'aiPolicyOverrideConfirm'))) return
     setOverriding(true)
     setErr('')
     try {

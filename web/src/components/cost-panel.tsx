@@ -18,6 +18,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
+import { engineWord } from '@/lib/phase-vocabulary'
 
 type Change = 'add' | 'remove' | 'noop'
 interface Range {
@@ -69,8 +70,18 @@ const CHANGE_BADGE: Record<Change, string> = {
   noop: 'bg-slate-700 text-slate-300',
 }
 
-export function CostPanel({ runId, workspaceId }: { runId?: string; workspaceId?: string }) {
+export function CostPanel({
+  runId,
+  workspaceId,
+  engine,
+}: {
+  runId?: string
+  workspaceId?: string
+  /** The run's engine, so the empty state names its phase (#1911). */
+  engine?: string
+}) {
   const t = useTranslations('runDetail')
+  const tRoot = useTranslations()
   const locale = useLocale()
   const [est, setEst] = useState<Estimate | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -163,7 +174,7 @@ export function CostPanel({ runId, workspaceId }: { runId?: string; workspaceId?
   if (isWorkspace && !sv) {
     return (
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-6 text-sm text-slate-400">
-        {t('cost.noState')}
+        {engineWord(tRoot, engine, 'costNoState')}
       </div>
     )
   }
