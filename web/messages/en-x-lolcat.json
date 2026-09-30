@@ -3458,16 +3458,16 @@
         "applying": "Runnin pulumi up"
       },
       "runStatus": {
-        "planning": "Previewnin",
-        "planned": "Previewnd",
-        "applying": "Upin",
-        "applied": "Upd"
+        "planning": "Previuin",
+        "planned": "Previud",
+        "applying": "Updaytin",
+        "applied": "Updaytd"
       },
       "status": {
-        "planning": "Previewnin",
-        "applying": "Upin",
-        "planned": "Previewnd",
-        "applied": "Upd"
+        "planning": "Previuin",
+        "applying": "Updaytin",
+        "planned": "Previud",
+        "applied": "Updaytd"
       },
       "words": {
         "actionConfirmFull": "Confirm & Updayt",
@@ -3483,7 +3483,7 @@
         "aiSummaryTitle": "AI Previu Summry",
         "badgePlanOnly": "previu only",
         "bannerPlanOnlyCli": "Dis iz a <strong>previu-only</strong> run initiatd from teh CLI on a VCS-connectd workspace. Updayt iz not availabul fer CLI-uploadd code — only VCS-managd code can be updaytd.",
-        "changesPlanning": "Previewnin…",
+        "changesPlanning": "Previuin…",
         "configurationsEmpty": "Noes configurashun vershunz yet. Dey appeer heer az soon az a VCS push triggurz a run.",
         "confirmApply": "Updayt dis run? Dis updayts teh previu an changez infrastrukchur.",
         "confirmDiscard": "Discard dis previu?",
@@ -3531,7 +3531,7 @@
         "timelineApplied": "Updaytd",
         "timelineApplyingStarted": "Updaytin startd",
         "timelinePlanComplete": "Previu compleet",
-        "timelinePlanningStarted": "Previewnin startd",
+        "timelinePlanningStarted": "Previuin startd",
         "typePlanApply": "previu + updayt",
         "vcsWorkflowWarningRbac": "Anywun hoo can merge teh PR can updayt. Branch protecshun rulez (requird reviewz, statuz checkz, code ownr approvul) becum teh gate. Terrapod role/labul RBAC do<em>not</em> apply ta comment-driven acshunz in dis mode.",
         "vcsWorkflowWarningRecommended": "<strong>Recommendd:</strong> requir linear histry (rebase/squash befor merge) so teh commit u updayt iz teh commit dat landz.",

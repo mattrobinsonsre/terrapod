@@ -3531,7 +3531,7 @@
         "timelineApplied": "Bijgewerkt",
         "timelineApplyingStarted": "Bijwerken gestart",
         "timelinePlanComplete": "Preview voltooid",
-        "timelinePlanningStarted": "Previewnen gestart",
+        "timelinePlanningStarted": "Previewen gestart",
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Iedereen die de PR kan samenvoegen, kan bijwerken. Branch-beschermingsregels (vereiste beoordelingen, statuscontroles, goedkeuring van code-eigenaar) worden de poort. Terrapod-rol-/label-RBAC is in deze modus<em>niet</em> van toepassing op comment-gestuurde acties.",
         "vcsWorkflowWarningRecommended": "<strong>Aanbevolen:</strong> vereis lineaire geschiedenis (rebase/squash vóór samenvoegen) zodat de commit van waaruit u bijwerkt de commit is die landt.",

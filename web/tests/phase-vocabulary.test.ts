@@ -469,3 +469,51 @@ test('a tab label never supplies its own separator — the component already doe
       'doubled separator, because the component supplies one of its own',
   )
 })
+
+// The English-derived locales do not carry a stem that only made sense as
+// "plan" or "apply" (#1915 follow-up).
+//
+// Five locales shipped "Previewning", "Previewned", "Uping", "Upin''", "Upd"
+// and Dutch "Previewnen" — the output of substituting Plan→Preview and
+// Apply→Up into the *inflected* Terraform form. "Planning" is "Plan" + "ning",
+// so the swap lands mid-word and leaves a non-word. These render in the run
+// header, the most-read string on the page, and each locale already had the
+// right form elsewhere in its own file.
+//
+// Deliberately a deny-list of the broken shapes rather than a rule derived from
+// the Terraform string: deriving it flags every locale whose correct form IS the
+// naive substitution, which is common and right for loan morphology — Polish
+// "previewu" is the genuine genitive, Norwegian "Previewsammendrag" a genuine
+// compound. Telling those apart needs the language, not a regex. The wider
+// question of whether other locales carry the same defect is tracked separately;
+// this guard only holds the ground that was cleared.
+test('no locale carries a stem that only parsed as "plan" or "apply"', () => {
+  const dir = join(import.meta.dirname, '../messages')
+  // "Previewn" catches Previewning/Previewned/Previewnin/Previewnen; the rest
+  // are whole values, since "Upd" is a prefix of the correct "Updating".
+  const MANGLED_SUBSTRING = /Previewn/i
+  const MANGLED_WHOLE = new Set(['Uping', 'Upin', "Upin''", 'Upd'])
+
+  const offenders: string[] = []
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const phases = JSON.parse(readFileSync(join(dir, file), 'utf8')).phases
+    if (!phases?.pulumi) continue
+    for (const group of ['runStatus', 'status', 'activity', 'words']) {
+      const values = phases.pulumi[group]
+      if (!values) continue
+      for (const [key, value] of Object.entries(values)) {
+        if (typeof value !== 'string') continue
+        if (MANGLED_SUBSTRING.test(value) || MANGLED_WHOLE.has(value)) {
+          offenders.push(`${file}:${group}.${key} = ${JSON.stringify(value)}`)
+        }
+      }
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    'these are the Terraform string with the verb substituted inside a word, which leaves ' +
+      "a non-word. Use the locale's own inflected form — it is attested elsewhere in the " +
+      'same file (for example its timelinePlanningStarted).',
+  )
+})

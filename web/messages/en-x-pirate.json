@@ -3458,15 +3458,15 @@
         "applying": "Runnin'' pulumi up"
       },
       "runStatus": {
-        "planning": "Previewnin''",
-        "planned": "Previewned",
-        "applying": "Upin''",
+        "planning": "Previewin''",
+        "planned": "Previewed",
+        "applying": "Updatin''",
         "applied": "Updated"
       },
       "status": {
-        "planning": "Previewnin''",
-        "applying": "Upin''",
-        "planned": "Previewned",
+        "planning": "Previewin''",
+        "applying": "Updatin''",
+        "planned": "Previewed",
         "applied": "Updated"
       },
       "words": {

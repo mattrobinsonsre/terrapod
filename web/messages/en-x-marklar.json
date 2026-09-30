@@ -3458,15 +3458,15 @@
         "applying": "Running marklar marklar"
       },
       "runStatus": {
-        "planning": "Previewning",
-        "planned": "Previewned",
-        "applying": "Uping",
+        "planning": "Previewing",
+        "planned": "Previewed",
+        "applying": "Updating",
         "applied": "Updated"
       },
       "status": {
-        "planning": "Previewning",
-        "applying": "Uping",
-        "planned": "Previewned",
+        "planning": "Previewing",
+        "applying": "Updating",
+        "planned": "Previewed",
         "applied": "Updated"
       },
       "words": {
