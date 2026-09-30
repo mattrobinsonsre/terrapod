@@ -3,6 +3,7 @@
 import { Fragment, Suspense, useEffect, useRef, useState, useCallback, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { engineWord } from '@/lib/phase-vocabulary'
 import Link from 'next/link'
 import { useFormat } from '@/lib/format'
 import NavBar from '@/components/nav-bar'
@@ -239,6 +240,10 @@ function WorkspacesPageInner() {
   const t = useTranslations('workspaces')
   const ts = useTranslations('status')
   const tMode = useTranslations('common.autoApplyMode')
+  // Root namespace, for the per-engine phase vocabulary (#1911). The create
+  // form carries an engine selector, so the engine is in view before the
+  // workspace exists — and the auto-apply hint sits directly beneath it.
+  const tPhase = useTranslations()
   const fmt = useFormat()
   // Translate a filter-suggestion's category hint (its stable English key stays
   // the internal value; only the displayed label is localized).
@@ -470,6 +475,15 @@ function WorkspacesPageInner() {
   // *within* the Terraform engine. Workspaces are created here, with the
   // provider, or via the API; never by an engine's own CLI (#1535).
   const [newEngine, setNewEngine] = useState('terraform')
+  // The hint under the auto-apply selector describes a phase, so it follows the
+  // engine the form is set to (#1911). `newEngine` has no unset state — it is
+  // initialised to Terraform, the <select> is controlled with no placeholder
+  // option, and on a single-engine deployment the selector is not rendered at
+  // all — so a Terraform-only install and an untouched form both read Terraform's
+  // wording without needing a special case. The four MODE values beside it stay
+  // put: they render the literal wire values (`never`, `always`, `create`,
+  // `create/update`), which are identifiers, not prose.
+  const phaseWord = (name: string) => engineWord(tPhase, newEngine, name)
   const [newExecMode, setNewExecMode] = useState('local')
   // The mode, not the boolean (#1301). The API accepts `auto-apply-mode` on
   // POST, but this form only ever sent `auto-apply` — so a conditional mode
@@ -1010,7 +1024,7 @@ function WorkspacesPageInner() {
                   <option value="create">{tMode('create')}</option>
                   <option value="create_update">{tMode('createUpdate')}</option>
                 </select>
-                <p className="mt-1 text-xs text-slate-500">{t('form.autoApplyModeHint')}</p>
+                <p className="mt-1 text-xs text-slate-500">{phaseWord('formAutoApplyModeHint')}</p>
               </div>
               <div>
                 <label htmlFor="ws-workdir" className="block text-sm font-medium text-slate-300 mb-1">{t('form.workingDirectory')}</label>

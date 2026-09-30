@@ -354,6 +354,35 @@ test.describe('Pulumi run vocabulary and Terraform-only surfaces', () => {
     });
   });
 
+  test('the create form re-words its auto-apply hint when the engine changes', async ({ page }) => {
+    // The one surface where the engine is CHOSEN rather than already fixed, so
+    // this is also the only place the binding itself can be tested: a
+    // `phaseWord` wired to a constant instead of `newEngine` passes every unit
+    // test and fails here. Drives the real selector rather than asserting a
+    // string twice.
+    await page.goto('/workspaces');
+    await page.getByRole('button', { name: 'New Workspace' }).click();
+
+    // Defaults to Terraform — and a single-engine deployment, which never
+    // renders the selector at all, sees exactly this.
+    await expect(page.getByText('apply every successful plan', { exact: false })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await page.locator('#ws-engine').selectOption('pulumi');
+    await expect(page.getByText('update on every successful preview', { exact: false })).toBeVisible();
+    await expect(page.getByText('apply every successful plan', { exact: false })).toHaveCount(0);
+
+    // The four MODE values are wire values, so they do not move with it.
+    const modes = page.locator('#ws-auto-apply-mode option');
+    await expect(modes).toHaveText(['never', 'always', 'create', 'create/update']);
+
+    // ...and back, so the binding is proven in both directions rather than the
+    // hint simply having been replaced wholesale.
+    await page.locator('#ws-engine').selectOption('terraform');
+    await expect(page.getByText('apply every successful plan', { exact: false })).toBeVisible();
+  });
+
   test('the Versions tab names no CLI a Pulumi workspace cannot run', async ({ page }) => {
     // The one string where the engines need different SENTENCES rather than a
     // different word: no `pulumi` subcommand uploads a configuration version,

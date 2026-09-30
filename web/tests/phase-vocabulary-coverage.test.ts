@@ -89,6 +89,13 @@ const SURRENDERED: Record<string, Record<string, string>> = {
     'vcsWorkflowWarning.recommended': 'vcsWorkflowWarningRecommended',
     'runTriggers.description': 'runTriggersDescription',
   },
+  // The create form, where the engine is chosen rather than already fixed. Only
+  // the HINT moves: the four mode values beside it render the literal wire
+  // strings (`never`, `always`, `create`, `create/update`) that
+  // `auto-apply-mode` accepts, so they are identifiers and stay in `common`.
+  'src/app/workspaces/page.tsx': {
+    'form.autoApplyModeHint': 'formAutoApplyModeHint',
+  },
   'src/components/plan-ai-summary.tsx': {
     'heading.planSummary': 'planSummaryHeading',
     'pending.summarisingPlan': 'planSummarySummarising',
@@ -156,4 +163,31 @@ test('the guard can actually see a reverted call site', () => {
   // spelled identically to the key.
   assert.equal(stillCalls("foo(word('discardedHeading'))", 'discardedHeading'), false)
   assert.equal(stillCalls("foo(phaseWord('queuePlan'))", 'runs.queuePlan'), false)
+})
+
+test('the mode VALUES are deliberately not vocabulary, and stay where they are', () => {
+  // The counterpart to the guard above, so the line between the two is written
+  // down rather than remembered. `never` / `always` / `create` / `create-update`
+  // render the literal values `auto-apply-mode` accepts; they are identifiers,
+  // and swapping them per engine would make the label disagree with the
+  // attribute, the column, the provider field and the MCP field — a wider
+  // inconsistency than the one the vocabulary exists to remove.
+  const en = JSON.parse(readFileSync('messages/en.json', 'utf8')) as {
+    common: { autoApplyMode: Record<string, string> }
+    phases: Record<string, Record<string, Record<string, string>>>
+  }
+  assert.deepEqual(en.common.autoApplyMode, {
+    never: 'never',
+    always: 'always',
+    create: 'create',
+    createUpdate: 'create/update',
+  })
+  for (const engine of ['terraform', 'pulumi']) {
+    for (const name of Object.keys(en.phases[engine].words)) {
+      assert.ok(
+        !/^autoApplyMode/.test(name),
+        `${name} moves an auto-apply MODE value into the vocabulary; those are wire values`,
+      )
+    }
+  }
 })
