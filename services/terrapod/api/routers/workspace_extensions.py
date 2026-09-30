@@ -80,6 +80,7 @@ async def workspace_list_events(
 
 @router.get("/workspaces/{workspace_id}/vcs-refs")
 async def list_vcs_refs(
+    request: Request,
     workspace_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -97,7 +98,7 @@ async def list_vcs_refs(
         _resolve_branch,
     )
 
-    ws = await _get_workspace_by_id(workspace_id, db)
+    ws = await _get_workspace_by_id(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.WORKSPACE_READ):
         raise HTTPException(
@@ -138,6 +139,7 @@ async def list_vcs_refs(
 
 @router.post("/workspaces/{workspace_id}/actions/dismiss-drift")
 async def dismiss_drift(
+    request: Request,
     workspace_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -156,7 +158,7 @@ async def dismiss_drift(
     """
     from terrapod.api.routers.tfe_v2 import _get_workspace_by_id
 
-    ws = await _get_workspace_by_id(workspace_id, db)
+    ws = await _get_workspace_by_id(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.DRIFT_DISMISS):
         raise HTTPException(
@@ -297,12 +299,17 @@ def _critique_json(c, *, translated_fields: dict | None = None, translated: bool
 
 
 async def _resolve_workspace_state_read(
-    db: AsyncSession, user: AuthenticatedUser, workspace_id: str
+    db: AsyncSession, user: AuthenticatedUser, workspace_id: str, request: Request
 ):
-    """Resolve the workspace and enforce ``state:read``; return the Workspace."""
+    """Resolve the workspace and enforce ``state:read``; return the Workspace.
+
+    Takes the request only to hand it to the shared loader: this router is native
+    and must serve every engine, and the loader reads an absent request as the
+    compatibility surface (#1911).
+    """
     from terrapod.api.routers.tfe_v2 import _get_workspace_by_id
 
-    ws = await _get_workspace_by_id(workspace_id, db)
+    ws = await _get_workspace_by_id(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.STATE_READ):
         raise HTTPException(
@@ -338,7 +345,7 @@ async def get_architecture_critique(
     if not settings.ai_architecture.enabled:
         raise HTTPException(status_code=404, detail="architecture critic not enabled")
 
-    ws = await _resolve_workspace_state_read(db, user, workspace_id)
+    ws = await _resolve_workspace_state_read(db, user, workspace_id, request)
     sv = (
         await db.execute(
             select(StateVersion)
@@ -380,6 +387,7 @@ async def get_architecture_critique(
 
 @router.post("/workspaces/{workspace_id}/architecture-critique/regenerate")
 async def regenerate_architecture_critique(
+    request: Request,
     workspace_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -395,7 +403,7 @@ async def regenerate_architecture_critique(
     if not settings.ai_architecture.enabled:
         raise HTTPException(status_code=404, detail="architecture critic not enabled")
 
-    await _resolve_workspace_state_read(db, user, workspace_id)
+    await _resolve_workspace_state_read(db, user, workspace_id, request)
 
     from terrapod.services.scheduler import enqueue_trigger
 
@@ -464,7 +472,7 @@ async def list_architecture_critique_messages(
 
     if not settings.ai_architecture.enabled:
         raise HTTPException(status_code=404, detail="architecture critic not enabled")
-    ws = await _resolve_workspace_state_read(db, user, workspace_id)
+    ws = await _resolve_workspace_state_read(db, user, workspace_id, request)
     critique = await critic.current_critique_for_workspace(db, ws.id)
     if critique is None:
         raise HTTPException(status_code=404, detail="no critique for current state")
@@ -495,7 +503,7 @@ async def post_architecture_critique_message(
 
     if not settings.ai_architecture.enabled:
         raise HTTPException(status_code=404, detail="architecture critic not enabled")
-    ws = await _resolve_workspace_state_read(db, user, workspace_id)
+    ws = await _resolve_workspace_state_read(db, user, workspace_id, request)
 
     try:
         body = await request.json()
@@ -574,7 +582,8 @@ async def create_workspace(
             ),
         )
 
-    return await _create_workspace_impl(body, user, db, engine=engine)
+    # Native surface only — this router is never mounted under /api/tfe/v2.
+    return await _create_workspace_impl(body, user, db, engine=engine, tfe=False)
 
 
 # ── workspace read, update and list (native surface, every engine) ───────────
@@ -704,6 +713,7 @@ async def show_workspace(
             caps,
             latest_run=latest.get(ws.id),
             live_pool_ids=await _resolve_live_pools([ws]),
+            tfe=False,
         )
     )
 
@@ -731,7 +741,7 @@ async def update_workspace(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Requires '{cap.WORKSPACE_SETTINGS}' capability on workspace",
         )
-    return await tfe_v2.update_workspace(ws, caps, body, user, db)
+    return await tfe_v2.update_workspace(ws, caps, body, user, db, tfe=False)
 
 
 @router.delete("/workspaces/{workspace_id}")

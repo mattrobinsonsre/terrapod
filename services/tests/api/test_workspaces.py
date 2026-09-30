@@ -843,7 +843,7 @@ class TestLockReasonAndHolder:
         from terrapod.api.routers.tfe_v2 import _workspace_json
 
         ws = _mock_workspace(locked=False, lock_reason="stale", locked_by="old@example.com")
-        attrs = _workspace_json(ws)["data"]["attributes"]
+        attrs = _workspace_json(ws, tfe=False)["data"]["attributes"]
 
         assert attrs["lock-reason"] is None
         assert attrs["locked-by"] is None

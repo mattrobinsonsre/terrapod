@@ -55,11 +55,11 @@ from terrapod.api.dependencies import (
     get_current_user,
     require_non_runner,
 )
-from terrapod.api.engine_scope import engine_filter
+from terrapod.api.engine_scope import engine_filter, load_workspace_scoped
 from terrapod.api.ids import parse_id
 from terrapod.api.labels import validate_labels
 from terrapod.api.pagination import MAX_PAGE_SIZE, build_meta, paginate, parse_page_params
-from terrapod.api.prefixes import TFE_PREFIX
+from terrapod.api.prefixes import TFE_PREFIX, is_tfe_path
 from terrapod.api.serialization import default_engine_version
 from terrapod.api.serialization import engine_version_attr as _engine_version_attr
 from terrapod.auth import capabilities as cap
@@ -100,6 +100,26 @@ router = APIRouter(tags=["tfe-v2"])
 # native management and dual-mounted at /api/terrapod/v1 + a deprecated
 # /api/v2 alias (removed in v0.24.0 — see #278).
 extensions_router = APIRouter(tags=["tfe-v2-management"])
+
+#: The routes that must answer for EVERY engine, mounted on BOTH surfaces (#1911).
+#:
+#: Locking a workspace and reading its state history are not Terraform concepts —
+#: every engine Terrapod runs has state and a lock protecting it. But these routes
+#: existed only on the TFE surface, which serves Terraform alone, so on a Pulumi
+#: workspace the UI's State tab errored and its padlock 404d. The capability was
+#: there; it had no door.
+#:
+#: Mounted here rather than moved: `terraform`/`tofu` drive the same paths through
+#: their cloud backend, so they cannot move, and serving both is purely additive.
+#: The handlers scope themselves on the REQUEST's prefix — the TFE mount still
+#: 404s a Pulumi workspace, exactly as before — which is why every one of them
+#: threads `request` down to `load_workspace_scoped`.
+#:
+#: The state-version WRITE routes stay TFE-only. They are the `go-tfe` upload
+#: protocol (create, then PUT content to a capability URL); a Pulumi workspace's
+#: state is published by its own update-complete path (#1564), never pushed
+#: through this one.
+dual_router = APIRouter(tags=["tfe-v2"])
 logger = get_logger(__name__)
 
 TFP_API_VERSION = "2.6"
@@ -619,6 +639,8 @@ def _workspace_json(
     caps: frozenset[str] | None = None,
     latest_run: Run | None = None,
     live_pool_ids: frozenset[uuid.UUID] | None = None,
+    *,
+    tfe: bool,
 ) -> dict:
     """Serialize a Workspace to TFE V2 JSON:API format.
 
@@ -642,7 +664,7 @@ def _workspace_json(
             "created-at": _rfc3339(latest_run.created_at),
         }
 
-    return {
+    payload = {
         "data": {
             "id": f"ws-{ws.id}",
             "type": "workspaces",
@@ -663,6 +685,9 @@ def _workspace_json(
                 # it, so serialising it beats the UI assuming.
                 "engine": ws.engine,
                 # Pulumi only (#1553); always false elsewhere.
+                # Pulumi-only. Dropped from the compatibility surface below,
+                # after this literal rather than inside it — see the `tfe` pop at
+                # the end of this function.
                 "pulumi-bind-plan": ws.pulumi_bind_plan,
                 # One version, two spellings (#1559). `engine-version` is the
                 # canonical one now that the column pins whichever engine the
@@ -827,6 +852,23 @@ def _workspace_json(
             },
         }
     }
+    if tfe:
+        # `pulumi-bind-plan` is a Pulumi concept, and this surface serves
+        # Terraform alone — it could only ever be `false` here (#1911). "Harmless"
+        # was a property of today's value, not of the attribute, and it was the
+        # one Pulumi concept reaching a wire pinned to Terraform.
+        #
+        # Removed here rather than made conditional inside the literal, because
+        # the attribute-contract gate AST-reads that literal and cannot see
+        # through a `**spread` — building it that way made the key vanish from
+        # the snapshot entirely, un-freezing it for the native consumers that DO
+        # read it. A pop keeps it frozen and still takes it off this wire.
+        #
+        # Gated on the door and not on `ws.engine`, so the native representation
+        # is unchanged for every engine: a consumer already reading this key on a
+        # Terraform workspace keeps getting it.
+        payload["data"]["attributes"].pop("pulumi-bind-plan", None)
+    return payload
 
 
 def _parse_tag_filters(request: Request) -> list[tuple[str, str | None]]:
@@ -982,6 +1024,7 @@ async def _list_workspaces_impl(query, user, db, request, latest_runs_for) -> JS
                     caps,
                     latest_run=latest_runs.get(ws.id),
                     live_pool_ids=live_pools,
+                    tfe=is_tfe_path(request.url.path),
                 )["data"]
             )
         return JSONResponse(
@@ -1007,6 +1050,7 @@ async def _list_workspaces_impl(query, user, db, request, latest_runs_for) -> JS
                     caps,
                     latest_run=latest_runs.get(ws.id),
                     live_pool_ids=live_pools,
+                    tfe=is_tfe_path(request.url.path),
                 )["data"]
             )
 
@@ -1024,14 +1068,39 @@ async def _list_workspaces_impl(query, user, db, request, latest_runs_for) -> JS
 
 @router.get("/organizations/default/workspaces/{workspace_name}")
 async def show_workspace(
+    request: Request,
     workspace_name: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Show a workspace by organization and name."""
+    """Show a workspace by organization and name (TFE surface: Terraform only)."""
+    return await _show_workspace_by_name(workspace_name, user, db, request=request)
 
+
+async def _show_workspace_by_name(
+    workspace_name: str,
+    user: AuthenticatedUser,
+    db: AsyncSession,
+    *,
+    request: Request,
+) -> JSONResponse:
+    """The by-name lookup, scoped on the surface that asked.
+
+    No native route is mounted here, and that is the point: the native surface
+    already resolves a name, because `GET /api/v1/workspaces/{ref}` takes an id
+    OR a name (`workspace_extensions._native_workspace`) — a Pulumi workspace is
+    addressed by its `project::stack` name everywhere a person meets it. A second
+    native path for the same lookup would be surface for nothing. The gap #1911
+    names is in the *consumer*: the UI's deep-link resolver reached for the TFE
+    route, which serves Terraform alone.
+    """
+    scoped = is_tfe_path(request.url.path)
     result = await db.execute(
-        select(Workspace).where(Workspace.name == workspace_name, _engine_filter(Workspace))
+        select(Workspace).where(
+            Workspace.name == workspace_name,
+            # One statement so the source-introspection guard can see the filter.
+            _engine_filter(Workspace) if scoped else True,
+        )
     )
     ws = result.scalar_one_or_none()
     if ws is None:
@@ -1053,7 +1122,15 @@ async def show_workspace(
     # Load latest primary run for this workspace (excludes module-test / speculative PR runs)
     run_result = await db.execute(
         select(Run)
-        .where(Run.workspace_id == ws.id, _primary_run_filter(), _engine_filter(Run))
+        .where(
+            Run.workspace_id == ws.id,
+            _primary_run_filter(),
+            # Runs of a workspace this surface has already been allowed to see,
+            # so the filter is redundant on the TFE side and wrong on the native
+            # one — a Pulumi workspace's own runs are what a native caller asked
+            # for.
+            _engine_filter(Run) if scoped else True,
+        )
         .order_by(Run.created_at.desc())
         .limit(1)
     )
@@ -1065,6 +1142,7 @@ async def show_workspace(
             caps,
             latest_run=latest_run,
             live_pool_ids=await _resolve_live_pools([ws]),
+            tfe=scoped,
         ),
         headers=_tfe_headers(),
     )
@@ -1162,7 +1240,7 @@ async def create_workspace(
     lives. Pinning it here rather than reading it from the body is what keeps a
     TFE client unable to express an engine it could not then see.
     """
-    return await _create_workspace_impl(body, user, db, engine=TERRAFORM)
+    return await _create_workspace_impl(body, user, db, engine=TERRAFORM, tfe=True)
 
 
 async def _create_workspace_impl(
@@ -1171,6 +1249,7 @@ async def _create_workspace_impl(
     db: AsyncSession,
     *,
     engine: str,
+    tfe: bool,
 ) -> JSONResponse:
     """The shared create, parameterised by engine (#1535).
 
@@ -1371,14 +1450,26 @@ async def _create_workspace_impl(
     await publish_workspace_event(str(ws.id), "workspace_created")
 
     return JSONResponse(
-        content=_workspace_json(ws, cap.caps_for_level("admin")),
+        content=_workspace_json(ws, cap.caps_for_level("admin"), tfe=tfe),
         status_code=201,
         headers=_tfe_headers(),
     )
 
 
-async def _get_workspace_by_id(workspace_id: str, db: AsyncSession) -> Workspace:
-    """Look up a workspace by its ws-{uuid} ID."""
+async def _get_workspace_by_id(
+    workspace_id: str, db: AsyncSession, *, request: Request | None = None
+) -> Workspace:
+    """Look up a workspace by its ws-{uuid} ID, scoped to the surface that asked.
+
+    `request` of None reads as the TFE surface, matching `load_workspace_scoped`.
+    Every TFE-only handler in this module therefore keeps omitting it and keeps
+    its existing behaviour; the `dual_router` handlers MUST pass it. A handler
+    that forgets 404s its own native route — visibly wrong, never a leak.
+
+    The uuid parse stays here rather than moving into the shared loader: a
+    malformed id is a client error worth a clean 404, and without it the
+    comparison reaches the driver as a cast failure.
+    """
     import uuid as _uuid
 
     ws_uuid = workspace_id.removeprefix("ws-")
@@ -1386,13 +1477,7 @@ async def _get_workspace_by_id(workspace_id: str, db: AsyncSession) -> Workspace
         _uuid.UUID(ws_uuid)
     except ValueError:
         raise HTTPException(status_code=404, detail="Workspace not found") from None
-    result = await db.execute(
-        select(Workspace).where(Workspace.id == ws_uuid, _engine_filter(Workspace))
-    )
-    ws = result.scalar_one_or_none()
-    if ws is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
-    return ws
+    return await load_workspace_scoped(workspace_id, db, request=request)
 
 
 async def _require_ws_capability(
@@ -1400,9 +1485,14 @@ async def _require_ws_capability(
     required: str,
     user: AuthenticatedUser,
     db: AsyncSession,
+    *,
+    request: Request | None = None,
 ) -> tuple[Workspace, frozenset[str]]:
-    """Load workspace and check capability. Returns (workspace, capability set)."""
-    ws = await _get_workspace_by_id(workspace_id, db)
+    """Load workspace and check capability. Returns (workspace, capability set).
+
+    `request` carries the surface through to `_get_workspace_by_id`; see there.
+    """
+    ws = await _get_workspace_by_id(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, required):
         raise HTTPException(
@@ -1410,6 +1500,41 @@ async def _require_ws_capability(
             detail=f"Requires '{required}' capability on workspace",
         )
     return ws, caps
+
+
+async def _load_state_version_scoped(
+    state_version_id: str,
+    db: AsyncSession,
+    *,
+    request: Request | None,
+) -> StateVersion:
+    """Load a state version by id, 404ing on the TFE surface if it belongs to
+    another engine's workspace (#1911).
+
+    This was the gap the workspace filter did not cover. `select(StateVersion)`
+    names a model the engine guard did not watch, and the owning workspace was
+    then loaded by primary key *from the row that query had already returned* —
+    which reads as derived-and-therefore-already-scoped, and is not. So
+    `GET /api/tfe/v2/workspaces/{id}` 404d a Pulumi workspace while
+    `GET /api/tfe/v2/state-versions/{sv}` handed a `terraform` CLI its state.
+
+    `request` of None reads as the TFE surface, the conservative direction, for
+    the same reason as `_get_workspace_by_id`.
+    """
+    sv_uuid = parse_id(state_version_id, "sv-", detail="State version not found")
+    scoped = request is None or is_tfe_path(request.url.path)
+    result = await db.execute(
+        select(StateVersion).where(
+            StateVersion.id == sv_uuid,
+            # One statement, so the source-introspection guard can see the
+            # filter — it reads the statement a `select()` sits in.
+            engine_filter(StateVersion) if scoped else True,
+        )
+    )
+    sv = result.scalar_one_or_none()
+    if sv is None:
+        raise HTTPException(status_code=404, detail="State version not found")
+    return sv
 
 
 async def _runner_state_read_allowed(
@@ -1523,6 +1648,7 @@ async def show_workspace_by_id(
             caps,
             latest_run=latest_run,
             live_pool_ids=await _resolve_live_pools([ws]),
+            tfe=True,
         ),
         headers=_tfe_headers(),
     )
@@ -1657,7 +1783,7 @@ async def patch_workspace(
     engine (#1554); both go through `update_workspace`.
     """
     ws, old_caps = await _require_ws_capability(workspace_id, cap.WORKSPACE_SETTINGS, user, db)
-    return await update_workspace(ws, old_caps, body, user, db)
+    return await update_workspace(ws, old_caps, body, user, db, tfe=True)
 
 
 async def update_workspace(
@@ -1666,6 +1792,8 @@ async def update_workspace(
     body: dict,
     user: AuthenticatedUser,
     db: AsyncSession,
+    *,
+    tfe: bool,
 ) -> JSONResponse:
     """Apply a settings update to a workspace the caller already looked up.
 
@@ -2031,6 +2159,7 @@ async def update_workspace(
             ws,
             old_caps,
             live_pool_ids=await _resolve_live_pools([ws]),
+            tfe=tfe,
         ),
         headers=_tfe_headers(),
     )
@@ -2074,7 +2203,7 @@ async def delete_workspace(
 # ── State Versions ───────────────────────────────────────────────────────────
 
 
-@router.get("/workspaces/{workspace_id}/state-versions")
+@dual_router.get("/workspaces/{workspace_id}/state-versions")
 async def list_state_versions(
     request: Request,
     workspace_id: str = Path(...),
@@ -2082,7 +2211,9 @@ async def list_state_versions(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all state versions for a workspace, ordered by serial DESC."""
-    ws, _ = await _require_ws_capability(workspace_id, cap.STATE_READ_METADATA, user, db)
+    ws, _ = await _require_ws_capability(
+        workspace_id, cap.STATE_READ_METADATA, user, db, request=request
+    )
 
     result = await db.execute(
         select(StateVersion)
@@ -2103,7 +2234,7 @@ async def list_state_versions(
     )
 
 
-@router.get("/workspaces/{workspace_id}/current-state-version")
+@dual_router.get("/workspaces/{workspace_id}/current-state-version")
 async def current_state_version(
     request: Request,
     workspace_id: str = Path(...),
@@ -2118,7 +2249,7 @@ async def current_state_version(
     owner. All other principals continue through the standard
     workspace RBAC path.
     """
-    ws = await _get_workspace_by_id(workspace_id, db)
+    ws = await _get_workspace_by_id(workspace_id, db, request=request)
     if not await _runner_state_read_allowed(db, user, ws):
         caps = await resolve_workspace_capabilities_for(db, user, ws)
         if not has_capability(caps, cap.STATE_READ_METADATA):
@@ -2140,19 +2271,15 @@ async def current_state_version(
     return JSONResponse(content=_state_version_json(sv, request), headers=_tfe_headers())
 
 
-@router.get("/state-versions/{state_version_id}/download")
+@dual_router.get("/state-versions/{state_version_id}/download")
 async def download_state(
+    request: Request,
     state_version_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Download the raw state JSON for a state version. Requires plan permission."""
-    sv_uuid = state_version_id.removeprefix("sv-")
-
-    result = await db.execute(select(StateVersion).where(StateVersion.id == sv_uuid))
-    sv = result.scalar_one_or_none()
-    if sv is None:
-        raise HTTPException(status_code=404, detail="State version not found")
+    sv = await _load_state_version_scoped(state_version_id, db, request=request)
 
     # Raw state may contain secrets. Authorization paths:
     # * Runner-token principals (agent-mode runs hitting this endpoint
@@ -2331,7 +2458,7 @@ def _state_version_json(
     }
 
 
-@router.get("/state-versions/{state_version_id}")
+@dual_router.get("/state-versions/{state_version_id}")
 async def show_state_version(
     request: Request,
     state_version_id: str = Path(...),
@@ -2342,11 +2469,7 @@ async def show_state_version(
 
     go-tfe reads this to get hosted-state-upload-url before uploading.
     """
-    sv_uuid = state_version_id.removeprefix("sv-")
-    result = await db.execute(select(StateVersion).where(StateVersion.id == sv_uuid))
-    sv = result.scalar_one_or_none()
-    if sv is None:
-        raise HTTPException(status_code=404, detail="State version not found")
+    sv = await _load_state_version_scoped(state_version_id, db, request=request)
 
     # Check read permission on workspace
     ws = await db.get(Workspace, sv.workspace_id)
@@ -2478,7 +2601,12 @@ async def upload_state_content(
     )
     sv_uuid = parse_id(segment, "sv-", detail="State version not found")
 
-    result = await db.execute(select(StateVersion).where(StateVersion.id == sv_uuid))
+    # TFE-only route, so the filter is unconditional: this is the `go-tfe` upload
+    # protocol, and another engine's state is never pushed through it however the
+    # capability was obtained (#1911).
+    result = await db.execute(
+        select(StateVersion).where(StateVersion.id == sv_uuid, engine_filter(StateVersion))
+    )
     sv = result.scalar_one_or_none()
     if sv is None:
         raise HTTPException(status_code=404, detail="State version not found")
@@ -2671,7 +2799,7 @@ def _lock_reason_from_body(lock_info: dict) -> str | None:
     return None
 
 
-@router.post("/workspaces/{workspace_id}/actions/lock")
+@dual_router.post("/workspaces/{workspace_id}/actions/lock")
 async def lock_workspace(
     request: Request,
     workspace_id: str = Path(...),
@@ -2680,7 +2808,9 @@ async def lock_workspace(
 ) -> JSONResponse:
     """Lock a workspace. Requires plan permission."""
     await ha_role.ensure_leader("lock workspaces")
-    ws, caps = await _require_ws_capability(workspace_id, cap.WORKSPACE_LOCK, user, db)
+    ws, caps = await _require_ws_capability(
+        workspace_id, cap.WORKSPACE_LOCK, user, db, request=request
+    )
 
     # Parse lock info from request body
     import json as json_mod
@@ -2715,18 +2845,22 @@ async def lock_workspace(
 
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": True})
 
-    return JSONResponse(content=_workspace_json(ws, caps), headers=_tfe_headers())
+    return JSONResponse(
+        content=_workspace_json(ws, caps, tfe=is_tfe_path(request.url.path)),
+        headers=_tfe_headers(),
+    )
 
 
-@router.post("/workspaces/{workspace_id}/actions/unlock")
+@dual_router.post("/workspaces/{workspace_id}/actions/unlock")
 async def unlock_workspace(
+    request: Request,
     workspace_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Unlock a workspace. Plan for own lock, admin for force-unlock."""
     await ha_role.ensure_leader("unlock workspaces")
-    ws = await _get_workspace_by_id(workspace_id, db)
+    ws = await _get_workspace_by_id(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
 
     # Check: at minimum the lock capability is required
@@ -2755,11 +2889,15 @@ async def unlock_workspace(
 
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": False})
 
-    return JSONResponse(content=_workspace_json(ws, caps), headers=_tfe_headers())
+    return JSONResponse(
+        content=_workspace_json(ws, caps, tfe=is_tfe_path(request.url.path)),
+        headers=_tfe_headers(),
+    )
 
 
-@router.post("/workspaces/{workspace_id}/actions/force-unlock")
+@dual_router.post("/workspaces/{workspace_id}/actions/force-unlock")
 async def force_unlock_workspace(
+    request: Request,
     workspace_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -2773,7 +2911,7 @@ async def force_unlock_workspace(
     ID to match and is gated on the workspace:force-unlock capability (#662).
     """
     await ha_role.ensure_leader("unlock workspaces")
-    ws = await _get_workspace_by_id(workspace_id, db)
+    ws = await _get_workspace_by_id(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
 
     if not has_capability(caps, cap.WORKSPACE_FORCE_UNLOCK):
@@ -2794,4 +2932,7 @@ async def force_unlock_workspace(
 
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": False})
 
-    return JSONResponse(content=_workspace_json(ws, caps), headers=_tfe_headers())
+    return JSONResponse(
+        content=_workspace_json(ws, caps, tfe=is_tfe_path(request.url.path)),
+        headers=_tfe_headers(),
+    )

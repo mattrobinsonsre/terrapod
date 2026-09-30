@@ -31,7 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.prefixes import is_tfe_path
-from terrapod.db.models import Run, Workspace
+from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.engines import TERRAFORM
 
 
@@ -49,6 +49,16 @@ def engine_filter(model):
     if model is Run:
         # Runs store no engine (#1536); a run's is its workspace's.
         return Run.workspace_id.in_(select(Workspace.id).where(Workspace.engine == TERRAFORM))
+    if model is StateVersion:
+        # Same shape as Run and for the same reason: a state version carries no
+        # engine of its own, it inherits its workspace's. Spelled out here rather
+        # than at the call sites so there is one thing to watch — a state version
+        # reached by id is the shape that went unscoped (#1911), because the
+        # workspace was then loaded by primary key FROM the row already returned,
+        # which reads as derived-and-therefore-safe and is not.
+        return StateVersion.workspace_id.in_(
+            select(Workspace.id).where(Workspace.engine == TERRAFORM)
+        )
     return model.engine == TERRAFORM
 
 

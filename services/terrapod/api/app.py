@@ -1176,6 +1176,9 @@ def create_application() -> FastAPI:
     # The one workspace-management path the CLI doesn't call (DELETE by
     # id) lives in extensions_router, mounted only under /api/terrapod/v1.
     from terrapod.api.routers.tfe_v2 import (
+        dual_router as tfe_v2_dual_router,
+    )
+    from terrapod.api.routers.tfe_v2 import (
         extensions_router as tfe_v2_extensions_router,
     )
     from terrapod.api.routers.tfe_v2 import (
@@ -1184,6 +1187,12 @@ def create_application() -> FastAPI:
 
     include_tfe(tfe_v2_router)
     include_terrapod(tfe_v2_extensions_router)
+    # Locking and state-version reads are not Terraform concepts, so they answer
+    # on both surfaces (#1911). The handlers scope themselves on the request's
+    # prefix — see the `dual_router` comment in routers/tfe_v2.py. Purely
+    # additive: no route moves, and the TFE mount behaves exactly as before.
+    include_tfe(tfe_v2_dual_router)
+    include_terrapod(tfe_v2_dual_router)
 
     # State management routes — Terrapod-specific (delete, rollback, upload).
     from terrapod.api.routers.state_management import router as state_management_router

@@ -530,9 +530,12 @@ old id needs repointing — it is a salvage operation, not an undo.
 
 ```
 POST /api/tfe/v2/workspaces/{id}/actions/lock
+POST /api/v1/workspaces/{id}/actions/lock
 ```
 
 **Required permission:** `plan` on the workspace.
+
+> **Also on the native surface.** `POST /api/v1/workspaces/{id}/actions/lock`, `/actions/unlock` and `/actions/force-unlock` do the same thing for **any** engine. The `/api/tfe/v2` paths are unchanged and still Terraform-only — a workspace on another engine 404s there, as it does everywhere on that surface.
 
 A manual lock is the CLI/UI state lock **and** an operator gate on applies: while a workspace is locked, apply-capable (plan+apply) runs **will not start** and a confirm (`POST /api/tfe/v2/runs/{id}/actions/apply`) returns **409 Conflict**. Auto-apply runs settle in `planned` and wait for an unlock rather than applying. **Plan-only runs (speculative plans, drift checks) are not blocked** — they never mutate state. Returns 409 if the workspace is already locked; the existing lock, its reason and its holder are left untouched.
 
@@ -563,6 +566,7 @@ Both attributes appear on every workspace response, and are `null` whenever `loc
 
 ```
 POST /api/tfe/v2/workspaces/{id}/actions/unlock
+POST /api/v1/workspaces/{id}/actions/unlock
 ```
 
 **Required permission:** `plan` on the workspace (own locks only).
@@ -740,14 +744,20 @@ Returns 422 if the workspace is not VCS-connected or the VCS connection is inact
 
 ```
 GET /api/tfe/v2/workspaces/{id}/state-versions
+GET /api/v1/workspaces/{id}/state-versions
 ```
 
 **Required permission:** `read` on the workspace.
+
+> **State reads answer on both surfaces.** Every engine Terrapod runs has state, so `GET /api/v1/workspaces/{id}/state-versions`, `/current-state-version`, `GET /api/v1/state-versions/{id}` and `/download` serve a workspace on any engine. The `/api/tfe/v2` paths stay Terraform-only.
+>
+> The state *write* pair (`POST .../state-versions` then `PUT /state-versions/{id}/content`) is the `go-tfe` upload protocol and remains TFE-only. A Pulumi stack's state is published by its own update-complete path, or uploaded by hand with `POST /api/v1/workspaces/{id}/state-versions/actions/upload`, which takes `pulumi stack export` output.
 
 ### Current State Version
 
 ```
 GET /api/tfe/v2/workspaces/{id}/current-state-version
+GET /api/v1/workspaces/{id}/current-state-version
 ```
 
 **Required permission:** `read` on the workspace.
@@ -780,12 +790,14 @@ POST /api/tfe/v2/workspaces/{id}/state-versions
 
 ```
 GET /api/tfe/v2/state-versions/{id}
+GET /api/v1/state-versions/{id}
 ```
 
 ### Download State
 
 ```
 GET /api/tfe/v2/state-versions/{id}/download
+GET /api/v1/state-versions/{id}/download
 ```
 
 Returns a redirect to a presigned URL for the raw state file.

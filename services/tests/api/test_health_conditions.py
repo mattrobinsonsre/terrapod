@@ -157,7 +157,7 @@ class TestComputeHealthConditions:
         from terrapod.api.routers.tfe_v2 import _workspace_json
 
         ws = _mock_workspace(state_diverged=True)
-        result = _workspace_json(ws)
+        result = _workspace_json(ws, tfe=False)
         attrs = result["data"]["attributes"]
         assert "health-conditions" in attrs
         assert len(attrs["health-conditions"]) == 1
@@ -167,7 +167,7 @@ class TestComputeHealthConditions:
         from terrapod.api.routers.tfe_v2 import _workspace_json
 
         ws = _mock_workspace(vcs_last_error="Something broke")
-        result = _workspace_json(ws)
+        result = _workspace_json(ws, tfe=False)
         attrs = result["data"]["attributes"]
         assert "vcs-last-polled-at" in attrs
         assert attrs["vcs-last-error"] == "Something broke"

@@ -97,7 +97,12 @@ async def estimate_workspace_cost(db: AsyncSession, user, workspace_id: str) -> 
     """
     from terrapod.api.routers.tfe_v2 import _get_workspace_by_id
 
-    ws: Workspace = await _get_workspace_by_id(workspace_id, db)
+    # Terraform-only, and said so rather than inherited: the estimator reads a
+    # Terraform state document, so there is nothing here to price for another
+    # engine. `request=None` is the loader's TFE-strict reading, which is the
+    # behaviour this has always had — spelled out so it reads as a decision
+    # instead of a forgotten argument (#1911).
+    ws: Workspace = await _get_workspace_by_id(workspace_id, db, request=None)
 
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.STATE_READ):

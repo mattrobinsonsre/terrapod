@@ -468,7 +468,7 @@ async def upload_state_manual(
     """
     from terrapod.api.routers.tfe_v2 import _get_workspace_by_id
 
-    ws = await _get_workspace_by_id(workspace_id, db)
+    ws = await _get_workspace_by_id(workspace_id, db, request=request)
     caps = await resolve_workspace_capabilities_for(db, user, ws)
     if not has_capability(caps, cap.STATE_WRITE):
         raise HTTPException(
