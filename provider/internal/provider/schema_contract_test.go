@@ -145,13 +145,63 @@ func TestProviderSchemaContract(t *testing.T) {
 			added = append(added, line)
 		}
 	}
-	sort.Strings(removed)
-	sort.Strings(added)
 
-	if len(removed) > 0 {
-		t.Errorf("BREAKING: provider schema attributes removed/renamed/retyped (operators' HCL + state depend on these — MAJOR bump or a documented deprecation window, NOT a golden regen):\n  %s", strings.Join(removed, "\n  "))
+	// Separate the attributes that are present on BOTH sides with a different
+	// rendering from the ones that genuinely appeared or vanished (#1911).
+	//
+	// The golden is a line set, and a line carries an attribute's whole rendered
+	// type — including, for a nested object, every field inside it. So ADDING a
+	// field to a nested object diffs as one removal plus one addition, and the
+	// gate announced a purely additive change under a BREAKING banner. That is
+	// worse than a false alarm: it is a false alarm on the one banner that must
+	// never be regenerated past, and a reviewer who sees it a few times learns to
+	// regenerate past all of them.
+	//
+	// This changes no verdict — a changed attribute still fails the build, which
+	// is right, because widening a nested object and retyping it are both changes
+	// and only a person can tell which. It changes what the failure is CALLED, so
+	// the reviewer is asked the question they can actually answer.
+	byKey := func(line string) string {
+		if i := strings.Index(line, " required="); i >= 0 {
+			return line[:i]
+		}
+		return line
 	}
-	if len(added) > 0 {
-		t.Errorf("Provider schema attributes added/changed (additive). Regenerate the golden:\n  UPDATE_SCHEMA=1 go test ./internal/provider/ -run TestProviderSchemaContract\n  added:\n  %s", strings.Join(added, "\n  "))
+	goneKeys := map[string]string{}
+	for _, line := range removed {
+		goneKeys[byKey(line)] = line
+	}
+	var changed, reallyRemoved, reallyAdded []string
+	for _, line := range added {
+		if before, both := goneKeys[byKey(line)]; both {
+			changed = append(changed, fmt.Sprintf("was: %s\n  now: %s", before, line))
+			continue
+		}
+		reallyAdded = append(reallyAdded, line)
+	}
+	stillChanged := map[string]bool{}
+	for _, c := range changed {
+		stillChanged[byKey(strings.TrimPrefix(strings.SplitN(c, "\n", 2)[0], "was: "))] = true
+	}
+	for _, line := range removed {
+		if !stillChanged[byKey(line)] {
+			reallyRemoved = append(reallyRemoved, line)
+		}
+	}
+	sort.Strings(reallyRemoved)
+	sort.Strings(reallyAdded)
+	sort.Strings(changed)
+
+	if len(reallyRemoved) > 0 {
+		t.Errorf("BREAKING: provider schema attributes removed/renamed (operators' HCL + state depend on these — MAJOR bump or a documented deprecation window, NOT a golden regen):\n  %s", strings.Join(reallyRemoved, "\n  "))
+	}
+	if len(changed) > 0 {
+		t.Errorf("Provider schema attributes CHANGED — the attribute still exists and its rendering moved. Decide which this is before regenerating:\n"+
+			"  * a nested object that GAINED a field, or a requiredness relaxation → additive, regenerate\n"+
+			"  * a type change, a narrowing, or a field REMOVED from a nested object → BREAKING, do not regenerate\n"+
+			"  UPDATE_SCHEMA=1 go test ./internal/provider/ -run TestProviderSchemaContract\n  %s", strings.Join(changed, "\n  "))
+	}
+	if len(reallyAdded) > 0 {
+		t.Errorf("Provider schema attributes added (additive). Regenerate the golden:\n  UPDATE_SCHEMA=1 go test ./internal/provider/ -run TestProviderSchemaContract\n  added:\n  %s", strings.Join(reallyAdded, "\n  "))
 	}
 }

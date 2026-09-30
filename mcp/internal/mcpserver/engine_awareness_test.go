@@ -247,3 +247,79 @@ func liveToolsByName(t *testing.T) map[string]string {
 	}
 	return out
 }
+
+// TestExecutionBackendSaysWhichEngineItIsAbout guards the field most likely to
+// be read as engine-neutral, on both tools that take it.
+//
+// `execution_backend` picks `tofu` vs `terraform` WITHIN the Terraform engine.
+// Described as "tofu or terraform" and nothing more, it reads to an agent as the
+// engine selector — which is `engine`, a different field on the same tool — so
+// the two most plausible wrong actions are setting it to pick Pulumi, and setting
+// it on a Pulumi workspace where it means nothing.
+//
+// The catalogue golden freezes field names and types, not descriptions, so this
+// reads the live input schema.
+func TestExecutionBackendSaysWhichEngineItIsAbout(t *testing.T) {
+	schemas := liveInputSchemasByName(t)
+	for _, tool := range []string{"terrapod_workspace_create", "terrapod_workspace_update"} {
+		t.Run(tool, func(t *testing.T) {
+			raw, ok := schemas[tool]
+			if !ok {
+				t.Fatalf("tool %s is not registered", tool)
+			}
+			var doc struct {
+				Properties map[string]struct {
+					Description string `json:"description"`
+				} `json:"properties"`
+			}
+			if err := json.Unmarshal(raw, &doc); err != nil {
+				t.Fatalf("decode input schema: %v", err)
+			}
+			desc := doc.Properties["execution_backend"].Description
+			if desc == "" {
+				t.Fatalf("%s has no execution_backend field", tool)
+			}
+			for _, want := range []string{"Terraform engine", "pulumi"} {
+				if !strings.Contains(desc, want) {
+					t.Errorf("execution_backend never mentions %q, so an agent cannot tell "+
+						"which engine it is about:\n%s", want, desc)
+				}
+			}
+		})
+	}
+}
+
+// liveInputSchemasByName returns every registered tool's raw input schema,
+// keyed by name — the sibling of liveToolsByName, for the field descriptions
+// the golden does not freeze either.
+func liveInputSchemasByName(t *testing.T) map[string]json.RawMessage {
+	t.Helper()
+	srv, _, err := New(Config{Host: "example.test", Name: "terrapod-test", Token: "test-token"})
+	if err != nil {
+		t.Fatalf("build server: %v", err)
+	}
+	ctx := t.Context()
+	ct, st := mcp.NewInMemoryTransports()
+	go func() { _ = srv.Run(ctx, st) }()
+	sess, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "0"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = sess.Close() })
+	res, err := sess.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatalf("list tools: %v", err)
+	}
+	out := make(map[string]json.RawMessage, len(res.Tools))
+	for _, tool := range res.Tools {
+		raw, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			t.Fatalf("marshal %s input schema: %v", tool.Name, err)
+		}
+		out[tool.Name] = raw
+	}
+	if len(out) == 0 {
+		t.Fatal("no tools registered")
+	}
+	return out
+}

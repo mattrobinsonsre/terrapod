@@ -43,7 +43,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		Name             string            `json:"name" jsonschema:"the workspace name (unique within the org)"`
 		Engine           string            `json:"engine,omitempty" jsonschema:"the execution engine family: terraform (default) or another engine this deployment enables, such as pulumi. NOT execution_backend, which picks tofu vs terraform within the Terraform engine. Workspaces are created here, in the UI or with the Terraform provider — never by an engine's own CLI"`
 		ExecutionMode    string            `json:"execution_mode,omitempty" jsonschema:"local or agent (default: server default)"`
-		ExecutionBackend string            `json:"execution_backend,omitempty" jsonschema:"tofu or terraform (default: server default)"`
+		ExecutionBackend string            `json:"execution_backend,omitempty" jsonschema:"which binary runs a Terraform-engine workspace: tofu or terraform. A choice WITHIN the Terraform engine — Pulumi has one binary, so this has no meaning on a pulumi workspace (default: server default)"`
 		EngineVersion    string            `json:"engine_version,omitempty" jsonschema:"version of the engine this workspace runs; partial like 1.15 (means 1.15.*), no HCL operators"`
 		TerraformVersion string            `json:"terraform_version,omitempty" jsonschema:"the same version under its original name; prefer engine_version. Setting both to different values is rejected"`
 		AutoApply        *bool             `json:"auto_apply,omitempty" jsonschema:"auto-apply successful plans (default false)"`
@@ -106,7 +106,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		WorkspaceID      string            `json:"workspace_id" jsonschema:"the workspace id (ws-...) to update"`
 		Name             string            `json:"name,omitempty" jsonschema:"rename the workspace (empty = leave)"`
 		ExecutionMode    string            `json:"execution_mode,omitempty" jsonschema:"local or agent"`
-		ExecutionBackend string            `json:"execution_backend,omitempty" jsonschema:"tofu or terraform"`
+		ExecutionBackend string            `json:"execution_backend,omitempty" jsonschema:"which binary runs a Terraform-engine workspace: tofu or terraform. A choice WITHIN the Terraform engine — Pulumi has one binary, so this has no meaning on a pulumi workspace"`
 		EngineVersion    string            `json:"engine_version,omitempty" jsonschema:"version of the engine this workspace runs; partial like 1.15 (means 1.15.*)"`
 		TerraformVersion string            `json:"terraform_version,omitempty" jsonschema:"the same version under its original name; prefer engine_version. Setting both to different values is rejected"`
 		AutoApply        *bool             `json:"auto_apply,omitempty" jsonschema:"auto-apply successful plans"`
