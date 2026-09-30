@@ -3514,13 +3514,13 @@
         "planning": "Previewning",
         "planned": "Previewned",
         "applying": "Uping",
-        "applied": "Applied"
+        "applied": "Updated"
       },
       "status": {
         "planning": "Previewning",
         "applying": "Uping",
         "planned": "Previewned",
-        "applied": "Applied"
+        "applied": "Updated"
       },
       "words": {
         "actionConfirmFull": "Confirm & Update",
@@ -3537,7 +3537,7 @@
         "badgePlanOnly": "marklar only",
         "bannerPlanOnlyCli": "This is a <strong>preview-only</strong> marklar initiated from the marklar on a marklar-connected marklar. Update is not available for marklar-uploaded marklar — only marklar-managed marklar can be updated.",
         "changesPlanning": "Marklaring…",
-        "configurationsEmpty": "No marklar marklars yet. They appear here as soon as a `terraform plan` uploads or a VCS marklar triggers a marklar.",
+        "configurationsEmpty": "No marklar marklars yet. They appear here as soon as a VCS marklar triggers a marklar.",
         "confirmApply": "Update this marklar? This updates the marklar and changes marklar.",
         "confirmDiscard": "Discard this marklar?",
         "costNoState": "No marklar yet — appears after the first marklar.",
@@ -3558,7 +3558,7 @@
         "logIndexTitle": "Jump to a marklar marklar, or the marklar marklar",
         "logPlanEmpty": "No marklar marklar available yet.",
         "nonDefaultRefNote": "Non-default marklar selected — marklar will be preview-only",
-        "planExpiryDescription": "Auto-discard an unconfirmed marklar once it is older than this, so a stale marklar can't be applied against a moved marklar. Off by default; the marklar must then be re-run. (Applies to apply-capable marklars only.)",
+        "planExpiryDescription": "Auto-discard an unconfirmed marklar once it is older than this, so a stale marklar can't be carried out against a moved marklar. Off by default; the marklar must then be re-run. (Applies to update-capable marklars only.)",
         "planExpiryTitle": "Marklar Marklar",
         "planOptions": "Marklar Marklars",
         "planSummaryChatPlaceholder": "Ask a follow-up marklar about this marklar… (⌘/Ctrl + Marklar to send)",
@@ -3582,11 +3582,11 @@
         "tabPlanLabel": "Marklar<log>Marklar</log>",
         "targetPlaceholder": "e.g. urn:pulumi:dev::shop::aws:s3/bucket:Bucket::assets",
         "timelineApplied": "Updated",
-        "timelineApplyingStarted": "Marklaring started",
+        "timelineApplyingStarted": "Marklar started",
         "timelinePlanComplete": "Marklar complete",
-        "timelinePlanningStarted": "Marklaring started",
+        "timelinePlanningStarted": "Marklar started",
         "typePlanApply": "preview + update",
-        "vcsWorkflowWarningRbac": "Marklar who can merge the marklar can apply. Marklar marklar marklars (required marklars, marklar marklars, marklar marklar marklar) become the marklar. Terrapod marklar/marklar marklar does<em>not</em> apply to comment-driven marklars in this marklar.",
+        "vcsWorkflowWarningRbac": "Marklar who can merge the marklar can update. Marklar marklar marklars (required marklars, marklar marklars, marklar marklar marklar) become the marklar. Terrapod marklar/marklar marklar does<em>not</em> apply to comment-driven marklars in this marklar.",
         "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear marklar (rebase/squash before marklar) so the marklar you update is the marklar that lands.",
         "slackDescription": "Opt this marklar into Slack run marklars — marklar marklars, marklars, marklars, and marklar. Leave the marklar empty and this marklar stays silent (there is no deployment-wide marklar). Requires the Slack marklar to be enabled by an marklar."
       }

@@ -3514,13 +3514,13 @@
         "planning": "Previewning",
         "planned": "Previewned",
         "applying": "Uping",
-        "applied": "Applied"
+        "applied": "Updated"
       },
       "status": {
         "planning": "Previewning",
         "applying": "Uping",
         "planned": "Previewned",
-        "applied": "Applied"
+        "applied": "Updated"
       },
       "words": {
         "actionConfirmFull": "Confirm and Update",
@@ -3537,7 +3537,7 @@
         "badgePlanOnly": "preview only",
         "bannerPlanOnlyCli": "A <strong>preview-only</strong> run initiated from the CLI on a VCS-connected workspace, this is. For CLI-uploaded code, update available it is not — only VCS-managed code, updated it can be.",
         "changesPlanning": "Previewing, we are…",
-        "configurationsEmpty": "No configuration versions yet, there are. As soon as a `terraform plan` uploads or a VCS push triggers a run, here appear they will.",
+        "configurationsEmpty": "No configuration versions yet, there are. As soon as a VCS push triggers a run, here appear they will.",
         "confirmApply": "This run, update? The preview this updates, and infrastructure changes it.",
         "confirmDiscard": "This preview, discard?",
         "costNoState": "No cost yet — appears after the first update, it does.",
@@ -3558,7 +3558,7 @@
         "logIndexTitle": "To a resource change, or to the preview summary, jump you will",
         "logPlanEmpty": "No preview output available yet, there is.",
         "nonDefaultRefNote": "Selected, a non-default ref is — preview-only the run will be",
-        "planExpiryDescription": "Once older than this it is, an unconfirmed plan auto-discard, so against a moved world, applied a stale plan cannot be. Off by default, it is; re-run then the plan must be. (To apply-capable runs only, this applies.)",
+        "planExpiryDescription": "Once older than this it is, an unconfirmed preview auto-discard, so against a moved world, carried out a stale preview cannot be. Off by default, it is; re-run then the preview must be. (To update-capable runs only, this applies.)",
         "planExpiryTitle": "Expiry, Preview",
         "planOptions": "Options, Preview",
         "planSummaryChatPlaceholder": "About this preview, a follow-up question ask… (⌘/Ctrl + Enter to send)",
@@ -3586,7 +3586,7 @@
         "timelinePlanComplete": "complete, Preview",
         "timelinePlanningStarted": "started, Previewing",
         "typePlanApply": "preview + update",
-        "vcsWorkflowWarningRbac": "Anyone who can merge the PR, apply they can. The gate, branch protection rules (required reviews, status checks, code owner approval) become. To comment-driven actions in this mode, Terrapod role/label RBAC apply it does<em>not</em>.",
+        "vcsWorkflowWarningRbac": "Anyone who can merge the PR, update they can. The gate, branch protection rules (required reviews, status checks, code owner approval) become. To comment-driven actions in this mode, Terrapod role/label RBAC apply it does<em>not</em>.",
         "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> linear history require (before merge, rebase/squash) so the commit you update, the commit that lands it is.",
         "slackDescription": "Into Slack run notifications, this workspace opt — approval requests, updates, errors, and drift. The channel empty leave, and silent this workspace stays (no deployment-wide fan-out, there is). By an administrator, the Slack app to be enabled, requires it."
       }

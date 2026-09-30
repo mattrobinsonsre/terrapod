@@ -3514,13 +3514,13 @@
         "planning": "Previewnin''",
         "planned": "Previewned",
         "applying": "Upin''",
-        "applied": "Applied"
+        "applied": "Updated"
       },
       "status": {
         "planning": "Previewnin''",
         "applying": "Upin''",
         "planned": "Previewned",
-        "applied": "Applied"
+        "applied": "Updated"
       },
       "words": {
         "actionConfirmFull": "Confirm & Update",
@@ -3537,7 +3537,7 @@
         "badgePlanOnly": "preview only",
         "bannerPlanOnlyCli": "This be a <strong>preview-only</strong> run started from th'' CLI on a VCS-connected work-deck. Update be nay available fer CLI-uploaded code — only VCS-managed code can be updated.",
         "changesPlanning": "Previewin''…",
-        "configurationsEmpty": "No configuration versions yet. They appear here as soon as a `terraform plan` uploads or a VCS push triggers a voyage.",
+        "configurationsEmpty": "No configuration versions yet. They appear here as soon as a VCS push triggers a voyage.",
         "confirmApply": "Update this run? This updates th'' preview and changes yer infrastructure.",
         "confirmDiscard": "Discard this preview?",
         "costNoState": "No booty yet — appears after th' first update.",
@@ -3558,7 +3558,7 @@
         "logIndexTitle": "Set sail fer a change in the cargo, or fer the scryed tally",
         "logPlanEmpty": "Nay preview output available yet.",
         "nonDefaultRefNote": "Non-default ref selected — voyage will be preview-only",
-        "planExpiryDescription": "Auto-discard an unconfirmed plan once it be older than this, so a stale plan can''t be applied against a moved world. Off by default; th'' plan must then be re-run. (Applies t'' apply-capable voyages only.)",
+        "planExpiryDescription": "Auto-discard an unconfirmed preview once it be older than this, so a stale preview can''t be carried out against a moved world. Off by default; th'' preview must then be re-run. (Applies t'' update-capable voyages only.)",
         "planExpiryTitle": "Preview Expiry",
         "planOptions": "Preview Options",
         "planSummaryChatPlaceholder": "Ask a follow-up question about this preview… (⌘/Ctrl + Enter t'' send)",
@@ -3586,7 +3586,7 @@
         "timelinePlanComplete": "Preview complete",
         "timelinePlanningStarted": "Previewin'' started",
         "typePlanApply": "preview + update",
-        "vcsWorkflowWarningRbac": "Any scallywag who can merge th'' PR can apply. Branch protection rules (required reviews, status checks, code owner approval) become th'' gate. Terrapod role/label RBAC does<em>not</em> apply t'' comment-driven actions in this mode.",
+        "vcsWorkflowWarningRbac": "Any scallywag who can merge th'' PR can update. Branch protection rules (required reviews, status checks, code owner approval) become th'' gate. Terrapod role/label RBAC does<em>not</em> apply t'' comment-driven actions in this mode.",
         "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear history (rebase/squash afore merge) so th'' commit ye update be th'' commit that lands.",
         "slackDescription": "Opt this work-deck into Slack voyage notifications — approval requests, refits, squalls, an'' drift. Leave th'' channel empty an'' this work-deck stays silent (there be no deployment-wide fan-out). Requires th'' Slack app t'' be enabled by an administrator."
       }

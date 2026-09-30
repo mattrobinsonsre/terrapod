@@ -3537,7 +3537,7 @@
         "badgePlanOnly": "previu only",
         "bannerPlanOnlyCli": "Dis iz a <strong>previu-only</strong> run initiatd from teh CLI on a VCS-connectd workspace. Updayt iz not availabul fer CLI-uploadd code — only VCS-managd code can be updaytd.",
         "changesPlanning": "Previewnin…",
-        "configurationsEmpty": "Noes configurashun vershunz yet. Dey appeer heer az soon az a `terraform plan` uploadz or a VCS push triggurz a run.",
+        "configurationsEmpty": "Noes configurashun vershunz yet. Dey appeer heer az soon az a VCS push triggurz a run.",
         "confirmApply": "Updayt dis run? Dis updayts teh previu an changez infrastrukchur.",
         "confirmDiscard": "Discard dis previu?",
         "costNoState": "No cost yet — appears after teh furst updayt.",
@@ -3558,7 +3558,7 @@
         "logIndexTitle": "Jumpz to a rezorce chanj, or teh previu summry",
         "logPlanEmpty": "No previu output availabul yet.",
         "nonDefaultRefNote": "Non-defawlt ref selectd — run will be previu-only",
-        "planExpiryDescription": "Auto-discard an unconfirmd plan wunce it iz oldr dan dis, so a stale plan can't be applyd against a moovd world. Off by defawlt; teh plan muzt den be re-run. (Appliez ta apply-capabul runz only.)",
+        "planExpiryDescription": "Auto-discard an unconfirmd previu wunce it iz oldr dan dis, so a stale previu can't be carryd out against a moovd world. Off by defawlt; teh previu muzt den be re-run. (Appliez ta updayt-capabul runz only.)",
         "planExpiryTitle": "Previu Ekspiry",
         "planOptions": "Previu Opshunz",
         "planSummaryChatPlaceholder": "Ask a follow-up questshun bout dis previu… (⌘/Ctrl + Enter ta send)",
@@ -3586,7 +3586,7 @@
         "timelinePlanComplete": "Previu compleet",
         "timelinePlanningStarted": "Previewnin startd",
         "typePlanApply": "previu + updayt",
-        "vcsWorkflowWarningRbac": "Anywun hoo can merge teh PR can apply. Branch protecshun rulez (requird reviewz, statuz checkz, code ownr approvul) becum teh gate. Terrapod role/labul RBAC do<em>not</em> apply ta comment-driven acshunz in dis mode.",
+        "vcsWorkflowWarningRbac": "Anywun hoo can merge teh PR can updayt. Branch protecshun rulez (requird reviewz, statuz checkz, code ownr approvul) becum teh gate. Terrapod role/labul RBAC do<em>not</em> apply ta comment-driven acshunz in dis mode.",
         "vcsWorkflowWarningRecommended": "<strong>Recommendd:</strong> requir linear histry (rebase/squash befor merge) so teh commit u updayt iz teh commit dat landz.",
         "slackDescription": "Opt dis workspace into Slack run notificashunz — approvul requestz, updaytz, errorz, an drift. Leev teh channul empty an dis workspace stayz silent (dere iz noes deployment-wide fan-out). Requirez teh Slack app ta be enabuld by an administraytor."
       }
