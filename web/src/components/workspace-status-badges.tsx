@@ -5,8 +5,18 @@ import { useTranslations } from 'next-intl'
 
 import { phaseKey } from '@/lib/phase-vocabulary'
 
-/** The status tokens that name a run *phase*, and so belong to the engine. */
-const PHASE_FILTERS = new Set(['planning', 'applying'])
+/** The status tokens that name a run *phase*, and so belong to the engine.
+ *
+ * All four, not just the two in-progress ones. `planned` and `applied` were
+ * missing, so a Pulumi workspace's pill fell through to the platform namespace
+ * and read "Planned" on the workspace LIST while the same run read "Previewed"
+ * on the workspace's own runs tab — the defect #1911 is about, one navigation
+ * step apart rather than one screen (#1911).
+ *
+ * The engine namespace is `status`, not `runStatus`: three locales phrase the
+ * two deliberately differently (de "Wird geplant" as a state vs "Plant" as a
+ * label), so they are not interchangeable even though English cannot tell. */
+const PHASE_FILTERS = new Set(['planning', 'applying', 'planned', 'applied'])
 import type { WorkspaceStatusDef } from '@/lib/workspace-status'
 
 // Colour → Tailwind pill classes for the workspace status/lifecycle badges.

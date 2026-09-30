@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Plannin''",
-        "applying": "Applyin''"
+        "applying": "Applyin''",
+        "planned": "Planned",
+        "applied": "Applied"
       },
       "words": {
         "actionConfirmFull": "Confirm & Apply",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Plannin'' started",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Any scallywag who can merge th'' PR can apply. Branch protection rules (required reviews, status checks, code owner approval) become th'' gate. Terrapod role/label RBAC does<em>not</em> apply t'' comment-driven actions in this mode.",
-        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear history (rebase/squash afore merge) so th'' commit ye apply be th'' commit that lands."
+        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear history (rebase/squash afore merge) so th'' commit ye apply be th'' commit that lands.",
+        "slackDescription": "Opt this work-deck into Slack voyage notifications — approval requests, applies, squalls, an'' drift. Leave th'' channel empty an'' this work-deck stays silent (there be no deployment-wide fan-out). Requires th'' Slack app t'' be enabled by an administrator."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Previewnin''",
-        "applying": "Upin''"
+        "applying": "Upin''",
+        "planned": "Previewned",
+        "applied": "Applied"
       },
       "words": {
         "actionConfirmFull": "Confirm & Update",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Previewin'' started",
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Any scallywag who can merge th'' PR can apply. Branch protection rules (required reviews, status checks, code owner approval) become th'' gate. Terrapod role/label RBAC does<em>not</em> apply t'' comment-driven actions in this mode.",
-        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear history (rebase/squash afore merge) so th'' commit ye update be th'' commit that lands."
+        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear history (rebase/squash afore merge) so th'' commit ye update be th'' commit that lands.",
+        "slackDescription": "Opt this work-deck into Slack voyage notifications — approval requests, refits, squalls, an'' drift. Leave th'' channel empty an'' this work-deck stays silent (there be no deployment-wide fan-out). Requires th'' Slack app t'' be enabled by an administrator."
       }
     }
   },

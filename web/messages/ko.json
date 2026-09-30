@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "계획 중",
-        "applying": "적용 중"
+        "applying": "적용 중",
+        "planned": "계획됨",
+        "applied": "적용됨"
       },
       "words": {
         "actionConfirmFull": "확인 및 적용",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "계획 시작됨",
         "typePlanApply": "계획 + 적용",
         "vcsWorkflowWarningRbac": "PR을 병합할 수 있는 사람은 누구나 적용할 수 있습니다. 브랜치 보호 규칙(필수 검토, 상태 검사, 코드 소유자 승인)이 관문이 됩니다. Terrapod 역할/라벨 RBAC는 이 모드에서 댓글 기반 작업에는 적용되지<em>않습니다</em>.",
-        "vcsWorkflowWarningRecommended": "<strong>권장:</strong> 선형 히스토리(병합 전 rebase/squash)를 요구하여 적용하는 커밋이 실제로 반영되는 커밋이 되도록 하세요."
+        "vcsWorkflowWarningRecommended": "<strong>권장:</strong> 선형 히스토리(병합 전 rebase/squash)를 요구하여 적용하는 커밋이 실제로 반영되는 커밋이 되도록 하세요.",
+        "slackDescription": "이 워크스페이스를 Slack 실행 알림(승인 요청, 적용, 오류, 드리프트)에 등록합니다. 채널을 비워두면 이 워크스페이스는 알림을 보내지 않습니다(배포 전체 팬아웃은 없습니다). 관리자가 Slack 앱을 활성화해야 합니다."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "계획 중",
-        "applying": "적용 중"
+        "applying": "적용 중",
+        "planned": "계획됨",
+        "applied": "적용됨"
       },
       "words": {
         "actionConfirmFull": "확인 및 적용",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "계획 시작됨",
         "typePlanApply": "계획 + 적용",
         "vcsWorkflowWarningRbac": "PR을 병합할 수 있는 사람은 누구나 적용할 수 있습니다. 브랜치 보호 규칙(필수 검토, 상태 검사, 코드 소유자 승인)이 관문이 됩니다. Terrapod 역할/라벨 RBAC는 이 모드에서 댓글 기반 작업에는 적용되지<em>않습니다</em>.",
-        "vcsWorkflowWarningRecommended": "<strong>권장:</strong> 선형 히스토리(병합 전 rebase/squash)를 요구하여 적용하는 커밋이 실제로 반영되는 커밋이 되도록 하세요."
+        "vcsWorkflowWarningRecommended": "<strong>권장:</strong> 선형 히스토리(병합 전 rebase/squash)를 요구하여 적용하는 커밋이 실제로 반영되는 커밋이 되도록 하세요.",
+        "slackDescription": "이 워크스페이스를 Slack 실행 알림(승인 요청, 적용, 오류, 드리프트)에 등록합니다. 채널을 비워두면 이 워크스페이스는 알림을 보내지 않습니다(배포 전체 팬아웃은 없습니다). 관리자가 Slack 앱을 활성화해야 합니다."
       }
     }
   },

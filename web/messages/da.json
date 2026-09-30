@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Planlægger",
-        "applying": "Anvender"
+        "applying": "Anvender",
+        "planned": "Planlagt",
+        "applied": "Anvendt"
       },
       "words": {
         "actionConfirmFull": "Bekræft og anvend",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Planlægning startet",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Enhver, der kan merge PR'en, kan anvende. Branch-beskyttelsesregler (påkrævede reviews, statustjek, code owner-godkendelse) bliver porten. Terrapods rolle-/label-RBAC gælder<em>ikke</em> for kommentar-drevne handlinger i denne tilstand.",
-        "vcsWorkflowWarningRecommended": "<strong>Anbefalet:</strong> kræv lineær historik (rebase/squash før merge), så den commit, du anvender, er den commit, der lander."
+        "vcsWorkflowWarningRecommended": "<strong>Anbefalet:</strong> kræv lineær historik (rebase/squash før merge), så den commit, du anvender, er den commit, der lander.",
+        "slackDescription": "Tilmeld dette arbejdsområde Slack-kørselsnotifikationer — godkendelsesanmodninger, applies, fejl og afdrift. Lad kanalen stå tom, og dette arbejdsområde forbliver tavst (der er ingen deployment-dækkende udsendelse). Kræver, at Slack-appen er aktiveret af en administrator."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Previewlægger",
-        "applying": "Anvender"
+        "applying": "Anvender",
+        "planned": "Previewlagt",
+        "applied": "Anvendt"
       },
       "words": {
         "actionConfirmFull": "Bekræft og anvend",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Previewlægning startet",
         "typePlanApply": "preview + apply",
         "vcsWorkflowWarningRbac": "Enhver, der kan merge PR'en, kan anvende. Branch-beskyttelsesregler (påkrævede reviews, statustjek, code owner-godkendelse) bliver porten. Terrapods rolle-/label-RBAC gælder<em>ikke</em> for kommentar-drevne handlinger i denne tilstand.",
-        "vcsWorkflowWarningRecommended": "<strong>Anbefalet:</strong> kræv lineær historik (rebase/squash før merge), så den commit, du anvender, er den commit, der lander."
+        "vcsWorkflowWarningRecommended": "<strong>Anbefalet:</strong> kræv lineær historik (rebase/squash før merge), så den commit, du anvender, er den commit, der lander.",
+        "slackDescription": "Tilmeld dette arbejdsområde Slack-kørselsnotifikationer — godkendelsesanmodninger, applies, fejl og afdrift. Lad kanalen stå tom, og dette arbejdsområde forbliver tavst (der er ingen deployment-dækkende udsendelse). Kræver, at Slack-appen er aktiveret af en administrator."
       }
     }
   },

@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Consilium Fit",
-        "applying": "Applicatur"
+        "applying": "Applicatur",
+        "planned": "Consilium Factum",
+        "applied": "Applicatum"
       },
       "words": {
         "actionConfirmFull": "Confirmare et Applicare",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Consilium inceptum",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Quisquis PR conflare potest applicare potest. Regulae protectionis ramorum (recognitiones requisitae, probationes status, approbatio dominorum codicis) fiunt porta. RBAC partium/titulorum Terrapod<em>non</em> applicatur ad actiones commentario-actas in hoc modo.",
-        "vcsWorkflowWarningRecommended": "<strong>Commendatum:</strong> historiam linearem require (rebase/squash ante conflationem) ut commissio quam applicas sit commissio quae terram tangit."
+        "vcsWorkflowWarningRecommended": "<strong>Commendatum:</strong> historiam linearem require (rebase/squash ante conflationem) ut commissio quam applicas sit commissio quae terram tangit.",
+        "slackDescription": "Adscribe hoc locus operis ad nuntiationes exsecutionis Slack — petitiones approbationis, applicationes, errores et aberrationes. Relinque canalem vacuum et hoc locus operis silet (nulla per totam instructionem dispersio). Requirit ut app Slack ab administratore activetur."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Consilium Fit",
-        "applying": "Applicatur"
+        "applying": "Applicatur",
+        "planned": "Consilium Factum",
+        "applied": "Applicatum"
       },
       "words": {
         "actionConfirmFull": "Confirmare et Applicare",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Consilium inceptum",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Quisquis PR conflare potest applicare potest. Regulae protectionis ramorum (recognitiones requisitae, probationes status, approbatio dominorum codicis) fiunt porta. RBAC partium/titulorum Terrapod<em>non</em> applicatur ad actiones commentario-actas in hoc modo.",
-        "vcsWorkflowWarningRecommended": "<strong>Commendatum:</strong> historiam linearem require (rebase/squash ante conflationem) ut commissio quam applicas sit commissio quae terram tangit."
+        "vcsWorkflowWarningRecommended": "<strong>Commendatum:</strong> historiam linearem require (rebase/squash ante conflationem) ut commissio quam applicas sit commissio quae terram tangit.",
+        "slackDescription": "Adscribe hoc locus operis ad nuntiationes exsecutionis Slack — petitiones approbationis, applicationes, errores et aberrationes. Relinque canalem vacuum et hoc locus operis silet (nulla per totam instructionem dispersio). Requirit ut app Slack ab administratore activetur."
       }
     }
   },

@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Pl4nn1ng",
-        "applying": "4pply1ng"
+        "applying": "4pply1ng",
+        "planned": "Pl4nn3d",
+        "applied": "4ppl13d"
       },
       "words": {
         "actionConfirmFull": "C0nf1rm & 4pply",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Pl4nn1ng 574r73d",
         "typePlanApply": "pl4n + 4pply",
         "vcsWorkflowWarningRbac": "4ny0n3 wh0 c4n m3rg3 7h3 PR c4n 4pply. Br4nch pr073c710n rul35 (r3qu1r3d r3v13w5, 5747u5 ch3ck5, c0d3 0wn3r 4ppr0v4l) b3c0m3 7h3 g473. 73rr4p0d r0l3/l4b3l RB4C d035<em>n07</em> 4pply 70 c0mm3n7-dr1v3n 4c710n5 1n 7h15 m0d3.",
-        "vcsWorkflowWarningRecommended": "<strong>R3c0mm3nd3d:</strong> r3qu1r3 l1n34r h1570ry (r3b453/5qu45h b3f0r3 m3rg3) 50 7h3 c0mm17 y0u 4pply 15 7h3 c0mm17 7h47 l4nd5."
+        "vcsWorkflowWarningRecommended": "<strong>R3c0mm3nd3d:</strong> r3qu1r3 l1n34r h1570ry (r3b453/5qu45h b3f0r3 m3rg3) 50 7h3 c0mm17 y0u 4pply 15 7h3 c0mm17 7h47 l4nd5.",
+        "slackDescription": "0p7 7h15 w0rk5p4c3 1n70 5l4ck run n071f1c4710n5 — 4ppr0v4l r3qu3575, 4ppl135, 3rr0r5, 4nd dr1f7. L34v3 7h3 ch4nn3l 3mp7y 4nd 7h15 w0rk5p4c3 574y5 51l3n7 (7h3r3 15 n0 d3pl0ym3n7-w1d3 f4n-0u7). R3qu1r35 7h3 5l4ck 4pp 70 b3 3n4bl3d by 4n 4dm1n157r470r."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Pr3v13w1ng",
-        "applying": "Upd471ng"
+        "applying": "Upd471ng",
+        "planned": "Pr3v13w3d",
+        "applied": "Upd473d"
       },
       "words": {
         "actionConfirmFull": "C0nf1rm & Upd473",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Pr3v13w 574r73d",
         "typePlanApply": "pr3v13w + upd473",
         "vcsWorkflowWarningRbac": "4ny0n3 wh0 c4n m3rg3 7h3 PR c4n upd473. Br4nch pr073c710n rul35 (r3qu1r3d r3v13w5, 5747u5 ch3ck5, c0d3 0wn3r 4ppr0v4l) b3c0m3 7h3 g473. 73rr4p0d r0l3/l4b3l RB4C d035<em>n07</em> 4pply 70 c0mm3n7-dr1v3n 4c710n5 1n 7h15 m0d3.",
-        "vcsWorkflowWarningRecommended": "<strong>R3c0mm3nd3d:</strong> r3qu1r3 l1n34r h1570ry (r3b453/5qu45h b3f0r3 m3rg3) 50 7h3 c0mm17 y0u upd473 fr0m 15 7h3 c0mm17 7h47 l4nd5."
+        "vcsWorkflowWarningRecommended": "<strong>R3c0mm3nd3d:</strong> r3qu1r3 l1n34r h1570ry (r3b453/5qu45h b3f0r3 m3rg3) 50 7h3 c0mm17 y0u upd473 fr0m 15 7h3 c0mm17 7h47 l4nd5.",
+        "slackDescription": "0p7 7h15 w0rk5p4c3 1n70 5l4ck run n071f1c4710n5 — 4ppr0v4l r3qu3575, upd4735, 3rr0r5, 4nd dr1f7. L34v3 7h3 ch4nn3l 3mp7y 4nd 7h15 w0rk5p4c3 574y5 51l3n7 (7h3r3 15 n0 d3pl0ym3n7-w1d3 f4n-0u7). R3qu1r35 7h3 5l4ck 4pp 70 b3 3n4bl3d by 4n 4dm1n157r470r."
       }
     }
   },

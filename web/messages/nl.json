@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Bezig met plannen",
-        "applying": "Bezig met toepassen"
+        "applying": "Bezig met toepassen",
+        "planned": "Gepland",
+        "applied": "Toegepast"
       },
       "words": {
         "actionConfirmFull": "Bevestigen & toepassen",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Plannen gestart",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Iedereen die de PR kan samenvoegen, kan toepassen. Branch-beschermingsregels (vereiste beoordelingen, statuscontroles, goedkeuring van code-eigenaar) worden de poort. Terrapod-rol-/label-RBAC is in deze modus<em>niet</em> van toepassing op comment-gestuurde acties.",
-        "vcsWorkflowWarningRecommended": "<strong>Aanbevolen:</strong> vereis lineaire geschiedenis (rebase/squash vóór samenvoegen) zodat de commit die u toepast de commit is die landt."
+        "vcsWorkflowWarningRecommended": "<strong>Aanbevolen:</strong> vereis lineaire geschiedenis (rebase/squash vóór samenvoegen) zodat de commit die u toepast de commit is die landt.",
+        "slackDescription": "Meld deze workspace aan voor Slack-uitvoeringsnotificaties — goedkeuringsverzoeken, applies, fouten en drift. Laat het kanaal leeg en deze workspace blijft stil (er is geen deployment-brede fan-out). Vereist dat de Slack-app door een beheerder is ingeschakeld."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Bezig met previewnen",
-        "applying": "Bezig met toepassen"
+        "applying": "Bezig met toepassen",
+        "planned": "Gepreviewd",
+        "applied": "Toegepast"
       },
       "words": {
         "actionConfirmFull": "Bevestigen & toepassen",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Previewnen gestart",
         "typePlanApply": "preview + apply",
         "vcsWorkflowWarningRbac": "Iedereen die de PR kan samenvoegen, kan toepassen. Branch-beschermingsregels (vereiste beoordelingen, statuscontroles, goedkeuring van code-eigenaar) worden de poort. Terrapod-rol-/label-RBAC is in deze modus<em>niet</em> van toepassing op comment-gestuurde acties.",
-        "vcsWorkflowWarningRecommended": "<strong>Aanbevolen:</strong> vereis lineaire geschiedenis (rebase/squash vóór samenvoegen) zodat de commit die u toepast de commit is die landt."
+        "vcsWorkflowWarningRecommended": "<strong>Aanbevolen:</strong> vereis lineaire geschiedenis (rebase/squash vóór samenvoegen) zodat de commit die u toepast de commit is die landt.",
+        "slackDescription": "Meld deze workspace aan voor Slack-uitvoeringsnotificaties — goedkeuringsverzoeken, applies, fouten en drift. Laat het kanaal leeg en deze workspace blijft stil (er is geen deployment-brede fan-out). Vereist dat de Slack-app door een beheerder is ingeschakeld."
       }
     }
   },

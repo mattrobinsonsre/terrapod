@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Planification",
-        "applying": "Application"
+        "applying": "Application",
+        "planned": "Planifié",
+        "applied": "Appliqué"
       },
       "words": {
         "actionConfirmFull": "Confirmer et appliquer",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Planification démarrée",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Quiconque peut fusionner la PR peut appliquer. Les règles de protection de branche (revues requises, vérifications de statut, approbation des propriétaires de code) deviennent le point de contrôle. Le RBAC par rôle/label de Terrapod ne s'applique <em>pas</em> aux actions pilotées par commentaire dans ce mode.",
-        "vcsWorkflowWarningRecommended": "<strong>Recommandé :</strong> exigez un historique linéaire (rebase/squash avant fusion) pour que le commit appliqué soit le commit qui arrive."
+        "vcsWorkflowWarningRecommended": "<strong>Recommandé :</strong> exigez un historique linéaire (rebase/squash avant fusion) pour que le commit appliqué soit le commit qui arrive.",
+        "slackDescription": "Abonnez cet espace de travail aux notifications d'exécution Slack — demandes d'approbation, applications, erreurs et dérives. Laissez le canal vide et cet espace de travail reste silencieux (il n'y a pas de diffusion à l'échelle du déploiement). Requiert que l'application Slack soit activée par un administrateur."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Previewification",
-        "applying": "Application"
+        "applying": "Application",
+        "planned": "Previewifié",
+        "applied": "Appliqué"
       },
       "words": {
         "actionConfirmFull": "Confirmer et appliquer",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Previewification démarrée",
         "typePlanApply": "preview + apply",
         "vcsWorkflowWarningRbac": "Quiconque peut fusionner la PR peut appliquer. Les règles de protection de branche (revues requises, vérifications de statut, approbation des propriétaires de code) deviennent le point de contrôle. Le RBAC par rôle/label de Terrapod ne s'applique <em>pas</em> aux actions pilotées par commentaire dans ce mode.",
-        "vcsWorkflowWarningRecommended": "<strong>Recommandé :</strong> exigez un historique linéaire (rebase/squash avant fusion) pour que le commit appliqué soit le commit qui arrive."
+        "vcsWorkflowWarningRecommended": "<strong>Recommandé :</strong> exigez un historique linéaire (rebase/squash avant fusion) pour que le commit appliqué soit le commit qui arrive.",
+        "slackDescription": "Abonnez cet espace de travail aux notifications d'exécution Slack — demandes d'approbation, applications, erreurs et dérives. Laissez le canal vide et cet espace de travail reste silencieux (il n'y a pas de diffusion à l'échelle du déploiement). Requiert que l'application Slack soit activée par un administrateur."
       }
     }
   },

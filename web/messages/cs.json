@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Plánování",
-        "applying": "Aplikování"
+        "applying": "Aplikování",
+        "planned": "Naplánováno",
+        "applied": "Aplikováno"
       },
       "words": {
         "actionConfirmFull": "Potvrdit a aplikovat",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Plánování zahájeno",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Kdokoli, kdo může sloučit PR, může aplikovat. Bránou se stávají pravidla ochrany větve (povinné kontroly, status checks, schválení vlastníkem kódu). Terrapod role/label RBAC se<em>ne</em>vztahuje na akce řízené komentáři v tomto režimu.",
-        "vcsWorkflowWarningRecommended": "<strong>Doporučeno:</strong> vyžadujte lineární historii (rebase/squash před sloučením), aby commit, který aplikujete, byl commitem, který přistane."
+        "vcsWorkflowWarningRecommended": "<strong>Doporučeno:</strong> vyžadujte lineární historii (rebase/squash před sloučením), aby commit, který aplikujete, byl commitem, který přistane.",
+        "slackDescription": "Přihlaste tento pracovní prostor k Slack oznámením o bězích — žádosti o schválení, aplikace, chyby a odchýlení. Ponechte kanál prázdný a tento pracovní prostor zůstane tichý (neexistuje žádné rozeslání pro celé nasazení). Vyžaduje, aby Slack aplikace byla povolena administrátorem."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Plánování",
-        "applying": "Aplikování"
+        "applying": "Aplikování",
+        "planned": "Naplánováno",
+        "applied": "Aplikováno"
       },
       "words": {
         "actionConfirmFull": "Potvrdit a aplikovat",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Plánování zahájeno",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Kdokoli, kdo může sloučit PR, může aplikovat. Bránou se stávají pravidla ochrany větve (povinné kontroly, status checks, schválení vlastníkem kódu). Terrapod role/label RBAC se<em>ne</em>vztahuje na akce řízené komentáři v tomto režimu.",
-        "vcsWorkflowWarningRecommended": "<strong>Doporučeno:</strong> vyžadujte lineární historii (rebase/squash před sloučením), aby commit, který aplikujete, byl commitem, který přistane."
+        "vcsWorkflowWarningRecommended": "<strong>Doporučeno:</strong> vyžadujte lineární historii (rebase/squash před sloučením), aby commit, který aplikujete, byl commitem, který přistane.",
+        "slackDescription": "Přihlaste tento pracovní prostor k Slack oznámením o bězích — žádosti o schválení, aplikace, chyby a odchýlení. Ponechte kanál prázdný a tento pracovní prostor zůstane tichý (neexistuje žádné rozeslání pro celé nasazení). Vyžaduje, aby Slack aplikace byla povolena administrátorem."
       }
     }
   },

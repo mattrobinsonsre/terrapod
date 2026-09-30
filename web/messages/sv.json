@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Planerar",
-        "applying": "Applicerar"
+        "applying": "Applicerar",
+        "planned": "Planerad",
+        "applied": "Applicerad"
       },
       "words": {
         "actionConfirmFull": "Bekräfta och applicera",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Planering startad",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Alla som kan merga PR:en kan applicera. Grenskyddsregler (obligatoriska granskningar, statuskontroller, godkännande av kodägare) blir grinden. Terrapods roll-/etikett-RBAC gäller<em>inte</em> för kommentarsdrivna åtgärder i detta läge.",
-        "vcsWorkflowWarningRecommended": "<strong>Rekommenderat:</strong> kräv linjär historik (rebase/squash före merge) så att den commit du applicerar är den commit som landar."
+        "vcsWorkflowWarningRecommended": "<strong>Rekommenderat:</strong> kräv linjär historik (rebase/squash före merge) så att den commit du applicerar är den commit som landar.",
+        "slackDescription": "Anmäl denna arbetsyta till Slack-körningsaviseringar — godkännandeförfrågningar, appliceringar, fel och drift. Lämna kanalen tom så förblir denna arbetsyta tyst (det finns ingen deploymentomfattande utsändning). Kräver att Slack-appen aktiverats av en administratör."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Previewerar",
-        "applying": "Applicerar"
+        "applying": "Applicerar",
+        "planned": "Previewerad",
+        "applied": "Applicerad"
       },
       "words": {
         "actionConfirmFull": "Bekräfta och applicera",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Previewering startad",
         "typePlanApply": "preview + apply",
         "vcsWorkflowWarningRbac": "Alla som kan merga PR:en kan applicera. Grenskyddsregler (obligatoriska granskningar, statuskontroller, godkännande av kodägare) blir grinden. Terrapods roll-/etikett-RBAC gäller<em>inte</em> för kommentarsdrivna åtgärder i detta läge.",
-        "vcsWorkflowWarningRecommended": "<strong>Rekommenderat:</strong> kräv linjär historik (rebase/squash före merge) så att den commit du applicerar är den commit som landar."
+        "vcsWorkflowWarningRecommended": "<strong>Rekommenderat:</strong> kräv linjär historik (rebase/squash före merge) så att den commit du applicerar är den commit som landar.",
+        "slackDescription": "Anmäl denna arbetsyta till Slack-körningsaviseringar — godkännandeförfrågningar, appliceringar, fel och drift. Lämna kanalen tom så förblir denna arbetsyta tyst (det finns ingen deploymentomfattande utsändning). Kräver att Slack-appen aktiverats av en administratör."
       }
     }
   },

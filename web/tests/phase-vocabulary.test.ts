@@ -132,3 +132,58 @@ test('every vocabulary name a component asks for exists for both engines', () =>
   )
   assert.deepEqual(missing, [], 'components ask for vocabulary names no engine defines')
 })
+
+// The status pill is rendered from a SET of phase tokens in one component and a
+// GROUP of catalogue keys in another, and nothing made the two agree. They did
+// not: the set held the two in-progress tokens and the group held the same two,
+// so `planned` and `applied` fell through to the platform namespace and read
+// "Planned" on a Pulumi workspace — on the workspace LIST, while the same run
+// read "Previewed" on that workspace's own runs tab. The defect #1911 is about,
+// one navigation step apart rather than one screen, found by looking at the
+// running UI rather than by any test.
+//
+// Asserted as an equality in both directions: a token added to the namespace
+// without widening the set renders the platform word, and a token added to the
+// set without the namespace renders a raw key. Neither is visible from the other
+// file, which is why this lives here and not beside either of them.
+test('the badge status set and the engine status namespace name the same tokens', () => {
+  const badge = readFileSync(
+    join(import.meta.dirname, '../src/components/workspace-status-badges.tsx'),
+    'utf8',
+  )
+  const m = badge.match(/const PHASE_FILTERS = new Set\(\[([^\]]*)\]\)/)
+  assert.ok(m, 'PHASE_FILTERS is not a literal Set any more — this guard reads it as source')
+  const filters = new Set([...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]))
+
+  const en = JSON.parse(
+    readFileSync(join(import.meta.dirname, '../messages/en.json'), 'utf8'),
+  )
+  for (const engine of ['terraform', 'pulumi']) {
+    const group = new Set(Object.keys(en.phases[engine].status ?? {}))
+    assert.deepEqual(
+      [...group].sort(),
+      [...filters].sort(),
+      `phases.${engine}.status and PHASE_FILTERS disagree — a token in one and not the ` +
+        `other either renders the platform word on every engine, or renders a raw key`,
+    )
+  }
+})
+
+// And the point of all of it: on the pill itself, the two engines must actually
+// say different things. The keys can line up perfectly and still both read
+// "Planned", which is what shipped.
+test('every phase status the badge shows reads differently on the two engines', () => {
+  const en = JSON.parse(
+    readFileSync(join(import.meta.dirname, '../messages/en.json'), 'utf8'),
+  )
+  const tf = en.phases.terraform.status
+  const pu = en.phases.pulumi.status
+  for (const token of Object.keys(tf)) {
+    assert.notEqual(
+      pu[token],
+      tf[token],
+      `status "${token}" reads "${tf[token]}" on both engines, so the pill tells a Pulumi ` +
+        `operator their run was ${tf[token]} — the word their runs tab does not use`,
+    )
+  }
+})

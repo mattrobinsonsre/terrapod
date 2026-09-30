@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "A planear",
-        "applying": "A aplicar"
+        "applying": "A aplicar",
+        "planned": "Planeado",
+        "applied": "Aplicado"
       },
       "words": {
         "actionConfirmFull": "Confirmar e Aplicar",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Planeamento iniciado",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Qualquer pessoa que possa fazer merge do PR pode aplicar. As regras de proteção de branch (revisões obrigatórias, verificações de estado, aprovação de code owner) passam a ser a barreira. O RBAC de função/etiqueta do Terrapod<em>não</em> se aplica a ações acionadas por comentários neste modo.",
-        "vcsWorkflowWarningRecommended": "<strong>Recomendado:</strong> exija histórico linear (rebase/squash antes do merge) para que o commit que aplica seja o commit que fica."
+        "vcsWorkflowWarningRecommended": "<strong>Recomendado:</strong> exija histórico linear (rebase/squash antes do merge) para que o commit que aplica seja o commit que fica.",
+        "slackDescription": "Inscreva este workspace nas notificações de execução do Slack — pedidos de aprovação, applies, erros e drift. Deixe o canal vazio e este workspace fica silencioso (não há distribuição a toda a implementação). Requer que a app do Slack seja ativada por um administrador."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "A previewear",
-        "applying": "A aplicar"
+        "applying": "A aplicar",
+        "planned": "Previeweado",
+        "applied": "Aplicado"
       },
       "words": {
         "actionConfirmFull": "Confirmar e Aplicar",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Previeweamento iniciado",
         "typePlanApply": "preview + apply",
         "vcsWorkflowWarningRbac": "Qualquer pessoa que possa fazer merge do PR pode aplicar. As regras de proteção de branch (revisões obrigatórias, verificações de estado, aprovação de code owner) passam a ser a barreira. O RBAC de função/etiqueta do Terrapod<em>não</em> se aplica a ações acionadas por comentários neste modo.",
-        "vcsWorkflowWarningRecommended": "<strong>Recomendado:</strong> exija histórico linear (rebase/squash antes do merge) para que o commit que aplica seja o commit que fica."
+        "vcsWorkflowWarningRecommended": "<strong>Recomendado:</strong> exija histórico linear (rebase/squash antes do merge) para que o commit que aplica seja o commit que fica.",
+        "slackDescription": "Inscreva este workspace nas notificações de execução do Slack — pedidos de aprovação, applies, erros e drift. Deixe o canal vazio e este workspace fica silencioso (não há distribuição a toda a implementação). Requer que a app do Slack seja ativada por um administrador."
       }
     }
   },

@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "プラン実行中",
-        "applying": "適用中"
+        "applying": "適用中",
+        "planned": "プラン完了",
+        "applied": "適用済み"
       },
       "words": {
         "actionConfirmFull": "確認して適用",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "プラン開始",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "PRをマージできる者は誰でも適用できます。ブランチ保護ルール（必須レビュー、ステータスチェック、コードオーナーの承認）がゲートになります。このモードでは、Terrapodのロール/ラベルRBACはコメント駆動のアクションに<em>適用されません</em>。",
-        "vcsWorkflowWarningRecommended": "<strong>推奨:</strong> 線形履歴を要求してください（マージ前にrebase/squash）。これにより、適用するコミットが実際に取り込まれるコミットになります。"
+        "vcsWorkflowWarningRecommended": "<strong>推奨:</strong> 線形履歴を要求してください（マージ前にrebase/squash）。これにより、適用するコミットが実際に取り込まれるコミットになります。",
+        "slackDescription": "このワークスペースをSlackの実行通知（承認リクエスト、適用、エラー、ドリフト）にオプトインします。チャンネルを空欄のままにすると、このワークスペースは通知しません（デプロイメント全体への一斉配信はありません）。管理者によるSlackアプリの有効化が必要です。"
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "プラン実行中",
-        "applying": "適用中"
+        "applying": "適用中",
+        "planned": "プラン完了",
+        "applied": "適用済み"
       },
       "words": {
         "actionConfirmFull": "確認して適用",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "プラン開始",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "PRをマージできる者は誰でも適用できます。ブランチ保護ルール（必須レビュー、ステータスチェック、コードオーナーの承認）がゲートになります。このモードでは、Terrapodのロール/ラベルRBACはコメント駆動のアクションに<em>適用されません</em>。",
-        "vcsWorkflowWarningRecommended": "<strong>推奨:</strong> 線形履歴を要求してください（マージ前にrebase/squash）。これにより、適用するコミットが実際に取り込まれるコミットになります。"
+        "vcsWorkflowWarningRecommended": "<strong>推奨:</strong> 線形履歴を要求してください（マージ前にrebase/squash）。これにより、適用するコミットが実際に取り込まれるコミットになります。",
+        "slackDescription": "このワークスペースをSlackの実行通知（承認リクエスト、適用、エラー、ドリフト）にオプトインします。チャンネルを空欄のままにすると、このワークスペースは通知しません（デプロイメント全体への一斉配信はありません）。管理者によるSlackアプリの有効化が必要です。"
       }
     }
   },

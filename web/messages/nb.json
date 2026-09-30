@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Planlegger",
-        "applying": "Anvender"
+        "applying": "Anvender",
+        "planned": "Planlagt",
+        "applied": "Anvendt"
       },
       "words": {
         "actionConfirmFull": "Bekreft og anvend",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Planlegging startet",
         "typePlanApply": "plan + anvend",
         "vcsWorkflowWarningRbac": "Alle som kan slå sammen PR-en kan anvende. Grenbeskyttelsesregler (påkrevde gjennomganger, statuskontroller, kodeierens godkjenning) blir porten. Terrapod rolle-/etikett-RBAC gjelder<em>ikke</em> for kommentardrevne handlinger i denne modusen.",
-        "vcsWorkflowWarningRecommended": "<strong>Anbefalt:</strong> krev lineær historikk (rebase/squash før sammenslåing) slik at kommitteringen du anvender er den kommitteringen som lander."
+        "vcsWorkflowWarningRecommended": "<strong>Anbefalt:</strong> krev lineær historikk (rebase/squash før sammenslåing) slik at kommitteringen du anvender er den kommitteringen som lander.",
+        "slackDescription": "Meld dette arbeidsområdet på Slack-kjøringsvarsler – godkjenningsforespørsler, anvendelser, feil og avdrift. La kanalen stå tom, så forblir dette arbeidsområdet stille (det finnes ingen utrullingsdekkende utsending). Krever at Slack-appen er aktivert av en administrator."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Previewlegger",
-        "applying": "Anvender"
+        "applying": "Anvender",
+        "planned": "Previewlagt",
+        "applied": "Anvendt"
       },
       "words": {
         "actionConfirmFull": "Bekreft og anvend",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Previewlegging startet",
         "typePlanApply": "preview + anvend",
         "vcsWorkflowWarningRbac": "Alle som kan slå sammen PR-en kan anvende. Grenbeskyttelsesregler (påkrevde gjennomganger, statuskontroller, kodeierens godkjenning) blir porten. Terrapod rolle-/etikett-RBAC gjelder<em>ikke</em> for kommentardrevne handlinger i denne modusen.",
-        "vcsWorkflowWarningRecommended": "<strong>Anbefalt:</strong> krev lineær historikk (rebase/squash før sammenslåing) slik at kommitteringen du anvender er den kommitteringen som lander."
+        "vcsWorkflowWarningRecommended": "<strong>Anbefalt:</strong> krev lineær historikk (rebase/squash før sammenslåing) slik at kommitteringen du anvender er den kommitteringen som lander.",
+        "slackDescription": "Meld dette arbeidsområdet på Slack-kjøringsvarsler – godkjenningsforespørsler, anvendelser, feil og avdrift. La kanalen stå tom, så forblir dette arbeidsområdet stille (det finnes ingen utrullingsdekkende utsending). Krever at Slack-appen er aktivert av en administrator."
       }
     }
   },

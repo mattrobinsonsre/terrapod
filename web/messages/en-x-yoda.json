@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Planning",
-        "applying": "Applying"
+        "applying": "Applying",
+        "planned": "Planned",
+        "applied": "Applied"
       },
       "words": {
         "actionConfirmFull": "Confirm and Apply",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "started, Planning",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Anyone who can merge the PR, apply they can. The gate, branch protection rules (required reviews, status checks, code owner approval) become. To comment-driven actions in this mode, Terrapod role/label RBAC apply it does<em>not</em>.",
-        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> linear history require (before merge, rebase/squash) so the commit you apply, the commit that lands it is."
+        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> linear history require (before merge, rebase/squash) so the commit you apply, the commit that lands it is.",
+        "slackDescription": "Into Slack run notifications, this workspace opt — approval requests, applies, errors, and drift. The channel empty leave, and silent this workspace stays (no deployment-wide fan-out, there is). By an administrator, the Slack app to be enabled, requires it."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Previewning",
-        "applying": "Uping"
+        "applying": "Uping",
+        "planned": "Previewned",
+        "applied": "Applied"
       },
       "words": {
         "actionConfirmFull": "Confirm and Update",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "started, Previewing",
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Anyone who can merge the PR, apply they can. The gate, branch protection rules (required reviews, status checks, code owner approval) become. To comment-driven actions in this mode, Terrapod role/label RBAC apply it does<em>not</em>.",
-        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> linear history require (before merge, rebase/squash) so the commit you update, the commit that lands it is."
+        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> linear history require (before merge, rebase/squash) so the commit you update, the commit that lands it is.",
+        "slackDescription": "Into Slack run notifications, this workspace opt — approval requests, updates, errors, and drift. The channel empty leave, and silent this workspace stays (no deployment-wide fan-out, there is). By an administrator, the Slack app to be enabled, requires it."
       }
     }
   },

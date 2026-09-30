@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Pianificazione",
-        "applying": "Applicazione"
+        "applying": "Applicazione",
+        "planned": "Pianificato",
+        "applied": "Applicato"
       },
       "words": {
         "actionConfirmFull": "Conferma e applica",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Pianificazione avviata",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Chiunque possa fare il merge della PR può applicare. Le regole di protezione del branch (revisioni obbligatorie, controlli di stato, approvazione del code owner) diventano il cancello. L''RBAC per ruolo/etichetta di Terrapod<em>non</em> si applica alle azioni guidate dai commenti in questa modalità.",
-        "vcsWorkflowWarningRecommended": "<strong>Consigliato:</strong> richiedi una cronologia lineare (rebase/squash prima del merge) in modo che il commit che applichi sia il commit che finisce nel branch."
+        "vcsWorkflowWarningRecommended": "<strong>Consigliato:</strong> richiedi una cronologia lineare (rebase/squash prima del merge) in modo che il commit che applichi sia il commit che finisce nel branch.",
+        "slackDescription": "Iscrivi questo workspace alle notifiche Slack delle esecuzioni — richieste di approvazione, apply, errori e deriva. Lascia il canale vuoto e questo workspace rimane silenzioso (non esiste un fan-out a livello di deployment). Richiede che l''app Slack sia attivata da un amministratore."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Pianificazione",
-        "applying": "Applicazione"
+        "applying": "Applicazione",
+        "planned": "Pianificato",
+        "applied": "Applicato"
       },
       "words": {
         "actionConfirmFull": "Conferma e applica",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Pianificazione avviata",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Chiunque possa fare il merge della PR può applicare. Le regole di protezione del branch (revisioni obbligatorie, controlli di stato, approvazione del code owner) diventano il cancello. L''RBAC per ruolo/etichetta di Terrapod<em>non</em> si applica alle azioni guidate dai commenti in questa modalità.",
-        "vcsWorkflowWarningRecommended": "<strong>Consigliato:</strong> richiedi una cronologia lineare (rebase/squash prima del merge) in modo che il commit che applichi sia il commit che finisce nel branch."
+        "vcsWorkflowWarningRecommended": "<strong>Consigliato:</strong> richiedi una cronologia lineare (rebase/squash prima del merge) in modo che il commit che applichi sia il commit che finisce nel branch.",
+        "slackDescription": "Iscrivi questo workspace alle notifiche Slack delle esecuzioni — richieste di approvazione, apply, errori e deriva. Lascia il canale vuoto e questo workspace rimane silenzioso (non esiste un fan-out a livello di deployment). Richiede che l''app Slack sia attivata da un amministratore."
       }
     }
   },

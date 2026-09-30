@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Planlanıyor",
-        "applying": "Uygulanıyor"
+        "applying": "Uygulanıyor",
+        "planned": "Planlandı",
+        "applied": "Uygulandı"
       },
       "words": {
         "actionConfirmFull": "Onayla ve Uygula",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Planlama başladı",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "PR''ı birleştirebilen herkes uygulayabilir. Dal koruma kuralları (gerekli incelemeler, durum denetimleri, kod sahibi onayı) kapı haline gelir. Terrapod rol/etiket RBAC''si bu modda yorum güdümlü eylemlere<em>uygulanmaz</em>.",
-        "vcsWorkflowWarningRecommended": "<strong>Önerilir:</strong> uyguladığınız commit''in yerleşen commit olması için doğrusal geçmiş gerektirin (birleştirmeden önce rebase/squash yapın)."
+        "vcsWorkflowWarningRecommended": "<strong>Önerilir:</strong> uyguladığınız commit''in yerleşen commit olması için doğrusal geçmiş gerektirin (birleştirmeden önce rebase/squash yapın).",
+        "slackDescription": "Bu çalışma alanını Slack çalıştırma bildirimlerine dahil edin — onay istekleri, uygulamalar, hatalar ve sürüklenme. Kanalı boş bırakın ve bu çalışma alanı sessiz kalır (dağıtım genelinde bir dağıtım yoktur). Slack uygulamasının bir yönetici tarafından etkinleştirilmesini gerektirir."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Previewlanıyor",
-        "applying": "Uygulanıyor"
+        "applying": "Uygulanıyor",
+        "planned": "Previewlandı",
+        "applied": "Uygulandı"
       },
       "words": {
         "actionConfirmFull": "Onayla ve Uygula",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Previewlama başladı",
         "typePlanApply": "preview + apply",
         "vcsWorkflowWarningRbac": "PR''ı birleştirebilen herkes uygulayabilir. Dal koruma kuralları (gerekli incelemeler, durum denetimleri, kod sahibi onayı) kapı haline gelir. Terrapod rol/etiket RBAC''si bu modda yorum güdümlü eylemlere<em>uygulanmaz</em>.",
-        "vcsWorkflowWarningRecommended": "<strong>Önerilir:</strong> uyguladığınız commit''in yerleşen commit olması için doğrusal geçmiş gerektirin (birleştirmeden önce rebase/squash yapın)."
+        "vcsWorkflowWarningRecommended": "<strong>Önerilir:</strong> uyguladığınız commit''in yerleşen commit olması için doğrusal geçmiş gerektirin (birleştirmeden önce rebase/squash yapın).",
+        "slackDescription": "Bu çalışma alanını Slack çalıştırma bildirimlerine dahil edin — onay istekleri, uygulamalar, hatalar ve sürüklenme. Kanalı boş bırakın ve bu çalışma alanı sessiz kalır (dağıtım genelinde bir dağıtım yoktur). Slack uygulamasının bir yönetici tarafından etkinleştirilmesini gerektirir."
       }
     }
   },

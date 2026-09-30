@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "正在计划",
-        "applying": "正在应用"
+        "applying": "正在应用",
+        "planned": "已计划",
+        "applied": "已应用"
       },
       "words": {
         "actionConfirmFull": "确认并应用",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "计划已开始",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "任何能够合并 PR 的人都可以应用。分支保护规则（必需的审查、状态检查、代码所有者批准）成为把关。在此模式下，Terrapod 的角色/标签 RBAC <em>不</em>适用于由评论驱动的操作。",
-        "vcsWorkflowWarningRecommended": "<strong>建议：</strong>要求线性历史（合并前进行 rebase/squash），以便您应用的提交就是最终落地的提交。"
+        "vcsWorkflowWarningRecommended": "<strong>建议：</strong>要求线性历史（合并前进行 rebase/squash），以便您应用的提交就是最终落地的提交。",
+        "slackDescription": "让此工作区选择接收 Slack 运行通知 — 审批请求、应用、错误和漂移。将频道留空则此工作区保持静默（没有部署级扇出）。需要管理员启用 Slack 应用。"
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "正在计划",
-        "applying": "正在应用"
+        "applying": "正在应用",
+        "planned": "已计划",
+        "applied": "已应用"
       },
       "words": {
         "actionConfirmFull": "确认并应用",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "计划已开始",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "任何能够合并 PR 的人都可以应用。分支保护规则（必需的审查、状态检查、代码所有者批准）成为把关。在此模式下，Terrapod 的角色/标签 RBAC <em>不</em>适用于由评论驱动的操作。",
-        "vcsWorkflowWarningRecommended": "<strong>建议：</strong>要求线性历史（合并前进行 rebase/squash），以便您应用的提交就是最终落地的提交。"
+        "vcsWorkflowWarningRecommended": "<strong>建议：</strong>要求线性历史（合并前进行 rebase/squash），以便您应用的提交就是最终落地的提交。",
+        "slackDescription": "让此工作区选择接收 Slack 运行通知 — 审批请求、应用、错误和漂移。将频道留空则此工作区保持静默（没有部署级扇出）。需要管理员启用 Slack 应用。"
       }
     }
   },

@@ -3312,7 +3312,7 @@ function WorkspaceDetailContent() {
             <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
               <h3 className="text-sm font-medium text-slate-200">{t('slack.title')}</h3>
               <p className="text-sm text-slate-400 mt-1">
-                {t('slack.description')}
+                {phaseWord('slackDescription')}
               </p>
               <dl className="mt-4">
                 <div>

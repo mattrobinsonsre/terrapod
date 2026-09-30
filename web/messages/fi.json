@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Suunnitellaan",
-        "applying": "Otetaan käyttöön"
+        "applying": "Otetaan käyttöön",
+        "planned": "Suunniteltu",
+        "applied": "Otettu käyttöön"
       },
       "words": {
         "actionConfirmFull": "Vahvista ja ota käyttöön",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Suunnittelu aloitettu",
         "typePlanApply": "suunnittelu + käyttöönotto",
         "vcsWorkflowWarningRbac": "Kuka tahansa, joka voi yhdistää PR:n, voi ottaa käyttöön. Haaran suojaussäännöistä (vaaditut tarkastelut, tilatarkistukset, koodinomistajan hyväksyntä) tulee portti. Terrapod-roolien/-tunnisteiden RBAC<em>ei</em> koske kommenttivetoisia toimintoja tässä tilassa.",
-        "vcsWorkflowWarningRecommended": "<strong>Suositeltu:</strong> vaadi lineaarinen historia (rebase/squash ennen yhdistämistä), jotta käyttöönotettava commit on se commit, joka päätyy kohteeseen."
+        "vcsWorkflowWarningRecommended": "<strong>Suositeltu:</strong> vaadi lineaarinen historia (rebase/squash ennen yhdistämistä), jotta käyttöönotettava commit on se commit, joka päätyy kohteeseen.",
+        "slackDescription": "Ota tämä työtila mukaan Slack-ajoilmoituksiin — hyväksyntäpyynnöt, käyttöönotot, virheet ja ajautuma. Jätä kanava tyhjäksi, niin tämä työtila pysyy hiljaa (ei ole käyttöönottolaajuista jakelua). Vaatii, että järjestelmänvalvoja on ottanut Slack-sovelluksen käyttöön."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Suunnitellaan",
-        "applying": "Otetaan käyttöön"
+        "applying": "Otetaan käyttöön",
+        "planned": "Suunniteltu",
+        "applied": "Otettu käyttöön"
       },
       "words": {
         "actionConfirmFull": "Vahvista ja ota käyttöön",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Suunnittelu aloitettu",
         "typePlanApply": "suunnittelu + käyttöönotto",
         "vcsWorkflowWarningRbac": "Kuka tahansa, joka voi yhdistää PR:n, voi ottaa käyttöön. Haaran suojaussäännöistä (vaaditut tarkastelut, tilatarkistukset, koodinomistajan hyväksyntä) tulee portti. Terrapod-roolien/-tunnisteiden RBAC<em>ei</em> koske kommenttivetoisia toimintoja tässä tilassa.",
-        "vcsWorkflowWarningRecommended": "<strong>Suositeltu:</strong> vaadi lineaarinen historia (rebase/squash ennen yhdistämistä), jotta käyttöönotettava commit on se commit, joka päätyy kohteeseen."
+        "vcsWorkflowWarningRecommended": "<strong>Suositeltu:</strong> vaadi lineaarinen historia (rebase/squash ennen yhdistämistä), jotta käyttöönotettava commit on se commit, joka päätyy kohteeseen.",
+        "slackDescription": "Ota tämä työtila mukaan Slack-ajoilmoituksiin — hyväksyntäpyynnöt, käyttöönotot, virheet ja ajautuma. Jätä kanava tyhjäksi, niin tämä työtila pysyy hiljaa (ei ole käyttöönottolaajuista jakelua). Vaatii, että järjestelmänvalvoja on ottanut Slack-sovelluksen käyttöön."
       }
     }
   },

@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "nabtaH",
-        "applying": "lo'taH"
+        "applying": "lo'taH",
+        "planned": "nabpu'",
+        "applied": "lo'pu'"
       },
       "words": {
         "actionConfirmFull": "tob 'ej lo'",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "nab taghpu'",
         "typePlanApply": "nab + lo'",
         "vcsWorkflowWarningRbac": "PR merge laHbogh Hoch lo''laH. paQ ''avmeH chutmey (poQlu''bogh laDmey, Dotlh toblu''mey, code ghajwI'' chaw'') moj lojmIt. mIwvamDaq QIn-ra''lu''bogh vangmeyDaq Terrapod patlh/per RBAC <em>lo''be''</em>.",
-        "vcsWorkflowWarningRecommended": "<strong>qeSlu':</strong> tlhegh nIH poQ (merge pa' rebase/squash) vaj lo'lu'bogh chum 'oH pumbogh chum'e'."
+        "vcsWorkflowWarningRecommended": "<strong>qeSlu':</strong> tlhegh nIH poQ (merge pa' rebase/squash) vaj lo'lu'bogh chum 'oH pumbogh chum'e'.",
+        "slackDescription": "Slack Sar QInmeyDaq Qumwo'vam 'el — chaw' tlhobmey, lo'mey, Qaghmey, je tlhotlh. HIvjeH chImmoH 'ej Qumwo'vam tammoHqa' (nISwI'-naQ ghommey Hutlh). che'wI' Slack app chu' poQ."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "nabtaH",
-        "applying": "lo'taH"
+        "applying": "lo'taH",
+        "planned": "nabpu'",
+        "applied": "lo'pu'"
       },
       "words": {
         "actionConfirmFull": "tob 'ej lo'",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "nab taghpu'",
         "typePlanApply": "nab + lo'",
         "vcsWorkflowWarningRbac": "PR merge laHbogh Hoch lo''laH. paQ ''avmeH chutmey (poQlu''bogh laDmey, Dotlh toblu''mey, code ghajwI'' chaw'') moj lojmIt. mIwvamDaq QIn-ra''lu''bogh vangmeyDaq Terrapod patlh/per RBAC <em>lo''be''</em>.",
-        "vcsWorkflowWarningRecommended": "<strong>qeSlu':</strong> tlhegh nIH poQ (merge pa' rebase/squash) vaj lo'lu'bogh chum 'oH pumbogh chum'e'."
+        "vcsWorkflowWarningRecommended": "<strong>qeSlu':</strong> tlhegh nIH poQ (merge pa' rebase/squash) vaj lo'lu'bogh chum 'oH pumbogh chum'e'.",
+        "slackDescription": "Slack Sar QInmeyDaq Qumwo'vam 'el — chaw' tlhobmey, lo'mey, Qaghmey, je tlhotlh. HIvjeH chImmoH 'ej Qumwo'vam tammoHqa' (nISwI'-naQ ghommey Hutlh). che'wI' Slack app chu' poQ."
       }
     }
   },

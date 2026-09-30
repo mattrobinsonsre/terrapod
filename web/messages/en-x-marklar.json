@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Planning",
-        "applying": "Applying"
+        "applying": "Applying",
+        "planned": "Planned",
+        "applied": "Applied"
       },
       "words": {
         "actionConfirmFull": "Confirm & Apply",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Marklaring started",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Marklar who can merge the marklar can apply. Marklar marklar marklars (required marklars, marklar marklars, marklar marklar marklar) become the marklar. Terrapod marklar/marklar marklar does<em>not</em> apply to comment-driven marklars in this marklar.",
-        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear marklar (rebase/squash before marklar) so the marklar you apply is the marklar that lands."
+        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear marklar (rebase/squash before marklar) so the marklar you apply is the marklar that lands.",
+        "slackDescription": "Opt this marklar into Slack run marklars — marklar marklars, marklars, marklars, and marklar. Leave the marklar empty and this marklar stays silent (there is no deployment-wide marklar). Requires the Slack marklar to be enabled by an marklar."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Previewning",
-        "applying": "Uping"
+        "applying": "Uping",
+        "planned": "Previewned",
+        "applied": "Applied"
       },
       "words": {
         "actionConfirmFull": "Confirm & Update",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Marklaring started",
         "typePlanApply": "preview + update",
         "vcsWorkflowWarningRbac": "Marklar who can merge the marklar can apply. Marklar marklar marklars (required marklars, marklar marklars, marklar marklar marklar) become the marklar. Terrapod marklar/marklar marklar does<em>not</em> apply to comment-driven marklars in this marklar.",
-        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear marklar (rebase/squash before marklar) so the marklar you update is the marklar that lands."
+        "vcsWorkflowWarningRecommended": "<strong>Recommended:</strong> require linear marklar (rebase/squash before marklar) so the marklar you update is the marklar that lands.",
+        "slackDescription": "Opt this marklar into Slack run marklars — marklar marklars, marklars, marklars, and marklar. Leave the marklar empty and this marklar stays silent (there is no deployment-wide marklar). Requires the Slack marklar to be enabled by an marklar."
       }
     }
   },

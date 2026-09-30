@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Planowanie",
-        "applying": "Zastosowywanie"
+        "applying": "Zastosowywanie",
+        "planned": "Zaplanowane",
+        "applied": "Zastosowane"
       },
       "words": {
         "actionConfirmFull": "Potwierdź i zastosuj",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Rozpoczęto planowanie",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Każdy, kto może scalić PR, może zastosować. Bramką stają się reguły ochrony gałęzi (wymagane przeglądy, sprawdzenia statusu, zatwierdzenie właściciela kodu). RBAC ról/etykiet Terrapod<em>nie</em> stosuje się do akcji sterowanych komentarzami w tym trybie.",
-        "vcsWorkflowWarningRecommended": "<strong>Zalecane:</strong> wymagaj liniowej historii (rebase/squash przed scaleniem), aby commit, który stosujesz, był commitem, który trafia do gałęzi."
+        "vcsWorkflowWarningRecommended": "<strong>Zalecane:</strong> wymagaj liniowej historii (rebase/squash przed scaleniem), aby commit, który stosujesz, był commitem, który trafia do gałęzi.",
+        "slackDescription": "Włącz dla tego obszaru roboczego powiadomienia Slack o przebiegach — prośby o zatwierdzenie, zastosowania, błędy i dryf. Pozostaw kanał pusty, a ten obszar roboczy pozostanie cichy (nie ma rozgłaszania obejmującego całe wdrożenie). Wymaga włączenia aplikacji Slack przez administratora."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Previewowanie",
-        "applying": "Zastosowywanie"
+        "applying": "Zastosowywanie",
+        "planned": "Zapreviewowane",
+        "applied": "Zastosowane"
       },
       "words": {
         "actionConfirmFull": "Potwierdź i zastosuj",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Rozpoczęto previewowanie",
         "typePlanApply": "preview + apply",
         "vcsWorkflowWarningRbac": "Każdy, kto może scalić PR, może zastosować. Bramką stają się reguły ochrony gałęzi (wymagane przeglądy, sprawdzenia statusu, zatwierdzenie właściciela kodu). RBAC ról/etykiet Terrapod<em>nie</em> stosuje się do akcji sterowanych komentarzami w tym trybie.",
-        "vcsWorkflowWarningRecommended": "<strong>Zalecane:</strong> wymagaj liniowej historii (rebase/squash przed scaleniem), aby commit, który stosujesz, był commitem, który trafia do gałęzi."
+        "vcsWorkflowWarningRecommended": "<strong>Zalecane:</strong> wymagaj liniowej historii (rebase/squash przed scaleniem), aby commit, który stosujesz, był commitem, który trafia do gałęzi.",
+        "slackDescription": "Włącz dla tego obszaru roboczego powiadomienia Slack o przebiegach — prośby o zatwierdzenie, zastosowania, błędy i dryf. Pozostaw kanał pusty, a ten obszar roboczy pozostanie cichy (nie ma rozgłaszania obejmującego całe wdrożenie). Wymaga włączenia aplikacji Slack przez administratora."
       }
     }
   },

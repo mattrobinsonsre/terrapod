@@ -79,6 +79,18 @@ test.describe('Pulumi workspace', () => {
     await expect(page).toHaveURL(/engine=pulumi/);
   });
 
+  // The workspace LIST's status pill is NOT asserted here, deliberately. It reads
+  // a run's terminal phase — "Previewed" vs "Planned" — and nothing in this suite
+  // can produce one: a seeded run stays `queued` because no runner claims it, and
+  // `queued` is a platform word that reads the same on every engine. A test
+  // written against it would assert "Queued" twice and prove nothing.
+  //
+  // That pill had a real bug (the list said "Planned" for a Pulumi workspace while
+  // its own runs tab said "Previewed"), found by looking at the running UI. Its
+  // coverage lives in web/tests/phase-vocabulary.test.ts, which checks the defect
+  // structurally and in both directions — the badge's token set against the
+  // catalogue group, and that the two engines actually read differently.
+
   test('its page shows Pulumi settings, and the bind-plan toggle round-trips', async ({ page }) => {
     const token = getStoredToken();
     const wsId = await createPulumiWorkspace(token, `${uniqueName('e2e-pulumi-b')}::dev`);

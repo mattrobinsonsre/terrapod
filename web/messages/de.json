@@ -3432,7 +3432,9 @@
       },
       "status": {
         "planning": "Wird geplant",
-        "applying": "Wird angewendet"
+        "applying": "Wird angewendet",
+        "planned": "Geplant",
+        "applied": "Angewendet"
       },
       "words": {
         "actionConfirmFull": "Bestätigen und anwenden",
@@ -3499,7 +3501,8 @@
         "timelinePlanningStarted": "Planung gestartet",
         "typePlanApply": "plan + apply",
         "vcsWorkflowWarningRbac": "Jeder, der den PR zusammenführen kann, kann anwenden. Branch-Schutzregeln (erforderliche Reviews, Statusprüfungen, Code-Owner-Freigabe) werden zur Kontrollinstanz. Die Rollen-/Label-RBAC von Terrapod gilt in diesem Modus <em>nicht</em> für kommentargesteuerte Aktionen.",
-        "vcsWorkflowWarningRecommended": "<strong>Empfohlen:</strong> Erzwingen Sie eine lineare Historie (rebase/squash vor dem Zusammenführen), damit der Commit, den Sie anwenden, auch der Commit ist, der landet."
+        "vcsWorkflowWarningRecommended": "<strong>Empfohlen:</strong> Erzwingen Sie eine lineare Historie (rebase/squash vor dem Zusammenführen), damit der Commit, den Sie anwenden, auch der Commit ist, der landet.",
+        "slackDescription": "Aktivieren Sie für diesen Arbeitsbereich Slack-Benachrichtigungen zu Ausführungen — Freigabeanfragen, Applies, Fehler und Drift. Lassen Sie den Kanal leer, bleibt dieser Arbeitsbereich stumm (es gibt keine bereitstellungsweite Verteilung). Erfordert, dass die Slack-App von einem Administrator aktiviert wurde."
       }
     },
     "pulumi": {
@@ -3515,7 +3518,9 @@
       },
       "status": {
         "planning": "Wird gepreviewt",
-        "applying": "Wird angewendet"
+        "applying": "Wird angewendet",
+        "planned": "Gepreviewt",
+        "applied": "Angewendet"
       },
       "words": {
         "actionConfirmFull": "Bestätigen und anwenden",
@@ -3582,7 +3587,8 @@
         "timelinePlanningStarted": "Previewung gestartet",
         "typePlanApply": "preview + apply",
         "vcsWorkflowWarningRbac": "Jeder, der den PR zusammenführen kann, kann anwenden. Branch-Schutzregeln (erforderliche Reviews, Statusprüfungen, Code-Owner-Freigabe) werden zur Kontrollinstanz. Die Rollen-/Label-RBAC von Terrapod gilt in diesem Modus <em>nicht</em> für kommentargesteuerte Aktionen.",
-        "vcsWorkflowWarningRecommended": "<strong>Empfohlen:</strong> Erzwingen Sie eine lineare Historie (rebase/squash vor dem Zusammenführen), damit der Commit, den Sie anwenden, auch der Commit ist, der landet."
+        "vcsWorkflowWarningRecommended": "<strong>Empfohlen:</strong> Erzwingen Sie eine lineare Historie (rebase/squash vor dem Zusammenführen), damit der Commit, den Sie anwenden, auch der Commit ist, der landet.",
+        "slackDescription": "Aktivieren Sie für diesen Arbeitsbereich Slack-Benachrichtigungen zu Ausführungen — Freigabeanfragen, Applies, Fehler und Drift. Lassen Sie den Kanal leer, bleibt dieser Arbeitsbereich stumm (es gibt keine bereitstellungsweite Verteilung). Erfordert, dass die Slack-App von einem Administrator aktiviert wurde."
       }
     }
   },
