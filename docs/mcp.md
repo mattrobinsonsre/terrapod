@@ -100,7 +100,7 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 
 | Tool | What it does |
 |---|---|
-| `terrapod_workspace_list` | List workspaces with status, execution mode, lock, drift, labels. |
+| `terrapod_workspace_list` | List workspaces with status, execution mode, lock, drift, labels. Takes an `engine` filter — narrow with it before anything that assumes one engine. |
 | `terrapod_workspace_get` | One workspace by id or name — full config + status. |
 | `terrapod_run_list` | Recent runs for a workspace (status, plan-only/destroy, has-changes). |
 | `terrapod_run_get` | One run's full status incl. Terrapod-native detail (has-changes, drift, resource profile, permitted actions). |

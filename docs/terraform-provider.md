@@ -32,7 +32,10 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 | Registry | `terrapod_registry_module`, `terrapod_module_autodiscovery_rule`, `terrapod_registry_provider`, `terrapod_gpg_key` |
 | Service catalog | `terrapod_catalog_item`, `terrapod_catalog_instance`, `terrapod_provider_template` |
 
-**Data sources** (`terrapod_*`): `terrapod_workspace`, `terrapod_workspaces`,
+**Data sources** (`terrapod_*`): `terrapod_workspace`, `terrapod_workspaces`
+(each entry reports its `engine`, and an optional `engine` argument returns only
+that engine's workspaces — narrow with it before feeding the list to anything
+that assumes one engine),
 `terrapod_workspace_cost`, `terrapod_architecture_critique`,
 `terrapod_agent_pool`, `terrapod_role`, `terrapod_user`,
 `terrapod_vcs_connection`, `terrapod_catalog_instances`,
