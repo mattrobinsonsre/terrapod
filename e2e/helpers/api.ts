@@ -262,7 +262,9 @@ export async function createWorkspace(
  * (#1705). The lock is held by the identity behind `token`.
  */
 export async function lockWorkspace(token: string, wsId: string, reason?: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v2/workspaces/${wsId}/actions/lock`, {
+  // Natively, so it works for every engine. The TFE-compatible route serves
+  // Terraform alone, so it 404s a Pulumi workspace (#1911).
+  const res = await fetch(`${API_URL}/api/v1/workspaces/${wsId}/actions/lock`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/vnd.api+json',

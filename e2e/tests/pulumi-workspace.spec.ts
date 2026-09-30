@@ -233,10 +233,17 @@ test.describe('Pulumi run vocabulary and Terraform-only surfaces', () => {
     await expect(page.getByRole('button', { name: /^Plan\b/ })).toHaveCount(0);
 
     // The speculative badge, and the Details field that mirrors it.
-    await expect(page.getByText('preview only', { exact: true })).toBeVisible();
+    //
+    // `.first()` on every PRESENCE check: the page dual-renders for desktop and
+    // phone from one source (AGENTS.md forbids forked trees), so each of these
+    // matches twice and a bare `toBeVisible` is a strict-mode error rather than
+    // a failure. The ABSENCE checks stay unscoped, which is the right way round
+    // — one instance showing the new word proves the thread-through, and the old
+    // word has to be gone from BOTH.
+    await expect(page.getByText('preview only', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('plan only', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Details', exact: true }).click();
-    await expect(page.getByText('Preview Only', { exact: true })).toBeVisible();
+    await expect(page.getByText('Preview Only', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Plan Only', { exact: true })).toHaveCount(0);
 
     // A missing `words` key renders as the raw key rather than throwing, so it
@@ -251,7 +258,7 @@ test.describe('Pulumi run vocabulary and Terraform-only surfaces', () => {
 
     await page.goto(`/workspaces/${wsId}/runs/${runId}`);
     await expect(page.getByRole('button', { name: /^Plan\b/ })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText('plan only', { exact: true })).toBeVisible();
+    await expect(page.getByText('plan only', { exact: true }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /^Preview\b/ })).toHaveCount(0);
   });
 
