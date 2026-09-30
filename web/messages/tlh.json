@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "Qaw'",
-      "planOnly": "nab neH"
+      "planOnly": "nab neH",
+      "savedPlan": "nab polta'",
+      "savedPlanHint": "loS lo': nab polta' lo'lu'pa', Qu'Daq vumwI' Daq DanIHbe'."
     },
     "actions": {
       "retryShort": "nID",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "Segh chum",
       "queueApplyTitle": "nab + ta qaStaHvIS lI",
       "queueApplyRefBlocked": "wIv ramus, per ghap commit qaStaHvIS talaHbe — nab neH bIH",
-      "awaitingDecision": "wuq loS"
+      "awaitingDecision": "wuq loS",
+      "typeSavedPlan": "nab polta'",
+      "typeSavedPlanHint": "loS lo': nab polta' lo'lu'pa', Qu'Daq vumwI' Daq DanIHbe'."
     },
     "state": {
       "deleteConfirm": "Dotlh mI' #{serial} Qaw''a'? choHlaHbe'lu'.",

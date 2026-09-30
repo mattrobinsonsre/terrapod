@@ -289,6 +289,7 @@ field CreateRunRequest.PlanOnly bool
 field CreateRunRequest.Refresh *bool
 field CreateRunRequest.RefreshOnly bool
 field CreateRunRequest.ReplaceAddrs []string
+field CreateRunRequest.SavePlan bool
 field CreateRunRequest.TargetAddrs []string
 field CreateRunRequest.TerraformVersion string
 field CreateRunRequest.VCSRef string
@@ -875,6 +876,7 @@ field Run.ResourceMemory string `json:"resource-memory,omitempty"`
 field Run.RunnerExitCode *int64 `json:"runner-exit-code,omitempty"`
 field Run.RunnerExitReason string `json:"runner-exit-reason,omitempty"`
 field Run.RunnerExitStatus string `json:"runner-exit-status,omitempty"`
+field Run.SavePlan bool `json:"save-plan,omitempty"`
 field Run.Source string `json:"source,omitempty"`
 field Run.StateDiverged bool `json:"state-diverged"`
 field Run.Status string `json:"status"`

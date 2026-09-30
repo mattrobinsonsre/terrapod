@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "destruir",
-      "planOnly": "solo plan"
+      "planOnly": "solo plan",
+      "savedPlan": "plan guardado",
+      "savedPlanHint": "Aplicación diferida: esta ejecución no bloquea el espacio de trabajo hasta que se aplique el plan guardado."
     },
     "actions": {
       "retryShort": "Reintentar",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "publicación de módulo",
       "queueApplyTitle": "Poner en cola una ejecución de plan + apply",
       "queueApplyRefBlocked": "Apply no está disponible mientras haya una rama, etiqueta o commit seleccionado: esas ejecuciones son siempre solo de plan",
-      "awaitingDecision": "esperando una decisión"
+      "awaitingDecision": "esperando una decisión",
+      "typeSavedPlan": "plan guardado",
+      "typeSavedPlanHint": "Aplicación diferida: esta ejecución no bloquea el espacio de trabajo hasta que se aplique el plan guardado."
     },
     "state": {
       "deleteConfirm": "¿Eliminar la versión de estado n.º {serial}? Esto no se puede deshacer.",

@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "dinistrio",
-      "planOnly": "cynllun yn unig"
+      "planOnly": "cynllun yn unig",
+      "savedPlan": "cynllun wedi'i gadw",
+      "savedPlanHint": "Gweithredu wedi'i ohirio: nid yw'r rhediad hwn yn dal y gweithle nes bod y cynllun wedi'i gadw yn cael ei weithredu."
     },
     "actions": {
       "retryShort": "Ailgeisio",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "cyhoeddi modiwl",
       "queueApplyTitle": "Ciwio rhediad cynllun + gweithredu",
       "queueApplyRefBlocked": "Nid yw gweithredu ar gael tra bo cangen, tag neu ymrwymiad wedii ddewis — maer rhediadau hynny bob amser yn gynllun yn unig",
-      "awaitingDecision": "yn aros am benderfyniad"
+      "awaitingDecision": "yn aros am benderfyniad",
+      "typeSavedPlan": "cynllun wedi'i gadw",
+      "typeSavedPlanHint": "Gweithredu wedi'i ohirio: nid yw'r rhediad hwn yn dal y gweithle nes bod y cynllun wedi'i gadw yn cael ei weithredu."
     },
     "state": {
       "deleteConfirm": "Dileu fersiwn cyflwr #{serial}? Ni ellir dadwneud hyn.",

@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "destroy",
-      "planOnly": "apenas plano"
+      "planOnly": "apenas plano",
+      "savedPlan": "plano guardado",
+      "savedPlanHint": "Aplicação adiada: esta execução não bloqueia a área de trabalho até que o plano guardado seja aplicado."
     },
     "actions": {
       "retryShort": "Repetir",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "publicação de módulo",
       "queueApplyTitle": "Colocar em fila uma execução plan + apply",
       "queueApplyRefBlocked": "Apply fica indisponível enquanto houver um ramo, etiqueta ou commit selecionado — essas execuções são sempre apenas plan",
-      "awaitingDecision": "a aguardar decisão"
+      "awaitingDecision": "a aguardar decisão",
+      "typeSavedPlan": "plano guardado",
+      "typeSavedPlanHint": "Aplicação adiada: esta execução não bloqueia a área de trabalho até que o plano guardado seja aplicado."
     },
     "state": {
       "deleteConfirm": "Eliminar a versão de estado #{serial}? Isto não pode ser anulado.",

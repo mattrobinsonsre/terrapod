@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "niszczenie",
-      "planOnly": "tylko plan"
+      "planOnly": "tylko plan",
+      "savedPlan": "zapisany plan",
+      "savedPlanHint": "Zastosowanie odroczone: to uruchomienie nie blokuje przestrzeni roboczej, dopóki zapisany plan nie zostanie zastosowany."
     },
     "actions": {
       "retryShort": "Ponów",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "publikacja modułu",
       "queueApplyTitle": "Dodaj do kolejki uruchomienie plan + apply",
       "queueApplyRefBlocked": "Apply jest niedostępne, gdy wybrano gałąź, tag lub commit — takie uruchomienia są zawsze tylko plan",
-      "awaitingDecision": "oczekuje na decyzję"
+      "awaitingDecision": "oczekuje na decyzję",
+      "typeSavedPlan": "zapisany plan",
+      "typeSavedPlanHint": "Zastosowanie odroczone: to uruchomienie nie blokuje przestrzeni roboczej, dopóki zapisany plan nie zostanie zastosowany."
     },
     "state": {
       "deleteConfirm": "Usunąć wersję stanu #{serial}? Tej operacji nie można cofnąć.",

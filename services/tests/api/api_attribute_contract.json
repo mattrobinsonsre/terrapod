@@ -794,6 +794,7 @@
     "runner-exit-code",
     "runner-exit-reason",
     "runner-exit-status",
+    "save-plan",
     "source",
     "status",
     "status-timestamps",

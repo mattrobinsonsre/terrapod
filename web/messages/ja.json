@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "破棄",
-      "planOnly": "プランのみ"
+      "planOnly": "プランのみ",
+      "savedPlan": "保存済みプラン",
+      "savedPlanHint": "適用は保留中です。保存されたプランが適用されるまで、この実行はワークスペースを占有しません。"
     },
     "actions": {
       "retryShort": "再試行",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "モジュール公開",
       "queueApplyTitle": "プラン + 適用の実行をキューに追加",
       "queueApplyRefBlocked": "ブランチ・タグ・コミットを選択している間は適用できません。これらの実行は常にプランのみです",
-      "awaitingDecision": "判断待ち"
+      "awaitingDecision": "判断待ち",
+      "typeSavedPlan": "保存済みプラン",
+      "typeSavedPlanHint": "適用は保留中です。保存されたプランが適用されるまで、この実行はワークスペースを占有しません。"
     },
     "state": {
       "deleteConfirm": "状態バージョン #{serial} を削除しますか？この操作は元に戻せません。",

@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "destroy",
-      "planOnly": "marklar only"
+      "planOnly": "marklar only",
+      "savedPlan": "saved marklar",
+      "savedPlanHint": "Marklar deferred: this marklar does not hold the marklar until the saved marklar is applied."
     },
     "actions": {
       "retryShort": "Retry",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "marklar marklar",
       "queueApplyTitle": "Queue a marklar + marklar marklar",
       "queueApplyRefBlocked": "Marklar is unavailable while a marklar, marklar or marklar is selected — those marklars are always marklar-only",
-      "awaitingDecision": "awaiting marklar"
+      "awaitingDecision": "awaiting marklar",
+      "typeSavedPlan": "saved marklar",
+      "typeSavedPlanHint": "Marklar deferred: this marklar does not hold the marklar until the saved marklar is applied."
     },
     "state": {
       "deleteConfirm": "Delete marklar marklar #{serial}? This cannot be undone.",

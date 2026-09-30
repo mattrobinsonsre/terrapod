@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "Zerstören",
-      "planOnly": "Nur Plan"
+      "planOnly": "Nur Plan",
+      "savedPlan": "gespeicherter Plan",
+      "savedPlanHint": "Anwendung aufgeschoben: Dieser Lauf belegt den Workspace nicht, bis der gespeicherte Plan angewendet wird."
     },
     "actions": {
       "retryShort": "Wiederholen",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "Modul-Veröffentlichung",
       "queueApplyTitle": "Einen Plan-+-Apply-Lauf einreihen",
       "queueApplyRefBlocked": "Apply ist nicht verfügbar, solange ein Branch, Tag oder Commit ausgewählt ist – solche Läufe sind immer Plan-only",
-      "awaitingDecision": "wartet auf Entscheidung"
+      "awaitingDecision": "wartet auf Entscheidung",
+      "typeSavedPlan": "gespeicherter Plan",
+      "typeSavedPlanHint": "Anwendung aufgeschoben: Dieser Lauf belegt den Workspace nicht, bis der gespeicherte Plan angewendet wird."
     },
     "state": {
       "deleteConfirm": "Zustandsversion #{serial} löschen? Dies kann nicht rückgängig gemacht werden.",

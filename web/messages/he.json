@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "השמדה",
-      "planOnly": "תכנון בלבד"
+      "planOnly": "תכנון בלבד",
+      "savedPlan": "תוכנית שמורה",
+      "savedPlanHint": "ההחלה נדחתה: ריצה זו אינה תופסת את סביבת העבודה עד שהתוכנית השמורה מוחלת."
     },
     "actions": {
       "retryShort": "נסה שוב",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "פרסום מודול",
       "queueApplyTitle": "הוספת הרצת תכנון + החלה לתור",
       "queueApplyRefBlocked": "החלה אינה זמינה כאשר נבחרו ענף, תגית או קומיט — הרצות אלה הן תמיד תכנון בלבד",
-      "awaitingDecision": "ממתין להחלטה"
+      "awaitingDecision": "ממתין להחלטה",
+      "typeSavedPlan": "תוכנית שמורה",
+      "typeSavedPlanHint": "ההחלה נדחתה: ריצה זו אינה תופסת את סביבת העבודה עד שהתוכנית השמורה מוחלת."
     },
     "state": {
       "deleteConfirm": "למחוק את גרסת המצב #{serial}? לא ניתן לבטל זאת.",

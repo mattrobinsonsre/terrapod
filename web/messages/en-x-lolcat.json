@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "destroy",
-      "planOnly": "plan only"
+      "planOnly": "plan only",
+      "savedPlan": "sayvd plan",
+      "savedPlanHint": "Aplly defurred: dis run duz not holdz teh workspace til teh sayvd plan gets apllyd. kthxbai"
     },
     "actions": {
       "retryShort": "Retry",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "module publish",
       "queueApplyTitle": "Queue a plan + do-it runz",
       "queueApplyRefBlocked": "No do-it while u picked a branch, tag or commit — dose runz iz alwayz plan only, srsly",
-      "awaitingDecision": "waitin fer decizun"
+      "awaitingDecision": "waitin fer decizun",
+      "typeSavedPlan": "sayvd plan",
+      "typeSavedPlanHint": "Aplly defurred: dis run duz not holdz teh workspace til teh sayvd plan gets apllyd. kthxbai"
     },
     "state": {
       "deleteConfirm": "Delete state vershun #{serial}? Dis cannot be undun.",

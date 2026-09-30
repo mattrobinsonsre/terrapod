@@ -978,6 +978,48 @@ The CLI plan/apply flow always supplies a CV (it uploads one first), so it's una
 | `refresh` | boolean | `true` | Whether to refresh state before planning. Set to `false` to skip refresh (equivalent to `-refresh=false`) |
 | `allow-empty-apply` | boolean | `false` | Allow apply even when the plan has no changes (equivalent to `-allow-empty-apply`) |
 | `vcs-ref` | string | `""` | Branch, tag, or SHA to fetch code from instead of the workspace's tracked branch. Only valid on VCS-connected workspaces. **Runs with a non-default ref are always plan-only** — the server enforces this regardless of the `plan-only` attribute value |
+| `save-plan` | boolean | `false` | A saved-plan run — `terraform plan -out=FILE`. See below |
+
+### Saved-plan runs (`terraform plan -out=FILE`)
+
+`save-plan: true` creates a run that is apply-capable but whose apply is
+**deferred**. That is the one thing it does differently, and it is the whole
+feature: an ordinary run awaiting confirmation holds its workspace from the
+moment it plans, so nothing else can plan behind it. A saved-plan run does not.
+It plans immediately, holds nothing, and takes the workspace's single apply slot
+only when someone confirms it — which is what makes keeping a plan file around
+for a while meaningful rather than an outage.
+
+Terrapod has no separate "workspace lock" for this to skip. `workspace.locked`
+is the CLI/manual state lock and is never set by run activity; the lock a run
+takes is its place in the per-workspace serialization, and that is what a
+saved-plan run defers.
+
+What follows from the deferral:
+
+- **A newer run does not discard it.** Ordinarily a newer apply-capable run
+  supersedes older unapplied ones. A saved plan is exempt: someone is holding
+  that file, and a colleague queueing a run must not silently invalidate it.
+- **It still goes stale.** Exemption from supersede is why the state check
+  matters more, not less. Confirming a saved plan whose workspace state has
+  moved since it planned is refused and the run discarded, exactly as for any
+  other plan — so a deferred apply can never apply against state it did not see.
+- **Confirming is refused while another run holds the workspace**, with a 409
+  naming the run in the way. Not queued (`terraform apply FILE` would block with
+  no way to say why) and not superseding (that would discard someone else's
+  planned run to make room for a plan made before theirs).
+
+Refused with a 422 in three cases, rather than accepted and quietly turned into
+something else:
+
+| Combination | Why |
+|---|---|
+| `save-plan` + `plan-only` | A plan-only run can never be applied, so the file would promise nothing |
+| `save-plan` + a speculative configuration version | Speculative configurations force plan-only — the same contradiction by another door |
+| `save-plan` on a VCS-connected **agent** workspace | Applying the saved plan would be a CLI apply, which those workspaces reserve for the VCS integration and the UI. Refused at plan time rather than after the operator holds a file they can never apply |
+
+The attribute round-trips on the run, so a client reading a run back sees what
+it asked for.
 
 ### Run Response Attributes (Drift Detection)
 

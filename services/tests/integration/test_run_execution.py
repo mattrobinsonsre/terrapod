@@ -203,6 +203,32 @@ async def _report_job_status(
     assert resp.status_code == 200, resp.text
 
 
+async def _push_state_version(client, ws_id: str, *, serial: int) -> None:
+    """Push a state version straight at the workspace, as a local-execution
+    `tofu apply` does. Moves the state under a run without driving a second full
+    apply through the runner."""
+    import hashlib
+
+    body = f'{{"serial": {serial}, "lineage": "savedplan-lineage"}}'.encode()
+    resp = await client.post(
+        f"/api/v2/workspaces/{ws_id}/state-versions",
+        json={
+            "data": {
+                "type": "state-versions",
+                "attributes": {
+                    "serial": serial,
+                    "lineage": "savedplan-lineage",
+                    "md5": hashlib.md5(body).hexdigest(),
+                },
+            }
+        },
+        headers=AUTH,
+    )
+    assert resp.status_code == 201, resp.text
+    upload = resp.json()["data"]["attributes"]["hosted-state-upload-url"]
+    assert (await client.put(upload, content=body)).status_code in (200, 204)
+
+
 async def _get_run(client, run_id: str) -> dict:
     """Get a run by ID, return data dict."""
     resp = await client.get(f"/api/v2/runs/{run_id}", headers=AUTH)
@@ -1068,6 +1094,202 @@ async def _plan_then_upload_json(client, listener_id: str, ws_id: str, plan_json
         await _upload_artifact(client, run_id, "plan-json-output", plan_json, runner_token)
     ) == 204
     return await _get_run(client, run_id)
+
+
+class TestSavedPlanRuns:
+    """`terraform plan -out=FILE` then `terraform apply FILE` (#1903).
+
+    A saved-plan run is apply-capable but its apply is **deferred**: it plans
+    immediately without taking the workspace's single apply slot, and takes it
+    only when the operator confirms. That deferral is the entire difference
+    between it and an ordinary run awaiting confirmation, and it is expressed in
+    the dispatcher's SQL gate and in `confirm_run` — so it is proven here,
+    against real Postgres through the real dispatcher, and not in a mocked test
+    that could only assert a helper was called.
+    """
+
+    async def test_a_saved_plan_does_not_hold_the_workspace(self, app, client, setup):
+        """The whole point of `-out`: hold a plan file, not the workspace.
+
+        An ordinary run awaiting confirmation blocks the next one from even
+        planning. A saved plan must not, or an operator who reached for `-out`
+        precisely to avoid holding the workspace gets the workspace held.
+        """
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "savedplan-free")
+
+        saved = await _create_run(client, ws_id, **{"save-plan": True})
+        await _run_plan_lifecycle(client, listener_id, saved["id"])
+        assert (await _get_run(client, saved["id"]))["attributes"]["status"] == "planned"
+
+        # An ordinary run queues behind it and IS claimable — the gate that
+        # would hold it for an ordinary `planned` run does not see this one.
+        other = await _create_run(client, ws_id, message="ordinary")
+        result = await _claim_run(client, listener_id)
+        assert result is not None, (
+            "a saved plan awaiting confirmation blocked the next run from planning — "
+            "it is holding the workspace, which is the one thing it must not do"
+        )
+        assert result[0]["id"] == other["id"]
+
+    async def test_a_saved_plan_plans_while_another_run_waits(self, app, client, setup):
+        """The other direction: a saved plan is not itself held by the gate.
+
+        `-out` is a request to plan now. A saved plan queued behind an ordinary
+        planned run must still get its plan, or the file it promises never
+        arrives.
+        """
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "savedplan-planning")
+
+        # An ordinary run reaches `planned` and holds the workspace.
+        ordinary = await _create_run(client, ws_id)
+        await _run_plan_lifecycle(client, listener_id, ordinary["id"])
+        assert (await _get_run(client, ordinary["id"]))["attributes"]["status"] == "planned"
+
+        saved = await _create_run(client, ws_id, **{"save-plan": True})
+        result = await _claim_run(client, listener_id)
+        assert result is not None and result[0]["id"] == saved["id"], (
+            "the saved plan was held by the ordinary run's slot — `-out` asks to "
+            "plan now, and deferring the apply is what buys that"
+        )
+
+    async def test_a_held_plan_file_is_not_superseded(self, app, client, setup):
+        """An ordinary newer run discards an older `planned` run. It must not
+        discard a saved plan: someone is holding that file, and invalidating it
+        because a colleague queued a run is the surprise this feature removes.
+        What DOES invalidate it is the state moving, which
+        `test_a_saved_plan_still_goes_stale_when_state_moves` pins.
+        """
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "savedplan-nosupersede")
+
+        saved = await _create_run(client, ws_id, **{"save-plan": True})
+        await _run_plan_lifecycle(client, listener_id, saved["id"])
+        assert (await _get_run(client, saved["id"]))["attributes"]["status"] == "planned"
+
+        await _create_run(client, ws_id, message="newer ordinary run")
+
+        after = await _get_run(client, saved["id"])
+        assert after["attributes"]["status"] == "planned", (
+            f"the saved plan was {after['attributes']['status']} — a newer run "
+            "discarded a plan file someone is holding"
+        )
+
+    async def test_a_saved_plan_does_not_supersede_others(self, app, client, setup):
+        """And it does not throw its weight the other way either: until it is
+        confirmed it is not the workspace's desired state, so it discards
+        nobody."""
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "savedplan-notsuperseder")
+
+        ordinary = await _create_run(client, ws_id)
+        await _run_plan_lifecycle(client, listener_id, ordinary["id"])
+        assert (await _get_run(client, ordinary["id"]))["attributes"]["status"] == "planned"
+
+        await _create_run(client, ws_id, **{"save-plan": True}, message="saved")
+        assert (await _get_run(client, ordinary["id"]))["attributes"]["status"] == "planned"
+
+    async def test_applying_a_saved_plan_takes_the_slot_it_deferred(self, app, client, setup):
+        """Confirm is where the deferred apply begins, so confirm is where the
+        serialization it skipped applies. On a free workspace it simply
+        succeeds — and once confirmed it holds the slot like any other apply.
+        """
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "savedplan-confirm")
+
+        saved = await _create_run(client, ws_id, **{"save-plan": True})
+        await _run_plan_lifecycle(client, listener_id, saved["id"])
+
+        resp = await client.post(f"/api/v2/runs/{saved['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+        assert (await _get_run(client, saved["id"]))["attributes"]["status"] == "confirmed"
+
+        # Now it DOES hold the workspace: an ordinary run queued behind it is
+        # gated, exactly as it would be behind any other confirmed apply.
+        await _create_run(client, ws_id, message="behind the confirmed saved plan")
+        result = await _claim_run(client, listener_id)
+        assert result is not None and result[1] == "apply", (
+            "expected the confirmed saved plan's own apply, not another run's plan"
+        )
+        assert result[0]["id"] == saved["id"]
+
+    async def test_confirm_is_refused_while_another_run_holds_the_workspace(
+        self, app, client, setup
+    ):
+        """Deferring the slot means it may be taken by the time you want it.
+
+        Refused rather than queued or superseded: queueing would make
+        `terraform apply FILE` block silently on somebody else's run, and
+        superseding would discard their planned run to make room for a plan made
+        before theirs. The error names the run in the way.
+        """
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "savedplan-contended")
+
+        saved = await _create_run(client, ws_id, **{"save-plan": True})
+        await _run_plan_lifecycle(client, listener_id, saved["id"])
+
+        # An ordinary run now plans and takes the slot.
+        ordinary = await _create_run(client, ws_id, message="ordinary")
+        await _run_plan_lifecycle(client, listener_id, ordinary["id"])
+        assert (await _get_run(client, ordinary["id"]))["attributes"]["status"] == "planned"
+
+        resp = await client.post(f"/api/v2/runs/{saved['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 409, resp.text
+        detail = resp.json()["detail"]
+        assert "awaiting confirmation" in detail or "applying" in detail, detail
+        assert ordinary["id"].removeprefix("run-")[:8] in detail, (
+            f"the refusal should name the run in the way, got: {detail}"
+        )
+
+    async def test_a_saved_plan_still_goes_stale_when_state_moves(self, app, client, setup):
+        """The guard that makes deferral safe.
+
+        A saved plan is exempt from supersede, so the state-serial check is the
+        only thing left stopping an operator applying a plan built against state
+        that has since moved. Folding the deferral into `_is_supersedeable_kind`
+        would have made saved plans the one run kind that never notices — this
+        is the test that would have caught it.
+
+        The state is moved by pushing a version directly rather than by a second
+        apply, because that is the case deferral actually creates: a colleague
+        running `tofu apply` from their own machine while you hold a plan file.
+        """
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "savedplan-stale")
+
+        # A baseline: the saved plan must be built against SOME state, or there
+        # is no serial to have moved and the guard correctly does nothing.
+        await _push_state_version(client, ws_id, serial=1)
+
+        saved = await _create_run(client, ws_id, **{"save-plan": True})
+        await _run_plan_lifecycle(client, listener_id, saved["id"])
+        assert (await _get_run(client, saved["id"]))["attributes"]["status"] == "planned"
+
+        # Somebody else's apply lands underneath it.
+        await _push_state_version(client, ws_id, serial=2)
+
+        resp = await client.post(f"/api/v2/runs/{saved['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 409, resp.text
+        after = await _get_run(client, saved["id"])
+        assert after["attributes"]["status"] == "discarded", (
+            "a saved plan built against state that has since moved was still "
+            "applicable — the one guard that makes deferring the apply safe"
+        )
+        assert "state changed since plan" in (after["attributes"]["discard-reason"] or "")
+
+    async def test_save_plan_round_trips(self, app, client, setup):
+        """A CLI reading the run back sees what it asked for."""
+        pool_id, _ = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "savedplan-roundtrip")
+
+        saved = await _create_run(client, ws_id, **{"save-plan": True})
+        assert saved["attributes"]["save-plan"] is True
+        assert (await _get_run(client, saved["id"]))["attributes"]["save-plan"] is True
+
+        ordinary = await _create_run(client, ws_id, **{"plan-only": True})
+        assert ordinary["attributes"]["save-plan"] is False
 
 
 class TestConditionalAutoApplyOrchestration:

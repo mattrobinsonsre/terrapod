@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "tuhoa",
-      "planOnly": "vain suunnittelu"
+      "planOnly": "vain suunnittelu",
+      "savedPlan": "tallennettu suunnitelma",
+      "savedPlanHint": "Käyttöönotto lykätty: tämä ajo ei varaa työtilaa ennen kuin tallennettu suunnitelma otetaan käyttöön."
     },
     "actions": {
       "retryShort": "Yritä uudelleen",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "moduulijulkaisu",
       "queueApplyTitle": "Lisää plan + apply -ajo jonoon",
       "queueApplyRefBlocked": "Apply ei ole käytettävissä, kun haara, tunniste tai commit on valittuna — nämä ajot ovat aina vain plan",
-      "awaitingDecision": "odottaa päätöstä"
+      "awaitingDecision": "odottaa päätöstä",
+      "typeSavedPlan": "tallennettu suunnitelma",
+      "typeSavedPlanHint": "Käyttöönotto lykätty: tämä ajo ei varaa työtilaa ennen kuin tallennettu suunnitelma otetaan käyttöön."
     },
     "state": {
       "deleteConfirm": "Poistetaanko tilaversio #{serial}? Tätä ei voi kumota.",

@@ -228,6 +228,9 @@ class TestRunDriftAttributes:
         run.auto_apply_mode = "never"
         run.auto_apply_declined_reason = None
         run.plan_only = True
+        # `terraform plan -out=FILE` (#1903) — same reason as `engine` below:
+        # the serializer reports it and a MagicMock is not JSON-serialisable.
+        run.save_plan = False
         run.source = "drift-detection"
         # The engine this run belongs to (#1521) — explicit because a MagicMock
         # attribute is not JSON-serialisable and the serializer now reports it.

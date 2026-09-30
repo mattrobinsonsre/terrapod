@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "銷毀",
-      "planOnly": "僅計畫"
+      "planOnly": "僅計畫",
+      "savedPlan": "已儲存的計畫",
+      "savedPlanHint": "套用已延後：在套用已儲存的計畫之前，此執行不會佔用工作區。"
     },
     "actions": {
       "retryShort": "重試",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "模組釋出",
       "queueApplyTitle": "將計畫 + 套用執行加入佇列",
       "queueApplyRefBlocked": "選取分支、標籤或提交時無法套用——這些執行一律僅為計畫",
-      "awaitingDecision": "等待決定"
+      "awaitingDecision": "等待決定",
+      "typeSavedPlan": "已儲存的計畫",
+      "typeSavedPlanHint": "套用已延後：在套用已儲存的計畫之前，此執行不會佔用工作區。"
     },
     "state": {
       "deleteConfirm": "刪除狀態版本 #{serial}？此操作無法撤銷。",

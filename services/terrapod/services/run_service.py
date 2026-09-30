@@ -700,6 +700,44 @@ async def blocked_by(
     return hold.gate if hold else None
 
 
+#: The statuses a run passes through before anyone has said "apply this".
+#: A saved-plan run is invisible to the workspace's apply slot throughout.
+_PRE_CONFIRM_STATES = frozenset({"pending", "queued", "planning", "planned"})
+
+
+def is_deferred_saved_plan(run: Run) -> bool:
+    """Whether this is a saved-plan run whose apply nobody has asked for yet.
+
+    `terraform plan -out=FILE` (#1903) is apply-capable but **deferred**: it
+    plans immediately and takes the workspace's single apply slot only when the
+    operator later confirms it. Holding a plan file is only meaningful if the
+    workspace is not held meanwhile — an operator who reaches for `-out`
+    precisely to avoid holding the workspace must not get the workspace held.
+
+    So a run answering True here is excluded from every contention decision:
+    it neither blocks another run from planning nor is discarded to make room
+    for one. The moment it is confirmed the answer flips and it contends like
+    any other apply.
+
+    **Not to be confused with `_is_supersedeable_kind`**, immediately below,
+    which answers a different question — "does this run represent the
+    workspace's desired state", used for *staleness*. A deferred saved plan
+    absolutely does go stale: a plan held across someone else's apply is
+    exactly what the state-serial guard exists to refuse. Folding this into
+    that predicate would have made saved plans the one run kind that never
+    expires and never notices the state moving under it.
+    """
+    return bool(run.save_plan) and run.status in _PRE_CONFIRM_STATES
+
+
+def _not_deferred_saved_plan(model) -> object:
+    """`is_deferred_saved_plan` as a SQL predicate over `model` (Run or an alias)."""
+    return or_(
+        model.save_plan.is_(False),
+        model.status.notin_(list(_PRE_CONFIRM_STATES)),
+    )
+
+
 def _is_supersedeable_kind(run: Run) -> bool:
     """True for apply-capable runs that represent the workspace's desired state.
 
@@ -725,6 +763,9 @@ async def _has_newer_live_run(db: AsyncSession, run: Run) -> bool:
             Run.plan_only.is_(False),
             Run.is_drift_detection.is_(False),
             Run.vcs_pull_request_number.is_(None),
+            # A saved plan nobody has confirmed is not the desired state yet,
+            # so it cannot be what supersedes an older run (#1903).
+            _not_deferred_saved_plan(Run),
             Run.created_at > run.created_at,
             Run.status.notin_(list(TERMINAL_STATES)),
         )
@@ -744,7 +785,7 @@ async def supersede_stale_runs(db: AsyncSession, newer: Run) -> int:
     Returns the number of runs superseded. No-op for ineligible ``newer``
     (drift / speculative PR runs).
     """
-    if not _is_supersedeable_kind(newer):
+    if not _is_supersedeable_kind(newer) or is_deferred_saved_plan(newer):
         return 0
 
     result = await db.execute(
@@ -755,6 +796,13 @@ async def supersede_stale_runs(db: AsyncSession, newer: Run) -> int:
             Run.plan_only.is_(False),
             Run.is_drift_detection.is_(False),
             Run.vcs_pull_request_number.is_(None),
+            # A held plan file is not collateral (#1903). Every state in
+            # `_SUPERSEDEABLE_STATES` is pre-confirm, so for a saved-plan run
+            # this is the whole of its deferred life: queueing an ordinary run
+            # must not silently invalidate a plan someone is holding. What DOES
+            # invalidate it is the state moving, and `_staleness_reason`
+            # refuses it at confirm for that reason instead.
+            Run.save_plan.is_(False),
             Run.created_at < newer.created_at,
         )
     )
@@ -952,6 +1000,7 @@ async def create_run(
     refresh_only: bool = False,
     refresh: bool = True,
     allow_empty_apply: bool = False,
+    save_plan: bool = False,
 ) -> Run:
     """Create a new run for a workspace.
 
@@ -1059,6 +1108,7 @@ async def create_run(
         refresh_only=refresh_only,
         refresh=refresh,
         allow_empty_apply=allow_empty_apply,
+        save_plan=save_plan,
     )
     db.add(run)
     await db.flush()
@@ -1685,6 +1735,7 @@ async def _complete_plan(
     if (
         run.status == "planned"
         and _is_supersedeable_kind(run)
+        and not is_deferred_saved_plan(run)
         and await _has_newer_live_run(db, run)
     ):
         run = await discard_run(db, run)
@@ -2011,6 +2062,33 @@ async def _check_mergeability_or_block(db: AsyncSession, run: Run) -> None:
     run.vcs_apply_blocked_reason = None
 
 
+async def _apply_slot_holder(db: AsyncSession, run: Run) -> Run | None:
+    """The other run currently holding this workspace's single apply slot, if any.
+
+    Only a saved-plan run needs to ask (#1903). Every other apply-capable run
+    was already refused the slot at dispatch, by the gate in `claim_next_run`;
+    a saved-plan run skipped that gate deliberately so it could plan straight
+    away, so this is where it pays for it — at the moment its apply begins.
+
+    The status set is the dispatcher's, so the two agree on what "in flight"
+    means: a run that has planned and is awaiting confirmation holds the slot
+    just as firmly as one mid-apply, because confirming it is one click away.
+    """
+    other = aliased(Run)
+    return await db.scalar(
+        select(other)
+        .where(
+            other.workspace_id == run.workspace_id,
+            other.id != run.id,
+            other.plan_only.is_(False),
+            other.is_drift_detection.is_(False),
+            _not_deferred_saved_plan(other),
+            other.status.in_(["planning", "planned", "confirmed", "applying", "canceling"]),
+        )
+        .limit(1)
+    )
+
+
 async def confirm_run(db: AsyncSession, run: Run) -> Run:
     """Confirm a planned run for apply.
 
@@ -2029,6 +2107,25 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
         raise ValueError(
             f'workspace is locked (lock ID: "{workspace.lock_id}") — unlock before applying'
         )
+    # A saved-plan run deferred this question at dispatch so it could plan
+    # without holding the workspace (#1903). Confirming it is the moment the
+    # apply starts, so the serialization it skipped applies now: one mutating
+    # run per workspace, as for every other apply.
+    #
+    # Refused rather than queued or superseded, deliberately. Queueing would
+    # make `terraform apply FILE` block on somebody else's run with no way to
+    # say so; superseding would discard their planned run to make room for a
+    # plan made before theirs. Refusing says what is true and leaves both
+    # decisions with the operator — and if the other run applies, the
+    # state-serial guard below will correctly refuse this plan anyway.
+    if run.save_plan:
+        holder = await _apply_slot_holder(db, run)
+        if holder is not None:
+            raise ValueError(
+                f"another run ({str(holder.id)[:8]}, {holder.status}) is already "
+                "applying or awaiting confirmation on this workspace — a saved plan "
+                "can only be applied when the workspace is free"
+            )
     # Staleness guards (#646 expiry, #647 state drift): a plan that no longer
     # reflects the current state, or has aged past the workspace TTL, must not be
     # applied. Auto-discard it and surface a 409 so the
@@ -2498,6 +2595,11 @@ async def claim_next_run(
                     other.id != Run.id,
                     other.plan_only.is_(False),
                     other.is_drift_detection.is_(False),
+                    # A saved-plan run holds nothing until it is confirmed
+                    # (#1903), so it must not be what blocks somebody else.
+                    # Once confirmed its status leaves the pre-confirm set and
+                    # it counts here like any other apply.
+                    _not_deferred_saved_plan(other),
                     other.status.in_(["planning", "planned", "confirmed", "applying", "canceling"]),
                 )
                 .exists()
@@ -2510,6 +2612,12 @@ async def claim_next_run(
             conditions.append(
                 or_(
                     Run.plan_only.is_(True),
+                    # The other half of the same rule: a saved-plan run plans
+                    # immediately rather than queueing behind the workspace,
+                    # which is what `-out` is for. It is apply-capable, so it
+                    # meets this gate — at confirm, in `confirm_run`, where the
+                    # apply it was deferring actually begins.
+                    Run.save_plan.is_(True),
                     and_(not_(ws_locked), not_(in_flight)),
                 )
             )

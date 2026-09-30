@@ -106,6 +106,41 @@ Terrapod-only management on the configuration-versions surface (list, download, 
 | GET | `/api/tfe/v2/applies/{id}` | `Applies.Read` | run status |
 | GET | `/api/tfe/v2/applies/{id}/log` | `Applies.Logs` (via `log-read-url`) | `cloud/backend_apply.go:229`, `remote/backend_apply.go:272` |
 
+### Run-create attributes
+
+The tables above catalogue **routes**, and that is what decides whether a route
+belongs on the compatibility surface. It is not sufficient on its own: a route
+can be served correctly while an attribute the CLI sends on it is dropped, and
+nothing here would show it. That is exactly how saved-plan runs were missed
+(#1903) — `POST /api/tfe/v2/runs` was listed and implemented, and `save-plan`
+was read off the body by nobody.
+
+So the body of the one route the CLI *writes* to is catalogued too. Every
+attribute `go-tfe`'s `RunCreateOptions` defines that Terrapod consumes:
+
+| Attribute | go-tfe field | Terrapod behaviour |
+|---|---|---|
+| `plan-only` | `PlanOnly` | Speculative run; never applies. Also forced on by a speculative configuration version, a `vcs-ref` override, and a CLI-initiated run on a VCS-connected agent workspace |
+| `save-plan` | `SavePlan` | `terraform plan -out=FILE`. Apply-capable, apply **deferred**: plans immediately without taking the workspace's apply slot, takes it on confirm. Refused alongside `plan-only`, alongside a speculative configuration version, and on a VCS-connected agent workspace |
+| `is-destroy` | `IsDestroy` | `terraform destroy`; needs `run:apply-destroy` |
+| `message` | `Message` | Recorded on the run |
+| `auto-apply` | `AutoApply` | Overrides the workspace setting for this run |
+| `refresh` | `Refresh` | `-refresh=false` |
+| `refresh-only` | `RefreshOnly` | `-refresh-only` |
+| `target-addrs` | `TargetAddrs` | `-target` |
+| `replace-addrs` | `ReplaceAddrs` | `-replace` |
+| `allow-empty-apply` | `AllowEmptyApply` | `-allow-empty-apply` |
+| `terraform-version` / `engine-version` | `TerraformVersion` | Pins the engine version for this run (#1559) |
+
+Terrapod-native attributes on the same route (`vcs-ref`, `is-drift-detection`)
+are not part of this contract and are documented in
+[api-reference.md](api-reference.md).
+
+**An attribute `go-tfe` defines and Terrapod does not consume must be listed
+here as unsupported, or refused — never accepted and ignored.** Accepting it
+turns a documented CLI workflow into a silent surprise, which is worse than
+either supporting it or saying plainly that it is not supported.
+
 ## Cost Estimates / Policy Checks / Task Stages
 
 These are CLI-aware (run progress display branches on relationships) but only exercised when the relationship is present on the run. Terrapod does not implement cost estimates in this shape, or Sentinel. Its OPA policy sets and security scan are served as **policy checks**, and run tasks as **task stages** (#1704).
@@ -180,5 +215,9 @@ When OpenTofu adds new go-tfe call sites in `internal/cloud/*` or `internal/back
 2. `grep -RP 'tfe\.[A-Z]\w+\(' internal/cloud internal/backend/remote --include='*.go' | grep -v _test.go`
 3. For each match, find the go-tfe method's `client.NewRequest(...)` line in https://github.com/hashicorp/go-tfe to extract the path
 4. Add to the relevant table above
+5. For `POST /runs`, diff `RunCreateOptions` in go-tfe's `run.go` against the
+   run-create attribute table above. A new field there is a new thing the CLI
+   may send, and step 2 will not find it — the call site does not change when
+   HashiCorp adds an option to a struct it already calls.
 
 Endpoints **not** verified by this process belong at `/api/v1/`, regardless of go-tfe lineage.

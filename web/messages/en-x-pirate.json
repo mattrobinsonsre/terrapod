@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "send t'' Davy Jones",
-      "planOnly": "plan only"
+      "planOnly": "plan only",
+      "savedPlan": "stowed chart",
+      "savedPlanHint": "Boardin' delayed: this voyage be not claimin' the harbour till the stowed chart be run."
     },
     "actions": {
       "retryShort": "Try again",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "module publish",
       "queueApplyTitle": "Queue a chart + commit voyage",
       "queueApplyRefBlocked": "No committin while a branch, tag or commit be chosen — them voyages be chartin only",
-      "awaitingDecision": "awaitin'' the cap''n''s word"
+      "awaitingDecision": "awaitin'' the cap''n''s word",
+      "typeSavedPlan": "stowed chart",
+      "typeSavedPlanHint": "Boardin' delayed: this voyage be not claimin' the harbour till the stowed chart be run."
     },
     "state": {
       "deleteConfirm": "Send state version #{serial} t'' Davy Jones? This cannot be undone.",

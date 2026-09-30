@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "destroy",
-      "planOnly": "plan only"
+      "planOnly": "plan only",
+      "savedPlan": "saved plan",
+      "savedPlanHint": "Apply deferred: this run does not hold the workspace until the saved plan is applied."
     },
     "actions": {
       "retryShort": "Retry",
@@ -2748,7 +2750,9 @@
       "sourceModulePublish": "module publish",
       "queueApplyTitle": "Queue a plan + apply run",
       "queueApplyRefBlocked": "Apply is unavailable while a branch, tag or commit is selected — those runs are always plan-only",
-      "awaitingDecision": "awaiting decision"
+      "awaitingDecision": "awaiting decision",
+      "typeSavedPlan": "saved plan",
+      "typeSavedPlanHint": "Apply deferred: this run does not hold the workspace until the saved plan is applied."
     },
     "state": {
       "deleteConfirm": "Delete state version #{serial}? This cannot be undone.",

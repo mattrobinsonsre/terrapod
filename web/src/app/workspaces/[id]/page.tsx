@@ -157,6 +157,10 @@ interface RunItem {
     source: string
     message: string
     'plan-only': boolean
+    // `tofu plan -out=FILE` (#1903): apply-capable, apply deferred. Shown
+    // because it is the only reason two runs on one workspace can sit at
+    // `planned` at once -- an ordinary planned run holds the workspace.
+    'save-plan': boolean
     'is-destroy': boolean
     'created-at': string
     'created-by': string
@@ -579,7 +583,7 @@ function WorkspaceDetailContent() {
       switch (key) {
         case 'id': return item.id
         case 'status': return item.attributes.status
-        case 'type': return item.attributes['is-destroy'] ? 'destroy' : item.attributes['plan-only'] ? 'plan only' : 'plan + apply'
+        case 'type': return (item.attributes['is-destroy'] ? 'destroy' : item.attributes['plan-only'] ? 'plan only' : 'plan + apply') + (item.attributes['save-plan'] ? ' (saved)' : '')
         case 'source': return item.attributes.source
         case 'created-by': return item.attributes['created-by'] || ''
         case 'created-at': return item.attributes['created-at']
@@ -3871,17 +3875,31 @@ function WorkspaceDetailContent() {
                           )}
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
-                          {run.attributes['is-destroy'] ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
-                              {t('runs.typeDestroy')}
-                            </span>
-                          ) : run.attributes['plan-only'] ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
-                              {t('runs.typePlanOnly')}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-500">{t('runs.typePlanApply')}</span>
-                          )}
+                          <span className="flex flex-wrap items-center gap-1">
+                            {run.attributes['is-destroy'] ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
+                                {t('runs.typeDestroy')}
+                              </span>
+                            ) : run.attributes['plan-only'] ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
+                                {t('runs.typePlanOnly')}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-500">{t('runs.typePlanApply')}</span>
+                            )}
+                            {/* Additive, not another branch: a saved plan can also
+                                be a destroy, and "deferred" is the fact that
+                                explains the run list, so it must not be the one
+                                that loses. */}
+                            {run.attributes['save-plan'] && (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300"
+                                title={t('runs.typeSavedPlanHint')}
+                              >
+                                {t('runs.typeSavedPlan')}
+                              </span>
+                            )}
+                          </span>
                         </td>
                         <td className="px-4 py-3 hidden md:table-cell">
                           {run.attributes['plan-summary'] ? (
@@ -3941,16 +3959,25 @@ function WorkspaceDetailContent() {
                       fields={[
                         {
                           label: t('runs.type'),
-                          value: run.attributes['is-destroy'] ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
-                              {t('runs.typeDestroy')}
+                          value: (
+                            <span className="flex flex-wrap items-center gap-1">
+                              {run.attributes['is-destroy'] ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
+                                  {t('runs.typeDestroy')}
+                                </span>
+                              ) : run.attributes['plan-only'] ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
+                                  {t('runs.typePlanOnly')}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">{t('runs.typePlanApply')}</span>
+                              )}
+                              {run.attributes['save-plan'] && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-900/50 text-violet-300">
+                                  {t('runs.typeSavedPlan')}
+                                </span>
+                              )}
                             </span>
-                          ) : run.attributes['plan-only'] ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
-                              {t('runs.typePlanOnly')}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">{t('runs.typePlanApply')}</span>
                           ),
                         },
                         ...(run.attributes['plan-summary']

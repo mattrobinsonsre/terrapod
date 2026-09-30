@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "destruction",
-      "planOnly": "plan uniquement"
+      "planOnly": "plan uniquement",
+      "savedPlan": "plan enregistré",
+      "savedPlanHint": "Application différée : cette exécution ne réserve pas l'espace de travail tant que le plan enregistré n'est pas appliqué."
     },
     "actions": {
       "retryShort": "Réessayer",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "publication de module",
       "queueApplyTitle": "Mettre en file un run plan + apply",
       "queueApplyRefBlocked": "Apply est indisponible tant quune branche, une étiquette ou un commit est sélectionné — ces runs sont toujours plan-only",
-      "awaitingDecision": "en attente de décision"
+      "awaitingDecision": "en attente de décision",
+      "typeSavedPlan": "plan enregistré",
+      "typeSavedPlanHint": "Application différée : cette exécution ne réserve pas l'espace de travail tant que le plan enregistré n'est pas appliqué."
     },
     "state": {
       "deleteConfirm": "Supprimer la version d'état n° {serial} ? Cette action est irréversible.",

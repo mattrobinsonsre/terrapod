@@ -67,8 +67,15 @@ type Run struct {
 	AutoApplyMode           string `json:"auto-apply-mode"`
 	AutoApplyDeclinedReason string `json:"auto-apply-declined-reason"`
 	PlanOnly                bool   `json:"plan-only"`
-	Source                  string `json:"source,omitempty"`
-	ExecutionBackend        string `json:"execution-backend,omitempty"`
+	// SavePlan is `terraform plan -out=FILE`: an apply-capable run whose
+	// apply is DEFERRED. It plans immediately without taking the workspace's
+	// single apply slot, and takes it only when confirmed — which is what
+	// makes holding a plan file for a while meaningful. Distinct from an
+	// ordinary run awaiting confirmation, which holds the workspace from the
+	// moment it plans.
+	SavePlan         bool   `json:"save-plan,omitempty"`
+	Source           string `json:"source,omitempty"`
+	ExecutionBackend string `json:"execution-backend,omitempty"`
 	// Engine names which engine produced this run — "terraform" or "pulumi".
 	// The server sets it on every run, derived from the workspace, because a run
 	// stores no copy (#1536). Without it a Run is not self-describing: a caller
@@ -159,8 +166,13 @@ type CreateRunRequest struct {
 	ConfigurationVersionID string
 	Message                string
 	PlanOnly               bool
-	IsDestroy              bool
-	AutoApply              *bool
+	// SavePlan requests a saved-plan run (`terraform plan -out=FILE`). Mutually
+	// exclusive with PlanOnly, and with a speculative configuration version —
+	// the server refuses either combination rather than picking a winner, since
+	// a saved plan that cannot be applied is a file that promises nothing.
+	SavePlan  bool
+	IsDestroy bool
+	AutoApply *bool
 	// Set either; EngineVersion is preferred. TerraformVersion is the name
 	// go-tfe uses and the API accepts it indefinitely (#1559) — not deprecated,
 	// just superseded for new callers. Whichever is set is sent under the
@@ -190,6 +202,9 @@ func (c *Client) CreateRun(ctx context.Context, req CreateRunRequest) (*Run, err
 	}
 	if req.IsDestroy {
 		attrs["is-destroy"] = true
+	}
+	if req.SavePlan {
+		attrs["save-plan"] = true
 	}
 	if req.AutoApply != nil {
 		attrs["auto-apply"] = *req.AutoApply
@@ -388,6 +403,7 @@ func runFromResource(res *Resource) *Run {
 		AutoApplyMode:           GetStringAttr(res, "auto-apply-mode"),
 		AutoApplyDeclinedReason: GetStringAttr(res, "auto-apply-declined-reason"),
 		PlanOnly:                GetBoolAttr(res, "plan-only"),
+		SavePlan:                GetBoolAttr(res, "save-plan"),
 		Source:                  GetStringAttr(res, "source"),
 		ExecutionBackend:        GetStringAttr(res, "execution-backend"),
 		Engine:                  GetStringAttr(res, "engine"),

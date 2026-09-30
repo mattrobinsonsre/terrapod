@@ -2251,6 +2251,14 @@ class Run(Base):
     refresh_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     refresh: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     allow_empty_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # `terraform plan -out=FILE` (#1903). A saved-plan run is apply-capable but
+    # its apply is DEFERRED: it plans immediately without contending for the
+    # workspace, and only takes the workspace's single apply slot when the
+    # operator confirms it — which is what makes holding a plan file for a while
+    # meaningful. See `is_deferred_saved_plan` in run_service for where that
+    # distinction is enforced; it is a scheduling property, so the runner is
+    # never told about it.
+    save_plan: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Module impact analysis overrides (maps module coords to override storage paths)
     module_overrides: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)

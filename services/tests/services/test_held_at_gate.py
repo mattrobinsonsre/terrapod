@@ -33,6 +33,9 @@ def _run(**kw):
     run.plan_finished_at = kw.get("plan_finished_at", FINISHED)
     run.plan_started_at = kw.get("plan_started_at", FINISHED)
     run.plan_only = kw.get("plan_only", False)
+    # A real bool: an unset MagicMock is truthy, which would make every
+    # run here a deferred saved plan and exempt it from supersede (#1903).
+    run.save_plan = kw.get("save_plan", False)
     run.job_name = kw.get("job_name", "tprun-abc-plan")
     run.job_namespace = "terrapod-runners"
     run.pool_id = uuid.uuid4()

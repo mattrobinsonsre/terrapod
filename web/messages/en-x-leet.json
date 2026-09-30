@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "d357r0y",
-      "planOnly": "pl4n 0nly"
+      "planOnly": "pl4n 0nly",
+      "savedPlan": "54v3d pl4n",
+      "savedPlanHint": "4pply d3f3rr3d: 7h15 run d035 n07 h0ld 7h3 w0rk5p4c3 un71l 7h3 54v3d pl4n 15 4ppl13d."
     },
     "actions": {
       "retryShort": "R37ry",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "m0dul3 publ15h",
       "queueApplyTitle": "Qu3u3 4 pl4n + 4pply run",
       "queueApplyRefBlocked": "4pply 15 un4v41l4bl3 wh1l3 4 br4nch, 74g 0r c0mm17 15 53l3c73d — 7h053 run5 4r3 4lw4y5 pl4n-0nly",
-      "awaitingDecision": "4w4171ng d3c1510n"
+      "awaitingDecision": "4w4171ng d3c1510n",
+      "typeSavedPlan": "54v3d pl4n",
+      "typeSavedPlanHint": "4pply d3f3rr3d: 7h15 run d035 n07 h0ld 7h3 w0rk5p4c3 un71l 7h3 54v3d pl4n 15 4ppl13d."
     },
     "state": {
       "deleteConfirm": "D3l373 57473 v3r510n #{serial}? 7h15 c4nn07 b3 und0n3.",

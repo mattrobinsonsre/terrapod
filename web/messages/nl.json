@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "vernietigen",
-      "planOnly": "alleen plan"
+      "planOnly": "alleen plan",
+      "savedPlan": "opgeslagen plan",
+      "savedPlanHint": "Toepassen uitgesteld: deze run bezet de workspace pas wanneer het opgeslagen plan wordt toegepast."
     },
     "actions": {
       "retryShort": "Opnieuw",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "modulepublicatie",
       "queueApplyTitle": "Een plan + apply-run in de wachtrij zetten",
       "queueApplyRefBlocked": "Apply is niet beschikbaar zolang een branch, tag of commit is geselecteerd — die runs zijn altijd alleen plan",
-      "awaitingDecision": "wacht op beslissing"
+      "awaitingDecision": "wacht op beslissing",
+      "typeSavedPlan": "opgeslagen plan",
+      "typeSavedPlanHint": "Toepassen uitgesteld: deze run bezet de workspace pas wanneer het opgeslagen plan wordt toegepast."
     },
     "state": {
       "deleteConfirm": "State-versie #{serial} verwijderen? Dit kan niet ongedaan worden gemaakt.",

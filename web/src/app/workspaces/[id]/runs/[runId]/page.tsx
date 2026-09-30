@@ -67,6 +67,8 @@ interface RunAttrs {
   'auto-apply-mode': string
   'auto-apply-declined-reason': string | null
   'plan-only': boolean
+  // `tofu plan -out=FILE` (#1903) -- apply-capable, apply deferred.
+  'save-plan': boolean
   'is-destroy': boolean
   'target-addrs': string[]
   'replace-addrs': string[]
@@ -1500,6 +1502,17 @@ function RunDetailPageInner() {
       {attrs['plan-only'] && !attrs['is-destroy'] && (
         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-cyan-900/50 text-cyan-300">
           {t('badge.planOnly')}
+        </span>
+      )}
+      {/* Not exclusive with the two above: a saved plan can be a destroy, and
+          this is the badge that explains why the workspace is free while this
+          run sits at `planned`. */}
+      {attrs['save-plan'] && (
+        <span
+          className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-violet-900/50 text-violet-300"
+          title={t('badge.savedPlanHint')}
+        >
+          {t('badge.savedPlan')}
         </span>
       )}
       {gate ? (

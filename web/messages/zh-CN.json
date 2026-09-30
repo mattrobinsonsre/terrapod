@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "销毁",
-      "planOnly": "仅计划"
+      "planOnly": "仅计划",
+      "savedPlan": "已保存的计划",
+      "savedPlanHint": "应用已延迟：在应用已保存的计划之前，此运行不会占用工作区。"
     },
     "actions": {
       "retryShort": "重试",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "模块发布",
       "queueApplyTitle": "将计划 + 应用运行加入队列",
       "queueApplyRefBlocked": "选择分支、标签或提交时无法应用——这些运行始终仅为计划",
-      "awaitingDecision": "等待决定"
+      "awaitingDecision": "等待决定",
+      "typeSavedPlan": "已保存的计划",
+      "typeSavedPlanHint": "应用已延迟：在应用已保存的计划之前，此运行不会占用工作区。"
     },
     "state": {
       "deleteConfirm": "删除状态版本 #{serial}？此操作无法撤销。",

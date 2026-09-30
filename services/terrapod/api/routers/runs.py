@@ -212,6 +212,10 @@ def _run_json(
                 "auto-apply-mode": run.auto_apply_mode,
                 "auto-apply-declined-reason": run.auto_apply_declined_reason,
                 "plan-only": run.plan_only,
+                # `terraform plan -out=FILE` (#1903). Emitted so a CLI reading
+                # the run back sees what it asked for, and `omitempty` on the
+                # go-tfe side means false costs nothing on the wire.
+                "save-plan": run.save_plan,
                 "source": run.source,
                 "execution-backend": run.execution_backend,
                 # Which engine, not which binary (#1407). The UI resolves phase
@@ -529,6 +533,19 @@ async def create_run(
     # The guard fires when a configuration version is provided (CLI upload).
     # Runs without a CV (UI-queued) will fetch code from VCS downstream.
     plan_only = attrs.get("plan-only", False)
+    # `terraform plan -out=FILE` (#1903). Apply-capable, but its apply is
+    # deferred until the operator runs `terraform apply FILE`.
+    save_plan = bool(attrs.get("save-plan", False))
+    if save_plan and plan_only:
+        # Contradictory, so say so. Silently dropping one of them is precisely
+        # the failure this attribute was added to fix: a plan-only saved plan
+        # would return `save-plan: true` to a CLI that could then never apply
+        # the file it was told it had.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="'save-plan' and 'plan-only' are mutually exclusive: a saved plan "
+            "exists to be applied later, and a plan-only run can never be applied.",
+        )
     cv_data = relationships.get("configuration-version", {}).get("data", {})
     cv_id_raw = cv_data.get("id", "") if cv_data else ""
     has_cv = bool(cv_id_raw)
@@ -555,6 +572,16 @@ async def create_run(
 
         _spec_cv = await db.get(ConfigurationVersion, cv_uuid)
         if _spec_cv is not None and _spec_cv.speculative:
+            if save_plan:
+                # The forcing below would silently turn the saved plan into a
+                # plan-only run — the same swallowed contradiction as above,
+                # arriving by a different door.
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="A saved-plan run cannot use a speculative configuration "
+                    "version: speculative configurations are plan-only, so the saved "
+                    "plan could never be applied.",
+                )
             plan_only = True
     # Config-managed guardrail (#535): a catalog-managed workspace runs only the
     # wrapper config the catalog generated for it. A run that pins a different
@@ -569,6 +596,19 @@ async def create_run(
             ),
         )
     if ws.execution_mode == "agent" and ws.vcs_connection_id is not None and has_cv:
+        if save_plan:
+            # Refused for the same reason every CLI apply is refused here —
+            # VCS is the source of truth — but said in the vocabulary the
+            # operator used. `-out` produces a plan file to apply later, and
+            # that apply would never be permitted, so the useful moment to
+            # refuse is now rather than after they have the file (#1903).
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Saved-plan runs ('tofu plan -out=FILE') are not allowed from the "
+                "CLI on VCS-connected agent workspaces: applying the saved plan would be "
+                "a CLI apply, which VCS-connected workspaces reserve for the VCS "
+                "integration and the UI. Use 'tofu plan' for a speculative plan.",
+            )
         if not plan_only:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -650,6 +690,7 @@ async def create_run(
         refresh_only=attrs.get("refresh-only", False),
         refresh=attrs.get("refresh", True),
         allow_empty_apply=attrs.get("allow-empty-apply", False),
+        save_plan=save_plan,
     )
 
     # Attach VCS metadata if we fetched code from VCS

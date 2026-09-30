@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "riv ned",
-      "planOnly": "kun plan"
+      "planOnly": "kun plan",
+      "savedPlan": "lagret plan",
+      "savedPlanHint": "Bruk utsatt: denne kjøringen holder ikke arbeidsområdet før den lagrede planen brukes."
     },
     "actions": {
       "retryShort": "Prøv igjen",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "modulpublisering",
       "queueApplyTitle": "Legg en plan + apply-kjøring i kø",
       "queueApplyRefBlocked": "Apply er utilgjengelig mens en branch, tag eller commit er valgt — slike kjøringer er alltid kun plan",
-      "awaitingDecision": "venter på beslutning"
+      "awaitingDecision": "venter på beslutning",
+      "typeSavedPlan": "lagret plan",
+      "typeSavedPlanHint": "Bruk utsatt: denne kjøringen holder ikke arbeidsområdet før den lagrede planen brukes."
     },
     "state": {
       "deleteConfirm": "Slett tilstandsversjon #{serial}? Dette kan ikke angres.",

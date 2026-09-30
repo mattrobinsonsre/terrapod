@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "destructio",
-      "planOnly": "solum consilium"
+      "planOnly": "solum consilium",
+      "savedPlan": "consilium servatum",
+      "savedPlanHint": "Applicatio dilata: haec executio locum operis non tenet donec consilium servatum applicetur."
     },
     "actions": {
       "retryShort": "Retentare",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "editio moduli",
       "queueApplyTitle": "Cursum consilii + exsecutionis in ordinem mittere",
       "queueApplyRefBlocked": "Exsecutio non praesto est dum ramus, nota vel commissio electa est — ii cursus semper consilium solum sunt",
-      "awaitingDecision": "decretum exspectat"
+      "awaitingDecision": "decretum exspectat",
+      "typeSavedPlan": "consilium servatum",
+      "typeSavedPlanHint": "Applicatio dilata: haec executio locum operis non tenet donec consilium servatum applicetur."
     },
     "state": {
       "deleteConfirm": "Versionem status #{serial} delere? Hoc revocari non potest.",

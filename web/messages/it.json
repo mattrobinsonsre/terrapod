@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "distruggi",
-      "planOnly": "solo plan"
+      "planOnly": "solo plan",
+      "savedPlan": "piano salvato",
+      "savedPlanHint": "Applicazione differita: questa esecuzione non occupa il workspace finché il piano salvato non viene applicato."
     },
     "actions": {
       "retryShort": "Riprova",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "pubblicazione del modulo",
       "queueApplyTitle": "Accoda una esecuzione plan + apply",
       "queueApplyRefBlocked": "Apply non è disponibile mentre è selezionato un branch, tag o commit: quelle esecuzioni sono sempre solo plan",
-      "awaitingDecision": "in attesa di decisione"
+      "awaitingDecision": "in attesa di decisione",
+      "typeSavedPlan": "piano salvato",
+      "typeSavedPlanHint": "Applicazione differita: questa esecuzione non occupa il workspace finché il piano salvato non viene applicato."
     },
     "state": {
       "deleteConfirm": "Eliminare la versione dello stato #{serial}? Questa azione non può essere annullata.",

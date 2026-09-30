@@ -126,6 +126,13 @@ def _mock_run(**kwargs):
     run.error_message = kwargs.get("error_message", "")
     run.auto_apply = kwargs.get("auto_apply", False)
     run.plan_only = kwargs.get("plan_only", False)
+    # `terraform plan -out=FILE` (#1903), explicit for the same reason as
+    # `configuration_version_id` below: an unset MagicMock attribute is truthy,
+    # so confirm_run would take the deferred-saved-plan branch for every run
+    # and look for an apply-slot holder in whatever `db.scalar` was stubbed
+    # with -- which is a MagicMock, and therefore always "somebody else is
+    # applying".
+    run.save_plan = kwargs.get("save_plan", False)
     run.listener_id = kwargs.get("listener_id", None)
     run.locked = kwargs.get("locked", False)
     run.source = kwargs.get("source", "tfe-api")

@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "삭제",
-      "planOnly": "계획 전용"
+      "planOnly": "계획 전용",
+      "savedPlan": "저장된 플랜",
+      "savedPlanHint": "적용이 보류되었습니다. 저장된 플랜이 적용될 때까지 이 실행은 워크스페이스를 점유하지 않습니다."
     },
     "actions": {
       "retryShort": "재시도",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "모듈 게시",
       "queueApplyTitle": "플랜 + 적용 실행을 대기열에 추가",
       "queueApplyRefBlocked": "브랜치, 태그 또는 커밋이 선택된 동안에는 적용할 수 없습니다. 해당 실행은 항상 플랜 전용입니다",
-      "awaitingDecision": "결정 대기 중"
+      "awaitingDecision": "결정 대기 중",
+      "typeSavedPlan": "저장된 플랜",
+      "typeSavedPlanHint": "적용이 보류되었습니다. 저장된 플랜이 적용될 때까지 이 실행은 워크스페이스를 점유하지 않습니다."
     },
     "state": {
       "deleteConfirm": "상태 버전 #{serial}을(를) 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",

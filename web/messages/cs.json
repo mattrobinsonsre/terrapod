@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "zničit",
-      "planOnly": "pouze plán"
+      "planOnly": "pouze plán",
+      "savedPlan": "uložený plán",
+      "savedPlanHint": "Aplikace odložena: tento běh neblokuje pracovní prostor, dokud není uložený plán aplikován."
     },
     "actions": {
       "retryShort": "Zkusit znovu",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "publikace modulu",
       "queueApplyTitle": "Zařadit běh plan + apply",
       "queueApplyRefBlocked": "Apply není dostupné, pokud je vybrána větev, značka nebo commit — takové běhy jsou vždy pouze plan",
-      "awaitingDecision": "čeká na rozhodnutí"
+      "awaitingDecision": "čeká na rozhodnutí",
+      "typeSavedPlan": "uložený plán",
+      "typeSavedPlanHint": "Aplikace odložena: tento běh neblokuje pracovní prostor, dokud není uložený plán aplikován."
     },
     "state": {
       "deleteConfirm": "Smazat verzi stavu #{serial}? Toto nelze vrátit zpět.",

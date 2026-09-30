@@ -34,6 +34,7 @@ def _mock_run(
     ws_id=None,
     auto_apply=False,
     plan_only=False,
+    save_plan=False,
     message="",
     pool_id=None,
     pool_extra_ids=None,
@@ -51,6 +52,10 @@ def _mock_run(
     run.auto_apply_mode = "always" if auto_apply else "never"
     run.auto_apply_declined_reason = None
     run.plan_only = plan_only
+    # `terraform plan -out=FILE` (#1903). Explicit for the same reason `engine`
+    # is: the serializer reports it, and a MagicMock attribute is not
+    # JSON-serialisable.
+    run.save_plan = save_plan
     run.source = "tfe-api"
     run.engine_version = "1.11"
     # The engine the run belongs to (#1521). Set explicitly because a
@@ -385,6 +390,164 @@ class TestCreateRun:
 
 
 # ── CLI plan on a VCS-connected workspace (#661) ───────────────────────
+
+
+class TestSavedPlanRunCreate:
+    """`terraform plan -out=FILE` (#1903) on the create path.
+
+    The behaviour that matters — that a saved plan does not hold the workspace —
+    lives in the dispatcher's SQL and is proven in the integration tier. What
+    is proven here is the create path's side: that the attribute is read at all,
+    and that the three ways it can contradict its own request are refused rather
+    than silently resolved. Silently resolving them is the exact failure the
+    issue was raised about: the attribute was accepted and ignored, so the
+    documented workflow appeared to work.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_save_plan_reaches_the_service(
+        self, mock_resolve, mock_create_run, mock_queue, *mocks
+    ):
+        """It was read off the body and passed on — the whole of the bug."""
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+        run = _mock_run(ws_id=ws.id, save_plan=True, status="queued")
+        mock_create_run.return_value = run
+        mock_queue.return_value = run
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"save-plan": True},
+                        "relationships": {"workspace": {"data": {"id": f"ws-{ws.id}"}}},
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201, resp.text
+        assert mock_create_run.await_args.kwargs["save_plan"] is True
+        assert resp.json()["data"]["attributes"]["save-plan"] is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_save_plan_with_plan_only_is_refused(self, mock_resolve, *mocks):
+        """A plan-only saved plan is a file that can never be applied. Refused
+        rather than resolved either way, because whichever attribute lost would
+        be reported back as though it had been honoured."""
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"save-plan": True, "plan-only": True},
+                        "relationships": {"workspace": {"data": {"id": f"ws-{ws.id}"}}},
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text
+        assert "mutually exclusive" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_save_plan_with_a_speculative_cv_is_refused(self, mock_resolve, *mocks):
+        """The same contradiction arriving by the other door: a speculative CV
+        forces plan-only, which would silently demote the saved plan."""
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        spec_cv = MagicMock()
+        spec_cv.speculative = True
+        mock_db.get = AsyncMock(return_value=spec_cv)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"save-plan": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}"}},
+                            "configuration-version": {"data": {"id": f"cv-{uuid.uuid4()}"}},
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text
+        assert "speculative" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_refused_on_a_vcs_agent_workspace_by_name(self, mock_resolve, *mocks):
+        """Refused for the same reason every CLI apply is refused there — but
+        saying so in the vocabulary the operator used, and at the useful moment:
+        before they hold a plan file whose apply would never be permitted."""
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+        ws.execution_mode = "agent"
+        ws.vcs_connection_id = uuid.uuid4()
+        ws.vcs_repo_url = "https://example.com/org/repo"
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        real_cv = MagicMock()
+        real_cv.speculative = False
+        mock_db.get = AsyncMock(return_value=real_cv)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"save-plan": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}"}},
+                            "configuration-version": {"data": {"id": f"cv-{uuid.uuid4()}"}},
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text
+        detail = resp.json()["detail"]
+        assert "-out" in detail, (
+            f"refused, but not in the words the operator used — they ran "
+            f"`tofu plan -out=FILE` and got: {detail}"
+        )
 
 
 class TestVCSSpeculativePlan:

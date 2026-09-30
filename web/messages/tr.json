@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "yok et",
-      "planOnly": "yalnızca plan"
+      "planOnly": "yalnızca plan",
+      "savedPlan": "kaydedilmiş plan",
+      "savedPlanHint": "Uygulama ertelendi: kaydedilmiş plan uygulanana kadar bu çalışma çalışma alanını tutmaz."
     },
     "actions": {
       "retryShort": "Yeniden Dene",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "modül yayımlama",
       "queueApplyTitle": "Plan + apply çalıştırması kuyruğa al",
       "queueApplyRefBlocked": "Bir dal, etiket veya commit seçiliyken apply kullanılamaz — bu çalıştırmalar her zaman yalnızca plan olur",
-      "awaitingDecision": "karar bekleniyor"
+      "awaitingDecision": "karar bekleniyor",
+      "typeSavedPlan": "kaydedilmiş plan",
+      "typeSavedPlanHint": "Uygulama ertelendi: kaydedilmiş plan uygulanana kadar bu çalışma çalışma alanını tutmaz."
     },
     "state": {
       "deleteConfirm": "#{serial} durum sürümü silinsin mi? Bu geri alınamaz.",

@@ -106,9 +106,14 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		PageSize    int    `json:"page_size,omitempty" jsonschema:"max runs to return (default 20, newest first)"`
 	}
 	type runSummary struct {
-		ID         string `json:"id"`
-		Status     string `json:"status"`
-		PlanOnly   bool   `json:"plan_only"`
+		ID       string `json:"id"`
+		Status   string `json:"status"`
+		PlanOnly bool   `json:"plan_only"`
+		// A saved plan (#1903) sitting at `planned` looks exactly like a run
+		// awaiting a human, and is not: its apply is deferred, so it holds
+		// nothing and the workspace is free. Without this an agent reports a
+		// workspace as blocked when it is not.
+		SavePlan   bool   `json:"save_plan,omitempty"`
 		IsDestroy  bool   `json:"is_destroy"`
 		HasChanges *bool  `json:"has_changes,omitempty"`
 		Source     string `json:"source,omitempty"`
@@ -130,7 +135,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_list",
-		Description: "List recent runs for a workspace (newest first) with status, whether each is plan-only/destroy, whether the plan had changes, and — for conditional auto-apply — the run's mode and why it was held. A run showing auto_apply_declined_reason reached `planned` and stopped because its plan contained something its mode does not auto-apply (a destroy or replace, or an in-place update under `create`); it is waiting for a human to confirm or discard.",
+		Description: "List recent runs for a workspace (newest first) with status, whether each is plan-only/destroy or a deferred saved plan, whether the plan had changes, and — for conditional auto-apply — the run's mode and why it was held. A run with save_plan=true at `planned` is NOT holding the workspace: its apply was deferred by `terraform plan -out=FILE` and begins only when someone applies that file. A run showing auto_apply_declined_reason reached `planned` and stopped because its plan contained something its mode does not auto-apply (a destroy or replace, or an in-place update under `create`); it is waiting for a human to confirm or discard.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runListIn) (*mcp.CallToolResult, runListOut, error) {
 		if in.WorkspaceID == "" {
@@ -148,7 +153,8 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		for i := range runs {
 			r := &runs[i]
 			out.Runs = append(out.Runs, runSummary{
-				ID: r.ID, Status: r.Status, PlanOnly: r.PlanOnly, IsDestroy: r.IsDestroy,
+				ID: r.ID, Status: r.Status, PlanOnly: r.PlanOnly, SavePlan: r.SavePlan,
+				IsDestroy:  r.IsDestroy,
 				HasChanges: r.HasChanges, Source: r.Source, CreatedAt: r.CreatedAt,
 				AgentPoolID:             r.AgentPoolID,
 				AutoApplyMode:           r.AutoApplyMode,

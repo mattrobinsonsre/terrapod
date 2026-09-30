@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "nedriv",
-      "planOnly": "kun plan"
+      "planOnly": "kun plan",
+      "savedPlan": "gemt plan",
+      "savedPlanHint": "Anvendelse udskudt: denne kørsel holder ikke arbejdsområdet, før den gemte plan anvendes."
     },
     "actions": {
       "retryShort": "Prøv igen",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "modulpublicering",
       "queueApplyTitle": "Sæt en plan + apply-kørsel i kø",
       "queueApplyRefBlocked": "Apply er utilgængelig, mens en branch, et tag eller et commit er valgt — de kørsler er altid kun plan",
-      "awaitingDecision": "afventer beslutning"
+      "awaitingDecision": "afventer beslutning",
+      "typeSavedPlan": "gemt plan",
+      "typeSavedPlanHint": "Anvendelse udskudt: denne kørsel holder ikke arbejdsområdet, før den gemte plan anvendes."
     },
     "state": {
       "deleteConfirm": "Slet tilstandsversion #{serial}? Dette kan ikke fortrydes.",

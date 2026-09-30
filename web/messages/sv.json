@@ -2052,7 +2052,9 @@
     },
     "badge": {
       "destroy": "förstör",
-      "planOnly": "endast plan"
+      "planOnly": "endast plan",
+      "savedPlan": "sparad plan",
+      "savedPlanHint": "Tillämpning uppskjuten: den här körningen håller inte arbetsytan förrän den sparade planen tillämpas."
     },
     "actions": {
       "retryShort": "Försök igen",
@@ -2740,7 +2742,9 @@
       "sourceModulePublish": "modulpublicering",
       "queueApplyTitle": "Köa en plan + apply-körning",
       "queueApplyRefBlocked": "Apply är otillgängligt medan en gren, tagg eller commit är vald — de körningarna är alltid endast plan",
-      "awaitingDecision": "väntar på beslut"
+      "awaitingDecision": "väntar på beslut",
+      "typeSavedPlan": "sparad plan",
+      "typeSavedPlanHint": "Tillämpning uppskjuten: den här körningen håller inte arbetsytan förrän den sparade planen tillämpas."
     },
     "state": {
       "deleteConfirm": "Ta bort tillståndsversion #{serial}? Detta kan inte ångras.",

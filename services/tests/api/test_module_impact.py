@@ -111,6 +111,9 @@ def _mock_run(
     run.auto_apply_mode = "never"
     run.auto_apply_declined_reason = None
     run.plan_only = False
+    # `tofu plan -out=FILE` (#1903) — a real bool, because the serializer
+    # reports it and a MagicMock is not JSON-serialisable.
+    run.save_plan = False
     run.execution_backend = "tofu"
     run.engine_version = "1.11"
     run.terragrunt_enabled = False
@@ -298,6 +301,7 @@ class TestRetryRunCopiesOverrides:
         # Module-impact runs are speculative plans, so plan-only — which is also
         # what lets a plan-level role retry one (#1599).
         original.plan_only = True
+        original.save_plan = False
         mock_get_run.return_value = original
         mock_resolve.return_value = caps_for_level("plan")
 
