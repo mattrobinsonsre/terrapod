@@ -375,3 +375,56 @@ def test_the_api_describes_itself_as_more_than_one_engine():
         desc.index("OpenTofu") < desc.index("Terraform Enterprise") or "OpenTofu/Terraform" in desc
     ), "AGENTS.md: the open-source engine leads in prose"
     assert "Ansible" not in desc, "Ansible is planned, not shipped — do not claim it"
+
+
+#: The lookups that decide which engine's row a handler may see.
+_SCOPED_LOOKUPS = {"_get_workspace_by_id", "_require_ws_capability", "_load_state_version_scoped"}
+
+
+def test_every_dual_mounted_handler_threads_the_request():
+    """A `dual_router` handler that forgets the request answers for one surface (#1911).
+
+    These handlers are mounted on BOTH surfaces, so the door is the only thing
+    that tells them which engine's rows they may serve — and the shared loaders
+    read an absent request as the compatibility surface. A handler that omits it
+    therefore 404s its own native route: every Pulumi workspace, from the only
+    page that operates one, with no error saying why.
+
+    That direction is the conservative one by design (too strict, never a leak),
+    which is exactly why it needs a test. A leak announces itself the moment
+    someone looks; this failure looks like the feature not existing.
+
+    Source-introspection rather than a request per handler: the property is
+    "every handler on this router, including the next one", and a behavioural
+    test only covers the ones somebody remembered to write.
+    """
+    tree = ast.parse(ROUTER.read_text())
+    missing = []
+    checked = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        decorators = [ast.unparse(d).split("(")[0] for d in node.decorator_list]
+        if not any(d.startswith("dual_router.") for d in decorators):
+            continue
+        calls = [
+            c
+            for c in ast.walk(node)
+            if isinstance(c, ast.Call) and getattr(c.func, "id", "") in _SCOPED_LOOKUPS
+        ]
+        if not calls:
+            missing.append(
+                f"{node.name} is mounted on both surfaces and makes no scoped lookup at all — "
+                f"either it cannot serve another engine's row, and should say so, or it does"
+            )
+        for call in calls:
+            checked += 1
+            if "request" not in {kw.arg for kw in call.keywords}:
+                missing.append(
+                    f"{node.name}:{call.lineno} calls {call.func.id} without request=, so it "
+                    f"reads as the TFE surface on both mounts and 404s its own native route"
+                )
+    assert checked, "no dual-mounted handlers found — the router parse has drifted"
+    assert not missing, "\n  ".join(
+        ["dual-mounted handlers that are not surface-scoped:", *missing]
+    )
