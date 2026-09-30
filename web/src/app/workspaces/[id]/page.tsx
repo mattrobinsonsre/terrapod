@@ -336,6 +336,13 @@ function WorkspaceDetailContent() {
   // lookup serves the whole runs tab (#1911).
   const phaseWord = (name: string) =>
     engineWord(tPhase, workspace?.attributes.engine, name)
+  // The same lookup as a KEY, for the sites that need next-intl itself to do
+  // the work: rich text with tag chunks, and a string with an ICU placeholder.
+  // Both must go through `tPhase.rich`/`tPhase(key, values)` rather than
+  // post-processing `phaseWord`'s output, or the tags stop rendering and the
+  // placeholder stops being formatted in the reader's locale.
+  const phaseKeyFor = (name: string) =>
+    phaseKey(workspace?.attributes.engine, 'words', name)
   // A run status that names a phase belongs to the engine; the rest (queued,
   // errored, canceled…) are the platform's own.
   const runStatusLabel = (status: string) =>
@@ -1687,7 +1694,9 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || t('errors.queuePlanStatus', { status: res.status }))
+        throw new Error(data.detail || tPhase(phaseKeyFor('errorsQueuePlanStatus'), {
+          status: res.status,
+        }))
       }
       const runData = await res.json().catch(() => null)
       const newRunId = runData?.data?.id as string | undefined
@@ -1704,7 +1713,7 @@ function WorkspaceDetailContent() {
       setVcsRef('')
       await loadRuns()
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('errors.queuePlan'))
+      setError(err instanceof Error ? err.message : phaseWord('errorsQueuePlan'))
     } finally {
       setQueueingPlan(false)
     }
@@ -2532,10 +2541,14 @@ function WorkspaceDetailContent() {
                   <div className="sm:col-span-2 rounded border border-amber-700 bg-amber-900/30 p-3 text-xs text-amber-100">
                     <p className="font-medium">{t('vcsWorkflowWarning.title')}</p>
                     <p className="mt-1">
-                      {t.rich('vcsWorkflowWarning.rbac', { em: (chunks) => <em> {chunks}</em> })}
+                      {tPhase.rich(phaseKeyFor('vcsWorkflowWarningRbac'), {
+                        em: (chunks) => <em> {chunks}</em>,
+                      })}
                     </p>
                     <p className="mt-1">
-                      {t.rich('vcsWorkflowWarning.recommended', { strong: (chunks) => <strong>{chunks}</strong> })}
+                      {tPhase.rich(phaseKeyFor('vcsWorkflowWarningRecommended'), {
+                        strong: (chunks) => <strong>{chunks}</strong>,
+                      })}
                     </p>
                     <p className="mt-1">
                       {t.rich('vcsWorkflowWarning.credit', {
@@ -2547,7 +2560,7 @@ function WorkspaceDetailContent() {
                   </div>
                 )}
                 <div>
-                  <dt className="text-xs text-slate-500">{t('fields.autoMerge')}</dt>
+                  <dt className="text-xs text-slate-500">{phaseWord('fieldsAutoMerge')}</dt>
                   {editing ? (
                     <label className="mt-1 flex items-center gap-2">
                       <input
@@ -2847,7 +2860,7 @@ function WorkspaceDetailContent() {
                 <div className="min-w-0">
                   <h3 className="text-sm font-medium text-slate-300">{t('lock.title')}</h3>
                   <p className="text-sm text-slate-400 mt-1">
-                    {attrs.locked ? t('lock.lockedDesc') : t('lock.unlockedDesc')}
+                    {attrs.locked ? phaseWord('lockLockedDesc') : t('lock.unlockedDesc')}
                   </p>
                   {attrs.locked && attrs['locked-by'] && (
                     <p className="text-sm text-slate-400 mt-1 break-words" data-testid="lock-holder">
@@ -2945,7 +2958,7 @@ function WorkspaceDetailContent() {
                       onClick={handleCheckDriftNow}
                       disabled={checkingDrift || attrs.locked || !attrs['drift-detection-enabled']}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-                      title={!attrs['drift-detection-enabled'] ? t('drift.checkNowTitleDisabled') : attrs.locked ? t('common.workspaceLocked') : t('drift.checkNowTitle')}
+                      title={!attrs['drift-detection-enabled'] ? t('drift.checkNowTitleDisabled') : attrs.locked ? t('common.workspaceLocked') : phaseWord('driftCheckNowTitle')}
                     >
                       {checkingDrift ? t('actions.queuing') : t('drift.checkNow')}
                     </button>
@@ -2957,9 +2970,9 @@ function WorkspaceDetailContent() {
             {/* Plan Expiry (#646) */}
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="mb-4">
-                <h3 className="text-sm font-medium text-slate-300">{t('planExpiry.title')}</h3>
+                <h3 className="text-sm font-medium text-slate-300">{phaseWord('planExpiryTitle')}</h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  {t('planExpiry.description')}
+                  {phaseWord('planExpiryDescription')}
                 </p>
               </div>
               <dl>
@@ -2985,9 +2998,9 @@ function WorkspaceDetailContent() {
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-sm font-medium text-slate-300">{t('aiSummary.title')}</h3>
+                  <h3 className="text-sm font-medium text-slate-300">{phaseWord('aiSummaryTitle')}</h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    {t('aiSummary.description')}
+                    {phaseWord('aiSummaryDescription')}
                   </p>
                 </div>
               </div>
@@ -4365,7 +4378,7 @@ function WorkspaceDetailContent() {
             {cvLoading ? (
               <LoadingSpinner />
             ) : cvs.length === 0 ? (
-              <EmptyState message={t('configurations.empty')} />
+              <EmptyState message={phaseWord('configurationsEmpty')} />
             ) : (
               <>
                 {/* Desktop (md+): the table with per-row compare checkboxes. */}
@@ -4846,7 +4859,7 @@ function WorkspaceDetailContent() {
               {trgLoading && <span className="text-xs text-slate-500">{t('actions.loadingLower')}</span>}
             </div>
             <p className="text-xs text-slate-500 mb-6">
-              {t('runTriggers.description')}
+              {phaseWord('runTriggersDescription')}
             </p>
 
             {/* Inbound — source workspaces that trigger runs HERE */}

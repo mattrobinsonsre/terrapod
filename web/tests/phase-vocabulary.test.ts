@@ -124,6 +124,7 @@ test('every vocabulary name a component asks for exists for both engines', () =>
     }
     for (const m of src.matchAll(/\bword\('([^']+)'\)/g)) names.add(m[1])
     for (const m of src.matchAll(/\bphaseWord\('([^']+)'\)/g)) names.add(m[1])
+    for (const m of src.matchAll(/\bphaseKeyFor\('([^']+)'\)/g)) names.add(m[1])
   }
   assert.ok(names.size > 20, `only found ${names.size} vocabulary call sites — extraction broke`)
   const missing = [...names].filter(

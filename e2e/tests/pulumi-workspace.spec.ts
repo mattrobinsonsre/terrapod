@@ -13,6 +13,7 @@ import {
   getStoredToken,
   createPulumiWorkspace,
   createWorkspace,
+  lockWorkspace,
   seedPulumiRun,
   seedRun,
   uniqueName,
@@ -273,5 +274,98 @@ test.describe('Pulumi run vocabulary and Terraform-only surfaces', () => {
     await expect(page.locator('#run-view-select')).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('#run-view-select option', { hasText: 'Preview log' })).toHaveCount(1);
     await expectNoHorizontalPageScroll(page);
+  });
+
+  test('the cards above the runs tab speak the same engine as the tab', async ({ page }) => {
+    // The whole point: these sit on the SAME page as the queue buttons, so a
+    // Terraform word here is "two words for one run" one scroll apart. Positive
+    // assertions on purpose — an absence check would also pass if the card
+    // stopped rendering, which is exactly the false green to avoid here.
+    const token = getStoredToken();
+    const wsId = await createPulumiWorkspace(token, `${uniqueName('e2e-pulumi-cards')}::dev`);
+    await lockWorkspace(token, wsId, 'e2e vocabulary check');
+
+    await page.goto(`/workspaces/${wsId}`);
+    await expect(page.getByTestId('ws-engine')).toHaveText('Pulumi', { timeout: 20_000 });
+
+    // The padlock, immediately above the runs tab.
+    await expect(page.getByText('No previews or updates can run.')).toBeVisible();
+    await expect(page.getByText('No plans or applies can run.')).toHaveCount(0);
+
+    // The cards below it.
+    await expect(page.getByRole('heading', { name: 'Preview Expiry' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Plan Expiry' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'AI Preview Summary' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'AI Plan Summary' })).toHaveCount(0);
+    await expect(page.getByText('every preview-phase outcome', { exact: false })).toBeVisible();
+
+    // Only the drift IGNORE RULES are Terraform's, and that control is absent —
+    // the classifier reads Terraform attribute paths and reports a Pulumi
+    // workspace CLEAN, so a rule here would fail OPEN. Drift detection ITSELF is
+    // engine-neutral; its tooltip is checked separately, because a locked
+    // workspace shows the lock reason there instead.
+    await expect(page.getByText('Drift Ignore Rules')).toHaveCount(0);
+  });
+
+  test('a Terraform workspace keeps every one of those words', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('e2e-tf-cards'));
+    await lockWorkspace(token, wsId, 'e2e vocabulary check');
+
+    await page.goto(`/workspaces/${wsId}`);
+    await expect(page.getByText('No plans or applies can run.')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'Plan Expiry' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'AI Plan Summary' })).toBeVisible();
+    // The Terraform-only control that a Pulumi workspace does not get.
+    await expect(page.getByText('Drift Ignore Rules')).toBeVisible();
+  });
+
+  test('the drift check-now tooltip names the phase, on both engines', async ({ page }) => {
+    // Its own test because the tooltip has three states and only one of them is
+    // the phase word: a workspace with drift OFF reads "Enable drift detection
+    // first" (the column defaults to false) and a LOCKED one reads "Workspace is
+    // locked". Asserting it on a default workspace would have passed on a string
+    // that never mentions a phase at all.
+    const token = getStoredToken();
+    const pulumiId = await createPulumiWorkspace(token, `${uniqueName('e2e-pulumi-drift')}::dev`);
+    const tfId = await createWorkspace(token, uniqueName('e2e-tf-drift'));
+    for (const id of [pulumiId, tfId]) {
+      const res = await fetch(`${API_URL}/api/v1/workspaces/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/vnd.api+json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          data: { type: 'workspaces', attributes: { 'drift-detection-enabled': true } },
+        }),
+      });
+      expect(res.status).toBe(200);
+    }
+
+    await page.goto(`/workspaces/${pulumiId}`);
+    await expect(page.getByTestId('ws-engine')).toHaveText('Pulumi', { timeout: 20_000 });
+    await expect(page.getByTitle('Queue a preview-only run to check for drift')).toHaveCount(1);
+    await expect(page.getByTitle('Queue a plan-only run to check for drift')).toHaveCount(0);
+
+    await page.goto(`/workspaces/${tfId}`);
+    await expect(page.getByTitle('Queue a plan-only run to check for drift')).toHaveCount(1, {
+      timeout: 20_000,
+    });
+  });
+
+  test('the Versions tab names no CLI a Pulumi workspace cannot run', async ({ page }) => {
+    // The one string where the engines need different SENTENCES rather than a
+    // different word: no `pulumi` subcommand uploads a configuration version,
+    // so naming one would send an operator looking for a command that does not
+    // exist.
+    const token = getStoredToken();
+    const wsId = await createPulumiWorkspace(token, `${uniqueName('e2e-pulumi-ver')}::dev`);
+
+    await page.goto(`/workspaces/${wsId}?tab=versions`);
+    await expect(page.getByText('as soon as a VCS push triggers a run', { exact: false })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText('terraform plan', { exact: false })).toHaveCount(0);
   });
 });
