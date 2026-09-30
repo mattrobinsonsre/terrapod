@@ -448,6 +448,20 @@ multi-language implementation ships in the same PR**:
   British dialect *override* that carries only the spelling deltas from the
   American source (the shared strings are genuinely identical, not a gap), so it
   is gated as a subset, not full parity.
+- **Key parity is not translation — assert the property, not the presence.** The
+  completeness gate compares each catalogue's key *set* against `en`. It has no
+  opinion about values, so a locale holding a key with the English string copied
+  into it passes every gate while being untranslated, and thirty-two locales
+  doing so are indistinguishable from thirty-two that are correct. That is not a
+  hypothetical: 26 of 33 locales described a Pulumi run in Terraform's words for
+  a full release, because `phases.pulumi.status.applied` existed everywhere and
+  held `Applied` (#1915). **Where a string's correctness is a relationship —
+  two values inside one catalogue that must differ, a value that must not equal
+  the source language's — that relationship needs its own guard**, because no
+  key-parity gate can see it. The per-engine vocabulary is guarded in
+  `web/tests/phase-vocabulary.test.ts`, which walks every catalogue and requires
+  the two engines to read differently on every key, with an
+  `IDENTICAL_BY_DESIGN` allowlist that must carry a reason per entry.
 - **Preserve ICU + tags.** Placeholders (`{name}`, `{count, plural, one {…}
   other {…}}`, `#`, escaped `'{'`/`'}'`) and rich-text tag names (`<code>`,
   `<strong>`, `<link>`, …) are structural — translate only the human words
