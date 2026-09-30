@@ -1312,7 +1312,7 @@ GET  /api/v1/workspaces/{workspace_id}/architecture-critique
 POST /api/v1/workspaces/{workspace_id}/architecture-critique/regenerate
 ```
 
-`GET` returns the critique for the workspace's current state version: `{"data": {"type": "architecture-critiques", "attributes": {"status": "ready|pending|skipped|errored", "risk-level": "low|medium|high|critical", "architecture": {...}, "findings": [{"severity", "category", "title", "detail", "resource-address"|"resource_address", "recommendation", "grounded_in"}], "deferred": [...], "state-serial": N, ...}}}`. Returns **404** when the feature is disabled, the workspace has no state, or no critique has been generated for the current state yet. `POST .../regenerate` queues a fresh critique (202) and mutates no infrastructure.
+`GET` returns the critique for the workspace's current state version: `{"data": {"type": "architecture-critiques", "attributes": {"status": "ready|pending|skipped|errored", "risk-level": "low|medium|high|critical", "architecture": {...}, "findings": [{"severity", "category", "title", "detail", "resource-address"|"resource_address", "recommendation", "grounded_in"}], "deferred": [...], "state-serial": N, ...}}}`. Returns **404** when the feature is disabled, the workspace has no state, the workspace runs an engine the critic does not read (it reads Terraform state — see [AI Architecture Critique](architecture-critique.md)), or no critique has been generated for the current state yet. `POST .../regenerate` queues a fresh critique (202) and mutates no infrastructure.
 
 **Required permission:** `state:read` on the workspace (the critique reasons over the secret-bearing state, so it requires the same access as downloading raw state).
 

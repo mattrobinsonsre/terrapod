@@ -356,3 +356,54 @@ class TestPostCritiqueFollowup:
         assert out.role == "assistant"
         assert "model boom" in out.error_message
         assert out.content == ""
+
+
+class TestTheCriticRefusesAnEngineItCannotRead:
+    """The failure this guards is silent, which is the whole reason for the gate.
+
+    `compact_state_for_critique` reuses `build_graph_from_state` — the Terraform
+    state-v4 builder — and that builder handed a Pulumi deployment does NOT
+    raise. It finds no `mode`/`name`/`instances` and returns an empty graph, so
+    the critic would have gone on to write confident prose about a stack with no
+    resources in it and store that as the workspace's architecture review.
+
+    `state_graph_service` already branches for exactly this reason and says so in
+    a comment (#1568); the critic re-created the hazard it was warning about.
+    """
+
+    async def _run(self, engine: str):
+        ws = SimpleNamespace(id=uuid.uuid4(), engine=engine)
+        session = MagicMock()
+        # The workspace, then no state version — so a run that gets past the gate
+        # stops one query later, and the query count is what separates the two.
+        session.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=ws)),
+                MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
+            ]
+        )
+        ctx = MagicMock()
+        ctx.__aenter__ = AsyncMock(return_value=session)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        with (
+            patch.object(svc.settings, "ai_architecture", SimpleNamespace(enabled=True)),
+            patch.object(svc, "get_db_session", MagicMock(return_value=ctx)),
+        ):
+            result = await svc.generate_critique(ws.id)
+        return result, session
+
+    async def test_a_pulumi_workspace_is_refused_before_any_state_is_read(self):
+        result, session = await self._run("pulumi")
+        assert result is None
+        # One query — the workspace. Reaching the state-version lookup would mean
+        # the gate sits after the point where the wrong answer becomes possible.
+        assert session.execute.await_count == 1, (
+            f"the gate ran after {session.execute.await_count} queries; it must be "
+            f"the first thing after the workspace is loaded"
+        )
+
+    async def test_but_a_terraform_workspace_carries_on_past_the_gate(self):
+        """The must-not-break half: the gate refuses one engine, not the feature."""
+        result, session = await self._run("terraform")
+        assert result is None  # no state version, which is a different reason
+        assert session.execute.await_count == 2, "the gate refused Terraform too"

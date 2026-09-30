@@ -89,6 +89,19 @@ class EngineStrategy(Protocol):
     #: change costs nothing".
     estimates_cost: bool
 
+    #: Whether the architecture critic may reason over this engine's state
+    #: (#1911). The critic compacts a Terraform **state v4** document into a
+    #: resource graph and grounds its findings in a cost estimate built the same
+    #: way, so an engine whose state is not that document must answer False.
+    #:
+    #: This one fails the way `honours_drift_ignore_rules` does, not the way the
+    #: gates do: `build_graph_from_state` handed a Pulumi deployment does not
+    #: raise -- it finds no `mode`/`name`/`instances` and returns an EMPTY graph.
+    #: The critic would then describe an architecture of nothing, in confident
+    #: prose, and present it to an operator as a review of their stack. A wrong
+    #: answer that reads as a right one, which is worse than no critique.
+    critiques_architecture: bool
+
     #: Whether `drift_ignore_rules` may be applied to this engine's drift run
     #: (#1561). The rules are globs over Terraform attribute PATHS, matched by
     #: `drift_ignore_classifier` against `resource_changes`/`resource_drift` in
@@ -195,6 +208,19 @@ def estimates_cost(engine: str | None) -> bool:
     """
     strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
     return False if strategy is None else strategy.estimates_cost
+
+
+def critiques_architecture(engine: str | None) -> bool:
+    """Whether the architecture critic may reason over this engine's state (#1911).
+
+    **An unknown engine answers False**, for the same reason as `estimates_cost`:
+    the wrong answer here is not a held apply, it is a confident description of a
+    stack shown to an operator. A state document nobody can vouch for compacts to
+    an empty graph, and a critique of an empty graph is indistinguishable from a
+    critique of a simple system.
+    """
+    strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
+    return False if strategy is None else strategy.critiques_architecture
 
 
 def honours_drift_ignore_rules(engine: str | None) -> bool:

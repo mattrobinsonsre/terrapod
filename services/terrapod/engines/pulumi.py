@@ -153,6 +153,12 @@ class PulumiStrategy:
     #: than an unpriced one because nothing about it looks wrong.
     estimates_cost = True
 
+    #: The critic reads a Terraform state v4 document and grounds in a cost
+    #: estimate built from one. A Pulumi deployment put through that compaction
+    #: yields an empty graph rather than an error (#1568's hazard, in the critic
+    #: this time), so the critique would be confident prose about nothing.
+    critiques_architecture = False
+
     #: Which phase each internal run status belongs to. The platform's status
     #: names never change — a run is `planning` whatever engine it belongs to —
     #: and this is what stops a Pulumi run being described as "planning" to a

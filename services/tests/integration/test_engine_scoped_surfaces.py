@@ -425,3 +425,52 @@ class TestPulumiBindPlanStaysOffTheTerraformPinnedWire:
         resp = await client.get(f"{prefix}/workspaces/{ws}", headers=AUTH)
         assert resp.status_code == 200, resp.text
         assert "pulumi-bind-plan" in resp.json()["data"]["attributes"]
+
+
+class TestNativeOnlyRoutesDoNotRefuseTheirOwnWorkspaces:
+    """The mirror-image failure, and the easier one to ship.
+
+    The shared workspace loader reads an absent request as the compatibility
+    surface — the conservative direction, so a handler that forgets can only be
+    too strict. Four native-only handlers had forgotten, and "too strict" on a
+    surface that exists to serve every engine means 404ing the workspace the
+    caller is looking at. Nothing leaks, and nothing works either.
+    """
+
+    @pytest.mark.parametrize("prefix", NATIVE_PREFIXES)
+    async def test_dismiss_drift(self, app, client, prefix):
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"native-drift-{len(prefix)}::dev", "pulumi")
+        resp = await client.post(
+            f"{prefix}/workspaces/{ws}/actions/dismiss-drift", json={}, headers=AUTH
+        )
+        assert resp.status_code == 200, f"{prefix}: {resp.status_code} {resp.text}"
+
+    @pytest.mark.parametrize("prefix", NATIVE_PREFIXES)
+    @pytest.mark.parametrize("sub", ["/state-outputs", "/state-graph"])
+    async def test_the_state_reads_behind_the_critique_routes(self, app, client, prefix, sub):
+        """`_resolve_workspace_state_read` is the helper that forgot the request.
+
+        Reached through the state routes rather than the critique itself, which
+        is behind a feature switch and 404s with the critic off whatever the
+        engine — a 404 that would have looked like this fix working when it was
+        not.
+        """
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"native-sr{sub.strip('/')[:4]}-{len(prefix)}::dev", "pulumi")
+        resp = await client.get(f"{prefix}/workspaces/{ws}{sub}", headers=AUTH)
+        assert resp.status_code == 200, f"{prefix}{sub}: {resp.status_code} {resp.text}"
+
+    @pytest.mark.parametrize("prefix", NATIVE_PREFIXES)
+    async def test_manual_state_upload(self, app, client, prefix):
+        """Also the fixture every state test above leans on, so it is pinned
+        twice over — deliberately, because an implicit pin disappears the moment
+        someone rewrites the fixture."""
+        set_auth(app, admin_user())
+        ws = await _workspace(client, f"native-upload-{len(prefix)}::dev", "pulumi")
+        resp = await client.post(
+            f"{prefix}/workspaces/{ws}/state-versions/actions/upload",
+            content=b'{"version": 3, "deployment": {"manifest": {"time": "2026-01-01T00:00:00Z"}}}',
+            headers={**AUTH, "Content-Type": "application/json"},
+        )
+        assert resp.status_code in (200, 201), f"{prefix}: {resp.status_code} {resp.text}"

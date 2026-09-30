@@ -101,6 +101,7 @@ class TerraformStrategy:
     #: The cost engine reads `terraform show -json`, which is this engine's own
     #: plan format, so pricing is native here (#871).
     estimates_cost = True
+    critiques_architecture = True
 
     #: The rules are Terraform attribute paths and this is the plan they were
     #: written against (#482).

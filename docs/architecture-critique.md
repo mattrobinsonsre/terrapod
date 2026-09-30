@@ -18,6 +18,20 @@ The critic reasons over a large context (the whole workspace's state + resource
 graph + cost + security findings), so it gets its **own** config block — a
 stronger model and an independent token budget — mirroring `ai_onboarding`.
 
+## Terraform and OpenTofu only
+
+The critic compacts a **Terraform state v4** document into a resource graph and
+grounds its findings in a cost estimate built the same way, so it runs on
+Terraform/OpenTofu workspaces and is **skipped on a Pulumi workspace**: no
+critique is generated, and the workspace's Architecture tab is not offered.
+
+This is a refusal rather than a best effort on purpose. The Terraform state
+reader handed a Pulumi deployment does not fail — it finds none of the fields it
+looks for and returns an empty graph — so a critic that tried anyway would
+produce confident prose about a stack with no resources in it and store that as
+the workspace's architecture review. A wrong answer that reads like a right one
+is worse than no answer.
+
 ## Grounded, never invented
 
 Every dimension is anchored in deterministic data; the AI does judgment, not
