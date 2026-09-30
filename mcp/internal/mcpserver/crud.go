@@ -56,11 +56,13 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		VCSBranch        string            `json:"vcs_branch,omitempty" jsonschema:"tracked branch (empty = repo default)"`
 		OwnerEmail       string            `json:"owner_email,omitempty" jsonschema:"workspace owner email (defaults to the caller)"`
 		Labels           map[string]string `json:"labels,omitempty" jsonschema:"key/value labels for RBAC + filtering (reserved keys rejected)"`
+		PulumiBindPlan   *bool             `json:"pulumi_bind_plan,omitempty" jsonschema:"Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; setting it true is rejected on any other engine"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_create",
 		Description: "Create a workspace. Only `name` is required; everything else falls back to the instance default. " +
-			"For agent execution set execution_mode=agent + agent_pool_id; for VCS-driven runs set vcs_connection_id + vcs_repo_url. Returns the created workspace.",
+			"For agent execution set execution_mode=agent + agent_pool_id; for VCS-driven runs set vcs_connection_id + vcs_repo_url. " +
+			"For a Pulumi workspace set engine=pulumi, and pulumi_bind_plan to bind its update to the approved preview. Returns the created workspace.",
 		Annotations: mutating,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceCreateIn) (*mcp.CallToolResult, *terrapod.Workspace, error) {
 		if in.Name == "" {
@@ -86,6 +88,12 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			VCSBranch:        in.VCSBranch,
 			OwnerEmail:       in.OwnerEmail,
 			Labels:           in.Labels,
+			// Passed straight through rather than pre-checked against
+			// `in.Engine`: the server refuses true on a non-Pulumi engine, and
+			// a second copy of that rule here would be one to keep in step for
+			// no gain — and would answer for an engine list only the server
+			// knows. Omitted when unset, so a Terraform create is unchanged.
+			PulumiBindPlan: in.PulumiBindPlan,
 		})
 		if err != nil {
 			return errResult(err), nil, nil

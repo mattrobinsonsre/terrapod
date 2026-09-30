@@ -110,21 +110,38 @@ func serverName(cfg Config) string {
 
 // instructions is the one-paragraph server orientation the agent reads on
 // connect. It names the bound instance (so the agent never confuses
-// environments) and states the safety model.
+// environments), states the safety model, and — because Terrapod is
+// multi-engine — tells the agent to read a workspace's or run's `engine`
+// before reaching for a tool. Several tools answer for one engine only, and an
+// agent that assumes every workspace is Terraform gets a confidently wrong
+// answer rather than a refusal (#1911).
+//
+// It names OpenTofu/Terraform and Pulumi, and nothing else: Ansible is planned
+// but does not ship, and orientation text that claims an engine the instance
+// cannot run is worse than orientation text that is short.
 func instructions(cfg Config) string {
 	env := ""
 	if cfg.EnvHint != "" {
 		env = fmt.Sprintf(" This is a **%s** environment — be especially careful with destructive actions.", cfg.EnvHint)
 	}
 	return fmt.Sprintf(
-		"This server drives the Terrapod instance at %s (a self-hosted Terraform/OpenTofu "+
-			"platform). All tools act on THIS instance only, authenticated as the user's "+
-			"`tofu login` identity, so every action is bounded by that user's Terrapod RBAC — "+
-			"a read-only user cannot mutate. Use the read tools (workspaces, runs, plan JSON, "+
-			"state, drift, policy results) to ground and diagnose before acting. Runs go through "+
-			"the normal gated lifecycle (plan-only unless an apply is explicitly confirmed and "+
-			"the workspace allows it). Treat delete/destroy/RBAC-change tools as irreversible and "+
-			"confirm with the user first.%s",
+		"This server drives the Terrapod instance at %s — a self-hosted platform that "+
+			"ORCHESTRATES infrastructure-as-code engines rather than being one: OpenTofu and "+
+			"Terraform, and Pulumi. All tools act on THIS instance only, authenticated as the "+
+			"user's `tofu login` identity, so every action is bounded by that user's Terrapod "+
+			"RBAC — a read-only user cannot mutate. "+
+			"**Every workspace and run reports its `engine` — read it before choosing a tool.** "+
+			"Not all tools answer for every engine: the structured plan JSON is OpenTofu/"+
+			"Terraform's `show -json` document, where a Pulumi run writes a preview digest "+
+			"instead; a Pulumi run carries no IaC security scan; and the AI architecture "+
+			"critique reads Terraform state only. What a phase is CALLED is the engine's too — "+
+			"Terraform plans and applies where Pulumi previews and updates — though the run "+
+			"states are the same either way. "+
+			"Use the read tools (workspaces, runs, plan JSON, state, drift, policy results) to "+
+			"ground and diagnose before acting. Runs go through the normal gated lifecycle "+
+			"(plan-only unless an apply is explicitly confirmed and the workspace allows it). "+
+			"Treat delete/destroy/RBAC-change tools as irreversible and confirm with the user "+
+			"first.%s",
 		cfg.Host, env)
 }
 

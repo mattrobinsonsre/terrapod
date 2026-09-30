@@ -677,7 +677,7 @@
           "type": "integer"
         },
         "view": {
-          "description": "changes (default): the resources the plan acts on, each with only the attributes that change. full: the raw tofu show -json document",
+          "description": "changes (default): the resources the plan acts on, each with only the attributes that change — OpenTofu/Terraform runs only. full: the raw plan document, which also reads a Pulumi run's preview digest",
           "type": "string"
         }
       },
@@ -993,6 +993,13 @@
           "description": "workspace owner email (defaults to the caller)",
           "type": "string"
         },
+        "pulumi_bind_plan": {
+          "description": "Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; setting it true is rejected on any other engine",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "terraform_version": {
           "description": "the same version under its original name; prefer engine_version. Setting both to different values is rejected",
           "type": "string"
@@ -1060,6 +1067,10 @@
     "input_schema": {
       "additionalProperties": false,
       "properties": {
+        "engine": {
+          "description": "return only workspaces on this execution engine: terraform or pulumi. Omit for every engine. Narrow with this before doing anything that assumes one engine — the tools differ by engine",
+          "type": "string"
+        },
         "page_size": {
           "description": "max workspaces to return in this page (default 50)",
           "type": "integer"

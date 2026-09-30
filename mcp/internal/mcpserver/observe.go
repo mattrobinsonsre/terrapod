@@ -20,6 +20,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	type workspaceListIn struct {
 		PageSize int    `json:"page_size,omitempty" jsonschema:"max workspaces to return in this page (default 50)"`
 		Search   string `json:"search,omitempty" jsonschema:"filter workspaces by name substring"`
+		Engine   string `json:"engine,omitempty" jsonschema:"return only workspaces on this execution engine: terraform or pulumi. Omit for every engine. Narrow with this before doing anything that assumes one engine — the tools differ by engine"`
 	}
 	type workspaceSummary struct {
 		ID            string            `json:"id"`
@@ -43,14 +44,14 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_workspace_list",
-		Description: "List workspaces on this Terrapod instance with their status, execution mode, lock state, drift status, and labels. Use this to orient before acting. Returns up to page_size workspaces; `total` reports the full count so you know if the result was truncated (narrow with `search`).",
+		Description: "List workspaces on this Terrapod instance with their engine, status, execution mode, lock state, drift status, and labels. Use this to orient before acting. Each workspace reports its `engine` — `terraform` (OpenTofu/Terraform) or `pulumi` — and several tools answer for one engine only, so read it before choosing one; `engine` also narrows the list server-side. Returns up to page_size workspaces; `total` reports the full count so you know if the result was truncated (narrow with `search` or `engine`).",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in workspaceListIn) (*mcp.CallToolResult, workspaceListOut, error) {
 		size := in.PageSize
 		if size <= 0 {
 			size = 50
 		}
-		list, err := c.ListWorkspaces(ctx, terrapod.WorkspaceListOptions{PageSize: size, Search: in.Search})
+		list, err := c.ListWorkspaces(ctx, terrapod.WorkspaceListOptions{PageSize: size, Search: in.Search, Engine: in.Engine})
 		if err != nil {
 			return errResult(err), workspaceListOut{}, nil
 		}
@@ -106,8 +107,15 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		PageSize    int    `json:"page_size,omitempty" jsonschema:"max runs to return (default 20, newest first)"`
 	}
 	type runSummary struct {
-		ID       string `json:"id"`
-		Status   string `json:"status"`
+		ID     string `json:"id"`
+		Status string `json:"status"`
+		// Which engine produced this run. A run inherits its workspace's
+		// engine, and several tools answer for one engine only: the plan JSON
+		// is OpenTofu/Terraform's document, and a Pulumi run carries neither an
+		// IaC security scan nor an AI policy verdict (it IS cost-estimated, and
+		// it DOES evaluate OPA policy sets). So an agent reading a run needs to
+		// know which engine it is looking at before reaching for the next tool.
+		Engine   string `json:"engine,omitempty"`
 		PlanOnly bool   `json:"plan_only"`
 		// A saved plan (#1903) sitting at `planned` looks exactly like a run
 		// awaiting a human, and is not: its apply is deferred, so it holds
@@ -135,7 +143,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_run_list",
-		Description: "List recent runs for a workspace (newest first) with status, whether each is plan-only/destroy or a deferred saved plan, whether the plan had changes, and — for conditional auto-apply — the run's mode and why it was held. A run with save_plan=true at `planned` is NOT holding the workspace: its apply was deferred by `terraform plan -out=FILE` and begins only when someone applies that file. A run showing auto_apply_declined_reason reached `planned` and stopped because its plan contained something its mode does not auto-apply (a destroy or replace, or an in-place update under `create`); it is waiting for a human to confirm or discard.",
+		Description: "List recent runs for a workspace (newest first) with the engine that produced each, status, whether each is plan-only/destroy or a deferred saved plan, whether the plan had changes, and — for conditional auto-apply — the run's mode and why it was held. A run with save_plan=true at `planned` is NOT holding the workspace: its apply was deferred by `terraform plan -out=FILE` and begins only when someone applies that file. A run showing auto_apply_declined_reason reached `planned` and stopped because its plan contained something its mode does not auto-apply (a destroy or replace, or an in-place update under `create`); it is waiting for a human to confirm or discard.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runListIn) (*mcp.CallToolResult, runListOut, error) {
 		if in.WorkspaceID == "" {
@@ -153,7 +161,8 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		for i := range runs {
 			r := &runs[i]
 			out.Runs = append(out.Runs, runSummary{
-				ID: r.ID, Status: r.Status, PlanOnly: r.PlanOnly, SavePlan: r.SavePlan,
+				ID: r.ID, Status: r.Status, Engine: r.Engine,
+				PlanOnly: r.PlanOnly, SavePlan: r.SavePlan,
 				IsDestroy:  r.IsDestroy,
 				HasChanges: r.HasChanges, Source: r.Source, CreatedAt: r.CreatedAt,
 				AgentPoolID:             r.AgentPoolID,
@@ -186,7 +195,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	// ── terrapod_run_plan_json ───────────────────────────────────────
 	type planJSONIn struct {
 		RunID    string   `json:"run_id" jsonschema:"the run id whose structured JSON plan output to fetch"`
-		View     string   `json:"view,omitempty" jsonschema:"changes (default): the resources the plan acts on, each with only the attributes that change. full: the raw tofu show -json document"`
+		View     string   `json:"view,omitempty" jsonschema:"changes (default): the resources the plan acts on, each with only the attributes that change — OpenTofu/Terraform runs only. full: the raw plan document, which also reads a Pulumi run's preview digest"`
 		Address  string   `json:"address,omitempty" jsonschema:"changes view: keep resources whose address starts with this, or matches it as a glob when it contains * or ? (brackets are literal, as in an index like web[0])"`
 		Actions  []string `json:"actions,omitempty" jsonschema:"changes view: keep resources with any of these actions: create, update, delete, replace, read, no-op. Default is every action except no-op"`
 		Start    int      `json:"start,omitempty" jsonschema:"changes view: index of the first change to return, for paging"`
@@ -220,7 +229,8 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_run_plan_json",
-		Description: "Fetch what a run's plan will do, from its structured JSON plan (`tofu show -json`). " +
+		Description: "Fetch what a run's plan will do, from its structured JSON plan. " +
+			"OpenTofu/Terraform ONLY: the document is `tofu show -json`, and a Pulumi run writes a preview digest of a different shape — view=changes refuses it (view=full reads the digest) rather than reporting the no-changes it would otherwise parse to. " +
 			"The default view=changes is compact, usually a few KB: tofu's add/change/destroy counts, then each resource the plan acts on with only the attributes that change (before and after), sensitive values redacted and values not known until apply marked as such. " +
 			"Narrow it with `address` (a prefix, or a glob) and `actions`; `matched` and `truncated` say whether there is more, and `start`/`limit` page through it. " +
 			"view=full returns the whole document: as the parsed `plan_json` object when it fits in max_bytes, otherwise as a `plan_json_text` chunk to page through with `offset` (pass back `next_offset`). A full plan is often megabytes. Sensitive values are redacted in both views. " +
@@ -358,7 +368,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_run_logs",
-		Description: "Fetch a run's plan or apply LOG — the terraform/tofu output, which is where the reason for a failure actually is. terrapod_run_get reports THAT a run errored and its exit code; this reports WHY. " +
+		Description: "Fetch a run's plan or apply LOG — the engine's own output (OpenTofu/Terraform, or Pulumi), which is where the reason for a failure actually is. terrapod_run_get reports THAT a run errored and its exit code; this reports WHY. " +
 			"Returns the END of the log by default, because that is where an error is reported and a full apply log can be megabytes; `truncated` says whether earlier output was dropped and `offset` says where the returned chunk starts, so pass that offset back to page further in. ANSI colour codes are stripped. " +
 			"An empty log is not an error: a run that has not reached the phase yet simply has nothing to show.",
 		Annotations: readOnly,
@@ -550,7 +560,7 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "terrapod_workspace_architecture_critique",
-		Description: "Get the AI architecture critique of a workspace's CURRENT deployed system, inferred from its latest Terraform state (the optional ai_architecture feature). Unlike a run's plan summary — which reviews a change — this reviews the system as it EXISTS, across reliability/security/cost/operations/scalability. Every finding is grounded (security ← the Checkov/Trivy scanner, carrying the rule id in `grounded_in`; cost ← the cost engine; reliability/operations ← state + resource graph) and anchored to a resource address; concerns the model couldn't judge from the data are listed under `deferred` rather than guessed. Returns the inferred `architecture` (summary, tiers, data stores, blast radius), an overall `risk-level`, and ranked `findings`. Returns 'not available' when the feature is disabled, the workspace has no state, or no critique exists for the current state yet. Branch on `status`: ready | pending | skipped | errored.",
+		Description: "Get the AI architecture critique of a workspace's CURRENT deployed system, inferred from its latest state (the optional ai_architecture feature). OpenTofu/Terraform workspaces only — the critique reads Terraform state, so ask it of a Pulumi workspace and there is nothing for it to describe. Unlike a run's plan summary — which reviews a change — this reviews the system as it EXISTS, across reliability/security/cost/operations/scalability. Every finding is grounded (security ← the Checkov/Trivy scanner, carrying the rule id in `grounded_in`; cost ← the cost engine; reliability/operations ← state + resource graph) and anchored to a resource address; concerns the model couldn't judge from the data are listed under `deferred` rather than guessed. Returns the inferred `architecture` (summary, tiers, data stores, blast radius), an overall `risk-level`, and ranked `findings`. Returns 'not available' when the feature is disabled, the workspace has no state, or no critique exists for the current state yet. Branch on `status`: ready | pending | skipped | errored.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in wsCritiqueIn) (*mcp.CallToolResult, *terrapod.ArchitectureCritique, error) {
 		if in.WorkspaceID == "" {
@@ -676,7 +686,9 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_run_policy_checks",
 		Description: "Get a run's policy checks as the tofu/terraform CLI sees them: one for its OPA policy sets and one for its " +
-			"IaC security scan, each present only if that gate ran. Each has a status (passed, soft_failed, overridden), " +
+			"IaC security scan, each present only if that gate ran. Both engines evaluate OPA policy sets; a Pulumi run " +
+			"has no security-scan check at all, so its absence there is by design rather than a gate that failed to run. " +
+			"Each has a status (passed, soft_failed, overridden), " +
 			"whether it can be overridden and whether you may, and its output (the failing policies' deny messages, or the " +
 			"scan findings, worst first). A soft_failed check is what holds a run in policy_override (or, in the 1.x " +
 			"vocabulary, planning with blocked-by policy or security-scan).",
