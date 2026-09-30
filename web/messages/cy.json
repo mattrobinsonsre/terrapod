@@ -70,7 +70,6 @@
       "agentPool": "Pwll Asiantau",
       "none": "Dim",
       "autoApply": "Gweithredu Awtomatig",
-      "autoApplyModeHint": "never: aros am berson bob tro. always: cymhwyso pob cynllun llwyddiannus. create / create/update: cymhwyso dim ond cynlluniau sy''n gyfyngedig i''r camau hynny — byth dileu na disodli.",
       "enabled": "Wedi'i alluogi",
       "workingDirectory": "Cyfeiriadur Gwaith",
       "workingDirectoryPlaceholder": "e.e. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "Cynhyrchwyd gan AI",
     "heading": {
-      "planSummary": "Crynodeb y cynllun",
       "failureAnalysis": "Dadansoddiad methiant"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Ailgynhyrchu",
       "queueing": "Wrthi'n ciwio…",
-      "tooltip": "Ail-redeg y crynodeb AI yn erbyn yr un mewnbynnau cynllun",
       "ariaLabel": "Ailgynhyrchu'r crynodeb AI",
       "confirm": "Ailgynhyrchu'r dadansoddiad AI? Mae hyn yn rhedeg y model eto.",
       "error": "Methwyd ailgynhyrchu: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Wrthi'n crynhoi'r cynllun…",
       "analysingFailure": "Wrthi'n dadansoddi'r methiant…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Dim newidiadau",
       "noChangesLower": "dim newidiadau",
-      "noChangesTitle": "Adroddodd y cynllun ddim newidiadau adnodd",
       "toAdd": "{count, plural, one {# i'w ychwanegu} other {# i'w hychwanegu}}",
       "toChange": "{count, plural, one {# i'w newid} other {# i'w newid}}",
       "toDestroy": "{count, plural, one {# i'w ddinistrio} other {# i'w dinistrio}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Dilyniant",
       "sharedThreadNote": "Un edefyn a rennir, gweladwy i unrhyw un â darllen ar y weithfan.",
-      "placeholder": "Gofynnwch gwestiwn dilynol am y cynllun hwn… (⌘/Ctrl + Enter i anfon)",
       "send": "Anfon",
       "thinking": "Wrthi'n meddwl…",
       "you": "Chi",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "gweithfan",
     "backTo": "Yn ôl i {name}",
     "errorHeading": "Gwall",
-    "discardedHeading": "Taflwyd — angen ail-gynllunio",
     "common": {
       "yes": "Ie",
       "no": "Na"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "dinistrio",
-      "planOnly": "cynllun yn unig",
       "savedPlan": "cynllun wedi'i gadw",
       "savedPlanHint": "Gweithredu wedi'i ohirio: nid yw'r rhediad hwn yn dal y gweithle nes bod y cynllun wedi'i gadw yn cael ei weithredu."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Ailgeisio",
       "retryFull": "Ailgeisio'r Rhediad",
       "retrying": "Wrthi'n ailgeisio…",
-      "confirmShort": "Gweithredu",
-      "confirmFull": "Cadarnhau a Gweithredu",
       "confirming": "Wrthi'n cadarnhau…",
       "discard": "Taflu",
       "discarding": "Wrthi'n taflu…",
@@ -2071,8 +2061,6 @@
       "queuing": "Yn ciwio…"
     },
     "confirm": {
-      "apply": "Gweithredu'r rhediad hwn? Mae hyn yn gweithredu'r cynllun ac yn newid seilwaith.",
-      "discard": "Taflu'r cynllun hwn?",
       "cancel": "Canslo'r rhediad hwn?",
       "retry": "Ailgeisio'r rhediad hwn?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Graff effaith",
       "cost": "Cost",
       "costFull": "Amcangyfrif cost",
-      "planLabel": "Cynllun<log>Log</log>",
-      "applyLabel": "Gweithredu<log>Log</log>",
-      "planFull": "Log cynllun",
-      "applyFull": "Log gweithredu",
       "details": "Manylion",
       "security": "Diogelwch",
       "securityFull": "Sgan diogelwch"
     },
     "banner": {
       "destroy": "Mae hwn yn rhediad <strong>dinistrio</strong> — dinistrir pob adnodd a reolir wrth ei weithredu.",
-      "planOnlyCli": "Mae hwn yn rhediad <strong>cynllun-yn-unig</strong> a gychwynnwyd o'r CLI ar weithfan sydd wedi'i chysylltu â VCS. Nid yw gweithredu ar gael ar gyfer cod a lwythwyd o'r CLI — dim ond cod a reolir gan VCS y gellir ei weithredu.",
       "moduleOverridesPrefix": "Mae'r rhediad hwn yn defnyddio <strong>diystyriadau modiwl</strong>",
       "moduleOverridesFromPr": "o PR #{number}",
       "moduleOverridesSuffix": "cânt eu nôl o gangen y PR yn lle'r fersiwn gofrestrfa a gyhoeddwyd."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Dim newidiadau",
-      "planning": "Wrthi'n cynllunio…",
       "toAdd": "i'w hychwanegu",
       "toChange": "i'w newid",
       "toDestroy": "i'w dinistrio",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Peiriant Gweithredu",
       "source": "Ffynhonnell",
       "autoApply": "Gweithredu Awtomatig",
-      "planOnly": "Cynllun yn Unig",
       "triggeredBy": "Sbardunwyd Gan",
       "created": "Crëwyd",
       "commit": "Ymrwymiad",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Llinell Amser",
       "queued": "Rhoddwyd yn y ciw",
-      "planningStarted": "Dechreuodd y cynllunio",
-      "planComplete": "Cynllun wedi'i gwblhau",
       "confirmed": "Cadarnhawyd",
-      "applyingStarted": "Dechreuodd y gweithredu",
-      "applied": "Gweithredwyd",
       "errored": "Gwallodd",
       "canceled": "Canslwyd",
       "discarded": "Taflwyd"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Dilyn y gynffon fyw",
       "end": "Diwedd",
       "endTitle": "Neidio i ddiwedd y log",
-      "planEmpty": "Dim allbwn cynllun ar gael eto.",
-      "applyEmpty": "Dim allbwn gweithredu ar gael eto.",
       "index": {
         "label": "Neidio i",
-        "title": "Neidio i newid adnodd, neu grynodeb y cynllun",
-        "summary": "Crynodeb y cynllun",
         "action": {
           "create": "creu",
           "update": "diweddaru",
@@ -2218,13 +2191,11 @@
           "error": "gwall",
           "warning": "rhybudd"
         }
-      },
-      "applySkippedNoChanges": "Ni redodd unrhyw weithredu: nid oedd newidiadau yn y cynllun, felly nid oedd dim i''w weithredu."
+      }
     },
     "policyPanel": {
       "heading": "Gwiriadau Polisi",
       "passedCount": "{passed}/{total} wedi pasio",
-      "blockedMessage": "Mae'r rhediad hwn wedi'i <strong>rwystro gan set polisi orfodol</strong>. Ni fydd yn gweithredu nes datrys y methiant neu nes i weinyddwr ei ddiystyru.",
       "overriding": "Wrthi'n diystyru...",
       "overrideContinue": "Diystyru a Pharhau",
       "overrideFailed": "Methodd y diystyru",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Doedd dim byd yn y data prisio yn cyfateb i'r rhain — math heb ei fapio, adnodd heb gost uniongyrchol, neu ddarparwr nad yw wedi'i gynnwys eto.",
       "indicative": "Amcangyfrifon dangosol yw'r rhain; mae'r gost wirioneddol yn dibynnu ar ddefnydd, rhanbarth, ymrwymiadau a gostyngiadau.",
       "asOfState": "fel ar gyflwr v{serial}",
-      "noState": "Dim cost eto — mae'n ymddangos ar ôl y gweithrediad cyntaf.",
       "usageBand": "{dimension}: {typical} {unit} nodweddiadol (ystod {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mis nodweddiadol — {costLow}–{costHigh} ar draws {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Ni chydweddodd unrhyw feini prawf polisi.",
       "overriding": "Wrthi'n diystyru...",
       "overrideContinue": "Diystyru a Pharhau",
-      "overrideConfirm": "Diystyru''r giât polisi AI a chaniatáu i''r rhediad hwn gael ei gymhwyso er gwaethaf y dyfarniad?",
       "overrideFailed": "Methodd y diystyru",
       "overrideFailedStatus": "Methodd y diystyru ({status})",
       "overriddenBy": "diystyrwyd gan {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Cyfieithwyd o''r gwreiddiol wrth ei weld."
     },
     "drift": {
-      "remediate": "Cynllun + gweithredu",
-      "remediateTitle": "Ciwio rhediad cynllun + gweithredu i ailalinio''r seilwaith â''r ffurfweddiad",
-      "remediateConfirm": "Ciwio rhediad cynllun + gweithredu ar gyfer y gweithle hwn?",
       "remediateMessage": "Wedii giwio o wiriad drifft",
       "remediateFailed": "Methwyd â chiwio''r rhediad cywiro"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",
-      "rbac": "Gall unrhyw un a all gyfuno'r PR weithredu. Daw rheolau diogelu cangen (adolygiadau gofynnol, gwiriadau statws, cymeradwyaeth perchennog cod) yn gât. <em>Nid</em> yw RBAC rôl/label Terrapod yn berthnasol i weithredoedd a yrrir gan sylwadau yn y modd hwn.",
-      "recommended": "<strong>Argymhellir:</strong> mynnu hanes llinol (rebase/squash cyn cyfuno) fel mai'r ymrwymiad a weithredwch yw'r ymrwymiad sy'n glanio.",
       "credit": "Clod: mae'r llifwaith hwn wedi'i seilio ar <atlantis>Atlantis</atlantis>. Atlantis yw'r offeryn iawn o hyd i dimau sydd ond eisiau gweithrediadau a yrrir gan sylwadau PR a dim rhyngwyneb platfform."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Statws Clo",
-      "lockedDesc": "Mae'r weithfan hon wedi'i chloi. Ni all unrhyw gynlluniau na gweithrediadau redeg.",
       "unlockedDesc": "Mae'r weithfan hon wedi'i datgloi ac yn barod ar gyfer rhediadau.",
       "lock": "Cloi",
       "unlock": "Datgloi",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Clirio'r cyflwr drifft a adroddwyd. Bydd y gwiriad amserlenedig nesaf yn ei ail-boblogi o'r realiti.",
       "lastChecked": "Gwiriwyd Ddiwethaf",
       "checkNow": "Gwirio Nawr",
-      "checkNowTitle": "Ciwio rhediad cynllun-yn-unig i wirio am ddrifft",
       "checkNowTitleDisabled": "Galluogwch ganfod drifft yn gyntaf"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 diwrnod"
     },
     "planExpiry": {
-      "title": "Terfyn Amser y Cynllun",
-      "description": "Taflu cynllun heb ei gadarnhau'n awtomatig unwaith y bydd yn hŷn na hyn, fel na ellir gweithredu cynllun hen yn erbyn byd sydd wedi symud. I ffwrdd yn ragosodedig; rhaid ail-redeg y cynllun wedyn. (Yn berthnasol i rediadau sy'n gallu gweithredu yn unig.)",
       "expireAfter": "Dod i ben ar ôl"
     },
     "aiSummary": {
       "title": "Crynodeb Cynllun AI",
-      "description": "Crynodeb newid a gynhyrchir yn awtomatig gan LLM, asesiad risg, a dadansoddiad methiant ar bob canlyniad cam-cynllun ar gyfer y weithfan hon.",
       "mode": "Modd",
       "modeDefault": "Dilyn rhagosodiad y defnydd",
       "modeEnabled": "Crynhoi bob amser",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Hysbysiadau Slack",
-      "description": "Optiwch y weithfan hon i mewn i hysbysiadau rhediad Slack — ceisiadau cymeradwyo, gweithrediadau, gwallau a drifft. Gadewch y sianel yn wag ac mae'r weithfan hon yn aros yn dawel (nid oes lledaenu ledled y defnydd). Angen i'r ap Slack gael ei alluogi gan weinyddwr.",
       "channel": "Sianel",
       "channelPlaceholder": "#deploys neu ID sianel (e.e. C0123ABCD)",
       "notSet": "Heb ei osod — tawel.",
@@ -2707,14 +2665,8 @@
       "options": "Opsiynau",
       "hideOptions": "Cuddio Opsiynau",
       "queueDestroy": "Dinistrio",
-      "queueDestroyTitle": "Ciwio cynllun dinistrio",
       "destroyAllConfirm": "Dinistrio pob adnodd?",
       "confirmDestroy": "Cadarnhau Dinistrio",
-      "queuePlan": "Cynllun",
-      "queueRun": "Cynllun + gweithredu",
-      "queuePlanConfirm": "Ciwio cynllun tybiannol ar gyfer y weithfan hon?",
-      "queueApplyConfirm": "Ciwio rhediad cynllun + gweithredu? Gall hyn newid seilwaith.",
-      "planOptions": "Opsiynau Cynllun",
       "targetResources": "Adnoddau targed",
       "replaceResources": "Amnewid adnoddau",
       "commaSeparated": "(wedi'u gwahanu â choma)",
@@ -2725,7 +2677,6 @@
       "branch": "Cangen",
       "tag": "Tag",
       "defaultBranch": "Rhagosodedig ({branch})",
-      "nonDefaultRefNote": "Dewiswyd cyfeirnod nad yw'n rhagosodedig — bydd y rhediad yn gynllun-yn-unig",
       "empty": "Dim rhediadau eto ar gyfer y weithfan hon.",
       "runId": "ID Rhediad",
       "status": "Statws",
@@ -2736,12 +2687,8 @@
       "created": "Crëwyd",
       "needsConfirm": "angen cadarnhau",
       "typeDestroy": "dinistrio",
-      "typePlanOnly": "cynllun yn unig",
-      "typePlanApply": "cynllun + gweithredu",
       "sourceModuleTest": "prawf modiwl",
       "sourceModulePublish": "cyhoeddi modiwl",
-      "queueApplyTitle": "Ciwio rhediad cynllun + gweithredu",
-      "queueApplyRefBlocked": "Nid yw gweithredu ar gael tra bo cangen, tag neu ymrwymiad wedii ddewis — maer rhediadau hynny bob amser yn gynllun yn unig",
       "awaitingDecision": "yn aros am benderfyniad",
       "typeSavedPlan": "cynllun wedi'i gadw",
       "typeSavedPlanHint": "Gweithredu wedi'i ohirio: nid yw'r rhediad hwn yn dal y gweithle nes bod y cynllun wedi'i gadw yn cael ei weithredu."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 wedi'u dewis",
       "compare": "Cymharu",
       "comparing": "Wrthi'n cymharu…",
-      "empty": "Dim fersiynau ffurfweddiad eto. Maent yn ymddangos yma cyn gynted ag y bydd `terraform plan` yn llwytho neu wthiad VCS yn sbarduno rhediad.",
       "id": "ID",
       "source": "Ffynhonnell",
       "status": "Statws",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Sbardunau Rhediad",
-      "description": "Pan fydd gweithfan ffynhonnell yn cwblhau gweithrediad, caiff gweithfannau i lawr yr afon rediad newydd wedi'i giwio'n awtomatig. Hyd at 20 gweithfan ffynhonnell fesul cyrchfan.",
       "inboundHeading": "Gweithfannau ffynhonnell sy'n sbarduno rhediadau yma",
       "inboundEmpty": "Nid oes gweithfannau ffynhonnell yn sbarduno rhediadau ar y weithfan hon.",
       "pickerPlaceholder": "Chwilio am weithfannau i'w hychwanegu fel ffynhonnell…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Methwyd ychwanegu'r newidyn ({status})",
       "deleteVariable": "Methwyd dileu'r newidyn",
       "updateVariable": "Methwyd diweddaru'r newidyn",
-      "queuePlan": "Methwyd ciwio'r cynllun",
-      "queuePlanStatus": "Methwyd ciwio'r cynllun ({status})",
       "queueDestroy": "Methwyd ciwio'r dinistrio",
       "queueDestroyStatus": "Methwyd ciwio'r dinistrio ({status})",
       "createNotification": "Methwyd creu'r hysbysiad",

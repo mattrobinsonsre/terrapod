@@ -70,7 +70,6 @@
       "agentPool": "Duy bIQ'a'",
       "none": "pagh",
       "autoApply": "tlhoS lo'",
-      "autoApplyModeHint": "never: reH Human loSlu''. always: Hoch nab Qapchu''bogh lo''lu''. create / create/update: neH nabmey vetlh vangmeH poHmey lo''lu'' — not QIH ''ej not chIl.",
       "enabled": "chu'lu'pu'",
       "workingDirectory": "vum tetlh",
       "workingDirectoryPlaceholder": "Da environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI chenmoHlu'pu'",
     "heading": {
-      "planSummary": "nab tlhoS",
       "failureAnalysis": "luj Qel"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "chenmoHqa'",
       "queueing": "tlhamDaq…",
-      "tooltip": "rap nab 'el AI tlhoS vangqa'",
       "ariaLabel": "AI tlhoS chenmoHqa'",
       "confirm": "AI Qel chenmoHqa''a'? model vangqa'vam.",
       "error": "chenmoHqa'laHbe': <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "nab tlhoStaH…",
       "analysingFailure": "luj Qeltaħ…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "choHbe'lu'",
       "noChangesLower": "choHbe'lu'",
-      "noChangesTitle": "Sep choHmey ghajbe' 'e' nab maq",
       "toAdd": "{count, plural, one {# chelnIS} other {# chelnIS}}",
       "toChange": "{count, plural, one {# choHnIS} other {# choHnIS}}",
       "toDestroy": "{count, plural, one {# Qaw'nIS} other {# Qaw'nIS}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "tlha'meH",
       "sharedThreadNote": "wa' hurgh HuvmoHlu', Qumwo' laD ghajwI' Hoch legh.",
-      "placeholder": "nab vam tlha'meH yu' yIghel… (⌘/Ctrl + Enter ngeHmeH)",
       "send": "ngeH",
       "thinking": "QubtaH…",
       "you": "SoH",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "Qumwo'",
     "backTo": "{name}Daq chegh",
     "errorHeading": "Qagh",
-    "discardedHeading": "woDlu'pu' — nab qa'nISlu'",
     "common": {
       "yes": "HISlaH",
       "no": "ghobe'"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "Qaw'",
-      "planOnly": "nab neH",
       "savedPlan": "nab polta'",
       "savedPlanHint": "loS lo': nab polta' lo'lu'pa', Qu'Daq vumwI' Daq DanIHbe'."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "nID",
       "retryFull": "Sar nID",
       "retrying": "nIDtaH…",
-      "confirmShort": "lo'",
-      "confirmFull": "tob 'ej lo'",
       "confirming": "tobtaH…",
       "discard": "woD",
       "discarding": "woDtaH…",
@@ -2071,8 +2061,6 @@
       "queuing": "lI'taH…"
     },
     "confirm": {
-      "apply": "Sar vam lo''a'? nab lo'vam 'ej nISwI' choHvam.",
-      "discard": "nab vam woD'a'?",
       "cancel": "Sar vam qIl'a'?",
       "retry": "Sar vam nID je'a'?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "'ang chart",
       "cost": "Cost",
       "costFull": "Cost estimate",
-      "planLabel": "nab<log>teywI''</log>",
-      "applyLabel": "lo''<log>teywI''</log>",
-      "planFull": "nab teywI'",
-      "applyFull": "lo' teywI'",
       "details": "De'De'",
       "security": "Hurgh QaD",
       "securityFull": "Hurgh QaD wanI''"
     },
     "banner": {
       "destroy": "<strong>Qaw''</strong> Sar vam — lo''lu''DI'' vu''lu''bogh Sepmey Hoch Qaw''lu''.",
-      "planOnlyCli": "VCS-rarlu'bogh QumwoDaq CLIvo' taghlu'pu'bogh <strong>nab-neH</strong> Sar vam. CLI-lI'lu'bogh code lo'laHbe' — VCS-vu'lu'bogh code neH lo'laH.",
       "moduleOverridesPrefix": "Sar vam <strong>Segh DIvI'mey</strong> lo'",
       "moduleOverridesFromPr": "PR #{number}vo'",
       "moduleOverridesSuffix": "chumlu'pu'bogh nughmey teywI' mI' DIvI'taHvIS PR paQvo' Hevlu'."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "choHbe'lu'",
-      "planning": "nabtaH…",
       "toAdd": "chelnIS",
       "toChange": "choHnIS",
       "toDestroy": "Qaw'nIS",
@@ -2157,7 +2139,6 @@
       "executionBackend": "vangmeH tool",
       "source": "mung",
       "autoApply": "tlhoS lo'",
-      "planOnly": "nab neH",
       "triggeredBy": "taghmoHwI'",
       "created": "chenmoHlu'pu'",
       "commit": "chum",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "poH tlhegh",
       "queued": "tlhamDaq",
-      "planningStarted": "nab taghpu'",
-      "planComplete": "nab rInpu'",
       "confirmed": "tobpu'",
-      "applyingStarted": "lo' taghpu'",
-      "applied": "lo'pu'",
       "errored": "Qaghpu'",
       "canceled": "qIlpu'",
       "discarded": "woDlu'pu'"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "yInbogh Qav tlha'",
       "end": "Qav",
       "endTitle": "teywI' Qav Sup",
-      "planEmpty": "nab chel tu'be'lu' DaH.",
-      "applyEmpty": "lo' chel tu'be'lu' DaH.",
       "index": {
         "label": "ghoSmeH",
-        "title": "Doch choHlu''bogh ghoS, ghap nab De'' ghoS",
-        "summary": "nab De''",
         "action": {
           "create": "chenmoH",
           "update": "choH",
@@ -2218,13 +2191,11 @@
           "error": "Qagh",
           "warning": "ghuHmoHwI''"
         }
-      },
-      "applySkippedNoChanges": "lo''lu''be'': nab choHmey tu''lu''be'', vaj lo''meH pagh tu''lu''."
+      }
     },
     "policyPanel": {
       "heading": "chut toblu'mey",
       "passedCount": "{passed}/{total} Qappu'",
-      "blockedMessage": "Sar vam <strong>poQlu''bogh chut Segh botlu''</strong>. luj SeHlu'' joq che''wI'' DIvI''moHchugh neH lo''.",
       "overriding": "DIvI'moHtaH...",
       "overrideContinue": "DIvI'moH 'ej taH",
       "overrideFailed": "DIvI'moH lujpu'",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
       "asOfState": "Dotlh v{serial} rurlaw'",
-      "noState": "wagh tu'lu'be' — wa'DIch lo' ghevqo' 'ej cha'lu'.",
       "usageBand": "{dimension}: {typical} {unit} typical (range {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mo typical — {costLow}–{costHigh} across {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "chut mIw rapbe''.",
       "overriding": "DIvI'moHtaH...",
       "overrideContinue": "DIvI'moH 'ej taH",
-      "overrideConfirm": "AI chut lojmIt DIvI''moH ''ej wuq pIH wanI''vam lo''lu''nIS''a''?",
       "overrideFailed": "DIvI'moH lujpu'",
       "overrideFailedStatus": "DIvI'moH lujpu' ({status})",
       "overriddenBy": "{by} DIvI'moHlu'pu'"
@@ -2410,9 +2379,6 @@
       "translatedNote": "legh'eghmeH mughlu'pu'."
     },
     "drift": {
-      "remediate": "nab + ta",
-      "remediateTitle": "cham chenmoHwI' rap 'e' luqaSmoH nab + ta lI'",
-      "remediateConfirm": "DaqvamvaD nab + ta DalI''a'?",
       "remediateMessage": "Deq wIv lo''egh lI'lu'",
       "remediateFailed": "tI'wI' lI'laHbe'"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",
-      "rbac": "PR merge laHbogh Hoch lo''laH. paQ ''avmeH chutmey (poQlu''bogh laDmey, Dotlh toblu''mey, code ghajwI'' chaw'') moj lojmIt. mIwvamDaq QIn-ra''lu''bogh vangmeyDaq Terrapod patlh/per RBAC <em>lo''be''</em>.",
-      "recommended": "<strong>qeSlu':</strong> tlhegh nIH poQ (merge pa' rebase/squash) vaj lo'lu'bogh chum 'oH pumbogh chum'e'.",
       "credit": "tlho': <atlantis>Atlantis</atlantis>Daq Qu'mIwvam patlhlu'. PR-QIn-ra'lu'bogh lo'mey neH 'ej pat UI Hutlh neHbogh ghommeyvaD reH Atlantis 'oH tool nIH'e'."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "ngaQ Dotlh",
-      "lockedDesc": "Qumwo'vam ngaQlu'. nab joq lo' vanglaHbe'.",
       "unlockedDesc": "Qumwo'vam poSlu' 'ej Sarmey ghuHpu'.",
       "lock": "ngaQmoH",
       "unlock": "poSmoH",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "maqlu'bogh tlhotlh Dotlh teq. tob veb tlhamlu'bogh 'oH buy'qa'moH teHvo'.",
       "lastChecked": "toblu' Qav",
       "checkNow": "DaH tob",
-      "checkNowTitle": "tlhotlh tobmeH nab-neH Sar tlham",
       "checkNowTitleDisabled": "tlhotlh tu' wa'DIch chu'"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 jaj"
     },
     "planExpiry": {
-      "title": "nab mevbej",
-      "description": "tobbe'lu'bogh nab qan law'DI' tlhoS woD, vaj nab qan lo'lu'be' choHpu'bogh qo'Daq. motlh chu'Ha'; vaj nab qa'nISlu'. (lo'laHbogh Sarmey neH lo'.)",
       "expireAfter": "mevbejmeH poH"
     },
     "aiSummary": {
       "title": "AI nab tlhoS",
-      "description": "Qumwo'vam Hoch nab-'ay' wanI'Daq tlhoS LLM-chenmoHlu'bogh choH tlhoS, Qob nab, je luj Qel.",
       "mode": "mIw",
       "modeDefault": "nISwI' motlh tlha'",
       "modeEnabled": "reH tlhoS",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack QInmey",
-      "description": "Slack Sar QInmeyDaq Qumwo'vam 'el — chaw' tlhobmey, lo'mey, Qaghmey, je tlhotlh. HIvjeH chImmoH 'ej Qumwo'vam tammoHqa' (nISwI'-naQ ghommey Hutlh). che'wI' Slack app chu' poQ.",
       "channel": "HIvjeH",
       "channelPlaceholder": "#deploys joq HIvjeH ID (Da C0123ABCD)",
       "notSet": "choqbe'lu' — tam.",
@@ -2707,14 +2665,8 @@
       "options": "wIvmey",
       "hideOptions": "wIvmey So'",
       "queueDestroy": "Qaw'",
-      "queueDestroyTitle": "Qaw' nab tlham",
       "destroyAllConfirm": "Hoch Sepmey Qaw''a'?",
       "confirmDestroy": "Qaw' tob",
-      "queuePlan": "nab",
-      "queueRun": "nab + ta",
-      "queuePlanConfirm": "Qumwo'vamvaD Hech nab tlham'a'?",
-      "queueApplyConfirm": "nab + lo' Sar tlham'a'? nISwI' choHlaH vam.",
-      "planOptions": "nab wIvmey",
       "targetResources": "DoS Sepmey",
       "replaceResources": "Sepmey chartlh",
       "commaSeparated": "(HIvje' chevlu')",
@@ -2725,7 +2677,6 @@
       "branch": "paQ",
       "tag": "per",
       "defaultBranch": "motlh ({branch})",
-      "nonDefaultRefNote": "motlhHa' Sum wIvlu' — nab-neH Sar moj",
       "empty": "Qumwo'vamvaD Sar Hutlh DaH.",
       "runId": "Sar ID",
       "status": "Dotlh",
@@ -2736,12 +2687,8 @@
       "created": "chenmoHlu'pu'",
       "needsConfirm": "tobnIS",
       "typeDestroy": "Qaw'",
-      "typePlanOnly": "nab neH",
-      "typePlanApply": "nab + lo'",
       "sourceModuleTest": "Segh toblu'",
       "sourceModulePublish": "Segh chum",
-      "queueApplyTitle": "nab + ta qaStaHvIS lI",
-      "queueApplyRefBlocked": "wIv ramus, per ghap commit qaStaHvIS talaHbe — nab neH bIH",
       "awaitingDecision": "wuq loS",
       "typeSavedPlan": "nab polta'",
       "typeSavedPlanHint": "loS lo': nab polta' lo'lu'pa', Qu'Daq vumwI' Daq DanIHbe'."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 wIvlu'",
       "compare": "rItlh",
       "comparing": "rItlhtaH…",
-      "empty": "numtaH mI' Hutlh DaH. `terraform plan` lI'DI' joq VCS pum Sar taghmoHDI' naDev 'ang.",
       "id": "ID",
       "source": "mung",
       "status": "Dotlh",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Sar taghwI'mey",
-      "description": "mung Qumwo' lo' rInmoHDI', bIng Qumwo'mey Sar chu' tlhoS Hev. Hoch paw'vaD 20 mung Qumwo'mey veH.",
       "inboundHeading": "naDev Sarmey taghmoHbogh mung Qumwo'mey",
       "inboundEmpty": "Qumwo'vamDaq Sarmey taghmoHbogh mung Qumwo' Hutlh.",
       "pickerPlaceholder": "mung moj chelmeH Qumwo'mey nej…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "choHlaH chelmeH lujpu' ({status})",
       "deleteVariable": "choHlaH Qaw'meH lujpu'",
       "updateVariable": "choHlaH choHmeH lujpu'",
-      "queuePlan": "nab tlhammeH lujpu'",
-      "queuePlanStatus": "nab tlhammeH lujpu' ({status})",
       "queueDestroy": "Qaw' tlhammeH lujpu'",
       "queueDestroyStatus": "Qaw' tlhammeH lujpu' ({status})",
       "createNotification": "QIn chenmoHmeH lujpu'",

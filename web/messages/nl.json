@@ -70,7 +70,6 @@
       "agentPool": "Agent-pool",
       "none": "Geen",
       "autoApply": "Automatisch toepassen",
-      "autoApplyModeHint": "never: wacht altijd op een mens. always: pas elk geslaagd plan toe. create / create/update: pas alleen plannen toe die tot die acties beperkt zijn — nooit een verwijdering of een vervanging.",
       "enabled": "Ingeschakeld",
       "workingDirectory": "Werkmap",
       "workingDirectoryPlaceholder": "bijv. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "Door AI gegenereerd",
     "heading": {
-      "planSummary": "Plansamenvatting",
       "failureAnalysis": "Foutanalyse"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Opnieuw genereren",
       "queueing": "In wachtrij zetten…",
-      "tooltip": "De AI-samenvatting opnieuw uitvoeren tegen dezelfde plan-inputs",
       "ariaLabel": "AI-samenvatting opnieuw genereren",
       "confirm": "De AI-analyse opnieuw genereren? Hiermee wordt het model opnieuw uitgevoerd.",
       "error": "Kan niet opnieuw genereren: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Plan samenvatten…",
       "analysingFailure": "Fout analyseren…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Geen wijzigingen",
       "noChangesLower": "geen wijzigingen",
-      "noChangesTitle": "Plan rapporteerde geen resourcewijzigingen",
       "toAdd": "{count, plural, one {# toe te voegen} other {# toe te voegen}}",
       "toChange": "{count, plural, one {# te wijzigen} other {# te wijzigen}}",
       "toDestroy": "{count, plural, one {# te vernietigen} other {# te vernietigen}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Vervolgvraag",
       "sharedThreadNote": "Eén gedeelde thread, zichtbaar voor iedereen met leestoegang tot de workspace.",
-      "placeholder": "Stel een vervolgvraag over dit plan… (⌘/Ctrl + Enter om te verzenden)",
       "send": "Verzenden",
       "thinking": "Bezig met nadenken…",
       "you": "U",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "workspace",
     "backTo": "Terug naar {name}",
     "errorHeading": "Fout",
-    "discardedHeading": "Verworpen — opnieuw plannen vereist",
     "common": {
       "yes": "Ja",
       "no": "Nee"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "vernietigen",
-      "planOnly": "alleen plan",
       "savedPlan": "opgeslagen plan",
       "savedPlanHint": "Toepassen uitgesteld: deze run bezet de workspace pas wanneer het opgeslagen plan wordt toegepast."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Opnieuw",
       "retryFull": "Uitvoering opnieuw proberen",
       "retrying": "Bezig met opnieuw proberen…",
-      "confirmShort": "Toepassen",
-      "confirmFull": "Bevestigen & toepassen",
       "confirming": "Bezig met bevestigen…",
       "discard": "Verwerpen",
       "discarding": "Bezig met verwerpen…",
@@ -2071,8 +2061,6 @@
       "queuing": "In wachtrij zetten…"
     },
     "confirm": {
-      "apply": "Deze uitvoering toepassen? Hiermee wordt het plan toegepast en infrastructuur gewijzigd.",
-      "discard": "Dit plan verwerpen?",
       "cancel": "Deze uitvoering annuleren?",
       "retry": "Deze uitvoering opnieuw proberen?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Impactgrafiek",
       "cost": "Kosten",
       "costFull": "Kostenraming",
-      "planLabel": "Plan<log>-logboek</log>",
-      "applyLabel": "Apply<log>-logboek</log>",
-      "planFull": "Plan-logboek",
-      "applyFull": "Apply-logboek",
       "details": "Details",
       "security": "Beveiliging",
       "securityFull": "Beveiligingsscan"
     },
     "banner": {
       "destroy": "Dit is een <strong>destroy</strong>-uitvoering — alle beheerde resources worden vernietigd bij toepassing.",
-      "planOnlyCli": "Dit is een uitvoering met <strong>alleen plan</strong>, gestart vanuit de CLI op een VCS-verbonden workspace. Apply is niet beschikbaar voor via CLI geüploade code — alleen VCS-beheerde code kan worden toegepast.",
       "moduleOverridesPrefix": "Deze uitvoering gebruikt <strong>module-overschrijvingen</strong>",
       "moduleOverridesFromPr": "uit PR #{number}",
       "moduleOverridesSuffix": "worden opgehaald uit de PR-branch in plaats van uit de gepubliceerde registryversie."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Geen wijzigingen",
-      "planning": "Bezig met plannen…",
       "toAdd": "toe te voegen",
       "toChange": "te wijzigen",
       "toDestroy": "te vernietigen",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Uitvoeringsbackend",
       "source": "Bron",
       "autoApply": "Automatisch toepassen",
-      "planOnly": "Alleen plan",
       "triggeredBy": "Geactiveerd door",
       "created": "Aangemaakt",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Tijdlijn",
       "queued": "In wachtrij",
-      "planningStarted": "Plannen gestart",
-      "planComplete": "Plan voltooid",
       "confirmed": "Bevestigd",
-      "applyingStarted": "Toepassen gestart",
-      "applied": "Toegepast",
       "errored": "Mislukt",
       "canceled": "Geannuleerd",
       "discarded": "Verworpen"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "De live tail volgen",
       "end": "Einde",
       "endTitle": "Naar het einde van het logboek springen",
-      "planEmpty": "Nog geen planuitvoer beschikbaar.",
-      "applyEmpty": "Nog geen applyuitvoer beschikbaar.",
       "index": {
         "label": "Ga naar",
-        "title": "Ga naar een resourcewijziging of naar de plansamenvatting",
-        "summary": "Plansamenvatting",
         "action": {
           "create": "aanmaken",
           "update": "bijwerken",
@@ -2218,13 +2191,11 @@
           "error": "fout",
           "warning": "waarschuwing"
         }
-      },
-      "applySkippedNoChanges": "Er is niets toegepast: het plan bevatte geen wijzigingen, dus er was niets toe te passen."
+      }
     },
     "policyPanel": {
       "heading": "Beleidscontroles",
       "passedCount": "{passed}/{total} geslaagd",
-      "blockedMessage": "Deze uitvoering wordt <strong>geblokkeerd door een verplichte beleidsset</strong>. Ze wordt niet toegepast totdat de fout is opgelost of een beheerder ze overschrijft.",
       "overriding": "Bezig met overschrijven...",
       "overrideContinue": "Overschrijven & doorgaan",
       "overrideFailed": "Overschrijven mislukt",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Niets in de prijsgegevens kwam overeen met deze — een niet-toegewezen type, een resource zonder directe kosten of een provider die nog niet wordt ondersteund.",
       "indicative": "Ramingen zijn indicatief; de werkelijke kosten hangen af van gebruik, regio, verplichtingen en kortingen.",
       "asOfState": "vanaf status v{serial}",
-      "noState": "Nog geen kosten — verschijnt na de eerste toepassing.",
       "usageBand": "{dimension}: {typical} {unit} typisch (bereik {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mnd typisch — {costLow}–{costHigh} over {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Geen beleidscriteria kwamen overeen.",
       "overriding": "Bezig met overschrijven...",
       "overrideContinue": "Overschrijven & doorgaan",
-      "overrideConfirm": "De AI-beleidspoort overschrijven en deze uitvoering laten toepassen ondanks het oordeel?",
       "overrideFailed": "Overschrijven mislukt",
       "overrideFailedStatus": "Overschrijven mislukt ({status})",
       "overriddenBy": "overschreven door {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Bij weergave vertaald vanuit het origineel."
     },
     "drift": {
-      "remediate": "Plan + apply",
-      "remediateTitle": "Een plan + apply-run in de wachtrij zetten om de infrastructuur weer met de configuratie in lijn te brengen",
-      "remediateConfirm": "Een plan + apply-run voor deze workspace in de wachtrij zetten?",
       "remediateMessage": "In wachtrij gezet vanuit een afwijkingscontrole",
       "remediateFailed": "Kon de herstelrun niet in de wachtrij zetten"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",
-      "rbac": "Iedereen die de PR kan samenvoegen, kan toepassen. Branch-beschermingsregels (vereiste beoordelingen, statuscontroles, goedkeuring van code-eigenaar) worden de poort. Terrapod-rol-/label-RBAC is in deze modus<em>niet</em> van toepassing op comment-gestuurde acties.",
-      "recommended": "<strong>Aanbevolen:</strong> vereis lineaire geschiedenis (rebase/squash vóór samenvoegen) zodat de commit die u toepast de commit is die landt.",
       "credit": "Met dank: deze workflow is gemodelleerd naar <atlantis>Atlantis</atlantis>. Atlantis blijft de juiste tool voor teams die alleen PR-comment-gestuurde applies willen en geen platform-UI."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Vergrendelingsstatus",
-      "lockedDesc": "Deze workspace is vergrendeld. Er kunnen geen plannen of applies worden uitgevoerd.",
       "unlockedDesc": "Deze workspace is ontgrendeld en klaar voor uitvoeringen.",
       "lock": "Vergrendelen",
       "unlock": "Ontgrendelen",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Wis de gerapporteerde driftstatus. De volgende geplande controle vult deze opnieuw op basis van de werkelijkheid.",
       "lastChecked": "Laatst gecontroleerd",
       "checkNow": "Nu controleren",
-      "checkNowTitle": "Zet een uitvoering met alleen plan in de wachtrij om op drift te controleren",
       "checkNowTitleDisabled": "Schakel eerst driftdetectie in"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 dagen"
     },
     "planExpiry": {
-      "title": "Planverval",
-      "description": "Verwerp een onbevestigd plan automatisch zodra het ouder is dan dit, zodat een verouderd plan niet kan worden toegepast op een veranderde wereld. Standaard uit; het plan moet dan opnieuw worden uitgevoerd. (Alleen van toepassing op apply-capabele uitvoeringen.)",
       "expireAfter": "Verloopt na"
     },
     "aiSummary": {
       "title": "AI-plansamenvatting",
-      "description": "Automatische, door LLM gegenereerde wijzigingssamenvatting, risicobeoordeling en foutanalyse bij elke uitkomst van de planfase voor deze workspace.",
       "mode": "Modus",
       "modeDefault": "Standaard van deployment volgen",
       "modeEnabled": "Altijd samenvatten",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack-notificaties",
-      "description": "Meld deze workspace aan voor Slack-uitvoeringsnotificaties — goedkeuringsverzoeken, applies, fouten en drift. Laat het kanaal leeg en deze workspace blijft stil (er is geen deployment-brede fan-out). Vereist dat de Slack-app door een beheerder is ingeschakeld.",
       "channel": "Kanaal",
       "channelPlaceholder": "#deploys of een kanaal-ID (bijv. C0123ABCD)",
       "notSet": "Niet ingesteld — stil.",
@@ -2707,14 +2665,8 @@
       "options": "Opties",
       "hideOptions": "Opties verbergen",
       "queueDestroy": "Vernietigen",
-      "queueDestroyTitle": "Zet een destroy-plan in de wachtrij",
       "destroyAllConfirm": "Alle resources vernietigen?",
       "confirmDestroy": "Vernietigen bevestigen",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + apply",
-      "queuePlanConfirm": "Een speculatief plan voor deze workspace in de wachtrij zetten?",
-      "queueApplyConfirm": "Een plan + apply-uitvoering in de wachtrij zetten? Dit kan infrastructuur wijzigen.",
-      "planOptions": "Planopties",
       "targetResources": "Doelresources",
       "replaceResources": "Resources vervangen",
       "commaSeparated": "(kommagescheiden)",
@@ -2725,7 +2677,6 @@
       "branch": "Branch",
       "tag": "Tag",
       "defaultBranch": "Standaard ({branch})",
-      "nonDefaultRefNote": "Niet-standaard ref geselecteerd — uitvoering is alleen plan",
       "empty": "Nog geen uitvoeringen voor deze workspace.",
       "runId": "Uitvoerings-ID",
       "status": "Status",
@@ -2736,12 +2687,8 @@
       "created": "Aangemaakt",
       "needsConfirm": "bevestiging vereist",
       "typeDestroy": "vernietigen",
-      "typePlanOnly": "alleen plan",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "moduletest",
       "sourceModulePublish": "modulepublicatie",
-      "queueApplyTitle": "Een plan + apply-run in de wachtrij zetten",
-      "queueApplyRefBlocked": "Apply is niet beschikbaar zolang een branch, tag of commit is geselecteerd — die runs zijn altijd alleen plan",
       "awaitingDecision": "wacht op beslissing",
       "typeSavedPlan": "opgeslagen plan",
       "typeSavedPlanHint": "Toepassen uitgesteld: deze run bezet de workspace pas wanneer het opgeslagen plan wordt toegepast."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 geselecteerd",
       "compare": "Vergelijken",
       "comparing": "Bezig met vergelijken…",
-      "empty": "Nog geen configuratieversies. Ze verschijnen hier zodra een `terraform plan` uploadt of een VCS-push een uitvoering activeert.",
       "id": "ID",
       "source": "Bron",
       "status": "Status",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Run-triggers",
-      "description": "Wanneer een bronworkspace een apply voltooit, krijgen downstream-workspaces automatisch een nieuwe uitvoering in de wachtrij. Tot 20 bronworkspaces per bestemming.",
       "inboundHeading": "Bronworkspaces die hier uitvoeringen activeren",
       "inboundEmpty": "Geen bronworkspaces activeren uitvoeringen op deze workspace.",
       "pickerPlaceholder": "Zoek workspaces om als bron toe te voegen…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Kan variabele niet toevoegen ({status})",
       "deleteVariable": "Kan variabele niet verwijderen",
       "updateVariable": "Kan variabele niet bijwerken",
-      "queuePlan": "Kan plan niet in wachtrij zetten",
-      "queuePlanStatus": "Kan plan niet in wachtrij zetten ({status})",
       "queueDestroy": "Kan destroy niet in wachtrij zetten",
       "queueDestroyStatus": "Kan destroy niet in wachtrij zetten ({status})",
       "createNotification": "Kan notificatie niet aanmaken",

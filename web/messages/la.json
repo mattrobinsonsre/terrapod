@@ -70,7 +70,6 @@
       "agentPool": "Copia Actorum",
       "none": "Nullus",
       "autoApply": "Applicatio Automatica",
-      "autoApplyModeHint": "never: semper hominem exspecta. always: omne consilium prosperum applica. create / create/update: sola consilia iis actionibus circumscripta applica — numquam deletionem aut substitutionem.",
       "enabled": "Activatum",
       "workingDirectory": "Directorium Operandi",
       "workingDirectoryPlaceholder": "e.g. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI generatum",
     "heading": {
-      "planSummary": "Summarium consilii",
       "failureAnalysis": "Analysis defectus"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Regenerare",
       "queueing": "In ordinem ponitur…",
-      "tooltip": "Summarium AI contra eosdem ingressus consilii iterum curre",
       "ariaLabel": "Summarium AI regenerare",
       "confirm": "Analysin AI regenerare? Hoc modelum iterum currit.",
       "error": "Regenerari non potuit: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Consilium summatim redigitur…",
       "analysingFailure": "Defectus analysatur…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Nullae mutationes",
       "noChangesLower": "nullae mutationes",
-      "noChangesTitle": "Consilium nullas mutationes facultatum rettulit",
       "toAdd": "{count, plural, one {# addendum} other {# addenda}}",
       "toChange": "{count, plural, one {# mutandum} other {# mutanda}}",
       "toDestroy": "{count, plural, one {# destruendum} other {# destruenda}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Subsequens",
       "sharedThreadNote": "Unus filum communis, visibilis cuivis cum accessu legendi loci operis.",
-      "placeholder": "Roga quaestionem subsequentem de hoc consilio… (⌘/Ctrl + Enter ut mittas)",
       "send": "Mittere",
       "thinking": "Cogitatur…",
       "you": "Tu",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "locus operis",
     "backTo": "Retro ad {name}",
     "errorHeading": "Error",
-    "discardedHeading": "Reiectum — reconsilium requisitum",
     "common": {
       "yes": "Ita",
       "no": "Non"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "destructio",
-      "planOnly": "solum consilium",
       "savedPlan": "consilium servatum",
       "savedPlanHint": "Applicatio dilata: haec executio locum operis non tenet donec consilium servatum applicetur."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Retentare",
       "retryFull": "Exsecutionem Retentare",
       "retrying": "Retentatur…",
-      "confirmShort": "Applicare",
-      "confirmFull": "Confirmare et Applicare",
       "confirming": "Confirmatur…",
       "discard": "Reicere",
       "discarding": "Reicitur…",
@@ -2071,8 +2061,6 @@
       "queuing": "In ordinem mittitur…"
     },
     "confirm": {
-      "apply": "Hanc exsecutionem applicare? Hoc consilium applicat et infrastructuram mutat.",
-      "discard": "Hoc consilium reicere?",
       "cancel": "Hanc exsecutionem abrogare?",
       "retry": "Hanc exsecutionem retentare?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Graphum effectus",
       "cost": "Impensa",
       "costFull": "Aestimatio impensae",
-      "planLabel": "Consilium<log>Diarium</log>",
-      "applyLabel": "Applicatio<log>Diarium</log>",
-      "planFull": "Diarium consilii",
-      "applyFull": "Diarium applicationis",
       "details": "Particularia",
       "security": "Securitas",
       "securityFull": "Perscrutatio securitatis"
     },
     "banner": {
       "destroy": "Haec est exsecutio <strong>destructionis</strong> — omnes facultates administratae destruentur cum applicatur.",
-      "planOnlyCli": "Haec est exsecutio <strong>solum-consilii</strong> ex CLI in loco operis VCS-coniuncto incepta. Applicatio pro codice CLI-subdito non praesto est — solum codex VCS-administratus applicari potest.",
       "moduleOverridesPrefix": "Haec exsecutio <strong>substitutiones modulorum</strong> usurpat",
       "moduleOverridesFromPr": "e PR #{number}",
       "moduleOverridesSuffix": "e ramo PR petentur loco versionis tabularii editae."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Nullae mutationes",
-      "planning": "Consilium fit…",
       "toAdd": "addenda",
       "toChange": "mutanda",
       "toDestroy": "destruenda",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Instrumentum Exsecutionis",
       "source": "Fons",
       "autoApply": "Applicatio Automatica",
-      "planOnly": "Solum Consilium",
       "triggeredBy": "Concitatum a",
       "created": "Creatum",
       "commit": "Commissio",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Series Temporum",
       "queued": "In Ordine Positum",
-      "planningStarted": "Consilium inceptum",
-      "planComplete": "Consilium perfectum",
       "confirmed": "Confirmatum",
-      "applyingStarted": "Applicatio incepta",
-      "applied": "Applicatum",
       "errored": "Erratum",
       "canceled": "Abrogatum",
       "discarded": "Reiectum"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Caudam vivam sequi",
       "end": "Finis",
       "endTitle": "Ad finem diarii salire",
-      "planEmpty": "Nullus egressus consilii adhuc praesto.",
-      "applyEmpty": "Nullus egressus applicationis adhuc praesto.",
       "index": {
         "label": "Salire ad",
-        "title": "Salire ad mutationem rei aut ad summarium consilii",
-        "summary": "Summarium consilii",
         "action": {
           "create": "creare",
           "update": "renovare",
@@ -2218,13 +2191,11 @@
           "error": "erratum",
           "warning": "monitum"
         }
-      },
-      "applySkippedNoChanges": "Nulla applicatio acta est: consilium nullas mutationes habuit, itaque nihil applicandum erat."
+      }
     },
     "policyPanel": {
       "heading": "Probationes Regularum",
       "passedCount": "{passed}/{total} probata",
-      "blockedMessage": "Haec exsecutio <strong>a copia regularum obligatoria obstruitur</strong>. Non applicabitur donec defectus solvatur aut administrator eam supersedat.",
       "overriding": "Superseditur...",
       "overrideContinue": "Supersedere et Pergere",
       "overrideFailed": "Supersessio defecit",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Nihil in datis pretiorum his congruebat — genus non designatum, fons sine impensa directa, vel provisor nondum comprehensus.",
       "indicative": "Aestimationes indicativae sunt; impensa vera ab usu, regione, obligationibus et deductionibus pendet.",
       "asOfState": "secundum statum v{serial}",
-      "noState": "Nullus sumptus adhuc — post primam applicationem apparet.",
       "usageBand": "{dimension}: {typical} {unit} usitate (ambitus {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mens. usitate — {costLow}–{costHigh} inter {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Nulla criteria regulae congruunt.",
       "overriding": "Superseditur...",
       "overrideContinue": "Supersedere et Pergere",
-      "overrideConfirm": "Portam regulae AI supersedere et hanc executionem contra sententiam applicari sinere?",
       "overrideFailed": "Supersessio defecit",
       "overrideFailedStatus": "Supersessio defecit ({status})",
       "overriddenBy": "supersessum ab {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Ex originali in conspectu translatum."
     },
     "drift": {
-      "remediate": "Consilium + exsecutio",
-      "remediateTitle": "Cursum consilii + exsecutionis in ordinem mittere ut infrastructura configurationi rursus congruat",
-      "remediateConfirm": "Cursum consilii + exsecutionis pro hoc loco operis in ordinem mittere?",
       "remediateMessage": "Ex inspectione discrepantiae in ordinem missum",
       "remediateFailed": "Cursus correctionis in ordinem mitti non potuit"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",
-      "rbac": "Quisquis PR conflare potest applicare potest. Regulae protectionis ramorum (recognitiones requisitae, probationes status, approbatio dominorum codicis) fiunt porta. RBAC partium/titulorum Terrapod<em>non</em> applicatur ad actiones commentario-actas in hoc modo.",
-      "recommended": "<strong>Commendatum:</strong> historiam linearem require (rebase/squash ante conflationem) ut commissio quam applicas sit commissio quae terram tangit.",
       "credit": "Meritum: hic fluxus operis ad exemplar <atlantis>Atlantis</atlantis> conformatus est. Atlantis manet rectum instrumentum turmis quae solum applicationes PR-commentario-actas et nullam suggestus UI volunt."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Status Occlusionis",
-      "lockedDesc": "Hoc locus operis occlusum est. Nulla consilia nec applicationes currere possunt.",
       "unlockedDesc": "Hoc locus operis reseratum est et exsecutionibus paratum.",
       "lock": "Occludere",
       "unlock": "Reserare",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Vacua statum aberrationis relatum. Proxima inspectio ordinata eum ex realitate reimplebit.",
       "lastChecked": "Ultimo Inspectum",
       "checkNow": "Nunc Inspicere",
-      "checkNowTitle": "Exsecutionem solum-consilii in ordinem pone ut aberrationem inspicias",
       "checkNowTitleDisabled": "Prius inventionem aberrationis activa"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 dies"
     },
     "planExpiry": {
-      "title": "Exspiratio Consilii",
-      "description": "Automatice reice consilium non confirmatum ubi hoc antiquius est, ut consilium obsoletum contra mundum mutatum applicari non possit. Praedefinite deactivatum; consilium deinde iterum currendum est. (Applicatur solum ad exsecutiones applicationis-capaces.)",
       "expireAfter": "Exspirare post"
     },
     "aiSummary": {
       "title": "Summarium Consilii AI",
-      "description": "Summarium mutationum ab LLM automatice generatum, aestimatio periculi et analysis defectus in omni exitu phasis consilii huius loci operis.",
       "mode": "Modus",
       "modeDefault": "Praedefinitum instructionis sequi",
       "modeEnabled": "Semper summatim redigere",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Nuntiationes Slack",
-      "description": "Adscribe hoc locus operis ad nuntiationes exsecutionis Slack — petitiones approbationis, applicationes, errores et aberrationes. Relinque canalem vacuum et hoc locus operis silet (nulla per totam instructionem dispersio). Requirit ut app Slack ab administratore activetur.",
       "channel": "Canalis",
       "channelPlaceholder": "#deploys aut ID canalis (e.g. C0123ABCD)",
       "notSet": "Non positum — silens.",
@@ -2707,14 +2665,8 @@
       "options": "Optiones",
       "hideOptions": "Optiones Celare",
       "queueDestroy": "Destruere",
-      "queueDestroyTitle": "Consilium destructionis in ordinem pone",
       "destroyAllConfirm": "Omnes facultates destruere?",
       "confirmDestroy": "Destructionem Confirmare",
-      "queuePlan": "Consilium",
-      "queueRun": "Consilium + exsecutio",
-      "queuePlanConfirm": "Consilium speculativum huic loco operis in ordinem ponere?",
-      "queueApplyConfirm": "Exsecutionem plan + apply in ordinem ponere? Hoc infrastructuram mutare potest.",
-      "planOptions": "Optiones Consilii",
       "targetResources": "Facultates destinatas",
       "replaceResources": "Facultates substituere",
       "commaSeparated": "(commate seiuncta)",
@@ -2725,7 +2677,6 @@
       "branch": "Ramus",
       "tag": "Nota",
       "defaultBranch": "Praedefinitus ({branch})",
-      "nonDefaultRefNote": "Ref non-praedefinitum selectum — exsecutio solum-consilii erit",
       "empty": "Nullae adhuc exsecutiones huic loco operis.",
       "runId": "ID Exsecutionis",
       "status": "Status",
@@ -2736,12 +2687,8 @@
       "created": "Creatum",
       "needsConfirm": "confirmatione eget",
       "typeDestroy": "destructio",
-      "typePlanOnly": "solum consilium",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "probatio moduli",
       "sourceModulePublish": "editio moduli",
-      "queueApplyTitle": "Cursum consilii + exsecutionis in ordinem mittere",
-      "queueApplyRefBlocked": "Exsecutio non praesto est dum ramus, nota vel commissio electa est — ii cursus semper consilium solum sunt",
       "awaitingDecision": "decretum exspectat",
       "typeSavedPlan": "consilium servatum",
       "typeSavedPlanHint": "Applicatio dilata: haec executio locum operis non tenet donec consilium servatum applicetur."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 selectae",
       "compare": "Comparare",
       "comparing": "Comparatur…",
-      "empty": "Nullae adhuc versiones configurationis. Hic apparent statim atque `terraform plan` subdit aut impulsus VCS exsecutionem concitat.",
       "id": "ID",
       "source": "Fons",
       "status": "Status",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Concitatores Exsecutionis",
-      "description": "Cum locus operis fons applicationem perficit, loca operis subsequentia novam exsecutionem automatice in ordinem positam accipiunt. Usque ad 20 loca operis fontia per destinationem.",
       "inboundHeading": "Loca operis fontia quae exsecutiones hic concitant",
       "inboundEmpty": "Nulla loca operis fontia exsecutiones in hoc loco operis concitant.",
       "pickerPlaceholder": "Quaere loca operis ut fontem addas…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Variabilis addi non potuit ({status})",
       "deleteVariable": "Variabilis deleri non potuit",
       "updateVariable": "Variabilis renovari non potuit",
-      "queuePlan": "Consilium in ordinem poni non potuit",
-      "queuePlanStatus": "Consilium in ordinem poni non potuit ({status})",
       "queueDestroy": "Destructio in ordinem poni non potuit",
       "queueDestroyStatus": "Destructio in ordinem poni non potuit ({status})",
       "createNotification": "Nuntiatio creari non potuit",

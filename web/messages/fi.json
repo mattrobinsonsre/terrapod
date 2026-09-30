@@ -70,7 +70,6 @@
       "agentPool": "Agenttipooli",
       "none": "Ei mitään",
       "autoApply": "Automaattinen käyttöönotto",
-      "autoApplyModeHint": "never: odota aina ihmistä. always: toteuta jokainen onnistunut suunnitelma. create / create/update: toteuta vain niihin toimiin rajoittuvat suunnitelmat — ei koskaan poistoa tai korvausta.",
       "enabled": "Käytössä",
       "workingDirectory": "Työhakemisto",
       "workingDirectoryPlaceholder": "esim. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "Tekoälyn luoma",
     "heading": {
-      "planSummary": "Suunnitelman yhteenveto",
       "failureAnalysis": "Epäonnistumisanalyysi"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Luo uudelleen",
       "queueing": "Asetetaan jonoon…",
-      "tooltip": "Aja tekoälyn yhteenveto uudelleen samoilla suunnitelman syötteillä",
       "ariaLabel": "Luo tekoälyn yhteenveto uudelleen",
       "confirm": "Luodaanko tekoälyanalyysi uudelleen? Tämä ajaa mallin uudelleen.",
       "error": "Uudelleenluonti ei onnistunut: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Tehdään yhteenvetoa suunnitelmasta…",
       "analysingFailure": "Analysoidaan epäonnistumista…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Ei muutoksia",
       "noChangesLower": "ei muutoksia",
-      "noChangesTitle": "Suunnitelma ei raportoinut resurssimuutoksia",
       "toAdd": "{count, plural, one {# lisättävä} other {# lisättävää}}",
       "toChange": "{count, plural, one {# muutettava} other {# muutettavaa}}",
       "toDestroy": "{count, plural, one {# tuhottava} other {# tuhottavaa}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Jatkokysymys",
       "sharedThreadNote": "Yksi jaettu keskustelu, näkyvissä kaikille, joilla on työtilan lukuoikeus.",
-      "placeholder": "Kysy jatkokysymys tästä suunnitelmasta… (⌘/Ctrl + Enter lähettää)",
       "send": "Lähetä",
       "thinking": "Ajatellaan…",
       "you": "Sinä",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "työtila",
     "backTo": "Takaisin kohteeseen {name}",
     "errorHeading": "Virhe",
-    "discardedHeading": "Hylätty — uudelleensuunnittelu vaaditaan",
     "common": {
       "yes": "Kyllä",
       "no": "Ei"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "tuhoa",
-      "planOnly": "vain suunnittelu",
       "savedPlan": "tallennettu suunnitelma",
       "savedPlanHint": "Käyttöönotto lykätty: tämä ajo ei varaa työtilaa ennen kuin tallennettu suunnitelma otetaan käyttöön."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Yritä uudelleen",
       "retryFull": "Yritä ajoa uudelleen",
       "retrying": "Yritetään uudelleen…",
-      "confirmShort": "Ota käyttöön",
-      "confirmFull": "Vahvista ja ota käyttöön",
       "confirming": "Vahvistetaan…",
       "discard": "Hylkää",
       "discarding": "Hylätään…",
@@ -2071,8 +2061,6 @@
       "queuing": "Lisätään jonoon…"
     },
     "confirm": {
-      "apply": "Otetaanko tämä ajo käyttöön? Tämä ottaa suunnitelman käyttöön ja muuttaa infrastruktuuria.",
-      "discard": "Hylätäänkö tämä suunnitelma?",
       "cancel": "Perutaanko tämä ajo?",
       "retry": "Yritetäänkö tätä ajoa uudelleen?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Vaikutusgraafi",
       "cost": "Kustannus",
       "costFull": "Kustannusarvio",
-      "planLabel": "Suunnitelma<log>Loki</log>",
-      "applyLabel": "Käyttöönotto<log>Loki</log>",
-      "planFull": "Suunnitelmaloki",
-      "applyFull": "Käyttöönottoloki",
       "details": "Tiedot",
       "security": "Turvallisuus",
       "securityFull": "Turvatarkistus"
     },
     "banner": {
       "destroy": "Tämä on <strong>tuhoajo</strong> — kaikki hallitut resurssit tuhotaan käyttöönotettaessa.",
-      "planOnlyCli": "Tämä on <strong>vain suunnittelu</strong> -ajo, joka on aloitettu CLI:stä VCS-yhdistetyssä työtilassa. Käyttöönotto ei ole saatavilla CLI:llä ladatulle koodille — vain VCS:n hallinnoima koodi voidaan ottaa käyttöön.",
       "moduleOverridesPrefix": "Tämä ajo käyttää <strong>moduuliohituksia</strong>",
       "moduleOverridesFromPr": "PR:stä #{number}",
       "moduleOverridesSuffix": "haetaan PR-haarasta julkaistun rekisteriversion sijaan."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Ei muutoksia",
-      "planning": "Suunnitellaan…",
       "toAdd": "lisättävää",
       "toChange": "muutettavaa",
       "toDestroy": "tuhottavaa",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Suoritustausta",
       "source": "Lähde",
       "autoApply": "Automaattinen käyttöönotto",
-      "planOnly": "Vain suunnittelu",
       "triggeredBy": "Käynnistänyt",
       "created": "Luotu",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Aikajana",
       "queued": "Jonossa",
-      "planningStarted": "Suunnittelu aloitettu",
-      "planComplete": "Suunnitelma valmis",
       "confirmed": "Vahvistettu",
-      "applyingStarted": "Käyttöönotto aloitettu",
-      "applied": "Otettu käyttöön",
       "errored": "Virhe",
       "canceled": "Peruttu",
       "discarded": "Hylätty"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Seuraa reaaliaikaista häntää",
       "end": "Loppu",
       "endTitle": "Siirry lokin loppuun",
-      "planEmpty": "Suunnitelman tulostetta ei ole vielä saatavilla.",
-      "applyEmpty": "Käyttöönoton tulostetta ei ole vielä saatavilla.",
       "index": {
         "label": "Siirry",
-        "title": "Siirry resurssimuutokseen tai suunnitelman yhteenvetoon",
-        "summary": "Suunnitelman yhteenveto",
         "action": {
           "create": "luo",
           "update": "päivitä",
@@ -2218,13 +2191,11 @@
           "error": "virhe",
           "warning": "varoitus"
         }
-      },
-      "applySkippedNoChanges": "Käyttöönottoa ei ajettu: suunnitelmassa ei ollut muutoksia, joten mitään ei ollut otettavana käyttöön."
+      }
     },
     "policyPanel": {
       "heading": "Käytäntötarkistukset",
       "passedCount": "{passed}/{total} läpäisi",
-      "blockedMessage": "Tämä ajo on <strong>estetty pakollisen käytäntöjoukon toimesta</strong>. Sitä ei oteta käyttöön, ennen kuin epäonnistuminen ratkaistaan tai järjestelmänvalvoja ohittaa sen.",
       "overriding": "Ohitetaan...",
       "overrideContinue": "Ohita ja jatka",
       "overrideFailed": "Ohitus epäonnistui",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Hinnoittelutiedoista ei löytynyt vastaavuutta näille — kartoittamaton tyyppi, resurssi ilman suoraa kustannusta tai palveluntarjoaja, jota ei vielä tueta.",
       "indicative": "Arviot ovat suuntaa antavia; todellinen kustannus riippuu käytöstä, alueesta, sitoumuksista ja alennuksista.",
       "asOfState": "tilan v{serial} mukaan",
-      "noState": "Ei vielä kustannuksia — näkyy ensimmäisen käytön jälkeen.",
       "usageBand": "{dimension}: tyypillisesti {typical} {unit} (vaihteluväli {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/kk tyypillisesti — {costLow}–{costHigh} välillä {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Yksikään käytäntökriteeri ei täsmännyt.",
       "overriding": "Ohitetaan...",
       "overrideContinue": "Ohita ja jatka",
-      "overrideConfirm": "Ohitetaanko tekoälykäytäntöportti ja sallitaanko tämän ajon soveltaminen päätöksestä huolimatta?",
       "overrideFailed": "Ohitus epäonnistui",
       "overrideFailedStatus": "Ohitus epäonnistui ({status})",
       "overriddenBy": "ohittanut {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Käännetty alkuperäisestä katselun yhteydessä."
     },
     "drift": {
-      "remediate": "Plan + apply",
-      "remediateTitle": "Lisää plan + apply -ajo jonoon, jotta infrastruktuuri saadaan taas vastaamaan konfiguraatiota",
-      "remediateConfirm": "Lisätäänkö plan + apply -ajo jonoon tälle työtilalle?",
       "remediateMessage": "Lisätty jonoon poikkeamatarkistuksesta",
       "remediateFailed": "Korjausajoa ei voitu lisätä jonoon"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",
-      "rbac": "Kuka tahansa, joka voi yhdistää PR:n, voi ottaa käyttöön. Haaran suojaussäännöistä (vaaditut tarkastelut, tilatarkistukset, koodinomistajan hyväksyntä) tulee portti. Terrapod-roolien/-tunnisteiden RBAC<em>ei</em> koske kommenttivetoisia toimintoja tässä tilassa.",
-      "recommended": "<strong>Suositeltu:</strong> vaadi lineaarinen historia (rebase/squash ennen yhdistämistä), jotta käyttöönotettava commit on se commit, joka päätyy kohteeseen.",
       "credit": "Kiitokset: tämä työnkulku on mallinnettu <atlantis>Atlantis</atlantis>in mukaan. Atlantis on edelleen oikea työkalu tiimeille, jotka haluavat vain PR-kommenttivetoiset käyttöönotot eivätkä alustan käyttöliittymää."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Lukituksen tila",
-      "lockedDesc": "Tämä työtila on lukittu. Suunnitelmia tai käyttöönottoja ei voi suorittaa.",
       "unlockedDesc": "Tämä työtila on lukitsematon ja valmis ajoihin.",
       "lock": "Lukitse",
       "unlock": "Poista lukitus",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Tyhjennä raportoitu ajautumatila. Seuraava ajoitettu tarkistus täyttää sen uudelleen todellisuudesta.",
       "lastChecked": "Viimeksi tarkistettu",
       "checkNow": "Tarkista nyt",
-      "checkNowTitle": "Aseta jonoon vain suunnittelu -ajo ajautuman tarkistamiseksi",
       "checkNowTitleDisabled": "Ota ajautuman tunnistus ensin käyttöön"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 päivää"
     },
     "planExpiry": {
-      "title": "Suunnitelman vanheneminen",
-      "description": "Hylkää vahvistamaton suunnitelma automaattisesti, kun se on tätä vanhempi, jotta vanhentunutta suunnitelmaa ei voi ottaa käyttöön muuttunutta maailmaa vastaan. Oletuksena pois päältä; suunnitelma on tällöin ajettava uudelleen. (Koskee vain käyttöönottokykyisiä ajoja.)",
       "expireAfter": "Vanhene jälkeen"
     },
     "aiSummary": {
       "title": "Tekoälyn suunnitelmayhteenveto",
-      "description": "Automaattinen LLM:n luoma muutosyhteenveto, riskiarvio ja epäonnistumisanalyysi jokaisesta tämän työtilan suunnitteluvaiheen tuloksesta.",
       "mode": "Tila",
       "modeDefault": "Noudata käyttöönoton oletusta",
       "modeEnabled": "Tee aina yhteenveto",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack-ilmoitukset",
-      "description": "Ota tämä työtila mukaan Slack-ajoilmoituksiin — hyväksyntäpyynnöt, käyttöönotot, virheet ja ajautuma. Jätä kanava tyhjäksi, niin tämä työtila pysyy hiljaa (ei ole käyttöönottolaajuista jakelua). Vaatii, että järjestelmänvalvoja on ottanut Slack-sovelluksen käyttöön.",
       "channel": "Kanava",
       "channelPlaceholder": "#deploys tai kanavan ID (esim. C0123ABCD)",
       "notSet": "Ei asetettu — hiljainen.",
@@ -2707,14 +2665,8 @@
       "options": "Vaihtoehdot",
       "hideOptions": "Piilota vaihtoehdot",
       "queueDestroy": "Tuhoa",
-      "queueDestroyTitle": "Aseta tuhosuunnitelma jonoon",
       "destroyAllConfirm": "Tuhotaanko kaikki resurssit?",
       "confirmDestroy": "Vahvista tuhoaminen",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + apply",
-      "queuePlanConfirm": "Asetetaanko spekulatiivinen suunnitelma jonoon tälle työtilalle?",
-      "queueApplyConfirm": "Asetetaanko suunnittelu- + käyttöönottoajo jonoon? Tämä voi muuttaa infrastruktuuria.",
-      "planOptions": "Suunnitelman vaihtoehdot",
       "targetResources": "Kohderesurssit",
       "replaceResources": "Korvaa resurssit",
       "commaSeparated": "(pilkuin eroteltuna)",
@@ -2725,7 +2677,6 @@
       "branch": "Haara",
       "tag": "Tagi",
       "defaultBranch": "Oletus ({branch})",
-      "nonDefaultRefNote": "Ei-oletusviite valittu — ajo on vain suunnittelu",
       "empty": "Ei vielä ajoja tälle työtilalle.",
       "runId": "Ajon ID",
       "status": "Tila",
@@ -2736,12 +2687,8 @@
       "created": "Luotu",
       "needsConfirm": "vaatii vahvistuksen",
       "typeDestroy": "tuhoa",
-      "typePlanOnly": "vain suunnittelu",
-      "typePlanApply": "suunnittelu + käyttöönotto",
       "sourceModuleTest": "moduulitesti",
       "sourceModulePublish": "moduulijulkaisu",
-      "queueApplyTitle": "Lisää plan + apply -ajo jonoon",
-      "queueApplyRefBlocked": "Apply ei ole käytettävissä, kun haara, tunniste tai commit on valittuna — nämä ajot ovat aina vain plan",
       "awaitingDecision": "odottaa päätöstä",
       "typeSavedPlan": "tallennettu suunnitelma",
       "typeSavedPlanHint": "Käyttöönotto lykätty: tämä ajo ei varaa työtilaa ennen kuin tallennettu suunnitelma otetaan käyttöön."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 valittu",
       "compare": "Vertaa",
       "comparing": "Vertaillaan…",
-      "empty": "Ei vielä määritysversioita. Ne näkyvät tässä heti, kun `terraform plan` lataa tai VCS-työntö käynnistää ajon.",
       "id": "ID",
       "source": "Lähde",
       "status": "Tila",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Ajokäynnistimet",
-      "description": "Kun lähdetyötila suorittaa käyttöönoton loppuun, alavirran työtilat saavat automaattisesti uuden ajon jonoon. Enintään 20 lähdetyötilaa kohdetta kohti.",
       "inboundHeading": "Lähdetyötilat, jotka käynnistävät ajoja täällä",
       "inboundEmpty": "Yksikään lähdetyötila ei käynnistä ajoja tässä työtilassa.",
       "pickerPlaceholder": "Etsi lähteeksi lisättäviä työtiloja…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Muuttujan lisääminen epäonnistui ({status})",
       "deleteVariable": "Muuttujan poistaminen epäonnistui",
       "updateVariable": "Muuttujan päivittäminen epäonnistui",
-      "queuePlan": "Suunnitelman asettaminen jonoon epäonnistui",
-      "queuePlanStatus": "Suunnitelman asettaminen jonoon epäonnistui ({status})",
       "queueDestroy": "Tuhoamisen asettaminen jonoon epäonnistui",
       "queueDestroyStatus": "Tuhoamisen asettaminen jonoon epäonnistui ({status})",
       "createNotification": "Ilmoituksen luominen epäonnistui",

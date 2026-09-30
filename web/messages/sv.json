@@ -70,7 +70,6 @@
       "agentPool": "Agentpool",
       "none": "Ingen",
       "autoApply": "Auto-applicera",
-      "autoApplyModeHint": "never: vänta alltid på en människa. always: tillämpa varje lyckad plan. create / create/update: tillämpa endast planer begränsade till dessa åtgärder — aldrig en borttagning eller en ersättning.",
       "enabled": "Aktiverad",
       "workingDirectory": "Arbetskatalog",
       "workingDirectoryPlaceholder": "t.ex. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI-genererad",
     "heading": {
-      "planSummary": "Plansammanfattning",
       "failureAnalysis": "Felanalys"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Generera om",
       "queueing": "Köar…",
-      "tooltip": "Kör om AI-sammanfattningen mot samma planindata",
       "ariaLabel": "Generera om AI-sammanfattning",
       "confirm": "Generera om AI-analysen? Detta kör modellen igen.",
       "error": "Kunde inte generera om: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Sammanfattar plan…",
       "analysingFailure": "Analyserar fel…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Inga ändringar",
       "noChangesLower": "inga ändringar",
-      "noChangesTitle": "Planen rapporterade inga resursändringar",
       "toAdd": "{count, plural, one {# att lägga till} other {# att lägga till}}",
       "toChange": "{count, plural, one {# att ändra} other {# att ändra}}",
       "toDestroy": "{count, plural, one {# att förstöra} other {# att förstöra}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Uppföljning",
       "sharedThreadNote": "En delad tråd, synlig för alla med läsåtkomst till arbetsytan.",
-      "placeholder": "Ställ en uppföljningsfråga om denna plan… (⌘/Ctrl + Enter för att skicka)",
       "send": "Skicka",
       "thinking": "Tänker…",
       "you": "Du",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "arbetsyta",
     "backTo": "Tillbaka till {name}",
     "errorHeading": "Fel",
-    "discardedHeading": "Kasserad — omplanering krävs",
     "common": {
       "yes": "Ja",
       "no": "Nej"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "förstör",
-      "planOnly": "endast plan",
       "savedPlan": "sparad plan",
       "savedPlanHint": "Tillämpning uppskjuten: den här körningen håller inte arbetsytan förrän den sparade planen tillämpas."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Försök igen",
       "retryFull": "Kör körningen igen",
       "retrying": "Försöker igen…",
-      "confirmShort": "Applicera",
-      "confirmFull": "Bekräfta och applicera",
       "confirming": "Bekräftar…",
       "discard": "Kassera",
       "discarding": "Kasserar…",
@@ -2071,8 +2061,6 @@
       "queuing": "Köar…"
     },
     "confirm": {
-      "apply": "Applicera denna körning? Detta tillämpar planen och ändrar infrastruktur.",
-      "discard": "Kassera denna plan?",
       "cancel": "Avbryt denna körning?",
       "retry": "Kör denna körning igen?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Konsekvensgraf",
       "cost": "Kostnad",
       "costFull": "Kostnadsuppskattning",
-      "planLabel": "Plan<log>logg</log>",
-      "applyLabel": "Apply<log>logg</log>",
-      "planFull": "Plan-logg",
-      "applyFull": "Apply-logg",
       "details": "Detaljer",
       "security": "Säkerhet",
       "securityFull": "Säkerhetsskanning"
     },
     "banner": {
       "destroy": "Detta är en <strong>förstörelsekörning</strong> — alla hanterade resurser förstörs vid applicering.",
-      "planOnlyCli": "Detta är en <strong>endast-plan</strong>-körning initierad från CLI på en VCS-ansluten arbetsyta. Applicering är inte tillgänglig för CLI-uppladdad kod — endast VCS-hanterad kod kan appliceras.",
       "moduleOverridesPrefix": "Denna körning använder <strong>modulåsidosättanden</strong>",
       "moduleOverridesFromPr": "från PR #{number}",
       "moduleOverridesSuffix": "kommer att hämtas från PR-grenen istället för den publicerade registerversionen."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Inga ändringar",
-      "planning": "Planerar…",
       "toAdd": "att lägga till",
       "toChange": "att ändra",
       "toDestroy": "att förstöra",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Exekveringsbackend",
       "source": "Källa",
       "autoApply": "Auto-applicera",
-      "planOnly": "Endast plan",
       "triggeredBy": "Utlöst av",
       "created": "Skapad",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Tidslinje",
       "queued": "I kö",
-      "planningStarted": "Planering startad",
-      "planComplete": "Plan klar",
       "confirmed": "Bekräftad",
-      "applyingStarted": "Applicering startad",
-      "applied": "Applicerad",
       "errored": "Fel",
       "canceled": "Avbruten",
       "discarded": "Kasserad"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Följ livesvansen",
       "end": "Slut",
       "endTitle": "Hoppa till slutet av loggen",
-      "planEmpty": "Ingen planutdata tillgänglig ännu.",
-      "applyEmpty": "Ingen applicerings-utdata tillgänglig ännu.",
       "index": {
         "label": "Gå till",
-        "title": "Gå till en resursändring eller till planöversikten",
-        "summary": "Planöversikt",
         "action": {
           "create": "skapa",
           "update": "uppdatera",
@@ -2218,13 +2191,11 @@
           "error": "fel",
           "warning": "varning"
         }
-      },
-      "applySkippedNoChanges": "Ingen applicering kördes: planen hade inga ändringar, så det fanns inget att applicera."
+      }
     },
     "policyPanel": {
       "heading": "Policykontroller",
       "passedCount": "{passed}/{total} godkända",
-      "blockedMessage": "Denna körning är <strong>blockerad av en obligatorisk policyuppsättning</strong>. Den kommer inte att appliceras förrän felet är åtgärdat eller en admin åsidosätter den.",
       "overriding": "Åsidosätter...",
       "overrideContinue": "Åsidosätt och fortsätt",
       "overrideFailed": "Åsidosättning misslyckades",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Inget i prisdata matchade dessa — en icke mappad typ, en resurs utan direkt kostnad eller en leverantör som ännu inte stöds.",
       "indicative": "Uppskattningarna är vägledande; den faktiska kostnaden beror på användning, region, åtaganden och rabatter.",
       "asOfState": "enligt tillstånd v{serial}",
-      "noState": "Ingen kostnad ännu — visas efter första tillämpningen.",
       "usageBand": "{dimension}: {typical} {unit} typiskt (intervall {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mån typiskt — {costLow}–{costHigh} vid {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Inga policykriterier matchade.",
       "overriding": "Åsidosätter...",
       "overrideContinue": "Åsidosätt och fortsätt",
-      "overrideConfirm": "Åsidosätt AI-policygrinden och låt körningen tillämpas trots utlåtandet?",
       "overrideFailed": "Åsidosättning misslyckades",
       "overrideFailedStatus": "Åsidosättning misslyckades ({status})",
       "overriddenBy": "åsidosatt av {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Översatt från originalet vid visning."
     },
     "drift": {
-      "remediate": "Plan + apply",
-      "remediateTitle": "Köa en plan + apply-körning för att åter få infrastrukturen i linje med konfigurationen",
-      "remediateConfirm": "Köa en plan + apply-körning för denna arbetsyta?",
       "remediateMessage": "Köad från en avvikelsekontroll",
       "remediateFailed": "Kunde inte köa rättningskörningen"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",
-      "rbac": "Alla som kan merga PR:en kan applicera. Grenskyddsregler (obligatoriska granskningar, statuskontroller, godkännande av kodägare) blir grinden. Terrapods roll-/etikett-RBAC gäller<em>inte</em> för kommentarsdrivna åtgärder i detta läge.",
-      "recommended": "<strong>Rekommenderat:</strong> kräv linjär historik (rebase/squash före merge) så att den commit du applicerar är den commit som landar.",
       "credit": "Erkännande: detta arbetsflöde är modellerat på <atlantis>Atlantis</atlantis>. Atlantis förblir rätt verktyg för team som bara vill ha PR-kommentarsdrivna appliceringar och inget plattforms-UI."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Låsstatus",
-      "lockedDesc": "Denna arbetsyta är låst. Inga planer eller appliceringar kan köras.",
       "unlockedDesc": "Denna arbetsyta är olåst och redo för körningar.",
       "lock": "Lås",
       "unlock": "Lås upp",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Rensa det rapporterade drifttillståndet. Nästa schemalagda kontroll återfyller det från verkligheten.",
       "lastChecked": "Senast kontrollerad",
       "checkNow": "Kontrollera nu",
-      "checkNowTitle": "Köa en endast-plan-körning för att kontrollera drift",
       "checkNowTitleDisabled": "Aktivera driftupptäckt först"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 dagar"
     },
     "planExpiry": {
-      "title": "Planutgång",
-      "description": "Kassera automatiskt en obekräftad plan när den är äldre än detta, så att en föråldrad plan inte kan appliceras mot en förändrad värld. Av som standard; planen måste då köras om. (Gäller endast appliceringsbara körningar.)",
       "expireAfter": "Går ut efter"
     },
     "aiSummary": {
       "title": "AI-plansammanfattning",
-      "description": "Automatisk LLM-genererad ändringssammanfattning, riskbedömning och felanalys vid varje planfasresultat för denna arbetsyta.",
       "mode": "Läge",
       "modeDefault": "Följ deploymentstandard",
       "modeEnabled": "Sammanfatta alltid",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack-aviseringar",
-      "description": "Anmäl denna arbetsyta till Slack-körningsaviseringar — godkännandeförfrågningar, appliceringar, fel och drift. Lämna kanalen tom så förblir denna arbetsyta tyst (det finns ingen deploymentomfattande utsändning). Kräver att Slack-appen aktiverats av en administratör.",
       "channel": "Kanal",
       "channelPlaceholder": "#deploys eller ett kanal-ID (t.ex. C0123ABCD)",
       "notSet": "Ej angiven — tyst.",
@@ -2707,14 +2665,8 @@
       "options": "Alternativ",
       "hideOptions": "Dölj alternativ",
       "queueDestroy": "Förstör",
-      "queueDestroyTitle": "Köa en förstörelseplan",
       "destroyAllConfirm": "Förstör alla resurser?",
       "confirmDestroy": "Bekräfta förstörelse",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + apply",
-      "queuePlanConfirm": "Köa en spekulativ plan för denna arbetsyta?",
-      "queueApplyConfirm": "Köa en plan- + apply-körning? Detta kan ändra infrastruktur.",
-      "planOptions": "Planalternativ",
       "targetResources": "Målresurser",
       "replaceResources": "Ersätt resurser",
       "commaSeparated": "(kommaseparerat)",
@@ -2725,7 +2677,6 @@
       "branch": "Gren",
       "tag": "Tagg",
       "defaultBranch": "Standard ({branch})",
-      "nonDefaultRefNote": "Icke-standardref vald — körningen blir endast-plan",
       "empty": "Inga körningar ännu för denna arbetsyta.",
       "runId": "Körnings-ID",
       "status": "Status",
@@ -2736,12 +2687,8 @@
       "created": "Skapad",
       "needsConfirm": "behöver bekräftas",
       "typeDestroy": "förstör",
-      "typePlanOnly": "endast plan",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "modultest",
       "sourceModulePublish": "modulpublicering",
-      "queueApplyTitle": "Köa en plan + apply-körning",
-      "queueApplyRefBlocked": "Apply är otillgängligt medan en gren, tagg eller commit är vald — de körningarna är alltid endast plan",
       "awaitingDecision": "väntar på beslut",
       "typeSavedPlan": "sparad plan",
       "typeSavedPlanHint": "Tillämpning uppskjuten: den här körningen håller inte arbetsytan förrän den sparade planen tillämpas."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 valda",
       "compare": "Jämför",
       "comparing": "Jämför…",
-      "empty": "Inga konfigurationsversioner ännu. De visas här så snart en `terraform plan` laddar upp eller en VCS-push utlöser en körning.",
       "id": "ID",
       "source": "Källa",
       "status": "Status",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Körningsutlösare",
-      "description": "När en källarbetsyta slutför en applicering får nedströmsarbetsytor automatiskt en ny körning köad. Upp till 20 källarbetsytor per destination.",
       "inboundHeading": "Källarbetsytor som utlöser körningar här",
       "inboundEmpty": "Inga källarbetsytor utlöser körningar på denna arbetsyta.",
       "pickerPlaceholder": "Sök arbetsytor att lägga till som källa…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Det gick inte att lägga till variabeln ({status})",
       "deleteVariable": "Det gick inte att ta bort variabeln",
       "updateVariable": "Det gick inte att uppdatera variabeln",
-      "queuePlan": "Det gick inte att köa planen",
-      "queuePlanStatus": "Det gick inte att köa planen ({status})",
       "queueDestroy": "Det gick inte att köa förstörelsen",
       "queueDestroyStatus": "Det gick inte att köa förstörelsen ({status})",
       "createNotification": "Det gick inte att skapa aviseringen",

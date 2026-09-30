@@ -70,7 +70,6 @@
       "agentPool": "代理池",
       "none": "無",
       "autoApply": "自動應用",
-      "autoApplyModeHint": "never：一律等待人工確認。always：套用每一個成功的計畫。create / create/update：只套用僅限於這些操作的計畫——絕不套用銷毀或取代。",
       "enabled": "已啟用",
       "workingDirectory": "工作目錄",
       "workingDirectoryPlaceholder": "例如 environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI 生成",
     "heading": {
-      "planSummary": "計畫摘要",
       "failureAnalysis": "失敗分析"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "重新生成",
       "queueing": "正在排隊…",
-      "tooltip": "針對相同的計畫輸入重新執行 AI 摘要",
       "ariaLabel": "重新生成 AI 摘要",
       "confirm": "重新生成 AI 分析？這將再次執行模型。",
       "error": "無法重新生成：<mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "正在摘要計畫…",
       "analysingFailure": "正在分析失敗…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "無更改",
       "noChangesLower": "無更改",
-      "noChangesTitle": "計畫報告沒有資源更改",
       "toAdd": "{count, plural, one {# 項待新增} other {# 項待新增}}",
       "toChange": "{count, plural, one {# 項待更改} other {# 項待更改}}",
       "toDestroy": "{count, plural, one {# 項待銷毀} other {# 項待銷毀}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "追問",
       "sharedThreadNote": "一個共享執行緒，對任何具有工作區讀取權限的人可見。",
-      "placeholder": "就此計畫提一個追問… （⌘/Ctrl + Enter 傳送）",
       "send": "傳送",
       "thinking": "正在思考…",
       "you": "你",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "工作區",
     "backTo": "返回 {name}",
     "errorHeading": "錯誤",
-    "discardedHeading": "已丟棄 — 需要重新計畫",
     "common": {
       "yes": "是",
       "no": "否"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "銷毀",
-      "planOnly": "僅計畫",
       "savedPlan": "已儲存的計畫",
       "savedPlanHint": "套用已延後：在套用已儲存的計畫之前，此執行不會佔用工作區。"
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "重試",
       "retryFull": "重試執行",
       "retrying": "正在重試…",
-      "confirmShort": "應用",
-      "confirmFull": "確認並應用",
       "confirming": "正在確認…",
       "discard": "丟棄",
       "discarding": "正在丟棄…",
@@ -2071,8 +2061,6 @@
       "queuing": "正在加入佇列…"
     },
     "confirm": {
-      "apply": "應用此執行？這將應用計畫並更改基礎設施。",
-      "discard": "丟棄此計畫？",
       "cancel": "取消此執行？",
       "retry": "重試此執行？"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "影響圖",
       "cost": "成本",
       "costFull": "成本估算",
-      "planLabel": "計畫<log>日誌</log>",
-      "applyLabel": "應用<log>日誌</log>",
-      "planFull": "計畫日誌",
-      "applyFull": "應用日誌",
       "details": "詳情",
       "security": "安全",
       "securityFull": "安全掃描"
     },
     "banner": {
       "destroy": "這是一次<strong>銷毀</strong>執行 — 應用時所有受管理的資源都將被銷毀。",
-      "planOnlyCli": "這是從 CLI 在已連線 VCS 的工作區上發起的<strong>僅計畫</strong>執行。對於 CLI 上傳的程式碼不可應用 — 只有 VCS 管理的程式碼才能被應用。",
       "moduleOverridesPrefix": "此執行使用<strong>模組覆蓋</strong>",
       "moduleOverridesFromPr": "來自 PR #{number}",
       "moduleOverridesSuffix": "將從 PR 分支而非已釋出的登錄庫版本獲取。"
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "無更改",
-      "planning": "正在計畫…",
       "toAdd": "待新增",
       "toChange": "待更改",
       "toDestroy": "待銷毀",
@@ -2157,7 +2139,6 @@
       "executionBackend": "執行後端",
       "source": "來源",
       "autoApply": "自動應用",
-      "planOnly": "僅計畫",
       "triggeredBy": "觸發者",
       "created": "建立時間",
       "commit": "提交",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "時間線",
       "queued": "已排隊",
-      "planningStarted": "計畫已開始",
-      "planComplete": "計畫已完成",
       "confirmed": "已確認",
-      "applyingStarted": "應用已開始",
-      "applied": "已應用",
       "errored": "已出錯",
       "canceled": "已取消",
       "discarded": "已丟棄"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "跟隨實時尾部",
       "end": "末尾",
       "endTitle": "跳轉到日誌末尾",
-      "planEmpty": "暫無可用的計畫輸出。",
-      "applyEmpty": "暫無可用的應用輸出。",
       "index": {
         "label": "跳至",
-        "title": "跳至資源變更或計畫摘要",
-        "summary": "計畫摘要",
         "action": {
           "create": "建立",
           "update": "更新",
@@ -2218,13 +2191,11 @@
           "error": "錯誤",
           "warning": "警告"
         }
-      },
-      "applySkippedNoChanges": "未執行套用：計畫中沒有變更，因此無需套用。"
+      }
     },
     "policyPanel": {
       "heading": "策略檢查",
       "passedCount": "{passed}/{total} 已透過",
-      "blockedMessage": "此執行<strong>被強制策略集阻止</strong>。在失敗得到解決或管理員覆蓋之前，它不會應用。",
       "overriding": "正在覆蓋...",
       "overrideContinue": "覆蓋並繼續",
       "overrideFailed": "覆蓋失敗",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "定價資料中沒有與這些資源相符的項目——未對應的類型、沒有直接成本的資源，或尚未支援的供應商。",
       "indicative": "估算僅供參考；實際成本取決於使用量、區域、承諾用量與折扣。",
       "asOfState": "截至狀態 v{serial}",
-      "noState": "尚無成本 — 首次套用後顯示。",
       "usageBand": "{dimension}：典型 {typical} {unit}（範圍 {low}–{high}）",
       "usageBandCost": "{dimension}：典型 {costTypical}/月 — {low}–{high} {unit} 區間 {costLow}–{costHigh}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "沒有相符的政策準則。",
       "overriding": "正在覆蓋...",
       "overrideContinue": "覆蓋並繼續",
-      "overrideConfirm": "覆寫 AI 政策閘門並允許此執行在存在裁定的情況下套用？",
       "overrideFailed": "覆蓋失敗",
       "overrideFailedStatus": "覆蓋失敗（{status}）",
       "overriddenBy": "由 {by} 覆蓋"
@@ -2410,9 +2379,6 @@
       "translatedNote": "檢視時從原文翻譯。"
     },
     "drift": {
-      "remediate": "計畫 + 套用",
-      "remediateTitle": "將計畫 + 套用執行加入佇列，使基礎架構重新與組態一致",
-      "remediateConfirm": "要為此工作區加入計畫 + 套用執行嗎？",
       "remediateMessage": "由偏移檢查加入佇列",
       "remediateFailed": "無法將修復執行加入佇列"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",
-      "rbac": "任何能夠合併 PR 的人都可以應用。分支保護規則（必需的審查、狀態檢查、程式碼所有者批准）成為把關。在此模式下，Terrapod 的角色/標籤 RBAC <em>不</em>適用於由評論驅動的操作。",
-      "recommended": "<strong>建議：</strong>要求線性歷史（合併前進行 rebase/squash），以便您應用的提交就是最終落地的提交。",
       "credit": "致謝：此工作流參照 <atlantis>Atlantis</atlantis> 設計。對於只需要 PR 評論驅動應用、不需要平台 UI 的團隊，Atlantis 仍是合適的工具。"
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "鎖定狀態",
-      "lockedDesc": "此工作區已鎖定。無法執行任何計畫或應用。",
       "unlockedDesc": "此工作區已解鎖，可供執行。",
       "lock": "鎖定",
       "unlock": "解鎖",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "清除已報告的漂移狀態。下次計畫檢查將根據實際情況重新填充它。",
       "lastChecked": "上次檢查",
       "checkNow": "立即檢查",
-      "checkNowTitle": "排隊一次僅計畫執行以檢查漂移",
       "checkNowTitleDisabled": "請先啟用漂移檢測"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 天"
     },
     "planExpiry": {
-      "title": "計畫過期",
-      "description": "當未確認的計畫超過此時長後自動丟棄，以防止過時的計畫針對已變化的環境被應用。預設關閉；關閉時計畫必須重新執行。（僅適用於可應用的執行。）",
       "expireAfter": "過期時長"
     },
     "aiSummary": {
       "title": "AI 計畫摘要",
-      "description": "對此工作區每個計畫階段的結果自動生成由 LLM 編寫的更改摘要、風險評估和失敗分析。",
       "mode": "模式",
       "modeDefault": "遵循部署預設設定",
       "modeEnabled": "始終摘要",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack 通知",
-      "description": "讓此工作區選擇接收 Slack 執行通知 — 審批請求、應用、錯誤和漂移。將頻道留空則此工作區保持靜默（沒有部署級扇出）。需要管理員啟用 Slack 應用。",
       "channel": "頻道",
       "channelPlaceholder": "#deploys 或頻道 ID（例如 C0123ABCD）",
       "notSet": "未設定 — 靜默。",
@@ -2707,14 +2665,8 @@
       "options": "選項",
       "hideOptions": "隱藏選項",
       "queueDestroy": "銷毀",
-      "queueDestroyTitle": "排隊一次銷毀計畫",
       "destroyAllConfirm": "銷毀所有資源？",
       "confirmDestroy": "確認銷毀",
-      "queuePlan": "計畫",
-      "queueRun": "計畫 + 套用",
-      "queuePlanConfirm": "為此工作區排隊一次推測性計畫？",
-      "queueApplyConfirm": "排隊一次 plan + apply 執行？這可能會更改基礎設施。",
-      "planOptions": "計畫選項",
       "targetResources": "目標資源",
       "replaceResources": "替換資源",
       "commaSeparated": "（逗號分隔）",
@@ -2725,7 +2677,6 @@
       "branch": "分支",
       "tag": "標籤",
       "defaultBranch": "預設（{branch}）",
-      "nonDefaultRefNote": "已選擇非預設引用 — 執行將僅計畫",
       "empty": "此工作區暫無執行。",
       "runId": "執行 ID",
       "status": "狀態",
@@ -2736,12 +2687,8 @@
       "created": "建立時間",
       "needsConfirm": "需要確認",
       "typeDestroy": "銷毀",
-      "typePlanOnly": "僅計畫",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "模組測試",
       "sourceModulePublish": "模組釋出",
-      "queueApplyTitle": "將計畫 + 套用執行加入佇列",
-      "queueApplyRefBlocked": "選取分支、標籤或提交時無法套用——這些執行一律僅為計畫",
       "awaitingDecision": "等待決定",
       "typeSavedPlan": "已儲存的計畫",
       "typeSavedPlanHint": "套用已延後：在套用已儲存的計畫之前，此執行不會佔用工作區。"
@@ -2773,7 +2720,6 @@
       "selectedCount": "已選擇 {count}/2",
       "compare": "比較",
       "comparing": "正在比較…",
-      "empty": "暫無配置版本。當 `terraform plan` 上傳或 VCS 推送觸發執行時，它們會立即在此處顯示。",
       "id": "ID",
       "source": "來源",
       "status": "狀態",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "執行觸發器",
-      "description": "當源工作區完成一次應用時，下游工作區會自動排隊一次新執行。每個目標最多 20 個源工作區。",
       "inboundHeading": "在此處觸發執行的源工作區",
       "inboundEmpty": "沒有源工作區在此工作區上觸發執行。",
       "pickerPlaceholder": "搜尋要新增為源的工作區…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "新增變數失敗（{status}）",
       "deleteVariable": "刪除變數失敗",
       "updateVariable": "更新變數失敗",
-      "queuePlan": "排隊計畫失敗",
-      "queuePlanStatus": "排隊計畫失敗（{status}）",
       "queueDestroy": "排隊銷毀失敗",
       "queueDestroyStatus": "排隊銷毀失敗（{status}）",
       "createNotification": "建立通知失敗",

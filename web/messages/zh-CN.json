@@ -70,7 +70,6 @@
       "agentPool": "代理池",
       "none": "无",
       "autoApply": "自动应用",
-      "autoApplyModeHint": "never：始终等待人工确认。always：应用每一个成功的计划。create / create/update：只应用仅限于这些操作的计划——绝不应用销毁或替换。",
       "enabled": "已启用",
       "workingDirectory": "工作目录",
       "workingDirectoryPlaceholder": "例如 environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI 生成",
     "heading": {
-      "planSummary": "计划摘要",
       "failureAnalysis": "失败分析"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "重新生成",
       "queueing": "正在排队…",
-      "tooltip": "针对相同的计划输入重新运行 AI 摘要",
       "ariaLabel": "重新生成 AI 摘要",
       "confirm": "重新生成 AI 分析？这将再次运行模型。",
       "error": "无法重新生成：<mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "正在摘要计划…",
       "analysingFailure": "正在分析失败…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "无更改",
       "noChangesLower": "无更改",
-      "noChangesTitle": "计划报告没有资源更改",
       "toAdd": "{count, plural, one {# 项待新增} other {# 项待新增}}",
       "toChange": "{count, plural, one {# 项待更改} other {# 项待更改}}",
       "toDestroy": "{count, plural, one {# 项待销毁} other {# 项待销毁}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "追问",
       "sharedThreadNote": "一个共享线程，对任何具有工作区读取权限的人可见。",
-      "placeholder": "就此计划提一个追问… （⌘/Ctrl + Enter 发送）",
       "send": "发送",
       "thinking": "正在思考…",
       "you": "你",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "工作区",
     "backTo": "返回 {name}",
     "errorHeading": "错误",
-    "discardedHeading": "已丢弃 — 需要重新计划",
     "common": {
       "yes": "是",
       "no": "否"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "销毁",
-      "planOnly": "仅计划",
       "savedPlan": "已保存的计划",
       "savedPlanHint": "应用已延迟：在应用已保存的计划之前，此运行不会占用工作区。"
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "重试",
       "retryFull": "重试运行",
       "retrying": "正在重试…",
-      "confirmShort": "应用",
-      "confirmFull": "确认并应用",
       "confirming": "正在确认…",
       "discard": "丢弃",
       "discarding": "正在丢弃…",
@@ -2071,8 +2061,6 @@
       "queuing": "正在加入队列…"
     },
     "confirm": {
-      "apply": "应用此运行？这将应用计划并更改基础设施。",
-      "discard": "丢弃此计划？",
       "cancel": "取消此运行？",
       "retry": "重试此运行？"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "影响图",
       "cost": "成本",
       "costFull": "成本估算",
-      "planLabel": "计划<log>日志</log>",
-      "applyLabel": "应用<log>日志</log>",
-      "planFull": "计划日志",
-      "applyFull": "应用日志",
       "details": "详情",
       "security": "安全",
       "securityFull": "安全扫描"
     },
     "banner": {
       "destroy": "这是一次<strong>销毁</strong>运行 — 应用时所有受管理的资源都将被销毁。",
-      "planOnlyCli": "这是从 CLI 在已连接 VCS 的工作区上发起的<strong>仅计划</strong>运行。对于 CLI 上传的代码不可应用 — 只有 VCS 管理的代码才能被应用。",
       "moduleOverridesPrefix": "此运行使用<strong>模块覆盖</strong>",
       "moduleOverridesFromPr": "来自 PR #{number}",
       "moduleOverridesSuffix": "将从 PR 分支而非已发布的注册表版本获取。"
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "无更改",
-      "planning": "正在计划…",
       "toAdd": "待新增",
       "toChange": "待更改",
       "toDestroy": "待销毁",
@@ -2157,7 +2139,6 @@
       "executionBackend": "执行后端",
       "source": "来源",
       "autoApply": "自动应用",
-      "planOnly": "仅计划",
       "triggeredBy": "触发者",
       "created": "创建时间",
       "commit": "提交",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "时间线",
       "queued": "已排队",
-      "planningStarted": "计划已开始",
-      "planComplete": "计划已完成",
       "confirmed": "已确认",
-      "applyingStarted": "应用已开始",
-      "applied": "已应用",
       "errored": "已出错",
       "canceled": "已取消",
       "discarded": "已丢弃"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "跟随实时尾部",
       "end": "末尾",
       "endTitle": "跳转到日志末尾",
-      "planEmpty": "暂无可用的计划输出。",
-      "applyEmpty": "暂无可用的应用输出。",
       "index": {
         "label": "跳转到",
-        "title": "跳转到资源变更或计划摘要",
-        "summary": "计划摘要",
         "action": {
           "create": "创建",
           "update": "更新",
@@ -2218,13 +2191,11 @@
           "error": "错误",
           "warning": "警告"
         }
-      },
-      "applySkippedNoChanges": "未执行应用：计划中没有变更，因此无需应用。"
+      }
     },
     "policyPanel": {
       "heading": "策略检查",
       "passedCount": "{passed}/{total} 已通过",
-      "blockedMessage": "此运行<strong>被强制策略集阻止</strong>。在失败得到解决或管理员覆盖之前，它不会应用。",
       "overriding": "正在覆盖...",
       "overrideContinue": "覆盖并继续",
       "overrideFailed": "覆盖失败",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "定价数据中没有与这些资源匹配的项——未映射的类型、无直接成本的资源，或尚未支持的提供商。",
       "indicative": "估算仅供参考；实际成本取决于使用量、区域、承诺用量和折扣。",
       "asOfState": "截至状态 v{serial}",
-      "noState": "暂无成本 — 首次应用后显示。",
       "usageBand": "{dimension}：典型 {typical} {unit}（范围 {low}–{high}）",
       "usageBandCost": "{dimension}：典型 {costTypical}/月 — {low}–{high} {unit} 区间 {costLow}–{costHigh}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "没有匹配的策略标准。",
       "overriding": "正在覆盖...",
       "overrideContinue": "覆盖并继续",
-      "overrideConfirm": "覆盖 AI 策略门禁并允许此运行在存在裁定的情况下应用？",
       "overrideFailed": "覆盖失败",
       "overrideFailedStatus": "覆盖失败（{status}）",
       "overriddenBy": "由 {by} 覆盖"
@@ -2410,9 +2379,6 @@
       "translatedNote": "查看时从原文翻译。"
     },
     "drift": {
-      "remediate": "计划 + 应用",
-      "remediateTitle": "将计划 + 应用运行加入队列，使基础设施重新与配置一致",
-      "remediateConfirm": "要为此工作区加入计划 + 应用运行吗？",
       "remediateMessage": "由漂移检查加入队列",
       "remediateFailed": "无法将修复运行加入队列"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",
-      "rbac": "任何能够合并 PR 的人都可以应用。分支保护规则（必需的审查、状态检查、代码所有者批准）成为把关。在此模式下，Terrapod 的角色/标签 RBAC <em>不</em>适用于由评论驱动的操作。",
-      "recommended": "<strong>建议：</strong>要求线性历史（合并前进行 rebase/squash），以便您应用的提交就是最终落地的提交。",
       "credit": "致谢：此工作流参照 <atlantis>Atlantis</atlantis> 设计。对于只需要 PR 评论驱动应用、不需要平台 UI 的团队，Atlantis 仍是合适的工具。"
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "锁定状态",
-      "lockedDesc": "此工作区已锁定。无法运行任何计划或应用。",
       "unlockedDesc": "此工作区已解锁，可供运行。",
       "lock": "锁定",
       "unlock": "解锁",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "清除已报告的漂移状态。下次计划检查将根据实际情况重新填充它。",
       "lastChecked": "上次检查",
       "checkNow": "立即检查",
-      "checkNowTitle": "排队一次仅计划运行以检查漂移",
       "checkNowTitleDisabled": "请先启用漂移检测"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 天"
     },
     "planExpiry": {
-      "title": "计划过期",
-      "description": "当未确认的计划超过此时长后自动丢弃，以防止过时的计划针对已变化的环境被应用。默认关闭；关闭时计划必须重新运行。（仅适用于可应用的运行。）",
       "expireAfter": "过期时长"
     },
     "aiSummary": {
       "title": "AI 计划摘要",
-      "description": "对此工作区每个计划阶段的结果自动生成由 LLM 编写的更改摘要、风险评估和失败分析。",
       "mode": "模式",
       "modeDefault": "遵循部署默认设置",
       "modeEnabled": "始终摘要",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack 通知",
-      "description": "让此工作区选择接收 Slack 运行通知 — 审批请求、应用、错误和漂移。将频道留空则此工作区保持静默（没有部署级扇出）。需要管理员启用 Slack 应用。",
       "channel": "频道",
       "channelPlaceholder": "#deploys 或频道 ID（例如 C0123ABCD）",
       "notSet": "未设置 — 静默。",
@@ -2707,14 +2665,8 @@
       "options": "选项",
       "hideOptions": "隐藏选项",
       "queueDestroy": "销毁",
-      "queueDestroyTitle": "排队一次销毁计划",
       "destroyAllConfirm": "销毁所有资源？",
       "confirmDestroy": "确认销毁",
-      "queuePlan": "计划",
-      "queueRun": "计划 + 应用",
-      "queuePlanConfirm": "为此工作区排队一次推测性计划？",
-      "queueApplyConfirm": "排队一次 plan + apply 运行？这可能会更改基础设施。",
-      "planOptions": "计划选项",
       "targetResources": "目标资源",
       "replaceResources": "替换资源",
       "commaSeparated": "（逗号分隔）",
@@ -2725,7 +2677,6 @@
       "branch": "分支",
       "tag": "标签",
       "defaultBranch": "默认（{branch}）",
-      "nonDefaultRefNote": "已选择非默认引用 — 运行将仅计划",
       "empty": "此工作区暂无运行。",
       "runId": "运行 ID",
       "status": "状态",
@@ -2736,12 +2687,8 @@
       "created": "创建时间",
       "needsConfirm": "需要确认",
       "typeDestroy": "销毁",
-      "typePlanOnly": "仅计划",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "模块测试",
       "sourceModulePublish": "模块发布",
-      "queueApplyTitle": "将计划 + 应用运行加入队列",
-      "queueApplyRefBlocked": "选择分支、标签或提交时无法应用——这些运行始终仅为计划",
       "awaitingDecision": "等待决定",
       "typeSavedPlan": "已保存的计划",
       "typeSavedPlanHint": "应用已延迟：在应用已保存的计划之前，此运行不会占用工作区。"
@@ -2773,7 +2720,6 @@
       "selectedCount": "已选择 {count}/2",
       "compare": "比较",
       "comparing": "正在比较…",
-      "empty": "暂无配置版本。当 `terraform plan` 上传或 VCS 推送触发运行时，它们会立即在此处显示。",
       "id": "ID",
       "source": "来源",
       "status": "状态",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "运行触发器",
-      "description": "当源工作区完成一次应用时，下游工作区会自动排队一次新运行。每个目标最多 20 个源工作区。",
       "inboundHeading": "在此处触发运行的源工作区",
       "inboundEmpty": "没有源工作区在此工作区上触发运行。",
       "pickerPlaceholder": "搜索要添加为源的工作区…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "添加变量失败（{status}）",
       "deleteVariable": "删除变量失败",
       "updateVariable": "更新变量失败",
-      "queuePlan": "排队计划失败",
-      "queuePlanStatus": "排队计划失败（{status}）",
       "queueDestroy": "排队销毁失败",
       "queueDestroyStatus": "排队销毁失败（{status}）",
       "createNotification": "创建通知失败",

@@ -70,7 +70,6 @@
       "agentPool": "Agent Crew",
       "none": "None",
       "autoApply": "Auto Apply",
-      "autoApplyModeHint": "never: always await a livin'' soul. always: apply every plan that sails true. create / create/update: apply only plans holdin'' to those deeds — never a scuttlin'' nor a swappin''.",
       "enabled": "Enabled",
       "workingDirectory": "Workin'' Directory",
       "workingDirectoryPlaceholder": "e.g. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI conjured",
     "heading": {
-      "planSummary": "Plan summary",
       "failureAnalysis": "Failure analysis"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Conjure anew",
       "queueing": "In th'' queue…",
-      "tooltip": "Re-run th'' AI summary against th'' same plan inputs",
       "ariaLabel": "Conjure th'' AI summary anew",
       "confirm": "Conjure th'' AI analysis anew? This runs th'' model again.",
       "error": "Could nay conjure anew: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Summarizin'' plan…",
       "analysingFailure": "Analysin'' th'' failure…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Nay changes",
       "noChangesLower": "nay changes",
-      "noChangesTitle": "Plan reported nay resource changes",
       "toAdd": "{count, plural, one {# t'' add} other {# t'' add}}",
       "toChange": "{count, plural, one {# t'' change} other {# t'' change}}",
       "toDestroy": "{count, plural, one {# t'' send t'' Davy Jones} other {# t'' send t'' Davy Jones}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Follow-up",
       "sharedThreadNote": "One shared thread, visible t'' any matey with work-deck read.",
-      "placeholder": "Ask a follow-up question about this plan… (⌘/Ctrl + Enter t'' send)",
       "send": "Send",
       "thinking": "Ponderin''…",
       "you": "Ye",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "work-deck",
     "backTo": "Back t'' {name}",
     "errorHeading": "Squall",
-    "discardedHeading": "Discarded — re-plan required, matey",
     "common": {
       "yes": "Aye",
       "no": "Nay"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "send t'' Davy Jones",
-      "planOnly": "plan only",
       "savedPlan": "stowed chart",
       "savedPlanHint": "Boardin' delayed: this voyage be not claimin' the harbour till the stowed chart be run."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Try again",
       "retryFull": "Try Run Again",
       "retrying": "Tryin'' again…",
-      "confirmShort": "Apply",
-      "confirmFull": "Confirm & Apply",
       "confirming": "Confirmin''…",
       "discard": "Discard",
       "discarding": "Discardin''…",
@@ -2071,8 +2061,6 @@
       "queuing": "Loggin…"
     },
     "confirm": {
-      "apply": "Apply this run? This applies th'' plan and changes yer infrastructure.",
-      "discard": "Discard this plan?",
       "cancel": "Cancel this run?",
       "retry": "Try this run again?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Impact graph",
       "cost": "Cost",
       "costFull": "Cost estimate",
-      "planLabel": "Plan<log>Ship''s Log</log>",
-      "applyLabel": "Apply<log>Ship''s Log</log>",
-      "planFull": "Plan ship''s log",
-      "applyFull": "Apply ship''s log",
       "details": "Details",
       "security": "Security",
       "securityFull": "Security scan"
     },
     "banner": {
       "destroy": "This be a <strong>send t'' Davy Jones</strong> run — all managed resources will be sent t'' th'' depths when applied.",
-      "planOnlyCli": "This be a <strong>plan-only</strong> run started from th'' CLI on a VCS-connected work-deck. Apply be nay available fer CLI-uploaded code — only VCS-managed code can be applied.",
       "moduleOverridesPrefix": "This run uses <strong>module overrides</strong>",
       "moduleOverridesFromPr": "from PR #{number}",
       "moduleOverridesSuffix": "will be fetched from th'' PR branch instead o'' th'' published registry version."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Nay changes",
-      "planning": "Plannin''…",
       "toAdd": "t'' add",
       "toChange": "t'' change",
       "toDestroy": "t'' send t'' Davy Jones",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Execution Backend",
       "source": "Source",
       "autoApply": "Auto Apply",
-      "planOnly": "Plan Only",
       "triggeredBy": "Triggered By",
       "created": "Created",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Timeline",
       "queued": "Queued",
-      "planningStarted": "Plannin'' started",
-      "planComplete": "Plan complete",
       "confirmed": "Confirmed",
-      "applyingStarted": "Applyin'' started",
-      "applied": "Applied",
       "errored": "Squalled",
       "canceled": "Canceled",
       "discarded": "Discarded"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Follow th'' live tail",
       "end": "End",
       "endTitle": "Jump t'' th'' end o'' th'' ship''s log",
-      "planEmpty": "Nay plan output available yet.",
-      "applyEmpty": "Nay apply output available yet.",
       "index": {
         "label": "Set sail fer",
-        "title": "Set sail fer a change in the cargo, or fer the charted tally",
-        "summary": "Charted tally",
         "action": {
           "create": "build",
           "update": "mend",
@@ -2218,13 +2191,11 @@
           "error": "scuttled",
           "warning": "squall ahead"
         }
-      },
-      "applySkippedNoChanges": "No apply were run: the chart had no changes, so there be nothin'' to apply."
+      }
     },
     "policyPanel": {
       "heading": "Policy Checks",
       "passedCount": "{passed}/{total} passed",
-      "blockedMessage": "This run be <strong>blocked by a mandatory policy set</strong>. It will nay apply until th'' failure be resolved or an admin overrides it.",
       "overriding": "Overridin''...",
       "overrideContinue": "Override & Continue",
       "overrideFailed": "Override foundered",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
       "asOfState": "as o' state v{serial}",
-      "noState": "No booty yet — appears after th' first apply.",
       "usageBand": "{dimension}: {typical} {unit} be usual (twixt {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mo be usual — {costLow}–{costHigh} twixt {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "No articles o'' the code were broken, matey.",
       "overriding": "Overridin''...",
       "overrideContinue": "Override & Continue",
-      "overrideConfirm": "Override the AI articles gate an'' let this run be applied despite the ruling?",
       "overrideFailed": "Override foundered",
       "overrideFailedStatus": "Override foundered ({status})",
       "overriddenBy": "overridden by {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Translated from th'' original on view."
     },
     "drift": {
-      "remediate": "Chart + commit",
-      "remediateTitle": "Queue a chart + commit voyage to bring the works back in line with the articles",
-      "remediateConfirm": "Queue a chart + commit voyage for this berth?",
       "remediateMessage": "Logged from a drift watch",
       "remediateFailed": "Could not queue the mendin'' voyage"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",
-      "rbac": "Any scallywag who can merge th'' PR can apply. Branch protection rules (required reviews, status checks, code owner approval) become th'' gate. Terrapod role/label RBAC does<em>not</em> apply t'' comment-driven actions in this mode.",
-      "recommended": "<strong>Recommended:</strong> require linear history (rebase/squash afore merge) so th'' commit ye apply be th'' commit that lands.",
       "credit": "Credit: this workflow be modelled on <atlantis>Atlantis</atlantis>. Atlantis remains th'' right tool fer crews who only want PR-comment-driven applies an'' no platform UI."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Lock Status",
-      "lockedDesc": "This work-deck be locked. No plans or applies can set sail.",
       "unlockedDesc": "This work-deck be unlocked an'' ready fer voyages.",
       "lock": "Lock",
       "unlock": "Unlock",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Clear th'' reported drift state. Th'' next scheduled check will repopulate it from reality.",
       "lastChecked": "Last Checked",
       "checkNow": "Check Now",
-      "checkNowTitle": "Queue a plan-only voyage t'' check fer drift",
       "checkNowTitleDisabled": "Enable drift detection first, matey"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 days"
     },
     "planExpiry": {
-      "title": "Plan Expiry",
-      "description": "Auto-discard an unconfirmed plan once it be older than this, so a stale plan can''t be applied against a moved world. Off by default; th'' plan must then be re-run. (Applies t'' apply-capable voyages only.)",
       "expireAfter": "Expire after"
     },
     "aiSummary": {
       "title": "AI Plan Summary",
-      "description": "Automatic LLM-generated change summary, risk assessment, an'' squall analysis on every plan-phase outcome fer this work-deck.",
       "mode": "Mode",
       "modeDefault": "Follow deployment default",
       "modeEnabled": "Always summarize",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack notifications",
-      "description": "Opt this work-deck into Slack voyage notifications — approval requests, applies, squalls, an'' drift. Leave th'' channel empty an'' this work-deck stays silent (there be no deployment-wide fan-out). Requires th'' Slack app t'' be enabled by an administrator.",
       "channel": "Channel",
       "channelPlaceholder": "#deploys or a channel ID (e.g. C0123ABCD)",
       "notSet": "Not set — silent.",
@@ -2707,14 +2665,8 @@
       "options": "Options",
       "hideOptions": "Hide Options",
       "queueDestroy": "Scuttle",
-      "queueDestroyTitle": "Queue a destroy plan",
       "destroyAllConfirm": "Destroy all resources?",
       "confirmDestroy": "Confirm Destroy",
-      "queuePlan": "Chart",
-      "queueRun": "Chart + commit",
-      "queuePlanConfirm": "Queue a speculative plan fer this work-deck?",
-      "queueApplyConfirm": "Queue a plan + apply voyage? This can change yer infrastructure.",
-      "planOptions": "Plan Options",
       "targetResources": "Target resources",
       "replaceResources": "Replace resources",
       "commaSeparated": "(comma-separated)",
@@ -2725,7 +2677,6 @@
       "branch": "Branch",
       "tag": "Tag",
       "defaultBranch": "Default ({branch})",
-      "nonDefaultRefNote": "Non-default ref selected — voyage will be plan-only",
       "empty": "No voyages yet fer this work-deck.",
       "runId": "Voyage ID",
       "status": "Status",
@@ -2736,12 +2687,8 @@
       "created": "Created",
       "needsConfirm": "needs confirm",
       "typeDestroy": "send t'' Davy Jones",
-      "typePlanOnly": "plan only",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "module test",
       "sourceModulePublish": "module publish",
-      "queueApplyTitle": "Queue a chart + commit voyage",
-      "queueApplyRefBlocked": "No committin while a branch, tag or commit be chosen — them voyages be chartin only",
       "awaitingDecision": "awaitin'' the cap''n''s word",
       "typeSavedPlan": "stowed chart",
       "typeSavedPlanHint": "Boardin' delayed: this voyage be not claimin' the harbour till the stowed chart be run."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 selected",
       "compare": "Compare",
       "comparing": "Comparin''…",
-      "empty": "No configuration versions yet. They appear here as soon as a `terraform plan` uploads or a VCS push triggers a voyage.",
       "id": "ID",
       "source": "Source",
       "status": "Status",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Voyage Triggers",
-      "description": "When a source work-deck completes an apply, downstream work-decks get a new voyage queued automatically. Up t'' 20 source work-decks per destination.",
       "inboundHeading": "Source work-decks that trigger voyages here",
       "inboundEmpty": "No source work-decks trigger voyages on this work-deck.",
       "pickerPlaceholder": "Search work-decks t'' add as a source…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Failed t'' add variable ({status})",
       "deleteVariable": "Failed t'' send variable t'' Davy Jones",
       "updateVariable": "Failed t'' update variable",
-      "queuePlan": "Failed t'' queue th'' plan",
-      "queuePlanStatus": "Failed t'' queue th'' plan ({status})",
       "queueDestroy": "Failed t'' queue th'' destroy",
       "queueDestroyStatus": "Failed t'' queue th'' destroy ({status})",
       "createNotification": "Failed t'' create notification",

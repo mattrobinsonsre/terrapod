@@ -70,7 +70,6 @@
       "agentPool": "에이전트 풀",
       "none": "없음",
       "autoApply": "자동 적용",
-      "autoApplyModeHint": "never: 항상 사람의 확인을 기다립니다. always: 성공한 모든 플랜을 적용합니다. create / create/update: 해당 작업으로만 이루어진 플랜만 적용하며, 삭제나 교체는 절대 적용하지 않습니다.",
       "enabled": "사용",
       "workingDirectory": "작업 디렉터리",
       "workingDirectoryPlaceholder": "예: environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI 생성",
     "heading": {
-      "planSummary": "계획 요약",
       "failureAnalysis": "실패 분석"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "재생성",
       "queueing": "대기 중…",
-      "tooltip": "동일한 계획 입력에 대해 AI 요약을 다시 실행합니다",
       "ariaLabel": "AI 요약 재생성",
       "confirm": "AI 분석을 재생성하시겠습니까? 모델을 다시 실행합니다.",
       "error": "재생성할 수 없습니다: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "계획 요약 중…",
       "analysingFailure": "실패 분석 중…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "변경 없음",
       "noChangesLower": "변경 없음",
-      "noChangesTitle": "계획에서 리소스 변경 사항이 없다고 보고했습니다",
       "toAdd": "{count, plural, one {추가 #개} other {추가 #개}}",
       "toChange": "{count, plural, one {변경 #개} other {변경 #개}}",
       "toDestroy": "{count, plural, one {삭제 #개} other {삭제 #개}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "후속 질문",
       "sharedThreadNote": "워크스페이스 읽기 권한이 있는 모든 사람에게 표시되는 하나의 공유 스레드입니다.",
-      "placeholder": "이 계획에 대해 후속 질문을 하세요… (⌘/Ctrl + Enter로 전송)",
       "send": "전송",
       "thinking": "생각 중…",
       "you": "나",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "워크스페이스",
     "backTo": "{name}(으)로 돌아가기",
     "errorHeading": "오류",
-    "discardedHeading": "폐기됨 — 다시 계획해야 합니다",
     "common": {
       "yes": "예",
       "no": "아니요"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "삭제",
-      "planOnly": "계획 전용",
       "savedPlan": "저장된 플랜",
       "savedPlanHint": "적용이 보류되었습니다. 저장된 플랜이 적용될 때까지 이 실행은 워크스페이스를 점유하지 않습니다."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "재시도",
       "retryFull": "실행 재시도",
       "retrying": "재시도 중…",
-      "confirmShort": "적용",
-      "confirmFull": "확인 및 적용",
       "confirming": "확인 중…",
       "discard": "폐기",
       "discarding": "폐기 중…",
@@ -2071,8 +2061,6 @@
       "queuing": "대기열에 추가 중…"
     },
     "confirm": {
-      "apply": "이 실행을 적용하시겠습니까? 계획을 적용하고 인프라를 변경합니다.",
-      "discard": "이 계획을 폐기하시겠습니까?",
       "cancel": "이 실행을 취소하시겠습니까?",
       "retry": "이 실행을 재시도하시겠습니까?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "영향 그래프",
       "cost": "비용",
       "costFull": "비용 추정치",
-      "planLabel": "계획<log>로그</log>",
-      "applyLabel": "적용<log>로그</log>",
-      "planFull": "계획 로그",
-      "applyFull": "적용 로그",
       "details": "세부 정보",
       "security": "보안",
       "securityFull": "보안 스캔"
     },
     "banner": {
       "destroy": "이것은 <strong>삭제</strong> 실행입니다 — 적용되면 관리 중인 모든 리소스가 삭제됩니다.",
-      "planOnlyCli": "이것은 VCS 연결된 워크스페이스에서 CLI로 시작된 <strong>계획 전용</strong> 실행입니다. CLI로 업로드된 코드에는 적용을 사용할 수 없습니다 — VCS로 관리되는 코드만 적용할 수 있습니다.",
       "moduleOverridesPrefix": "이 실행은 <strong>모듈 재정의</strong>를 사용합니다",
       "moduleOverridesFromPr": "PR #{number}에서",
       "moduleOverridesSuffix": "게시된 레지스트리 버전 대신 PR 브랜치에서 가져옵니다."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "변경 없음",
-      "planning": "계획 중…",
       "toAdd": "추가",
       "toChange": "변경",
       "toDestroy": "삭제",
@@ -2157,7 +2139,6 @@
       "executionBackend": "실행 백엔드",
       "source": "소스",
       "autoApply": "자동 적용",
-      "planOnly": "계획 전용",
       "triggeredBy": "트리거한 주체",
       "created": "생성일",
       "commit": "커밋",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "타임라인",
       "queued": "대기됨",
-      "planningStarted": "계획 시작됨",
-      "planComplete": "계획 완료",
       "confirmed": "확인됨",
-      "applyingStarted": "적용 시작됨",
-      "applied": "적용됨",
       "errored": "오류",
       "canceled": "취소됨",
       "discarded": "폐기됨"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "실시간 로그 따라가기",
       "end": "끝",
       "endTitle": "로그 끝으로 이동",
-      "planEmpty": "아직 사용 가능한 계획 출력이 없습니다.",
-      "applyEmpty": "아직 사용 가능한 적용 출력이 없습니다.",
       "index": {
         "label": "이동",
-        "title": "리소스 변경 또는 플랜 요약으로 이동합니다",
-        "summary": "플랜 요약",
         "action": {
           "create": "생성",
           "update": "업데이트",
@@ -2218,13 +2191,11 @@
           "error": "오류",
           "warning": "경고"
         }
-      },
-      "applySkippedNoChanges": "적용이 실행되지 않았습니다: 계획에 변경 사항이 없어 적용할 것이 없었습니다."
+      }
     },
     "policyPanel": {
       "heading": "정책 검사",
       "passedCount": "{total}개 중 {passed}개 통과",
-      "blockedMessage": "이 실행은 <strong>필수 정책 집합에 의해 차단</strong>되었습니다. 실패가 해결되거나 관리자가 재정의할 때까지 적용되지 않습니다.",
       "overriding": "재정의 중...",
       "overrideContinue": "재정의 및 계속",
       "overrideFailed": "재정의에 실패했습니다",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "가격 데이터에서 일치하는 항목이 없습니다. 매핑되지 않은 유형, 직접 비용이 없는 리소스 또는 아직 지원되지 않는 공급자입니다.",
       "indicative": "추정치는 참고용이며, 실제 비용은 사용량, 리전, 약정, 할인에 따라 달라집니다.",
       "asOfState": "상태 v{serial} 기준",
-      "noState": "아직 비용이 없습니다 — 첫 적용 후에 표시됩니다.",
       "usageBand": "{dimension}: 일반적으로 {typical} {unit} (범위 {low}–{high})",
       "usageBandCost": "{dimension}: 월 {costTypical} 일반 — {low}–{high} {unit}에서 {costLow}–{costHigh}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "일치하는 정책 기준이 없습니다.",
       "overriding": "재정의 중...",
       "overrideContinue": "재정의 및 계속",
-      "overrideConfirm": "AI 정책 게이트를 재정의하고 판정과 관계없이 이 실행의 적용을 허용하시겠습니까?",
       "overrideFailed": "재정의에 실패했습니다",
       "overrideFailedStatus": "재정의 실패 ({status})",
       "overriddenBy": "{by}에 의해 재정의됨"
@@ -2410,9 +2379,6 @@
       "translatedNote": "보기 시 원문에서 번역되었습니다."
     },
     "drift": {
-      "remediate": "플랜 + 적용",
-      "remediateTitle": "인프라를 구성에 다시 맞추기 위해 플랜 + 적용 실행을 대기열에 추가합니다",
-      "remediateConfirm": "이 워크스페이스에 대해 플랜 + 적용 실행을 대기열에 추가할까요?",
       "remediateMessage": "드리프트 검사에서 대기열에 추가됨",
       "remediateFailed": "수정 실행을 대기열에 추가하지 못했습니다"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",
-      "rbac": "PR을 병합할 수 있는 사람은 누구나 적용할 수 있습니다. 브랜치 보호 규칙(필수 검토, 상태 검사, 코드 소유자 승인)이 관문이 됩니다. Terrapod 역할/라벨 RBAC는 이 모드에서 댓글 기반 작업에는 적용되지<em>않습니다</em>.",
-      "recommended": "<strong>권장:</strong> 선형 히스토리(병합 전 rebase/squash)를 요구하여 적용하는 커밋이 실제로 반영되는 커밋이 되도록 하세요.",
       "credit": "출처: 이 워크플로는 <atlantis>Atlantis</atlantis>를 모델로 합니다. Atlantis는 PR 댓글 기반 적용만 원하고 플랫폼 UI가 필요 없는 팀에게 여전히 적합한 도구입니다."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "잠금 상태",
-      "lockedDesc": "이 워크스페이스는 잠겨 있습니다. 계획이나 적용을 실행할 수 없습니다.",
       "unlockedDesc": "이 워크스페이스는 잠금 해제되어 실행 준비가 되었습니다.",
       "lock": "잠금",
       "unlock": "잠금 해제",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "보고된 드리프트 상태를 지웁니다. 다음 예약 검사에서 실제 상태로 다시 채워집니다.",
       "lastChecked": "마지막 검사",
       "checkNow": "지금 검사",
-      "checkNowTitle": "드리프트를 확인하기 위해 계획 전용 실행을 대기열에 넣습니다",
       "checkNowTitleDisabled": "먼저 드리프트 감지를 활성화하세요"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7일"
     },
     "planExpiry": {
-      "title": "계획 만료",
-      "description": "확인되지 않은 계획이 이 기간보다 오래되면 자동으로 폐기하여, 오래된 계획이 변경된 상태에 적용되지 않도록 합니다. 기본적으로 꺼져 있으며, 이 경우 계획을 다시 실행해야 합니다. (적용 가능한 실행에만 적용됩니다.)",
       "expireAfter": "만료 기간"
     },
     "aiSummary": {
       "title": "AI 계획 요약",
-      "description": "이 워크스페이스의 모든 계획 단계 결과에 대해 LLM이 자동 생성하는 변경 요약, 위험 평가, 실패 분석입니다.",
       "mode": "모드",
       "modeDefault": "배포 기본값 따르기",
       "modeEnabled": "항상 요약",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack 알림",
-      "description": "이 워크스페이스를 Slack 실행 알림(승인 요청, 적용, 오류, 드리프트)에 등록합니다. 채널을 비워두면 이 워크스페이스는 알림을 보내지 않습니다(배포 전체 팬아웃은 없습니다). 관리자가 Slack 앱을 활성화해야 합니다.",
       "channel": "채널",
       "channelPlaceholder": "#deploys 또는 채널 ID (예: C0123ABCD)",
       "notSet": "설정되지 않음 — 알림 없음.",
@@ -2707,14 +2665,8 @@
       "options": "옵션",
       "hideOptions": "옵션 숨기기",
       "queueDestroy": "파기",
-      "queueDestroyTitle": "삭제 계획 대기",
       "destroyAllConfirm": "모든 리소스를 삭제하시겠습니까?",
       "confirmDestroy": "삭제 확인",
-      "queuePlan": "플랜",
-      "queueRun": "플랜 + 적용",
-      "queuePlanConfirm": "이 워크스페이스에 대한 예상 계획을 대기하시겠습니까?",
-      "queueApplyConfirm": "계획 + 적용 실행을 대기하시겠습니까? 인프라가 변경될 수 있습니다.",
-      "planOptions": "계획 옵션",
       "targetResources": "대상 리소스",
       "replaceResources": "교체 리소스",
       "commaSeparated": "(쉼표로 구분)",
@@ -2725,7 +2677,6 @@
       "branch": "브랜치",
       "tag": "태그",
       "defaultBranch": "기본값 ({branch})",
-      "nonDefaultRefNote": "기본이 아닌 레퍼런스가 선택됨 — 실행은 계획 전용이 됩니다",
       "empty": "이 워크스페이스에 대한 실행이 아직 없습니다.",
       "runId": "실행 ID",
       "status": "상태",
@@ -2736,12 +2687,8 @@
       "created": "생성일",
       "needsConfirm": "확인 필요",
       "typeDestroy": "삭제",
-      "typePlanOnly": "계획 전용",
-      "typePlanApply": "계획 + 적용",
       "sourceModuleTest": "모듈 테스트",
       "sourceModulePublish": "모듈 게시",
-      "queueApplyTitle": "플랜 + 적용 실행을 대기열에 추가",
-      "queueApplyRefBlocked": "브랜치, 태그 또는 커밋이 선택된 동안에는 적용할 수 없습니다. 해당 실행은 항상 플랜 전용입니다",
       "awaitingDecision": "결정 대기 중",
       "typeSavedPlan": "저장된 플랜",
       "typeSavedPlanHint": "적용이 보류되었습니다. 저장된 플랜이 적용될 때까지 이 실행은 워크스페이스를 점유하지 않습니다."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 선택됨",
       "compare": "비교",
       "comparing": "비교 중…",
-      "empty": "아직 구성 버전이 없습니다. `terraform plan`이 업로드하거나 VCS 푸시가 실행을 트리거하는 즉시 여기에 표시됩니다.",
       "id": "ID",
       "source": "소스",
       "status": "상태",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "실행 트리거",
-      "description": "소스 워크스페이스가 적용을 완료하면 다운스트림 워크스페이스에 새 실행이 자동으로 대기됩니다. 대상당 최대 20개의 소스 워크스페이스.",
       "inboundHeading": "여기에서 실행을 트리거하는 소스 워크스페이스",
       "inboundEmpty": "이 워크스페이스에서 실행을 트리거하는 소스 워크스페이스가 없습니다.",
       "pickerPlaceholder": "소스로 추가할 워크스페이스 검색…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "변수를 추가하지 못했습니다 ({status})",
       "deleteVariable": "변수를 삭제하지 못했습니다",
       "updateVariable": "변수를 업데이트하지 못했습니다",
-      "queuePlan": "계획을 대기하지 못했습니다",
-      "queuePlanStatus": "계획을 대기하지 못했습니다 ({status})",
       "queueDestroy": "삭제를 대기하지 못했습니다",
       "queueDestroyStatus": "삭제를 대기하지 못했습니다 ({status})",
       "createNotification": "알림을 생성하지 못했습니다",

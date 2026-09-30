@@ -70,7 +70,6 @@
       "agentPool": "4g3n7 P00l",
       "none": "N0n3",
       "autoApply": "4u70 4pply",
-      "autoApplyModeHint": "n3v3r: 4lw4y5 w417 f0r 4 hum4n. 4lw4y5: 4pply 3v3ry 5ucc355ful pl4n. cr3473 / cr3473/upd473: 4pply 0nly pl4n5 l1m173d 70 7h053 4c710n5 — n3v3r 4 d357r0y 0r 4 r3pl4c3.",
       "enabled": "3n4bl3d",
       "workingDirectory": "W0rk1ng D1r3c70ry",
       "workingDirectoryPlaceholder": "3.g. 3nv1r0nm3n75/d3v",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "41 g3n3r473d",
     "heading": {
-      "planSummary": "Pl4n 5umm4ry",
       "failureAnalysis": "F41lur3 4n4ly515"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "R3g3n3r473",
       "queueing": "Qu3u31ng…",
-      "tooltip": "R3-run 7h3 41 5umm4ry 4g41n57 7h3 54m3 pl4n 1npu75",
       "ariaLabel": "R3g3n3r473 41 5umm4ry",
       "confirm": "R3g3n3r473 7h3 41 4n4ly515? 7h15 run5 7h3 m0d3l 4g41n.",
       "error": "C0uld n07 r3g3n3r473: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "5umm4r1z1ng pl4n…",
       "analysingFailure": "4n4ly51ng f41lur3…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "N0 ch4ng35",
       "noChangesLower": "n0 ch4ng35",
-      "noChangesTitle": "Pl4n r3p0r73d n0 r350urc3 ch4ng35",
       "toAdd": "{count, plural, one {# to add} other {# to add}}",
       "toChange": "{count, plural, one {# to change} other {# to change}}",
       "toDestroy": "{count, plural, one {# to destroy} other {# to destroy}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "F0ll0w-up",
       "sharedThreadNote": "0n3 5h4r3d 7hr34d, v151bl3 70 4ny0n3 w17h w0rk5p4c3 r34d.",
-      "placeholder": "45k 4 f0ll0w-up qu35710n 4b0u7 7h15 pl4n… (⌘/C7rl + 3n73r 70 53nd)",
       "send": "53nd",
       "thinking": "7h1nk1ng…",
       "you": "Y0u",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "w0rk5p4c3",
     "backTo": "B4ck 70 {name}",
     "errorHeading": "3rr0r",
-    "discardedHeading": "D15c4rd3d — r3-pl4n r3qu1r3d",
     "common": {
       "yes": "Y35",
       "no": "N0"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "d357r0y",
-      "planOnly": "pl4n 0nly",
       "savedPlan": "54v3d pl4n",
       "savedPlanHint": "4pply d3f3rr3d: 7h15 run d035 n07 h0ld 7h3 w0rk5p4c3 un71l 7h3 54v3d pl4n 15 4ppl13d."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "R37ry",
       "retryFull": "R37ry Run",
       "retrying": "R37ry1ng…",
-      "confirmShort": "4pply",
-      "confirmFull": "C0nf1rm & 4pply",
       "confirming": "C0nf1rm1ng…",
       "discard": "D15c4rd",
       "discarding": "D15c4rd1ng…",
@@ -2071,8 +2061,6 @@
       "queuing": "Qu3u31ng…"
     },
     "confirm": {
-      "apply": "4pply 7h15 run? 7h15 4ppl135 7h3 pl4n 4nd ch4ng35 1nfr457ruc7ur3.",
-      "discard": "D15c4rd 7h15 pl4n?",
       "cancel": "C4nc3l 7h15 run?",
       "retry": "R37ry 7h15 run?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "1mp4c7 gr4ph",
       "cost": "Cost",
       "costFull": "Cost estimate",
-      "planLabel": "Pl4n<log>L0g</log>",
-      "applyLabel": "4pply<log>L0g</log>",
-      "planFull": "Pl4n l0g",
-      "applyFull": "4pply l0g",
       "details": "D3741l5",
       "security": "53cur17y",
       "securityFull": "53cur17y 5c4n"
     },
     "banner": {
       "destroy": "7h15 15 4 <strong>d357r0y</strong> run — 4ll m4n4g3d r350urc35 w1ll b3 d357r0y3d wh3n 4ppl13d.",
-      "planOnlyCli": "7h15 15 4 <strong>pl4n-0nly</strong> run 1n171473d fr0m 7h3 CL1 0n 4 VC5-c0nn3c73d w0rk5p4c3. 4pply 15 n07 4v41l4bl3 f0r CL1-upl04d3d c0d3 — 0nly VC5-m4n4g3d c0d3 c4n b3 4ppl13d.",
       "moduleOverridesPrefix": "7h15 run u535 <strong>m0dul3 0v3rr1d35</strong>",
       "moduleOverridesFromPr": "fr0m PR #{number}",
       "moduleOverridesSuffix": "w1ll b3 f37ch3d fr0m 7h3 PR br4nch 1n5734d 0f 7h3 publ15h3d r3g157ry v3r510n."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "N0 ch4ng35",
-      "planning": "Pl4nn1ng…",
       "toAdd": "70 4dd",
       "toChange": "70 ch4ng3",
       "toDestroy": "70 d357r0y",
@@ -2157,7 +2139,6 @@
       "executionBackend": "3x3cu710n B4ck3nd",
       "source": "50urc3",
       "autoApply": "4u70 4pply",
-      "planOnly": "Pl4n 0nly",
       "triggeredBy": "7r1gg3r3d By",
       "created": "Cr3473d",
       "commit": "C0mm17",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "71m3l1n3",
       "queued": "Qu3u3d",
-      "planningStarted": "Pl4nn1ng 574r73d",
-      "planComplete": "Pl4n c0mpl373",
       "confirmed": "C0nf1rm3d",
-      "applyingStarted": "4pply1ng 574r73d",
-      "applied": "4ppl13d",
       "errored": "3rr0r3d",
       "canceled": "C4nc3l3d",
       "discarded": "D15c4rd3d"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "F0ll0w 7h3 l1v3 741l",
       "end": "3nd",
       "endTitle": "Jump 70 7h3 3nd 0f 7h3 l0g",
-      "planEmpty": "N0 pl4n 0u7pu7 4v41l4bl3 y37.",
-      "applyEmpty": "N0 4pply 0u7pu7 4v41l4bl3 y37.",
       "index": {
         "label": "Jump 70",
-        "title": "Jump 70 4 r350urc3 ch4ng3, 0r 7h3 pl4n 5umm4ry",
-        "summary": "Pl4n 5umm4ry",
         "action": {
           "create": "cr3473",
           "update": "upd473",
@@ -2218,13 +2191,11 @@
           "error": "3rr0r",
           "warning": "w4rn1ng"
         }
-      },
-      "applySkippedNoChanges": "N0 4pply r4n: 7h3 pl4n h4d n0 ch4ng35, 50 7h3r3 w45 n07h1ng 70 4pply."
+      }
     },
     "policyPanel": {
       "heading": "P0l1cy Ch3ck5",
       "passedCount": "{passed}/{total} p4553d",
-      "blockedMessage": "7h15 run 15 <strong>bl0ck3d by 4 m4nd470ry p0l1cy 537</strong>. 17 w1ll n07 4pply un71l 7h3 f41lur3 15 r350lv3d 0r 4n 4dm1n 0v3rr1d35 17.",
       "overriding": "0v3rr1d1ng...",
       "overrideContinue": "0v3rr1d3 & C0n71nu3",
       "overrideFailed": "0v3rr1d3 f41l3d",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
       "asOfState": "as of state v{serial}",
-      "noState": "No cost yet — appears after the first apply.",
       "usageBand": "{dimension}: {typical} {unit} typ1c4l (r4ng3 {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mo typ1c4l — {costLow}–{costHigh} 4cr0ss {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "N0 p0l1cy cr173r14 m47ch3d.",
       "overriding": "0v3rr1d1ng...",
       "overrideContinue": "0v3rr1d3 & C0n71nu3",
-      "overrideConfirm": "0v3rr1d3 7h3 41 p0l1cy g473 4nd 4ll0w 7h15 run 70 4pply d35p173 7h3 v3rd1c7?",
       "overrideFailed": "0v3rr1d3 f41l3d",
       "overrideFailedStatus": "0v3rr1d3 f41l3d ({status})",
       "overriddenBy": "0v3rr1dd3n by {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "7r4n5l473d fr0m 7h3 0r1g1n4l 0n v13w."
     },
     "drift": {
-      "remediate": "Pl4n + 4pply",
-      "remediateTitle": "Qu3u3 4 pl4n + 4pply run 70 br1ng 1nfr457ruc7ur3 b4ck 1n l1n3 w17h 7h3 c0nf1gur4710n",
-      "remediateConfirm": "Qu3u3 4 pl4n + 4pply run f0r 7h15 w0rk5p4c3?",
       "remediateMessage": "Qu3u3d fr0m 4 dr1f7 ch3ck",
       "remediateFailed": "C0uld n07 qu3u3 7h3 r3m3d14710n run"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",
-      "rbac": "4ny0n3 wh0 c4n m3rg3 7h3 PR c4n 4pply. Br4nch pr073c710n rul35 (r3qu1r3d r3v13w5, 5747u5 ch3ck5, c0d3 0wn3r 4ppr0v4l) b3c0m3 7h3 g473. 73rr4p0d r0l3/l4b3l RB4C d035<em>n07</em> 4pply 70 c0mm3n7-dr1v3n 4c710n5 1n 7h15 m0d3.",
-      "recommended": "<strong>R3c0mm3nd3d:</strong> r3qu1r3 l1n34r h1570ry (r3b453/5qu45h b3f0r3 m3rg3) 50 7h3 c0mm17 y0u 4pply 15 7h3 c0mm17 7h47 l4nd5.",
       "credit": "Cr3d17: 7h15 w0rkfl0w 15 m0d3ll3d 0n <atlantis>47l4n715</atlantis>. 47l4n715 r3m41n5 7h3 r1gh7 700l f0r 734m5 wh0 0nly w4n7 PR-c0mm3n7-dr1v3n 4ppl135 4nd n0 pl47f0rm U1."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "L0ck 5747u5",
-      "lockedDesc": "7h15 w0rk5p4c3 15 l0ck3d. N0 pl4n5 0r 4ppl135 c4n run.",
       "unlockedDesc": "7h15 w0rk5p4c3 15 unl0ck3d 4nd r34dy f0r run5.",
       "lock": "L0ck",
       "unlock": "Unl0ck",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Cl34r 7h3 r3p0r73d dr1f7 57473. 7h3 n3x7 5ch3dul3d ch3ck w1ll r3p0pul473 17 fr0m r34l17y.",
       "lastChecked": "L457 Ch3ck3d",
       "checkNow": "Ch3ck N0w",
-      "checkNowTitle": "Qu3u3 4 pl4n-0nly run 70 ch3ck f0r dr1f7",
       "checkNowTitleDisabled": "3n4bl3 dr1f7 d373c710n f1r57"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 d4y5"
     },
     "planExpiry": {
-      "title": "Pl4n 3xp1ry",
-      "description": "4u70-d15c4rd 4n unc0nf1rm3d pl4n 0nc3 17 15 0ld3r 7h4n 7h15, 50 4 574l3 pl4n c4n'7 b3 4ppl13d 4g41n57 4 m0v3d w0rld. 0ff by d3f4ul7; 7h3 pl4n mu57 7h3n b3 r3-run. (4ppl135 70 4pply-c4p4bl3 run5 0nly.)",
       "expireAfter": "3xp1r3 4f73r"
     },
     "aiSummary": {
       "title": "41 Pl4n 5umm4ry",
-      "description": "4u70m471c LLM-g3n3r473d ch4ng3 5umm4ry, r15k 455355m3n7, 4nd f41lur3 4n4ly515 0n 3v3ry pl4n-ph453 0u7c0m3 f0r 7h15 w0rk5p4c3.",
       "mode": "M0d3",
       "modeDefault": "F0ll0w d3pl0ym3n7 d3f4ul7",
       "modeEnabled": "4lw4y5 5umm4r1z3",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "5l4ck n071f1c4710n5",
-      "description": "0p7 7h15 w0rk5p4c3 1n70 5l4ck run n071f1c4710n5 — 4ppr0v4l r3qu3575, 4ppl135, 3rr0r5, 4nd dr1f7. L34v3 7h3 ch4nn3l 3mp7y 4nd 7h15 w0rk5p4c3 574y5 51l3n7 (7h3r3 15 n0 d3pl0ym3n7-w1d3 f4n-0u7). R3qu1r35 7h3 5l4ck 4pp 70 b3 3n4bl3d by 4n 4dm1n157r470r.",
       "channel": "Ch4nn3l",
       "channelPlaceholder": "#d3pl0y5 0r 4 ch4nn3l 1D (3.g. C01234BCD)",
       "notSet": "N07 537 — 51l3n7.",
@@ -2707,14 +2665,8 @@
       "options": "0p710n5",
       "hideOptions": "H1d3 0p710n5",
       "queueDestroy": "D357r0y",
-      "queueDestroyTitle": "Qu3u3 4 d357r0y pl4n",
       "destroyAllConfirm": "D357r0y 4ll r350urc35?",
       "confirmDestroy": "C0nf1rm D357r0y",
-      "queuePlan": "Pl4n",
-      "queueRun": "Pl4n + 4pply",
-      "queuePlanConfirm": "Qu3u3 4 5p3cul471v3 pl4n f0r 7h15 w0rk5p4c3?",
-      "queueApplyConfirm": "Qu3u3 4 pl4n + 4pply run? 7h15 c4n ch4ng3 1nfr457ruc7ur3.",
-      "planOptions": "Pl4n 0p710n5",
       "targetResources": "74rg37 r350urc35",
       "replaceResources": "R3pl4c3 r350urc35",
       "commaSeparated": "(c0mm4-53p4r473d)",
@@ -2725,7 +2677,6 @@
       "branch": "Br4nch",
       "tag": "74g",
       "defaultBranch": "D3f4ul7 ({branch})",
-      "nonDefaultRefNote": "N0n-d3f4ul7 r3f 53l3c73d — run w1ll b3 pl4n-0nly",
       "empty": "N0 run5 y37 f0r 7h15 w0rk5p4c3.",
       "runId": "Run 1D",
       "status": "5747u5",
@@ -2736,12 +2687,8 @@
       "created": "Cr3473d",
       "needsConfirm": "n33d5 c0nf1rm",
       "typeDestroy": "d357r0y",
-      "typePlanOnly": "pl4n 0nly",
-      "typePlanApply": "pl4n + 4pply",
       "sourceModuleTest": "m0dul3 7357",
       "sourceModulePublish": "m0dul3 publ15h",
-      "queueApplyTitle": "Qu3u3 4 pl4n + 4pply run",
-      "queueApplyRefBlocked": "4pply 15 un4v41l4bl3 wh1l3 4 br4nch, 74g 0r c0mm17 15 53l3c73d — 7h053 run5 4r3 4lw4y5 pl4n-0nly",
       "awaitingDecision": "4w4171ng d3c1510n",
       "typeSavedPlan": "54v3d pl4n",
       "typeSavedPlanHint": "4pply d3f3rr3d: 7h15 run d035 n07 h0ld 7h3 w0rk5p4c3 un71l 7h3 54v3d pl4n 15 4ppl13d."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 53l3c73d",
       "compare": "C0mp4r3",
       "comparing": "C0mp4r1ng…",
-      "empty": "N0 c0nf1gur4710n v3r510n5 y37. 7h3y 4pp34r h3r3 45 500n 45 4 `73rr4f0rm pl4n` upl04d5 0r 4 VC5 pu5h 7r1gg3r5 4 run.",
       "id": "1D",
       "source": "50urc3",
       "status": "5747u5",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Run 7r1gg3r5",
-      "description": "Wh3n 4 50urc3 w0rk5p4c3 c0mpl3735 4n 4pply, d0wn57r34m w0rk5p4c35 g37 4 n3w run qu3u3d 4u70m471c4lly. Up 70 20 50urc3 w0rk5p4c35 p3r d3571n4710n.",
       "inboundHeading": "50urc3 w0rk5p4c35 7h47 7r1gg3r run5 h3r3",
       "inboundEmpty": "N0 50urc3 w0rk5p4c35 7r1gg3r run5 0n 7h15 w0rk5p4c3.",
       "pickerPlaceholder": "534rch w0rk5p4c35 70 4dd 45 4 50urc3…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "F41l3d 70 4dd v4r14bl3 ({status})",
       "deleteVariable": "F41l3d 70 d3l373 v4r14bl3",
       "updateVariable": "F41l3d 70 upd473 v4r14bl3",
-      "queuePlan": "F41l3d 70 qu3u3 pl4n",
-      "queuePlanStatus": "F41l3d 70 qu3u3 pl4n ({status})",
       "queueDestroy": "F41l3d 70 qu3u3 d357r0y",
       "queueDestroyStatus": "F41l3d 70 qu3u3 d357r0y ({status})",
       "createNotification": "F41l3d 70 cr3473 n071f1c4710n",

@@ -70,7 +70,6 @@
       "agentPool": "Agent Pool",
       "none": "Nenhum",
       "autoApply": "Aplicação Automática",
-      "autoApplyModeHint": "never: sempre esperar por uma pessoa. always: aplicar todo plano bem-sucedido. create / create/update: aplicar apenas planos limitados a essas ações — nunca uma destruição ou uma substituição.",
       "enabled": "Ativado",
       "workingDirectory": "Diretório de Trabalho",
       "workingDirectoryPlaceholder": "ex.: environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "Gerado por IA",
     "heading": {
-      "planSummary": "Resumo do plano",
       "failureAnalysis": "Análise de falha"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Regerar",
       "queueing": "Enfileirando…",
-      "tooltip": "Reexecutar o resumo de IA com as mesmas entradas do plano",
       "ariaLabel": "Regerar resumo de IA",
       "confirm": "Regerar a análise de IA? Isso executa o modelo novamente.",
       "error": "Não foi possível regerar: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Resumindo o plano…",
       "analysingFailure": "Analisando a falha…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Nenhuma alteração",
       "noChangesLower": "nenhuma alteração",
-      "noChangesTitle": "O plano não relatou alterações de recursos",
       "toAdd": "{count, plural, one {# a adicionar} other {# a adicionar}}",
       "toChange": "{count, plural, one {# a alterar} other {# a alterar}}",
       "toDestroy": "{count, plural, one {# a destruir} other {# a destruir}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Acompanhamento",
       "sharedThreadNote": "Um único thread compartilhado, visível para qualquer pessoa com acesso de leitura ao workspace.",
-      "placeholder": "Faça uma pergunta de acompanhamento sobre este plano… (⌘/Ctrl + Enter para enviar)",
       "send": "Enviar",
       "thinking": "Pensando…",
       "you": "Você",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "workspace",
     "backTo": "Voltar para {name}",
     "errorHeading": "Erro",
-    "discardedHeading": "Descartado — replanejamento necessário",
     "common": {
       "yes": "Sim",
       "no": "Não"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "destroy",
-      "planOnly": "somente plano",
       "savedPlan": "plano salvo",
       "savedPlanHint": "Aplicação adiada: esta execução não bloqueia o workspace até que o plano salvo seja aplicado."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Repetir",
       "retryFull": "Repetir Execução",
       "retrying": "Repetindo…",
-      "confirmShort": "Aplicar",
-      "confirmFull": "Confirmar e Aplicar",
       "confirming": "Confirmando…",
       "discard": "Descartar",
       "discarding": "Descartando…",
@@ -2071,8 +2061,6 @@
       "queuing": "Enfileirando…"
     },
     "confirm": {
-      "apply": "Aplicar esta execução? Isso aplica o plano e altera a infraestrutura.",
-      "discard": "Descartar este plano?",
       "cancel": "Cancelar esta execução?",
       "retry": "Repetir esta execução?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Grafo de impacto",
       "cost": "Custo",
       "costFull": "Estimativa de custo",
-      "planLabel": "Plan<log>Log</log>",
-      "applyLabel": "Apply<log>Log</log>",
-      "planFull": "Log do plan",
-      "applyFull": "Log do apply",
       "details": "Detalhes",
       "security": "Segurança",
       "securityFull": "Verificação de segurança"
     },
     "banner": {
       "destroy": "Esta é uma execução de <strong>destroy</strong> — todos os recursos gerenciados serão destruídos quando aplicada.",
-      "planOnlyCli": "Esta é uma execução <strong>somente plano</strong> iniciada a partir da CLI em um workspace conectado ao VCS. O apply não está disponível para código enviado pela CLI — apenas código gerenciado pelo VCS pode ser aplicado.",
       "moduleOverridesPrefix": "Esta execução usa <strong>substituições de módulo</strong>",
       "moduleOverridesFromPr": "do PR #{number}",
       "moduleOverridesSuffix": "serão buscadas a partir do branch do PR, em vez da versão publicada no registro."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Nenhuma alteração",
-      "planning": "Planejando…",
       "toAdd": "a adicionar",
       "toChange": "a alterar",
       "toDestroy": "a destruir",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Backend de Execução",
       "source": "Origem",
       "autoApply": "Aplicação Automática",
-      "planOnly": "Somente Plano",
       "triggeredBy": "Acionado Por",
       "created": "Criado",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Linha do Tempo",
       "queued": "Na Fila",
-      "planningStarted": "Planejamento iniciado",
-      "planComplete": "Plano concluído",
       "confirmed": "Confirmado",
-      "applyingStarted": "Aplicação iniciada",
-      "applied": "Aplicado",
       "errored": "Com Erro",
       "canceled": "Cancelado",
       "discarded": "Descartado"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Seguir o tail ao vivo",
       "end": "Fim",
       "endTitle": "Ir para o fim do log",
-      "planEmpty": "Nenhuma saída de plan disponível ainda.",
-      "applyEmpty": "Nenhuma saída de apply disponível ainda.",
       "index": {
         "label": "Ir para",
-        "title": "Ir para uma alteração de recurso ou para o resumo do plano",
-        "summary": "Resumo do plano",
         "action": {
           "create": "criar",
           "update": "atualizar",
@@ -2218,13 +2191,11 @@
           "error": "erro",
           "warning": "aviso"
         }
-      },
-      "applySkippedNoChanges": "Nenhuma aplicação foi executada: o plano não tinha alterações, então não havia nada a aplicar."
+      }
     },
     "policyPanel": {
       "heading": "Verificações de Política",
       "passedCount": "{passed}/{total} aprovadas",
-      "blockedMessage": "Esta execução está <strong>bloqueada por um conjunto de políticas obrigatório</strong>. Ela não será aplicada até que a falha seja resolvida ou um administrador a substitua.",
       "overriding": "Substituindo...",
       "overrideContinue": "Substituir e Continuar",
       "overrideFailed": "Falha na substituição",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Nada nos dados de preços correspondeu a estes — um tipo não mapeado, um recurso sem custo direto ou um provedor ainda não coberto.",
       "indicative": "As estimativas são indicativas; o custo real depende do uso, da região, dos compromissos e dos descontos.",
       "asOfState": "a partir do estado v{serial}",
-      "noState": "Sem custo ainda — aparece após a primeira aplicação.",
       "usageBand": "{dimension}: {typical} {unit} típico (faixa {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mês típico — {costLow}–{costHigh} entre {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Nenhum critério de política correspondeu.",
       "overriding": "Substituindo...",
       "overrideContinue": "Substituir e Continuar",
-      "overrideConfirm": "Substituir o portão de política de IA e permitir que esta execução seja aplicada apesar do veredito?",
       "overrideFailed": "Falha na substituição",
       "overrideFailedStatus": "Falha na substituição ({status})",
       "overriddenBy": "substituído por {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Traduzido do original na visualização."
     },
     "drift": {
-      "remediate": "Plan + apply",
-      "remediateTitle": "Enfileirar uma execução plan + apply para realinhar a infraestrutura à configuração",
-      "remediateConfirm": "Enfileirar uma execução plan + apply para este workspace?",
       "remediateMessage": "Enfileirado a partir de uma verificação de desvio",
       "remediateFailed": "Não foi possível enfileirar a execução de correção"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",
-      "rbac": "Qualquer pessoa que possa fazer merge do PR pode aplicar. As regras de proteção de branch (revisões obrigatórias, verificações de status, aprovação do code owner) tornam-se a barreira. O RBAC de função/rótulo do Terrapod<em>não</em> se aplica a ações orientadas por comentários neste modo.",
-      "recommended": "<strong>Recomendado:</strong> exija histórico linear (rebase/squash antes do merge) para que o commit que você aplica seja o commit que efetivamente entra.",
       "credit": "Crédito: este fluxo de trabalho é modelado no <atlantis>Atlantis</atlantis>. O Atlantis continua sendo a ferramenta certa para equipes que querem apenas applies orientados por comentários de PR e nenhuma UI de plataforma."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Status do Bloqueio",
-      "lockedDesc": "Este workspace está bloqueado. Nenhum plan ou apply pode ser executado.",
       "unlockedDesc": "Este workspace está desbloqueado e pronto para execuções.",
       "lock": "Bloquear",
       "unlock": "Desbloquear",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Limpar o estado de drift relatado. A próxima verificação agendada o repopulará com base na realidade.",
       "lastChecked": "Última Verificação",
       "checkNow": "Verificar Agora",
-      "checkNowTitle": "Enfileirar uma execução somente plano para verificar drift",
       "checkNowTitleDisabled": "Ative a detecção de drift primeiro"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 dias"
     },
     "planExpiry": {
-      "title": "Expiração do Plano",
-      "description": "Descartar automaticamente um plano não confirmado quando ele ficar mais antigo do que isto, para que um plano obsoleto não possa ser aplicado contra um mundo que mudou. Desativado por padrão; o plano deve então ser reexecutado. (Aplica-se apenas a execuções com capacidade de apply.)",
       "expireAfter": "Expirar após"
     },
     "aiSummary": {
       "title": "Resumo de Plano por IA",
-      "description": "Resumo de alterações, avaliação de risco e análise de falha gerados automaticamente por LLM em cada resultado da fase de plan deste workspace.",
       "mode": "Modo",
       "modeDefault": "Seguir o padrão da implantação",
       "modeEnabled": "Sempre resumir",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Notificações do Slack",
-      "description": "Habilite este workspace para notificações de execução no Slack — solicitações de aprovação, applies, erros e drift. Deixe o canal vazio e este workspace permanece em silêncio (não há distribuição para toda a implantação). Requer que o app do Slack seja ativado por um administrador.",
       "channel": "Canal",
       "channelPlaceholder": "#deploys ou um ID de canal (ex.: C0123ABCD)",
       "notSet": "Não definido — silencioso.",
@@ -2707,14 +2665,8 @@
       "options": "Opções",
       "hideOptions": "Ocultar Opções",
       "queueDestroy": "Destruir",
-      "queueDestroyTitle": "Enfileirar um plano de destroy",
       "destroyAllConfirm": "Destruir todos os recursos?",
       "confirmDestroy": "Confirmar Destroy",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + apply",
-      "queuePlanConfirm": "Enfileirar um plano especulativo para este workspace?",
-      "queueApplyConfirm": "Enfileirar uma execução de plan + apply? Isso pode alterar a infraestrutura.",
-      "planOptions": "Opções de Plan",
       "targetResources": "Recursos alvo",
       "replaceResources": "Substituir recursos",
       "commaSeparated": "(separados por vírgula)",
@@ -2725,7 +2677,6 @@
       "branch": "Branch",
       "tag": "Tag",
       "defaultBranch": "Padrão ({branch})",
-      "nonDefaultRefNote": "Ref não padrão selecionada — a execução será somente plano",
       "empty": "Nenhuma execução ainda para este workspace.",
       "runId": "ID da Execução",
       "status": "Status",
@@ -2736,12 +2687,8 @@
       "created": "Criado",
       "needsConfirm": "requer confirmação",
       "typeDestroy": "destroy",
-      "typePlanOnly": "somente plano",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "teste de módulo",
       "sourceModulePublish": "publicação de módulo",
-      "queueApplyTitle": "Enfileirar uma execução plan + apply",
-      "queueApplyRefBlocked": "Apply fica indisponível enquanto houver um branch, tag ou commit selecionado — essas execuções são sempre somente plan",
       "awaitingDecision": "aguardando decisão",
       "typeSavedPlan": "plano salvo",
       "typeSavedPlanHint": "Aplicação adiada: esta execução não bloqueia o workspace até que o plano salvo seja aplicado."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 selecionadas",
       "compare": "Comparar",
       "comparing": "Comparando…",
-      "empty": "Nenhuma versão de configuração ainda. Elas aparecem aqui assim que um `terraform plan` envia ou um push de VCS aciona uma execução.",
       "id": "ID",
       "source": "Origem",
       "status": "Status",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Run Triggers",
-      "description": "Quando um workspace de origem conclui um apply, os workspaces subsequentes têm uma nova execução enfileirada automaticamente. Até 20 workspaces de origem por destino.",
       "inboundHeading": "Workspaces de origem que acionam execuções aqui",
       "inboundEmpty": "Nenhum workspace de origem aciona execuções neste workspace.",
       "pickerPlaceholder": "Pesquisar workspaces para adicionar como origem…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Falha ao adicionar a variável ({status})",
       "deleteVariable": "Falha ao excluir a variável",
       "updateVariable": "Falha ao atualizar a variável",
-      "queuePlan": "Falha ao enfileirar o plan",
-      "queuePlanStatus": "Falha ao enfileirar o plan ({status})",
       "queueDestroy": "Falha ao enfileirar o destroy",
       "queueDestroyStatus": "Falha ao enfileirar o destroy ({status})",
       "createNotification": "Falha ao criar a notificação",

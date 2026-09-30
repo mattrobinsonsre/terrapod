@@ -70,7 +70,6 @@
       "agentPool": "Agent Havuzu",
       "none": "Yok",
       "autoApply": "Otomatik Uygula",
-      "autoApplyModeHint": "never: her zaman bir insanı bekle. always: başarılı her planı uygula. create / create/update: yalnızca bu işlemlerle sınırlı planları uygula — asla bir silme ya da değiştirme.",
       "enabled": "Etkin",
       "workingDirectory": "Çalışma Dizini",
       "workingDirectoryPlaceholder": "örn. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI üretti",
     "heading": {
-      "planSummary": "Plan özeti",
       "failureAnalysis": "Başarısızlık analizi"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Yeniden üret",
       "queueing": "Sıraya alınıyor…",
-      "tooltip": "AI özetini aynı plan girdilerine karşı yeniden çalıştır",
       "ariaLabel": "AI özetini yeniden üret",
       "confirm": "AI analizi yeniden üretilsin mi? Bu, modeli tekrar çalıştırır.",
       "error": "Yeniden üretilemedi: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Plan özetleniyor…",
       "analysingFailure": "Başarısızlık analiz ediliyor…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Değişiklik yok",
       "noChangesLower": "değişiklik yok",
-      "noChangesTitle": "Plan hiçbir kaynak değişikliği bildirmedi",
       "toAdd": "{count, plural, one {# eklenecek} other {# eklenecek}}",
       "toChange": "{count, plural, one {# değişecek} other {# değişecek}}",
       "toDestroy": "{count, plural, one {# yok edilecek} other {# yok edilecek}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "İzleme",
       "sharedThreadNote": "Çalışma alanı okuma iznine sahip herkesin görebildiği tek bir paylaşılan konu.",
-      "placeholder": "Bu plan hakkında bir izleme sorusu sorun… (göndermek için ⌘/Ctrl + Enter)",
       "send": "Gönder",
       "thinking": "Düşünüyor…",
       "you": "Siz",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "çalışma alanı",
     "backTo": "{name} sayfasına dön",
     "errorHeading": "Hata",
-    "discardedHeading": "İptal edildi — yeniden planlama gerekli",
     "common": {
       "yes": "Evet",
       "no": "Hayır"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "yok et",
-      "planOnly": "yalnızca plan",
       "savedPlan": "kaydedilmiş plan",
       "savedPlanHint": "Uygulama ertelendi: kaydedilmiş plan uygulanana kadar bu çalışma çalışma alanını tutmaz."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Yeniden Dene",
       "retryFull": "Çalıştırmayı Yeniden Dene",
       "retrying": "Yeniden deneniyor…",
-      "confirmShort": "Uygula",
-      "confirmFull": "Onayla ve Uygula",
       "confirming": "Onaylanıyor…",
       "discard": "İptal Et",
       "discarding": "İptal ediliyor…",
@@ -2071,8 +2061,6 @@
       "queuing": "Kuyruğa alınıyor…"
     },
     "confirm": {
-      "apply": "Bu çalıştırma uygulansın mı? Bu, planı uygular ve altyapıyı değiştirir.",
-      "discard": "Bu plan iptal edilsin mi?",
       "cancel": "Bu çalıştırma iptal edilsin mi?",
       "retry": "Bu çalıştırma yeniden denensin mi?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Etki grafiği",
       "cost": "Maliyet",
       "costFull": "Maliyet tahmini",
-      "planLabel": "Plan<log>Günlüğü</log>",
-      "applyLabel": "Uygulama<log>Günlüğü</log>",
-      "planFull": "Plan günlüğü",
-      "applyFull": "Uygulama günlüğü",
       "details": "Ayrıntılar",
       "security": "Güvenlik",
       "securityFull": "Güvenlik taraması"
     },
     "banner": {
       "destroy": "Bu bir <strong>yok etme</strong> çalıştırmasıdır — uygulandığında yönetilen tüm kaynaklar yok edilecek.",
-      "planOnlyCli": "Bu, VCS bağlı bir çalışma alanında CLI''den başlatılan <strong>yalnızca plan</strong> çalıştırmasıdır. CLI ile yüklenen kod için uygulama kullanılamaz — yalnızca VCS ile yönetilen kod uygulanabilir.",
       "moduleOverridesPrefix": "Bu çalıştırma <strong>modül geçersiz kılmaları</strong> kullanır",
       "moduleOverridesFromPr": "PR #{number} kaynaklı",
       "moduleOverridesSuffix": "yayımlanan registry sürümü yerine PR dalından getirilecek."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Değişiklik yok",
-      "planning": "Planlanıyor…",
       "toAdd": "eklenecek",
       "toChange": "değişecek",
       "toDestroy": "yok edilecek",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Yürütme Arka Ucu",
       "source": "Kaynak",
       "autoApply": "Otomatik Uygula",
-      "planOnly": "Yalnızca Plan",
       "triggeredBy": "Tetikleyen",
       "created": "Oluşturulma",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Zaman Çizelgesi",
       "queued": "Sıraya Alındı",
-      "planningStarted": "Planlama başladı",
-      "planComplete": "Plan tamamlandı",
       "confirmed": "Onaylandı",
-      "applyingStarted": "Uygulama başladı",
-      "applied": "Uygulandı",
       "errored": "Hata Verdi",
       "canceled": "İptal Edildi",
       "discarded": "İptal Edildi"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Canlı akışı izle",
       "end": "Son",
       "endTitle": "Günlüğün sonuna atla",
-      "planEmpty": "Henüz plan çıktısı mevcut değil.",
-      "applyEmpty": "Henüz uygulama çıktısı mevcut değil.",
       "index": {
         "label": "Şuraya git",
-        "title": "Bir kaynak değişikliğine veya plan özetine git",
-        "summary": "Plan özeti",
         "action": {
           "create": "oluştur",
           "update": "güncelle",
@@ -2218,13 +2191,11 @@
           "error": "hata",
           "warning": "uyarı"
         }
-      },
-      "applySkippedNoChanges": "Uygulama çalıştırılmadı: planda değişiklik yoktu, bu yüzden uygulanacak bir şey yoktu."
+      }
     },
     "policyPanel": {
       "heading": "Politika Denetimleri",
       "passedCount": "{passed}/{total} geçti",
-      "blockedMessage": "Bu çalıştırma <strong>zorunlu bir politika seti tarafından engellendi</strong>. Başarısızlık çözülene veya bir yönetici geçersiz kılana kadar uygulanmayacak.",
       "overriding": "Geçersiz kılınıyor...",
       "overrideContinue": "Geçersiz Kıl ve Devam Et",
       "overrideFailed": "Geçersiz kılma başarısız",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Fiyatlandırma verilerinde bunlarla eşleşen bir şey yoktu — eşlenmemiş bir tür, doğrudan maliyeti olmayan bir kaynak veya henüz kapsanmayan bir sağlayıcı.",
       "indicative": "Tahminler yaklaşıktır; gerçek maliyet kullanıma, bölgeye, taahhütlere ve indirimlere bağlıdır.",
       "asOfState": "durum v{serial} itibarıyla",
-      "noState": "Henüz maliyet yok — ilk uygulamadan sonra görünür.",
       "usageBand": "{dimension}: tipik {typical} {unit} (aralık {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/ay tipik — {low}–{high} {unit} aralığında {costLow}–{costHigh}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Hiçbir politika ölçütü eşleşmedi.",
       "overriding": "Geçersiz kılınıyor...",
       "overrideContinue": "Geçersiz Kıl ve Devam Et",
-      "overrideConfirm": "AI politika kapısı geçersiz kılınıp karara rağmen bu çalıştırmanın uygulanmasına izin verilsin mi?",
       "overrideFailed": "Geçersiz kılma başarısız",
       "overrideFailedStatus": "Geçersiz kılma başarısız ({status})",
       "overriddenBy": "{by} tarafından geçersiz kılındı"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Görüntülenirken orijinalinden çevrildi."
     },
     "drift": {
-      "remediate": "Plan + apply",
-      "remediateTitle": "Altyapıyı yeniden yapılandırmayla uyumlu hale getirmek için bir plan + apply çalıştırması kuyruğa al",
-      "remediateConfirm": "Bu çalışma alanı için plan + apply çalıştırması kuyruğa alınsın mı?",
       "remediateMessage": "Sapma kontrolünden kuyruğa alındı",
       "remediateFailed": "Düzeltme çalıştırması kuyruğa alınamadı"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",
-      "rbac": "PR''ı birleştirebilen herkes uygulayabilir. Dal koruma kuralları (gerekli incelemeler, durum denetimleri, kod sahibi onayı) kapı haline gelir. Terrapod rol/etiket RBAC''si bu modda yorum güdümlü eylemlere<em>uygulanmaz</em>.",
-      "recommended": "<strong>Önerilir:</strong> uyguladığınız commit''in yerleşen commit olması için doğrusal geçmiş gerektirin (birleştirmeden önce rebase/squash yapın).",
       "credit": "Not: bu iş akışı <atlantis>Atlantis</atlantis> temel alınarak modellenmiştir. Atlantis, yalnızca PR yorum güdümlü uygulamalar isteyen ve platform arayüzü istemeyen ekipler için doğru araç olmaya devam ediyor."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Kilit Durumu",
-      "lockedDesc": "Bu çalışma alanı kilitli. Hiçbir plan veya uygulama çalışamaz.",
       "unlockedDesc": "Bu çalışma alanının kilidi açık ve çalıştırmalara hazır.",
       "lock": "Kilitle",
       "unlock": "Kilidi Aç",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Bildirilen sürüklenme durumunu temizle. Bir sonraki planlı denetim onu gerçeklikten yeniden dolduracak.",
       "lastChecked": "Son Denetim",
       "checkNow": "Şimdi Denetle",
-      "checkNowTitle": "Sürüklenmeyi denetlemek için yalnızca plan çalıştırması sıraya al",
       "checkNowTitleDisabled": "Önce sürüklenme tespitini etkinleştirin"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 gün"
     },
     "planExpiry": {
-      "title": "Plan Sona Ermesi",
-      "description": "Bir plan bu süreden eskidiğinde, onaylanmamış bir planı otomatik olarak iptal edin; böylece eski bir plan, değişmiş bir dünyaya karşı uygulanamaz. Varsayılan olarak kapalı; plan daha sonra yeniden çalıştırılmalıdır. (Yalnızca uygulama yapabilen çalıştırmalara uygulanır.)",
       "expireAfter": "Şu süre sonra sona er"
     },
     "aiSummary": {
       "title": "AI Plan Özeti",
-      "description": "Bu çalışma alanı için her plan aşaması sonucunda otomatik olarak LLM tarafından üretilen değişiklik özeti, risk değerlendirmesi ve başarısızlık analizi.",
       "mode": "Mod",
       "modeDefault": "Dağıtım varsayılanını izle",
       "modeEnabled": "Her zaman özetle",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack bildirimleri",
-      "description": "Bu çalışma alanını Slack çalıştırma bildirimlerine dahil edin — onay istekleri, uygulamalar, hatalar ve sürüklenme. Kanalı boş bırakın ve bu çalışma alanı sessiz kalır (dağıtım genelinde bir dağıtım yoktur). Slack uygulamasının bir yönetici tarafından etkinleştirilmesini gerektirir.",
       "channel": "Kanal",
       "channelPlaceholder": "#deploys veya bir kanal ID''si (örn. C0123ABCD)",
       "notSet": "Ayarlanmadı — sessiz.",
@@ -2707,14 +2665,8 @@
       "options": "Seçenekler",
       "hideOptions": "Seçenekleri Gizle",
       "queueDestroy": "Yok et",
-      "queueDestroyTitle": "Bir yok etme planını sıraya al",
       "destroyAllConfirm": "Tüm kaynaklar yok edilsin mi?",
       "confirmDestroy": "Yok Etmeyi Onayla",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + apply",
-      "queuePlanConfirm": "Bu çalışma alanı için spekülatif bir plan sıraya alınsın mı?",
-      "queueApplyConfirm": "Bir plan + apply çalıştırması sıraya alınsın mı? Bu, altyapıyı değiştirebilir.",
-      "planOptions": "Plan Seçenekleri",
       "targetResources": "Hedef kaynaklar",
       "replaceResources": "Kaynakları değiştir",
       "commaSeparated": "(virgülle ayrılmış)",
@@ -2725,7 +2677,6 @@
       "branch": "Dal",
       "tag": "Etiket",
       "defaultBranch": "Varsayılan ({branch})",
-      "nonDefaultRefNote": "Varsayılan olmayan ref seçildi — çalıştırma yalnızca plan olacak",
       "empty": "Bu çalışma alanı için henüz çalıştırma yok.",
       "runId": "Çalıştırma ID''si",
       "status": "Durum",
@@ -2736,12 +2687,8 @@
       "created": "Oluşturulma",
       "needsConfirm": "onay gerekiyor",
       "typeDestroy": "yok et",
-      "typePlanOnly": "yalnızca plan",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "modül testi",
       "sourceModulePublish": "modül yayımlama",
-      "queueApplyTitle": "Plan + apply çalıştırması kuyruğa al",
-      "queueApplyRefBlocked": "Bir dal, etiket veya commit seçiliyken apply kullanılamaz — bu çalıştırmalar her zaman yalnızca plan olur",
       "awaitingDecision": "karar bekleniyor",
       "typeSavedPlan": "kaydedilmiş plan",
       "typeSavedPlanHint": "Uygulama ertelendi: kaydedilmiş plan uygulanana kadar bu çalışma çalışma alanını tutmaz."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 seçildi",
       "compare": "Karşılaştır",
       "comparing": "Karşılaştırılıyor…",
-      "empty": "Henüz yapılandırma sürümü yok. Bir `terraform plan` yüklediğinde veya bir VCS gönderimi bir çalıştırmayı tetiklediğinde burada görünürler.",
       "id": "ID",
       "source": "Kaynak",
       "status": "Durum",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Çalıştırma Tetikleyicileri",
-      "description": "Bir kaynak çalışma alanı bir uygulamayı tamamladığında, aşağı akış çalışma alanlarına otomatik olarak yeni bir çalıştırma sıraya alınır. Her hedef için en fazla 20 kaynak çalışma alanı.",
       "inboundHeading": "Burada çalıştırmaları tetikleyen kaynak çalışma alanları",
       "inboundEmpty": "Hiçbir kaynak çalışma alanı bu çalışma alanında çalıştırma tetiklemiyor.",
       "pickerPlaceholder": "Kaynak olarak eklemek için çalışma alanlarını ara…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Değişken eklenemedi ({status})",
       "deleteVariable": "Değişken silinemedi",
       "updateVariable": "Değişken güncellenemedi",
-      "queuePlan": "Plan sıraya alınamadı",
-      "queuePlanStatus": "Plan sıraya alınamadı ({status})",
       "queueDestroy": "Yok etme sıraya alınamadı",
       "queueDestroyStatus": "Yok etme sıraya alınamadı ({status})",
       "createNotification": "Bildirim oluşturulamadı",

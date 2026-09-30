@@ -70,7 +70,6 @@
       "agentPool": "Agent-Pool",
       "none": "Keiner",
       "autoApply": "Automatisch anwenden",
-      "autoApplyModeHint": "never: immer auf einen Menschen warten. always: jeden erfolgreichen Plan anwenden. create / create/update: nur Pläne anwenden, die auf diese Aktionen beschränkt sind — niemals ein Löschen oder Ersetzen.",
       "enabled": "Aktiviert",
       "workingDirectory": "Arbeitsverzeichnis",
       "workingDirectoryPlaceholder": "z. B. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "KI-generiert",
     "heading": {
-      "planSummary": "Plan-Zusammenfassung",
       "failureAnalysis": "Fehleranalyse"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Neu generieren",
       "queueing": "Wird eingereiht…",
-      "tooltip": "Die KI-Zusammenfassung mit denselben Plan-Eingaben erneut ausführen",
       "ariaLabel": "KI-Zusammenfassung neu generieren",
       "confirm": "Die KI-Analyse neu generieren? Dabei wird das Modell erneut ausgeführt.",
       "error": "Neu generieren nicht möglich: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Plan wird zusammengefasst…",
       "analysingFailure": "Fehler wird analysiert…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Keine Änderungen",
       "noChangesLower": "keine Änderungen",
-      "noChangesTitle": "Der Plan hat keine Ressourcenänderungen gemeldet",
       "toAdd": "{count, plural, one {# hinzuzufügen} other {# hinzuzufügen}}",
       "toChange": "{count, plural, one {# zu ändern} other {# zu ändern}}",
       "toDestroy": "{count, plural, one {# zu zerstören} other {# zu zerstören}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Rückfrage",
       "sharedThreadNote": "Ein gemeinsamer Thread, sichtbar für alle mit Leseberechtigung für den Arbeitsbereich.",
-      "placeholder": "Stellen Sie eine Rückfrage zu diesem Plan… (⌘/Strg + Eingabe zum Senden)",
       "send": "Senden",
       "thinking": "Denkt nach…",
       "you": "Sie",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "Arbeitsbereich",
     "backTo": "Zurück zu {name}",
     "errorHeading": "Fehler",
-    "discardedHeading": "Verworfen — erneuter Plan erforderlich",
     "common": {
       "yes": "Ja",
       "no": "Nein"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "Zerstören",
-      "planOnly": "Nur Plan",
       "savedPlan": "gespeicherter Plan",
       "savedPlanHint": "Anwendung aufgeschoben: Dieser Lauf belegt den Workspace nicht, bis der gespeicherte Plan angewendet wird."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Wiederholen",
       "retryFull": "Ausführung wiederholen",
       "retrying": "Wird wiederholt…",
-      "confirmShort": "Anwenden",
-      "confirmFull": "Bestätigen und anwenden",
       "confirming": "Wird bestätigt…",
       "discard": "Verwerfen",
       "discarding": "Wird verworfen…",
@@ -2071,8 +2061,6 @@
       "queuing": "Wird eingereiht…"
     },
     "confirm": {
-      "apply": "Diese Ausführung anwenden? Dadurch wird der Plan angewendet und die Infrastruktur verändert.",
-      "discard": "Diesen Plan verwerfen?",
       "cancel": "Diese Ausführung abbrechen?",
       "retry": "Diese Ausführung wiederholen?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Auswirkungsdiagramm",
       "cost": "Kosten",
       "costFull": "Kostenschätzung",
-      "planLabel": "Plan<log>-Protokoll</log>",
-      "applyLabel": "Anwenden<log>-Protokoll</log>",
-      "planFull": "Plan-Protokoll",
-      "applyFull": "Anwenden-Protokoll",
       "details": "Details",
       "security": "Sicherheit",
       "securityFull": "Sicherheits-Scan"
     },
     "banner": {
       "destroy": "Dies ist eine <strong>Zerstörungsausführung</strong> — beim Anwenden werden alle verwalteten Ressourcen zerstört.",
-      "planOnlyCli": "Dies ist eine <strong>Nur-Plan</strong>-Ausführung, die über die Befehlszeilenschnittstelle in einem mit einem VCS verbundenen Arbeitsbereich gestartet wurde. Für über die Befehlszeilenschnittstelle hochgeladenen Code ist keine Anwendung möglich — nur über das VCS verwalteter Code kann angewendet werden.",
       "moduleOverridesPrefix": "Diese Ausführung verwendet <strong>Modul-Überschreibungen</strong>",
       "moduleOverridesFromPr": "aus PR #{number}",
       "moduleOverridesSuffix": "wird aus dem PR-Branch anstelle der veröffentlichten Registry-Version abgerufen."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Keine Änderungen",
-      "planning": "Plant…",
       "toAdd": "hinzuzufügen",
       "toChange": "zu ändern",
       "toDestroy": "zu zerstören",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Ausführungs-Hintergrundsystem",
       "source": "Quelle",
       "autoApply": "Automatisch anwenden",
-      "planOnly": "Nur Plan",
       "triggeredBy": "Ausgelöst von",
       "created": "Erstellt",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Zeitverlauf",
       "queued": "In Warteschlange",
-      "planningStarted": "Planung gestartet",
-      "planComplete": "Plan abgeschlossen",
       "confirmed": "Bestätigt",
-      "applyingStarted": "Anwendung gestartet",
-      "applied": "Angewendet",
       "errored": "Fehlgeschlagen",
       "canceled": "Abgebrochen",
       "discarded": "Verworfen"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Dem Live-Ende folgen",
       "end": "Ende",
       "endTitle": "Zum Ende des Protokolls springen",
-      "planEmpty": "Noch keine Plan-Ausgabe verfügbar.",
-      "applyEmpty": "Noch keine Anwendungs-Ausgabe verfügbar.",
       "index": {
         "label": "Springe zu",
-        "title": "Zu einer Ressourcenänderung oder zur Planübersicht springen",
-        "summary": "Planübersicht",
         "action": {
           "create": "erstellen",
           "update": "aktualisieren",
@@ -2218,13 +2191,11 @@
           "error": "Fehler",
           "warning": "Warnung"
         }
-      },
-      "applySkippedNoChanges": "Es wurde nichts angewendet: Der Plan enthielt keine Änderungen, daher gab es nichts anzuwenden."
+      }
     },
     "policyPanel": {
       "heading": "Richtlinienprüfungen",
       "passedCount": "{passed}/{total} bestanden",
-      "blockedMessage": "Diese Ausführung ist <strong>durch ein verbindliches Richtlinienset blockiert</strong>. Sie wird nicht angewendet, bis der Fehler behoben wird oder ein Administrator sie überschreibt.",
       "overriding": "Wird überschrieben...",
       "overrideContinue": "Überschreiben und fortfahren",
       "overrideFailed": "Überschreiben fehlgeschlagen",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "In den Preisdaten gab es keine Übereinstimmung für diese — ein nicht zugeordneter Typ, eine Ressource ohne direkte Kosten oder ein noch nicht abgedeckter Anbieter.",
       "indicative": "Schätzungen sind Richtwerte; die tatsächlichen Kosten hängen von Nutzung, Region, Verpflichtungen und Rabatten ab.",
       "asOfState": "Stand Zustand v{serial}",
-      "noState": "Noch keine Kosten — erscheint nach der ersten Anwendung.",
       "usageBand": "{dimension}: {typical} {unit} typisch (Bereich {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/Mon. typisch — {costLow}–{costHigh} über {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Keine Richtlinienkriterien trafen zu.",
       "overriding": "Wird überschrieben...",
       "overrideContinue": "Überschreiben und fortfahren",
-      "overrideConfirm": "Das KI-Richtlinien-Gate überschreiben und diesen Lauf trotz des Urteils anwenden lassen?",
       "overrideFailed": "Überschreiben fehlgeschlagen",
       "overrideFailedStatus": "Überschreiben fehlgeschlagen ({status})",
       "overriddenBy": "überschrieben von {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Beim Anzeigen aus dem Original übersetzt."
     },
     "drift": {
-      "remediate": "Plan + Apply",
-      "remediateTitle": "Einen Plan-+-Apply-Lauf einreihen, um die Infrastruktur wieder mit der Konfiguration in Einklang zu bringen",
-      "remediateConfirm": "Einen Plan-+-Apply-Lauf für diesen Workspace einreihen?",
       "remediateMessage": "Aus einer Abweichungsprüfung eingereiht",
       "remediateFailed": "Der Behebungslauf konnte nicht eingereiht werden"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",
-      "rbac": "Jeder, der den PR zusammenführen kann, kann anwenden. Branch-Schutzregeln (erforderliche Reviews, Statusprüfungen, Code-Owner-Freigabe) werden zur Kontrollinstanz. Die Rollen-/Label-RBAC von Terrapod gilt in diesem Modus <em>nicht</em> für kommentargesteuerte Aktionen.",
-      "recommended": "<strong>Empfohlen:</strong> Erzwingen Sie eine lineare Historie (rebase/squash vor dem Zusammenführen), damit der Commit, den Sie anwenden, auch der Commit ist, der landet.",
       "credit": "Hinweis: Dieser Workflow ist an <atlantis>Atlantis</atlantis> angelehnt. Atlantis bleibt das richtige Werkzeug für Teams, die ausschließlich per PR-Kommentar gesteuerte Applies ohne Plattform-UI wünschen."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Sperrzustand",
-      "lockedDesc": "Dieser Arbeitsbereich ist gesperrt. Es können keine Pläne oder Applies ausgeführt werden.",
       "unlockedDesc": "Dieser Arbeitsbereich ist entsperrt und bereit für Ausführungen.",
       "lock": "Sperren",
       "unlock": "Entsperren",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Den gemeldeten Drift-Status löschen. Die nächste geplante Prüfung füllt ihn anhand des tatsächlichen Zustands neu.",
       "lastChecked": "Zuletzt geprüft",
       "checkNow": "Jetzt prüfen",
-      "checkNowTitle": "Eine reine Plan-Ausführung zur Drift-Prüfung einreihen",
       "checkNowTitleDisabled": "Aktivieren Sie zuerst die Drift-Erkennung"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 Tage"
     },
     "planExpiry": {
-      "title": "Plan-Ablauf",
-      "description": "Verwirft einen unbestätigten Plan automatisch, sobald er älter als dieser Wert ist, damit ein veralteter Plan nicht auf eine veränderte Umgebung angewendet werden kann. Standardmäßig deaktiviert; der Plan muss dann erneut ausgeführt werden. (Gilt nur für apply-fähige Ausführungen.)",
       "expireAfter": "Ablauf nach"
     },
     "aiSummary": {
       "title": "KI-Plan-Zusammenfassung",
-      "description": "Automatische, per LLM erzeugte Änderungszusammenfassung, Risikobewertung und Fehleranalyse für jedes Plan-Phasenergebnis dieses Arbeitsbereichs.",
       "mode": "Modus",
       "modeDefault": "Bereitstellungsstandard folgen",
       "modeEnabled": "Immer zusammenfassen",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack-Benachrichtigungen",
-      "description": "Aktivieren Sie für diesen Arbeitsbereich Slack-Benachrichtigungen zu Ausführungen — Freigabeanfragen, Applies, Fehler und Drift. Lassen Sie den Kanal leer, bleibt dieser Arbeitsbereich stumm (es gibt keine bereitstellungsweite Verteilung). Erfordert, dass die Slack-App von einem Administrator aktiviert wurde.",
       "channel": "Kanal",
       "channelPlaceholder": "#deploys oder eine Kanal-ID (z. B. C0123ABCD)",
       "notSet": "Nicht festgelegt — stumm.",
@@ -2707,14 +2665,8 @@
       "options": "Optionen",
       "hideOptions": "Optionen ausblenden",
       "queueDestroy": "Zerstören",
-      "queueDestroyTitle": "Einen Destroy-Plan einreihen",
       "destroyAllConfirm": "Alle Ressourcen zerstören?",
       "confirmDestroy": "Destroy bestätigen",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + Apply",
-      "queuePlanConfirm": "Einen spekulativen Plan für diesen Arbeitsbereich einreihen?",
-      "queueApplyConfirm": "Eine plan + apply-Ausführung einreihen? Dies kann die Infrastruktur verändern.",
-      "planOptions": "Plan-Optionen",
       "targetResources": "Zielressourcen",
       "replaceResources": "Ressourcen ersetzen",
       "commaSeparated": "(durch Kommas getrennt)",
@@ -2725,7 +2677,6 @@
       "branch": "Branch",
       "tag": "Tag",
       "defaultBranch": "Standard ({branch})",
-      "nonDefaultRefNote": "Nicht-Standard-Ref ausgewählt — Ausführung erfolgt nur als Plan",
       "empty": "Noch keine Ausführungen für diesen Arbeitsbereich.",
       "runId": "Ausführungs-ID",
       "status": "Status",
@@ -2736,12 +2687,8 @@
       "created": "Erstellt",
       "needsConfirm": "Bestätigung erforderlich",
       "typeDestroy": "Zerstören",
-      "typePlanOnly": "nur Plan",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "Modul-Test",
       "sourceModulePublish": "Modul-Veröffentlichung",
-      "queueApplyTitle": "Einen Plan-+-Apply-Lauf einreihen",
-      "queueApplyRefBlocked": "Apply ist nicht verfügbar, solange ein Branch, Tag oder Commit ausgewählt ist – solche Läufe sind immer Plan-only",
       "awaitingDecision": "wartet auf Entscheidung",
       "typeSavedPlan": "gespeicherter Plan",
       "typeSavedPlanHint": "Anwendung aufgeschoben: Dieser Lauf belegt den Workspace nicht, bis der gespeicherte Plan angewendet wird."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 ausgewählt",
       "compare": "Vergleichen",
       "comparing": "Wird verglichen…",
-      "empty": "Noch keine Konfigurationsversionen. Sie erscheinen hier, sobald ein `terraform plan` hochlädt oder ein VCS-Push eine Ausführung auslöst.",
       "id": "ID",
       "source": "Quelle",
       "status": "Status",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Ausführungsauslöser",
-      "description": "Wenn ein Quellarbeitsbereich ein Apply abschließt, wird für nachgelagerte Arbeitsbereiche automatisch eine neue Ausführung eingereiht. Bis zu 20 Quellarbeitsbereiche pro Ziel.",
       "inboundHeading": "Quellarbeitsbereiche, die hier Ausführungen auslösen",
       "inboundEmpty": "Keine Quellarbeitsbereiche lösen Ausführungen in diesem Arbeitsbereich aus.",
       "pickerPlaceholder": "Arbeitsbereiche suchen, um sie als Quelle hinzuzufügen…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Variable konnte nicht hinzugefügt werden ({status})",
       "deleteVariable": "Variable konnte nicht gelöscht werden",
       "updateVariable": "Variable konnte nicht aktualisiert werden",
-      "queuePlan": "Plan konnte nicht eingereiht werden",
-      "queuePlanStatus": "Plan konnte nicht eingereiht werden ({status})",
       "queueDestroy": "Destroy konnte nicht eingereiht werden",
       "queueDestroyStatus": "Destroy konnte nicht eingereiht werden ({status})",
       "createNotification": "Benachrichtigung konnte nicht erstellt werden",

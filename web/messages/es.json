@@ -70,7 +70,6 @@
       "agentPool": "Grupo de agentes",
       "none": "Ninguno",
       "autoApply": "Aplicación automática",
-      "autoApplyModeHint": "never: esperar siempre a una persona. always: aplicar todos los planes correctos. create / create/update: aplicar solo los planes limitados a esas acciones — nunca una destrucción ni un reemplazo.",
       "enabled": "Habilitado",
       "workingDirectory": "Directorio de trabajo",
       "workingDirectoryPlaceholder": "p. ej. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "Generado por IA",
     "heading": {
-      "planSummary": "Resumen del plan",
       "failureAnalysis": "Análisis del fallo"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Regenerar",
       "queueing": "Poniendo en cola…",
-      "tooltip": "Volver a ejecutar el resumen de IA con las mismas entradas del plan",
       "ariaLabel": "Regenerar resumen de IA",
       "confirm": "¿Regenerar el análisis de IA? Esto vuelve a ejecutar el modelo.",
       "error": "No se pudo regenerar: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Resumiendo el plan…",
       "analysingFailure": "Analizando el fallo…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Sin cambios",
       "noChangesLower": "sin cambios",
-      "noChangesTitle": "El plan no reportó cambios de recursos",
       "toAdd": "{count, plural, one {# a añadir} other {# a añadir}}",
       "toChange": "{count, plural, one {# a cambiar} other {# a cambiar}}",
       "toDestroy": "{count, plural, one {# a destruir} other {# a destruir}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Seguimiento",
       "sharedThreadNote": "Un único hilo compartido, visible para cualquiera con acceso de lectura al espacio de trabajo.",
-      "placeholder": "Haga una pregunta de seguimiento sobre este plan… (⌘/Ctrl + Enter para enviar)",
       "send": "Enviar",
       "thinking": "Pensando…",
       "you": "Usted",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "espacio de trabajo",
     "backTo": "Volver a {name}",
     "errorHeading": "Error",
-    "discardedHeading": "Descartado — se requiere volver a planificar",
     "common": {
       "yes": "Sí",
       "no": "No"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "destruir",
-      "planOnly": "solo plan",
       "savedPlan": "plan guardado",
       "savedPlanHint": "Aplicación diferida: esta ejecución no bloquea el espacio de trabajo hasta que se aplique el plan guardado."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Reintentar",
       "retryFull": "Reintentar ejecución",
       "retrying": "Reintentando…",
-      "confirmShort": "Aplicar",
-      "confirmFull": "Confirmar y aplicar",
       "confirming": "Confirmando…",
       "discard": "Descartar",
       "discarding": "Descartando…",
@@ -2071,8 +2061,6 @@
       "queuing": "Poniendo en cola…"
     },
     "confirm": {
-      "apply": "¿Aplicar esta ejecución? Esto aplica el plan y cambia la infraestructura.",
-      "discard": "¿Descartar este plan?",
       "cancel": "¿Cancelar esta ejecución?",
       "retry": "¿Reintentar esta ejecución?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Grafo de impacto",
       "cost": "Coste",
       "costFull": "Estimación de coste",
-      "planLabel": "Plan<log>Registro</log>",
-      "applyLabel": "Apply<log>Registro</log>",
-      "planFull": "Registro del plan",
-      "applyFull": "Registro del apply",
       "details": "Detalles",
       "security": "Seguridad",
       "securityFull": "Análisis de seguridad"
     },
     "banner": {
       "destroy": "Esta es una ejecución de <strong>destrucción</strong> — todos los recursos gestionados se destruirán al aplicar.",
-      "planOnlyCli": "Esta es una ejecución <strong>solo de plan</strong> iniciada desde la CLI en un espacio de trabajo conectado a VCS. Apply no está disponible para código subido desde la CLI — solo se puede aplicar código gestionado por VCS.",
       "moduleOverridesPrefix": "Esta ejecución usa <strong>anulaciones de módulo</strong>",
       "moduleOverridesFromPr": "del PR #{number}",
       "moduleOverridesSuffix": "se obtendrá de la rama del PR en lugar de la versión publicada del registro."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Sin cambios",
-      "planning": "Planificando…",
       "toAdd": "a añadir",
       "toChange": "a cambiar",
       "toDestroy": "a destruir",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Backend de ejecución",
       "source": "Origen",
       "autoApply": "Aplicación automática",
-      "planOnly": "Solo plan",
       "triggeredBy": "Activado por",
       "created": "Creado",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Cronología",
       "queued": "En cola",
-      "planningStarted": "Planificación iniciada",
-      "planComplete": "Plan completado",
       "confirmed": "Confirmado",
-      "applyingStarted": "Aplicación iniciada",
-      "applied": "Aplicado",
       "errored": "Con error",
       "canceled": "Cancelado",
       "discarded": "Descartado"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Seguir la cola en vivo",
       "end": "Fin",
       "endTitle": "Ir al final del registro",
-      "planEmpty": "Aún no hay salida del plan disponible.",
-      "applyEmpty": "Aún no hay salida del apply disponible.",
       "index": {
         "label": "Ir a",
-        "title": "Ir a un cambio de recurso o al resumen del plan",
-        "summary": "Resumen del plan",
         "action": {
           "create": "crear",
           "update": "actualizar",
@@ -2218,13 +2191,11 @@
           "error": "error",
           "warning": "advertencia"
         }
-      },
-      "applySkippedNoChanges": "No se ejecutó ninguna aplicación: el plan no tenía cambios, así que no había nada que aplicar."
+      }
     },
     "policyPanel": {
       "heading": "Comprobaciones de políticas",
       "passedCount": "{passed}/{total} superadas",
-      "blockedMessage": "Esta ejecución está <strong>bloqueada por un conjunto de políticas obligatorio</strong>. No se aplicará hasta que se resuelva el fallo o un administrador lo anule.",
       "overriding": "Anulando...",
       "overrideContinue": "Anular y continuar",
       "overrideFailed": "Error al anular",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Nada en los datos de precios coincidió con estos: un tipo no asignado, un recurso sin coste directo o un proveedor aún no cubierto.",
       "indicative": "Las estimaciones son orientativas; el coste real depende del uso, la región, los compromisos y los descuentos.",
       "asOfState": "según el estado v{serial}",
-      "noState": "Aún sin coste — aparece tras la primera aplicación.",
       "usageBand": "{dimension}: {typical} {unit} típico (rango {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mes típico — {costLow}–{costHigh} entre {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Ningún criterio de política coincidió.",
       "overriding": "Anulando...",
       "overrideContinue": "Anular y continuar",
-      "overrideConfirm": "¿Anular la puerta de política de IA y permitir que esta ejecución se aplique a pesar del veredicto?",
       "overrideFailed": "Error al anular",
       "overrideFailedStatus": "Error al anular ({status})",
       "overriddenBy": "anulado por {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Traducido del original al visualizar."
     },
     "drift": {
-      "remediate": "Plan + apply",
-      "remediateTitle": "Poner en cola una ejecución plan + apply para volver a alinear la infraestructura con la configuración",
-      "remediateConfirm": "¿Poner en cola una ejecución plan + apply para este espacio de trabajo?",
       "remediateMessage": "Puesto en cola desde una comprobación de desviación",
       "remediateFailed": "No se pudo poner en cola la ejecución de corrección"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",
-      "rbac": "Cualquiera que pueda fusionar el PR puede aplicar. Las reglas de protección de rama (revisiones obligatorias, comprobaciones de estado, aprobación del propietario del código) se convierten en la barrera. El RBAC de roles/etiquetas de Terrapod<em>no</em> se aplica a las acciones impulsadas por comentarios en este modo.",
-      "recommended": "<strong>Recomendado:</strong> exija un historial lineal (rebase/squash antes de fusionar) para que el commit que aplica sea el commit que llega.",
       "credit": "Crédito: este flujo de trabajo está modelado según <atlantis>Atlantis</atlantis>. Atlantis sigue siendo la herramienta adecuada para equipos que solo quieren applies impulsados por comentarios de PR y ninguna interfaz de plataforma."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Estado de bloqueo",
-      "lockedDesc": "Este espacio de trabajo está bloqueado. No se pueden ejecutar planes ni applies.",
       "unlockedDesc": "Este espacio de trabajo está desbloqueado y listo para ejecuciones.",
       "lock": "Bloquear",
       "unlock": "Desbloquear",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Borrar el estado de desviación reportado. La siguiente comprobación programada lo repoblará a partir de la realidad.",
       "lastChecked": "Última comprobación",
       "checkNow": "Comprobar ahora",
-      "checkNowTitle": "Poner en cola una ejecución solo de plan para comprobar la desviación",
       "checkNowTitleDisabled": "Habilite primero la detección de desviación"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 días"
     },
     "planExpiry": {
-      "title": "Caducidad del plan",
-      "description": "Descartar automáticamente un plan sin confirmar una vez que sea más antiguo que esto, para que un plan obsoleto no pueda aplicarse contra un mundo que ha cambiado. Desactivado de forma predeterminada; el plan debe entonces volver a ejecutarse. (Solo se aplica a ejecuciones con capacidad de apply.)",
       "expireAfter": "Caducar tras"
     },
     "aiSummary": {
       "title": "Resumen de plan por IA",
-      "description": "Resumen de cambios generado automáticamente por LLM, evaluación de riesgos y análisis de fallos en cada resultado de fase de plan para este espacio de trabajo.",
       "mode": "Modo",
       "modeDefault": "Seguir el valor predeterminado del despliegue",
       "modeEnabled": "Resumir siempre",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Notificaciones de Slack",
-      "description": "Active para este espacio de trabajo las notificaciones de ejecución en Slack — solicitudes de aprobación, applies, errores y desviación. Deje el canal vacío y este espacio de trabajo permanecerá en silencio (no hay difusión para todo el despliegue). Requiere que un administrador haya habilitado la app de Slack.",
       "channel": "Canal",
       "channelPlaceholder": "#deploys o un ID de canal (p. ej. C0123ABCD)",
       "notSet": "Sin establecer — en silencio.",
@@ -2707,14 +2665,8 @@
       "options": "Opciones",
       "hideOptions": "Ocultar opciones",
       "queueDestroy": "Destruir",
-      "queueDestroyTitle": "Poner en cola un plan de destrucción",
       "destroyAllConfirm": "¿Destruir todos los recursos?",
       "confirmDestroy": "Confirmar destrucción",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + apply",
-      "queuePlanConfirm": "¿Poner en cola un plan especulativo para este espacio de trabajo?",
-      "queueApplyConfirm": "¿Poner en cola una ejecución de plan + apply? Esto puede cambiar la infraestructura.",
-      "planOptions": "Opciones del plan",
       "targetResources": "Recursos objetivo",
       "replaceResources": "Reemplazar recursos",
       "commaSeparated": "(separados por comas)",
@@ -2725,7 +2677,6 @@
       "branch": "Rama",
       "tag": "Etiqueta",
       "defaultBranch": "Predeterminada ({branch})",
-      "nonDefaultRefNote": "Referencia no predeterminada seleccionada — la ejecución será solo de plan",
       "empty": "Aún no hay ejecuciones para este espacio de trabajo.",
       "runId": "ID de ejecución",
       "status": "Estado",
@@ -2736,12 +2687,8 @@
       "created": "Creado",
       "needsConfirm": "requiere confirmación",
       "typeDestroy": "destruir",
-      "typePlanOnly": "solo plan",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "prueba de módulo",
       "sourceModulePublish": "publicación de módulo",
-      "queueApplyTitle": "Poner en cola una ejecución de plan + apply",
-      "queueApplyRefBlocked": "Apply no está disponible mientras haya una rama, etiqueta o commit seleccionado: esas ejecuciones son siempre solo de plan",
       "awaitingDecision": "esperando una decisión",
       "typeSavedPlan": "plan guardado",
       "typeSavedPlanHint": "Aplicación diferida: esta ejecución no bloquea el espacio de trabajo hasta que se aplique el plan guardado."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 seleccionadas",
       "compare": "Comparar",
       "comparing": "Comparando…",
-      "empty": "Aún no hay versiones de configuración. Aparecen aquí en cuanto un `terraform plan` sube una o un push de VCS activa una ejecución.",
       "id": "ID",
       "source": "Origen",
       "status": "Estado",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Disparadores de ejecución",
-      "description": "Cuando un espacio de trabajo de origen completa un apply, los espacios de trabajo descendentes obtienen automáticamente una nueva ejecución en cola. Hasta 20 espacios de trabajo de origen por destino.",
       "inboundHeading": "Espacios de trabajo de origen que activan ejecuciones aquí",
       "inboundEmpty": "Ningún espacio de trabajo de origen activa ejecuciones en este espacio de trabajo.",
       "pickerPlaceholder": "Buscar espacios de trabajo para añadir como origen…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "No se pudo añadir la variable ({status})",
       "deleteVariable": "No se pudo eliminar la variable",
       "updateVariable": "No se pudo actualizar la variable",
-      "queuePlan": "No se pudo poner el plan en cola",
-      "queuePlanStatus": "No se pudo poner el plan en cola ({status})",
       "queueDestroy": "No se pudo poner la destrucción en cola",
       "queueDestroyStatus": "No se pudo poner la destrucción en cola ({status})",
       "createNotification": "No se pudo crear la notificación",

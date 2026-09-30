@@ -70,7 +70,6 @@
       "agentPool": "Agentpulje",
       "none": "Ingen",
       "autoApply": "Anvend automatisk",
-      "autoApplyModeHint": "never: vent altid på et menneske. always: anvend hver vellykket plan. create / create/update: anvend kun planer begrænset til de handlinger — aldrig en sletning eller en udskiftning.",
       "enabled": "Aktiveret",
       "workingDirectory": "Arbejdsmappe",
       "workingDirectoryPlaceholder": "f.eks. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI-genereret",
     "heading": {
-      "planSummary": "Planoversigt",
       "failureAnalysis": "Fejlanalyse"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Regenerér",
       "queueing": "Sætter i kø…",
-      "tooltip": "Kør AI-oversigten igen mod de samme planinput",
       "ariaLabel": "Regenerér AI-oversigt",
       "confirm": "Regenerér AI-analysen? Dette kører modellen igen.",
       "error": "Kunne ikke regenerere: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Opsummerer plan…",
       "analysingFailure": "Analyserer fejl…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Ingen ændringer",
       "noChangesLower": "ingen ændringer",
-      "noChangesTitle": "Planen rapporterede ingen ressourceændringer",
       "toAdd": "{count, plural, one {# at tilføje} other {# at tilføje}}",
       "toChange": "{count, plural, one {# at ændre} other {# at ændre}}",
       "toDestroy": "{count, plural, one {# at nedrive} other {# at nedrive}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Opfølgning",
       "sharedThreadNote": "Én delt tråd, synlig for alle med læseadgang til arbejdsområdet.",
-      "placeholder": "Stil et opfølgende spørgsmål om denne plan… (⌘/Ctrl + Enter for at sende)",
       "send": "Send",
       "thinking": "Tænker…",
       "you": "Dig",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "arbejdsområde",
     "backTo": "Tilbage til {name}",
     "errorHeading": "Fejl",
-    "discardedHeading": "Kasseret — genplanlægning påkrævet",
     "common": {
       "yes": "Ja",
       "no": "Nej"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "nedriv",
-      "planOnly": "kun plan",
       "savedPlan": "gemt plan",
       "savedPlanHint": "Anvendelse udskudt: denne kørsel holder ikke arbejdsområdet, før den gemte plan anvendes."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Prøv igen",
       "retryFull": "Kør igen",
       "retrying": "Prøver igen…",
-      "confirmShort": "Anvend",
-      "confirmFull": "Bekræft og anvend",
       "confirming": "Bekræfter…",
       "discard": "Kassér",
       "discarding": "Kasserer…",
@@ -2071,8 +2061,6 @@
       "queuing": "Sætter i kø…"
     },
     "confirm": {
-      "apply": "Anvend denne kørsel? Dette anvender planen og ændrer infrastrukturen.",
-      "discard": "Kassér denne plan?",
       "cancel": "Annuller denne kørsel?",
       "retry": "Kør denne kørsel igen?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Konsekvensgraf",
       "cost": "Omkostning",
       "costFull": "Omkostningsestimat",
-      "planLabel": "Plan<log>log</log>",
-      "applyLabel": "Apply<log>log</log>",
-      "planFull": "Plan-log",
-      "applyFull": "Apply-log",
       "details": "Detaljer",
       "security": "Sikkerhed",
       "securityFull": "Sikkerhedsscanning"
     },
     "banner": {
       "destroy": "Dette er en <strong>nedrivnings</strong>kørsel — alle styrede ressourcer nedrives, når den anvendes.",
-      "planOnlyCli": "Dette er en <strong>kun-plan</strong>-kørsel startet fra CLI'en på et VCS-forbundet arbejdsområde. Apply er ikke tilgængelig for CLI-uploadet kode — kun VCS-styret kode kan anvendes.",
       "moduleOverridesPrefix": "Denne kørsel bruger <strong>modultilsidesættelser</strong>",
       "moduleOverridesFromPr": "fra PR #{number}",
       "moduleOverridesSuffix": "hentes fra PR-branchen i stedet for den publicerede registry-version."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Ingen ændringer",
-      "planning": "Planlægger…",
       "toAdd": "at tilføje",
       "toChange": "at ændre",
       "toDestroy": "at nedrive",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Eksekverings-backend",
       "source": "Kilde",
       "autoApply": "Anvend automatisk",
-      "planOnly": "Kun plan",
       "triggeredBy": "Udløst af",
       "created": "Oprettet",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Tidslinje",
       "queued": "I kø",
-      "planningStarted": "Planlægning startet",
-      "planComplete": "Plan fuldført",
       "confirmed": "Bekræftet",
-      "applyingStarted": "Anvendelse startet",
-      "applied": "Anvendt",
       "errored": "Fejlet",
       "canceled": "Annulleret",
       "discarded": "Kasseret"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Følg den live hale",
       "end": "Slut",
       "endTitle": "Hop til slutningen af loggen",
-      "planEmpty": "Ingen plan-output tilgængelig endnu.",
-      "applyEmpty": "Ingen apply-output tilgængelig endnu.",
       "index": {
         "label": "Gå til",
-        "title": "Gå til en ressourceændring eller til planoversigten",
-        "summary": "Planoversigt",
         "action": {
           "create": "opret",
           "update": "opdater",
@@ -2218,13 +2191,11 @@
           "error": "fejl",
           "warning": "advarsel"
         }
-      },
-      "applySkippedNoChanges": "Ingen anvendelse blev kørt: planen havde ingen ændringer, så der var intet at anvende."
+      }
     },
     "policyPanel": {
       "heading": "Politiktjek",
       "passedCount": "{passed}/{total} bestået",
-      "blockedMessage": "Denne kørsel er <strong>blokeret af et obligatorisk politiksæt</strong>. Den anvendes ikke, før fejlen er løst, eller en administrator tilsidesætter den.",
       "overriding": "Tilsidesætter...",
       "overrideContinue": "Tilsidesæt og fortsæt",
       "overrideFailed": "Tilsidesættelse mislykkedes",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Intet i prisdataene matchede disse — en ikke-tilknyttet type, en ressource uden direkte omkostning eller en udbyder, der endnu ikke er dækket.",
       "indicative": "Estimaterne er vejledende; den faktiske omkostning afhænger af forbrug, region, forpligtelser og rabatter.",
       "asOfState": "pr. tilstand v{serial}",
-      "noState": "Ingen omkostning endnu — vises efter første anvendelse.",
       "usageBand": "{dimension}: {typical} {unit} typisk (interval {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/md typisk — {costLow}–{costHigh} ved {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Ingen politikkriterier matchede.",
       "overriding": "Tilsidesætter...",
       "overrideContinue": "Tilsidesæt og fortsæt",
-      "overrideConfirm": "Tilsidesæt AI-politikporten og lad denne kørsel blive anvendt på trods af kendelsen?",
       "overrideFailed": "Tilsidesættelse mislykkedes",
       "overrideFailedStatus": "Tilsidesættelse mislykkedes ({status})",
       "overriddenBy": "tilsidesat af {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Oversat fra originalen ved visning."
     },
     "drift": {
-      "remediate": "Plan + apply",
-      "remediateTitle": "Sæt en plan + apply-kørsel i kø for at bringe infrastrukturen på linje med konfigurationen igen",
-      "remediateConfirm": "Sæt en plan + apply-kørsel i kø for dette workspace?",
       "remediateMessage": "Sat i kø fra et afvigelsestjek",
       "remediateFailed": "Kunne ikke sætte rettelseskørslen i kø"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",
-      "rbac": "Enhver, der kan merge PR'en, kan anvende. Branch-beskyttelsesregler (påkrævede reviews, statustjek, code owner-godkendelse) bliver porten. Terrapods rolle-/label-RBAC gælder<em>ikke</em> for kommentar-drevne handlinger i denne tilstand.",
-      "recommended": "<strong>Anbefalet:</strong> kræv lineær historik (rebase/squash før merge), så den commit, du anvender, er den commit, der lander.",
       "credit": "Kredit: denne arbejdsgang er modelleret efter <atlantis>Atlantis</atlantis>. Atlantis er fortsat det rette værktøj for teams, der kun vil have PR-kommentar-drevne applies og ingen platform-brugergrænseflade."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Låsestatus",
-      "lockedDesc": "Dette arbejdsområde er låst. Ingen planer eller applies kan køre.",
       "unlockedDesc": "Dette arbejdsområde er ulåst og klar til kørsler.",
       "lock": "Lås",
       "unlock": "Lås op",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Ryd den rapporterede afdriftstilstand. Det næste planlagte tjek genudfylder den fra virkeligheden.",
       "lastChecked": "Sidst tjekket",
       "checkNow": "Tjek nu",
-      "checkNowTitle": "Sæt en kun-plan-kørsel i kø for at tjekke for afdrift",
       "checkNowTitleDisabled": "Aktivér afdriftsregistrering først"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 dage"
     },
     "planExpiry": {
-      "title": "Planudløb",
-      "description": "Kassér automatisk en ubekræftet plan, når den er ældre end dette, så en forældet plan ikke kan anvendes mod en verden, der har flyttet sig. Fra som standard; planen skal så køres igen. (Gælder kun for apply-egnede kørsler.)",
       "expireAfter": "Udløb efter"
     },
     "aiSummary": {
       "title": "AI-planoversigt",
-      "description": "Automatisk LLM-genereret ændringsoversigt, risikovurdering og fejlanalyse på hvert plan-fase-udfald for dette arbejdsområde.",
       "mode": "Tilstand",
       "modeDefault": "Følg deployment-standard",
       "modeEnabled": "Opsummer altid",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack-notifikationer",
-      "description": "Tilmeld dette arbejdsområde Slack-kørselsnotifikationer — godkendelsesanmodninger, applies, fejl og afdrift. Lad kanalen stå tom, og dette arbejdsområde forbliver tavst (der er ingen deployment-dækkende udsendelse). Kræver, at Slack-appen er aktiveret af en administrator.",
       "channel": "Kanal",
       "channelPlaceholder": "#deploys eller et kanal-ID (f.eks. C0123ABCD)",
       "notSet": "Ikke angivet — tavs.",
@@ -2707,14 +2665,8 @@
       "options": "Indstillinger",
       "hideOptions": "Skjul indstillinger",
       "queueDestroy": "Destruér",
-      "queueDestroyTitle": "Sæt en nedrivningsplan i kø",
       "destroyAllConfirm": "Nedriv alle ressourcer?",
       "confirmDestroy": "Bekræft nedrivning",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + apply",
-      "queuePlanConfirm": "Sæt en spekulativ plan i kø for dette arbejdsområde?",
-      "queueApplyConfirm": "Sæt en plan + apply-kørsel i kø? Dette kan ændre infrastrukturen.",
-      "planOptions": "Planindstillinger",
       "targetResources": "Målressourcer",
       "replaceResources": "Erstat ressourcer",
       "commaSeparated": "(kommasepareret)",
@@ -2725,7 +2677,6 @@
       "branch": "Branch",
       "tag": "Tag",
       "defaultBranch": "Standard ({branch})",
-      "nonDefaultRefNote": "Ikke-standard-ref valgt — kørslen bliver kun-plan",
       "empty": "Ingen kørsler endnu for dette arbejdsområde.",
       "runId": "Kørsels-ID",
       "status": "Status",
@@ -2736,12 +2687,8 @@
       "created": "Oprettet",
       "needsConfirm": "kræver bekræftelse",
       "typeDestroy": "nedriv",
-      "typePlanOnly": "kun plan",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "modultest",
       "sourceModulePublish": "modulpublicering",
-      "queueApplyTitle": "Sæt en plan + apply-kørsel i kø",
-      "queueApplyRefBlocked": "Apply er utilgængelig, mens en branch, et tag eller et commit er valgt — de kørsler er altid kun plan",
       "awaitingDecision": "afventer beslutning",
       "typeSavedPlan": "gemt plan",
       "typeSavedPlanHint": "Anvendelse udskudt: denne kørsel holder ikke arbejdsområdet, før den gemte plan anvendes."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 valgt",
       "compare": "Sammenlign",
       "comparing": "Sammenligner…",
-      "empty": "Ingen konfigurationsversioner endnu. De vises her, så snart en `terraform plan` uploader, eller et VCS-push udløser en kørsel.",
       "id": "ID",
       "source": "Kilde",
       "status": "Status",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Kørselstriggere",
-      "description": "Når et kilde-arbejdsområde fuldfører en apply, får downstream-arbejdsområder automatisk sat en ny kørsel i kø. Op til 20 kilde-arbejdsområder pr. destination.",
       "inboundHeading": "Kilde-arbejdsområder, der udløser kørsler her",
       "inboundEmpty": "Ingen kilde-arbejdsområder udløser kørsler på dette arbejdsområde.",
       "pickerPlaceholder": "Søg efter arbejdsområder at tilføje som kilde…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Kunne ikke tilføje variabel ({status})",
       "deleteVariable": "Kunne ikke slette variabel",
       "updateVariable": "Kunne ikke opdatere variabel",
-      "queuePlan": "Kunne ikke sætte plan i kø",
-      "queuePlanStatus": "Kunne ikke sætte plan i kø ({status})",
       "queueDestroy": "Kunne ikke sætte nedrivning i kø",
       "queueDestroyStatus": "Kunne ikke sætte nedrivning i kø ({status})",
       "createNotification": "Kunne ikke oprette notifikation",

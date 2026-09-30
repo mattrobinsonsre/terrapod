@@ -70,7 +70,6 @@
       "agentPool": "エージェントプール",
       "none": "なし",
       "autoApply": "自動適用",
-      "autoApplyModeHint": "never: 常に人の確認を待ちます。always: 成功したプランをすべて適用します。create / create/update: それらの操作だけに限られたプランのみを適用し、破棄や置換は決して適用しません。",
       "enabled": "有効",
       "workingDirectory": "作業ディレクトリ",
       "workingDirectoryPlaceholder": "例: environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI生成",
     "heading": {
-      "planSummary": "プランサマリー",
       "failureAnalysis": "障害分析"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "再生成",
       "queueing": "キューに追加中…",
-      "tooltip": "同じプラン入力に対してAIサマリーを再実行します",
       "ariaLabel": "AIサマリーを再生成",
       "confirm": "AI分析を再生成しますか？モデルが再度実行されます。",
       "error": "再生成できませんでした: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "プランを要約中…",
       "analysingFailure": "障害を分析中…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "変更なし",
       "noChangesLower": "変更なし",
-      "noChangesTitle": "プランはリソースの変更がないと報告しました",
       "toAdd": "{count, plural, one {# 件追加} other {# 件追加}}",
       "toChange": "{count, plural, one {# 件変更} other {# 件変更}}",
       "toDestroy": "{count, plural, one {# 件破棄} other {# 件破棄}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "フォローアップ",
       "sharedThreadNote": "1つの共有スレッドで、ワークスペースの読み取り権限を持つ全員に表示されます。",
-      "placeholder": "このプランについてフォローアップの質問をする…（⌘/Ctrl + Enter で送信）",
       "send": "送信",
       "thinking": "思考中…",
       "you": "あなた",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "ワークスペース",
     "backTo": "{name} に戻る",
     "errorHeading": "エラー",
-    "discardedHeading": "破棄済み — 再プランが必要",
     "common": {
       "yes": "はい",
       "no": "いいえ"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "破棄",
-      "planOnly": "プランのみ",
       "savedPlan": "保存済みプラン",
       "savedPlanHint": "適用は保留中です。保存されたプランが適用されるまで、この実行はワークスペースを占有しません。"
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "再試行",
       "retryFull": "実行を再試行",
       "retrying": "再試行中…",
-      "confirmShort": "適用",
-      "confirmFull": "確認して適用",
       "confirming": "確認中…",
       "discard": "破棄",
       "discarding": "破棄中…",
@@ -2071,8 +2061,6 @@
       "queuing": "キューに追加中…"
     },
     "confirm": {
-      "apply": "この実行を適用しますか？プランが適用され、インフラが変更されます。",
-      "discard": "このプランを破棄しますか？",
       "cancel": "この実行をキャンセルしますか？",
       "retry": "この実行を再試行しますか？"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "影響グラフ",
       "cost": "コスト",
       "costFull": "コスト見積もり",
-      "planLabel": "プラン<log>ログ</log>",
-      "applyLabel": "適用<log>ログ</log>",
-      "planFull": "プランログ",
-      "applyFull": "適用ログ",
       "details": "詳細",
       "security": "セキュリティ",
       "securityFull": "セキュリティスキャン"
     },
     "banner": {
       "destroy": "これは<strong>破棄</strong>実行です — 適用するとすべての管理対象リソースが破棄されます。",
-      "planOnlyCli": "これは、VCS接続されたワークスペースでCLIから開始された<strong>プランのみ</strong>の実行です。CLIでアップロードされたコードには適用できません — 適用できるのはVCS管理下のコードのみです。",
       "moduleOverridesPrefix": "この実行は<strong>モジュールオーバーライド</strong>を使用します",
       "moduleOverridesFromPr": "PR #{number} から",
       "moduleOverridesSuffix": "は公開されたレジストリバージョンではなく、PRブランチから取得されます。"
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "変更なし",
-      "planning": "プラン実行中…",
       "toAdd": "追加",
       "toChange": "変更",
       "toDestroy": "破棄",
@@ -2157,7 +2139,6 @@
       "executionBackend": "実行バックエンド",
       "source": "ソース",
       "autoApply": "自動適用",
-      "planOnly": "プランのみ",
       "triggeredBy": "トリガー元",
       "created": "作成日時",
       "commit": "コミット",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "タイムライン",
       "queued": "キュー待ち",
-      "planningStarted": "プラン開始",
-      "planComplete": "プラン完了",
       "confirmed": "確認済み",
-      "applyingStarted": "適用開始",
-      "applied": "適用済み",
       "errored": "エラー",
       "canceled": "キャンセル済み",
       "discarded": "破棄済み"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "ライブ末尾を追従",
       "end": "末尾",
       "endTitle": "ログの末尾へ移動",
-      "planEmpty": "まだプラン出力がありません。",
-      "applyEmpty": "まだ適用出力がありません。",
       "index": {
         "label": "移動先",
-        "title": "リソースの変更またはプラン概要に移動します",
-        "summary": "プラン概要",
         "action": {
           "create": "作成",
           "update": "更新",
@@ -2218,13 +2191,11 @@
           "error": "エラー",
           "warning": "警告"
         }
-      },
-      "applySkippedNoChanges": "適用は実行されませんでした: プランに変更がなかったため、適用するものはありませんでした。"
+      }
     },
     "policyPanel": {
       "heading": "ポリシーチェック",
       "passedCount": "{total} 件中 {passed} 件が合格",
-      "blockedMessage": "この実行は<strong>必須ポリシーセットによってブロックされています</strong>。失敗が解決されるか、管理者がオーバーライドするまで適用されません。",
       "overriding": "オーバーライド中...",
       "overrideContinue": "オーバーライドして続行",
       "overrideFailed": "オーバーライドに失敗しました",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "価格データに一致するものがありませんでした。マッピングされていない種類、直接コストのないリソース、または未対応のプロバイダーです。",
       "indicative": "見積もりは目安です。実際のコストは使用状況、リージョン、コミットメント、割引によって異なります。",
       "asOfState": "状態 v{serial} 時点",
-      "noState": "まだコストはありません — 最初の適用後に表示されます。",
       "usageBand": "{dimension}：標準 {typical} {unit}（範囲 {low}〜{high}）",
       "usageBandCost": "{dimension}：標準 {costTypical}/月 — {low}〜{high} {unit} で {costLow}〜{costHigh}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "一致したポリシー基準はありません。",
       "overriding": "オーバーライド中...",
       "overrideContinue": "オーバーライドして続行",
-      "overrideConfirm": "AI ポリシーゲートをオーバーライドし、判定にかかわらずこの実行の適用を許可しますか？",
       "overrideFailed": "オーバーライドに失敗しました",
       "overrideFailedStatus": "オーバーライドに失敗しました（{status}）",
       "overriddenBy": "{by} によりオーバーライド"
@@ -2410,9 +2379,6 @@
       "translatedNote": "表示時に原文から翻訳されています。"
     },
     "drift": {
-      "remediate": "プラン + 適用",
-      "remediateTitle": "インフラを構成に一致させるためプラン + 適用の実行をキューに追加します",
-      "remediateConfirm": "このワークスペースでプラン + 適用の実行をキューに追加しますか?",
       "remediateMessage": "差分チェックからキューに追加",
       "remediateFailed": "修正の実行をキューに追加できませんでした"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",
-      "rbac": "PRをマージできる者は誰でも適用できます。ブランチ保護ルール（必須レビュー、ステータスチェック、コードオーナーの承認）がゲートになります。このモードでは、Terrapodのロール/ラベルRBACはコメント駆動のアクションに<em>適用されません</em>。",
-      "recommended": "<strong>推奨:</strong> 線形履歴を要求してください（マージ前にrebase/squash）。これにより、適用するコミットが実際に取り込まれるコミットになります。",
       "credit": "クレジット: このワークフローは<atlantis>Atlantis</atlantis>をモデルにしています。AtlantisはPRコメント駆動の適用のみを望み、プラットフォームUIを不要とするチームにとって、依然として適切なツールです。"
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "ロック状態",
-      "lockedDesc": "このワークスペースはロックされています。プランや適用は実行できません。",
       "unlockedDesc": "このワークスペースはロック解除されており、実行の準備ができています。",
       "lock": "ロック",
       "unlock": "ロック解除",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "報告されたドリフト状態をクリアします。次回のスケジュールされたチェックが実際の状態から再取得します。",
       "lastChecked": "最終チェック",
       "checkNow": "今すぐチェック",
-      "checkNowTitle": "ドリフトをチェックするためのプランのみの実行をキューに追加します",
       "checkNowTitleDisabled": "まずドリフト検出を有効にしてください"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7日"
     },
     "planExpiry": {
-      "title": "プラン有効期限",
-      "description": "未確認のプランがこの期間より古くなると自動的に破棄します。これにより、状況が変化した後に古いプランが適用されるのを防ぎます。デフォルトではオフで、その場合プランは再実行が必要です。（適用可能な実行にのみ適用されます。）",
       "expireAfter": "有効期限"
     },
     "aiSummary": {
       "title": "AIプランサマリー",
-      "description": "このワークスペースのすべてのプランフェーズの結果に対する、LLMによる自動生成の変更サマリー、リスク評価、障害分析です。",
       "mode": "モード",
       "modeDefault": "デプロイメントのデフォルトに従う",
       "modeEnabled": "常に要約する",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack通知",
-      "description": "このワークスペースをSlackの実行通知（承認リクエスト、適用、エラー、ドリフト）にオプトインします。チャンネルを空欄のままにすると、このワークスペースは通知しません（デプロイメント全体への一斉配信はありません）。管理者によるSlackアプリの有効化が必要です。",
       "channel": "チャンネル",
       "channelPlaceholder": "#deploys またはチャンネルID（例: C0123ABCD）",
       "notSet": "未設定 — 通知なし。",
@@ -2707,14 +2665,8 @@
       "options": "オプション",
       "hideOptions": "オプションを非表示",
       "queueDestroy": "破棄",
-      "queueDestroyTitle": "破棄プランをキューに追加",
       "destroyAllConfirm": "すべてのリソースを破棄しますか？",
       "confirmDestroy": "破棄の確認",
-      "queuePlan": "プラン",
-      "queueRun": "プラン + 適用",
-      "queuePlanConfirm": "このワークスペースの投機的プランをキューに追加しますか？",
-      "queueApplyConfirm": "plan + apply の実行をキューに追加しますか？これによりインフラが変更される可能性があります。",
-      "planOptions": "プランオプション",
       "targetResources": "対象リソース",
       "replaceResources": "置換リソース",
       "commaSeparated": "（カンマ区切り）",
@@ -2725,7 +2677,6 @@
       "branch": "ブランチ",
       "tag": "タグ",
       "defaultBranch": "デフォルト（{branch}）",
-      "nonDefaultRefNote": "デフォルト以外のリファレンスが選択されています — 実行はプランのみになります",
       "empty": "このワークスペースの実行はまだありません。",
       "runId": "実行ID",
       "status": "ステータス",
@@ -2736,12 +2687,8 @@
       "created": "作成日時",
       "needsConfirm": "確認が必要",
       "typeDestroy": "破棄",
-      "typePlanOnly": "プランのみ",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "モジュールテスト",
       "sourceModulePublish": "モジュール公開",
-      "queueApplyTitle": "プラン + 適用の実行をキューに追加",
-      "queueApplyRefBlocked": "ブランチ・タグ・コミットを選択している間は適用できません。これらの実行は常にプランのみです",
       "awaitingDecision": "判断待ち",
       "typeSavedPlan": "保存済みプラン",
       "typeSavedPlanHint": "適用は保留中です。保存されたプランが適用されるまで、この実行はワークスペースを占有しません。"
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 選択中",
       "compare": "比較",
       "comparing": "比較中…",
-      "empty": "設定バージョンがまだありません。`terraform plan`がアップロードするか、VCSプッシュが実行をトリガーすると、すぐにここに表示されます。",
       "id": "ID",
       "source": "ソース",
       "status": "ステータス",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "実行トリガー",
-      "description": "ソースワークスペースが適用を完了すると、下流のワークスペースに新しい実行が自動的にキュー追加されます。宛先ごとに最大20個のソースワークスペースを指定できます。",
       "inboundHeading": "ここで実行をトリガーするソースワークスペース",
       "inboundEmpty": "このワークスペースで実行をトリガーするソースワークスペースはありません。",
       "pickerPlaceholder": "ソースとして追加するワークスペースを検索…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "変数の追加に失敗しました（{status}）",
       "deleteVariable": "変数の削除に失敗しました",
       "updateVariable": "変数の更新に失敗しました",
-      "queuePlan": "プランのキュー追加に失敗しました",
-      "queuePlanStatus": "プランのキュー追加に失敗しました（{status}）",
       "queueDestroy": "破棄のキュー追加に失敗しました",
       "queueDestroyStatus": "破棄のキュー追加に失敗しました（{status}）",
       "createNotification": "通知の作成に失敗しました",

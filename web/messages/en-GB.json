@@ -18,9 +18,6 @@
     }
   },
   "planSummary": {
-    "pending": {
-      "summarisingPlan": "Summarising plan…"
-    },
     "errored": {
       "heading": "Summariser failed"
     }

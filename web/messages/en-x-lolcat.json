@@ -70,7 +70,6 @@
       "agentPool": "Agent Pool",
       "none": "Noes",
       "autoApply": "Auto Apploy",
-      "autoApplyModeHint": "never: alwayz waits for a hooman. always: applyz every gud plan. create / create/update: onlee applyz planz wif just dose akshuns — NEVAR a destroy or a replace. srsly.",
       "enabled": "Enabuld",
       "workingDirectory": "Werkin Direktoree",
       "workingDirectoryPlaceholder": "e.g. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI generated",
     "heading": {
-      "planSummary": "Plan summry",
       "failureAnalysis": "Failyoor analysis"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Regeneratez",
       "queueing": "Queuein…",
-      "tooltip": "Re-run teh AI summry against teh same plan inputs",
       "ariaLabel": "Regenerate AI summry",
       "confirm": "Regenerate teh AI analysis? Dis runs teh model agin.",
       "error": "Could not regenerate: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Summarizin plan…",
       "analysingFailure": "Analysin failyoor…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "No changez",
       "noChangesLower": "no changez",
-      "noChangesTitle": "Plan reported no resource changez",
       "toAdd": "{count, plural, one {# ta add} other {# ta add}}",
       "toChange": "{count, plural, one {# ta change} other {# ta change}}",
       "toDestroy": "{count, plural, one {# ta destroy} other {# ta destroy}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Follow-up",
       "sharedThreadNote": "One shared thred, visibul ta anywun wif workspace reed.",
-      "placeholder": "Ask a follow-up questshun bout dis plan… (⌘/Ctrl + Enter ta send)",
       "send": "Send",
       "thinking": "Thinkin…",
       "you": "U",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "workspace",
     "backTo": "Bak ta {name}",
     "errorHeading": "Errur",
-    "discardedHeading": "Discardid — re-plan requird",
     "common": {
       "yes": "Yus",
       "no": "Noes"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "destroy",
-      "planOnly": "plan only",
       "savedPlan": "sayvd plan",
       "savedPlanHint": "Aplly defurred: dis run duz not holdz teh workspace til teh sayvd plan gets apllyd. kthxbai"
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Retry",
       "retryFull": "Retry Run",
       "retrying": "Retryin…",
-      "confirmShort": "Apply",
-      "confirmFull": "Confirm & Apply",
       "confirming": "Confirmin…",
       "discard": "Discard",
       "discarding": "Discardin…",
@@ -2071,8 +2061,6 @@
       "queuing": "Queuein…"
     },
     "confirm": {
-      "apply": "Apply dis run? Dis applys teh plan an changez infrastrukchur.",
-      "discard": "Discard dis plan?",
       "cancel": "Cancel dis run?",
       "retry": "Retry dis run?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Impakt graf",
       "cost": "Cost",
       "costFull": "Cost estimate",
-      "planLabel": "Plan<log>Log</log>",
-      "applyLabel": "Apply<log>Log</log>",
-      "planFull": "Plan log",
-      "applyFull": "Apply log",
       "details": "Detailz",
       "security": "Sekurity",
       "securityFull": "Sekurity scan"
     },
     "banner": {
       "destroy": "Dis iz a <strong>destroy</strong> run — all managd resourcez wil be destroyd when applyd.",
-      "planOnlyCli": "Dis iz a <strong>plan-only</strong> run initiatd from teh CLI on a VCS-connectd workspace. Apply iz not availabul fer CLI-uploadd code — only VCS-managd code can be applyd.",
       "moduleOverridesPrefix": "Dis run usez <strong>module overridez</strong>",
       "moduleOverridesFromPr": "from PR #{number}",
       "moduleOverridesSuffix": "wil be fetchd from teh PR branch insted ov teh publishd registry vershun."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "No changez",
-      "planning": "Plannin…",
       "toAdd": "ta add",
       "toChange": "ta change",
       "toDestroy": "ta destroy",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Execushun Backend",
       "source": "Sorse",
       "autoApply": "Auto Apploy",
-      "planOnly": "Plan Only",
       "triggeredBy": "Triggerd By",
       "created": "Maekd",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Timeline",
       "queued": "Kweued",
-      "planningStarted": "Plannin startd",
-      "planComplete": "Plan compleet",
       "confirmed": "Confurmd",
-      "applyingStarted": "Applyin startd",
-      "applied": "Applyd",
       "errored": "Errurd",
       "canceled": "Canceld",
       "discarded": "Discardd"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Follow teh live tail",
       "end": "End",
       "endTitle": "Jump ta teh end ov teh log",
-      "planEmpty": "No plan output availabul yet.",
-      "applyEmpty": "No apply output availabul yet.",
       "index": {
         "label": "Jumpz to",
-        "title": "Jumpz to a rezorce chanj, or teh plan summry",
-        "summary": "Plan Summry",
         "action": {
           "create": "makez",
           "update": "updatez",
@@ -2218,13 +2191,11 @@
           "error": "oh noes",
           "warning": "warnin"
         }
-      },
-      "applySkippedNoChanges": "No apply happend: teh plan haz no changez, so nuthin to apply."
+      }
     },
     "policyPanel": {
       "heading": "Policy Checkz",
       "passedCount": "{passed}/{total} passd",
-      "blockedMessage": "Dis run iz <strong>blockd by a mandatory policy set</strong>. It wil not apply til teh failyoor iz resolvd or an admin overridez it.",
       "overriding": "Overridin...",
       "overrideContinue": "Override & Continyoo",
       "overrideFailed": "Override failed",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
       "asOfState": "as of state v{serial}",
-      "noState": "No cost yet — appears after teh furst apply.",
       "usageBand": "{dimension}: {typical} {unit} usual (rangez {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mo usual — {costLow}–{costHigh} across {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "No polisy kriteria matchd. yay.",
       "overriding": "Overridin...",
       "overrideContinue": "Override & Continyoo",
-      "overrideConfirm": "Overryd teh AI polisy gate an let dis run apply anywayz despite da verdikt?",
       "overrideFailed": "Override failed",
       "overrideFailedStatus": "Override failed ({status})",
       "overriddenBy": "overridd by {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Translaytd from teh orijinal on vew."
     },
     "drift": {
-      "remediate": "Plan + do it",
-      "remediateTitle": "Queue a plan + do-it runz so teh infrastruktur matchiz teh config agin",
-      "remediateConfirm": "Queue a plan + do-it runz for dis wurkspase?",
       "remediateMessage": "Queued from a driftz chek",
       "remediateFailed": "Culd not queue teh fixin runz"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",
-      "rbac": "Anywun hoo can merge teh PR can apply. Branch protecshun rulez (requird reviewz, statuz checkz, code ownr approvul) becum teh gate. Terrapod role/labul RBAC do<em>not</em> apply ta comment-driven acshunz in dis mode.",
-      "recommended": "<strong>Recommendd:</strong> requir linear histry (rebase/squash befor merge) so teh commit u apply iz teh commit dat landz.",
       "credit": "Credit: dis workflow iz modelld on <atlantis>Atlantis</atlantis>. Atlantis remainz teh rite tool fer teemz hoo only wants PR-comment-driven appliez an noes platform UI."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Lock Statuz",
-      "lockedDesc": "Dis workspace iz lockd. Noes planz or appliez can run.",
       "unlockedDesc": "Dis workspace iz unlockd an redy fer runz.",
       "lock": "Lock",
       "unlock": "Unlock",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Cleer teh reportd drift state. Teh nekst scheduld check will repopulayt it frum reality.",
       "lastChecked": "Last Checkd",
       "checkNow": "Check Now",
-      "checkNowTitle": "Queue a plan-only run ta check fer drift",
       "checkNowTitleDisabled": "Enabul drift deteckshun furst"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 dayz"
     },
     "planExpiry": {
-      "title": "Plan Ekspiry",
-      "description": "Auto-discard an unconfirmd plan wunce it iz oldr dan dis, so a stale plan can't be applyd against a moovd world. Off by defawlt; teh plan muzt den be re-run. (Appliez ta apply-capabul runz only.)",
       "expireAfter": "Ekspir aftr"
     },
     "aiSummary": {
       "title": "AI Plan Summry",
-      "description": "Automatik LLM-generayted change summry, risk assessment, an failyoor analysiz on evry plan-phase outcum fer dis workspace.",
       "mode": "Mode",
       "modeDefault": "Follo deployment defawlt",
       "modeEnabled": "Alwayz summarize",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack notificashunz",
-      "description": "Opt dis workspace into Slack run notificashunz — approvul requestz, appliez, errorz, an drift. Leev teh channul empty an dis workspace stayz silent (dere iz noes deployment-wide fan-out). Requirez teh Slack app ta be enabuld by an administraytor.",
       "channel": "Channul",
       "channelPlaceholder": "#deploys or a channul ID (e.g. C0123ABCD)",
       "notSet": "Not set — silent.",
@@ -2707,14 +2665,8 @@
       "options": "Opshunz",
       "hideOptions": "Hide Opshunz",
       "queueDestroy": "Destroyz",
-      "queueDestroyTitle": "Queue a destroy plan",
       "destroyAllConfirm": "Destroy all resorcez?",
       "confirmDestroy": "Confirm Destroy",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + do it",
-      "queuePlanConfirm": "Queue a speculativ plan fer dis workspace?",
-      "queueApplyConfirm": "Queue a plan + apply run? Dis can change infrastruckchure.",
-      "planOptions": "Plan Opshunz",
       "targetResources": "Targit resorcez",
       "replaceResources": "Replace resorcez",
       "commaSeparated": "(comma-separaytd)",
@@ -2725,7 +2677,6 @@
       "branch": "Branch",
       "tag": "Tag",
       "defaultBranch": "Defawlt ({branch})",
-      "nonDefaultRefNote": "Non-defawlt ref selectd — run will be plan-only",
       "empty": "Noes runz yet fer dis workspace.",
       "runId": "Run ID",
       "status": "Status",
@@ -2736,12 +2687,8 @@
       "created": "Maekd",
       "needsConfirm": "needz confirm",
       "typeDestroy": "destroy",
-      "typePlanOnly": "plan only",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "module test",
       "sourceModulePublish": "module publish",
-      "queueApplyTitle": "Queue a plan + do-it runz",
-      "queueApplyRefBlocked": "No do-it while u picked a branch, tag or commit — dose runz iz alwayz plan only, srsly",
       "awaitingDecision": "waitin fer decizun",
       "typeSavedPlan": "sayvd plan",
       "typeSavedPlanHint": "Aplly defurred: dis run duz not holdz teh workspace til teh sayvd plan gets apllyd. kthxbai"
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 selectd",
       "compare": "Compare",
       "comparing": "Comparin…",
-      "empty": "Noes configurashun vershunz yet. Dey appeer heer az soon az a `terraform plan` uploadz or a VCS push triggurz a run.",
       "id": "ID",
       "source": "Sorse",
       "status": "Status",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Run Triggurz",
-      "description": "Wen a sorce workspace completez an apply, downstreem workspacez get a noo run queued automatikly. Up ta 20 sorce workspacez per destinashun.",
       "inboundHeading": "Sorce workspacez dat triggur runz heer",
       "inboundEmpty": "Noes sorce workspacez triggur runz on dis workspace.",
       "pickerPlaceholder": "Serch workspacez ta add az a sorce…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Failz ta add variable ({status})",
       "deleteVariable": "Failz ta delete variable",
       "updateVariable": "Failz ta updayt variable",
-      "queuePlan": "Failz ta kweue teh plan",
-      "queuePlanStatus": "Failz ta kweue teh plan ({status})",
       "queueDestroy": "Failz ta kweue teh destroy",
       "queueDestroyStatus": "Failz ta kweue teh destroy ({status})",
       "createNotification": "Failz ta creat teh notificashun",

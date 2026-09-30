@@ -70,7 +70,6 @@
       "agentPool": "Pula agentów",
       "none": "Brak",
       "autoApply": "Automatyczne zastosowanie",
-      "autoApplyModeHint": "never: zawsze czekaj na człowieka. always: zastosuj każdy udany plan. create / create/update: zastosuj tylko plany ograniczone do tych działań — nigdy usunięcia ani zastąpienia.",
       "enabled": "Włączone",
       "workingDirectory": "Katalog roboczy",
       "workingDirectoryPlaceholder": "np. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "Wygenerowano przez AI",
     "heading": {
-      "planSummary": "Podsumowanie planu",
       "failureAnalysis": "Analiza niepowodzenia"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Wygeneruj ponownie",
       "queueing": "Kolejkowanie…",
-      "tooltip": "Uruchom ponownie podsumowanie AI dla tych samych danych wejściowych planu",
       "ariaLabel": "Wygeneruj ponownie podsumowanie AI",
       "confirm": "Wygenerować ponownie analizę AI? Spowoduje to ponowne uruchomienie modelu.",
       "error": "Nie udało się wygenerować ponownie: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Podsumowywanie planu…",
       "analysingFailure": "Analizowanie niepowodzenia…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Brak zmian",
       "noChangesLower": "brak zmian",
-      "noChangesTitle": "Plan nie zgłosił żadnych zmian zasobów",
       "toAdd": "{count, plural, one {# do dodania} few {# do dodania} many {# do dodania} other {# do dodania}}",
       "toChange": "{count, plural, one {# do zmiany} few {# do zmiany} many {# do zmiany} other {# do zmiany}}",
       "toDestroy": "{count, plural, one {# do zniszczenia} few {# do zniszczenia} many {# do zniszczenia} other {# do zniszczenia}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Pytanie uzupełniające",
       "sharedThreadNote": "Jeden współdzielony wątek, widoczny dla każdego z dostępem odczytu do obszaru roboczego.",
-      "placeholder": "Zadaj pytanie uzupełniające o ten plan… (⌘/Ctrl + Enter, aby wysłać)",
       "send": "Wyślij",
       "thinking": "Myślenie…",
       "you": "Ty",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "obszar roboczy",
     "backTo": "Powrót do {name}",
     "errorHeading": "Błąd",
-    "discardedHeading": "Odrzucone — wymagane ponowne planowanie",
     "common": {
       "yes": "Tak",
       "no": "Nie"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "niszczenie",
-      "planOnly": "tylko plan",
       "savedPlan": "zapisany plan",
       "savedPlanHint": "Zastosowanie odroczone: to uruchomienie nie blokuje przestrzeni roboczej, dopóki zapisany plan nie zostanie zastosowany."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Ponów",
       "retryFull": "Ponów przebieg",
       "retrying": "Ponawianie…",
-      "confirmShort": "Zastosuj",
-      "confirmFull": "Potwierdź i zastosuj",
       "confirming": "Potwierdzanie…",
       "discard": "Odrzuć",
       "discarding": "Odrzucanie…",
@@ -2071,8 +2061,6 @@
       "queuing": "Dodawanie do kolejki…"
     },
     "confirm": {
-      "apply": "Zastosować ten przebieg? Spowoduje to zastosowanie planu i zmianę infrastruktury.",
-      "discard": "Odrzucić ten plan?",
       "cancel": "Anulować ten przebieg?",
       "retry": "Ponowić ten przebieg?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Graf wpływu",
       "cost": "Koszt",
       "costFull": "Szacunkowy koszt",
-      "planLabel": "Plan<log>Dziennik</log>",
-      "applyLabel": "Zastosuj<log>Dziennik</log>",
-      "planFull": "Dziennik planu",
-      "applyFull": "Dziennik zastosowania",
       "details": "Szczegóły",
       "security": "Bezpieczeństwo",
       "securityFull": "Skan bezpieczeństwa"
     },
     "banner": {
       "destroy": "To jest przebieg <strong>niszczący</strong> — wszystkie zarządzane zasoby zostaną zniszczone po zastosowaniu.",
-      "planOnlyCli": "To jest przebieg <strong>tylko plan</strong> zainicjowany z CLI na obszarze roboczym połączonym z VCS. Zastosowanie nie jest dostępne dla kodu przesłanego z CLI — zastosować można tylko kod zarządzany przez VCS.",
       "moduleOverridesPrefix": "Ten przebieg używa <strong>nadpisań modułów</strong>",
       "moduleOverridesFromPr": "z PR #{number}",
       "moduleOverridesSuffix": "zostanie pobrany z gałęzi PR zamiast z opublikowanej wersji rejestru."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Brak zmian",
-      "planning": "Planowanie…",
       "toAdd": "do dodania",
       "toChange": "do zmiany",
       "toDestroy": "do zniszczenia",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Backend wykonania",
       "source": "Źródło",
       "autoApply": "Automatyczne zastosowanie",
-      "planOnly": "Tylko plan",
       "triggeredBy": "Wyzwolone przez",
       "created": "Utworzono",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Oś czasu",
       "queued": "W kolejce",
-      "planningStarted": "Rozpoczęto planowanie",
-      "planComplete": "Plan ukończony",
       "confirmed": "Potwierdzone",
-      "applyingStarted": "Rozpoczęto zastosowywanie",
-      "applied": "Zastosowane",
       "errored": "Błąd",
       "canceled": "Anulowane",
       "discarded": "Odrzucone"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Śledź bieżący koniec dziennika",
       "end": "Koniec",
       "endTitle": "Przejdź na koniec dziennika",
-      "planEmpty": "Brak dostępnego wyjścia planu.",
-      "applyEmpty": "Brak dostępnego wyjścia zastosowania.",
       "index": {
         "label": "Przejdź do",
-        "title": "Przejdź do zmiany zasobu lub do podsumowania planu",
-        "summary": "Podsumowanie planu",
         "action": {
           "create": "utworzyć",
           "update": "zaktualizować",
@@ -2218,13 +2191,11 @@
           "error": "błąd",
           "warning": "ostrzeżenie"
         }
-      },
-      "applySkippedNoChanges": "Nie uruchomiono zastosowania: plan nie zawierał zmian, więc nie było czego zastosować."
+      }
     },
     "policyPanel": {
       "heading": "Sprawdzenia zasad",
       "passedCount": "{passed}/{total} zaliczonych",
-      "blockedMessage": "Ten przebieg jest <strong>zablokowany przez obowiązkowy zestaw zasad</strong>. Nie zostanie zastosowany, dopóki niepowodzenie nie zostanie rozwiązane lub administrator go nie nadpisze.",
       "overriding": "Nadpisywanie...",
       "overrideContinue": "Nadpisz i kontynuuj",
       "overrideFailed": "Nadpisanie nie powiodło się",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Nic w danych cenowych nie pasowało do nich — niezmapowany typ, zasób bez bezpośredniego kosztu lub dostawca jeszcze nieobsługiwany.",
       "indicative": "Szacunki mają charakter orientacyjny; rzeczywisty koszt zależy od użycia, regionu, zobowiązań i rabatów.",
       "asOfState": "według stanu v{serial}",
-      "noState": "Brak kosztu — pojawia się po pierwszym zastosowaniu.",
       "usageBand": "{dimension}: typowo {typical} {unit} (zakres {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mies typowo — {costLow}–{costHigh} przy {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Żadne kryterium zasad nie pasowało.",
       "overriding": "Nadpisywanie...",
       "overrideContinue": "Nadpisz i kontynuuj",
-      "overrideConfirm": "Zastąpić bramkę zasad AI i zezwolić na zastosowanie tego przebiegu mimo werdyktu?",
       "overrideFailed": "Nadpisanie nie powiodło się",
       "overrideFailedStatus": "Nadpisanie nie powiodło się ({status})",
       "overriddenBy": "nadpisane przez {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Przetłumaczono z oryginału podczas wyświetlania."
     },
     "drift": {
-      "remediate": "Plan + apply",
-      "remediateTitle": "Dodaj do kolejki uruchomienie plan + apply, aby ponownie dopasować infrastrukturę do konfiguracji",
-      "remediateConfirm": "Dodać do kolejki uruchomienie plan + apply dla tej przestrzeni roboczej?",
       "remediateMessage": "Dodane do kolejki z kontroli rozbieżności",
       "remediateFailed": "Nie udało się dodać uruchomienia naprawczego do kolejki"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",
-      "rbac": "Każdy, kto może scalić PR, może zastosować. Bramką stają się reguły ochrony gałęzi (wymagane przeglądy, sprawdzenia statusu, zatwierdzenie właściciela kodu). RBAC ról/etykiet Terrapod<em>nie</em> stosuje się do akcji sterowanych komentarzami w tym trybie.",
-      "recommended": "<strong>Zalecane:</strong> wymagaj liniowej historii (rebase/squash przed scaleniem), aby commit, który stosujesz, był commitem, który trafia do gałęzi.",
       "credit": "Uznanie: ten przepływ pracy jest wzorowany na <atlantis>Atlantis</atlantis>. Atlantis pozostaje właściwym narzędziem dla zespołów, które chcą wyłącznie zastosowań sterowanych komentarzami w PR i nie potrzebują UI platformy."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Status blokady",
-      "lockedDesc": "Ten obszar roboczy jest zablokowany. Nie można uruchamiać planów ani zastosowań.",
       "unlockedDesc": "Ten obszar roboczy jest odblokowany i gotowy do przebiegów.",
       "lock": "Zablokuj",
       "unlock": "Odblokuj",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Wyczyść zgłoszony stan dryfu. Następne zaplanowane sprawdzenie ponownie wypełni go na podstawie rzeczywistości.",
       "lastChecked": "Ostatnio sprawdzono",
       "checkNow": "Sprawdź teraz",
-      "checkNowTitle": "Umieść w kolejce przebieg tylko planujący, aby sprawdzić dryf",
       "checkNowTitleDisabled": "Najpierw włącz wykrywanie dryfu"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 dni"
     },
     "planExpiry": {
-      "title": "Wygaśnięcie planu",
-      "description": "Automatycznie odrzuca niepotwierdzony plan, gdy stanie się starszy niż ta wartość, aby nieaktualny plan nie mógł zostać zastosowany przeciwko zmienionemu światu. Domyślnie wyłączone; plan musi wtedy zostać uruchomiony ponownie. (Dotyczy tylko przebiegów zdolnych do zastosowania.)",
       "expireAfter": "Wygaśnij po"
     },
     "aiSummary": {
       "title": "Podsumowanie planu AI",
-      "description": "Automatyczne, wygenerowane przez LLM podsumowanie zmian, ocena ryzyka i analiza niepowodzeń dla każdego wyniku fazy planowania tego obszaru roboczego.",
       "mode": "Tryb",
       "modeDefault": "Zgodnie z domyślnym ustawieniem wdrożenia",
       "modeEnabled": "Zawsze podsumowuj",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Powiadomienia Slack",
-      "description": "Włącz dla tego obszaru roboczego powiadomienia Slack o przebiegach — prośby o zatwierdzenie, zastosowania, błędy i dryf. Pozostaw kanał pusty, a ten obszar roboczy pozostanie cichy (nie ma rozgłaszania obejmującego całe wdrożenie). Wymaga włączenia aplikacji Slack przez administratora.",
       "channel": "Kanał",
       "channelPlaceholder": "#deploys lub identyfikator kanału (np. C0123ABCD)",
       "notSet": "Nie ustawiono — cichy.",
@@ -2707,14 +2665,8 @@
       "options": "Opcje",
       "hideOptions": "Ukryj opcje",
       "queueDestroy": "Zniszcz",
-      "queueDestroyTitle": "Umieść w kolejce plan niszczenia",
       "destroyAllConfirm": "Zniszczyć wszystkie zasoby?",
       "confirmDestroy": "Potwierdź niszczenie",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + apply",
-      "queuePlanConfirm": "Umieścić w kolejce plan spekulatywny dla tego obszaru roboczego?",
-      "queueApplyConfirm": "Umieścić w kolejce przebieg plan + apply? Może to zmienić infrastrukturę.",
-      "planOptions": "Opcje planu",
       "targetResources": "Docelowe zasoby",
       "replaceResources": "Zastąp zasoby",
       "commaSeparated": "(oddzielone przecinkami)",
@@ -2725,7 +2677,6 @@
       "branch": "Gałąź",
       "tag": "Tag",
       "defaultBranch": "Domyślna ({branch})",
-      "nonDefaultRefNote": "Wybrano niedomyślną referencję — przebieg będzie tylko planujący",
       "empty": "Brak przebiegów dla tego obszaru roboczego.",
       "runId": "Identyfikator przebiegu",
       "status": "Status",
@@ -2736,12 +2687,8 @@
       "created": "Utworzono",
       "needsConfirm": "wymaga potwierdzenia",
       "typeDestroy": "niszczenie",
-      "typePlanOnly": "tylko plan",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "test modułu",
       "sourceModulePublish": "publikacja modułu",
-      "queueApplyTitle": "Dodaj do kolejki uruchomienie plan + apply",
-      "queueApplyRefBlocked": "Apply jest niedostępne, gdy wybrano gałąź, tag lub commit — takie uruchomienia są zawsze tylko plan",
       "awaitingDecision": "oczekuje na decyzję",
       "typeSavedPlan": "zapisany plan",
       "typeSavedPlanHint": "Zastosowanie odroczone: to uruchomienie nie blokuje przestrzeni roboczej, dopóki zapisany plan nie zostanie zastosowany."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 wybrano",
       "compare": "Porównaj",
       "comparing": "Porównywanie…",
-      "empty": "Brak wersji konfiguracji. Pojawią się tutaj, gdy tylko `terraform plan` prześle dane lub wypchnięcie do VCS wyzwoli przebieg.",
       "id": "Identyfikator",
       "source": "Źródło",
       "status": "Status",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Wyzwalacze przebiegów",
-      "description": "Gdy źródłowy obszar roboczy ukończy zastosowanie, powiązane obszary robocze poniżej otrzymują automatycznie nowy przebieg w kolejce. Do 20 źródłowych obszarów roboczych na każdy docelowy.",
       "inboundHeading": "Źródłowe obszary robocze, które wyzwalają tutaj przebiegi",
       "inboundEmpty": "Żaden źródłowy obszar roboczy nie wyzwala przebiegów w tym obszarze roboczym.",
       "pickerPlaceholder": "Wyszukaj obszary robocze do dodania jako źródło…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Nie udało się dodać zmiennej ({status})",
       "deleteVariable": "Nie udało się usunąć zmiennej",
       "updateVariable": "Nie udało się zaktualizować zmiennej",
-      "queuePlan": "Nie udało się umieścić planu w kolejce",
-      "queuePlanStatus": "Nie udało się umieścić planu w kolejce ({status})",
       "queueDestroy": "Nie udało się umieścić niszczenia w kolejce",
       "queueDestroyStatus": "Nie udało się umieścić niszczenia w kolejce ({status})",
       "createNotification": "Nie udało się utworzyć powiadomienia",

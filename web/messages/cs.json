@@ -70,7 +70,6 @@
       "agentPool": "Fond agentů",
       "none": "Žádný",
       "autoApply": "Automatické použití",
-      "autoApplyModeHint": "never: vždy počkat na člověka. always: aplikovat každý úspěšný plán. create / create/update: aplikovat jen plány omezené na tyto akce — nikdy ne mazání ani nahrazení.",
       "enabled": "Povoleno",
       "workingDirectory": "Pracovní adresář",
       "workingDirectoryPlaceholder": "např. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "Vygenerováno AI",
     "heading": {
-      "planSummary": "Shrnutí plánu",
       "failureAnalysis": "Analýza selhání"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Vygenerovat znovu",
       "queueing": "Zařazování do fronty…",
-      "tooltip": "Znovu spustit AI shrnutí proti stejným vstupům plánu",
       "ariaLabel": "Vygenerovat AI shrnutí znovu",
       "confirm": "Vygenerovat AI analýzu znovu? Toto znovu spustí model.",
       "error": "Nepodařilo se vygenerovat znovu: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Shrnování plánu…",
       "analysingFailure": "Analyzování selhání…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "Žádné změny",
       "noChangesLower": "žádné změny",
-      "noChangesTitle": "Plán nehlásil žádné změny prostředků",
       "toAdd": "{count, plural, one {# k přidání} few {# k přidání} many {# k přidání} other {# k přidání}}",
       "toChange": "{count, plural, one {# ke změně} few {# ke změně} many {# ke změně} other {# ke změně}}",
       "toDestroy": "{count, plural, one {# ke zničení} few {# ke zničení} many {# ke zničení} other {# ke zničení}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Návazné dotazy",
       "sharedThreadNote": "Jedno sdílené vlákno, viditelné pro každého s právem čtení pracovního prostoru.",
-      "placeholder": "Položte návazný dotaz k tomuto plánu… (⌘/Ctrl + Enter pro odeslání)",
       "send": "Odeslat",
       "thinking": "Přemýšlím…",
       "you": "Vy",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "pracovní prostor",
     "backTo": "Zpět na {name}",
     "errorHeading": "Chyba",
-    "discardedHeading": "Zahozeno — vyžadováno opětovné naplánování",
     "common": {
       "yes": "Ano",
       "no": "Ne"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "zničit",
-      "planOnly": "pouze plán",
       "savedPlan": "uložený plán",
       "savedPlanHint": "Aplikace odložena: tento běh neblokuje pracovní prostor, dokud není uložený plán aplikován."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Zkusit znovu",
       "retryFull": "Zkusit běh znovu",
       "retrying": "Opakování…",
-      "confirmShort": "Aplikovat",
-      "confirmFull": "Potvrdit a aplikovat",
       "confirming": "Potvrzování…",
       "discard": "Zahodit",
       "discarding": "Zahazování…",
@@ -2071,8 +2061,6 @@
       "queuing": "Zařazuje se…"
     },
     "confirm": {
-      "apply": "Aplikovat tento běh? Toto aplikuje plán a změní infrastrukturu.",
-      "discard": "Zahodit tento plán?",
       "cancel": "Zrušit tento běh?",
       "retry": "Zkusit tento běh znovu?"
     },
@@ -2095,17 +2083,12 @@
       "impactFull": "Graf dopadu",
       "cost": "Náklady",
       "costFull": "Odhad nákladů",
-      "planLabel": "Plán<log>Log</log>",
-      "applyLabel": "Apply<log>Log</log>",
-      "planFull": "Log plánu",
-      "applyFull": "Log apply",
       "details": "Podrobnosti",
       "security": "Zabezpečení",
       "securityFull": "Bezpečnostní kontrola"
     },
     "banner": {
       "destroy": "Toto je <strong>destroy</strong> běh — všechny spravované prostředky budou při aplikaci zničeny.",
-      "planOnlyCli": "Toto je <strong>plan-only</strong> běh spuštěný z CLI na pracovním prostoru připojeném k VCS. Apply není pro kód nahraný z CLI dostupný — aplikovat lze pouze kód spravovaný VCS.",
       "moduleOverridesPrefix": "Tento běh používá <strong>přepisy modulů</strong>",
       "moduleOverridesFromPr": "z PR #{number}",
       "moduleOverridesSuffix": "budou staženy z větve PR namísto publikované verze z registry."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "Žádné změny",
-      "planning": "Plánování…",
       "toAdd": "k přidání",
       "toChange": "ke změně",
       "toDestroy": "ke zničení",
@@ -2157,7 +2139,6 @@
       "executionBackend": "Prováděcí backend",
       "source": "Zdroj",
       "autoApply": "Automatické použití",
-      "planOnly": "Pouze plán",
       "triggeredBy": "Spuštěno kým",
       "created": "Vytvořeno",
       "commit": "Commit",
@@ -2173,11 +2154,7 @@
     "timeline": {
       "heading": "Časová osa",
       "queued": "Ve frontě",
-      "planningStarted": "Plánování zahájeno",
-      "planComplete": "Plán dokončen",
       "confirmed": "Potvrzeno",
-      "applyingStarted": "Aplikování zahájeno",
-      "applied": "Aplikováno",
       "errored": "Chyba",
       "canceled": "Zrušeno",
       "discarded": "Zahozeno"
@@ -2201,12 +2178,8 @@
       "followOffTitle": "Sledovat živý výstup",
       "end": "Konec",
       "endTitle": "Přejít na konec logu",
-      "planEmpty": "Zatím není k dispozici žádný výstup plánu.",
-      "applyEmpty": "Zatím není k dispozici žádný výstup apply.",
       "index": {
         "label": "Přejít na",
-        "title": "Přejít na změnu zdroje nebo na souhrn plánu",
-        "summary": "Souhrn plánu",
         "action": {
           "create": "vytvořit",
           "update": "aktualizovat",
@@ -2218,13 +2191,11 @@
           "error": "chyba",
           "warning": "varování"
         }
-      },
-      "applySkippedNoChanges": "Žádná aplikace neproběhla: plán neobsahoval žádné změny, takže nebylo co aplikovat."
+      }
     },
     "policyPanel": {
       "heading": "Kontroly zásad",
       "passedCount": "{passed}/{total} prošlo",
-      "blockedMessage": "Tento běh je <strong>blokován povinnou sadou zásad</strong>. Nebude aplikován, dokud nebude selhání vyřešeno nebo dokud jej administrátor nepřepíše.",
       "overriding": "Přepisování...",
       "overrideContinue": "Přepsat a pokračovat",
       "overrideFailed": "Přepsání selhalo",
@@ -2264,7 +2235,6 @@
       "unpricedHint": "Nic v cenových datech těmto neodpovídalo — nenamapovaný typ, zdroj bez přímých nákladů nebo dosud nepodporovaný poskytovatel.",
       "indicative": "Odhady jsou orientační; skutečné náklady závisí na využití, regionu, závazcích a slevách.",
       "asOfState": "dle stavu v{serial}",
-      "noState": "Zatím žádné náklady — zobrazí se po prvním použití.",
       "usageBand": "{dimension}: typicky {typical} {unit} (rozsah {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/měs typicky — {costLow}–{costHigh} při {low}–{high} {unit}"
     },
@@ -2351,7 +2321,6 @@
       "passed": "Žádná kritéria zásad neodpovídají.",
       "overriding": "Přepisování...",
       "overrideContinue": "Přepsat a pokračovat",
-      "overrideConfirm": "Přepsat bránu zásad AI a povolit použití tohoto běhu navzdory verdiktu?",
       "overrideFailed": "Přepsání selhalo",
       "overrideFailedStatus": "Přepsání selhalo ({status})",
       "overriddenBy": "přepsal {by}"
@@ -2410,9 +2379,6 @@
       "translatedNote": "Přeloženo z originálu při zobrazení."
     },
     "drift": {
-      "remediate": "Plan + apply",
-      "remediateTitle": "Zařadit běh plan + apply, aby se infrastruktura opět shodovala s konfigurací",
-      "remediateConfirm": "Zařadit běh plan + apply pro tento pracovní prostor?",
       "remediateMessage": "Zařazeno z kontroly odchylek",
       "remediateFailed": "Nápravný běh se nepodařilo zařadit"
     }
@@ -2548,8 +2514,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",
-      "rbac": "Kdokoli, kdo může sloučit PR, může aplikovat. Bránou se stávají pravidla ochrany větve (povinné kontroly, status checks, schválení vlastníkem kódu). Terrapod role/label RBAC se<em>ne</em>vztahuje na akce řízené komentáři v tomto režimu.",
-      "recommended": "<strong>Doporučeno:</strong> vyžadujte lineární historii (rebase/squash před sloučením), aby commit, který aplikujete, byl commitem, který přistane.",
       "credit": "Poděkování: toto workflow je modelováno podle <atlantis>Atlantis</atlantis>. Atlantis zůstává tím správným nástrojem pro týmy, které chtějí pouze aplikace řízené komentáři v PR a žádné platformové UI."
     },
     "vcsPolling": {
@@ -2565,7 +2529,6 @@
     },
     "lock": {
       "title": "Stav uzamčení",
-      "lockedDesc": "Tento pracovní prostor je uzamčen. Nemohou probíhat žádné plány ani aplikace.",
       "unlockedDesc": "Tento pracovní prostor je odemčen a připraven na běhy.",
       "lock": "Uzamknout",
       "unlock": "Odemknout",
@@ -2587,7 +2550,6 @@
       "dismissTitle": "Vymazat nahlášený stav odchýlení. Další naplánovaná kontrola jej znovu naplní podle reality.",
       "lastChecked": "Naposledy zkontrolováno",
       "checkNow": "Zkontrolovat nyní",
-      "checkNowTitle": "Zařadit plan-only běh ke kontrole odchýlení",
       "checkNowTitleDisabled": "Nejprve povolte detekci odchýlení"
     },
     "intervals": {
@@ -2601,13 +2563,10 @@
       "7days": "7 dní"
     },
     "planExpiry": {
-      "title": "Vypršení plánu",
-      "description": "Automaticky zahodit nepotvrzený plán, jakmile je starší než toto, aby nebylo možné aplikovat zastaralý plán proti změněnému světu. Ve výchozím nastavení vypnuto; plán pak musí být znovu spuštěn. (Platí pouze pro běhy schopné apply.)",
       "expireAfter": "Vypršet po"
     },
     "aiSummary": {
       "title": "AI shrnutí plánu",
-      "description": "Automatické, LLM generované shrnutí změn, posouzení rizik a analýza selhání u každého výsledku fáze plánu pro tento pracovní prostor.",
       "mode": "Režim",
       "modeDefault": "Řídit se výchozím nastavením nasazení",
       "modeEnabled": "Vždy shrnout",
@@ -2622,7 +2581,6 @@
     },
     "slack": {
       "title": "Slack oznámení",
-      "description": "Přihlaste tento pracovní prostor k Slack oznámením o bězích — žádosti o schválení, aplikace, chyby a odchýlení. Ponechte kanál prázdný a tento pracovní prostor zůstane tichý (neexistuje žádné rozeslání pro celé nasazení). Vyžaduje, aby Slack aplikace byla povolena administrátorem.",
       "channel": "Kanál",
       "channelPlaceholder": "#deploys nebo ID kanálu (např. C0123ABCD)",
       "notSet": "Nenastaveno — tiché.",
@@ -2707,14 +2665,8 @@
       "options": "Možnosti",
       "hideOptions": "Skrýt možnosti",
       "queueDestroy": "Zničit",
-      "queueDestroyTitle": "Zařadit destroy plán do fronty",
       "destroyAllConfirm": "Zničit všechny prostředky?",
       "confirmDestroy": "Potvrdit zničení",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + apply",
-      "queuePlanConfirm": "Zařadit spekulativní plán pro tento pracovní prostor?",
-      "queueApplyConfirm": "Zařadit běh plan + apply? Toto může změnit infrastrukturu.",
-      "planOptions": "Možnosti plánu",
       "targetResources": "Cílové prostředky",
       "replaceResources": "Nahradit prostředky",
       "commaSeparated": "(oddělené čárkou)",
@@ -2725,7 +2677,6 @@
       "branch": "Větev",
       "tag": "Tag",
       "defaultBranch": "Výchozí ({branch})",
-      "nonDefaultRefNote": "Vybrán nevýchozí ref — běh bude pouze plan-only",
       "empty": "Zatím žádné běhy pro tento pracovní prostor.",
       "runId": "ID běhu",
       "status": "Stav",
@@ -2736,12 +2687,8 @@
       "created": "Vytvořeno",
       "needsConfirm": "vyžaduje potvrzení",
       "typeDestroy": "zničit",
-      "typePlanOnly": "pouze plán",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "test modulu",
       "sourceModulePublish": "publikace modulu",
-      "queueApplyTitle": "Zařadit běh plan + apply",
-      "queueApplyRefBlocked": "Apply není dostupné, pokud je vybrána větev, značka nebo commit — takové běhy jsou vždy pouze plan",
       "awaitingDecision": "čeká na rozhodnutí",
       "typeSavedPlan": "uložený plán",
       "typeSavedPlanHint": "Aplikace odložena: tento běh neblokuje pracovní prostor, dokud není uložený plán aplikován."
@@ -2773,7 +2720,6 @@
       "selectedCount": "{count}/2 vybráno",
       "compare": "Porovnat",
       "comparing": "Porovnávání…",
-      "empty": "Zatím žádné verze konfigurace. Objeví se zde, jakmile `terraform plan` provede nahrání nebo VCS push spustí běh.",
       "id": "ID",
       "source": "Zdroj",
       "status": "Stav",
@@ -2835,7 +2781,6 @@
     },
     "runTriggers": {
       "title": "Run triggery",
-      "description": "Když zdrojový pracovní prostor dokončí apply, navazujícím pracovním prostorům se automaticky zařadí nový běh do fronty. Až 20 zdrojových pracovních prostorů na cíl.",
       "inboundHeading": "Zdrojové pracovní prostory, které zde spouštějí běhy",
       "inboundEmpty": "Žádné zdrojové pracovní prostory nespouštějí běhy na tomto pracovním prostoru.",
       "pickerPlaceholder": "Vyhledat pracovní prostory k přidání jako zdroj…",
@@ -2912,8 +2857,6 @@
       "addVariableStatus": "Nepodařilo se přidat proměnnou ({status})",
       "deleteVariable": "Nepodařilo se smazat proměnnou",
       "updateVariable": "Nepodařilo se aktualizovat proměnnou",
-      "queuePlan": "Nepodařilo se zařadit plán",
-      "queuePlanStatus": "Nepodařilo se zařadit plán ({status})",
       "queueDestroy": "Nepodařilo se zařadit zničení",
       "queueDestroyStatus": "Nepodařilo se zařadit zničení ({status})",
       "createNotification": "Nepodařilo se vytvořit oznámení",

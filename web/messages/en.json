@@ -70,7 +70,6 @@
       "agentPool": "Agent Pool",
       "none": "None",
       "autoApply": "Auto Apply",
-      "autoApplyModeHint": "never: always wait for a human. always: apply every successful plan. create / create/update: apply only plans limited to those actions — never a destroy or a replace.",
       "enabled": "Enabled",
       "workingDirectory": "Working Directory",
       "workingDirectoryPlaceholder": "e.g. environments/dev",
@@ -1925,7 +1924,6 @@
   "planSummary": {
     "aiGenerated": "AI generated",
     "heading": {
-      "planSummary": "Plan summary",
       "failureAnalysis": "Failure analysis"
     },
     "errors": {
@@ -1934,13 +1932,11 @@
     "regenerate": {
       "label": "Regenerate",
       "queueing": "Queueing…",
-      "tooltip": "Re-run the AI summary against the same plan inputs",
       "ariaLabel": "Regenerate AI summary",
       "confirm": "Regenerate the AI analysis? This runs the model again.",
       "error": "Could not regenerate: <mono>{detail}</mono>"
     },
     "pending": {
-      "summarisingPlan": "Summarizing plan…",
       "analysingFailure": "Analysing failure…"
     },
     "skipped": {
@@ -1964,7 +1960,6 @@
     "badges": {
       "noChanges": "No changes",
       "noChangesLower": "no changes",
-      "noChangesTitle": "Plan reported no resource changes",
       "toAdd": "{count, plural, one {# to add} other {# to add}}",
       "toChange": "{count, plural, one {# to change} other {# to change}}",
       "toDestroy": "{count, plural, one {# to destroy} other {# to destroy}}",
@@ -1974,7 +1969,6 @@
     "chat": {
       "heading": "Follow-up",
       "sharedThreadNote": "One shared thread, visible to anyone with workspace read.",
-      "placeholder": "Ask a follow-up question about this plan… (⌘/Ctrl + Enter to send)",
       "send": "Send",
       "thinking": "Thinking…",
       "you": "You",
@@ -1998,7 +1992,6 @@
     "workspaceFallback": "workspace",
     "backTo": "Back to {name}",
     "errorHeading": "Error",
-    "discardedHeading": "Discarded — re-plan required",
     "common": {
       "yes": "Yes",
       "no": "No"
@@ -2052,7 +2045,6 @@
     },
     "badge": {
       "destroy": "destroy",
-      "planOnly": "plan only",
       "savedPlan": "saved plan",
       "savedPlanHint": "Apply deferred: this run does not hold the workspace until the saved plan is applied."
     },
@@ -2060,8 +2052,6 @@
       "retryShort": "Retry",
       "retryFull": "Retry Run",
       "retrying": "Retrying…",
-      "confirmShort": "Apply",
-      "confirmFull": "Confirm & Apply",
       "confirming": "Confirming…",
       "discard": "Discard",
       "discarding": "Discarding…",
@@ -2071,8 +2061,6 @@
       "queuing": "Queueing…"
     },
     "confirm": {
-      "apply": "Apply this run? This applies the plan and changes infrastructure.",
-      "discard": "Discard this plan?",
       "cancel": "Cancel this run?",
       "retry": "Retry this run?"
     },
@@ -2097,15 +2085,10 @@
       "impactFull": "Impact graph",
       "cost": "Cost",
       "costFull": "Cost estimate",
-      "planLabel": "Plan<log>Log</log>",
-      "applyLabel": "Apply<log>Log</log>",
-      "planFull": "Plan log",
-      "applyFull": "Apply log",
       "details": "Details"
     },
     "banner": {
       "destroy": "This is a <strong>destroy</strong> run — all managed resources will be destroyed when applied.",
-      "planOnlyCli": "This is a <strong>plan-only</strong> run initiated from the CLI on a VCS-connected workspace. Apply is not available for CLI-uploaded code — only VCS-managed code can be applied.",
       "moduleOverridesPrefix": "This run uses <strong>module overrides</strong>",
       "moduleOverridesFromPr": "from PR #{number}",
       "moduleOverridesSuffix": "will be fetched from the PR branch instead of the published registry version."
@@ -2120,7 +2103,6 @@
     },
     "changes": {
       "noChanges": "No changes",
-      "planning": "Planning…",
       "toAdd": "to add",
       "toChange": "to change",
       "toDestroy": "to destroy",
@@ -2163,7 +2145,6 @@
       "executionBackend": "Execution Backend",
       "source": "Source",
       "autoApply": "Auto Apply",
-      "planOnly": "Plan Only",
       "triggeredBy": "Triggered By",
       "created": "Created",
       "commit": "Commit",
@@ -2179,11 +2160,7 @@
     "timeline": {
       "heading": "Timeline",
       "queued": "Queued",
-      "planningStarted": "Planning started",
-      "planComplete": "Plan complete",
       "confirmed": "Confirmed",
-      "applyingStarted": "Applying started",
-      "applied": "Applied",
       "errored": "Errored",
       "canceled": "Canceled",
       "discarded": "Discarded"
@@ -2207,12 +2184,8 @@
       "followOffTitle": "Follow the live tail",
       "end": "End",
       "endTitle": "Jump to the end of the log",
-      "planEmpty": "No plan output available yet.",
-      "applyEmpty": "No apply output available yet.",
       "index": {
         "label": "Jump to",
-        "title": "Jump to a resource change, or the plan summary",
-        "summary": "Plan summary",
         "action": {
           "create": "create",
           "update": "update",
@@ -2224,13 +2197,11 @@
           "error": "error",
           "warning": "warning"
         }
-      },
-      "applySkippedNoChanges": "No apply ran: the plan had no changes, so there was nothing to apply."
+      }
     },
     "policyPanel": {
       "heading": "Policy Checks",
       "passedCount": "{passed}/{total} passed",
-      "blockedMessage": "This run is <strong>blocked by a mandatory policy set</strong>. It will not apply until the failure is resolved or an admin overrides it.",
       "overriding": "Overriding...",
       "overrideContinue": "Override & Continue",
       "overrideFailed": "Override failed",
@@ -2291,7 +2262,6 @@
       "passed": "No policy criteria matched.",
       "overriding": "Overriding...",
       "overrideContinue": "Override & Continue",
-      "overrideConfirm": "Override the AI policy gate and allow this run to apply despite the verdict?",
       "overrideFailed": "Override failed",
       "overrideFailedStatus": "Override failed ({status})",
       "overriddenBy": "overridden by {by}"
@@ -2371,7 +2341,6 @@
       "unpricedHint": "Nothing in the pricing data matched these — an unmapped type, a resource with no direct cost, or a provider not yet covered.",
       "indicative": "Estimates are indicative; actual cost depends on usage, region, commitments, and discounts.",
       "asOfState": "as of state v{serial}",
-      "noState": "No cost yet — appears after the first apply.",
       "usageBand": "{dimension}: {typical} {unit} typical (range {low}–{high})",
       "usageBandCost": "{dimension}: {costTypical}/mo typical — {costLow}–{costHigh} across {low}–{high} {unit}"
     },
@@ -2410,9 +2379,6 @@
       }
     },
     "drift": {
-      "remediate": "Plan + apply",
-      "remediateTitle": "Queue a plan + apply run to bring infrastructure back in line with the configuration",
-      "remediateConfirm": "Queue a plan + apply run for this workspace?",
       "remediateMessage": "Queued from a drift check",
       "remediateFailed": "Could not queue the remediation run"
     }
@@ -2556,8 +2522,6 @@
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",
-      "rbac": "Anyone who can merge the PR can apply. Branch protection rules (required reviews, status checks, code owner approval) become the gate. Terrapod role/label RBAC does<em>not</em> apply to comment-driven actions in this mode.",
-      "recommended": "<strong>Recommended:</strong> require linear history (rebase/squash before merge) so the commit you apply is the commit that lands.",
       "credit": "Credit: this workflow is modelled on <atlantis>Atlantis</atlantis>. Atlantis remains the right tool for teams who only want PR-comment-driven applies and no platform UI."
     },
     "vcsPolling": {
@@ -2573,7 +2537,6 @@
     },
     "lock": {
       "title": "Lock Status",
-      "lockedDesc": "This workspace is locked. No plans or applies can run.",
       "unlockedDesc": "This workspace is unlocked and ready for runs.",
       "lock": "Lock",
       "unlock": "Unlock",
@@ -2595,7 +2558,6 @@
       "dismissTitle": "Clear the reported drift state. The next scheduled check will repopulate it from reality.",
       "lastChecked": "Last Checked",
       "checkNow": "Check Now",
-      "checkNowTitle": "Queue a plan-only run to check for drift",
       "checkNowTitleDisabled": "Enable drift detection first"
     },
     "intervals": {
@@ -2609,13 +2571,10 @@
       "7days": "7 days"
     },
     "planExpiry": {
-      "title": "Plan Expiry",
-      "description": "Auto-discard an unconfirmed plan once it is older than this, so a stale plan can't be applied against a moved world. Off by default; the plan must then be re-run. (Applies to apply-capable runs only.)",
       "expireAfter": "Expire after"
     },
     "aiSummary": {
       "title": "AI Plan Summary",
-      "description": "Automatic LLM-generated change summary, risk assessment, and failure analysis on every plan-phase outcome for this workspace.",
       "mode": "Mode",
       "modeDefault": "Follow deployment default",
       "modeEnabled": "Always summarize",
@@ -2630,7 +2589,6 @@
     },
     "slack": {
       "title": "Slack notifications",
-      "description": "Opt this workspace into Slack run notifications — approval requests, applies, errors, and drift. Leave the channel empty and this workspace stays silent (there is no deployment-wide fan-out). Requires the Slack app to be enabled by an administrator.",
       "channel": "Channel",
       "channelPlaceholder": "#deploys or a channel ID (e.g. C0123ABCD)",
       "notSet": "Not set — silent.",
@@ -2715,14 +2673,8 @@
       "options": "Options",
       "hideOptions": "Hide Options",
       "queueDestroy": "Destroy",
-      "queueDestroyTitle": "Queue a destroy plan",
       "destroyAllConfirm": "Destroy all resources?",
       "confirmDestroy": "Confirm Destroy",
-      "queuePlan": "Plan",
-      "queueRun": "Plan + apply",
-      "queuePlanConfirm": "Queue a speculative plan for this workspace?",
-      "queueApplyConfirm": "Queue a plan + apply run? This can change infrastructure.",
-      "planOptions": "Plan Options",
       "targetResources": "Target resources",
       "replaceResources": "Replace resources",
       "commaSeparated": "(comma-separated)",
@@ -2733,7 +2685,6 @@
       "branch": "Branch",
       "tag": "Tag",
       "defaultBranch": "Default ({branch})",
-      "nonDefaultRefNote": "Non-default ref selected — run will be plan-only",
       "empty": "No runs yet for this workspace.",
       "runId": "Run ID",
       "status": "Status",
@@ -2744,12 +2695,8 @@
       "created": "Created",
       "needsConfirm": "needs confirm",
       "typeDestroy": "destroy",
-      "typePlanOnly": "plan only",
-      "typePlanApply": "plan + apply",
       "sourceModuleTest": "module test",
       "sourceModulePublish": "module publish",
-      "queueApplyTitle": "Queue a plan + apply run",
-      "queueApplyRefBlocked": "Apply is unavailable while a branch, tag or commit is selected — those runs are always plan-only",
       "awaitingDecision": "awaiting decision",
       "typeSavedPlan": "saved plan",
       "typeSavedPlanHint": "Apply deferred: this run does not hold the workspace until the saved plan is applied."
@@ -2781,7 +2728,6 @@
       "selectedCount": "{count}/2 selected",
       "compare": "Compare",
       "comparing": "Comparing…",
-      "empty": "No configuration versions yet. They appear here as soon as a `terraform plan` uploads or a VCS push triggers a run.",
       "id": "ID",
       "source": "Source",
       "status": "Status",
@@ -2843,7 +2789,6 @@
     },
     "runTriggers": {
       "title": "Run Triggers",
-      "description": "When a source workspace completes an apply, downstream workspaces get a new run queued automatically. Up to 20 source workspaces per destination.",
       "inboundHeading": "Source workspaces that trigger runs here",
       "inboundEmpty": "No source workspaces trigger runs on this workspace.",
       "pickerPlaceholder": "Search workspaces to add as a source…",
@@ -2920,8 +2865,6 @@
       "addVariableStatus": "Failed to add variable ({status})",
       "deleteVariable": "Failed to delete variable",
       "updateVariable": "Failed to update variable",
-      "queuePlan": "Failed to queue plan",
-      "queuePlanStatus": "Failed to queue plan ({status})",
       "queueDestroy": "Failed to queue destroy",
       "queueDestroyStatus": "Failed to queue destroy ({status})",
       "createNotification": "Failed to create notification",
