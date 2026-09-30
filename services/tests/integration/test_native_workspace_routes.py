@@ -72,13 +72,43 @@ class TestTheNativeSurfaceServesEveryEngine:
         again = await client.get(f"{NATIVE}/{pid}", headers=AUTH)
         assert again.json()["data"]["attributes"]["pulumi-bind-plan"] is True
 
+    #: Attributes the native surface serves and the compatibility surface does
+    #: not, with the reason. Enumerated rather than tolerated: a difference that
+    #: nobody had to write down is a difference nobody notices growing.
+    NATIVE_ONLY_ATTRS = {
+        "pulumi-bind-plan": "a Pulumi concept, and this surface serves Terraform alone (#1911)",
+    }
+
     async def test_a_terraform_workspace_reads_the_same_on_both_surfaces(self, app, client):
+        """The same workspace, described identically wherever the two overlap.
+
+        This asserted byte-identity until #1911, which was true and slightly
+        stronger than the property worth holding. The surfaces are *designed* to
+        differ — the native one serves every engine — so the native body is a
+        strict SUPERSET, and what matters is that no shared attribute disagrees
+        and that every extra one is there on purpose.
+
+        Gated on the surface rather than on the workspace's engine, deliberately:
+        gating on the engine would drop the attribute from the native body too,
+        where the provider reads it as `Optional+Computed` and a value that turned
+        null under an unchanged configuration is a perpetual diff.
+        """
         set_auth(app, admin_user())
         tid = await _create(client, "tf-both", "terraform")
         native = await client.get(f"{NATIVE}/{tid}", headers=AUTH)
         tfe = await client.get(f"/api/v2/workspaces/{tid}", headers=AUTH)
         assert native.status_code == tfe.status_code == 200
-        assert native.json()["data"]["attributes"] == tfe.json()["data"]["attributes"]
+
+        n = native.json()["data"]["attributes"]
+        t = tfe.json()["data"]["attributes"]
+        assert set(t) <= set(n), (
+            f"the TFE surface serves attributes the native one does not: {set(t) - set(n)}"
+        )
+        assert {k: n[k] for k in t} == t, "a shared attribute disagrees between the two surfaces"
+        assert set(n) - set(t) == set(self.NATIVE_ONLY_ATTRS), (
+            f"native-only attributes changed: {set(n) - set(t)}. Add it to "
+            f"NATIVE_ONLY_ATTRS with a reason, or stop serving it only there."
+        )
 
 
 class TestTheTfeSurfaceStaysTerraformOnly:

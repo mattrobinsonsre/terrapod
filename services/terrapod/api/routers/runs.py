@@ -509,6 +509,38 @@ async def _fetch_vcs_config(
         raise vcs_unavailable(conn, repo, ref_override or ws.vcs_branch, e) from e
 
 
+#: Run-create attributes that only some engines consume, and which engine each
+#: needs. Refused rather than ignored on the others — a stored setting nothing
+#: reads is a promise the platform does not keep, and the operator has no way to
+#: find that out (#1911).
+#:
+#: Most run options are NOT here, because they are not Terraform-only: Pulumi
+#: reads `target-addrs` and `replace-addrs` as `--target`/`--replace` URNs, and
+#: `refresh-only`/`refresh` as `pulumi refresh` and `--refresh=false`.
+#:
+#: Only a TRUTHY value is refused. A client sending the attribute at its default
+#: is not asking for anything, and 422ing that would break callers that serialize
+#: every field. Same rule as `_validate_pulumi_bind_plan`.
+_ENGINE_SPECIFIC_RUN_ATTRS: dict[str, tuple[str, str]] = {
+    # `-allow-empty-apply` is an OpenTofu/Terraform apply flag. `pulumi up` has
+    # no equivalent — it carries out whatever the preview produced, empty or not.
+    "allow-empty-apply": (TERRAFORM, "the terraform/tofu apply flag of the same name"),
+}
+
+
+def _validate_engine_specific_run_attrs(attrs: dict, engine: str | None) -> None:
+    """Refuse a run attribute asked for on an engine that has no such thing."""
+    for name, (needs, why) in _ENGINE_SPECIFIC_RUN_ATTRS.items():
+        if attrs.get(name) and (engine or TERRAFORM) != needs:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"'{name}' applies only to {needs} workspaces ({why}); "
+                    f"this workspace runs {engine}."
+                ),
+            )
+
+
 @router.post("/runs", status_code=201)
 async def create_run(
     request: Request,
@@ -536,6 +568,10 @@ async def create_run(
     # `terraform plan -out=FILE` (#1903). Apply-capable, but its apply is
     # deferred until the operator runs `terraform apply FILE`.
     save_plan = bool(attrs.get("save-plan", False))
+    # `save-plan` needs no engine check of its own: no engine reads it. It is a
+    # run-lifecycle setting — hold this apply-capable run until someone confirms —
+    # so it means the same whatever runs the phase.
+    _validate_engine_specific_run_attrs(attrs, ws.engine)
     if save_plan and plan_only:
         # Contradictory, so say so. Silently dropping one of them is precisely
         # the failure this attribute was added to fix: a plan-only saved plan

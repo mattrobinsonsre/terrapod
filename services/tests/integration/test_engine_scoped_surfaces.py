@@ -474,3 +474,69 @@ class TestNativeOnlyRoutesDoNotRefuseTheirOwnWorkspaces:
             headers={**AUTH, "Content-Type": "application/json"},
         )
         assert resp.status_code in (200, 201), f"{prefix}: {resp.status_code} {resp.text}"
+
+
+class TestARunOptionOnlyOneEngineHasIsRefusedNotStored:
+    """`allow-empty-apply` was accepted on any workspace and read by one engine.
+
+    On a Pulumi workspace the column was written and nothing ever looked at it:
+    `pulumi up` carries out whatever the preview produced, empty or not, so there
+    is no flag for it to map to. A stored setting nothing reads is a promise the
+    platform does not keep, and the operator has no way to find that out — the run
+    simply behaves as though they had not asked.
+
+    Most run options are NOT in this class, which is why the check is a table and
+    not a blanket "Terraform-only options" rule: Pulumi reads `target-addrs` and
+    `replace-addrs` as `--target`/`--replace` URNs, and `refresh-only`/`refresh`
+    as `pulumi refresh` and `--refresh=false`.
+    """
+
+    async def _queue(self, client, ws: str, attrs: dict):
+        return await client.post(
+            "/api/v1/runs",
+            json={
+                "data": {
+                    "type": "runs",
+                    "attributes": attrs,
+                    "relationships": {"workspace": {"data": {"type": "workspaces", "id": ws}}},
+                }
+            },
+            headers=AUTH,
+        )
+
+    async def test_asking_for_it_on_pulumi_is_refused(self, app, client):
+        set_auth(app, admin_user())
+        ws = await _runnable(client, "emptyapply-pu::dev", "pulumi")
+        resp = await self._queue(client, ws, {"plan-only": True, "allow-empty-apply": True})
+        assert resp.status_code == 422, f"{resp.status_code}: {resp.text}"
+        assert "allow-empty-apply" in resp.text
+
+    async def test_but_sending_it_at_its_default_is_not_asking_for_anything(self, app, client):
+        """A client that serializes every field must not start failing."""
+        set_auth(app, admin_user())
+        ws = await _runnable(client, "emptyapply-def::dev", "pulumi")
+        resp = await self._queue(client, ws, {"plan-only": True, "allow-empty-apply": False})
+        assert resp.status_code == 201, f"{resp.status_code}: {resp.text}"
+
+    async def test_and_terraform_still_takes_it(self, app, client):
+        set_auth(app, admin_user())
+        ws = await _runnable(client, "emptyapply-tf", "terraform")
+        resp = await self._queue(client, ws, {"plan-only": True, "allow-empty-apply": True})
+        assert resp.status_code == 201, f"{resp.status_code}: {resp.text}"
+
+    @pytest.mark.parametrize(
+        "attrs",
+        [
+            {"target-addrs": ["urn:pulumi:dev::p::aws:s3/bucket:Bucket::a"]},
+            {"replace-addrs": ["urn:pulumi:dev::p::aws:s3/bucket:Bucket::a"]},
+            {"refresh-only": True},
+            {"refresh": False},
+        ],
+    )
+    async def test_the_options_pulumi_does_read_are_untouched(self, app, client, attrs):
+        """The guard against over-correcting into "Terraform-only run options"."""
+        set_auth(app, admin_user())
+        name = f"pulopt-{next(iter(attrs)).replace('-', '')}::dev"
+        ws = await _runnable(client, name, "pulumi")
+        resp = await self._queue(client, ws, {"plan-only": True, **attrs})
+        assert resp.status_code == 201, f"{attrs}: {resp.status_code} {resp.text}"

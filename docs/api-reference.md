@@ -988,7 +988,7 @@ The CLI plan/apply flow always supplies a CV (it uploads one first), so it's una
 | `replace-addrs` | array of strings | `[]` | Resource addresses to force replacement (equivalent to `-replace` CLI flag, plan phase only) |
 | `refresh-only` | boolean | `false` | Refresh-only plan — reconcile state without planning changes (equivalent to `-refresh-only`) |
 | `refresh` | boolean | `true` | Whether to refresh state before planning. Set to `false` to skip refresh (equivalent to `-refresh=false`) |
-| `allow-empty-apply` | boolean | `false` | Allow apply even when the plan has no changes (equivalent to `-allow-empty-apply`) |
+| `allow-empty-apply` | boolean | `false` | Allow apply even when the plan has no changes (equivalent to `-allow-empty-apply`). **Terraform/OpenTofu only** — `pulumi up` carries out whatever the preview produced, empty or not, so setting it `true` on a Pulumi workspace is refused with 422 rather than stored and ignored. The other run options are not engine-specific: Pulumi reads `target-addrs`/`replace-addrs` as `--target`/`--replace` URNs and `refresh-only`/`refresh` as `pulumi refresh` / `--refresh=false`. |
 | `vcs-ref` | string | `""` | Branch, tag, or SHA to fetch code from instead of the workspace's tracked branch. Only valid on VCS-connected workspaces. **Runs with a non-default ref are always plan-only** — the server enforces this regardless of the `plan-only` attribute value |
 | `save-plan` | boolean | `false` | A saved-plan run — `terraform plan -out=FILE`. See below |
 
