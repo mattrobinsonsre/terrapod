@@ -35,7 +35,11 @@ export default function TFERedirectPage() {
         const runId = segments[3]
 
         try {
-          const res = await apiFetch(`/api/v2/organizations/default/workspaces/${wsName}`)
+          // The native workspace route takes an id OR a name, for every
+          // enabled engine. The TFE route this used resolves Terraform alone, so
+          // a deep link to a Pulumi workspace fell through to the list below
+          // (#1911). Encoded because a Pulumi workspace is named `project::stack`.
+          const res = await apiFetch(`/api/v1/workspaces/${encodeURIComponent(wsName)}`)
           if (res.ok) {
             const data = await res.json()
             const wsId = data.data.id

@@ -768,7 +768,7 @@ function WorkspaceDetailContent() {
 
   async function loadStateVersions() {
     try {
-      setStateVersions(await fetchAllPages<StateVersionItem>(`/api/v2/workspaces/${workspaceId}/state-versions`))
+      setStateVersions(await fetchAllPages<StateVersionItem>(`/api/v1/workspaces/${workspaceId}/state-versions`))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errors.loadStateVersions'))
     } finally {
@@ -778,7 +778,7 @@ function WorkspaceDetailContent() {
 
   async function downloadStateVersion(sv: StateVersionItem) {
     try {
-      const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/download`)
+      const resp = await apiFetch(`/api/v1/state-versions/${sv.id}/download`)
       const blob = await resp.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -1250,8 +1250,9 @@ function WorkspaceDetailContent() {
     const action = workspace.attributes.locked ? 'unlock' : 'lock'
     if (!confirmTouchMutation(action === 'unlock' ? t('lock.unlockConfirm') : t('lock.lockConfirm'))) return
     try {
-      // lock/unlock are TFE V2 CLI-contract endpoints — only at /api/v2/.
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/actions/${action}`, {
+      // Natively, so the padlock works on every engine (#1911). The same
+      // paths are still served on /api/tfe/v2 for the CLI — they did not move.
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}/actions/${action}`, {
         method: 'POST',
       })
       if (!res.ok) {

@@ -27,10 +27,6 @@ const ALLOWED: Record<string, string> = {
     'org-scoped varsets — not workspace- or run-scoped, so the engine filter does not apply',
   'app/admin/variable-sets/[id]/page.tsx':
     'varset CRUD and its workspace relationships are org-scoped; the workspace LIST here is native',
-  'app/workspaces/[id]/page.tsx':
-    'state-version list/download and workspace lock/unlock have no native route yet — tracked',
-  'app/app/[...path]/page.tsx':
-    'resolves a workspace by NAME, which exists only on the TFE surface — tracked',
   'components/nav-bar.tsx': 'GET /api/v2/ping is the TFE service-discovery probe itself',
   'lib/api.ts': 'prose in a doc comment, not a call',
 }
