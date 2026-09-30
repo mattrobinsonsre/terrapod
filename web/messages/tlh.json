@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "PR #{number}vo'",
       "moduleOverridesSuffix": "chumlu'pu'bogh nughmey teywI' mI' DIvI'taHvIS PR paQvo' Hevlu'."
     },
+    "bindPlan": {
+      "bound": "tI''ang vam baghlu''pu'': naDev nab ''anglu''bogh ta'' choH. ghIq choHlu''pu''bogh vay'' ta''be''lu''; luj choH.",
+      "unbound": "tI''ang vam baghbe''lu''. choHmeyDaj ngu'' choH, pulumi up rur. chaq naDev ''anglu''bogh rurbe'' ta''lu''bogh."
+    },
     "cards": {
       "changes": "choHmey",
       "cost": "wagh",

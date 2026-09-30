@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "uit PR #{number}",
       "moduleOverridesSuffix": "worden opgehaald uit de PR-branch in plaats van uit de gepubliceerde registryversie."
     },
+    "bindPlan": {
+      "bound": "Vastgelegd op dit preview: de update past precies het hier getoonde plan toe, en alles wat sindsdien is veranderd laat de update mislukken in plaats van te worden toegepast.",
+      "unbound": "Niet vastgelegd op dit preview: de update bepaalt zelf zijn wijzigingen wanneer die draait, zoals een gewone pulumi up doet, dus wat er wordt toegepast kan afwijken van wat hier wordt getoond."
+    },
     "cards": {
       "changes": "Wijzigingen",
       "cost": "Kosten",

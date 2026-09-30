@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "från PR #{number}",
       "moduleOverridesSuffix": "kommer att hämtas från PR-grenen istället för den publicerade registerversionen."
     },
+    "bindPlan": {
+      "bound": "Låst till denna preview: uppdateringen tillämpar exakt den plan som visas här, och allt som har ändrats sedan dess får uppdateringen att misslyckas i stället för att tillämpas.",
+      "unbound": "Inte låst till denna preview: uppdateringen räknar själv ut sina ändringar när den körs, precis som en vanlig pulumi up, så det som tillämpas kan skilja sig från det som visas här."
+    },
     "cards": {
       "changes": "Ändringar",
       "cost": "Kostnad",

@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "aus PR #{number}",
       "moduleOverridesSuffix": "wird aus dem PR-Branch anstelle der veröffentlichten Registry-Version abgerufen."
     },
+    "bindPlan": {
+      "bound": "An diesen Preview gebunden: Die Aktualisierung wendet genau den hier gezeigten Plan an, und was sich seitdem geändert hat, lässt die Aktualisierung fehlschlagen, statt angewendet zu werden.",
+      "unbound": "Nicht an diesen Preview gebunden: Die Aktualisierung ermittelt ihre Änderungen beim Ausführen selbst, wie ein einfaches pulumi up, sodass sie etwas anderes anwenden kann als hier gezeigt."
+    },
     "cards": {
       "changes": "Änderungen",
       "cost": "Kosten",

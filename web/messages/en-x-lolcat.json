@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "from PR #{number}",
       "moduleOverridesSuffix": "wil be fetchd from teh PR branch insted ov teh publishd registry vershun."
     },
+    "bindPlan": {
+      "bound": "Lokd 2 dis previu: teh updayt applyz exakly teh plan shown heer, an anyfin dat changd sinse failz teh updayt insted ov gettin applyd.",
+      "unbound": "Not lokd 2 dis previu: teh updayt werkz out itz own changez wen it runz, liek a plain pulumi up duz, so wut it applyz mite differ from wut is shown heer."
+    },
     "cards": {
       "changes": "Chaenges",
       "cost": "Kost",

@@ -81,6 +81,10 @@ interface RunAttrs {
   'refresh-only': boolean
   'refresh': boolean
   'allow-empty-apply': boolean
+  // Pulumi only (#1553, #1560): whether this update is bound to the plan its
+  // preview saved. Null on every other engine, which have no such distinction —
+  // so `!= null` is the engine test, not a separate one.
+  'pulumi-bind-plan'?: boolean | null
   'vcs-commit-sha': string | null
   'vcs-branch': string | null
   'vcs-pull-request-number': number | null
@@ -1729,6 +1733,27 @@ function RunDetailPageInner() {
             click — unchanged. */}
         {hasActions && (
           <div className="hidden md:flex flex-wrap gap-3 mb-6">{actionButtons}</div>
+        )}
+
+        {/* Whether the update performs exactly the operations the preview
+            showed (#1553, #1560). It belongs HERE rather than in Details
+            because it is a property of the decision being taken, and the
+            moment of approval is the only moment it can change anyone's mind.
+            Pulumi-only: the attribute is null on every other engine, so the
+            null check is the engine check. Shown only while the run is
+            confirmable — after that it is history, and Details carries it. */}
+        {actions['is-confirmable'] && attrs['pulumi-bind-plan'] != null && (
+          <div
+            data-testid="run-bind-plan"
+            className={
+              'mb-6 px-3 py-2 rounded-lg border text-xs ' +
+              (attrs['pulumi-bind-plan']
+                ? 'bg-slate-800/50 border-slate-700/50 text-slate-300'
+                : 'bg-amber-900/20 border-amber-800/50 text-amber-200')
+            }
+          >
+            {attrs['pulumi-bind-plan'] ? t('bindPlan.bound') : t('bindPlan.unbound')}
+          </div>
         )}
 
         {/* View tabs (#721) — Overview summarises the run; AI and OPA appear

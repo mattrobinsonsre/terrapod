@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "来自 PR #{number}",
       "moduleOverridesSuffix": "将从 PR 分支而非已发布的注册表版本获取。"
     },
+    "bindPlan": {
+      "bound": "已锁定到此预览：更新会严格应用此处显示的计划，自预览以来发生的任何变化都会导致更新失败，而不会被应用。",
+      "unbound": "未锁定到此预览：更新运行时会像普通的 pulumi up 一样自行确定变更，因此实际应用的内容可能与此处显示的不同。"
+    },
     "cards": {
       "changes": "更改",
       "cost": "成本",

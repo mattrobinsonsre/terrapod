@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "del PR #{number}",
       "moduleOverridesSuffix": "se obtendrá de la rama del PR en lugar de la versión publicada del registro."
     },
+    "bindPlan": {
+      "bound": "Vinculado a este preview: el update aplica exactamente el plan que se muestra aquí, y cualquier cambio posterior hace fallar el update en lugar de aplicarse.",
+      "unbound": "Sin vincular a este preview: el update calcula sus propios cambios al ejecutarse, como hace un pulumi up normal, así que lo que aplique puede diferir de lo que se muestra aquí."
+    },
     "cards": {
       "changes": "Cambios",
       "cost": "Coste",

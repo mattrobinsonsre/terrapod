@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "from PR #{number}",
       "moduleOverridesSuffix": "will be fetched from the PR branch instead of the published registry version."
     },
+    "bindPlan": {
+      "bound": "Locked to this preview: the update applies exactly the plan shown here, and anything that changed since fails the update instead of being applied.",
+      "unbound": "Not locked to this preview: the update works out its own changes when it runs, as a plain pulumi up does, so what it applies may differ from what is shown here."
+    },
     "cards": {
       "changes": "Changes",
       "cost": "Cost",

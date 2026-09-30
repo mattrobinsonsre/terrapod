@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "dalla PR #{number}",
       "moduleOverridesSuffix": "verranno recuperati dal branch della PR anziché dalla versione pubblicata nel registry."
     },
+    "bindPlan": {
+      "bound": "Vincolato a questa anteprima: l''aggiornamento applica esattamente il piano mostrato qui e qualsiasi cosa cambiata da allora fa fallire l''aggiornamento invece di essere applicata.",
+      "unbound": "Non vincolato a questa anteprima: l''aggiornamento determina da sé le proprie modifiche quando viene eseguito, come un semplice pulumi up, quindi ciò che applica può differire da quanto mostrato qui."
+    },
     "cards": {
       "changes": "Modifiche",
       "cost": "Costo",

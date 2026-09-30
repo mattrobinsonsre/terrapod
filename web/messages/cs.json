@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "z PR #{number}",
       "moduleOverridesSuffix": "budou staženy z větve PR namísto publikované verze z registry."
     },
+    "bindPlan": {
+      "bound": "Uzamčeno na tento náhled: aktualizace použije přesně plán zobrazený zde a cokoli, co se od té doby změnilo, aktualizaci zastaví, místo aby se to použilo.",
+      "unbound": "Neuzamčeno na tento náhled: aktualizace si při spuštění změny určí sama, stejně jako prosté pulumi up, takže může použít jiné změny, než jsou zobrazeny zde."
+    },
     "cards": {
       "changes": "Změny",
       "cost": "Náklady",

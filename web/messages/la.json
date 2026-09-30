@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "e PR #{number}",
       "moduleOverridesSuffix": "e ramo PR petentur loco versionis tabularii editae."
     },
+    "bindPlan": {
+      "bound": "Ad hanc praevisionem alligata: renovatio ipsum consilium hic ostensum adhibet, et quidquid postea mutatum est renovationem deficere facit nec adhibetur.",
+      "unbound": "Ad hanc praevisionem non alligata: renovatio mutationes suas ipsa invenit cum currit, sicut simplex pulumi up facit, itaque quod adhibet ab eo quod hic ostenditur differre potest."
+    },
     "cards": {
       "changes": "Mutationes",
       "cost": "Impensa",

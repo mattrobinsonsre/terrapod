@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "PR:stä #{number}",
       "moduleOverridesSuffix": "haetaan PR-haarasta julkaistun rekisteriversion sijaan."
     },
+    "bindPlan": {
+      "bound": "Lukittu tähän esikatseluun: päivitys soveltaa täsmälleen tässä näytettyä suunnitelmaa, joten kaikki sen jälkeen muuttunut kaataa päivityksen sen sijaan, että se sovellettaisiin.",
+      "unbound": "Ei lukittu tähän esikatseluun: päivitys selvittää muutoksensa itse ajon aikana, kuten tavallinen pulumi up, joten se voi soveltaa muuta kuin tässä näytettyä."
+    },
     "cards": {
       "changes": "Muutokset",
       "cost": "Kustannus",

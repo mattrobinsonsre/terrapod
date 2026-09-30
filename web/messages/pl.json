@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "z PR #{number}",
       "moduleOverridesSuffix": "zostanie pobrany z gałęzi PR zamiast z opublikowanej wersji rejestru."
     },
+    "bindPlan": {
+      "bound": "Zablokowane na tym previewie: aktualizacja stosuje dokładnie plan pokazany tutaj, a wszystko, co zmieniło się od tego czasu, powoduje niepowodzenie aktualizacji zamiast zostać zastosowane.",
+      "unbound": "Niezablokowane na tym previewie: aktualizacja sama ustala swoje zmiany w trakcie działania, tak jak zwykłe pulumi up, więc może zastosować co innego, niż pokazano tutaj."
+    },
     "cards": {
       "changes": "Zmiany",
       "cost": "Koszt",

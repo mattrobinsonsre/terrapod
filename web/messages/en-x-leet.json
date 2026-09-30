@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "fr0m PR #{number}",
       "moduleOverridesSuffix": "w1ll b3 f37ch3d fr0m 7h3 PR br4nch 1n5734d 0f 7h3 publ15h3d r3g157ry v3r510n."
     },
+    "bindPlan": {
+      "bound": "L0ck3d 70 7h15 pr3v13w: 7h3 upd473 4ppl135 3x4c7ly 7h3 pl4n 5h0wn h3r3, 4nd 4ny7h1ng 7h47 ch4ng3d 51nc3 f41l5 7h3 upd473 1n5734d 0f b31ng 4ppl13d.",
+      "unbound": "N07 l0ck3d 70 7h15 pr3v13w: 7h3 upd473 w0rk5 0u7 175 0wn ch4ng35 wh3n 17 run5, 45 4 pl41n pulumi up d035, 50 wh47 17 4ppl135 m4y d1ff3r fr0m wh47 15 5h0wn h3r3."
+    },
     "cards": {
       "changes": "Ch4ng35",
       "cost": "C057",

@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "de la PR #{number}",
       "moduleOverridesSuffix": "seront récupérés depuis la branche de la PR au lieu de la version publiée du registre."
     },
+    "bindPlan": {
+      "bound": "Lié à ce preview : la mise à jour applique exactement le plan affiché ici, et tout ce qui a changé depuis fait échouer la mise à jour au lieu d''être appliqué.",
+      "unbound": "Non lié à ce preview : la mise à jour détermine elle-même ses changements lors de son exécution, comme un simple pulumi up, de sorte que ce qu''elle applique peut différer de ce qui est affiché ici."
+    },
     "cards": {
       "changes": "Modifications",
       "cost": "Coût",

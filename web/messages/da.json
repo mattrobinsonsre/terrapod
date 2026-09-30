@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "fra PR #{number}",
       "moduleOverridesSuffix": "hentes fra PR-branchen i stedet for den publicerede registry-version."
     },
+    "bindPlan": {
+      "bound": "Låst til denne preview: opdateringen anvender præcis den plan, der vises her, og alt, der har ændret sig siden, får opdateringen til at fejle i stedet for at blive anvendt.",
+      "unbound": "Ikke låst til denne preview: opdateringen finder selv sine ændringer, når den kører, som en almindelig pulumi up gør, så det, den anvender, kan afvige fra det, der vises her."
+    },
     "cards": {
       "changes": "Ændringer",
       "cost": "Omkostning",

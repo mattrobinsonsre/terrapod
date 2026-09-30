@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "o PR #{number}",
       "moduleOverridesSuffix": "cânt eu nôl o gangen y PR yn lle'r fersiwn gofrestrfa a gyhoeddwyd."
     },
+    "bindPlan": {
+      "bound": "Wedi''i gloi i''r rhagolwg hwn: mae''r diweddariad yn gweithredu''r union gynllun a ddangosir yma, felly mae unrhyw beth a newidiodd ers hynny yn methu''r diweddariad yn hytrach na chael ei weithredu.",
+      "unbound": "Heb ei gloi i''r rhagolwg hwn: mae''r diweddariad yn cyfrifo ei newidiadau ei hun wrth redeg, fel y mae pulumi up plaen yn ei wneud, felly gall yr hyn a weithredir fod yn wahanol i''r hyn a ddangosir yma."
+    },
     "cards": {
       "changes": "Newidiadau",
       "cost": "Cost",

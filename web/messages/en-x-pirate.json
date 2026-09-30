@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "from PR #{number}",
       "moduleOverridesSuffix": "will be fetched from th'' PR branch instead o'' th'' published registry version."
     },
+    "bindPlan": {
+      "bound": "Lashed t'' this preview: th'' update hoists exactly th'' plan shown here, an'' anythin'' that shifted since scuttles th'' update instead o'' bein'' applied.",
+      "unbound": "Not lashed t'' this preview: th'' update charts its own course when she sails, as a plain pulumi up does, so what she applies may differ from what be shown here."
+    },
     "cards": {
       "changes": "Changes",
       "cost": "Coin",

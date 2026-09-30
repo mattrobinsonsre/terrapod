@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "from marklar #{number}",
       "moduleOverridesSuffix": "will be fetched from the marklar marklar instead of the published marklar marklar."
     },
+    "bindPlan": {
+      "bound": "Locked to this marklar: the marklar applies exactly the marklar shown here, and anything that changed since fails the marklar instead of being applied.",
+      "unbound": "Not locked to this marklar: the marklar works out its own marklars when it runs, as a plain pulumi up does, so what it applies may differ from what is shown here."
+    },
     "cards": {
       "changes": "Marklars",
       "cost": "Marklar",

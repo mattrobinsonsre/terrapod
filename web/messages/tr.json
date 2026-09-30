@@ -2093,6 +2093,10 @@
       "moduleOverridesFromPr": "PR #{number} kaynaklı",
       "moduleOverridesSuffix": "yayımlanan registry sürümü yerine PR dalından getirilecek."
     },
+    "bindPlan": {
+      "bound": "Bu previewa kilitli: güncelleme burada gösterilen planı birebir uygular; o andan beri değişen her şey, uygulanmak yerine güncellemenin başarısız olmasına yol açar.",
+      "unbound": "Bu previewa kilitli değil: güncelleme, sıradan bir pulumi up gibi, çalışırken değişikliklerini kendisi belirler; bu yüzden uyguladığı şey burada gösterilenden farklı olabilir."
+    },
     "cards": {
       "changes": "Değişiklikler",
       "cost": "Maliyet",
