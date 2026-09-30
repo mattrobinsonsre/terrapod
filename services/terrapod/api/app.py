@@ -770,7 +770,18 @@ def create_application() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
         title="Terrapod API",
-        description="Terrapod - Open-source Terraform Enterprise replacement",
+        # The first orientation an agent or a tooling client reading
+        # /api/openapi.json gets, so it says what Terrapod runs rather than only
+        # what it replaces (#1911). An OpenTofu/Terraform orchestrator first, and
+        # a workspace's `engine` says which engine it belongs to — a client that
+        # assumes one engine is the failure this line exists to head off. Ansible
+        # is deliberately not claimed here: it is planned, not shipped.
+        description=(
+            "Terrapod - open-source Terraform Enterprise replacement. Orchestrates "
+            "OpenTofu/Terraform, and Pulumi where it is enabled; a workspace's "
+            "`engine` attribute says which. The /api/tfe/v2 compatibility surface "
+            "serves OpenTofu/Terraform workspaces only — /api/v1 serves every engine."
+        ),
         version="0.1.0",
         lifespan=lifespan,
         docs_url=None,

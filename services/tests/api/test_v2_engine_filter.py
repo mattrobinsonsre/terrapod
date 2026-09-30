@@ -353,3 +353,25 @@ def test_every_caller_of_the_chokepoint_hands_it_the_request(module: str, func: 
         f"{module}: these call {func}() without passing `request=`, so the "
         f"engine check cannot tell which surface asked: {', '.join(missing)}"
     )
+
+
+def test_the_api_describes_itself_as_more_than_one_engine():
+    """The OpenAPI description is the first orientation an agent gets (#1911).
+
+    It read "Terrapod - Open-source Terraform Enterprise replacement", which is
+    true and incomplete in the direction that matters: a client reading it is
+    primed to assume one engine, and the surfaces that then 404 give it no clue
+    why. Asserted rather than left to a reviewer, because nothing else reads this
+    string and prose drifts silently.
+
+    Ansible is deliberately absent — planned, not shipped, and orientation text
+    that over-claims is worse than orientation text that under-claims.
+    """
+    from terrapod.api.app import create_application
+
+    desc = create_application().description
+    assert "Pulumi" in desc, "the description names one engine; a client will assume one engine"
+    assert (
+        desc.index("OpenTofu") < desc.index("Terraform Enterprise") or "OpenTofu/Terraform" in desc
+    ), "AGENTS.md: the open-source engine leads in prose"
+    assert "Ansible" not in desc, "Ansible is planned, not shipped — do not claim it"
