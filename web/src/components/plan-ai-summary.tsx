@@ -25,6 +25,7 @@ import { apiFetch } from '@/lib/api'
 import { useIsTouch } from '@/lib/use-media-query'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { PlanSummaryChat } from '@/components/plan-summary-chat'
+import { withMarkdownSafety } from '@/lib/markdown-safety'
 
 type Severity = 'low' | 'medium' | 'high' | 'critical' | ''
 
@@ -397,7 +398,11 @@ function RiskFactorRow({ factor }: { factor: RiskFactor }) {
 // no extra margin so detail blocks stay tight; description gets vertical
 // spacing from a `space-y-2` on its first paragraph via the prose layout.
 // Inline `<code>` uses the same monospace pill in both places.
-const SUMMARY_MARKDOWN_COMPONENTS = {
+// Wrapped in withMarkdownSafety (GHSA remote-image exfiltration): the model's
+// prose renders no remote images, and its links carry rel="noopener noreferrer".
+// The wrapper layers those over the styling below rather than beside it, so the
+// styled `a` keeps its classes AND gets the rel.
+const SUMMARY_MARKDOWN_COMPONENTS = withMarkdownSafety({
   code: ({ children, ...props }: React.ComponentPropsWithoutRef<'code'>) => (
     <code
       {...props}
@@ -426,4 +431,4 @@ const SUMMARY_MARKDOWN_COMPONENTS = {
       {children}
     </p>
   ),
-}
+})

@@ -26,6 +26,7 @@ import { apiFetch } from '@/lib/api'
 import { useIsTouch } from '@/lib/use-media-query'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { CostSummaryChat } from '@/components/cost-summary-chat'
+import { withMarkdownSafety } from '@/lib/markdown-safety'
 
 interface Range {
   min: number
@@ -380,7 +381,11 @@ export function CostAiSummary({ runId, refreshKey = 0 }: Props) {
   )
 }
 
-const COST_MARKDOWN_COMPONENTS = {
+// Wrapped in withMarkdownSafety (GHSA remote-image exfiltration): the model's
+// prose renders no remote images, and its links carry rel="noopener noreferrer".
+// The wrapper layers those over the styling below rather than beside it, so the
+// styled `a` keeps its classes AND gets the rel.
+const COST_MARKDOWN_COMPONENTS = withMarkdownSafety({
   code: ({ children, ...props }: React.ComponentPropsWithoutRef<'code'>) => (
     <code {...props} className="rounded bg-slate-900 px-1 py-0.5 font-mono text-[0.7rem] text-brand-300">
       {children}
@@ -396,4 +401,4 @@ const COST_MARKDOWN_COMPONENTS = {
       {children}
     </p>
   ),
-}
+})
