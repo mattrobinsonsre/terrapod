@@ -1065,7 +1065,7 @@
       "noExpiry": "No expiry",
       "addDriftIgnoreRule": "Add rule",
       "debugModeHint": "Hold failed runner pods open on the workspaces this rule creates. On by default on this release line — a held pod keeps that workspace's credentials.",
-      "allowForkPrPlansHint": "Applies to every workspace this rule creates. On by default on this release line, because that plan runs the fork author's code with this workspace's credentials."
+      "allowForkPrPlansHint": "Applies to every workspace this rule creates. Off by default: a pull request from a fork gets no speculative plan, because it would run its author's code with the workspace's credentials."
     },
     "table": {
       "name": "Name",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plans on fork pull requests",
-      "description": "Whether a pull request opened from a fork gets a speculative plan. On by default on this release line, because that plan runs the fork author's code with this workspace's credentials.",
+      "description": "Whether a pull request opened from a fork gets a speculative plan. Off by default, because that plan runs the fork author's code with this workspace's credentials.",
       "label": "Plan fork pull requests",
       "hint": "A run receives this workspace's environment variables, sensitive values, any Vault-resolved secrets and the job's cloud identity. Someone opening a pull request from a fork has no write access and cannot merge, so a speculative plan is the only way their code reaches those credentials. Turn this on for a workspace that holds nothing worth taking — a public module repository accepting community contributions, say. Pull requests from branches in the repository itself are unaffected and always plan.",
       "activeBadge": "On",

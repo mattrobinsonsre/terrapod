@@ -1065,7 +1065,7 @@
       "noExpiry": "Bez wygaśnięcia",
       "addDriftIgnoreRule": "Dodaj regułę",
       "debugModeHint": "Utrzymuj pody nieudanych runnerów otwarte w przestrzeniach roboczych tworzonych przez tę regułę. Domyślnie wyłączone — utrzymywany pod przechowuje poświadczenia tej przestrzeni roboczej.",
-      "allowForkPrPlansHint": "Dotyczy każdej przestrzeni roboczej tworzonej przez tę regułę. Domyślnie włączone w tej linii wydań, ponieważ taki plan uruchamia kod autora forka z poświadczeniami tej przestrzeni roboczej."
+      "allowForkPrPlansHint": "Dotyczy każdej przestrzeni roboczej tworzonej przez tę regułę. Domyślnie wyłączone: pull request z forka nie otrzymuje planu spekulatywnego, ponieważ uruchomiłby kod swojego autora z poświadczeniami przestrzeni roboczej."
     },
     "table": {
       "name": "Nazwa",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plany dla pull requestów z forków",
-      "description": "Czy pull request otwarty z forka otrzymuje plan spekulatywny. Domyślnie włączone w tej linii wydań, ponieważ taki plan uruchamia kod autora forka z poświadczeniami tej przestrzeni roboczej.",
+      "description": "Czy pull request otwarty z forka otrzymuje plan spekulatywny. Domyślnie wyłączone, ponieważ taki plan uruchamia kod autora forka z poświadczeniami tej przestrzeni roboczej.",
       "label": "Planuj pull requesty z forków",
       "hint": "Uruchomienie otrzymuje zmienne środowiskowe tej przestrzeni roboczej, wartości wrażliwe, wszystkie sekrety pobrane przez Vault oraz tożsamość chmurową zadania. Kto otwiera pull request z forka, nie ma uprawnień do zapisu i nie może scalić zmian, więc plan spekulatywny to jedyna droga, którą jego kod dociera do tych poświadczeń. Włącz to dla przestrzeni roboczej, w której nie ma nic wartego zabrania — na przykład dla publicznego repozytorium modułów przyjmującego wkład społeczności. Pull requesty z gałęzi samego repozytorium nie są tym objęte i zawsze otrzymują plan.",
       "activeBadge": "Wł.",

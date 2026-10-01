@@ -281,18 +281,26 @@ class TestTheRegistryModulePathIsGated:
 
 class TestTheForkGateDefaultOnThisLine:
     """The default is the decision, and it was split three ways once already:
-    the column defaulted true, the create path hardcoded false, and restore
-    fell back to false — so two workspaces on one repo behaved differently
-    depending on how they came to exist.
+    the column defaulted one way, the create path the other, and restore a third —
+    so two workspaces on the same repository behaved differently depending on how
+    they came to exist.
+
+    1.8 shipped it permissive deliberately: a patch must not stop a fork pull
+    request that plans today. This line takes the secure default, so the column,
+    the create path and the autodiscovery template move together. Leaving the
+    column permissive would re-open the setting for every workspace a rule
+    creates, which reads exactly like the setting not working.
     """
 
-    def test_the_column_defaults_permissive(self):
+    def test_the_column_defaults_closed(self):
         from terrapod.db.models import AutodiscoveryRule, Workspace
 
         for model in (Workspace, AutodiscoveryRule):
             col = model.__table__.c["allow_fork_pr_plans"]
-            assert col.default.arg is True, f"{model.__name__} ORM default"
-            assert "true" in str(col.server_default.arg).lower(), f"{model.__name__} server_default"
+            assert col.default.arg is False, f"{model.__name__} ORM default"
+            assert "false" in str(col.server_default.arg).lower(), (
+                f"{model.__name__} server_default"
+            )
 
     def test_the_create_path_agrees_with_the_column(self):
         """An explicit value in the INSERT overrides the ORM default, so the
@@ -303,10 +311,13 @@ class TestTheForkGateDefaultOnThisLine:
         from terrapod.api.routers import tfe_v2
 
         src = inspect.getsource(tfe_v2)
-        assert 'attrs.get("allow-fork-pr-plans", True)' in src, (
-            "the create path does not fall back to this line's permissive default"
+        assert 'attrs.get("allow-fork-pr-plans", False)' in src, (
+            "the create path does not fall back to this line's closed default"
         )
-        assert 'attrs.get("allow-fork-pr-plans", False)' not in src
+        assert 'attrs.get("allow-fork-pr-plans", True)' not in src, (
+            "the permissive 1.8 fallback is still here, so a workspace created "
+            "through the API opts itself in whatever the column says"
+        )
 
     def test_restore_agrees_too(self):
         import inspect
@@ -314,7 +325,7 @@ class TestTheForkGateDefaultOnThisLine:
         from terrapod.services import deleted_workspace_service
 
         src = inspect.getsource(deleted_workspace_service)
-        assert 'settings.get("allow_fork_pr_plans", True)' in src, (
+        assert 'settings.get("allow_fork_pr_plans", False)' in src, (
             "restoring a workspace snapshotted before the column existed would "
             "silently differ from its never-deleted neighbours"
         )

@@ -1158,7 +1158,7 @@ list.
 request author's code with the workspace's full credential set, and a fork
 author has neither write access to the base repository nor the ability to
 merge — so the plan would be the only path by which their code reaches those
-credentials. `allow-fork-pr-plans` is `true` by default on this release line, so assume it is on unless someone turned it off
+credentials. `allow-fork-pr-plans` is `false` by default, so assume a fork pull request does not plan unless someone turned it on
 ([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)).
 
 A pull request from a branch **in the repository itself** is never affected by

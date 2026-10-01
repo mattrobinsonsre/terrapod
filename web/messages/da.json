@@ -1065,7 +1065,7 @@
       "noExpiry": "Ingen udløb",
       "addDriftIgnoreRule": "Tilføj regel",
       "debugModeHint": "Hold mislykkede runner-pods åbne på de arbejdsområder, denne regel opretter. Slået fra som standard – en tilbageholdt pod beholder det arbejdsområdes legitimationsoplysninger.",
-      "allowForkPrPlansHint": "Gælder for alle arbejdsområder, denne regel opretter. Slået til som standard i denne udgivelseslinje, fordi den plan kører fork-forfatterens kode med dette arbejdsområdes legitimationsoplysninger."
+      "allowForkPrPlansHint": "Gælder for alle arbejdsområder, denne regel opretter. Slået fra som standard: en pull request fra en fork får ingen spekulativ plan, fordi den ville køre forfatterens kode med arbejdsområdets legitimationsoplysninger."
     },
     "table": {
       "name": "Navn",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Planer på pull requests fra forks",
-      "description": "Om en pull request åbnet fra en fork får en spekulativ plan. Slået til som standard i denne udgivelseslinje, fordi den plan kører fork-forfatterens kode med dette arbejdsområdes legitimationsoplysninger.",
+      "description": "Om en pull request åbnet fra en fork får en spekulativ plan. Slået fra som standard, fordi den plan kører fork-forfatterens kode med dette arbejdsområdes legitimationsoplysninger.",
       "label": "Planlæg pull requests fra forks",
       "hint": "En kørsel modtager dette arbejdsområdes miljøvariabler, følsomme værdier, alle hemmeligheder hentet via Vault og jobbets cloud-identitet. Den, der åbner en pull request fra en fork, har ingen skriveadgang og kan ikke merge, så en spekulativ plan er den eneste vej, ad hvilken deres kode når frem til de legitimationsoplysninger. Slå dette til for et arbejdsområde, der ikke rummer noget værd at tage — for eksempel et offentligt modul-repository, der tager imod bidrag fra fællesskabet. Pull requests fra grene i selve repositoryet er upåvirkede og planlægges altid.",
       "activeBadge": "Til",

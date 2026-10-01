@@ -1065,7 +1065,7 @@
       "noExpiry": "Nulla expiratio",
       "addDriftIgnoreRule": "Regulam addere",
       "debugModeHint": "Podes cursorum defectorum apertos tenere in locis operis quos haec regula creat. Praedefinite exstinctus — pod retentus credentias illius loci operis servat.",
-      "allowForkPrPlansHint": "Ad omnem locum operis quem haec regula creat pertinet. In hac linea editionis praedefinite accensum, quia illud consilium codicem auctoris furcae cum credentiis huius loci operis exsequitur."
+      "allowForkPrPlansHint": "Ad omnem locum operis quem haec regula creat pertinet. Praedefinite exstinctum: rogatio tractionis e furca nullum consilium speculativum accipit, quia codicem auctoris sui cum credentiis loci operis exsequeretur."
     },
     "table": {
       "name": "Nomen",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Consilia in rogationibus tractionis e furca",
-      "description": "Utrum rogatio tractionis e furca aperta consilium speculativum accipiat. In hac linea editionis praedefinite accensum, quia illud consilium codicem auctoris furcae cum credentiis huius loci operis exsequitur.",
+      "description": "Utrum rogatio tractionis e furca aperta consilium speculativum accipiat. Praedefinite exstinctum, quia illud consilium codicem auctoris furcae cum credentiis huius loci operis exsequitur.",
       "label": "Rogationes tractionis e furca consiliari",
       "hint": "Exsecutio accipit variabiles ambitus huius loci operis, valores sensibiles, arcana quaelibet per Vault resoluta, atque identitatem nubis operis. Qui rogationem tractionis e furca aperit neque scribendi potestatem habet neque conflare potest; itaque consilium speculativum sola via est qua codex eius ad illas credentias pervenit. Hoc accende pro loco operis qui nihil auferendum continet — exempli gratia, pro repositorio modulorum publico quod conlationes communitatis accipit. Rogationes tractionis e ramis ipsius repositorii non afficiuntur et semper consilium accipiunt.",
       "activeBadge": "Accensum",

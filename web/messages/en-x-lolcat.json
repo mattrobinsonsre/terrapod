@@ -1065,7 +1065,7 @@
       "noExpiry": "No expiry. srsly.",
       "addDriftIgnoreRule": "Add rule",
       "debugModeHint": "Hold faild runnr podz open on da werkspaces dis rule makez. Off by defalt — a held pod keepz dat werkspace credenshulz.",
-      "allowForkPrPlansHint": "Applyz ta evry werkspace dis rule makez. On by defalt on dis release line, coz dat plan runz da fork authrs code wif dis werkspace credenshulz."
+      "allowForkPrPlansHint": "Applyz ta evry werkspace dis rule makez. Off by defalt: a pull rekwest from a fork getz no speculativ plan, coz it wud run itz authrs code wif da werkspace credenshulz."
     },
     "table": {
       "name": "Naym",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Planz on Fork Pull Rekwestz",
-      "description": "Wethr a pull rekwest opend from a fork getz a speculativ plan. On by defalt on dis release line, coz dat plan runz da fork authrs code wif dis werkspace credenshulz.",
+      "description": "Wethr a pull rekwest opend from a fork getz a speculativ plan. Off by defalt, coz dat plan runz da fork authrs code wif dis werkspace credenshulz.",
       "label": "Plan Fork Pull Rekwestz",
       "hint": "A run getz dis werkspace environmint variablez, sensitiv valuez, any Vault-resolvd secretz an da jobz cloud identitee. Sumwun openin a pull rekwest from a fork haz no rite access an can not merge, so a speculativ plan iz da only way der code reechez doze credenshulz. Turn dis on fer a werkspace dat holdz nuffin wurth takin — a publik module repozitory acceptin communitee contribushunz, sez I. Pull rekwestz from branchez in da repozitory itself iz unaffectd an alwayz plan.",
       "activeBadge": "Awn",

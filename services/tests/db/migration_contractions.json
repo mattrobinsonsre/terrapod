@@ -35,6 +35,9 @@
   "bb5e7f11d575_unify_working_directory": [
     "drop_column(workspaces, vcs_working_directory)"
   ],
+  "c49590b8f20d_fork_pr_plans_defaults_closed": [
+    "alter_column(allow_fork_pr_plans)"
+  ],
   "f3e984cc98cf_drop_runner_listeners": [
     "drop_constraint(runs_listener_id_fkey, runs)",
     "drop_table(runner_listeners)"

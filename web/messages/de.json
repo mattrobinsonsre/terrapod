@@ -1065,7 +1065,7 @@
       "noExpiry": "Kein Ablauf",
       "addDriftIgnoreRule": "Regel hinzufügen",
       "debugModeHint": "Pods fehlgeschlagener Runner auf den von dieser Regel erstellten Arbeitsbereichen offen halten. Auf dieser Release-Linie standardmäßig ein – ein offen gehaltener Pod behält die Zugangsdaten dieses Arbeitsbereichs.",
-      "allowForkPrPlansHint": "Gilt für jeden Arbeitsbereich, den diese Regel erstellt. Auf dieser Release-Linie standardmäßig ein, weil dieser Plan den Code des Fork-Autors mit den Zugangsdaten dieses Arbeitsbereichs ausführt."
+      "allowForkPrPlansHint": "Gilt für jeden Arbeitsbereich, den diese Regel erstellt. Standardmäßig aus: Ein Pull Request aus einem Fork erhält keinen spekulativen Plan, weil dabei der Code seines Autors mit den Zugangsdaten des Arbeitsbereichs ausgeführt würde."
     },
     "table": {
       "name": "Name",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Pläne für Pull Requests aus Forks",
-      "description": "Ob ein aus einem Fork geöffneter Pull Request einen spekulativen Plan erhält. Auf dieser Release-Linie standardmäßig ein, weil dieser Plan den Code des Fork-Autors mit den Zugangsdaten dieses Arbeitsbereichs ausführt.",
+      "description": "Ob ein aus einem Fork geöffneter Pull Request einen spekulativen Plan erhält. Standardmäßig aus, weil dieser Plan den Code des Fork-Autors mit den Zugangsdaten dieses Arbeitsbereichs ausführt.",
       "label": "Pull Requests aus Forks planen",
       "hint": "Ein Lauf erhält die Umgebungsvariablen dieses Arbeitsbereichs, vertrauliche Werte, alle über Vault aufgelösten Geheimnisse und die Cloud-Identität des Jobs. Wer einen Pull Request aus einem Fork öffnet, hat keinen Schreibzugriff und kann nicht mergen – ein spekulativer Plan ist also der einzige Weg, auf dem sein Code an diese Zugangsdaten gelangt. Aktivieren Sie dies für einen Arbeitsbereich, in dem es nichts zu holen gibt – etwa ein öffentliches Modul-Repository, das Beiträge aus der Community annimmt. Pull Requests aus Branches im Repository selbst sind davon nicht betroffen und werden immer geplant.",
       "activeBadge": "Ein",

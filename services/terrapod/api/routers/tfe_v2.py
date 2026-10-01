@@ -1258,7 +1258,7 @@ async def create_workspace(
         # reaches those credentials. Same-repository PRs are unaffected.
         allow_fork_pr_plans=_422(
             workspace_settings.validate_bool,
-            attrs.get("allow-fork-pr-plans", True),
+            attrs.get("allow-fork-pr-plans", False),
             "allow-fork-pr-plans",
         ),
         auto_merge_strategy=auto_merge_strategy,

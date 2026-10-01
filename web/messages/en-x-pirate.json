@@ -1065,7 +1065,7 @@
       "noExpiry": "No expiry, matey",
       "addDriftIgnoreRule": "Add a rule",
       "debugModeHint": "Keep failed runner pods open on the work-decks this rule creates. On by default on this release line — a held pod keeps that work-deck''s credentials.",
-      "allowForkPrPlansHint": "Applies t'' every work-deck this rule creates. On by default on this release line, fer that plan runs the fork author''s code with this work-deck''s credentials."
+      "allowForkPrPlansHint": "Applies t'' every work-deck this rule creates. Off by default: a pull request from a fork gets no speculative plan, fer it would run its author''s code with the work-deck''s credentials."
     },
     "table": {
       "name": "Name",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plans fer pull requests from foreign forks",
-      "description": "Whether a pull request hoisted from a fork gets a speculative plan. On by default on this release line, fer that plan runs the fork author''s code with this work-deck''s credentials.",
+      "description": "Whether a pull request hoisted from a fork gets a speculative plan. Off by default, fer that plan runs the fork author''s code with this work-deck''s credentials.",
       "label": "Plan pull requests from forks",
       "hint": "A voyage receives this work-deck''s environment variables, sensitive values, any Vault-resolved secrets an'' the job''s cloud colours. A soul openin'' a pull request from a fork has no write access an'' cannot merge, so a speculative plan be the only way their code reaches them credentials. Hoist this fer a work-deck that holds nothin'' worth plunderin'' — a public module repository takin'' in contributions from the crew, say. Pull requests from branches in the repository itself be unaffected an'' always plan.",
       "activeBadge": "Hoisted",

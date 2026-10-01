@@ -1065,7 +1065,7 @@
       "noExpiry": "Pas d'expiration",
       "addDriftIgnoreRule": "Ajouter une règle",
       "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Activé par défaut sur cette ligne de version — un pod maintenu ouvert conserve les identifiants de cet espace de travail.",
-      "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Activé par défaut sur cette ligne de version, car ce plan exécute le code de l'auteur du fork avec les identifiants de cet espace de travail."
+      "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Désactivé par défaut : une pull request depuis un fork ne reçoit aucun plan spéculatif, car cela exécuterait le code de son auteur avec les identifiants de l'espace de travail."
     },
     "table": {
       "name": "Nom",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plans sur les pull requests depuis un fork",
-      "description": "Détermine si une pull request ouverte depuis un fork reçoit un plan spéculatif. Activé par défaut sur cette ligne de version, car ce plan exécute le code de l'auteur du fork avec les identifiants de cet espace de travail.",
+      "description": "Détermine si une pull request ouverte depuis un fork reçoit un plan spéculatif. Désactivé par défaut, car ce plan exécute le code de l'auteur du fork avec les identifiants de cet espace de travail.",
       "label": "Lancer un plan sur les pull requests depuis un fork",
       "hint": "Une exécution reçoit les variables d'environnement de cet espace de travail, les valeurs sensibles, tous les secrets résolus via Vault et l'identité cloud du job. Qui ouvre une pull request depuis un fork n'a pas d'accès en écriture et ne peut pas fusionner : un plan spéculatif est donc le seul moyen pour son code d'atteindre ces identifiants. Activez ceci pour un espace de travail qui ne contient rien à dérober — un dépôt de modules public ouvert aux contributions de la communauté, par exemple. Les pull requests issues de branches du dépôt lui-même ne sont pas concernées et donnent toujours lieu à un plan.",
       "activeBadge": "Activé",

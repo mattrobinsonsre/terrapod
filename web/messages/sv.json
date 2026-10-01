@@ -1065,7 +1065,7 @@
       "noExpiry": "Ingen utgång",
       "addDriftIgnoreRule": "Lägg till regel",
       "debugModeHint": "Håll misslyckade runner-poddar öppna på de arbetsytor som den här regeln skapar. Av som standard – en kvarhållen podd behåller den arbetsytans autentiseringsuppgifter.",
-      "allowForkPrPlansHint": "Gäller varje arbetsyta som den här regeln skapar. På som standard i den här utgåvelinjen, eftersom den planen kör forkförfattarens kod med den här arbetsytans autentiseringsuppgifter."
+      "allowForkPrPlansHint": "Gäller varje arbetsyta som den här regeln skapar. Av som standard: en pull request från en fork får ingen spekulativ plan, eftersom den skulle köra författarens kod med arbetsytans autentiseringsuppgifter."
     },
     "table": {
       "name": "Namn",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Planer på pull requests från forkar",
-      "description": "Om en pull request som öppnats från en fork får en spekulativ plan. På som standard i den här utgåvelinjen, eftersom den planen kör forkförfattarens kod med den här arbetsytans autentiseringsuppgifter.",
+      "description": "Om en pull request som öppnats från en fork får en spekulativ plan. Av som standard, eftersom den planen kör forkförfattarens kod med den här arbetsytans autentiseringsuppgifter.",
       "label": "Planera pull requests från forkar",
       "hint": "En körning får den här arbetsytans miljövariabler, känsliga värden, alla hemligheter som hämtats via Vault och jobbets molnidentitet. Den som öppnar en pull request från en fork har ingen skrivbehörighet och kan inte merga, så en spekulativ plan är den enda vägen för deras kod till de här autentiseringsuppgifterna. Slå på detta för en arbetsyta som inte innehåller något värt att ta — till exempel ett publikt modulförråd som tar emot bidrag från communityn. Pull requests från grenar i själva förrådet påverkas inte och planeras alltid.",
       "activeBadge": "På",

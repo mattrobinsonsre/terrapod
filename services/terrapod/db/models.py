@@ -411,7 +411,7 @@ class Workspace(Base):
     # same shape as naming a loopback destination in
     # `outbound_requests.allowed_hosts`.
     allow_fork_pr_plans: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true", default=True
+        Boolean, nullable=False, server_default="false", default=False
     )
 
     # Auto-merge after apply succeeds. Available in both modes; primary use is
@@ -1340,7 +1340,7 @@ class AutodiscoveryRule(Base):
     #: holds only until autodiscovery creates the next workspace, which looks
     #: exactly like the setting not working.
     allow_fork_pr_plans: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default="true"
+        Boolean, nullable=False, default=False, server_default="false"
     )
     # #314 deletion lifecycle: what to do when a discovered directory is
     # removed on the tracked branch. "flag" (default, safe) marks the

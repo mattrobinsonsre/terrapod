@@ -1065,7 +1065,7 @@
       "noExpiry": "Süre dolumu yok",
       "addDriftIgnoreRule": "Kural ekle",
       "debugModeHint": "Bu kuralın oluşturduğu çalışma alanlarında başarısız çalıştırıcı pod'larını açık tutun. Varsayılan olarak kapalı — açık tutulan bir pod o çalışma alanının kimlik bilgilerini barındırır.",
-      "allowForkPrPlansHint": "Bu kuralın oluşturduğu her çalışma alanı için geçerlidir. Bu sürüm hattında varsayılan olarak açık, çünkü bu plan fork sahibinin kodunu bu çalışma alanının kimlik bilgileriyle çalıştırır."
+      "allowForkPrPlansHint": "Bu kuralın oluşturduğu her çalışma alanı için geçerlidir. Varsayılan olarak kapalı: bir fork''tan gelen pull request spekülatif plan almaz, çünkü yazarının kodunu çalışma alanının kimlik bilgileriyle çalıştırırdı."
     },
     "table": {
       "name": "Ad",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Fork pull request''lerinde planlar",
-      "description": "Bir fork''tan açılan pull request''in spekülatif plan alıp almayacağı. Bu sürüm hattında varsayılan olarak açık, çünkü bu plan fork sahibinin kodunu bu çalışma alanının kimlik bilgileriyle çalıştırır.",
+      "description": "Bir fork''tan açılan pull request''in spekülatif plan alıp almayacağı. Varsayılan olarak kapalı, çünkü bu plan fork sahibinin kodunu bu çalışma alanının kimlik bilgileriyle çalıştırır.",
       "label": "Fork pull request''lerini planla",
       "hint": "Bir çalıştırma, bu çalışma alanının ortam değişkenlerini, hassas değerlerini, Vault''tan çözümlenen tüm gizli bilgileri ve işin bulut kimliğini alır. Bir fork''tan pull request açan kişinin yazma erişimi yoktur ve birleştirme yapamaz; dolayısıyla spekülatif plan, kodunun bu kimlik bilgilerine ulaşmasının tek yoludur. Bunu, alınmaya değer hiçbir şey barındırmayan bir çalışma alanı için açın — örneğin topluluk katkılarını kabul eden herkese açık bir modül deposu. Deponun kendi dallarından açılan pull request''ler bundan etkilenmez ve her zaman plan alır.",
       "activeBadge": "Açık",

@@ -480,8 +480,11 @@ async def restore_workspace(
         allow_fork_pr_plans=bool(
             # A snapshot taken before this column existed has no key, and the
             # fallback has to match the column default or a restored workspace
-            # silently differs from its never-deleted neighbours.
-            settings.get("allow_fork_pr_plans", True)
+            # silently differs from its never-deleted neighbours. It moved with the
+            # default in this release: a snapshot from 1.8 that predates the column
+            # restores CLOSED, which is the safe direction — a restore that re-opened
+            # fork plans would undo the upgrade one workspace at a time.
+            settings.get("allow_fork_pr_plans", False)
         ),
         ai_summary_mode=settings.get("ai_summary_mode") or "default",
         ai_policy_mode=settings.get("ai_policy_mode") or "default",

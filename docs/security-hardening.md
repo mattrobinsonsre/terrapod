@@ -347,8 +347,11 @@ not plan fork pull requests unless the workspace opts in:
             "attributes": { "allow-fork-pr-plans": false } } }
 ```
 
-`true` is the default **on this release line** — a patch must not stop a fork pull request that plans today — so a hardened deployment DOES have something to change. 2.0 defaults it false. Audit
-it rather than set it:
+`false` is the default from this release, so a new workspace is closed without
+anyone doing anything. What a hardened deployment still has to check is the
+workspaces that already exist: a **1.8 deployment defaulted it true**, and the
+upgrade does not rewrite stored rows, so every workspace created before the
+upgrade keeps whatever it had. Audit rather than assume:
 
 ```sql
 SELECT name FROM workspaces WHERE allow_fork_pr_plans = true;
