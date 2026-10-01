@@ -286,6 +286,35 @@ async def test_normalize_falls_back_to_original_on_failure():
     assert out == "Frage"  # a stray foreign prompt beats a dropped question
 
 
+async def test_normalize_respects_the_daily_token_budget():
+    """This was the one model call in the module with no budget gate — and the
+    one a reader triggers on demand, once per follow-up prompt. An exhausted
+    budget stopped every other translation path and not this one."""
+    with (
+        patch.object(st.settings.ai_summary, "summary_language", "en"),
+        patch.object(st, "_budget_ok", AsyncMock(return_value=False)),
+        patch.object(st, "_translate_call", AsyncMock()) as call,
+        patch.object(st, "_charge", AsyncMock()) as charge,
+    ):
+        out = await st.normalize_to_system_language("Frage", reader_locale="de")
+    assert out == "Frage"  # fails open: the prompt joins the thread untranslated
+    call.assert_not_called()
+    charge.assert_not_called()
+
+
+async def test_normalize_still_translates_while_budget_remains():
+    """The gate is worthless if it also refuses the ordinary case."""
+    with (
+        patch.object(st.settings.ai_summary, "summary_language", "en"),
+        patch.object(st, "_budget_ok", AsyncMock(return_value=True)),
+        patch.object(st, "_translate_call", AsyncMock(return_value=("Why?", 7))),
+        patch.object(st, "_charge", AsyncMock()) as charge,
+    ):
+        out = await st.normalize_to_system_language("Warum?", reader_locale="de")
+    assert out == "Why?"
+    charge.assert_awaited_once_with(7)
+
+
 # ── translate_architecture_critique (#1036) ──────────────────────────────────
 
 
