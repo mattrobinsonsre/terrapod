@@ -16,12 +16,31 @@ import pytest
 from terrapod.services import vcs_connection_rbac as rbac
 
 
-def _db(owns: bool):
-    """A db whose ownership query finds a row, or does not."""
+def _db(owns: bool, *, row_for: tuple[uuid.UUID, str] | None = None):
+    """A db that answers the query it is actually given.
+
+    The obvious fake ignores the statement and returns a row whenever `owns` is
+    set, which makes every test below a test of the *caller* rather than of the
+    filter: a predicate querying on the wrong columns, or binding the actor's
+    email to the connection id, passes it unchanged. So this one compiles the
+    statement and hands back a row only when the bound parameters genuinely
+    carry the connection and the actor the caller claims to be asking about.
+
+    `row_for` names the pair the stored workspace belongs to; it defaults to
+    whatever the query asks for, which is the ordinary "this user does own such a
+    workspace" case. Passing a different pair models the finding: a real row
+    exists, but not one that answers *this* question.
+    """
     db = AsyncMock()
-    result = MagicMock()
-    result.first.return_value = (uuid.uuid4(),) if owns else None
-    db.execute.return_value = result
+
+    async def execute(stmt, *a, **kw):
+        params = set(stmt.compile().params.values())
+        result = MagicMock()
+        found = owns and (row_for is None or set(row_for) <= params)
+        result.first.return_value = (uuid.uuid4(),) if found else None
+        return result
+
+    db.execute = AsyncMock(side_effect=execute)
     return db
 
 
@@ -81,6 +100,29 @@ class TestTheRule:
         sql = str(db.execute.await_args.args[0]).lower()
         assert "vcs_connection_id" in sql, sql
         assert "owner_email" in sql, sql
+
+    async def test_a_row_belonging_to_someone_else_does_not_answer_this_question(self):
+        """The substring check above sees the columns, not the values bound to them.
+
+        Here the deployment really does hold a workspace owned by someone, using
+        some connection — just not this pair. A predicate that queried on the
+        connection and compared the owner against the wrong thing (or omitted the
+        bind entirely) would read that row as a grant, which is the escalation.
+        """
+        mine, theirs = uuid.uuid4(), uuid.uuid4()
+        db = _db(owns=True, row_for=(theirs, "someone-else@x"))
+        assert not await rbac.may_reference_connection(
+            db, conn_id=mine, actor_email="a@x", is_platform_admin=False
+        )
+
+    async def test_and_the_matching_row_still_grants(self):
+        """Otherwise the test above would pass against a predicate that refuses
+        everyone, which is not the property either."""
+        mine = uuid.uuid4()
+        db = _db(owns=True, row_for=(mine, "a@x"))
+        assert await rbac.may_reference_connection(
+            db, conn_id=mine, actor_email="a@x", is_platform_admin=False
+        )
 
 
 class TestTheRefusalIsUseful:
@@ -206,6 +248,13 @@ class TestTheRunTimeGateIsActuallyWired:
         assert "resolve_git_auth(db, resolved)" not in src, (
             "a call without the workspace kwarg remains"
         )
+        # `workspace=None` satisfies the substring above and disables the gate just
+        # as completely as omitting the kwarg — the review found this guard passed
+        # against exactly that mutation.
+        assert "workspace=None" not in src, (
+            "the workspace is passed as None, so `if workspace is not None` "
+            "short-circuits and the run-time gate never runs"
+        )
 
 
 class TestTheRegistryModulePathIsGated:
@@ -254,3 +303,53 @@ class TestThePatchGateIsGuarded:
             "the PATCH gate no longer fires only on a change"
         )
         assert src.count("may_reference_connection(") >= 2, "create and PATCH must both authorize"
+
+
+class TestTheNarrowedTokenIsNarrowedAtEveryCallSite:
+    """The narrowing (`8prq`) lands on two callers by virtue of the DEFAULT.
+
+    So the guard was one level removed from the thing protected: the default has a
+    test, but nothing stopped either call site passing
+    `permissions=ALL_APP_PERMISSIONS` and handing a runner Job a token carrying
+    every permission the App holds across every repository in the installation.
+    A mutation review did exactly that and the whole suite stayed green.
+
+    These are the only two places a minted token LEAVES the API process — the
+    runner's git credential helper and the sparse-fetch Basic header — which is
+    what makes them worth pinning individually rather than trusting the default.
+    """
+
+    CALLERS = (
+        ("terrapod/services/git_auth_service.py", "the runner's git credential helper"),
+        ("terrapod/services/git_fetch.py", "the sparse VCS fetch's Basic header"),
+    )
+
+    def test_neither_caller_asks_for_a_wider_token(self):
+        import pathlib as _p
+        import re
+
+        root = _p.Path(__file__).resolve().parents[2]
+        offenders = []
+        for rel, why in self.CALLERS:
+            src = (root / rel).read_text()
+            for m in re.finditer(r"get_installation_token\(([^)]*)\)", src, re.S):
+                args = m.group(1)
+                if "permissions" in args and "CLONE_PERMISSIONS" not in args:
+                    offenders.append(f"{rel}: {args.strip()[:80]}  ({why})")
+        assert not offenders, (
+            "a token that leaves the API process is minted with an explicit wider "
+            "permission set, so the narrowing is bypassed at the one place it "
+            f"matters:\n  {offenders}"
+        )
+
+    def test_both_callers_still_exist_where_this_test_thinks_they_are(self):
+        """Otherwise the test above passes by reading nothing."""
+        import pathlib as _p
+
+        root = _p.Path(__file__).resolve().parents[2]
+        for rel, _why in self.CALLERS:
+            src = (root / rel).read_text()
+            assert "get_installation_token(" in src, (
+                f"{rel} no longer mints an installation token — if the call moved, "
+                "this guard is pointed at the wrong file"
+            )
