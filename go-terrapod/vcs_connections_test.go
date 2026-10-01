@@ -357,3 +357,304 @@ func TestOlderServerLeavesTheWindowFieldsNil(t *testing.T) {
 		t.Fatalf("absent saturation should stay empty, got %q", got.Saturation)
 	}
 }
+
+// ── Reach and scope: owner, labels, repository allowlist (GHSA-v8g7-pqrj-8mcm) ──
+
+func TestVCSConnection_DecodesReachAndScope(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"id":"vcs-aaa","type":"vcs-connections","attributes":{
+		  "name":"github-prod","provider":"github","has-token":true,
+		  "owner-email":"platform@example.com",
+		  "labels":{"team":"platform","tier":"prod"},
+		  "allowed-repositories":["example-org/infra-*","example-org/app"]
+		}}}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conn, err := c.GetVCSConnection(t.Context(), "vcs-aaa")
+	if err != nil {
+		t.Fatalf("GetVCSConnection: %v", err)
+	}
+	if conn.OwnerEmail != "platform@example.com" {
+		t.Errorf("owner-email = %q", conn.OwnerEmail)
+	}
+	if len(conn.Labels) != 2 || conn.Labels["team"] != "platform" || conn.Labels["tier"] != "prod" {
+		t.Errorf("labels = %+v", conn.Labels)
+	}
+	if len(conn.AllowedRepositories) != 2 ||
+		conn.AllowedRepositories[0] != "example-org/infra-*" ||
+		conn.AllowedRepositories[1] != "example-org/app" {
+		t.Errorf("allowed-repositories = %+v", conn.AllowedRepositories)
+	}
+}
+
+// An empty allowlist means "any repository", so it must decode to a connection
+// that is unrestricted — not be mistaken for a scope that failed to decode. The
+// server always sends the key, so this is the ordinary shape of an unscoped
+// connection rather than an edge case.
+func TestVCSConnection_EmptyAllowlistMeansAnyRepository(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"id":"vcs-aaa","type":"vcs-connections","attributes":{
+		  "name":"github-prod","provider":"github",
+		  "owner-email":"","labels":{},"allowed-repositories":[]}}}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	conn, err := c.GetVCSConnection(t.Context(), "vcs-aaa")
+	if err != nil {
+		t.Fatalf("GetVCSConnection: %v", err)
+	}
+	if len(conn.AllowedRepositories) != 0 {
+		t.Errorf("allowed-repositories should be empty, got %+v", conn.AllowedRepositories)
+	}
+	if len(conn.Labels) != 0 {
+		t.Errorf("labels should be empty, got %+v", conn.Labels)
+	}
+	if conn.OwnerEmail != "" {
+		t.Errorf("owner-email should be empty, got %q", conn.OwnerEmail)
+	}
+	if conn.Name != "github-prod" {
+		t.Errorf("the rest of the connection must still decode, got %q", conn.Name)
+	}
+}
+
+// A server that predates the fix sends none of the three. Version skew across a
+// MINOR must not become a client-side failure.
+func TestVCSConnection_ReachAbsentIsNotAnError(t *testing.T) {
+	c, _, _ := newVCSConnFixture(t)
+	conn, err := c.GetVCSConnection(t.Context(), "vcs-aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conn.OwnerEmail != "" || conn.Labels != nil || conn.AllowedRepositories != nil {
+		t.Errorf("absent reach fields should stay zero, got %+v", conn)
+	}
+	if conn.Name != "github-prod" {
+		t.Errorf("the rest of the connection must still decode, got %q", conn.Name)
+	}
+}
+
+func TestCreateVCSConnection_SendsReachAndScope(t *testing.T) {
+	c, lastBody, _ := newVCSConnFixture(t)
+	_, err := c.CreateVCSConnection(t.Context(), CreateVCSConnectionRequest{
+		Name:                "github-prod",
+		Provider:            "github",
+		GithubAppID:         12345,
+		PrivateKey:          "-----BEGIN RSA-----\nkey\n-----END RSA-----",
+		OwnerEmail:          "platform@example.com",
+		Labels:              map[string]string{"team": "platform"},
+		AllowedRepositories: []string{"example-org/infra-*"},
+	})
+	if err != nil {
+		t.Fatalf("CreateVCSConnection: %v", err)
+	}
+	attrs := vcsConnReqAttrs(t, *lastBody)
+	if attrs["owner-email"] != "platform@example.com" {
+		t.Errorf("owner-email not sent: %+v", attrs)
+	}
+	labels, ok := attrs["labels"].(map[string]any)
+	if !ok || labels["team"] != "platform" {
+		t.Errorf("labels not sent: %+v", attrs["labels"])
+	}
+	repos, ok := attrs["allowed-repositories"].([]any)
+	if !ok || len(repos) != 1 || repos[0] != "example-org/infra-*" {
+		t.Errorf("allowed-repositories not sent: %+v", attrs["allowed-repositories"])
+	}
+}
+
+// Create omits what the caller did not set, so the server's defaults apply
+// rather than the SDK asserting an empty owner/labels/allowlist on its behalf.
+func TestCreateVCSConnection_OmitsUnsetReachFields(t *testing.T) {
+	c, lastBody, _ := newVCSConnFixture(t)
+	_, err := c.CreateVCSConnection(t.Context(), CreateVCSConnectionRequest{
+		Name:     "github-prod",
+		Provider: "github",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attrs := vcsConnReqAttrs(t, *lastBody)
+	for _, k := range []string{"owner-email", "labels", "allowed-repositories"} {
+		if _, has := attrs[k]; has {
+			t.Errorf("%s should be omitted when unset: %+v", k, attrs)
+		}
+	}
+}
+
+// The clear-vs-omit distinction, which is the whole reason these are pointers.
+// A rename must not clear the owner, the labels or the allowlist.
+func TestUpdateVCSConnection_OmitsReachFieldsLeftNil(t *testing.T) {
+	c, lastBody, _ := newVCSConnFixture(t)
+	_, err := c.UpdateVCSConnection(t.Context(), "vcs-aaa", UpdateVCSConnectionRequest{
+		Name: "github-renamed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attrs := vcsConnReqAttrs(t, *lastBody)
+	for _, k := range []string{"owner-email", "labels", "allowed-repositories"} {
+		if _, has := attrs[k]; has {
+			t.Errorf("%s leaked into a rename-only request, which would overwrite it: %+v", k, attrs)
+		}
+	}
+}
+
+func TestUpdateVCSConnection_SetsReachAndScope(t *testing.T) {
+	c, lastBody, _ := newVCSConnFixture(t)
+	owner := "platform@example.com"
+	labels := map[string]string{"team": "platform"}
+	repos := []string{"example-org/infra-*"}
+	_, err := c.UpdateVCSConnection(t.Context(), "vcs-aaa", UpdateVCSConnectionRequest{
+		OwnerEmail:          &owner,
+		Labels:              &labels,
+		AllowedRepositories: &repos,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attrs := vcsConnReqAttrs(t, *lastBody)
+	if attrs["owner-email"] != owner {
+		t.Errorf("owner-email = %v", attrs["owner-email"])
+	}
+	if m, ok := attrs["labels"].(map[string]any); !ok || m["team"] != "platform" {
+		t.Errorf("labels = %+v", attrs["labels"])
+	}
+	if s, ok := attrs["allowed-repositories"].([]any); !ok || len(s) != 1 {
+		t.Errorf("allowed-repositories = %+v", attrs["allowed-repositories"])
+	}
+}
+
+// Clearing. An explicitly empty value must reach the wire as an empty
+// object/array and never as null or an omitted key: an omitted key means
+// "leave alone", so a clear that marshalled away would silently leave the old
+// allowlist in force. Removing the last pattern has to restore "any
+// repository", or the allowlist is a one-way door.
+func TestUpdateVCSConnection_ExplicitlyEmptyClears(t *testing.T) {
+	c, lastBody, _ := newVCSConnFixture(t)
+	owner := ""
+	labels := map[string]string{}
+	repos := []string{}
+	_, err := c.UpdateVCSConnection(t.Context(), "vcs-aaa", UpdateVCSConnectionRequest{
+		OwnerEmail:          &owner,
+		Labels:              &labels,
+		AllowedRepositories: &repos,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Inspect the raw body, not only the decoded map: `null` and `[]` both
+	// decode to a present key, and only one of them is right.
+	raw := string(*lastBody)
+	if !strings.Contains(raw, `"allowed-repositories":[]`) {
+		t.Errorf("empty allowlist did not marshal as []: %s", raw)
+	}
+	if !strings.Contains(raw, `"labels":{}`) {
+		t.Errorf("empty labels did not marshal as {}: %s", raw)
+	}
+	attrs := vcsConnReqAttrs(t, *lastBody)
+	if v, has := attrs["owner-email"]; !has || v != "" {
+		t.Errorf("owner-email should be present and empty, got %v (present=%v)", v, has)
+	}
+}
+
+// A nil map or slice behind a non-nil pointer is still a clear, not an
+// omission — it is the shape a caller gets from `var repos []string;
+// req.AllowedRepositories = &repos`, and marshalling it as null would leave
+// the reader of the wire unable to tell a clear from nothing sent.
+func TestUpdateVCSConnection_NilBehindPointerStillClears(t *testing.T) {
+	c, lastBody, _ := newVCSConnFixture(t)
+	var repos []string
+	var labels map[string]string
+	_, err := c.UpdateVCSConnection(t.Context(), "vcs-aaa", UpdateVCSConnectionRequest{
+		Labels:              &labels,
+		AllowedRepositories: &repos,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := string(*lastBody)
+	if strings.Contains(raw, `"allowed-repositories":null`) {
+		t.Errorf("a nil slice behind a pointer marshalled as null: %s", raw)
+	}
+	if !strings.Contains(raw, `"allowed-repositories":[]`) {
+		t.Errorf("expected [], got: %s", raw)
+	}
+	if !strings.Contains(raw, `"labels":{}`) {
+		t.Errorf("expected {}, got: %s", raw)
+	}
+}
+
+// Error path: the server rejects a reserved label key with 422, and the SDK
+// must surface that as a ValidationError carrying the server's detail rather
+// than a bare APIError.
+func TestUpdateVCSConnection_ReservedLabelIsAValidationError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"errors":[{"status":"422","detail":"label key 'owner' is reserved"}],` +
+			`"detail":"label key 'owner' is reserved"}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	labels := map[string]string{"owner": "someone@example.com"}
+	_, err = c.UpdateVCSConnection(t.Context(), "vcs-aaa", UpdateVCSConnectionRequest{Labels: &labels})
+	if err == nil {
+		t.Fatal("expected an error for a reserved label key")
+	}
+	if !IsValidation(err) {
+		t.Fatalf("expected a ValidationError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "reserved") {
+		t.Errorf("the server's detail should survive: %v", err)
+	}
+}
+
+func TestCreateVCSConnection_BadAllowlistIsAValidationError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"errors":[{"status":"422",` +
+			`"detail":"allowed-repositories must be a list of strings"}]}`))
+	}))
+	defer srv.Close()
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = c.CreateVCSConnection(t.Context(), CreateVCSConnectionRequest{
+		Name: "gh", Provider: "github",
+		AllowedRepositories: []string{"example-org/infra-*"},
+	})
+	if !IsValidation(err) {
+		t.Fatalf("expected a ValidationError, got %T: %v", err, err)
+	}
+}
+
+// vcsConnReqAttrs decodes the attributes of a captured JSON:API request body.
+func vcsConnReqAttrs(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+	var req struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		t.Fatalf("unmarshal request body: %v (%s)", err, body)
+	}
+	return req.Data.Attributes
+}
