@@ -1080,6 +1080,18 @@ workspaces already pointing outside the new patterns keep their configuration
 and start failing their next run. Find them first — see
 [the runbook](runbooks.md#a-run-cannot-fetch-its-repository).
 
+**Know what it does not cover.** All four sinks are **workspace** paths. A
+VCS-sourced **registry module** also names a connection and a repository URL, and
+the registry pollers clone that repository to publish versions and to run
+module-impact analysis — those fetches are **not** checked against
+`allowed-repositories`. Naming the connection on a module is authorized (create
+and update both check the claim), so this is not open to anyone; but a caller who
+*does* hold a claim can point a module at any repository the credential can reach,
+allowlist or not. So read `allowed-repositories` as "which repositories
+**workspaces** on this connection may use", and keep the connection's credential
+itself scoped — a GitHub App installed on only the repositories it needs is the
+control that bounds every path at once.
+
 Clearing the list (`"allowed-repositories": []`) restores "any repository the
 credential can reach". Sending the attribute is what changes it; omitting it from
 a `PATCH` leaves it alone. (GHSA-v8g7-pqrj-8mcm)

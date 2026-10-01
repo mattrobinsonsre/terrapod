@@ -423,7 +423,20 @@ ORDER  BY (allowed_repositories = '[]'::jsonb) DESC, name;
 
 Rows at the top accept any repository the credential can reach. A row with an
 empty `owner_email` **and** empty `labels` is one only an admin (or an existing
-workspace owner) can build on. And before narrowing a connection, list the
+workspace owner) can build on.
+
+**`allowed-repositories` bounds workspaces, not everything.** A VCS-sourced
+registry module names a connection and a repository URL too, and the registry
+pollers' clones are not checked against the allowlist — naming the connection on a
+module is claim-checked, so an unentitled caller cannot do it, but an entitled one
+can point a module at any repository the credential reaches. **Scope the
+credential itself** if you need a single bound across every path: install the
+GitHub App on only the repositories it needs, or use a project- or group-scoped
+GitLab token rather than one covering the whole instance. The allowlist is then
+defence in depth over an already-narrow credential, which is where it is worth the
+most.
+
+Before narrowing a connection, list the
 workspaces that would fall outside the new patterns — they keep their
 configuration and start failing their next run:
 
