@@ -193,3 +193,108 @@ class TestOverrideReleasesARunThatWasNeverRuledOn:
         # overruled it, it does not erase what was decided.
         assert row.outcome == "denied"
         record.assert_not_awaited()
+
+
+# ── 4. a gate ruling on a plan it was only partly shown ──────────────
+
+
+class TestAMandatoryGateRefusesAReducedPlan:
+    """`_fit_plan_json` reduces an over-cap plan to address+actions skeletons.
+    The gate still reported a clean pass on the part it could see, so padding a
+    plan past `ai_summary.plan_json_max_bytes` pushed the offending change out
+    of the model's view and through a MANDATORY gate — and the size of the plan
+    is something whoever authors the configuration controls.
+
+    Treated as the existing "no verdict" case is: un-ruled. That holds the run
+    and leaves an admin to override after reading the plan themselves, which is
+    the same machinery `decide_outcome` already uses for silence.
+    """
+
+    @staticmethod
+    def _ws(enforcement: str):
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            ai_summary_policy_enforcement=enforcement,
+            ai_summary_context="",
+        )
+
+    async def _settle(self, enforcement: str, *, incomplete: str | None):
+        """Drive `_settle_ai_policy_gate` and return the recorded kwargs."""
+        from terrapod.services import summariser
+
+        run = SimpleNamespace(id=uuid.uuid4(), workspace_id=uuid.uuid4())
+        ws = self._ws(enforcement)
+        recorded = AsyncMock()
+        db = AsyncMock()
+        with (
+            patch.object(ai_policy_service, "record_evaluation", recorded),
+            patch.object(ai_policy_service, "gate_applies_to", lambda *_a: True),
+            patch.object(ai_policy_service, "effective_enforcement", lambda *_a: enforcement),
+            patch.object(summariser, "_redrive_after_gate", AsyncMock(), create=True),
+            patch("terrapod.services.run_service.complete_plan", AsyncMock(), create=True),
+        ):
+            await summariser._settle_ai_policy_gate(
+                db,
+                run,
+                ws,
+                kind="plan_summary",
+                verdict={"decision": "allow", "reason": "looks fine"},
+                risk_level="low",
+                evidence_incomplete=incomplete,
+            )
+        recorded.assert_awaited_once()
+        return recorded.await_args.kwargs
+
+    @pytest.mark.asyncio
+    async def test_a_mandatory_gate_is_un_ruled_when_the_plan_was_reduced(self):
+        from terrapod.services.summariser import INCOMPLETE_EVIDENCE_ERROR
+
+        kw = await self._settle("mandatory", incomplete=INCOMPLETE_EVIDENCE_ERROR)
+        assert kw["outcome"] == "errored", "a model allow on a partial plan was honoured"
+        assert "plan_json_max_bytes" in kw["error"]
+
+    @pytest.mark.asyncio
+    async def test_the_model_s_opinion_is_still_recorded(self):
+        """The human deciding whether to override needs to see what the model
+        made of the part it did read. Erroring must not discard it."""
+        from terrapod.services.summariser import INCOMPLETE_EVIDENCE_ERROR
+
+        kw = await self._settle("mandatory", incomplete=INCOMPLETE_EVIDENCE_ERROR)
+        assert kw["verdict"] == {"decision": "allow", "reason": "looks fine"}
+
+    @pytest.mark.asyncio
+    async def test_an_advisory_gate_keeps_its_verdict(self):
+        """Deliberately narrow: advisory never blocks, so overwriting its
+        verdict with an error would lose the opinion and protect nothing. The
+        prompt has already told the model which parts it could not see."""
+        from terrapod.services.summariser import INCOMPLETE_EVIDENCE_ERROR
+
+        kw = await self._settle("advisory", incomplete=INCOMPLETE_EVIDENCE_ERROR)
+        assert kw["outcome"] == "passed"
+
+    @pytest.mark.asyncio
+    async def test_a_complete_plan_rules_normally_under_mandatory(self):
+        kw = await self._settle("mandatory", incomplete=None)
+        assert kw["outcome"] == "passed"
+
+    def test_the_detector_fires_on_both_reduction_keys(self):
+        from terrapod.services.summariser import _plan_evidence_withheld
+
+        assert _plan_evidence_withheld('{"_reduced_changes": 3}')
+        assert _plan_evidence_withheld('{"_omitted_changes": 1}')
+
+    def test_the_detector_is_silent_on_a_whole_plan(self):
+        """The fitter returns an over-cap plan byte-identical when it fits, so
+        an ordinary plan must not be read as reduced."""
+        from terrapod.services.summariser import _plan_evidence_withheld
+
+        assert not _plan_evidence_withheld(
+            '{"resource_changes": [{"address": "aws_s3_bucket.a", "change": {"actions": ["create"]}}]}'
+        )
+
+    def test_the_message_names_all_three_ways_out(self):
+        from terrapod.services.summariser import INCOMPLETE_EVIDENCE_ERROR
+
+        assert "override" in INCOMPLETE_EVIDENCE_ERROR
+        assert "plan_json_max_bytes" in INCOMPLETE_EVIDENCE_ERROR
+        assert "advisory" in INCOMPLETE_EVIDENCE_ERROR
