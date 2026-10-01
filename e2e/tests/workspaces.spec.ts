@@ -577,7 +577,7 @@ test.describe('Fork pull request plans (GHSA-gp5w-76rw-c452)', () => {
       await expect(page.getByLabel('Plan fork pull requests', { exact: true })).toBeChecked();
     }).toPass({ timeout: 20_000 });
 
-    const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+    const res = await page.request.get(`/api/terrapod/v1/workspaces/${wsId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status()).toBe(200);
@@ -600,7 +600,7 @@ test.describe('Fork pull request plans (GHSA-gp5w-76rw-c452)', () => {
     // The off direction is the one a naive `if value` guard drops, leaving the
     // operator looking at an unchecked box over a workspace that still plans.
     await expect(async () => {
-      const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+      const res = await page.request.get(`/api/terrapod/v1/workspaces/${wsId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect((await res.json()).data.attributes['allow-fork-pr-plans']).toBe(false);

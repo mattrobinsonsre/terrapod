@@ -328,6 +328,40 @@ Runner Jobs execute untrusted Terraform/Tofu code. Harden them:
 - **Resource limits**: CPU and memory limits prevent noisy-neighbor issues
 - **Network isolation**: NetworkPolicies deny access to Postgres and Redis
 
+### Plans on pull requests from forks
+
+The isolation above bounds what a run can reach; it does not decide **whose**
+code gets to run. A speculative plan executes the configuration on a pull
+request branch with the workspace's own credentials — `env`-category
+variables, sensitive values, OpenBao/Vault-resolved values, minted git
+credentials and the Job's cloud workload identity.
+
+For a pull request raised inside the repository that is the intended
+behaviour: its author already has write access and can get code applied by
+merging. A **fork** author has neither, so the speculative plan is the only
+path by which their code reaches those credentials. Terrapod therefore does
+not plan fork pull requests unless the workspace opts in:
+
+```json
+{ "data": { "type": "workspaces",
+            "attributes": { "allow-fork-pr-plans": false } } }
+```
+
+`false` is the default, so a hardened deployment has nothing to change. Audit
+it rather than set it:
+
+```sql
+SELECT name FROM workspaces WHERE allow_fork_pr_plans = true;
+```
+
+Every workspace in that result accepts code from people outside the
+repository's write boundary. Keep the list to workspaces that hold nothing
+worth taking — a public module repository taking community contributions is
+the case it exists for — and check the autodiscovery rules too, since a rule
+that sets it hands it to every workspace it creates from now on. See
+[vcs-integration.md → Pull requests from
+forks](vcs-integration.md#pull-requests-from-forks).
+
 ### Runner Token TTL
 
 Tune token lifetimes based on your typical run duration:

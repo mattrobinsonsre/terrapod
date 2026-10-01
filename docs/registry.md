@@ -573,6 +573,7 @@ When the runner downloads the module during `terraform init`, the download endpo
 - For each VCS-connected module with workspace links, it lists open PRs targeting the default branch
 - New commits on a PR trigger new speculative runs; same SHA is skipped (deduplication via `vcs_last_pr_shas`)
 - When a PR is closed or merged, active speculative runs for that PR are cancelled
+- A PR opened **from a fork** creates runs only on consuming workspaces whose `allow-fork-pr-plans` is on (off by default). The plan would run the fork author's code with each consuming workspace's own credentials, so the decision is per workspace — one consumer opting in does not volunteer another's. When no linked workspace has opted in, the override tarball is not even built. PRs from a branch in the module repository itself are unaffected. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks)
 
 ### Automatic Runs on Version Publish
 

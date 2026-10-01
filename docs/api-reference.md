@@ -497,6 +497,12 @@ Workspaces support the following drift detection attributes (settable on create 
 |---|---|---|---|
 | `debug-mode` | boolean | `false` | Hold this workspace's **failed** runner pods open so an operator can `kubectl exec` into one (#1764). The run is reported as failed first and is final from Terrapod's side; only then does the container stay up, for at most `runners.debugLingerSeconds`. Successful runs are unaffected. See [runners.md → Debug mode](runners.md#debug-mode-inspecting-a-failed-runner-pod) for what a held pod exposes and who can reach it |
 
+### Pull Requests From Forks
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `allow-fork-pr-plans` | boolean | `false` | Whether a pull request opened **from a fork** gets a speculative plan ([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)). Off by default: that plan runs the pull request author's code with the workspace's full credential set — `env`-category variables, sensitive values, OpenBao/Vault-resolved values, minted git credentials and the Job's cloud workload identity — and a fork author has neither write access nor the ability to merge, so the plan is the only path by which their code reaches any of it. **Pull requests from a branch in the repository itself are unaffected and always plan.** It gates [module-impact](registry.md#module-impact-analysis) runs the same way, per consuming workspace. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks) |
+
 ### Terragrunt Attributes
 
 Workspaces support running agent-mode plans/applies through Terragrunt (settable on create and update). See [terragrunt.md](terragrunt.md) for the full feature description, including the CLI-driven path that needs no configuration.
@@ -2605,6 +2611,7 @@ These are editable in the UI under **Admin → Autodiscovery**, alongside the ru
 - `ai-policy-mode` — the AI **policy gate** per-workspace override for every created workspace. `disabled` opts out of an advisory verdict only, and a mandatory deployment-wide gate ignores it; `enabled` is a synonym for `default` and has no effect (#1766).
 - `terragrunt-enabled` / `terragrunt-version`, `vcs-workflow`, `auto-merge` / `auto-merge-strategy`, `drift-detection-enabled` / `drift-detection-interval-seconds`, `drift-ignore-rules`, `plan-expiry-seconds` and `slack-channel` — the remaining per-workspace settings (#1763). `drift-detection-enabled` defaults **true** here, unlike the workspace column, because every autodiscovered workspace is VCS-connected.
 - `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **false**, as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
+- `allow-fork-pr-plans` — let a pull request opened from a fork plan on every created workspace. Defaults **false**, matching the workspace column rather than overriding it the way `drift-detection-enabled` does: an operator who decides fork pull requests should plan has to say so, and a rule is how they say it once for every directory the repository grows later. Without it, enabling the setting in bulk holds only until autodiscovery creates the next workspace — which reads as the setting not working. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks).
 
 These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template). The same pairing holds for the scan and AI-summary settings, and their values are validated by the same rules the workspace endpoint uses — so a rule cannot template a setting the workspace API would reject.
 

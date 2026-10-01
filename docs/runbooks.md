@@ -1147,6 +1147,78 @@ service=terrapod-api logger=terrapod.services.vcs_status_dispatcher
 
 ---
 
+## A pull request from a fork gets no plan
+
+**Symptom**: a contributor opens a pull request from their own fork, every
+other pull request on the repository plans normally, and this one produces no
+run at all — no errored run, no commit status, nothing in the workspace's run
+list.
+
+**Why**: this is the default, not a fault. A speculative plan runs the pull
+request author's code with the workspace's full credential set, and a fork
+author has neither write access to the base repository nor the ability to
+merge — so the plan would be the only path by which their code reaches those
+credentials. `allow-fork-pr-plans` is `false` unless someone turned it on
+([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)).
+
+A pull request from a branch **in the repository itself** is never affected by
+this. If one of those stopped planning, the cause is elsewhere — start at
+[Speculative plans not appearing for
+PRs/MRs](vcs-integration.md#speculative-plans-not-appearing-for-prsmrs).
+
+### Diagnosis
+
+The poller logs each skip, with the workspace and the pull request:
+
+```sh
+kubectl logs deploy/terrapod-api --tail=2000 | grep fork_plan_skipped
+```
+
+`vcs.pr.fork_plan_skipped` is the workspace case;
+`module_impact.fork_pr_skipped` and
+`module_impact.fork_pr_skipped_for_workspace` are the module-impact ones.
+
+Then read the setting:
+
+```sh
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD_URL/api/terrapod/v1/workspaces/$WS_ID" \
+| jq '.data.attributes."allow-fork-pr-plans"'
+```
+
+One more thing to rule out before concluding it is a fork: Terrapod fails
+**closed**, so a pull request whose head repository has been deleted is
+treated as a fork even though it was raised from a branch. The log line names
+the pull request, so compare it with what the provider shows.
+
+### Resolution
+
+Decide whether this workspace should accept code from outside the
+repository's write boundary. If it should — a public module repository taking
+community contributions, with a workspace holding nothing worth taking:
+
+```sh
+curl -X PATCH "$TERRAPOD_URL/api/terrapod/v1/workspaces/$WS_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/vnd.api+json' \
+  -d '{"data":{"type":"workspaces","attributes":{"allow-fork-pr-plans":true}}}'
+```
+
+The next poll cycle picks the pull request up; no push to the branch is
+needed, because the gate is re-evaluated each cycle and nothing was recorded
+for the skipped commit.
+
+If it should not, say so on the pull request rather than leaving it silent —
+the contributor sees no status at all, which looks like the integration being
+broken. A maintainer can reproduce the plan by pushing the branch into the
+repository itself, which puts the code back inside the write boundary and
+makes the review a deliberate act.
+
+For a workspace created by autodiscovery, set it on the **rule** as well, or
+the next workspace the rule creates starts from the default again.
+
+---
+
 ## AI plan-summary daily token budget exhausted
 
 **Symptom**: AI plan summary panels on run detail pages start showing "Summary skipped for this run" (italic grey muted text) instead of the LLM description. New `plan_summaries` rows arrive with `status='skipped'` and `error_message='daily token budget exhausted'`. With the policy gate off, the run lifecycle itself is unaffected (plan / apply / lock state machine continues normally) and only the summary surface is muted. **Unless the policy gate is on** (`ai_summary.policy.enabled`): under `enforcement_level: mandatory` a budget exhaustion or a model fault records an `errored` verdict, and an errored verdict HOLDS the run — the gate fails closed, so an AI outage does stop applies. Check `blocked-by: ai-policy` on held runs before concluding the AI subsystem cannot be the cause.

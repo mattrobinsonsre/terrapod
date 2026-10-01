@@ -495,6 +495,69 @@ You can identify speculative runs in the API response by:
 - `"vcs-pull-request-number"` is set (e.g. `42`)
 - `"message"` starts with "Speculative plan for PR #..."
 
+### Pull requests from forks
+
+A pull request opened **from a fork** gets no speculative plan unless the
+workspace opts in. The setting is `allow-fork-pr-plans` and it defaults to
+**false** ([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)).
+
+A speculative plan executes the pull request author's configuration — provider
+blocks, `external` data sources, `local-exec` provisioners — with everything
+the run receives: `env`-category variables, sensitive variable values, values
+resolved from OpenBao/Vault, the git credentials Terrapod mints for private
+module sources, and the Kubernetes Job's cloud workload identity. There is no
+smaller credential set to hand it instead: a plan needs those credentials to
+refresh state and those variables to evaluate the configuration at all.
+
+Someone opening a pull request from a fork has no write access to the base
+repository and cannot merge, so that speculative plan is the only path by
+which their code ever runs against the workspace's credentials. That is the
+boundary the setting draws.
+
+**Pull requests opened from a branch within the repository itself are
+unaffected and always plan.** Their author already has write access and can
+get code applied by merging, so gating them would buy almost nothing and would
+cost the plan-on-pull-request loop the whole integration exists for — a
+reviewer with no plan is being asked to approve blind.
+
+In [`apply_then_merge`](vcs-workflows.md) mode a pull request push creates a
+full plan-and-apply-capable run rather than a speculative one, and the gate
+covers that too — a fork pull request produces no run of either kind. The
+stake there is higher, because in that mode anyone who can comment on the
+pull request can issue `terrapod apply`.
+
+Turn it on where the trade is worth making: a public module repository taking
+community contributions, backed by a workspace that holds nothing worth
+taking.
+
+| Where | How |
+|---|---|
+| Web UI | **Plans on fork pull requests** on the workspace Configuration tab |
+| API | `allow-fork-pr-plans` on workspace create and `PATCH` |
+| Provider | `allow_fork_pr_plans` on `terrapod_workspace` |
+| Autodiscovery | `allow-fork-pr-plans` on the rule, materialised onto every workspace it creates |
+
+Setting it on an [autodiscovery rule](autodiscovery.md) matters more than it
+looks. Without it, enabling the setting across a fleet holds only until
+autodiscovery creates the next workspace — which presents as the setting not
+working rather than as a new workspace correctly defaulting off.
+
+**What counts as a fork.** Terrapod compares the pull request's head
+repository with its base one: a different repository on GitHub, a different
+source project on GitLab. It deliberately does not read GitHub's
+`head.repo.fork` flag, which says the head repository is *itself* a fork of
+something — true for a pull request raised inside a fork against that same
+fork, which is same-repository and trusted. Anything Terrapod cannot
+positively establish as same-repository counts as a fork, including a pull
+request whose head repository has since been deleted.
+
+**Module impact runs follow the same rule.** A pull request on a module
+repository creates speculative plans on the workspaces that consume that
+module (see [Module impact
+analysis](registry.md#module-impact-analysis)), each with its own credentials.
+A fork pull request reaches only those consuming workspaces that have opted
+in — one consumer opting in does not volunteer another consumer's credentials.
+
 ### Run VCS Metadata
 
 Runs created by the VCS poller carry metadata:
@@ -810,6 +873,16 @@ All VCS credentials are stored in PostgreSQL and protected by database encryptio
 
 Credentials are never returned in API responses.
 
+### Code from a pull request runs with the workspace's credentials
+
+A speculative plan executes the configuration on the pull request branch with
+everything the run receives — secrets, resolved variables and the Job's cloud
+identity. For a pull request raised within the repository that is the point of
+the product; for one raised **from a fork** it hands those credentials to
+someone who has neither write access nor the ability to merge, so fork pull
+requests do not plan unless the workspace sets `allow-fork-pr-plans`. See
+[Pull requests from forks](#pull-requests-from-forks).
+
 ### Network Requirements
 
 | Direction | Protocol | Destination | Purpose |
@@ -880,6 +953,11 @@ permission change can take that long to take effect.
 
 ### Speculative plans not appearing for PRs/MRs
 
+- **Is the PR/MR from a fork?** Fork pull requests do not plan unless the
+  workspace sets `allow-fork-pr-plans` (off by default). The poller logs
+  `vcs.pr.fork_plan_skipped` with the workspace id and PR number each time it
+  skips one. Pull requests from a branch in the repository itself are never
+  affected by this — see [Pull requests from forks](#pull-requests-from-forks)
 - The PR/MR must target the workspace's tracked branch (e.g., `main`)
 - Check that no run already exists for the same PR/MR number + head SHA (deduplication)
 - Verify the VCS connection has permission to list pull requests / merge requests

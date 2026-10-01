@@ -35,6 +35,17 @@ This is deliberate and matches Atlantis exactly. It sidesteps a brittle mapping 
 
 The workspace settings page surfaces this contract as a banner when you switch a workspace into `apply_then_merge`.
 
+**Pull requests from forks sit outside that contract, so they do not run at
+all unless the workspace opts in.** "If you can merge the PR, you can apply
+it" rests on the PR author being inside the repository's write boundary; a
+fork author is not — they cannot push to the base repository and cannot merge.
+In this mode the stake is higher than elsewhere, because a PR push creates a
+full plan-and-apply-capable run rather than a speculative one. Terrapod
+therefore skips fork pull requests entirely unless the workspace sets
+`allow-fork-pr-plans` (off by default). Pull requests raised from a branch in
+the repository itself are unaffected. See [Pull requests from
+forks](vcs-integration.md#pull-requests-from-forks).
+
 ## How apply-then-merge runs work
 
 A PR push in `apply_then_merge` mode does **not** trigger a speculative plan-only run. It triggers a **full run that saves the plan file**, then sits in `planned` waiting on a user action. When the user comments `terrapod apply`, the apply phase consumes the exact saved tfplan — so the user reviews and approves the same plan that gets applied, with no re-plan in between.
