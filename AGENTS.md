@@ -1029,6 +1029,30 @@ The switch is a config key or Helm value, which is explicitly patch material
 when its default changes nothing. It still needs all three legs of the
 config-channel contract and a documented default per line.
 
+### A credential that cannot be narrowed has no safe default
+
+Tiers 2 and 3 both assume a middle setting exists — that the fix can hand over
+*less* rather than nothing. Where the exposure is a credential we mint, that
+holds: ask the provider for a narrower one, scoped to the repositories and
+permissions the caller actually needs, and nothing is withdrawn.
+
+Where the credential is a **static secret an operator pasted in**, it does not.
+There is no operation that produces a narrower copy of a stored access token.
+The only choices are handing it over whole or not handing it over, so
+"preserve existing behaviour" and "stop disclosing the credential" are flatly
+incompatible and no default can satisfy both.
+
+So: **a non-attenuable credential disclosure is fixed on every supported line**,
+switch or no switch, even where the surface disclosing it was built
+deliberately. A switch here would not preserve a capability, it would preserve
+the disclosure — and an operator cannot make an informed choice between "leak
+the whole token" and "leak the whole token".
+
+Prefer removing the need for the judgement in the first place: where a surface
+can take either a mintable credential or a stored one, support the mintable path
+and refuse the stored one, rather than offering both and documenting the
+difference.
+
 ### What a tier 3 default does not excuse
 
 Shipping the insecure default is a mitigation, not a fix, and the release notes
