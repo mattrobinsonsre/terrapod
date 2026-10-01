@@ -1065,7 +1065,7 @@
       "noExpiry": "Geen verval",
       "addDriftIgnoreRule": "Regel toevoegen",
       "debugModeHint": "Pods van mislukte runners openhouden op de werkruimten die deze regel aanmaakt. Standaard uit — een opengehouden pod behoudt de referenties van die werkruimte.",
-      "allowForkPrPlansHint": "Geldt voor elke werkruimte die deze regel aanmaakt. Standaard uit: een pull request uit een fork krijgt geen speculatief plan, omdat daarbij de code van de auteur met de referenties van de werkruimte zou draaien."
+      "allowForkPrPlansHint": "Geldt voor elke werkruimte die deze regel aanmaakt. Standaard aan op deze releaselijn, omdat dat plan de code van de forkauteur draait met de referenties van deze werkruimte."
     },
     "table": {
       "name": "Naam",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plannen op pull requests uit forks",
-      "description": "Of een pull request die vanuit een fork is geopend een speculatief plan krijgt. Standaard uit, omdat dat plan de code van de forkauteur draait met de referenties van deze werkruimte.",
+      "description": "Of een pull request die vanuit een fork is geopend een speculatief plan krijgt. Standaard aan op deze releaselijn, omdat dat plan de code van de forkauteur draait met de referenties van deze werkruimte.",
       "label": "Pull requests uit forks plannen",
       "hint": "Een uitvoering krijgt de omgevingsvariabelen van deze werkruimte, gevoelige waarden, alle via Vault opgehaalde secrets en de cloudidentiteit van de job. Wie een pull request vanuit een fork opent heeft geen schrijfrechten en kan niet mergen, dus een speculatief plan is de enige weg waarlangs hun code bij die referenties komt. Zet dit aan voor een werkruimte waarin niets te halen valt — bijvoorbeeld een openbare modulerepository die bijdragen uit de community aanneemt. Pull requests vanuit branches in de repository zelf zijn hierdoor niet geraakt en krijgen altijd een plan.",
       "activeBadge": "Aan",

@@ -1065,7 +1065,7 @@
       "noExpiry": "Ingen utløp",
       "addDriftIgnoreRule": "Legg til regel",
       "debugModeHint": "Hold pods fra mislykkede runnere åpne på arbeidsområdene denne regelen oppretter. Av som standard – en pod som holdes åpen, beholder det arbeidsområdets legitimasjon.",
-      "allowForkPrPlansHint": "Gjelder hvert arbeidsområde denne regelen oppretter. Av som standard: en pull request fra en fork får ingen spekulativ plan, fordi den ville kjøre forfatterens kode med arbeidsområdets legitimasjon."
+      "allowForkPrPlansHint": "Gjelder hvert arbeidsområde denne regelen oppretter. På som standard i denne utgivelseslinjen, fordi den planen kjører fork-forfatterens kode med dette arbeidsområdets legitimasjon."
     },
     "table": {
       "name": "Navn",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Planer på pull requests fra forker",
-      "description": "Om en pull request som er åpnet fra en fork får en spekulativ plan. Av som standard, fordi den planen kjører fork-forfatterens kode med dette arbeidsområdets legitimasjon.",
+      "description": "Om en pull request som er åpnet fra en fork får en spekulativ plan. På som standard i denne utgivelseslinjen, fordi den planen kjører fork-forfatterens kode med dette arbeidsområdets legitimasjon.",
       "label": "Planlegg pull requests fra forker",
       "hint": "En kjøring mottar dette arbeidsområdets miljøvariabler, sensitive verdier, alle hemmeligheter hentet via Vault og jobbens skyidentitet. Den som åpner en pull request fra en fork har ingen skrivetilgang og kan ikke slå sammen, så en spekulativ plan er den eneste veien koden deres når fram til den legitimasjonen. Slå dette på for et arbeidsområde som ikke rommer noe verdt å ta — for eksempel et offentlig modulrepositorium som tar imot bidrag fra fellesskapet. Pull requests fra grener i selve repositoriet er upåvirket og får alltid plan.",
       "activeBadge": "På",

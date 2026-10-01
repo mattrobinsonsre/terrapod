@@ -1065,7 +1065,7 @@
       "noExpiry": "No expiry, matey",
       "addDriftIgnoreRule": "Add a rule",
       "debugModeHint": "Keep failed runner pods open on the work-decks this rule creates. On by default on this release line — a held pod keeps that work-deck''s credentials.",
-      "allowForkPrPlansHint": "Applies t'' every work-deck this rule creates. On by default on this release line: a pull request from a fork gets no speculative plan, fer it would run its author''s code with the work-deck''s credentials."
+      "allowForkPrPlansHint": "Applies t'' every work-deck this rule creates. On by default on this release line, fer that plan runs the fork author''s code with this work-deck''s credentials."
     },
     "table": {
       "name": "Name",

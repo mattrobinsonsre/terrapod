@@ -1065,7 +1065,7 @@
       "noExpiry": "Bez vypršení",
       "addDriftIgnoreRule": "Přidat pravidlo",
       "debugModeHint": "Ponechat pody neúspěšných runnerů otevřené v pracovních prostorech, které toto pravidlo vytvoří. Ve výchozím stavu vypnuto — ponechaný pod si drží přihlašovací údaje daného pracovního prostoru.",
-      "allowForkPrPlansHint": "Platí pro každý pracovní prostor, který toto pravidlo vytvoří. Ve výchozím stavu vypnuto: pull request z forku nedostane spekulativní plán, protože by spustil kód svého autora s přihlašovacími údaji pracovního prostoru."
+      "allowForkPrPlansHint": "Platí pro každý pracovní prostor, který toto pravidlo vytvoří. V této řadě vydání je ve výchozím stavu zapnuto, protože takový plán spustí kód autora forku s přihlašovacími údaji tohoto pracovního prostoru."
     },
     "table": {
       "name": "Název",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plány u pull requestů z forků",
-      "description": "Zda pull request otevřený z forku dostane spekulativní plán. Ve výchozím stavu vypnuto, protože takový plán spustí kód autora forku s přihlašovacími údaji tohoto pracovního prostoru.",
+      "description": "Zda pull request otevřený z forku dostane spekulativní plán. V této řadě vydání je ve výchozím stavu zapnuto, protože takový plán spustí kód autora forku s přihlašovacími údaji tohoto pracovního prostoru.",
       "label": "Plánovat pull requesty z forků",
       "hint": "Běh dostane proměnné prostředí tohoto pracovního prostoru, citlivé hodnoty, všechna tajemství získaná přes Vault a cloudovou identitu úlohy. Kdo otevře pull request z forku, nemá právo zápisu a nemůže slučovat, takže spekulativní plán je jediná cesta, kterou se jeho kód k těmto přihlašovacím údajům dostane. Zapněte to pro pracovní prostor, v němž není nic, co by stálo za odnesení — třeba pro veřejný repozitář modulů přijímající příspěvky komunity. Pull requesty z větví samotného repozitáře to neovlivní a plán dostanou vždy.",
       "activeBadge": "Zapnuto",

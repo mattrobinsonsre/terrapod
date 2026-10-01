@@ -1065,7 +1065,7 @@
       "noExpiry": "Nessuna scadenza",
       "addDriftIgnoreRule": "Aggiungi regola",
       "debugModeHint": "Mantenere aperti i pod dei runner falliti sugli spazi di lavoro creati da questa regola. Disattivato per impostazione predefinita: un pod mantenuto aperto conserva le credenziali di quello spazio di lavoro.",
-      "allowForkPrPlansHint": "Si applica a ogni spazio di lavoro creato da questa regola. Disattivato per impostazione predefinita: una pull request da un fork non riceve alcun plan speculativo, perché eseguirebbe il codice del suo autore con le credenziali dello spazio di lavoro."
+      "allowForkPrPlansHint": "Si applica a ogni spazio di lavoro creato da questa regola. Attivato per impostazione predefinita in questa linea di rilascio, perché quel plan esegue il codice dell''autore del fork con le credenziali di questo workspace."
     },
     "table": {
       "name": "Nome",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plan sulle pull request da fork",
-      "description": "Se una pull request aperta da un fork riceve un plan speculativo. Disattivato per impostazione predefinita, perché quel plan esegue il codice dell''autore del fork con le credenziali di questo spazio di lavoro.",
+      "description": "Se una pull request aperta da un fork riceve un plan speculativo. Attivato per impostazione predefinita in questa linea di rilascio, perché quel plan esegue il codice dell''autore del fork con le credenziali di questo workspace.",
       "label": "Esegui il plan sulle pull request da fork",
       "hint": "Un''esecuzione riceve le variabili d''ambiente di questo spazio di lavoro, i valori sensibili, tutti i segreti risolti tramite Vault e l''identità cloud del job. Chi apre una pull request da un fork non ha accesso in scrittura e non può fare merge, quindi un plan speculativo è l''unico modo in cui il suo codice raggiunge quelle credenziali. Attivalo per uno spazio di lavoro che non custodisce nulla che valga la pena rubare — un repository pubblico di moduli aperto ai contributi della comunità, per esempio. Le pull request dai branch del repository stesso non sono interessate e generano sempre un plan.",
       "activeBadge": "Attivo",

@@ -1065,7 +1065,7 @@
       "noExpiry": "Kein Ablauf",
       "addDriftIgnoreRule": "Regel hinzufügen",
       "debugModeHint": "Pods fehlgeschlagener Runner auf den von dieser Regel erstellten Arbeitsbereichen offen halten. Auf dieser Release-Linie standardmäßig ein – ein offen gehaltener Pod behält die Zugangsdaten dieses Arbeitsbereichs.",
-      "allowForkPrPlansHint": "Gilt für jeden Arbeitsbereich, den diese Regel erstellt. Auf dieser Release-Linie standardmäßig ein: Ein Pull Request aus einem Fork erhält keinen spekulativen Plan, weil dabei der Code seines Autors mit den Zugangsdaten des Arbeitsbereichs ausgeführt würde."
+      "allowForkPrPlansHint": "Gilt für jeden Arbeitsbereich, den diese Regel erstellt. Auf dieser Release-Linie standardmäßig ein, weil dieser Plan den Code des Fork-Autors mit den Zugangsdaten dieses Arbeitsbereichs ausführt."
     },
     "table": {
       "name": "Name",

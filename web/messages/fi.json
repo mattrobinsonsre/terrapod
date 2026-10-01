@@ -1065,7 +1065,7 @@
       "noExpiry": "Ei vanhenemista",
       "addDriftIgnoreRule": "Lisää sääntö",
       "debugModeHint": "Pidä epäonnistuneiden suorittajien podit auki työtiloissa, jotka tämä sääntö luo. Oletuksena pois päältä – auki pidetty podi säilyttää kyseisen työtilan tunnukset.",
-      "allowForkPrPlansHint": "Koskee jokaista työtilaa, jonka tämä sääntö luo. Oletuksena pois päältä: forkista avattu pull request ei saa spekulatiivista suunnitelmaa, koska se ajaisi tekijänsä koodin työtilan tunnuksilla."
+      "allowForkPrPlansHint": "Koskee jokaista työtilaa, jonka tämä sääntö luo. Oletuksena päällä tässä julkaisulinjassa, koska tuo suunnitelma ajaa forkin tekijän koodin tämän työtilan tunnuksilla."
     },
     "table": {
       "name": "Nimi",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Suunnitelmat forkista avatuille pull requesteille",
-      "description": "Saako forkista avattu pull request spekulatiivisen suunnitelman. Oletuksena pois päältä, koska tuo suunnitelma ajaa forkin tekijän koodin tämän työtilan tunnuksilla.",
+      "description": "Saako forkista avattu pull request spekulatiivisen suunnitelman. Oletuksena päällä tässä julkaisulinjassa, koska tuo suunnitelma ajaa forkin tekijän koodin tämän työtilan tunnuksilla.",
       "label": "Suunnittele forkista avatut pull requestit",
       "hint": "Ajo saa tämän työtilan ympäristömuuttujat, arkaluonteiset arvot, kaikki Vaultista haetut salaisuudet ja työn pilvi-identiteetin. Forkista pull requestin avaavalla ei ole kirjoitusoikeutta eikä hän voi yhdistää, joten spekulatiivinen suunnitelma on ainoa reitti, jota pitkin hänen koodinsa pääsee noihin tunnuksiin. Ota tämä käyttöön työtilassa, jossa ei ole mitään viemisen arvoista — vaikkapa julkisessa moduulirepositoriossa, joka ottaa vastaan yhteisön kontribuutioita. Repositorion omista haaroista avatut pull requestit eivät muutu, ja ne suunnitellaan aina.",
       "activeBadge": "Päällä",

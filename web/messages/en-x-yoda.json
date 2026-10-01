@@ -1065,7 +1065,7 @@
       "noExpiry": "Expiry, there is none",
       "addDriftIgnoreRule": "A rule, add",
       "debugModeHint": "Open failed runner pods hold, on the workspaces this rule creates. On by default on this release line — that workspace's credentials, a held pod keeps.",
-      "allowForkPrPlansHint": "To every workspace this rule creates, applies it. On by default on this release line, it is: no speculative plan a pull request from a fork gets, because run its author's code with the workspace's credentials, it would."
+      "allowForkPrPlansHint": "To every workspace this rule creates, applies it. On by default on this release line, it is, because run the fork author's code with this workspace's credentials, that plan does."
     },
     "table": {
       "name": "Name",

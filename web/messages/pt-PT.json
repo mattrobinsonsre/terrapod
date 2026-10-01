@@ -1065,7 +1065,7 @@
       "noExpiry": "Sem expiração",
       "addDriftIgnoreRule": "Adicionar regra",
       "debugModeHint": "Manter abertos os pods de runners falhados nos espaços de trabalho criados por esta regra. Desativado por predefinição — um pod mantido aberto conserva as credenciais desse espaço de trabalho.",
-      "allowForkPrPlansHint": "Aplica-se a todos os espaços de trabalho que esta regra cria. Desativado por predefinição: uma pull request de um fork não recebe plano especulativo, porque executaria o código do seu autor com as credenciais do espaço de trabalho."
+      "allowForkPrPlansHint": "Aplica-se a todos os espaços de trabalho que esta regra cria. Ativado por predefinição nesta linha de versões, porque esse plano executa o código do autor do fork com as credenciais deste espaço de trabalho."
     },
     "table": {
       "name": "Nome",
@@ -2941,7 +2941,7 @@
     },
     "allowForkPrPlans": {
       "title": "Planos em pull requests de forks",
-      "description": "Se uma pull request aberta a partir de um fork recebe um plano especulativo. Desativado por predefinição, porque esse plano executa o código do autor do fork com as credenciais deste espaço de trabalho.",
+      "description": "Se uma pull request aberta a partir de um fork recebe um plano especulativo. Ativado por predefinição nesta linha de versões, porque esse plano executa o código do autor do fork com as credenciais deste espaço de trabalho.",
       "label": "Planear pull requests de forks",
       "hint": "Uma execução recebe as variáveis de ambiente deste espaço de trabalho, os valores sensíveis, quaisquer segredos resolvidos pelo Vault e a identidade na nuvem do job. Quem abre uma pull request a partir de um fork não tem acesso de escrita nem pode fazer merge, por isso um plano especulativo é a única via pela qual o seu código chega a essas credenciais. Ative isto num espaço de trabalho que não guarde nada que valha a pena levar — um repositório público de módulos que aceita contribuições da comunidade, por exemplo. As pull requests de ramos do próprio repositório não são afetadas e geram sempre plano.",
       "activeBadge": "Ligado",

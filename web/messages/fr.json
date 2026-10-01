@@ -1065,7 +1065,7 @@
       "noExpiry": "Pas d'expiration",
       "addDriftIgnoreRule": "Ajouter une règle",
       "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Activé par défaut sur cette ligne de version — un pod maintenu ouvert conserve les identifiants de cet espace de travail.",
-      "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Activé par défaut sur cette ligne de version : une pull request depuis un fork ne reçoit aucun plan spéculatif, car cela exécuterait le code de son auteur avec les identifiants de l'espace de travail."
+      "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Activé par défaut sur cette ligne de version, car ce plan exécute le code de l'auteur du fork avec les identifiants de cet espace de travail."
     },
     "table": {
       "name": "Nom",
