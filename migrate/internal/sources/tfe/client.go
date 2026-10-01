@@ -36,6 +36,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -217,17 +218,25 @@ func probeTokenTier(ctx context.Context, api *tfe.Client, orgName string) (Token
 //
 // Same shape as the SDK's gate on purpose, including the loopback exemption and
 // the environment-variable escape hatch, so an operator meets one rule rather
-// than two.
+// than two. "Same shape" is load-bearing and the first version of this function
+// did not honour it: it found the host by splitting on the first "/" or ":",
+// which on an IPv6 literal cuts inside the brackets — `http://[::1]:8080` gave
+// the host `"["` and was refused, while the SDK accepts it. It also refused
+// anything in 127/8 other than 127.0.0.1, and its bare `"::1"` arm was
+// unreachable because that spelling is not valid in a URL authority. So this
+// parses with net/url and asks net.IP, exactly as the SDK's isLoopback does.
 func checkTFEAddressTransport(addr string, allowInsecure bool) error {
 	if !strings.HasPrefix(addr, "http://") || allowInsecure {
 		return nil
 	}
-	host := addr[len("http://"):]
-	if i := strings.IndexAny(host, "/:"); i >= 0 {
-		host = host[:i]
-	}
-	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-		return nil
+	if u, err := url.Parse(addr); err == nil {
+		host := u.Hostname()
+		if strings.EqualFold(host, "localhost") {
+			return nil
+		}
+		if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+			return nil
+		}
 	}
 	return fmt.Errorf(
 		"TFE address %q uses http:// — your TFE API token would cross the network "+

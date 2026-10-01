@@ -40,6 +40,21 @@ Automated clients should surface a `Deprecation: true` response as a warning in
 their logs and plan a migration before the `Sunset` date. Nothing breaks at the
 moment the header appears — it is advance notice.
 
+## Removed without a deprecation window (v1.9.0)
+
+One surface was removed outright rather than deprecated, under the security
+exception in [Versioning & Support](versioning-and-support.md). It is listed here
+because the policy otherwise says a surface never disappears in a MINOR, and a
+reader checking whether that held needs to find the answer rather than infer it.
+
+| Surface | Removed in | Why there was no window | What to use instead |
+|---|---|---|---|
+| The `terrapod merge` pull-request comment command | v1.9.0 | Commenting was not authorization: on earlier releases anyone who could comment on a pull request could merge it through Terrapod. A deprecation window means shipping that for two more minors. ([`GHSA-x4jp-5g4j-f8rr`](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-x4jp-5g4j-f8rr), critical) | Merge on the provider. Terrapod's only self-initiated merge is workspace-configured auto-merge after a successful apply. The other comment commands (`plan`, `apply`, `unlock`, `help`) still exist and now require push access to the repository. |
+
+This is a wider use of the exception than its own wording allows — it covers
+tightening a permission, "never removing a route, an attribute, or a config key",
+and a comment verb is a command surface. Named rather than quietly stretched.
+
 ## Active deprecations
 
 **None.** No public Terrapod surface is currently deprecated.
@@ -51,6 +66,48 @@ When the first deprecation lands, it will be listed here in this shape:
 |---|---|---|---|---|
 | `GET /api/…/old-thing` | v1.3.0 | v2.0.0 / 2027-06-30 | `GET /api/…/new-thing` | Response shape is identical; only the path changed. |
 -->
+
+## Behaviour changes in v1.9.0
+
+Not deprecations — nothing was removed and nothing is scheduled to be — but each
+changes what an existing deployment does, which is the other thing a reader comes
+to this file to check.
+
+### Fork pull requests do not plan by default
+
+`allow_fork_pr_plans` defaults `false` for workspaces and autodiscovery rules
+created from v1.9.0. **Existing rows are not rewritten**, so a workspace created on
+1.8 keeps whatever it had — the upgrade closes the default and leaves the audit to
+you: `SELECT name FROM workspaces WHERE allow_fork_pr_plans = true;`
+([`GHSA-gp5w-76rw-c452`](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452),
+critical.)
+
+### A non-admin cannot make a workspace join a secret-bearing variable set
+
+Creating or editing a workspace so that it newly matches the assignment rule of a
+variable set **carrying a sensitive or broker-resolved variable** is refused for
+anyone who is not a platform admin. Sets of plain configuration still join
+automatically, and shrinking the set that reaches a workspace is always allowed.
+`drift_status` and `locked` are no longer usable as rule selectors at all, because
+a workspace's own owner can move both; a rule naming one is rejected with `422` and
+a stored rule naming one matches nothing.
+([`GHSA-49q6-pm68-3xgw`](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-49q6-pm68-3xgw).)
+
+### Using a VCS connection requires a claim to it, and may be scoped to repositories
+
+A workspace, a registry module or a minted git credential may only name a VCS
+connection its caller has a claim to — platform admin, the connection's owner, a
+role reaching its labels, or an existing workspace on it. A connection may also
+carry `allowed_repositories`, which is **empty by default and means any
+repository**, so nothing changes until you narrow one.
+([`GHSA-v8g7-pqrj-8mcm`](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-v8g7-pqrj-8mcm).)
+
+### An explicitly configured Helm `false` now takes effect
+
+`| default true` discarded it, so an opt-out has been silently inert. Two existing
+values are affected — `notifications.smtp.use_tls` and `database.pool_pre_ping` —
+and in both cases honouring the setting changes behaviour on upgrade. Check both
+before upgrading; the release notes have the table.
 
 ## Announced behaviour changes for 2.0
 

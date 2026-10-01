@@ -41,7 +41,7 @@ for every public surface below.
 > itself the harm and a deprecation window would mean shipping a known hole for
 > two more minors. This is narrow — it covers removing access that should never
 > have been granted, never removing a route, an attribute, or a config key. It
-> has been used three times. In **v1.4.0**, when GPG signing-key registration
+> has been used three times before v1.9.0, which uses it again — see below. In **v1.4.0**, when GPG signing-key registration
 > went from "any authenticated caller" to requiring `registry:admin`; an
 > unprivileged account could otherwise add a trust anchor for the whole provider
 > registry. Twice in **v1.7.0**: retrying a run went from `run:cancel` to
@@ -56,6 +56,18 @@ for every public surface below.
 > carry the migration step, so an operator meets it before their next apply
 > fails rather than after — see
 > [registry-publishing.md](registry-publishing.md#1-register-the-publishers-gpg-public-key).
+>
+> **v1.9.0 uses it more widely, and once outside its own wording.** Five tightenings
+> close reported findings: fork pull requests no longer plan by default, a non-admin
+> cannot join a secret-bearing variable set, using a VCS connection requires a claim,
+> a scoped token cannot widen itself, and every PR-comment command requires push
+> access. Those are permission tightenings, which is what this exception is for. The
+> sixth is not: **`terrapod merge` was removed outright**, and a comment verb is a
+> command surface, not a permission. It is recorded in
+> [`deprecations.md`](deprecations.md#removed-without-a-deprecation-window-v190)
+> rather than stretched silently, because the alternative was shipping a critical
+> finding — anyone who could comment could merge — for two more minors.
+
 
 > **Stability note.** As of **`1.0.0`**, the MAJOR/MINOR/PATCH contract below is
 > absolute and enforced in CI: no stable surface is removed, renamed, or retyped

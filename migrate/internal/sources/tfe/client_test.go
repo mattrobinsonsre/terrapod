@@ -197,6 +197,17 @@ func TestAnHTTPTFEAddressIsRefusedUnlessAccepted(t *testing.T) {
 		{"the opt-out is honoured", "http://tfe.example.com", true, false},
 		{"loopback is exempt", "http://localhost:8080", false, false},
 		{"loopback by address is exempt", "http://127.0.0.1:8080", false, false},
+		// The three spellings go-terrapod's own loopback test pins, so the two
+		// halves of a migration genuinely agree. The IPv6 literal is the one
+		// the first version of the gate got wrong: splitting the authority on
+		// the first ":" cuts inside the brackets and yields the host "[".
+		{"an IPv6 loopback literal is exempt", "http://[::1]:8080", false, false},
+		{"the rest of 127/8 is loopback too", "http://127.0.0.2:8080", false, false},
+		// And the carve-out is loopback, not "anything private" — an http://
+		// hop to another pod does cross a network, which is the case the gate
+		// exists for.
+		{"a private address is not loopback", "http://10.1.2.3:8080", false, true},
+		{"an IPv6 non-loopback literal is refused", "http://[2001:db8::1]:8080", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := checkTFEAddressTransport(tc.addr, tc.allowInsecure)

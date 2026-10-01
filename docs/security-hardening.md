@@ -357,7 +357,32 @@ upgrade keeps whatever it had. Audit rather than assume:
 SELECT name FROM workspaces WHERE allow_fork_pr_plans = true;
 ```
 
-Every workspace in that result accepts code from people outside the
+**To close them in one call** rather than one at a time — which is what the
+migration note points here for:
+
+```sh
+curl -X POST "$TERRAPOD_URL/api/terrapod/v1/workspaces/actions/bulk-update" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"filter":{"all":true},
+       "update":{"allow-fork-pr-plans":false},
+       "dry_run":true}'
+```
+
+Note the shape: `filter`, `update` and `dry_run` sit at the **top level of the
+body**, not inside a `data`/`attributes` envelope, and `dry_run` is spelled with
+an underscore while the keys inside `update` are the kebab-case workspace
+attribute names. This endpoint is admin-only.
+
+`dry_run` defaults to true and reports what would change without changing it —
+the identical code path, rolled back — so the preview is exactly what an apply
+would do; send `"dry_run":false` to apply. The whole update is a single
+transaction, all or nothing, and it never queues a run: the change lands on each
+workspace's next normal run. `{"all":true}` has to be asked for explicitly; an
+empty `filter` is a 422 rather than an implicit match-all. Narrow `filter` if you
+want to keep a specific workspace open rather than re-opening it afterwards.
+
+Every workspace in the audit result accepts code from people outside the
 repository's write boundary. Keep the list to workspaces that hold nothing
 worth taking — a public module repository taking community contributions is
 the case it exists for — and check the autodiscovery rules too, since a rule
