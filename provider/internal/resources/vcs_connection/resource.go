@@ -8,12 +8,23 @@
 //	Read:    GET    /api/terrapod/v1/vcs-connections/{id}
 //	Delete:  DELETE /api/terrapod/v1/vcs-connections/{id}
 //
-// This resource is immutable from the Terraform side — any attribute
-// change forces replacement. The Terrapod API does support PATCH
-// (#315) but the provider has historically modelled VCS connections
-// as RequiresReplace because rotating a private key cleanly via
-// Terraform plans is messy. The go-terrapod SDK exposes the PATCH
-// path for direct callers (CLI tooling, migration tool).
+// Everything that identifies the connection or authenticates it is immutable
+// from the Terraform side — changing it forces replacement. The Terrapod API
+// does support PATCH (#315) but the provider has historically modelled VCS
+// connections as RequiresReplace because rotating a private key cleanly via
+// Terraform plans is messy. The go-terrapod SDK exposes the PATCH path for
+// direct callers (CLI tooling, migration tool).
+//
+// Update:  PATCH  /api/terrapod/v1/vcs-connections/{id}
+//
+// The exception, and it is deliberate: owner_email, labels and
+// allowed_repositories update in place (GHSA-v8g7-pqrj-8mcm). Replacement is
+// not an option for these. Deleting a VCS connection unlinks every workspace
+// that references it, so if tightening a repository allowlist or adding an RBAC
+// label destroyed the connection, the cost of using the control would be an
+// estate-wide outage — and a security control that expensive to adjust does not
+// get adjusted. These three are also exactly what the server models as a
+// partial PATCH, so the mapping is direct.
 //
 // Migrated to go-terrapod (#347): CRUD goes through the typed SDK;
 // the legacy *client.Client is kept only because the provider's
@@ -25,10 +36,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -53,6 +67,11 @@ type vcsConnectionModel struct {
 	PrivateKey           types.String `tfsdk:"private_key"`
 	Token                types.String `tfsdk:"token"`
 	WebhookSecret        types.String `tfsdk:"webhook_secret"`
+
+	// Reach and scope. Updatable in place — see the package doc.
+	OwnerEmail          types.String `tfsdk:"owner_email"`
+	Labels              types.Map    `tfsdk:"labels"`
+	AllowedRepositories types.List   `tfsdk:"allowed_repositories"`
 
 	Status             types.String `tfsdk:"status"`
 	HasToken           types.Bool   `tfsdk:"has_token"`
@@ -149,6 +168,37 @@ func (r *vcsConnectionResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 
+			// Reach and scope (GHSA-v8g7-pqrj-8mcm). Unlike every other
+			// configurable attribute here these do NOT force replacement — see
+			// the package doc for why destroying the connection is not an
+			// acceptable way to change them.
+			"owner_email": schema.StringAttribute{
+				Description: "Email of the connection owner, who may reference it from a workspace. Updated in place.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"labels": schema.MapAttribute{
+				Description: "Labels for RBAC-based access control: a role whose rules match these may reference the connection from a workspace. Updated in place. Set `{}` to remove every label — omitting the attribute keeps whatever is already set.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"allowed_repositories": schema.ListAttribute{
+				Description: "Glob patterns bounding which repositories a workspace may point at through this connection. AN EMPTY LIST MEANS ANY REPOSITORY, so `[]` removes the restriction rather than denying everything. Updated in place. Note that omitting the attribute keeps whatever is already set — widen the scope by setting `[]` explicitly, not by deleting the attribute.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
+
 			"status": schema.StringAttribute{
 				Description: "The connection status.",
 				Computed:    true,
@@ -222,7 +272,7 @@ func (r *vcsConnectionResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	readVCSConnectionFromSDK(v, &plan)
+	resp.Diagnostics.Append(readVCSConnectionFromSDK(ctx, v, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -249,20 +299,50 @@ func (r *vcsConnectionResource) Read(ctx context.Context, req resource.ReadReque
 	token := state.Token
 	webhookSecret := state.WebhookSecret
 
-	readVCSConnectionFromSDK(v, &state)
+	resp.Diagnostics.Append(readVCSConnectionFromSDK(ctx, v, &state)...)
 	state.PrivateKey = privateKey
 	state.Token = token
 	state.WebhookSecret = webhookSecret
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// Update is not supported — all schema attributes force replacement.
-// Required by the framework interface but never reached at runtime.
-func (r *vcsConnectionResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Update not supported",
-		"VCS connections are immutable on the Terraform provider — all attributes force replacement. Use the Terrapod CLI / API directly to rotate credentials in-place.",
-	)
+// Update patches the three reach/scope attributes — owner_email, labels and
+// allowed_repositories — and nothing else. Every other attribute forces
+// replacement, so the framework only reaches this when the diff is confined to
+// those three. See the package doc for why they are not RequiresReplace: a
+// connection's deletion unlinks every workspace using it, which is far too
+// expensive a way to add a label or adjust a repository pattern.
+func (r *vcsConnectionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan vcsConnectionModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var state vcsConnectionModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	v, err := r.tc.UpdateVCSConnection(ctx, state.ID.ValueString(), buildUpdateVCSConnectionRequest(&plan))
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to update VCS connection", err.Error())
+		return
+	}
+
+	// The API never echoes the credentials back, so carry them across from the
+	// plan exactly as Create does — reading them off the response would wipe
+	// them from state and make the next plan want to replace the connection.
+	privateKey := plan.PrivateKey
+	token := plan.Token
+	webhookSecret := plan.WebhookSecret
+
+	resp.Diagnostics.Append(readVCSConnectionFromSDK(ctx, v, &plan)...)
+	plan.PrivateKey = privateKey
+	plan.Token = token
+	plan.WebhookSecret = webhookSecret
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *vcsConnectionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -311,13 +391,76 @@ func buildCreateVCSConnectionRequest(m *vcsConnectionModel) terrapod.CreateVCSCo
 	if !m.WebhookSecret.IsNull() && !m.WebhookSecret.IsUnknown() {
 		req.WebhookSecret = m.WebhookSecret.ValueString()
 	}
+	if !m.OwnerEmail.IsNull() && !m.OwnerEmail.IsUnknown() {
+		req.OwnerEmail = m.OwnerEmail.ValueString()
+	}
+	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
+		req.Labels = labelsFromModel(m)
+	}
+	if !m.AllowedRepositories.IsNull() && !m.AllowedRepositories.IsUnknown() {
+		req.AllowedRepositories = reposFromModel(m)
+	}
 	return req
+}
+
+// buildUpdateVCSConnectionRequest projects the plan into the SDK's partial
+// PATCH shape, and sends ONLY the three reach/scope attributes. Everything else
+// on this resource forces replacement, so Update is unreachable unless the diff
+// is confined to these three — including name and the credentials in the body
+// would widen a deliberately narrow write for no reason.
+//
+// An unknown or null planned value is left nil, which omits the key and leaves
+// the server's stored value alone. A known value is sent even when empty,
+// because an explicit empty value is how the server is told to clear the
+// field — and for the allowlist, clearing it is what restores "any repository".
+func buildUpdateVCSConnectionRequest(m *vcsConnectionModel) terrapod.UpdateVCSConnectionRequest {
+	var req terrapod.UpdateVCSConnectionRequest
+	if !m.OwnerEmail.IsNull() && !m.OwnerEmail.IsUnknown() {
+		o := m.OwnerEmail.ValueString()
+		req.OwnerEmail = &o
+	}
+	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
+		labels := labelsFromModel(m)
+		req.Labels = &labels
+	}
+	if !m.AllowedRepositories.IsNull() && !m.AllowedRepositories.IsUnknown() {
+		repos := reposFromModel(m)
+		req.AllowedRepositories = &repos
+	}
+	return req
+}
+
+// labelsFromModel flattens the labels map. It returns a non-nil empty map for
+// an empty attribute so the caller can send `{}` rather than `null`.
+func labelsFromModel(m *vcsConnectionModel) map[string]string {
+	labels := map[string]string{}
+	for k, v := range m.Labels.Elements() {
+		if s, ok := v.(types.String); ok {
+			labels[k] = s.ValueString()
+		}
+	}
+	return labels
+}
+
+// reposFromModel flattens the allowlist, returning a non-nil empty slice for an
+// empty attribute — `[]` is meaningful on this field and must not become null.
+func reposFromModel(m *vcsConnectionModel) []string {
+	elems := m.AllowedRepositories.Elements()
+	repos := make([]string, 0, len(elems))
+	for _, v := range elems {
+		if s, ok := v.(types.String); ok {
+			repos = append(repos, s.ValueString())
+		}
+	}
+	return repos
 }
 
 // readVCSConnectionFromSDK populates the Terraform model from the SDK
 // type. PrivateKey and Token are write-only — the caller preserves
 // them from prior state.
-func readVCSConnectionFromSDK(v *terrapod.VCSConnection, m *vcsConnectionModel) {
+func readVCSConnectionFromSDK(ctx context.Context, v *terrapod.VCSConnection, m *vcsConnectionModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	m.ID = types.StringValue(v.ID)
 	m.Name = types.StringValue(v.Name)
 	m.Provider = types.StringValue(v.Provider)
@@ -353,6 +496,34 @@ func readVCSConnectionFromSDK(v *terrapod.VCSConnection, m *vcsConnectionModel) 
 		m.GithubAccountType = types.StringNull()
 	}
 
+	// Reach and scope round-trip FAITHFULLY: an empty value stays an empty
+	// value and is never collapsed to null. The older mapping used elsewhere in
+	// the provider ("empty means null") cannot be used here, because a config
+	// that explicitly asks for `allowed_repositories = []` — the supported way
+	// to widen the scope back to any repository — would then plan as [] and
+	// apply to null, which the framework rejects as an inconsistent result.
+	// Since all three are Computed, an absent config simply takes whatever the
+	// server reports.
+	m.OwnerEmail = types.StringValue(v.OwnerEmail)
+
+	labels := v.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labelVal, d := types.MapValueFrom(ctx, types.StringType, labels)
+	diags.Append(d...)
+	m.Labels = labelVal
+
+	repos := v.AllowedRepositories
+	if repos == nil {
+		repos = []string{}
+	}
+	repoVal, d := types.ListValueFrom(ctx, types.StringType, repos)
+	diags.Append(d...)
+	m.AllowedRepositories = repoVal
+
 	m.CreatedAt = types.StringValue(v.CreatedAt)
 	m.UpdatedAt = types.StringValue(v.UpdatedAt)
+
+	return diags
 }

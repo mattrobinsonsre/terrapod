@@ -50,6 +50,7 @@ data terrapod_user.has_password required=false optional=false computed=true sens
 data terrapod_user.is_active required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_user.last_login_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_user.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_vcs_connection.allowed_repositories required=false optional=false computed=true sensitive=false type=types.ListType[basetypes.StringType]
 data terrapod_vcs_connection.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_vcs_connection.github_account_login required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_vcs_connection.github_account_type required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -58,7 +59,9 @@ data terrapod_vcs_connection.github_installation_id required=false optional=fals
 data terrapod_vcs_connection.has_token required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_vcs_connection.has_webhook_secret required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_vcs_connection.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
+data terrapod_vcs_connection.labels required=false optional=false computed=true sensitive=false type=types.MapType[basetypes.StringType]
 data terrapod_vcs_connection.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
+data terrapod_vcs_connection.owner_email required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_vcs_connection.server_url required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_vcs_connection.status required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_vcs_connection.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -423,6 +426,7 @@ resource terrapod_variable_set_variable.version_id required=false optional=false
 resource terrapod_variable_set_workspace.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_workspace.varset_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_variable_set_workspace.workspace_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_vcs_connection.allowed_repositories required=false optional=true computed=true sensitive=false type=types.ListType[basetypes.StringType]
 resource terrapod_vcs_connection.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_vcs_connection.github_account_login required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_vcs_connection.github_account_type required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -431,7 +435,9 @@ resource terrapod_vcs_connection.github_installation_id required=false optional=
 resource terrapod_vcs_connection.has_token required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_vcs_connection.has_webhook_secret required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_vcs_connection.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_vcs_connection.labels required=false optional=true computed=true sensitive=false type=types.MapType[basetypes.StringType]
 resource terrapod_vcs_connection.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_vcs_connection.owner_email required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_vcs_connection.private_key required=false optional=true computed=false sensitive=true type=basetypes.StringType
 resource terrapod_vcs_connection.server_url required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_vcs_connection.status required=false optional=false computed=true sensitive=false type=basetypes.StringType
