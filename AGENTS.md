@@ -1042,16 +1042,28 @@ The only choices are handing it over whole or not handing it over, so
 "preserve existing behaviour" and "stop disclosing the credential" are flatly
 incompatible and no default can satisfy both.
 
-So: **a non-attenuable credential disclosure is fixed on every supported line**,
-switch or no switch, even where the surface disclosing it was built
-deliberately. A switch here would not preserve a capability, it would preserve
-the disclosure — and an operator cannot make an informed choice between "leak
-the whole token" and "leak the whole token".
+So this is its own tier, and the rule is about the **default**, not about
+whether a switch exists: a non-attenuable credential disclosure is **off by
+default on every line, including the supported ones**. A switch may keep the
+capability available — an operator with a private runner fleet and a
+single-project token may be entirely content with the trade — but it is an
+informed opt-in, never the state someone inherits by upgrading.
+
+That is what separates this from tier 3. There, the supported line keeps its
+existing default because the behaviour is something operators legitimately
+built on. Here the existing default *is* the disclosure, so preserving it would
+be preserving the vulnerability; and unlike tier 3 there is no partial setting
+to land on, because the credential has no narrower form.
+
+The switch therefore carries the warning, not just the key: what is handed over,
+to whom, and what cannot be narrowed about it. An operator turning this on is
+accepting a specific disclosure and must be able to read what it is at the point
+of turning it on.
 
 Prefer removing the need for the judgement in the first place: where a surface
-can take either a mintable credential or a stored one, support the mintable path
-and refuse the stored one, rather than offering both and documenting the
-difference.
+can take either a mintable credential or a stored one, make the mintable path
+the supported one and put the stored path behind this kind of switch, rather
+than offering both as equals and explaining the difference in a footnote.
 
 ### What a tier 3 default does not excuse
 
