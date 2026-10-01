@@ -173,3 +173,23 @@ def test_the_tiltfile_deps_match_the_dockerfile() -> None:
         "COPIED into the runner image but absent from the Tiltfile's "
         f"build-runner-image deps, so editing it will not rebuild: {missing}"
     )
+
+
+def test_the_test_image_ships_the_dockerfiles_this_test_reads() -> None:
+    """Otherwise the guard above skips, silently, in CI.
+
+    `ROOT` is None when `docker/` is absent and both tests then skip — which is
+    indistinguishable from passing. The release lines' `Dockerfile.test` did not
+    copy `docker/` in, so the guard could not run at all; restoring that COPY is
+    what makes it a gate rather than a local convenience. Nothing pinned it.
+    """
+    if ROOT is None:
+        pytest.skip("no docker/ in this tree")
+    test_image = ROOT / "docker" / "Dockerfile.test"
+    if not test_image.is_file():
+        pytest.skip("Dockerfile.test is not shipped here")
+    assert "COPY docker" in test_image.read_text(), (
+        "docker/Dockerfile.test no longer copies `docker/` into the test image, so "
+        "test_every_module_the_job_imports_is_in_the_runner_image SKIPS in CI and "
+        "the runner-image omission it exists to catch ships unnoticed"
+    )
