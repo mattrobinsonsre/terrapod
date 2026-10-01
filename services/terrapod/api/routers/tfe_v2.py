@@ -1207,7 +1207,7 @@ async def create_workspace(
             conn_id=vcs_connection_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
-            actor_roles=sorted(effective_platform_roles(user)),
+            actor_roles=list(user.roles),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(vcs_connection_id))
 
@@ -2044,7 +2044,7 @@ async def update_workspace(
             conn_id=ws.vcs_connection_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
-            actor_roles=sorted(effective_platform_roles(user)),
+            actor_roles=list(user.roles),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(ws.vcs_connection_id))
 

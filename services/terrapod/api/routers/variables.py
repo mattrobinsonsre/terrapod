@@ -553,6 +553,26 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
     # below would be decorative — `workspace-ids` sailed straight past it.
     rule = {str(k).replace("-", "_"): v for k, v in rule.items()}
 
+    # GHSA-49q6-pm68-3xgw. Some dimensions are platform STATE, not identity, and a
+    # workspace's own owner can move them through endpoints that have no business
+    # paying a variable-set check — `dismiss-drift` needs only `drift:dismiss`,
+    # lock/unlock only `workspace:lock`. A rule keyed on one of those is
+    # self-joinable whatever the create/PATCH guard does, so the dimension is
+    # refused rather than five more endpoints gated.
+    from terrapod.services.varset_self_join import RULE_DIMENSIONS_REFUSED
+
+    refused = sorted(k for k in RULE_DIMENSIONS_REFUSED if k in rule)
+    if refused:
+        why = "; ".join(f"{k}: {RULE_DIMENSIONS_REFUSED[k]}" for k in refused)
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"assignment-rule cannot select on {', '.join(refused)} — {why}. "
+                "Select on something the workspace's owner cannot change, such as "
+                "labels an admin applies, or assign the set explicitly."
+            ),
+        )
+
     if "workspace_ids" in rule:
         # A literal list of ids is not a rule — it is explicit assignment, which
         # the relationships endpoint already does and the UI already surfaces as

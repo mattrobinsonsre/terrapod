@@ -385,6 +385,22 @@ async def _rule_matches(db: AsyncSession, rule: dict | None, workspace_id: uuid.
 
     if not rule:
         return False
+
+    # GHSA-49q6-pm68-3xgw. A rule stored before these dimensions were refused must
+    # stop matching, not keep working: both are platform state a workspace's own
+    # owner can move, so continuing to honour such a rule would leave the
+    # escalation open for exactly the deployments that already have one.
+    from terrapod.services.varset_self_join import RULE_DIMENSIONS_REFUSED
+
+    if isinstance(rule, dict):
+        refused = sorted(k for k in RULE_DIMENSIONS_REFUSED if k in rule)
+        if refused:
+            logger.warning(
+                "variable set assignment rule selects on a refused dimension; matching nothing",
+                refused=refused,
+            )
+            return False
+
     try:
         # build_workspace_query must be inside the guard, not only parse_filter:
         # it is where the "at least one selector" check lives, so a rule that

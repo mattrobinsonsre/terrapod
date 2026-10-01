@@ -186,11 +186,17 @@ data:
             acs_url: {{ .acs_url | quote }}
             {{- end }}
             {{- /*
-              hasKey, not `| default`: these default to TRUE, and Helm's
-              `default` treats false as empty — so `| default true` would render
-              true for an operator who explicitly set false, and their opt-out
-              would be silently inert. Omitting the key entirely lets the code
-              default stand, which is what an unset value means.
+              hasKey, not `| default`: all five default to **FALSE on this
+                release line** — they are opt-in here and strict only from 2.0,
+                which `tests/auth/test_saml.py::test_all_five_default_to_false`
+                enforces. `hasKey` is right either way, because Helm's `default`
+                treats false as empty and would discard whichever explicit value
+                an operator set. Omitting the key lets the code default stand,
+                which is what an unset value means.
+
+                (This previously said TRUE, carried in from the 2.0 line where
+                that is correct. Harmless to behaviour, and a trap for the next
+                person reasoning about SAML posture from the chart.)
             */ -}}
             {{- if hasKey . "validate_destination" }}
             validate_destination: {{ .validate_destination }}
@@ -522,6 +528,16 @@ data:
       {{- if hasKey .Values.api.config.vcs "require_push_permission_for_commands" }}
       require_push_permission_for_commands: {{ .Values.api.config.vcs.require_push_permission_for_commands }}
       {{- end }}
+      {{/* Restored: the `| default true` cleanup deleted this line as collateral,
+           and nothing caught it — the values contract snapshots keys in
+           values.yaml, not rendered output. An operator who had set this false (the
+           documented remedy on 1.8.2 for "the first workspace on a connection must
+           be created by an admin") would have had it silently revert to true on
+           upgrade, and then met a 403 whose own text told them to set the key that
+           had stopped working. `hasKey` for the same reason as the line above. */}}
+      {{- if hasKey .Values.api.config.vcs "require_connection_authorization" }}
+      require_connection_authorization: {{ .Values.api.config.vcs.require_connection_authorization }}
+      {{- end }}
       # tmpdir tracks the ephemeralStorage mountPath so the VCS poller writes
       # streamed tarballs onto the PVC, not pod memory. Override
       # api.config.vcs.tmpdir if you remount the PVC elsewhere.
@@ -637,7 +653,6 @@ data:
       config_versions_retention_days: {{ .Values.api.config.artifact_retention.config_versions_retention_days | default 90 | int64 }}
       provider_cache_retention_days: {{ .Values.api.config.artifact_retention.provider_cache_retention_days | default 30 | int64 }}
       binary_cache_retention_days: {{ .Values.api.config.artifact_retention.binary_cache_retention_days | default 30 | int64 }}
-      package_cache_retention_days: {{ .Values.api.config.artifact_retention.package_cache_retention_days | default 30 | int64 }}
       module_overrides_retention_days: {{ .Values.api.config.artifact_retention.module_overrides_retention_days | default 14 | int64 }}
       deleted_workspace_retention_days: {{ .Values.api.config.artifact_retention.deleted_workspace_retention_days | default 30 | int64 }}
     {{- end }}
@@ -802,10 +817,6 @@ data:
     {{- end }}
     default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
     default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.12" | quote }}
-    default_pulumi_version: {{ .Values.api.config.default_pulumi_version | default "3.208" | quote }}
-    default_node_version: {{ .Values.api.config.default_node_version | default "22" | quote }}
-    default_go_version: {{ .Values.api.config.default_go_version | default "1.25" | quote }}
-    default_dotnet_version: {{ .Values.api.config.default_dotnet_version | default "9.0" | quote }}
     {{- with .Values.api.config.cors }}
     {{- /* Only emit `cors:` when at least one child renders — a bare `cors:`
            serialises to null, which Settings (CORSConfig) rejects. The common

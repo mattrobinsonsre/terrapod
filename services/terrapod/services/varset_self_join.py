@@ -40,54 +40,85 @@ from terrapod.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-#: PATCH body attribute keys that can change whether an assignment rule matches.
-#: Keyed to `WorkspaceFilter`'s dimensions, and `test_every_filter_dimension_is_
-#: classified` fails if that model grows one nothing here accounts for — so the
-#: set cannot silently stop covering a dimension, which is the way a guard like
-#: this rots.
-RULE_SELECTABLE_ATTRS: frozenset[str] = frozenset(
+#: Workspace attributes that provably cannot change whether an assignment rule
+#: matches. This is a DENYLIST, which is the whole point: the check fails OPEN, so
+#: an attribute nobody has classified still pays for the guard. The first version
+#: of this was an allowlist of *triggering* keys and therefore failed closed-to-skip
+#: — a new attribute silently escaped the check, and the docstring claimed the
+#: opposite. Both reviewers found it.
+NOT_RULE_SELECTABLE: frozenset[str] = frozenset(
     {
-        "labels",
-        "name",
-        "execution-backend",
-        "execution-mode",
-        "terraform-version",
-        "engine-version",
-        "agent-pool-id",
-        "agent-pool-ids",
-        "vcs-connection-id",
-        "vcs-repo-url",
-        "owner-email",
+        "description",
+        "auto-apply",
+        "auto-apply-mode",
+        "queue-all-runs",
+        "speculative-enabled",
+        "allow-destroy-plan",
+        "terraform-working-directory",
+        "working-directory",
+        "trigger-prefixes",
+        "file-triggers-enabled",
+        "slack-channel",
+        "ai-summary-mode",
+        "ai-summary-context",
+        "ai-policy-mode",
+        "notifications",
+        "resource-cpu",
+        "resource-memory",
+        "debug-mode",
+        "allow-fork-pr-plans",
+        "vcs-branch",
+        "vcs-workflow",
+        "auto-merge",
+        "auto-merge-strategy",
+        "drift-detection-interval-seconds",
     }
 )
 
-#: `WorkspaceFilter` dimensions that no PATCH attribute can move, with the reason.
-#: An entry here is a claim that the dimension cannot be self-assigned, which is
-#: the only basis on which it is safe to leave out of the check above.
-FILTER_DIMENSIONS_NOT_PATCHABLE: dict[str, str] = {
-    "workspace_ids": "the id is assigned at create and immutable",
-    "drift_status": "written by the drift checker, not by a request",
-    "locked": "moved by the lock/unlock endpoints, which take no attributes",
-    "has_vcs": "derived from vcs-connection-id and vcs-repo-url, both watched above",
-    "name_prefix": "selects on `name`, which is watched above",
-    "name_glob": "selects on `name`, which is watched above",
-    "all": "not a workspace attribute — it is the filter's explicit select-everything flag",
+#: Rule dimensions a workspace's own owner must not be able to move, so they are
+#: refused as assignment-rule selectors rather than guarded at every write site.
+#:
+#: `drift_status` and `locked` are platform state, not identity, and both are
+#: writable by endpoints that have no business paying a variable-set check:
+#: `POST .../actions/dismiss-drift` needs only `drift:dismiss`, `PATCH
+#: {"drift-detection-enabled": false}` clears drift status as a side effect, and
+#: lock/unlock/force-unlock need only `workspace:lock`. A rule keyed on either was
+#: therefore self-joinable through a door the guard does not watch — five doors.
+#:
+#: Gating all five would work and would be worse: scoping a credential on "is this
+#: workspace currently drifted" is not a thing anyone should be able to express, so
+#: the dimension is the defect rather than the missing gate.
+RULE_DIMENSIONS_REFUSED: dict[str, str] = {
+    "drift_status": (
+        "drift status is written by the drift checker and cleared by "
+        "`dismiss-drift` and by disabling drift detection, so a workspace's own "
+        "owner can move it"
+    ),
+    "locked": (
+        "lock state is moved by the lock, unlock and force-unlock endpoints, which "
+        "need only `workspace:lock`"
+    ),
 }
 
 
 def touches_rule_selectable(attrs: dict, relationships: dict | None = None) -> bool:
     """Whether this request body could change which assignment rules match.
 
-    The point is to avoid three queries on every workspace PATCH that cannot
-    possibly move the answer — a rename of an unrelated field, a description edit,
-    a notification toggle. It fails OPEN: anything unrecognised counts as touching,
-    so a new attribute is covered before anyone remembers to classify it.
+    Fails OPEN by construction: it asks whether EVERY key in the body is known not
+    to matter, so an attribute nobody has classified counts as touching. The point
+    is only to spare the three queries on a body that provably cannot move the
+    answer — a description edit, a notification toggle.
+
+    Getting this the wrong way round is the subtle version of switching the guard
+    off, which is what the first version did.
     """
-    if any(k in attrs for k in RULE_SELECTABLE_ATTRS):
+    if relationships:
+        # Any relationship may carry a connection or a pool; neither is worth
+        # enumerating against a body shape that can nest.
         return True
-    # The connection also arrives as a relationship, and gating on the attribute
-    # spelling alone is how the PATCH gate was got wrong once already.
-    return bool(relationships and "vcs-connection" in relationships)
+    if not attrs:
+        return False
+    return any(k not in NOT_RULE_SELECTABLE for k in attrs)
 
 
 async def rule_assigned_varset_ids(db: AsyncSession, workspace_id: uuid.UUID) -> set[uuid.UUID]:

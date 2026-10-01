@@ -44,7 +44,6 @@ from __future__ import annotations
 
 import fnmatch
 import uuid
-from urllib.parse import urlparse
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,6 +51,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.config import settings
 from terrapod.db.models import VCSConnection, Workspace
 from terrapod.logging_config import get_logger
+from terrapod.services.vcs_provider import parse_repo_url
 
 logger = get_logger(__name__)
 
@@ -74,6 +74,12 @@ async def may_reference_connection(
     roles to evaluate, and omitting it must mean "no label claim", never "all
     labels". A missing argument that widened access would be the whole finding
     again, in the fix for it.
+
+    Pass **`user.roles`**, not `effective_platform_roles(user)`. That derived set is
+    documented as being for platform gates only and never a substitute here — for a
+    `service_detached` token it is the PINNED roles, so using it would let a
+    detached token keep label reach to a connection through a role its user no
+    longer holds. This is a per-resource decision and wants the un-attenuated set.
     """
     if not settings.vcs.require_connection_authorization:
         return True
@@ -95,12 +101,28 @@ async def may_reference_connection(
     if conn.owner_email and conn.owner_email == actor_email:
         return True
 
-    # Label RBAC, the same allow/deny evaluation every labelled resource gets.
-    # Only consulted when the caller actually presented roles.
+    # Label RBAC, the same allow/deny evaluation every labelled resource gets —
+    # with two deliberate narrowings, because a VCS connection is not like the
+    # other labelled resources: reaching one grants read on every repository its
+    # credential can reach, so the usual conveniences are too blunt here.
     if actor_roles:
         from terrapod.services.rbac_service import check_access
 
-        if await check_access(db, actor_email, conn.name, conn.labels or {}, actor_roles):
+        labels = dict(conn.labels or {})
+
+        # 1. The `access: everyone` floor is NOT honoured. `check_access` seeds it
+        #    unconditionally, so a connection carrying that label — a habitual one —
+        #    would be nameable by every authenticated principal, which is a one-label
+        #    revert of this entire finding. Delegate a connection with a role's
+        #    `allow_labels` or with `owner_email`, both of which name someone.
+        labels.pop("access", None)
+
+        # 2. No name-based matching. `allow_names` is a flat namespace shared across
+        #    every resource type, so a role written as `allow_names: ["prod-net"]`
+        #    for a workspace would otherwise also authorise the CONNECTION called
+        #    `prod-net`. Passing an empty name leaves label matching as the only
+        #    path, which is the one an operator writing connection delegation means.
+        if labels and await check_access(db, actor_email, "", labels, actor_roles):
             return True
 
     # Kept from v1.8.2: already owns a workspace using it, so the grant is one they
@@ -118,23 +140,33 @@ async def may_reference_connection(
     return row is not None
 
 
-def _repo_forms(repo_url: str) -> list[str]:
-    """The spellings a pattern may legitimately be written against.
+def _repo_forms(conn: VCSConnection | None, repo_url: str) -> list[str] | None:
+    """The spellings a pattern may legitimately be written against, or None.
 
-    An operator writes `myorg/*`, not
-    `https://github.com/myorg/service.git`, so matching only the full URL would
-    make the feature unusable. Both are offered; a pattern matching either passes.
+    **Derived from the same parser the fetch uses**, not from a second URL parse.
+    That is the whole correctness argument here, and the first version of this
+    function got it wrong in a way that voided the allowlist entirely: it matched on
+    `urlparse(url).path`, which DROPS the query string and the fragment, while
+    `vcs_provider.parse_repo_url` splits on the first `://` anywhere in the string.
+    So `myorg/safe?x=a://host/evilorg/evil` matched the pattern `myorg/safe` and
+    cloned `evilorg/evil`. Two parsers disagreeing about what the repository is, is
+    the same failure as two matchers disagreeing about who receives a credential.
+
+    `None` means "this URL does not name a repository", which callers must treat as
+    refusal rather than as "no constraint".
     """
-    url = (repo_url or "").strip()
-    if not url:
-        return []
-    forms = [url]
-    path = urlparse(url).path if "://" in url else url.split(":", 1)[-1]
-    path = path.strip("/")
-    if path.endswith(".git"):
-        path = path[: -len(".git")]
-    if path:
-        forms.append(path)
+    parsed = parse_repo_url(conn, repo_url) if conn is not None else None
+    if not parsed:
+        return None
+    owner, repo = parsed
+    canonical = f"{owner}/{repo}"
+    forms = [canonical]
+    # Operators write `myorg/*`, so the canonical form is the one that matters. The
+    # raw URL is offered as well for a pattern written against a full address, but
+    # ONLY when it parsed — an unparseable URL has no forms at all.
+    raw = (repo_url or "").strip()
+    if raw and raw != canonical:
+        forms.append(raw)
     return forms
 
 
@@ -144,24 +176,47 @@ def repository_allowed(conn: VCSConnection | None, repo_url: str) -> bool:
     Empty list means any, which is what every existing deployment has after the
     migration — the allowlist is opt-in, so upgrading changes nothing until an
     operator narrows it.
+
+    A pattern containing no `/` is matched against the owner alone as well as the
+    `owner/repo` form, so `myorg` and `myorg/*` both mean what an operator expects.
+
+    **`fnmatch`'s `*` crosses `/`, and the canonical form is NOT always two
+    segments.** GitHub's parser returns exactly owner and repo, but GitLab's keeps
+    the nested group path — `https://gitlab.com/group/sub/proj` parses as
+    `('group/sub', 'proj')`, so the canonical form is `group/sub/proj`. On GitLab
+    that makes `group/*` match everything at any depth under `group`, which is what
+    an operator almost certainly wants from a group-wide pattern but is wider than
+    the pattern reads. Someone who means only the group's direct projects should
+    write the projects out, or a pattern per subgroup. Stated here rather than
+    silently relied on, because the earlier version of this function claimed the
+    opposite and was wrong.
     """
     if conn is None:
         return False
-    patterns = list(getattr(conn, "allowed_repositories", None) or [])
+    patterns = [
+        p.strip()
+        for p in (getattr(conn, "allowed_repositories", None) or [])
+        if isinstance(p, str) and p.strip()
+    ]
     if not patterns:
         return True
-    forms = _repo_forms(repo_url)
+
+    forms = _repo_forms(conn, repo_url)
     if not forms:
-        # A connection that is narrowed to specific repositories should not accept
-        # a blank target. Failing closed here costs nothing: the callers all have a
-        # URL by the time they ask.
+        # A narrowed connection must not accept a target nobody can resolve. The
+        # fetch would fail anyway, but failing here means it fails as "out of
+        # scope" rather than somewhere deeper as a parse error.
         return False
-    return any(
-        fnmatch.fnmatch(form, pattern)
-        for form in forms
-        for pattern in patterns
-        if isinstance(pattern, str) and pattern
-    )
+
+    owner = forms[0].split("/", 1)[0]
+    for pattern in patterns:
+        for form in forms:
+            if fnmatch.fnmatch(form, pattern):
+                return True
+        # `myorg` on its own means the whole owner.
+        if "/" not in pattern and fnmatch.fnmatch(owner, pattern):
+            return True
+    return False
 
 
 def refusal_detail(conn_id: uuid.UUID) -> str:
