@@ -30,11 +30,32 @@ def _user(email="u@test.com", roles=None):
     )
 
 
+def _no_rows():
+    """A result shaped like SQLAlchemy's, answering "nothing matched".
+
+    Needed because `provision_instance` is patched out in these tests while the
+    router still runs the GHSA-49q6-pm68-3xgw self-join check after it — and that
+    check asks real queries. A bare `AsyncMock` makes `.scalars().all()` a
+    coroutine, which fails in a way that names neither the check nor the mock.
+    """
+    r = MagicMock()
+    r.scalars.return_value.all.return_value = []
+    r.scalar_one_or_none.return_value = None
+    r.scalar_one.return_value = None
+    r.first.return_value = None
+    r.all.return_value = []
+    return r
+
+
 def _make_app(user, mock_db=None):
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: user
     if mock_db is None:
         mock_db = AsyncMock()
+        # Default to "no rows" rather than an AsyncMock's async children, so a
+        # router that asks an unrelated question gets a usable answer instead of a
+        # coroutine. Tests that script `execute` themselves override this.
+        mock_db.execute = AsyncMock(return_value=_no_rows())
     app.dependency_overrides[get_db] = lambda: mock_db
     return app, mock_db
 

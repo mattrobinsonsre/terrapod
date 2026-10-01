@@ -283,3 +283,49 @@ class TestTheSelectableSetCannotSilentlyGoStale:
         assert touches_rule_selectable(
             {}, {"vcs-connection": {"data": {"id": "vcs-x", "type": "vcs-connections"}}}
         )
+
+
+class TestEveryWayAWorkspaceComesIntoExistence:
+    """Three code paths construct a `Workspace` directly and so bypass the router
+    guard. Each needs a decision, and two of the three are fine — but only because
+    of who can reach them, which is a fact that can change.
+    """
+
+    def test_catalog_provision_is_gated(self):
+        """It takes CALLER-SUPPLIED labels and needs only catalog `use` plus pool
+        `write`, nowhere near platform admin. Without the check a non-admin could
+        label a provisioned workspace into another team's rule-assigned set and
+        receive its secrets in the run the provision queues — the reported
+        escalation through a different door.
+        """
+        import inspect
+
+        from terrapod.api.routers import catalog
+
+        src = inspect.getsource(catalog)
+        assert "refuse_varset_growth(" in src, (
+            "catalog provision accepts user-supplied labels and does not consult "
+            "the self-join guard, so it is an open path to the same escalation"
+        )
+
+    def test_the_two_admin_only_paths_are_recorded_as_such(self):
+        """Autodiscovery rule creation and deleted-workspace restore both construct
+        a Workspace directly and are NOT gated. That is correct because both are
+        `require_admin` — an admin chose those labels — but it is correct only for
+        that reason, so the reason is asserted rather than assumed. If either opens
+        up, this fails and the guard has to follow.
+        """
+        import inspect
+
+        from terrapod.api.routers import autodiscovery_rules, deleted_workspaces
+
+        for mod, fn in (
+            (autodiscovery_rules, "create_rule"),
+            (deleted_workspaces, "restore_deleted_workspace"),
+        ):
+            src = inspect.getsource(getattr(mod, fn))
+            assert "require_admin" in src, (
+                f"{mod.__name__}.{fn} is no longer admin-only, so the labels it "
+                "writes are no longer an admin's choice and it needs the "
+                "self-join guard that create and catalog provision have"
+            )
