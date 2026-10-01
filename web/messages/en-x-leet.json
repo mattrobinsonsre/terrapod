@@ -1064,7 +1064,8 @@
       "terragruntVersion": "73rr4grun7 v3r510n",
       "noExpiry": "N0 3xp1ry",
       "addDriftIgnoreRule": "4dd rul3",
-      "debugModeHint": "H0ld f41l3d runn3r p0d5 0p3n 0n 7h3 w0rk5p4c35 7h15 rul3 cr34735. 0ff by d3f4ul7 — 4 h3ld p0d k33p5 7h47 w0rk5p4c3'5 cr3d3n714l5."
+      "debugModeHint": "H0ld f41l3d runn3r p0d5 0p3n 0n 7h3 w0rk5p4c35 7h15 rul3 cr34735. 0ff by d3f4ul7 — 4 h3ld p0d k33p5 7h47 w0rk5p4c3'5 cr3d3n714l5.",
+      "allowForkPrPlansHint": "4ppl135 70 3v3ry w0rk5p4c3 7h15 rul3 cr34735. 0ff by d3f4ul7: 4 pull r3qu357 fr0m 4 f0rk g375 n0 5p3cul471v3 pl4n, b3c4u53 17 w0uld run 175 4u7h0r'5 c0d3 w17h 7h3 w0rk5p4c3'5 cr3d3n714l5."
     },
     "table": {
       "name": "N4m3",
@@ -2883,7 +2884,8 @@
       "uploadState": "F41l3d 70 upl04d 57473",
       "uploadStateFile": "F41l3d 70 upl04d 57473 f1l3",
       "updateSecurityScan": "F41l3d 70 upd473 53cur17y 5c4nn1ng",
-      "updateDebugMode": "F41l3d 70 upd473 d3bug m0d3"
+      "updateDebugMode": "F41l3d 70 upd473 d3bug m0d3",
+      "updateForkPlans": "F41l3d 70 upd473 f0rk pull r3qu357 pl4n5"
     },
     "subtabs": {
       "state": "57473",
@@ -2936,6 +2938,14 @@
       "bannerTitle": "D3bug m0d3 15 0n f0r 7h15 w0rk5p4c3",
       "bannerBody": "4 f41l3d run'5 p0d 15 h3ld 0p3n f0r 1n5p3c710n 1n5734d 0f 3x171ng, 4nd 17 k33p5 7h15 w0rk5p4c3'5 cr3d3n714l5 4nd d3cryp73d v4r14bl35 wh1l3 17 15 h3ld. 7urn d3bug m0d3 0ff wh3n y0u 4r3 f1n15h3d 7r0ubl35h0071ng.",
       "confirmEnable": "7urn 0n d3bug m0d3? 4 f41l3d run'5 p0d w1ll b3 h3ld 0p3n h0ld1ng 7h15 w0rk5p4c3'5 cr3d3n714l5 4nd d3cryp73d v4r14bl35 un71l 7h3 w1nd0w 3xp1r35 0r y0u d3l373 7h3 p0d."
+    },
+    "allowForkPrPlans": {
+      "title": "Pl4n5 0n f0rk pull r3qu3575",
+      "description": "Wh37h3r 4 pull r3qu357 0p3n3d fr0m 4 f0rk g375 4 5p3cul471v3 pl4n. 0ff by d3f4ul7, b3c4u53 7h47 pl4n run5 7h3 f0rk 4u7h0r'5 c0d3 w17h 7h15 w0rk5p4c3'5 cr3d3n714l5.",
+      "label": "Pl4n f0rk pull r3qu3575",
+      "hint": "4 run r3c31v35 7h15 w0rk5p4c3'5 3nv1r0nm3n7 v4r14bl35, 53n5171v3 v4lu35, 4ny V4ul7-r350lv3d 53cr375 4nd 7h3 j0b'5 cl0ud 1d3n717y. 50m30n3 0p3n1ng 4 pull r3qu357 fr0m 4 f0rk h45 n0 wr173 4cc355 4nd c4nn07 m3rg3, 50 4 5p3cul471v3 pl4n 15 7h3 0nly w4y 7h31r c0d3 r34ch35 7h053 cr3d3n714l5. 7urn 7h15 0n f0r 4 w0rk5p4c3 7h47 h0ld5 n07h1ng w0r7h 74k1ng — 4 publ1c m0dul3 r3p05170ry 4cc3p71ng c0mmun17y c0n7r1bu710n5, 54y. Pull r3qu3575 fr0m br4nch35 1n 7h3 r3p05170ry 1753lf 4r3 un4ff3c73d 4nd 4lw4y5 pl4n.",
+      "activeBadge": "0n",
+      "confirmEnable": "Pl4n pull r3qu3575 0p3n3d fr0m f0rk5? 7h31r 4u7h0r5' c0d3 w1ll run w17h 7h15 w0rk5p4c3'5 cr3d3n714l5 4nd d3cryp73d v4r14bl35, w17h0u7 4ny0n3 4ppr0v1ng 17 f1r57."
     }
   },
   "graphs": {

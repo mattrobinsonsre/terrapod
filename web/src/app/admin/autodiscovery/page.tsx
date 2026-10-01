@@ -63,6 +63,7 @@ interface AutodiscoveryRule {
     'plan-expiry-seconds'?: number | null
     'slack-channel'?: string
     'debug-mode'?: boolean
+    'allow-fork-pr-plans'?: boolean
     'run-task-templates': RunTaskSpec[]
     'notification-templates': NotificationSpec[]
     'created-at': string
@@ -146,6 +147,7 @@ export default function AutodiscoveryPage() {
   // Runner debug mode (#1764). Off by default here as on a workspace: a rule
   // can materialise hundreds of workspaces, and a held pod keeps credentials.
   const [ruleDebugMode, setRuleDebugMode] = useState(false)
+  const [ruleAllowForkPrPlans, setRuleAllowForkPrPlans] = useState(false)
   const [runTaskTemplates, setRunTaskTemplates] = useState<RunTaskSpec[]>([])
   const [notificationTemplates, setNotificationTemplates] = useState<NotificationSpec[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -301,6 +303,7 @@ export default function AutodiscoveryPage() {
     setPlanExpiry(a['plan-expiry-seconds'] ? String(a['plan-expiry-seconds']) : '')
     setRuleSlackChannel(a['slack-channel'] || '')
     setRuleDebugMode(a['debug-mode'] ?? false)
+    setRuleAllowForkPrPlans(a['allow-fork-pr-plans'] ?? false)
     setRunTaskTemplates(a['run-task-templates'] || [])
     setNotificationTemplates(a['notification-templates'] || [])
     setShowForm(true)
@@ -355,6 +358,7 @@ export default function AutodiscoveryPage() {
       'plan-expiry-seconds': planExpiry.trim() ? Number(planExpiry) : null,
       'slack-channel': ruleSlackChannel.trim(),
       'debug-mode': ruleDebugMode,
+      'allow-fork-pr-plans': ruleAllowForkPrPlans,
       'run-task-templates': runTaskTemplates,
       'notification-templates': notificationTemplates,
     }
@@ -881,6 +885,29 @@ export default function AutodiscoveryPage() {
                       </span>
                     </label>
                     <p className="text-xs text-slate-500 mt-1">{t('form.debugModeHint')}</p>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="ad-allow-fork-pr-plans"
+                      className="block text-xs text-slate-500 mb-1"
+                    >
+                      {tWs('allowForkPrPlans.label')}
+                    </label>
+                    <label className="flex items-center gap-2 mt-2">
+                      <input
+                        id="ad-allow-fork-pr-plans"
+                        type="checkbox"
+                        checked={ruleAllowForkPrPlans}
+                        onChange={(e) => setRuleAllowForkPrPlans(e.target.checked)}
+                        className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
+                      />
+                      <span className="text-sm text-slate-200">
+                        {ruleAllowForkPrPlans ? tWs('common.enabled') : tWs('common.disabled')}
+                      </span>
+                    </label>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {t('form.allowForkPrPlansHint')}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-3">

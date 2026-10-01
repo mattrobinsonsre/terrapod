@@ -550,3 +550,60 @@ test.describe('AI policy gate (#1766)', () => {
     await expect(page.locator('text=Waiting for the AI policy verdict')).toHaveCount(0);
   });
 });
+
+test.describe('Fork pull request plans (GHSA-gp5w-76rw-c452)', () => {
+  test('a new workspace defaults to off and the toggle round-trips', async ({ page }) => {
+    // Defaulting off is the whole point, so the default is asserted first:
+    // a control that merely persists whatever it is set to would pass every
+    // other assertion here while leaving fork pull requests planning.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('forkplans'));
+
+    await page.goto(`/workspaces/${wsId}`);
+
+    const toggle = page.getByLabel('Plan fork pull requests', { exact: true });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+    await expect(toggle).not.toBeChecked();
+    await expect(page.getByTestId('allow-fork-pr-plans-indicator')).toHaveCount(0);
+
+    // `.click()`, never `.check()` — the input is controlled by the fetched
+    // workspace, so it flips only once the PATCH resolves.
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
+    await expect(page.getByTestId('allow-fork-pr-plans-indicator')).toBeVisible();
+
+    await expect(async () => {
+      await page.reload();
+      await expect(page.getByLabel('Plan fork pull requests', { exact: true })).toBeChecked();
+    }).toPass({ timeout: 20_000 });
+
+    const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status()).toBe(200);
+    expect((await res.json()).data.attributes['allow-fork-pr-plans']).toBe(true);
+  });
+
+  test('turning it back off persists', async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('forkoff'));
+
+    await page.goto(`/workspaces/${wsId}`);
+    const toggle = page.getByLabel('Plan fork pull requests', { exact: true });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
+    await toggle.click();
+    await expect(toggle).not.toBeChecked({ timeout: 15_000 });
+
+    // The off direction is the one a naive `if value` guard drops, leaving the
+    // operator looking at an unchecked box over a workspace that still plans.
+    await expect(async () => {
+      const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect((await res.json()).data.attributes['allow-fork-pr-plans']).toBe(false);
+    }).toPass({ timeout: 20_000 });
+  });
+});

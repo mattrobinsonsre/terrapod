@@ -1064,7 +1064,8 @@
       "terragruntVersion": "Terragrunt-versio",
       "noExpiry": "Ei vanhenemista",
       "addDriftIgnoreRule": "Lisää sääntö",
-      "debugModeHint": "Pidä epäonnistuneiden suorittajien podit auki työtiloissa, jotka tämä sääntö luo. Oletuksena pois päältä – auki pidetty podi säilyttää kyseisen työtilan tunnukset."
+      "debugModeHint": "Pidä epäonnistuneiden suorittajien podit auki työtiloissa, jotka tämä sääntö luo. Oletuksena pois päältä – auki pidetty podi säilyttää kyseisen työtilan tunnukset.",
+      "allowForkPrPlansHint": "Koskee jokaista työtilaa, jonka tämä sääntö luo. Oletuksena pois päältä: forkista avattu pull request ei saa spekulatiivista suunnitelmaa, koska se ajaisi tekijänsä koodin työtilan tunnuksilla."
     },
     "table": {
       "name": "Nimi",
@@ -2883,7 +2884,8 @@
       "uploadState": "Tilan lataaminen epäonnistui",
       "uploadStateFile": "Tilatiedoston lataaminen epäonnistui",
       "updateSecurityScan": "Tietoturvatarkistuksen päivitys epäonnistui",
-      "updateDebugMode": "Virheenkorjaustilan päivitys epäonnistui"
+      "updateDebugMode": "Virheenkorjaustilan päivitys epäonnistui",
+      "updateForkPlans": "Forkien pull requestien suunnitelmien päivitys epäonnistui"
     },
     "subtabs": {
       "state": "Tila",
@@ -2936,6 +2938,14 @@
       "bannerTitle": "Virheenkorjaustila on päällä tässä työtilassa",
       "bannerBody": "Epäonnistuneen ajon podi pidetään auki tarkastelua varten sen sijaan, että se päättyisi, ja se säilyttää koko sen ajan tämän työtilan tunnukset ja puretut muuttujat. Kytke virheenkorjaustila pois, kun olet saanut selvityksen valmiiksi.",
       "confirmEnable": "Otetaanko virheenkorjaustila käyttöön? Epäonnistuneen ajon podi pidetään auki tämän työtilan tunnusten ja purettujen muuttujien kanssa, kunnes ikkuna umpeutuu tai poistat podin."
+    },
+    "allowForkPrPlans": {
+      "title": "Suunnitelmat forkista avatuille pull requesteille",
+      "description": "Saako forkista avattu pull request spekulatiivisen suunnitelman. Oletuksena pois päältä, koska tuo suunnitelma ajaa forkin tekijän koodin tämän työtilan tunnuksilla.",
+      "label": "Suunnittele forkista avatut pull requestit",
+      "hint": "Ajo saa tämän työtilan ympäristömuuttujat, arkaluonteiset arvot, kaikki Vaultista haetut salaisuudet ja työn pilvi-identiteetin. Forkista pull requestin avaavalla ei ole kirjoitusoikeutta eikä hän voi yhdistää, joten spekulatiivinen suunnitelma on ainoa reitti, jota pitkin hänen koodinsa pääsee noihin tunnuksiin. Ota tämä käyttöön työtilassa, jossa ei ole mitään viemisen arvoista — vaikkapa julkisessa moduulirepositoriossa, joka ottaa vastaan yhteisön kontribuutioita. Repositorion omista haaroista avatut pull requestit eivät muutu, ja ne suunnitellaan aina.",
+      "activeBadge": "Päällä",
+      "confirmEnable": "Suunnitellaanko forkeista avatut pull requestit? Niiden tekijöiden koodi ajetaan tämän työtilan tunnuksilla ja puretuilla muuttujilla, ilman että kukaan hyväksyy sitä ensin."
     }
   },
   "graphs": {

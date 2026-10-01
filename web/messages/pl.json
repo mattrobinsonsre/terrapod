@@ -1064,7 +1064,8 @@
       "terragruntVersion": "Wersja Terragrunt",
       "noExpiry": "Bez wygaśnięcia",
       "addDriftIgnoreRule": "Dodaj regułę",
-      "debugModeHint": "Utrzymuj pody nieudanych runnerów otwarte w przestrzeniach roboczych tworzonych przez tę regułę. Domyślnie wyłączone — utrzymywany pod przechowuje poświadczenia tej przestrzeni roboczej."
+      "debugModeHint": "Utrzymuj pody nieudanych runnerów otwarte w przestrzeniach roboczych tworzonych przez tę regułę. Domyślnie wyłączone — utrzymywany pod przechowuje poświadczenia tej przestrzeni roboczej.",
+      "allowForkPrPlansHint": "Dotyczy każdej przestrzeni roboczej tworzonej przez tę regułę. Domyślnie wyłączone: pull request z forka nie otrzymuje planu spekulatywnego, ponieważ uruchomiłby kod swojego autora z poświadczeniami przestrzeni roboczej."
     },
     "table": {
       "name": "Nazwa",
@@ -2883,7 +2884,8 @@
       "uploadState": "Nie udało się przesłać stanu",
       "uploadStateFile": "Nie udało się przesłać pliku stanu",
       "updateSecurityScan": "Nie udało się zaktualizować skanowania bezpieczeństwa",
-      "updateDebugMode": "Nie udało się zaktualizować trybu debugowania"
+      "updateDebugMode": "Nie udało się zaktualizować trybu debugowania",
+      "updateForkPlans": "Nie udało się zaktualizować planów dla pull requestów z forków"
     },
     "subtabs": {
       "state": "Stan",
@@ -2936,6 +2938,14 @@
       "bannerTitle": "Tryb debugowania jest włączony dla tej przestrzeni roboczej",
       "bannerBody": "Pod nieudanego uruchomienia jest utrzymywany otwarty do inspekcji zamiast się kończyć i przez ten czas przechowuje poświadczenia oraz odszyfrowane zmienne tej przestrzeni roboczej. Wyłącz tryb debugowania, gdy skończysz diagnozowanie.",
       "confirmEnable": "Włączyć tryb debugowania? Pod nieudanego uruchomienia będzie utrzymywany otwarty wraz z poświadczeniami i odszyfrowanymi zmiennymi tej przestrzeni roboczej, dopóki okno nie wygaśnie lub nie usuniesz poda."
+    },
+    "allowForkPrPlans": {
+      "title": "Plany dla pull requestów z forków",
+      "description": "Czy pull request otwarty z forka otrzymuje plan spekulatywny. Domyślnie wyłączone, ponieważ taki plan uruchamia kod autora forka z poświadczeniami tej przestrzeni roboczej.",
+      "label": "Planuj pull requesty z forków",
+      "hint": "Uruchomienie otrzymuje zmienne środowiskowe tej przestrzeni roboczej, wartości wrażliwe, wszystkie sekrety pobrane przez Vault oraz tożsamość chmurową zadania. Kto otwiera pull request z forka, nie ma uprawnień do zapisu i nie może scalić zmian, więc plan spekulatywny to jedyna droga, którą jego kod dociera do tych poświadczeń. Włącz to dla przestrzeni roboczej, w której nie ma nic wartego zabrania — na przykład dla publicznego repozytorium modułów przyjmującego wkład społeczności. Pull requesty z gałęzi samego repozytorium nie są tym objęte i zawsze otrzymują plan.",
+      "activeBadge": "Wł.",
+      "confirmEnable": "Planować pull requesty otwarte z forków? Kod ich autorów zostanie uruchomiony z poświadczeniami i odszyfrowanymi zmiennymi tej przestrzeni roboczej, bez niczyjego wcześniejszego zatwierdzenia."
     }
   },
   "graphs": {

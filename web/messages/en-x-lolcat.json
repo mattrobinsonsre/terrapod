@@ -1064,7 +1064,8 @@
       "terragruntVersion": "Terragrunt vershun",
       "noExpiry": "No expiry. srsly.",
       "addDriftIgnoreRule": "Add rule",
-      "debugModeHint": "Hold faild runnr podz open on da werkspaces dis rule makez. Off by defalt — a held pod keepz dat werkspace credenshulz."
+      "debugModeHint": "Hold faild runnr podz open on da werkspaces dis rule makez. Off by defalt — a held pod keepz dat werkspace credenshulz.",
+      "allowForkPrPlansHint": "Applyz ta evry werkspace dis rule makez. Off by defalt: a pull rekwest from a fork getz no speculativ plan, coz it wud run itz authrs code wif da werkspace credenshulz."
     },
     "table": {
       "name": "Naym",
@@ -2883,7 +2884,8 @@
       "uploadState": "Failz ta uplod teh state",
       "uploadStateFile": "Failz ta uplod teh state file",
       "updateSecurityScan": "Faild 2 updayt sekurity scannin",
-      "updateDebugMode": "Failz ta updat teh debug mode"
+      "updateDebugMode": "Failz ta updat teh debug mode",
+      "updateForkPlans": "Failz ta updat da fork pull rekwest planz"
     },
     "subtabs": {
       "state": "Stayt",
@@ -2936,6 +2938,14 @@
       "bannerTitle": "Debug mode iz ON fer dis werkspace",
       "bannerBody": "A faild runz pod getz held open fer snoopin insted ov exitin, an it keepz dis werkspace credenshulz an dekrypted variablez wile its held. Turn debug mode off wen u iz dun troubleshootin.",
       "confirmEnable": "Turn on debug mode? A faild runz pod will b held open wif dis werkspace credenshulz an dekrypted variablez til da windo runz out or u delet da pod."
+    },
+    "allowForkPrPlans": {
+      "title": "Planz on Fork Pull Rekwestz",
+      "description": "Wethr a pull rekwest opend from a fork getz a speculativ plan. Off by defalt, coz dat plan runz da fork authrs code wif dis werkspace credenshulz.",
+      "label": "Plan Fork Pull Rekwestz",
+      "hint": "A run getz dis werkspace environmint variablez, sensitiv valuez, any Vault-resolvd secretz an da jobz cloud identitee. Sumwun openin a pull rekwest from a fork haz no rite access an can not merge, so a speculativ plan iz da only way der code reechez doze credenshulz. Turn dis on fer a werkspace dat holdz nuffin wurth takin — a publik module repozitory acceptin communitee contribushunz, sez I. Pull rekwestz from branchez in da repozitory itself iz unaffectd an alwayz plan.",
+      "activeBadge": "Awn",
+      "confirmEnable": "Plan pull rekwestz opend from forkz? Der authorz code wil run wif dis werkspace credenshulz an dekrypted variablez, wifout anywun approovin it furst."
     }
   },
   "graphs": {

@@ -1064,7 +1064,8 @@
       "terragruntVersion": "Terragrunt mI'",
       "noExpiry": "van Hutlh",
       "addDriftIgnoreRule": "chu'wI' chel",
-      "debugModeHint": "Qumwo'mey chenmoHbogh chu'wI'vam, pa' poSqu'moH vumwI' pod lujpu'bogh. motlh chu'Ha'lu' — pod pollu'bogh Qumwo'vetlh pegh pol."
+      "debugModeHint": "Qumwo'mey chenmoHbogh chu'wI'vam, pa' poSqu'moH vumwI' pod lujpu'bogh. motlh chu'Ha'lu' — pod pollu'bogh Qumwo'vetlh pegh pol.",
+      "allowForkPrPlansHint": "Qumwo'mey chenmoHbogh chu'wI'vam Hoch chel. motlh chu'Ha'lu': fork-vo' PR Hech nab Hevbe', qaStaHvIS Qumwo' pegh lo'taHvIS qonwI'Daj ngoq vumqu'."
     },
     "table": {
       "name": "pong",
@@ -2883,7 +2884,8 @@
       "uploadState": "Dotlh lI'meH lujpu'",
       "uploadStateFile": "Dotlh teywI' lI'meH lujpu'",
       "updateSecurityScan": "Hujqu'ghach Sup choqlaHbe'",
-      "updateDebugMode": "Qagh Sam mIw choHmeH lujpu'"
+      "updateDebugMode": "Qagh Sam mIw choHmeH lujpu'",
+      "updateForkPlans": "fork PR nabmey choHmeH lujpu'"
     },
     "subtabs": {
       "state": "Sep",
@@ -2936,6 +2938,14 @@
       "bannerTitle": "Qumwo'vamvaD chu'lu'pu' Qagh Sam mIw",
       "bannerBody": "mevbe'; nuDmeH poSqu'taH Sar lujpu'bogh pod, 'ej pollu'taHvIS Qumwo'vam pegh je choHlaHmey pol. Qagh DaSampu'DI', Qagh Sam mIw yIchu'Ha'.",
       "confirmEnable": "Qagh Sam mIw Dachu' 'e' DaneH'a'? Qumwo'vam pegh je choHlaHmey qengtaHvIS poSqu'taH Sar lujpu'bogh pod, poH mevDI' pagh pod DaQaw'DI'."
+    },
+    "allowForkPrPlans": {
+      "title": "fork PRmey nabmey",
+      "description": "fork-vo' poSmoHlu'bogh PR Hech nab Hev'a'. motlh chu'Ha'lu', qaStaHvIS nabvam fork qonwI' ngoq vumqu' 'ej Qumwo'vam pegh lo'.",
+      "label": "fork PRmey yInab",
+      "hint": "Qumwo'vam choHlaHmey, pegh De'mey, Vault-vo' Sambogh peghmey, je Qu' 'eng pong Hev Sar. fork-vo' PR poSmoHbogh ghot ghItlh chaw' ghajbe' 'ej merge laHbe'; vaj Hech nab neH 'oH He'e' ngoqDaj pegh ghoSmeH. pagh ngaSbogh Qumwo'vaD wa' yIchu' — ghom boQ Hevbogh qawHaq pegh Hutlhbogh. qawHaq paQmeyvo' poSmoHlu'bogh PRmey choHbe'lu', 'ej reH nab Hevlu'.",
+      "activeBadge": "chu'lu'",
+      "confirmEnable": "fork-vo' poSmoHlu'bogh PRmey DanabmoH'a'? pagh chaw'DI' vay', Qumwo'vam pegh je choHlaHmey lo'taHvIS qonwI'chaj ngoq qaS."
     }
   },
   "graphs": {
