@@ -13,6 +13,7 @@ import json
 
 import pytest
 
+from terrapod.services import agent_pool_service
 from tests.integration.conftest import AUTH, admin_user, set_auth, set_listener_auth
 
 pytestmark = pytest.mark.integration
@@ -352,6 +353,66 @@ class TestListenerJoinFlow:
         assert "private_key" in result
         assert "ca_certificate" in result
         assert result["certificate"].startswith("-----BEGIN CERTIFICATE-----")
+
+    async def test_a_re_join_into_the_same_pool_still_refreshes_the_certificate(self, app, client):
+        """The legitimate case, and the reason the re-join path exists at all:
+        a listener restarting keeps its id and gets a fresh certificate."""
+        set_auth(app, admin_user())
+        pool_id = await _create_pool(client, name="rejoin-same-pool")
+        raw_token = await _create_pool_token(client, pool_id)
+
+        first = await _join_listener(client, pool_id, raw_token, name="steady-listener")
+        again = await _join_listener(client, pool_id, raw_token, name="steady-listener")
+
+        assert again["listener_id"] == first["listener_id"], "the identity was not kept"
+        assert again["certificate"] != first["certificate"], "no fresh certificate"
+
+    async def test_a_re_join_from_another_pool_is_refused(self, app, client):
+        """Listener names share one global namespace, so a join token for pool B
+        could re-join under a name held in pool A — and the re-join branch
+        rewrote that record's `pool_id`. The victim's listener, still
+        heartbeating under the same id, would then claim pool B's runs and
+        execute them on the victim's cluster with the victim's credentials.
+        Certificate auth cannot catch it: it reads `pool_id` from the Redis hash
+        rather than from the certificate's own pool SAN."""
+        set_auth(app, admin_user())
+        victim_pool = await _create_pool(client, name="victim-pool")
+        attacker_pool = await _create_pool(client, name="attacker-pool")
+        victim_token = await _create_pool_token(client, victim_pool)
+        attacker_token = await _create_pool_token(client, attacker_pool)
+
+        joined = await _join_listener(client, victim_pool, victim_token, name="shared-name")
+
+        resp = await client.post(
+            f"/api/terrapod/v1/agent-pools/{attacker_pool}/listeners/join",
+            json={"join_token": attacker_token, "name": "shared-name"},
+        )
+        assert resp.status_code == 409, resp.text
+        assert "different agent pool" in resp.json()["detail"]
+
+        # And the victim's record is untouched — not merely un-moved, but still
+        # carrying the same id, so its certificate keeps working.
+        listener = await agent_pool_service.get_listener_by_name("shared-name")
+        assert listener is not None
+        assert listener["id"] == joined["listener_id"]
+        assert listener["pool_id"] == victim_pool.removeprefix("apool-")
+
+    async def test_the_refusal_covers_the_pool_less_join_endpoint_too(self, app, client):
+        """`POST /agent-pools/join` resolves the pool from the token, so it is a
+        second door to the same code. Both map the refusal to 409."""
+        set_auth(app, admin_user())
+        victim_pool = await _create_pool(client, name="victim-pool-2")
+        attacker_pool = await _create_pool(client, name="attacker-pool-2")
+        victim_token = await _create_pool_token(client, victim_pool)
+        attacker_token = await _create_pool_token(client, attacker_pool)
+
+        await _join_listener(client, victim_pool, victim_token, name="shared-name-2")
+
+        resp = await client.post(
+            "/api/terrapod/v1/agent-pools/join",
+            json={"join_token": attacker_token, "name": "shared-name-2"},
+        )
+        assert resp.status_code == 409, resp.text
 
 
 class TestClaimRun:

@@ -286,6 +286,31 @@ async def is_fingerprint_valid(
     return False
 
 
+class ListenerNameInUse(Exception):
+    """A listener name is already registered to a DIFFERENT pool.
+
+    Listener names live in one global namespace (`tp:listener_name:{name}`),
+    while the re-join path exists so a restarting listener keeps its identity.
+    Together those let a join token for pool A re-join under a name already held
+    in pool B — and the re-join branch rewrites that record's `pool_id`.
+
+    The effect is the inverse of a name squat: the VICTIM'S listener, which goes
+    on heartbeating under the same id, is now registered to the attacker's pool,
+    so it claims and executes that pool's runs on the victim's cluster with the
+    victim's credentials. Certificate auth does not contain it, because it reads
+    `pool_id` from the Redis hash rather than from the certificate's own pool
+    SAN — the hash is the mutable half.
+
+    Refusing the second joiner trades a silent cross-pool redirect for a loud
+    collision an operator can see and resolve (rename the listener, or remove
+    the record that holds the name). That is a worse outcome than today's for
+    the colliding listener and a far better one for the pool it would have been
+    moved into, which is the trade worth making: a name collision between pools
+    has no legitimate meaning, and both parties must already hold a valid join
+    token to reach it at all.
+    """
+
+
 async def join_listener(
     pool: AgentPool,
     token: AgentPoolToken,
@@ -315,6 +340,22 @@ async def join_listener(
     # Check if listener already exists (re-join after restart)
     existing_id = await redis.get(f"{_LISTENER_NAME_PREFIX}{name}")
     if existing_id:
+        # A re-join may refresh a listener's certificate; it may NOT move the
+        # record into a different pool. See ListenerNameInUse.
+        existing_pool = await redis.hget(f"{_LISTENER_PREFIX}{existing_id}", "pool_id")
+        if existing_pool and existing_pool != str(pool.id):
+            logger.warning(
+                "refusing a listener re-join that would move it between pools",
+                listener=name,
+                from_pool=existing_pool,
+                to_pool=str(pool.id),
+            )
+            raise ListenerNameInUse(
+                f"A listener named {name!r} is already registered to a different "
+                "agent pool. A listener cannot change pools by re-joining under "
+                "the same name. Give this listener a distinct name, or remove the "
+                "existing registration from the pool that holds it."
+            )
         listener_id = existing_id
         # Update existing hash with fresh cert
         await redis.hset(
