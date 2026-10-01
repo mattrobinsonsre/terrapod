@@ -250,6 +250,7 @@
   "api.config.vcs.module_poll_interval_seconds",
   "api.config.vcs.poll_interval_seconds",
   "api.config.vcs.require_connection_authorization",
+  "api.config.vcs.require_push_permission_for_commands",
   "api.containerSecurityContext.allowPrivilegeEscalation",
   "api.containerSecurityContext.capabilities.drop",
   "api.containerSecurityContext.readOnlyRootFilesystem",

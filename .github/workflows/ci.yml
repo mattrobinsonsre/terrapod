@@ -922,6 +922,33 @@ jobs:
             && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
           echo "the GitLab git-credential switch renders off on every profile and is ConfigMap-only"
 
+      - name: The comment-command push gate reaches the pod and stays on by default
+        run: |
+          # Config-channel contract for the PR-comment authorization gate. The
+          # switch decides whether `terrapod apply` from a pull-request comment
+          # requires the author to have push access, so a render line that goes
+          # missing is not cosmetic: an operator who turns it off still gets it
+          # on, or -- the direction that matters -- a chart that stops rendering
+          # it silently falls back to the code default and nobody finds out
+          # which way round it was.
+          out=$(helm template ./helm/terrapod -f helm/terrapod/values.yaml)
+          echo "$out" | grep -q 'require_push_permission_for_commands:' \
+            || { echo "require_push_permission_for_commands is not rendered into the ConfigMap"; exit 1; }
+          # Default ON: commenting is not authorization.
+          echo "$out" | grep -q 'require_push_permission_for_commands: true' \
+            || { echo "the push gate must default to true"; exit 1; }
+          # And turning it OFF must actually reach the pod. This is the half a
+          # `| default true` or a `with` block silently breaks, because Go
+          # templates treat false as empty -- the operator asks for off and the
+          # chart renders on.
+          off=$(helm template ./helm/terrapod --set api.config.vcs.require_push_permission_for_commands=false)
+          echo "$off" | grep -q 'require_push_permission_for_commands: false' \
+            || { echo "setting it false does not reach the ConfigMap"; exit 1; }
+          # It is policy, not a credential -- ConfigMap only (house rule).
+          echo "$out" | grep -q 'TERRAPOD_VCS__REQUIRE_PUSH_PERMISSION' \
+            && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
+          echo "the comment-command push gate renders, defaults on, and honours false"
+
       - name: The Vault value source reaches the pod, and its credential never does
         run: |
           # Two halves of the config-channel contract for #1439.

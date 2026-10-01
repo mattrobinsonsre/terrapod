@@ -646,3 +646,128 @@ class TestAMintedTokenIsNoWiderThanItsPurpose:
         assert await get_installation_token(conn) == "ghs_clone"
         assert await _api_call_token(conn) == "ghs_api"
         assert mock_request.call_count == 2
+
+
+# ── actor_has_push_access ────────────────────────────────────────────
+
+
+class TestActorHasPushAccess:
+    """Who may drive a `terrapod ...` comment command.
+
+    Three-valued on purpose: True, False, and None for "could not establish".
+    The dispatcher refuses on None, so conflating it with False would be
+    harmless and conflating it with True would hand the gate to anyone who can
+    make the GitHub API fail.
+    """
+
+    @staticmethod
+    def _resp(status, body=None):
+        r = MagicMock()
+        r.status_code = status
+        r.json = MagicMock(return_value=body if body is not None else {})
+        return r
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._api_call_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_push_true_is_a_yes(self, req, token):
+        from terrapod.services.github_service import actor_has_push_access
+
+        token.return_value = "t"
+        req.return_value = self._resp(
+            200, {"permission": "write", "user": {"permissions": {"pull": True, "push": True}}}
+        )
+        assert await actor_has_push_access(_mock_conn(), "org", "repo", "octocat") is True
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._api_call_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_read_only_is_a_no(self, req, token):
+        from terrapod.services.github_service import actor_has_push_access
+
+        token.return_value = "t"
+        req.return_value = self._resp(
+            200, {"permission": "read", "user": {"permissions": {"pull": True, "push": False}}}
+        )
+        assert await actor_has_push_access(_mock_conn(), "org", "repo", "octocat") is False
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._api_call_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_a_maintainer_can_push(self, req, token):
+        """Read off the flat string, which the boolean block is absent for on
+        some responses. `maintain` is not in the three-value vocabulary that
+        field was documented with, so matching `admin`/`write` alone would lock
+        a maintainer out of their own repository."""
+        from terrapod.services.github_service import actor_has_push_access
+
+        token.return_value = "t"
+        req.return_value = self._resp(200, {"permission": "maintain"})
+        assert await actor_has_push_access(_mock_conn(), "org", "repo", "octocat") is True
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._api_call_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_not_a_collaborator_is_a_definitive_no(self, req, token):
+        """404 is the answer, not an error: GitHub says it both for a
+        non-collaborator and for a repository the installation cannot see, and
+        neither is someone who may apply infrastructure from a comment."""
+        from terrapod.services.github_service import actor_has_push_access
+
+        token.return_value = "t"
+        req.return_value = self._resp(404)
+        assert await actor_has_push_access(_mock_conn(), "org", "repo", "stranger") is False
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._api_call_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_a_rate_limit_is_not_an_answer(self, req, token):
+        from terrapod.services.github_service import actor_has_push_access
+
+        token.return_value = "t"
+        req.return_value = self._resp(403)
+        assert await actor_has_push_access(_mock_conn(), "org", "repo", "octocat") is None
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._api_call_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_a_transport_error_is_not_an_answer(self, req, token):
+        from terrapod.services.github_service import actor_has_push_access
+
+        token.return_value = "t"
+        req.side_effect = RuntimeError("connection reset")
+        assert await actor_has_push_access(_mock_conn(), "org", "repo", "octocat") is None
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._api_call_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_an_unrecognised_body_is_not_an_answer(self, req, token):
+        from terrapod.services.github_service import actor_has_push_access
+
+        token.return_value = "t"
+        req.return_value = self._resp(200, {"unexpected": "shape"})
+        assert await actor_has_push_access(_mock_conn(), "org", "repo", "octocat") is None
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._api_call_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_an_empty_login_needs_no_call(self, req, token):
+        from terrapod.services.github_service import actor_has_push_access
+
+        token.return_value = "t"
+        assert await actor_has_push_access(_mock_conn(), "org", "repo", "") is False
+        req.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._api_call_token")
+    @patch("terrapod.services.github_service._github_request")
+    async def test_a_login_with_a_slash_cannot_escape_the_path(self, req, token):
+        """The login comes off a comment payload. Unescaped, `a/../../x` would
+        address a different endpoint entirely."""
+        from terrapod.services.github_service import actor_has_push_access
+
+        token.return_value = "t"
+        req.return_value = self._resp(404)
+        await actor_has_push_access(_mock_conn(), "org", "repo", "a/../../x")
+        url = req.call_args.args[1]
+        assert "/collaborators/a%2F..%2F..%2Fx/permission" in url

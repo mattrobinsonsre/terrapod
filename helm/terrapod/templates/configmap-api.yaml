@@ -405,6 +405,15 @@ data:
       enabled: {{ .Values.api.config.vcs.enabled }}
       poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 }}
       module_poll_interval_seconds: {{ .Values.api.config.vcs.module_poll_interval_seconds | default 300 }}
+      poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 | int64 }}
+      module_poll_interval_seconds: {{ .Values.api.config.vcs.module_poll_interval_seconds | default 300 | int64 }}
+      {{/* hasKey, not `with` and not `| default true`: the code default is
+           TRUE, and both of those treat `false` as absent -- so an operator
+           who turned the gate off would have it rendered back on, which is
+           the opposite of what they asked for and silent. */}}
+      {{- if hasKey .Values.api.config.vcs "require_push_permission_for_commands" }}
+      require_push_permission_for_commands: {{ .Values.api.config.vcs.require_push_permission_for_commands }}
+      {{- end }}
       # tmpdir tracks the ephemeralStorage mountPath so the VCS poller writes
       # streamed tarballs onto the PVC, not pod memory. Override
       # api.config.vcs.tmpdir if you remount the PVC elsewhere.

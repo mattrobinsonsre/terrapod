@@ -1269,3 +1269,73 @@ def parse_repo_url(repo_url: str) -> tuple[str, str] | None:
                 return remaining[0], remaining[1]
 
     return None
+
+
+async def actor_has_push_access(
+    conn: VCSConnection, owner: str, repo: str, login: str
+) -> bool | None:
+    """Whether `login` may push to `owner/repo`.
+
+    True when they can, False when they definitively cannot, and **None when
+    we could not establish it** — a transport error, a rate limit, a response
+    shape we do not recognise. The caller decides what to do with None; the
+    command dispatcher refuses, because an authorization check that cannot
+    answer must not be read as a yes.
+
+    `GET /repos/{o}/{r}/collaborators/{u}/permission` answers for the
+    effective permission, so an organisation member who gets write through a
+    team is covered without enumerating teams. It needs no permission beyond
+    the `metadata: read` every installation grants, which matters: this runs
+    on every comment command, and an App that could not call it would turn a
+    new authorization check into a total outage of the comment surface.
+
+    A 404 is a definitive no, not an error. GitHub answers 404 both for a user
+    who is not a collaborator and for a repository the installation cannot
+    see; neither is a person who may push to a repository Terrapod runs
+    applies against.
+    """
+    if not login:
+        return False
+    try:
+        token = await _api_call_token(conn)
+        resp = await _github_request(
+            "GET",
+            f"{_api_url(conn)}/repos/{url_quote(owner, safe='')}/{url_quote(repo, safe='')}"
+            f"/collaborators/{url_quote(login, safe='')}/permission",
+            token,
+            conn=conn,
+        )
+    except Exception as e:
+        logger.warning(
+            "could not establish push access",
+            repo=f"{owner}/{repo}",
+            login=login,
+            error=repr(e),
+        )
+        return None
+    if resp.status_code == 404:
+        return False
+    if resp.status_code != 200:
+        logger.warning(
+            "could not establish push access",
+            repo=f"{owner}/{repo}",
+            login=login,
+            status=resp.status_code,
+        )
+        return None
+    try:
+        body = resp.json()
+    except Exception:
+        return None
+    # `user.permissions.push` is the authoritative boolean. The flat
+    # `permission` string is read only as a fallback, and `maintain` is in the
+    # list on purpose: it carries push and is absent from the three-value
+    # vocabulary (`admin`/`write`/`read`) the string field was documented with,
+    # so matching on the string alone would lock out a maintainer.
+    perms = (body.get("user") or {}).get("permissions")
+    if isinstance(perms, dict) and "push" in perms:
+        return bool(perms["push"])
+    named = body.get("permission")
+    if isinstance(named, str):
+        return named in ("admin", "maintain", "write")
+    return None

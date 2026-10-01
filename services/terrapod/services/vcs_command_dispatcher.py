@@ -6,6 +6,13 @@ delegated to VCS repo permissions (the apply-then-merge contract) — this
 module records the VCS actor on whatever run/action it kicks off, but
 does not consult Terrapod RBAC.
 
+Being able to comment is NOT on its own authorization. Every command is
+gated on the author having push access to the repository
+(`vcs.require_push_permission_for_commands`, on by default), asked of the
+provider at command time. Branch protection is still the gate on the apply
+itself; this is the gate on who may ask for one — and on `terrapod unlock`,
+which branch protection does not cover at all.
+
 Triggered task name: `vcs_comment_dispatch`.
 
 Payload shape:
@@ -39,10 +46,16 @@ from terrapod.services.vcs_command_parser import Command, parse
 logger = get_logger(__name__)
 
 
-# Verbs we route in phase 4. Surfaces that depend on later phases
-# (status comment posting, auto-merge) are stubbed with audit-only
-# acknowledgements that say "this will work after phase N".
-_ROUTABLE_VERBS = frozenset({"plan", "apply", "unlock", "merge", "help"})
+# Verbs we route. Pinned against the dispatcher's own `cmd.verb == "..."`
+# chain by a source-introspection test, so a verb cannot be routed without
+# appearing in the help table.
+#
+# `merge` is gone and must not return -- see `vcs_command_parser._KNOWN_VERBS`
+# for why. Workspace-configured auto-merge is a different thing and is
+# untouched: it fires from `vcs_auto_merge.handle_vcs_apply_completed` after a
+# successful apply, only when a workspace sets `auto_merge`, and only when
+# every affected workspace has met its gate.
+_ROUTABLE_VERBS = frozenset({"plan", "apply", "unlock", "help"})
 
 # Kept in step with docs/vcs-workflows.md, which documents the same table.
 _HELP_BODY = "\n".join(
@@ -55,7 +68,6 @@ _HELP_BODY = "\n".join(
         "| `terrapod apply` | Apply the current planned run for every affected workspace |",
         "| `terrapod apply -W <workspace>` | Apply a single workspace |",
         "| `terrapod unlock` | Release the workspace lock if it is stuck |",
-        "| `terrapod merge` | Force-merge despite incomplete applies (audit-logged) |",
         "| `terrapod help` | This list |",
         "",
         "A command in a code-fenced block is ignored, so quoting one in a "
@@ -84,6 +96,25 @@ _NO_CANDIDATES_BODY = (
     "is affected by this pull request, so there is nothing to run.\n\n"
     "Check that a workspace points at this repository and that its "
     "working directory matches a path this pull request changes."
+)
+
+
+_NO_PUSH_ACCESS_BODY = (
+    "Terrapod received this command, but it only acts on commands from people "
+    "who can push to this repository.\n\n"
+    "`terrapod apply` applies real infrastructure changes and `terrapod unlock` "
+    "releases a workspace lock, so being able to comment is not on its own "
+    "enough. Ask someone with write access to run it, or have your access "
+    "raised.\n\n"
+    "See [VCS workflows](https://github.com/mattrobinsonsre/terrapod/blob/main/docs/vcs-workflows.md)."
+)
+
+_UNKNOWN_ACCESS_BODY = (
+    "Terrapod received this command, but could not check whether you can push "
+    "to this repository, so it did not run it.\n\n"
+    "That is usually a transient provider error or a rate limit — comment "
+    "again in a moment. If it persists, check the VCS connection on the "
+    "Terrapod side."
 )
 
 
@@ -273,6 +304,43 @@ async def _unreact(
         )
 
 
+async def _actor_push_access(
+    conn: VCSConnection, repo: str, actor_login: str, actor_user_id: str
+) -> bool | None:
+    """Whether the comment's author may push to `repo`.
+
+    True / False / None, where None means the provider could not be asked.
+    Returns True unconditionally when the gate is switched off, so the single
+    call site has one branch rather than two.
+
+    Deliberately NOT cached. The lookup is one GET per *command* — the
+    dispatcher reaches here only after the body parsed as a command, after the
+    prose guard, and after an open session was found, and the enqueue is
+    deduplicated on the provider's comment id — so it adds nothing to a poll
+    cycle and nothing to an ordinary PR conversation. A cache would buy a
+    rounding error of API budget in exchange for a window in which revoked
+    write access still applies infrastructure, which is the wrong trade for an
+    authorization decision.
+    """
+    from terrapod.config import settings
+    from terrapod.services import github_service, gitlab_service
+
+    if not settings.vcs.require_push_permission_for_commands:
+        return True
+    owner, _, repo_name = repo.partition("/")
+    if not repo_name:
+        logger.warning("vcs_comment_dispatch: malformed repo", repo=repo)
+        return None
+    if conn.provider == "gitlab":
+        return await gitlab_service.actor_has_push_access(conn, owner, repo_name, actor_user_id)
+    if conn.provider == "github":
+        return await github_service.actor_has_push_access(conn, owner, repo_name, actor_login)
+    # An unrecognised provider has no permission model we know how to read.
+    # Refusing is the only safe reading of "we cannot tell".
+    logger.warning("vcs_comment_dispatch: unknown provider", provider=conn.provider)
+    return None
+
+
 async def handle_vcs_comment_dispatch(payload: dict[str, Any]) -> None:
     """Scheduler trigger handler.
 
@@ -364,6 +432,46 @@ async def handle_vcs_comment_dispatch(payload: dict[str, Any]) -> None:
             await settle(False)
             return
 
+        # Commenting is not authorization. Asked here rather than earlier so
+        # the refusal can only ever land on a pull request Terrapod already
+        # tracks: with the App installed org-wide, checking before the session
+        # lookup would answer a passing `terrapod ...` on an unrelated repo
+        # with a permissions lecture, which is the noise #1836 and #1799 were
+        # raised about.
+        #
+        # `help` is exempt, and deliberately. The reason this gate exists is that
+        # commenting is a low bar to take an ACTION; help takes none. It lists
+        # the same commands the public documentation lists, so gating it
+        # discloses nothing — while costing the thing that matters most: an
+        # unrecognised verb resolves to `help`, so a contributor who mistypes
+        # would get a permissions lecture instead of the usage table, which is
+        # being unhelpful to precisely the person asking for help.
+        #
+        # It buys no protection against comment spam either: a refusal is itself
+        # a posted comment, so a gated `help` costs the same provider calls as an
+        # ungated one.
+        if cmd.verb != "help":
+            access = await _actor_push_access(conn, repo, actor_login, actor_user_id)
+        else:
+            access = True
+        if access is not True:
+            logger.info(
+                "vcs_comment_dispatch: refused — author cannot push",
+                repo=repo,
+                pr_number=pr_number,
+                verb=cmd.verb,
+                actor_login=actor_login,
+                established=access is not None,
+            )
+            await _post_comment(
+                conn,
+                repo,
+                pr_number,
+                _NO_PUSH_ACCESS_BODY if access is False else _UNKNOWN_ACCESS_BODY,
+            )
+            await settle(False)
+            return
+
         # Find PR-affected apply-then-merge workspaces (the ones the
         # commands actually operate on). Other workspaces (different
         # mode, different repo) are ignored.
@@ -439,38 +547,6 @@ async def _route(
             return False
         await _post_reply(db, sess, _HELP_BODY)
         return True
-
-    if cmd.verb == "merge":
-        # Force-merge: skip the cross-workspace gate, record the partial
-        # apply state at merge time in the audit log, then call the
-        # provider's merge API.
-        from terrapod.services.vcs_auto_merge import force_merge
-
-        merged, error_reason = await force_merge(
-            db, sess, conn, "merge", actor_login, actor_user_id
-        )
-        if merged:
-            logger.info(
-                "vcs_comment_dispatch: force-merged",
-                **audit_ctx,
-                strategy="merge",
-            )
-        else:
-            logger.info(
-                "vcs_comment_dispatch: force-merge rejected by provider",
-                **audit_ctx,
-                error_reason=error_reason,
-            )
-        # Refresh the status comment so the merge result is visible.
-        await db.commit()
-        await enqueue_trigger(
-            "vcs_status_comment_update",
-            {"session_id": str(sess.id)},
-            dedup_key=f"vcs_status:{sess.id}",
-        )
-        # A merge the provider refused is a rejected command, not a done one
-        # — the status comment carries the reason.
-        return merged
 
     if not candidates:
         if cmd.workspace:

@@ -134,7 +134,7 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
 
    | Permission | Access | Purpose |
    |---|---|---|
-   | **Contents** | Read-only (read & write if using apply-then-merge auto-merge — see [VCS Workflows](vcs-workflows.md)) | Download repository archives; merging PRs creates a commit on the target branch |
+   | **Contents** | Read-only (read & write if using apply-then-merge auto-merge — see [VCS Workflows](vcs-workflows.md)) | Download repository archives; auto-merging a PR creates a commit on the target branch |
    | **Metadata** | Read-only (auto-selected) | Repository metadata |
    | **Checks** | Read & write | Post check runs on commits |
    | **Commit statuses** | Read & write | Post plan/apply status to commits |
@@ -523,8 +523,11 @@ reviewer with no plan is being asked to approve blind.
 In [`apply_then_merge`](vcs-workflows.md) mode a pull request push creates a
 full plan-and-apply-capable run rather than a speculative one, and the gate
 covers that too — a fork pull request produces no run of either kind. The
-stake there is higher, because in that mode anyone who can comment on the
-pull request can issue `terrapod apply`.
+stake there is higher, because in that mode a `terrapod apply` comment applies
+the run. That command requires push access to the repository, which a fork
+author does not have — but the plan itself is created by the push, before any
+comment, so this gate is what stands between a fork branch and the workspace's
+credentials.
 
 Turn it on where the trade is worth making: a public module repository taking
 community contributions, backed by a workspace that holds nothing worth

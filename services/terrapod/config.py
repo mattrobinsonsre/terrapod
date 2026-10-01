@@ -1153,6 +1153,22 @@ class VCSConfig(BaseModel):
             "latency anyone experiences."
         ),
     )
+    require_push_permission_for_commands: bool = Field(
+        default=True,
+        description=(
+            "Require the author of a `terrapod ...` pull-request comment to have push "
+            "access to the repository before the command is acted on (GitHub: the "
+            "collaborator permission API; GitLab: Developer, access level 30, or above "
+            "including membership inherited from the parent group). On by default: a "
+            "comment is a very low bar for `terrapod apply`, which applies real "
+            "infrastructure changes, and on a public repository anyone at all can post "
+            "one. Set to false only to restore the older behaviour, where the "
+            "repository's branch protection was the sole gate -- and understand that "
+            "`terrapod unlock` is not covered by branch protection at all. The check "
+            "fails CLOSED: a command whose author cannot be established is refused, "
+            "with a reply saying so."
+        ),
+    )
     github: GitHubWebhookConfig = Field(default_factory=GitHubWebhookConfig)
     gitlab: GitLabConfig = Field(default_factory=GitLabConfig)
     tmpdir: str = Field(

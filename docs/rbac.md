@@ -2,7 +2,7 @@
 
 Terrapod uses a label-based RBAC system instead of Terraform Enterprise's team model. Labels replace teams entirely -- a "team" is just a label. This document covers the permission model, role configuration, and common patterns.
 
-> Note: Workspaces configured for **[apply-then-merge](vcs-workflows.md)** delegate authorization for PR-comment-driven actions (`terrapod plan`, `terrapod apply`, `terrapod merge`) to the VCS provider's repo permissions and branch protection — Terrapod's label-based RBAC described here does **not** gate those actions. RBAC continues to apply to everything else (UI navigation, CLI runs, state access, settings changes).
+> Note: Workspaces configured for **[apply-then-merge](vcs-workflows.md)** delegate authorization for PR-comment-driven actions (`terrapod plan`, `terrapod apply`, `terrapod unlock`) to the VCS provider's repo permissions and branch protection — Terrapod's label-based RBAC described here does **not** gate those actions. Those commands require the commenter to have **push access** to the repository (GitHub collaborator permission; GitLab Developer or above), so commenting alone is not authorization. RBAC continues to apply to everything else (UI navigation, CLI runs, state access, settings changes).
 
 ---
 

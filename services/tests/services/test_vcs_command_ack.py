@@ -85,6 +85,11 @@ def _run(db, payload, *, route_accepted=True):
     return patch.multiple(
         disp,
         get_db_session=MagicMock(return_value=_session_cm(db)),
+        # The author can push. These tests are about the acknowledgement, not
+        # the authorization gate; that has its own file. Left unpatched the
+        # gate would reach for the provider and fail closed, so every one of
+        # these would assert on a refusal rather than on what it is named for.
+        _actor_push_access=AsyncMock(return_value=True),
         _react=AsyncMock(return_value=99),
         _unreact=AsyncMock(),
         _post_comment=AsyncMock(),
@@ -178,6 +183,9 @@ async def test_a_provider_that_refuses_the_reaction_does_not_lose_the_command():
     with patch.multiple(
         disp,
         get_db_session=MagicMock(return_value=_session_cm(db)),
+        # This one builds its own patch set rather than using `_run`, so the
+        # authorization gate has to be named here too.
+        _actor_push_access=AsyncMock(return_value=True),
         _react=AsyncMock(return_value=None),
         _unreact=AsyncMock(),
         _post_comment=AsyncMock(),
