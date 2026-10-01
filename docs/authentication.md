@@ -433,6 +433,31 @@ Example: `abc123def456.tpod.ghijklmnopqrstuvwxyz0123456789`
 - SHA-256 hashed at rest in the `api_tokens` PostgreSQL table
 - The raw token value is returned only once at creation time
 - Max lifetime enforced via `auth.api_token_max_ttl_hours` config
+
+> **A non-positive `lifespan_hours` makes an interactive token never expire.**
+> `lifespan_hours` takes precedence over `api_token_max_ttl_hours`, and a value of
+> `0` — or any negative number — is read as "no expiry" rather than as "unset", so
+> an interactive token created with `{"lifespan_hours": 0}` is exempt from the cap
+> for the rest of its life. The cap uses `0` to mean *no limit*, and that meaning
+> is applied to the per-token field as well, where it is almost never what the
+> caller intended.
+>
+> **Service tokens are not affected** — they fall back to
+> `auth.service_token_max_ttl_hours` whenever their resolved lifespan is
+> non-positive, so they always carry an expiry.
+>
+> Until this is addressed, treat a non-positive `lifespan_hours` as a value to
+> reject at your own boundary: omit the field to get the cap, or pass a positive
+> number of hours. `GET /api/terrapod/v1/users/{user_id}/authentication-tokens`
+> reports `expires-at`, and it is `null` for every token that has no expiry —
+> which is these, plus every interactive token when `api_token_max_ttl_hours` is
+> itself `0`. So a `null` is evidence of this only when the cap is set.
+>
+> **In 2.0 a non-positive `lifespan_hours` is treated as unset**, so the cap
+> applies and the token expires. A deployment that is relying on `0` to mint a
+> non-expiring interactive token will find those tokens expiring after
+> `api_token_max_ttl_hours` once upgraded; mint them with an explicit positive
+> lifespan, or set the cap to `0`, before you upgrade.
 - Changing the max TTL retroactively affects all existing tokens
 
 ### Token Kinds — Personal vs Service Tokens

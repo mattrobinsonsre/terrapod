@@ -998,6 +998,30 @@ Returns the structured JSON representation of the plan, as produced by `terrafor
 
 The endpoint is mounted at `/api/v2/` because `go-tfe` and Terraform's `cloud` block expect it there. Returns **404** if the runner never uploaded the JSON output (older runs, runs that errored before the plan completed).
 
+**Required permission: `read` on the workspace — the same tier as viewing the run.**
+Be deliberate about that when granting `read`, because the structured plan is a
+richer artifact than the human-readable log it sits beside. It carries each
+resource's **resolved attribute values**, which includes values that originated in
+a sensitive variable: Terraform marks them in the plan rather than removing them,
+and Terrapod stores and serves the plan as the engine produced it. So a principal
+who can view a run can also read the values that run is about to apply.
+
+Two ways to narrow it today, both available on this release line:
+
+- **Grant `read` deliberately.** On a workspace whose plans carry secrets, the
+  label-based role that grants `read` is the control. There is no separate
+  switch for this endpoint.
+- **Keep secrets out of resource arguments.** What puts a value in the plan is
+  its being an argument of a resource, not which variable category delivered it.
+  A credential a provider reads from its own environment variable never becomes a
+  resource attribute, so it never reaches the plan; the same secret interpolated
+  into a resource argument does, whichever category carried it.
+
+**This changes in 2.0**, where the endpoint requires the **`plan`** tier instead,
+putting it alongside `download raw state` — the other route that serves resolved
+values. If you rely on a `read`-only principal fetching plan JSON (a downstream
+tool, a dashboard), raise that principal to `plan` before upgrading.
+
 ### Impact Graph
 
 ```
