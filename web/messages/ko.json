@@ -763,6 +763,23 @@
       "delete": "삭제"
     },
     "confirmDelete": "이 VCS 연결을 삭제하시겠습니까? 이를 사용하는 워크스페이스는 VCS 통합을 잃게 됩니다. 이 작업은 취소할 수 없습니다.",
+    "access": {
+      "heading": "이 연결을 사용할 수 있는 사용자",
+      "intro": "이 세 가지 설정이 어떤 워크스페이스가 이 연결을 가리킬 수 있는지 결정합니다. 자격 증명 자체는 쓰기 전용으로 유지됩니다.",
+      "ownerEmail": "소유자 이메일",
+      "ownerEmailHint": "소유자는 항상 이 연결을 사용할 수 있습니다. 연결을 소유자 없이 두려면 비워 두세요.",
+      "labels": "액세스 레이블",
+      "labelsHint": "규칙이 이 레이블과 일치하는 역할은 워크스페이스를 이 연결로 가리킬 수 있습니다.",
+      "allowedRepositories": "허용된 리포지토리",
+      "allowedRepositoriesHint": "워크스페이스가 사용하려는 리포지토리와 비교되는 glob 패턴입니다.",
+      "addPattern": "패턴 추가",
+      "anyRepositoryWarning": "나열된 패턴이 없으므로 이 연결은 어떤 리포지토리든 가리킬 수 있습니다.",
+      "restricted": "{count, plural, one {패턴 #개가 나열되어} other {패턴 #개가 나열되어}} 있으므로 그 중 어느 것과도 일치하지 않는 리포지토리는 거부됩니다.",
+      "ownedBy": "{email} 소유",
+      "unowned": "소유자가 설정되지 않았습니다",
+      "anyRepositorySummary": "모든 리포지토리가 허용됩니다",
+      "repositoryCount": "{count, plural, one {리포지토리 #개} other {리포지토리 #개}}로 제한됩니다"
+    },
     "form": {
       "name": "이름",
       "namePattern": "영문자, 숫자, 하이픈, 밑줄만 사용할 수 있습니다. 영문자나 숫자로 시작해야 합니다.",

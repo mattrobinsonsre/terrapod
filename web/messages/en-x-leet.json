@@ -763,6 +763,23 @@
       "delete": "D3l373"
     },
     "confirmDelete": "D3l373 7h15 VC5 c0nn3c710n? W0rk5p4c35 u51ng 17 w1ll l053 VC5 1n73gr4710n. 7h15 c4nn07 b3 und0n3.",
+    "access": {
+      "heading": "Wh0 m4y u53 7h15 c0nn3c710n",
+      "intro": "7h353 7hr33 53771ng5 d3c1d3 wh1ch w0rk5p4c35 m4y b3 p01n73d 47 7h15 c0nn3c710n. 7h3 cr3d3n714l 1753lf 574y5 wr173-0nly.",
+      "ownerEmail": "0wn3r 3m41l",
+      "ownerEmailHint": "7h3 0wn3r m4y 4lw4y5 u53 7h15 c0nn3c710n. L34v3 17 bl4nk 70 l34v3 7h3 c0nn3c710n un0wn3d.",
+      "labels": "4cc355 l4b3l5",
+      "labelsHint": "4 r0l3 wh053 rul35 m47ch 7h353 l4b3l5 m4y p01n7 4 w0rk5p4c3 47 7h15 c0nn3c710n.",
+      "allowedRepositories": "4ll0w3d r3p05170r135",
+      "allowedRepositoriesHint": "Gl0b p4773rn5 m47ch3d 4g41n57 7h3 r3p05170ry 4 w0rk5p4c3 45k5 70 u53.",
+      "addPattern": "4dd 4 p4773rn",
+      "anyRepositoryWarning": "N0 p4773rn5 4r3 l1573d, 50 7h15 c0nn3c710n m4y b3 p01n73d 47 4ny r3p05170ry.",
+      "restricted": "{count, plural, one {# pattern is listed} other {# patterns are listed}}, 50 4 r3p05170ry m47ch1ng n0n3 0f 7h3m 15 r3fu53d.",
+      "ownedBy": "0wn3d by {email}",
+      "unowned": "N0 0wn3r 15 537",
+      "anyRepositorySummary": "4ny r3p05170ry 15 4ll0w3d",
+      "repositoryCount": "R357r1c73d 70 {count, plural, one {# repository} other {# repositories}}"
+    },
     "form": {
       "name": "N4m3",
       "namePattern": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",

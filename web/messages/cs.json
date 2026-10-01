@@ -763,6 +763,23 @@
       "delete": "Smazat"
     },
     "confirmDelete": "Smazat toto VCS připojení? Pracovní prostory, které jej používají, ztratí integraci VCS. Toto nelze vrátit zpět.",
+    "access": {
+      "heading": "Kdo může používat toto připojení",
+      "intro": "Tato tři nastavení určují, které pracovní prostory mohou odkazovat na toto připojení. Samotné přihlašovací údaje zůstávají pouze pro zápis.",
+      "ownerEmail": "E-mail vlastníka",
+      "ownerEmailHint": "Vlastník může toto připojení používat vždy. Ponechte prázdné, aby připojení zůstalo bez vlastníka.",
+      "labels": "Štítky přístupu",
+      "labelsHint": "Role, jejíž pravidla odpovídají těmto štítkům, může nasměrovat pracovní prostor na toto připojení.",
+      "allowedRepositories": "Povolená repozitáře",
+      "allowedRepositoriesHint": "Vzory glob porovnávané s repozitářem, o který pracovní prostor žádá.",
+      "addPattern": "Přidat vzor",
+      "anyRepositoryWarning": "Není uveden žádný vzor, takže toto připojení může odkazovat na jakýkoli repozitář.",
+      "restricted": "{count, plural, one {Je uveden # vzor} few {Jsou uvedeny # vzory} many {Je uvedeno # vzoru} other {Je uvedeno # vzorů}}, takže repozitář, který neodpovídá žádnému z nich, je odmítnut.",
+      "ownedBy": "Vlastníkem je {email}",
+      "unowned": "Není nastaven žádný vlastník",
+      "anyRepositorySummary": "Je povolen jakýkoli repozitář",
+      "repositoryCount": "Omezeno na {count, plural, one {# repozitář} few {# repozitáře} many {# repozitáře} other {# repozitářů}}"
+    },
     "form": {
       "name": "Název",
       "namePattern": "Pouze písmena, číslice, pomlčky a podtržítka. Musí začínat písmenem nebo číslicí.",

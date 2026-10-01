@@ -763,6 +763,23 @@
       "delete": "Verwijderen"
     },
     "confirmDelete": "Deze VCS-verbinding verwijderen? Workspaces die deze gebruiken verliezen hun VCS-integratie. Dit kan niet ongedaan worden gemaakt.",
+    "access": {
+      "heading": "Wie deze verbinding mag gebruiken",
+      "intro": "Deze drie instellingen bepalen welke workspaces naar deze verbinding mogen verwijzen. De referentie zelf blijft alleen-schrijven.",
+      "ownerEmail": "E-mail van de eigenaar",
+      "ownerEmailHint": "De eigenaar mag deze verbinding altijd gebruiken. Laat leeg om de verbinding zonder eigenaar te laten.",
+      "labels": "Toegangslabels",
+      "labelsHint": "Een rol waarvan de regels op deze labels passen, mag een workspace naar deze verbinding laten verwijzen.",
+      "allowedRepositories": "Toegestane repository''s",
+      "allowedRepositoriesHint": "Glob-patronen die worden vergeleken met de repository die een workspace wil gebruiken.",
+      "addPattern": "Patroon toevoegen",
+      "anyRepositoryWarning": "Er zijn geen patronen vermeld, dus deze verbinding mag naar elke repository verwijzen.",
+      "restricted": "{count, plural, one {Er is # patroon vermeld} other {Er zijn # patronen vermeld}}, dus een repository die op geen enkele daarvan past, wordt geweigerd.",
+      "ownedBy": "Eigendom van {email}",
+      "unowned": "Er is geen eigenaar ingesteld",
+      "anyRepositorySummary": "Elke repository is toegestaan",
+      "repositoryCount": "Beperkt tot {count, plural, one {# repository} other {# repository''s}}"
+    },
     "form": {
       "name": "Naam",
       "namePattern": "Alleen letters, cijfers, koppeltekens en underscores. Moet met een letter of cijfer beginnen.",

@@ -763,6 +763,23 @@
       "delete": "Eliminar"
     },
     "confirmDelete": "¿Eliminar esta conexión VCS? Los espacios de trabajo que la usen perderán la integración con VCS. Esto no se puede deshacer.",
+    "access": {
+      "heading": "Quién puede usar esta conexión",
+      "intro": "Estos tres ajustes deciden qué espacios de trabajo pueden apuntar a esta conexión. La credencial en sí sigue siendo de solo escritura.",
+      "ownerEmail": "Correo del propietario",
+      "ownerEmailHint": "El propietario siempre puede usar esta conexión. Déjalo en blanco para que la conexión quede sin propietario.",
+      "labels": "Etiquetas de acceso",
+      "labelsHint": "Un rol cuyas reglas coincidan con estas etiquetas puede apuntar un espacio de trabajo a esta conexión.",
+      "allowedRepositories": "Repositorios permitidos",
+      "allowedRepositoriesHint": "Patrones glob que se comparan con el repositorio que un espacio de trabajo pide usar.",
+      "addPattern": "Añadir un patrón",
+      "anyRepositoryWarning": "No hay ningún patrón en la lista, así que esta conexión puede apuntar a cualquier repositorio.",
+      "restricted": "{count, plural, one {Hay # patrón en la lista} other {Hay # patrones en la lista}}, así que se rechaza un repositorio que no coincida con ninguno de ellos.",
+      "ownedBy": "Propiedad de {email}",
+      "unowned": "No se ha establecido ningún propietario",
+      "anyRepositorySummary": "Se permite cualquier repositorio",
+      "repositoryCount": "Restringido a {count, plural, one {# repositorio} other {# repositorios}}"
+    },
     "form": {
       "name": "Nombre",
       "namePattern": "Solo letras, números, guiones y guiones bajos. Debe empezar por una letra o un número.",

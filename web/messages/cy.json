@@ -763,6 +763,23 @@
       "delete": "Dileu"
     },
     "confirmDelete": "Dileu'r cysylltiad VCS hwn? Bydd gweithfannau sy'n ei ddefnyddio'n colli integreiddiad VCS. Ni ellir dadwneud hyn.",
+    "access": {
+      "heading": "Pwy sy''n cael defnyddio''r cysylltiad hwn",
+      "intro": "Mae''r tair gosodiad hyn yn penderfynu pa fannau gwaith y gellir eu cyfeirio at y cysylltiad hwn. Mae''r cymhwysiad ei hun yn parhau i fod yn ysgrifennu-yn-unig.",
+      "ownerEmail": "E-bost y perchennog",
+      "ownerEmailHint": "Caiff y perchennog ddefnyddio''r cysylltiad hwn bob amser. Gadewch yn wag i adael y cysylltiad heb berchennog.",
+      "labels": "Labeli mynediad",
+      "labelsHint": "Caiff rôl y mae ei rheolau''n cyfateb i''r labeli hyn gyfeirio man gwaith at y cysylltiad hwn.",
+      "allowedRepositories": "Ystorfeydd a ganiateir",
+      "allowedRepositoriesHint": "Patrymau glob a gymharir â''r ystorfa y mae man gwaith yn gofyn am ei defnyddio.",
+      "addPattern": "Ychwanegu patrwm",
+      "anyRepositoryWarning": "Nid oes unrhyw batrymau wedi''u rhestru, felly gellir cyfeirio''r cysylltiad hwn at unrhyw ystorfa.",
+      "restricted": "{count, plural, one {Mae # patrwm wedi''i restru} other {Mae # patrwm wedi''u rhestru}}, felly gwrthodir ystorfa nad yw''n cyfateb i''r un ohonynt.",
+      "ownedBy": "Eiddo {email}",
+      "unowned": "Nid oes perchennog wedi''i osod",
+      "anyRepositorySummary": "Caniateir unrhyw ystorfa",
+      "repositoryCount": "Cyfyngedig i {count, plural, one {# ystorfa} other {# ystorfa}}"
+    },
     "form": {
       "name": "Enw",
       "namePattern": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",

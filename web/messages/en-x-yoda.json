@@ -763,6 +763,23 @@
       "delete": "Delete"
     },
     "confirmDelete": "This VCS connection, delete? Workspaces using it, VCS integration lose they will. Undone, this cannot be.",
+    "access": {
+      "heading": "Use this connection, who may",
+      "intro": "Which workspaces may be pointed at this connection, these three settings decide. Write-only, the credential itself stays.",
+      "ownerEmail": "Email, owner",
+      "ownerEmailHint": "Always use this connection, the owner may. To leave the connection unowned, blank it leave.",
+      "labels": "Labels, access",
+      "labelsHint": "Point a workspace at this connection, a role whose rules match these labels may.",
+      "allowedRepositories": "Repositories, allowed",
+      "allowedRepositoriesHint": "Against the repository a workspace asks to use, glob patterns matched they are.",
+      "addPattern": "A pattern, add",
+      "anyRepositoryWarning": "Listed, no patterns are. Pointed at any repository, this connection may be.",
+      "restricted": "{count, plural, one {Listed, # pattern is} other {Listed, # patterns are}}. Refused, a repository matching none of them is.",
+      "ownedBy": "By {email}, owned",
+      "unowned": "Set, no owner is",
+      "anyRepositorySummary": "Allowed, any repository is",
+      "repositoryCount": "To {count, plural, one {# repository} other {# repositories}}, restricted it is"
+    },
     "form": {
       "name": "Name",
       "namePattern": "Letters, numbers, hyphens, and underscores only, there must be. With a letter or number, start it must.",

@@ -763,6 +763,23 @@
       "delete": "Qaw'"
     },
     "confirmDelete": "VCS rar vam Qaw''a'? 'oH lo'bogh Qumwo'mey VCS numtaH Hutlh. choHlaHbe'lu'.",
+    "access": {
+      "heading": "''Iv rarmeH lo''laH",
+      "intro": "wej Dochvam yIn nuqDaq Qu''mey rar. mIllogh ghItlh neH lo''lu''.",
+      "ownerEmail": "ghajwI'' QIn De''wI''",
+      "ownerEmailHint": "reH rarvam lo''laH ghajwI''. rarvam ghajwI'' Hutlh ''e'' DaneHchugh, chIm yIlan.",
+      "labels": "chaw'' permey",
+      "labelsHint": "Qu'' permeyvam rurchugh, Qu''vam rarvam Daq Qu''Daq lo''laH.",
+      "allowedRepositories": "chaw''lu''bogh ghItlhmey",
+      "allowedRepositoriesHint": "Qu'' poQbogh ghItlh rurmeH glob permey.",
+      "addPattern": "per chel",
+      "anyRepositoryWarning": "pagh per lughItlhlu'', vaj Hoch ghItlh rarvam lo''laH.",
+      "restricted": "{count, plural, one {# per lughItlhlu''} other {# permey lughItlhlu''}}, vaj pagh rurbogh ghItlh lajbe''lu''.",
+      "ownedBy": "{email} ghaj",
+      "unowned": "pagh ghajwI'' lughItlhlu''",
+      "anyRepositorySummary": "Hoch ghItlh chaw''lu''",
+      "repositoryCount": "{count, plural, one {# ghItlh} other {# ghItlhmey}} neH chaw''lu''"
+    },
     "form": {
       "name": "pong",
       "namePattern": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",

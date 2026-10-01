@@ -763,6 +763,23 @@
       "delete": "Delere"
     },
     "confirmDelete": "Hunc nexum VCS delere? Loca operis eo utentia integrationem VCS amittent. Hoc revocari non potest.",
+    "access": {
+      "heading": "Quis hac coniunctione uti potest",
+      "intro": "Hae tres optiones decernunt quae spatia operis ad hanc coniunctionem dirigi possint. Fides ipsa tantum scribenda manet.",
+      "ownerEmail": "Inscriptio possessoris",
+      "ownerEmailHint": "Possessor hac coniunctione semper uti potest. Vacuum relinque ut coniunctio sine possessore maneat.",
+      "labels": "Titulis accessus",
+      "labelsHint": "Munus cuius regulae his titulis congruunt spatium operis ad hanc coniunctionem dirigere potest.",
+      "allowedRepositories": "Promptuaria permissa",
+      "allowedRepositoriesHint": "Formulae glob cum promptuario comparatae quod spatium operis uti petit.",
+      "addPattern": "Formulam addere",
+      "anyRepositoryWarning": "Nullae formulae enumeratae sunt, itaque haec coniunctio ad quodlibet promptuarium dirigi potest.",
+      "restricted": "{count, plural, one {# formula enumerata est} other {# formulae enumeratae sunt}}, itaque promptuarium quod nulli earum congruit recusatur.",
+      "ownedBy": "Possidetur a {email}",
+      "unowned": "Nullus possessor constitutus est",
+      "anyRepositorySummary": "Quodlibet promptuarium permittitur",
+      "repositoryCount": "Circumscriptum ad {count, plural, one {# promptuarium} other {# promptuaria}}"
+    },
     "form": {
       "name": "Nomen",
       "namePattern": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",

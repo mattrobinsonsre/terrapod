@@ -763,6 +763,23 @@
       "delete": "删除"
     },
     "confirmDelete": "删除此 VCS 连接？使用它的工作区将失去 VCS 集成。此操作无法撤销。",
+    "access": {
+      "heading": "谁可以使用此连接",
+      "intro": "这三项设置决定哪些工作区可以指向此连接。凭据本身仍为只写。",
+      "ownerEmail": "所有者邮箱",
+      "ownerEmailHint": "所有者始终可以使用此连接。留空可让此连接没有所有者。",
+      "labels": "访问标签",
+      "labelsHint": "规则与这些标签匹配的角色可以将工作区指向此连接。",
+      "allowedRepositories": "允许的仓库",
+      "allowedRepositoriesHint": "与工作区请求使用的仓库进行匹配的 glob 模式。",
+      "addPattern": "添加模式",
+      "anyRepositoryWarning": "未列出任何模式，因此此连接可以指向任何仓库。",
+      "restricted": "已列出 {count, plural, one {# 个模式} other {# 个模式}}，因此与其中任何一个都不匹配的仓库都会被拒绝。",
+      "ownedBy": "由 {email} 拥有",
+      "unowned": "未设置所有者",
+      "anyRepositorySummary": "允许任何仓库",
+      "repositoryCount": "仅限 {count, plural, one {# 个仓库} other {# 个仓库}}"
+    },
     "form": {
       "name": "名称",
       "namePattern": "仅限字母、数字、连字符和下划线。必须以字母或数字开头。",

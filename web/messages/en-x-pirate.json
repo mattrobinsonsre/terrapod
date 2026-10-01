@@ -763,6 +763,23 @@
       "delete": "Send t'' Davy Jones"
     },
     "confirmDelete": "Send this VCS connection t'' Davy Jones? Work-decks usin'' it will lose VCS integration. This cannot be undone.",
+    "access": {
+      "heading": "Who be allowed to sail this connection",
+      "intro": "These three settin''s decide which workspaces be allowed to point at this connection, matey. Th'' credential itself stays write-only, locked in th'' hold.",
+      "ownerEmail": "Cap''n''s email",
+      "ownerEmailHint": "Th'' cap''n may always sail this connection. Leave it bare to leave th'' connection without a cap''n.",
+      "labels": "Boardin'' labels",
+      "labelsHint": "A role whose articles match these labels may point a workspace at this connection.",
+      "allowedRepositories": "Permitted repositories",
+      "allowedRepositoriesHint": "Glob patterns matched against th'' repository a workspace be askin'' to plunder.",
+      "addPattern": "Hoist a pattern",
+      "anyRepositoryWarning": "Nary a pattern be listed, so this connection may be pointed at ANY repository on th'' seven seas.",
+      "restricted": "{count, plural, one {# pattern be listed} other {# patterns be listed}}, so a repository matchin'' none o'' them be turned away.",
+      "ownedBy": "Owned by {email}, aye",
+      "unowned": "Nary an owner be set",
+      "anyRepositorySummary": "Any repository be permitted",
+      "repositoryCount": "Held to {count, plural, one {# repository} other {# repositories}}, no more"
+    },
     "form": {
       "name": "Name",
       "namePattern": "Letters, numbers, hyphens, an'' underscores only, matey. Must start with a letter or number.",

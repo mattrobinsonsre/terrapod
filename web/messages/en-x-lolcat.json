@@ -763,6 +763,23 @@
       "delete": "Delete"
     },
     "confirmDelete": "Delete dis VCS connekshun? Wurkspacez usin it wil looz VCS integrashun. Dis cannot be undun.",
+    "access": {
+      "heading": "Hoo can uze dis connekshun",
+      "intro": "Deez three settingz decyde wich workspacez can be pointd at dis connekshun. Teh credenshul itself stayz writ-only.",
+      "ownerEmail": "Ownr emayl",
+      "ownerEmailHint": "Teh ownr can alwayz uze dis connekshun. Leev it blank to leev teh connekshun ownrless.",
+      "labels": "Akcess labelz",
+      "labelsHint": "A rolez wot haz rulez dat match deez labelz can point a workspace at dis connekshun.",
+      "allowedRepositories": "Allowd repozitoriez",
+      "allowedRepositoriesHint": "Glob patternz matchd agenst teh repozitory a workspace askz to uze.",
+      "addPattern": "Add a pattrn",
+      "anyRepositoryWarning": "No patternz iz listd, so dis connekshun can be pointd at ANY repozitory. srsly.",
+      "restricted": "{count, plural, one {# pattern iz listd} other {# patternz iz listd}}, so a repozitory matchin nun of dem getz refuzd.",
+      "ownedBy": "Ownd by {email}",
+      "unowned": "No ownr iz setted",
+      "anyRepositorySummary": "Any repozitory iz allowd",
+      "repositoryCount": "Restriktd to {count, plural, one {# repozitory} other {# repozitoriez}}"
+    },
     "form": {
       "name": "Naym",
       "namePattern": "Lettrs, numburz, hyphenz, an underscorez only. Muzt start wif a lettr or numbr.",

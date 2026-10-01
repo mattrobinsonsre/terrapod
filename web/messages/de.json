@@ -763,6 +763,23 @@
       "delete": "Löschen"
     },
     "confirmDelete": "Diese VCS-Verbindung löschen? Arbeitsbereiche, die sie verwenden, verlieren die VCS-Integration. Dies kann nicht rückgängig gemacht werden.",
+    "access": {
+      "heading": "Wer diese Verbindung verwenden darf",
+      "intro": "Diese drei Einstellungen legen fest, welche Workspaces auf diese Verbindung verweisen dürfen. Die Anmeldeinformation selbst bleibt schreibgeschützt im Sinne von nur schreibbar.",
+      "ownerEmail": "E-Mail der Eigentümerin bzw. des Eigentümers",
+      "ownerEmailHint": "Die Eigentümerin bzw. der Eigentümer darf diese Verbindung immer verwenden. Leer lassen, damit die Verbindung ohne Eigentümer bleibt.",
+      "labels": "Zugriffs-Labels",
+      "labelsHint": "Eine Rolle, deren Regeln auf diese Labels passen, darf einen Workspace auf diese Verbindung verweisen.",
+      "allowedRepositories": "Zugelassene Repositorys",
+      "allowedRepositoriesHint": "Glob-Muster, die mit dem Repository verglichen werden, das ein Workspace verwenden möchte.",
+      "addPattern": "Muster hinzufügen",
+      "anyRepositoryWarning": "Es sind keine Muster aufgeführt, daher darf diese Verbindung auf jedes Repository verweisen.",
+      "restricted": "{count, plural, one {# Muster ist aufgeführt} other {# Muster sind aufgeführt}}, daher wird ein Repository abgelehnt, das auf keines davon passt.",
+      "ownedBy": "Eigentum von {email}",
+      "unowned": "Es ist kein Eigentümer festgelegt",
+      "anyRepositorySummary": "Jedes Repository ist zugelassen",
+      "repositoryCount": "Beschränkt auf {count, plural, one {# Repository} other {# Repositorys}}"
+    },
     "form": {
       "name": "Name",
       "namePattern": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Zahl beginnen.",

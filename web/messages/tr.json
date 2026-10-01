@@ -763,6 +763,23 @@
       "delete": "Sil"
     },
     "confirmDelete": "Bu VCS bağlantısı silinsin mi? Onu kullanan çalışma alanları VCS entegrasyonunu kaybeder. Bu geri alınamaz.",
+    "access": {
+      "heading": "Bu bağlantıyı kimler kullanabilir",
+      "intro": "Bu üç ayar, hangi çalışma alanlarının bu bağlantıya yönlendirilebileceğini belirler. Kimlik bilgisinin kendisi yalnızca yazılabilir kalır.",
+      "ownerEmail": "Sahibinin e-postası",
+      "ownerEmailHint": "Sahibi bu bağlantıyı her zaman kullanabilir. Bağlantıyı sahipsiz bırakmak için boş bırakın.",
+      "labels": "Erişim etiketleri",
+      "labelsHint": "Kuralları bu etiketlerle eşleşen bir rol, bir çalışma alanını bu bağlantıya yönlendirebilir.",
+      "allowedRepositories": "İzin verilen depolar",
+      "allowedRepositoriesHint": "Bir çalışma alanının kullanmak istediği depoyla karşılaştırılan glob desenleri.",
+      "addPattern": "Desen ekle",
+      "anyRepositoryWarning": "Hiçbir desen listelenmemiş, bu nedenle bu bağlantı herhangi bir depoya yönlendirilebilir.",
+      "restricted": "{count, plural, one {# desen listelenmiş} other {# desen listelenmiş}}, bu nedenle bunlardan hiçbiriyle eşleşmeyen bir depo reddedilir.",
+      "ownedBy": "{email} sahibi",
+      "unowned": "Hiçbir sahip ayarlanmamış",
+      "anyRepositorySummary": "Herhangi bir depoya izin verilir",
+      "repositoryCount": "{count, plural, one {# depoyla} other {# depoyla}} sınırlı"
+    },
     "form": {
       "name": "Ad",
       "namePattern": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",

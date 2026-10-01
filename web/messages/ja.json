@@ -763,6 +763,23 @@
       "delete": "削除"
     },
     "confirmDelete": "このVCS接続を削除しますか？これを使用しているワークスペースはVCS統合を失います。この操作は元に戻せません。",
+    "access": {
+      "heading": "この接続を使用できるユーザー",
+      "intro": "この 3 つの設定により、どのワークスペースがこの接続を指定できるかが決まります。認証情報そのものは書き込み専用のままです。",
+      "ownerEmail": "所有者のメールアドレス",
+      "ownerEmailHint": "所有者は常にこの接続を使用できます。接続を所有者なしにするには空欄のままにしてください。",
+      "labels": "アクセスラベル",
+      "labelsHint": "ルールがこれらのラベルに一致するロールは、ワークスペースをこの接続に指定できます。",
+      "allowedRepositories": "許可するリポジトリ",
+      "allowedRepositoriesHint": "ワークスペースが使用を要求したリポジトリと照合される glob パターンです。",
+      "addPattern": "パターンを追加",
+      "anyRepositoryWarning": "パターンが一覧にないため、この接続は任意のリポジトリを指定できます。",
+      "restricted": "{count, plural, one {# 件のパターンが一覧にある} other {# 件のパターンが一覧にある}}ため、いずれにも一致しないリポジトリは拒否されます。",
+      "ownedBy": "{email} が所有",
+      "unowned": "所有者が設定されていません",
+      "anyRepositorySummary": "任意のリポジトリが許可されています",
+      "repositoryCount": "{count, plural, one {# 件のリポジトリ} other {# 件のリポジトリ}}に制限されています"
+    },
     "form": {
       "name": "名前",
       "namePattern": "使用できるのは英字、数字、ハイフン、アンダースコアのみです。先頭は英字または数字である必要があります。",

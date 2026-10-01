@@ -763,6 +763,23 @@
       "delete": "Usuń"
     },
     "confirmDelete": "Usunąć to połączenie VCS? Obszary robocze, które go używają, utracą integrację z VCS. Tej operacji nie można cofnąć.",
+    "access": {
+      "heading": "Kto może używać tego połączenia",
+      "intro": "Te trzy ustawienia decydują, które przestrzenie robocze mogą wskazywać na to połączenie. Same dane uwierzytelniające pozostają tylko do zapisu.",
+      "ownerEmail": "E-mail właściciela",
+      "ownerEmailHint": "Właściciel może zawsze używać tego połączenia. Pozostaw puste, aby połączenie pozostało bez właściciela.",
+      "labels": "Etykiety dostępu",
+      "labelsHint": "Rola, której reguły pasują do tych etykiet, może wskazać przestrzeń roboczą na to połączenie.",
+      "allowedRepositories": "Dozwolone repozytoria",
+      "allowedRepositoriesHint": "Wzorce glob porównywane z repozytorium, o które prosi przestrzeń robocza.",
+      "addPattern": "Dodaj wzorzec",
+      "anyRepositoryWarning": "Nie wymieniono żadnych wzorców, więc to połączenie może wskazywać na dowolne repozytorium.",
+      "restricted": "{count, plural, one {Wymieniono # wzorzec} few {Wymieniono # wzorce} many {Wymieniono # wzorców} other {Wymieniono # wzorca}}, więc repozytorium niepasujące do żadnego z nich jest odrzucane.",
+      "ownedBy": "Należy do {email}",
+      "unowned": "Nie ustawiono właściciela",
+      "anyRepositorySummary": "Dozwolone jest dowolne repozytorium",
+      "repositoryCount": "Ograniczone do {count, plural, one {# repozytorium} few {# repozytoriów} many {# repozytoriów} other {# repozytorium}}"
+    },
     "form": {
       "name": "Nazwa",
       "namePattern": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",

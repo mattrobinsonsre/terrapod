@@ -763,6 +763,23 @@
       "delete": "Slet"
     },
     "confirmDelete": "Slet denne VCS-forbindelse? Arbejdsområder, der bruger den, mister VCS-integration. Dette kan ikke fortrydes.",
+    "access": {
+      "heading": "Hvem der må bruge denne forbindelse",
+      "intro": "Disse tre indstillinger afgør, hvilke arbejdsområder der må pege på denne forbindelse. Selve legitimationsoplysningen forbliver kun skrivbar.",
+      "ownerEmail": "Ejerens e-mail",
+      "ownerEmailHint": "Ejeren må altid bruge denne forbindelse. Lad feltet være tomt for at lade forbindelsen stå uden ejer.",
+      "labels": "Adgangsetiketter",
+      "labelsHint": "En rolle, hvis regler matcher disse etiketter, må pege et arbejdsområde på denne forbindelse.",
+      "allowedRepositories": "Tilladte depoter",
+      "allowedRepositoriesHint": "Glob-mønstre, der matches mod det depot, et arbejdsområde beder om at bruge.",
+      "addPattern": "Tilføj et mønster",
+      "anyRepositoryWarning": "Der er ikke angivet nogen mønstre, så denne forbindelse må pege på et vilkårligt depot.",
+      "restricted": "{count, plural, one {# mønster er angivet} other {# mønstre er angivet}}, så et depot, der ikke matcher nogen af dem, afvises.",
+      "ownedBy": "Ejes af {email}",
+      "unowned": "Der er ikke angivet nogen ejer",
+      "anyRepositorySummary": "Et vilkårligt depot er tilladt",
+      "repositoryCount": "Begrænset til {count, plural, one {# depot} other {# depoter}}"
+    },
     "form": {
       "name": "Navn",
       "namePattern": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",

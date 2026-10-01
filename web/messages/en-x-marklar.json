@@ -763,6 +763,23 @@
       "delete": "Delete"
     },
     "confirmDelete": "Delete this marklar marklar? Marklars using it will lose marklar marklar. This cannot be undone.",
+    "access": {
+      "heading": "Who may use this marklar",
+      "intro": "These three marklars decide which marklars may be pointed at this marklar. The marklar itself stays write-only.",
+      "ownerEmail": "Marklar marklar",
+      "ownerEmailHint": "The marklar may always use this marklar. Leave it blank to leave the marklar unmarklared.",
+      "labels": "Marklar marklars",
+      "labelsHint": "A marklar whose marklars match these marklars may point a marklar at this marklar.",
+      "allowedRepositories": "Allowed marklars",
+      "allowedRepositoriesHint": "Marklar marklars matched against the marklar a marklar asks to use.",
+      "addPattern": "Add a marklar",
+      "anyRepositoryWarning": "No marklars are listed, so this marklar may be pointed at any marklar.",
+      "restricted": "{count, plural, one {# marklar is listed} other {# marklars are listed}}, so a marklar matching none of them is refused.",
+      "ownedBy": "This marklar is owned by {email}",
+      "unowned": "No marklar is set",
+      "anyRepositorySummary": "Any marklar is allowed",
+      "repositoryCount": "Restricted to {count, plural, one {# marklar} other {# marklars}}"
+    },
     "form": {
       "name": "Marklar",
       "namePattern": "Marklars, marklars, marklars, and marklars only. Must start with a marklar or marklar.",

@@ -763,6 +763,23 @@
       "delete": "刪除"
     },
     "confirmDelete": "刪除此 VCS 連線？使用它的工作區將失去 VCS 整合。此操作無法撤銷。",
+    "access": {
+      "heading": "誰可以使用此連線",
+      "intro": "這三項設定決定哪些工作區可以指向此連線。憑證本身仍為唯寫。",
+      "ownerEmail": "擁有者電子郵件",
+      "ownerEmailHint": "擁有者一律可以使用此連線。留空可讓此連線沒有擁有者。",
+      "labels": "存取標籤",
+      "labelsHint": "規則與這些標籤相符的角色可以將工作區指向此連線。",
+      "allowedRepositories": "允許的存放庫",
+      "allowedRepositoriesHint": "與工作區要求使用的存放庫進行比對的 glob 模式。",
+      "addPattern": "新增模式",
+      "anyRepositoryWarning": "未列出任何模式，因此此連線可以指向任何存放庫。",
+      "restricted": "已列出 {count, plural, one {# 個模式} other {# 個模式}}，因此與其中任何一個都不相符的存放庫都會被拒絕。",
+      "ownedBy": "由 {email} 擁有",
+      "unowned": "未設定擁有者",
+      "anyRepositorySummary": "允許任何存放庫",
+      "repositoryCount": "僅限 {count, plural, one {# 個存放庫} other {# 個存放庫}}"
+    },
     "form": {
       "name": "名稱",
       "namePattern": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
