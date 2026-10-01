@@ -82,6 +82,16 @@ def _validated_value_source(attrs: dict, current: str = "static") -> str:
     if "value-source" not in attrs:
         return current
     src = attrs["value-source"] or "static"
+    # A non-string reaches `in VALUE_SOURCES` as an unhashable key and raises
+    # TypeError, which the global handler turns into a 500 — so a caller sending the
+    # object shape this field looks like it should take got "Internal server error"
+    # instead of being told the field is a string. Found by a test that guessed the
+    # shape wrong, which is exactly what a caller would do.
+    if not isinstance(src, str):
+        raise HTTPException(
+            status_code=422,
+            detail=f"value-source must be a string, one of {sorted(VALUE_SOURCES)}",
+        )
     if src not in VALUE_SOURCES:
         raise HTTPException(
             status_code=422, detail=f"value-source must be one of {sorted(VALUE_SOURCES)}"

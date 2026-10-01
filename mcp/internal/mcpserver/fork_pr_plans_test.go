@@ -147,12 +147,14 @@ func TestAllowForkPRPlansDescriptionNamesTheConsequence(t *testing.T) {
 			if desc == "" {
 				t.Fatalf("%s has no allow_fork_pr_plans field", tool)
 			}
-			// "On by default" rather than the 2.x line's "Off by default": the
-			// phrase has to match THIS line's default, or the description tells
-			// an agent the opposite of what the server will do. The property the
-			// assertion holds is unchanged — the description states the default,
-			// names the credentials at stake, and says the author cannot merge.
-			for _, want := range []string{"fork", "credential", "On by default", "merge"} {
+			// "Off by default" from this release: the phrase has to match THIS
+			// line's default, or the description tells an agent the opposite of
+			// what the server will do. It said "On by default" while 1.8 shipped
+			// the permissive default, and the flip to a closed default had to move
+			// this with it. The property the assertion holds is unchanged — the
+			// description states the default, names the credentials at stake, and
+			// says the author cannot merge.
+			for _, want := range []string{"fork", "credential", "Off by default", "merge"} {
 				if !strings.Contains(desc, want) {
 					t.Errorf("description never mentions %q, so an agent cannot weigh "+
 						"enabling it:\n%s", want, desc)

@@ -134,6 +134,46 @@ async def rule_assigned_varset_ids(db: AsyncSession, workspace_id: uuid.UUID) ->
     return {vs.id for vs, how in applicable if how == ASSIGNMENT_RULE}
 
 
+async def _sets_holding_secrets(db: AsyncSession, set_ids: set[uuid.UUID]) -> set[uuid.UUID]:
+    """Of these variable sets, the ones carrying a secret.
+
+    `sensitive` is the stored-secret case. `value_source` is the brokered one — an
+    OpenBao/Vault reference resolved at run time, whose value never sits in the
+    column at all, so a check that only looked at `sensitive` would wave through
+    precisely the sets whose contents are most worth having.
+
+    **It is compared against `"static"`, not against NULL.** The column is NOT NULL
+    and defaults to `"static"`, so `value_source IS NOT NULL` matches every variable
+    ever written — which would have made this whole narrowing a silent no-op while
+    looking exactly like a narrowing. Checked against the model rather than assumed.
+
+    The `value_source` clause is **not load-bearing today**: the variables router
+    stores a vault-sourced variable with `sensitive` forced true, so the first clause
+    already catches everything written through the API. It stays as defence for rows
+    this router did not write — a migration, a direct fixup, a future writer that
+    sets the source without the flag. Removing it fails no test, and the test says
+    so rather than implying coverage it does not have.
+    """
+    from sqlalchemy import or_, select
+
+    from terrapod.db.models import VariableSetVariable
+
+    if not set_ids:
+        return set()
+    rows = await db.execute(
+        select(VariableSetVariable.variable_set_id)
+        .where(
+            VariableSetVariable.variable_set_id.in_(set_ids),
+            or_(
+                VariableSetVariable.sensitive.is_(True),
+                VariableSetVariable.value_source != "static",
+            ),
+        )
+        .distinct()
+    )
+    return {r for (r,) in rows.all()}
+
+
 async def refuse_varset_growth(
     db: AsyncSession,
     *,
@@ -157,6 +197,24 @@ async def refuse_varset_growth(
 
     after = await rule_assigned_varset_ids(db, workspace_id)
     gained = after - before
+    if not gained:
+        return
+
+    # Narrow the refusal to sets that actually hold something worth taking.
+    #
+    # Refusing EVERY match closes the finding and also closes the feature: the
+    # documented workflow is an admin writing "label `env=prod` -> varset
+    # `aws-prod-creds`" and developers self-servicing `env=prod` workspaces, and the
+    # service catalog is *entirely* non-admin self-service, so a blanket refusal
+    # breaks every catalog item whose labels match a rule. The reported impact is
+    # specific — "variable-set credentials, including sensitive static values and
+    # Vault-brokered secrets" — so that is what is refused: a set carrying a
+    # `sensitive` variable or one resolved through a broker. A rule-assigned set of
+    # plain configuration joining automatically is the feature working.
+    #
+    # A guard that refuses ordinary work gets switched off, which would leave the
+    # secrets unprotected too.
+    gained = await _sets_holding_secrets(db, gained)
     if not gained:
         return
 

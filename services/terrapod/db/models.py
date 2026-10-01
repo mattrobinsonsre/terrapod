@@ -1351,7 +1351,7 @@ class AutodiscoveryRule(Base):
     debug_mode: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
-    #: Defaults TRUE on this release line, matching the workspace column rather than overriding it
+    #: Defaults FALSE, matching the workspace column rather than overriding it
     #: like `drift_detection_enabled` above. An operator who decides fork PRs
     #: should plan has to say so, and a rule is how they say it once for every
     #: directory the repository grows later -- otherwise enabling it in bulk

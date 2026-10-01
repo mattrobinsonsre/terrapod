@@ -20,7 +20,13 @@ WS = "/api/v2/organizations/default/workspaces"
 VARSETS = "/api/v2/organizations/default/varsets"
 
 
-async def _varset(client, name, *, rule=None, global_set=False):
+async def _varset(client, name, *, rule=None, global_set=False, secret=True):
+    """Create a variable set. `secret=True` adds a sensitive variable.
+
+    That matters: the refusal is scoped to sets that actually hold something worth
+    taking, so a set of plain configuration is deliberately allowed to join. A
+    fixture without a secret would make every refusal test silently vacuous.
+    """
     attrs = {"name": name, "global": global_set}
     if rule is not None:
         attrs["assignment-rule"] = rule
@@ -28,7 +34,46 @@ async def _varset(client, name, *, rule=None, global_set=False):
         VARSETS, json={"data": {"type": "varsets", "attributes": attrs}}, headers=AUTH
     )
     assert resp.status_code in (200, 201), resp.text
-    return resp.json()["data"]["id"]
+    vs_id = resp.json()["data"]["id"]
+    if not secret:
+        # A set with NO variables holds no secrets trivially, which makes the
+        # "plain configuration may still join" test pass however the secret check is
+        # written — including when it is a no-op. Give it a real, ordinary variable
+        # so the test distinguishes "no secrets" from "nothing at all".
+        r = await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "log_level",
+                        "value": "debug",
+                        "category": "terraform",
+                        "sensitive": False,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert r.status_code in (200, 201), r.text
+    if secret:
+        r = await client.post(
+            f"/api/v2/varsets/{vs_id}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "db_password",
+                        "value": "TEAM-A-SECRET",
+                        "category": "terraform",
+                        "sensitive": True,
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        assert r.status_code in (200, 201), r.text
+    return vs_id
 
 
 async def _create_ws(client, name, **attrs):
@@ -224,65 +269,102 @@ class TestTheGuardIsWiredIntoBothPaths:
         )
 
 
-class TestTheSelectableSetCannotSilentlyGoStale:
+class TestTheSkipOptimisationCannotSilentlyGoStale:
     """The PATCH path skips its three queries when the body cannot move the answer.
 
-    That is an optimisation resting on a claim — "these attribute keys are the ones
-    an assignment rule can select on" — and a claim like that is exactly what rots:
-    `WorkspaceFilter` grows a dimension, nobody updates the set, and the guard
-    quietly stops covering it. So the classification is checked against the filter
-    model itself rather than trusted.
+    The first version of that was an allowlist of *triggering* keys, so it failed
+    closed-to-skip: an attribute nobody had classified escaped the check entirely,
+    while the docstring claimed the opposite and the test named `fails_open`
+    asserted the opposite in its own body. Both reviewers found it. It is now a
+    denylist, and these pin the direction.
     """
 
-    def test_every_filter_dimension_is_classified(self):
-        from terrapod.services.varset_self_join import (
-            FILTER_DIMENSIONS_NOT_PATCHABLE,
-            RULE_SELECTABLE_ATTRS,
-        )
-        from terrapod.services.workspace_search_service import WorkspaceFilter
-
-        # filter field -> the attribute key(s) a PATCH would use
-        mapping = {
-            "labels": "labels",
-            "execution_backend": "execution-backend",
-            "execution_mode": "execution-mode",
-            "terraform_version": "terraform-version",
-            "agent_pool_id": "agent-pool-id",
-            "vcs_connection_id": "vcs-connection-id",
-            "owner_email": "owner-email",
-        }
-        unclassified = []
-        for field in WorkspaceFilter.model_fields:
-            if field in FILTER_DIMENSIONS_NOT_PATCHABLE:
-                continue
-            key = mapping.get(field)
-            if key is None or key not in RULE_SELECTABLE_ATTRS:
-                unclassified.append(field)
-        assert not unclassified, (
-            "WorkspaceFilter has dimension(s) that are neither watched by "
-            "RULE_SELECTABLE_ATTRS nor declared unreachable in "
-            f"FILTER_DIMENSIONS_NOT_PATCHABLE: {unclassified}. A PATCH touching one "
-            "would skip the self-join check entirely."
-        )
-
-    def test_it_fails_open_on_an_attribute_nobody_classified(self):
-        """Being wrong in the safe direction is the whole reason the optimisation is
-        acceptable. An unrecognised key must still trigger the check."""
+    def test_an_unclassified_attribute_still_pays_for_the_check(self):
         from terrapod.services.varset_self_join import touches_rule_selectable
 
+        assert touches_rule_selectable({"something-nobody-has-classified": 1})
         assert touches_rule_selectable({"labels": {}})
-        assert touches_rule_selectable({}, {"vcs-connection": {"data": None}})
-        # and a body that genuinely cannot move it does not pay for the queries
+        # and a body that provably cannot move it does not pay
         assert not touches_rule_selectable({"description": "x", "auto-apply": True})
 
-    def test_the_connection_relationship_spelling_counts_too(self):
+    def test_a_relationship_always_counts(self):
         """The connection arrives as a relationship as well as an attribute, and
         gating on the attribute alone is how the PATCH gate was got wrong once."""
         from terrapod.services.varset_self_join import touches_rule_selectable
 
-        assert touches_rule_selectable(
-            {}, {"vcs-connection": {"data": {"id": "vcs-x", "type": "vcs-connections"}}}
+        assert touches_rule_selectable({}, {"vcs-connection": {"data": None}})
+        assert touches_rule_selectable({}, {"anything-at-all": {}})
+
+    def test_nothing_in_the_denylist_is_a_filter_dimension(self):
+        """The denylist is the only thing that can switch the guard off, so an entry
+        that names something a rule CAN select on would be a silent hole. Checked
+        against `WorkspaceFilter` itself rather than trusted."""
+        from terrapod.services.varset_self_join import NOT_RULE_SELECTABLE
+        from terrapod.services.workspace_search_service import WorkspaceFilter
+
+        # attribute key -> filter field, for the dimensions a PATCH can move
+        selectable = {
+            "labels": "labels",
+            "name": "name_prefix",
+            "execution-backend": "execution_backend",
+            "execution-mode": "execution_mode",
+            "terraform-version": "terraform_version",
+            "agent-pool-id": "agent_pool_id",
+            "vcs-connection-id": "vcs_connection_id",
+            "owner-email": "owner_email",
+        }
+        for attr, field in selectable.items():
+            assert field in WorkspaceFilter.model_fields, (
+                f"this test maps {attr} to a filter field that no longer exists"
+            )
+            assert attr not in NOT_RULE_SELECTABLE, (
+                f"{attr} moves the {field} dimension but is on the denylist, so a "
+                "PATCH touching it would skip the self-join check"
+            )
+
+    def test_the_refused_dimensions_are_refused_at_both_ends(self):
+        """`drift_status` and `locked` are platform state a workspace's own owner can
+        move — through `dismiss-drift`, through disabling drift detection, and through
+        lock/unlock — none of which pays the guard. They are refused as selectors
+        instead of gating five more endpoints."""
+        from terrapod.services.varset_self_join import RULE_DIMENSIONS_REFUSED
+        from terrapod.services.workspace_search_service import WorkspaceFilter
+
+        assert set(RULE_DIMENSIONS_REFUSED) == {"drift_status", "locked"}
+        for dim in RULE_DIMENSIONS_REFUSED:
+            assert dim in WorkspaceFilter.model_fields, (
+                f"{dim} is refused but is no longer a filter dimension — the refusal "
+                "is now dead code"
+            )
+            assert RULE_DIMENSIONS_REFUSED[dim].strip(), "every refusal needs its reason"
+
+    async def test_a_rule_naming_a_refused_dimension_is_422(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        set_auth(app, admin_user())
+        resp = await client.post(
+            VARSETS,
+            json={
+                "data": {
+                    "type": "varsets",
+                    "attributes": {
+                        "name": f"drifty-{tag}",
+                        "global": False,
+                        "assignment-rule": {"drift_status": "", "labels": {"team": tag}},
+                    },
+                }
+            },
+            headers=AUTH,
         )
+        assert resp.status_code == 422, resp.text
+        assert "drift_status" in resp.text
+
+    async def test_a_stored_rule_naming_one_matches_nothing(self, db_session=None):
+        """A deployment that already has such a rule must stop honouring it, not keep
+        the hole open for exactly the installs that have one."""
+        from terrapod.services.variable_service import _rule_matches
+
+        assert not await _rule_matches(None, {"locked": True}, uuid.uuid4())
+        assert not await _rule_matches(None, {"drift_status": ""}, uuid.uuid4())
 
 
 class TestEveryWayAWorkspaceComesIntoExistence:
@@ -329,3 +411,74 @@ class TestEveryWayAWorkspaceComesIntoExistence:
                 "writes are no longer an admin's choice and it needs the "
                 "self-join guard that create and catalog provision have"
             )
+
+
+class TestOnlySetsHoldingSecretsAreRefused:
+    """The refusal is scoped to the reported impact — "sensitive static values and
+    Vault-brokered secrets" — because refusing every match would close the feature
+    as well as the finding.
+
+    The documented workflow is an admin writing "label `env=prod` -> varset" and
+    developers self-servicing matching workspaces; the service catalog is entirely
+    non-admin self-service. A blanket refusal breaks both, and a guard that refuses
+    ordinary work gets switched off, taking the secrets with it.
+    """
+
+    async def test_a_set_of_plain_configuration_may_still_be_joined(self, app, client):
+        tag = uuid.uuid4().hex[:8]
+        set_auth(app, admin_user())
+        await _varset(client, f"plain-{tag}", rule={"labels": {"team": tag}}, secret=False)
+
+        set_auth(app, regular_user(f"probe-{tag}@test.com"))
+        resp = await _create_ws(client, f"mine-{tag}", labels={"team": tag})
+        assert resp.status_code == 201, resp.text
+
+    async def test_a_set_with_a_sensitive_variable_is_refused(self, app, client):
+        """The contrast is the test. Same shape, one sensitive variable."""
+        tag = uuid.uuid4().hex[:8]
+        set_auth(app, admin_user())
+        await _varset(client, f"secret-{tag}", rule={"labels": {"team": tag}}, secret=True)
+
+        set_auth(app, regular_user(f"probe-{tag}@test.com"))
+        resp = await _create_ws(client, f"mine-{tag}", labels={"team": tag})
+        assert resp.status_code == 403, resp.text
+
+    async def test_a_brokered_value_is_refused(self, app, client):
+        """The OpenBao/Vault case, where the secret never sits in the column.
+
+        Measured rather than assumed: this router stores a vault-sourced variable
+        with `sensitive` forced TRUE (`_apply_value_source` returns
+        `force_sensitive`), so the `sensitive` clause alone already catches anything
+        written through the API — removing the `value_source` clause does not fail
+        this test, and that is correct rather than a gap in it.
+
+        The clause stays as defence for rows this router did not write: a migration,
+        a direct SQL fixup, or a future writer that sets `value_source` without
+        setting `sensitive`. It is not load-bearing today and is not claimed to be.
+        """
+        tag = uuid.uuid4().hex[:8]
+        set_auth(app, admin_user())
+        vs = await _varset(client, f"brokered-{tag}", rule={"labels": {"team": tag}}, secret=False)
+        r = await client.post(
+            f"/api/v2/varsets/{vs}/relationships/vars",
+            json={
+                "data": {
+                    "type": "vars",
+                    "attributes": {
+                        "key": "db_password",
+                        "value": '{"mount":"secret","path":"apps/demo","field":"token"}',
+                        "category": "terraform",
+                        "sensitive": False,
+                        "value-source": "vault",
+                    },
+                }
+            },
+            headers=AUTH,
+        )
+        # No skip: if the brokered shape stops being accepted, this test must FAIL
+        # rather than quietly pass over the half of the check that matters most.
+        assert r.status_code in (200, 201), r.text
+
+        set_auth(app, regular_user(f"probe-{tag}@test.com"))
+        resp = await _create_ws(client, f"mine-{tag}", labels={"team": tag})
+        assert resp.status_code == 403, resp.text

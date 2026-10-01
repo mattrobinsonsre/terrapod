@@ -2266,6 +2266,20 @@ match itself would be the grant. A caller who is **not** a platform admin
 therefore may not **grow** the set of rule-assigned variable sets reaching a
 workspace. (GHSA-49q6-pm68-3xgw)
 
+**It is scoped to sets that hold a secret.** The refusal fires only when a set the
+workspace newly matches carries a `sensitive` variable or one resolved through
+OpenBao/Vault — the reported impact. A rule-assigned set of plain configuration
+still joins automatically, because that is the feature working, and a guard that
+refused every match would also refuse the documented self-service workflow and
+every service-catalog item whose labels match a rule.
+
+**Two rule dimensions are refused outright.** `drift_status` and `locked` are
+platform state a workspace's own owner can move — through `dismiss-drift`, through
+disabling drift detection, and through lock/unlock, none of which is a variable-set
+write — so a rule selecting on either is rejected with `422`, and a rule stored
+before this release that names one matches nothing. Select on something an admin
+controls, such as labels.
+
 **It is a behaviour change**, so expect it on first upgrade from any self-service
 workflow that created workspaces carrying labels a rule-scoped set selects on,
 and from a non-admin running the OpenTofu/Terraform provider.

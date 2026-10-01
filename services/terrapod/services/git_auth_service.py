@@ -158,6 +158,31 @@ async def _mint_from_connection(
     # named. REFUSED rather than dropped, for the reason the GitLab gate below
     # gives — a silently absent credential spends the operator's attention on an
     # `init` failure that names neither the credential nor the cause.
+    # The allowlist, checked for EVERY minted credential — including the workspace's
+    # own connection, which the authorization check below deliberately skips. A
+    # `git_http_auth` credential's scope is its `key`, a bare URL pattern the
+    # workspace owner chooses, so `key = github.com` installs the token for the whole
+    # host and the workspace's own configuration can then clone anything the
+    # credential reaches. Without this, `allowed_repositories` bounded the workspace's
+    # repo URL and not the credential, which is not what "restricts the connection to
+    # those patterns" says.
+    if workspace is not None:
+        from terrapod.services.vcs_connection_rbac import repository_allowed
+
+        conn_for_scope = await db.get(VCSConnection, conn_uuid)
+        if conn_for_scope is not None and not repository_allowed(
+            conn_for_scope, getattr(workspace, "vcs_repo_url", "") or ""
+        ):
+            raise GitAuthRefused(
+                f"git credential {key!r} references VCS connection vcs-{conn_uuid}, "
+                "which is restricted to specific repositories that do not include "
+                f"{getattr(workspace, 'vcs_repo_url', '') or '<unset>'!r}. A minted "
+                "credential is installed for the scope in the variable's key, so it "
+                "would reach repositories the connection is not scoped to. Widen "
+                "`allowed-repositories` on the connection, or use a `static` "
+                "credential holding a token you have scoped yourself."
+            )
+
     if workspace is not None and conn_uuid != getattr(workspace, "vcs_connection_id", None):
         from terrapod.services.vcs_connection_rbac import may_reference_connection
 

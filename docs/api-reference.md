@@ -2540,11 +2540,11 @@ omitting one leaves it alone, and an explicitly empty value clears it — so
 `"allowed-repositories": []` means "allow any repository again".
 
 A `labels` value that is not an object, and an `allowed-repositories` that is not
-a list of strings, are both rejected with `422`. A **reserved** label key is
-refused too, but currently as a `500` rather than the `422` every other labelled
-resource answers, because the connection router calls the service-level validator
-rather than the HTTP one. Treat the status as a defect, not a contract: reserved
-keys are listed under
+a list of strings, are both rejected with `422`. So is a **reserved** label key,
+and so is an `allowed-repositories` whose entries are all blank — that one matters
+because blanks are stripped, and an empty list means *any* repository, so silently
+dropping them would answer `200` having made the connection **wider** than it was.
+Send `[]` when you mean "any". Reserved keys are listed under
 [RBAC → Reserved Label Keys](rbac.md#reserved-label-keys) and there is no reason
 to send one.
 

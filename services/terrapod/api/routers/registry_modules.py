@@ -383,6 +383,26 @@ async def create_module_endpoint(
             actor_roles=list(user.roles),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
+
+        # The allowlist, beside the claim. The gate authorises the CONNECTION; this
+        # bounds which repository it may be pointed at, and a registry module is the
+        # same door as a workspace — an entitled caller could otherwise publish a
+        # module pointing a narrowed connection at anything its credential reaches,
+        # and ingestion clones it.
+        from terrapod.services.vcs_connection_rbac import (
+            repository_allowed,
+            repository_refusal_detail,
+        )
+
+        _conn_row = await db.get(VCSConnection, conn_id)
+        _repo_url_for_allowlist = attrs.vcs_repo_url
+        if _conn_row is not None and not repository_allowed(_conn_row, _repo_url_for_allowlist):
+            raise HTTPException(
+                status_code=403,
+                detail=repository_refusal_detail(
+                    conn_id, _repo_url_for_allowlist, list(_conn_row.allowed_repositories or [])
+                ),
+            )
         module.vcs_connection_id = conn_id
         module.source = "vcs"
     if attrs.vcs_repo_url:
@@ -661,6 +681,26 @@ async def update_module_endpoint(
                 actor_roles=list(user.roles),
             ):
                 raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
+
+        # The allowlist, beside the claim. The gate authorises the CONNECTION; this
+        # bounds which repository it may be pointed at, and a registry module is the
+        # same door as a workspace — an entitled caller could otherwise publish a
+        # module pointing a narrowed connection at anything its credential reaches,
+        # and ingestion clones it.
+        from terrapod.services.vcs_connection_rbac import (
+            repository_allowed,
+            repository_refusal_detail,
+        )
+
+        _conn_row = await db.get(VCSConnection, conn_id)
+        _repo_url_for_allowlist = attrs["vcs-repo-url"] or ""
+        if _conn_row is not None and not repository_allowed(_conn_row, _repo_url_for_allowlist):
+            raise HTTPException(
+                status_code=403,
+                detail=repository_refusal_detail(
+                    conn_id, _repo_url_for_allowlist, list(_conn_row.allowed_repositories or [])
+                ),
+            )
             module.vcs_connection_id = conn_id
             module.source = "vcs"
         else:
@@ -957,6 +997,26 @@ async def update_module_vcs_endpoint(
             actor_roles=list(user.roles),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
+
+        # The allowlist, beside the claim. The gate authorises the CONNECTION; this
+        # bounds which repository it may be pointed at, and a registry module is the
+        # same door as a workspace — an entitled caller could otherwise publish a
+        # module pointing a narrowed connection at anything its credential reaches,
+        # and ingestion clones it.
+        from terrapod.services.vcs_connection_rbac import (
+            repository_allowed,
+            repository_refusal_detail,
+        )
+
+        _conn_row = await db.get(VCSConnection, conn_id)
+        _repo_url_for_allowlist = attrs.vcs_repo_url
+        if _conn_row is not None and not repository_allowed(_conn_row, _repo_url_for_allowlist):
+            raise HTTPException(
+                status_code=403,
+                detail=repository_refusal_detail(
+                    conn_id, _repo_url_for_allowlist, list(_conn_row.allowed_repositories or [])
+                ),
+            )
         module.vcs_connection_id = conn_id
     else:
         module.vcs_connection_id = None

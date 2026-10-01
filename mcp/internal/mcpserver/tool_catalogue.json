@@ -921,7 +921,7 @@
           ]
         },
         "allow_fork_pr_plans": {
-          "description": "allow a pull request opened from a FORK to get a speculative plan. **On by default on this release line** (2.0 defaults it off), and off is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it to false to close this on a workspace, and do the same on any autodiscovery rule that creates workspaces, or the next discovery re-opens it (GHSA-gp5w-76rw-c452)",
+          "description": "allow a pull request opened from a FORK to get a speculative plan. **Off by default**, which is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it true only on a workspace that holds nothing worth taking, and note that an autodiscovery rule carries its own value for the workspaces it creates (GHSA-gp5w-76rw-c452)",
           "type": [
             "null",
             "boolean"
@@ -1063,7 +1063,7 @@
           ]
         },
         "allow_fork_pr_plans": {
-          "description": "allow a pull request opened from a FORK to get a speculative plan. **On by default on this release line** (2.0 defaults it off), and off is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it to false to close this on a workspace, and do the same on any autodiscovery rule that creates workspaces, or the next discovery re-opens it (GHSA-gp5w-76rw-c452)",
+          "description": "allow a pull request opened from a FORK to get a speculative plan. **Off by default**, which is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it true only on a workspace that holds nothing worth taking, and note that an autodiscovery rule carries its own value for the workspaces it creates (GHSA-gp5w-76rw-c452)",
           "type": [
             "null",
             "boolean"

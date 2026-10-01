@@ -34,6 +34,17 @@ def _db(owns: bool, *, row_for: tuple[uuid.UUID, str] | None = None):
     """
     db = AsyncMock()
 
+    # `may_reference_connection` loads the connection by primary key first, so the
+    # fake has to answer that too. A connection with no owner and no labels is the
+    # shape every row has straight after the migration, which is exactly the case
+    # these tests are about: the ownership fallback is the only claim available.
+    conn = MagicMock()
+    conn.name = "a-connection"
+    conn.owner_email = ""
+    conn.labels = {}
+    conn.allowed_repositories = []
+    db.get = AsyncMock(return_value=conn)
+
     async def execute(stmt, *a, **kw):
         params = set(stmt.compile().params.values())
         result = MagicMock()
@@ -502,41 +513,83 @@ class TestTheOwnerAndLabelClaims:
 class TestTheRepositoryAllowlist:
     """The residual hole after any amount of per-connection RBAC: being entitled to
     the connection says nothing about which repository it may be pointed at.
+
+    Every case goes through a connection with a real `provider`, because the matcher
+    canonicalises the URL with **the provider's own parser** — the same one the clone
+    uses. The first version parsed the URL itself and the two disagreed, which voided
+    the allowlist entirely: `myorg/safe?x=a://host/evilorg/evil` matched the pattern
+    `myorg/safe` while the fetch resolved `evilorg/evil`. A fixture without a
+    provider would exercise none of that.
     """
 
-    def _conn(self, allowed):
+    def _conn(self, allowed, provider="github"):
         c = MagicMock()
         c.allowed_repositories = allowed
+        c.provider = provider
+        c.server_url = ""
         return c
 
     def test_empty_means_any_so_an_upgrade_changes_nothing(self):
         assert rbac.repository_allowed(self._conn([]), "https://github.com/anyone/anything")
 
-    def test_a_pattern_matches_the_owner_slash_name_form(self):
-        """An operator writes `myorg/*`, not the full URL with a `.git` suffix.
-        Matching only the URL would make the feature unusable and so unused."""
+    def test_a_pattern_matches_the_canonical_owner_slash_name(self):
+        """An operator writes `myorg/*`, not a URL with a `.git` suffix. The
+        canonical form comes from the parser, so one pattern covers every spelling of
+        the same repository."""
         c = self._conn(["myorg/*"])
-        assert rbac.repository_allowed(c, "https://github.com/myorg/service.git")
-        assert rbac.repository_allowed(c, "git@github.com:myorg/service.git")
-        assert not rbac.repository_allowed(c, "https://github.com/other/service.git")
+        for url in (
+            "https://github.com/myorg/service",
+            "https://github.com/myorg/service.git",
+            "git@github.com:myorg/service.git",
+        ):
+            assert rbac.repository_allowed(c, url), url
+        assert not rbac.repository_allowed(c, "https://github.com/other/service")
 
     def test_a_pattern_may_also_be_written_against_the_full_url(self):
         c = self._conn(["https://github.com/myorg/*"])
         assert rbac.repository_allowed(c, "https://github.com/myorg/service")
         assert not rbac.repository_allowed(c, "https://github.com/myorg2/service")
 
-    def test_a_narrowed_connection_refuses_a_blank_target(self):
-        """Failing closed costs nothing — every caller has a URL by the time it
-        asks — and failing open would let a blank URL slip past a restriction."""
+    def test_a_bare_owner_pattern_means_the_whole_owner(self):
+        c = self._conn(["myorg"])
+        assert rbac.repository_allowed(c, "https://github.com/myorg/anything")
+        assert not rbac.repository_allowed(c, "https://github.com/other/anything")
+
+    def test_the_parser_disagreement_bypass_is_closed(self):
+        """THE finding in this function. A query string or fragment carrying a second
+        `://` made the two parsers resolve different repositories, so the gate passed
+        and the clone went elsewhere."""
+        c = self._conn(["myorg/safe"])
+        for url in (
+            "myorg/safe?x=a://host/evilorg/evil",
+            "myorg/safe#a://host/evilorg/evil",
+        ):
+            assert not rbac.repository_allowed(c, url), url
+
+    def test_a_narrowed_connection_refuses_a_target_that_does_not_parse(self):
+        """Failing closed costs nothing — the fetch would fail anyway — and failing
+        open would let an unresolvable URL slip past a restriction."""
         assert not rbac.repository_allowed(self._conn(["myorg/*"]), "")
+        assert not rbac.repository_allowed(self._conn(["myorg/*"]), "not a url at all")
 
     def test_a_blank_pattern_does_not_match_everything(self):
-        """A stray empty string in the list would otherwise turn a restriction into
-        `fnmatch(x, "")`, and worse, read as a configured allowlist."""
+        """A stray empty string would otherwise become `fnmatch(x, "")` while reading
+        as a configured allowlist."""
         assert not rbac.repository_allowed(self._conn([""]), "https://github.com/a/b")
+        assert not rbac.repository_allowed(self._conn(["   "]), "https://github.com/a/b")
 
     def test_no_connection_is_not_permission(self):
         assert not rbac.repository_allowed(None, "https://github.com/a/b")
+
+    def test_a_gitlab_group_pattern_reaches_nested_subgroups(self):
+        """Recorded because it is wider than the pattern reads. GitLab's parser keeps
+        the nested group path, so `group/*` matches at any depth — which is what a
+        group-wide pattern is almost certainly meant to do, but is worth pinning so
+        nobody discovers it as a surprise."""
+        c = self._conn(["group/*"], provider="gitlab")
+        assert rbac.repository_allowed(c, "https://gitlab.com/group/proj")
+        assert rbac.repository_allowed(c, "https://gitlab.com/group/sub/proj")
+        assert not rbac.repository_allowed(c, "https://gitlab.com/other/proj")
 
 
 class TestBothSinksAreGuarded:

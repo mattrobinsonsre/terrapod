@@ -153,9 +153,17 @@ def _rbac_attrs(attrs: dict) -> tuple[str, dict, list]:
     accepted on create and then rejected on every subsequent edit, leaving the
     entity uneditable.
     """
-    from terrapod.services.label_validation import validate_labels
+    # The HTTP-translating wrapper, not the raw service function. The raw one raises
+    # LabelValidationError (a ValueError), which has no handler, so a reserved label
+    # key on a connection answered 500 "Internal server error" instead of telling the
+    # operator which key is reserved. Every other labelled entity uses this wrapper.
+    from terrapod.api.labels import validate_labels
 
-    owner_email = (attrs.get("owner-email") or "").strip()[:255]
+    # Lower-cased, because the comparison in `may_reference_connection` is equality
+    # and an admin typing `Owner@Example.com` would otherwise create a grant that can
+    # never match an identity presented as `owner@example.com` — a security control
+    # that silently does nothing, with no feedback anywhere.
+    owner_email = (attrs.get("owner-email") or "").strip().lower()[:255]
 
     labels = attrs.get("labels")
     if labels is None:

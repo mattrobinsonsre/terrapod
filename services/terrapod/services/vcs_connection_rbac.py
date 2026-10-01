@@ -97,8 +97,11 @@ async def may_reference_connection(
         # existence check reports it; this must not report True.
         return False
 
-    # The connection's owner.
-    if conn.owner_email and conn.owner_email == actor_email:
+    # The connection's owner. Case-folded on both sides: the write path lower-cases
+    # from this release, but a row written before it — or by a migration, or by hand —
+    # may carry mixed case, and an owner grant that silently never matches is worse
+    # than no grant at all because nothing reports it.
+    if conn.owner_email and conn.owner_email.strip().lower() == actor_email.strip().lower():
         return True
 
     # Label RBAC, the same allow/deny evaluation every labelled resource gets —
@@ -193,13 +196,19 @@ def repository_allowed(conn: VCSConnection | None, repo_url: str) -> bool:
     """
     if conn is None:
         return False
-    patterns = [
-        p.strip()
-        for p in (getattr(conn, "allowed_repositories", None) or [])
-        if isinstance(p, str) and p.strip()
-    ]
+    raw = list(getattr(conn, "allowed_repositories", None) or [])
+    patterns = [p.strip() for p in raw if isinstance(p, str) and p.strip()]
     if not patterns:
-        return True
+        # An empty list means "any repository", which is what every existing
+        # deployment has after the migration — the allowlist is opt-in.
+        #
+        # But a list that was NON-empty and left nothing after stripping is a
+        # different thing: somebody intended a restriction. The API refuses that
+        # shape with a 422, so reaching here means the row was written another way,
+        # and the two options are to allow everything or to allow nothing. For a
+        # security control the second is right — a mangled restriction should fail
+        # loudly rather than silently become the widest possible setting.
+        return not raw
 
     forms = _repo_forms(conn, repo_url)
     if not forms:
