@@ -31,7 +31,7 @@ the setting to reach for rather than granting someone admin.
 Deliberately NOT keyed on labels. Every other RBAC'd entity here carries `labels` and
 `owner_email`; `VCSConnection` carries neither, so there is no dimension to match on
 without a schema change. Giving it one, and gating it the way agent pools and the
-registry are gated, is the 2.0 answer — this is the version that fits a patch.
+registry are gated, is the 1.9.0 answer — this is the version that fits a patch.
 """
 
 from __future__ import annotations

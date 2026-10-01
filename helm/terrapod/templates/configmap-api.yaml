@@ -177,7 +177,7 @@ data:
             acs_url: {{ .acs_url | quote }}
             {{- end }}
             {{- /*
-              hasKey, not `| default`: these default to TRUE, and Helm's
+              hasKey, not `| default`: these default to FALSE on this release line, and Helm's
               `default` treats false as empty — so `| default true` would render
               true for an operator who explicitly set false, and their opt-out
               would be silently inert. Omitting the key entirely lets the code

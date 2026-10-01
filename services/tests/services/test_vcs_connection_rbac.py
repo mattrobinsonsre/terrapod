@@ -174,3 +174,83 @@ class TestTheMintIsGatedToo:
         except Exception:
             pass
         assert seen["n"] == 0
+
+
+# ── The gates the review found unguarded ────────────────────────────────
+#
+# Each of these pins something that was shipped working and could have been
+# removed with the whole suite still green. One of them — the `workspace=`
+# kwarg — WAS missing on the 1.7 line, and nothing failed.
+
+
+class TestTheRunTimeGateIsActuallyWired:
+    """`resolve_git_auth(workspace=...)` is optional, so omitting it disables the
+    run-time half of GHSA-v8g7 silently.
+
+    That is not hypothetical: the 1.7 branch shipped the gate and omitted the
+    kwarg, so `workspace` was None on every request and the authorization check
+    was never reached. The mint's own tests call `_mint_from_connection` directly
+    with a workspace, so they cannot see it. This drives the real caller.
+    """
+
+    async def test_next_run_passes_the_workspace_to_the_resolver(self):
+        import inspect
+
+        from terrapod.api.routers import runs as runs_router
+
+        src = inspect.getsource(runs_router)
+        assert "resolve_git_auth(db, resolved, workspace=" in src, (
+            "next_run calls resolve_git_auth without workspace=, so the "
+            "GHSA-v8g7 run-time gate short-circuits on every request"
+        )
+        assert "resolve_git_auth(db, resolved)" not in src, (
+            "a call without the workspace kwarg remains"
+        )
+
+
+class TestTheRegistryModulePathIsGated:
+    """A module names a connection and a repo URL; the poller then clones with
+    that connection's credential. Module creation is open to any authenticated
+    user, so this path needs the same authorization as a workspace.
+    """
+
+    async def test_all_three_connection_sites_authorize(self):
+        import inspect
+
+        from terrapod.api.routers import registry_modules
+
+        src = inspect.getsource(registry_modules)
+        existence = src.count('detail="VCS connection not found"')
+        gated = src.count("may_reference_connection(")
+        assert existence > 0
+        assert gated >= existence, (
+            f"{existence} sites accept a connection id but only {gated} authorize "
+            "it — an ungated site lets any authenticated user clone a private "
+            "repository with someone else's installation credential"
+        )
+
+
+# `TestTheForkGateDefaultOnThisLine` is deliberately absent here: the fork-PR
+# gate and its `allow_fork_pr_plans` column ship on 1.8 and above only, because
+# the migration can be sequenced onto one release line. On 1.8 that class pins
+# the default the column, the create path and restore must all agree on.
+
+
+class TestThePatchGateIsGuarded:
+    """The create gate has route tests; the PATCH gate had none, and it carries
+    its own change-detection logic (`!= _conn_before_patch`) that create does
+    not. Deleting the PATCH block left the suite green."""
+
+    async def test_patch_authorizes_a_changed_connection(self):
+        import inspect
+
+        from terrapod.api.routers import tfe_v2
+
+        src = inspect.getsource(tfe_v2)
+        assert "_conn_before_patch" in src, "the PATCH change-detection is gone"
+        # the gate must sit after the value is applied and compare against the
+        # captured pre-PATCH value, or an unchanged PATCH starts failing
+        assert "ws.vcs_connection_id != _conn_before_patch" in src, (
+            "the PATCH gate no longer fires only on a change"
+        )
+        assert src.count("may_reference_connection(") >= 2, "create and PATCH must both authorize"

@@ -129,7 +129,7 @@ The environment variable name follows the pattern `TERRAPOD_{UPPERCASE_NAME}_CLI
 | Setting | Value |
 |---|---|
 | Application Type | Regular Web Application |
-| Allowed Callback URLs | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
+| Allowed Callback URLs | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` |
 | Allowed Logout URLs | `https://terrapod.example.com` |
 
 ### Okta Example
@@ -165,7 +165,7 @@ TERRAPOD_OKTA_CLIENT_SECRET="your-client-secret"
 |---|---|
 | Sign-in method | OIDC - OpenID Connect |
 | Application type | Web Application |
-| Sign-in redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
+| Sign-in redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` |
 | Assignments | Assign to users/groups as needed |
 
 ### Azure AD (Entra ID) Example
@@ -195,7 +195,7 @@ TERRAPOD_AZURE_AD_CLIENT_SECRET="your-client-secret"
 
 | Setting | Value |
 |---|---|
-| Redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` (Web platform) |
+| Redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` (Web platform) |
 | Token configuration | Add optional claim: `groups` |
 | API permissions | `openid`, `profile`, `email` |
 
@@ -276,7 +276,7 @@ api:
             display_name: "Azure AD (SAML)"
             metadata_url: "https://login.microsoftonline.com/{tenant-id}/federationmetadata/2007-06/federationmetadata.xml?appid={app-id}"
             entity_id: "https://terrapod.example.com"
-            acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/callback"
+            acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/saml/acs"
             role_prefixes: ["terrapod:"]
             claims_to_roles:
               - claim: "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
@@ -289,7 +289,7 @@ api:
 | Setting | Value |
 |---|---|
 | Identifier (Entity ID) | `https://terrapod.example.com` |
-| Reply URL (ACS URL) | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
+| Reply URL (ACS URL) | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` |
 | Sign on URL | `https://terrapod.example.com/login` |
 | Claims | Name ID (email), groups |
 
@@ -297,7 +297,7 @@ Note: The API Docker image includes `xmlsec1` which is required for SAML signatu
 
 ### Assertion validation
 
-Four checks decide whether an assertion the IDP posted is one Terrapod should
+Five checks decide whether an assertion the IDP posted is one Terrapod should
 act on. Each has its own switch, per provider, because identity providers get
 different things wrong and relaxing one should never cost you the others.
 
