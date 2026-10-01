@@ -723,6 +723,7 @@ def _workspace_json(
                 "vcs-last-error": ws.vcs_last_error,
                 "vcs-last-error-at": _rfc3339(ws.vcs_last_error_at),
                 "vcs-workflow": ws.vcs_workflow,
+                "allow-fork-pr-plans": ws.allow_fork_pr_plans,
                 "auto-merge": ws.auto_merge,
                 "auto-merge-strategy": ws.auto_merge_strategy,
                 "latest-run": latest_run_attr,
@@ -1232,6 +1233,15 @@ async def create_workspace(
         auto_merge=_422(
             workspace_settings.validate_bool, attrs.get("auto-merge", False), "auto-merge"
         ),
+        # Defaults off. A fork PR's speculative plan executes its author's code
+        # with the workspace's full credential set, and that author has no write
+        # access and cannot merge — so this is the only path by which their code
+        # reaches those credentials. Same-repository PRs are unaffected.
+        allow_fork_pr_plans=_422(
+            workspace_settings.validate_bool,
+            attrs.get("allow-fork-pr-plans", False),
+            "allow-fork-pr-plans",
+        ),
         auto_merge_strategy=auto_merge_strategy,
         auto_apply_mode=auto_apply_mode,
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
@@ -1726,6 +1736,12 @@ async def update_workspace(
             )
         )
 
+    if "allow-fork-pr-plans" in attrs:
+        ws.allow_fork_pr_plans = _422(
+            workspace_settings.validate_bool,
+            attrs["allow-fork-pr-plans"],
+            "allow-fork-pr-plans",
+        )
     if "auto-merge" in attrs:
         ws.auto_merge = _422(workspace_settings.validate_bool, attrs["auto-merge"], "auto-merge")
     if "auto-merge-strategy" in attrs:

@@ -80,6 +80,7 @@ class PullRequest:
         "author_login",
         "state",
         "merged",
+        "from_fork",
     )
 
     def __init__(
@@ -88,6 +89,8 @@ class PullRequest:
         head_sha: str,
         head_ref: str,
         title: str,
+        *,
+        from_fork: bool,
         draft: bool = False,
         author_login: str = "",
         state: str = "",
@@ -106,6 +109,18 @@ class PullRequest:
         # (workspace graduated) from a closed-unmerged one (orphan).
         self.state = state
         self.merged = merged
+        # Whether the head came from a different repository than the base —
+        # a fork on GitHub, a different source project on GitLab.
+        #
+        # Keyword-only and REQUIRED, with no default, deliberately. A fork
+        # author has no write access to the base repository and cannot merge,
+        # so a speculative plan is the only way their code ever executes with
+        # the workspace's credentials. That makes this a trust boundary, and a
+        # trust flag that defaults to "trusted" when a construction site forgets
+        # it fails open silently. Requiring it means a new provider, or a new
+        # path within an existing one, cannot omit it by accident — the same
+        # reasoning as the optional-parameter trap recorded in AGENTS.md.
+        self.from_fork = from_fork
 
 
 @dataclass(frozen=True)

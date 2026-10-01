@@ -74,6 +74,7 @@ async def _list_open_prs(
             head_sha=pr["head_sha"],
             head_ref=pr["head_ref"],
             title=pr["title"],
+            from_fork=bool(pr["from_fork"]),
         )
         for pr in prs
     ]
@@ -327,6 +328,23 @@ async def _create_module_test_runs(
     pr: PullRequest,
 ) -> None:
     """Download PR archive, upload override tarball, and create speculative runs."""
+    # A module PR from a fork reaches further than a workspace PR does: it
+    # creates a plan on every workspace that consumes the module, each with its
+    # own credentials. Each of those workspaces decides for itself (the per-
+    # workspace gate is in the run loop below); this early return just avoids
+    # downloading and storing an override tarball nobody will use.
+    if pr.from_fork and not any(
+        link.workspace is not None and link.workspace.allow_fork_pr_plans
+        for link in module.workspace_links
+    ):
+        logger.info(
+            "module_impact.fork_pr_skipped",
+            module=module.name,
+            pr_number=pr.number,
+            head_sha=pr.head_sha,
+        )
+        return
+
     # Download archive from PR head
     try:
         archive_bytes = await _download_archive(conn, owner, repo, pr.head_sha)
@@ -386,6 +404,17 @@ async def _create_module_test_runs(
     for link in module.workspace_links:
         ws = link.workspace
         if ws is None:
+            continue
+
+        # Per-workspace, because the setting is per-workspace: one consumer
+        # opting in to fork PRs does not volunteer the others' credentials.
+        if pr.from_fork and not ws.allow_fork_pr_plans:
+            logger.info(
+                "module_impact.fork_pr_skipped_for_workspace",
+                workspace=ws.name,
+                module=module.name,
+                pr_number=pr.number,
+            )
             continue
 
         # Fetch the workspace's own VCS code so the runner has configuration

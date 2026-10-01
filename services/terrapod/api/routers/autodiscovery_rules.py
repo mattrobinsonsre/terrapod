@@ -106,6 +106,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "plan-expiry-seconds": rule.plan_expiry_seconds,
             "slack-channel": rule.slack_channel or "",
             "debug-mode": rule.debug_mode,
+            "allow-fork-pr-plans": rule.allow_fork_pr_plans,
             "created-at": _rfc3339(rule.created_at),
             "updated-at": _rfc3339(rule.updated_at),
         },
@@ -398,6 +399,7 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         ("auto-merge", "auto_merge"),
         ("drift-detection-enabled", "drift_detection_enabled"),
         ("debug-mode", "debug_mode"),
+        ("allow-fork-pr-plans", "allow_fork_pr_plans"),
     ):
         if key in attrs:
             try:

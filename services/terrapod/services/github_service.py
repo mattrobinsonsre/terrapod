@@ -490,12 +490,40 @@ async def download_repo_archive_to_file(
     return bytes_written
 
 
+def _is_fork(pr: dict) -> bool:
+    """Whether this PR's head lives in a different repository than its base.
+
+    Fails closed: anything we cannot positively establish as same-repo counts
+    as a fork, because the consequence of guessing "trusted" is a speculative
+    plan running an outsider's code with the workspace's credentials.
+    """
+    head_repo = (pr.get("head") or {}).get("repo")
+    base_repo = (pr.get("base") or {}).get("repo")
+    if not head_repo or not base_repo:
+        return True
+    head_id, base_id = head_repo.get("id"), base_repo.get("id")
+    if head_id is not None and base_id is not None:
+        return head_id != base_id
+    head_name, base_name = head_repo.get("full_name"), base_repo.get("full_name")
+    if head_name and base_name:
+        return head_name != base_name
+    return True
+
+
 async def list_open_pull_requests(
     conn: VCSConnection, owner: str, repo: str, base_branch: str
 ) -> list[dict]:
     """List open pull requests targeting a specific base branch.
 
-    Returns a list of dicts with keys: number, head_sha, head_ref, title.
+    Returns a list of dicts with keys: number, head_sha, head_ref, title,
+    from_fork.
+
+    `from_fork` compares the head repository to the base one rather than
+    reading `head.repo.fork`: that flag says the head repo is *itself* a fork
+    of something, which is true for a PR raised inside a fork against that same
+    fork — trusted, same-repo, and not what we are asking. A deleted head repo
+    (`head.repo` is null) counts as a fork, because we cannot establish it was
+    the base.
     """
     token = await _api_call_token(conn)
     api_url = _api_url(conn)
@@ -521,6 +549,7 @@ async def list_open_pull_requests(
             "head_sha": pr["head"]["sha"],
             "head_ref": pr["head"]["ref"],
             "title": pr["title"],
+            "from_fork": _is_fork(pr),
         }
         for pr in resp.json()
     ]
@@ -847,6 +876,7 @@ async def get_pull_request(
         head_sha=pr["head"]["sha"],
         head_ref=pr["head"]["ref"],
         title=pr["title"],
+        from_fork=_is_fork(pr),
         draft=bool(pr.get("draft", False)),
         author_login=(pr.get("user") or {}).get("login", ""),
         state=pr.get("state", ""),

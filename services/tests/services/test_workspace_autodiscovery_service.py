@@ -524,6 +524,7 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "plan_expiry_seconds",
         "slack_channel",
         "debug_mode",
+        "allow_fork_pr_plans",
     )
 
     def _materialisation_source(self) -> str:

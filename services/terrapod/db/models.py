@@ -387,6 +387,32 @@ class Workspace(Base):
         String(20), nullable=False, server_default="merge_then_apply", default="merge_then_apply"
     )
 
+    # Whether a pull request opened from a FORK may trigger a speculative plan.
+    #
+    # Off by default, and that default is the point. A plan executes the PR
+    # author's code — provider configuration, `external` data sources,
+    # `local-exec` — with everything the run receives: env-category secrets,
+    # sensitive variables, Vault-resolved values, minted git credentials and the
+    # Job's cloud workload identity. There is no meaningful subset to hand it
+    # instead, because a plan needs the credentials to refresh state and the
+    # variables to evaluate the config at all.
+    #
+    # For a same-repository PR that is fine and is the entire point of the
+    # product: the author already has write access, can already get code
+    # applied by merging, and plan-on-PR is the safety property Terrapod
+    # exists to provide. Gating them would ask a reviewer to merge blind.
+    #
+    # A fork author is outside that boundary. They have no write access and
+    # cannot merge, so a speculative plan is the only path by which their code
+    # ever runs against these credentials. An operator who genuinely wants fork
+    # PRs planned — a public module repository taking community contributions,
+    # with a workspace holding nothing worth stealing — turns it on here, the
+    # same shape as naming a loopback destination in
+    # `outbound_requests.allowed_hosts`.
+    allow_fork_pr_plans: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true", default=True
+    )
+
     # Auto-merge after apply succeeds. Available in both modes; primary use is
     # apply_then_merge. When all PR-affected workspaces meet their per-mode
     # required state, the merge fires via the VCS provider's merge API.
@@ -1305,6 +1331,15 @@ class AutodiscoveryRule(Base):
     )
     debug_mode: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
+    )
+    #: Defaults FALSE, matching the workspace column rather than overriding it
+    #: like `drift_detection_enabled` above. An operator who decides fork PRs
+    #: should plan has to say so, and a rule is how they say it once for every
+    #: directory the repository grows later -- otherwise enabling it in bulk
+    #: holds only until autodiscovery creates the next workspace, which looks
+    #: exactly like the setting not working.
+    allow_fork_pr_plans: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
     )
     # #314 deletion lifecycle: what to do when a discovered directory is
     # removed on the tracked branch. "flag" (default, safe) marks the

@@ -22,6 +22,9 @@ def _mock_workspace(**overrides):
     ws.vcs_last_attempted_at = overrides.get("vcs_last_attempted_at", None)
     ws.vcs_last_error = overrides.get("vcs_last_error", None)
     ws.vcs_last_error_at = overrides.get("vcs_last_error_at", None)
+    # Mirrors the column default. A MagicMock attribute would be truthy, which
+    # is the opposite of the shipped behaviour and would hide the gate.
+    ws.allow_fork_pr_plans = overrides.get("allow_fork_pr_plans", False)
     ws.locked = False
     ws.auto_apply = False
     ws.execution_mode = "agent"
@@ -1488,6 +1491,10 @@ class TestFilteredPRIsDecidedOnce:
         pr.head_sha = head_sha
         pr.head_ref = "feature"
         pr.title = "some app change"
+        # Same-repository PR. Stated rather than left to MagicMock truthiness:
+        # a bare attribute reads as "from a fork", and these tests would then
+        # pass only because the workspace mock's opt-in is truthy too.
+        pr.from_fork = False
         return [pr]
 
     def _db_with_no_existing_run(self):
@@ -1797,6 +1804,7 @@ class TestPRSessionIsCreatedInBothModes:
         pr.head_sha = "deadbeefcafe"
         pr.head_ref = "feature/x"
         pr.title = "add a thing"
+        pr.from_fork = False
         return pr
 
     def _db(self):
@@ -1917,3 +1925,74 @@ class TestClosedPRSessionsAreReconciledInBothModes:
         reconcile.assert_awaited_once()
         # Comment-command polling drives applies, so it stays apply-then-merge only.
         comments.assert_not_awaited()
+
+
+class TestForkPullRequestsDoNotPlanByDefault:
+    """A fork PR executes its author's code during a speculative plan, with
+    everything the run receives — env secrets, sensitive variables, Vault
+    values, minted git credentials, the Job's cloud identity. A fork author has
+    no write access and cannot merge, so that plan is the only path by which
+    their code reaches those credentials.
+
+    The negative case is the important one and is asserted first below: a
+    SAME-REPOSITORY PR must still plan. Plan-on-PR is the safety property the
+    product exists to provide, and its author can already get code applied by
+    merging — gating them would ask a reviewer to merge blind while buying
+    almost nothing.
+    """
+
+    def _pr(self, *, from_fork):
+        pr = MagicMock()
+        pr.number, pr.head_sha = 11, "fff999"
+        pr.head_ref, pr.title = "contrib", "a contribution"
+        pr.from_fork = from_fork
+        return pr
+
+    def _db(self):
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        result.scalars.return_value.all.return_value = []
+        db.execute = AsyncMock(return_value=result)
+        return db
+
+    async def _cycle(self, ws, pr):
+        from terrapod.services.vcs_poller import _poll_workspace_prs
+
+        with patch("terrapod.services.vcs_poller._list_open_prs", new=AsyncMock(return_value=[pr])):
+            await _poll_workspace_prs(self._db(), ws, _mock_connection(), "org", "repo", "main")
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    async def test_a_same_repository_pr_still_plans(self, mock_create):
+        """The regression guard. If this ever fails, the gate has been widened
+        past forks and the core workflow is broken."""
+        mock_create.return_value = MagicMock(id=uuid.uuid4())
+        await self._cycle(_mock_workspace(), self._pr(from_fork=False))
+        mock_create.assert_called()
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    async def test_a_fork_pr_does_not_plan_on_a_default_workspace(self, mock_create):
+        await self._cycle(_mock_workspace(), self._pr(from_fork=True))
+        mock_create.assert_not_called()
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    async def test_a_fork_pr_plans_once_the_workspace_opts_in(self, mock_create):
+        mock_create.return_value = MagicMock(id=uuid.uuid4())
+        await self._cycle(_mock_workspace(allow_fork_pr_plans=True), self._pr(from_fork=True))
+        mock_create.assert_called()
+
+    @patch("terrapod.services.vcs_poller._upsert_pr_session")
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    async def test_a_blocked_fork_pr_gets_no_pr_session(self, mock_create, mock_session):
+        """No session means no comment-command surface, and that is load-bearing.
+
+        `handle_vcs_comment_dispatch` works from a `PRSession`, which carries no
+        notion of where the head branch lives — so it cannot re-apply this gate
+        itself. What keeps `terrapod plan` from handing a fork author the plan
+        the poller just withheld is that the session is only written after a run
+        exists, below this gate in the same loop. Moving the upsert above it
+        would reopen the hole without touching a line of gate code.
+        """
+        mock_create.return_value = MagicMock(id=uuid.uuid4())
+        await self._cycle(_mock_workspace(), self._pr(from_fork=True))
+        mock_session.assert_not_called()
