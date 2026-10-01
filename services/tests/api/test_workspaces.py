@@ -78,6 +78,7 @@ def _mock_workspace(
     ws.drift_status = ""
     ws.state_diverged = False
     ws.vcs_workflow = "merge_then_apply"
+    ws.allow_fork_pr_plans = False
     ws.auto_merge = False
     ws.auto_merge_strategy = "merge"
     ws.lifecycle_state = "active"
@@ -1945,3 +1946,75 @@ class TestCreateHonoursTheVCSWorkflowSettings1763:
         resp = await self._post(app, {"name": "bad-strat", "auto-merge-strategy": "fast-forward"})
         assert resp.status_code == 422, resp.text
         mock_db.commit.assert_not_awaited()
+
+
+# ── The route-level gate (GHSA-v8g7-pqrj-8mcm) ──────────────────────────
+#
+# The predicate has its own unit tests; these pin that the ROUTES consult it.
+# Without them the gate can be deleted from the router and every other workspace
+# test still passes — which is how it was nearly shipped unguarded.
+
+
+class TestNamingAVcsConnectionIsAuthorized:
+    _CONN = "vcs-11111111-2222-3333-4444-555555555555"
+
+    def _app(self):
+        user = _user(roles=["everyone"])
+        app, db = _make_app(user)
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        db.execute.return_value = result
+        db.refresh = AsyncMock()
+        return app, db
+
+    async def _post(self, body):
+        """POST a create with the authorization predicate refusing."""
+        app, db = self._app()
+        with (
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_db"),
+            patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock),
+            patch(
+                "terrapod.services.vcs_connection_rbac.may_reference_connection",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post("/api/v2/organizations/default/workspaces", json=body)
+        return resp, db
+
+    async def test_create_refuses_an_unauthorized_connection_attribute(self):
+        resp, db = await self._post(
+            {
+                "data": {
+                    "type": "workspaces",
+                    "attributes": {"name": "w", "vcs-connection-id": self._CONN},
+                }
+            }
+        )
+        assert resp.status_code == 403, resp.text
+        assert "every repository" in resp.text
+        db.commit.assert_not_awaited()
+
+    async def test_create_refuses_it_through_the_RELATIONSHIP_too(self):
+        """Both spellings reach the same column; gating one leaves the other open."""
+        resp, db = await self._post(
+            {
+                "data": {
+                    "type": "workspaces",
+                    "attributes": {"name": "w"},
+                    "relationships": {
+                        "vcs-connection": {"data": {"type": "vcs-connections", "id": self._CONN}}
+                    },
+                }
+            }
+        )
+        assert resp.status_code == 403, resp.text
+        db.commit.assert_not_awaited()
+
+    async def test_create_with_no_connection_is_untouched(self):
+        """The gate must not fire where no connection was named at all."""
+        resp, _ = await self._post({"data": {"type": "workspaces", "attributes": {"name": "w"}}})
+        assert resp.status_code != 403, resp.text

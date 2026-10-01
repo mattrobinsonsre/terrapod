@@ -207,8 +207,40 @@ async def _github_request(
         return resp
 
 
-# Installation token cache: {installation_id: (token, expires_at_epoch)}
-_token_cache: dict[int, tuple[str, float]] = {}
+# What a token is granted when the caller does not ask for anything wider:
+# read access to repository contents, which is all a `git clone`, a submodule
+# fetch or an archive download needs.
+#
+# This is the DEFAULT, rather than something a caller opts into, because the
+# callers outside this module are the ones whose token LEAVES the API process.
+# `git_auth_service` writes it into a runner Job's git credential helper and
+# `git_fetch` hands it to `git` as a Basic header — in a Job that is also
+# running user-supplied IaC. A mint with no `permissions` body gets every
+# permission the App holds, across every repository in the installation, which
+# is far more than a clone needs and is exactly what an attacker gets to keep.
+#
+# `repositories` is deliberately NOT narrowed alongside it. A workspace routinely
+# clones module sources from repositories Terrapod never recorded, so there is no
+# list to narrow to and restricting it would break fetches that work today.
+# Permissions-only is lossless: strictly less than the App already holds, and
+# `contents: read` is a permission every GitHub VCS connection must have for
+# polling to work at all, so asking for it can never be refused.
+CLONE_PERMISSIONS: dict[str, str] = {"contents": "read"}
+
+#: Passed as `permissions` to ask for every permission the App holds on the
+#: installation — GitHub's behaviour when the mint carries no `permissions`
+#: body. Only ever for a token that stays inside the API process.
+ALL_APP_PERMISSIONS: dict[str, str] = {}
+
+# Installation token cache: {(installation_id, permissions): (token, expires_at)}
+#
+# The permission set is part of the key, and has to be. Tokens minted for
+# different permission sets are not interchangeable, so a cache keyed on the
+# installation alone would serve whichever one happened to warm it first — a
+# clone handed a fully-permissioned token (the vulnerability, restored by the
+# cache), or a PR-comment write handed the read-only clone token and 403ing
+# depending on call order.
+_token_cache: dict[tuple[int, tuple[tuple[str, str], ...]], tuple[str, float]] = {}
 
 
 def _api_url(conn: VCSConnection) -> str:
@@ -238,14 +270,29 @@ def _generate_app_jwt(app_id: int, private_key: str) -> str:
     return jwt.encode(payload, private_key, algorithm="RS256")
 
 
-async def get_installation_token(conn: VCSConnection) -> str:
+async def get_installation_token(
+    conn: VCSConnection,
+    *,
+    permissions: dict[str, str] | None = None,
+) -> str:
     """Get an installation access token, using a 50-minute cache.
 
     Installation tokens are valid for 1 hour. We cache for 50 minutes
     to ensure we never use an expired token.
+
+    `permissions` is the set the minted token carries, and it defaults to
+    :data:`CLONE_PERMISSIONS` — `contents: read` and nothing else. That default
+    exists for the callers outside this module, which hand the token to a runner
+    Job; it is the narrowest thing that can still clone. Pass
+    `permissions=ALL_APP_PERMISSIONS` for a token Terrapod only uses from inside
+    the API process, where it needs whatever the App holds to comment on a PR,
+    set a commit status or merge — see :func:`_api_call_token`.
     """
+    if permissions is None:
+        permissions = CLONE_PERMISSIONS
     installation_id = conn.github_installation_id
-    cached = _token_cache.get(installation_id)
+    cache_key = (installation_id, tuple(sorted(permissions.items())))
+    cached = _token_cache.get(cache_key)
     if cached:
         token, expires_at = cached
         if time.time() < expires_at:
@@ -260,22 +307,53 @@ async def get_installation_token(conn: VCSConnection) -> str:
     # is safe), so opt in to 5xx retries via retry_5xx=True — otherwise a
     # single transient 5xx would propagate as an auth failure and stall
     # every subsequent VCS operation on this connection.
+    #
+    # An empty permission set means "whatever the App holds", and that is
+    # expressed by omitting the body entirely: GitHub reads the ABSENCE of
+    # `permissions` as the full installation grant, where an explicit `{}` would
+    # mint a token with no permissions at all. `dict(permissions)` copies rather
+    # than captures, so a caller's mapping can't be mutated from under the
+    # request.
+    extra: dict[str, object] = {}
+    if permissions:
+        extra["json"] = {"permissions": dict(permissions)}
+
     resp = await _github_request(
         "POST",
         f"{api_url}/app/installations/{installation_id}/access_tokens",
         app_jwt,
         retry_5xx=True,
         conn=conn,
+        **extra,
     )
     resp.raise_for_status()
     data = resp.json()
 
     token = data["token"]
     # Cache for 50 minutes (tokens last 60 min)
-    _token_cache[installation_id] = (token, time.time() + 50 * 60)
+    _token_cache[cache_key] = (token, time.time() + 50 * 60)
 
-    logger.debug("GitHub installation token obtained", installation_id=installation_id)
+    logger.debug(
+        "GitHub installation token obtained",
+        installation_id=installation_id,
+        permissions=",".join(sorted(permissions)) or "all-app-permissions",
+    )
     return token
+
+
+async def _api_call_token(conn: VCSConnection) -> str:
+    """An installation token for Terrapod's OWN GitHub API calls.
+
+    Separate from the default because the two have opposite requirements. This
+    token never leaves the API process, and the operations below it include
+    writes — PR comments, comment reactions, commit statuses, a squash merge —
+    so narrowing it to a fixed set would mean naming each permission, and
+    GitHub refuses the whole mint with a 422 when a requested permission is one
+    the installation does not grant. An operator whose App grants `checks:
+    write` but not `statuses: write` would lose every VCS operation rather than
+    one. So it asks for what the App holds, exactly as before this split.
+    """
+    return await get_installation_token(conn, permissions=ALL_APP_PERMISSIONS)
 
 
 def validate_webhook_signature(
@@ -308,7 +386,7 @@ async def get_repo_branch_sha(
 
     Returns None if the branch doesn't exist or isn't accessible.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -325,7 +403,7 @@ async def get_repo_default_branch(conn: VCSConnection, owner: str, repo: str) ->
 
     Returns None if the repo doesn't exist or isn't accessible.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request("GET", f"{api_url}/repos/{owner}/{repo}", token, conn=conn)
@@ -345,7 +423,7 @@ async def download_repo_archive(conn: VCSConnection, owner: str, repo: str, ref:
     pod will OOM under enough concurrent workspace polls. Use
     `download_repo_archive_to_file` for the VCS-poll path.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -382,7 +460,7 @@ async def download_repo_archive_to_file(
     (no resumable offset against the GitHub tarball endpoint) and pre-byte
     retries would just duplicate the cycle's own retry cadence.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
     url = f"{api_url}/repos/{owner}/{repo}/tarball/{ref}"
     headers = {
@@ -412,14 +490,42 @@ async def download_repo_archive_to_file(
     return bytes_written
 
 
+def _is_fork(pr: dict) -> bool:
+    """Whether this PR's head lives in a different repository than its base.
+
+    Fails closed: anything we cannot positively establish as same-repo counts
+    as a fork, because the consequence of guessing "trusted" is a speculative
+    plan running an outsider's code with the workspace's credentials.
+    """
+    head_repo = (pr.get("head") or {}).get("repo")
+    base_repo = (pr.get("base") or {}).get("repo")
+    if not head_repo or not base_repo:
+        return True
+    head_id, base_id = head_repo.get("id"), base_repo.get("id")
+    if head_id is not None and base_id is not None:
+        return head_id != base_id
+    head_name, base_name = head_repo.get("full_name"), base_repo.get("full_name")
+    if head_name and base_name:
+        return head_name != base_name
+    return True
+
+
 async def list_open_pull_requests(
     conn: VCSConnection, owner: str, repo: str, base_branch: str
 ) -> list[dict]:
     """List open pull requests targeting a specific base branch.
 
-    Returns a list of dicts with keys: number, head_sha, head_ref, title.
+    Returns a list of dicts with keys: number, head_sha, head_ref, title,
+    from_fork.
+
+    `from_fork` compares the head repository to the base one rather than
+    reading `head.repo.fork`: that flag says the head repo is *itself* a fork
+    of something, which is true for a PR raised inside a fork against that same
+    fork — trusted, same-repo, and not what we are asking. A deleted head repo
+    (`head.repo` is null) counts as a fork, because we cannot establish it was
+    the base.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -443,6 +549,7 @@ async def list_open_pull_requests(
             "head_sha": pr["head"]["sha"],
             "head_ref": pr["head"]["ref"],
             "title": pr["title"],
+            "from_fork": _is_fork(pr),
         }
         for pr in resp.json()
     ]
@@ -453,7 +560,7 @@ async def list_repo_branches(conn: VCSConnection, owner: str, repo: str) -> list
 
     Returns a list of dicts with keys: name, sha.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -473,7 +580,7 @@ async def list_repo_tags(conn: VCSConnection, owner: str, repo: str) -> list[dic
 
     Returns a list of dicts with keys: name, sha.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -497,7 +604,7 @@ async def get_changed_files(
     Returns None if the response is truncated (GitHub caps at 300 files),
     signaling that the caller should not filter and should create the run.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -531,7 +638,7 @@ async def get_pr_file_changes(
     caller MUST then skip lifecycle detection (acting on a partial diff
     could wrongly move/destroy a workspace).
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
     resp = await _github_request(
         "GET",
@@ -570,7 +677,7 @@ async def list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -
     >7 MB) — callers should treat that as "can't backfill this repo
     via tree API" and fall back to a manual scan when we have one.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     # `GET /repos/{owner}/{repo}/git/trees/{ref}?recursive=1` returns
@@ -613,7 +720,7 @@ async def create_commit_status(
         state: One of pending, success, failure, error.
         description: Max 140 chars.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     body: dict[str, str] = {
@@ -651,7 +758,7 @@ async def create_pr_comment(
     conn: VCSConnection, owner: str, repo: str, pr_number: int, body: str
 ) -> int:
     """Create a comment on a PR. Returns the comment ID."""
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -669,7 +776,7 @@ async def update_pr_comment(
     conn: VCSConnection, owner: str, repo: str, comment_id: int, body: str
 ) -> None:
     """Update an existing PR comment."""
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -691,7 +798,7 @@ async def add_comment_reaction(
     permission the App already holds to post them — reacting adds no new
     permission requirement over answering.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -709,7 +816,7 @@ async def remove_comment_reaction(
     conn: VCSConnection, owner: str, repo: str, comment_id: int, reaction_id: int
 ) -> None:
     """Remove one of our own reactions from a PR comment."""
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -725,7 +832,7 @@ async def list_pr_comments(
     conn: VCSConnection, owner: str, repo: str, pr_number: int
 ) -> list[dict]:
     """List comments on a PR. Used for marker-based comment lookup."""
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
 
     resp = await _github_request(
@@ -755,7 +862,7 @@ async def get_pull_request(
     conn: VCSConnection, owner: str, repo: str, pr_number: int
 ) -> PullRequest | None:
     """Fetch a single PR's current state."""
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
     resp = await _github_request(
         "GET", f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}", token, conn=conn
@@ -769,6 +876,7 @@ async def get_pull_request(
         head_sha=pr["head"]["sha"],
         head_ref=pr["head"]["ref"],
         title=pr["title"],
+        from_fork=_is_fork(pr),
         draft=bool(pr.get("draft", False)),
         author_login=(pr.get("user") or {}).get("login", ""),
         state=pr.get("state", ""),
@@ -786,7 +894,7 @@ async def get_pull_request_mergeability(
     `unknown=True` so the caller can retry rather than treating it as a
     permanent block.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
     resp = await _github_request(
         "GET", f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}", token, conn=conn
@@ -858,7 +966,7 @@ async def merge_pull_request(
     """
     if strategy not in ("merge", "squash", "rebase"):
         return PRMergeResult(merged=False, error_reason=f"invalid strategy {strategy!r}")
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
     payload: dict = {"merge_method": strategy}
     if commit_title:
@@ -900,7 +1008,7 @@ async def list_pr_comments_typed(
     other callers — notification dispatcher, status-comment lookup —
     still use.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
     params: dict = {"per_page": 100, "sort": "updated", "direction": "asc"}
     if since:
@@ -933,7 +1041,7 @@ async def list_pr_reviews(
     conn: VCSConnection, owner: str, repo: str, pr_number: int
 ) -> list[PRReview]:
     """List reviews submitted on a PR (used for approval-state detection)."""
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     api_url = _api_url(conn)
     resp = await _github_request(
         "GET",
@@ -988,7 +1096,7 @@ def repository_ref(data: dict) -> RepositoryRef:
 
 async def _get_or_none(conn: VCSConnection, path: str) -> dict | None:
     """GET an API path: the JSON, None on 404, raising on any other failure."""
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     resp = await _github_request("GET", f"{_api_url(conn)}{path}", token, conn=conn)
     if resp.status_code == 404:
         return None
@@ -1081,7 +1189,7 @@ async def list_installation_repositories(
     listing costs nothing. The cache is best-effort; without it every page is
     fetched in full. Raises on a provider error.
     """
-    token = await get_installation_token(conn)
+    token = await _api_call_token(conn)
     url = f"{_api_url(conn)}/installation/repositories"
     refs: list[RepositoryRef] = []
     page = 1

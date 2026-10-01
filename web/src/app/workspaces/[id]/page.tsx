@@ -69,6 +69,7 @@ interface WorkspaceAttrs {
   'resource-cpu': string
   'resource-memory': string
   'debug-mode': boolean
+  'allow-fork-pr-plans': boolean
   'agent-pool-id': string | null
   // The full pool set (#1085). Flat — a run is offered to every pool at once
   // and whichever has a live runner claims it first.
@@ -461,6 +462,7 @@ function WorkspaceDetailContent() {
   // Runner debug mode (#1764). A held pod keeps the run's credentials, so the
   // toggle is deliberate rather than a convenience — hence the touch confirm.
   const [savingDebugMode, setSavingDebugMode] = useState(false)
+  const [savingForkPlans, setSavingForkPlans] = useState(false)
 
   // Slack run notifications (#556). Local draft for the channel input,
   // autosaved on blur. Opt-in: empty channel = this workspace stays silent.
@@ -1268,6 +1270,40 @@ function WorkspaceDetailContent() {
       setError(err instanceof Error ? err.message : t('errors.updateDebugMode'))
     } finally {
       setSavingDebugMode(false)
+    }
+  }
+
+  // Speculative plans for pull requests opened from a fork
+  // (GHSA-gp5w-76rw-c452). A fork author has no write access and cannot
+  // merge, so the plan is the only way their code runs with this workspace's
+  // credentials — turning it ON is the direction that costs something, and
+  // the touch confirm guards that one.
+  async function handleForkPlansUpdate(next: boolean) {
+    if (!workspace) return
+    if (next && isTouch && !window.confirm(t('allowForkPrPlans.confirmEnable'))) return
+    setSavingForkPlans(true)
+    try {
+      // The BARE workspace resource is PATCHed on the TFE surface on this
+      // release line — `PATCH /api/terrapod/v1/workspaces/{id}` does not exist, so
+      // the native spelling 404s and the toggle silently never persists. Checked
+      // against api_route_contract.json; the DELETE a few hundred lines below IS
+      // native, which is exactly what makes copying a neighbour's prefix wrong.
+      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: { type: 'workspaces', attributes: { 'allow-fork-pr-plans': next } },
+        }),
+      })
+      if (!res.ok) {
+        throw new Error(await parseApiError(res, t('errors.updateForkPlans')))
+      }
+      const data = await res.json()
+      setWorkspace(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('errors.updateForkPlans'))
+    } finally {
+      setSavingForkPlans(false)
     }
   }
 
@@ -3120,6 +3156,60 @@ function WorkspaceDetailContent() {
                     <p className="text-xs text-slate-500 mt-1">
                       {t('debugMode.hint')}
                       {savingDebugMode && (
+                        <span className="ms-2 text-brand-400">{t('actions.saving')}</span>
+                      )}
+                    </p>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Speculative plans on fork pull requests (GHSA-gp5w-76rw-c452) */}
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-sm font-medium text-slate-300">
+                    {t('allowForkPrPlans.title')}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {t('allowForkPrPlans.description')}
+                  </p>
+                </div>
+                {attrs['allow-fork-pr-plans'] && (
+                  <span
+                    data-testid="allow-fork-pr-plans-indicator"
+                    className="shrink-0 px-2 py-1 rounded text-xs font-medium bg-amber-900/40 text-amber-300 border border-amber-700/50"
+                  >
+                    {t('allowForkPrPlans.activeBadge')}
+                  </span>
+                )}
+              </div>
+              <dl>
+                <div>
+                  <dt className="text-xs text-slate-500">{t('allowForkPrPlans.label')}</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          aria-label={t('allowForkPrPlans.label')}
+                          checked={!!attrs['allow-fork-pr-plans']}
+                          onChange={(e) => handleForkPlansUpdate(e.target.checked)}
+                          disabled={savingForkPlans}
+                          className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
+                        />
+                        <span className="text-sm text-slate-200">
+                          {attrs['allow-fork-pr-plans'] ? t('common.enabled') : t('common.disabled')}
+                        </span>
+                      </label>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['allow-fork-pr-plans'] ? t('common.enabled') : t('common.disabled')}
+                      </span>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      {t('allowForkPrPlans.hint')}
+                      {savingForkPlans && (
                         <span className="ms-2 text-brand-400">{t('actions.saving')}</span>
                       )}
                     </p>

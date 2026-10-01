@@ -171,6 +171,10 @@ class TestSubmoduleScoping:
         module.workspace_links = []
         pr = MagicMock()
         pr.number, pr.head_sha = 7, "abc123def456"
+        # Same-repository PR: these tests are about submodule scoping, not the
+        # fork trust gate. Stated explicitly because a bare MagicMock attribute
+        # is truthy, which would read as "from a fork" and skip the work.
+        pr.from_fork = False
         storage = MagicMock()
         storage.put = AsyncMock()
         db = AsyncMock()
@@ -205,3 +209,71 @@ class TestSubmoduleScoping:
             "modules/create/variables.tf",
             "modules/create-extra/main.tf",
         }
+
+
+class TestForkPullRequestsOnAModuleRepository:
+    """A module PR reaches further than a workspace PR (GHSA-gp5w-76rw-c452).
+
+    It plans on every workspace that consumes the module, each with that
+    workspace's own credentials. So the opt-in is read per consumer: one
+    workspace's operator cannot volunteer another's secrets, and a module
+    maintainer cannot volunteer any of them by merging nothing at all.
+    """
+
+    ARCHIVE = _tar_gz({"org-repo-abc123/main.tf": b"# root"})
+
+    def _module(self, *opted_in: bool):
+        module = MagicMock()
+        module.namespace, module.name, module.provider = "default", "mg", "azurerm"
+        module.subdirectory = ""
+        links = []
+        for i, allow in enumerate(opted_in):
+            ws = MagicMock()
+            ws.name = f"ws{i}"
+            ws.allow_fork_pr_plans = allow
+            links.append(MagicMock(workspace=ws))
+        module.workspace_links = links
+        return module
+
+    async def _run(self, module, *, from_fork: bool):
+        pr = MagicMock()
+        pr.number, pr.head_sha, pr.head_ref = 7, "abc123def456", "feature"
+        pr.from_fork = from_fork
+        storage = MagicMock()
+        storage.put = AsyncMock()
+        # A plain AsyncMock makes `result.scalars()` a coroutine, so the
+        # supersede sweep blows up before the gate under test is reached.
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = []
+        db = MagicMock()
+        db.execute = AsyncMock(return_value=result)
+        fetch = AsyncMock(return_value=None)  # stop each workspace after the gate
+        with (
+            patch.object(
+                module_impact_service, "_download_archive", new=AsyncMock(return_value=self.ARCHIVE)
+            ),
+            patch.object(module_impact_service, "_fetch_workspace_config", new=fetch),
+        ):
+            await module_impact_service._create_module_test_runs(
+                db, storage, module, MagicMock(provider="github"), "org", "repo", pr
+            )
+        planned = [call.args[1].name for call in fetch.await_args_list]
+        return storage, planned
+
+    async def test_a_fork_pr_plans_on_nothing_when_no_consumer_opted_in(self):
+        storage, planned = await self._run(self._module(False, False), from_fork=True)
+        assert planned == []
+        # No override tarball either: storing one would be writing a fork
+        # author's code into the registry's storage for nobody to use.
+        storage.put.assert_not_awaited()
+
+    async def test_a_fork_pr_plans_only_on_the_consumer_that_opted_in(self):
+        storage, planned = await self._run(self._module(False, True, False), from_fork=True)
+        assert planned == ["ws1"]
+        storage.put.assert_awaited_once()
+
+    async def test_a_same_repository_pr_still_plans_on_every_consumer(self):
+        # The model is plan-on-PR. Narrowing it for a branch inside the
+        # repository would be the regression this whole gate must not become.
+        _, planned = await self._run(self._module(False, False), from_fork=False)
+        assert planned == ["ws0", "ws1"]

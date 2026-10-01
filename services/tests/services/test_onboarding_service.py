@@ -5,7 +5,11 @@ step mocked — the real ``tofu init`` + ``terrapod-query schema`` execution is
 proven in the live P2.4 smoke, not here (mocked DB/Redis can't run tofu).
 """
 
+import io
+import os
+import tempfile
 import uuid
+import zipfile
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -321,3 +325,174 @@ async def test_complete_discovery_no_polish_when_nothing_found(monkeypatch):
     with patch("terrapod.services.scheduler.enqueue_trigger", enqueue):
         await svc.complete_discovery(db, uuid.uuid4(), success=True)
     enqueue.assert_not_awaited()
+
+
+# --- cache key: bounded by normalisation ----------------------------------
+def test_surface_cache_key_normalises_interior_whitespace():
+    """Equivalent constraint spellings share one entry.
+
+    `_VERSION_CONSTRAINT_RE` permits `\\s`, so without normalisation a caller can
+    mint unboundedly many distinct keys — each a miss that re-downloads a provider.
+    """
+    canonical = svc._surface_cache_key("tofu", "1.12", "aws", "< 6.0")
+    for variant in ("<  6.0", "<\t6.0", "< 6.0 ", " <  6.0", "<\n6.0"):
+        assert svc._surface_cache_key("tofu", "1.12", "aws", variant) == canonical
+    # Genuinely different constraints still get different keys.
+    assert svc._surface_cache_key("tofu", "1.12", "aws", "< 5.0") != canonical
+
+
+@pytest.mark.asyncio
+async def test_create_session_normalises_the_stored_constraint():
+    db = AsyncMock()
+    db.add = lambda _obj: None  # sync on the real session; AsyncMock would return a coroutine
+    session = await svc.create_session(
+        db, workspace_id=uuid.uuid4(), provider="aws", created_by="a@b", provider_version="<  6.0"
+    )
+    assert session.provider_version == "< 6.0"
+
+
+# --- scratch directories are always reaped --------------------------------
+def _fake_download_into(tmp_path):
+    """A stand-in for `_download_engine_binary` that leaves a real dir behind."""
+
+    async def _download(_db, engine, _version):
+        dest_dir = tempfile.mkdtemp(prefix="onb-bin-", dir=str(tmp_path))
+        dest = os.path.join(dest_dir, engine)
+        with open(dest, "wb") as f:
+            f.write(b"#!/bin/true\n")
+        return dest, dest_dir
+
+    return _download
+
+
+@pytest.mark.asyncio
+async def test_run_schema_discovery_reaps_both_scratch_dirs(tmp_path):
+    """Nothing is left on the PVC — neither the workdir nor the binary dir.
+
+    `_resolve_tmpdir` falls back to the system default when no PVC is configured,
+    which on an API pod is RAM-backed, so a leak here is memory not just disk.
+    """
+    ws = _workspace()
+    session = OnboardingSession(workspace_id=ws.id, provider="aws", status="pending")
+    db = _fake_db(session, ws)
+
+    with (
+        patch.object(svc, "_resolve_tmpdir", return_value=str(tmp_path)),
+        patch.object(svc, "get_cached_surface", AsyncMock(return_value=None)),
+        patch.object(svc, "set_cached_surface", AsyncMock()),
+        patch.object(svc, "_download_engine_binary", _fake_download_into(tmp_path)),
+        patch.object(
+            svc, "_discover_surface_blocking", return_value={"count": 0, "data_sources": []}
+        ),
+    ):
+        await svc.run_schema_discovery(db, session.id)
+
+    assert session.status == "schema_ready"
+    assert os.listdir(tmp_path) == []
+
+
+@pytest.mark.asyncio
+async def test_run_schema_discovery_reaps_both_scratch_dirs_on_failure(tmp_path):
+    ws = _workspace()
+    session = OnboardingSession(workspace_id=ws.id, provider="aws", status="pending")
+    db = _fake_db(session, ws)
+
+    with (
+        patch.object(svc, "_resolve_tmpdir", return_value=str(tmp_path)),
+        patch.object(svc, "get_cached_surface", AsyncMock(return_value=None)),
+        patch.object(svc, "_download_engine_binary", _fake_download_into(tmp_path)),
+        patch.object(svc, "_discover_surface_blocking", side_effect=RuntimeError("init failed")),
+    ):
+        await svc.run_schema_discovery(db, session.id)
+
+    assert session.status == "errored"
+    assert os.listdir(tmp_path) == []
+
+
+def _tofu_release_zip() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("tofu", "#!/bin/true\n")
+    return buf.getvalue()
+
+
+class _FakeStream:
+    def __init__(self, payload: bytes):
+        self._payload = payload
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        return False
+
+    def raise_for_status(self):
+        return None
+
+    async def aiter_bytes(self, _size):
+        yield self._payload
+
+
+class _FakeHTTPClient:
+    payload = b""
+
+    def __init__(self, **_kwargs):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        return False
+
+    def stream(self, _method, _url):
+        return _FakeStream(type(self).payload)
+
+
+def _patched_binary_cache(url="https://example.invalid/tofu.zip"):
+    return (
+        patch(
+            "terrapod.services.binary_cache_service.resolve_version",
+            AsyncMock(return_value="1.12.0"),
+        ),
+        patch(
+            "terrapod.services.binary_cache_service.get_or_cache_binary",
+            AsyncMock(return_value=url),
+        ),
+        patch("terrapod.storage.get_storage", lambda: None),
+    )
+
+
+@pytest.mark.asyncio
+async def test_download_engine_binary_leaves_only_the_binary(tmp_path):
+    """The release archive is unlinked once extracted — it is dead weight on the PVC."""
+    resolve, cache, storage = _patched_binary_cache()
+    _FakeHTTPClient.payload = _tofu_release_zip()
+    with (
+        patch.object(svc, "_resolve_tmpdir", return_value=str(tmp_path)),
+        resolve,
+        cache,
+        storage,
+        patch.object(svc.httpx, "AsyncClient", _FakeHTTPClient),
+    ):
+        dest, dest_dir = await svc._download_engine_binary(AsyncMock(), "tofu", "1.12")
+
+    assert os.path.basename(dest) == "tofu"
+    assert os.listdir(dest_dir) == ["tofu"]  # no leftover tofu.zip
+
+
+@pytest.mark.asyncio
+async def test_download_engine_binary_reaps_its_own_dir_on_failure(tmp_path):
+    """A failure here must leave nothing: the caller never receives the dir to reap."""
+    resolve, cache, storage = _patched_binary_cache()
+    with (
+        patch.object(svc, "_resolve_tmpdir", return_value=str(tmp_path)),
+        resolve,
+        cache,
+        storage,
+        patch.object(svc.httpx, "AsyncClient", side_effect=RuntimeError("network down")),
+        pytest.raises(RuntimeError, match="network down"),
+    ):
+        await svc._download_engine_binary(AsyncMock(), "tofu", "1.12")
+
+    assert os.listdir(tmp_path) == []

@@ -115,6 +115,12 @@ type Workspace struct {
 	// inspection (#1764). How long is the deployment's setting, not the
 	// workspace's — the pod keeps the run's credentials for that window.
 	DebugMode bool `json:"debug-mode"`
+	// AllowForkPRPlans permits a speculative plan for a pull request opened
+	// from a fork (GHSA-gp5w-76rw-c452). True by default on this release line (false from 2.0): such a plan runs
+	// the fork author's code with this workspace's credentials, and the
+	// author has neither write access nor the ability to merge. Pull requests
+	// from branches in the repository itself are unaffected.
+	AllowForkPRPlans bool `json:"allow-fork-pr-plans"`
 	// AISummaryMode is the three-state per-workspace override (#401):
 	//   "default"  → follow the deployment-wide ai_summary.enabled flag
 	//   "enabled"  → always summarise (no-op when global is off)
@@ -183,8 +189,14 @@ type CreateWorkspaceRequest struct {
 	// DebugMode holds this workspace's failed runner pods open for inspection
 	// (#1764). A pointer so that "leave it alone" and "turn it off" stay
 	// distinguishable -- a bare bool with omitempty cannot express the second.
-	DebugMode     *bool  `json:"debug-mode,omitempty"`
-	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	DebugMode *bool `json:"debug-mode,omitempty"`
+	// AllowForkPRPlans permits a speculative plan for a pull request opened
+	// from a fork (GHSA-gp5w-76rw-c452). A pointer for the same reason as
+	// DebugMode: a bare bool with omitempty cannot distinguish "leave it
+	// alone" from "turn it off", and this one gates whether untrusted code
+	// sees the credentials.
+	AllowForkPRPlans *bool  `json:"allow-fork-pr-plans,omitempty"`
+	AISummaryMode    string `json:"ai-summary-mode,omitempty"`
 	// AIPolicyMode is the per-workspace override for the AI policy GATE
 	// (#1766), with the same three states as AISummaryMode. Note the one
 	// asymmetry: "disabled" opts out of an ADVISORY verdict only. A mandatory
@@ -247,8 +259,14 @@ type UpdateWorkspaceRequest struct {
 	// DebugMode holds this workspace's failed runner pods open for inspection
 	// (#1764). A pointer so that "leave it alone" and "turn it off" stay
 	// distinguishable -- a bare bool with omitempty cannot express the second.
-	DebugMode     *bool  `json:"debug-mode,omitempty"`
-	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	DebugMode *bool `json:"debug-mode,omitempty"`
+	// AllowForkPRPlans permits a speculative plan for a pull request opened
+	// from a fork (GHSA-gp5w-76rw-c452). A pointer for the same reason as
+	// DebugMode: a bare bool with omitempty cannot distinguish "leave it
+	// alone" from "turn it off", and this one gates whether untrusted code
+	// sees the credentials.
+	AllowForkPRPlans *bool  `json:"allow-fork-pr-plans,omitempty"`
+	AISummaryMode    string `json:"ai-summary-mode,omitempty"`
 	// AIPolicyMode see CreateWorkspaceRequest. On UPDATE, empty string leaves
 	// the existing value untouched -- to explicitly set "follow the deployment
 	// default", pass "default".
@@ -550,6 +568,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.DebugMode != nil {
 		attrs["debug-mode"] = *req.DebugMode
 	}
+	if req.AllowForkPRPlans != nil {
+		attrs["allow-fork-pr-plans"] = *req.AllowForkPRPlans
+	}
 	if req.SlackChannel != "" {
 		attrs["slack-channel"] = req.SlackChannel
 	}
@@ -663,6 +684,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.DebugMode != nil {
 		attrs["debug-mode"] = *req.DebugMode
 	}
+	if req.AllowForkPRPlans != nil {
+		attrs["allow-fork-pr-plans"] = *req.AllowForkPRPlans
+	}
 	if req.SlackChannel != nil {
 		// *string so callers can explicitly go silent with &"".
 		attrs["slack-channel"] = *req.SlackChannel
@@ -746,6 +770,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		AgentPoolName:                 GetStringAttr(res, "agent-pool-name"),
 		VCSConnectionName:             GetStringAttr(res, "vcs-connection-name"),
 		DebugMode:                     GetBoolAttr(res, "debug-mode"),
+		AllowForkPRPlans:              GetBoolAttr(res, "allow-fork-pr-plans"),
 		AISummaryMode:                 GetStringAttr(res, "ai-summary-mode"),
 		AISummaryContext:              GetStringAttr(res, "ai-summary-context"),
 		AIPolicyMode:                  GetStringAttr(res, "ai-policy-mode"),

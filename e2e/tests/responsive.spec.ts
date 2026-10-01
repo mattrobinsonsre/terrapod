@@ -328,7 +328,7 @@ test.describe('Responsive harness (phone viewport)', () => {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' },
       body: JSON.stringify({
-        data: { type: 'vcs-connections', attributes: { name, provider: 'gitlab', token: 'glpat-e2e-not-a-real-token' } },
+        data: { type: 'vcs-connections', attributes: { name, provider: 'gitlab', token: 'glpat-e2e-not-a-real-token' /* gitleaks:allow — fixture, not a credential */ } },
       }),
     })
     expect(created.ok).toBeTruthy()

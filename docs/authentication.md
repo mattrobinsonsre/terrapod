@@ -129,7 +129,7 @@ The environment variable name follows the pattern `TERRAPOD_{UPPERCASE_NAME}_CLI
 | Setting | Value |
 |---|---|
 | Application Type | Regular Web Application |
-| Allowed Callback URLs | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
+| Allowed Callback URLs | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` |
 | Allowed Logout URLs | `https://terrapod.example.com` |
 
 ### Okta Example
@@ -165,7 +165,7 @@ TERRAPOD_OKTA_CLIENT_SECRET="your-client-secret"
 |---|---|
 | Sign-in method | OIDC - OpenID Connect |
 | Application type | Web Application |
-| Sign-in redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
+| Sign-in redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` |
 | Assignments | Assign to users/groups as needed |
 
 ### Azure AD (Entra ID) Example
@@ -195,7 +195,7 @@ TERRAPOD_AZURE_AD_CLIENT_SECRET="your-client-secret"
 
 | Setting | Value |
 |---|---|
-| Redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` (Web platform) |
+| Redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` (Web platform) |
 | Token configuration | Add optional claim: `groups` |
 | API permissions | `openid`, `profile`, `email` |
 
@@ -204,6 +204,36 @@ TERRAPOD_AZURE_AD_CLIENT_SECRET="your-client-secret"
 When a user logs in via OIDC, roles are resolved from three sources (merged and deduplicated):
 
 1. **IDP groups** -- group names from the `groups_claim`, with `role_prefixes` stripped. For example, if the IDP returns `terrapod:developer` and the prefix is `terrapod:`, the role `developer` is assigned.
+
+   > **Read this before pointing Terrapod at a directory you do not fully control.**
+   >
+   > **Every group becomes a role name. There is no allow-list.** A group the IDP
+   > returns is a role name Terrapod will look for — so a group named literally
+   > `admin` grants the built-in **platform admin** role, and one named `audit`
+   > grants read access to every workspace. Neither needs any Terrapod-side
+   > configuration, and neither leaves a role assignment behind to notice.
+   >
+   > **`role_prefixes` strips; it does not filter.** The name reads like a scope
+   > and is not one. A group that matches a prefix has it removed; a group that
+   > matches **no** prefix is passed through **unchanged**. So configuring
+   > `role_prefixes: ["terrapod-"]` does not confine role-granting to
+   > `terrapod-*` groups — `admin` still arrives as `admin`. The default is
+   > `["terrapod:", "terrapod-"]`, so this applies to every deployment that has
+   > not changed it.
+   >
+   > **SAML does not apply `role_prefixes` at all.** The setting exists on a SAML
+   > provider and nothing reads it, so a SAML group arrives at role resolution
+   > with its prefix intact: `terrapod-admin` is looked up as the role
+   > `terrapod-admin`, which matches no built-in role and usually nothing at all.
+   > The practical effect is that a prefixed SAML group grants nothing while an
+   > unprefixed one named `admin` grants everything.
+   >
+   > **What to do today.** Treat the IDP group list as a grant list: if your
+   > directory contains a group named `admin` or `audit` for any other purpose,
+   > whoever is in it becomes a Terrapod platform admin or auditor at their next
+   > login. Either rename those groups, or stop returning them in the
+   > `groups_claim` — most IDPs can scope which groups are released per
+   > application, and that scoping is the only real filter available.
 
 2. **Claims-to-roles mapping** -- explicit rules in the config. Each rule matches a claim name + value and assigns specific roles.
 
@@ -246,7 +276,7 @@ api:
             display_name: "Azure AD (SAML)"
             metadata_url: "https://login.microsoftonline.com/{tenant-id}/federationmetadata/2007-06/federationmetadata.xml?appid={app-id}"
             entity_id: "https://terrapod.example.com"
-            acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/callback"
+            acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/saml/acs"
             role_prefixes: ["terrapod:"]
             claims_to_roles:
               - claim: "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
@@ -259,11 +289,76 @@ api:
 | Setting | Value |
 |---|---|
 | Identifier (Entity ID) | `https://terrapod.example.com` |
-| Reply URL (ACS URL) | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
+| Reply URL (ACS URL) | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` |
 | Sign on URL | `https://terrapod.example.com/login` |
 | Claims | Name ID (email), groups |
 
 Note: The API Docker image includes `xmlsec1` which is required for SAML signature verification.
+
+### Assertion validation
+
+Five checks decide whether an assertion the IDP posted is one Terrapod should
+act on. Each has its own switch, per provider, because identity providers get
+different things wrong and relaxing one should never cost you the others.
+
+| Key | What it requires | Turn it off when |
+|---|---|---|
+| `validate_destination` | The assertion's `Destination` and `Recipient` name **this** deployment's ACS URL | Your IDP sends a `Destination` that genuinely differs from the URL you registered |
+| `validate_in_response_to` | The assertion answers the authentication request this login sent | Your IDP does not echo `InResponseTo` on the `Response` element |
+| `reject_replayed_assertions` | Each assertion is used once; the id is remembered in Redis for the rest of its validity window | Never, in practice — an IDP does not issue the same assertion twice |
+| `want_assertions_signed` | The signature is on the assertion itself, not only on the enclosing message | Your IDP signs the message only |
+| `reject_deprecated_algorithm` | No SHA-1 signature or digest (`RSA-SHA1`, `DSA-SHA1`, `SHA1`) | Your IDP cannot yet be moved off SHA-1 |
+
+**The defaults differ by release line.** On the 2.x development line every one of
+them is `true`. On the 1.x release lines every one is `false`, preserving the
+behaviour an operator already has — a patch release must never lock someone out
+of their own deployment. The implementation is identical on both; only the
+default differs, so the setting you choose means the same thing on either.
+
+```yaml
+api:
+  config:
+    auth:
+      sso:
+        saml:
+          - name: azure-ad-saml
+            metadata_url: "https://login.microsoftonline.com/{tenant-id}/federationmetadata/2007-06/federationmetadata.xml"
+            entity_id: "https://terrapod.example.com"
+            # Explicit on a 1.x release, where the defaults are false:
+            validate_destination: true
+            validate_in_response_to: true
+            reject_replayed_assertions: true
+            want_assertions_signed: true
+            reject_deprecated_algorithm: true
+```
+
+**What `Destination` is checked against.** The ACS URL, resolved in this order:
+the provider's own `acs_url`; otherwise `auth.callback_base_url` plus the SAML
+ACS path; otherwise `external_url` plus that path. `callback_base_url` comes
+first because it is what the ACS URL registered with your IDP was built from,
+and the IDP mirrors that URL back as `Destination` and `Recipient` — checking
+against a different base is how this turns from a security control into a failed
+login. If a proxy rewrites the path between your IDP and Terrapod, set `acs_url`
+to the address the IDP actually posts to.
+
+A SAML provider has always needed an absolute ACS URL — python3-saml refuses to
+start without one — so turning `validate_destination` on asks for no
+configuration a working SAML setup does not already have.
+
+**Diagnosing a refusal.** Each check fails with its own message in the API log
+and in the `401` body, naming the provider:
+
+| Message contains | Check | Usual cause |
+|---|---|---|
+| `The response was received at … instead of …` | `validate_destination` | The IDP's reply URL is not the one Terrapod believes it serves |
+| `carries no InResponseTo` | `validate_in_response_to` | IDP-initiated sign-on, or an IDP that omits the attribute |
+| `answers a different authentication request` | `validate_in_response_to` | A stale browser tab, or a replayed assertion |
+| `already been used` | `reject_replayed_assertions` | A replayed assertion, or a user double-submitting the IDP's form |
+| `not signed and the SP require it` | `want_assertions_signed` | The IDP signs the message only |
+| `Deprecated signature algorithm` | `reject_deprecated_algorithm` | The IDP still signs with SHA-1 |
+
+Relax the one check the message names rather than all five: each failure is a
+different problem, and the other four keep protecting you.
 
 ---
 
@@ -338,6 +433,31 @@ Example: `abc123def456.tpod.ghijklmnopqrstuvwxyz0123456789`
 - SHA-256 hashed at rest in the `api_tokens` PostgreSQL table
 - The raw token value is returned only once at creation time
 - Max lifetime enforced via `auth.api_token_max_ttl_hours` config
+
+> **A non-positive `lifespan_hours` makes an interactive token never expire.**
+> `lifespan_hours` takes precedence over `api_token_max_ttl_hours`, and a value of
+> `0` — or any negative number — is read as "no expiry" rather than as "unset", so
+> an interactive token created with `{"lifespan_hours": 0}` is exempt from the cap
+> for the rest of its life. The cap uses `0` to mean *no limit*, and that meaning
+> is applied to the per-token field as well, where it is almost never what the
+> caller intended.
+>
+> **Service tokens are not affected** — they fall back to
+> `auth.service_token_max_ttl_hours` whenever their resolved lifespan is
+> non-positive, so they always carry an expiry.
+>
+> Until this is addressed, treat a non-positive `lifespan_hours` as a value to
+> reject at your own boundary: omit the field to get the cap, or pass a positive
+> number of hours. `GET /api/terrapod/v1/users/{user_id}/authentication-tokens`
+> reports `expires-at`, and it is `null` for every token that has no expiry —
+> which is these, plus every interactive token when `api_token_max_ttl_hours` is
+> itself `0`. So a `null` is evidence of this only when the cap is set.
+>
+> **In 2.0 a non-positive `lifespan_hours` is treated as unset**, so the cap
+> applies and the token expires. A deployment that is relying on `0` to mint a
+> non-expiring interactive token will find those tokens expiring after
+> `api_token_max_ttl_hours` once upgraded; mint them with an explicit positive
+> lifespan, or set the cap to `0`, before you upgrade.
 - Changing the max TTL retroactively affects all existing tokens
 
 ### Token Kinds — Personal vs Service Tokens

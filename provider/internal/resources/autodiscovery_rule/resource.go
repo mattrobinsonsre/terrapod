@@ -114,6 +114,7 @@ type autodiscoveryRuleModel struct {
 	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
+	AllowForkPRPlans              types.Bool   `tfsdk:"allow_fork_pr_plans"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	VCSWorkflow                   types.String `tfsdk:"vcs_workflow"`
@@ -387,6 +388,14 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 			// default instead of planning a change on every run (#684).
 			"debug_mode": schema.BoolAttribute{
 				Description: "Hold failed runner pods open for inspection on workspaces this rule creates.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"allow_fork_pr_plans": schema.BoolAttribute{
+				Description: "Give fork pull requests a speculative plan on workspaces this rule creates. Defaults to true on this release line (false from 2.0): such a plan runs the pull request author's code with the workspace's full credential set, and a fork author cannot merge, so it is the only path by which their code reaches those credentials (GHSA-gp5w-76rw-c452). Pull requests opened from branches within the repository itself are unaffected and always plan.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
@@ -811,6 +820,7 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		val types.Bool
 	}{
 		{"debug-mode", m.DebugMode},
+		{"allow-fork-pr-plans", m.AllowForkPRPlans},
 		{"terragrunt-enabled", m.TerragruntEnabled},
 		{"auto-merge", m.AutoMerge},
 		{"drift-detection-enabled", m.DriftDetectionEnabled},
@@ -1008,6 +1018,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	m.AutoMergeStrategy = types.StringValue(terrapod.GetStringAttr(res, "auto-merge-strategy"))
 	m.SlackChannel = types.StringValue(terrapod.GetStringAttr(res, "slack-channel"))
 	m.DebugMode = types.BoolValue(terrapod.GetBoolAttr(res, "debug-mode"))
+	m.AllowForkPRPlans = types.BoolValue(terrapod.GetBoolAttr(res, "allow-fork-pr-plans"))
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
 	m.AutoMerge = types.BoolValue(terrapod.GetBoolAttr(res, "auto-merge"))
 	m.DriftDetectionEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "drift-detection-enabled"))

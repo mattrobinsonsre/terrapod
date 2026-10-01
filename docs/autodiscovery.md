@@ -80,7 +80,8 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `drift-ignore-rules` | list | no | Address/attribute-path patterns whose drift is ignored on created workspaces (#1763). |
 | `plan-expiry-seconds` | int | no | Auto-discard an unconfirmed plan after this many seconds. Unset means no expiry (#1763). |
 | `slack-channel` | string | no | Slack channel for run notifications on created workspaces; empty is silent (#1763). |
-| `debug-mode` | bool | no | Hold a **failed** runner pod open on created workspaces so an operator can `kubectl exec` into it. Defaults off — a held pod keeps the run's credentials and decrypted variables for the deployment's linger window, so it is worth enabling deliberately rather than across every discovered directory (#1764). See [runners.md → Debug mode](runners.md#debug-mode-inspecting-a-failed-runner-pod). |
+| `debug-mode` | bool | no | Hold a **failed** runner pod open on created workspaces so an operator can `kubectl exec` into it. Defaults ON on this release line (off from 2.0) — a held pod keeps the run's credentials and decrypted variables for the deployment's linger window, so it is worth enabling deliberately rather than across every discovered directory (#1764). See [runners.md → Debug mode](runners.md#debug-mode-inspecting-a-failed-runner-pod). |
+| `allow-fork-pr-plans` | bool | no | Let a pull request opened **from a fork** get a speculative plan on created workspaces. Defaults ON on this release line (off from 2.0) — such a plan runs the fork author's code with the workspace's credentials, and they have neither write access nor the ability to merge. Set it here so the choice survives the next directory autodiscovery picks up; pull requests from branches in the repository itself always plan either way. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks). |
 
 ## Pattern syntax
 

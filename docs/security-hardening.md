@@ -78,6 +78,34 @@ api:
         - audit
 ```
 
+### Validate SAML Assertions Strictly
+
+If you use a SAML provider, confirm all five assertion checks are on. They are
+per provider, and on the 1.x release lines they default to **off** so that a
+patch release could not lock anyone out — which means a deployment carried
+forward from 1.x keeps the permissive setting until you say otherwise:
+
+```yaml
+api:
+  config:
+    auth:
+      sso:
+        saml:
+          - name: azure-ad
+            metadata_url: "https://login.microsoftonline.com/…/federationmetadata.xml"
+            validate_destination: true          # the assertion is addressed to us
+            validate_in_response_to: true       # it answers a request we sent
+            reject_replayed_assertions: true    # it is used once
+            want_assertions_signed: true        # the claims are covered by a signature
+            reject_deprecated_algorithm: true   # no SHA-1
+```
+
+`validate_destination` is the one to turn on first: without it an assertion the
+IDP issued for a different service provider is accepted here, so anyone who can
+obtain one for a host they control can replay it at Terrapod and log in as that
+user. See [Authentication](authentication.md#assertion-validation) for what each
+check refuses and how to read a failure.
+
 ## Secrets Management
 
 ### Use Kubernetes Secrets
@@ -299,6 +327,40 @@ Runner Jobs execute untrusted Terraform/Tofu code. Harden them:
 - **Seccomp profile**: RuntimeDefault
 - **Resource limits**: CPU and memory limits prevent noisy-neighbor issues
 - **Network isolation**: NetworkPolicies deny access to Postgres and Redis
+
+### Plans on pull requests from forks
+
+The isolation above bounds what a run can reach; it does not decide **whose**
+code gets to run. A speculative plan executes the configuration on a pull
+request branch with the workspace's own credentials — `env`-category
+variables, sensitive values, OpenBao/Vault-resolved values, minted git
+credentials and the Job's cloud workload identity.
+
+For a pull request raised inside the repository that is the intended
+behaviour: its author already has write access and can get code applied by
+merging. A **fork** author has neither, so the speculative plan is the only
+path by which their code reaches those credentials. Terrapod therefore does
+not plan fork pull requests unless the workspace opts in:
+
+```json
+{ "data": { "type": "workspaces",
+            "attributes": { "allow-fork-pr-plans": false } } }
+```
+
+`true` is the default **on this release line** — a patch must not stop a fork pull request that plans today — so a hardened deployment DOES have something to change. 2.0 defaults it false. Audit
+it rather than set it:
+
+```sql
+SELECT name FROM workspaces WHERE allow_fork_pr_plans = true;
+```
+
+Every workspace in that result accepts code from people outside the
+repository's write boundary. Keep the list to workspaces that hold nothing
+worth taking — a public module repository taking community contributions is
+the case it exists for — and check the autodiscovery rules too, since a rule
+that sets it hands it to every workspace it creates from now on. See
+[vcs-integration.md → Pull requests from
+forks](vcs-integration.md#pull-requests-from-forks).
 
 ### Runner Token TTL
 

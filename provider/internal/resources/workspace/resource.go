@@ -486,6 +486,14 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"allow_fork_pr_plans": schema.BoolAttribute{
+				Description: "Give a pull request opened from a fork a speculative plan. Defaults to true on this release line (false from 2.0): that plan runs the pull request author's code against this workspace's whole credential set — env variables, secret-manager-resolved values, minted git credentials and the runner Job's cloud workload identity — and a fork author cannot merge, so it is the only path by which their code ever reaches those credentials (GHSA-gp5w-76rw-c452). Pull requests opened from branches within the repository itself are unaffected and always plan; turn this on only for a workspace holding nothing worth taking, such as one backing a public module repository.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"ai_summary_mode": schema.StringAttribute{
 				Description: "Per-workspace AI plan-summary opt-in (#401). One of \"default\" (follow the deployment's global `ai_summary.enabled` setting), \"enabled\" (always summarise this workspace's plans), or \"disabled\" (never summarise — overrides global). Defaults to \"default\".",
 				Optional:    true,
@@ -927,6 +935,10 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.DebugMode.ValueBool()
 		req.DebugMode = &v
 	}
+	if !m.AllowForkPRPlans.IsNull() && !m.AllowForkPRPlans.IsUnknown() {
+		v := m.AllowForkPRPlans.ValueBool()
+		req.AllowForkPRPlans = &v
+	}
 	if !m.AISummaryMode.IsNull() && !m.AISummaryMode.IsUnknown() {
 		req.AISummaryMode = m.AISummaryMode.ValueString()
 	}
@@ -1071,6 +1083,10 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.DebugMode.IsNull() && !m.DebugMode.IsUnknown() {
 		v := m.DebugMode.ValueBool()
 		req.DebugMode = &v
+	}
+	if !m.AllowForkPRPlans.IsNull() && !m.AllowForkPRPlans.IsUnknown() {
+		v := m.AllowForkPRPlans.ValueBool()
+		req.AllowForkPRPlans = &v
 	}
 	if !m.AISummaryMode.IsNull() && !m.AISummaryMode.IsUnknown() {
 		req.AISummaryMode = m.AISummaryMode.ValueString()
@@ -1247,6 +1263,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	// context is the empty string for new workspaces. Pin both to
 	// concrete StringValues so Terraform doesn't see "unknown" drift.
 	m.DebugMode = types.BoolValue(ws.DebugMode)
+	m.AllowForkPRPlans = types.BoolValue(ws.AllowForkPRPlans)
 	if ws.AISummaryMode != "" {
 		m.AISummaryMode = types.StringValue(ws.AISummaryMode)
 	} else {

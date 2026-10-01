@@ -607,6 +607,37 @@ async def _route_apply(
     await db.commit()
 
 
+async def _pr_is_from_fork(db, sess: PRSession) -> bool:
+    """Whether this session's PR has its head in another repository.
+
+    Asked of the provider at command time rather than read off the session,
+    because the session has no such column and adding one would answer with
+    whatever was true when the row was written. Fails CLOSED: a provider error
+    or a PR the provider will not describe counts as a fork, matching
+    `_is_fork` in both provider modules.
+    """
+    from terrapod.services import github_service, gitlab_service
+
+    conn = await db.get(VCSConnection, sess.vcs_connection_id)
+    if conn is None or "/" not in (sess.repo or ""):
+        return True
+    owner, repo = sess.repo.split("/", 1)
+    svc = gitlab_service if conn.provider == "gitlab" else github_service
+    try:
+        pr = await svc.get_pull_request(conn, owner, repo, sess.pr_number)
+    except Exception as e:
+        logger.warning(
+            "plan: could not establish whether the PR is from a fork",
+            repo=sess.repo,
+            pr_number=sess.pr_number,
+            error=repr(e),
+        )
+        return True
+    if pr is None:
+        return True
+    return bool(pr.from_fork)
+
+
 async def _route_plan(
     db,
     sess: PRSession,
@@ -663,6 +694,37 @@ async def _route_plan(
         # which is correct, just slower.
         logger.warning("plan: could not compute path narrowing", error=repr(e))
         paths_unions = None
+
+    # `terrapod plan` reaches `_create_vcs_run` directly, so the poller's fork
+    # gate does not cover it (GHSA-gp5w-76rw-c452). A session exists only for a
+    # PR that was planned once, so the reachable case is a workspace opted IN,
+    # planned, then opted OUT -- after which this command would go on handing a
+    # fork author plans with the workspace's credentials, from a setting that
+    # says it has stopped.
+    #
+    # Filtered BEFORE the loop, not inside it: the loop cancels each
+    # workspace's current run before replacing it, so refusing further down
+    # would cancel a run and decline to replace it, leaving the PR with no plan
+    # at all and no way to get one back.
+    blocked = [ws for ws in candidates if not ws.allow_fork_pr_plans]
+    if blocked and await _pr_is_from_fork(db, sess):
+        for ws in blocked:
+            logger.info(
+                "plan: refused — PR is from a fork and the workspace has not opted in",
+                workspace=ws.name,
+                pr_number=sess.pr_number,
+            )
+        candidates = [ws for ws in candidates if ws.allow_fork_pr_plans]
+        if not candidates:
+            await _post_reply(
+                db,
+                sess,
+                "This pull request comes from a fork, and no workspace it "
+                "affects allows plans for fork pull requests. A plan would run "
+                "this branch's code with the workspace's credentials, so it is "
+                "off by default. A maintainer can turn it on per workspace.",
+            )
+            return
 
     for ws in candidates:
         active = await db.execute(

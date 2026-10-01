@@ -1064,7 +1064,8 @@
       "terragruntVersion": "Version de Terragrunt",
       "noExpiry": "Pas d'expiration",
       "addDriftIgnoreRule": "Ajouter une règle",
-      "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Désactivé par défaut — un pod maintenu ouvert conserve les identifiants de cet espace de travail."
+      "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Activé par défaut sur cette ligne de version — un pod maintenu ouvert conserve les identifiants de cet espace de travail.",
+      "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Activé par défaut sur cette ligne de version, car ce plan exécute le code de l'auteur du fork avec les identifiants de cet espace de travail."
     },
     "table": {
       "name": "Nom",
@@ -2569,7 +2570,7 @@
     },
     "planExpiry": {
       "title": "Expiration du plan",
-      "description": "Abandonne automatiquement un plan non confirmé une fois qu'il est plus ancien que cela, afin qu'un plan périmé ne puisse pas être appliqué contre un monde qui a évolué. Désactivé par défaut ; le plan doit alors être réexécuté. (S'applique uniquement aux exécutions capables d'application.)",
+      "description": "Abandonne automatiquement un plan non confirmé une fois qu'il est plus ancien que cela, afin qu'un plan périmé ne puisse pas être appliqué contre un monde qui a évolué. Activé par défaut sur cette ligne de version ; le plan doit alors être réexécuté. (S'applique uniquement aux exécutions capables d'application.)",
       "expireAfter": "Expire après"
     },
     "aiSummary": {
@@ -2883,7 +2884,8 @@
       "uploadState": "Échec du téléversement de l'état",
       "uploadStateFile": "Échec du téléversement du fichier d'état",
       "updateSecurityScan": "Échec de la mise à jour de l'analyse de sécurité",
-      "updateDebugMode": "Échec de la mise à jour du mode débogage"
+      "updateDebugMode": "Échec de la mise à jour du mode débogage",
+      "updateForkPlans": "Échec de la mise à jour des plans sur les pull requests depuis un fork"
     },
     "subtabs": {
       "state": "État",
@@ -2931,11 +2933,19 @@
       "title": "Mode débogage du runner",
       "description": "Maintenir ouvert le pod d'une exécution en échec pour pouvoir y entrer. L'échec de l'exécution est signalé d'abord ; le conteneur ne reste actif qu'ensuite.",
       "label": "Mode débogage",
-      "hint": "Désactivé par défaut. Lorsqu'il est actif, le pod d'un runner en échec reste accessible par exec pendant la fenêtre configurée par votre opérateur, et il conserve pendant tout ce temps les identifiants et les variables déchiffrées de cet espace de travail.",
+      "hint": "Activé par défaut sur cette ligne de version. Lorsqu'il est actif, le pod d'un runner en échec reste accessible par exec pendant la fenêtre configurée par votre opérateur, et il conserve pendant tout ce temps les identifiants et les variables déchiffrées de cet espace de travail.",
       "activeBadge": "Actif",
       "bannerTitle": "Le mode débogage est activé pour cet espace de travail",
       "bannerBody": "Le pod d'une exécution en échec est maintenu ouvert pour inspection au lieu de se terminer, et il conserve pendant ce temps les identifiants et les variables déchiffrées de cet espace de travail. Désactivez le mode débogage une fois le diagnostic terminé.",
       "confirmEnable": "Activer le mode débogage ? Le pod d'une exécution en échec sera maintenu ouvert avec les identifiants et les variables déchiffrées de cet espace de travail jusqu'à l'expiration de la fenêtre ou jusqu'à ce que vous supprimiez le pod."
+    },
+    "allowForkPrPlans": {
+      "title": "Plans sur les pull requests depuis un fork",
+      "description": "Détermine si une pull request ouverte depuis un fork reçoit un plan spéculatif. Activé par défaut sur cette ligne de version, car ce plan exécute le code de l'auteur du fork avec les identifiants de cet espace de travail.",
+      "label": "Lancer un plan sur les pull requests depuis un fork",
+      "hint": "Une exécution reçoit les variables d'environnement de cet espace de travail, les valeurs sensibles, tous les secrets résolus via Vault et l'identité cloud du job. Qui ouvre une pull request depuis un fork n'a pas d'accès en écriture et ne peut pas fusionner : un plan spéculatif est donc le seul moyen pour son code d'atteindre ces identifiants. Activez ceci pour un espace de travail qui ne contient rien à dérober — un dépôt de modules public ouvert aux contributions de la communauté, par exemple. Les pull requests issues de branches du dépôt lui-même ne sont pas concernées et donnent toujours lieu à un plan.",
+      "activeBadge": "Activé",
+      "confirmEnable": "Lancer un plan sur les pull requests ouvertes depuis un fork ? Le code de leurs auteurs s'exécutera avec les identifiants et les variables déchiffrées de cet espace de travail, sans approbation préalable."
     }
   },
   "graphs": {

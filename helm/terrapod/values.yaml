@@ -275,6 +275,54 @@ api:
         #   metadata_url: https://login.microsoftonline.com/<tenant>/federationmetadata/2007-06/federationmetadata.xml
         #   entity_id: "https://terrapod.example.com"
         #   role_prefixes: ["terrapod:", "terrapod-"]
+        #
+        #   # The externally-reachable address the IDP posts assertions to.
+        #   # Leave it unset and it is derived from auth.callback_base_url
+        #   # (falling back to external_url). Set it when a proxy rewrites the
+        #   # path, because this is the URL an assertion's Destination and
+        #   # Recipient are checked against — and it must be the URL you
+        #   # registered with the IDP.
+        #   acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/saml/acs"
+        #
+        #   # ── Assertion validation ──────────────────────────────────
+        #   # Five independent checks, one switch each, because identity
+        #   # providers get different things wrong. An IDP that cannot be moved
+        #   # off SHA-1 is a different problem from one that signs only the
+        #   # message, and neither should cost you the other protections.
+        #   #
+        #   # ALL FIVE DEFAULT TO FALSE ON THIS RELEASE LINE, preserving the
+        #   # behaviour an operator already has — a patch release must not lock
+        #   # anyone out of their own deployment. Set the ones your IDP supports
+        #   # to true, as shown below; each is independent, so you can adopt
+        #   # them one at a time. They default to TRUE from 2.0 onward, so treat
+        #   # this block as the list to work through before upgrading.
+        #
+        #   # Check that an assertion's Destination and Recipient name THIS
+        #   # deployment. Without it an assertion the IDP minted for a different
+        #   # service provider is accepted here, so anyone who can obtain one for
+        #   # a host they control can replay it at Terrapod and log in as that
+        #   # user. Needs an absolute ACS URL, which SAML already requires.
+        #   validate_destination: true
+        #
+        #   # Require the assertion to answer the authentication request this
+        #   # login actually sent. Turn off only for an IDP that does not echo
+        #   # InResponseTo on the Response element.
+        #   validate_in_response_to: true
+        #
+        #   # Remember each accepted assertion in Redis for the rest of its
+        #   # validity window and refuse a second use, across all API replicas.
+        #   # An IDP never issues the same assertion twice, so this refuses no
+        #   # legitimate login.
+        #   reject_replayed_assertions: true
+        #
+        #   # Require the signature to be on the assertion itself. A response
+        #   # signed only at the message level leaves the assertion the claims
+        #   # are read from unprotected. Turn off for a message-only-signing IDP.
+        #   want_assertions_signed: true
+        #
+        #   # Refuse SHA-1 signature and digest algorithms. Turn off for an IDP
+        #   # that cannot yet be moved off SHA-1.
+        #   reject_deprecated_algorithm: true
 
     # Private Registry & Caching
     registry:
@@ -611,6 +659,14 @@ api:
       # so with webhooks configured this is the fallback floor rather than the
       # latency anyone experiences.
       module_poll_interval_seconds: 300
+      # Require a claim to a VCS connection before naming it
+      # (GHSA-v8g7-pqrj-8mcm). A connection reaches every repository its
+      # credential can reach, so naming one is a grant, not a reference. A
+      # platform admin may name any; anyone else may name one they already own a
+      # workspace on. Deliberate consequence: the FIRST workspace for a given
+      # connection must be created by an admin. Set false to accept any id, as
+      # releases before this one did.
+      require_connection_authorization: true
       github:
         # Optional: K8s Secret containing the webhook HMAC secret.
         # Only needed if GitHub webhooks are enabled for faster feedback.
@@ -623,6 +679,28 @@ api:
         # per-connection webhook secret on the VCS connection.
         existingSecret: ""
         existingSecretKey: "webhook_secret"
+        # Whether a `git_http_auth` workspace variable sourced from a
+        # `vcs_connection` may hand a GitLab connection's stored access token to
+        # a runner Job, for fetching private git module sources.
+        #
+        # OFF, and the default is the point. A GitLab VCS connection holds a
+        # Personal or Group Access Token an operator pasted in, and nothing
+        # produces a narrower copy of one — so the runner receives it WHOLE,
+        # with every permission and every project that token covers, inside a
+        # Job that is also running workspace-supplied IaC. Worse, the connection
+        # is named in a variable *value*, so the chooser is anyone who can set a
+        # workspace variable, not an admin.
+        #
+        # GitHub has no such switch and needs none: its installation token is
+        # minted per run and narrowed to `contents: read`.
+        #
+        # Turn this on only if you accept that specific disclosure — a private
+        # runner fleet with a single-project token is a reasonable place to.
+        # Otherwise use a `static` git_http_auth credential holding a token you
+        # scoped yourself, which needs nothing enabled. With this off, such a
+        # variable FAILS the run with a message naming this key; it is never
+        # dropped silently.
+        allow_token_delivery_to_runners: false
 
     # Audit logging
     audit:

@@ -297,6 +297,7 @@ async def _list_open_prs(
             head_sha=pr["head_sha"],
             head_ref=pr["head_ref"],
             title=pr["title"],
+            from_fork=bool(pr["from_fork"]),
         )
         for pr in prs
     ]
@@ -991,6 +992,28 @@ async def _poll_workspace_prs(
         await _poll_pr_comments(db, conn, f"{owner}/{repo}")
 
     for pr in prs:
+        # A fork PR does not plan unless the workspace opted in.
+        #
+        # First in the loop, before the dedup query, because the decision needs
+        # nothing but the PR itself and the answer is "do nothing at all" — no
+        # run row, no archive fetch, no provider call. Re-evaluating it each
+        # cycle is free for the same reason.
+        #
+        # Deliberately NOT extended to same-repository PRs. Their author has
+        # write access and can already get code applied by merging, so gating
+        # them buys almost nothing and costs the product its core loop: a
+        # developer who opens a PR and gets no plan is being asked to merge
+        # blind, which is the failure this tool exists to prevent.
+        if pr.from_fork and not ws.allow_fork_pr_plans:
+            logger.info(
+                "vcs.pr.fork_plan_skipped",
+                workspace_id=str(ws.id),
+                pr_number=pr.number,
+                head_sha=pr.head_sha,
+                repo=f"{owner}/{repo}",
+            )
+            continue
+
         # Check if we already have any run for this PR + SHA (avoid duplicates)
         existing = await db.execute(
             select(Run)

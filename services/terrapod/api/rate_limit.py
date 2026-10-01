@@ -90,14 +90,31 @@ def _get_client_ip(
     everything to its right was appended by infrastructure we trust and
     everything to its left is whatever the client sent.
 
-    **The list is empty by default, and that is a deliberate trade.** With no
-    trusted proxy the header is ignored entirely and the socket peer is used —
-    which in Terrapod is the BFF pod for every request, so unauthenticated
-    traffic shares one bucket until an operator sets
-    `rate_limit.trusted_proxy_cidrs`. That is a real cost and it is the right
-    default anyway: the alternative is a control that reports per-client limits
-    it is not enforcing. Failing closed is visible; trusting a forgeable header
-    is not.
+    **The default is the private ranges plus CGNAT, not an empty list** — see
+    `rate_limit.trusted_proxy_cidrs` in `config.py`. An earlier version of this
+    docstring said the opposite, which mattered: the whole paragraph below turns
+    on which it is.
+
+    **A client sharing a range with the proxy collapses into the peer's bucket.**
+    The right-most-untrusted rule assumes proxies and clients are disjoint sets.
+    They are not when the default is this broad: a client on a Tailscale tailnet
+    arrives as `100.x`, which is inside the trusted `100.64.0.0/10`, so its own
+    entry is skipped as "infrastructure" and the scan falls through to the peer
+    — the BFF pod — putting every such client in ONE bucket. The same holds for
+    a client on a private `10.x`/`172.16.x`/`192.168.x` network. The breadth
+    that makes the default work out of the box is exactly what defeats it for
+    the deployments it was widened to serve.
+
+    The remedy is configuration, not a different rule here: narrow
+    `trusted_proxy_cidrs` to the pod network your BFF actually runs on. It
+    cannot be narrowed by default because that network differs per cluster —
+    and some (EKS with custom CNI networking) legitimately place pods in
+    `100.64.0.0/10` themselves, so dropping that entry would collapse
+    attribution entirely on those. `docs/rate-limiting.md` carries this.
+
+    An empty list is still supported and means "ignore the header, bucket on the
+    peer", which collapses every unauthenticated caller into one bucket. That is
+    sound only if the ingress sanitises the header.
     """
     if trusted_networks and request.client and _is_trusted(request.client.host, trusted_networks):
         forwarded = request.headers.get("X-Forwarded-For")

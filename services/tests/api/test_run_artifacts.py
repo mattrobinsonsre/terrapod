@@ -26,11 +26,14 @@ def _runner_user(run_id: uuid.UUID) -> AuthenticatedUser:
     )
 
 
-def _mock_run(run_id=None, ws_id=None, is_drift_detection=False):
+def _mock_run(run_id=None, ws_id=None, is_drift_detection=False, plan_only=False):
     run = MagicMock()
     run.id = run_id or uuid.uuid4()
     run.workspace_id = ws_id or uuid.uuid4()
     run.created_by = "matt@example.com"
+    # Stated explicitly: a bare MagicMock attribute is truthy, which the state
+    # upload now reads as "plan-only" and refuses.
+    run.plan_only = plan_only
     # Default False so the AI-summary tests see exactly one enqueue; the
     # drift-reclassify path (#482) is opt-in per test via True.
     run.is_drift_detection = is_drift_detection
@@ -71,7 +74,11 @@ class TestUploadStateDuplicateSerial:
         # db.execute(select(StateVersion)) — different call sites, separate mocks.
         mock_db.get.return_value = run
         existing = MagicMock()
-        existing.scalar_one_or_none.return_value = MagicMock(spec=StateVersion)
+        # Serves BOTH the latest-state lookup and the dup-serial select, so it
+        # needs a real lineage and serial or the lineage guard refuses first.
+        sv = MagicMock(spec=StateVersion)
+        sv.lineage, sv.serial = "abc", 8
+        existing.scalar_one_or_none.return_value = sv
         mock_db.execute.return_value = existing
 
         app = _make_app(_runner_user(run_id), mock_db)
@@ -196,6 +203,7 @@ class TestUploadStateDuplicateSerial:
         existing_sv = MagicMock(spec=StateVersion)
         existing_sv.md5 = body_md5
         existing_sv.sha256 = body_sha
+        existing_sv.lineage, existing_sv.serial = "abc", 8
         ws = MagicMock()
         ws.state_diverged = True  # stale flag from a prior mis-fire
         # db.get: first _get_run(Run), then db.get(Workspace) in the no-op branch.
@@ -245,6 +253,7 @@ class TestUploadStateDuplicateSerial:
         existing_sv = MagicMock(spec=StateVersion)
         existing_sv.md5 = body_md5
         existing_sv.sha256 = ""  # legacy row, pre-sha256-column
+        existing_sv.lineage, existing_sv.serial = "abc", 8
         ws = MagicMock()
         ws.state_diverged = False
         mock_db.get.side_effect = [run, ws]
@@ -284,6 +293,7 @@ class TestUploadStateDuplicateSerial:
         existing_sv = MagicMock(spec=StateVersion)
         existing_sv.md5 = "deadbeef"
         existing_sv.sha256 = "a-different-sha256-than-the-upload"
+        existing_sv.lineage, existing_sv.serial = "abc", 8
         mock_db.get.return_value = run
         lookup = MagicMock()
         lookup.scalar_one_or_none.return_value = existing_sv
@@ -1191,3 +1201,154 @@ class TestArtifactUploadsRefreshThePRComment:
         assert resp.status_code in (200, 204)
         refresh.assert_awaited_once()
         assert refresh.await_args.args[2] == "counts"
+
+
+class TestStateUploadIsForApplyRunsOnly:
+    """A plan-only run cannot write state, and state cannot go backwards.
+
+    `require_runner_for_run` proves the caller holds this run's token and
+    nothing else, which was the only gate on the route. So a speculative
+    pull-request plan — the kind a stranger's pull request creates — could
+    push a state version at the next serial and have it become the
+    workspace's canonical state, because the download path serves the
+    highest serial.
+
+    The Pulumi route in the same module has carried the `plan_only` guard
+    since it was written. The Terraform route never got it.
+    """
+
+    def _db(self, *, latest=None, at_serial=None):
+        """A db whose execute() answers the two selects in order.
+
+        The route looks up the workspace's latest state version, then any
+        row already at the uploaded serial. A single return value cannot
+        distinguish them, and conflating them is how the existing tests in
+        this file broke when the first query was added.
+        """
+        first, second = MagicMock(), MagicMock()
+        first.scalar_one_or_none.return_value = latest
+        second.scalar_one_or_none.return_value = at_serial
+
+        # The first two selects are the ones under test; the happy path makes
+        # further ones afterwards. A fixed list would raise StopIteration there
+        # and read as a failure of the guard rather than of the fixture, so
+        # anything past the second gets an empty result.
+        scripted = [first, second]
+
+        async def _execute(*_a, **_kw):
+            if scripted:
+                return scripted.pop(0)
+            spare = MagicMock()
+            spare.scalar_one_or_none.return_value = None
+            spare.scalars.return_value.all.return_value = []
+            return spare
+
+        db = AsyncMock()
+        db.execute = _execute
+        return db
+
+    def _sv(self, serial, lineage):
+        sv = MagicMock(spec=StateVersion)
+        sv.serial, sv.lineage = serial, lineage
+        sv.md5, sv.sha256 = "x", "y"
+        return sv
+
+    async def _put(self, run, db, *, serial, lineage):
+        app = _make_app(_runner_user(run.id), db)
+        body = json.dumps({"version": 4, "serial": serial, "lineage": lineage})
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            return await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/state",
+                content=body,
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_plan_only_run_is_refused(self, *_m):
+        run = _mock_run(plan_only=True)
+        db = self._db()
+        db.get.return_value = run
+        resp = await self._put(run, db, serial=9, lineage="abc")
+        assert resp.status_code == 409
+        assert "plan-only" in resp.json()["detail"].lower()
+        # Refused before anything was written — no row, and no storage write.
+        db.add.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_apply_run_still_uploads(self, *_m):
+        """The regression guard. If this fails, applies cannot write state."""
+        run = _mock_run(plan_only=False)
+        db = self._db(latest=self._sv(8, "abc"), at_serial=None)
+        db.get.return_value = run
+        with patch("terrapod.api.routers.run_artifacts.get_storage", return_value=AsyncMock()):
+            resp = await self._put(run, db, serial=9, lineage="abc")
+        assert resp.status_code in (200, 201, 204), resp.text
+        db.add.assert_called_once()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_serial_behind_the_head_is_refused(self, *_m):
+        run = _mock_run()
+        db = self._db(latest=self._sv(12, "abc"), at_serial=None)
+        db.get.return_value = run
+        resp = await self._put(run, db, serial=9, lineage="abc")
+        assert resp.status_code == 409
+        assert "behind the recorded serial" in resp.json()["detail"]
+        db.add.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_foreign_lineage_is_refused(self, *_m):
+        run = _mock_run()
+        db = self._db(latest=self._sv(8, "aaaa"), at_serial=None)
+        db.get.return_value = run
+        resp = await self._put(run, db, serial=9, lineage="bbbb")
+        assert resp.status_code == 409
+        assert "lineage" in resp.json()["detail"].lower()
+        db.add.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_legacy_head_with_no_lineage_does_not_block_the_upload(self, *_m):
+        """The column defaults to "" and legacy rows never populated it, so a
+        strict comparison would refuse every upload on an older workspace."""
+        run = _mock_run()
+        db = self._db(latest=self._sv(8, ""), at_serial=None)
+        db.get.return_value = run
+        with patch("terrapod.api.routers.run_artifacts.get_storage", return_value=AsyncMock()):
+            resp = await self._put(run, db, serial=9, lineage="abc")
+        assert resp.status_code in (200, 201, 204), resp.text
+        db.add.assert_called_once()
+
+
+class TestAnEmptyUploadedLineageDoesNotSkipTheCheck:
+    """Omitting `lineage` from the state JSON used to turn the guard off.
+
+    The relaxation exists for the DATABASE side — the column defaults to "" and
+    legacy heads predate it being populated. It was applied symmetrically, so
+    `latest.lineage and lineage` short-circuited on an empty UPLOADED lineage, and
+    a wholly foreign state at the head's serial + 1 was accepted. terraform and
+    tofu always write a lineage, so an empty one is never a legacy artefact; it is
+    the one half of the comparison an attacker controls.
+    """
+
+    def test_the_guard_does_not_test_the_uploaded_lineage_for_truthiness(self):
+        import inspect
+
+        from terrapod.api.routers import run_artifacts
+
+        src = inspect.getsource(run_artifacts)
+        assert "latest.lineage and lineage and" not in src, (
+            "the uploaded lineage is tested for truthiness, so omitting it skips "
+            "the mismatch check entirely"
+        )
+        assert "latest.lineage and latest.lineage != lineage" in src, (
+            "the guard no longer compares a populated head against the upload"
+        )

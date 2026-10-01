@@ -1,12 +1,12 @@
-import { test, expect } from '@playwright/test';
-import path from 'path';
+import { test, expect } from "@playwright/test";
+import path from "path";
 import {
   createAgentPool,
   createWorkspace,
   getStoredToken,
   uniqueName,
-} from '../helpers/api.js';
-import { expectNoHorizontalPageScroll } from '../helpers/responsive.js';
+} from "../helpers/api.js";
+import { expectNoHorizontalPageScroll } from "../helpers/responsive.js";
 
 /**
  * Multi-pool workspace routing (#1085) — the UI half.
@@ -17,34 +17,38 @@ import { expectNoHorizontalPageScroll } from '../helpers/responsive.js';
  * that an operator can actually *see and change the set* — the feature is
  * API-only otherwise.
  */
-const ADMIN_AUTH = path.join(__dirname, '..', '.auth', 'admin.json');
+const ADMIN_AUTH = path.join(__dirname, "..", ".auth", "admin.json");
 
-test.describe('Multi-pool workspace routing', () => {
+test.describe("Multi-pool workspace routing", () => {
   test.use({ storageState: ADMIN_AUTH });
 
-  test('a workspace renders every pool in its set, not just the first', async ({ page }) => {
-    const token = getStoredToken('admin.json');
-    const nameA = uniqueName('e2e-pool-a');
-    const nameB = uniqueName('e2e-pool-b');
+  test("a workspace renders every pool in its set, not just the first", async ({
+    page,
+  }) => {
+    const token = getStoredToken("admin.json");
+    const nameA = uniqueName("e2e-pool-a");
+    const nameB = uniqueName("e2e-pool-b");
     const poolA = await createAgentPool(token, nameA);
     const poolB = await createAgentPool(token, nameB);
-    const wsId = await createWorkspace(token, uniqueName('e2e-multipool'), {
-      'execution-mode': 'agent',
-      'agent-pool-ids': [poolA, poolB],
+    const wsId = await createWorkspace(token, uniqueName("e2e-multipool"), {
+      "execution-mode": "agent",
+      "agent-pool-ids": [poolA, poolB],
     });
 
     await page.goto(`/workspaces/${wsId}`);
 
     // Both pools are listed. Asserting on BOTH is the point — showing only the
     // first would look correct while hiding half the set.
-    const pools = page.getByText('Agent pools', { exact: true });
+    const pools = page.getByText("Agent pools", { exact: true });
     await expect(pools).toBeVisible({ timeout: 10_000 });
     // By NAME, not by a slice of the UUID. This previously asserted the first 8
     // characters of the pool id, which pinned the very defect it now guards
     // against: the read-only view rendered `apool-<uuid>` because names were
     // resolved from a pool list fetched only on entering edit mode.
     for (const name of [nameA, nameB]) {
-      await expect(page.getByText(name, { exact: false }).first()).toBeVisible();
+      await expect(
+        page.getByText(name, { exact: false }).first(),
+      ).toBeVisible();
     }
     // And the raw id must NOT be on the page.
     for (const id of [poolA, poolB]) {
@@ -52,62 +56,98 @@ test.describe('Multi-pool workspace routing', () => {
     }
   });
 
-  test('the set survives a round-trip through the settings form', async ({ page }) => {
-    const token = getStoredToken('admin.json');
-    const poolA = await createAgentPool(token, uniqueName('e2e-rt-a'));
-    const poolB = await createAgentPool(token, uniqueName('e2e-rt-b'));
+  test("the set survives a round-trip through the settings form", async ({
+    page,
+  }) => {
+    const token = getStoredToken("admin.json");
+    const nameA = uniqueName("e2e-rt-a");
+    const nameB = uniqueName("e2e-rt-b");
+    const poolA = await createAgentPool(token, nameA);
+    const poolB = await createAgentPool(token, nameB);
     // Start with one pool, add the second through the UI.
-    const wsId = await createWorkspace(token, uniqueName('e2e-multipool-rt'), {
-      'execution-mode': 'agent',
-      'agent-pool-ids': [poolA],
+    const wsId = await createWorkspace(token, uniqueName("e2e-multipool-rt"), {
+      "execution-mode": "agent",
+      "agent-pool-ids": [poolA],
     });
 
     await page.goto(`/workspaces/${wsId}`);
-    await page.getByRole('button', { name: /^edit$/i }).first().click();
+    await page
+      .getByRole("button", { name: /^edit$/i })
+      .first()
+      .click();
 
     // The editor lists every assignable pool as a checkbox — not a native
-    // multi-select, which is a poor tap target and hides its own state.
-    const checkboxes = page.getByRole('checkbox');
-    await expect(checkboxes.first()).toBeVisible({ timeout: 10_000 });
+    // multi-select, which is a poor tap target and hides its own state. Each
+    // input is wrapped in a label carrying the pool's name, so the name IS the
+    // checkbox's accessible name and every assertion below can say which pool it
+    // means.
+    //
+    // Addressed by name rather than by counting `{ checked: true }` across the
+    // page. That count was a standing trap: the settings form holds unrelated
+    // checkboxes (Terragrunt, debug mode, the fork-PR toggle), so any one of them
+    // defaulting ON broke this test while the pool behaviour was perfectly
+    // correct — a red E2E shard pointing at the wrong feature. A count also
+    // cannot tell "poolA and poolB" from "poolA twice".
+    const boxA = page.getByRole("checkbox", { name: nameA });
+    const boxB = page.getByRole("checkbox", { name: nameB });
+    await expect(boxA).toBeVisible({ timeout: 10_000 });
 
-    // Exactly one is checked to begin with.
-    await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(1);
+    // The assigned pool is ticked and the other is not.
+    await expect(boxA).toBeChecked();
+    await expect(boxB).not.toBeChecked();
 
-    // Tick a second pool and save.
-    const unchecked = page.getByRole('checkbox', { checked: false }).first();
-    await unchecked.check();
+    // Tick the second pool and save.
+    await boxB.check();
     // The button is "Save changes", not "Save" — an exact /^save$/ never
     // matched it and the click timed out.
-    await page.getByRole('button', { name: /save changes/i }).first().click();
+    await page
+      .getByRole("button", { name: /save changes/i })
+      .first()
+      .click();
 
     // Re-enter edit: the second pool stuck. Waiting for the Edit button to
     // come back is what proves the save round-tripped, not a fixed sleep.
-    await expect(page.getByRole('button', { name: /^edit$/i }).first()).toBeVisible({
+    await expect(
+      page.getByRole("button", { name: /^edit$/i }).first(),
+    ).toBeVisible({
       timeout: 15_000,
     });
-    await page.getByRole('button', { name: /^edit$/i }).first().click();
-    await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(2);
+    await page
+      .getByRole("button", { name: /^edit$/i })
+      .first()
+      .click();
+    await expect(page.getByRole("checkbox", { name: nameA })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: nameB })).toBeChecked();
 
     expect(poolB).toBeTruthy(); // both pools were created for this workspace
   });
 
-  test('the pool editor does not push the page sideways on a phone', async ({ page }) => {
-    const token = getStoredToken('admin.json');
-    const poolA = await createAgentPool(token, uniqueName('e2e-mob-a'));
-    const poolB = await createAgentPool(token, uniqueName('e2e-mob-b'));
-    const wsId = await createWorkspace(token, uniqueName('e2e-multipool-mob'), {
-      'execution-mode': 'agent',
-      'agent-pool-ids': [poolA, poolB],
+  test("the pool editor does not push the page sideways on a phone", async ({
+    page,
+  }) => {
+    const token = getStoredToken("admin.json");
+    const poolA = await createAgentPool(token, uniqueName("e2e-mob-a"));
+    const poolB = await createAgentPool(token, uniqueName("e2e-mob-b"));
+    const wsId = await createWorkspace(token, uniqueName("e2e-multipool-mob"), {
+      "execution-mode": "agent",
+      "agent-pool-ids": [poolA, poolB],
     });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/workspaces/${wsId}`);
-    await expect(page.getByText('Agent pools', { exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Agent pools", { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
     await expectNoHorizontalPageScroll(page);
 
     // And in edit mode, where the checkbox rows are.
-    await page.getByRole('button', { name: /^edit$/i }).first().click();
-    await expect(page.getByRole('checkbox').first()).toBeVisible({ timeout: 10_000 });
+    await page
+      .getByRole("button", { name: /^edit$/i })
+      .first()
+      .click();
+    await expect(page.getByRole("checkbox").first()).toBeVisible({
+      timeout: 10_000,
+    });
     await expectNoHorizontalPageScroll(page);
   });
 });

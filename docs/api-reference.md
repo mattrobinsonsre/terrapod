@@ -497,6 +497,12 @@ Workspaces support the following drift detection attributes (settable on create 
 |---|---|---|---|
 | `debug-mode` | boolean | `false` | Hold this workspace's **failed** runner pods open so an operator can `kubectl exec` into one (#1764). The run is reported as failed first and is final from Terrapod's side; only then does the container stay up, for at most `runners.debugLingerSeconds`. Successful runs are unaffected. See [runners.md → Debug mode](runners.md#debug-mode-inspecting-a-failed-runner-pod) for what a held pod exposes and who can reach it |
 
+### Pull Requests From Forks
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `allow-fork-pr-plans` | boolean | `false` | Whether a pull request opened **from a fork** gets a speculative plan ([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)). Off by default: that plan runs the pull request author's code with the workspace's full credential set — `env`-category variables, sensitive values, OpenBao/Vault-resolved values, minted git credentials and the Job's cloud workload identity — and a fork author has neither write access nor the ability to merge, so the plan is the only path by which their code reaches any of it. **Pull requests from a branch in the repository itself are unaffected and always plan.** It gates [module-impact](registry.md#module-impact-analysis) runs the same way, per consuming workspace. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks) |
+
 ### Terragrunt Attributes
 
 Workspaces support running agent-mode plans/applies through Terragrunt (settable on create and update). See [terragrunt.md](terragrunt.md) for the full feature description, including the CLI-driven path that needs no configuration.
@@ -998,6 +1004,30 @@ Returns the structured JSON representation of the plan, as produced by `terrafor
 
 The endpoint is mounted at `/api/v2/` because `go-tfe` and Terraform's `cloud` block expect it there. Returns **404** if the runner never uploaded the JSON output (older runs, runs that errored before the plan completed).
 
+**Required permission: `read` on the workspace — the same tier as viewing the run.**
+Be deliberate about that when granting `read`, because the structured plan is a
+richer artifact than the human-readable log it sits beside. It carries each
+resource's **resolved attribute values**, which includes values that originated in
+a sensitive variable: Terraform marks them in the plan rather than removing them,
+and Terrapod stores and serves the plan as the engine produced it. So a principal
+who can view a run can also read the values that run is about to apply.
+
+Two ways to narrow it today, both available on this release line:
+
+- **Grant `read` deliberately.** On a workspace whose plans carry secrets, the
+  label-based role that grants `read` is the control. There is no separate
+  switch for this endpoint.
+- **Keep secrets out of resource arguments.** What puts a value in the plan is
+  its being an argument of a resource, not which variable category delivered it.
+  A credential a provider reads from its own environment variable never becomes a
+  resource attribute, so it never reaches the plan; the same secret interpolated
+  into a resource argument does, whichever category carried it.
+
+**This changes in 2.0**, where the endpoint requires the **`plan`** tier instead,
+putting it alongside `download raw state` — the other route that serves resolved
+values. If you rely on a `read`-only principal fetching plan JSON (a downstream
+tool, a dashboard), raise that principal to `plan` before upgrading.
+
 ### Impact Graph
 
 ```
@@ -1076,7 +1106,7 @@ Returns the **single-workspace resource dependency graph** behind the [State Res
 
 ### AI Architecture Critique (Terrapod Extension)
 
-State-based, whole-system critique (#1036 Part 2). Reviews the workspace's deployed system **as it exists** — inferred from its current Terraform state (+ the resource graph, the deterministic cost estimate, and the deterministic security-scan findings) and critiqued across resilience / security / cost / well-architected. Distinct from the per-run [Plan Summary](#plan-summary), which reviews a *change*. Enabled by the independent `ai_architecture` config (off by default).
+State-based, whole-system critique (#1036 Part 2). Reviews the workspace's deployed system **as it exists** — inferred from its current Terraform state (+ the resource graph, the deterministic cost estimate, and the deterministic security-scan findings) and critiqued across resilience / security / cost / well-architected. Distinct from the per-run [Plan Summary](#plan-summary), which reviews a *change*. Enabled by the independent `ai_architecture` config (on by default on this release line; off from 2.0).
 
 ```
 GET  /api/terrapod/v1/workspaces/{workspace_id}/architecture-critique
@@ -1701,7 +1731,7 @@ POST /api/v2/workspaces/{id}/vars
 }
 ```
 
-`category` is one of `terraform`, `env`, `git_http_auth`, or `git_ssh_auth`. In agent mode all are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec): `terraform` vars are rendered into a generated `terrapod.auto.tfvars` from a Secret-mounted blob (honouring `hcl`), and `env` vars are injected via `secretKeyRef`. (In local execution mode the CLI handles variables itself.) The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly.
+`category` is one of `terraform`, `env`, `git_http_auth`, or `git_ssh_auth`. In agent mode all are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec): `terraform` vars are rendered into a generated `terrapod.auto.tfvars` from a Secret-mounted blob (honouring `hcl`), and `env` vars are injected via `secretKeyRef`. (In local execution mode the CLI handles variables itself.) The two `git_*_auth` categories carry credentials for private git module sources — the `key` is a host/URL pattern and the `value` a JSON credential; they are always forced `sensitive` and consumed by the runner's git-auth phase before `init` (see [Module Source Auth](module-auth.md)), not by terraform/tofu directly. A `git_http_auth` value whose `source` is `vcs_connection` is accepted on write whatever the connection's provider, but a **GitLab** connection's token cannot be narrowed before it reaches the runner — so unless the deployment sets `api.config.vcs.gitlab.allow_token_delivery_to_runners: true`, the run that would use it is **errored** with a message naming the variable and the key, rather than served without the credential.
 
 **Required permission:** `write` on the workspace.
 
@@ -2580,7 +2610,8 @@ These are editable in the UI under **Admin → Autodiscovery**, alongside the ru
 - `ai-summary-mode` / `ai-summary-context` — the AI plan-summary opt-in and its free-text context for every created workspace (#1763).
 - `ai-policy-mode` — the AI **policy gate** per-workspace override for every created workspace. `disabled` opts out of an advisory verdict only, and a mandatory deployment-wide gate ignores it; `enabled` is a synonym for `default` and has no effect (#1766).
 - `terragrunt-enabled` / `terragrunt-version`, `vcs-workflow`, `auto-merge` / `auto-merge-strategy`, `drift-detection-enabled` / `drift-detection-interval-seconds`, `drift-ignore-rules`, `plan-expiry-seconds` and `slack-channel` — the remaining per-workspace settings (#1763). `drift-detection-enabled` defaults **true** here, unlike the workspace column, because every autodiscovered workspace is VCS-connected.
-- `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **false**, as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
+- `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **true** on this release line (false from 2.0), as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
+- `allow-fork-pr-plans` — let a pull request opened from a fork plan on every created workspace. Defaults **true** on this release line (false from 2.0), matching the workspace column rather than overriding it the way `drift-detection-enabled` does: an operator who decides fork pull requests should plan has to say so, and a rule is how they say it once for every directory the repository grows later. Without it, enabling the setting in bulk holds only until autodiscovery creates the next workspace — which reads as the setting not working. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks).
 
 These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template). The same pairing holds for the scan and AI-summary settings, and their values are validated by the same rules the workspace endpoint uses — so a rule cannot template a setting the workspace API would reject.
 

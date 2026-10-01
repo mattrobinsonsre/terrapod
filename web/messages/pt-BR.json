@@ -1064,7 +1064,8 @@
       "terragruntVersion": "Versão do Terragrunt",
       "noExpiry": "Sem expiração",
       "addDriftIgnoreRule": "Adicionar regra",
-      "debugModeHint": "Manter abertos os pods de runners com falha nos espaços de trabalho criados por esta regra. Desativado por padrão — um pod mantido aberto conserva as credenciais daquele espaço de trabalho."
+      "debugModeHint": "Manter abertos os pods de runners com falha nos espaços de trabalho criados por esta regra. Desativado por padrão — um pod mantido aberto conserva as credenciais daquele espaço de trabalho.",
+      "allowForkPrPlansHint": "Aplica-se a todos os espaços de trabalho criados por esta regra. Ativado por padrão nesta linha de versões, porque esse plano executa o código do autor do fork com as credenciais deste espaço de trabalho."
     },
     "table": {
       "name": "Nome",
@@ -2883,7 +2884,8 @@
       "uploadState": "Falha ao enviar o estado",
       "uploadStateFile": "Falha ao enviar o arquivo de estado",
       "updateSecurityScan": "Falha ao atualizar a verificação de segurança",
-      "updateDebugMode": "Falha ao atualizar o modo de depuração"
+      "updateDebugMode": "Falha ao atualizar o modo de depuração",
+      "updateForkPlans": "Falha ao atualizar os planos de pull requests de forks"
     },
     "subtabs": {
       "state": "Estado",
@@ -2936,6 +2938,14 @@
       "bannerTitle": "O modo de depuração está ativado para este espaço de trabalho",
       "bannerBody": "O pod de uma execução com falha é mantido aberto para inspeção em vez de encerrar e, enquanto isso, mantém as credenciais e as variáveis descriptografadas deste espaço de trabalho. Desative o modo de depuração quando terminar a investigação.",
       "confirmEnable": "Ativar o modo de depuração? O pod de uma execução com falha será mantido aberto com as credenciais e as variáveis descriptografadas deste espaço de trabalho até a janela expirar ou você excluir o pod."
+    },
+    "allowForkPrPlans": {
+      "title": "Planos em pull requests de forks",
+      "description": "Se uma pull request aberta a partir de um fork recebe um plano especulativo. Ativado por padrão nesta linha de versões, porque esse plano executa o código do autor do fork com as credenciais deste espaço de trabalho.",
+      "label": "Planejar pull requests de forks",
+      "hint": "Uma execução recebe as variáveis de ambiente deste espaço de trabalho, os valores sensíveis, quaisquer segredos resolvidos pelo Vault e a identidade de nuvem do job. Quem abre uma pull request a partir de um fork não tem acesso de escrita e não pode fazer merge, então um plano especulativo é o único caminho pelo qual o código dessa pessoa alcança essas credenciais. Ative isto para um espaço de trabalho que não guarda nada que valha a pena levar — um repositório público de módulos que aceita contribuições da comunidade, por exemplo. Pull requests de branches do próprio repositório não são afetadas e sempre geram plano.",
+      "activeBadge": "Ligado",
+      "confirmEnable": "Planejar pull requests abertas a partir de forks? O código de seus autores será executado com as credenciais e as variáveis descriptografadas deste espaço de trabalho, sem que ninguém aprove antes."
     }
   },
   "graphs": {

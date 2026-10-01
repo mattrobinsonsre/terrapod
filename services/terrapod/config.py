@@ -456,7 +456,73 @@ class SAMLProviderConfig(BaseModel):
     )
     metadata_url: str = Field(description="IDP metadata URL")
     entity_id: str = Field(default="", description="SP entity ID")
-    acs_url: str = Field(default="", description="Assertion consumer service URL")
+    acs_url: str = Field(
+        default="",
+        description=(
+            "Assertion consumer service URL — the externally-reachable address the "
+            "IDP posts assertions to. When empty it is derived from "
+            "auth.callback_base_url (falling back to external_url). Set it "
+            "explicitly when a proxy rewrites the path, because this is the URL "
+            "an assertion's Destination and Recipient are checked against."
+        ),
+    )
+    validate_destination: bool = Field(
+        default=False,
+        description=(
+            "Check that an assertion's Destination and Recipient name THIS "
+            "deployment's ACS URL. Without it an assertion the IDP minted for a "
+            "different service provider is accepted here, so anyone who can get "
+            "the IDP to issue one for a host they control can replay it at "
+            "Terrapod and log in as that user. Needs a usable ACS URL (acs_url, "
+            "auth.callback_base_url, or external_url); a login is refused rather "
+            "than waved through if none is configured. Defaults to false on this "
+            "release line, preserving the behaviour operators already have, and "
+            "to true from 2.0."
+        ),
+    )
+    validate_in_response_to: bool = Field(
+        default=False,
+        description=(
+            "Require the assertion to answer the AuthnRequest this login "
+            "started, by matching InResponseTo against the request id we issued. "
+            "An assertion with no InResponseTo at all is refused too, which the "
+            "underlying library skips. Turn off for an IDP that does not echo "
+            "InResponseTo on the Response element. Defaults to false on this "
+            "release line, preserving existing behaviour, and to true from 2.0."
+        ),
+    )
+    reject_replayed_assertions: bool = Field(
+        default=False,
+        description=(
+            "Remember each accepted assertion id in Redis for the remainder of "
+            "its validity window and refuse a second use. Shared across replicas, "
+            "so a captured assertion cannot be re-presented to another pod. An "
+            "IDP never issues the same assertion id twice, so there is no "
+            "legitimate login this refuses. Defaults to false on this release "
+            "line, preserving existing behaviour, and to true from 2.0."
+        ),
+    )
+    want_assertions_signed: bool = Field(
+        default=False,
+        description=(
+            "Require a signature on the assertion itself, not merely somewhere in "
+            "the response. A response signed only at the message level leaves the "
+            "assertion the claims are read from unprotected. Turn off for an IDP "
+            "that signs the message only. Defaults to false on this release line, "
+            "preserving existing behaviour, and to true from 2.0."
+        ),
+    )
+    reject_deprecated_algorithm: bool = Field(
+        default=False,
+        description=(
+            "Refuse SHA-1 signature and digest algorithms (RSA-SHA1, DSA-SHA1, "
+            "SHA1). Turn off for an IDP that cannot yet be moved off SHA-1 — a "
+            "separate decision from want_assertions_signed, so neither "
+            "compatibility problem costs you the other protection. Defaults to "
+            "false on this release line, preserving existing behaviour, and to "
+            "true from 2.0."
+        ),
+    )
     role_prefixes: list[str] = Field(
         default=["terrapod:", "terrapod-"],
         description="Prefixes to strip from group names to derive role names.",
@@ -1009,17 +1075,39 @@ class GitHubWebhookConfig(BaseModel):
     )
 
 
-class GitLabWebhookConfig(BaseModel):
-    """GitLab webhook configuration (optional, for faster feedback).
+class GitLabConfig(BaseModel):
+    """GitLab VCS settings: webhook delivery, and what a connection token may do.
 
-    GitLab does not HMAC-sign the body — it sends the configured secret
-    verbatim in the ``X-Gitlab-Token`` header. This global secret is the
-    fallback when a VCS connection does not set its own ``webhook_secret``.
+    Both fields concern a GitLab access token, from opposite directions — one
+    is a secret GitLab proves itself with on the way in, the other decides
+    whether the connection's own token is allowed back out.
     """
 
     webhook_secret: str = Field(
         default="",
         description="Webhook secret matched against the X-Gitlab-Token header (optional)",
+    )
+    allow_token_delivery_to_runners: bool = Field(
+        default=False,
+        description=(
+            "Allow a `git_http_auth` workspace variable whose source is "
+            "`vcs_connection` to hand a GitLab connection's stored access token "
+            "to a runner Job. OFF by default on every line, and the default is "
+            "the point: a GitLab VCS connection holds a Personal or Group Access "
+            "Token an operator pasted in, and there is no operation that produces "
+            "a narrower copy of one. The token is delivered whole, with every "
+            "permission and every project it covers, into a Job that is also "
+            "running workspace-supplied IaC — and the connection is chosen in a "
+            "variable *value*, so any workspace owner can name any connection an "
+            "admin created. (GitHub is unaffected and needs no switch: its "
+            "installation token is minted per run and is already narrowed to "
+            "`contents: read`.) Turning this on accepts that disclosure "
+            "deliberately; the alternative that needs no switch is a `static` "
+            "git_http_auth credential holding a token the operator scoped "
+            "themselves. With it off, such a variable fails the run with a "
+            "message naming this key — never silently, because a credential that "
+            "vanishes leaves `terraform init` to fail somewhere confusing."
+        ),
     )
 
 
@@ -1027,6 +1115,21 @@ class VCSConfig(BaseModel):
     """VCS integration configuration."""
 
     enabled: bool = Field(default=True, description="Enable VCS integration")
+    require_connection_authorization: bool = Field(
+        default=True,
+        description=(
+            "Require a principal to already have a claim to a VCS connection before "
+            "naming it (GHSA-v8g7-pqrj-8mcm). A connection covers every repository "
+            "its credential can reach, and its id is visible to anyone with read on "
+            "a workspace using it — so without this any authenticated user could "
+            "point a workspace of their own at someone else's installation. A "
+            "platform admin may name any connection; anyone else may name one they "
+            "already own a workspace on. The consequence is deliberate: the FIRST "
+            "workspace for a connection must be created by an admin, since until "
+            "one exists there is no workspace to own. Set false to accept any "
+            "connection id, as releases before this one did."
+        ),
+    )
     poll_interval_seconds: int = Field(
         default=60,
         description=(
@@ -1051,7 +1154,7 @@ class VCSConfig(BaseModel):
         ),
     )
     github: GitHubWebhookConfig = Field(default_factory=GitHubWebhookConfig)
-    gitlab: GitLabWebhookConfig = Field(default_factory=GitLabWebhookConfig)
+    gitlab: GitLabConfig = Field(default_factory=GitLabConfig)
     tmpdir: str = Field(
         default="/var/lib/terrapod/tmp",
         description=(

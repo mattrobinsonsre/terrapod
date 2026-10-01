@@ -723,6 +723,7 @@ def _workspace_json(
                 "vcs-last-error": ws.vcs_last_error,
                 "vcs-last-error-at": _rfc3339(ws.vcs_last_error_at),
                 "vcs-workflow": ws.vcs_workflow,
+                "allow-fork-pr-plans": ws.allow_fork_pr_plans,
                 "auto-merge": ws.auto_merge,
                 "auto-merge-strategy": ws.auto_merge_strategy,
                 "latest-run": latest_run_attr,
@@ -1164,6 +1165,25 @@ async def create_workspace(
         if vcs_conn_id_str:
             vcs_connection_id = _parse_conn_id(vcs_conn_id_str)
 
+    # GHSA-v8g7-pqrj-8mcm: a connection id is discoverable — it is serialised to
+    # anyone with read on a workspace using it — and naming one grants everything
+    # that credential reaches, so the reference needs authorising like any other
+    # grant. Checked here, after BOTH the attribute and the relationship have been
+    # resolved, so neither spelling slips past.
+    if vcs_connection_id is not None:
+        from terrapod.services.vcs_connection_rbac import (
+            may_reference_connection,
+            refusal_detail,
+        )
+
+        if not await may_reference_connection(
+            db,
+            conn_id=vcs_connection_id,
+            actor_email=user.email,
+            is_platform_admin="admin" in effective_platform_roles(user),
+        ):
+            raise HTTPException(status_code=403, detail=refusal_detail(vcs_connection_id))
+
     from terrapod.config import settings
 
     resolved_pools = await _resolve_pool_set_attrs(attrs, db, user)
@@ -1231,6 +1251,15 @@ async def create_workspace(
         # exists for this and is used forty lines below on `debug-mode`.
         auto_merge=_422(
             workspace_settings.validate_bool, attrs.get("auto-merge", False), "auto-merge"
+        ),
+        # Defaults ON on this release line (2.0 defaults it off). A fork PR's speculative plan executes its author's code
+        # with the workspace's full credential set, and that author has no write
+        # access and cannot merge — so this is the only path by which their code
+        # reaches those credentials. Same-repository PRs are unaffected.
+        allow_fork_pr_plans=_422(
+            workspace_settings.validate_bool,
+            attrs.get("allow-fork-pr-plans", True),
+            "allow-fork-pr-plans",
         ),
         auto_merge_strategy=auto_merge_strategy,
         auto_apply_mode=auto_apply_mode,
@@ -1726,6 +1755,12 @@ async def update_workspace(
             )
         )
 
+    if "allow-fork-pr-plans" in attrs:
+        ws.allow_fork_pr_plans = _422(
+            workspace_settings.validate_bool,
+            attrs["allow-fork-pr-plans"],
+            "allow-fork-pr-plans",
+        )
     if "auto-merge" in attrs:
         ws.auto_merge = _422(workspace_settings.validate_bool, attrs["auto-merge"], "auto-merge")
     if "auto-merge-strategy" in attrs:
@@ -1879,6 +1914,11 @@ async def update_workspace(
     # only the relationship — so the obvious PATCH, mirroring the create body
     # that worked, was accepted with a 200 and silently ignored. Silently
     # dropping a recognised field is worse than rejecting it: the caller has no
+    # Captured before either spelling is applied, so the gate below fires only on a
+    # CHANGE. A PATCH that leaves the connection alone must not start failing for
+    # someone who legitimately administers the workspace today.
+    _conn_before_patch = ws.vcs_connection_id
+
     # way to tell it did nothing. The relationship stays canonical and wins
     # when both are present.
     if "vcs-connection-id" in attrs:
@@ -1914,6 +1954,23 @@ async def update_workspace(
             # Auto-enable drift detection when VCS is connected (unless explicitly set in this request)
             if "drift-detection-enabled" not in attrs and ws.vcs_connection_id:
                 ws.drift_detection_enabled = True
+
+    # The same gate as create (GHSA-v8g7-pqrj-8mcm), after both spellings have been
+    # applied — PATCH accepts the attribute and the relationship, and the
+    # relationship wins, so checking one would leave the other open.
+    if ws.vcs_connection_id is not None and ws.vcs_connection_id != _conn_before_patch:
+        from terrapod.services.vcs_connection_rbac import (
+            may_reference_connection,
+            refusal_detail,
+        )
+
+        if not await may_reference_connection(
+            db,
+            conn_id=ws.vcs_connection_id,
+            actor_email=user.email,
+            is_platform_admin="admin" in effective_platform_roles(user),
+        ):
+            raise HTTPException(status_code=403, detail=refusal_detail(ws.vcs_connection_id))
 
     await db.commit()
     await db.refresh(ws)

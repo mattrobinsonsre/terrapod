@@ -27,7 +27,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Workspaces** | Isolate state, variables, and runs per workspace |
 | **Remote State Management** | Versioned state storage with locking, rollback, encryption at rest via CSP services |
 | **Agent Execution** | Plan/apply runs on the server via K8s Job-based runner infrastructure |
-| **VCS Integration** | GitHub (App) and GitLab (access token); inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, plus outbound polling so webhooks are optional, never required |
+| **VCS Integration** | GitHub (App) and GitLab (access token); inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, plus outbound polling so webhooks are optional, never required. Pull requests from [forks](vcs-integration.md#pull-requests-from-forks) need a per-workspace opt-in before they plan; pull requests within the repository always do |
 | **VCS API-budget management** | Per-connection saturation verdict, consumption rate against the budget, and a breakdown of the top consumers by kind and by label — so an estate outgrowing one credential can see it before runs stop, and knows where to split. Always on; no configuration, no extra API calls |
 | **Conditional auto-apply** | Per-workspace `auto_apply_mode` — apply automatically only when the plan is within a declared safety standard (`create`, `create_update`); anything that destroys or replaces stops for a human |
 | **Workspace undelete** | Deleting a workspace leaves its state behind a delete marker; an admin can salvage it into a new workspace within the retention window. See [runbooks.md](runbooks.md#i-deleted-a-workspace-by-mistake) |

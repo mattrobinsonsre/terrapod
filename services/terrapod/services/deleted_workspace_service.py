@@ -112,6 +112,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "security_scan_severity_threshold": ws.security_scan_severity_threshold,
         "security_scan_skip_rules": list(ws.security_scan_skip_rules or []),
         "debug_mode": ws.debug_mode,
+        "allow_fork_pr_plans": ws.allow_fork_pr_plans,
         "ai_summary_mode": ws.ai_summary_mode,
         "ai_policy_mode": ws.ai_policy_mode,
         "ai_summary_context": ws.ai_summary_context,
@@ -476,6 +477,12 @@ async def restore_workspace(
         ),
         security_scan_skip_rules=list(settings.get("security_scan_skip_rules") or []),
         debug_mode=bool(settings.get("debug_mode", False)),
+        allow_fork_pr_plans=bool(
+            # A snapshot taken before this column existed has no key, and the
+            # fallback has to match the column default or a restored workspace
+            # silently differs from its never-deleted neighbours.
+            settings.get("allow_fork_pr_plans", True)
+        ),
         ai_summary_mode=settings.get("ai_summary_mode") or "default",
         ai_policy_mode=settings.get("ai_policy_mode") or "default",
         ai_summary_context=settings.get("ai_summary_context") or "",

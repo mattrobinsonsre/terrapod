@@ -64,13 +64,29 @@ _DISCOVERY_TIMEOUT_SECONDS = 300
 # ---------------------------------------------------------------------------
 # Redis surface cache (pure — keyed by engine + version + provider)
 # ---------------------------------------------------------------------------
+def _normalise_version(value: str) -> str:
+    """Collapse surrounding + interior whitespace in a version or constraint.
+
+    ``_VERSION_CONSTRAINT_RE`` permits ``\\s``, and ``create_session`` only strips
+    the ends, so ``"<  6.0"`` and ``"< 6.0"`` are both accepted and mean exactly
+    the same thing to the engine — while producing *different* cache keys. That
+    makes the key space caller-controlled: each variant misses the cache and
+    re-downloads a provider into a fresh scratch directory. Normalising bounds the
+    key space to the constraints that genuinely differ.
+    """
+    return " ".join(value.split())
+
+
 def _surface_cache_key(
     engine: str, engine_version: str, provider: str, provider_version: str
 ) -> str:
     # provider_version is part of the key: a v5 and a v6 provider schema differ
     # (v6 adds a per-resource `region` attribute, etc.), so their surfaces must
-    # not collide. Empty constraint (latest) is its own key.
-    return f"tp:onboard:surface:{engine}:{engine_version}:{provider}:{provider_version}"
+    # not collide. Empty constraint (latest) is its own key. Both version segments
+    # are whitespace-normalised so equivalent spellings share one entry.
+    ev = _normalise_version(engine_version)
+    pv = _normalise_version(provider_version)
+    return f"tp:onboard:surface:{engine}:{ev}:{provider}:{pv}"
 
 
 async def get_cached_surface(
@@ -161,7 +177,9 @@ async def create_session(
     session = OnboardingSession(
         workspace_id=workspace_id,
         provider=provider.strip(),
-        provider_version=provider_version.strip(),
+        # Normalised, not just stripped: the stored constraint is what the cache
+        # key is built from, so interior whitespace here is unbounded key space.
+        provider_version=_normalise_version(provider_version),
         created_by=created_by,
         status="pending",
     )
@@ -324,7 +342,14 @@ def _local_platform() -> tuple[str, str]:
 
 
 def _resolve_tmpdir() -> str | None:
-    """The CSP-attached ephemeral PVC dir (Rule 14), or None for the system default."""
+    """The CSP-attached ephemeral PVC dir (Rule 14), or None for the system default.
+
+    None is the documented fallback for local dev and tests. On an API pod with no
+    PVC configured it means the system default — which is RAM-backed ``/tmp`` — so
+    anything written there counts against the pod's memory. That makes the
+    scratch-directory cleanup in ``run_schema_discovery`` load-bearing rather than
+    tidiness: a leaked engine binary or provider plugin is leaked memory.
+    """
     configured = settings.vcs.tmpdir
     if configured and os.path.isdir(configured):
         return configured
@@ -351,8 +376,14 @@ def _provider_config_hcl(provider: str, version_constraint: str = "") -> str:
     )
 
 
-async def _download_engine_binary(db: AsyncSession, engine: str, version: str) -> str:
-    """Resolve + fetch the tofu/terraform binary to the PVC, return its path.
+async def _download_engine_binary(db: AsyncSession, engine: str, version: str) -> tuple[str, str]:
+    """Resolve + fetch the tofu/terraform binary to the PVC.
+
+    Returns ``(binary_path, scratch_dir)``. The CALLER owns ``scratch_dir`` and must
+    remove it — it holds the extracted engine binary, so it cannot be reaped until
+    the discovery subprocesses are done with it. If anything fails in here the
+    directory is removed before re-raising, so a failed download leaks nothing and
+    the caller never has to clean up a dir it was never handed.
 
     The API image bakes no engine binary (removed in #824 P1); we pull the
     workspace's exact version through the binary cache, same as the runner.
@@ -369,21 +400,27 @@ async def _download_engine_binary(db: AsyncSession, engine: str, version: str) -
     tmpdir = _resolve_tmpdir()
     dest_dir = await asyncio.to_thread(tempfile.mkdtemp, prefix="onb-bin-", dir=tmpdir)
     dest = os.path.join(dest_dir, engine)
-
-    # Stream the (zip) release to the PVC, extract the single binary. Both the
-    # download and the unzip are blocking → threaded.
-    async with httpx.AsyncClient(timeout=_DISCOVERY_TIMEOUT_SECONDS) as client:
-        zip_path = os.path.join(dest_dir, f"{engine}.zip")
-        async with client.stream("GET", url) as resp:
-            resp.raise_for_status()
-            f = await asyncio.to_thread(open, zip_path, "wb")
-            try:
-                async for chunk in resp.aiter_bytes(1024 * 1024):
-                    await asyncio.to_thread(f.write, chunk)
-            finally:
-                await asyncio.to_thread(f.close)
-    await asyncio.to_thread(_unzip_engine, zip_path, dest, engine)
-    return dest
+    try:
+        # Stream the (zip) release to the PVC, extract the single binary. Both the
+        # download and the unzip are blocking → threaded.
+        async with httpx.AsyncClient(timeout=_DISCOVERY_TIMEOUT_SECONDS) as client:
+            zip_path = os.path.join(dest_dir, f"{engine}.zip")
+            async with client.stream("GET", url) as resp:
+                resp.raise_for_status()
+                f = await asyncio.to_thread(open, zip_path, "wb")
+                try:
+                    async for chunk in resp.aiter_bytes(1024 * 1024):
+                        await asyncio.to_thread(f.write, chunk)
+                finally:
+                    await asyncio.to_thread(f.close)
+        await asyncio.to_thread(_unzip_engine, zip_path, dest, engine)
+        # The archive is dead weight once extracted, and it is the same order of
+        # magnitude as the binary — drop it rather than hold both for the whole run.
+        await asyncio.to_thread(os.unlink, zip_path)
+    except BaseException:  # cleanup then re-raise, incl. cancellation
+        await asyncio.to_thread(shutil.rmtree, dest_dir, ignore_errors=True)
+        raise
+    return dest, dest_dir
 
 
 def _unzip_engine(zip_path: str, dest: str, engine: str) -> None:
@@ -488,8 +525,9 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
         return
 
     workdir: str | None = None
+    bindir: str | None = None
     try:
-        engine_bin = await _download_engine_binary(db, engine, version)
+        engine_bin, bindir = await _download_engine_binary(db, engine, version)
         tmpdir = _resolve_tmpdir()
         workdir = await asyncio.to_thread(tempfile.mkdtemp, prefix="onb-d1-", dir=tmpdir)
         surface = await asyncio.wait_for(
@@ -517,8 +555,13 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
             "onboarding_schema_discovery_failed", session_id=str(session_id), error=str(exc)
         )
     finally:
-        if workdir:
-            await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
+        # BOTH scratch dirs, on every path: `workdir` holds the downloaded provider
+        # plugin (hundreds of MB) and `bindir` the engine binary. See
+        # `_resolve_tmpdir` — with no PVC configured these land on RAM-backed
+        # `/tmp`, so a leak is memory, not just disk.
+        for path in (workdir, bindir):
+            if path:
+                await asyncio.to_thread(shutil.rmtree, path, ignore_errors=True)
 
 
 async def handle_schema_discover_trigger(payload: dict) -> None:

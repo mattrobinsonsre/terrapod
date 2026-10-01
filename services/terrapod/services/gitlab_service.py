@@ -290,6 +290,21 @@ async def download_archive_to_file(
     return bytes_written
 
 
+def _is_fork(mr: dict) -> bool:
+    """Whether this MR's source project differs from its target project.
+
+    GitLab's equivalent of a fork PR. Fails closed: if either id is missing we
+    treat it as a fork, because the consequence of guessing "trusted" is a
+    speculative plan running an outsider's code with the workspace's
+    credentials.
+    """
+    source = mr.get("source_project_id")
+    target = mr.get("target_project_id")
+    if source is None or target is None:
+        return True
+    return source != target
+
+
 async def list_open_prs(
     conn: VCSConnection, owner: str, repo: str, base_branch: str
 ) -> list[PullRequest]:
@@ -317,6 +332,7 @@ async def list_open_prs(
             head_sha=mr["sha"],
             head_ref=mr["source_branch"],
             title=mr["title"],
+            from_fork=_is_fork(mr),
         )
         for mr in resp.json()
     ]
@@ -674,6 +690,7 @@ async def get_pull_request(
         head_sha=mr.get("sha") or "",
         head_ref=mr.get("source_branch") or "",
         title=mr.get("title") or "",
+        from_fork=_is_fork(mr),
         draft=bool(mr.get("draft", False)),
         author_login=(mr.get("author") or {}).get("username", ""),
         state=mr_state,

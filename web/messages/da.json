@@ -1064,7 +1064,8 @@
       "terragruntVersion": "Terragrunt-version",
       "noExpiry": "Ingen udløb",
       "addDriftIgnoreRule": "Tilføj regel",
-      "debugModeHint": "Hold mislykkede runner-pods åbne på de arbejdsområder, denne regel opretter. Slået fra som standard – en tilbageholdt pod beholder det arbejdsområdes legitimationsoplysninger."
+      "debugModeHint": "Hold mislykkede runner-pods åbne på de arbejdsområder, denne regel opretter. Slået fra som standard – en tilbageholdt pod beholder det arbejdsområdes legitimationsoplysninger.",
+      "allowForkPrPlansHint": "Gælder for alle arbejdsområder, denne regel opretter. Slået til som standard i denne udgivelseslinje, fordi den plan kører fork-forfatterens kode med dette arbejdsområdes legitimationsoplysninger."
     },
     "table": {
       "name": "Navn",
@@ -2883,7 +2884,8 @@
       "uploadState": "Kunne ikke uploade tilstand",
       "uploadStateFile": "Kunne ikke uploade tilstandsfil",
       "updateSecurityScan": "Sikkerhedsscanningen kunne ikke opdateres",
-      "updateDebugMode": "Fejlfindingstilstanden kunne ikke opdateres"
+      "updateDebugMode": "Fejlfindingstilstanden kunne ikke opdateres",
+      "updateForkPlans": "Planer for pull requests fra forks kunne ikke opdateres"
     },
     "subtabs": {
       "state": "Tilstand",
@@ -2936,6 +2938,14 @@
       "bannerTitle": "Fejlfindingstilstand er slået til for dette arbejdsområde",
       "bannerBody": "En mislykket kørsels pod holdes åben til inspektion i stedet for at afslutte, og den beholder dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler, så længe den holdes. Slå fejlfindingstilstanden fra, når du er færdig med at fejlsøge.",
       "confirmEnable": "Slå fejlfindingstilstand til? En mislykket kørsels pod holdes åben med dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler, indtil vinduet udløber, eller du sletter podden."
+    },
+    "allowForkPrPlans": {
+      "title": "Planer på pull requests fra forks",
+      "description": "Om en pull request åbnet fra en fork får en spekulativ plan. Slået til som standard i denne udgivelseslinje, fordi den plan kører fork-forfatterens kode med dette arbejdsområdes legitimationsoplysninger.",
+      "label": "Planlæg pull requests fra forks",
+      "hint": "En kørsel modtager dette arbejdsområdes miljøvariabler, følsomme værdier, alle hemmeligheder hentet via Vault og jobbets cloud-identitet. Den, der åbner en pull request fra en fork, har ingen skriveadgang og kan ikke merge, så en spekulativ plan er den eneste vej, ad hvilken deres kode når frem til de legitimationsoplysninger. Slå dette til for et arbejdsområde, der ikke rummer noget værd at tage — for eksempel et offentligt modul-repository, der tager imod bidrag fra fællesskabet. Pull requests fra grene i selve repositoryet er upåvirkede og planlægges altid.",
+      "activeBadge": "Til",
+      "confirmEnable": "Planlæg pull requests åbnet fra forks? Deres forfatteres kode vil køre med dette arbejdsområdes legitimationsoplysninger og dekrypterede variabler, uden at nogen godkender det først."
     }
   },
   "graphs": {

@@ -2198,9 +2198,20 @@ async def next_run(
     # delivered — like the vars/hooks — via the per-run Secret and materialized by
     # the runner's git_auth phase before `init` fetches modules. Never plaintext
     # in the Job spec; never in logs (the phase is log-safe by construction).
-    from terrapod.services.git_auth_service import resolve_git_auth
+    #
+    # A credential that fails to resolve is dropped inside the resolver, as it
+    # always has been. A REFUSAL is different and is fatal here, for the same
+    # reason the Vault block above is: the operator made a deliberate policy
+    # choice, and a silently absent credential would spend it on an `init`
+    # failure that names neither the credential nor the cause.
+    from terrapod.services.git_auth_service import GitAuthRefused, resolve_git_auth
 
-    git_auth = await resolve_git_auth(db, resolved)
+    try:
+        git_auth = await resolve_git_auth(db, resolved, workspace=ws)
+    except GitAuthRefused as e:
+        await run_service.transition_run(db, run, "errored", error_message=str(e))
+        await db.commit()
+        return Response(status_code=204)
 
     # Resolve execution hooks associated with this workspace (#619). Delivered
     # alongside the vars via the per-run Secret; the runner runs each hook_point

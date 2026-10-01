@@ -1064,7 +1064,8 @@
       "terragruntVersion": "Terragrunt version",
       "noExpiry": "No expiry, matey",
       "addDriftIgnoreRule": "Add a rule",
-      "debugModeHint": "Keep failed runner pods open on the work-decks this rule creates. Off by default — a held pod keeps that work-deck''s credentials."
+      "debugModeHint": "Keep failed runner pods open on the work-decks this rule creates. On by default on this release line — a held pod keeps that work-deck''s credentials.",
+      "allowForkPrPlansHint": "Applies t'' every work-deck this rule creates. On by default on this release line, fer that plan runs the fork author''s code with this work-deck''s credentials."
     },
     "table": {
       "name": "Name",
@@ -2569,7 +2570,7 @@
     },
     "planExpiry": {
       "title": "Plan Expiry",
-      "description": "Auto-discard an unconfirmed plan once it be older than this, so a stale plan can''t be applied against a moved world. Off by default; th'' plan must then be re-run. (Applies t'' apply-capable voyages only.)",
+      "description": "Auto-discard an unconfirmed plan once it be older than this, so a stale plan can''t be applied against a moved world. On by default on this release line; th'' plan must then be re-run. (Applies t'' apply-capable voyages only.)",
       "expireAfter": "Expire after"
     },
     "aiSummary": {
@@ -2883,7 +2884,8 @@
       "uploadState": "Failed t'' hoist th'' state aboard",
       "uploadStateFile": "Failed t'' hoist th'' state file aboard",
       "updateSecurityScan": "Failed to update the security sweep",
-      "updateDebugMode": "Failed t'' update debuggin'' mode"
+      "updateDebugMode": "Failed t'' update debuggin'' mode",
+      "updateForkPlans": "Failed t'' update fork pull request plans"
     },
     "subtabs": {
       "state": "State",
@@ -2931,11 +2933,19 @@
       "title": "Runner Debuggin'' Mode",
       "description": "Keep a failed voyage''s pod open so ye can climb aboard it. The voyage be reported as failed first; only then does the hold stay afloat.",
       "label": "Debuggin'' Mode",
-      "hint": "Off by default. While on, a failed runner''s pod stays exec-able fer the window yer quartermaster set, an'' it keeps this work-deck''s credentials an'' decrypted variables that whole time.",
+      "hint": "On by default on this release line. While on, a failed runner''s pod stays exec-able fer the window yer quartermaster set, an'' it keeps this work-deck''s credentials an'' decrypted variables that whole time.",
       "activeBadge": "Active",
       "bannerTitle": "Debuggin'' mode be on fer this work-deck",
       "bannerBody": "A failed voyage''s pod be held open fer inspection instead o'' endin'', an'' it keeps this work-deck''s credentials an'' decrypted variables while it be held. Douse debuggin'' mode once ye be done huntin'' the fault.",
       "confirmEnable": "Hoist debuggin'' mode? A failed voyage''s pod will be held open carryin'' this work-deck''s credentials an'' decrypted variables until the window runs out or ye delete the pod."
+    },
+    "allowForkPrPlans": {
+      "title": "Plans fer pull requests from foreign forks",
+      "description": "Whether a pull request hoisted from a fork gets a speculative plan. On by default on this release line, fer that plan runs the fork author''s code with this work-deck''s credentials.",
+      "label": "Plan pull requests from forks",
+      "hint": "A voyage receives this work-deck''s environment variables, sensitive values, any Vault-resolved secrets an'' the job''s cloud colours. A soul openin'' a pull request from a fork has no write access an'' cannot merge, so a speculative plan be the only way their code reaches them credentials. Hoist this fer a work-deck that holds nothin'' worth plunderin'' — a public module repository takin'' in contributions from the crew, say. Pull requests from branches in the repository itself be unaffected an'' always plan.",
+      "activeBadge": "Hoisted",
+      "confirmEnable": "Plan pull requests hoisted from forks? Their authors'' code will run with this work-deck''s credentials an'' decrypted variables, without a soul approvin'' it first."
     }
   },
   "graphs": {
