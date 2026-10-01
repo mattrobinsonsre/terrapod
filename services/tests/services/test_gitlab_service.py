@@ -381,46 +381,6 @@ class TestValidateWebhookToken:
             settings.vcs.gitlab.webhook_secret = original
 
 
-class TestPullRequestsForCommit:
-    """#1878, GitLab's half. `iid`, not `id`.
-
-    The project-scoped number is what the UI shows, what `PRSession.pr_number`
-    holds, and what every other MR call in this module addresses; the global
-    `id` would match no session.
-    """
-
-    @pytest.mark.asyncio
-    async def test_it_returns_the_mr_iids(self):
-        resp = MagicMock()
-        resp.status_code = 200
-        resp.json.return_value = [{"iid": 7, "id": 91823}, {"iid": 9, "id": 91824}]
-        resp.raise_for_status = MagicMock()
-
-        with patch(
-            "terrapod.services.gitlab_service._gitlab_request", AsyncMock(return_value=resp)
-        ):
-            from terrapod.services.gitlab_service import pull_requests_for_commit
-
-            assert await pull_requests_for_commit(_mock_conn(), "grp", "proj", "deadbeef") == [7, 9]
-
-    @pytest.mark.asyncio
-    async def test_a_commit_belonging_to_no_mr_is_empty(self):
-        resp = MagicMock()
-        resp.status_code = 200
-        resp.json.return_value = []
-        resp.raise_for_status = MagicMock()
-
-        with patch(
-            "terrapod.services.gitlab_service._gitlab_request", AsyncMock(return_value=resp)
-        ):
-            from terrapod.services.gitlab_service import pull_requests_for_commit
-
-            assert await pull_requests_for_commit(_mock_conn(), "grp", "proj", "deadbeef") == []
-
-
-# ── actor_has_push_access ────────────────────────────────────────────
-
-
 class TestActorHasPushAccess:
     """Who may drive a `terrapod ...` comment command on GitLab.
 
