@@ -497,9 +497,13 @@ You can identify speculative runs in the API response by:
 
 ### Pull requests from forks
 
-A pull request opened **from a fork** gets no speculative plan unless the
-workspace opts in. The setting is `allow-fork-pr-plans` and it defaults to
-**false** ([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)).
+A pull request opened **from a fork** plans only where the workspace allows it.
+The setting is `allow-fork-pr-plans` and on this release line it defaults to
+**true** ([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)) —
+so fork pull requests DO plan until an operator turns it off. A patch release must
+not stop a plan that works today, which is why the secure default waits for 2.0.
+Set it to `false` on every workspace whose repository takes pull requests from
+people who should not reach its credentials.
 
 A speculative plan executes the pull request author's configuration — provider
 blocks, `external` data sources, `local-exec` provisioners — with everything
