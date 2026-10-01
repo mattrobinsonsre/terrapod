@@ -39,25 +39,36 @@ def _root() -> pathlib.Path:
     for cand in here.parents:
         if (cand / "docker" / "Dockerfile.runner").is_file():
             return cand
-    raise AssertionError(
-        "docker/Dockerfile.runner not found above "
-        f"{here} — if the test image stopped copying `docker/`, this test cannot "
-        "run and must be skipped rather than silently passing"
-    )
+    return None
 
 
+#: None when `docker/` is absent, which only happens in an image that does
+#: not ship it; both tests then skip rather than fail for want of a fixture.
 ROOT = _root()
 #: `services/terrapod/runner` in a checkout, `terrapod/runner` in the image.
-RUNNER = next(
-    p
-    for p in (ROOT / "services" / "terrapod" / "runner", ROOT / "terrapod" / "runner")
-    if p.is_dir()
+RUNNER = (
+    next(
+        (
+            p
+            for p in (
+                ROOT / "services" / "terrapod" / "runner",
+                ROOT / "terrapod" / "runner",
+            )
+            if p.is_dir()
+        ),
+        None,
+    )
+    if ROOT
+    else None
 )
-DOCKERFILE = ROOT / "docker" / "Dockerfile.runner"
-TILTFILE = ROOT / "Tiltfile"
+DOCKERFILE = (ROOT / "docker" / "Dockerfile.runner") if ROOT else None
+TILTFILE = (ROOT / "Tiltfile") if ROOT else None
 
-#: Entry point of the chain that runs inside a runner Job.
-ENTRYPOINT = RUNNER / "job_entrypoint.py"
+#: Entry point of the chain that runs inside a runner Job. None when the tree has
+#: no runner package, which with ROOT is the whole skip condition — resolving it
+#: eagerly is what turned a missing fixture into a COLLECTION error, taking the
+#: entire shard down rather than skipping two tests.
+ENTRYPOINT = (RUNNER / "job_entrypoint.py") if RUNNER else None
 
 #: Modules the Job never imports, so the image is right not to carry them.
 #: Each needs a reason: this list is how a genuine exclusion is told apart from
@@ -112,6 +123,8 @@ def _runner_imports_reachable_from(start: pathlib.Path) -> set[str]:
 
 
 def test_every_module_the_job_imports_is_in_the_runner_image() -> None:
+    if ROOT is None or RUNNER is None or ENTRYPOINT is None:
+        pytest.skip("this tree has no docker/ or no runner package to check")
     dockerfile = DOCKERFILE.read_text()
     missing = []
     for mod in sorted(_runner_imports_reachable_from(ENTRYPOINT)):
@@ -146,7 +159,7 @@ def test_the_tiltfile_deps_match_the_dockerfile() -> None:
     development concern. It runs in a checkout, which is where someone adds a
     runner module in the first place.
     """
-    if not TILTFILE.is_file():
+    if ROOT is None or not TILTFILE.is_file():
         pytest.skip("Tiltfile is not shipped in the test image")
     dockerfile = DOCKERFILE.read_text()
     tiltfile = TILTFILE.read_text()

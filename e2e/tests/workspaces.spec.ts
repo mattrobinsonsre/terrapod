@@ -552,10 +552,15 @@ test.describe('AI policy gate (#1766)', () => {
 });
 
 test.describe('Fork pull request plans (GHSA-gp5w-76rw-c452)', () => {
-  test('a new workspace defaults to off and the toggle round-trips', async ({ page }) => {
-    // Defaulting off is the whole point, so the default is asserted first:
-    // a control that merely persists whatever it is set to would pass every
-    // other assertion here while leaving fork pull requests planning.
+  test('a new workspace defaults to ON on this line, and turning it off persists', async ({
+    page,
+  }) => {
+    // The default is asserted FIRST because it is the whole point, and on this
+    // release line it is the permissive one: a patch must not stop a fork pull
+    // request that plans today, so the control ships on and the operator turns it
+    // off. (2.0 defaults it off.) A control that merely persisted whatever it was
+    // set to would pass every other assertion here while telling an operator
+    // nothing about what their workspace is actually doing.
     const token = getStoredToken();
     const wsId = await createWorkspace(token, uniqueName('forkplans'));
 
@@ -563,28 +568,31 @@ test.describe('Fork pull request plans (GHSA-gp5w-76rw-c452)', () => {
 
     const toggle = page.getByLabel('Plan fork pull requests', { exact: true });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
-    await expect(toggle).not.toBeChecked();
-    await expect(page.getByTestId('allow-fork-pr-plans-indicator')).toHaveCount(0);
+    await expect(toggle).toBeChecked();
+    await expect(page.getByTestId('allow-fork-pr-plans-indicator')).toBeVisible();
 
     // `.click()`, never `.check()` — the input is controlled by the fetched
     // workspace, so it flips only once the PATCH resolves.
     await toggle.click();
-    await expect(toggle).toBeChecked({ timeout: 15_000 });
-    await expect(page.getByTestId('allow-fork-pr-plans-indicator')).toBeVisible();
+    await expect(toggle).not.toBeChecked({ timeout: 15_000 });
+    await expect(page.getByTestId('allow-fork-pr-plans-indicator')).toHaveCount(0);
 
     await expect(async () => {
       await page.reload();
-      await expect(page.getByLabel('Plan fork pull requests', { exact: true })).toBeChecked();
+      await expect(page.getByLabel('Plan fork pull requests', { exact: true })).not.toBeChecked();
     }).toPass({ timeout: 20_000 });
 
+    // The OFF direction is the one that matters here — it is the remedy — and the
+    // one a naive `if value` guard drops, leaving the operator looking at an
+    // unchecked box over a workspace that still plans fork pull requests.
     const res = await page.request.get(`/api/terrapod/v1/workspaces/${wsId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status()).toBe(200);
-    expect((await res.json()).data.attributes['allow-fork-pr-plans']).toBe(true);
+    expect((await res.json()).data.attributes['allow-fork-pr-plans']).toBe(false);
   });
 
-  test('turning it back off persists', async ({ page }) => {
+  test('turning it back on persists', async ({ page }) => {
     const token = getStoredToken();
     const wsId = await createWorkspace(token, uniqueName('forkoff'));
 
@@ -593,17 +601,15 @@ test.describe('Fork pull request plans (GHSA-gp5w-76rw-c452)', () => {
     await expect(toggle).toBeVisible({ timeout: 15_000 });
 
     await toggle.click();
-    await expect(toggle).toBeChecked({ timeout: 15_000 });
-    await toggle.click();
     await expect(toggle).not.toBeChecked({ timeout: 15_000 });
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
 
-    // The off direction is the one a naive `if value` guard drops, leaving the
-    // operator looking at an unchecked box over a workspace that still plans.
     await expect(async () => {
       const res = await page.request.get(`/api/terrapod/v1/workspaces/${wsId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      expect((await res.json()).data.attributes['allow-fork-pr-plans']).toBe(false);
+      expect((await res.json()).data.attributes['allow-fork-pr-plans']).toBe(true);
     }).toPass({ timeout: 20_000 });
   });
 });
