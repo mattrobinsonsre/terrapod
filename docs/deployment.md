@@ -589,6 +589,17 @@ The chart supports up to three Ingresses. See [Split-networking deployments](dep
 | `bootstrap.poolName` | `""` | Optional: create a single agent pool with this name |
 | `bootstrap.poolToken` | `""` | Its join token, **as a literal in the Job spec** — prefer `poolTokenExistingSecret`. Generated and printed once if omitted |
 | `bootstrap.poolTokenExistingSecret` | `""` | Read `poolName`'s join token from a Secret instead of from values |
+
+> **The bootstrap join token does not expire and has no use limit, on purpose.**
+> A listener keeps its certificate on an `emptyDir`, so a replaced pod has lost
+> it and re-joins with this token to be issued another. A token with two uses
+> would break the Deployment on its third pod, and one with an expiry would
+> break it on the first replacement afterwards — in both cases the agent pool
+> just goes quiet.
+>
+> It is bounded operationally instead: **once the pool is established, revoke the
+> bootstrap token** and issue per-listener tokens with whatever expiry you want.
+> Until you do, anyone holding it can join a listener to that pool.
 | `bootstrap.poolTokenKey` | `join_token` | Key within that Secret |
 | `bootstrap.pools` | `[]` | Several pools at once — see below. Mutually exclusive with `poolName` |
 
