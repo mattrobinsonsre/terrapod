@@ -9,6 +9,8 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { VCSConsumption, type ConnectionConsumption } from '@/components/vcs-consumption'
+import { LabelsEditor } from '@/components/labels-editor'
+import { StringListEditor } from '@/components/template-editors'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch, fetchAllPages } from '@/lib/api'
@@ -29,7 +31,22 @@ interface VCSConnection {
     'has-token': boolean
     'has-webhook-secret'?: boolean
     'created-at': string
+    // GHSA-v8g7-pqrj-8mcm. Who may point a workspace at this connection, and
+    // where it may be pointed. None of the three is a secret, so all three are
+    // returned on read — unlike the credential, which stays write-only. Typed
+    // optional because a lagging server omits them entirely.
+    'owner-email'?: string
+    labels?: Record<string, string>
+    'allowed-repositories'?: string[]
   } & ConnectionConsumption
+}
+
+// An empty allowlist means "any repository", so the count that decides which of
+// the two states to show has to ignore the blank row StringListEditor adds when
+// Add is pressed — the server trims those away, and a UI that counted them
+// would claim a restriction that does not exist.
+function nonBlank(values: string[]): string[] {
+  return values.map((v) => v.trim()).filter(Boolean)
 }
 
 type VCSSortKey = 'name' | 'provider' | 'server-url' | 'status' | 'created'
@@ -58,6 +75,10 @@ export default function VCSConnectionsPage() {
   const pemFileRef = useRef<HTMLInputElement>(null)
   // GitLab fields
   const [token, setToken] = useState('')
+  // GHSA-v8g7-pqrj-8mcm. Access control, shared by both providers.
+  const [ownerEmail, setOwnerEmail] = useState('')
+  const [connLabels, setConnLabels] = useState<Record<string, string>>({})
+  const [allowedRepos, setAllowedRepos] = useState<string[]>([])
   const [creating, setCreating] = useState(false)
   // When set, the form is editing this connection (PATCH) rather than creating.
   const [editId, setEditId] = useState<string | null>(null)
@@ -67,6 +88,7 @@ export default function VCSConnectionsPage() {
   function resetForm() {
     setName(''); setServerUrl(''); setAppId(''); setInstallationId('')
     setPrivateKey(''); setToken(''); setWebhookSecret(''); setProvider('github'); setEditId(null)
+    setOwnerEmail(''); setConnLabels({}); setAllowedRepos([])
   }
 
   function startEdit(conn: VCSConnection) {
@@ -84,6 +106,13 @@ export default function VCSConnectionsPage() {
     setPrivateKey('')
     setToken('')
     setWebhookSecret('')
+    // Access control is readable, so the form opens on the stored values rather
+    // than on blanks — otherwise saving an unrelated field (a rotated key, a new
+    // server URL) would silently clear the owner, the labels and the allowlist,
+    // widening who may use the connection.
+    setOwnerEmail(conn.attributes['owner-email'] || '')
+    setConnLabels({ ...(conn.attributes.labels || {}) })
+    setAllowedRepos([...(conn.attributes['allowed-repositories'] || [])])
     setShowCreate(true)
     setError(''); setSuccess('')
   }
@@ -143,6 +172,15 @@ export default function VCSConnectionsPage() {
         if (token) attrs.token = token
         else if (!editing) attrs.token = token
       }
+      // GHSA-v8g7-pqrj-8mcm. Sent on create and on every edit. PATCH applies a
+      // key only when present, so sending all three is what makes the form
+      // authoritative: the fields were loaded from the server in startEdit, so
+      // this writes back what the operator sees. An explicitly empty value
+      // clears the field — a cleared allowlist has to mean "any repository
+      // again", or an allowlist could never be undone.
+      attrs['owner-email'] = ownerEmail.trim()
+      attrs.labels = connLabels
+      attrs['allowed-repositories'] = nonBlank(allowedRepos)
       const url = editing
         ? `/api/terrapod/v1/vcs-connections/${editId}`
         : '/api/terrapod/v1/vcs-connections'
@@ -322,6 +360,64 @@ export default function VCSConnectionsPage() {
               </div>
             )}
 
+            {/* GHSA-v8g7-pqrj-8mcm. The three settings that decide who may use
+                this connection and where it may be pointed. Grouped and
+                labelled as access control rather than scattered among the
+                credential fields, because an operator setting a glob here is
+                making a security decision, not filling in a detail. */}
+            {/* role=group + aria-labelledby rather than fieldset/legend: a
+                legend notches whatever border the fieldset carries, and a
+                fieldset's `min-width: min-content` does not shrink, which is how
+                a grouped form pushes a phone sideways. The grouping an assistive
+                technology announces is the same. */}
+            <div role="group" aria-labelledby="vcs-access-heading"
+              className="pt-3 border-t border-slate-700/50 space-y-3">
+              <h3 id="vcs-access-heading" className="text-sm font-semibold text-slate-200">{t('access.heading')}</h3>
+              <p className="text-xs text-slate-500">{t('access.intro')}</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="vcs-owner" className="block text-sm font-medium text-slate-300 mb-1">
+                    {t('access.ownerEmail')} <span className="text-slate-500 font-normal">{t('form.optional')}</span>
+                  </label>
+                  <input id="vcs-owner" type="email" value={ownerEmail}
+                    onChange={(e) => setOwnerEmail(e.target.value)}
+                    placeholder="owner@example.com" /* i18n-ignore — an address shape, not prose */
+                    className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                  <p className="mt-1 text-xs text-slate-500">{t('access.ownerEmailHint')}</p>
+                </div>
+                <div>
+                  <span className="block text-sm font-medium text-slate-300 mb-1">{t('access.labels')}</span>
+                  <LabelsEditor labels={connLabels} onChange={setConnLabels} />
+                  <p className="mt-1 text-xs text-slate-500">{t('access.labelsHint')}</p>
+                </div>
+              </div>
+
+              <div>
+                <span className="block text-sm font-medium text-slate-300 mb-1">{t('access.allowedRepositories')}</span>
+                <StringListEditor
+                  values={allowedRepos}
+                  onChange={setAllowedRepos}
+                  placeholder="org/repo-*" /* i18n-ignore — a glob example, not prose */
+                  addLabel={t('access.addPattern')}
+                />
+                <p className="mt-1 text-xs text-slate-500">{t('access.allowedRepositoriesHint')}</p>
+                {/* The empty state is stated outright, because "no entries" here
+                    means the OPPOSITE of what a blank list usually implies: an
+                    empty allowlist permits every repository. Leaving the list
+                    simply blank would read as "nothing is permitted". */}
+                {nonBlank(allowedRepos).length === 0 ? (
+                  <p className="mt-2 p-2 rounded-lg text-xs bg-amber-900/30 text-amber-300 border border-amber-800/50">
+                    {t('access.anyRepositoryWarning')}
+                  </p>
+                ) : (
+                  <p className="mt-2 p-2 rounded-lg text-xs bg-slate-700/50 text-slate-300 border border-slate-600/50">
+                    {t('access.restricted', { count: nonBlank(allowedRepos).length })}
+                  </p>
+                )}
+              </div>
+            </div>
+
             <button type="submit" disabled={creating}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
               {creating
@@ -386,6 +482,39 @@ export default function VCSConnectionsPage() {
                   {conn.attributes['server-url'] ? (
                     <p className="text-xs text-slate-500 break-all" dir="ltr">{conn.attributes['server-url']}</p>
                   ) : null}
+
+                  {/* GHSA-v8g7-pqrj-8mcm. Readable from the list, not only from
+                      the edit form: "which repositories can this credential
+                      reach" is the question an operator comes here to answer,
+                      and it should not require opening a form to see. */}
+                  <div className="pt-3 border-t border-slate-700/50 space-y-2">
+                    <p className="text-xs text-slate-400 break-all">
+                      {conn.attributes['owner-email']
+                        ? t('access.ownedBy', { email: conn.attributes['owner-email'] })
+                        : t('access.unowned')}
+                    </p>
+                    <LabelsEditor labels={conn.attributes.labels || {}} readOnly />
+                    {nonBlank(conn.attributes['allowed-repositories'] || []).length === 0 ? (
+                      <p className="text-xs text-amber-300">{t('access.anyRepositorySummary')}</p>
+                    ) : (
+                      <div className="space-y-1">
+                        <p className="text-xs text-slate-400">
+                          {t('access.repositoryCount', {
+                            count: nonBlank(conn.attributes['allowed-repositories'] || []).length,
+                          })}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {nonBlank(conn.attributes['allowed-repositories'] || []).map((pattern) => (
+                            <span key={pattern}
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono bg-slate-700 text-slate-200 border border-slate-600 break-all"
+                              dir="ltr">
+                              {pattern}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="pt-3 border-t border-slate-700/50">
                     <VCSConsumption attrs={conn.attributes} />

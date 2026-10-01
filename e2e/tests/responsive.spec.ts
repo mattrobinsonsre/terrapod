@@ -362,6 +362,91 @@ test.describe('Responsive harness (phone viewport)', () => {
     }
   })
 
+  test('a VCS connection states which repositories it may reach, at phone width (GHSA-v8g7-pqrj-8mcm)', async ({ page }) => {
+    // Two connections, because the thing under test is a CONTRAST: an empty
+    // allowlist means *any* repository, which is the opposite of what a blank
+    // list usually implies. A single unrestricted fixture would pass however
+    // the two states were worded, so one of each is seeded.
+    const token = getStoredToken()
+    const open = uniqueName('e2erespvcsopen')
+    const shut = uniqueName('e2erespvcsshut')
+    const ids: string[] = []
+
+    async function seed(name: string, allowed: string[]) {
+      const res = await fetch(`${API_URL}/api/terrapod/v1/vcs-connections`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'vcs-connections',
+            attributes: {
+              name,
+              provider: 'gitlab',
+              token: 'glpat-e2e-not-a-real-token' /* gitleaks:allow — fixture, not a credential */,
+              'owner-email': 'owner@example.com',
+              labels: { team: 'platform' },
+              'allowed-repositories': allowed,
+            },
+          },
+        }),
+      })
+      expect(res.ok).toBeTruthy()
+      ids.push((await res.json()).data.id)
+    }
+
+    try {
+      await seed(open, [])
+      await seed(shut, ['example/infra-*', 'example/platform'])
+
+      await page.goto('/admin/vcs-connections')
+      await expect(page.getByText(open)).toBeVisible({ timeout: 15_000 })
+
+      // Each card carries its own verdict, so locate within the card rather
+      // than page-wide — page-wide would pass on either fixture's text.
+      const openCard = page.locator('div').filter({ hasText: open }).last()
+      const shutCard = page.locator('div').filter({ hasText: shut }).last()
+      await expect(openCard.getByText('Any repository is allowed')).toBeVisible()
+      await expect(shutCard.getByText('Restricted to 2 repositories')).toBeVisible()
+      // The patterns themselves are readable from the list — the question an
+      // operator comes here to answer should not need a form opened.
+      await expect(shutCard.getByText('example/infra-*')).toBeVisible()
+      // The owner and the access labels are visible too.
+      await expect(openCard.getByText('Owned by owner@example.com')).toBeVisible()
+      await expect(openCard.getByText('platform')).toBeVisible()
+
+      await expectNoHorizontalPageScroll(page)
+
+      // The edit form's access controls have to be usable here, not just
+      // present: a glob typed on a phone is the same security decision.
+      await openCard.getByRole('button', { name: 'Edit' }).click()
+      await expect(page.locator('#vcs-owner')).toHaveValue('owner@example.com')
+      await expect(
+        page.getByText('No patterns are listed, so this connection may be pointed at any repository.'),
+      ).toBeVisible()
+
+      const add = page.getByRole('button', { name: 'Add a pattern' })
+      // A real tap target, not a run of coloured text (AGENTS.md → Responsive).
+      expect((await add.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+      await add.click()
+      const row = page.locator('input[placeholder="org/repo-*"]')
+      await row.fill('example/only-this')
+      // Adding the first pattern flips the stated posture from permissive to
+      // restrictive — the UI must not keep claiming "any repository".
+      await expect(page.getByText('1 pattern is listed', { exact: false })).toBeVisible()
+      const remove = page.getByRole('button', { name: 'Remove' }).first()
+      expect((await remove.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+
+      await expectNoHorizontalPageScroll(page)
+    } finally {
+      for (const id of ids) {
+        await fetch(`${API_URL}/api/terrapod/v1/vcs-connections/${id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      }
+    }
+  })
+
   test('both queue buttons are reachable at phone width (#1340)', async ({ page }) => {
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2eresp-queue'))
