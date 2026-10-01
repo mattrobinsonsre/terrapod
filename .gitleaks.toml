@@ -3,6 +3,13 @@
 
 title = "Terrapod gitleaks config"
 
+# gitleaks treats a supplied --config as the COMPLETE ruleset. Without this the
+# file below defined an allowlist and no rules at all, so the scan matched
+# nothing and the required check could not fail. Removing --config would not fix
+# it either: gitleaks auto-discovers this file.
+[extend]
+  useDefault = true
+
 [allowlist]
   description = "Allowlisted paths and patterns"
   paths = [
