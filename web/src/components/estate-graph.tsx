@@ -9,6 +9,7 @@ import { useTranslations } from 'next-intl'
 import ForceGraph3D from 'react-force-graph-3d'
 import SpriteText from 'three-spritetext'
 import * as THREE from 'three'
+import { escapeHtml } from '@/lib/html-escape'
 import {
   categoryOf,
   endId,
@@ -57,6 +58,9 @@ type FgProps = {
   cooldownTicks?: number
   onEngineStop?: () => void
   nodeThreeObject?: (n: EstateNode) => object
+  // Returned string is assigned to the tooltip's innerHTML by float-tooltip —
+  // every caller escapes.
+  nodeLabel?: (n: EstateNode) => string
   onNodeClick?: (n: EstateNode) => void
   linkColor?: (l: EstateEdge) => string
   linkWidth?: (l: EstateEdge) => number
@@ -240,6 +244,10 @@ export function EstateGraph3D({
           if (!userMoved.current) frame() // don't stomp a camera the user moved
         }}
         nodeThreeObject={nodeObj}
+        // float-tooltip renders this through d3's .html(), i.e. innerHTML, and
+        // the default accessor ('name') fed it the raw value — here a workspace
+        // or module name.
+        nodeLabel={(n) => escapeHtml(n.name)}
         onNodeClick={(n) => {
           onSelect(n.id === selectedId ? null : n)
           // Make the clicked node the rotation pivot by setting the controls
