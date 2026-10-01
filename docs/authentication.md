@@ -470,7 +470,9 @@ Every token has a **kind** that determines how its permissions are resolved:
 | **`service_bound`** | anyone | the **intersection** of the token's pinned roles and the owner's live roles, resolved per resource | the owner | scoped automation that should never outlive the person who made it |
 | **`service_detached`** | **admins only** | the token's pinned roles as an **absolute** scope | nobody (unbound) | critical machine-to-machine automation that must survive any one person leaving |
 
-The intersection for `service_bound` is the key safety property: you can pin a token to a subset of your roles, but it can never grant more than you currently have. Pick the pinned roles from your own roles in the create form; the UI filters to exactly that set.
+The intersection for `service_bound` is the key safety property: you can pin a token to a subset of your roles, but it can never grant more than you currently have.
+
+That property is enforced on token management too, which is the non-obvious half: a request authenticated **with** a scoped token cannot create a token of kind `interactive` (which would carry its owner's full live roles), convert any token to `interactive`, or pin roles outside its own scope. Without that, a pinned credential could simply mint an unpinned one for the same person and step around its own scope without needing a single extra role. Narrowing is unaffected, and an effectively-admin service token is exempt because it already holds the maximum scope. Manage tokens from an interactive session or token. Pick the pinned roles from your own roles in the create form; the UI filters to exactly that set.
 
 `service_detached` tokens are the supported path for long-lived, business-critical automation. Because they are unbound and admin-managed, they don't break when an individual is offboarded — but they also don't inherit anyone's live permissions, so their pinned scope is the whole story. Keep it minimal.
 
