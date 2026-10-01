@@ -62,6 +62,89 @@ _DISCOVERY_TIMEOUT_SECONDS = 300
 
 
 # ---------------------------------------------------------------------------
+# Subprocess environment (allowlist, never os.environ)
+# ---------------------------------------------------------------------------
+# The API process environment holds the key-encryption key, the token signing key
+# and the database DSN. `terrapod-query schema` makes the engine launch the
+# provider PLUGIN — third-party code we just downloaded from a registry — as a
+# child, so handing those subprocesses `os.environ` hands all of it to that
+# plugin. Schema introspection needs none of it (it is credential-less by
+# design), so the child environment is an explicit ALLOWLIST rather than a scrub:
+# a list of what to keep cannot go stale in the dangerous direction, whereas a
+# list of what to drop silently leaks every setting added after it was written.
+#
+# Everything here is present because the engine or its download path reads it
+# from the environment and nowhere else — which is also why these are the one
+# sanctioned class of env-only value in AGENTS.md:
+#   PATH / HOME / TMPDIR / XDG_*  process basics; the engine writes under $HOME
+#   TF_IN_AUTOMATION              we set it; suppresses interactive hints
+#   TF_CLI_CONFIG_FILE            points the engine at a provider mirror, which
+#                                 is how an air-gapped deployment resolves the
+#                                 provider at all
+#   TF_PLUGIN_CACHE_DIR           reuses an already-downloaded plugin
+#   TF_REGISTRY_* / TF_PROVIDER_DOWNLOAD_RETRY  registry timeout/retry tuning
+#   HTTP(S)_PROXY / NO_PROXY      both cases — Go, Python and curl read
+#                                 different ones, and the chart injects both
+#   SSL_CERT_* / *_CA_BUNDLE      the init-container-merged custom CA bundle
+#   GIT_SSL_CAINFO                git-sourced fetches trust the same bundle
+# Dropping any of the last three groups breaks every egress-proxied or custom-CA
+# deployment, so err towards keeping a harmless one rather than omitting it.
+_ENGINE_ENV_KEYS = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "TF_IN_AUTOMATION",
+        "TF_CLI_CONFIG_FILE",
+        "TF_PLUGIN_CACHE_DIR",
+        "TF_REGISTRY_CLIENT_TIMEOUT",
+        "TF_REGISTRY_DISCOVERY_RETRY",
+        "TF_PROVIDER_DOWNLOAD_RETRY",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "no_proxy",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "CURL_CA_BUNDLE",
+        "REQUESTS_CA_BUNDLE",
+        "NODE_EXTRA_CA_CERTS",
+        "GIT_SSL_CAINFO",
+    }
+)
+
+# Registry credentials an operator sets deliberately FOR the engine (an
+# authenticated private or air-gapped provider registry). Matched by prefix
+# because the suffix is the registry hostname. These are the engine's own
+# credentials, not Terrapod's, and without them an authenticated mirror cannot
+# serve the provider — but note they do reach the provider plugin, so the bound
+# on this fix is "the plugin can see what the operator gave the engine", not
+# "the plugin sees nothing".
+_ENGINE_ENV_PREFIXES = ("TF_TOKEN_", "TF_CLI_ARGS")
+
+
+# `TF_CLI_ARGS` / `TF_CLI_ARGS_init` are matched by the prefix above: they are how
+# an operator adds a flag the chart has no value for — `-plugin-dir` on an
+# air-gapped install being the usual one — and the engine reads them only from the
+# environment. Operator-placed and operator-trusted, like the registry tokens.
+
+
+def _engine_env() -> dict[str, str]:
+    """The explicit environment for the engine subprocesses — never ``os.environ``."""
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k in _ENGINE_ENV_KEYS or k.startswith(_ENGINE_ENV_PREFIXES)
+    }
+    env["TF_IN_AUTOMATION"] = "1"
+    return env
+
+
+# ---------------------------------------------------------------------------
 # Redis surface cache (pure — keyed by engine + version + provider)
 # ---------------------------------------------------------------------------
 def _normalise_version(value: str) -> str:
@@ -450,12 +533,15 @@ def _discover_surface_blocking(
     """Run ``tofu init`` + ``terrapod-query schema`` in ``workdir`` (BLOCKING).
 
     Isolated so callers wrap it in ``asyncio.to_thread`` and tests can mock it.
-    Credential-less and read-only: schema introspection never touches the cloud.
+    Credential-less and read-only: schema introspection never touches the cloud,
+    so both children run with the ``_engine_env()`` allowlist rather than the API's
+    own environment — the schema read launches the provider plugin, and the plugin
+    has no business seeing Terrapod's keys.
     """
     with open(os.path.join(workdir, "providers.tf"), "w") as f:
         f.write(_provider_config_hcl(provider, version_constraint))
 
-    env = {**os.environ, "TF_IN_AUTOMATION": "1"}
+    env = _engine_env()
     init = subprocess.run(  # noqa: S603 — fixed argv, no shell, trusted binary
         [engine_bin, "init", "-no-color", "-input=false"],
         cwd=workdir,
