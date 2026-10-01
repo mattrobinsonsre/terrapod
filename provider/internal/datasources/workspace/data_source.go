@@ -36,6 +36,7 @@ type workspaceDataSourceModel struct {
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
+	AllowForkPRPlans              types.Bool   `tfsdk:"allow_fork_pr_plans"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
 	ResourceMemory                types.String `tfsdk:"resource_memory"`
 	Labels                        types.Map    `tfsdk:"labels"`
@@ -101,6 +102,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
 			"working_directory":                computedString("Working directory."),
 			"debug_mode":                       computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
+			"allow_fork_pr_plans":              computedBool("Whether a pull request opened from a fork gets a speculative plan. False by default, because that plan runs the author's code with this workspace's credentials (GHSA-gp5w-76rw-c452); same-repository pull requests always plan regardless."),
 			"resource_cpu":                     computedString("CPU request."),
 			"resource_memory":                  computedString("Memory request."),
 			"labels":                           computedMap("Labels."),
@@ -222,6 +224,7 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
 	setOptionalString(&m.TerragruntVersion, terrapod.GetStringAttr(res, "terragrunt-version"))
 	m.DebugMode = types.BoolValue(terrapod.GetBoolAttr(res, "debug-mode"))
+	m.AllowForkPRPlans = types.BoolValue(terrapod.GetBoolAttr(res, "allow-fork-pr-plans"))
 	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))
 	setOptionalString(&m.VCSBranch, terrapod.GetStringAttr(res, "vcs-branch"))
 	setOptionalString(&m.AgentPoolID, terrapod.GetStringAttr(res, "agent-pool-id"))

@@ -30,6 +30,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		VCSConnectionID  string            `json:"vcs_connection_id,omitempty" jsonschema:"VCS connection id to wire this workspace to a repo"`
 		VCSRepoURL       string            `json:"vcs_repo_url,omitempty" jsonschema:"git repo URL (requires vcs_connection_id)"`
 		VCSBranch        string            `json:"vcs_branch,omitempty" jsonschema:"tracked branch (empty = repo default)"`
+		AllowForkPRPlans *bool             `json:"allow_fork_pr_plans,omitempty" jsonschema:"allow a pull request opened from a FORK to get a speculative plan. **On by default on this release line** (2.0 defaults it off), and off is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it to false to close this on a workspace, and do the same on any autodiscovery rule that creates workspaces, or the next discovery re-opens it (GHSA-gp5w-76rw-c452)"`
 		OwnerEmail       string            `json:"owner_email,omitempty" jsonschema:"workspace owner email (defaults to the caller)"`
 		Labels           map[string]string `json:"labels,omitempty" jsonschema:"key/value labels for RBAC + filtering (reserved keys rejected)"`
 	}
@@ -57,6 +58,12 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			VCSBranch:        in.VCSBranch,
 			OwnerEmail:       in.OwnerEmail,
 			Labels:           in.Labels,
+			// A pointer all the way through, so "leave it alone" stays
+			// distinguishable from "turn it off" (GHSA-gp5w-76rw-c452). Unset
+			// is omitted from the request, leaving the server's default — which
+			// on this release line is ON — rather than asserting a value over
+			// whatever the operator chose.
+			AllowForkPRPlans: in.AllowForkPRPlans,
 		})
 		if err != nil {
 			return errResult(err), nil, nil
@@ -77,6 +84,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		AgentPoolIDs     []string          `json:"agent_pool_ids,omitempty" jsonschema:"replace the workspace''s agent-pool set (apool-...). Flat set — every pool is equally eligible to claim a run. Mutually exclusive with agent_pool_id"`
 		WorkingDirectory string            `json:"working_directory,omitempty" jsonschema:"subdirectory within the repo"`
 		Labels           map[string]string `json:"labels,omitempty" jsonschema:"replace the label set (reserved keys rejected)"`
+		AllowForkPRPlans *bool             `json:"allow_fork_pr_plans,omitempty" jsonschema:"allow a pull request opened from a FORK to get a speculative plan. **On by default on this release line** (2.0 defaults it off), and off is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it to false to close this on a workspace, and do the same on any autodiscovery rule that creates workspaces, or the next discovery re-opens it (GHSA-gp5w-76rw-c452)"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_update",
@@ -98,6 +106,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AgentPoolIDs:     in.AgentPoolIDs,
 			WorkingDirectory: in.WorkingDirectory,
 			Labels:           in.Labels,
+			AllowForkPRPlans: in.AllowForkPRPlans,
 		})
 		if err != nil {
 			return errResult(err), nil, nil
