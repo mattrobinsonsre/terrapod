@@ -2207,7 +2207,7 @@ async def next_run(
     from terrapod.services.git_auth_service import GitAuthRefused, resolve_git_auth
 
     try:
-        git_auth = await resolve_git_auth(db, resolved)
+        git_auth = await resolve_git_auth(db, resolved, workspace=ws)
     except GitAuthRefused as e:
         await run_service.transition_run(db, run, "errored", error_message=str(e))
         await db.commit()

@@ -961,3 +961,37 @@ permission change can take that long to take effect.
 - The PR/MR must target the workspace's tracked branch (e.g., `main`)
 - Check that no run already exists for the same PR/MR number + head SHA (deduplication)
 - Verify the VCS connection has permission to list pull requests / merge requests
+
+
+### Naming a VCS connection is authorized
+
+A VCS connection holds a GitHub App installation or a GitLab access token, and it
+reaches **every repository that credential can reach**. Naming one on a workspace is
+therefore a grant rather than a reference — and a connection's id is returned to
+anyone with `read` on a workspace using it, so the id is discoverable by design.
+
+A **platform admin** may name any connection. Anyone else may name a connection only
+where they **already own a workspace using it**, so the access is one they already
+hold. This is enforced on workspace create, on workspace update (both the
+`vcs-connection-id` attribute and the `vcs-connection` relationship), and at run time
+when a `git_http_auth` credential with `source: vcs_connection` is minted — a
+workspace may always use its own connection, and anything else is checked.
+
+A refusal is a **403** on the API, and on the run-time path the run is **errored with
+the reason** rather than run without the credential, so an `init` failure never has to
+be traced back to a missing credential.
+
+One consequence is deliberate: the **first** workspace for a connection must be
+created by a platform admin, because until one exists there is no workspace to own.
+After that an ordinary user can create as many as they like against it. An operator
+who needs the previous behaviour — any authenticated user naming any connection id —
+can set:
+
+```yaml
+api:
+  config:
+    vcs:
+      require_connection_authorization: false
+```
+
+Prefer that over granting someone admin. (GHSA-v8g7-pqrj-8mcm)

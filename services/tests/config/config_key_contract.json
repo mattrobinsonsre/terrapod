@@ -331,6 +331,7 @@
   "vcs.gitlab.webhook_secret",
   "vcs.module_poll_interval_seconds",
   "vcs.poll_interval_seconds",
+  "vcs.require_connection_authorization",
   "vcs.tmpdir",
   "vcs.tmpdir_min_free_bytes",
   "version"

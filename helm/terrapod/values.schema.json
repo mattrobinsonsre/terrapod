@@ -1986,6 +1986,10 @@
                   "type": "boolean"
                 }
               }
+            },
+            "require_connection_authorization": {
+              "type": "boolean",
+              "description": "Require a claim to a VCS connection before naming it (GHSA-v8g7-pqrj-8mcm)."
             }
           }
         },

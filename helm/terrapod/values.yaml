@@ -659,6 +659,14 @@ api:
       # so with webhooks configured this is the fallback floor rather than the
       # latency anyone experiences.
       module_poll_interval_seconds: 300
+      # Require a claim to a VCS connection before naming it
+      # (GHSA-v8g7-pqrj-8mcm). A connection reaches every repository its
+      # credential can reach, so naming one is a grant, not a reference. A
+      # platform admin may name any; anyone else may name one they already own a
+      # workspace on. Deliberate consequence: the FIRST workspace for a given
+      # connection must be created by an admin. Set false to accept any id, as
+      # releases before this one did.
+      require_connection_authorization: true
       github:
         # Optional: K8s Secret containing the webhook HMAC secret.
         # Only needed if GitHub webhooks are enabled for faster feedback.
