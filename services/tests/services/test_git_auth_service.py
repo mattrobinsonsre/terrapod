@@ -4,6 +4,9 @@ The server resolves each git-auth variable's *source* into a concrete credential
 before delivery, so the runner phase is source-agnostic. Static values pass
 through; a ``vcs_connection`` source mints a short-lived token from the referenced
 VCS connection. A cred that can't be resolved is dropped (never fails the run).
+
+The exception is the GitLab switch below: a GitLab connection's token cannot be
+narrowed, so delivering it is a refusal that FAILS the run rather than a drop.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from terrapod.config import settings
 from terrapod.services import git_auth_service
 
 
@@ -96,18 +100,12 @@ async def test_github_connection_mints_installation_token():
 
 
 async def test_gitlab_connection_uses_stored_token_as_oauth2():
+    """The behaviour an operator gets once they have accepted the trade."""
     conn = MagicMock(provider="gitlab", token="glpat_STORED")
     db = await _db_returning(conn)
-    resolved = [
-        _var(
-            "git_http_auth",
-            "gitlab.example.com",
-            source="vcs_connection",
-            vcs_connection_id=f"vcs-{uuid.uuid4()}",
-            rewrite="none",
-        )
-    ]
-    out = await git_auth_service.resolve_git_auth(db, resolved)
+    resolved = [_gitlab_var()]
+    with patch.object(settings.vcs.gitlab, "allow_token_delivery_to_runners", True):
+        out = await git_auth_service.resolve_git_auth(db, resolved)
     v = json.loads(out[0]["value"])
     assert v == {"username": "oauth2", "token": "glpat_STORED", "rewrite": "none"}
 
@@ -163,6 +161,97 @@ async def test_mint_failure_drops_entry_never_raises():
     ):
         out = await git_auth_service.resolve_git_auth(db, resolved)
     assert out == []  # dropped, not raised
+
+
+# --- the GitLab switch: a credential that cannot be narrowed ----------------
+#
+# A GitLab VCS connection stores a Personal or Group Access Token an operator
+# pasted in. Nothing produces a narrower copy of one, so the only choices are
+# handing it over whole or not at all -- and the connection is named in a
+# variable VALUE, so the chooser is whoever can set a workspace variable. Hence
+# a switch, off by default, and a refusal rather than a silent drop.
+
+
+def _gitlab_var(key="gitlab.example.com", ref=None):
+    return _var(
+        "git_http_auth",
+        key,
+        source="vcs_connection",
+        vcs_connection_id=ref or f"vcs-{uuid.uuid4()}",
+        rewrite="none",
+    )
+
+
+async def test_the_shipped_default_is_off():
+    """The default IS the fix; a test that only toggled it would not notice."""
+    assert settings.vcs.gitlab.allow_token_delivery_to_runners is False
+
+
+async def test_gitlab_connection_is_refused_while_the_switch_is_off():
+    conn = MagicMock(provider="gitlab", token="glpat_STORED")
+    db = await _db_returning(conn)
+    with pytest.raises(git_auth_service.GitAuthRefused) as excinfo:
+        await git_auth_service.resolve_git_auth(db, [_gitlab_var()])
+    msg = str(excinfo.value)
+    # The message has to carry everything the operator needs, because it is the
+    # only thing they see: which variable, the key to set, and the way out that
+    # needs no switch at all.
+    #
+    # Pinned by position rather than by containment. `"gitlab.example.com" in msg`
+    # passed for the wrong reasons: it would also hold if the message named
+    # `evil-gitlab.example.com`, and a bare host substring test is the shape of an
+    # authorization check, so CodeQL flags it as incomplete URL sanitization —
+    # correctly, since the pattern is unsafe wherever it decides something.
+    assert msg.startswith(f"git credential {'gitlab.example.com'!r} references GitLab ")
+    assert "api.config.vcs.gitlab.allow_token_delivery_to_runners" in msg
+    assert "static" in msg
+    # And never the credential itself -- this string becomes the run's error
+    # message, which is rendered in the UI and read back over the API.
+    assert "glpat_STORED" not in msg
+
+
+async def test_a_refusal_delivers_nothing_at_all_rather_than_the_rest():
+    """A refusal is fatal, not a drop of the one entry.
+
+    The gate sits BEFORE the `try` that turns every exception in the mint into a
+    dropped entry. Moved inside it, this run would be delivered the static
+    credential and proceed without the GitLab one -- which is the silent
+    half-configured state the switch exists to replace, and `init` would fail
+    later naming neither the credential nor the cause.
+    """
+    conn = MagicMock(provider="gitlab", token="glpat_STORED")
+    db = await _db_returning(conn)
+    resolved = [
+        _var("git_http_auth", "github.com/org", source="static", token="ghp_X", rewrite="none"),
+        _gitlab_var(),
+    ]
+    with pytest.raises(git_auth_service.GitAuthRefused):
+        await git_auth_service.resolve_git_auth(db, resolved)
+
+
+async def test_the_switch_does_not_touch_github():
+    """GitHub needs no switch: its token is minted per run and already narrowed.
+
+    Run with the switch at its shipped default (off), so a gate written on the
+    `vcs_connection` source rather than on the provider fails here.
+    """
+    conn = MagicMock(provider="github")
+    db = await _db_returning(conn)
+    resolved = [_gitlab_var(key="github.com/org")]
+    with patch.object(
+        git_auth_service.github_service,
+        "get_installation_token",
+        new=AsyncMock(return_value="ghs_MINTED"),
+    ):
+        out = await git_auth_service.resolve_git_auth(db, resolved)
+    assert json.loads(out[0]["value"])["token"] == "ghs_MINTED"
+
+
+async def test_an_unknown_provider_is_still_dropped_not_refused():
+    """The refusal is specific to GitLab, and the drop paths are unchanged."""
+    conn = MagicMock(provider="bitbucket")
+    db = await _db_returning(conn)
+    assert await git_auth_service.resolve_git_auth(db, [_gitlab_var()]) == []
 
 
 pytestmark = pytest.mark.asyncio

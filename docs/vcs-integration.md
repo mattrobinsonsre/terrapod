@@ -238,6 +238,21 @@ GitLab integration uses a **Project or Group Access Token** for repository acces
 2. Create a new token with the same settings as above
 3. Copy the token value
 
+> **This token is not handed to runners by default.** Terrapod uses it for its
+> own calls to GitLab -- polling, fetching archives, commit statuses, MR
+> comments. It does **not** give it to a runner Job, even when a workspace asks
+> for it with a `vcs_connection` [git module credential](module-auth.md), unless
+> `api.config.vcs.gitlab.allow_token_delivery_to_runners` is set to `true`.
+>
+> The reason is that there is nothing to narrow. A GitHub connection is an app
+> identity, so Terrapod mints a fresh per-run token scoped to reading contents;
+> a GitLab connection *is* this stored token, and GitLab has no call that returns
+> a narrower copy of one. Delivering it means delivering it whole, with every
+> permission and every project it covers, into a container that is also running
+> the workspace's own IaC -- and the connection is named in a variable *value*,
+> so any workspace owner can name any connection. See
+> [Module Source Auth](module-auth.md#gitlab-the-connections-token-cannot-be-narrowed).
+
 ### Step 2: Create a GitLab VCS Connection
 
 No platform-level configuration is needed for GitLab -- the access token is stored (encrypted) on the VCS connection itself.

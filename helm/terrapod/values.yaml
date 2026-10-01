@@ -623,6 +623,28 @@ api:
         # per-connection webhook secret on the VCS connection.
         existingSecret: ""
         existingSecretKey: "webhook_secret"
+        # Whether a `git_http_auth` workspace variable sourced from a
+        # `vcs_connection` may hand a GitLab connection's stored access token to
+        # a runner Job, for fetching private git module sources.
+        #
+        # OFF, and the default is the point. A GitLab VCS connection holds a
+        # Personal or Group Access Token an operator pasted in, and nothing
+        # produces a narrower copy of one — so the runner receives it WHOLE,
+        # with every permission and every project that token covers, inside a
+        # Job that is also running workspace-supplied IaC. Worse, the connection
+        # is named in a variable *value*, so the chooser is anyone who can set a
+        # workspace variable, not an admin.
+        #
+        # GitHub has no such switch and needs none: its installation token is
+        # minted per run and narrowed to `contents: read`.
+        #
+        # Turn this on only if you accept that specific disclosure — a private
+        # runner fleet with a single-project token is a reasonable place to.
+        # Otherwise use a `static` git_http_auth credential holding a token you
+        # scoped yourself, which needs nothing enabled. With this off, such a
+        # variable FAILS the run with a message naming this key; it is never
+        # dropped silently.
+        allow_token_delivery_to_runners: false
 
     # Audit logging
     audit:

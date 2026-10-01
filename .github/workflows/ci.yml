@@ -891,6 +891,37 @@ jobs:
             && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
           echo "the strong-secrets switch renders, defaults off, and is ConfigMap-only"
 
+      - name: The GitLab git-credential switch renders, on every profile, and stays off
+        run: |
+          # Config-channel contract for the GitLab half of the VCS-connection
+          # git credential. A GitLab connection holds an access token that
+          # cannot be narrowed, so the switch decides whether a runner Job --
+          # chosen by whoever set a workspace variable -- receives it whole.
+          #
+          # A missing render line here is the worst shape this contract takes:
+          # the key would look configurable in values.yaml, the pod would never
+          # see it, and the CODE default (off) would quietly win. That fails
+          # safe, so nothing breaks and nobody notices -- until an operator who
+          # deliberately turned it ON finds their runs refused with a message
+          # telling them to set a key they already set.
+          #
+          # Asserted on all three profiles, because the eval and local profiles
+          # are where a `with`-style guard would silently drop a false.
+          for f in values.yaml values-local.yaml values-eval.yaml; do
+            out=$(helm template ./helm/terrapod -f "helm/terrapod/$f")
+            echo "$out" | grep -q 'allow_token_delivery_to_runners: false' \
+              || { echo "$f: the GitLab git-credential switch must render, and render false"; exit 1; }
+          done
+          # Turning it on must actually reach the pod.
+          on=$(helm template ./helm/terrapod --set api.config.vcs.gitlab.allow_token_delivery_to_runners=true)
+          echo "$on" | grep -q 'allow_token_delivery_to_runners: true' \
+            || { echo "setting it true does not reach the ConfigMap"; exit 1; }
+          # Policy, not a credential: ConfigMap only, never a TERRAPOD_* env var.
+          helm template ./helm/terrapod -f helm/terrapod/values.yaml \
+            | grep -q 'TERRAPOD_VCS__GITLAB__ALLOW_TOKEN_DELIVERY_TO_RUNNERS' \
+            && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
+          echo "the GitLab git-credential switch renders off on every profile and is ConfigMap-only"
+
       - name: The Vault value source reaches the pod, and its credential never does
         run: |
           # Two halves of the config-channel contract for #1439.

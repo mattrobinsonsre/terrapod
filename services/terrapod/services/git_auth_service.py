@@ -9,16 +9,25 @@ Sources for ``git_http_auth``:
 
 * **static** — ``{"source":"static","username","token","rewrite"}`` — passed
   through (a raw operator PAT).
-* **vcs_connection** (flagship) — ``{"source":"vcs_connection",
-  "vcs_connection_id","rewrite"}`` — a short-lived git-HTTPS token minted from the
-  referenced :class:`VCSConnection` (GitHub-App installation token via
-  ``github_service`` / GitLab access token), the same minting the VCS poller uses.
+* **vcs_connection** (flagship on GitHub) — ``{"source":"vcs_connection",
+  "vcs_connection_id","rewrite"}`` — a git-HTTPS token derived from the
+  referenced :class:`VCSConnection`, the same derivation the VCS poller uses.
+  On **GitHub** that is a short-lived installation token minted per run and
+  narrowed to ``contents: read``. On **GitLab** there is nothing to mint: the
+  connection's stored access token is the credential, and it is gated — see
+  :data:`_GITLAB_REFUSAL`.
 
 ``git_ssh_auth`` is static only (VCS connections mint HTTPS tokens, not SSH keys).
 
 A credential that can't be resolved (missing/unknown connection, mint failure,
 malformed value) is **dropped with a logged warning** — one bad cred must never
 fail the run.
+
+The one exception is a **refusal**, which fails the run with :class:`GitAuthRefused`
+rather than dropping. Dropping is right for an accident; it is wrong for a policy
+decision, because the operator who set the switch gets no signal and the run
+instead fails later inside ``init`` with an error naming neither the credential
+nor the cause. See :data:`_GITLAB_REFUSAL` for the one case.
 """
 
 from __future__ import annotations
@@ -29,6 +38,7 @@ import uuid
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.config import settings
 from terrapod.db.models import VCSConnection
 from terrapod.services import github_service
 
@@ -38,6 +48,35 @@ _HTTP = "git_http_auth"
 _SSH = "git_ssh_auth"
 
 
+class GitAuthRefused(RuntimeError):
+    """Delivering a configured git credential is forbidden by policy.
+
+    Distinct from the drop paths around it: the credential resolved fine and we
+    are declining to hand it over. The caller errors the run with this message,
+    so the operator reads the reason once rather than debugging a clone failure.
+    """
+
+
+#: Why a GitLab VCS connection cannot be a git credential unless an operator
+#: says so. A GitLab connection holds a Personal or Group Access Token someone
+#: pasted in, and there is no call that returns a narrower copy of one — so the
+#: runner gets it whole, with every permission and every project it covers, in a
+#: Job that is also running workspace-supplied IaC. The connection is named in a
+#: variable *value*, so the chooser is whoever can set a workspace variable, not
+#: an admin. GitHub needs no switch: its installation token is minted per run and
+#: narrowed to `contents: read`, which is all a clone needs.
+_GITLAB_REFUSAL = (
+    "git credential {key!r} references GitLab VCS connection {ref} and "
+    "`api.config.vcs.gitlab.allow_token_delivery_to_runners` is off, so the run "
+    "is refused rather than given the credential. A GitLab connection stores an "
+    "access token that cannot be narrowed: the runner would receive it whole, "
+    "with every permission and every project it covers, and any workspace owner "
+    "can name any connection in a variable value. Either set that key to true to "
+    "accept the disclosure, or replace the variable with a `static` git_http_auth "
+    "credential holding a token you scoped yourself."
+)
+
+
 async def resolve_git_auth(db: AsyncSession, resolved: list) -> list[dict]:
     """Resolve the git-category resolved variables into concrete delivery entries.
 
@@ -45,6 +84,9 @@ async def resolve_git_auth(db: AsyncSession, resolved: list) -> list[dict]:
     ``resolve_variables``; only the two git categories are consumed. Returns
     ``[{category, key, value}]`` where ``value`` is the concrete credential JSON
     (any ``vcs_connection`` source already minted to ``{username, token}``).
+
+    Raises :class:`GitAuthRefused` when a credential resolved but policy forbids
+    delivering it; the caller errors the run with the message.
     """
     out: list[dict] = []
     for v in resolved:
@@ -64,7 +106,9 @@ async def resolve_git_auth(db: AsyncSession, resolved: list) -> list[dict]:
         rewrite = cred.get("rewrite", "none")
         source = cred.get("source", "static")
         if source == "vcs_connection":
-            concrete = await _mint_from_connection(db, cred.get("vcs_connection_id"), rewrite)
+            concrete = await _mint_from_connection(
+                db, cred.get("vcs_connection_id"), rewrite, key=v.key
+            )
             if concrete is None:
                 continue  # already logged
         else:  # static
@@ -80,9 +124,13 @@ async def resolve_git_auth(db: AsyncSession, resolved: list) -> list[dict]:
     return out
 
 
-async def _mint_from_connection(db: AsyncSession, ref, rewrite: str) -> dict | None:
+async def _mint_from_connection(db: AsyncSession, ref, rewrite: str, *, key: str) -> dict | None:
     """Mint a concrete ``{username, token, rewrite}`` from a VCS connection, or
-    ``None`` (logged) if it can't be resolved."""
+    ``None`` (logged) if it can't be resolved.
+
+    Raises :class:`GitAuthRefused` for the one case that is a decision rather
+    than a failure — see :data:`_GITLAB_REFUSAL`.
+    """
     if not ref:
         logger.warning("git-auth vcs_connection source missing vcs_connection_id")
         return None
@@ -95,6 +143,17 @@ async def _mint_from_connection(db: AsyncSession, ref, rewrite: str) -> dict | N
     if conn is None:
         logger.warning("git-auth references an unknown VCS connection", ref=str(ref))
         return None
+    # Checked BEFORE the try below, which turns every exception into a drop. A
+    # refusal that fell into it would be indistinguishable from a mint failure
+    # and the run would carry on without the credential, which is the behaviour
+    # this exists to replace.
+    if conn.provider == "gitlab" and not settings.vcs.gitlab.allow_token_delivery_to_runners:
+        logger.warning(
+            "refusing to deliver a GitLab connection token as a git credential",
+            key=key,
+            ref=str(ref),
+        )
+        raise GitAuthRefused(_GITLAB_REFUSAL.format(key=key, ref=str(ref)))
     try:
         if conn.provider == "github":
             token = await github_service.get_installation_token(conn)
