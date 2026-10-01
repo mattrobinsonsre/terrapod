@@ -78,6 +78,12 @@ COPY services/ai_eval ./ai_eval
 # Helm chart values — the Helm-value-removal contract test (tests/helm) parses
 # values.yaml as text/YAML to freeze the operator-facing value keys. Chart only
 # (values + templates); no helm binary is invoked in the Python image.
+# The image Dockerfiles themselves, so a test can assert what an image SHIPS.
+# `reserved_env.py` was imported by the runner Job and never COPYed into the
+# runner image, so every Job died at import — a failure no source-only test could
+# see, because the module is present in the tree the tests import from.
+COPY docker ./docker
+
 COPY helm ./helm
 
 # Source for the API↔SDK↔provider contract test (tests/test_api_sdk_contract.py).
