@@ -1182,7 +1182,7 @@ Then read the setting:
 
 ```sh
 curl -s -H "Authorization: Bearer $TOKEN" \
-  "$TERRAPOD_URL/api/terrapod/v1/workspaces/$WS_ID" \
+  "$TERRAPOD_URL/api/v2/workspaces/$WS_ID" \
 | jq '.data.attributes."allow-fork-pr-plans"'
 ```
 
@@ -1198,7 +1198,7 @@ repository's write boundary. If it should — a public module repository taking
 community contributions, with a workspace holding nothing worth taking:
 
 ```sh
-curl -X PATCH "$TERRAPOD_URL/api/terrapod/v1/workspaces/$WS_ID" \
+curl -X PATCH "$TERRAPOD_URL/api/v2/workspaces/$WS_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/vnd.api+json' \
   -d '{"data":{"type":"workspaces","attributes":{"allow-fork-pr-plans":true}}}'

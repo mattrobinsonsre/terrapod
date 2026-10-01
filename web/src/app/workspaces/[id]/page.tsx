@@ -1283,7 +1283,12 @@ function WorkspaceDetailContent() {
     if (next && isTouch && !window.confirm(t('allowForkPrPlans.confirmEnable'))) return
     setSavingForkPlans(true)
     try {
-      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}`, {
+      // The BARE workspace resource is PATCHed on the TFE surface on this
+      // release line — `PATCH /api/terrapod/v1/workspaces/{id}` does not exist, so
+      // the native spelling 404s and the toggle silently never persists. Checked
+      // against api_route_contract.json; the DELETE a few hundred lines below IS
+      // native, which is exactly what makes copying a neighbour's prefix wrong.
+      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({

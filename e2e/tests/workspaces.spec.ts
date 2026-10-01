@@ -585,7 +585,7 @@ test.describe('Fork pull request plans (GHSA-gp5w-76rw-c452)', () => {
     // The OFF direction is the one that matters here — it is the remedy — and the
     // one a naive `if value` guard drops, leaving the operator looking at an
     // unchecked box over a workspace that still plans fork pull requests.
-    const res = await page.request.get(`/api/terrapod/v1/workspaces/${wsId}`, {
+    const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status()).toBe(200);
@@ -606,7 +606,7 @@ test.describe('Fork pull request plans (GHSA-gp5w-76rw-c452)', () => {
     await expect(toggle).toBeChecked({ timeout: 15_000 });
 
     await expect(async () => {
-      const res = await page.request.get(`/api/terrapod/v1/workspaces/${wsId}`, {
+      const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect((await res.json()).data.attributes['allow-fork-pr-plans']).toBe(true);
