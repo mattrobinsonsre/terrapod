@@ -442,7 +442,73 @@ class SAMLProviderConfig(BaseModel):
     )
     metadata_url: str = Field(description="IDP metadata URL")
     entity_id: str = Field(default="", description="SP entity ID")
-    acs_url: str = Field(default="", description="Assertion consumer service URL")
+    acs_url: str = Field(
+        default="",
+        description=(
+            "Assertion consumer service URL — the externally-reachable address the "
+            "IDP posts assertions to. When empty it is derived from "
+            "auth.callback_base_url (falling back to external_url). Set it "
+            "explicitly when a proxy rewrites the path, because this is the URL "
+            "an assertion's Destination and Recipient are checked against."
+        ),
+    )
+    validate_destination: bool = Field(
+        default=False,
+        description=(
+            "Check that an assertion's Destination and Recipient name THIS "
+            "deployment's ACS URL. Without it an assertion the IDP minted for a "
+            "different service provider is accepted here, so anyone who can get "
+            "the IDP to issue one for a host they control can replay it at "
+            "Terrapod and log in as that user. Needs a usable ACS URL (acs_url, "
+            "auth.callback_base_url, or external_url); a login is refused rather "
+            "than waved through if none is configured. Defaults to false on this "
+            "release line, preserving the behaviour operators already have, and "
+            "to true from 2.0."
+        ),
+    )
+    validate_in_response_to: bool = Field(
+        default=False,
+        description=(
+            "Require the assertion to answer the AuthnRequest this login "
+            "started, by matching InResponseTo against the request id we issued. "
+            "An assertion with no InResponseTo at all is refused too, which the "
+            "underlying library skips. Turn off for an IDP that does not echo "
+            "InResponseTo on the Response element. Defaults to false on this "
+            "release line, preserving existing behaviour, and to true from 2.0."
+        ),
+    )
+    reject_replayed_assertions: bool = Field(
+        default=False,
+        description=(
+            "Remember each accepted assertion id in Redis for the remainder of "
+            "its validity window and refuse a second use. Shared across replicas, "
+            "so a captured assertion cannot be re-presented to another pod. An "
+            "IDP never issues the same assertion id twice, so there is no "
+            "legitimate login this refuses. Defaults to false on this release "
+            "line, preserving existing behaviour, and to true from 2.0."
+        ),
+    )
+    want_assertions_signed: bool = Field(
+        default=False,
+        description=(
+            "Require a signature on the assertion itself, not merely somewhere in "
+            "the response. A response signed only at the message level leaves the "
+            "assertion the claims are read from unprotected. Turn off for an IDP "
+            "that signs the message only. Defaults to false on this release line, "
+            "preserving existing behaviour, and to true from 2.0."
+        ),
+    )
+    reject_deprecated_algorithm: bool = Field(
+        default=False,
+        description=(
+            "Refuse SHA-1 signature and digest algorithms (RSA-SHA1, DSA-SHA1, "
+            "SHA1). Turn off for an IDP that cannot yet be moved off SHA-1 — a "
+            "separate decision from want_assertions_signed, so neither "
+            "compatibility problem costs you the other protection. Defaults to "
+            "false on this release line, preserving existing behaviour, and to "
+            "true from 2.0."
+        ),
+    )
     role_prefixes: list[str] = Field(
         default=["terrapod:", "terrapod-"],
         description="Prefixes to strip from group names to derive role names.",

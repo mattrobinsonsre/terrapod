@@ -176,6 +176,28 @@ data:
             {{- if .acs_url }}
             acs_url: {{ .acs_url | quote }}
             {{- end }}
+            {{- /*
+              hasKey, not `| default`: these default to TRUE, and Helm's
+              `default` treats false as empty — so `| default true` would render
+              true for an operator who explicitly set false, and their opt-out
+              would be silently inert. Omitting the key entirely lets the code
+              default stand, which is what an unset value means.
+            */ -}}
+            {{- if hasKey . "validate_destination" }}
+            validate_destination: {{ .validate_destination }}
+            {{- end }}
+            {{- if hasKey . "validate_in_response_to" }}
+            validate_in_response_to: {{ .validate_in_response_to }}
+            {{- end }}
+            {{- if hasKey . "reject_replayed_assertions" }}
+            reject_replayed_assertions: {{ .reject_replayed_assertions }}
+            {{- end }}
+            {{- if hasKey . "want_assertions_signed" }}
+            want_assertions_signed: {{ .want_assertions_signed }}
+            {{- end }}
+            {{- if hasKey . "reject_deprecated_algorithm" }}
+            reject_deprecated_algorithm: {{ .reject_deprecated_algorithm }}
+            {{- end }}
             {{- if .role_prefixes }}
             role_prefixes:
               {{- range .role_prefixes }}

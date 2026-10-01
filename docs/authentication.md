@@ -265,6 +265,71 @@ api:
 
 Note: The API Docker image includes `xmlsec1` which is required for SAML signature verification.
 
+### Assertion validation
+
+Four checks decide whether an assertion the IDP posted is one Terrapod should
+act on. Each has its own switch, per provider, because identity providers get
+different things wrong and relaxing one should never cost you the others.
+
+| Key | What it requires | Turn it off when |
+|---|---|---|
+| `validate_destination` | The assertion's `Destination` and `Recipient` name **this** deployment's ACS URL | Your IDP sends a `Destination` that genuinely differs from the URL you registered |
+| `validate_in_response_to` | The assertion answers the authentication request this login sent | Your IDP does not echo `InResponseTo` on the `Response` element |
+| `reject_replayed_assertions` | Each assertion is used once; the id is remembered in Redis for the rest of its validity window | Never, in practice — an IDP does not issue the same assertion twice |
+| `want_assertions_signed` | The signature is on the assertion itself, not only on the enclosing message | Your IDP signs the message only |
+| `reject_deprecated_algorithm` | No SHA-1 signature or digest (`RSA-SHA1`, `DSA-SHA1`, `SHA1`) | Your IDP cannot yet be moved off SHA-1 |
+
+**The defaults differ by release line.** On the 2.x development line every one of
+them is `true`. On the 1.x release lines every one is `false`, preserving the
+behaviour an operator already has — a patch release must never lock someone out
+of their own deployment. The implementation is identical on both; only the
+default differs, so the setting you choose means the same thing on either.
+
+```yaml
+api:
+  config:
+    auth:
+      sso:
+        saml:
+          - name: azure-ad-saml
+            metadata_url: "https://login.microsoftonline.com/{tenant-id}/federationmetadata/2007-06/federationmetadata.xml"
+            entity_id: "https://terrapod.example.com"
+            # Explicit on a 1.x release, where the defaults are false:
+            validate_destination: true
+            validate_in_response_to: true
+            reject_replayed_assertions: true
+            want_assertions_signed: true
+            reject_deprecated_algorithm: true
+```
+
+**What `Destination` is checked against.** The ACS URL, resolved in this order:
+the provider's own `acs_url`; otherwise `auth.callback_base_url` plus the SAML
+ACS path; otherwise `external_url` plus that path. `callback_base_url` comes
+first because it is what the ACS URL registered with your IDP was built from,
+and the IDP mirrors that URL back as `Destination` and `Recipient` — checking
+against a different base is how this turns from a security control into a failed
+login. If a proxy rewrites the path between your IDP and Terrapod, set `acs_url`
+to the address the IDP actually posts to.
+
+A SAML provider has always needed an absolute ACS URL — python3-saml refuses to
+start without one — so turning `validate_destination` on asks for no
+configuration a working SAML setup does not already have.
+
+**Diagnosing a refusal.** Each check fails with its own message in the API log
+and in the `401` body, naming the provider:
+
+| Message contains | Check | Usual cause |
+|---|---|---|
+| `The response was received at … instead of …` | `validate_destination` | The IDP's reply URL is not the one Terrapod believes it serves |
+| `carries no InResponseTo` | `validate_in_response_to` | IDP-initiated sign-on, or an IDP that omits the attribute |
+| `answers a different authentication request` | `validate_in_response_to` | A stale browser tab, or a replayed assertion |
+| `already been used` | `reject_replayed_assertions` | A replayed assertion, or a user double-submitting the IDP's form |
+| `not signed and the SP require it` | `want_assertions_signed` | The IDP signs the message only |
+| `Deprecated signature algorithm` | `reject_deprecated_algorithm` | The IDP still signs with SHA-1 |
+
+Relax the one check the message names rather than all five: each failure is a
+different problem, and the other four keep protecting you.
+
 ---
 
 ## Terraform Login Flow (OAuth2 PKCE)

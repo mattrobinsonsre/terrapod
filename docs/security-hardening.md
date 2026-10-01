@@ -78,6 +78,34 @@ api:
         - audit
 ```
 
+### Validate SAML Assertions Strictly
+
+If you use a SAML provider, confirm all four assertion checks are on. They are
+per provider, and on the 1.x release lines they default to **off** so that a
+patch release could not lock anyone out — which means a deployment carried
+forward from 1.x keeps the permissive setting until you say otherwise:
+
+```yaml
+api:
+  config:
+    auth:
+      sso:
+        saml:
+          - name: azure-ad
+            metadata_url: "https://login.microsoftonline.com/…/federationmetadata.xml"
+            validate_destination: true          # the assertion is addressed to us
+            validate_in_response_to: true       # it answers a request we sent
+            reject_replayed_assertions: true    # it is used once
+            want_assertions_signed: true        # the claims are covered by a signature
+            reject_deprecated_algorithm: true   # no SHA-1
+```
+
+`validate_destination` is the one to turn on first: without it an assertion the
+IDP issued for a different service provider is accepted here, so anyone who can
+obtain one for a host they control can replay it at Terrapod and log in as that
+user. See [Authentication](authentication.md#assertion-validation) for what each
+check refuses and how to read a failure.
+
 ## Secrets Management
 
 ### Use Kubernetes Secrets
