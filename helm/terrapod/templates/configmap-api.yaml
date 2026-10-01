@@ -388,6 +388,13 @@ data:
       {{- with .Values.api.config.vcs.tmpdir_min_free_bytes }}
       tmpdir_min_free_bytes: {{ . | int64 }}
       {{- end }}
+      gitlab:
+        # Rendered unconditionally, and deliberately NOT via `with`: false is
+        # the safe state here, `with` treats false as empty and would render
+        # nothing, so an operator who read the warning and left it off would see
+        # their decision expressed only by omission. Rendering it keeps the
+        # pod's config and the values file agreeing on the answer.
+        allow_token_delivery_to_runners: {{ dig "gitlab" "allow_token_delivery_to_runners" false .Values.api.config.vcs }}
     {{- end }}
     {{- if .Values.api.config.audit }}
     audit:

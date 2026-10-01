@@ -995,17 +995,39 @@ class GitHubWebhookConfig(BaseModel):
     )
 
 
-class GitLabWebhookConfig(BaseModel):
-    """GitLab webhook configuration (optional, for faster feedback).
+class GitLabConfig(BaseModel):
+    """GitLab VCS settings: webhook delivery, and what a connection token may do.
 
-    GitLab does not HMAC-sign the body — it sends the configured secret
-    verbatim in the ``X-Gitlab-Token`` header. This global secret is the
-    fallback when a VCS connection does not set its own ``webhook_secret``.
+    Both fields concern a GitLab access token, from opposite directions — one
+    is a secret GitLab proves itself with on the way in, the other decides
+    whether the connection's own token is allowed back out.
     """
 
     webhook_secret: str = Field(
         default="",
         description="Webhook secret matched against the X-Gitlab-Token header (optional)",
+    )
+    allow_token_delivery_to_runners: bool = Field(
+        default=False,
+        description=(
+            "Allow a `git_http_auth` workspace variable whose source is "
+            "`vcs_connection` to hand a GitLab connection's stored access token "
+            "to a runner Job. OFF by default on every line, and the default is "
+            "the point: a GitLab VCS connection holds a Personal or Group Access "
+            "Token an operator pasted in, and there is no operation that produces "
+            "a narrower copy of one. The token is delivered whole, with every "
+            "permission and every project it covers, into a Job that is also "
+            "running workspace-supplied IaC — and the connection is chosen in a "
+            "variable *value*, so any workspace owner can name any connection an "
+            "admin created. (GitHub is unaffected and needs no switch: its "
+            "installation token is minted per run and is already narrowed to "
+            "`contents: read`.) Turning this on accepts that disclosure "
+            "deliberately; the alternative that needs no switch is a `static` "
+            "git_http_auth credential holding a token the operator scoped "
+            "themselves. With it off, such a variable fails the run with a "
+            "message naming this key — never silently, because a credential that "
+            "vanishes leaves `terraform init` to fail somewhere confusing."
+        ),
     )
 
 
@@ -1037,7 +1059,7 @@ class VCSConfig(BaseModel):
         ),
     )
     github: GitHubWebhookConfig = Field(default_factory=GitHubWebhookConfig)
-    gitlab: GitLabWebhookConfig = Field(default_factory=GitLabWebhookConfig)
+    gitlab: GitLabConfig = Field(default_factory=GitLabConfig)
     tmpdir: str = Field(
         default="/var/lib/terrapod/tmp",
         description=(

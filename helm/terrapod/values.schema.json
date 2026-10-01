@@ -1960,6 +1960,9 @@
                 },
                 "existingSecretKey": {
                   "type": "string"
+                },
+                "allow_token_delivery_to_runners": {
+                  "type": "boolean"
                 }
               }
             }

@@ -240,6 +240,7 @@
   "api.config.vcs.enabled",
   "api.config.vcs.github.existingSecret",
   "api.config.vcs.github.existingSecretKey",
+  "api.config.vcs.gitlab.allow_token_delivery_to_runners",
   "api.config.vcs.gitlab.existingSecret",
   "api.config.vcs.gitlab.existingSecretKey",
   "api.config.vcs.module_poll_interval_seconds",

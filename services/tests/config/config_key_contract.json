@@ -317,6 +317,7 @@
   "vcs.archive_cache_retention_days",
   "vcs.enabled",
   "vcs.github.webhook_secret",
+  "vcs.gitlab.allow_token_delivery_to_runners",
   "vcs.gitlab.webhook_secret",
   "vcs.module_poll_interval_seconds",
   "vcs.poll_interval_seconds",
