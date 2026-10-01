@@ -509,7 +509,7 @@ tprun-<run-short-id>-plan-auth     # plan-phase Job consumes this
 tprun-<run-short-id>-apply-auth    # apply-phase Job consumes this
 ```
 
-The Job's pod spec references the token via `secretKeyRef` and exposes it as `TP_AUTH_TOKEN` — the raw token never appears in the Job spec, the listener logs, or `kubectl describe` output. The token is scoped to a single `run_id` and the matching phase, so a leaked apply token can't be replayed against an unrelated run or used to download a different workspace's state.
+The Job's pod spec references the token via `secretKeyRef` and exposes it as `TP_AUTH_TOKEN` — the raw token never appears in the Job spec, the listener logs, or `kubectl describe` output. The token is scoped to a single `run_id`, so a leaked token cannot be replayed against an unrelated run or used to download a different workspace's state. It is **not** bound to a phase: the token is `runtok:{run_id}:{ttl}:{timestamp}:{signature}` and carries no phase, so a plan-phase token remains usable against that same run's apply-phase endpoints until its TTL expires. The per-phase Secret naming above is collision avoidance between overlapping Jobs, not a narrower scope. Earlier text here claimed the phase binding; it has never existed, and the TTL (`runners.tokenTTLSeconds`, default 1h) is what actually bounds a leaked token's life.
 
 ### Per-phase vars Secret
 
