@@ -7,6 +7,7 @@ import { LocaleSwitcher } from '@/components/locale-switcher'
 import { setAuth } from '@/lib/auth'
 import { STORAGE_AUTH_STATE, STORAGE_PKCE_VERIFIER, STORAGE_REDIRECT_AFTER_LOGIN } from '@/lib/constants'
 import { generatePKCE, generateState } from '@/lib/pkce'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 
 interface Provider {
   name: string
@@ -47,7 +48,11 @@ function LoginContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
-  const redirectUrl = searchParams.get('redirect')
+  // Validated once, here, so BOTH consumers below are covered: the local-login
+  // path assigns it to window.location.href, and the SSO path parks it in
+  // sessionStorage for /auth/callback. Unvalidated it was an open redirect that
+  // fires AFTER the session token is in localStorage.
+  const redirectUrl = safeRedirectPath(searchParams.get('redirect'))
   const cliState = searchParams.get('cli_state')
 
   const hasLocalProvider = providers.some((p) => p.type === 'local')
