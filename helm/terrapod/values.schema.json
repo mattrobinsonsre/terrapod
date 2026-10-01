@@ -1704,6 +1704,21 @@
                         "items": {
                           "type": "object"
                         }
+                      },
+                      "validate_destination": {
+                        "type": "boolean"
+                      },
+                      "validate_in_response_to": {
+                        "type": "boolean"
+                      },
+                      "reject_replayed_assertions": {
+                        "type": "boolean"
+                      },
+                      "want_assertions_signed": {
+                        "type": "boolean"
+                      },
+                      "reject_deprecated_algorithm": {
+                        "type": "boolean"
                       }
                     }
                   }
@@ -1960,8 +1975,15 @@
                 },
                 "existingSecretKey": {
                   "type": "string"
+                },
+                "allow_token_delivery_to_runners": {
+                  "type": "boolean"
                 }
               }
+            },
+            "require_connection_authorization": {
+              "type": "boolean",
+              "description": "Require a claim to a VCS connection before naming it (GHSA-v8g7-pqrj-8mcm)."
             }
           }
         },

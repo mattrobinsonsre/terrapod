@@ -63,12 +63,17 @@ The token can come from two sources:
 - **Static** — a personal access token you supply:
   `{"source":"static","username":"x-access-token","token":"ghp_…","rewrite":"to_https"}`
   (`username` defaults to `x-access-token` if omitted).
-- **VCS connection (recommended)** — reference an existing
-  [VCS connection](vcs-integration.md); Terrapod **mints a short-lived
-  git-HTTPS token** from it at run time (a GitHub-App installation token, or the
-  GitLab connection's access token):
+- **VCS connection** — reference an existing
+  [VCS connection](vcs-integration.md); Terrapod derives a git-HTTPS token from
+  it at run time:
   `{"source":"vcs_connection","vcs_connection_id":"vcs-…","rewrite":"to_https"}`.
-  No PAT to rotate — the token is minted per run.
+
+  **On GitHub this is the recommended source.** The connection is a GitHub App,
+  so Terrapod **mints a fresh installation token per run**, narrowed to
+  `contents: read` — the whole of what a clone needs. There is no PAT to rotate,
+  and the credential the runner holds can do nothing but read code.
+
+  **On GitLab it is off by default — see the warning below.**
 
 `git_ssh_auth` is static only (VCS connections mint HTTPS tokens, not SSH keys):
 `{"private_key":"-----BEGIN …","known_hosts":"github.com ssh-ed25519 …","rewrite":"none"}`.
@@ -80,9 +85,61 @@ are baked into the runner image (authoritative — github.com from the GitHub
 `known_hosts` only to pin a **self-hosted** GitHub Enterprise / GitLab host; for
 github.com/gitlab.com you can leave it blank.
 
+### GitLab: the connection's token cannot be narrowed
+
+A GitLab VCS connection does not hold an app identity Terrapod can mint from. It
+holds a **Personal or Group Access Token an operator pasted in**, and there is no
+GitLab call that returns a narrower copy of one. So a `vcs_connection` credential
+on GitLab means handing the runner Job **that token, whole** — with every
+permission and every project it covers, for as long as it is valid — into a
+container that is also executing the workspace's own IaC.
+
+Two things make that sharper than it first looks:
+
+- **The connection is chosen in a variable *value*.** Anyone who can set a
+  workspace variable can name any connection an admin created, including ones
+  covering projects they have no access to themselves. There is no per-connection
+  permission check, because a credential nobody can narrow has nothing to check
+  *against*.
+- **Nothing expires it per run.** A GitHub installation token lives an hour and
+  reads code; this one is the operator's standing token.
+
+So it is **off by default on every supported release**, behind:
+
+```yaml
+api:
+  config:
+    vcs:
+      gitlab:
+        allow_token_delivery_to_runners: false   # the default
+```
+
+With it off, a run whose workspace carries such a variable **fails immediately**
+with a message naming the variable, this key, and the alternative — it is never
+dropped silently, because a credential that quietly vanishes leaves `init` to
+fail later against a private module source with an error naming neither the
+credential nor the cause.
+
+**The alternative needs nothing enabled, and is the better answer in most
+deployments:** use a **`static`** credential holding a project- or group-scoped
+GitLab token you minted for exactly this, with `read_repository` and nothing
+else. That is a narrowing GitLab *can* do — it just has to be done when the
+token is created, not when it is used.
+
+Turn the switch on only if you have read the above and accept it — a private
+runner fleet fetching modules from one group, with a connection token scoped to
+that group, is a perfectly reasonable place to. It is an informed opt-in, not a
+default anyone should inherit by upgrading.
+
 ## Enabling it
 
-Nothing to enable — it's on by default. Create the credential like any variable.
+Nothing to enable for **static** credentials or for **GitHub** VCS connections —
+they are on by default. Create the credential like any variable.
+
+**GitLab VCS connections are the exception**: they need
+`api.config.vcs.gitlab.allow_token_delivery_to_runners: true`, and you should
+read [the warning above](#gitlab-the-connections-token-cannot-be-narrowed)
+before setting it.
 
 ### Via the API / SDK
 

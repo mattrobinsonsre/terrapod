@@ -58,6 +58,60 @@ async def _nudge(response_url: str, text: str) -> None:
     await post_response_url(response_url, text, replace_original=False)
 
 
+#: Audit `origin` for a decision taken from Slack — the surface, as distinct from
+#: the actor. Fits `AuditLog.origin`'s String(20), so no migration.
+_AUDIT_ORIGIN = "slack"
+
+#: Audit `actor_type` for a click whose Slack identity maps to no Terrapod
+#: account. A linked clicker is an ordinary `terrapod_user`: the email and the
+#: roles behind the decision were resolved live. An unlinked one is neither that
+#: nor a `vcs_user`, and recording them as either would misattribute a refusal.
+_UNLINKED_ACTOR_TYPE = "slack_user"
+
+
+async def _audit(
+    db,
+    *,
+    action: str,
+    run_id: str,
+    status_code: int,
+    slack_user_id: str,
+    actor_email: str = "",
+    actor_type: str = "terrapod_user",
+    detail: str = "",
+) -> None:
+    """Record a Slack-driven run decision, and the refusals, in the audit log.
+
+    Socket Mode means there is no HTTP request, so the audit middleware
+    structurally cannot see any of this: without an explicit write, a run applied
+    by a Slack button leaves exactly the same trail as one nobody touched. Every
+    field is already resolved by the time `_act` decides.
+
+    `log_audit_event` commits internally, so callers sequence this AFTER the
+    mutation's own commit rather than before it. Best-effort for the same reason:
+    on the success path the apply is already committed and cannot be unwound, so
+    a failed audit write is logged loudly rather than turned into an exception
+    that would also strand the Slack message.
+    """
+    from terrapod.services import audit_service
+
+    try:
+        await audit_service.log_audit_event(
+            db,
+            actor_email=actor_email,
+            action=action,
+            resource_type="run",
+            resource_id=run_id,
+            status_code=status_code,
+            actor_type=actor_type,
+            origin=_AUDIT_ORIGIN,
+            actor_id=slack_user_id,
+            detail=detail,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("slack.audit_write_failed", action=action, run_id=run_id, err=str(exc))
+
+
 async def _act(
     approve: bool,
     run_id: str,
@@ -76,6 +130,10 @@ async def _act(
     from terrapod.services.workspace_rbac_service import resolve_workspace_capabilities_for
 
     verb = "Approve" if approve else "Discard"
+    # The audited action names what was ATTEMPTED, so a refusal is recorded under
+    # the same action as a success and the status code is what separates them —
+    # the same shape the HTTP path produces.
+    audited_action = "run.confirm" if approve else "run.discard"
 
     async with get_db_session() as db:
         # 1. Durable identity binding → email. No binding → nudge, no mutation.
@@ -88,6 +146,15 @@ async def _act(
                 response_url,
                 f"You're not linked yet. Run `{cmd} link` to connect your Terrapod "
                 "account, then try again.",
+            )
+            await _audit(
+                db,
+                action=audited_action,
+                run_id=run_id,
+                status_code=401,
+                slack_user_id=user_id,
+                actor_type=_UNLINKED_ACTOR_TYPE,
+                detail=f"Slack {team_id}/{user_id} is not linked to a Terrapod account",
             )
             return
         email = link.terrapod_email
@@ -121,6 +188,15 @@ async def _act(
                 response_url,
                 f"You ({email}) don't have permission to apply runs on *{ws_name}*.",
             )
+            await _audit(
+                db,
+                action=audited_action,
+                run_id=str(run.id),
+                status_code=403,
+                slack_user_id=user_id,
+                actor_email=email,
+                detail=f"run:apply refused on workspace {ws_name}",
+            )
             return
 
         # Capture the rest of the parent-edit primitives BEFORE commit
@@ -129,6 +205,7 @@ async def _act(
 
         counts = counts_text(run)
         url = run_url(workspace.id, run.id)
+        audited_run_id = str(run.id)
 
         # 4. Confirm / discard. A stale button (run already resolved) raises
         #    ValueError — surface it ephemerally, don't 500.
@@ -141,6 +218,19 @@ async def _act(
         except ValueError as exc:
             await _nudge(response_url, f"Couldn't {verb.lower()} this run: {exc}")
             return
+
+        # After the mutation's commit, never before: `log_audit_event` commits,
+        # and an audit row for a decision that then failed to land would be worse
+        # than none.
+        await _audit(
+            db,
+            action=audited_action,
+            run_id=audited_run_id,
+            status_code=200,
+            slack_user_id=user_id,
+            actor_email=email,
+            detail=f"{'Approved' if approve else 'Discarded'} from Slack on workspace {ws_name}",
+        )
 
     # 5. Edit the PARENT approval message: drop the buttons (no re-click) and
     #    record who acted. The apply/errored *result* arrives separately as a

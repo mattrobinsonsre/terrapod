@@ -100,7 +100,9 @@ def _github(routes):
     )
 
 
-async def _token(conn):
+async def _token(conn, **_):
+    # `**_` absorbs `permissions=` — the real mint takes a permission set
+    # so a clone token can be narrower than Terrapod's own API token.
     return "t"
 
 

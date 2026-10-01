@@ -67,27 +67,62 @@ The two common ingresses are safe by default:
   documentation; if you depend on it, verify against your own deployment rather
   than on this table.
 
+## Clients that share a range with the proxy
+
+The rule above — the right-most entry that is not itself a trusted proxy —
+assumes proxies and clients are different machines on different networks. Where
+they are not, the client's own entry is skipped as infrastructure and the scan
+falls through to the peer, which in Terrapod is always the BFF pod. Every such
+client then shares one bucket.
+
+The default list makes this likely rather than exotic, because it is deliberately
+broad:
+
+| Your clients reach the API from | Attributed correctly with the default list? |
+|---|---|
+| The public internet | Yes |
+| A Tailscale tailnet (`100.64.0.0/10`) | **No** — collapses to one bucket |
+| A corporate VPN on `10.x` / `172.16.x` / `192.168.x` | **No** — collapses to one bucket |
+
+**The remedy is to narrow `trusted_proxy_cidrs` to the pod network your BFF
+actually runs on**, which is the only thing that genuinely needs trusting:
+
+```yaml
+api:
+  config:
+    rate_limit:
+      trusted_proxy_cidrs: ["10.42.0.0/16"]   # your cluster's pod CIDR
+```
+
+This cannot be the shipped default because the pod network differs per cluster,
+and some — EKS with custom CNI networking, for instance — place pods inside
+`100.64.0.0/10` themselves, so simply dropping the CGNAT entry would collapse
+attribution for those deployments instead.
+
 ## Verifying it
 
-The audit log records the attributed address. Make a request through your real
-ingress and check what was recorded:
+**Not from the audit log.** `audit_logs.actor_ip` records the socket peer
+(`request.client.host`) and never reads `X-Forwarded-For`, so through the BFF it
+is always a pod address — whether attribution is working or not. An earlier
+version of this page suggested checking it, which could not distinguish the two
+cases and would have read as a permanent failure.
 
-```sql
-SELECT actor_ip, action, resource_type, timestamp
-FROM audit_logs ORDER BY timestamp DESC LIMIT 5;
-```
-
-If `actor_ip` is a pod address rather than your client address, attribution is
-not working and every unauthenticated caller is sharing a bucket.
-
-Then confirm the header cannot be forged — from a machine that reaches the
-ingress, send a bogus entry and check it is not what gets recorded:
+Verify by behaviour instead, from two clients that reach the ingress from
+different addresses. Exhaust the unauthenticated limit from the first:
 
 ```sh
-curl -H 'X-Forwarded-For: 203.0.113.99' https://terrapod.example.com/api/terrapod/v1/auth/providers
+for i in $(seq 1 120); do
+  curl -so /dev/null -w '%{http_code} ' https://terrapod.example.com/api/terrapod/v1/auth/providers
+done
 ```
 
-A well-configured ingress records your real address, not `203.0.113.99`.
+Then make a single request from the second. If it succeeds, the two are in
+different buckets and attribution is working. If it is also `429`, they are
+sharing one — check the table above before anything else.
+
+To confirm the header cannot be forged, send a bogus entry from a machine whose
+address is already attributed correctly and repeat the test. If forging it moved
+you into a different bucket, your peer is trusted when it should not be.
 
 ## Why this matters beyond fairness
 

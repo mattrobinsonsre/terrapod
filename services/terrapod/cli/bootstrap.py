@@ -296,6 +296,18 @@ async def _bootstrap_pool(session: AsyncSession, spec: PoolSpec) -> None:
             )
         logger.info("Join token already exists for pool '%s', skipping", pool_name)
     else:
+        # No `expires_at` and no `max_uses`, deliberately -- it reads like an
+        # oversight and is not. A listener's certificate lives on an emptyDir,
+        # so it is lost whenever the pod is REPLACED, and the listener re-joins
+        # with this token to get a new one. A two-use token would therefore
+        # break the Deployment on its third pod, and an expiring one would break
+        # it on the first replacement after the expiry -- in both cases with the
+        # agent pool simply going quiet rather than reporting anything.
+        #
+        # The bound is operational rather than structural: once the pool is
+        # established, revoke this token and issue per-listener ones with
+        # whatever expiry suits. `docs/deployment.md` says so where the value is
+        # configured.
         token = AgentPoolToken(
             pool_id=pool.id,
             token_hash=token_hash,

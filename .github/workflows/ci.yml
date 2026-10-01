@@ -479,7 +479,7 @@ jobs:
             # Root-level tests/*.py are NOT auto-collected by the directory
             # shards below — each must be listed here explicitly, or it silently
             # never runs in CI. All of these are pure-unit (no Postgres/Redis/S3).
-            paths: tests/auth tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/test_logging_config.py tests/test_dependency_pins.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py
+            paths: tests/auth tests/runner tests/storage tests/ai_eval tests/config tests/crypto tests/db tests/helm tests/test_ha_config.py tests/test_logging_config.py tests/test_dependency_pins.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py
             pytest_args: -n auto
           - name: services-api
             paths: tests/services tests/api
@@ -891,6 +891,37 @@ jobs:
             && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
           echo "the strong-secrets switch renders, defaults off, and is ConfigMap-only"
 
+      - name: The GitLab git-credential switch renders, on every profile, and stays off
+        run: |
+          # Config-channel contract for the GitLab half of the VCS-connection
+          # git credential. A GitLab connection holds an access token that
+          # cannot be narrowed, so the switch decides whether a runner Job --
+          # chosen by whoever set a workspace variable -- receives it whole.
+          #
+          # A missing render line here is the worst shape this contract takes:
+          # the key would look configurable in values.yaml, the pod would never
+          # see it, and the CODE default (off) would quietly win. That fails
+          # safe, so nothing breaks and nobody notices -- until an operator who
+          # deliberately turned it ON finds their runs refused with a message
+          # telling them to set a key they already set.
+          #
+          # Asserted on all three profiles, because the eval and local profiles
+          # are where a `with`-style guard would silently drop a false.
+          for f in values.yaml values-local.yaml values-eval.yaml; do
+            out=$(helm template ./helm/terrapod -f "helm/terrapod/$f")
+            echo "$out" | grep -q 'allow_token_delivery_to_runners: false' \
+              || { echo "$f: the GitLab git-credential switch must render, and render false"; exit 1; }
+          done
+          # Turning it on must actually reach the pod.
+          on=$(helm template ./helm/terrapod --set api.config.vcs.gitlab.allow_token_delivery_to_runners=true)
+          echo "$on" | grep -q 'allow_token_delivery_to_runners: true' \
+            || { echo "setting it true does not reach the ConfigMap"; exit 1; }
+          # Policy, not a credential: ConfigMap only, never a TERRAPOD_* env var.
+          helm template ./helm/terrapod -f helm/terrapod/values.yaml \
+            | grep -q 'TERRAPOD_VCS__GITLAB__ALLOW_TOKEN_DELIVERY_TO_RUNNERS' \
+            && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
+          echo "the GitLab git-credential switch renders off on every profile and is ConfigMap-only"
+
       - name: The Vault value source reaches the pod, and its credential never does
         run: |
           # Two halves of the config-channel contract for #1439.
@@ -1058,6 +1089,95 @@ jobs:
             echo "FAIL: Vault volumes rendered while api.config.vault.enabled is false"; exit 1
           }
           echo "vault jwt projects its token; the custom CA is mounted at ca_file"
+
+      - name: Every SAML assertion check reaches the pod, in both positions
+        run: |
+          # The config-channel contract for the SAML hardening switches.
+          #
+          # These default to TRUE in the code, which makes the render line the
+          # part that can silently fail: `{{ if .validate_destination }}` would
+          # drop the key for an operator who set it to FALSE, the code default
+          # would stand, and their deliberate opt-out would be inert — the exact
+          # failure the contract exists to catch, in the one direction a naive
+          # render gets wrong. So both positions are asserted.
+          #
+          # Both halves matter for a different reason too: `validate_destination`
+          # is what makes an assertion's Destination and Recipient mean anything,
+          # and an IDP that cannot satisfy one of these checks needs the opt-out
+          # to work or its operator cannot log in at all.
+          cat > /tmp/saml-values.yaml <<'EOF'
+          api:
+            config:
+              auth:
+                callback_base_url: "https://terrapod.example.com"
+                sso:
+                  saml:
+                    - name: strict-idp
+                      metadata_url: https://idp.example.com/metadata
+                      entity_id: "https://terrapod.example.com"
+                      acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/saml/acs"
+                      validate_destination: true
+                      validate_in_response_to: true
+                      reject_replayed_assertions: true
+                      want_assertions_signed: true
+                      reject_deprecated_algorithm: true
+                    - name: legacy-idp
+                      metadata_url: https://old-idp.example.com/metadata
+                      validate_destination: false
+                      validate_in_response_to: false
+                      reject_replayed_assertions: false
+                      want_assertions_signed: false
+                      reject_deprecated_algorithm: false
+                    - name: silent-idp
+                      metadata_url: https://quiet-idp.example.com/metadata
+          EOF
+          docker run --rm -v "$PWD:/chart" -v /tmp:/tmp -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+            --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+            --set redis.url=redis://redis:6379 \
+            -f /tmp/saml-values.yaml > /tmp/rendered-saml.yaml
+
+          cm=$(awk '/^kind: ConfigMap/,/^---/' /tmp/rendered-saml.yaml)
+
+          # The ACS URL is what an assertion's Destination is checked against.
+          echo "$cm" | grep -q 'acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/saml/acs"' || {
+            echo "auth.sso.saml[].acs_url never reaches the rendered ConfigMap"
+            echo "add a render line to templates/configmap-api.yaml"
+            exit 1
+          }
+
+          for key in validate_destination validate_in_response_to \
+                     reject_replayed_assertions want_assertions_signed \
+                     reject_deprecated_algorithm; do
+            # On this release line these default to FALSE in code, so the
+            # operator's action is to turn them ON. A swallowed `true` would
+            # leave that opt-in inert and the deployment less protected than its
+            # values.yaml says — the direction that matters here.
+            echo "$cm" | grep -q "$key: true" || {
+              echo "an operator's explicit true for $key never reaches the pod."
+              echo "add a render line to templates/configmap-api.yaml; the code"
+              echo "default on this line is false, so the opt-in would be inert."
+              exit 1
+            }
+            # The opposite position too. `| default` treats false as empty, so a
+            # template written that way renders the wrong value for an operator
+            # who has deliberately written one — harmless while the code default
+            # is false, and a lockout the moment it is not.
+            echo "$cm" | grep -q "$key: false" || {
+              echo "an operator's explicit false for $key is swallowed by the template."
+              echo "use hasKey, not '| default'."
+              exit 1
+            }
+            # And a provider that sets nothing renders nothing, so the code
+            # default applies rather than a value the chart invented.
+            count=$(echo "$cm" | grep -c "$key:" || true)
+            [ "$count" = "2" ] || {
+              echo "$key rendered $count times for three providers, two of which set it."
+              echo "an unset switch must render no line at all."
+              exit 1
+            }
+          done
+          echo "the SAML assertion checks render in both positions, and an unset one does not"
 
       - name: Every retention key in values.yaml reaches the rendered ConfigMap
         run: |

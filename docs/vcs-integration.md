@@ -238,6 +238,21 @@ GitLab integration uses a **Project or Group Access Token** for repository acces
 2. Create a new token with the same settings as above
 3. Copy the token value
 
+> **This token is not handed to runners by default.** Terrapod uses it for its
+> own calls to GitLab -- polling, fetching archives, commit statuses, MR
+> comments. It does **not** give it to a runner Job, even when a workspace asks
+> for it with a `vcs_connection` [git module credential](module-auth.md), unless
+> `api.config.vcs.gitlab.allow_token_delivery_to_runners` is set to `true`.
+>
+> The reason is that there is nothing to narrow. A GitHub connection is an app
+> identity, so Terrapod mints a fresh per-run token scoped to reading contents;
+> a GitLab connection *is* this stored token, and GitLab has no call that returns
+> a narrower copy of one. Delivering it means delivering it whole, with every
+> permission and every project it covers, into a container that is also running
+> the workspace's own IaC -- and the connection is named in a variable *value*,
+> so any workspace owner can name any connection. See
+> [Module Source Auth](module-auth.md#gitlab-the-connections-token-cannot-be-narrowed).
+
 ### Step 2: Create a GitLab VCS Connection
 
 No platform-level configuration is needed for GitLab -- the access token is stored (encrypted) on the VCS connection itself.
@@ -868,3 +883,37 @@ permission change can take that long to take effect.
 - The PR/MR must target the workspace's tracked branch (e.g., `main`)
 - Check that no run already exists for the same PR/MR number + head SHA (deduplication)
 - Verify the VCS connection has permission to list pull requests / merge requests
+
+
+### Naming a VCS connection is authorized
+
+A VCS connection holds a GitHub App installation or a GitLab access token, and it
+reaches **every repository that credential can reach**. Naming one on a workspace is
+therefore a grant rather than a reference — and a connection's id is returned to
+anyone with `read` on a workspace using it, so the id is discoverable by design.
+
+A **platform admin** may name any connection. Anyone else may name a connection only
+where they **already own a workspace using it**, so the access is one they already
+hold. This is enforced on workspace create, on workspace update (both the
+`vcs-connection-id` attribute and the `vcs-connection` relationship), and at run time
+when a `git_http_auth` credential with `source: vcs_connection` is minted — a
+workspace may always use its own connection, and anything else is checked.
+
+A refusal is a **403** on the API, and on the run-time path the run is **errored with
+the reason** rather than run without the credential, so an `init` failure never has to
+be traced back to a missing credential.
+
+One consequence is deliberate: the **first** workspace for a connection must be
+created by a platform admin, because until one exists there is no workspace to own.
+After that an ordinary user can create as many as they like against it. An operator
+who needs the previous behaviour — any authenticated user naming any connection id —
+can set:
+
+```yaml
+api:
+  config:
+    vcs:
+      require_connection_authorization: false
+```
+
+Prefer that over granting someone admin. (GHSA-v8g7-pqrj-8mcm)

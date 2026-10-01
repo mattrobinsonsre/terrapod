@@ -512,3 +512,137 @@ class TestParseRetryDelay:
 
         resp = MagicMock(headers={})
         assert _parse_retry_delay(resp) == _DEFAULT_BACKOFF_SECONDS
+
+
+@pytest.fixture(scope="module")
+def app_pem() -> str:
+    """A real app key, so the whole mint path runs rather than a patched middle."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    return (
+        rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        .private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        .decode()
+    )
+
+
+class TestAMintedTokenIsNoWiderThanItsPurpose:
+    """A mint with no `permissions` body carries every permission the App holds,
+    across every repository in the installation.
+
+    That token does not stay inside the API process: `git_auth_service` writes it
+    into a runner Job's git credential helper and `git_fetch` hands it to `git`
+    as a Basic header, in a Job that is also running user-supplied IaC. A clone
+    needs `contents: read`; anything beyond that is handed over for free.
+
+    `repositories` is deliberately not narrowed too — see `CLONE_PERMISSIONS`.
+    """
+
+    @staticmethod
+    def _mint_body(mock_request) -> dict | None:
+        """The `json=` the access-token POST actually sent, if any."""
+        return mock_request.call_args.kwargs.get("json")
+
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self):
+        from terrapod.services import github_service
+
+        github_service._token_cache.clear()  # noqa: SLF001
+        yield
+        github_service._token_cache.clear()  # noqa: SLF001
+
+    def _token_response(self):
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"token": "ghs_minted"}
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._github_request")
+    async def test_the_default_asks_for_contents_read_and_nothing_else(self, mock_request, app_pem):
+        """The default is what the out-of-module callers get, so it must be the
+        narrow one — they do not pass `permissions` and cannot be expected to."""
+        from terrapod.services.github_service import get_installation_token
+
+        mock_request.return_value = self._token_response()
+        assert await get_installation_token(_mock_conn(token=app_pem)) == "ghs_minted"
+
+        assert self._mint_body(mock_request) == {"permissions": {"contents": "read"}}
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._github_request")
+    async def test_terrapods_own_api_calls_still_get_the_full_app_grant(
+        self, mock_request, app_pem
+    ):
+        """Negative path. The internal token writes PR comments, commit statuses
+        and merges; naming each permission risks a 422 on an installation that
+        grants a different one, which would take out every VCS operation rather
+        than one. The body is OMITTED — GitHub reads absence as the full grant,
+        where an explicit `{}` would mint a powerless token.
+        """
+        from terrapod.services.github_service import _api_call_token
+
+        mock_request.return_value = self._token_response()
+        assert await _api_call_token(_mock_conn(token=app_pem)) == "ghs_minted"
+
+        assert self._mint_body(mock_request) is None
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._github_request")
+    async def test_a_write_operation_does_not_run_on_the_clone_token(self, mock_request, app_pem):
+        """Driven through a real caller rather than asserted on the helper: an
+        internal operation that reached for the default would 403 in the field.
+        """
+        from terrapod.services.github_service import create_pr_comment
+
+        token_resp = self._token_response()
+        comment_resp = MagicMock()
+        comment_resp.status_code = 201
+        comment_resp.json.return_value = {"id": 7}
+        comment_resp.raise_for_status = MagicMock()
+        mock_request.side_effect = [token_resp, comment_resp]
+
+        await create_pr_comment(_mock_conn(token=app_pem), "acme", "infra", 1, "hello")
+
+        mint = mock_request.call_args_list[0]
+        assert "access_tokens" in mint.args[1]
+        assert mint.kwargs.get("json") is None, (
+            "a PR comment ran on a contents:read token — it will 403 in the field"
+        )
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.github_service._github_request")
+    async def test_the_cache_does_not_serve_one_permission_set_for_another(
+        self, mock_request, app_pem
+    ):
+        """The cache key includes the permission set.
+
+        Keyed on the installation alone, whichever call warmed it first would win:
+        a clone would be handed the fully-permissioned token — restoring the
+        vulnerability through the cache — or a write would be handed the
+        read-only one and 403 depending on call order.
+        """
+        from terrapod.services.github_service import _api_call_token, get_installation_token
+
+        clone_resp = self._token_response()
+        clone_resp.json.return_value = {"token": "ghs_clone"}
+        api_resp = self._token_response()
+        api_resp.json.return_value = {"token": "ghs_api"}
+        mock_request.side_effect = [clone_resp, api_resp]
+
+        conn = _mock_conn(token=app_pem)
+        assert await get_installation_token(conn) == "ghs_clone"
+        assert await _api_call_token(conn) == "ghs_api"
+        assert mock_request.call_count == 2, "the second mint was served from the first's cache"
+
+        # And each is still cached in its own right — the split must not cost a
+        # mint per call.
+        assert await get_installation_token(conn) == "ghs_clone"
+        assert await _api_call_token(conn) == "ghs_api"
+        assert mock_request.call_count == 2

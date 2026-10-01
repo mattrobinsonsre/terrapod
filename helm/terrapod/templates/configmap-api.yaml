@@ -176,6 +176,28 @@ data:
             {{- if .acs_url }}
             acs_url: {{ .acs_url | quote }}
             {{- end }}
+            {{- /*
+              hasKey, not `| default`: these default to FALSE on this release line, and Helm's
+              `default` treats false as empty — so `| default true` would render
+              true for an operator who explicitly set false, and their opt-out
+              would be silently inert. Omitting the key entirely lets the code
+              default stand, which is what an unset value means.
+            */ -}}
+            {{- if hasKey . "validate_destination" }}
+            validate_destination: {{ .validate_destination }}
+            {{- end }}
+            {{- if hasKey . "validate_in_response_to" }}
+            validate_in_response_to: {{ .validate_in_response_to }}
+            {{- end }}
+            {{- if hasKey . "reject_replayed_assertions" }}
+            reject_replayed_assertions: {{ .reject_replayed_assertions }}
+            {{- end }}
+            {{- if hasKey . "want_assertions_signed" }}
+            want_assertions_signed: {{ .want_assertions_signed }}
+            {{- end }}
+            {{- if hasKey . "reject_deprecated_algorithm" }}
+            reject_deprecated_algorithm: {{ .reject_deprecated_algorithm }}
+            {{- end }}
             {{- if .role_prefixes }}
             role_prefixes:
               {{- range .role_prefixes }}
@@ -375,6 +397,11 @@ data:
     {{- end }}
     {{- if .Values.api.config.vcs }}
     vcs:
+      # Rendered unconditionally via `dig`, for the reason the gitlab key below
+      # gives: the answer belongs in the pod's config either way. `dig` returns a
+      # stored false rather than treating it as empty, so an operator turning this
+      # off is not silently overruled.
+      require_connection_authorization: {{ dig "require_connection_authorization" true .Values.api.config.vcs }}
       enabled: {{ .Values.api.config.vcs.enabled }}
       poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 }}
       module_poll_interval_seconds: {{ .Values.api.config.vcs.module_poll_interval_seconds | default 300 }}
@@ -388,6 +415,13 @@ data:
       {{- with .Values.api.config.vcs.tmpdir_min_free_bytes }}
       tmpdir_min_free_bytes: {{ . | int64 }}
       {{- end }}
+      gitlab:
+        # Rendered unconditionally, and deliberately NOT via `with`: false is
+        # the safe state here, `with` treats false as empty and would render
+        # nothing, so an operator who read the warning and left it off would see
+        # their decision expressed only by omission. Rendering it keeps the
+        # pod's config and the values file agreeing on the answer.
+        allow_token_delivery_to_runners: {{ dig "gitlab" "allow_token_delivery_to_runners" false .Values.api.config.vcs }}
     {{- end }}
     {{- if .Values.api.config.audit }}
     audit:
