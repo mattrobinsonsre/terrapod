@@ -42,7 +42,7 @@ fork author is not — they cannot push to the base repository and cannot merge.
 In this mode the stake is higher than elsewhere, because a PR push creates a
 full plan-and-apply-capable run rather than a speculative one. Terrapod
 therefore skips fork pull requests entirely unless the workspace sets
-`allow-fork-pr-plans` (off by default). Pull requests raised from a branch in
+`allow-fork-pr-plans` (on by default on this release line; off from 2.0). Pull requests raised from a branch in
 the repository itself are unaffected. See [Pull requests from
 forks](vcs-integration.md#pull-requests-from-forks).
 

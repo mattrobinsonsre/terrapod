@@ -102,7 +102,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
 			"working_directory":                computedString("Working directory."),
 			"debug_mode":                       computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
-			"allow_fork_pr_plans":              computedBool("Whether a pull request opened from a fork gets a speculative plan. False by default, because that plan runs the author's code with this workspace's credentials (GHSA-gp5w-76rw-c452); same-repository pull requests always plan regardless."),
+			"allow_fork_pr_plans":              computedBool("Whether a pull request opened from a fork gets a speculative plan. True by default on this release line (false from 2.0), because that plan runs the author's code with this workspace's credentials (GHSA-gp5w-76rw-c452); same-repository pull requests always plan regardless."),
 			"resource_cpu":                     computedString("CPU request."),
 			"resource_memory":                  computedString("Memory request."),
 			"labels":                           computedMap("Labels."),

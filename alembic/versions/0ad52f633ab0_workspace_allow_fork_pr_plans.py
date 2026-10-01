@@ -14,12 +14,12 @@ Expand-only: two nullable-free booleans with server defaults, so an older
 replica serving traffic during a rolling upgrade is unaffected — it simply
 never reads the columns.
 
-The default is `false`, which is a deliberate behaviour change rather than a
-no-op: fork PRs that plan today will stop. That is the tightening this
-migration exists for, and the release notes say so.
+The default is `true` on this release line: a patch must not stop a fork PR
+that plans today, so the column ships permissive and the operator turns it
+off. 2.0 defaults it false. The release notes say so.
 
 Revision ID: 0ad52f633ab0
-Revises: e0498e07de5c
+Revises: bb495836611d
 """
 
 import sqlalchemy as sa

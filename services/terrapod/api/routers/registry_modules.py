@@ -364,6 +364,24 @@ async def create_module_endpoint(
         result = await db.execute(sa_select(VCSConnection).where(VCSConnection.id == conn_id))
         if result.scalars().first() is None:
             raise HTTPException(status_code=422, detail="VCS connection not found")
+
+        # GHSA-v8g7-pqrj-8mcm, the registry half. A module names a connection and an
+        # arbitrary `vcs_repo_url`, and the registry poller then clones that repository
+        # with that connection's credential and publishes it as a module the caller
+        # owns. Module creation is open to any authenticated user, so with only the
+        # workspace gate in place the same escalation stands here.
+        from terrapod.services.vcs_connection_rbac import (
+            may_reference_connection,
+            refusal_detail,
+        )
+
+        if not await may_reference_connection(
+            db,
+            conn_id=conn_id,
+            actor_email=user.email,
+            is_platform_admin="admin" in effective_platform_roles(user),
+        ):
+            raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
         module.vcs_connection_id = conn_id
         module.source = "vcs"
     if attrs.vcs_repo_url:
@@ -623,6 +641,24 @@ async def update_module_endpoint(
             result = await db.execute(sa_select(VCSConnection).where(VCSConnection.id == conn_id))
             if result.scalars().first() is None:
                 raise HTTPException(status_code=422, detail="VCS connection not found")
+
+            # GHSA-v8g7-pqrj-8mcm, the registry half. A module names a connection and an
+            # arbitrary `vcs_repo_url`, and the registry poller then clones that repository
+            # with that connection's credential and publishes it as a module the caller
+            # owns. Module creation is open to any authenticated user, so with only the
+            # workspace gate in place the same escalation stands here.
+            from terrapod.services.vcs_connection_rbac import (
+                may_reference_connection,
+                refusal_detail,
+            )
+
+            if not await may_reference_connection(
+                db,
+                conn_id=conn_id,
+                actor_email=user.email,
+                is_platform_admin="admin" in effective_platform_roles(user),
+            ):
+                raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
             module.vcs_connection_id = conn_id
             module.source = "vcs"
         else:
@@ -900,6 +936,24 @@ async def update_module_vcs_endpoint(
         result = await db.execute(sa_select(VCSConnection).where(VCSConnection.id == conn_id))
         if result.scalars().first() is None:
             raise HTTPException(status_code=422, detail="VCS connection not found")
+
+        # GHSA-v8g7-pqrj-8mcm, the registry half. A module names a connection and an
+        # arbitrary `vcs_repo_url`, and the registry poller then clones that repository
+        # with that connection's credential and publishes it as a module the caller
+        # owns. Module creation is open to any authenticated user, so with only the
+        # workspace gate in place the same escalation stands here.
+        from terrapod.services.vcs_connection_rbac import (
+            may_reference_connection,
+            refusal_detail,
+        )
+
+        if not await may_reference_connection(
+            db,
+            conn_id=conn_id,
+            actor_email=user.email,
+            is_platform_admin="admin" in effective_platform_roles(user),
+        ):
+            raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
         module.vcs_connection_id = conn_id
     else:
         module.vcs_connection_id = None

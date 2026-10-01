@@ -389,7 +389,8 @@ class Workspace(Base):
 
     # Whether a pull request opened from a FORK may trigger a speculative plan.
     #
-    # Off by default, and that default is the point. A plan executes the PR
+    # ON by default on this release line, and that is deliberate: a patch must not
+    # stop a fork pull request that plans today. 2.0 defaults it off. A plan executes the PR
     # author's code — provider configuration, `external` data sources,
     # `local-exec` — with everything the run receives: env-category secrets,
     # sensitive variables, Vault-resolved values, minted git credentials and the
@@ -1332,7 +1333,7 @@ class AutodiscoveryRule(Base):
     debug_mode: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
-    #: Defaults FALSE, matching the workspace column rather than overriding it
+    #: Defaults TRUE on this release line, matching the workspace column rather than overriding it
     #: like `drift_detection_enabled` above. An operator who decides fork PRs
     #: should plan has to say so, and a rule is how they say it once for every
     #: directory the repository grows later -- otherwise enabling it in bulk

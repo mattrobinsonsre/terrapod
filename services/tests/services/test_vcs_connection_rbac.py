@@ -174,3 +174,118 @@ class TestTheMintIsGatedToo:
         except Exception:
             pass
         assert seen["n"] == 0
+
+
+# ── The gates the review found unguarded ────────────────────────────────
+#
+# Each of these pins something that was shipped working and could have been
+# removed with the whole suite still green. One of them — the `workspace=`
+# kwarg — WAS missing on the 1.7 line, and nothing failed.
+
+
+class TestTheRunTimeGateIsActuallyWired:
+    """`resolve_git_auth(workspace=...)` is optional, so omitting it disables the
+    run-time half of GHSA-v8g7 silently.
+
+    That is not hypothetical: the 1.7 branch shipped the gate and omitted the
+    kwarg, so `workspace` was None on every request and the authorization check
+    was never reached. The mint's own tests call `_mint_from_connection` directly
+    with a workspace, so they cannot see it. This drives the real caller.
+    """
+
+    async def test_next_run_passes_the_workspace_to_the_resolver(self):
+        import inspect
+
+        from terrapod.api.routers import runs as runs_router
+
+        src = inspect.getsource(runs_router)
+        assert "resolve_git_auth(db, resolved, workspace=" in src, (
+            "next_run calls resolve_git_auth without workspace=, so the "
+            "GHSA-v8g7 run-time gate short-circuits on every request"
+        )
+        assert "resolve_git_auth(db, resolved)" not in src, (
+            "a call without the workspace kwarg remains"
+        )
+
+
+class TestTheRegistryModulePathIsGated:
+    """A module names a connection and a repo URL; the poller then clones with
+    that connection's credential. Module creation is open to any authenticated
+    user, so this path needs the same authorization as a workspace.
+    """
+
+    async def test_all_three_connection_sites_authorize(self):
+        import inspect
+
+        from terrapod.api.routers import registry_modules
+
+        src = inspect.getsource(registry_modules)
+        existence = src.count('detail="VCS connection not found"')
+        gated = src.count("may_reference_connection(")
+        assert existence > 0
+        assert gated >= existence, (
+            f"{existence} sites accept a connection id but only {gated} authorize "
+            "it — an ungated site lets any authenticated user clone a private "
+            "repository with someone else's installation credential"
+        )
+
+
+class TestTheForkGateDefaultOnThisLine:
+    """The default is the decision, and it was split three ways once already:
+    the column defaulted true, the create path hardcoded false, and restore
+    fell back to false — so two workspaces on one repo behaved differently
+    depending on how they came to exist.
+    """
+
+    def test_the_column_defaults_permissive(self):
+        from terrapod.db.models import AutodiscoveryRule, Workspace
+
+        for model in (Workspace, AutodiscoveryRule):
+            col = model.__table__.c["allow_fork_pr_plans"]
+            assert col.default.arg is True, f"{model.__name__} ORM default"
+            assert "true" in str(col.server_default.arg).lower(), f"{model.__name__} server_default"
+
+    def test_the_create_path_agrees_with_the_column(self):
+        """An explicit value in the INSERT overrides the ORM default, so the
+        router's fallback has to say the same thing or the column default is
+        unreachable for every workspace created through the API."""
+        import inspect
+
+        from terrapod.api.routers import tfe_v2
+
+        src = inspect.getsource(tfe_v2)
+        assert 'attrs.get("allow-fork-pr-plans", True)' in src, (
+            "the create path does not fall back to this line's permissive default"
+        )
+        assert 'attrs.get("allow-fork-pr-plans", False)' not in src
+
+    def test_restore_agrees_too(self):
+        import inspect
+
+        from terrapod.services import deleted_workspace_service
+
+        src = inspect.getsource(deleted_workspace_service)
+        assert 'settings.get("allow_fork_pr_plans", True)' in src, (
+            "restoring a workspace snapshotted before the column existed would "
+            "silently differ from its never-deleted neighbours"
+        )
+
+
+class TestThePatchGateIsGuarded:
+    """The create gate has route tests; the PATCH gate had none, and it carries
+    its own change-detection logic (`!= _conn_before_patch`) that create does
+    not. Deleting the PATCH block left the suite green."""
+
+    async def test_patch_authorizes_a_changed_connection(self):
+        import inspect
+
+        from terrapod.api.routers import tfe_v2
+
+        src = inspect.getsource(tfe_v2)
+        assert "_conn_before_patch" in src, "the PATCH change-detection is gone"
+        # the gate must sit after the value is applied and compare against the
+        # captured pre-PATCH value, or an unchanged PATCH starts failing
+        assert "ws.vcs_connection_id != _conn_before_patch" in src, (
+            "the PATCH gate no longer fires only on a change"
+        )
+        assert src.count("may_reference_connection(") >= 2, "create and PATCH must both authorize"

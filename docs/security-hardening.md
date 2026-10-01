@@ -80,7 +80,7 @@ api:
 
 ### Validate SAML Assertions Strictly
 
-If you use a SAML provider, confirm all four assertion checks are on. They are
+If you use a SAML provider, confirm all five assertion checks are on. They are
 per provider, and on the 1.x release lines they default to **off** so that a
 patch release could not lock anyone out — which means a deployment carried
 forward from 1.x keeps the permissive setting until you say otherwise:
@@ -347,7 +347,7 @@ not plan fork pull requests unless the workspace opts in:
             "attributes": { "allow-fork-pr-plans": false } } }
 ```
 
-`false` is the default, so a hardened deployment has nothing to change. Audit
+`true` is the default **on this release line** — a patch must not stop a fork pull request that plans today — so a hardened deployment DOES have something to change. 2.0 defaults it false. Audit
 it rather than set it:
 
 ```sql

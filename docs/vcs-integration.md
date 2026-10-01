@@ -954,7 +954,7 @@ permission change can take that long to take effect.
 ### Speculative plans not appearing for PRs/MRs
 
 - **Is the PR/MR from a fork?** Fork pull requests do not plan unless the
-  workspace sets `allow-fork-pr-plans` (off by default). The poller logs
+  workspace sets `allow-fork-pr-plans` (on by default on this release line; off from 2.0). The poller logs
   `vcs.pr.fork_plan_skipped` with the workspace id and PR number each time it
   skips one. Pull requests from a branch in the repository itself are never
   affected by this — see [Pull requests from forks](#pull-requests-from-forks)

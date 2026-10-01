@@ -1326,3 +1326,29 @@ class TestStateUploadIsForApplyRunsOnly:
             resp = await self._put(run, db, serial=9, lineage="abc")
         assert resp.status_code in (200, 201, 204), resp.text
         db.add.assert_called_once()
+
+
+class TestAnEmptyUploadedLineageDoesNotSkipTheCheck:
+    """Omitting `lineage` from the state JSON used to turn the guard off.
+
+    The relaxation exists for the DATABASE side — the column defaults to "" and
+    legacy heads predate it being populated. It was applied symmetrically, so
+    `latest.lineage and lineage` short-circuited on an empty UPLOADED lineage, and
+    a wholly foreign state at the head's serial + 1 was accepted. terraform and
+    tofu always write a lineage, so an empty one is never a legacy artefact; it is
+    the one half of the comparison an attacker controls.
+    """
+
+    def test_the_guard_does_not_test_the_uploaded_lineage_for_truthiness(self):
+        import inspect
+
+        from terrapod.api.routers import run_artifacts
+
+        src = inspect.getsource(run_artifacts)
+        assert "latest.lineage and lineage and" not in src, (
+            "the uploaded lineage is tested for truthiness, so omitting it skips "
+            "the mismatch check entirely"
+        )
+        assert "latest.lineage and latest.lineage != lineage" in src, (
+            "the guard no longer compares a populated head against the upload"
+        )

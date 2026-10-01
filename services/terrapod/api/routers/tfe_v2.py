@@ -1252,13 +1252,13 @@ async def create_workspace(
         auto_merge=_422(
             workspace_settings.validate_bool, attrs.get("auto-merge", False), "auto-merge"
         ),
-        # Defaults off. A fork PR's speculative plan executes its author's code
+        # Defaults ON on this release line (2.0 defaults it off). A fork PR's speculative plan executes its author's code
         # with the workspace's full credential set, and that author has no write
         # access and cannot merge — so this is the only path by which their code
         # reaches those credentials. Same-repository PRs are unaffected.
         allow_fork_pr_plans=_422(
             workspace_settings.validate_bool,
-            attrs.get("allow-fork-pr-plans", False),
+            attrs.get("allow-fork-pr-plans", True),
             "allow-fork-pr-plans",
         ),
         auto_merge_strategy=auto_merge_strategy,

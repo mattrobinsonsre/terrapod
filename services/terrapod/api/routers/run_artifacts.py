@@ -693,7 +693,12 @@ async def _persist_runner_state(
     # legacy rows predate it being populated, so a strict comparison would
     # refuse every upload on a workspace whose head was written before then.
     latest = await _latest_state_version(db, run.workspace_id)
-    if latest is not None and latest.lineage and lineage and latest.lineage != lineage:
+    # `latest.lineage` is relaxed because the column defaults to "" and legacy rows
+    # predate it being populated. The UPLOADED lineage is NOT relaxed: terraform and
+    # tofu always write one, so an empty value is not a legacy artefact — it is the
+    # one input an attacker controls, and treating it as "skip the check" turned the
+    # guard off for exactly the caller it exists to stop.
+    if latest is not None and latest.lineage and latest.lineage != lineage:
         raise HTTPException(
             status_code=409,
             detail=(
