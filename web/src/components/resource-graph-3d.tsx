@@ -23,12 +23,18 @@ import { useTranslations } from 'next-intl'
 import ForceGraph3D from 'react-force-graph-3d'
 import SpriteText from 'three-spritetext'
 import * as THREE from 'three'
+import { escapeHtml } from '@/lib/html-escape'
 
 // A node needs an id + module membership; consumers extend with their own
 // metadata (action, type, mode…) which their colorOf/nodeShape closures read.
 export interface RGNode {
   id: string
   module: string // '' for root-module resources
+  // What the hover tooltip shows. react-force-graph's default nodeLabel
+  // accessor is the literal string 'name', so this field was already being read
+  // — and rendered through innerHTML. It is declared here so the escaping
+  // accessor below can read it without a cast.
+  name?: string
   instances?: number // count/for_each instance count → drawn as a "nucleus" (#770)
   // react-force-graph mutates x/y/z (+ velocities) onto nodes after layout
   x?: number
@@ -82,6 +88,9 @@ type FgProps<T extends RGNode> = {
   nodeThreeObjectExtend?: boolean
   nodeThreeObject?: (n: T) => object
   onNodeClick?: (n: T) => void
+  // Returned string is assigned to the tooltip's innerHTML by float-tooltip —
+  // every caller escapes.
+  nodeLabel?: (n: T) => string
   linkColor?: (l: RGLink<T>) => string
   linkWidth?: (l: RGLink<T>) => number
   linkDirectionalArrowLength?: number
@@ -628,6 +637,11 @@ export function ResourceGraph3D<T extends RGNode>({
             group.add(label)
             return group
           }}
+          // float-tooltip renders this through d3's .html(), i.e. innerHTML, and
+          // the default accessor ('name') fed it the raw value. In the state
+          // graph that name comes out of the uploaded state blob, so workspace
+          // write became script execution for anyone holding plan.
+          nodeLabel={(n) => escapeHtml(n.name ?? n.id)}
           onNodeClick={(n) => {
             select(n.id)
             // Make the clicked resource the rotation pivot by setting the
