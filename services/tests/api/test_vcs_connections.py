@@ -9,6 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
@@ -729,3 +730,51 @@ class TestRateLimitAttributes:
             "rate-limit-observed-at",
         ):
             assert k in attrs
+
+
+class TestTheAllowlistCannotBeWidenedByAccident:
+    """An empty `allowed-repositories` means ANY repository the credential can
+    reach, which makes "drop the blank entries" a dangerous convenience: a
+    fat-fingered pattern collapsed the list to empty and answered 200, leaving the
+    connection WIDER than before with nothing said. Found in review of the fix
+    itself.
+    """
+
+    def test_a_list_of_only_blanks_is_refused(self):
+        from fastapi import HTTPException
+
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        for payload in (
+            {"allowed-repositories": ["   "]},
+            {"allowed-repositories": ["", "  ", "\t"]},
+        ):
+            with pytest.raises(HTTPException) as exc:
+                _rbac_attrs(payload)
+            assert exc.value.status_code == 422
+            assert "blank" in str(exc.value.detail)
+
+    def test_a_deliberately_empty_list_still_means_any(self):
+        """The refusal must not take away the only way to widen scope again."""
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        assert _rbac_attrs({"allowed-repositories": []})[2] == []
+
+    def test_blanks_mixed_with_a_real_pattern_are_dropped_not_refused(self):
+        """Still a narrowing, so there is nothing to warn about."""
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        assert _rbac_attrs({"allowed-repositories": ["myorg/*", "  "]})[2] == ["myorg/*"]
+
+    def test_the_docstring_lists_the_fields_the_handler_actually_edits(self):
+        """The docstring named only name/server-url/status/App-ids while the code
+        twenty lines below edited three more — the exact drift this project's own
+        notes call out, and the first thing a reader checking "can I PATCH the
+        allowlist?" would land on."""
+        import inspect
+
+        from terrapod.api.routers.vcs_connections import update_connection
+
+        doc = inspect.getdoc(update_connection) or ""
+        for attr in ("owner-email", "labels", "allowed-repositories"):
+            assert attr in doc, f"{attr} is editable here but the docstring omits it"

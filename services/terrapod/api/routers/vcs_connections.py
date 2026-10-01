@@ -172,8 +172,23 @@ def _rbac_attrs(attrs: dict) -> tuple[str, dict, list]:
             status_code=422, detail="allowed-repositories must be a list of strings"
         )
     # A blank pattern would match nothing while looking like a restriction, which
-    # reads as the allowlist being broken rather than empty.
+    # reads as the allowlist being broken rather than empty — so blanks are dropped.
     cleaned = [r.strip() for r in repos if r and r.strip()]
+    # But dropping them must not turn a narrowing into a widening. An empty list
+    # means ANY repository, so `["  "]` silently became "allow everything" — a
+    # fat-fingered pattern answered 200 and left the connection WIDER than before,
+    # which is the one direction a validation error is cheaper than. A caller who
+    # meant "any" sends `[]` and gets it; a caller whose patterns all vanished gets
+    # told.
+    if repos and not cleaned:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "allowed-repositories contained only blank entries. Send an empty "
+                "list to allow any repository the connection's credential can "
+                "reach; a list of blanks would do that silently."
+            ),
+        )
     return owner_email, labels, cleaned
 
 
@@ -358,7 +373,16 @@ async def update_connection(
     different connection; delete + recreate instead). Credentials are
     write-only: pass `private-key` (GitHub) or `token` (GitLab) to
     rotate; omit them to leave the stored credential untouched. Editable
-    fields: name, server-url, status, and the GitHub App identifiers.
+    fields: name, server-url, status, the GitHub App identifiers, and the
+    three reach-and-scope attributes `owner-email`, `labels` and
+    `allowed-repositories` (GHSA-v8g7-pqrj-8mcm).
+
+    On those three, an absent key leaves the field alone and an explicitly empty
+    value clears it — `allowed-repositories: []` is how a connection is widened back
+    to any repository its credential can reach, so an allowlist that could not be
+    cleared by removing its last entry would be a one-way door. A list whose entries
+    are all blank is refused rather than treated as empty, because dropping blanks
+    would otherwise turn a typo into a silent widening.
     """
     conn_uuid = parse_id(connection_id, "vcs-", detail="VCS connection not found")
     conn = await _get_connection(db, conn_uuid)
