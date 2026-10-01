@@ -1330,6 +1330,28 @@ async def create_workspace(
     )
     pool_set.set_workspace_pools(ws, requested_pool_ids)
     db.add(ws)
+
+    # GHSA-49q6-pm68-3xgw. An assignment rule selects on attributes this caller
+    # just chose, so a new workspace can be shaped to match another team's
+    # rule-assigned variable set and receive its secrets. Flush — not commit — so
+    # the real selector can be asked about the pending row, then refuse any
+    # rule-assigned set it pulls in. A new workspace starts from nothing, so every
+    # match is growth.
+    from terrapod.services.varset_self_join import refuse_varset_growth
+
+    await db.flush()
+    try:
+        await refuse_varset_growth(
+            db,
+            workspace_id=ws.id,
+            before=set(),
+            is_platform_admin="admin" in effective_platform_roles(user),
+            actor_email=user.email,
+        )
+    except Exception:
+        await db.rollback()
+        raise
+
     await db.commit()
     await db.refresh(ws)
 
@@ -1623,6 +1645,13 @@ async def update_workspace(
 ) -> JSONResponse:
     """Update workspace settings. Requires admin on workspace."""
     ws, old_caps = await _require_ws_capability(workspace_id, cap.WORKSPACE_SETTINGS, user, db)
+
+    # GHSA-49q6-pm68-3xgw. Snapshotted BEFORE any attribute moves, because an
+    # assignment rule selects on the very attributes this PATCH may change, so the
+    # comparison has to straddle the whole edit rather than one field of it.
+    from terrapod.services.varset_self_join import rule_assigned_varset_ids
+
+    _varsets_before_patch = await rule_assigned_varset_ids(db, ws.id)
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -1971,6 +2000,24 @@ async def update_workspace(
             is_platform_admin="admin" in effective_platform_roles(user),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(ws.vcs_connection_id))
+
+    # GHSA-49q6-pm68-3xgw, the edit path. `_varsets_before_patch` was taken before
+    # any attribute moved; growing the set of rule-assigned variable sets reaching
+    # this workspace is the escalation, shrinking it is a de-escalation and allowed.
+    from terrapod.services.varset_self_join import refuse_varset_growth
+
+    await db.flush()
+    try:
+        await refuse_varset_growth(
+            db,
+            workspace_id=ws.id,
+            before=_varsets_before_patch,
+            is_platform_admin="admin" in effective_platform_roles(user),
+            actor_email=user.email,
+        )
+    except Exception:
+        await db.rollback()
+        raise
 
     await db.commit()
     await db.refresh(ws)
