@@ -2250,3 +2250,234 @@ are re-claimed automatically and need nothing more.
 Press **Check** again and confirm every step passes, then re-queue the errored
 run. On the status page, the next sample should show the instance reachable
 with a working login.
+
+---
+
+## A workspace write is refused with a 403 about a variable set
+
+Creating or updating a workspace returns **403** with a message naming one or
+more variable sets, saying the change would make the workspace match their
+assignment rule.
+
+This is working as intended. An assignment rule selects on attributes the
+workspace's own owner controls — labels, name, execution mode, agent pool, engine
+version, VCS connection — and a variable set has no per-set permissions, so the
+match itself would be the grant. A caller who is **not** a platform admin
+therefore may not **grow** the set of rule-assigned variable sets reaching a
+workspace. (GHSA-49q6-pm68-3xgw)
+
+**It is a behaviour change**, so expect it on first upgrade from any self-service
+workflow that created workspaces carrying labels a rule-scoped set selects on,
+and from a non-admin running the OpenTofu/Terraform provider.
+
+### Symptoms
+
+- `403` on `POST /api/v2/organizations/default/workspaces` or
+  `PATCH /api/v2/workspaces/{id}`, detail beginning "This change would make the
+  workspace match the assignment rule of variable set …"
+- No workspace is left behind by a refused create — the change is rolled back
+- The API server log carries `refused a workspace change that would pull in a
+  rule-assigned variable set`, with the actor and the set names
+- A non-admin `tofu apply`/`terraform apply` of `terrapod_workspace` fails on the
+  create or the update, not on the plan
+
+### Diagnosis
+
+1. **Read the message.** It names the variable sets, which is what you need to ask
+   about. The names are not secret; the values are.
+
+2. **Find the rule that is matching.** Admin only:
+
+   ```zsh
+   curl -sH "Authorization: Bearer $TOKEN" \
+     "$TERRAPOD/api/terrapod/v1/varsets/<varset-id>/relationships/workspaces"
+   ```
+
+   and from the set itself, `assignment-rule` on
+   `GET /api/v2/organizations/default/varsets`. Compare its dimensions against
+   the attributes the refused request was setting.
+
+3. **Work out which attribute did it.** Only these can move the answer: `labels`,
+   `name`, `execution-backend`, `execution-mode`, `terraform-version`,
+   `engine-version`, `agent-pool-id`/`agent-pool-ids`, `vcs-connection-id` (as
+   attribute *or* relationship), `vcs-repo-url` and `owner-email`. A request
+   touching none of them is never checked, so if the refusal appeared on what
+   looks like an unrelated edit, one of those is in the body.
+
+4. **Confirm it is growth, not membership.** These are all still allowed, so if
+   one of them is being refused, that is a bug worth reporting:
+
+   | Allowed | Why |
+   |---|---|
+   | An edit to a workspace that **already** matches | The test is growth, not presence |
+   | **Dropping** a label that was pulling a set in | Shrinking is a de-escalation |
+   | Matching a **global** set | It already reaches every workspace |
+   | Matching an **explicitly assigned** set | An admin assigned it to this workspace deliberately |
+
+5. **Check what the workspace receives today**, which answers "where did this
+   variable come from". Needs only `workspace:read`:
+
+   ```zsh
+   curl -sH "Authorization: Bearer $TOKEN" \
+     "$TERRAPOD/api/terrapod/v1/workspaces/<workspace-id>/varsets"
+   ```
+
+   Each entry's `assignment-source` is `explicit`, `global` or `rule`.
+
+### Resolution
+
+Pick whichever matches the intent — the first two are the right answers, and the
+third is the one to reach for only when the rule itself is wrong:
+
+1. **A platform admin makes the change.** An admin is exempt, because an admin can
+   already read every variable set and so has nothing to escalate to. Right answer
+   when the workspace genuinely should receive the set.
+2. **A platform admin assigns the set to the workspace explicitly**
+   (`POST /api/v2/varsets/{id}/relationships/workspaces`). The caller can then set
+   whatever attributes they like, because an explicit assignment does not count as
+   growth. Right answer when a team should own the workspace day to day.
+3. **Change the attribute so it does not match** — pick a different label value or
+   name. Right answer when the match was accidental, which it often is where a
+   rule selects on a broadly-used label such as `env`.
+
+If the refusal revealed that a rule is **wider than intended**, treat it as the
+more serious finding and narrow the rule: see
+[A variable set is applying to workspaces I did not expect](#a-variable-set-is-applying-to-workspaces-i-did-not-expect).
+A set whose rule was too wide for a while should have its credential rotated.
+
+For a self-service workflow that is now blocked wholesale, prefer giving the
+affected workspaces an explicit assignment over granting the caller admin.
+
+### Verification
+
+Re-send the refused request and confirm a `201`/`200`. Then confirm the workspace
+receives what you expect:
+
+```zsh
+curl -sH "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/workspaces/<workspace-id>/varsets"
+```
+
+The same resolver backs this view and run-time injection, so what is listed is
+what the next run receives.
+
+---
+
+## A run cannot fetch its repository
+
+A run errors before it plans, with a message saying the VCS connection is
+restricted to specific repositories and the workspace's repository is not one of
+them — or `GET …/vcs-refs` returns **403** and the branch/tag picker in the run
+dialog will not populate.
+
+This is the repository allowlist on the VCS connection. `allowed-repositories` is
+empty by default and empty means any repository the credential can reach, so this
+only appears once an operator has narrowed a connection — and it is **expected**
+immediately afterwards for any workspace already pointing outside the new
+patterns, because narrowing does not rewrite stored workspace rows.
+(GHSA-v8g7-pqrj-8mcm)
+
+### Symptoms
+
+- A run errors with `VCS connection vcs-… is restricted to specific repositories
+  and '…' is not one of them`, with no plan output
+- `GET /api/terrapod/v1/workspaces/{id}/vcs-refs` returns **403** with the same
+  shape of message, naming the allowed patterns
+- Workspace `PATCH` returns **403** on an otherwise valid edit, because the
+  allowlist is re-checked on every update that leaves a connection attached
+- Polling-driven runs keep failing on each cycle; nothing is cloned
+
+Distinguish this from the other 403 on the same resource: *"Not authorized to use
+VCS connection vcs-…"* is a **claim** problem (who may name the connection), not a
+scoping one. The two have different remedies, which is why the messages differ —
+for the claim case see
+[vcs-integration.md → Naming a VCS connection](vcs-integration.md#naming-a-vcs-connection-is-authorized).
+
+### Diagnosis
+
+1. **Read the patterns out of the message.** It lists up to five, then a count of
+   the rest.
+
+2. **Compare them against the workspace's URL.** Admin only for the connection:
+
+   ```zsh
+   curl -sH "Authorization: Bearer $TOKEN" \
+     "$TERRAPOD/api/terrapod/v1/vcs-connections/vcs-<id>" \
+     | jq '.data.attributes["allowed-repositories"]'
+   ```
+
+   A pattern is matched against **both** the full URL as stored and the
+   `owner/name` path with any `.git` suffix removed, so `platform-team/*` matches
+   `https://github.example.com/platform-team/service.git`.
+
+3. **Check the three things that most often explain a surprising non-match:**
+
+   | Cause | Example |
+   |---|---|
+   | **Case.** Patterns are case-sensitive | `Platform-Team/*` does not match `platform-team/service` |
+   | A pattern pinned to a **host** that no longer matches | `https://github.example.com/org/*` against a workspace URL stored in SSH form |
+   | A **blank** repository URL on the workspace | A narrowed connection refuses an empty target rather than allowing it |
+
+   Note `*` **crosses `/`**, so `platform-team/*` does match a nested subgroup
+   path — a too-deep path is rarely the cause.
+
+4. **Find every workspace on the connection that is now out of scope**, since the
+   one that errored is unlikely to be the only one:
+
+   ```sql
+   SELECT w.name, w.vcs_repo_url
+   FROM   workspaces w
+   JOIN   vcs_connections c ON c.id = w.vcs_connection_id
+   WHERE  c.name = '<connection-name>'
+   ORDER  BY w.vcs_repo_url;
+   ```
+
+5. **If nothing looks narrowed at all**, confirm you are looking at the right
+   failure. A connection with `allowed_repositories = '[]'` enforces nothing, and
+   an ordinary clone failure (a revoked credential, a provider outage, a renamed
+   repository) reports the provider's own error instead.
+
+### Resolution
+
+- **The workspace is legitimate** → a platform admin widens the connection's
+  patterns. Send the whole list; the attribute replaces rather than appends:
+
+  ```zsh
+  curl -X PATCH "$TERRAPOD/api/terrapod/v1/vcs-connections/vcs-<id>" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/vnd.api+json" \
+    -d '{"data": {"type": "vcs-connections", "attributes": {
+          "allowed-repositories": ["platform-team/*", "shared/terraform-modules"]}}}'
+  ```
+
+- **The workspace should use a different connection** → repoint it, which needs a
+  claim to the new connection and brings its allowlist with it.
+- **The workspace should not exist** → the allowlist caught something real.
+  Investigate who created it and what it pointed at before deleting it.
+- **You need the restriction gone entirely** → send `"allowed-repositories": []`,
+  which restores "any repository the credential can reach". Prefer widening over
+  clearing.
+
+Omitting the attribute from a `PATCH` leaves it unchanged, so an unrelated edit to
+the connection cannot clear it by accident.
+
+### Verification
+
+Re-queue the run and confirm it reaches `planning`. The refs endpoint is the
+quicker check, since it exercises the same allowlist at workspace-read:
+
+```zsh
+curl -sH "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/workspaces/<workspace-id>/vcs-refs"
+```
+
+A `200` carrying branches and tags means the workspace is inside the connection's
+scope again. Re-run the query in step 4 to confirm no other workspace on the
+connection is still outside it.
+
+### Prevention
+
+Before narrowing a connection, run the query in step 4 and widen the patterns to
+cover every repository already in use; then remove entries as those workspaces are
+retired. See
+[security-hardening.md → Scope every VCS connection](security-hardening.md#scope-every-vcs-connection-to-an-owner-and-a-repository-set).

@@ -365,6 +365,142 @@ that sets it hands it to every workspace it creates from now on. See
 [vcs-integration.md → Pull requests from
 forks](vcs-integration.md#pull-requests-from-forks).
 
+### Scope every VCS connection to an owner and a repository set
+
+A VCS connection holds a GitHub App installation or a GitLab access token and
+reaches **every repository that credential can reach**. Its id is returned to
+anyone with `read` on a workspace using it, so the id is not a secret. Naming one
+is therefore a grant, and Terrapod authorizes it: a caller must be a platform
+admin, the connection's `owner-email`, reached by a role matching its `labels`, or
+already own a workspace on it. Anything else is a **403**. (GHSA-v8g7-pqrj-8mcm)
+
+That gate is on by default and needs no configuration. What a hardened deployment
+should go on to do is the **two things it cannot decide for you**:
+
+**1. Give each connection an owner or labels.** Without either, the only non-admin
+claim left is "already owns a workspace on it", which means an admin has to create
+each team's first workspace. Delegate instead:
+
+```zsh
+curl -X PATCH "$TERRAPOD/api/terrapod/v1/vcs-connections/vcs-<id>" \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{"data": {"type": "vcs-connections", "attributes": {
+        "owner-email": "platform-lead@example.com",
+        "labels": {"team": "platform"}}}}'
+```
+
+> **Never label a connection `access: everyone`.** That label is merged into every
+> caller's effective allow rules and every authenticated user implicitly holds the
+> `everyone` role, so it makes the connection — and every repository its
+> credential can reach — nameable by anyone.
+
+**2. Narrow `allowed-repositories`.** This is **empty by default, and empty means
+any repository the credential can reach**, so an upgrade changes nothing until you
+set it. It is the control that stops an *entitled* caller pointing an entitled
+connection at an unrelated repository in the same organization:
+
+```zsh
+curl -X PATCH "$TERRAPOD/api/terrapod/v1/vcs-connections/vcs-<id>" \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{"data": {"type": "vcs-connections", "attributes": {
+        "allowed-repositories": ["platform-team/*"]}}}'
+```
+
+Audit which connections are still wide open, and who may name each:
+
+```sql
+SELECT name,
+       provider,
+       owner_email,
+       labels,
+       allowed_repositories
+FROM   vcs_connections
+WHERE  status = 'active'
+ORDER  BY (allowed_repositories = '[]'::jsonb) DESC, name;
+```
+
+Rows at the top accept any repository the credential can reach. A row with an
+empty `owner_email` **and** empty `labels` is one only an admin (or an existing
+workspace owner) can build on. And before narrowing a connection, list the
+workspaces that would fall outside the new patterns — they keep their
+configuration and start failing their next run:
+
+```sql
+SELECT w.name, w.vcs_repo_url
+FROM   workspaces w
+JOIN   vcs_connections c ON c.id = w.vcs_connection_id
+WHERE  c.name = '<connection-name>'
+ORDER  BY w.vcs_repo_url;
+```
+
+Refusals are visible in the audit log. It has no `status-code` filter, so select
+on it client-side:
+
+```zsh
+curl -sH "Authorization: Bearer $TERRAPOD_TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/admin/audit-log?filter[resource-type]=workspaces&page[size]=100" \
+  | jq '[.data[] | select(.attributes["status-code"] == 403)]'
+```
+
+Run-time refusals (a `git_http_auth` credential naming a connection the workspace
+may not use) fail the run with the reason rather than running without the
+credential, so they surface on the run itself, not as a 403.
+
+Full semantics, including the four points the allowlist is enforced at, are in
+[vcs-integration.md → Naming a VCS
+connection](vcs-integration.md#naming-a-vcs-connection-is-authorized).
+
+### Do not treat workspace labels as a variable-set trust boundary
+
+A variable set with an **assignment rule** selects workspaces by labels, name,
+execution mode, agent pool, engine version, VCS connection and similar — and all
+of those are settable by whoever has `admin` on the workspace. Workspace creation
+is open and the creator becomes owner, so a rule describes a fleet; it is **not**
+an authorization check, and a variable set has no per-set permissions for one to
+appeal to. (GHSA-49q6-pm68-3xgw)
+
+Terrapod enforces the one invariant available without an entitlement to consult:
+a caller who is **not** a platform admin may not make a workspace **match** a
+rule-assigned variable set it does not already match. Shrinking is allowed, as is
+any edit to a workspace that already matches, and global or explicitly-assigned
+sets never count. It is a **403** on workspace create and workspace `PATCH`.
+
+This is a **behaviour change**: a non-admin who previously created workspaces that
+joined a rule-scoped set now needs an admin to make the change, or an explicit
+assignment. Expect it on first upgrade from self-service workflows and from a
+non-admin running the OpenTofu/Terraform provider — see
+[the runbook](runbooks.md#a-workspace-write-is-refused-with-a-403-about-a-variable-set).
+
+For a hardened deployment the gate is a backstop, not the design. Audit the rules
+whose sets carry credentials:
+
+```sql
+SELECT vs.name,
+       vs.assignment_rule,
+       count(vsv.id) FILTER (WHERE vsv.sensitive)       AS sensitive_vars,
+       count(vsv.id) FILTER (WHERE vsv.value_source = 'vault') AS vault_vars
+FROM   variable_sets vs
+LEFT   JOIN variable_set_variables vsv ON vsv.variable_set_id = vs.id
+WHERE  vs.assignment_rule IS NOT NULL
+GROUP  BY vs.id, vs.name, vs.assignment_rule
+HAVING count(vsv.id) FILTER (WHERE vsv.sensitive OR vsv.value_source = 'vault') > 0
+ORDER  BY vs.name;
+```
+
+Any set in that result delivers a secret to **every workspace that can be made to
+match**, which is a larger set than the one matching today. Assign those
+explicitly, or move the value into the owning workspaces' own variables. Ask a set
+who it currently reaches with
+`GET /api/terrapod/v1/varsets/{id}/relationships/workspaces`, which reports
+`explicit`, `global` or `rule` per workspace.
+
+Refused workspace writes appear in the audit log the same way as above, on
+`filter[resource-type]=workspaces` with `status-code` 403; the API server also
+logs each one as `refused a workspace change that would pull in a rule-assigned
+variable set`, with the actor and the variable-set names.
+
 ### Runner Token TTL
 
 Tune token lifetimes based on your typical run duration:

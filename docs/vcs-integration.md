@@ -973,22 +973,46 @@ reaches **every repository that credential can reach**. Naming one on a workspac
 therefore a grant rather than a reference — and a connection's id is returned to
 anyone with `read` on a workspace using it, so the id is discoverable by design.
 
-A **platform admin** may name any connection. Anyone else may name a connection only
-where they **already own a workspace using it**, so the access is one they already
-hold. This is enforced on workspace create, on workspace update (both the
-`vcs-connection-id` attribute and the `vcs-connection` relationship), and at run time
-when a `git_http_auth` credential with `source: vcs_connection` is minted — a
-workspace may always use its own connection, and anything else is checked.
+**Four claims, any one of which is enough.** A caller may name a connection when:
+
+| Claim | How it is granted |
+|---|---|
+| Platform `admin` | Admins may name any connection. |
+| The connection's **owner** | `owner-email` on the connection matches the caller. |
+| A **role reaching its labels** | `labels` on the connection, matched by the caller's roles with the same allow/deny evaluation every labelled resource gets — see [RBAC → VCS connections are a labelled resource](rbac.md#vcs-connections-are-a-labelled-resource). |
+| Already **owns a workspace using it** | The access is one the caller already holds, so naming it again gains them nothing. |
+
+The last of those is kept from the release that first closed this finding, where
+`owner-email` and `labels` did not yet exist. It carried a consequence that those
+two attributes now remove: there is **no longer any need for a platform admin to
+create the first workspace on a connection**. Set the owner, or label the
+connection and point a role at it, and the team can create its own from the start.
+
+The claim is checked wherever a connection is named:
+
+- **workspace create** and **workspace update** — both the `vcs-connection-id`
+  attribute and the `vcs-connection` relationship, so neither spelling slips
+  past. Update is checked only when the connection actually **changes**, so an
+  edit that leaves it alone does not start failing for whoever administers the
+  workspace today;
+- **registry module** create and update — a module names a connection and a
+  repository URL, and the registry poller then clones that repository with that
+  connection's credential and publishes it as a module the caller owns;
+- **run time**, when a `git_http_auth` credential with `source: vcs_connection`
+  is minted. A workspace may always use its own connection; anything else is
+  checked against the **workspace owner**, since there is no live caller at run
+  time. Two of the four claims do not apply on this path: there are no roles to
+  evaluate, so a label claim does not grant here, and nothing is treated as a
+  platform admin. A workspace whose claim rests only on labels should name its
+  own connection, or hold a `static` credential with a token the operator scoped
+  themselves — see [Private module source auth](module-auth.md).
 
 A refusal is a **403** on the API, and on the run-time path the run is **errored with
 the reason** rather than run without the credential, so an `init` failure never has to
 be traced back to a missing credential.
 
-One consequence is deliberate: the **first** workspace for a connection must be
-created by a platform admin, because until one exists there is no workspace to own.
-After that an ordinary user can create as many as they like against it. An operator
-who needs the previous behaviour — any authenticated user naming any connection id —
-can set:
+An operator who needs the previous behaviour — any authenticated user naming any
+connection id — can set:
 
 ```yaml
 api:
@@ -997,4 +1021,65 @@ api:
       require_connection_authorization: false
 ```
 
-Prefer that over granting someone admin. (GHSA-v8g7-pqrj-8mcm)
+Prefer delegating with `owner-email` or `labels` over either turning this off or
+granting someone admin. (GHSA-v8g7-pqrj-8mcm)
+
+<a id="restricting-a-connection-to-specific-repositories"></a>
+
+### Restricting a connection to specific repositories
+
+Holding a claim to a connection says nothing about **which** repository it may be
+pointed at. The repository URL is an ordinary string on the workspace, so an
+entitled caller could point an entitled connection at anything its credential can
+read. `allowed-repositories` closes that, and it is the control to reach for when
+one GitHub App installation covers an organization broader than the team using it.
+
+**It is empty by default, and empty means any repository the credential can
+reach.** Narrowing is opt-in, so upgrading changes nothing until an operator sets
+it on a connection.
+
+```zsh
+curl -X PATCH "$TERRAPOD/api/terrapod/v1/vcs-connections/vcs-<id>" \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{"data": {"type": "vcs-connections", "attributes": {
+        "allowed-repositories": ["platform-team/*", "shared/terraform-modules"]}}}'
+```
+
+Patterns are globs, matched against **both** spellings of the target so an
+operator can write whichever reads better:
+
+- the repository's `owner/name` path, with any `.git` suffix removed — so
+  `platform-team/*` matches `https://github.com/platform-team/service.git` and
+  the SSH form of the same repository;
+- the full URL as stored — so `https://github.example.com/platform-team/*`
+  additionally pins the host.
+
+Three details worth knowing before writing one:
+
+- **`*` crosses `/`.** `platform-team/*` matches a nested subgroup path such as
+  `platform-team/infra/sub/service`, which a shell glob would not. Pin the depth
+  explicitly if that matters.
+- **Patterns are case-sensitive.** `Platform-Team/*` does not match
+  `platform-team/service`.
+- **A narrowed connection refuses a blank repository URL**, and a blank pattern
+  in the list matches nothing rather than everything — so a stray empty string
+  cannot quietly turn a restriction into an allow-all.
+
+The allowlist is enforced at four points, not only where the URL is set:
+
+| Where | Effect when the repository is out of scope |
+|---|---|
+| Workspace **create** | **403**, naming the repository and the patterns. |
+| Workspace **update** | **403**. Re-checked on **every** update that leaves a connection attached, not only when the connection changes — otherwise an entitled owner could repoint an allowlisted connection by editing `vcs-repo-url` alone. |
+| `GET /api/terrapod/v1/workspaces/{id}/vcs-refs` | **403**. This endpoint answers "which branches and tags does this repository have" at workspace-**read**, which makes it an existence oracle for private repositories the credential can reach. |
+| The **config fetch**, where the source actually arrives | The fetch fails and the run **errors with the reason**. This is the path the poller and run triggers take, where there is no live caller to refuse — so a workspace whose URL was set *before* an operator narrowed the connection stops fetching rather than quietly cloning something out of scope. |
+
+That last row is the one to plan for when narrowing an existing connection:
+workspaces already pointing outside the new patterns keep their configuration
+and start failing their next run. Find them first — see
+[the runbook](runbooks.md#a-run-cannot-fetch-its-repository).
+
+Clearing the list (`"allowed-repositories": []`) restores "any repository the
+credential can reach". Sending the attribute is what changes it; omitting it from
+a `PATCH` leaves it alone. (GHSA-v8g7-pqrj-8mcm)
