@@ -136,7 +136,7 @@ Everything below is implemented and shipped today.
 
 | Feature | Description |
 |---|---|
-| Label-based RBAC | Roles with granular `resource:verb` capabilities (e.g. `run:plan` without `run:apply`); read/plan/write/admin levels remain as authoring shorthand |
+| Label-based RBAC | Roles with granular `resource:verb` capabilities (e.g. `run:plan` without `run:apply`); read/plan/write/admin levels remain as authoring shorthand. Workspaces, agent pools, registry modules and providers, catalog items and **VCS connections** all carry `labels` and an owner, so a connection can be delegated to a team rather than being usable by anyone who can name it |
 | AI policy gate | The plan summary's own verdict as a post-plan gate: operator-written natural-language deny criteria plus a risk threshold, advisory or mandatory, with admin override. Rides the summary's existing model call, so gating costs no extra tokens. Off by default |
 | Policy-as-code (OPA) | Rego enforcement on plan JSON — the open-source equivalent of Sentinel. Advisory or mandatory sets, label-scoped to workspaces, evaluated on the runner, with admin override. Optional shared evaluation lets a set's policies share helper rules and data files |
 | IaC security scanning | Checkov/Trivy misconfiguration scanning of the plan JSON with maintained rule catalogues — per-workspace `off`/`advisory`/`enforced`, severity threshold, skip rules; enforced holds the run at the gate on a failed finding, with admin override |
