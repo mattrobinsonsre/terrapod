@@ -1101,6 +1101,21 @@ class VCSConfig(BaseModel):
     """VCS integration configuration."""
 
     enabled: bool = Field(default=True, description="Enable VCS integration")
+    require_connection_authorization: bool = Field(
+        default=True,
+        description=(
+            "Require a principal to already have a claim to a VCS connection before "
+            "naming it (GHSA-v8g7-pqrj-8mcm). A connection covers every repository "
+            "its credential can reach, and its id is visible to anyone with read on "
+            "a workspace using it — so without this any authenticated user could "
+            "point a workspace of their own at someone else's installation. A "
+            "platform admin may name any connection; anyone else may name one they "
+            "already own a workspace on. The consequence is deliberate: the FIRST "
+            "workspace for a connection must be created by an admin, since until "
+            "one exists there is no workspace to own. Set false to accept any "
+            "connection id, as releases before this one did."
+        ),
+    )
     poll_interval_seconds: int = Field(
         default=60,
         description=(

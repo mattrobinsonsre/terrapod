@@ -20,8 +20,39 @@ from __future__ import annotations
 import ast
 import pathlib
 
-ROOT = pathlib.Path(__file__).resolve().parents[2].parent
-RUNNER = ROOT / "services" / "terrapod" / "runner"
+import pytest
+
+
+def _root() -> pathlib.Path:
+    """The directory holding `docker/Dockerfile.runner`.
+
+    Two layouts, and a fixed `parents[n]` is wrong in one of them. In a checkout
+    this file is `<repo>/services/tests/runner/...` and the Dockerfile is at
+    `<repo>/docker/`. In the test image `services/tests` is copied to `/app/tests`
+    and `docker` to `/app/docker`, so the same climb lands on `/`. Searching
+    upward for the file is correct in both — and the first version of this test,
+    which hardcoded the climb, failed in CI with
+    `FileNotFoundError: '/docker/Dockerfile.runner'`. A test about things missing
+    from an image, undone by something missing from an image.
+    """
+    here = pathlib.Path(__file__).resolve()
+    for cand in here.parents:
+        if (cand / "docker" / "Dockerfile.runner").is_file():
+            return cand
+    raise AssertionError(
+        "docker/Dockerfile.runner not found above "
+        f"{here} — if the test image stopped copying `docker/`, this test cannot "
+        "run and must be skipped rather than silently passing"
+    )
+
+
+ROOT = _root()
+#: `services/terrapod/runner` in a checkout, `terrapod/runner` in the image.
+RUNNER = next(
+    p
+    for p in (ROOT / "services" / "terrapod" / "runner", ROOT / "terrapod" / "runner")
+    if p.is_dir()
+)
 DOCKERFILE = ROOT / "docker" / "Dockerfile.runner"
 TILTFILE = ROOT / "Tiltfile"
 
@@ -109,7 +140,14 @@ def test_every_module_the_job_imports_is_in_the_runner_image() -> None:
 
 
 def test_the_tiltfile_deps_match_the_dockerfile() -> None:
-    """Otherwise a local change to the module never rebuilds the image."""
+    """Otherwise a local change to the module never rebuilds the image.
+
+    Skipped in the test image, which does not copy the `Tiltfile` — it is a local
+    development concern. It runs in a checkout, which is where someone adds a
+    runner module in the first place.
+    """
+    if not TILTFILE.is_file():
+        pytest.skip("Tiltfile is not shipped in the test image")
     dockerfile = DOCKERFILE.read_text()
     tiltfile = TILTFILE.read_text()
     copied = {

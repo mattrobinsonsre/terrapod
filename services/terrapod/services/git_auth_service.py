@@ -77,7 +77,7 @@ _GITLAB_REFUSAL = (
 )
 
 
-async def resolve_git_auth(db: AsyncSession, resolved: list) -> list[dict]:
+async def resolve_git_auth(db: AsyncSession, resolved: list, *, workspace=None) -> list[dict]:
     """Resolve the git-category resolved variables into concrete delivery entries.
 
     ``resolved`` is the full list of ``ResolvedVariable`` from
@@ -107,7 +107,11 @@ async def resolve_git_auth(db: AsyncSession, resolved: list) -> list[dict]:
         source = cred.get("source", "static")
         if source == "vcs_connection":
             concrete = await _mint_from_connection(
-                db, cred.get("vcs_connection_id"), rewrite, key=v.key
+                db,
+                cred.get("vcs_connection_id"),
+                rewrite,
+                key=v.key,
+                workspace=workspace,
             )
             if concrete is None:
                 continue  # already logged
@@ -124,7 +128,9 @@ async def resolve_git_auth(db: AsyncSession, resolved: list) -> list[dict]:
     return out
 
 
-async def _mint_from_connection(db: AsyncSession, ref, rewrite: str, *, key: str) -> dict | None:
+async def _mint_from_connection(
+    db: AsyncSession, ref, rewrite: str, *, key: str, workspace=None
+) -> dict | None:
     """Mint a concrete ``{username, token, rewrite}`` from a VCS connection, or
     ``None`` (logged) if it can't be resolved.
 
@@ -143,6 +149,32 @@ async def _mint_from_connection(db: AsyncSession, ref, rewrite: str, *, key: str
     if conn is None:
         logger.warning("git-auth references an unknown VCS connection", ref=str(ref))
         return None
+    # GHSA-v8g7-pqrj-8mcm, the run-time half. A variable value names the
+    # connection, so a workspace owner could mint a credential from ANY connection
+    # — the create/PATCH gate does not cover this path, because nothing here came
+    # through a workspace field. Authorised against the workspace's OWNER, since
+    # there is no live caller at run time: the connection the workspace itself
+    # uses is always allowed, and anything else must be one its owner could have
+    # named. REFUSED rather than dropped, for the reason the GitLab gate below
+    # gives — a silently absent credential spends the operator's attention on an
+    # `init` failure that names neither the credential nor the cause.
+    if workspace is not None and conn_uuid != getattr(workspace, "vcs_connection_id", None):
+        from terrapod.services.vcs_connection_rbac import may_reference_connection
+
+        if not await may_reference_connection(
+            db,
+            conn_id=conn_uuid,
+            actor_email=getattr(workspace, "owner_email", "") or "",
+            is_platform_admin=False,
+        ):
+            raise GitAuthRefused(
+                f"git credential {key!r} references VCS connection vcs-{conn_uuid}, "
+                "which this workspace is not authorized to use. A VCS connection "
+                "reaches every repository its credential can reach, so naming one "
+                "grants that access. Use the connection this workspace is "
+                "configured with, or a `static` git_http_auth credential holding a "
+                "token you scoped yourself."
+            )
     # Checked BEFORE the try below, which turns every exception into a drop. A
     # refusal that fell into it would be indistinguishable from a mint failure
     # and the run would carry on without the credential, which is the behaviour

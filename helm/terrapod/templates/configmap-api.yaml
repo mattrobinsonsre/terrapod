@@ -397,6 +397,11 @@ data:
     {{- end }}
     {{- if .Values.api.config.vcs }}
     vcs:
+      # Rendered unconditionally via `dig`, for the reason the gitlab key below
+      # gives: the answer belongs in the pod's config either way. `dig` returns a
+      # stored false rather than treating it as empty, so an operator turning this
+      # off is not silently overruled.
+      require_connection_authorization: {{ dig "require_connection_authorization" true .Values.api.config.vcs }}
       enabled: {{ .Values.api.config.vcs.enabled }}
       poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 }}
       module_poll_interval_seconds: {{ .Values.api.config.vcs.module_poll_interval_seconds | default 300 }}
