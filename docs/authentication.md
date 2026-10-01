@@ -205,6 +205,36 @@ When a user logs in via OIDC, roles are resolved from three sources (merged and 
 
 1. **IDP groups** -- group names from the `groups_claim`, with `role_prefixes` stripped. For example, if the IDP returns `terrapod:developer` and the prefix is `terrapod:`, the role `developer` is assigned.
 
+   > **Read this before pointing Terrapod at a directory you do not fully control.**
+   >
+   > **Every group becomes a role name. There is no allow-list.** A group the IDP
+   > returns is a role name Terrapod will look for — so a group named literally
+   > `admin` grants the built-in **platform admin** role, and one named `audit`
+   > grants read access to every workspace. Neither needs any Terrapod-side
+   > configuration, and neither leaves a role assignment behind to notice.
+   >
+   > **`role_prefixes` strips; it does not filter.** The name reads like a scope
+   > and is not one. A group that matches a prefix has it removed; a group that
+   > matches **no** prefix is passed through **unchanged**. So configuring
+   > `role_prefixes: ["terrapod-"]` does not confine role-granting to
+   > `terrapod-*` groups — `admin` still arrives as `admin`. The default is
+   > `["terrapod:", "terrapod-"]`, so this applies to every deployment that has
+   > not changed it.
+   >
+   > **SAML does not apply `role_prefixes` at all.** The setting exists on a SAML
+   > provider and nothing reads it, so a SAML group arrives at role resolution
+   > with its prefix intact: `terrapod-admin` is looked up as the role
+   > `terrapod-admin`, which matches no built-in role and usually nothing at all.
+   > The practical effect is that a prefixed SAML group grants nothing while an
+   > unprefixed one named `admin` grants everything.
+   >
+   > **What to do today.** Treat the IDP group list as a grant list: if your
+   > directory contains a group named `admin` or `audit` for any other purpose,
+   > whoever is in it becomes a Terrapod platform admin or auditor at their next
+   > login. Either rename those groups, or stop returning them in the
+   > `groups_claim` — most IDPs can scope which groups are released per
+   > application, and that scoping is the only real filter available.
+
 2. **Claims-to-roles mapping** -- explicit rules in the config. Each rule matches a claim name + value and assigns specific roles.
 
 3. **Internal role assignments** -- roles assigned via the `role_assignments` table (managed through the admin API or UI).
