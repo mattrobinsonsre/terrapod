@@ -1710,6 +1710,21 @@
                         "items": {
                           "type": "object"
                         }
+                      },
+                      "validate_destination": {
+                        "type": "boolean"
+                      },
+                      "validate_in_response_to": {
+                        "type": "boolean"
+                      },
+                      "reject_replayed_assertions": {
+                        "type": "boolean"
+                      },
+                      "want_assertions_signed": {
+                        "type": "boolean"
+                      },
+                      "reject_deprecated_algorithm": {
+                        "type": "boolean"
                       }
                     }
                   }
