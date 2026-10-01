@@ -179,3 +179,46 @@ func TestNormaliseAddress(t *testing.T) {
 		})
 	}
 }
+
+// The two halves of a migration were asymmetric: go-terrapod refuses an http://
+// base URL unless TERRAPOD_ALLOW_INSECURE_TRANSPORT=1, because the bearer would
+// cross the network in the clear, while this client accepted http:// silently
+// and carried a TFE API token the same way. One credential in the command was
+// protected and the other was not.
+func TestAnHTTPTFEAddressIsRefusedUnlessAccepted(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		addr          string
+		allowInsecure bool
+		wantErr       bool
+	}{
+		{"plain http is refused", "http://tfe.example.com", false, true},
+		{"https is fine", "https://tfe.example.com", false, false},
+		{"the opt-out is honoured", "http://tfe.example.com", true, false},
+		{"loopback is exempt", "http://localhost:8080", false, false},
+		{"loopback by address is exempt", "http://127.0.0.1:8080", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkTFEAddressTransport(tc.addr, tc.allowInsecure)
+			if tc.wantErr && err == nil {
+				t.Fatalf("%s was accepted; the TFE token would cross in the clear", tc.addr)
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("%s was refused: %v", tc.addr, err)
+			}
+		})
+	}
+}
+
+// The message has to name the way out, and the SAME way out the Terrapod side
+// already uses — meeting two different variables for one rule is the thing this
+// symmetry exists to avoid.
+func TestTheRefusalNamesTheSharedEscapeHatch(t *testing.T) {
+	err := checkTFEAddressTransport("http://tfe.example.com", false)
+	if err == nil {
+		t.Fatal("expected a refusal")
+	}
+	if !strings.Contains(err.Error(), "TERRAPOD_ALLOW_INSECURE_TRANSPORT") {
+		t.Errorf("the refusal does not say how to accept the risk: %v", err)
+	}
+}

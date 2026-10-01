@@ -37,6 +37,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/hashicorp/go-tfe"
@@ -138,6 +139,11 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		return nil, ErrMissingOrg
 	}
 	addr := normaliseAddress(cfg.Address)
+	if err := checkTFEAddressTransport(
+		addr, os.Getenv("TERRAPOD_ALLOW_INSECURE_TRANSPORT") == "1",
+	); err != nil {
+		return nil, err
+	}
 
 	api, err := tfe.NewClient(&tfe.Config{
 		Address: addr,
@@ -198,6 +204,38 @@ func probeTokenTier(ctx context.Context, api *tfe.Client, orgName string) (Token
 	// false-positive (thinking we can read sensitive values when we
 	// can't) is silent data loss, which isn't.
 	return TokenTierWorker, nil
+}
+
+// errInsecureTFEAddress explains the refusal and how to accept the risk.
+//
+// The two halves of a migration were asymmetric: go-terrapod refuses an http://
+// base URL unless `TERRAPOD_ALLOW_INSECURE_TRANSPORT=1`, because the bearer
+// would cross the network in the clear — and this client, carrying a TFE API
+// token that is every bit as long-lived and as privileged, accepted http://
+// silently. One credential was protected and the other was not, in the same
+// command, for no stated reason.
+//
+// Same shape as the SDK's gate on purpose, including the loopback exemption and
+// the environment-variable escape hatch, so an operator meets one rule rather
+// than two.
+func checkTFEAddressTransport(addr string, allowInsecure bool) error {
+	if !strings.HasPrefix(addr, "http://") || allowInsecure {
+		return nil
+	}
+	host := addr[len("http://"):]
+	if i := strings.IndexAny(host, "/:"); i >= 0 {
+		host = host[:i]
+	}
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return nil
+	}
+	return fmt.Errorf(
+		"TFE address %q uses http:// — your TFE API token would cross the network "+
+			"in the clear. Use https://, or set TERRAPOD_ALLOW_INSECURE_TRANSPORT=1 "+
+			"to accept that risk deliberately (the same variable the Terrapod side "+
+			"of the migration already honours)",
+		addr,
+	)
 }
 
 // normaliseAddress trims trailing slashes and adds the https:// scheme
