@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { setAuth } from '@/lib/auth'
 import { STORAGE_AUTH_STATE, STORAGE_PKCE_VERIFIER, STORAGE_REDIRECT_AFTER_LOGIN } from '@/lib/constants'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 
 // A callback error is either a translatable error key (resolved at render via
 // useTranslations) or a verbatim message the IDP returned (error_description) —
@@ -80,7 +81,10 @@ export default function CallbackHandler() {
         setAuth(data.session_token, data.email, data.roles, data.expires_at)
         sessionStorage.removeItem(STORAGE_PKCE_VERIFIER)
         sessionStorage.removeItem(STORAGE_AUTH_STATE)
-        const redirect = sessionStorage.getItem(STORAGE_REDIRECT_AFTER_LOGIN)
+        // Re-checked on the way out as well as on the way in (login/page.tsx
+        // validates before storing), so an entry written by anything other than
+        // that page cannot steer this navigation off-origin.
+        const redirect = safeRedirectPath(sessionStorage.getItem(STORAGE_REDIRECT_AFTER_LOGIN))
         sessionStorage.removeItem(STORAGE_REDIRECT_AFTER_LOGIN)
         if (redirect) {
           window.location.href = redirect
