@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from terrapod.services import rbac_service as rbac_service_module
 from terrapod.services import vcs_connection_rbac as rbac
 
 
@@ -399,3 +400,180 @@ class TestTheNarrowedTokenIsNarrowedAtEveryCallSite:
                 f"{rel} no longer mints an installation token — if the call moved, "
                 "this guard is pointed at the wrong file"
             )
+
+
+class TestTheOwnerAndLabelClaims:
+    """The 1.9.0 half (`option b`). v1.8.2 could only ask "do you already own a
+    workspace on it", which worked and forced the FIRST workspace on any connection
+    to be created by an admin. These are the two claims that remove that.
+    """
+
+    def _conn(self, *, owner="", labels=None, allowed=None):
+        c = MagicMock()
+        c.id = uuid.uuid4()
+        c.name = "prod-github"
+        c.owner_email = owner
+        c.labels = labels or {}
+        c.allowed_repositories = allowed or []
+        return c
+
+    def _db_with(self, conn, *, owns_workspace=False):
+        """`db.get` answers the primary-key load of the connection; `db.execute`
+        answers the workspace-ownership probe.
+
+        Split the way the code splits, so a change from one to the other shows up
+        here rather than silently falling through to "no claim".
+        """
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=conn)
+
+        async def execute(stmt, *a, **kw):
+            result = MagicMock()
+            result.first.return_value = (uuid.uuid4(),) if owns_workspace else None
+            return result
+
+        db.execute = AsyncMock(side_effect=execute)
+        return db
+
+    async def test_the_connections_owner_may_name_it(self):
+        conn = self._conn(owner="owner@x")
+        assert await rbac.may_reference_connection(
+            self._db_with(conn),
+            conn_id=conn.id,
+            actor_email="owner@x",
+            is_platform_admin=False,
+        )
+
+    async def test_an_empty_owner_does_not_match_an_empty_actor(self):
+        """`owner_email` defaults to empty on every row the migration adds, so
+        `'' == ''` would hand every pre-existing connection to any caller."""
+        conn = self._conn(owner="")
+        assert not await rbac.may_reference_connection(
+            self._db_with(conn), conn_id=conn.id, actor_email="", is_platform_admin=False
+        )
+
+    async def test_a_role_reaching_the_label_may_name_it(self, monkeypatch):
+        conn = self._conn(labels={"team": "platform"})
+        seen = {}
+
+        async def fake_check(db, email, name, labels, roles):
+            seen.update(email=email, name=name, labels=labels, roles=roles)
+            return True
+
+        monkeypatch.setattr(rbac_service_module, "check_access", fake_check)
+        assert await rbac.may_reference_connection(
+            self._db_with(conn),
+            conn_id=conn.id,
+            actor_email="a@x",
+            is_platform_admin=False,
+            actor_roles=["platform-team"],
+        )
+        # It must be asked about the CONNECTION's labels, not the workspace's.
+        assert seen["labels"] == {"team": "platform"}
+        assert seen["roles"] == ["platform-team"]
+
+    async def test_no_roles_means_no_label_claim_rather_than_every_label(self):
+        """The caller with no live principal — the run-time credential mint — passes
+        no roles. If a missing argument widened access, the fix would reintroduce
+        the finding it closes.
+        """
+        conn = self._conn(labels={"team": "platform"})
+        assert not await rbac.may_reference_connection(
+            self._db_with(conn), conn_id=conn.id, actor_email="a@x", is_platform_admin=False
+        )
+
+    async def test_the_workspace_ownership_path_still_grants(self):
+        """Kept from v1.8.2 deliberately: removing it would break every deployment
+        that upgraded onto it."""
+        conn = self._conn()
+        assert await rbac.may_reference_connection(
+            self._db_with(conn, owns_workspace=True),
+            conn_id=conn.id,
+            actor_email="a@x",
+            is_platform_admin=False,
+        )
+
+    async def test_a_connection_that_does_not_exist_is_not_a_claim(self):
+        assert not await rbac.may_reference_connection(
+            self._db_with(None), conn_id=uuid.uuid4(), actor_email="a@x", is_platform_admin=False
+        )
+
+
+class TestTheRepositoryAllowlist:
+    """The residual hole after any amount of per-connection RBAC: being entitled to
+    the connection says nothing about which repository it may be pointed at.
+    """
+
+    def _conn(self, allowed):
+        c = MagicMock()
+        c.allowed_repositories = allowed
+        return c
+
+    def test_empty_means_any_so_an_upgrade_changes_nothing(self):
+        assert rbac.repository_allowed(self._conn([]), "https://github.com/anyone/anything")
+
+    def test_a_pattern_matches_the_owner_slash_name_form(self):
+        """An operator writes `myorg/*`, not the full URL with a `.git` suffix.
+        Matching only the URL would make the feature unusable and so unused."""
+        c = self._conn(["myorg/*"])
+        assert rbac.repository_allowed(c, "https://github.com/myorg/service.git")
+        assert rbac.repository_allowed(c, "git@github.com:myorg/service.git")
+        assert not rbac.repository_allowed(c, "https://github.com/other/service.git")
+
+    def test_a_pattern_may_also_be_written_against_the_full_url(self):
+        c = self._conn(["https://github.com/myorg/*"])
+        assert rbac.repository_allowed(c, "https://github.com/myorg/service")
+        assert not rbac.repository_allowed(c, "https://github.com/myorg2/service")
+
+    def test_a_narrowed_connection_refuses_a_blank_target(self):
+        """Failing closed costs nothing — every caller has a URL by the time it
+        asks — and failing open would let a blank URL slip past a restriction."""
+        assert not rbac.repository_allowed(self._conn(["myorg/*"]), "")
+
+    def test_a_blank_pattern_does_not_match_everything(self):
+        """A stray empty string in the list would otherwise turn a restriction into
+        `fnmatch(x, "")`, and worse, read as a configured allowlist."""
+        assert not rbac.repository_allowed(self._conn([""]), "https://github.com/a/b")
+
+    def test_no_connection_is_not_permission(self):
+        assert not rbac.repository_allowed(None, "https://github.com/a/b")
+
+
+class TestBothSinksAreGuarded:
+    """The connection gate stops an unentitled workspace existing. The allowlist has
+    to be checked where the repository is actually READ, and the finding named both
+    sinks: the refs endpoint is a private-repository oracle at workspace-read, and
+    the config fetch is where the source arrives.
+    """
+
+    def test_the_refs_endpoint_checks_it(self):
+        import inspect
+
+        from terrapod.api.routers import workspace_extensions
+
+        src = inspect.getsource(workspace_extensions)
+        assert "repository_allowed(" in src, (
+            "the refs endpoint does not check the allowlist, so it remains an "
+            "oracle for any repository the credential can reach"
+        )
+
+    def test_the_config_fetch_checks_it(self):
+        import inspect
+
+        from terrapod.services import vcs_config_service
+
+        src = inspect.getsource(vcs_config_service)
+        assert "repository_allowed(" in src, (
+            "the fetch path does not check the allowlist, so the poller and a run "
+            "trigger would keep cloning a repository an operator has excluded"
+        )
+
+    def test_create_and_patch_both_enforce_it(self):
+        import inspect
+
+        from terrapod.api.routers import tfe_v2
+
+        src = inspect.getsource(tfe_v2)
+        assert src.count("_enforce_repository_allowlist(") >= 2, (
+            "only one of workspace create / PATCH enforces the allowlist"
+        )

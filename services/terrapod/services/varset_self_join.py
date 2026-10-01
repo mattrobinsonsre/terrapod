@@ -40,6 +40,56 @@ from terrapod.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+#: PATCH body attribute keys that can change whether an assignment rule matches.
+#: Keyed to `WorkspaceFilter`'s dimensions, and `test_every_filter_dimension_is_
+#: classified` fails if that model grows one nothing here accounts for — so the
+#: set cannot silently stop covering a dimension, which is the way a guard like
+#: this rots.
+RULE_SELECTABLE_ATTRS: frozenset[str] = frozenset(
+    {
+        "labels",
+        "name",
+        "execution-backend",
+        "execution-mode",
+        "terraform-version",
+        "engine-version",
+        "agent-pool-id",
+        "agent-pool-ids",
+        "vcs-connection-id",
+        "vcs-repo-url",
+        "owner-email",
+    }
+)
+
+#: `WorkspaceFilter` dimensions that no PATCH attribute can move, with the reason.
+#: An entry here is a claim that the dimension cannot be self-assigned, which is
+#: the only basis on which it is safe to leave out of the check above.
+FILTER_DIMENSIONS_NOT_PATCHABLE: dict[str, str] = {
+    "workspace_ids": "the id is assigned at create and immutable",
+    "drift_status": "written by the drift checker, not by a request",
+    "locked": "moved by the lock/unlock endpoints, which take no attributes",
+    "has_vcs": "derived from vcs-connection-id and vcs-repo-url, both watched above",
+    "name_prefix": "selects on `name`, which is watched above",
+    "name_glob": "selects on `name`, which is watched above",
+    "all": "not a workspace attribute — it is the filter's explicit select-everything flag",
+}
+
+
+def touches_rule_selectable(attrs: dict, relationships: dict | None = None) -> bool:
+    """Whether this request body could change which assignment rules match.
+
+    The point is to avoid three queries on every workspace PATCH that cannot
+    possibly move the answer — a rename of an unrelated field, a description edit,
+    a notification toggle. It fails OPEN: anything unrecognised counts as touching,
+    so a new attribute is covered before anyone remembers to classify it.
+    """
+    if any(k in attrs for k in RULE_SELECTABLE_ATTRS):
+        return True
+    # The connection also arrives as a relationship, and gating on the attribute
+    # spelling alone is how the PATCH gate was got wrong once already.
+    return bool(relationships and "vcs-connection" in relationships)
+
+
 async def rule_assigned_varset_ids(db: AsyncSession, workspace_id: uuid.UUID) -> set[uuid.UUID]:
     """The variable sets reaching this workspace *by assignment rule*.
 

@@ -1122,6 +1122,32 @@ async def _resolve_pool_set_attrs(
     return requested
 
 
+async def _enforce_repository_allowlist(db, *, conn_id, repo_url: str) -> None:
+    """403 if this connection may not be pointed at this repository.
+
+    GHSA-v8g7-pqrj-8mcm's second half. Separate from the connection gate because
+    the two have different remedies: "you may not use this connection" is a claim
+    problem and "this connection may not go there" is a scoping one, and collapsing
+    them sends the operator to ask for the wrong thing.
+    """
+    from terrapod.db.models import VCSConnection as _VCSConnection
+    from terrapod.services.vcs_connection_rbac import (
+        repository_allowed,
+        repository_refusal_detail,
+    )
+
+    conn = await db.get(_VCSConnection, conn_id)
+    if conn is None:
+        return  # the caller's own existence check reports this
+    if not repository_allowed(conn, repo_url):
+        raise HTTPException(
+            status_code=403,
+            detail=repository_refusal_detail(
+                conn_id, repo_url, list(conn.allowed_repositories or [])
+            ),
+        )
+
+
 @router.post("/organizations/default/workspaces")
 async def create_workspace(
     body: dict = Body(...),
@@ -1181,8 +1207,17 @@ async def create_workspace(
             conn_id=vcs_connection_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
+            actor_roles=sorted(effective_platform_roles(user)),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(vcs_connection_id))
+
+        # The residual half of the same finding: being entitled to the connection
+        # says nothing about WHICH repository it may be pointed at, and the URL is
+        # just a string on the workspace. An empty allowlist means any, so this is
+        # inert until an operator narrows a connection.
+        await _enforce_repository_allowlist(
+            db, conn_id=vcs_connection_id, repo_url=attrs.get("vcs-repo-url", "")
+        )
 
     from terrapod.config import settings
 
@@ -1649,9 +1684,20 @@ async def update_workspace(
     # GHSA-49q6-pm68-3xgw. Snapshotted BEFORE any attribute moves, because an
     # assignment rule selects on the very attributes this PATCH may change, so the
     # comparison has to straddle the whole edit rather than one field of it.
-    from terrapod.services.varset_self_join import rule_assigned_varset_ids
+    #
+    # Skipped entirely when the body cannot move the answer — a description edit, a
+    # notification toggle — because this costs three queries and a workspace PATCH
+    # should not pay them to learn nothing. `touches_rule_selectable` fails OPEN, so
+    # an attribute nobody has classified counts as touching.
+    from terrapod.services.varset_self_join import (
+        rule_assigned_varset_ids,
+        touches_rule_selectable,
+    )
 
-    _varsets_before_patch = await rule_assigned_varset_ids(db, ws.id)
+    _patch_attrs = body.get("data", {}).get("attributes", {}) or {}
+    _patch_rels = body.get("data", {}).get("relationships", {}) or {}
+    _varsets_checked = touches_rule_selectable(_patch_attrs, _patch_rels)
+    _varsets_before_patch = await rule_assigned_varset_ids(db, ws.id) if _varsets_checked else set()
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -1998,26 +2044,37 @@ async def update_workspace(
             conn_id=ws.vcs_connection_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
+            actor_roles=sorted(effective_platform_roles(user)),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(ws.vcs_connection_id))
+
+    # Re-checked on every PATCH that leaves a connection attached, not only when the
+    # connection itself changes: the repo URL is separately settable, so an entitled
+    # owner could otherwise repoint an allowlisted connection at anything its
+    # credential can read without the connection gate ever firing.
+    if ws.vcs_connection_id is not None:
+        await _enforce_repository_allowlist(
+            db, conn_id=ws.vcs_connection_id, repo_url=ws.vcs_repo_url or ""
+        )
 
     # GHSA-49q6-pm68-3xgw, the edit path. `_varsets_before_patch` was taken before
     # any attribute moved; growing the set of rule-assigned variable sets reaching
     # this workspace is the escalation, shrinking it is a de-escalation and allowed.
     from terrapod.services.varset_self_join import refuse_varset_growth
 
-    await db.flush()
-    try:
-        await refuse_varset_growth(
-            db,
-            workspace_id=ws.id,
-            before=_varsets_before_patch,
-            is_platform_admin="admin" in effective_platform_roles(user),
-            actor_email=user.email,
-        )
-    except Exception:
-        await db.rollback()
-        raise
+    if _varsets_checked:
+        await db.flush()
+        try:
+            await refuse_varset_growth(
+                db,
+                workspace_id=ws.id,
+                before=_varsets_before_patch,
+                is_platform_admin="admin" in effective_platform_roles(user),
+                actor_email=user.email,
+            )
+        except Exception:
+            await db.rollback()
+            raise
 
     await db.commit()
     await db.refresh(ws)

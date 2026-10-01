@@ -63,6 +63,14 @@ def _mock_conn(
     c.github_account_type = github_account_type
     c.status = status
     c.webhook_secret = webhook_secret
+    # GHSA-v8g7-pqrj-8mcm added three columns the serializer reads. Set here
+    # rather than per-test: a MagicMock left to invent them returns a Mock, which
+    # is not JSON serialisable, so every response assertion in this file would fail
+    # on a detail unrelated to what it tests. Values match the migration's server
+    # defaults, which is what a pre-existing row actually holds.
+    c.owner_email = ""
+    c.labels = {}
+    c.allowed_repositories = []
     c.created_at = datetime(2026, 5, 9, tzinfo=UTC)
     c.updated_at = datetime(2026, 5, 9, tzinfo=UTC)
     return c
@@ -672,6 +680,9 @@ class TestRateLimitAttributes:
         c.github_installation_id = 2
         c.github_account_login = "org"
         c.github_account_type = "Organization"
+        c.owner_email = ""
+        c.labels = {}
+        c.allowed_repositories = []
         c.created_at = datetime.now(UTC)
         c.updated_at = datetime.now(UTC)
         return c

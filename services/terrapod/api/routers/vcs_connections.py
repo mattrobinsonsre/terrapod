@@ -125,6 +125,14 @@ def _connection_json(
     # different bases, which is how shares came to exceed 100%.
     attrs["consumers-window-total"] = getattr(consumption, "consumers_window_total", None)
 
+    # GHSA-v8g7-pqrj-8mcm. Who may point a workspace at this connection, and
+    # where it may be pointed. Serialised so the provider and the admin UI can
+    # manage them; none of the three is a secret — the credential is, and that is
+    # still write-only.
+    attrs["owner-email"] = conn.owner_email or ""
+    attrs["labels"] = conn.labels or {}
+    attrs["allowed-repositories"] = list(conn.allowed_repositories or [])
+
     return {
         "id": f"vcs-{conn.id}",
         "type": "vcs-connections",
@@ -135,6 +143,38 @@ def _connection_json(
             },
         },
     }
+
+
+def _rbac_attrs(attrs: dict) -> tuple[str, dict, list]:
+    """Parse and validate `owner-email`, `labels` and `allowed-repositories`.
+
+    GHSA-v8g7-pqrj-8mcm. Shared by create and update so the two cannot drift —
+    they have drifted before, and the shape of that bug is a reserved label
+    accepted on create and then rejected on every subsequent edit, leaving the
+    entity uneditable.
+    """
+    from terrapod.services.label_validation import validate_labels
+
+    owner_email = (attrs.get("owner-email") or "").strip()[:255]
+
+    labels = attrs.get("labels")
+    if labels is None:
+        labels = {}
+    if not isinstance(labels, dict):
+        raise HTTPException(status_code=422, detail="labels must be an object")
+    validate_labels(labels)
+
+    repos = attrs.get("allowed-repositories")
+    if repos is None:
+        repos = []
+    if not isinstance(repos, list) or not all(isinstance(r, str) for r in repos):
+        raise HTTPException(
+            status_code=422, detail="allowed-repositories must be a list of strings"
+        )
+    # A blank pattern would match nothing while looking like a restriction, which
+    # reads as the allowlist being broken rather than empty.
+    cleaned = [r.strip() for r in repos if r and r.strip()]
+    return owner_email, labels, cleaned
 
 
 async def _list_connections(db: AsyncSession) -> list[VCSConnection]:
@@ -236,12 +276,21 @@ async def create_connection(
     # whitespace-only value is treated as unset rather than stored verbatim.
     webhook_secret = (attrs.get("webhook-secret") or "").strip()
 
+    # GHSA-v8g7-pqrj-8mcm. Labels go through the same chokepoint every labelled
+    # entity uses, at CREATE as well as update: a create path that skips it lets a
+    # reserved key in, and the update path's re-validation then traps the entity so
+    # it cannot be edited at all (#316).
+    owner_email, conn_labels, allowed_repos = _rbac_attrs(attrs)
+
     conn = VCSConnection(
         id=generate_uuid7(),
         provider=provider,
         name=name,
         server_url=attrs.get("server-url", ""),
         token=token_value,
+        owner_email=owner_email,
+        labels=conn_labels,
+        allowed_repositories=allowed_repos,
         # GitHub-specific
         github_app_id=int(attrs.get("github-app-id", 0)),
         github_installation_id=int(attrs.get("github-installation-id", 0)),
@@ -336,6 +385,29 @@ async def update_connection(
         if status not in ("active", "disabled"):
             raise HTTPException(status_code=422, detail="status must be 'active' or 'disabled'")
         conn.status = status
+
+    # GHSA-v8g7-pqrj-8mcm. Partial update: each is applied only when its key is
+    # PRESENT, so omitting one leaves it alone, while an explicitly empty value
+    # clears it. Sending `allowed-repositories: []` has to mean "allow any
+    # repository again" — an allowlist that cannot be cleared by deleting its last
+    # entry is a trap, which is the same reasoning as the policy-set scope in
+    # #1765.
+    if any(k in attrs for k in ("owner-email", "labels", "allowed-repositories")):
+        owner_email, conn_labels, allowed_repos = _rbac_attrs(
+            {
+                "owner-email": attrs.get("owner-email", conn.owner_email),
+                "labels": attrs.get("labels", conn.labels),
+                "allowed-repositories": attrs.get(
+                    "allowed-repositories", conn.allowed_repositories
+                ),
+            }
+        )
+        if "owner-email" in attrs:
+            conn.owner_email = owner_email
+        if "labels" in attrs:
+            conn.labels = conn_labels
+        if "allowed-repositories" in attrs:
+            conn.allowed_repositories = allowed_repos
 
     if conn.provider == "github":
         if "github-app-id" in attrs:

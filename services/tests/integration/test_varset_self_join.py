@@ -222,3 +222,64 @@ class TestTheGuardIsWiredIntoBothPaths:
         assert snap < min(writes), (
             "the snapshot is taken after an attribute has already been applied"
         )
+
+
+class TestTheSelectableSetCannotSilentlyGoStale:
+    """The PATCH path skips its three queries when the body cannot move the answer.
+
+    That is an optimisation resting on a claim — "these attribute keys are the ones
+    an assignment rule can select on" — and a claim like that is exactly what rots:
+    `WorkspaceFilter` grows a dimension, nobody updates the set, and the guard
+    quietly stops covering it. So the classification is checked against the filter
+    model itself rather than trusted.
+    """
+
+    def test_every_filter_dimension_is_classified(self):
+        from terrapod.services.varset_self_join import (
+            FILTER_DIMENSIONS_NOT_PATCHABLE,
+            RULE_SELECTABLE_ATTRS,
+        )
+        from terrapod.services.workspace_search_service import WorkspaceFilter
+
+        # filter field -> the attribute key(s) a PATCH would use
+        mapping = {
+            "labels": "labels",
+            "execution_backend": "execution-backend",
+            "execution_mode": "execution-mode",
+            "terraform_version": "terraform-version",
+            "agent_pool_id": "agent-pool-id",
+            "vcs_connection_id": "vcs-connection-id",
+            "owner_email": "owner-email",
+        }
+        unclassified = []
+        for field in WorkspaceFilter.model_fields:
+            if field in FILTER_DIMENSIONS_NOT_PATCHABLE:
+                continue
+            key = mapping.get(field)
+            if key is None or key not in RULE_SELECTABLE_ATTRS:
+                unclassified.append(field)
+        assert not unclassified, (
+            "WorkspaceFilter has dimension(s) that are neither watched by "
+            "RULE_SELECTABLE_ATTRS nor declared unreachable in "
+            f"FILTER_DIMENSIONS_NOT_PATCHABLE: {unclassified}. A PATCH touching one "
+            "would skip the self-join check entirely."
+        )
+
+    def test_it_fails_open_on_an_attribute_nobody_classified(self):
+        """Being wrong in the safe direction is the whole reason the optimisation is
+        acceptable. An unrecognised key must still trigger the check."""
+        from terrapod.services.varset_self_join import touches_rule_selectable
+
+        assert touches_rule_selectable({"labels": {}})
+        assert touches_rule_selectable({}, {"vcs-connection": {"data": None}})
+        # and a body that genuinely cannot move it does not pay for the queries
+        assert not touches_rule_selectable({"description": "x", "auto-apply": True})
+
+    def test_the_connection_relationship_spelling_counts_too(self):
+        """The connection arrives as a relationship as well as an attribute, and
+        gating on the attribute alone is how the PATCH gate was got wrong once."""
+        from terrapod.services.varset_self_join import touches_rule_selectable
+
+        assert touches_rule_selectable(
+            {}, {"vcs-connection": {"data": {"id": "vcs-x", "type": "vcs-connections"}}}
+        )

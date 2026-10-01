@@ -380,6 +380,7 @@ async def create_module_endpoint(
             conn_id=conn_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
+            actor_roles=sorted(effective_platform_roles(user)),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
         module.vcs_connection_id = conn_id
@@ -657,6 +658,7 @@ async def update_module_endpoint(
                 conn_id=conn_id,
                 actor_email=user.email,
                 is_platform_admin="admin" in effective_platform_roles(user),
+                actor_roles=sorted(effective_platform_roles(user)),
             ):
                 raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
             module.vcs_connection_id = conn_id
@@ -952,6 +954,7 @@ async def update_module_vcs_endpoint(
             conn_id=conn_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
+            actor_roles=sorted(effective_platform_roles(user)),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
         module.vcs_connection_id = conn_id

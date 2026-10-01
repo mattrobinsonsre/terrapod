@@ -1174,6 +1174,24 @@ class VCSConnection(Base):
     # encryption envelope never overflows it. App-encrypted at rest when enabled.
     webhook_secret: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
 
+    # GHSA-v8g7-pqrj-8mcm. A connection reaches every repository its credential
+    # can reach, and its id is serialised to anyone with read on a workspace using
+    # it — so the id is discoverable by design and naming one is a grant, not a
+    # reference. v1.8.2 closed the worst of it by requiring the caller to already
+    # own a workspace on the connection, which has a deliberate consequence: the
+    # FIRST workspace on a connection has to be created by an admin. These two
+    # columns are the general answer, so a connection can be delegated to a team
+    # the same way every other labelled resource is.
+    owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    labels: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    # The residual hole after per-connection RBAC: an entitled caller could still
+    # point the connection at ANY repository its credential can read. A non-empty
+    # list restricts it to these patterns (fnmatch against the repo URL and against
+    # `owner/name`); empty keeps today's behaviour of any reachable repository, so
+    # an existing deployment is unchanged until an operator narrows it.
+    allowed_repositories: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="active"
     )  # active, suspended, removed

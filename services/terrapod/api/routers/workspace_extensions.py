@@ -112,6 +112,25 @@ async def list_vcs_refs(
     if not conn or conn.status != "active":
         raise HTTPException(status_code=422, detail="VCS connection is not active")
 
+    # GHSA-v8g7-pqrj-8mcm named this endpoint specifically: it answers "which
+    # branches and tags does this repository have" at workspace-READ, which makes it
+    # a private-repository oracle for anything the connection's credential can
+    # reach. The connection gate on create and PATCH is what stops an unentitled
+    # workspace existing; this is what stops an allowlisted connection being read
+    # through for a repository it is not scoped to.
+    from terrapod.services.vcs_connection_rbac import (
+        repository_allowed,
+        repository_refusal_detail,
+    )
+
+    if not repository_allowed(conn, ws.vcs_repo_url):
+        raise HTTPException(
+            status_code=403,
+            detail=repository_refusal_detail(
+                conn.id, ws.vcs_repo_url, list(conn.allowed_repositories or [])
+            ),
+        )
+
     parsed = _parse_repo_url(conn, ws.vcs_repo_url)
     if not parsed:
         raise HTTPException(status_code=422, detail="Cannot parse VCS repo URL")
