@@ -7,13 +7,15 @@ Uses python3-saml for metadata parsing and assertion validation.
 and `reject_deprecated_algorithm` — because different identity providers get
 different things wrong and relaxing one should never cost you the others.
 
-**All five currently default to `False`,** so nothing changes for an operator who
-upgrades without touching their config: that is what makes the hardening shippable
-on a patch release, and it is also why an unconfigured deployment is not protected
-by it. Turning them on is the operator's step, and
-`docs/upgrading-to-2.0.md` records flipping the defaults as 2.0 work
-(GHSA-hgx9-xwfp-5qcr). Read the default off `SAMLProviderConfig` rather than from
-here if it matters to you — a sentence in a docstring is not a gate.
+**All five default to `True` on this line**, which is the 2.0 posture
+(GHSA-hgx9-xwfp-5qcr): a deployment that configures nothing is protected, and an
+operator whose IDP cannot satisfy one check relaxes that one check rather than
+inheriting a permissive default nobody chose. The 1.x release lines default all
+five to `False`, because a patch release must not change what a running
+deployment does; `docs/upgrading-to-2.0.md` records what to check before
+upgrading. Read the default off `SAMLProviderConfig` rather than from here if it
+matters to you — a sentence in a docstring is not a gate, which is why
+`tests/auth/test_saml.py` pins each one.
 
 The thing worth understanding before touching `_request_data`: python3-saml
 decides what the assertion was *addressed to* by reconstructing the current URL
@@ -120,11 +122,12 @@ class SAMLConnector(SSOConnector):
     def _request_data(self, acs_url: str, post_data: dict[str, Any]) -> dict[str, Any]:
         """The pseudo-request python3-saml reconstructs the current URL from.
 
-        With `validate_destination` on, `http_host` and `script_name` come from
-        the real ACS URL, which is what makes the Destination and Recipient
-        comparisons mean anything. With it off we send the empty host the
-        connector has always sent, so nothing changes for a deployment that has
-        not opted in.
+        With `validate_destination` on — the default — `http_host` and
+        `script_name` come from the real ACS URL, which is what makes the
+        Destination and Recipient comparisons mean anything. With it explicitly
+        turned off we send the empty host the connector sent before the check
+        existed, so an operator who has to relax it lands exactly where the 1.x
+        release lines sit rather than somewhere new.
         """
         if not self._config.validate_destination:
             return {

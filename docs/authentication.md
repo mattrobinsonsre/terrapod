@@ -323,11 +323,15 @@ different things wrong and relaxing one should never cost you the others.
 | `want_assertions_signed` | The signature is on the assertion itself, not only on the enclosing message | Your IDP signs the message only |
 | `reject_deprecated_algorithm` | No SHA-1 signature or digest (`RSA-SHA1`, `DSA-SHA1`, `SHA1`) | Your IDP cannot yet be moved off SHA-1 |
 
-**The defaults differ by release line.** On the 2.x development line every one of
-them is `true`. On the 1.x release lines every one is `false`, preserving the
-behaviour an operator already has — a patch release must never lock someone out
-of their own deployment. The implementation is identical on both; only the
-default differs, so the setting you choose means the same thing on either.
+**The defaults differ by release line.** From 2.0 every one of them is `true`, so
+a provider that configures none of them is protected. On the 1.x release lines
+every one is `false`, preserving the behaviour an operator already has — a patch
+release must never lock someone out of their own deployment. The implementation is
+identical on both; only the default differs, so the setting you choose means the
+same thing on either.
+
+Relax one check rather than all five: each failure below is a different problem,
+and the four you keep still protect you.
 
 ```yaml
 api:
@@ -338,7 +342,8 @@ api:
           - name: azure-ad-saml
             metadata_url: "https://login.microsoftonline.com/{tenant-id}/federationmetadata/2007-06/federationmetadata.xml"
             entity_id: "https://terrapod.example.com"
-            # Explicit on a 1.x release, where the defaults are false:
+            # These five are the defaults from 2.0, spelled out. Set them
+            # explicitly on a 1.x release, where each one is false.
             validate_destination: true
             validate_in_response_to: true
             reject_replayed_assertions: true

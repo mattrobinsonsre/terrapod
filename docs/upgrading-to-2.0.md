@@ -458,27 +458,39 @@ the same reason. Compare categories with the new `SameCategory` rather than `==`
 but your own comparisons are right only until something reads from the other
 prefix.
 
-### SAML assertion checks are still opt-in, and 2.0 is where that changes
+### The five SAML assertion checks are strict by default
+
+**Affects:** every deployment using SAML. **A misconfigured provider stops being
+able to log in**, so work through the table below before you upgrade.
 
 Five per-provider SAML checks arrived with the 1.7.7 and 1.8.2 security releases
-(`GHSA-hgx9-xwfp-5qcr`): `validate_destination`, `validate_in_response_to`,
-`reject_replayed_assertions`, `want_assertions_signed` and
-`reject_deprecated_algorithm`. **All five default to `false`,** because a patch
-release must not change what a running deployment does — a destination check that
-starts rejecting assertions mid-week is an outage, not a fix.
+(`GHSA-hgx9-xwfp-5qcr`). On those lines all five default to `false`, because a
+patch release must not change what a running deployment does — a destination check
+that starts rejecting assertions mid-week is an outage, not a fix. **From 2.0 all
+five default to `true`.** The implementation is unchanged; only the default moved,
+so a provider that already sets these explicitly is unaffected.
 
-That trade does not survive into a major. Flipping these defaults to `true` is 2.0
-work and is **not yet done**; this entry exists so the gap is a stated plan rather
-than something discovered later.
+| Setting | What it starts requiring | Check this first | If your IDP cannot do it |
+|---|---|---|---|
+| `validate_destination` | the assertion's `Destination` and `Recipient` name **this** deployment's ACS URL | the ACS URL Terrapod builds is the one you registered with the IDP — the provider's own `acs_url`, else `auth.callback_base_url`, else `external_url`, plus the SAML ACS path | `validate_destination: false` |
+| `validate_in_response_to` | the assertion answers the `AuthnRequest` this login sent, and carries an `InResponseTo` at all | your IDP echoes `InResponseTo` on the `Response` element, and you do not rely on IDP-initiated sign-on | `validate_in_response_to: false` |
+| `reject_replayed_assertions` | each assertion id is used once, remembered in Redis for the rest of its validity window | Redis is reachable from every API replica (it already must be — sessions live there) | `reject_replayed_assertions: false` |
+| `want_assertions_signed` | the signature is on the assertion itself, not only on the enclosing message | your IDP signs the assertion; Azure AD, Okta and Auth0 all do by default | `want_assertions_signed: false` |
+| `reject_deprecated_algorithm` | no SHA-1 signature or digest (`RSA-SHA1`, `DSA-SHA1`, `SHA1`) | your IDP signs with SHA-256 | `reject_deprecated_algorithm: false` |
 
-**Turn them on now rather than waiting**, provided
-`auth.saml.<provider>.sp_acs_url` carries the real externally-reachable ACS URL.
-It has to: python3-saml decides what an assertion was addressed to by
-reconstructing the current URL, and an empty host makes that reconstruction the
-literal string `https://`, which every https URL starts with — so the destination
-and recipient checks run, pass, and accept an assertion minted for a different
-service provider entirely. Set the URL first, then the flags, or the checks are
-decoration.
+**The ACS URL is the one to get right**, because `validate_destination` is the
+check with a configuration prerequisite rather than an IDP prerequisite. Set
+`auth.sso.saml[].acs_url` when a proxy rewrites the path between your IDP and
+Terrapod; otherwise `auth.callback_base_url` has to be this deployment's
+externally-reachable URL. A SAML provider with no absolute ACS URL is **refused**
+rather than waved through, and the refusal names the keys to set.
+
+The quickest way to upgrade without surprises is to set all five to `true` on your
+current 1.x release, confirm a login still works, and then upgrade — at which point
+the defaults and your config agree. Relax one at a time if a login fails; each
+failure message names the check that refused it (see
+[`docs/authentication.md`](authentication.md#assertion-validation)).
+
 ### An IdP group can no longer grant `admin` or `audit`
 
 Role resolution took IdP group names verbatim, so a group called `admin` granted

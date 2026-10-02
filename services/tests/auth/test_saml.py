@@ -2,14 +2,20 @@
 
 Every assertion here is real and really signed (see `saml_fixtures`), and every
 test drives `SAMLConnector.handle_callback` end to end. That is deliberate: all
-four of the checks below live inside python3-saml's validation, so a test built
+five of the checks below live inside python3-saml's validation, so a test built
 on a mocked `OneLogin_Saml2_Auth` would pass against the unfixed connector just
 as happily as against the fixed one and prove nothing at all.
 
 Each check is pinned twice — strict refuses the bad assertion, strict still
 accepts the good one — because a check that refuses everything is not a fix.
 And each switch is pinned in both positions, because the permissive position is
-what the 1.x release lines ship and it has to keep working.
+what the 1.x release lines ship and what an incompatible IDP needs here.
+
+`_config` below sets all five explicitly, so no test in this module would notice
+a default reverting to `False`. The defaults are therefore pinned separately —
+see `TestTheAssertionChecksAreStrictByDefaultOnThisLine`, which also drives one
+foreign assertion through a provider configured the way an operator who set
+nothing gets it.
 """
 
 from __future__ import annotations
@@ -440,57 +446,90 @@ class TestTheAuthnRequestIdIsCarried:
         assert identity.email == "user@example.com"
 
 
-class TestTheAssertionChecksAreOffByDefaultOnThisReleaseLine:
-    """One implementation, two defaults — and this line is the permissive one.
+class TestTheAssertionChecksAreStrictByDefaultOnThisLine:
+    """One implementation, two defaults — and this line is the strict one.
 
-    Every check below is correct and all five are on by default from 2.0. On a
-    1.x line they default OFF, because turning them on can refuse a login that
-    works today: an IDP that signs only the message, one that does not echo
-    InResponseTo, one still on SHA-1. A patch release that locked an operator
-    out of their own deployment would be a worse outcome than the weakness it
-    closed.
+    All five are on by default here, which is the 2.0 posture
+    (GHSA-hgx9-xwfp-5qcr): a deployment that configures nothing is protected,
+    and an operator whose IDP cannot satisfy one check relaxes that one rather
+    than inheriting a permissive default nobody chose. The 1.x release lines
+    default all five OFF, because a patch release must not change what a running
+    deployment does.
 
     This is pinned rather than left to the field declarations because the
-    failure is silent and the likely cause is mechanical: the 2.x line has the
-    same five fields with `default=True`, so a blind cherry-pick flips them and
-    nothing else looks wrong until nobody can log in.
+    failure is silent in the dangerous direction: a flag that quietly reverts to
+    `False` leaves every strict-path test below still passing — each one passes
+    its own `True` explicitly — while an unconfigured deployment accepts an
+    assertion minted for somebody else's service provider. Nothing else looks
+    wrong. A carry from a 1.x branch is the likely way it happens.
     """
 
-    #: field name -> why turning it on can refuse a login that works today
-    PERMISSIVE = {
-        "validate_destination": "needs a correctly-registered ACS URL",
-        "validate_in_response_to": "an IDP may not echo InResponseTo",
-        "reject_replayed_assertions": "needs Redis reachable to record ids",
-        "want_assertions_signed": "an IDP may sign the message only",
-        "reject_deprecated_algorithm": "an IDP may still be on SHA-1",
+    #: field name -> the compatibility problem that justifies turning it off
+    STRICT = {
+        "validate_destination": "an IDP whose Destination differs from the registered URL",
+        "validate_in_response_to": "an IDP that does not echo InResponseTo",
+        "reject_replayed_assertions": "a deployment that cannot rely on Redis",
+        "want_assertions_signed": "an IDP that signs the message only",
+        "reject_deprecated_algorithm": "an IDP still on SHA-1",
     }
 
-    def test_all_five_default_to_false(self) -> None:
+    def test_all_five_default_to_true(self) -> None:
         from terrapod.config import SAMLProviderConfig
 
         provider = SAMLProviderConfig(name="p", metadata_url="https://idp.example.com/md")
-        for field, why in self.PERMISSIVE.items():
-            assert getattr(provider, field) is False, (
-                f"{field} defaults to True on this release line. Turning it on by "
-                f"default can refuse a login that works today ({why}), so it must "
-                "stay opt-in here and be strict only from 2.0."
+        for field, why in self.STRICT.items():
+            assert getattr(provider, field) is True, (
+                f"{field} defaults to False on this line. 2.0 is where these flip "
+                "to strict, so an unconfigured deployment must be protected; "
+                f"relaxing it is the operator's deliberate step for {why}."
             )
 
     def test_the_set_is_exactly_the_five(self) -> None:
-        """A sixth check added on 2.x must be placed deliberately, not inherited."""
+        """A sixth check must be placed deliberately, not inherited."""
         from terrapod.config import SAMLProviderConfig
 
         bools = {n for n, f in SAMLProviderConfig.model_fields.items() if f.annotation is bool}
-        assert bools == set(self.PERMISSIVE), (
+        assert bools == set(self.STRICT), (
             "the boolean switches on SAMLProviderConfig changed. Decide this "
-            f"line's default for each and record it here: {bools ^ set(self.PERMISSIVE)}"
+            f"line's default for each and record it here: {bools ^ set(self.STRICT)}"
         )
 
-    def test_each_one_can_still_be_turned_on(self) -> None:
+    def test_each_one_can_still_be_turned_off(self) -> None:
+        """The relax path is what an incompatible IDP needs, so it has to work."""
         from terrapod.config import SAMLProviderConfig
 
-        for field in self.PERMISSIVE:
+        for field in self.STRICT:
             provider = SAMLProviderConfig(
-                name="p", metadata_url="https://idp.example.com/md", **{field: True}
+                name="p", metadata_url="https://idp.example.com/md", **{field: False}
             )
-            assert getattr(provider, field) is True
+            assert getattr(provider, field) is False
+
+    async def test_an_unconfigured_provider_refuses_a_foreign_assertion(self, idp_keys) -> None:
+        """The property the defaults exist for, driven end to end.
+
+        `_config` in this module sets all five explicitly, so every other test
+        here would pass with the defaults reverted. This one builds the provider
+        the way an operator who configured nothing gets it.
+        """
+        from terrapod.config import SAMLProviderConfig
+
+        key, cert = idp_keys
+        response, _ = saml_response(
+            key, cert, destination=OTHER_SP_ACS_URL, recipient=OTHER_SP_ACS_URL
+        )
+        connector = SAMLConnector(
+            SAMLProviderConfig(
+                name="idp",
+                metadata_url="https://idp.test/metadata",
+                entity_id=SP_ENTITY_ID,
+            )
+        )
+        connector._idp_metadata = idp_metadata(cert)
+        with pytest.raises(ValueError) as exc:
+            await _login(connector, response)
+        # The cause, not just any refusal — `validation failed` alone would keep
+        # passing if the destination check stopped running and something else
+        # refused the assertion instead.
+        message = str(exc.value)
+        assert "instead of" in message, message
+        assert OTHER_SP_ACS_URL in message, message

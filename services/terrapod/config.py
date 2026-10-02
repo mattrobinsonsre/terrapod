@@ -468,7 +468,7 @@ class SAMLProviderConfig(BaseModel):
         ),
     )
     validate_destination: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Check that an assertion's Destination and Recipient name THIS "
             "deployment's ACS URL. Without it an assertion the IDP minted for a "
@@ -476,52 +476,51 @@ class SAMLProviderConfig(BaseModel):
             "the IDP to issue one for a host they control can replay it at "
             "Terrapod and log in as that user. Needs a usable ACS URL (acs_url, "
             "auth.callback_base_url, or external_url); a login is refused rather "
-            "than waved through if none is configured. Defaults to false on this "
-            "release line, preserving the behaviour operators already have, and "
-            "to true from 2.0."
+            "than waved through if none is configured. Defaults to true from "
+            "2.0; turn it off only for an IDP whose Destination genuinely "
+            "differs from the URL you registered."
         ),
     )
     validate_in_response_to: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Require the assertion to answer the AuthnRequest this login "
             "started, by matching InResponseTo against the request id we issued. "
             "An assertion with no InResponseTo at all is refused too, which the "
-            "underlying library skips. Turn off for an IDP that does not echo "
-            "InResponseTo on the Response element. Defaults to false on this "
-            "release line, preserving existing behaviour, and to true from 2.0."
+            "underlying library skips. Defaults to true from 2.0; turn it off "
+            "for an IDP that does not echo InResponseTo on the Response "
+            "element, or for IDP-initiated sign-on."
         ),
     )
     reject_replayed_assertions: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Remember each accepted assertion id in Redis for the remainder of "
             "its validity window and refuse a second use. Shared across replicas, "
             "so a captured assertion cannot be re-presented to another pod. An "
             "IDP never issues the same assertion id twice, so there is no "
-            "legitimate login this refuses. Defaults to false on this release "
-            "line, preserving existing behaviour, and to true from 2.0."
+            "legitimate login this refuses. Defaults to true from 2.0; turning "
+            "it off trades away replay protection and buys only independence "
+            "from Redis, never IDP compatibility."
         ),
     )
     want_assertions_signed: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Require a signature on the assertion itself, not merely somewhere in "
             "the response. A response signed only at the message level leaves the "
-            "assertion the claims are read from unprotected. Turn off for an IDP "
-            "that signs the message only. Defaults to false on this release line, "
-            "preserving existing behaviour, and to true from 2.0."
+            "assertion the claims are read from unprotected. Defaults to true "
+            "from 2.0; turn it off for an IDP that signs the message only."
         ),
     )
     reject_deprecated_algorithm: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Refuse SHA-1 signature and digest algorithms (RSA-SHA1, DSA-SHA1, "
-            "SHA1). Turn off for an IDP that cannot yet be moved off SHA-1 — a "
-            "separate decision from want_assertions_signed, so neither "
+            "SHA1). A separate decision from want_assertions_signed, so neither "
             "compatibility problem costs you the other protection. Defaults to "
-            "false on this release line, preserving existing behaviour, and to "
-            "true from 2.0."
+            "true from 2.0; turn it off for an IDP that cannot yet be moved off "
+            "SHA-1."
         ),
     )
     role_prefixes: list[str] = Field(

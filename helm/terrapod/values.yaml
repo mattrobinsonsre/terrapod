@@ -321,12 +321,14 @@ api:
         #   # off SHA-1 is a different problem from one that signs only the
         #   # message, and neither should cost you the other protections.
         #   #
-        #   # ALL FIVE DEFAULT TO FALSE ON THIS RELEASE LINE, preserving the
-        #   # behaviour an operator already has — a patch release must not lock
-        #   # anyone out of their own deployment. Set the ones your IDP supports
-        #   # to true, as shown below; each is independent, so you can adopt
-        #   # them one at a time. They default to TRUE from 2.0 onward, so treat
-        #   # this block as the list to work through before upgrading.
+        #   # ALL FIVE DEFAULT TO TRUE, so a provider that sets none of them is
+        #   # protected. The 1.x release lines default all five to false, where
+        #   # a patch release must not change what a running deployment does —
+        #   # so if you are upgrading from 1.x, work through this block and
+        #   # check your IDP against each one before you upgrade. Each switch is
+        #   # independent: relax the one your IDP cannot satisfy and keep the
+        #   # other four. The failure messages in docs/authentication.md name
+        #   # which check refused a login.
         #
         #   # Check that an assertion's Destination and Recipient name THIS
         #   # deployment. Without it an assertion the IDP minted for a different
@@ -336,22 +338,23 @@ api:
         #   validate_destination: true
         #
         #   # Require the assertion to answer the authentication request this
-        #   # login actually sent. Turn off only for an IDP that does not echo
-        #   # InResponseTo on the Response element.
+        #   # login actually sent. Set false only for an IDP that does not echo
+        #   # InResponseTo on the Response element, or for IDP-initiated sign-on.
         #   validate_in_response_to: true
         #
         #   # Remember each accepted assertion in Redis for the rest of its
         #   # validity window and refuse a second use, across all API replicas.
         #   # An IDP never issues the same assertion twice, so this refuses no
-        #   # legitimate login.
+        #   # legitimate login — setting it false only buys independence from
+        #   # Redis, never IDP compatibility.
         #   reject_replayed_assertions: true
         #
         #   # Require the signature to be on the assertion itself. A response
         #   # signed only at the message level leaves the assertion the claims
-        #   # are read from unprotected. Turn off for a message-only-signing IDP.
+        #   # are read from unprotected. Set false for a message-only-signing IDP.
         #   want_assertions_signed: true
         #
-        #   # Refuse SHA-1 signature and digest algorithms. Turn off for an IDP
+        #   # Refuse SHA-1 signature and digest algorithms. Set false for an IDP
         #   # that cannot yet be moved off SHA-1.
         #   reject_deprecated_algorithm: true
 
