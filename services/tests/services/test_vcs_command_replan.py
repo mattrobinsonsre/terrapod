@@ -12,7 +12,25 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from terrapod.services import vcs_command_dispatcher
+
+
+@pytest.fixture(autouse=True)
+def same_repository_pr():
+    """These tests are about the replan mechanism, not the fork gate.
+
+    The workspace fixture below carries the production default
+    (`allow_fork_pr_plans=False`), so without this every test here would reach
+    the gate and ask a real provider whether the PR is from a fork. Pinned to
+    "same repository" rather than removed, so the gate stays on the path these
+    tests exercise and a regression that bypassed it would still show up.
+    """
+    with patch.object(
+        vcs_command_dispatcher, "_pr_is_from_fork", new=AsyncMock(return_value=False)
+    ) as m:
+        yield m
 
 
 def _ws(**kw):
@@ -22,6 +40,8 @@ def _ws(**kw):
         "vcs_connection_id": uuid.uuid4(),
         "vcs_repo_url": "https://github.com/org/repo",
         "vcs_workflow": "apply_then_merge",
+        # The production default. See `same_repository_pr` above.
+        "allow_fork_pr_plans": False,
     }
     base.update(kw)
     return SimpleNamespace(**base)
@@ -230,3 +250,68 @@ async def test_one_workspace_failing_does_not_strand_the_others():
         await vcs_command_dispatcher._route_plan(db, _sess(), [ws_a, ws_b], "octocat", "1")
 
     assert create.await_count == 2
+
+
+class TestForkPullRequestsCannotBeReplannedIntoAPlan:
+    """`terrapod plan` reaches `_create_vcs_run` directly (GHSA-gp5w-76rw-c452).
+
+    The poller's fork gate lives in `_poll_workspace_prs`, not in the create
+    itself, so this command route goes round it. A session exists only for a PR
+    that was planned once, so the reachable case is a workspace opted IN,
+    planned, then opted OUT — after which the command would keep handing a fork
+    author plans carrying the workspace's credentials, from a setting whose
+    whole claim is that it has stopped.
+    """
+
+    async def _route(self, *, from_fork, allow, db=None):
+        ws = _ws(allow_fork_pr_plans=allow)
+        live = _prior_run()
+        db = db or _db_returning([live], live)
+        created = SimpleNamespace(id=uuid.uuid4(), vcs_actor_login=None, vcs_actor_user_id=None)
+        create = AsyncMock(return_value=created)
+        reply = AsyncMock()
+        with (
+            patch.object(
+                vcs_command_dispatcher, "_pr_is_from_fork", new=AsyncMock(return_value=from_fork)
+            ),
+            patch.object(vcs_command_dispatcher, "_post_reply", new=reply),
+            patch(
+                "terrapod.services.vcs_poller._compute_paths_unions", new=AsyncMock(return_value={})
+            ),
+            patch("terrapod.services.vcs_poller._create_vcs_run", new=create),
+            patch.object(vcs_command_dispatcher.run_service, "cancel_run", new=AsyncMock()),
+        ):
+            await vcs_command_dispatcher._route_plan(db, _sess(), [ws], "someone", "u1")
+        return create, reply
+
+    async def test_a_fork_pr_is_refused_on_a_workspace_that_has_not_opted_in(self):
+        create, reply = await self._route(from_fork=True, allow=False)
+        create.assert_not_called()
+        reply.assert_awaited_once()
+
+    async def test_the_refusal_never_cancels_the_run_it_declines_to_replace(self):
+        """The loop cancels before it replaces, so refusing inside it would
+        leave the PR with no plan and no way to get one back."""
+        live = _prior_run()
+        db = _db_returning([live], live)
+        cancel = AsyncMock()
+        ws = _ws(allow_fork_pr_plans=False)
+        with (
+            patch.object(
+                vcs_command_dispatcher, "_pr_is_from_fork", new=AsyncMock(return_value=True)
+            ),
+            patch.object(vcs_command_dispatcher, "_post_reply", new=AsyncMock()),
+            patch.object(vcs_command_dispatcher.run_service, "cancel_run", new=cancel),
+        ):
+            await vcs_command_dispatcher._route_plan(db, _sess(), [ws], "someone", "u1")
+        cancel.assert_not_called()
+
+    async def test_a_fork_pr_replans_on_a_workspace_that_opted_in(self):
+        create, _ = await self._route(from_fork=True, allow=True)
+        create.assert_called()
+
+    async def test_a_same_repository_pr_replans_as_before(self):
+        # The command's normal use. If this ever fails, the check has been
+        # widened past forks and `terrapod plan` is broken for everyone.
+        create, _ = await self._route(from_fork=False, allow=False)
+        create.assert_called()

@@ -269,7 +269,23 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
         ):
             continue
 
-        # Download archive at this tag (new version or SHA mismatch)
+        # Download archive at this tag (new version or SHA mismatch).
+        #
+        # GHSA-v8g7-pqrj-8mcm: guarded HERE and not inside
+        # `_dispatch_download_archive`, because that helper takes only the provider
+        # name — and because a test replaces it wholesale, which would make the guard
+        # untestable at the one place it matters.
+        from terrapod.services.vcs_connection_rbac import repository_pair_allowed
+
+        if not repository_pair_allowed(conn, owner, repo):
+            logger.warning(
+                "module repository is outside its VCS connection's allowlist; not cloning",
+                module_id=str(module.id),
+                repo=f"{owner}/{repo}",
+                tag=tag_name,
+            )
+            continue
+
         download_fn = _dispatch_download_archive(conn.provider)
         try:
             archive_bytes = await download_fn(conn, owner, repo, tag_name)

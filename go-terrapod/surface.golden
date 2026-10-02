@@ -310,9 +310,12 @@ field CreateUserRequest.DisplayName string
 field CreateUserRequest.Email string
 field CreateUserRequest.IsActive *bool
 field CreateUserRequest.Password string
+field CreateVCSConnectionRequest.AllowedRepositories []string
 field CreateVCSConnectionRequest.GithubAppID int64
 field CreateVCSConnectionRequest.GithubInstallationID int64
+field CreateVCSConnectionRequest.Labels map[string]string
 field CreateVCSConnectionRequest.Name string
+field CreateVCSConnectionRequest.OwnerEmail string
 field CreateVCSConnectionRequest.PrivateKey string
 field CreateVCSConnectionRequest.Provider string
 field CreateVCSConnectionRequest.ServerURL string
@@ -344,6 +347,7 @@ field CreateWorkspaceRequest.AISummaryContext string `json:"ai-summary-context,o
 field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field CreateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
+field CreateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
@@ -1035,9 +1039,12 @@ field UpdateRunTaskRequest.URL string
 field UpdateUserRequest.DisplayName *string
 field UpdateUserRequest.IsActive *bool
 field UpdateUserRequest.Password string
+field UpdateVCSConnectionRequest.AllowedRepositories *[]string
 field UpdateVCSConnectionRequest.GithubAppID *int64
 field UpdateVCSConnectionRequest.GithubInstallationID *int64
+field UpdateVCSConnectionRequest.Labels *map[string]string
 field UpdateVCSConnectionRequest.Name string
+field UpdateVCSConnectionRequest.OwnerEmail *string
 field UpdateVCSConnectionRequest.PrivateKey string
 field UpdateVCSConnectionRequest.ServerURL string
 field UpdateVCSConnectionRequest.Token string
@@ -1068,6 +1075,7 @@ field UpdateWorkspaceRequest.AISummaryContext *string `json:"ai-summary-context,
 field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
+field UpdateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
 field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
@@ -1117,6 +1125,7 @@ field User.HasPassword bool `json:"has-password"`
 field User.IsActive bool `json:"is-active"`
 field User.LastLoginAt string `json:"last-login-at,omitempty"`
 field User.UpdatedAt string `json:"updated-at,omitempty"`
+field VCSConnection.AllowedRepositories []string `json:"allowed-repositories,omitempty"`
 field VCSConnection.BudgetWindowSeconds *int64 `json:"budget-window-seconds,omitempty"`
 field VCSConnection.CallsPerHour *int64 `json:"calls-per-hour,omitempty"`
 field VCSConnection.ConsumersWindowTotal *int64 `json:"consumers-window-total,omitempty"`
@@ -1130,7 +1139,9 @@ field VCSConnection.HasToken bool `json:"has-token"`
 field VCSConnection.HasWebhookSecret bool `json:"has-webhook-secret"`
 field VCSConnection.ID string `json:"id"`
 field VCSConnection.LabelTotals []VCSLabelTotal `json:"label-totals,omitempty"`
+field VCSConnection.Labels map[string]string `json:"labels,omitempty"`
 field VCSConnection.Name string `json:"name"`
+field VCSConnection.OwnerEmail string `json:"owner-email,omitempty"`
 field VCSConnection.Provider string `json:"provider"`
 field VCSConnection.RateLimit *int64 `json:"rate-limit,omitempty"`
 field VCSConnection.RateLimitObservedAt string `json:"rate-limit-observed-at,omitempty"`
@@ -1258,6 +1269,7 @@ field Workspace.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field Workspace.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field Workspace.AgentPoolName string `json:"agent-pool-name,omitempty"`
 field Workspace.AgentPoolNames []string `json:"agent-pool-names,omitempty"`
+field Workspace.AllowForkPRPlans bool `json:"allow-fork-pr-plans"`
 field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoMerge bool `json:"auto-merge"`

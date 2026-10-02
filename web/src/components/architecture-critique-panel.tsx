@@ -31,6 +31,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { useIsTouch } from '@/lib/use-media-query'
 import { ArchitectureCritiqueChat } from '@/components/architecture-critique-chat'
+import { withMarkdownSafety } from '@/lib/markdown-safety'
 
 type Severity = 'low' | 'medium' | 'high' | 'critical'
 type Category = 'reliability' | 'security' | 'cost' | 'operations' | 'scalability'
@@ -422,7 +423,11 @@ function FindingRow({ f }: { f: Finding }) {
   )
 }
 
-const MD = {
+// Wrapped in withMarkdownSafety (GHSA remote-image exfiltration): the model's
+// prose renders no remote images, and its links carry rel="noopener noreferrer".
+// The wrapper layers those over the styling below rather than beside it, so the
+// styled `a` keeps its classes AND gets the rel.
+const MD = withMarkdownSafety({
   code: ({ children, ...props }: React.ComponentPropsWithoutRef<'code'>) => (
     <code {...props} className="px-1 py-0.5 rounded bg-slate-900 text-brand-300 font-mono text-[0.7rem]">
       {children}
@@ -438,4 +443,4 @@ const MD = {
       {children}
     </ul>
   ),
-}
+})

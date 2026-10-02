@@ -104,6 +104,7 @@ _FIELD_MAP: dict[str, str] = {
     "drift-ignore-rules": "drift_ignore_rules",
     "slack-channel": "slack_channel",
     "debug-mode": "debug_mode",
+    "allow-fork-pr-plans": "allow_fork_pr_plans",
 }
 
 #: Payload keys that write a workspace column but cannot live in `_FIELD_MAP`,
@@ -367,6 +368,7 @@ _SETTING_RULES: dict[str, Any] = {
         v, "drift-detection-enabled"
     ),
     "debug-mode": lambda v: workspace_settings.validate_bool(v, "debug-mode"),
+    "allow-fork-pr-plans": lambda v: workspace_settings.validate_bool(v, "allow-fork-pr-plans"),
 }
 
 

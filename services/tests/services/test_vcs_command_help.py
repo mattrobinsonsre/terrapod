@@ -37,8 +37,12 @@ async def test_help_posts_the_command_list_on_github():
 
     post.assert_awaited_once()
     body = post.await_args.args[4]
-    for verb in ("terrapod plan", "terrapod apply", "terrapod unlock", "terrapod merge"):
+    for verb in ("terrapod plan", "terrapod apply", "terrapod unlock"):
         assert verb in body
+    # `terrapod merge` force-merged the pull request with the App's own
+    # credentials on nothing but someone's ability to comment. It was removed,
+    # and the help table is the surface that would advertise it back.
+    assert "terrapod merge" not in body
     # owner/repo are split from the session, not parsed out of a URL.
     assert post.await_args.args[1] == "org"
     assert post.await_args.args[2] == "repo"

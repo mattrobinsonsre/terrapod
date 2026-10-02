@@ -134,7 +134,7 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
 
    | Permission | Access | Purpose |
    |---|---|---|
-   | **Contents** | Read-only (read & write if using apply-then-merge auto-merge — see [VCS Workflows](vcs-workflows.md)) | Download repository archives; merging PRs creates a commit on the target branch |
+   | **Contents** | Read-only (read & write if using apply-then-merge auto-merge — see [VCS Workflows](vcs-workflows.md)) | Download repository archives; auto-merging a PR creates a commit on the target branch |
    | **Metadata** | Read-only (auto-selected) | Repository metadata |
    | **Checks** | Read & write | Post check runs on commits |
    | **Commit statuses** | Read & write | Post plan/apply status to commits |
@@ -237,6 +237,21 @@ GitLab integration uses a **Project or Group Access Token** for repository acces
 1. Go to your project **Settings > Access Tokens**
 2. Create a new token with the same settings as above
 3. Copy the token value
+
+> **This token is not handed to runners by default.** Terrapod uses it for its
+> own calls to GitLab -- polling, fetching archives, commit statuses, MR
+> comments. It does **not** give it to a runner Job, even when a workspace asks
+> for it with a `vcs_connection` [git module credential](module-auth.md), unless
+> `api.config.vcs.gitlab.allow_token_delivery_to_runners` is set to `true`.
+>
+> The reason is that there is nothing to narrow. A GitHub connection is an app
+> identity, so Terrapod mints a fresh per-run token scoped to reading contents;
+> a GitLab connection *is* this stored token, and GitLab has no call that returns
+> a narrower copy of one. Delivering it means delivering it whole, with every
+> permission and every project it covers, into a container that is also running
+> the workspace's own IaC -- and the connection is named in a variable *value*,
+> so any workspace owner can name any connection. See
+> [Module Source Auth](module-auth.md#gitlab-the-connections-token-cannot-be-narrowed).
 
 ### Step 2: Create a GitLab VCS Connection
 
@@ -480,6 +495,72 @@ You can identify speculative runs in the API response by:
 - `"vcs-pull-request-number"` is set (e.g. `42`)
 - `"message"` starts with "Speculative plan for PR #..."
 
+### Pull requests from forks
+
+A pull request opened **from a fork** gets no speculative plan unless the
+workspace opts in. The setting is `allow-fork-pr-plans` and it defaults to
+**false** ([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)).
+
+A speculative plan executes the pull request author's configuration — provider
+blocks, `external` data sources, `local-exec` provisioners — with everything
+the run receives: `env`-category variables, sensitive variable values, values
+resolved from OpenBao/Vault, the git credentials Terrapod mints for private
+module sources, and the Kubernetes Job's cloud workload identity. There is no
+smaller credential set to hand it instead: a plan needs those credentials to
+refresh state and those variables to evaluate the configuration at all.
+
+Someone opening a pull request from a fork has no write access to the base
+repository and cannot merge, so that speculative plan is the only path by
+which their code ever runs against the workspace's credentials. That is the
+boundary the setting draws.
+
+**Pull requests opened from a branch within the repository itself are
+unaffected and always plan.** Their author already has write access and can
+get code applied by merging, so gating them would buy almost nothing and would
+cost the plan-on-pull-request loop the whole integration exists for — a
+reviewer with no plan is being asked to approve blind.
+
+In [`apply_then_merge`](vcs-workflows.md) mode a pull request push creates a
+full plan-and-apply-capable run rather than a speculative one, and the gate
+covers that too — a fork pull request produces no run of either kind. The
+stake there is higher, because in that mode a `terrapod apply` comment applies
+the run. That command requires push access to the repository, which a fork
+author does not have — but the plan itself is created by the push, before any
+comment, so this gate is what stands between a fork branch and the workspace's
+credentials.
+
+Turn it on where the trade is worth making: a public module repository taking
+community contributions, backed by a workspace that holds nothing worth
+taking.
+
+| Where | How |
+|---|---|
+| Web UI | **Plans on fork pull requests** on the workspace Configuration tab |
+| API | `allow-fork-pr-plans` on workspace create and `PATCH` |
+| Provider | `allow_fork_pr_plans` on `terrapod_workspace` |
+| Autodiscovery | `allow-fork-pr-plans` on the rule, materialised onto every workspace it creates |
+
+Setting it on an [autodiscovery rule](autodiscovery.md) matters more than it
+looks. Without it, enabling the setting across a fleet holds only until
+autodiscovery creates the next workspace — which presents as the setting not
+working rather than as a new workspace correctly defaulting off.
+
+**What counts as a fork.** Terrapod compares the pull request's head
+repository with its base one: a different repository on GitHub, a different
+source project on GitLab. It deliberately does not read GitHub's
+`head.repo.fork` flag, which says the head repository is *itself* a fork of
+something — true for a pull request raised inside a fork against that same
+fork, which is same-repository and trusted. Anything Terrapod cannot
+positively establish as same-repository counts as a fork, including a pull
+request whose head repository has since been deleted.
+
+**Module impact runs follow the same rule.** A pull request on a module
+repository creates speculative plans on the workspaces that consume that
+module (see [Module impact
+analysis](registry.md#module-impact-analysis)), each with its own credentials.
+A fork pull request reaches only those consuming workspaces that have opted
+in — one consumer opting in does not volunteer another consumer's credentials.
+
 ### Run VCS Metadata
 
 Runs created by the VCS poller carry metadata:
@@ -708,6 +789,15 @@ app or token is a second budget. Terrapod supports as many connections as you li
 and each workspace names the one it uses, so this needs no new concepts: create a
 second app or token, add it as a connection, and repoint some workspaces' `vcs-connection`.
 
+> **Before v1.9.0 this was impossible on GitLab.** A unique constraint carried over
+> from the initial schema covered `(provider, github_installation_id)`, and that
+> column is `0` on every GitLab row — so a second GitLab connection collided with
+> the first and was refused with a bare `409 Resource already exists or violates a
+> constraint`, naming neither the column nor the reason. The constraint is now
+> scoped to GitHub, where the installation id is what it is for. If you met that
+> 409 and concluded one GitLab connection was the limit, it was not: upgrade and
+> add the second.
+
 Split **by repository**, not by workspace. Workspaces sharing a repository already
 share one deduplicated lookup, so separating *them* across connections increases
 total calls; separating repositories divides the work. Putting the busiest monorepo
@@ -845,6 +935,16 @@ All VCS credentials are stored in PostgreSQL and protected by database encryptio
 
 Credentials are never returned in API responses.
 
+### Code from a pull request runs with the workspace's credentials
+
+A speculative plan executes the configuration on the pull request branch with
+everything the run receives — secrets, resolved variables and the Job's cloud
+identity. For a pull request raised within the repository that is the point of
+the product; for one raised **from a fork** it hands those credentials to
+someone who has neither write access nor the ability to merge, so fork pull
+requests do not plan unless the workspace sets `allow-fork-pr-plans`. See
+[Pull requests from forks](#pull-requests-from-forks).
+
 ### Network Requirements
 
 | Direction | Protocol | Destination | Purpose |
@@ -913,8 +1013,199 @@ permission change can take that long to take effect.
 - Ensure the webhook secret configured in Terrapod (`TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET`) exactly matches the one set in the GitHub App settings
 - The webhook secret is case-sensitive
 
+### GitLab webhooks are accepted but nothing happens (two connections, one host)
+
+The receiver answers `200 {"message": "unknown project"}` and no run is created,
+while **polling still picks the change up** a minute later. So the symptom is that
+webhooks stopped accelerating anything, not that the integration is broken.
+
+GitLab webhooks carry no installation identity, so Terrapod binds an event to a
+connection by **host**. With one GitLab connection on a host that is unambiguous.
+With two or more — which is possible from v1.9.0, because GitLab connections are no
+longer unique by installation id — the only thing that distinguishes them is the
+secret presented in `X-Gitlab-Token`.
+
+**Give every GitLab connection on the same host its own `webhook_secret`.** A
+connection relying on the global `vcs.gitlab.webhook_secret` cannot be told apart
+from its neighbours, and the event is dropped rather than attributed to the wrong
+one. The log line says so explicitly, naming the host and how many of the candidate
+connections have no secret of their own:
+
+```
+several GitLab connections share this host and none of their own webhook secrets
+matched the presented token, so the event cannot be attributed to one
+```
+
+```zsh
+curl -sX PATCH -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/vnd.api+json' \
+  "$TERRAPOD/api/terrapod/v1/vcs-connections/<connection-id>" \
+  -d '{"data":{"type":"vcs-connections","attributes":{"webhook-secret":"<distinct-secret>"}}}'
+```
+
+Then set the same value as the Secret Token on that project's webhook in GitLab. The
+attribute is write-only; `has-webhook-secret` on a read tells you whether one is set.
+
 ### Speculative plans not appearing for PRs/MRs
 
+- **Is the PR/MR from a fork?** Fork pull requests do not plan unless the
+  workspace sets `allow-fork-pr-plans` (off by default). The poller logs
+  `vcs.pr.fork_plan_skipped` with the workspace id and PR number each time it
+  skips one. Pull requests from a branch in the repository itself are never
+  affected by this — see [Pull requests from forks](#pull-requests-from-forks)
 - The PR/MR must target the workspace's tracked branch (e.g., `main`)
 - Check that no run already exists for the same PR/MR number + head SHA (deduplication)
 - Verify the VCS connection has permission to list pull requests / merge requests
+
+
+### Naming a VCS connection is authorized
+
+A VCS connection holds a GitHub App installation or a GitLab access token, and it
+reaches **every repository that credential can reach**. Naming one on a workspace is
+therefore a grant rather than a reference — and a connection's id is returned to
+anyone with `read` on a workspace using it, so the id is discoverable by design.
+
+**Four claims, any one of which is enough.** A caller may name a connection when:
+
+| Claim | How it is granted |
+|---|---|
+| Platform `admin` | Admins may name any connection. |
+| The connection's **owner** | `owner-email` on the connection matches the caller. |
+| A **role reaching its labels** | `labels` on the connection, matched by the caller's roles with the same allow/deny evaluation every labelled resource gets — see [RBAC → VCS connections are a labelled resource](rbac.md#vcs-connections-are-a-labelled-resource). |
+| Already **owns a workspace using it** | The access is one the caller already holds, so naming it again gains them nothing. |
+
+The last of those is kept from the release that first closed this finding, where
+`owner-email` and `labels` did not yet exist. It carried a consequence that those
+two attributes now remove: there is **no longer any need for a platform admin to
+create the first workspace on a connection**. Set the owner, or label the
+connection and point a role at it, and the team can create its own from the start.
+
+The claim is checked wherever a connection is named:
+
+- **workspace create** and **workspace update** — both the `vcs-connection-id`
+  attribute and the `vcs-connection` relationship, so neither spelling slips
+  past. Update is checked only when the connection actually **changes**, so an
+  edit that leaves it alone does not start failing for whoever administers the
+  workspace today;
+- **registry module** create and update — a module names a connection and a
+  repository URL, and the registry poller then clones that repository with that
+  connection's credential and publishes it as a module the caller owns;
+- **run time**, when a `git_http_auth` credential with `source: vcs_connection`
+  is minted. A workspace may always use its own connection; anything else is
+  checked against the **workspace owner**, since there is no live caller at run
+  time. Two of the four claims do not apply on this path: there are no roles to
+  evaluate, so a label claim does not grant here, and nothing is treated as a
+  platform admin. A workspace whose claim rests only on labels should name its
+  own connection, or hold a `static` credential with a token the operator scoped
+  themselves — see [Private module source auth](module-auth.md).
+
+A refusal is a **403** on the API, and on the run-time path the run is **errored with
+the reason** rather than run without the credential, so an `init` failure never has to
+be traced back to a missing credential.
+
+An operator who needs the previous behaviour — any authenticated user naming any
+connection id — can set:
+
+```yaml
+api:
+  config:
+    vcs:
+      require_connection_authorization: false
+```
+
+Prefer delegating with `owner-email` or `labels` over either turning this off or
+granting someone admin. (GHSA-v8g7-pqrj-8mcm)
+
+<a id="restricting-a-connection-to-specific-repositories"></a>
+
+### Restricting a connection to specific repositories
+
+Holding a claim to a connection says nothing about **which** repository it may be
+pointed at. The repository URL is an ordinary string on the workspace, so an
+entitled caller could point an entitled connection at anything its credential can
+read. `allowed-repositories` closes that, and it is the control to reach for when
+one GitHub App installation covers an organization broader than the team using it.
+
+**It is empty by default, and empty means any repository the credential can
+reach.** Narrowing is opt-in, so upgrading changes nothing until an operator sets
+it on a connection.
+
+```zsh
+curl -X PATCH "$TERRAPOD/api/terrapod/v1/vcs-connections/vcs-<id>" \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{"data": {"type": "vcs-connections", "attributes": {
+        "allowed-repositories": ["platform-team/*", "shared/terraform-modules"]}}}'
+```
+
+Patterns are globs, matched against **one** spelling of the target: the
+repository's `owner/name` path, with any `.git` suffix removed. So
+`platform-team/*` matches `https://github.com/platform-team/service.git` and the
+SSH form of the same repository.
+
+You may write a pattern against a full address — `https://github.example.com/platform-team/*`
+— and it will work, because the **pattern** is reduced to the same `owner/name`
+shape. But it does **not** pin the host, and nothing about a pattern does. An
+earlier version of this page said it did, and an earlier version of the matcher
+offered the raw URL as a second thing a pattern could match — which is what made the
+allowlist bypassable, since `*` crosses `/` and so `platform-team/*` matched an
+entire crafted URL.
+
+**The host is decided by the connection, not by a pattern**, and that is why a
+pattern does not need to pin it: a clone builds its URL from the connection's own
+server and takes only `owner` and `repo` from what you stored, so a repository URL
+naming some other host still clones from the connection's server. The one place a
+host mattered is a minted git credential, whose key is written verbatim into a git
+`[credential "https://<key>"]` section — and that is now checked against the
+connection's own host directly. See the runbook entry for a credential refused that
+way.
+
+Three details worth knowing before writing one:
+
+- **`*` crosses `/`.** `platform-team/*` matches a nested subgroup path such as
+  `platform-team/infra/sub/service`, which a shell glob would not. Pin the depth
+  explicitly if that matters.
+- **Patterns are case-sensitive.** `Platform-Team/*` does not match
+  `platform-team/service`.
+- **A narrowed connection refuses a blank repository URL**, and a blank pattern
+  in the list matches nothing rather than everything — so a stray empty string
+  cannot quietly turn a restriction into an allow-all.
+
+The allowlist is enforced in two places, not only where the URL is set — at every
+path that **accepts** a repository URL, and again wherever the credential is
+actually **used** to clone:
+
+| Where | Effect when the repository is out of scope |
+|---|---|
+| Workspace **create** | **403**, naming the repository and the patterns. |
+| Workspace **update** | **403**. Re-checked on **every** update that leaves a connection attached, not only when the connection changes — otherwise an entitled owner could repoint an allowlisted connection by editing `vcs-repo-url` alone. |
+| `GET /api/terrapod/v1/workspaces/{id}/vcs-refs` | **403**. This endpoint answers "which branches and tags does this repository have" at workspace-**read**, which makes it an existence oracle for private repositories the credential can reach. |
+| The **config fetch**, where the source actually arrives | The fetch fails and the run **errors with the reason**. This is the path the poller and run triggers take, where there is no live caller to refuse — so a workspace whose URL was set *before* an operator narrowed the connection stops fetching rather than quietly cloning something out of scope. |
+| **Every minted git credential** | The mint is refused. A `git_http_auth` variable carries its own URL pattern, so the credential's scope is set on the *variable* rather than on a workspace's `vcs-repo-url` — checking only where a workspace names a repository would leave the connection mintable for anything the pattern covered, including the workspace's own connection. A `git_ssh_auth` variable is `static`-only — it mints nothing, so there is nothing to check. |
+| Registry module **create** | **403**. |
+| Registry module **update** | **403**. |
+| Registry module **VCS update** | **403**. |
+
+The **config fetch** row is the one to plan for when narrowing an existing
+connection: workspaces already pointing outside the new patterns keep their
+configuration and start failing their next run. Find them first — see
+[the runbook](runbooks.md#a-run-cannot-fetch-its-repository).
+
+**The registry and policy-set pollers are covered too, from this release.** They
+clone through their own dispatchers rather than the shared one, so for a while they
+reached neither check: a module, policy set or registry entry whose URL predated a
+narrowing kept being cloned, where a workspace in exactly that position stopped at
+its next config fetch. All three now check before fetching. A refusal there has no
+HTTP caller to receive it, so it appears as a logged refusal and the module simply
+stops publishing new versions — find those the same way you find the workspaces,
+and fix or
+remove them in the same pass.
+
+Keep the connection's credential itself scoped regardless — a GitHub App installed
+on only the repositories it needs, or a project- or group-scoped GitLab token, is
+the control that bounds every path at once, and the allowlist is then defence in
+depth over an already-narrow credential.
+
+Clearing the list (`"allowed-repositories": []`) restores "any repository the
+credential can reach". Sending the attribute is what changes it; omitting it from
+a `PATCH` leaves it alone. (GHSA-v8g7-pqrj-8mcm)

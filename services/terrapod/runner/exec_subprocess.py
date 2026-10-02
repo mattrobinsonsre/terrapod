@@ -37,6 +37,7 @@ exit — same formula bash uses.
 from __future__ import annotations
 
 import argparse
+import os
 import signal
 import subprocess
 import sys
@@ -45,6 +46,8 @@ import time
 from dataclasses import dataclass
 
 import structlog
+
+from terrapod.runner.reserved_env import is_reserved_env_key
 
 logger = structlog.get_logger("runner.exec_subprocess")
 
@@ -147,11 +150,27 @@ def run(
     if log_file:
         log_fh = open(log_file, "wb", buffering=0)  # noqa: SIM115 — closed below
 
+    # Scrub the platform's own plumbing out of the child's environment. The
+    # orchestrator holds `TP_AUTH_TOKEN` — the run's runner token, which can
+    # upload artifacts and state for this run — and without `env=` the engine
+    # and every provider plugin it loads inherits it. A provider is third-party
+    # code running against the operator's credentials by design; it has no
+    # business also holding the token that writes this run's state.
+    #
+    # A SCRUB rather than an allowlist, deliberately: the engine legitimately
+    # needs `PATH`, `HOME`, `TMPDIR`, every `TF_*`/`PULUMI_*`, the cloud
+    # credential variables, and the proxy and CA-bundle variables that libraries
+    # read from nowhere else. An allowlist would have to enumerate all of that
+    # correctly and would break a deployment behind an egress proxy the first
+    # time it missed one.
+    child_env = {k: v for k, v in os.environ.items() if not is_reserved_env_key(k)}
+
     proc = subprocess.Popen(  # noqa: S603 — argv is operator-supplied
         argv,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         bufsize=0,
+        env=child_env,
     )
     state.proc = proc
 

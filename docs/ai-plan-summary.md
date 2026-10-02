@@ -346,6 +346,32 @@ reset", the other is "something is wrong with the endpoint". Be aware that with
 `mandatory` enforcement a spent budget holds every subsequent run until the
 budget resets or an admin overrides — the budget is fleet-wide.
 
+### It will not rule on a plan it was only partly shown
+
+A plan document larger than `ai_summary.plan_json_max_bytes` (600 KB in code, but **the Helm chart ships 500 KB** — size against what your deployment sets) is
+reduced before the model sees it. A **mandatory** gate handed a reduced plan
+records an un-ruled evaluation and holds the run, by the same principle as the
+section above: a gate cannot infer consent from evidence it was never shown, any
+more than from silence. The model's opinion of the part it *did* read is still
+recorded, so whoever decides whether to override can see it.
+
+Mandatory only. An advisory verdict is advice, the prompt already tells the model
+which parts it could not see, and replacing that with an error would lose the
+opinion while protecting nothing.
+
+**This changes when runs block.** A deployment with a mandatory gate and plans
+over the cap will see runs held that previously got a clean pass — which was the
+bypass: the plan's size is controlled by whoever authors the configuration, so
+padding a plan past the cap pushed the offending change out of the model's view
+while the gate went on passing it. Three ways forward, all of which already
+existed: override the run, raise `ai_summary.plan_json_max_bytes` if your plans
+legitimately exceed it, or set the gate to `advisory`.
+
+One honest caveat: the reduction is detected from markers in the plan text, so a
+plan whose own content spells one of those markers reads as reduced and holds a
+mandatory gate. That is a cheap way to stall a gate, and it is the direction we
+would rather fail in — but it is worth knowing it exists.
+
 ### Per-workspace override
 
 `ai_policy_mode` — `default`, `enabled` or `disabled` — on the workspace
@@ -412,7 +438,7 @@ Set to `0` for unlimited.
 
 The counter is on output tokens only (cheaper to reason about than
 mixed input/output cost). Input-side cost is bounded by
-`plan_json_max_bytes` (default 600 KB) and `code_context_max_bytes`
+`plan_json_max_bytes` (600 KB in code, but **the Helm chart ships 500 KB** — size against what your deployment sets) and `code_context_max_bytes`
 (default 200 KB).
 
 ## Skipping and overrides
@@ -456,7 +482,7 @@ the bulk of the request):
   output by the runner, cleaned (`prior_state` stripped, no-op
   resource_changes pruned, drift partitioned, etc. — see
   `_clean_plan_json_bytes`). Bounded by
-  `ai_summary.plan_json_max_bytes` (default 600 KB): under the cap the
+  `ai_summary.plan_json_max_bytes` (600 KB in code, but **the Helm chart ships 500 KB** — size against what your deployment sets): under the cap the
   plan is sent unchanged; over it, `_fit_plan_json` reduces structurally
   — every change keeps its address and actions (destroys → creates →
   updates → sampled remainder) so a `destroy` is never hidden; only

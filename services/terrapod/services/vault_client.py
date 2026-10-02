@@ -364,6 +364,41 @@ def _reject_traversal(mount: str, path: str) -> None:
                 )
 
 
+def _reject_token_endpoints(read_path: str) -> None:
+    """Refuse ``auth/token/...``, whatever the allow-list and the policy permit.
+
+    Vault's built-in ``default`` policy — attached to every token it issues —
+    grants ``auth/token/lookup-self``, and that response's ``data.id`` *is the
+    token*. So a reference to it is not a secret read: it extracts Terrapod's
+    own Vault identity and hands it to a runner the requester controls, with
+    every capability the instance's role carries. ``renew-self`` extends that
+    stolen token's life and ``revoke-self`` kills the cached one for every
+    queued run, which is a denial of service on the whole estate.
+
+    None of these is reachable through the per-instance allow-list, because the
+    person who writes a reference is anyone with write on one workspace, and the
+    default (empty) allow-list is unrestricted. So the refusal is unconditional
+    and hardcoded: there is no legitimate reference to a token endpoint, and
+    nothing an operator could usefully opt out of.
+
+    The whole ``auth/token/`` subtree is refused rather than the named paths
+    alone — the self-service surface is what the ``default`` policy grants, and
+    enumerating it exactly invites the next endpoint to be the one that was
+    missed. Checked on the assembled read path and not on the engine, so a
+    reference cannot route around it by claiming to be kv-v2 (where the URL
+    gains a ``/data/`` segment and could not reach a token endpoint anyway);
+    Vault reserves the ``auth/`` prefix for auth backends, so no secret engine
+    can be mounted there and no real secret read is lost.
+    """
+    segments = read_path.strip("/").split("/")
+    if segments[:2] == ["auth", "token"]:
+        raise VaultDenied(
+            f"path {read_path!r} is under auth/token/ and is never readable through a "
+            "vault reference: a token endpoint discloses, mints or revokes Terrapod's "
+            "own OpenBao/Vault token rather than returning a secret"
+        )
+
+
 def _check_allowed(inst: VaultInstanceConfig, read_path: str) -> None:
     """Enforce the per-instance path allow-list.
 
@@ -420,6 +455,7 @@ async def read_secret_response(
 
     _reject_traversal(mount_s, path_s)
     read_path = f"{mount_s}/{path_s}"
+    _reject_token_endpoints(read_path)
     _check_allowed(inst, read_path)
 
     base = inst.address.rstrip("/")

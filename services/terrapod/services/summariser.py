@@ -121,6 +121,46 @@ _PLAN_BACKGROUND_KEYS = ("configuration", "planned_values", "prior_state", "rele
 _PLAN_CHANGE_ARRAYS = ("resource_changes", "resource_drift", "drift_observed_no_apply_action")
 
 
+#: Appended to a reduced plan so the model can tell that what it received is
+#: partial. It must say so even when nothing was dropped outright: a change
+#: reduced to address+actions looks complete, and an offending value in
+#: ``change.after`` — an open CIDR, a public ACL — is simply absent. Without
+#: this the model reports confidently on a plan it never saw in full.
+_PLAN_REDUCTION_NOTE = (
+    "plan too large to show in full; changes are shown in priority order (all "
+    "destroys, then creates, then updates, then a sample of the rest). An entry "
+    "shown as address+type+name+actions ONLY has had its attribute detail "
+    "withheld: _reduced_changes counts those, and _omitted_changes counts any "
+    "not shown at all. A reduced or omitted change has NOT been read — do not "
+    "state that it is safe, and say which parts of the plan you could not see."
+)
+
+#: Why a mandatory gate refuses a reduced plan. Names all three ways out,
+#: because an operator who hits this needs the remedy and not a diagnosis.
+INCOMPLETE_EVIDENCE_ERROR = (
+    "The plan exceeded ai_summary.plan_json_max_bytes, so the gate was shown a "
+    "reduced plan: at least one change reached the model as address and actions "
+    "only, or not at all. A gate cannot rule on evidence it was not shown, so "
+    "this run is treated as un-ruled. Review the plan and override if it is "
+    "acceptable, raise ai_summary.plan_json_max_bytes, or set the gate to "
+    "advisory."
+)
+
+
+def _plan_evidence_withheld(primary: str) -> bool:
+    """True when ``_fit_plan_json`` had to reduce or omit changes.
+
+    Read off the fitted document rather than returned from the fitter, so the
+    fitter's signature stays as it is. A substring match and not a parse: this
+    runs on a document up to ``plan_json_max_bytes``, and a full ``json.loads``
+    to recover two integers would be sync work in an async handler for nothing
+    (AGENTS.md rule 13). Both keys are written by ``_fit_plan_json`` itself, so
+    a false positive needs a plan whose own text spells one of them — and it
+    would fail CLOSED, holding a mandatory gate rather than passing it.
+    """
+    return '"_reduced_changes":' in primary or '"_omitted_changes":' in primary
+
+
 def _change_skeleton(rc: dict) -> dict:
     """address + type + name + change.actions only — the bare risk signal that
     preserves a change's existence and action when its full body won't fit."""
@@ -149,12 +189,19 @@ def _fit_plan_json(data: bytes, max_bytes: int) -> str:
         3. every update — full;
         4. a bounded sample of anything else (reads / observed drift).
 
-    Each tier is added in full while budget remains; once full entries no longer
-    fit, the remaining entries are kept as address+actions skeletons so their
-    existence is never lost; only when even skeletons don't fit are the
+    A tier is upgraded to full detail only once the tier above it is complete,
+    so a destroy too large to fit is never traded for the smaller creates behind
+    it. Entries that are not upgraded are kept as address+actions skeletons, so
+    their existence is never lost; only when even skeletons don't fit are the
     lowest-priority changes summarised as a count in ``_omitted_changes``.
     Destroys are processed first, so they are the last thing ever reduced — a
     destroy is effectively never hidden.
+
+    Whatever was withheld, the result says so: ``_note`` plus
+    ``_reduced_changes`` (present but shown as address+actions) and
+    ``_omitted_changes`` (not shown at all). This matters most in the case that
+    drops nothing — every change present, all of them skeletons — because that
+    reads as a complete plan while every attribute value is absent.
     """
     if max_bytes <= 0 or len(data) <= max_bytes:
         return data.decode("utf-8", errors="replace")
@@ -194,8 +241,16 @@ def _fit_plan_json(data: bytes, max_bytes: int) -> str:
     other = [r for r in rcs if id(r) not in seen]
     real = destroys + creates + updates  # every real change, in priority order
 
-    reserve = 400  # headroom for the _note / _omitted_changes appended below
+    # Headroom for the _note / _omitted_changes / _reduced_changes appended
+    # below. Derived from the note rather than a magic number: the note is the
+    # thing that must always fit, and a note edit must not silently push the
+    # result over the cap it exists to respect.
+    reserve = len(_PLAN_REDUCTION_NOTE) + 200
     omitted: dict[str, int] = {}
+    # How many changes are PRESENT but reduced to address+actions. Tracked
+    # separately from `omitted` (not shown at all) because both are reasons the
+    # model must not claim to have read the plan.
+    reduced = 0
 
     # Pass A: list EVERY real change as a skeleton first, so its existence and
     # action are guaranteed present (a destroy is never hidden).
@@ -205,15 +260,39 @@ def _fit_plan_json(data: bytes, max_bytes: int) -> str:
 
     if base + reserve <= max_bytes:
         used = base
-        # Pass B: upgrade skeletons to FULL detail in priority order (destroys,
-        # then creates, then updates) while budget remains. The most
-        # consequential changes get full attributes; routine ones may stay
-        # skeletons.
-        for i, rc in enumerate(real):
-            delta = _size(rc) - _size(skeletons[i])
-            if delta > 0 and used + delta <= max_bytes - reserve:
-                plan["resource_changes"][i] = rc
-                used += delta
+        # Pass B: upgrade skeletons to FULL detail TIER BY TIER — destroys
+        # first, then creates, then updates — and move to the next tier only
+        # once the current one is entirely upgraded.
+        #
+        # Greedily walking the flat priority-ordered list is not the same thing.
+        # A destroy whose body is too big to fit is skipped, and then the
+        # smaller creates behind it fit and spend the budget — so the plan the
+        # model reads has full attributes for every create and address+actions
+        # for a destroy, which is the inversion the priority order exists to
+        # prevent. Stopping instead reserves what remains for the tier that
+        # could not be completed, and the note below says the detail is missing.
+        upgraded: set[int] = set()
+        i = 0
+        for tier in (destroys, creates, updates):
+            tier_intact = True
+            for rc in tier:
+                delta = max(_size(rc) - _size(skeletons[i]), 0)
+                if used + delta <= max_bytes - reserve:
+                    plan["resource_changes"][i] = rc
+                    used += delta
+                    upgraded.add(i)
+                else:
+                    tier_intact = False
+                i += 1
+            if not tier_intact:
+                break
+        reduced += sum(
+            1
+            for j, rc in enumerate(real)
+            # A skeleton identical to the full entry withheld nothing, so it is
+            # not a reduction and must not be announced as one.
+            if j not in upgraded and skeletons[j] != rc
+        )
         # Pass C: a bounded sample of the lowest-priority changes (reads /
         # observed drift); count the rest.
         sample_budget = 25
@@ -224,6 +303,8 @@ def _fit_plan_json(data: bytes, max_bytes: int) -> str:
                 plan["resource_changes"].append(sk)
                 used += sz
                 sample_budget -= 1
+                if sk != rc:
+                    reduced += 1
             else:
                 key = ",".join(_acts(rc)) or "other"
                 omitted[key] = omitted.get(key, 0) + 1
@@ -240,6 +321,8 @@ def _fit_plan_json(data: bytes, max_bytes: int) -> str:
             if used + sz + reserve <= max_bytes:
                 plan["resource_changes"].append(sk)
                 used += sz
+                if sk != rc:
+                    reduced += 1
             else:
                 key = ",".join(_acts(rc)) or "other"
                 omitted[key] = omitted.get(key, 0) + 1
@@ -249,12 +332,14 @@ def _fit_plan_json(data: bytes, max_bytes: int) -> str:
 
     if omitted:
         plan["_omitted_changes"] = omitted
-        plan["_note"] = (
-            "plan too large to show in full; changes are shown in priority "
-            "order (all destroys, then creates, then updates, then a sample of "
-            "the rest), each in full where it fits else as address+actions. "
-            "Counts of any not shown are in _omitted_changes."
-        )
+    if reduced:
+        plan["_reduced_changes"] = reduced
+    # Marked whenever ANYTHING was withheld, not only when a change was dropped
+    # outright. A plan where every change is present but skeletonised used to
+    # carry no marker at all, so the model could not tell it was reading
+    # address+actions rather than attributes.
+    if omitted or reduced:
+        plan["_note"] = _PLAN_REDUCTION_NOTE
     return json.dumps(plan, separators=(",", ":"))
 
 
@@ -853,6 +938,7 @@ async def _settle_ai_policy_gate(
     verdict: dict | None = None,
     risk_level: str = "",
     error: str | None = None,
+    evidence_incomplete: str | None = None,
 ) -> None:
     """Record the gate's verdict for this run and release any hold (#1766).
 
@@ -882,6 +968,23 @@ async def _settle_ai_policy_gate(
         return
 
     enforcement = ai_policy_service.effective_enforcement(ws)
+
+    # A gate cannot rule on evidence it was never shown. `_fit_plan_json`
+    # reduces an over-cap plan to skeletons, and the size of the plan is
+    # something whoever authored the configuration controls — so padding it
+    # past the cap pushed the offending change out of the model's view while
+    # the gate still reported a clean pass. Treated exactly as a missing
+    # verdict is: un-ruled, which under `mandatory` holds the run and leaves an
+    # admin to override after reading the plan themselves.
+    #
+    # Mandatory only, deliberately. Advisory never blocks, so its recorded
+    # verdict is advice, and the model has been told in the prompt which parts
+    # it could not see — overwriting that with an error would lose the opinion
+    # without protecting anything. The verdict is still recorded below in both
+    # cases, so the human deciding whether to override can see what the model
+    # made of the part it did read.
+    if error is None and evidence_incomplete and enforcement == "mandatory":
+        error = evidence_incomplete
 
     if error is not None:
         outcome, err = "errored", error
@@ -1685,6 +1788,10 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             )
             return
 
+        # Sibling of the branch above: there, the gate had nothing to rule
+        # over; here it has only part of it.
+        evidence_withheld = kind == "plan_summary" and _plan_evidence_withheld(primary)
+
         # Grounded design-review signals (plan_summary only; #963/#1036) —
         # deterministic scan + cost fed as ground truth. Best-effort: absent →
         # empty → the prompt reviews the change exactly as before.
@@ -1812,6 +1919,7 @@ async def _summarise_one(payload: dict, _slack: dict) -> None:
             kind=kind,
             verdict=parsed.get("policy_verdict"),
             risk_level=risk_level,
+            evidence_incomplete=(INCOMPLETE_EVIDENCE_ERROR if evidence_withheld else None),
         )
 
     # Out-of-transaction side effects

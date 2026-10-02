@@ -496,7 +496,7 @@ jobs:
             # Root-level tests/*.py are NOT auto-collected by the directory
             # shards below — each must be listed here explicitly, or it silently
             # never runs in CI. All of these are pure-unit (no Postgres/Redis/S3).
-            paths: tests/auth tests/meta tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/oci tests/test_logging_config.py tests/test_dependency_pins.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py
+            paths: tests/auth tests/meta tests/runner tests/storage tests/ai_eval tests/config tests/db tests/helm tests/oci tests/test_logging_config.py tests/test_dependency_pins.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py tests/crypto tests/test_ha_config.py
             pytest_args: -n auto
           # services-api is sharded across three runners as well as run under
           # xdist within each. One job took ~8.5 min (#1555): ~6 min of pytest
@@ -987,6 +987,108 @@ jobs:
             && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
           echo "the strong-secrets switch renders, defaults off, and is ConfigMap-only"
 
+      - name: The GitLab git-credential switch renders, on every profile, and stays off
+        run: |
+          # Config-channel contract for the GitLab half of the VCS-connection
+          # git credential. A GitLab connection holds an access token that
+          # cannot be narrowed, so the switch decides whether a runner Job --
+          # chosen by whoever set a workspace variable -- receives it whole.
+          #
+          # A missing render line here is the worst shape this contract takes:
+          # the key would look configurable in values.yaml, the pod would never
+          # see it, and the CODE default (off) would quietly win. That fails
+          # safe, so nothing breaks and nobody notices -- until an operator who
+          # deliberately turned it ON finds their runs refused with a message
+          # telling them to set a key they already set.
+          #
+          # Asserted on all three profiles, because the eval and local profiles
+          # are where a `with`-style guard would silently drop a false.
+          for f in values.yaml values-local.yaml values-eval.yaml; do
+            out=$(helm template ./helm/terrapod -f "helm/terrapod/$f")
+            echo "$out" | grep -q 'allow_token_delivery_to_runners: false' \
+              || { echo "$f: the GitLab git-credential switch must render, and render false"; exit 1; }
+          done
+          # Turning it on must actually reach the pod.
+          on=$(helm template ./helm/terrapod --set api.config.vcs.gitlab.allow_token_delivery_to_runners=true)
+          echo "$on" | grep -q 'allow_token_delivery_to_runners: true' \
+            || { echo "setting it true does not reach the ConfigMap"; exit 1; }
+          # Policy, not a credential: ConfigMap only, never a TERRAPOD_* env var.
+          helm template ./helm/terrapod -f helm/terrapod/values.yaml \
+            | grep -q 'TERRAPOD_VCS__GITLAB__ALLOW_TOKEN_DELIVERY_TO_RUNNERS' \
+            && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
+          echo "the GitLab git-credential switch renders off on every profile and is ConfigMap-only"
+
+      - name: An explicit false reaches the pod, and nothing unmodelled is rendered
+        run: |
+          # The config CHANNEL contract, both directions, in the job that has a helm
+          # binary. There is an equivalent pytest (tests/helm/
+          # test_rendered_config_matches_settings.py) and it can only ever SKIP in
+          # CI, because docker/Dockerfile.test deliberately ships no helm — so this
+          # is the leg that actually runs. Both failures it exists for have happened
+          # in one release:
+          #
+          #  - a `| default true` cleanup deleted the render line for
+          #    vcs.require_connection_authorization as collateral. The key stayed in
+          #    values.yaml and in the values snapshot, so every gate stayed green
+          #    while an operator's explicit `false` silently stopped reaching the pod
+          #    -- and they would then have met a 403 whose own text told them to set
+          #    the key that had stopped working.
+          #  - four keys carried in from the 2.0 line were rendered to every
+          #    deployment while `Settings` modelled none of them, and
+          #    values.schema.json is additionalProperties:false, so an operator could
+          #    not even override one.
+          #
+          # Direction 1: a deliberate `false` survives. Go templates treat false as
+          # empty, so this is the half `| default true` and `with` silently break.
+          for k in \
+            vcs.require_connection_authorization \
+            vcs.require_push_permission_for_commands \
+            database.pool_pre_ping \
+            notifications.smtp.use_tls
+          do
+            leaf="${k##*.}"
+            helm template ./helm/terrapod --set "api.config.${k}=false" \
+              | grep -q "${leaf}: false" \
+              || { echo "setting ${k}=false does not reach the ConfigMap"; exit 1; }
+          done
+          echo "an explicit false reaches the pod for all four keys"
+
+          # Direction 2: every key rendered into config.yaml is one Settings accepts,
+          # on all three profiles -- the eval profile included, because a key behind
+          # a `with` block only appears when a profile sets it.
+          for f in values.yaml values-local.yaml values-eval.yaml; do
+            helm template ./helm/terrapod -f "helm/terrapod/$f" \
+              | python3 scripts/ci/check_rendered_config_keys.py \
+              || { echo "rendered config disagrees with Settings on $f"; exit 1; }
+          done
+
+      - name: The comment-command push gate reaches the pod and stays on by default
+        run: |
+          # Config-channel contract for the PR-comment authorization gate. The
+          # switch decides whether `terrapod apply` from a pull-request comment
+          # requires the author to have push access, so a render line that goes
+          # missing is not cosmetic: an operator who turns it off still gets it
+          # on, or -- the direction that matters -- a chart that stops rendering
+          # it silently falls back to the code default and nobody finds out
+          # which way round it was.
+          out=$(helm template ./helm/terrapod -f helm/terrapod/values.yaml)
+          echo "$out" | grep -q 'require_push_permission_for_commands:' \
+            || { echo "require_push_permission_for_commands is not rendered into the ConfigMap"; exit 1; }
+          # Default ON: commenting is not authorization.
+          echo "$out" | grep -q 'require_push_permission_for_commands: true' \
+            || { echo "the push gate must default to true"; exit 1; }
+          # And turning it OFF must actually reach the pod. This is the half a
+          # `| default true` or a `with` block silently breaks, because Go
+          # templates treat false as empty -- the operator asks for off and the
+          # chart renders on.
+          off=$(helm template ./helm/terrapod --set api.config.vcs.require_push_permission_for_commands=false)
+          echo "$off" | grep -q 'require_push_permission_for_commands: false' \
+            || { echo "setting it false does not reach the ConfigMap"; exit 1; }
+          # It is policy, not a credential -- ConfigMap only (house rule).
+          echo "$out" | grep -q 'TERRAPOD_VCS__REQUIRE_PUSH_PERMISSION' \
+            && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
+          echo "the comment-command push gate renders, defaults on, and honours false"
+
       - name: The Vault value source reaches the pod, and its credential never does
         run: |
           # Two halves of the config-channel contract for #1439.
@@ -1154,6 +1256,101 @@ jobs:
             echo "FAIL: Vault volumes rendered while api.config.vault.enabled is false"; exit 1
           }
           echo "vault jwt projects its token; the custom CA is mounted at ca_file"
+
+      - name: Every SAML assertion check reaches the pod, in both positions
+        run: |
+          # The config-channel contract for the SAML hardening switches.
+          #
+          # These default to FALSE in the code (config.py: `Field(default=False)`
+          # on all five), so the operator's action is to turn them ON, and the
+          # render line is the part that can silently fail: `{{ if .want_assertions_signed }}`
+          # would drop the key for an operator who set it, the code default would
+          # stand, and their deliberate opt-IN would be inert — a deployment less
+          # protected than its own values.yaml says. The opposite position is
+          # asserted too, because `| default` treats false as empty and would
+          # render the wrong value for someone who has deliberately written one:
+          # harmless while the default is false, a lockout the moment it is not.
+          #
+          # (The carried version of this comment said these default to TRUE, which
+          # contradicted the loop below it and is not what the code does.)
+          #
+          # Both halves matter for a different reason too: `validate_destination`
+          # is what makes an assertion's Destination and Recipient mean anything,
+          # and an IDP that cannot satisfy one of these checks needs the opt-out
+          # to work or its operator cannot log in at all.
+          cat > /tmp/saml-values.yaml <<'EOF'
+          api:
+            config:
+              auth:
+                callback_base_url: "https://terrapod.example.com"
+                sso:
+                  saml:
+                    - name: strict-idp
+                      metadata_url: https://idp.example.com/metadata
+                      entity_id: "https://terrapod.example.com"
+                      acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/saml/acs"
+                      validate_destination: true
+                      validate_in_response_to: true
+                      reject_replayed_assertions: true
+                      want_assertions_signed: true
+                      reject_deprecated_algorithm: true
+                    - name: legacy-idp
+                      metadata_url: https://old-idp.example.com/metadata
+                      validate_destination: false
+                      validate_in_response_to: false
+                      reject_replayed_assertions: false
+                      want_assertions_signed: false
+                      reject_deprecated_algorithm: false
+                    - name: silent-idp
+                      metadata_url: https://quiet-idp.example.com/metadata
+          EOF
+          docker run --rm -v "$PWD:/chart" -v /tmp:/tmp -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+            --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+            --set redis.url=redis://redis:6379 \
+            -f /tmp/saml-values.yaml > /tmp/rendered-saml.yaml
+
+          cm=$(awk '/^kind: ConfigMap/,/^---/' /tmp/rendered-saml.yaml)
+
+          # The ACS URL is what an assertion's Destination is checked against.
+          echo "$cm" | grep -q 'acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/saml/acs"' || {
+            echo "auth.sso.saml[].acs_url never reaches the rendered ConfigMap"
+            echo "add a render line to templates/configmap-api.yaml"
+            exit 1
+          }
+
+          for key in validate_destination validate_in_response_to \
+                     reject_replayed_assertions want_assertions_signed \
+                     reject_deprecated_algorithm; do
+            # On this release line these default to FALSE in code, so the
+            # operator's action is to turn them ON. A swallowed `true` would
+            # leave that opt-in inert and the deployment less protected than its
+            # values.yaml says — the direction that matters here.
+            echo "$cm" | grep -q "$key: true" || {
+              echo "an operator's explicit true for $key never reaches the pod."
+              echo "add a render line to templates/configmap-api.yaml; the code"
+              echo "default on this line is false, so the opt-in would be inert."
+              exit 1
+            }
+            # The opposite position too. `| default` treats false as empty, so a
+            # template written that way renders the wrong value for an operator
+            # who has deliberately written one — harmless while the code default
+            # is false, and a lockout the moment it is not.
+            echo "$cm" | grep -q "$key: false" || {
+              echo "an operator's explicit false for $key is swallowed by the template."
+              echo "use hasKey, not '| default'."
+              exit 1
+            }
+            # And a provider that sets nothing renders nothing, so the code
+            # default applies rather than a value the chart invented.
+            count=$(echo "$cm" | grep -c "$key:" || true)
+            [ "$count" = "2" ] || {
+              echo "$key rendered $count times for three providers, two of which set it."
+              echo "an unset switch must render no line at all."
+              exit 1
+            }
+          done
+          echo "the SAML assertion checks render in both positions, and an unset one does not"
 
       - name: Every retention key in values.yaml reaches the rendered ConfigMap
         run: |

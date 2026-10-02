@@ -7,6 +7,7 @@ Includes presigned URL endpoint tests via FastAPI test client.
 from __future__ import annotations
 
 import time
+import urllib.parse
 
 import httpx
 import pytest
@@ -275,3 +276,105 @@ class TestThePresignedKeyIsNotPercentEncoded:
     async def test_a_character_that_genuinely_needs_encoding_still_is(self, fs_store):
         url = (await fs_store.presigned_get_url("cache/a b/c?d.tgz")).url
         assert "%20" in url and "%3F" in url
+
+
+class TestAPresignedUploadCannotChooseWhatTheGetServes:
+    """The `content_type` parameter sits outside the signature.
+
+    `_sign` covers `operation:key:expires` and nothing else, so an attacker who
+    holds a presigned PUT URL (or who tampers with one in flight) can rewrite
+    `&content_type=` without breaking it. The value is persisted to the sidecar
+    and returned verbatim as the GET's `Content-Type` — from the deployment's own
+    origin, with no credential, because the signature *is* the credential. Left
+    unconstrained that is stored XSS on the API's hostname.
+
+    It is clamped at the route rather than signed: extending `_sign` would
+    invalidate every presigned URL already in flight, PUT and GET alike, since
+    both operations share one signing function.
+    """
+
+    @pytest.fixture
+    def app(self, fs_store: FilesystemStore) -> FastAPI:
+        test_app = FastAPI()
+        set_filesystem_store(fs_store)
+        test_app.include_router(router, prefix="/api/terrapod/v1")
+        return test_app
+
+    @staticmethod
+    def _route(url: str) -> str:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        return parsed.path + "?" + parsed.query
+
+    async def _round_trip(self, app: FastAPI, fs_store: FilesystemStore, declared: str) -> str:
+        """Upload declaring `declared`, then return the Content-Type served back."""
+        key = "upload-probe.bin"
+        put_url = await fs_store.presigned_put_url(key)
+        # Appended, not substituted: a second `content_type` is exactly what a
+        # tampering client sends, and it must not change the signature's verdict.
+        put_route = self._route(put_url.url) + f"&content_type={urllib.parse.quote(declared)}"
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.put(put_route, content=b"<script>alert(1)</script>")
+            # The upload itself still succeeds — the signature was never broken,
+            # which is the whole reason this has to be neutralised on content.
+            assert resp.status_code == 201, resp.text
+
+            get_url = await fs_store.presigned_get_url(key)
+            resp = await client.get(self._route(get_url.url))
+            assert resp.status_code == 200
+            return resp.headers["content-type"]
+
+    @pytest.mark.parametrize(
+        "declared",
+        [
+            "text/html",
+            "text/html; charset=utf-8",
+            "image/svg+xml",
+            "application/xhtml+xml",
+            "TEXT/HTML",
+        ],
+    )
+    async def test_a_renderable_type_is_never_served_back(
+        self, app: FastAPI, fs_store: FilesystemStore, declared: str
+    ) -> None:
+        served = await self._round_trip(app, fs_store, declared)
+        assert served.startswith("application/octet-stream"), (
+            f"declared {declared!r} came back as {served!r} — the deployment's own "
+            "origin would render attacker-supplied bytes as a document"
+        )
+
+    async def test_a_legitimate_type_still_round_trips(
+        self, app: FastAPI, fs_store: FilesystemStore
+    ) -> None:
+        """`application/gzip` is what the one presigned-PUT caller declares.
+
+        A clamp that mis-serves a real artifact has traded one bug for another.
+        """
+        served = await self._round_trip(app, fs_store, "application/gzip")
+        assert served.startswith("application/gzip")
+
+    async def test_every_type_terrapod_stores_survives_the_clamp(self) -> None:
+        from terrapod.storage import filesystem_routes as fr
+
+        for allowed in fr._ALLOWED_CONTENT_TYPES:  # noqa: SLF001
+            assert fr._safe_content_type(allowed) == allowed  # noqa: SLF001
+
+    async def test_parameters_are_dropped_rather_than_echoed(self) -> None:
+        from terrapod.storage import filesystem_routes as fr
+
+        # An allowed bare type with a parameter is honoured, but the parameter
+        # is not carried into a response header we control.
+        assert fr._safe_content_type("application/json; charset=utf-8") == (  # noqa: SLF001
+            "application/json"
+        )
+
+    async def test_an_unknown_type_falls_back_rather_than_failing_the_upload(self) -> None:
+        from terrapod.storage import filesystem_routes as fr
+
+        # Not an error: a stored artifact is still readable, just not as a
+        # type the client named.
+        assert fr._safe_content_type("application/x-made-up") == "application/octet-stream"  # noqa: SLF001
+        assert fr._safe_content_type("") == "application/octet-stream"  # noqa: SLF001

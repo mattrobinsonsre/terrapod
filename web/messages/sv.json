@@ -773,6 +773,23 @@
       "delete": "Ta bort"
     },
     "confirmDelete": "Ta bort denna VCS-anslutning? Arbetsytor som använder den förlorar VCS-integrationen. Detta kan inte ångras.",
+    "access": {
+      "heading": "Vem som får använda den här anslutningen",
+      "intro": "Dessa tre inställningar avgör vilka arbetsytor som får peka på den här anslutningen. Själva autentiseringsuppgiften förblir endast skrivbar.",
+      "ownerEmail": "Ägarens e-post",
+      "ownerEmailHint": "Ägaren får alltid använda den här anslutningen. Lämna tomt för att låta anslutningen sakna ägare.",
+      "labels": "Åtkomstetiketter",
+      "labelsHint": "En roll vars regler matchar dessa etiketter får peka en arbetsyta på den här anslutningen.",
+      "allowedRepositories": "Tillåtna utvecklingskataloger",
+      "allowedRepositoriesHint": "Glob-mönster som matchas mot den utvecklingskatalog en arbetsyta ber om att få använda.",
+      "addPattern": "Lägg till ett mönster",
+      "anyRepositoryWarning": "Inga mönster är angivna, så den här anslutningen får peka på vilken utvecklingskatalog som helst.",
+      "restricted": "{count, plural, one {# mönster är angivet} other {# mönster är angivna}}, så en utvecklingskatalog som inte matchar något av dem avvisas.",
+      "ownedBy": "Ägs av {email}",
+      "unowned": "Ingen ägare är angiven",
+      "anyRepositorySummary": "Vilken utvecklingskatalog som helst är tillåten",
+      "repositoryCount": "Begränsad till {count, plural, one {# utvecklingskatalog} other {# utvecklingskataloger}}"
+    },
     "form": {
       "name": "Namn",
       "namePattern": "Endast bokstäver, siffror, bindestreck och understreck. Måste börja med en bokstav eller siffra.",
@@ -1076,7 +1093,8 @@
       "terragruntVersion": "Terragrunt-version",
       "noExpiry": "Ingen utgång",
       "addDriftIgnoreRule": "Lägg till regel",
-      "debugModeHint": "Håll misslyckade runner-poddar öppna på de arbetsytor som den här regeln skapar. Av som standard – en kvarhållen podd behåller den arbetsytans autentiseringsuppgifter."
+      "debugModeHint": "Håll misslyckade runner-poddar öppna på de arbetsytor som den här regeln skapar. Av som standard – en kvarhållen podd behåller den arbetsytans autentiseringsuppgifter.",
+      "allowForkPrPlansHint": "Gäller varje arbetsyta som den här regeln skapar. Av som standard: en pull request från en fork får ingen spekulativ plan, eftersom den skulle köra författarens kod med arbetsytans autentiseringsuppgifter."
     },
     "table": {
       "name": "Namn",
@@ -2877,7 +2895,8 @@
       "uploadState": "Det gick inte att ladda upp tillstånd",
       "uploadStateFile": "Det gick inte att ladda upp tillståndsfilen",
       "updateSecurityScan": "Det gick inte att uppdatera säkerhetsskanningen",
-      "updateDebugMode": "Det gick inte att uppdatera felsökningsläget"
+      "updateDebugMode": "Det gick inte att uppdatera felsökningsläget",
+      "updateForkPlans": "Det gick inte att uppdatera planer för pull requests från forkar"
     },
     "subtabs": {
       "state": "Tillstånd",
@@ -2930,6 +2949,14 @@
       "bannerTitle": "Felsökningsläget är på för den här arbetsytan",
       "bannerBody": "Podden för en misslyckad körning hålls öppen för inspektion i stället för att avslutas, och den behåller den här arbetsytans autentiseringsuppgifter och dekrypterade variabler så länge den hålls kvar. Stäng av felsökningsläget när du är klar med felsökningen.",
       "confirmEnable": "Slå på felsökningsläget? Podden för en misslyckad körning hålls öppen med den här arbetsytans autentiseringsuppgifter och dekrypterade variabler tills fönstret går ut eller du tar bort podden."
+    },
+    "allowForkPrPlans": {
+      "title": "Planer på pull requests från forkar",
+      "description": "Om en pull request som öppnats från en fork får en spekulativ plan. Av som standard, eftersom den planen kör forkförfattarens kod med den här arbetsytans autentiseringsuppgifter.",
+      "label": "Planera pull requests från forkar",
+      "hint": "En körning får den här arbetsytans miljövariabler, känsliga värden, alla hemligheter som hämtats via Vault och jobbets molnidentitet. Den som öppnar en pull request från en fork har ingen skrivbehörighet och kan inte merga, så en spekulativ plan är den enda vägen för deras kod till de här autentiseringsuppgifterna. Slå på detta för en arbetsyta som inte innehåller något värt att ta — till exempel ett publikt modulförråd som tar emot bidrag från communityn. Pull requests från grenar i själva förrådet påverkas inte och planeras alltid.",
+      "activeBadge": "På",
+      "confirmEnable": "Planera pull requests som öppnats från forkar? Deras författares kod körs med den här arbetsytans autentiseringsuppgifter och dekrypterade variabler, utan att någon godkänner det först."
     }
   },
   "graphs": {

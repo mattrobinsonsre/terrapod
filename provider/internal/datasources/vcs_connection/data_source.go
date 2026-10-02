@@ -34,6 +34,9 @@ type vcsConnectionDataSourceModel struct {
 	GithubAccountType    types.String `tfsdk:"github_account_type"`
 	CreatedAt            types.String `tfsdk:"created_at"`
 	UpdatedAt            types.String `tfsdk:"updated_at"`
+	OwnerEmail           types.String `tfsdk:"owner_email"`
+	Labels               types.Map    `tfsdk:"labels"`
+	AllowedRepositories  types.List   `tfsdk:"allowed_repositories"`
 }
 
 func NewDataSource() datasource.DataSource {
@@ -61,6 +64,17 @@ func (d *vcsConnectionDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			"github_account_type":    schema.StringAttribute{Computed: true, Description: "GitHub account type."},
 			"created_at":             schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
 			"updated_at":             schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"owner_email":            schema.StringAttribute{Computed: true, Description: "Email of the connection owner, who may reference it from a workspace."},
+			"labels": schema.MapAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+				Description: "Labels for RBAC-based access control: a role whose rules match these may reference the connection from a workspace.",
+			},
+			"allowed_repositories": schema.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+				Description: "Glob patterns bounding which repositories a workspace may point at through this connection. An empty list means any repository.",
+			},
 		},
 	}
 }
@@ -134,6 +148,32 @@ func (d *vcsConnectionDataSource) Read(ctx context.Context, req datasource.ReadR
 			config.GithubAccountType = types.StringValue(c.GithubAccountType)
 		} else {
 			config.GithubAccountType = types.StringNull()
+		}
+
+		// Reach and scope (GHSA-v8g7-pqrj-8mcm). Reported faithfully rather than
+		// collapsing empty to null: on `allowed_repositories` an empty list is a
+		// meaningful answer — the connection is unrestricted — and a caller
+		// writing `length(...) == 0` to test for that must not get a null.
+		config.OwnerEmail = types.StringValue(c.OwnerEmail)
+
+		labels := c.Labels
+		if labels == nil {
+			labels = map[string]string{}
+		}
+		labelVal, d := types.MapValueFrom(ctx, types.StringType, labels)
+		resp.Diagnostics.Append(d...)
+		config.Labels = labelVal
+
+		repos := c.AllowedRepositories
+		if repos == nil {
+			repos = []string{}
+		}
+		repoVal, d := types.ListValueFrom(ctx, types.StringType, repos)
+		resp.Diagnostics.Append(d...)
+		config.AllowedRepositories = repoVal
+
+		if resp.Diagnostics.HasError() {
+			return
 		}
 
 		resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
