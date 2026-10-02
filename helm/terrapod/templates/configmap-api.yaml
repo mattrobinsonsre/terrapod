@@ -170,6 +170,12 @@ data:
             claims_to_roles:
               {{- toYaml .claims_to_roles | nindent 14 }}
             {{- end }}
+            {{- /* hasKey, not `| default`: the default is true, so `| default`
+                   would discard an operator's explicit false and silently keep
+                   refusing logins from an IdP that omits the claim. */}}
+            {{- if hasKey . "require_email_verified" }}
+            require_email_verified: {{ .require_email_verified }}
+            {{- end }}
           {{- end }}
         {{- end }}
         {{- if .Values.api.config.auth.sso.saml }}

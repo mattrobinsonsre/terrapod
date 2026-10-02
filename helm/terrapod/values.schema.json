@@ -1706,6 +1706,9 @@
                       },
                       "existingSecretKey": {
                         "type": "string"
+                      },
+                      "require_email_verified": {
+                        "type": "boolean"
                       }
                     }
                   }

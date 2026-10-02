@@ -446,6 +446,22 @@ class OIDCProviderConfig(BaseModel):
         default_factory=list,
         description="Rules mapping IDP claims to Terrapod roles",
     )
+    # The email claim is the principal: it selects role assignments and owns
+    # workspaces. An IdP that lets a user set their own email, or that simply
+    # does not vouch for it, can therefore hand an attacker a victim's identity
+    # (GHSA-3m8x-ff8g-7x8c). An explicit `email_verified: false` is ALWAYS
+    # rejected regardless of this setting -- the IdP is telling us the address is
+    # unverified, and nothing legitimate relies on trusting it anyway. This
+    # setting governs only the weaker case where the claim is ABSENT: strict
+    # (the 2.0 default) treats absent as unverified and refuses the login.
+    require_email_verified: bool = Field(
+        default=True,
+        description="Require a truthy `email_verified` claim. When true (the default), an OIDC "
+        "login whose claims omit `email_verified` is refused, because the email claim is the "
+        "principal and an unvouched one can be set by its owner. Set false only for an IdP that "
+        "verifies email but does not send the claim; an explicit `email_verified: false` is "
+        "refused either way.",
+    )
 
 
 class SAMLProviderConfig(BaseModel):

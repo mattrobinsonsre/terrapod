@@ -23,6 +23,11 @@ from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+#: Distinguishes "the IdP did not send email_verified" from "it sent a falsy
+#: value". They mean different things and are refused under different rules, so
+#: a plain ``.get(..., False)`` default would collapse them.
+_CLAIM_ABSENT = object()
+
 
 def _generate_pkce_pair() -> tuple[str, str]:
     """Return (code_verifier, S256 code_challenge) for upstream OIDC PKCE."""
@@ -113,6 +118,60 @@ class OIDCConnector(SSOConnector):
             code_verifier=code_verifier,
         )
 
+    def _require_vouched_identity(
+        self, subject: str, email: str, merged_claims: dict[str, Any]
+    ) -> None:
+        """Refuse a login whose principal the IdP has not vouched for.
+
+        The email claim is the principal everywhere downstream: it selects role
+        assignments, owns workspaces and names token owners. Three ways that goes
+        wrong, all of which this refuses (GHSA-3m8x-ff8g-7x8c):
+
+        * **No subject.** `sub` is mandatory in OIDC, so an empty one is a broken
+          IdP -- and subject is the stable half of the identity, the half that
+          survives the user changing their email.
+        * **No email.** Every such user collapses into one empty principal that
+          shares whatever is assigned to "".
+        * **Email the IdP does not vouch for.** An explicit
+          ``email_verified: false`` is refused unconditionally: the IdP is saying
+          the address is unverified, and an attacker at any configured provider
+          could otherwise set a victim's address and inherit their roles. A
+          *missing* claim is the weaker case, governed by
+          ``require_email_verified`` (default true, i.e. absent means unverified)
+          because some IdPs verify email without sending it.
+
+        Raises ValueError, which the callback path already surfaces as a failed
+        login -- never a partial identity.
+        """
+        if not subject:
+            raise ValueError(
+                f"{self.name} returned no 'sub' claim; refusing a login with no stable subject"
+            )
+        if not email:
+            raise ValueError(
+                f"{self.name} returned no 'email' claim; refusing a login with no principal"
+            )
+
+        verified = merged_claims.get("email_verified", _CLAIM_ABSENT)
+        if verified is _CLAIM_ABSENT:
+            if self._config.require_email_verified:
+                raise ValueError(
+                    f"{self.name} did not send an 'email_verified' claim for {email!r}. "
+                    "The email claim is the principal, so an unvouched address is refused. "
+                    "Set require_email_verified=false for this provider only if it verifies "
+                    "email without sending the claim."
+                )
+            return
+
+        # Present: must be truthy. A string "false" is falsy as an assertion of
+        # verification but truthy to Python, so compare against the real shapes
+        # an IdP sends rather than relying on bool().
+        if verified is True or (isinstance(verified, str) and verified.lower() == "true"):
+            return
+        raise ValueError(
+            f"{self.name} reports email_verified={verified!r} for {email!r}; refusing the login"
+        )
+
     async def handle_callback(
         self,
         callback_url: str,
@@ -174,6 +233,7 @@ class OIDCConnector(SSOConnector):
         # Extract identity from merged claims
         subject = merged_claims.get("sub", "")
         email = merged_claims.get("email", "")
+        self._require_vouched_identity(subject, email, merged_claims)
         display_name = merged_claims.get("name") or merged_claims.get("preferred_username")
 
         # Groups from the configured claim name (ID token or userinfo)

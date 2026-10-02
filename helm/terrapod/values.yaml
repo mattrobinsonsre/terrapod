@@ -300,6 +300,13 @@ api:
         #   audience: ""                     # API audience (Auth0/Okta); omit if unused
         #   groups_claim: groups             # Claim name containing user groups
         #   role_prefixes: ["terrapod:", "terrapod-"]  # Stripped from group names
+        #   # The email claim is the principal: it selects role assignments and
+        #   # owns workspaces. Default true refuses a login whose claims omit
+        #   # `email_verified`, because an address the IdP does not vouch for may
+        #   # have been set by whoever is logging in. Set false ONLY for an IdP
+        #   # that verifies email without sending the claim; an explicit
+        #   # `email_verified: false` is refused either way.
+        #   require_email_verified: true
         #   # K8s Secret containing the client_secret:
         #   existingSecret: "terrapod-auth0"
         #   existingSecretKey: "client_secret"   # Key within the Secret

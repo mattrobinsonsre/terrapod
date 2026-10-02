@@ -140,6 +140,7 @@
   "auth.sso.oidc[].groups_claim",
   "auth.sso.oidc[].issuer_url",
   "auth.sso.oidc[].name",
+  "auth.sso.oidc[].require_email_verified",
   "auth.sso.oidc[].role_prefixes",
   "auth.sso.oidc[].scopes",
   "auth.sso.saml[].acs_url",
