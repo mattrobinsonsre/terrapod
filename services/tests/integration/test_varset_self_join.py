@@ -240,13 +240,25 @@ class TestTheGuardIsWiredIntoBothPaths:
     only PATCH would leave the demonstrated attack working."""
 
     def test_create_and_patch_both_consult_it(self):
+        """A presence check, and it says so — the enforcement itself is covered by the
+        route-driven tests above.
+
+        `src.count("refuse_varset_growth(") >= 2` reads like it proves both call sites
+        are live and does not: wrapping either in `if False:` leaves the count at 2
+        while the guard is dead. Verified, for both sites. What catches that is
+        behavioural — four of this file's tests fail when the create guard is disabled
+        and one when the PATCH guard is, which is the coverage that matters.
+
+        This is kept for the thing those cannot do: fail when someone removes a call
+        site outright, or adds a third workspace-write path without one.
+        """
         import inspect
 
         from terrapod.api.routers import tfe_v2
 
         src = inspect.getsource(tfe_v2)
         assert src.count("refuse_varset_growth(") >= 2, (
-            "only one of create/PATCH consults the guard"
+            "a workspace-write path no longer reaches the guard at all"
         )
         assert "before=set()" in src, "create does not treat a new workspace as starting empty"
         assert "before=_varsets_before_patch" in src, (

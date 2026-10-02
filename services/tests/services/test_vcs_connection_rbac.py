@@ -596,44 +596,73 @@ class TestTheRepositoryAllowlist:
         assert not rbac.repository_allowed(c, "https://gitlab.com/other/proj")
 
 
-class TestBothSinksAreGuarded:
-    """The connection gate stops an unentitled workspace existing. The allowlist has
-    to be checked where the repository is actually READ, and the finding named both
-    sinks: the refs endpoint is a private-repository oracle at workspace-read, and
-    the config fetch is where the source arrives.
+class TestEverySinkHasBehaviouralCoverage:
+    """This class used to assert the sinks by reading their source, and those
+    assertions survived the deletion of what they guarded.
+
+    `"repository_allowed(" in src` is satisfied by any change that keeps the call and
+    discards its verdict — proven by mutating the refs guard to
+    `if not repository_allowed(...) and False:`, which left the endpoint an oracle for
+    every repository the credential can reach and passed all three tests. And
+    `src.count("_enforce_repository_allowlist(") >= 2` is satisfied by the `def` plus
+    ONE call site, so deleting either the create or the PATCH enforcement passed too.
+
+    The four sinks are now covered behaviourally in
+    `tests/integration/test_workspace_vcs_allowlist.py` (refs endpoint, config fetch,
+    workspace create, workspace PATCH), in
+    `tests/integration/test_registry_module_vcs_allowlist.py` (the three registry
+    paths), and in this file's `TestTheCredentialIsRefusedAtTheFetchItself` for the two
+    clone-time guards. Each of those fails under the mutation above.
+
+    What remains here is the one thing a behavioural test cannot do: fail when a NEW
+    sink appears without a guard, since no test can drive a route that does not exist
+    yet.
     """
 
-    def test_the_refs_endpoint_checks_it(self):
+    def test_every_path_that_accepts_a_repo_url_consults_the_allowlist(self):
         import inspect
 
-        from terrapod.api.routers import workspace_extensions
-
-        src = inspect.getsource(workspace_extensions)
-        assert "repository_allowed(" in src, (
-            "the refs endpoint does not check the allowlist, so it remains an "
-            "oracle for any repository the credential can reach"
-        )
-
-    def test_the_config_fetch_checks_it(self):
-        import inspect
-
+        from terrapod.api.routers import registry_modules, tfe_v2, workspace_extensions
         from terrapod.services import vcs_config_service
 
-        src = inspect.getsource(vcs_config_service)
-        assert "repository_allowed(" in src, (
-            "the fetch path does not check the allowlist, so the poller and a run "
-            "trigger would keep cloning a repository an operator has excluded"
+        #: A module that reads a caller-supplied repository URL must reach the
+        #: allowlist, by either name. Listed explicitly so that adding a module to the
+        #: set is a deliberate act with a reviewer attached.
+        must_check = {
+            "tfe_v2": tfe_v2,
+            "workspace_extensions": workspace_extensions,
+            "registry_modules": registry_modules,
+            "vcs_config_service": vcs_config_service,
+        }
+        missing = [
+            name
+            for name, mod in must_check.items()
+            if not any(
+                token in inspect.getsource(mod)
+                for token in ("repository_allowed(", "_enforce_repository_allowlist(")
+            )
+        ]
+        assert not missing, (
+            "these accept a repository URL without reaching the allowlist at all:\n  "
+            + "\n  ".join(missing)
+            + "\n\nThis is a presence check and deliberately weak — it cannot see a "
+            "call whose verdict is discarded. The real coverage is behavioural; add a "
+            "route-driven test alongside any new sink."
         )
 
-    def test_create_and_patch_both_enforce_it(self):
+    def test_the_clone_itself_is_guarded_in_both_fetch_functions(self):
+        """The layer the accepting paths cannot provide: a URL stored before a
+        narrowing must stop being cloned, and the poller clones before a run checks
+        anything."""
         import inspect
 
-        from terrapod.api.routers import tfe_v2
+        from terrapod.services import vcs_archive_cache, vcs_provider
 
-        src = inspect.getsource(tfe_v2)
-        assert src.count("_enforce_repository_allowlist(") >= 2, (
-            "only one of workspace create / PATCH enforces the allowlist"
-        )
+        for mod in (vcs_provider, vcs_archive_cache):
+            assert "repository_pair_allowed(" in inspect.getsource(mod), (
+                f"{mod.__name__} fetches a repository without the allowlist, so a "
+                "narrowing does not reach the clone"
+            )
 
 
 class TestTheAllowlistCannotBeBypassedByCraftingTheUrl:
