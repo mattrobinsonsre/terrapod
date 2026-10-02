@@ -23,7 +23,30 @@ import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "terrapod"
-DOCKERFILE = ROOT.parent / "docker" / "Dockerfile.listener"
+
+
+def _dockerfile() -> pathlib.Path:
+    """Find Dockerfile.listener under either layout.
+
+    The repository has it at `<repo>/docker/` with the python under
+    `<repo>/services/`, so one level UP from this test's root. The test image
+    flattens `services/` into `/app` and copies `docker/` beside it, so there it is
+    one level DOWN. A path hard-coded for either resolves to nothing in the other —
+    which is how this test passed locally and then failed the unit shard on a
+    FileNotFoundError, the same shape of mistake as the missing COPY it exists to
+    catch.
+    """
+    for cand in (ROOT.parent / "docker", ROOT / "docker"):
+        f = cand / "Dockerfile.listener"
+        if f.is_file():
+            return f
+    raise AssertionError(
+        "Dockerfile.listener not found beside or above the test root — if the test "
+        "image stopped copying docker/, this guard is silently not running."
+    )
+
+
+DOCKERFILE = _dockerfile()
 
 #: Where the listener process starts.
 ENTRYPOINTS = ("runner/__main__.py", "runner/listener.py")
