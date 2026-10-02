@@ -115,6 +115,46 @@ These are not deprecated surfaces. They are changes to what an existing field
 reports, so there is no `Deprecation` header to watch. Each keeps its current
 behaviour through every 1.x release.
 
+### A mandatory AI policy gate holds a run whose plan it saw only in part
+
+A plan over `ai_summary.plan_json_max_bytes` is reduced before the model sees it,
+and a **mandatory** gate now records an un-ruled evaluation and holds the run
+rather than ruling on the part it was shown. If you run a mandatory gate and large
+plans, runs that previously passed will hold and need an admin override; raise the
+cap, or set the gate to `advisory`. Advisory gates are unchanged.
+([`GHSA-v677-9r29-3xq8`](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-v677-9r29-3xq8).)
+
+### A listener cannot re-join into a different pool
+
+Listener names live in one global namespace, so a join under a name already
+registered to a **different** pool returns `409` instead of moving the listener.
+Re-joining the same pool and renaming are unaffected. What this stops is moving a
+listener between pools by swapping the join token while keeping `listener.name`:
+delete the old registration first, or give the listener a new name. A listener
+image older than v1.9.0 has never seen a `409` on join and will most likely retry
+rather than surface it.
+([`GHSA-vr88-c3hx-xr4h`](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-vr88-c3hx-xr4h).)
+
+### Resource onboarding runs the engine with an allowlisted environment
+
+`tofu init` and schema introspection no longer inherit the API's own environment —
+which matters because the second of those makes the engine launch a provider plugin
+as a child. Process basics, the engine's `TF_*` settings, both cases of the proxy
+variables, the CA-bundle variables and `TF_TOKEN_*` / `TF_CLI_ARGS*` survive;
+anything else you set through `api.extraEnv` does not. **If discovery stops working
+after upgrading, look here first** —
+[`terrapod-query.md`](terrapod-query.md#the-schema-subprocesses-get-an-allowlisted-environment)
+names what survives.
+([`GHSA-658f-j48w-w8m9`](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-658f-j48w-w8m9).)
+
+### `terrapod-migrate` refuses an `http://` TFE address
+
+The TFE API token it carries is as privileged as the Terrapod token beside it, and
+one was protected while the other was not. Loopback is exempt; set
+`TERRAPOD_ALLOW_INSECURE_TRANSPORT=1` if plaintext is deliberate — the same
+variable the Terrapod side already honours.
+([`GHSA-r98p-vq35-mcg2`](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-r98p-vq35-mcg2).)
+
 ### A run held at a post-plan gate stops reporting `planning` (v1.7.2)
 
 **Today:** when a mandatory policy set, an enforced security scan, or a
