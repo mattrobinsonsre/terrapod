@@ -26,9 +26,23 @@ from fastapi import HTTPException
 from terrapod.api.routers import tokens as router
 
 
-def _user(email="admin@example.com", roles=("admin",)):
+def _user(
+    email="admin@example.com",
+    roles=("admin",),
+    identity_provider="oidc",
+    identity_subject="sub-admin",
+):
+    # `identity_provider`/`identity_subject` are real `AuthenticatedUser` fields
+    # (GHSA-3m8x-ff8g-7x8c), so the stand-in carries them. Omitting them made the
+    # self-mint path raise AttributeError while the delegated path passed, because
+    # only a self-mint reads the caller's own identity.
     return SimpleNamespace(
-        email=email, roles=list(roles), kind="interactive", auth_method="session"
+        email=email,
+        roles=list(roles),
+        kind="interactive",
+        auth_method="session",
+        identity_provider=identity_provider,
+        identity_subject=identity_subject,
     )
 
 
@@ -102,6 +116,72 @@ class TestTheTokenIsBoundToTheUserInThePath:
                     db=_db(),
                 )
         assert exc.value.status_code == 403
+
+
+class TestTheOwningIdentityIsRecorded:
+    """The token records the OWNER's provider and subject, never the minter's.
+
+    `dependencies._resolve_user_roles` filters assignments on the token's provider
+    and subject, so getting this wrong is not cosmetic: a delegated token stamped
+    with the admin's provider would resolve the admin's assignments under the
+    subject's email, and one stamped with the admin's `sub` would match assignments
+    pinned to the admin.
+    """
+
+    async def test_a_self_mint_carries_the_callers_own_provider_and_subject(self):
+        db = _db()
+        created = SimpleNamespace(id="t1", bound_to=None, kind="interactive")
+        with (
+            patch.object(router, "effective_platform_roles", return_value=set()),
+            patch.object(
+                router, "create_api_token", new=AsyncMock(return_value=(created, "raw"))
+            ) as mk,
+            patch.object(router, "_token_to_jsonapi", return_value={}),
+        ):
+            await router.create_user_token(
+                user_id="alice",
+                body=_body(),
+                user=_user(
+                    "alice@example.com",
+                    roles=(),
+                    identity_provider="okta",
+                    identity_subject="sub-alice",
+                ),
+                db=db,
+            )
+        kwargs = mk.await_args.kwargs
+        assert kwargs["identity_provider"] == "okta"
+        assert kwargs["identity_subject"] == "sub-alice"
+
+    async def test_a_delegated_mint_is_local_and_claims_no_subject(self):
+        # The subject was resolved out of the `users` table, which holds local
+        # accounts only, so the owning identity is local -- and the admin has no
+        # way to know the subject's `sub`, so it must stay unset rather than
+        # inherit the minter's.
+        db = _db(local_row=SimpleNamespace(email="planner@example.com", is_active=True))
+        created = SimpleNamespace(id="t1", bound_to=None, kind="interactive")
+        with (
+            patch.object(router, "effective_platform_roles", return_value={"admin"}),
+            patch.object(
+                router, "create_api_token", new=AsyncMock(return_value=(created, "raw"))
+            ) as mk,
+            patch.object(router, "_token_to_jsonapi", return_value={}),
+        ):
+            await router.create_user_token(
+                user_id="planner@example.com",
+                body=_body(),
+                user=_user(identity_provider="okta", identity_subject="sub-admin"),
+                db=db,
+            )
+        kwargs = mk.await_args.kwargs
+        assert kwargs["identity_provider"] == "local", (
+            "a delegated mint resolves a LOCAL account, so the owning identity is "
+            "local -- stamping the minter's provider would resolve the minter's "
+            "assignments under the subject's email"
+        )
+        assert kwargs["identity_subject"] is None, (
+            "an admin minting for someone else must not be able to claim that person's subject"
+        )
 
 
 class TestItRefusesToBindToNobody:
