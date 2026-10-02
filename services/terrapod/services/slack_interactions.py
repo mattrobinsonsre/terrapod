@@ -122,7 +122,7 @@ async def _act(
     message_ts: str,
 ) -> None:
     from terrapod.api.dependencies import AuthenticatedUser, _resolve_user_roles
-    from terrapod.auth.capabilities import RUN_APPLY, has_capability
+    from terrapod.auth.capabilities import confirm_capability, has_capability
     from terrapod.db.models import Run, Workspace
     from terrapod.db.session import get_db_session
     from terrapod.services.run_service import confirm_run, discard_run
@@ -181,9 +181,13 @@ async def _act(
 
         ws_name = workspace.name  # captured for the deny message + parent edit
 
-        # 3. Live capability check — the same gate the API/UI use.
+        # 3. Live capability check — the SAME predicate the API route uses, via
+        # confirm_capability, so a destroy run requires run:apply-destroy here as
+        # well. This comment used to claim parity with the API while checking
+        # RUN_APPLY for everything, which let a role without run:apply-destroy
+        # confirm a destroy from Slack that the API would have refused.
         caps = await resolve_workspace_capabilities_for(db, user, workspace)
-        if not has_capability(caps, RUN_APPLY):
+        if not has_capability(caps, confirm_capability(run.is_destroy)):
             await _nudge(
                 response_url,
                 f"You ({email}) don't have permission to apply runs on *{ws_name}*.",
