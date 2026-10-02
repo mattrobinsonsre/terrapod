@@ -569,9 +569,12 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
     # lock/unlock only `workspace:lock`. A rule keyed on one of those is
     # self-joinable whatever the create/PATCH guard does, so the dimension is
     # refused rather than five more endpoints gated.
-    from terrapod.services.varset_self_join import RULE_DIMENSIONS_REFUSED
+    from terrapod.services.varset_self_join import (
+        RULE_DIMENSIONS_REFUSED,
+        rule_refused_dimensions,
+    )
 
-    refused = sorted(k for k in RULE_DIMENSIONS_REFUSED if k in rule)
+    refused = rule_refused_dimensions(rule)
     if refused:
         why = "; ".join(f"{k}: {RULE_DIMENSIONS_REFUSED[k]}" for k in refused)
         raise HTTPException(

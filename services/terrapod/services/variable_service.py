@@ -322,6 +322,21 @@ async def applicable_varsets(
     return out
 
 
+def _rule_refused(rule, varset) -> bool:
+    """True when `rule` selects on a dimension the matcher refuses (and logs it)."""
+    from terrapod.services.varset_self_join import rule_refused_dimensions
+
+    refused = rule_refused_dimensions(rule)
+    if refused:
+        logger.warning(
+            "variable set assignment rule selects on a refused dimension; "
+            "reporting no rule-derived workspaces",
+            varset=str(getattr(varset, "id", "")),
+            refused=refused,
+        )
+    return bool(refused)
+
+
 async def workspaces_for_varset(
     db: AsyncSession, varset: VariableSet
 ) -> list[tuple[Workspace, str]]:
@@ -352,7 +367,13 @@ async def workspaces_for_varset(
     for ws in explicit.scalars().all():
         seen[ws.id] = (ws, ASSIGNMENT_EXPLICIT)
 
-    if varset.assignment_rule:
+    # `_rule_refused` is in the condition because the matcher refuses those dimensions,
+    # so such a set reaches nothing through its rule and this view must say so.
+    # Reporting the rows the rule would have selected tells an operator a credential is
+    # in use where it no longer is, which is the wrong direction for the one screen
+    # read before a rotation. Explicit assignments above are unaffected — they do not
+    # go through the rule at all.
+    if varset.assignment_rule and not _rule_refused(varset.assignment_rule, varset):
         try:
             # build_workspace_query inside the guard, exactly as _rule_matches
             # does: it holds the "at least one selector" check, so a rule that
@@ -390,16 +411,15 @@ async def _rule_matches(db: AsyncSession, rule: dict | None, workspace_id: uuid.
     # stop matching, not keep working: both are platform state a workspace's own
     # owner can move, so continuing to honour such a rule would leave the
     # escalation open for exactly the deployments that already have one.
-    from terrapod.services.varset_self_join import RULE_DIMENSIONS_REFUSED
+    from terrapod.services.varset_self_join import rule_refused_dimensions
 
-    if isinstance(rule, dict):
-        refused = sorted(k for k in RULE_DIMENSIONS_REFUSED if k in rule)
-        if refused:
-            logger.warning(
-                "variable set assignment rule selects on a refused dimension; matching nothing",
-                refused=refused,
-            )
-            return False
+    refused = rule_refused_dimensions(rule)
+    if refused:
+        logger.warning(
+            "variable set assignment rule selects on a refused dimension; matching nothing",
+            refused=refused,
+        )
+        return False
 
     try:
         # build_workspace_query must be inside the guard, not only parse_filter:

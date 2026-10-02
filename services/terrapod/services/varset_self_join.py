@@ -101,6 +101,26 @@ RULE_DIMENSIONS_REFUSED: dict[str, str] = {
 }
 
 
+def rule_refused_dimensions(rule) -> list[str]:
+    """The refused dimensions this rule selects on, sorted. Empty means none.
+
+    Every consumer of `assignment_rule` must agree about this, and they did not: the
+    matcher that decides delivery refused these dimensions while the blast-radius view
+    that answers "who currently receives this credential" did not, so the view listed
+    workspaces that had already stopped receiving the set. On a rule keyed only on a
+    refused dimension the matcher matches nothing at all, so the view reported reach
+    where there was none — and it is the screen an operator reads before rotating a
+    credential.
+
+    One predicate rather than the same comprehension in three files, with
+    `test_every_assignment_rule_consumer_refuses_the_same_dimensions` failing if a
+    fourth consumer appears without it.
+    """
+    if not isinstance(rule, dict):
+        return []
+    return sorted(k for k in RULE_DIMENSIONS_REFUSED if k in rule)
+
+
 def touches_rule_selectable(attrs: dict, relationships: dict | None = None) -> bool:
     """Whether this request body could change which assignment rules match.
 
