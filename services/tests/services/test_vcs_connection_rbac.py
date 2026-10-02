@@ -930,3 +930,48 @@ class TestAPinnedTokenCannotEscapeItsPinThroughTheLabelPath:
             "a call site passes an un-narrowed role set to the label path:\n  "
             + "\n  ".join(offenders)
         )
+
+
+class TestARefusalAtTheCloneCostsOneWorkspaceNotTheCycle:
+    """The blast radius of enforcing the allowlist at the clone, asserted rather than
+    assumed — this is the property that would make the change dangerous if wrong.
+
+    The poller walks every workspace in one pass. If `RepositoryNotAllowed` escaped the
+    per-workspace handler, narrowing ONE connection would stop the poll cycle for the
+    whole deployment, and every workspace would quietly stop picking up commits. The
+    handler that contains it is a broad pre-existing `except Exception`, so this test
+    exists to stop someone narrowing it later to something that no longer catches a
+    `PermissionError`.
+    """
+
+    def test_the_refusal_is_catchable_by_the_handlers_that_wrap_the_fetch(self):
+        from terrapod.services.vcs_connection_rbac import RepositoryNotAllowed
+
+        # `PermissionError` -> `OSError` -> `Exception`. The poller's handler is
+        # `except Exception`, and an `except OSError` for transport would also catch it.
+        assert issubclass(RepositoryNotAllowed, Exception)
+        assert issubclass(RepositoryNotAllowed, OSError)
+
+    def test_the_poller_wraps_both_fetch_call_sites(self):
+        """A source check, because driving a full poll cycle to assert "the other
+        workspaces still got polled" needs the whole VCS fixture — and the property is
+        positional: the call must sit inside a `try`."""
+        import inspect
+        import re
+
+        from terrapod.services import vcs_poller
+
+        src = inspect.getsource(vcs_poller)
+        unwrapped = []
+        for m in re.finditer(r"\n([ \t]*)(?:\w+ = )?await (?:cache|meta)\.get_or_fetch\(", src):
+            before = src[: m.start()].rstrip().splitlines()
+            j = len(before) - 1
+            while j >= 0 and (before[j].strip().startswith("#") or not before[j].strip()):
+                j -= 1
+            if j >= 0 and before[j].strip() != "try:":
+                unwrapped.append(before[j].strip()[:70])
+        assert not unwrapped, (
+            "a get_or_fetch in the poller is not the first statement in a try:, so a "
+            "repository refused by the allowlist would abort the poll cycle for every "
+            "other workspace too:\n  " + "\n  ".join(unwrapped)
+        )
