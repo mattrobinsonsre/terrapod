@@ -117,6 +117,60 @@ class TestTokenExpiry:
         ) == rotated + timedelta(hours=24)
 
 
+class TestANonPositiveLifespanCannotDefeatTheCap:
+    """GHSA-4frx-7xrc-c96g.
+
+    `lifespan_hours = 0` on an INTERACTIVE token used to mint one that never
+    expires: the rescue that mapped a non-positive ttl back to the cap applied
+    only to service kinds, so an interactive token fell through to the
+    `ttl <= 0 -> None` branch. The field exists to be bounded by the cap, and it
+    was the way round it.
+
+    Fixed at interpretation as well as at the write, because a create-time check
+    alone cannot reach a row already stored with a non-positive value.
+    """
+
+    @pytest.mark.parametrize("bad", [0, -1, -24])
+    @patch("terrapod.auth.api_tokens.settings")
+    def test_an_interactive_token_falls_back_to_the_cap(self, ms, bad):
+        ms.auth.api_token_max_ttl_hours = 24
+        created = datetime(2026, 1, 1, tzinfo=UTC)
+        assert token_expires_at(
+            _tok(kind="interactive", lifespan_hours=bad, created_at=created)
+        ) == created + timedelta(hours=24)
+
+    @pytest.mark.parametrize("bad", [0, -1])
+    @patch("terrapod.auth.api_tokens.settings")
+    def test_a_service_token_is_unchanged(self, ms, bad):
+        """It was already rescued; this pins that the widening did not move it."""
+        # Service kinds read their OWN cap (`_max_ttl_hours_for_kind`), so setting
+        # only the interactive one leaves a MagicMock in the arithmetic — which is
+        # how this test failed first time round rather than the code being wrong.
+        ms.auth.service_token_max_ttl_hours = 24
+        ms.auth.api_token_max_ttl_hours = 24
+        created = datetime(2026, 1, 1, tzinfo=UTC)
+        assert token_expires_at(
+            _tok(kind="service_bound", lifespan_hours=bad, created_at=created)
+        ) == created + timedelta(hours=24)
+
+    @patch("terrapod.auth.api_tokens.settings")
+    def test_the_operators_own_no_limit_still_means_no_limit(self, ms):
+        """The negative path. `api_token_max_ttl_hours = 0` is documented as "no
+        limit", so it must still return None — otherwise this fix would quietly
+        take away a configuration option rather than closing a hole."""
+        ms.auth.api_token_max_ttl_hours = 0
+        assert token_expires_at(_tok(kind="interactive", lifespan_hours=0)) is None
+        assert token_expires_at(_tok(kind="interactive")) is None
+
+    @patch("terrapod.auth.api_tokens.settings")
+    def test_a_positive_lifespan_is_untouched(self, ms):
+        ms.auth.api_token_max_ttl_hours = 24
+        created = datetime(2026, 1, 1, tzinfo=UTC)
+        assert token_expires_at(
+            _tok(kind="interactive", lifespan_hours=5, created_at=created)
+        ) == created + timedelta(hours=5)
+
+
 class TestCreateAPIToken:
     @pytest.fixture
     def mock_db(self):
