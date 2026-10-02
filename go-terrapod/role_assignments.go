@@ -15,7 +15,11 @@ type RoleAssignment struct {
 	ProviderName string `json:"provider-name"`
 	Email        string `json:"email"`
 	RoleName     string `json:"role-name"`
-	CreatedAt    string `json:"created-at,omitempty"`
+	// Subject optionally pins the assignment to one IdP subject. Empty is the
+	// normal case and means it matches on (provider, email); set, it matches only
+	// that subject, so acquiring the address does not acquire the grant.
+	Subject   string `json:"subject,omitempty"`
+	CreatedAt string `json:"created-at,omitempty"`
 }
 
 // ListRoleAssignments returns every assignment visible to the
@@ -55,23 +59,56 @@ func (c *Client) ListRoleAssignmentsForIdentity(ctx context.Context, providerNam
 // slice to remove all custom assignments (the user still gets
 // implicit `everyone`).
 func (c *Client) SetRolesForIdentity(ctx context.Context, providerName, email string, roles []string) error {
+	return c.SetRolesForIdentityPinned(ctx, providerName, email, roles, "")
+}
+
+// SetRolesForIdentityPinned is SetRolesForIdentity with an optional IdP subject.
+//
+// A subject pins the assignments to one identity at that provider. Email is the
+// weaker half: an IdP that lets a user change their address, or an operator
+// recycling one, otherwise moves the grant to a different human. Pass "" for the
+// normal unpinned behaviour -- which is what most callers want, since a subject is
+// an opaque provider-issued string an operator does not have to hand.
+func (c *Client) SetRolesForIdentityPinned(ctx context.Context, providerName, email string, roles []string, subject string) error {
 	if roles == nil {
 		roles = []string{}
 	}
-	body, err := json.Marshal(map[string]any{
-		"data": map[string]any{
-			"attributes": map[string]any{
-				"provider-name": providerName,
-				"email":         email,
-				"roles":         roles,
-			},
-		},
-	})
+	attrs := map[string]any{
+		"provider-name": providerName,
+		"email":         email,
+		"roles":         roles,
+	}
+	// Omitted rather than sent empty: the server reads a falsy value as "unpinned",
+	// but sending the key makes a future server unable to tell "leave it alone" from
+	// "clear it".
+	if subject != "" {
+		attrs["subject"] = subject
+	}
+	body, err := json.Marshal(map[string]any{"data": map[string]any{"attributes": attrs}})
 	if err != nil {
 		return fmt.Errorf("marshal role assignment PUT: %w", err)
 	}
 	_, err = c.Put(ctx, "/api/terrapod/v1/role-assignments", body)
 	return err
+}
+
+// PinIdentitySubject sets (or clears, with "") the IdP subject pinned to an
+// identity's role assignments, leaving the role set itself alone.
+//
+// The pin is a property of the identity rather than of one grant: the replace-all
+// PUT applies one subject to every row it writes. So this reads the current roles
+// and re-sends them with the new subject, which is the only way to change the pin
+// without also changing what is assigned.
+func (c *Client) PinIdentitySubject(ctx context.Context, providerName, email, subject string) error {
+	current, err := c.ListRoleAssignmentsForIdentity(ctx, providerName, email)
+	if err != nil {
+		return err
+	}
+	names := make([]string, 0, len(current))
+	for _, a := range current {
+		names = append(names, a.RoleName)
+	}
+	return c.SetRolesForIdentityPinned(ctx, providerName, email, names, subject)
 }
 
 // AddRoleToIdentity adds a single role to the existing set. Idempotent —
@@ -83,14 +120,22 @@ func (c *Client) AddRoleToIdentity(ctx context.Context, providerName, email, rol
 		return err
 	}
 	names := make([]string, 0, len(current)+1)
+	// Carry the existing subject pin forward. The PUT this ends in is replace-all and
+	// applies one subject to every row it writes, so sending none would silently
+	// UNPIN a subject-pinned identity as a side effect of adding an unrelated role --
+	// turning an "add a role" into a quiet downgrade of its security.
+	subject := ""
 	for _, a := range current {
 		if a.RoleName == roleName {
 			return nil // already present
 		}
+		if subject == "" {
+			subject = a.Subject
+		}
 		names = append(names, a.RoleName)
 	}
 	names = append(names, roleName)
-	return c.SetRolesForIdentity(ctx, providerName, email, names)
+	return c.SetRolesForIdentityPinned(ctx, providerName, email, names, subject)
 }
 
 // RemoveRoleFromIdentity removes a single (provider, email, role)

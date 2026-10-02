@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.security import HTTPAuthorizationCredentials
 
-from terrapod.api.dependencies import _resolve_user_roles, get_current_user
+from terrapod.api.dependencies import _cache_slot, _resolve_user_roles, get_current_user
 
 
 class _Result:
@@ -122,7 +122,7 @@ class TestTheCacheIsProviderScoped:
         the first provider to resolve would have populated a single list served to
         every other provider for the next 60 seconds.
         """
-        cached = json.dumps({"strong-idp": ["admin", "everyone"]})
+        cached = json.dumps({_cache_slot("strong-idp", None): ["admin", "everyone"]})
         db = _ScopedDB({"weak-idp": []})
         r = _redis(initial=cached)
         with patch("terrapod.redis.client.get_redis_client", return_value=r):
@@ -130,7 +130,7 @@ class TestTheCacheIsProviderScoped:
         assert "admin" not in roles, roles
 
     async def test_a_cache_hit_for_the_same_provider_is_served(self):
-        cached = json.dumps({"strong-idp": ["admin", "everyone"]})
+        cached = json.dumps({_cache_slot("strong-idp", None): ["admin", "everyone"]})
         db = _ScopedDB({})
         r = _redis(initial=cached)
         with patch("terrapod.redis.client.get_redis_client", return_value=r):
@@ -213,3 +213,86 @@ class TestTheTokenPathPassesItsProvider:
         assert user.email == "victim@example.com"
         assert "admin" not in user.roles, user.roles
         assert user.identity_provider == "weak-idp"
+
+
+class _PinnedDB:
+    """A db that honours BOTH the provider and the subject predicate in the WHERE.
+
+    `rows` maps (provider, pinned_subject_or_None) -> role names. A statement only
+    yields a row's roles if its compiled SQL both names that provider and admits
+    that pinning — so removing either clause changes the answer, and a fake that
+    returned fixtures regardless would prove nothing about either.
+    """
+
+    def __init__(self, rows: dict[tuple[str, str | None], list[str]]):
+        self.rows = rows
+        self.seen: list[str] = []
+
+    async def execute(self, stmt):
+        sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+        self.seen.append(sql)
+        if "platform_role_assignments" in sql:
+            return _Result([])
+        out: list[tuple[str]] = []
+        for (provider, pinned), roles in self.rows.items():
+            if f"provider_name = '{provider}'" not in sql:
+                continue
+            # An unpinned row is admitted by the `subject IS NULL` disjunct, which is
+            # present in both forms of the predicate.
+            if pinned is None:
+                if "subject IS NULL" in sql:
+                    out += [(r,) for r in roles]
+            # A pinned row needs its own subject named.
+            elif f"subject = '{pinned}'" in sql:
+                out += [(r,) for r in roles]
+        return _Result(out)
+
+
+class TestASubjectPinnedAssignmentIsNarrower:
+    """An assignment may pin itself to one IdP subject.
+
+    Email is the weak half of an identity: an IdP that lets a user change their
+    address, or an operator recycling one, moves a grant to a different human. A
+    subject cannot be acquired by acquiring an address.
+    """
+
+    async def test_an_unpinned_assignment_matches_any_subject(self):
+        db = _PinnedDB({("okta", None): ["deployer"]})
+        with patch("terrapod.redis.client.get_redis_client", return_value=_redis()):
+            roles = await _resolve_user_roles(db, "u@example.com", "okta", "sub-anything")
+        assert "deployer" in roles, roles
+
+    async def test_an_unpinned_assignment_matches_an_unknown_subject(self):
+        """The normal case: operators type an address, not an opaque `sub`."""
+        db = _PinnedDB({("okta", None): ["deployer"]})
+        with patch("terrapod.redis.client.get_redis_client", return_value=_redis()):
+            roles = await _resolve_user_roles(db, "u@example.com", "okta", None)
+        assert "deployer" in roles, roles
+
+    async def test_a_pinned_assignment_matches_only_its_own_subject(self):
+        db = _PinnedDB({("okta", "sub-alice"): ["admin-ish"]})
+        with patch("terrapod.redis.client.get_redis_client", return_value=_redis()):
+            alice = await _resolve_user_roles(db, "alice@example.com", "okta", "sub-alice")
+            impostor = await _resolve_user_roles(db, "alice@example.com", "okta", "sub-bob")
+        assert "admin-ish" in alice, alice
+        assert "admin-ish" not in impostor, impostor
+
+    async def test_a_pinned_assignment_does_not_match_an_unknown_subject(self):
+        """Fail closed: a credential that cannot prove its subject gets the narrow set."""
+        db = _PinnedDB({("okta", "sub-alice"): ["admin-ish"]})
+        with patch("terrapod.redis.client.get_redis_client", return_value=_redis()):
+            roles = await _resolve_user_roles(db, "alice@example.com", "okta", None)
+        assert "admin-ish" not in roles, roles
+
+    async def test_the_cache_does_not_leak_a_pinned_grant_across_subjects(self):
+        """Two principals can share an address at one provider — that is why pinning exists.
+
+        A provider-only cache slot would serve one of them the other's pinned roles for
+        up to 60 seconds.
+        """
+        cached = json.dumps({_cache_slot("okta", "sub-alice"): ["admin-ish", "everyone"]})
+        db = _PinnedDB({})
+        r = _redis(initial=cached)
+        with patch("terrapod.redis.client.get_redis_client", return_value=r):
+            bob = await _resolve_user_roles(db, "alice@example.com", "okta", "sub-bob")
+        assert "admin-ish" not in bob, bob

@@ -777,7 +777,9 @@
       "setAssignmentStatus": "Nie udało się ustawić przypisania ({status})",
       "deleteAssignment": "Nie udało się usunąć przypisania",
       "conflictingLabelKeys": "{keys} otrzymał więcej niż jedną wartość. Reguła etykiety przechowuje jedną wartość na klucz, więc ostatnia po cichu zastąpiłaby wcześniejsze. API obsługuje wiele wartości dla jednego klucza, ale nie można ich jeszcze ustawić tutaj."
-    }
+    },
+    "pinnedToSubject": "Przypięte",
+    "pinnedToSubjectTitle": "Przypięte do podmiotu IdP {subject}"
   },
   "adminVcs": {
     "title": "Połączenia VCS",

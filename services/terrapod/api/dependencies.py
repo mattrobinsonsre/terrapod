@@ -31,6 +31,7 @@ from terrapod.auth.sessions import (
     refresh_session,
 )
 from terrapod.config import settings
+from terrapod.db.models import subject_matches as _subject_matches
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
@@ -76,6 +77,9 @@ class AuthenticatedUser:
     # for a runner token, and for a credential minted before the provider was
     # recorded; either way it resolves to no roles rather than to all of them.
     identity_provider: str | None = None
+    # The IdP subject, where known. Lets a subject-pinned role assignment be matched
+    # for this principal; None matches unpinned assignments only.
+    identity_subject: str | None = None
 
 
 def effective_platform_roles(user: AuthenticatedUser) -> set[str]:
@@ -123,8 +127,26 @@ def label_reach_roles(user: AuthenticatedUser) -> set[str]:
     return roles
 
 
+def _cache_slot(identity_provider: str | None, identity_subject: str | None) -> str:
+    """The per-principal slot inside the email-keyed role cache.
+
+    The cache key is the email (five call sites already invalidate by it), so the
+    value is a map and this is its key. It must include the subject as well as the
+    provider: two principals can share an address at one provider -- which is the
+    entire reason subject pinning exists -- so a provider-only slot would serve one
+    of them the other's pinned roles.
+
+    NUL-separated because neither a provider name nor a subject can contain it, so
+    no pair of distinct principals can collide on one slot.
+    """
+    return f"{identity_provider}\x00{identity_subject or ''}"
+
+
 async def _resolve_user_roles(
-    db: AsyncSession, email: str, identity_provider: str | None
+    db: AsyncSession,
+    email: str,
+    identity_provider: str | None,
+    identity_subject: str | None = None,
 ) -> list[str]:
     """Resolve a principal's roles from role_assignments + platform_role_assignments.
 
@@ -140,6 +162,14 @@ async def _resolve_user_roles(
     column existed cannot be attributed, and picking a provider for it would
     reinstate the hole. Such tokens must be re-minted.
 
+    ``identity_subject`` narrows it further. An assignment may pin itself to one IdP
+    subject, which is the stable half of an identity -- it survives the user changing
+    their email, and an attacker who acquires the address does not acquire it. A pinned
+    assignment matches only that subject; an unpinned one (the normal case, since a
+    ``sub`` is opaque and an operator types an address) matches on provider and email as
+    before. **An unknown subject therefore matches unpinned assignments only**, which is
+    the fail-closed direction.
+
     Cached in Redis for 60s. The cache key stays ``tp:token_roles:{email}`` and
     the *value* holds a per-provider map, deliberately: five call sites already
     invalidate by that exact key, and adding the provider to the key would mean
@@ -154,6 +184,7 @@ async def _resolve_user_roles(
 
     redis = get_redis_client()
     cache_key = _TOKEN_ROLES_PREFIX + email
+    cache_slot = _cache_slot(identity_provider, identity_subject)
 
     cached = await redis.get(cache_key)
     by_provider: dict[str, list[str]] = {}
@@ -166,14 +197,18 @@ async def _resolve_user_roles(
                 by_provider = loaded
         except (TypeError, ValueError):
             by_provider = {}
-        if identity_provider in by_provider:
-            return by_provider[identity_provider]
+        # Keyed by provider AND subject: two principals can share an address at one
+        # provider (that is the whole reason pinning exists), so a provider-only key
+        # would serve one of them the other's pinned roles.
+        if cache_slot in by_provider:
+            return by_provider[cache_slot]
 
     # Platform roles (admin, audit)
     result = await db.execute(
         select(PlatformRoleAssignment.role_name).where(
             PlatformRoleAssignment.email == email,
             PlatformRoleAssignment.provider_name == identity_provider,
+            _subject_matches(PlatformRoleAssignment, identity_subject),
         )
     )
     roles: set[str] = {row[0] for row in result.all()}
@@ -183,6 +218,7 @@ async def _resolve_user_roles(
         select(RoleAssignment.role_name).where(
             RoleAssignment.email == email,
             RoleAssignment.provider_name == identity_provider,
+            _subject_matches(RoleAssignment, identity_subject),
         )
     )
     roles.update(row[0] for row in result.all())
@@ -190,7 +226,7 @@ async def _resolve_user_roles(
     roles.add("everyone")
     role_list = _drop_roles_requiring_external_sso(sorted(roles), identity_provider, email)
 
-    by_provider[identity_provider] = role_list
+    by_provider[cache_slot] = role_list
     await redis.set(cache_key, json.dumps(by_provider), ex=_TOKEN_ROLES_CACHE_TTL)
 
     return role_list
@@ -285,7 +321,11 @@ async def get_current_user(
                     bound_to=email,
                 )
             roles = (
-                await _resolve_user_roles(db, email, api_token.identity_provider) if email else []
+                await _resolve_user_roles(
+                    db, email, api_token.identity_provider, api_token.identity_subject
+                )
+                if email
+                else []
             )
 
             request.state.user_email = email  # for audit middleware
@@ -296,6 +336,7 @@ async def get_current_user(
                 provider_name="api_token",
                 auth_method="api_token",
                 identity_provider=api_token.identity_provider,
+                identity_subject=api_token.identity_subject,
                 kind=api_token.kind,
                 pinned_roles=api_token.pinned_roles,
             )
@@ -316,6 +357,7 @@ async def get_current_user(
                 provider_name=session.provider_name,
                 auth_method="session",
                 identity_provider=session.provider_name,
+                identity_subject=session.subject,
             )
 
     if credentials is not None:
@@ -383,7 +425,11 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
                 )
             email = api_token.bound_to or ""
             roles = (
-                await _resolve_user_roles(db, email, api_token.identity_provider) if email else []
+                await _resolve_user_roles(
+                    db, email, api_token.identity_provider, api_token.identity_subject
+                )
+                if email
+                else []
             )
             request.state.user_email = email
             return AuthenticatedUser(
@@ -393,6 +439,7 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
                 provider_name="api_token",
                 auth_method="api_token",
                 identity_provider=api_token.identity_provider,
+                identity_subject=api_token.identity_subject,
                 kind=api_token.kind,
                 pinned_roles=api_token.pinned_roles,
             )
@@ -411,6 +458,7 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
             provider_name=session.provider_name,
             auth_method="session",
             identity_provider=session.provider_name,
+            identity_subject=session.subject,
         )
 
     raise HTTPException(

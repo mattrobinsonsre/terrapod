@@ -75,6 +75,12 @@ class Session:
     #: that case rather than treating the gap as "no ceiling".
     absolute_expires_at: str = ""
 
+    # The IdP subject -- the stable half of the identity. Carried so a role
+    # assignment pinned to a subject can be matched, and so an email change at the
+    # IdP does not silently move someone else's grants onto this principal
+    # (GHSA-3m8x-ff8g-7x8c). Defaulted, so a value written before this field
+    # existed deserialises rather than failing.
+    subject: str | None = None
     # Token is not stored in Redis — it's the key, not the value.
     token: str = field(default="", repr=False)
 
@@ -136,6 +142,7 @@ async def create_session(
     roles: list[str],
     provider_name: str,
     max_ttl: int | None = None,
+    subject: str | None = None,
 ) -> Session:
     """Create a new session in Redis. Returns the Session with its token.
 
@@ -169,6 +176,7 @@ async def create_session(
         expires_at=expires_at.isoformat(),
         last_active_at=now.isoformat(),
         absolute_expires_at=absolute_expires_at,
+        subject=subject,
         token=token,
     )
 

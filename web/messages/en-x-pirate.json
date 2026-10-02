@@ -777,7 +777,9 @@
       "setAssignmentStatus": "Failed t'' set assignment ({status})",
       "deleteAssignment": "Failed t'' send assignment t'' Davy Jones",
       "conflictingLabelKeys": "{keys} be given more than one value. A marking rule holds one value per key, so the last would quietly replace them afore it. Matching several values for one key be supported by the API but cannot yet be set here."
-    }
+    },
+    "pinnedToSubject": "Belayed",
+    "pinnedToSubjectTitle": "Belayed to th'' IdP subject {subject}"
   },
   "adminVcs": {
     "title": "VCS Moorin''s",

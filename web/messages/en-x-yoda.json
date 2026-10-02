@@ -777,7 +777,9 @@
       "setAssignmentStatus": "Set the assignment, it did not ({status})",
       "deleteAssignment": "Delete the assignment, it did not",
       "conflictingLabelKeys": "More than one value, {keys} is given. One value per key a label rule holds, so silently replace the earlier ones the last would. Supported by the API, several values for one key are, but set here yet they cannot be."
-    }
+    },
+    "pinnedToSubject": "Pinned",
+    "pinnedToSubjectTitle": "To IdP subject {subject}, pinned it is"
   },
   "adminVcs": {
     "title": "Connections, VCS",

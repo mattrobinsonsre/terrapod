@@ -777,7 +777,9 @@
       "setAssignmentStatus": "Nepodařilo se nastavit přiřazení ({status})",
       "deleteAssignment": "Nepodařilo se smazat přiřazení",
       "conflictingLabelKeys": "{keys} má více než jednu hodnotu. Pravidlo štítku drží jednu hodnotu na klíč, takže poslední by tiše nahradila předchozí. Více hodnot pro jeden klíč API podporuje, ale zde je zatím nastavit nelze."
-    }
+    },
+    "pinnedToSubject": "Připnuto",
+    "pinnedToSubjectTitle": "Připnuto k subjektu IdP {subject}"
   },
   "adminVcs": {
     "title": "VCS připojení",

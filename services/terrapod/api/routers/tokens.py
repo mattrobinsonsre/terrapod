@@ -301,11 +301,17 @@ async def create_user_token(
     # row there -- see _resolve_subject_email), so that owner is local. A detached
     # token owns no identity and gets None.
     owner_provider = user.identity_provider if is_self else (None if bound_to is None else "local")
+    # Only a self-mint knows the owner's subject. A delegated mint resolves a local
+    # account by email and has no `sub` to record, so the token matches unpinned
+    # assignments only -- which is the fail-closed direction, and correct: an admin
+    # minting for someone else should not be able to claim that person's subject.
+    owner_subject = user.identity_subject if is_self else None
     api_token, raw_token = await create_api_token(
         db=db,
         bound_to=bound_to,
         created_by=user.email,
         identity_provider=owner_provider,
+        identity_subject=owner_subject,
         kind=kind,
         description=body.data.attributes.description,
         lifespan_hours=body.data.attributes.lifespan_hours,

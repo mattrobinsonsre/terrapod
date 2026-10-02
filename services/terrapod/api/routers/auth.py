@@ -324,6 +324,7 @@ async def local_authorize(
     auth_code = AuthCode(
         email=login.email,
         roles=login.roles,
+        subject=login.subject,
         provider_name="local",
         code_challenge=body.code_challenge,
         code_challenge_method=body.code_challenge_method,
@@ -386,6 +387,7 @@ async def local_login_submit(
     auth_code = AuthCode(
         email=login.email,
         roles=login.roles,
+        subject=login.subject,
         provider_name="local",
         code_challenge=auth_state.code_challenge,
         code_challenge_method=auth_state.code_challenge_method,
@@ -519,6 +521,7 @@ async def callback(
     auth_code = AuthCode(
         email=login.email,
         roles=login.roles,
+        subject=login.subject,
         provider_name=auth_state.provider_name,
         code_challenge=auth_state.code_challenge,
         code_challenge_method=auth_state.code_challenge_method,
@@ -603,6 +606,7 @@ async def saml_acs(
     auth_code = AuthCode(
         email=login.email,
         roles=login.roles,
+        subject=login.subject,
         provider_name=auth_state.provider_name,
         code_challenge=auth_state.code_challenge,
         code_challenge_method=auth_state.code_challenge_method,
@@ -661,6 +665,7 @@ async def exchange_token(
         roles=auth_code.roles,
         provider_name=auth_code.provider_name,
         max_ttl=auth_code.max_session_ttl,
+        subject=auth_code.subject,
     )
 
     logger.info(

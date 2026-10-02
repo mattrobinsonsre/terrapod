@@ -25,6 +25,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    or_,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -151,6 +152,15 @@ class RoleAssignment(Base):
     role_name: Mapped[str] = mapped_column(
         String(63), ForeignKey("roles.name", ondelete="CASCADE"), primary_key=True
     )
+    # Optionally pins this assignment to one IdP SUBJECT. The subject is the stable
+    # half of an identity: it survives the user changing their email, and an
+    # attacker who acquires the address cannot acquire it. NULL means the
+    # assignment matches on (provider, email) as it always has -- which is what an
+    # operator can actually type, since a `sub` is opaque. Set, it matches ONLY
+    # that subject, so an email takeover at the same provider inherits nothing.
+    # A restriction on an existing grant rather than a new kind of row, which is
+    # why it is not part of the primary key (GHSA-3m8x-ff8g-7x8c).
+    subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
@@ -168,6 +178,15 @@ class PlatformRoleAssignment(Base):
     provider_name: Mapped[str] = mapped_column(String(63), primary_key=True)
     email: Mapped[str] = mapped_column(String(255), primary_key=True)
     role_name: Mapped[str] = mapped_column(String(63), primary_key=True)
+    # Optionally pins this assignment to one IdP SUBJECT. The subject is the stable
+    # half of an identity: it survives the user changing their email, and an
+    # attacker who acquires the address cannot acquire it. NULL means the
+    # assignment matches on (provider, email) as it always has -- which is what an
+    # operator can actually type, since a `sub` is opaque. Set, it matches ONLY
+    # that subject, so an email takeover at the same provider inherits nothing.
+    # A restriction on an existing grant rather than a new kind of row, which is
+    # why it is not part of the primary key (GHSA-3m8x-ff8g-7x8c).
+    subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
@@ -207,6 +226,9 @@ class APIToken(Base):
     # roles rather than to all of them, because guessing a provider is how the
     # original hole worked.
     identity_provider: Mapped[str | None] = mapped_column(String(63), nullable=True)
+    # The IdP subject of the owning identity, where it was known at mint time. Lets a
+    # subject-pinned role assignment be matched for a token, not only a session.
+    identity_subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Token's own pinned role set (service tokens). Resolved through label-RBAC.
     pinned_roles: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     # Legacy TFE-shaped field, superseded by `kind`. Retained (unread) for
@@ -3853,3 +3875,21 @@ class OCIUploadSession(Base):
     )
 
     __table_args__ = (sa.Index("ix_oci_upload_sessions_updated_at", "updated_at"),)
+
+
+def subject_matches(model, identity_subject: str | None):
+    """SQL for "this assignment is unpinned, or pinned to exactly this subject".
+
+    Shared by both role resolvers -- `dependencies._resolve_user_roles` for tokens and
+    `sso_service._load_internal_assignments` for logins -- so the rule cannot drift
+    between them. A rule applied in one and not the other is a hole, because the other
+    path becomes the way around it (GHSA-3m8x-ff8g-7x8c).
+
+    An unpinned assignment (``subject IS NULL``) is the normal case and always matches,
+    because an operator types an address and a ``sub`` is opaque. A pinned one matches
+    only its own subject, so an unknown subject matches unpinned assignments only --
+    the fail-closed direction.
+    """
+    if identity_subject is None:
+        return model.subject.is_(None)
+    return or_(model.subject.is_(None), model.subject == identity_subject)

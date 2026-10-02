@@ -79,6 +79,12 @@ class AuthCode:
     # Maximum session TTL in seconds, set when the IDP id_token expires
     # sooner than the configured session_ttl_hours.
     max_session_ttl: int | None = None
+    # The IdP subject -- the stable half of the identity. Carried so a role
+    # assignment pinned to a subject can be matched, and so an email change at the
+    # IdP does not silently move someone else's grants onto this principal
+    # (GHSA-3m8x-ff8g-7x8c). Defaulted, so a value written before this field
+    # existed deserialises rather than failing.
+    subject: str | None = None
     # "session" for web UI, "api_token" for terraform login
     credential_type: str = "session"
 

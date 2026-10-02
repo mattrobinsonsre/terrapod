@@ -201,6 +201,10 @@ interface RoleAssignment {
     'provider-name': string
     email: string
     'role-name': string
+    // Non-null when the grant is pinned to one IdP subject, so acquiring the email
+    // does not acquire the grant. Shown read-only: a subject is an opaque provider
+    // string, set as code or via the API rather than typed into a form.
+    subject: string | null
     'created-at': string
   }
 }
@@ -1053,7 +1057,17 @@ export default function RolesPage() {
                     {sortedAssignments.map((a) => (
                       <tr key={`${a.attributes['provider-name']}:${a.attributes.email}:${a.attributes['role-name']}`} className="hover:bg-slate-700/20 transition-colors">
                         <td className="px-4 py-3 text-sm text-slate-400">{a.attributes['provider-name']}</td>
-                        <td className="px-4 py-3 text-sm text-slate-200">{a.attributes.email}</td>
+                        <td className="px-4 py-3 text-sm text-slate-200">
+                          {a.attributes.email}
+                          {a.attributes.subject ? (
+                            <span
+                              className="ms-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-300 align-middle"
+                              title={t('pinnedToSubjectTitle', { subject: a.attributes.subject })}
+                            >
+                              {t('pinnedToSubject')}
+                            </span>
+                          ) : null}
+                        </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-900/50 text-brand-300">
                             {a.attributes['role-name']}

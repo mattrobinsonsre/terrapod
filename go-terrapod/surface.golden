@@ -817,6 +817,7 @@ field RoleAssignment.CreatedAt string `json:"created-at,omitempty"`
 field RoleAssignment.Email string `json:"email"`
 field RoleAssignment.ProviderName string `json:"provider-name"`
 field RoleAssignment.RoleName string `json:"role-name"`
+field RoleAssignment.Subject string `json:"subject,omitempty"`
 field RoleReach.Axes map[string]RoleReachAxis `json:"axes,omitempty"`
 field RoleReach.Denied []RoleReachWorkspace `json:"denied,omitempty"`
 field RoleReach.DeniedCount int `json:"denied-count"`
@@ -1613,6 +1614,7 @@ method (*Client) ScanModuleAutodiscoveryRule(ctx context.Context, id string, sub
 method (*Client) ScanModuleAutodiscoveryRuleSelections(ctx context.Context, id string, selections []ModuleAutodiscoverySelection) (*ModuleAutodiscoveryScan, error)
 method (*Client) SearchWorkspaces(ctx context.Context, filter WorkspaceFilter) (*SearchWorkspacesResult, error)
 method (*Client) SetRolesForIdentity(ctx context.Context, providerName, email string, roles []string) error
+method (*Client) SetRolesForIdentityPinned(ctx context.Context, providerName, email string, roles []string, subject string) error
 method (*Client) StartOnboardingDiscovery(ctx context.Context, sessionID string, selectedTypes []string) (*OnboardingSession, error)
 method (*Client) SyncPolicySet(ctx context.Context, id string) (*PolicySet, error)
 method (*Client) UnassignWorkspaceFromExecutionHook(ctx context.Context, hookID, workspaceID string) error

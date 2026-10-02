@@ -777,7 +777,9 @@
       "setAssignmentStatus": "Määrityksen asettaminen epäonnistui ({status})",
       "deleteAssignment": "Määrityksen poistaminen epäonnistui",
       "conflictingLabelKeys": "{keys} sai useamman kuin yhden arvon. Tunnistesääntö pitää yhden arvon avainta kohden, joten viimeinen korvaisi aiemmat huomaamatta. API tukee useaa arvoa avainta kohden, mutta sitä ei voi vielä asettaa täällä."
-    }
+    },
+    "pinnedToSubject": "Kiinnitetty",
+    "pinnedToSubjectTitle": "Kiinnitetty IdP-subjektiin {subject}"
   },
   "adminVcs": {
     "title": "VCS-yhteydet",

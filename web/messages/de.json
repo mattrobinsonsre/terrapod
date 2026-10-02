@@ -777,7 +777,9 @@
       "setAssignmentStatus": "Zuweisung konnte nicht festgelegt werden ({status})",
       "deleteAssignment": "Zuweisung konnte nicht gelöscht werden",
       "conflictingLabelKeys": "{keys} hat mehr als einen Wert. Eine Label-Regel hält einen Wert pro Schlüssel, der letzte würde die früheren stillschweigend ersetzen. Mehrere Werte für einen Schlüssel unterstützt die API, hier aber noch nicht einstellbar."
-    }
+    },
+    "pinnedToSubject": "Angeheftet",
+    "pinnedToSubjectTitle": "An IdP-Subjekt {subject} angeheftet"
   },
   "adminVcs": {
     "title": "VCS-Verbindungen",

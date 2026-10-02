@@ -777,7 +777,9 @@
       "setAssignmentStatus": "Atama ayarlanamadı ({status})",
       "deleteAssignment": "Atama silinemedi",
       "conflictingLabelKeys": "{keys} birden fazla değer aldı. Bir etiket kuralı anahtar başına tek değer tutar, bu yüzden sonuncusu öncekileri sessizce değiştirirdi. Bir anahtar için birden çok değeri API destekler, ancak burada henüz ayarlanamaz."
-    }
+    },
+    "pinnedToSubject": "Sabitlendi",
+    "pinnedToSubjectTitle": "IdP öznesi {subject} ile sabitlendi"
   },
   "adminVcs": {
     "title": "VCS Bağlantıları",

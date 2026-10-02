@@ -777,7 +777,9 @@
       "setAssignmentStatus": "Attributio poni non potuit ({status})",
       "deleteAssignment": "Attributio deleri non potuit",
       "conflictingLabelKeys": "{keys} plus quam unum valorem accepit. Regula tituli unum valorem per clavem tenet, itaque ultimus priores tacite substitueret. Plures valores unius clavis ab API sustinentur sed hic nondum poni possunt."
-    }
+    },
+    "pinnedToSubject": "Affixum",
+    "pinnedToSubjectTitle": "Subiecto IdP {subject} affixum"
   },
   "adminVcs": {
     "title": "Nexus VCS",

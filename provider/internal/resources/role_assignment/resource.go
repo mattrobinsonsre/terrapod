@@ -36,6 +36,9 @@ type roleAssignmentModel struct {
 	Email        types.String `tfsdk:"email"`
 	RoleName     types.String `tfsdk:"role_name"`
 
+	// Subject optionally pins this identity's assignments to one IdP subject.
+	Subject types.String `tfsdk:"subject"`
+
 	CreatedAt types.String `tfsdk:"created_at"`
 }
 
@@ -85,6 +88,23 @@ func (r *roleAssignmentResource) Schema(_ context.Context, _ resource.SchemaRequ
 				},
 			},
 
+			"subject": schema.StringAttribute{
+				Description: "Optionally pin this identity's role assignments to one IdP subject (the " +
+					"`sub` claim). Email is the weaker half of an identity: a provider that lets a user " +
+					"change their address, or an operator recycling one, otherwise moves the grant to a " +
+					"different person. A pinned assignment matches only that subject.\n\n" +
+					"This is a property of the IDENTITY, not of the single role this resource manages, so " +
+					"every `terrapod_role_assignment` for the same (provider_name, email) shares it. It is " +
+					"Optional+Computed for that reason: an instance that does not set it keeps whatever is " +
+					"already pinned rather than clearing it, so several resources for one identity do not " +
+					"fight. Set it on one of them, or on all of them to the same value.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+
 			"created_at": schema.StringAttribute{
 				Description: "Creation timestamp.",
 				Computed:    true,
@@ -131,6 +151,16 @@ func (r *roleAssignmentResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
+	// A configured subject pins the identity. Unset leaves whatever is already there:
+	// AddRoleToIdentity carries an existing pin forward, so an instance that does not
+	// name the subject neither sets nor clears it.
+	if subject := plan.Subject.ValueString(); subject != "" {
+		if err := r.tc.PinIdentitySubject(ctx, pn, email, subject); err != nil {
+			resp.Diagnostics.AddError("Failed to pin the identity's subject", err.Error())
+			return
+		}
+	}
+
 	// Round-trip to populate created_at.
 	a, err := r.tc.GetRoleAssignment(ctx, pn, email, role)
 	if err != nil {
@@ -145,6 +175,7 @@ func (r *roleAssignmentResource) Create(ctx context.Context, req resource.Create
 
 	plan.ID = types.StringValue(pn + "/" + email + "/" + role)
 	plan.CreatedAt = types.StringValue(a.CreatedAt)
+	plan.Subject = types.StringValue(a.Subject)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -176,6 +207,7 @@ func (r *roleAssignmentResource) Read(ctx context.Context, req resource.ReadRequ
 
 	state.ID = types.StringValue(pn + "/" + email + "/" + role)
 	state.CreatedAt = types.StringValue(a.CreatedAt)
+	state.Subject = types.StringValue(a.Subject)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

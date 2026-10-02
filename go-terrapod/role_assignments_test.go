@@ -1,6 +1,7 @@
 package terrapod
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -33,6 +34,7 @@ func newAssignmentFixture(t *testing.T, initial []RoleAssignment) (*Client, *[]b
 						"provider-name": a.ProviderName,
 						"email":         a.Email,
 						"role-name":     a.RoleName,
+						"subject":       a.Subject,
 						"created-at":    "2025-01-01T00:00:00Z",
 					},
 				})
@@ -46,6 +48,7 @@ func newAssignmentFixture(t *testing.T, initial []RoleAssignment) (*Client, *[]b
 						ProviderName string   `json:"provider-name"`
 						Email        string   `json:"email"`
 						Roles        []string `json:"roles"`
+						Subject      string   `json:"subject"`
 					} `json:"attributes"`
 				} `json:"data"`
 			}
@@ -62,6 +65,8 @@ func newAssignmentFixture(t *testing.T, initial []RoleAssignment) (*Client, *[]b
 					ProviderName: doc.Data.Attributes.ProviderName,
 					Email:        doc.Data.Attributes.Email,
 					RoleName:     role,
+					// Replace-all applies one subject to every row, like the server.
+					Subject: doc.Data.Attributes.Subject,
 				})
 			}
 			store = next
@@ -189,5 +194,29 @@ func TestGetRoleAssignment(t *testing.T) {
 	}
 	if missing != nil {
 		t.Errorf("expected nil for missing assignment, got %+v", missing)
+	}
+}
+
+// TestAddRoleToIdentityPreservesTheSubjectPin guards a bug introduced when subject
+// pinning was added. AddRoleToIdentity is a read-modify-write that ends in the
+// replace-all PUT, and that PUT applies one subject to every row it writes. Sending
+// no subject therefore UNPINS the identity as a side effect of adding an unrelated
+// role -- a quiet security downgrade from an operation that looks purely additive.
+func TestAddRoleToIdentityPreservesTheSubjectPin(t *testing.T) {
+	c, _, store := newAssignmentFixture(t, []RoleAssignment{
+		{ProviderName: "okta", Email: "a@example.com", RoleName: "reader", Subject: "sub-alice"},
+	})
+
+	if err := c.AddRoleToIdentity(context.Background(), "okta", "a@example.com", "deployer"); err != nil {
+		t.Fatalf("AddRoleToIdentity: %v", err)
+	}
+
+	if len(*store) != 2 {
+		t.Fatalf("expected 2 assignments, got %d: %+v", len(*store), *store)
+	}
+	for _, a := range *store {
+		if a.Subject != "sub-alice" {
+			t.Fatalf("adding a role dropped the subject pin on %q: %+v", a.RoleName, *store)
+		}
 	}
 }

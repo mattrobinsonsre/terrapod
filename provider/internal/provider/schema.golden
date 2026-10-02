@@ -373,6 +373,7 @@ resource terrapod_role_assignment.email required=true optional=false computed=fa
 resource terrapod_role_assignment.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_role_assignment.provider_name required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_role_assignment.role_name required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_role_assignment.subject required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_run_task.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_run_task.enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_run_task.enforcement_level required=true optional=false computed=false sensitive=false type=basetypes.StringType

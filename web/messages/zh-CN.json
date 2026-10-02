@@ -777,7 +777,9 @@
       "setAssignmentStatus": "设置分配失败（{status}）",
       "deleteAssignment": "删除分配失败",
       "conflictingLabelKeys": "{keys} 被指定了多个值。标签规则每个键只保留一个值，因此最后一个会悄悄替换先前的值。API 支持一个键对应多个值，但此处尚不能设置。"
-    }
+    },
+    "pinnedToSubject": "已固定",
+    "pinnedToSubjectTitle": "已固定到 IdP 主体 {subject}"
   },
   "adminVcs": {
     "title": "VCS 连接",

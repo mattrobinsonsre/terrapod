@@ -627,7 +627,8 @@
     "created-at",
     "email",
     "provider-name",
-    "role-name"
+    "role-name",
+    "subject"
   ],
   "roles._builtin_role_json": [
     "allow-all",

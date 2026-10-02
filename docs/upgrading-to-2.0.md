@@ -672,6 +672,37 @@ the restricted roles regardless. A local-provider token now has them dropped fro
 its resolved set — the token keeps working for everything else rather than being
 refused outright, since automation cannot be prompted to go and log in via SSO.
 
+### A role assignment can be pinned to an IdP subject
+
+Role assignments are keyed by provider and email. Email is the weaker half of an
+identity: a provider that lets a user change their address, or an operator recycling
+one, moves the grant to a different person.
+
+An assignment may now carry a `subject` — the IdP's `sub` claim. Unpinned is the
+default and behaves exactly as before, matching on provider and email; every existing
+assignment is unpinned, so **nothing changes on upgrade**. Pinned, it matches only
+that subject, and a credential that cannot prove its subject matches unpinned
+assignments only.
+
+Pin the grants that matter most, which in practice means `admin` and `audit`:
+
+```hcl
+resource "terrapod_role_assignment" "platform_admin" {
+  provider_name = "okta"
+  email         = "admin@example.com"
+  role_name     = "admin"
+  subject       = "00u1a2b3c4d5e6f7g8h9"  # the IdP's `sub` for this person
+}
+```
+
+`subject` is Optional+Computed, and that matters when an identity has several
+`terrapod_role_assignment` resources: the pin belongs to the identity, not to one
+grant, so an instance that does not name it keeps whatever is already pinned rather
+than clearing it. Set it on one of them, or on all of them to the same value.
+
+The UI shows a pin read-only. A `sub` is an opaque provider-issued string, so it is
+set as code or through the API rather than typed into a form.
+
 ## Before you upgrade
 
 1. Read the sections above and make the edits they name.

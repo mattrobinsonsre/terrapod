@@ -110,6 +110,7 @@ async def create_api_token(
     bound_to: str | None,
     created_by: str,
     identity_provider: str | None = None,
+    identity_subject: str | None = None,
     kind: str = "interactive",
     description: str = "",
     lifespan_hours: int | None = None,
@@ -148,6 +149,7 @@ async def create_api_token(
         bound_to=bound_to,
         created_by=created_by,
         identity_provider=identity_provider,
+        identity_subject=identity_subject,
         pinned_roles=pinned_roles,
         lifespan_hours=lifespan_hours,
     )
