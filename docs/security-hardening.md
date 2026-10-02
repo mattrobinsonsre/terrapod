@@ -225,7 +225,9 @@ so. Recreate the Secret and roll the API.
 
 ## Network Policies
 
-Terrapod ships with NetworkPolicy templates that restrict pod-to-pod and pod-to-external traffic. Enable them:
+Terrapod ships with NetworkPolicy templates that restrict pod-to-pod and pod-to-external traffic.
+**They are off by default** (`networkPolicies.enabled: false`), so nothing below applies to a
+deployment that has not set this. Enable them:
 
 ```yaml
 networkPolicies:
@@ -241,7 +243,10 @@ This creates four NetworkPolicies:
 | **listener** | None | API (8000), K8s API (443), DNS |
 | **runner** | None | API (8000), HTTPS (443), DNS |
 
-Runners are explicitly denied access to Postgres and Redis.
+**When enabled**, runners are denied access to Postgres and Redis. Note also what the
+runner egress list does not contain: port 80. Cloud instance-metadata services listen
+there, so a runner cannot reach one — denied by omission rather than by an explicit
+rule, which is worth knowing if you audit these policies expecting to find one.
 
 **Prerequisite:** Your cluster must have a CNI plugin that supports NetworkPolicy (Calico, Cilium, Weave Net, etc.).
 

@@ -64,7 +64,8 @@ api:
   # either inline (the chart creates the ConfigMap for you) or by referencing an
   # existing one. The chart mounts it read-only and wires
   # config.database.ssl_root_cert to the mounted path automatically. Leave unset
-  # for ssl_mode require / a system-trusted CA.
+  # only if you set ssl_mode to require, or the server's CA is already in the
+  # system trust store — unset plus the verify-full default means system CAs.
   databaseCA:
     inline: ""                       # paste the CA bundle PEM here; the chart creates a ConfigMap for it
     existingConfigMap: ""            # OR reference an existing ConfigMap holding the CA bundle
@@ -157,7 +158,10 @@ api:
       #   azure_ad  — Azure Database for PostgreSQL Entra auth (Azure Workload Identity)
       auth_mode: password
       aws_iam_region: ""       # AWS region for RDS IAM signing ("" = AWS_REGION env); aws_iam only
-      ssl_mode: ""             # IAM-auth TLS: "" / require (encrypt) | verify-ca | verify-full
+      # "" means verify-full (chain + hostname) — NOT encrypt-only. IAM auth sends
+      # the cloud token as the password, so the default verifies the peer; set
+      # require explicitly to encrypt without verifying (the pre-2.0 behaviour).
+      ssl_mode: ""             # "" = verify-full | verify-ca | require (encrypt only)
       ssl_root_cert: ""        # CA bundle path for verify-ca/verify-full (mount via api.extraVolumes); "" = system CAs
 
     # Redis/Valkey auth (#579). "password" (default — static auth string in the
