@@ -129,7 +129,7 @@ The environment variable name follows the pattern `TERRAPOD_{UPPERCASE_NAME}_CLI
 | Setting | Value |
 |---|---|
 | Application Type | Regular Web Application |
-| Allowed Callback URLs | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` |
+| Allowed Callback URLs | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
 | Allowed Logout URLs | `https://terrapod.example.com` |
 
 ### Okta Example
@@ -165,7 +165,7 @@ TERRAPOD_OKTA_CLIENT_SECRET="your-client-secret"
 |---|---|
 | Sign-in method | OIDC - OpenID Connect |
 | Application type | Web Application |
-| Sign-in redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` |
+| Sign-in redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
 | Assignments | Assign to users/groups as needed |
 
 ### Azure AD (Entra ID) Example
@@ -195,7 +195,7 @@ TERRAPOD_AZURE_AD_CLIENT_SECRET="your-client-secret"
 
 | Setting | Value |
 |---|---|
-| Redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/saml/acs` (Web platform) |
+| Redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` (Web platform) |
 | Token configuration | Add optional claim: `groups` |
 | API permissions | `openid`, `profile`, `email` |
 
