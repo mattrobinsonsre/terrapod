@@ -118,6 +118,53 @@ class TestTheAlwaysRefused:
                 await validate_outbound_url("https://webhook.test/hook")
 
 
+class TestAUnicodeHostIsJudgedByWhatItResolvesTo:
+    """GHSA-jhw5-99r7-3fg4, reported as a bypass and refuted — but untested.
+
+    The report is right about its premise and wrong about the consequence, and the
+    two halves are pinned separately here because only the first is obvious.
+
+    `ipaddress.ip_address('\uff11\uff12\uff17.\uff10.\uff10.\uff11')` raises, so a
+    fullwidth host is NOT caught by the literal-IP branch. That routes it into the
+    *stronger* path rather than past it: the guard resolves first and judges every
+    address it gets back, and a resolver folds the fullwidth digits to `127.0.0.1`
+    on the way. So the fold the attack depends on is performed by the very call the
+    guard makes.
+
+    The asymmetry is deliberate and documented in `_literal_ip`: the legacy IPv4
+    spellings (`127.1`, `2130706433`) must be judged WITHOUT a resolver because
+    those skip resolution through a proxy. A unicode host does not skip it.
+    """
+
+    #: Fullwidth digits for 127.0.0.1 — the exact string from the report.
+    FULLWIDTH = "\uff11\uff12\uff17.\uff10.\uff10.\uff11"
+
+    async def test_the_literal_branch_does_not_catch_it(self) -> None:
+        """The report's own observation, kept as the floor the rest rests on."""
+        from terrapod.services.outbound_url_guard import _literal_ip
+
+        assert _literal_ip(self.FULLWIDTH) is None
+
+    async def test_but_it_is_refused_once_resolved(self) -> None:
+        """Which is the half that decides whether the finding holds."""
+        with _resolves_to("127.0.0.1"):
+            with pytest.raises(BlockedURLError, match="loopback"):
+                await validate_outbound_url(f"https://{self.FULLWIDTH}/hook")
+
+    async def test_the_same_holds_for_the_metadata_address(self) -> None:
+        """A fullwidth spelling of 169.254.169.254 is the case worth having,
+        since the metadata endpoint is the target the report names."""
+        with _resolves_to("169.254.169.254"):
+            with pytest.raises(BlockedURLError, match="link-local"):
+                await validate_outbound_url(f"https://{self.FULLWIDTH}/hook")
+
+    async def test_a_unicode_host_resolving_somewhere_public_is_allowed(self) -> None:
+        """The negative path: refusing every non-ASCII host would be its own bug,
+        and an internationalised domain is a legitimate webhook target."""
+        with _resolves_to("93.184.216.34"):
+            await validate_outbound_url("https://b\u00fccher.example/hook")
+
+
 class TestPrivateSpaceIsAllowedByDefault:
     """The narrowness, pinned.
 

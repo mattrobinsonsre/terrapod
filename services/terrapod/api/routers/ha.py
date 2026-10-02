@@ -22,8 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import (
     AuthenticatedUser,
-    get_current_user,
     require_admin_or_audit,
+    require_non_runner,
 )
 from terrapod.config import settings
 from terrapod.db.session import get_db
@@ -56,7 +56,11 @@ def _iso(value: datetime | None) -> str | None:
 
 @router.get("/status")
 async def status(
-    user: AuthenticatedUser = Depends(get_current_user),
+    # GHSA-cpqm-6fr7-5fwc. `require_non_runner`, not `get_current_user`: a run's
+    # own short-lived token has no business reading the replication topology, and
+    # it reaches this router like any other credential. Returns the same user, so
+    # the privileged check below is unchanged -- this only removes one principal.
+    user: AuthenticatedUser = Depends(require_non_runner),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Whether this node is converging with its peer, and how much margin it has.
