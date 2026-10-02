@@ -2,11 +2,18 @@
 
 Uses python3-saml for metadata parsing and assertion validation.
 
-**Four checks are configurable per provider**, because different identity
-providers get different things wrong and relaxing one should never cost you the
-others. See `SAMLProviderConfig` for the keys; each defaults to the strict value
-here and to the permissive one on the 1.x release lines, so an operator upgrading
-a patch release inherits exactly the behaviour they already had.
+**Five checks are configurable per provider** — `validate_destination`,
+`validate_in_response_to`, `reject_replayed_assertions`, `want_assertions_signed`
+and `reject_deprecated_algorithm` — because different identity providers get
+different things wrong and relaxing one should never cost you the others.
+
+**All five currently default to `False`,** so nothing changes for an operator who
+upgrades without touching their config: that is what makes the hardening shippable
+on a patch release, and it is also why an unconfigured deployment is not protected
+by it. Turning them on is the operator's step, and
+`docs/upgrading-to-2.0.md` records flipping the defaults as 2.0 work
+(GHSA-hgx9-xwfp-5qcr). Read the default off `SAMLProviderConfig` rather than from
+here if it matters to you — a sentence in a docstring is not a gate.
 
 The thing worth understanding before touching `_request_data`: python3-saml
 decides what the assertion was *addressed to* by reconstructing the current URL
