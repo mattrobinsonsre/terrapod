@@ -263,6 +263,94 @@ def repository_allowed(conn: VCSConnection | None, repo_url: str) -> bool:
     return False
 
 
+def _scope_repo_form(scope: str) -> str:
+    """A git credential scope reduced to the `owner/repo` shape patterns are in.
+
+    NOT `_pattern_repo_form`, which only strips a host when a scheme is present. A
+    credential scope is always `host[/path]` — the runner writes it as
+    `[credential "https://<scope>"]` — so the first segment is the host whether or
+    not the operator wrote a scheme, and `github.com` must reduce to the empty
+    string, meaning host-wide. Using the pattern reduction here left the host in and
+    nothing matched, so every narrowed connection refused every minted credential.
+    """
+    s = scope.strip()
+    if "://" in s:
+        s = s.split("://", 1)[1]
+    _host, slash, rest = s.partition("/")
+    return rest.strip("/") if slash else ""
+
+
+def credential_scope_allowed(conn: VCSConnection | None, scope: str) -> bool:
+    """Is every repository a credential installed at `scope` could reach allowed?
+
+    A different question from `repository_allowed`, which asks about ONE repository.
+    A minted `git_http_auth` credential is installed by the runner as a git
+    `[credential "https://<scope>"]` section, and `<scope>` comes from the variable's
+    **key**, which the workspace owner chooses. git matches such a section by host
+    **and path prefix**, so `key = github.com` installs the token for the entire host
+    and the workspace's own configuration can then clone anything the credential
+    reaches. The subject of the allowlist check here is therefore the key, not the
+    workspace's own repository URL — the workspace's URL is already checked at create,
+    at PATCH and at the config fetch, and checking it a fourth time here bounds
+    nothing new.
+
+    Because the scope is a path PREFIX rather than a glob, containment is decidable
+    rather than approximated. Two probes settle it: a pattern must either match the
+    scope itself — `myorg` against the pattern `myorg`, or `myorg/repo` against
+    `myorg/repo`, both of which name no more than the pattern does — or match
+    everything one and two segments beneath it, which is what a prefix reaches. Two
+    depths rather than one because a GitLab canonical form keeps the nested group
+    path, so `group/sub/proj` is three segments.
+
+    This refuses more than a perfect decision procedure would; that is the direction
+    to err in, and the refusal says how to narrow the key.
+    """
+    if conn is None:
+        return False
+    raw = list(getattr(conn, "allowed_repositories", None) or [])
+    patterns = [p.strip() for p in raw if isinstance(p, str) and p.strip()]
+    if not patterns:
+        # Same semantics as `repository_allowed`: an empty list means any repository,
+        # which is every deployment that has not opted in. A list that stripped to
+        # nothing means somebody intended a restriction, and fails closed.
+        return not raw
+
+    key = _scope_repo_form(scope or "")
+    for raw_pattern in patterns:
+        pattern = _pattern_repo_form(raw_pattern)
+        if not pattern:
+            continue
+        if fnmatch.fnmatchcase(key, pattern):
+            return True
+        # What a prefix actually reaches. `\x00` cannot occur in a repository name,
+        # so a pattern matching these probes matches on its wildcards rather than by
+        # coincidence.
+        deeper = f"{key}/\x00" if key else "\x00"
+        deeper2 = f"{deeper}/\x00"
+        if fnmatch.fnmatchcase(deeper, pattern) and fnmatch.fnmatchcase(deeper2, pattern):
+            return True
+    return False
+
+
+def credential_scope_refusal_detail(conn_id: uuid.UUID, scope: str, patterns: list) -> str:
+    """Distinct from `repository_refusal_detail`: the subject is the key, not a repo.
+
+    An operator told "this repository is not allowed" would go looking at the
+    workspace's VCS settings, which are not what refused them.
+    """
+    shown = ", ".join(repr(p) for p in patterns[:5] if isinstance(p, str))
+    more = "" if len(patterns) <= 5 else f" (and {len(patterns) - 5} more)"
+    return (
+        f"VCS connection vcs-{conn_id} is restricted to specific repositories, and a "
+        f"credential installed for {scope!r} would reach more than those. The "
+        "credential's scope is the variable's key, and git applies it by host and "
+        f"path prefix, so {scope!r} covers everything beneath it. Allowed: "
+        f"{shown}{more}. Narrow the key to a repository or an owner inside the "
+        "allowlist, widen `allowed-repositories` on the connection, or use a "
+        "`static` credential holding a token you have scoped yourself."
+    )
+
+
 def refusal_detail(conn_id: uuid.UUID) -> str:
     """What the caller is told. Names the id, the reason and the way out."""
     return (

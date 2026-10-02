@@ -159,28 +159,31 @@ async def _mint_from_connection(
     # gives — a silently absent credential spends the operator's attention on an
     # `init` failure that names neither the credential nor the cause.
     # The allowlist, checked for EVERY minted credential — including the workspace's
-    # own connection, which the authorization check below deliberately skips. A
-    # `git_http_auth` credential's scope is its `key`, a bare URL pattern the
-    # workspace owner chooses, so `key = github.com` installs the token for the whole
-    # host and the workspace's own configuration can then clone anything the
-    # credential reaches. Without this, `allowed_repositories` bounded the workspace's
-    # repo URL and not the credential, which is not what "restricts the connection to
-    # those patterns" says.
+    # own connection, which the authorization check below deliberately skips.
+    #
+    # **The subject is the credential's KEY, not the workspace's repository URL.** The
+    # key is the scope the runner installs the token at (`[credential "https://<key>"]`,
+    # matched by git on host and path prefix), and the workspace owner chooses it, so
+    # `key = github.com` installs the token host-wide and the workspace's own
+    # configuration can then clone anything the credential reaches. The first version
+    # of this check said exactly that in its comment and then passed
+    # `workspace.vcs_repo_url` anyway, so it bounded the one thing already checked at
+    # create, at PATCH and at the config fetch, and bounded the credential not at all
+    # — net new protection approximately none. It also refused outright on a workspace
+    # with no repository URL of its own, which is the normal shape for one that mints
+    # a credential purely to fetch private module sources.
     if workspace is not None:
-        from terrapod.services.vcs_connection_rbac import repository_allowed
+        from terrapod.services.vcs_connection_rbac import (
+            credential_scope_allowed,
+            credential_scope_refusal_detail,
+        )
 
-        conn_for_scope = await db.get(VCSConnection, conn_uuid)
-        if conn_for_scope is not None and not repository_allowed(
-            conn_for_scope, getattr(workspace, "vcs_repo_url", "") or ""
-        ):
+        if not credential_scope_allowed(conn, key):
             raise GitAuthRefused(
-                f"git credential {key!r} references VCS connection vcs-{conn_uuid}, "
-                "which is restricted to specific repositories that do not include "
-                f"{getattr(workspace, 'vcs_repo_url', '') or '<unset>'!r}. A minted "
-                "credential is installed for the scope in the variable's key, so it "
-                "would reach repositories the connection is not scoped to. Widen "
-                "`allowed-repositories` on the connection, or use a `static` "
-                "credential holding a token you have scoped yourself."
+                f"git credential {key!r} references VCS connection vcs-{conn_uuid}: "
+                + credential_scope_refusal_detail(
+                    conn_uuid, key, list(conn.allowed_repositories or [])
+                )
             )
 
     if workspace is not None and conn_uuid != getattr(workspace, "vcs_connection_id", None):

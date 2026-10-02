@@ -255,3 +255,86 @@ async def test_an_unknown_provider_is_still_dropped_not_refused():
 
 
 pytestmark = pytest.mark.asyncio
+
+
+class TestTheAllowlistBoundsTheCredentialNotTheWorkspaceRepo:
+    """GHSA-v8g7-pqrj-8mcm, the run-time half — and the half that was wrong.
+
+    A minted `git_http_auth` credential is installed by the runner at the scope in
+    the variable's **key**, as `[credential "https://<key>"]`, which git applies by
+    host and path prefix. So the key is what decides how much the token reaches, and
+    it is chosen by whoever can set a workspace variable.
+
+    The first version of this check said all of that in its comment and then passed
+    `workspace.vcs_repo_url` to `repository_allowed`, which bounds the workspace's own
+    repository — already checked at create, at PATCH and at the config fetch. So a
+    narrowed connection still minted a host-wide token, and separately a workspace
+    with no repository URL of its own (the normal shape for one that mints a
+    credential purely for private module sources) was refused outright.
+    """
+
+    @staticmethod
+    def _ws(repo_url="https://github.com/myorg/thing", conn_id=None):
+        return MagicMock(
+            vcs_repo_url=repo_url,
+            vcs_connection_id=conn_id,
+            owner_email="owner@example.com",
+        )
+
+    async def _mint(self, key, allowed, *, repo_url="https://github.com/myorg/thing"):
+        cid = uuid.uuid4()
+        conn = MagicMock(provider="github", allowed_repositories=allowed)
+        db = await _db_returning(conn)
+        resolved = [
+            _var(
+                "git_http_auth",
+                key,
+                source="vcs_connection",
+                vcs_connection_id=f"vcs-{cid}",
+                rewrite="none",
+            )
+        ]
+        with patch.object(
+            git_auth_service.github_service,
+            "get_installation_token",
+            new=AsyncMock(return_value="ghs_MINTED"),
+        ):
+            return await git_auth_service.resolve_git_auth(
+                db, resolved, workspace=self._ws(repo_url, cid)
+            )
+
+    async def test_a_host_wide_key_is_refused_by_a_narrowed_connection(self):
+        """The finding. The workspace's own repo IS in the allowlist, so the old
+        check passed — and installed a token for the whole of github.com."""
+        with pytest.raises(git_auth_service.GitAuthRefused) as exc:
+            await self._mint("github.com", ["myorg/*"])
+        assert "github.com" in str(exc.value)
+        assert "path prefix" in str(exc.value)
+
+    async def test_a_key_inside_the_allowlist_is_minted(self):
+        out = await self._mint("github.com/myorg", ["myorg/*"])
+        assert json.loads(out[0]["value"])["token"] == "ghs_MINTED"
+
+    async def test_an_exact_repo_key_is_minted(self):
+        out = await self._mint("github.com/myorg/safe", ["myorg/safe"])
+        assert json.loads(out[0]["value"])["token"] == "ghs_MINTED"
+
+    async def test_a_key_for_another_owner_is_refused(self):
+        with pytest.raises(git_auth_service.GitAuthRefused):
+            await self._mint("github.com/otherorg", ["myorg/*"])
+
+    async def test_an_owner_wide_key_against_a_single_repo_pattern_is_refused(self):
+        """`myorg/safe` does not entitle a credential covering all of `myorg`."""
+        with pytest.raises(git_auth_service.GitAuthRefused):
+            await self._mint("github.com/myorg", ["myorg/safe"])
+
+    async def test_an_empty_allowlist_mints_anything(self):
+        """Every deployment that has not opted in, which must be unaffected."""
+        out = await self._mint("github.com", [])
+        assert json.loads(out[0]["value"])["token"] == "ghs_MINTED"
+
+    async def test_a_workspace_with_no_repo_url_is_not_refused_outright(self):
+        """The over-refusal the old subject caused: `repository_allowed("")` is False,
+        so a module-sources-only workspace could mint nothing at all."""
+        out = await self._mint("github.com/myorg", ["myorg/*"], repo_url="")
+        assert json.loads(out[0]["value"])["token"] == "ghs_MINTED"
