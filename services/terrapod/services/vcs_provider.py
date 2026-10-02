@@ -403,7 +403,7 @@ async def download_archive(conn: VCSConnection, owner: str, repo: str, ref: str)
 
     if not repository_pair_allowed(conn, owner, repo):
         raise RepositoryNotAllowed(
-            f"VCS connection vcs-{conn.id} is restricted to specific repositories and "
+            f"VCS connection vcs-{getattr(conn, 'id', None)} is restricted to specific repositories and "
             f"{owner}/{repo} is not one of them, so its credential will not be used to "
             "clone it. Widen `allowed-repositories` on the connection, or clear it to "
             "allow any repository the credential can reach."
