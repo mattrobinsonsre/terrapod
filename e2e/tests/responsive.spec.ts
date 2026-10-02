@@ -441,7 +441,12 @@ test.describe('Responsive harness (phone viewport)', () => {
       // Adding the first pattern flips the stated posture from permissive to
       // restrictive — the UI must not keep claiming "any repository".
       await expect(page.getByText('1 pattern is listed', { exact: false })).toBeVisible()
-      const remove = page.getByRole('button', { name: 'Remove' }).first()
+      // Scoped to the pattern row, not `.first()` page-wide: the labels editor
+      // renders above this one and its per-chip remove is also named "Remove …",
+      // so `.first()` measured a different control than the one under test. (It
+      // was 16px tall, which was a real defect and is fixed — but in the labels
+      // editor, which this test is not about.)
+      const remove = row.locator('xpath=..').getByRole('button', { name: 'Remove' }).first()
       expect((await remove.boundingBox())!.height).toBeGreaterThanOrEqual(44)
 
       await expectNoHorizontalPageScroll(page)
