@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // allow-fork-pr-plans decides whether a pull request opened from a FORK gets a
@@ -184,58 +182,4 @@ func TestWorkspaceWriteToolsKeepTheirMutatingAnnotation(t *testing.T) {
 			t.Errorf("tool %q is marked destructive; it is a config write", n)
 		}
 	}
-}
-
-// `callTool` and `liveInputSchemasByName` live in `engine_awareness_test.go` on
-// the 2.x line. That file is part of the multi-engine work this release line does
-// not have, so the cherry-pick brought this test across and left its helpers
-// behind. Defined here, verbatim, under the same names: the engine layer is a 2.0
-// feature and will not be backported, so there is nothing for them to collide
-// with, and keeping the names identical costs a future carry nothing.
-func callTool(t *testing.T, sess *mcp.ClientSession, name string, args map[string]any) map[string]any {
-	t.Helper()
-	res, err := sess.CallTool(t.Context(), &mcp.CallToolParams{Name: name, Arguments: args})
-	if err != nil {
-		t.Fatalf("CallTool %s: %v", name, err)
-	}
-	if res.IsError {
-		t.Fatalf("%s tool error: %s", name, resultText(t, res))
-	}
-	var out map[string]any
-	if err := json.Unmarshal(mustJSON(t, res.StructuredContent), &out); err != nil {
-		t.Fatalf("decode %s: %v", name, err)
-	}
-	return out
-}
-
-func liveInputSchemasByName(t *testing.T) map[string]json.RawMessage {
-	t.Helper()
-	srv, _, err := New(Config{Host: "example.test", Name: "terrapod-test", Token: "test-token"})
-	if err != nil {
-		t.Fatalf("build server: %v", err)
-	}
-	ctx := t.Context()
-	ct, st := mcp.NewInMemoryTransports()
-	go func() { _ = srv.Run(ctx, st) }()
-	sess, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "0"}, nil).Connect(ctx, ct, nil)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	t.Cleanup(func() { _ = sess.Close() })
-	res, err := sess.ListTools(ctx, nil)
-	if err != nil {
-		t.Fatalf("list tools: %v", err)
-	}
-	out := make(map[string]json.RawMessage, len(res.Tools))
-	for _, tool := range res.Tools {
-		raw, err := json.Marshal(tool.InputSchema)
-		if err != nil {
-			t.Fatalf("marshal %s input schema: %v", tool.Name, err)
-		}
-		out[tool.Name] = raw
-	}
-	if len(out) == 0 {
-		t.Fatal("no tools registered")
-	}
-	return out
 }

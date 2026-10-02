@@ -23,3 +23,14 @@ title = "Terrapod gitleaks config"
     # Alembic migrations (revision hashes look like secrets)
     '''alembic/versions/''',
   ]
+
+  # Pulumi's own published format markers, not credentials. A deployment marks a
+  # value secret with a map carrying `sig.Key` -> `sig.Secret`; both are fixed
+  # constants of Pulumi's `apitype.SecretV1` (pulumi/pulumi, `resource/sig.go`),
+  # so Terrapod has to hold the same literals to read or write the format at all.
+  # Allowlisted by value rather than by path, so the files that carry them stay
+  # scanned for everything else.
+  regexes = [
+    '''4dabf18193072939515e22adb298388d''',
+    '''1b47061264138c4ac30d75fd1eb44270''',
+  ]
