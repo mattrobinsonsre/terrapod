@@ -777,16 +777,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [python, javascript-typescript, go]
+        # Go is NOT here yet, and that is a known gap rather than an oversight:
+        # see the CodeQL-Go note in docs/security-hardening.md. `build-mode: none`
+        # fails Initialize CodeQL for Go, and the alternatives need a manual build
+        # across seven root-level modules while excluding the vendored
+        # .conformance specs and any local .claude/worktrees copies — plus a
+        # triaged baseline before the job can be made fatal. Landing it half-done
+        # would have left a red check on every PR.
+        language: [python, javascript-typescript]
         include:
           - language: python
             build-mode: none
           - language: javascript-typescript
-            build-mode: none
-          # `none` rather than `autobuild`: there is no go.mod at the repo root —
-          # seven independent modules live below it — so an autobuild has nothing
-          # to build from and fails before it analyses anything.
-          - language: go
             build-mode: none
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
