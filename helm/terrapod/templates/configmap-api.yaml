@@ -572,6 +572,14 @@ data:
       {{- with .Values.api.config.agent_pools.default_join_token_ttl_seconds }}
       default_join_token_ttl_seconds: {{ . | int64 }}
       {{- end }}
+      {{- /* hasKey, NOT `| default true`: this is a boolean an operator may need
+             to set FALSE during a mixed-fleet upgrade, and `| default` treats an
+             explicit false as empty and renders true — the exact defect v1.9.0
+             fixed for smtp.use_tls and database.pool_pre_ping. Omitting the key
+             when unset lets the Settings default stand. */}}
+      {{- if hasKey .Values.api.config.agent_pools "require_listener_proof_of_possession" }}
+      require_listener_proof_of_possession: {{ .Values.api.config.agent_pools.require_listener_proof_of_possession }}
+      {{- end }}
     {{- end }}
     {{- if .Values.api.config.drift_detection }}
     drift_detection:

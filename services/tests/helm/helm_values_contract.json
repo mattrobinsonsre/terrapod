@@ -8,6 +8,7 @@
   "api.config.agent_pools.default_join_token_max_uses",
   "api.config.agent_pools.default_join_token_ttl_seconds",
   "api.config.agent_pools.listener_cert_ttl_seconds",
+  "api.config.agent_pools.require_listener_proof_of_possession",
   "api.config.ai_architecture.api_base",
   "api.config.ai_architecture.auth.aws_external_id",
   "api.config.ai_architecture.auth.aws_region",

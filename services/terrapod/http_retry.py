@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 
 import httpx
 import structlog
@@ -146,12 +147,24 @@ async def arequest_with_retry(
     retries: int = DEFAULT_RETRIES,
     base_delay: float = DEFAULT_BASE_DELAY,
     max_delay: float = DEFAULT_MAX_DELAY,
+    headers_factory: Callable[[str, str], dict[str, str]] | None = None,
     **kwargs: object,
 ) -> httpx.Response:
-    """Asynchronous bounded-retry request. See module docstring for semantics."""
+    """Asynchronous bounded-retry request. See module docstring for semantics.
+
+    `headers_factory`, when given, is called once per ATTEMPT as
+    `headers_factory(method, url)` and replaces `headers`. Deriving the signed
+    path from the request the helper is about to send is what stops a signature
+    being minted for one path and presented on another. That exists for single-use credentials: a listener signs each
+    request against a one-shot nonce, so reusing one set of headers across
+    retries would have the server reject the retry as a replay — turning a
+    transient 5xx into a hard 401 on the very path that retries exist for.
+    """
     last_exc: Exception | None = None
     send = getattr(client, method.lower())  # client.get/post/put/... — same as .request
     for attempt in range(retries + 1):
+        if headers_factory is not None:
+            kwargs["headers"] = headers_factory(method, url)
         try:
             resp = await send(url, **kwargs)  # type: ignore[arg-type]
         except httpx.RequestError as exc:

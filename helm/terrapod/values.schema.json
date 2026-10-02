@@ -2257,6 +2257,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "require_listener_proof_of_possession": {
+              "type": "boolean"
             }
           }
         },

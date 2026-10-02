@@ -1690,6 +1690,19 @@ class AgentPoolsConfig(BaseModel):
             "in values-local.yaml so a renewal cycle finishes in minutes."
         ),
     )
+    require_listener_proof_of_possession: bool = Field(
+        default=True,
+        description=(
+            "Require a listener to prove it holds the private key matching its "
+            "certificate, by signing every request. Without this the certificate "
+            "alone authenticates — and a certificate is PUBLIC material that "
+            "travels on every request, so anyone who observes one call can replay "
+            "the header until the certificate expires. On from 2.0. A listener "
+            "image older than 2.0 does not sign, so a mixed fleet must set this "
+            "false until every listener in every pool has been upgraded; see "
+            "docs/upgrading-to-2.0.md."
+        ),
+    )
     default_join_token_max_uses: int | None = Field(
         default=2,
         description=(

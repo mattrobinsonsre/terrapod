@@ -519,6 +519,43 @@ prefixes is ignored rather than taken as a role name. That is what the setting
 always read as, and it narrows rather than widens — but if you relied on the
 pass-through, those roles stop arriving.
 
+### Listeners must prove they hold their certificate's private key
+
+**Affects:** any pool still running a listener image older than 2.0.
+
+A listener authenticates with `X-Terrapod-Client-Cert`, the certificate the CA
+issued it at join. A certificate is **public material** and it travels on every
+request, so until 2.0 that header was effectively a bearer token: anyone who
+observed one call could replay it until the certificate expired, and every check
+the API made — CA signature, expiry, name lookup, fingerprint — was satisfied by
+the copy just as well as by the holder.
+
+From 2.0 each request is also signed with the private key the CA returns once at
+join, binding it to one method, one path and a single-use nonce inside a 60-second
+window. Both listener authentication paths enforce it, including the SSE event
+stream.
+
+**A listener image older than 2.0 does not sign, so it gets `401` on every call —
+including `renew`, which is not retried and falls back to the join token.** The
+effect is not a clean failure: the listener re-registers under a fresh name on
+every renewal cycle and churns pool membership. So either upgrade every listener
+in every pool before the API, or set:
+
+```yaml
+api:
+  config:
+    agent_pools:
+      require_listener_proof_of_possession: false
+```
+
+and remove it once the fleet is upgraded. The setting honours an explicit
+`false` — it is rendered with `hasKey`, not `| default`.
+
+**Clock skew matters now.** The signature carries a timestamp and is rejected
+more than 60 seconds either side of the API's clock, so a listener cluster whose
+clock has drifted further than that fails to authenticate. That is a real failure
+mode on long-running VMs and in nested virtualisation.
+
 ## Before you upgrade
 
 1. Read the sections above and make the edits they name.

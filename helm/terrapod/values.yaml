@@ -929,6 +929,12 @@ api:
       # no expiry).
       default_join_token_max_uses: 2
       default_join_token_ttl_seconds: 3600
+      # A listener authenticates with its certificate — PUBLIC material, sent on
+      # every request — so it also signs each request with the private key the CA
+      # issued it at join, proving possession rather than presenting a copy. Set
+      # false ONLY while a pool still runs listener images older than 2.0, which
+      # do not sign; see docs/upgrading-to-2.0.md.
+      require_listener_proof_of_possession: true
 
     # AI plan-summary (#401). Off by default. When enabled, every
     # plan-phase terminal transition triggers an asynchronous LLM call
