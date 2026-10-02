@@ -777,11 +777,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [python, javascript-typescript]
+        language: [python, javascript-typescript, go]
         include:
           - language: python
             build-mode: none
           - language: javascript-typescript
+            build-mode: none
+          # `none` rather than `autobuild`: there is no go.mod at the repo root —
+          # seven independent modules live below it — so an autobuild has nothing
+          # to build from and fails before it analyses anything.
+          - language: go
             build-mode: none
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -2239,6 +2244,26 @@ jobs:
         with:
           sarif_file: semgrep-results.sarif
           category: semgrep
+
+      # Semgrep ran without `--error`, so a finding was reported and the job
+      # still passed — the gate could not fail, which is the whole of the
+      # finding. Gate on the count AFTER the suppression filter above rather
+      # than on semgrep's own exit code, so the gate and the upload agree about
+      # what counts as a finding; `--error` would judge it before that filter.
+      # Ordered after the upload, and the upload is `always()`, so a finding is
+      # always visible in code scanning as well as failing the build.
+      - name: Fail on Semgrep findings
+        if: always()
+        run: |
+          set -euo pipefail
+          f=semgrep-results.sarif
+          [ -s "$f" ] || { echo "no SARIF produced — semgrep did not run"; exit 1; }
+          n=$(jq '[.runs[].results[]] | length' "$f")
+          echo "semgrep findings after suppression: $n"
+          if [ "$n" -ne 0 ]; then
+            jq -r '.runs[].results[] | "  \(.ruleId): \(.locations[0].physicalLocation.artifactLocation.uri)"' "$f"
+            exit 1
+          fi
 
   # ── Build Images ───────────────────────────────────────
   # Built per-arch in SEPARATE jobs (not one arch×image matrix) so the
