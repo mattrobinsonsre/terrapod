@@ -382,8 +382,32 @@ async def get_default_branch(conn: VCSConnection, owner: str, repo: str) -> str 
 
 
 async def download_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
-    """Download repository tarball at a given ref."""
+    """Download repository tarball at a given ref.
+
+    GHSA-v8g7-pqrj-8mcm. The allowlist is enforced HERE, at the point the credential
+    is actually used, as well as at every path that accepts a repository URL. The
+    accepting paths are where an operator gets a useful error; this is what makes the
+    control true of the clone itself.
+
+    It was not enough to check only the accepting paths. A URL set while a connection
+    was wide keeps being cloned after the connection is narrowed, and the workspace
+    poller clones *before* anything a run would check — so the credential had already
+    read the out-of-scope repository by the time the config fetch refused the run. The
+    documentation described a narrower residual gap than existed.
+    """
     from terrapod.services import github_service, gitlab_service
+    from terrapod.services.vcs_connection_rbac import (
+        RepositoryNotAllowed,
+        repository_pair_allowed,
+    )
+
+    if not repository_pair_allowed(conn, owner, repo):
+        raise RepositoryNotAllowed(
+            f"VCS connection vcs-{conn.id} is restricted to specific repositories and "
+            f"{owner}/{repo} is not one of them, so its credential will not be used to "
+            "clone it. Widen `allowed-repositories` on the connection, or clear it to "
+            "allow any repository the credential can reach."
+        )
 
     if conn.provider == "gitlab":
         return await gitlab_service.download_archive(conn, owner, repo, ref)

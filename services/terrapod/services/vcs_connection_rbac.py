@@ -143,6 +143,16 @@ async def may_reference_connection(
     return row is not None
 
 
+class RepositoryNotAllowed(PermissionError):
+    """A fetch was attempted against a repository outside the connection's allowlist.
+
+    `PermissionError` rather than a bare `Exception` so a caller that already handles
+    OS-level fetch failures treats it as what it is — a refusal, not a transport
+    problem — and so it cannot be swallowed by an `except OSError` meant for the
+    network while looking like one.
+    """
+
+
 def _canonical_repo(conn: VCSConnection | None, repo_url: str) -> str | None:
     """The ONE spelling a pattern is matched against: `owner/repo`, or None.
 
@@ -226,19 +236,9 @@ def repository_allowed(conn: VCSConnection | None, repo_url: str) -> bool:
     """
     if conn is None:
         return False
-    raw = list(getattr(conn, "allowed_repositories", None) or [])
-    patterns = [p.strip() for p in raw if isinstance(p, str) and p.strip()]
-    if not patterns:
-        # An empty list means "any repository", which is what every existing
-        # deployment has after the migration — the allowlist is opt-in.
-        #
-        # But a list that was NON-empty and left nothing after stripping is a
-        # different thing: somebody intended a restriction. The API refuses that
-        # shape with a 422, so reaching here means the row was written another way,
-        # and the two options are to allow everything or to allow nothing. For a
-        # security control the second is right — a mangled restriction should fail
-        # loudly rather than silently become the widest possible setting.
-        return not raw
+    patterns, decided = _patterns_or_verdict(conn)
+    if decided is not None:
+        return decided
 
     canonical = _canonical_repo(conn, repo_url)
     if not canonical:
@@ -246,7 +246,51 @@ def repository_allowed(conn: VCSConnection | None, repo_url: str) -> bool:
         # fetch would fail anyway, but failing here means it fails as "out of
         # scope" rather than somewhere deeper as a parse error.
         return False
+    return _matches_any(canonical, patterns)
 
+
+def repository_pair_allowed(conn: VCSConnection | None, owner: str, repo: str) -> bool:
+    """`repository_allowed` for callers that already hold the owner and repo.
+
+    The fetch functions — the provider `download_archive` dispatcher and the archive
+    cache — are handed `(conn, owner, repo, ref)` rather than a URL, so they have the
+    canonical form already and need no parsing. That is strictly safer: the two
+    historical breaks of this control were both "a second string, derived differently
+    from the one the fetch uses, offered to the matcher", and here there is no second
+    string to derive.
+    """
+    if conn is None:
+        return False
+    patterns, decided = _patterns_or_verdict(conn)
+    if decided is not None:
+        return decided
+    if not owner or not repo:
+        return False
+    return _matches_any(f"{owner}/{repo}", patterns)
+
+
+def _patterns_or_verdict(conn: VCSConnection) -> tuple[list[str], bool | None]:
+    """The usable patterns, or a verdict when there is nothing to match against.
+
+    An empty list means "any repository", which is what every existing deployment has
+    after the migration — the allowlist is opt-in.
+
+    But a list that was NON-empty and left nothing after stripping is a different
+    thing: somebody intended a restriction. The API refuses that shape with a 422, so
+    reaching here means the row was written another way, and the two options are to
+    allow everything or to allow nothing. For a security control the second is right —
+    a mangled restriction should fail loudly rather than silently become the widest
+    possible setting.
+    """
+    raw = list(getattr(conn, "allowed_repositories", None) or [])
+    patterns = [p.strip() for p in raw if isinstance(p, str) and p.strip()]
+    if not patterns:
+        return [], (not raw)
+    return patterns, None
+
+
+def _matches_any(canonical: str, patterns: list[str]) -> bool:
+    """The ONE matcher. Every entry point reduces to this, by construction."""
     owner = canonical.split("/", 1)[0]
     for raw_pattern in patterns:
         pattern = _pattern_repo_form(raw_pattern)
@@ -307,13 +351,9 @@ def credential_scope_allowed(conn: VCSConnection | None, scope: str) -> bool:
     """
     if conn is None:
         return False
-    raw = list(getattr(conn, "allowed_repositories", None) or [])
-    patterns = [p.strip() for p in raw if isinstance(p, str) and p.strip()]
-    if not patterns:
-        # Same semantics as `repository_allowed`: an empty list means any repository,
-        # which is every deployment that has not opted in. A list that stripped to
-        # nothing means somebody intended a restriction, and fails closed.
-        return not raw
+    patterns, decided = _patterns_or_verdict(conn)
+    if decided is not None:
+        return decided
 
     key = _scope_repo_form(scope or "")
     for raw_pattern in patterns:

@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from terrapod.db.models import VCSConnection
 from terrapod.services import rbac_service as rbac_service_module
 from terrapod.services import vcs_connection_rbac as rbac
 from terrapod.services.vcs_connection_rbac import repository_allowed
@@ -730,3 +731,85 @@ class TestTheAllowlistCannotBeBypassedByCraftingTheUrl:
         """
         conn = self._conn(["https://github.com/"])
         assert repository_allowed(conn, "https://github.com/othercorp/private") is False
+
+
+class TestTheCredentialIsRefusedAtTheFetchItself:
+    """GHSA-v8g7-pqrj-8mcm. Checking only the paths that ACCEPT a repository URL
+    leaves two holes, and the documentation described a narrower residual gap than
+    existed:
+
+    1. A URL set while a connection was wide keeps being cloned after a narrowing.
+    2. The workspace poller clones *before* anything a run would check, so by the time
+       the config fetch refuses the run, the credential has already read the
+       out-of-scope repository — which is the thing the control exists to prevent.
+
+    So the allowlist is enforced at the two places the credential is actually used as
+    well. These take `(conn, owner, repo)`, so there is no second string to derive —
+    which is what broke this control twice before.
+    """
+
+    async def test_the_provider_dispatcher_refuses_an_out_of_scope_repo(self):
+        from terrapod.services.vcs_connection_rbac import RepositoryNotAllowed
+        from terrapod.services.vcs_provider import download_archive
+
+        conn = VCSConnection(id=uuid.uuid4(), provider="github", allowed_repositories=["myorg/*"])
+        with pytest.raises(RepositoryNotAllowed) as exc:
+            await download_archive(conn, "otherorg", "private", "main")
+        assert "otherorg/private" in str(exc.value)
+
+    async def test_the_provider_dispatcher_allows_one_in_scope(self):
+        """Reaches the real provider call, which fails for want of credentials — any
+        error that is NOT the refusal proves the guard let it through."""
+        from terrapod.services.vcs_connection_rbac import RepositoryNotAllowed
+        from terrapod.services.vcs_provider import download_archive
+
+        conn = VCSConnection(id=uuid.uuid4(), provider="github", allowed_repositories=["myorg/*"])
+        with pytest.raises(Exception) as exc:
+            await download_archive(conn, "myorg", "thing", "main")
+        assert not isinstance(exc.value, RepositoryNotAllowed)
+
+    async def test_the_archive_cache_refuses_an_out_of_scope_repo(self):
+        from terrapod.services.vcs_archive_cache import VCSArchiveCache
+        from terrapod.services.vcs_connection_rbac import RepositoryNotAllowed
+
+        conn = VCSConnection(id=uuid.uuid4(), provider="github", allowed_repositories=["myorg/*"])
+        with pytest.raises(RepositoryNotAllowed) as exc:
+            await VCSArchiveCache().get_or_fetch(conn, "otherorg", "private", "abc123")
+        assert "otherorg/private" in str(exc.value)
+
+    async def test_an_empty_allowlist_leaves_both_fetch_paths_alone(self):
+        """Every deployment that has not opted in, which must be unaffected."""
+        from terrapod.services.vcs_archive_cache import VCSArchiveCache
+        from terrapod.services.vcs_connection_rbac import RepositoryNotAllowed
+        from terrapod.services.vcs_provider import download_archive
+
+        conn = VCSConnection(id=uuid.uuid4(), provider="github", allowed_repositories=[])
+        for call in (
+            download_archive(conn, "anyorg", "anyrepo", "main"),
+            VCSArchiveCache().get_or_fetch(conn, "anyorg", "anyrepo", "abc123"),
+        ):
+            with pytest.raises(Exception) as exc:
+                await call
+            assert not isinstance(exc.value, RepositoryNotAllowed)
+
+    def test_a_refusal_is_a_permission_error_not_a_transport_one(self):
+        """So `except OSError` meant for the network cannot swallow it while looking
+        like a flaky clone."""
+        from terrapod.services.vcs_connection_rbac import RepositoryNotAllowed
+
+        assert issubclass(RepositoryNotAllowed, PermissionError)
+
+    def test_the_pair_entry_point_agrees_with_the_url_one(self):
+        """The two must never diverge: a divergence is exactly the shape of both
+        historical breaks of this control."""
+        from terrapod.services.vcs_connection_rbac import (
+            repository_allowed,
+            repository_pair_allowed,
+        )
+
+        for pats in (["myorg/*"], ["myorg"], ["myorg/safe"], [], ["*"]):
+            conn = VCSConnection(provider="github", allowed_repositories=pats)
+            for owner, repo in (("myorg", "safe"), ("myorg", "other"), ("otherorg", "x")):
+                assert repository_pair_allowed(conn, owner, repo) == repository_allowed(
+                    conn, f"https://github.com/{owner}/{repo}"
+                ), (pats, owner, repo)
