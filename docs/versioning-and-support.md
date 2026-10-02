@@ -41,7 +41,8 @@ for every public surface below.
 > itself the harm and a deprecation window would mean shipping a known hole for
 > two more minors. This is narrow — it covers removing access that should never
 > have been granted, never removing a route, an attribute, or a config key. It
-> has been used three times before v1.9.0, which uses it again — see below. In **v1.4.0**, when GPG signing-key registration
+> has been used three times before v1.9.0, which uses it again — see below.
+> In **v1.4.0**, when GPG signing-key registration
 > went from "any authenticated caller" to requiring `registry:admin`; an
 > unprivileged account could otherwise add a trust anchor for the whole provider
 > registry. Twice in **v1.7.0**: retrying a run went from `run:cancel` to
