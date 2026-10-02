@@ -138,7 +138,12 @@ class RunnerListener:
             self._cached_auth_headers_for_cert = (cert_pem, dict(headers))
 
         key_pem = getattr(self.identity, "private_key_pem", "") if self.identity else ""
-        if key_pem and path:
+        # isinstance, not truthiness: anything that is not actually a PEM string
+        # cannot be signed with, and attempting it raises from inside the request
+        # path. The listener's loops are long-lived, so a raise here takes the whole
+        # listener down; an unsigned request merely gets 401 from an API that
+        # requires the proof, which is visible and recoverable.
+        if isinstance(key_pem, str) and key_pem and path:
             import secrets as _secrets
             import time as _time
 
@@ -149,11 +154,20 @@ class RunnerListener:
                 sign_request,
             )
 
-            ts = str(int(_time.time()))
-            nonce = _secrets.token_urlsafe(24)
-            headers[TIMESTAMP_HEADER] = ts
-            headers[NONCE_HEADER] = nonce
-            headers[SIGNATURE_HEADER] = sign_request(key_pem, method, path, ts, nonce)
+            try:
+                ts = str(int(_time.time()))
+                nonce = _secrets.token_urlsafe(24)
+                headers[TIMESTAMP_HEADER] = ts
+                headers[NONCE_HEADER] = nonce
+                headers[SIGNATURE_HEADER] = sign_request(key_pem, method, path, ts, nonce)
+            except Exception as exc:
+                logger.warning(
+                    "Could not sign the request; sending unsigned, which the API will "
+                    "refuse if it requires proof of possession",
+                    error=str(exc),
+                )
+                for h in (TIMESTAMP_HEADER, NONCE_HEADER, SIGNATURE_HEADER):
+                    headers.pop(h, None)
         return headers
 
     async def _establish_identity(self) -> None:
