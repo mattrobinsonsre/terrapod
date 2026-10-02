@@ -429,8 +429,15 @@ class TestTwoGitlabConnectionsOnOneHost:
         ):
             await vcs_events._resolve_gitlab_connection("https://gitlab.com/acme/infra.git", "tok")
         assert warn.called, "an unattributable event must say why, not fail silently"
-        msg = str(warn.call_args)
-        assert "webhook_secret" in msg and "gitlab.com" in msg
+        # The structured kwargs, compared exactly — not `"gitlab.com" in str(call_args)`.
+        # A substring test against a host is both weaker (it would pass on
+        # `notgitlab.com`) and flagged as incomplete URL sanitization, which is a true
+        # positive about the shape even in a test.
+        kwargs = warn.call_args.kwargs
+        assert kwargs["host"] == "gitlab.com"
+        assert kwargs["candidates"] == 2
+        assert kwargs["without_secret"] == 2
+        assert "webhook_secret" in warn.call_args.args[0]
 
     async def test_one_connection_on_the_host_still_needs_no_secret_of_its_own(self):
         """The common case must not regress: a single GitLab connection is unambiguous

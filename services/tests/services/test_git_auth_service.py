@@ -308,8 +308,16 @@ class TestTheAllowlistBoundsTheCredentialNotTheWorkspaceRepo:
         check passed — and installed a token for the whole of github.com."""
         with pytest.raises(git_auth_service.GitAuthRefused) as exc:
             await self._mint("github.com", ["myorg/*"])
-        assert "github.com" in str(exc.value)
-        assert "path prefix" in str(exc.value)
+        detail = str(exc.value)
+        # What distinguishes the credential-scope refusal from the plain repository
+        # one, plus the allowlist it was judged against. Deliberately NOT
+        # `"github.com" in detail`: a substring test against a host would also pass on
+        # `notgithub.com`, and it is flagged as incomplete URL sanitization — a true
+        # positive about the shape of the assertion even in a test. The scope itself is
+        # asserted exactly in `TestTheCredentialScopeRefusalNamesTheKey` below.
+        assert "a credential installed for" in detail
+        assert "path prefix" in detail
+        assert "myorg/*" in detail
 
     async def test_a_key_inside_the_allowlist_is_minted(self):
         out = await self._mint("github.com/myorg", ["myorg/*"])
@@ -338,3 +346,30 @@ class TestTheAllowlistBoundsTheCredentialNotTheWorkspaceRepo:
         so a module-sources-only workspace could mint nothing at all."""
         out = await self._mint("github.com/myorg", ["myorg/*"], repo_url="")
         assert json.loads(out[0]["value"])["token"] == "ghs_MINTED"
+
+
+class TestTheCredentialScopeRefusalNamesTheKey:
+    """Exact, rather than by substring: the operator cannot narrow a key they are not
+    told about, and the remedy differs from the plain repository refusal's."""
+
+    async def test_the_detail_names_the_scope_and_the_patterns(self):
+        import uuid as _uuid
+
+        from terrapod.services.vcs_connection_rbac import credential_scope_refusal_detail
+
+        cid = _uuid.uuid4()
+        detail = credential_scope_refusal_detail(cid, "example.invalid", ["myorg/*"])
+        assert f"vcs-{cid}" in detail
+        assert "'example.invalid'" in detail
+        assert "'myorg/*'" in detail
+        assert "path prefix" in detail
+
+    async def test_it_says_how_many_more_patterns_there_are(self):
+        import uuid as _uuid
+
+        from terrapod.services.vcs_connection_rbac import credential_scope_refusal_detail
+
+        detail = credential_scope_refusal_detail(
+            _uuid.uuid4(), "example.invalid", [f"org{i}/*" for i in range(8)]
+        )
+        assert "(and 3 more)" in detail

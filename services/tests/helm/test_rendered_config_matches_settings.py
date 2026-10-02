@@ -93,14 +93,17 @@ def _rendered_config() -> dict:
         text=True,
     )
     if out.returncode != 0:
-        pytest.fail(f"helm template failed: {out.stderr[-2000:]}")
+        raise AssertionError(f"helm template failed: {out.stderr[-2000:]}")
     for doc in yaml.safe_load_all(out.stdout):
         if not isinstance(doc, dict) or doc.get("kind") != "ConfigMap":
             continue
         data = doc.get("data") or {}
         if "config.yaml" in data:
             return yaml.safe_load(data["config.yaml"]) or {}
-    pytest.fail("no ConfigMap rendered a config.yaml")
+    # `raise`, not `pytest.fail`, on both paths: a static analyser cannot see that
+    # `pytest.fail` never returns, so the function reads as one that sometimes returns
+    # a dict and sometimes None — and a caller would then be right to check for None.
+    raise AssertionError("no ConfigMap rendered a config.yaml")
 
 
 def _leaf_paths(node, prefix: str = "") -> list[str]:
