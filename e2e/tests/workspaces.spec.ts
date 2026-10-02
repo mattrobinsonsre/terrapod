@@ -1,18 +1,18 @@
-import { test, expect } from '@playwright/test';
-import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api';
+import { test, expect } from "@playwright/test";
+import { getStoredToken, createWorkspace, uniqueName } from "../helpers/api";
 
-test.describe('Workspaces', () => {
-  test('workspace list page loads', async ({ page }) => {
-    await page.goto('/workspaces');
+test.describe("Workspaces", () => {
+  test("workspace list page loads", async ({ page }) => {
+    await page.goto("/workspaces");
 
     // Page header should be visible
     await expect(page.locator('h1:has-text("Workspaces")')).toBeVisible();
   });
 
-  test('create workspace and see it in list', async ({ page }) => {
+  test("create workspace and see it in list", async ({ page }) => {
     const wsName = `e2e-ws-${Date.now()}`;
 
-    await page.goto('/workspaces');
+    await page.goto("/workspaces");
     await expect(page.locator('h1:has-text("Workspaces")')).toBeVisible();
 
     // Open create form
@@ -25,14 +25,16 @@ test.describe('Workspaces', () => {
     await page.click('button:has-text("Create Workspace")');
 
     // Workspace should appear in the list
-    await expect(page.locator(`text=${wsName}`)).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(`text=${wsName}`)).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
-  test('workspace detail shows tabs', async ({ page }) => {
+  test("workspace detail shows tabs", async ({ page }) => {
     // Create a workspace first
     const wsName = `e2e-detail-${Date.now()}`;
 
-    await page.goto('/workspaces');
+    await page.goto("/workspaces");
     await expect(page.locator('h1:has-text("Workspaces")')).toBeVisible();
 
     await page.click('button:has-text("New Workspace")');
@@ -43,60 +45,76 @@ test.describe('Workspaces', () => {
     await page.click(`text=${wsName}`);
 
     // Verify tabs are present (use getByRole to avoid matching text in other elements)
-    await expect(page.getByRole('button', { name: 'Configuration' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Variables' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Runs' })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Configuration" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Variables" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Runs" })).toBeVisible();
     // `exact` so 'State' doesn't also match the 'State Graph' tab (#765).
-    await expect(page.getByRole('button', { name: 'State', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Notifications' })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "State", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Notifications" }),
+    ).toBeVisible();
   });
 
-  test('run-triggers tab uses a searchable workspace picker', async ({ page }) => {
+  test("run-triggers tab uses a searchable workspace picker", async ({
+    page,
+  }) => {
     const src = `e2e-trg-src-${Date.now()}`;
     const dest = `e2e-trg-dest-${Date.now()}`;
 
     for (const name of [src, dest]) {
-      await page.goto('/workspaces');
+      await page.goto("/workspaces");
       await page.click('button:has-text("New Workspace")');
       await page.fill('input[placeholder*="workspace"]', name);
       await page.click('button:has-text("Create Workspace")');
-      await expect(page.locator(`text=${name}`).first()).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator(`text=${name}`).first()).toBeVisible({
+        timeout: 10_000,
+      });
     }
 
     // Open the destination workspace's Run Triggers tab. Run Triggers now lives
     // under the merged "Automation" group (#1036 tab consolidation): open the
     // group, then its "Triggers" sub-view.
-    await page.goto('/workspaces');
+    await page.goto("/workspaces");
     await page.click(`text=${dest}`);
-    await page.getByRole('button', { name: 'Automation', exact: true }).click();
-    await page.getByRole('button', { name: 'Triggers', exact: true }).click();
+    await page.getByRole("button", { name: "Automation", exact: true }).click();
+    await page.getByRole("button", { name: "Triggers", exact: true }).click();
 
     // The picker is a search box + clickable list — NOT a free-text name input
     // (a typo can't 404 any more). Filter to the source, then click to add.
-    const search = page.locator('input[placeholder*="Search workspaces to add"]');
+    const search = page.locator(
+      'input[placeholder*="Search workspaces to add"]',
+    );
     await expect(search).toBeVisible();
     await search.fill(src);
 
-    const srcButton = page.getByRole('button', { name: src });
+    const srcButton = page.getByRole("button", { name: src });
     await expect(srcButton).toBeVisible({ timeout: 10_000 });
     await srcButton.click();
 
     // The inbound edge appears live (id-based add → refetch), with a Remove control
-    await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible({
+    await expect(
+      page.getByRole("button", { name: "Remove" }).first(),
+    ).toBeVisible({
       timeout: 10_000,
     });
   });
 
-  test('workspace filter typeahead: bare Enter keeps free text; explicit pick applies a suggestion', async ({
+  test("workspace filter typeahead: bare Enter keeps free text; explicit pick applies a suggestion", async ({
     page,
   }) => {
     const wsName = `e2e-flt-${Date.now()}`;
 
-    await page.goto('/workspaces');
+    await page.goto("/workspaces");
     await page.click('button:has-text("New Workspace")');
     await page.fill('input[placeholder*="workspace"]', wsName);
     await page.click('button:has-text("Create Workspace")');
-    await expect(page.locator(`text=${wsName}`).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(`text=${wsName}`).first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     const filter = page.locator('input[aria-label="Filter workspaces"]');
     await expect(filter).toBeVisible();
@@ -106,12 +124,12 @@ test.describe('Workspaces', () => {
     await filter.click();
     await filter.pressSequentially(wsName);
     await expect(menu).toBeVisible();
-    await expect(menu.getByRole('option', { name: wsName })).toBeVisible();
+    await expect(menu.getByRole("option", { name: wsName })).toBeVisible();
 
     // Bare Enter with nothing highlighted must KEEP the free text — it must not
     // auto-apply the suggestion (the regression this guards: a single suggestion
     // under the cursor used to be applied on a plain Enter).
-    await page.keyboard.press('Enter');
+    await page.keyboard.press("Enter");
     await expect(filter).toHaveValue(wsName);
     await expect(menu).toBeHidden();
 
@@ -119,26 +137,26 @@ test.describe('Workspaces', () => {
     // focused but closed, and refocusing an already-focused input fires no new
     // focus event). Arrow-highlight + Enter applies the suggestion — a
     // completed chip is the typed text plus a trailing space.
-    await filter.fill('');
+    await filter.fill("");
     await filter.pressSequentially(wsName);
     await expect(menu).toBeVisible();
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
     await expect(filter).toHaveValue(`${wsName} `);
 
     // A mouse click on a suggestion applies it the same way.
-    await filter.fill('');
+    await filter.fill("");
     await filter.pressSequentially(wsName);
     await expect(menu).toBeVisible();
-    await menu.getByRole('option', { name: wsName }).click();
+    await menu.getByRole("option", { name: wsName }).click();
     await expect(filter).toHaveValue(`${wsName} `);
   });
 
-  test('workspace settings can be updated', async ({ page }) => {
+  test("workspace settings can be updated", async ({ page }) => {
     // Create a workspace
     const wsName = `e2e-settings-${Date.now()}`;
 
-    await page.goto('/workspaces');
+    await page.goto("/workspaces");
     await page.click('button:has-text("New Workspace")');
     await page.fill('input[placeholder*="workspace"]', wsName);
     await page.click('button:has-text("Create Workspace")');
@@ -154,35 +172,41 @@ test.describe('Workspaces', () => {
     // `input[type=checkbox].first()`, which silently re-aimed at the Terragrunt
     // checkbox when the control became a select, and kept passing while testing
     // nothing (#1280). A named locator fails closed instead.
-    const autoApply = page.getByRole('combobox', { name: 'Auto Apply' });
-    await expect(autoApply).toHaveValue('never'); // default for a new workspace
+    const autoApply = page.getByRole("combobox", { name: "Auto Apply" });
+    await expect(autoApply).toHaveValue("never"); // default for a new workspace
 
     // Pick a conditional mode — the interesting case, since it has to survive
     // the round trip as a mode rather than collapsing back to a boolean.
-    await autoApply.selectOption('create_update');
+    await autoApply.selectOption("create_update");
 
     // Save
     await page.click('button:has-text("Save")');
 
     // Wait for save to complete (Edit button re-appears)
-    await expect(page.locator('button:has-text("Edit")')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('button:has-text("Edit")')).toBeVisible({
+      timeout: 10_000,
+    });
 
     // The read view must name the mode, not a yes/no.
-    await expect(page.getByText('create/update', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("create/update", { exact: true }),
+    ).toBeVisible();
 
     // Reload proves it persisted server-side rather than living in React state.
     await page.reload();
     await page.click('button:has-text("Edit")');
-    await expect(page.getByRole('combobox', { name: 'Auto Apply' })).toHaveValue('create_update');
+    await expect(
+      page.getByRole("combobox", { name: "Auto Apply" }),
+    ).toHaveValue("create_update");
   });
 
   test("a refused settings save shows the API's reason, not a generic failure (#1586)", async ({
     page,
   }) => {
     const token = getStoredToken();
-    const wsId = await createWorkspace(token, uniqueName('e2e-save-detail'));
+    const wsId = await createWorkspace(token, uniqueName("e2e-save-detail"));
     const detail =
-      'Cannot change vcs-workflow while 7 PR run(s) are in flight. Cancel or discard them first.';
+      "Cannot change vcs-workflow while 7 PR run(s) are in flight. Cancel or discard them first.";
 
     // Refuse the save the way the API does (#282) — the exact body from the
     // report, both error shapes — without having to put real PR runs in flight.
@@ -191,8 +215,11 @@ test.describe('Workspaces', () => {
       route.request().method() === 'PATCH'
         ? route.fulfill({
             status: 422,
-            contentType: 'application/vnd.api+json',
-            body: JSON.stringify({ errors: [{ status: '422', detail }], detail }),
+            contentType: "application/vnd.api+json",
+            body: JSON.stringify({
+              errors: [{ status: "422", detail }],
+              detail,
+            }),
           })
         : route.continue(),
     );
@@ -202,15 +229,19 @@ test.describe('Workspaces', () => {
     // hydration is otherwise lost.
     await expect(async () => {
       await page.locator('button:has-text("Edit")').first().click();
-      await expect(page.locator('button:has-text("Save")').first()).toBeVisible({ timeout: 1_000 });
+      await expect(page.locator('button:has-text("Save")').first()).toBeVisible(
+        { timeout: 1_000 },
+      );
     }).toPass({ timeout: 15_000 });
     await page.locator('button:has-text("Save")').first().click();
 
     await expect(page.getByText(detail)).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Failed to update workspace')).toHaveCount(0);
+    await expect(page.getByText("Failed to update workspace")).toHaveCount(0);
   });
 
-  test('terragrunt toggle + version persists through settings (#534)', async ({ page }) => {
+  test("terragrunt toggle + version persists through settings (#534)", async ({
+    page,
+  }) => {
     // Enabling terragrunt reveals a version input; both must round-trip the
     // workspace PATCH and re-render on reload. Failure modes this catches:
     //   - terragrunt-enabled missing from the PATCH body
@@ -219,7 +250,7 @@ test.describe('Workspaces', () => {
     // Name avoids the "terragrunt" substring so locators don't collide with it.
     const wsName = `e2e-tg-${Date.now()}`;
 
-    await page.goto('/workspaces');
+    await page.goto("/workspaces");
     await page.click('button:has-text("New Workspace")');
     await page.fill('input[placeholder*="workspace"]', wsName);
     await page.click('button:has-text("Create Workspace")');
@@ -227,27 +258,35 @@ test.describe('Workspaces', () => {
 
     // The Terragrunt setting lives in a <div> whose <dt> is exactly "Terragrunt";
     // scope all assertions to that block to avoid the auto-apply row.
-    const tgBlock = page.getByText('Terragrunt', { exact: true }).locator('xpath=..');
+    const tgBlock = page
+      .getByText("Terragrunt", { exact: true })
+      .locator("xpath=..");
     await expect(tgBlock).toBeVisible();
-    await expect(tgBlock.getByText('Disabled')).toBeVisible(); // read view starts Disabled
+    await expect(tgBlock.getByText("Disabled")).toBeVisible(); // read view starts Disabled
 
     await page.click('button:has-text("Edit")');
-    await tgBlock.getByRole('checkbox').check();
+    await tgBlock.getByRole("checkbox").check();
 
     // Version input appears only once enabled.
-    const tgVersion = tgBlock.getByPlaceholder('e.g. 1.0');
+    const tgVersion = tgBlock.getByPlaceholder("e.g. 1.0");
     await expect(tgVersion).toBeVisible();
-    await tgVersion.fill('1.0');
+    await tgVersion.fill("1.0");
 
     await page.click('button:has-text("Save")');
-    await expect(page.locator('button:has-text("Edit")')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('button:has-text("Edit")')).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Reload: the read view must show Enabled (v1.0).
     await page.reload();
-    await expect(page.getByText('Enabled (v1.0)')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Enabled (v1.0)")).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
-  test('drift-ignore-rules editor adds, persists, and removes a rule', async ({ page }) => {
+  test("drift-ignore-rules editor adds, persists, and removes a rule", async ({
+    page,
+  }) => {
     // #482 — verify the workspace settings drift-ignore-rules editor
     // round-trips through the API. Failure cases the spec catches:
     //   - rule not added to the array on Enter / "Add" click
@@ -255,9 +294,10 @@ test.describe('Workspaces', () => {
     //   - re-rendered list doesn't reflect the saved value
     //   - Remove button doesn't drop the rule from state or PATCH
     const wsName = `e2e-drift-ignore-${Date.now()}`;
-    const rule = 'module.eks*.argocd_cluster.*.config.tls_client_config.ca_data';
+    const rule =
+      "module.eks*.argocd_cluster.*.config.tls_client_config.ca_data";
 
-    await page.goto('/workspaces');
+    await page.goto("/workspaces");
     await page.click('button:has-text("New Workspace")');
     await page.fill('input[placeholder*="workspace"]', wsName);
     await page.click('button:has-text("Create Workspace")');
@@ -272,7 +312,9 @@ test.describe('Workspaces', () => {
     await ruleInput.fill(rule);
     // Two Add buttons exist (trigger-prefixes + drift-ignore-rules) —
     // scope to the one inside the drift-ignore row.
-    const driftAddRow = page.locator('input[placeholder*="argocd_cluster"]').locator('..');
+    const driftAddRow = page
+      .locator('input[placeholder*="argocd_cluster"]')
+      .locator("..");
     await driftAddRow.locator('button:has-text("Add")').click();
 
     // The pill should render with the rule text.
@@ -280,7 +322,9 @@ test.describe('Workspaces', () => {
 
     // Save.
     await page.click('button:has-text("Save")');
-    await expect(page.locator('button:has-text("Edit")')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('button:has-text("Edit")')).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Reload and confirm the value persisted server-side (the
     // settings round-trip is the part that broke for trigger_prefixes
@@ -291,15 +335,20 @@ test.describe('Workspaces', () => {
     // Remove the rule via Edit → Remove → Save, and confirm it's
     // gone after reload.
     await page.click('button:has-text("Edit")');
-    const removeBtn = page.locator(`code:has-text("${rule}")`).locator('..').locator('button:has-text("Remove")');
+    const removeBtn = page
+      .locator(`code:has-text("${rule}")`)
+      .locator("..")
+      .locator('button:has-text("Remove")');
     await removeBtn.click();
     await page.click('button:has-text("Save")');
-    await expect(page.locator('button:has-text("Edit")')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('button:has-text("Edit")')).toBeVisible({
+      timeout: 10_000,
+    });
     await page.reload();
     await expect(page.locator(`code:has-text("${rule}")`)).not.toBeVisible();
   });
 
-  test('Health Issues indicator filters the list to unhealthy workspaces', async ({
+  test("Health Issues indicator filters the list to unhealthy workspaces", async ({
     page,
   }) => {
     // Create two workspaces via the API so the test is deterministic and
@@ -309,34 +358,34 @@ test.describe('Workspaces', () => {
     //     condition, which `_compute_health_conditions` flags. This is the
     //     simplest condition to provoke without running anything.
     const token = getStoredToken();
-    const healthyName = uniqueName('e2e-health-ok');
-    const unhealthyName = uniqueName('e2e-health-bad');
+    const healthyName = uniqueName("e2e-health-ok");
+    const unhealthyName = uniqueName("e2e-health-bad");
     await createWorkspace(token, healthyName);
-    await createWorkspace(token, unhealthyName, { 'execution-mode': 'agent' });
+    await createWorkspace(token, unhealthyName, { "execution-mode": "agent" });
 
-    await page.goto('/workspaces');
+    await page.goto("/workspaces");
     await expect(page.locator('h1:has-text("Workspaces")')).toBeVisible();
 
     // Both of MY workspaces are present before filtering. (Never assert global
     // counts/positions — other workers mutate the same org concurrently.)
-    const healthyRow = page.getByRole('link', { name: healthyName });
-    const unhealthyRow = page.getByRole('link', { name: unhealthyName });
+    const healthyRow = page.getByRole("link", { name: healthyName });
+    const unhealthyRow = page.getByRole("link", { name: unhealthyName });
     await expect(unhealthyRow).toBeVisible({ timeout: 10_000 });
     await expect(healthyRow).toBeVisible();
 
     // The Health Issues card is a toggle button whenever the count is > 0
     // (which my unhealthy workspace guarantees). Clicking it applies the
     // aggregate `status:unhealthy` filter.
-    const healthBtn = page.getByRole('button', { name: /health issues/i });
+    const healthBtn = page.getByRole("button", { name: /health issues/i });
     await expect(healthBtn).toBeVisible();
     await healthBtn.click();
 
     // Filter now active: the term is in the box, my unhealthy ws stays, my
     // healthy ws is filtered out. (Assert on MY named resources, not counts —
     // the unhealthy view also contains other workers' unhealthy workspaces.)
-    await expect(page.locator('input[aria-label="Filter workspaces"]')).toHaveValue(
-      /status:unhealthy/,
-    );
+    await expect(
+      page.locator('input[aria-label="Filter workspaces"]'),
+    ).toHaveValue(/status:unhealthy/);
     await expect(unhealthyRow).toBeVisible();
     await expect(healthyRow).toBeHidden();
 
@@ -346,99 +395,121 @@ test.describe('Workspaces', () => {
   });
 });
 
-test.describe('Workspace access tab (#1456)', () => {
-  test('shows who can reach the workspace, including the role-free paths', async ({ page }) => {
+test.describe("Workspace access tab (#1456)", () => {
+  test("shows who can reach the workspace, including the role-free paths", async ({
+    page,
+  }) => {
     // From the stored auth state, not page.evaluate: before the first goto
     // the page is about:blank, where reading localStorage is a SecurityError.
     const token = getStoredToken();
     const name = `acctab${Date.now()}`;
-    const res = await page.request.post('/api/v2/organizations/default/workspaces', {
-      headers: { 'Content-Type': 'application/vnd.api+json', Authorization: `Bearer ${token}` },
-      data: { data: { type: 'workspaces', attributes: { name, labels: { env: 'prod' } } } },
-    });
+    const res = await page.request.post(
+      "/api/v2/organizations/default/workspaces",
+      {
+        headers: {
+          "Content-Type": "application/vnd.api+json",
+          Authorization: `Bearer ${token}`,
+        },
+        data: {
+          data: {
+            type: "workspaces",
+            attributes: { name, labels: { env: "prod" } },
+          },
+        },
+      },
+    );
     expect(res.status()).toBe(201);
     const wsId = (await res.json()).data.id;
 
     await page.goto(`/workspaces/${wsId}?tab=access`);
-    const panel = page.getByTestId('resource-access');
+    const panel = page.getByTestId("resource-access");
     await expect(panel).toBeVisible({ timeout: 15_000 });
 
     // The platform paths must be present: a role list alone reads as the
     // complete answer when a platform admin reaches everything anyway.
-    await expect(panel.getByText(/platform admins/i)).toBeVisible({ timeout: 15_000 });
+    await expect(panel.getByText(/platform admins/i)).toBeVisible({
+      timeout: 15_000,
+    });
   });
 });
 
-test.describe('Workspace security scanning settings (#1763)', () => {
-  test('an operator can see and change enforcement from the UI', async ({ page }) => {
+test.describe("Workspace security scanning settings (#1763)", () => {
+  test("an operator can see and change enforcement from the UI", async ({
+    page,
+  }) => {
     // Before #1763 these were managed through the API and the Terraform
     // provider only, so an operator with the UI in front of them could not
     // see what the workspace was set to, let alone change it.
     const token = getStoredToken();
-    const wsId = await createWorkspace(token, uniqueName('scanui'));
+    const wsId = await createWorkspace(token, uniqueName("scanui"));
 
     await page.goto(`/workspaces/${wsId}`);
 
-    const enforcement = page.getByLabel('Enforcement', { exact: true });
+    const enforcement = page.getByLabel("Enforcement", { exact: true });
     await expect(enforcement).toBeVisible({ timeout: 15_000 });
     // The workspace default, shown rather than assumed.
-    await expect(enforcement).toHaveValue('advisory');
+    await expect(enforcement).toHaveValue("advisory");
 
-    await enforcement.selectOption('enforced');
+    await enforcement.selectOption("enforced");
 
     // The change round-trips through the API, so it survives a reload —
     // a select that only moved in the browser would pass a naive assertion.
     await expect(async () => {
       await page.reload();
-      await expect(page.getByLabel('Enforcement', { exact: true })).toHaveValue('enforced');
+      await expect(page.getByLabel("Enforcement", { exact: true })).toHaveValue(
+        "enforced",
+      );
     }).toPass({ timeout: 20_000 });
 
     const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status()).toBe(200);
-    expect((await res.json()).data.attributes['security-scan-enforcement']).toBe('enforced');
+    expect(
+      (await res.json()).data.attributes["security-scan-enforcement"],
+    ).toBe("enforced");
   });
 
-  test('ignored rules round-trip as a list', async ({ page }) => {
+  test("ignored rules round-trip as a list", async ({ page }) => {
     const token = getStoredToken();
-    const wsId = await createWorkspace(token, uniqueName('scanskip'));
+    const wsId = await createWorkspace(token, uniqueName("scanskip"));
 
     await page.goto(`/workspaces/${wsId}`);
-    const skip = page.getByLabel('Ignored rules');
+    const skip = page.getByLabel("Ignored rules");
     await expect(skip).toBeVisible({ timeout: 15_000 });
 
-    await skip.fill('CKV_AWS_24, CKV2_AWS_5');
+    await skip.fill("CKV_AWS_24, CKV2_AWS_5");
     await skip.blur();
 
     await expect(async () => {
       const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      expect((await res.json()).data.attributes['security-scan-skip-rules']).toEqual([
-        'CKV_AWS_24',
-        'CKV2_AWS_5',
-      ]);
+      expect(
+        (await res.json()).data.attributes["security-scan-skip-rules"],
+      ).toEqual(["CKV_AWS_24", "CKV2_AWS_5"]);
     }).toPass({ timeout: 20_000 });
   });
 });
 
-test.describe('Workspace runner debug mode (#1764)', () => {
-  test('the toggle round-trips and the banner says it is on', async ({ page }) => {
+test.describe("Workspace runner debug mode (#1764)", () => {
+  test("the toggle round-trips and the banner says it is on", async ({
+    page,
+  }) => {
     // The indicator is the half that is easy to drop: a setting that only
     // shows on the tab that sets it leaves an operator on any other tab
     // unaware that failed pods are being held with this workspace's
     // credentials in them.
     const token = getStoredToken();
-    const wsId = await createWorkspace(token, uniqueName('debugui'));
+    const wsId = await createWorkspace(token, uniqueName("debugui"));
 
     await page.goto(`/workspaces/${wsId}`);
 
-    const toggle = page.getByLabel('Debug mode', { exact: true });
+    const toggle = page.getByLabel("Debug mode", { exact: true });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
     await expect(toggle).not.toBeChecked();
     // Off means no banner, not a banner saying "off".
-    await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0);
+    await expect(page.getByTestId("debug-mode-banner")).toHaveCount(0);
 
     // `.click()`, never `.check()`: the toggle is a controlled input whose
     // checked state comes from the fetched workspace, so it only flips once the
@@ -448,105 +519,200 @@ test.describe('Workspace runner debug mode (#1764)', () => {
     await toggle.click();
     await expect(toggle).toBeChecked({ timeout: 15_000 });
 
-    await expect(page.getByTestId('debug-mode-banner')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('debug-mode-indicator')).toBeVisible();
+    await expect(page.getByTestId("debug-mode-banner")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("debug-mode-indicator")).toBeVisible();
 
     // Survives a reload, so this is the stored value and not browser state.
     await expect(async () => {
       await page.reload();
-      await expect(page.getByLabel('Debug mode', { exact: true })).toBeChecked();
-      await expect(page.getByTestId('debug-mode-banner')).toBeVisible();
+      await expect(
+        page.getByLabel("Debug mode", { exact: true }),
+      ).toBeChecked();
+      await expect(page.getByTestId("debug-mode-banner")).toBeVisible();
     }).toPass({ timeout: 20_000 });
 
     const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status()).toBe(200);
-    expect((await res.json()).data.attributes['debug-mode']).toBe(true);
+    expect((await res.json()).data.attributes["debug-mode"]).toBe(true);
   });
 
-  test('turning it back off clears the banner', async ({ page }) => {
+  test("turning it back off clears the banner", async ({ page }) => {
     const token = getStoredToken();
-    const wsId = await createWorkspace(token, uniqueName('debugoff'));
+    const wsId = await createWorkspace(token, uniqueName("debugoff"));
 
     await page.goto(`/workspaces/${wsId}`);
-    const toggle = page.getByLabel('Debug mode', { exact: true });
+    const toggle = page.getByLabel("Debug mode", { exact: true });
     await expect(toggle).toBeVisible({ timeout: 15_000 });
 
     await toggle.click();
     await expect(toggle).toBeChecked({ timeout: 15_000 });
-    await expect(page.getByTestId('debug-mode-banner')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("debug-mode-banner")).toBeVisible({
+      timeout: 15_000,
+    });
 
     await toggle.click();
     await expect(toggle).not.toBeChecked({ timeout: 15_000 });
-    await expect(page.getByTestId('debug-mode-banner')).toHaveCount(0);
+    await expect(page.getByTestId("debug-mode-banner")).toHaveCount(0);
 
     await expect(async () => {
       const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      expect((await res.json()).data.attributes['debug-mode']).toBe(false);
+      expect((await res.json()).data.attributes["debug-mode"]).toBe(false);
     }).toPass({ timeout: 20_000 });
   });
 });
 
-test.describe('AI policy gate (#1766)', () => {
+test.describe("AI policy gate (#1766)", () => {
   // The E2E stack runs with `ai_summary.enabled = false`, so the gate is off
   // and there is no verdict to assert on — the positive paths need a real
   // model and belong to the live Tilt smoke. What IS load-bearing here, and
   // what a mocked test could not show, is the surface parity #1763 exists to
   // enforce: the per-workspace override reaching the GUI, and the gate-off
   // path staying quiet instead of rendering an empty panel on every run.
-  test('the per-workspace override round-trips through the GUI', async ({ page }) => {
+  test("the per-workspace override round-trips through the GUI", async ({
+    page,
+  }) => {
     const token = getStoredToken();
-    const wsId = await createWorkspace(token, uniqueName('aipolui'));
+    const wsId = await createWorkspace(token, uniqueName("aipolui"));
 
     await page.goto(`/workspaces/${wsId}`);
 
-    const select = page.getByTestId('ai-policy-mode');
+    const select = page.getByTestId("ai-policy-mode");
     await expect(select).toBeVisible({ timeout: 15_000 });
-    await expect(select).toHaveValue('default');
+    await expect(select).toHaveValue("default");
 
-    await select.selectOption('disabled');
+    await select.selectOption("disabled");
     // The value comes from the fetched workspace, so it settles only once the
     // PATCH resolves — this assertion is the wait, not a redundant check.
-    await expect(select).toHaveValue('disabled', { timeout: 15_000 });
+    await expect(select).toHaveValue("disabled", { timeout: 15_000 });
 
     // Survives a reload, so this is the stored value and not browser state.
     await expect(async () => {
       await page.reload();
-      await expect(page.getByTestId('ai-policy-mode')).toHaveValue('disabled');
+      await expect(page.getByTestId("ai-policy-mode")).toHaveValue("disabled");
     }).toPass({ timeout: 20_000 });
 
     const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status()).toBe(200);
-    expect((await res.json()).data.attributes['ai-policy-mode']).toBe('disabled');
+    expect((await res.json()).data.attributes["ai-policy-mode"]).toBe(
+      "disabled",
+    );
   });
 
-  test('the gate being off is reported, not a 500', async ({ page }) => {
+  test("the gate being off is reported, not a 500", async ({ page }) => {
     // A run that does not exist must 404. The endpoint is the one an operator
     // (and the MCP tool) reads to find out WHY a run is held, so it failing
     // loudly is worse than the gate being off.
     const token = getStoredToken();
     const res = await page.request.get(
-      '/api/terrapod/v1/runs/run-00000000-0000-0000-0000-000000000000/ai-policy',
+      "/api/terrapod/v1/runs/run-00000000-0000-0000-0000-000000000000/ai-policy",
       { headers: { Authorization: `Bearer ${token}` } },
     );
     expect(res.status()).toBe(404);
   });
 
-  test('no AI policy panel leaks onto a workspace with the gate off', async ({ page }) => {
+  test("no AI policy panel leaks onto a workspace with the gate off", async ({
+    page,
+  }) => {
     const token = getStoredToken();
-    const wsId = await createWorkspace(token, uniqueName('aipoloff'));
+    const wsId = await createWorkspace(token, uniqueName("aipoloff"));
 
     await page.goto(`/workspaces/${wsId}`);
-    await expect(page.getByTestId('ai-policy-mode')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("ai-policy-mode")).toBeVisible({
+      timeout: 15_000,
+    });
 
     // The panel is a RUN surface. Its heading must not appear on the workspace
     // page, and no half-rendered verdict box either.
-    await expect(page.locator('text=AI Policy Gate')).toHaveCount(0);
-    await expect(page.locator('text=Waiting for the AI policy verdict')).toHaveCount(0);
+    await expect(page.locator("text=AI Policy Gate")).toHaveCount(0);
+    await expect(
+      page.locator("text=Waiting for the AI policy verdict"),
+    ).toHaveCount(0);
+  });
+});
+
+// The workspace reads below use `/api/v1`, the canonical native surface. They
+// arrived from the 1.9 line on `/api/v2`, where that was correct because the bare
+// workspace resource had no native GET or PATCH at all. Here it does, and `/api/v2`
+// is a deprecated alias (see `docs/deprecations.md`), so leaving them on it would
+// have them break at its removal rather than now. `web/tests/engine-scoped-prefixes.test.ts`
+// does not catch this: it scans `web/`, not `e2e/`.
+//
+// The prefix is still per-ROUTE and not guessable from a neighbour —
+// `services/tests/api/api_route_contract.json` is the authority, and a wrong one
+// is a silent 404 no contract gate can see.
+test.describe("Fork pull request plans (GHSA-gp5w-76rw-c452)", () => {
+  test("a new workspace defaults to off and the toggle round-trips", async ({
+    page,
+  }) => {
+    // Defaulting off is the whole point, so the default is asserted first:
+    // a control that merely persists whatever it is set to would pass every
+    // other assertion here while leaving fork pull requests planning.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName("forkplans"));
+
+    await page.goto(`/workspaces/${wsId}`);
+
+    const toggle = page.getByLabel("Plan fork pull requests", { exact: true });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+    await expect(toggle).not.toBeChecked();
+    await expect(page.getByTestId("allow-fork-pr-plans-indicator")).toHaveCount(
+      0,
+    );
+
+    // `.click()`, never `.check()` — the input is controlled by the fetched
+    // workspace, so it flips only once the PATCH resolves.
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
+    await expect(
+      page.getByTestId("allow-fork-pr-plans-indicator"),
+    ).toBeVisible();
+
+    await expect(async () => {
+      await page.reload();
+      await expect(
+        page.getByLabel("Plan fork pull requests", { exact: true }),
+      ).toBeChecked();
+    }).toPass({ timeout: 20_000 });
+
+    const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status()).toBe(200);
+    expect((await res.json()).data.attributes["allow-fork-pr-plans"]).toBe(
+      true,
+    );
+  });
+
+  test("turning it back off persists", async ({ page }) => {
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName("forkoff"));
+
+    await page.goto(`/workspaces/${wsId}`);
+    const toggle = page.getByLabel("Plan fork pull requests", { exact: true });
+    await expect(toggle).toBeVisible({ timeout: 15_000 });
+
+    await toggle.click();
+    await expect(toggle).toBeChecked({ timeout: 15_000 });
+    await toggle.click();
+    await expect(toggle).not.toBeChecked({ timeout: 15_000 });
+
+    // The off direction is the one a naive `if value` guard drops, leaving the
+    // operator looking at an unchecked box over a workspace that still plans.
+    await expect(async () => {
+      const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect((await res.json()).data.attributes["allow-fork-pr-plans"]).toBe(
+        false,
+      );
+    }).toPass({ timeout: 20_000 });
   });
 });

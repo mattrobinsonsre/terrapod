@@ -286,6 +286,31 @@ async def is_fingerprint_valid(
     return False
 
 
+class ListenerNameInUse(Exception):
+    """A listener name is already registered to a DIFFERENT pool.
+
+    Listener names live in one global namespace (`tp:listener_name:{name}`),
+    while the re-join path exists so a restarting listener keeps its identity.
+    Together those let a join token for pool A re-join under a name already held
+    in pool B — and the re-join branch rewrites that record's `pool_id`.
+
+    The effect is the inverse of a name squat: the VICTIM'S listener, which goes
+    on heartbeating under the same id, is now registered to the attacker's pool,
+    so it claims and executes that pool's runs on the victim's cluster with the
+    victim's credentials. Certificate auth does not contain it, because it reads
+    `pool_id` from the Redis hash rather than from the certificate's own pool
+    SAN — the hash is the mutable half.
+
+    Refusing the second joiner trades a silent cross-pool redirect for a loud
+    collision an operator can see and resolve (rename the listener, or remove
+    the record that holds the name). That is a worse outcome than today's for
+    the colliding listener and a far better one for the pool it would have been
+    moved into, which is the trade worth making: a name collision between pools
+    has no legitimate meaning, and both parties must already hold a valid join
+    token to reach it at all.
+    """
+
+
 async def join_listener(
     pool: AgentPool,
     token: AgentPoolToken,
@@ -314,6 +339,58 @@ async def join_listener(
 
     # Check if listener already exists (re-join after restart)
     existing_id = await redis.get(f"{_LISTENER_NAME_PREFIX}{name}")
+
+    # Decide the branch FIRST, then take it. Collapsing the two into one block is
+    # how this went wrong once already: clearing `existing_id` inside
+    # `if existing_id:` does not fall through to the fresh-registration `else`, so
+    # the re-join body ran on with `listener_id = None` and wrote a hash keyed on
+    # the literal string "None". A behavioural test caught it; reading the diff did
+    # not.
+    if existing_id:
+        # A re-join may refresh a listener's certificate; it may NOT move the
+        # record into a different pool. See ListenerNameInUse.
+        existing_pool = await redis.hget(f"{_LISTENER_PREFIX}{existing_id}", "pool_id")
+        if not existing_pool:
+            # The name key survives but the hash it points at does not, so there is
+            # nothing to compare the pool against. Taking the re-join branch here
+            # would adopt an id whose owning pool cannot be read and then WRITE this
+            # pool's id into it — the exact cross-pool redirect the check below
+            # exists to refuse, reached by skipping the check rather than passing it.
+            #
+            # The two keys carry the same TTL and heartbeat refreshes both, so this
+            # needs them to diverge: an eviction under memory pressure, a cluster
+            # failover losing one slot, or the pipeline that writes them partially
+            # applying — it cannot be transactional, because the two prefixes hash to
+            # different slots in cluster mode.
+            #
+            # Falling through to a fresh registration rather than raising, because a
+            # listener whose hash is gone is not re-joining in any meaningful sense;
+            # it is in the same position as one whose record expired entirely, and
+            # that already yields a new id. The stale name key is overwritten by the
+            # registration below, so the condition self-heals instead of 409ing until
+            # a TTL runs out. What it must not do is inherit the id.
+            logger.warning(
+                "listener name maps to a record that no longer exists; registering "
+                "fresh rather than adopting an unverifiable id",
+                listener=name,
+                orphaned_id=existing_id,
+                pool=pool.name,
+            )
+            existing_id = None
+        elif existing_pool != str(pool.id):
+            logger.warning(
+                "refusing a listener re-join that would move it between pools",
+                listener=name,
+                from_pool=existing_pool,
+                to_pool=str(pool.id),
+            )
+            raise ListenerNameInUse(
+                f"A listener named {name!r} is already registered to a different "
+                "agent pool. A listener cannot change pools by re-joining under "
+                "the same name. Give this listener a distinct name, or remove the "
+                "existing registration from the pool that holds it."
+            )
+
     if existing_id:
         listener_id = existing_id
         # Update existing hash with fresh cert

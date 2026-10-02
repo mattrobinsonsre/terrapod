@@ -37,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import (
     AuthenticatedUser,
+    effective_platform_roles,
     get_current_user,
     require_admin,
     require_admin_or_audit,
@@ -734,6 +735,28 @@ async def provision_catalog_item(
     except CatalogError as e:
         await db.rollback()
         raise HTTPException(status_code=e.status_code, detail=str(e)) from e
+
+    # GHSA-49q6-pm68-3xgw, through the catalog door. Provisioning takes
+    # caller-supplied `labels` and needs only catalog `use` plus pool `write` —
+    # nowhere near platform admin — so without this a non-admin could label a
+    # provisioned workspace into another team's rule-assigned variable set and
+    # receive its secrets in the run the provision queues. The ordinary create path
+    # is gated in `tfe_v2`; this is the same check at the other entry point, which
+    # constructs its Workspace directly and so does not pass through it.
+    from terrapod.services.varset_self_join import refuse_varset_growth
+
+    await db.flush()
+    try:
+        await refuse_varset_growth(
+            db,
+            workspace_id=ws.id,
+            before=set(),
+            is_platform_admin="admin" in effective_platform_roles(user),
+            actor_email=user.email,
+        )
+    except Exception:
+        await db.rollback()
+        raise
 
     try:
         await db.commit()

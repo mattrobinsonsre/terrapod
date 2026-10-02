@@ -253,3 +253,62 @@ class TestModuleCli:
             absent = Path(td) / "absent-binary"
             rc = exec_subprocess.main(argv=["--", str(absent)])
             assert rc == 127
+
+
+class TestThePlatformsOwnEnvironmentIsNotHandedToTheEngine:
+    """`TP_*` is scrubbed from the child's environment.
+
+    `TP_AUTH_TOKEN` is the run's runner token — it uploads this run's
+    artifacts and its state. Without `env=`, the engine inherited it, and so
+    did every provider plugin the engine loads. A provider runs third-party
+    code against the operator's cloud credentials by design; it has no
+    business also holding the token that writes the state.
+
+    A scrub, not an allowlist: the engine needs `PATH`, `HOME`, every `TF_*`,
+    the cloud credential variables and the proxy and CA-bundle variables that
+    libraries read from nowhere else. An allowlist would have to enumerate all
+    of that and would break an egress-proxied deployment the first time it
+    missed one — so this pins both directions.
+
+    Runs a real child that dumps its own environment, in keeping with the rest
+    of this file: a mocked `Popen` would assert on the kwargs we passed rather
+    than on what the process actually received.
+    """
+
+    def test_tp_is_dropped_and_everything_else_survives(self, monkeypatch):
+        monkeypatch.setenv("TP_AUTH_TOKEN", "runtok-should-not-appear")
+        monkeypatch.setenv("TP_API_URL", "https://api.internal")
+        # Lower case is the same attempt; `is_reserved_env_key` folds case.
+        monkeypatch.setenv("tp_auth_token", "runtok-lower-should-not-appear")
+        for k, v in {
+            "TF_IN_AUTOMATION": "1",
+            "HTTPS_PROXY": "http://egress:3128",
+            "NO_PROXY": "10.0.0.0/8",
+            "SSL_CERT_FILE": "/etc/ssl/ca.pem",
+            "AWS_ROLE_ARN": "arn:aws:iam::1:role/r",
+        }.items():
+            monkeypatch.setenv(k, v)
+
+        with tempfile.TemporaryDirectory() as d:
+            log = os.path.join(d, "env.log")
+            result = exec_subprocess.run(["/usr/bin/env"], log_file=log)
+            assert result.exit_code == 0
+            with open(log, encoding="utf-8", errors="replace") as fh:
+                dumped = fh.read()
+
+        names = {line.split("=", 1)[0] for line in dumped.splitlines() if "=" in line}
+
+        leaked = sorted(n for n in names if n.upper().startswith("TP_"))
+        assert not leaked, f"platform plumbing reached the engine: {leaked}"
+        assert "runtok-should-not-appear" not in dumped
+        assert "runtok-lower-should-not-appear" not in dumped
+
+        for keep in (
+            "TF_IN_AUTOMATION",
+            "HTTPS_PROXY",
+            "NO_PROXY",
+            "SSL_CERT_FILE",
+            "AWS_ROLE_ARN",
+            "PATH",
+        ):
+            assert keep in names, f"{keep} was dropped — the engine needs it"

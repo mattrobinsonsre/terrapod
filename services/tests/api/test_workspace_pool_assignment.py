@@ -92,6 +92,7 @@ def _mock_workspace(ws_id=None, pool_id=None, extra_pool_ids=None):
     ws.drift_status = ""
     ws.state_diverged = False
     ws.vcs_workflow = "merge_then_apply"
+    ws.allow_fork_pr_plans = False
     ws.auto_merge = False
     ws.auto_merge_strategy = "merge"
     ws.lifecycle_state = "active"

@@ -773,6 +773,23 @@
       "delete": "Löschen"
     },
     "confirmDelete": "Diese VCS-Verbindung löschen? Arbeitsbereiche, die sie verwenden, verlieren die VCS-Integration. Dies kann nicht rückgängig gemacht werden.",
+    "access": {
+      "heading": "Wer diese Verbindung verwenden darf",
+      "intro": "Diese drei Einstellungen legen fest, welche Workspaces auf diese Verbindung verweisen dürfen. Die Anmeldeinformation selbst bleibt schreibgeschützt im Sinne von nur schreibbar.",
+      "ownerEmail": "E-Mail der Eigentümerin bzw. des Eigentümers",
+      "ownerEmailHint": "Die Eigentümerin bzw. der Eigentümer darf diese Verbindung immer verwenden. Leer lassen, damit die Verbindung ohne Eigentümer bleibt.",
+      "labels": "Zugriffs-Labels",
+      "labelsHint": "Eine Rolle, deren Regeln auf diese Labels passen, darf einen Workspace auf diese Verbindung verweisen.",
+      "allowedRepositories": "Zugelassene Repositorys",
+      "allowedRepositoriesHint": "Glob-Muster, die mit dem Repository verglichen werden, das ein Workspace verwenden möchte.",
+      "addPattern": "Muster hinzufügen",
+      "anyRepositoryWarning": "Es sind keine Muster aufgeführt, daher darf diese Verbindung auf jedes Repository verweisen.",
+      "restricted": "{count, plural, one {# Muster ist aufgeführt} other {# Muster sind aufgeführt}}, daher wird ein Repository abgelehnt, das auf keines davon passt.",
+      "ownedBy": "Eigentum von {email}",
+      "unowned": "Es ist kein Eigentümer festgelegt",
+      "anyRepositorySummary": "Jedes Repository ist zugelassen",
+      "repositoryCount": "Beschränkt auf {count, plural, one {# Repository} other {# Repositorys}}"
+    },
     "form": {
       "name": "Name",
       "namePattern": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Zahl beginnen.",
@@ -1076,7 +1093,8 @@
       "terragruntVersion": "Terragrunt-Version",
       "noExpiry": "Kein Ablauf",
       "addDriftIgnoreRule": "Regel hinzufügen",
-      "debugModeHint": "Pods fehlgeschlagener Runner auf den von dieser Regel erstellten Arbeitsbereichen offen halten. Standardmäßig aus – ein offen gehaltener Pod behält die Zugangsdaten dieses Arbeitsbereichs."
+      "debugModeHint": "Pods fehlgeschlagener Runner auf den von dieser Regel erstellten Arbeitsbereichen offen halten. Standardmäßig deaktiviert – ein offen gehaltener Pod behält die Zugangsdaten dieses Arbeitsbereichs.",
+      "allowForkPrPlansHint": "Gilt für jeden Arbeitsbereich, den diese Regel erstellt. Standardmäßig aus: Ein Pull Request aus einem Fork erhält keinen spekulativen Plan, weil dabei der Code seines Autors mit den Zugangsdaten des Arbeitsbereichs ausgeführt würde."
     },
     "table": {
       "name": "Name",
@@ -2877,7 +2895,8 @@
       "uploadState": "Zustand konnte nicht hochgeladen werden",
       "uploadStateFile": "Zustandsdatei konnte nicht hochgeladen werden",
       "updateSecurityScan": "Sicherheitsprüfung konnte nicht aktualisiert werden",
-      "updateDebugMode": "Debugmodus konnte nicht aktualisiert werden"
+      "updateDebugMode": "Debugmodus konnte nicht aktualisiert werden",
+      "updateForkPlans": "Pläne für Pull Requests aus Forks konnten nicht aktualisiert werden"
     },
     "subtabs": {
       "state": "Zustand",
@@ -2925,11 +2944,19 @@
       "title": "Runner-Debugmodus",
       "description": "Den Pod eines fehlgeschlagenen Laufs offen halten, damit Sie hineinschauen können. Der Lauf wird zuerst als fehlgeschlagen gemeldet; erst danach bleibt der Container stehen.",
       "label": "Debugmodus",
-      "hint": "Standardmäßig aus. Solange er aktiv ist, bleibt der Pod eines fehlgeschlagenen Runners für das von Ihrem Betreiber konfigurierte Zeitfenster per exec erreichbar und behält währenddessen die Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs.",
+      "hint": "Standardmäßig deaktiviert. Solange er aktiv ist, bleibt der Pod eines fehlgeschlagenen Runners für das von Ihrem Betreiber konfigurierte Zeitfenster per exec erreichbar und behält währenddessen die Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs.",
       "activeBadge": "Aktiv",
       "bannerTitle": "Der Debugmodus ist für diesen Arbeitsbereich aktiviert",
       "bannerBody": "Der Pod eines fehlgeschlagenen Laufs wird zur Untersuchung offen gehalten, statt sich zu beenden, und behält dabei die Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs. Schalten Sie den Debugmodus aus, sobald Sie mit der Fehlersuche fertig sind.",
       "confirmEnable": "Debugmodus aktivieren? Der Pod eines fehlgeschlagenen Laufs wird mit den Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs offen gehalten, bis das Zeitfenster abläuft oder Sie den Pod löschen."
+    },
+    "allowForkPrPlans": {
+      "title": "Pläne für Pull Requests aus Forks",
+      "description": "Ob ein aus einem Fork geöffneter Pull Request einen spekulativen Plan erhält. Standardmäßig aus, weil dieser Plan den Code des Fork-Autors mit den Zugangsdaten dieses Arbeitsbereichs ausführt.",
+      "label": "Pull Requests aus Forks planen",
+      "hint": "Ein Lauf erhält die Umgebungsvariablen dieses Arbeitsbereichs, vertrauliche Werte, alle über Vault aufgelösten Geheimnisse und die Cloud-Identität des Jobs. Wer einen Pull Request aus einem Fork öffnet, hat keinen Schreibzugriff und kann nicht mergen – ein spekulativer Plan ist also der einzige Weg, auf dem sein Code an diese Zugangsdaten gelangt. Aktivieren Sie dies für einen Arbeitsbereich, in dem es nichts zu holen gibt – etwa ein öffentliches Modul-Repository, das Beiträge aus der Community annimmt. Pull Requests aus Branches im Repository selbst sind davon nicht betroffen und werden immer geplant.",
+      "activeBadge": "Ein",
+      "confirmEnable": "Pull Requests aus Forks planen? Der Code ihrer Autoren wird mit den Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs ausgeführt, ohne dass jemand dies zuvor genehmigt."
     }
   },
   "graphs": {

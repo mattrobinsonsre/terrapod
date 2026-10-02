@@ -2,7 +2,7 @@
 
 Terrapod uses a label-based RBAC system instead of Terraform Enterprise's team model. Labels replace teams entirely -- a "team" is just a label. This document covers the permission model, role configuration, and common patterns.
 
-> Note: Workspaces configured for **[apply-then-merge](vcs-workflows.md)** delegate authorization for PR-comment-driven actions (`terrapod plan`, `terrapod apply`, `terrapod merge`) to the VCS provider's repo permissions and branch protection — Terrapod's label-based RBAC described here does **not** gate those actions. RBAC continues to apply to everything else (UI navigation, CLI runs, state access, settings changes).
+> Note: Workspaces configured for **[apply-then-merge](vcs-workflows.md)** delegate authorization for PR-comment-driven actions (`terrapod plan`, `terrapod apply`, `terrapod unlock`) to the VCS provider's repo permissions and branch protection — Terrapod's label-based RBAC described here does **not** gate those actions. Those commands require the commenter to have **push access** to the repository (GitHub collaborator permission; GitLab Developer or above), so commenting alone is not authorization. RBAC continues to apply to everything else (UI navigation, CLI runs, state access, settings changes).
 
 ---
 
@@ -55,6 +55,71 @@ Pool permission resolution follows the same order as workspace permissions:
 4. **Label-based RBAC** — custom roles matched against pool labels using `pool_permission`
 5. **`everyone` role** — pools with label `access: everyone` → `read`
 6. **Default** → no access (pool is invisible)
+
+<a id="vcs-connections-are-a-labelled-resource"></a>
+
+### VCS Connections (labelled, but not a permission level)
+
+A VCS connection carries `owner-email` and `labels`, so it is reachable by a role
+the way a workspace or an agent pool is. It is the one labelled resource with **no
+permission level of its own**, and the distinction matters:
+
+- **CRUD on a connection is platform `admin` only.** Creating, listing, viewing,
+  updating and deleting a connection all still require the `admin` role. No
+  `*_permission` field on a custom role changes that, and there is nothing to set.
+- **What labels and ownership grant is the right to _name_ the connection** — to
+  point a workspace or a VCS-sourced registry module at it. A connection reaches
+  every repository its credential can reach, so naming one is a grant; see
+  [VCS integration → Naming a VCS connection is authorized](vcs-integration.md#naming-a-vcs-connection-is-authorized).
+
+So a role grants "this team may build workspaces on this installation", never
+"this team may edit the installation". The evaluation is the ordinary one:
+
+1. **Platform admin** → may name any connection
+2. **Connection owner** (`owner_email == user.email`) → may name it
+3. **Label-based RBAC** — the caller's custom roles matched against the
+   connection's `labels` **only**, with deny winning as always. The connection's
+   **name is deliberately not matched**: `allow-names` is a flat namespace shared
+   across every resource type, so a role written `allow-names: ["prod-net"]` for a
+   workspace would otherwise also authorise the *connection* called `prod-net`
+4. **Already owns a workspace using it** → may name it again, since the access is
+   one they already hold
+5. **Default** → **403**
+
+There is **no `everyone` floor here, and the label is ignored rather than
+honoured.** Everywhere else, `access: everyone` grants a read level to every
+authenticated user. On a VCS connection it is dropped before the labels are
+evaluated:
+
+> **An `access` key on a VCS connection has no effect.** Honouring it would make
+> the connection — and therefore every repository its credential can reach —
+> nameable by every authenticated user, since all of them implicitly hold the
+> `everyone` role. That is a one-label revert of the finding the owner and label
+> columns exist to close, so the key is stripped. Labelling a connection
+> `access: everyone` is not dangerous; it simply does nothing, and the connection
+> stays reachable only by an admin, its owner, a role matching its *other* labels,
+> or someone who already owns a workspace on it.
+
+Two further asymmetries, both deliberate:
+
+- **A label claim does not grant at run time.** When a `git_http_auth` credential
+  with `source: vcs_connection` names a connection other than the workspace's own,
+  the claim is checked against the **workspace owner** with no roles to evaluate,
+  because there is no live caller. A workspace whose claim rests only on labels
+  should name its own connection, or use a `static` credential.
+- **Delegating a connection does not need a new role axis.** Point an existing
+  role's `allow-labels` at the connection's labels; the role's
+  `workspace_permission`, `registry_permission` and `pool_permission` are all
+  irrelevant here.
+
+**The role-reach preview does not cover VCS connections.** It reports the
+workspace, pool, registry and catalog axes, so a connection's labels will not
+appear in its output. Review a connection's delegation by reading the connection
+itself (`GET /api/terrapod/v1/vcs-connections`, admin only) against the role's
+`allow-labels` and `deny-labels` — **not** `allow-names`, which is not consulted for
+a connection (see above). Because the same label rules are used, a
+preview of what the role reaches on the **workspace** axis is still a good proxy
+for which labels that role matches.
 
 ### Fine-grained capabilities
 
@@ -811,4 +876,6 @@ oidc:
         roles: ["platform-team", "platform-prod"]
 ```
 
-With `role_prefixes: ["terrapod:"]`, an IDP group named `terrapod:developer` automatically maps to the Terrapod role `developer` without needing an explicit `claims_to_roles` entry.
+With `role_prefixes: ["terrapod:"]`, an IDP group named `terrapod:developer` automatically maps to the Terrapod role `developer` without needing an explicit `claims_to_roles` entry. A group that carries none of the configured prefixes is **ignored** -- so `developer` on its own grants nothing while the prefix is set. With `role_prefixes` empty, every group is taken verbatim.
+
+**`admin` and `audit` are never granted this way**, however the group is named or prefixed (`GHSA-22vg-4g2w-7w34`): a directory membership is not a Terrapod authorization. Use a `claims_to_roles` rule or a platform role assignment, which is a deliberate act by whoever administers Terrapod. **Labels are not a credential trust boundary and neither are group names.**

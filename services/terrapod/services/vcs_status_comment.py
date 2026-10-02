@@ -432,7 +432,7 @@ def _render_gate_details(row: _Row) -> str:
     return "\n".join(lines)
 
 
-def render_comment(rows: list[_Row], *, force_merge_hint: bool = False) -> str:
+def render_comment(rows: list[_Row]) -> str:
     """Render the Markdown status-comment body.
 
     Mode-aware rows: apply_then_merge workspaces show 'not applied' /
@@ -498,11 +498,6 @@ def render_comment(rows: list[_Row], *, force_merge_hint: bool = False) -> str:
                 "Comment `terrapod apply` to apply all pending workspaces, "
                 "or `terrapod apply -W <workspace>` for one at a time."
             )
-    if force_merge_hint:
-        parts.append("")
-        parts.append(
-            "Auto-merge is blocked. Use `terrapod merge` to merge despite incomplete applies."
-        )
     # Staleness signal, in the format `vcs_status_dispatcher` already uses on
     # its sibling comment. It carries more weight here: this comment is edited
     # as three separate runner uploads land, and every refresh is best-effort

@@ -275,3 +275,105 @@ func TestShortID(t *testing.T) {
 		}
 	}
 }
+
+// A TFE tag spelled `access:everyone` is not a label on the Terrapod side — it
+// is the grant the built-in `everyone` role keys on, giving every authenticated
+// user read on that workspace. A migration applies tags in bulk, so one such
+// tag in the source silently opens every workspace carrying it.
+func TestAnAccessEveryoneTagIsWithheldFromTheLabels(t *testing.T) {
+	labels := translateTags([]string{"env:prod", "access:everyone"})
+	withholdAccessGrant(labels)
+
+	if _, present := labels["access"]; present {
+		t.Fatalf("the access grant survived into the labels: %+v", labels)
+	}
+	if labels["terrapod-migration/withheld-access-tag"] != "everyone" {
+		t.Errorf("the withheld value was not recorded: %+v", labels)
+	}
+	if labels["env"] != "prod" {
+		t.Errorf("an unrelated tag was lost: %+v", labels)
+	}
+}
+
+// The server matches the key AND the value exactly, so any other `access` value
+// grants nothing and is an ordinary descriptive label. Withholding it would
+// lose a legitimate label for no security benefit.
+func TestAnAccessTagWithAnotherValueIsLeftAlone(t *testing.T) {
+	for _, value := range []string{"production", "restricted", "team", ""} {
+		labels := translateTags([]string{"access:" + value})
+		withholdAccessGrant(labels)
+		if got, present := labels["access"]; !present || got != value {
+			t.Errorf("access:%q was withheld but grants nothing: %+v", value, labels)
+		}
+		if _, recorded := labels["terrapod-migration/withheld-access-tag"]; recorded {
+			t.Errorf("access:%q was recorded as withheld: %+v", value, labels)
+		}
+	}
+}
+
+// The newer HCP key/value tag bindings write into the same map by a different
+// path, so the filter has to run over the assembled result, not inside the
+// flat-string reader.
+func TestTheGrantIsWithheldFromTheKeyValueTagShapeToo(t *testing.T) {
+	labels := translateTags(nil)
+	labels["access"] = "everyone" // as a TagBinding would set it
+	withholdAccessGrant(labels)
+
+	if _, present := labels["access"]; present {
+		t.Fatalf("a tag-binding grant survived: %+v", labels)
+	}
+}
+
+// The helper tests above call withholdAccessGrant directly, which proves it is
+// correct and nothing about whether EmitWorkspaces reaches it — removing the
+// call site leaves them all green. This drives the real path end to end,
+// through go-tfe's deserialiser, so the guard cannot be quietly disconnected.
+//
+// It is also what the file's older note deferred: TFE's tag relation needs the
+// tag in the response's `included` array AND referenced from the workspace's
+// `relationships.tags.data`, and go-tfe is strict about both halves.
+func TestEmitWorkspaces_WithholdsTheAccessGrantEndToEnd(t *testing.T) {
+	f := newFakeTFE(t)
+	f.orgRead("acme", http.StatusOK, minimalOrgBody)
+	f.orgMembershipsList("acme", http.StatusOK)
+	f.mux.HandleFunc("/api/v2/organizations/acme/workspaces", func(w http.ResponseWriter, r *http.Request) {
+		tagRel := `,
+    "relationships": {
+      "tags": {"data": [{"id": "tag-1", "type": "tags"}, {"id": "tag-2", "type": "tags"}]}
+    }`
+		body := `{
+  "data": [` + wsItem("ws-aaa", "api-prod", "agent", "1.12.0", "", false, "", tagRel) + `],
+  "included": [
+    {"id": "tag-1", "type": "tags", "attributes": {"name": "access:everyone"}},
+    {"id": "tag-2", "type": "tags", "attributes": {"name": "env:prod"}}
+  ],
+  "meta": {"pagination": {"current-page": 1, "total-pages": 1, "total-count": 1}}
+}`
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(body))
+	})
+
+	c, err := NewClient(t.Context(), Config{Address: f.server.URL, Token: "t", OrgName: "acme"})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	ws, _, _, err := c.EmitWorkspaces(t.Context())
+	if err != nil {
+		t.Fatalf("EmitWorkspaces: %v", err)
+	}
+	if len(ws) != 1 {
+		t.Fatalf("expected 1 workspace, got %d: %+v", len(ws), ws)
+	}
+
+	// The fixture has to actually carry the tags, or this test would pass on
+	// a workspace with no labels at all and prove nothing.
+	if ws[0].Labels["env"] != "prod" {
+		t.Fatalf("the tag fixture did not deserialise; labels are %+v", ws[0].Labels)
+	}
+	if _, present := ws[0].Labels["access"]; present {
+		t.Errorf("the fleet-wide read grant was migrated onto the workspace: %+v", ws[0].Labels)
+	}
+	if ws[0].Labels["terrapod-migration/withheld-access-tag"] != "everyone" {
+		t.Errorf("the withheld grant was not recorded: %+v", ws[0].Labels)
+	}
+}

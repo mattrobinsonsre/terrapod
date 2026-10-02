@@ -65,6 +65,7 @@
     "ai-policy-mode",
     "ai-summary-context",
     "ai-summary-mode",
+    "allow-fork-pr-plans",
     "auto-apply",
     "auto-apply-mode",
     "auto-merge",
@@ -909,6 +910,7 @@
     "ai-policy-mode",
     "ai-summary-context",
     "ai-summary-mode",
+    "allow-fork-pr-plans",
     "auto-apply",
     "auto-apply-mode",
     "auto-merge",
@@ -1178,6 +1180,7 @@
     "vault.unavailable-reason"
   ],
   "vcs_connections._connection_json": [
+    "allowed-repositories",
     "budget-window-seconds",
     "calls-per-hour",
     "consumers-window-total",
@@ -1190,7 +1193,9 @@
     "has-token",
     "has-webhook-secret",
     "label-totals",
+    "labels",
     "name",
+    "owner-email",
     "provider",
     "rate-limit",
     "rate-limit-observed-at",

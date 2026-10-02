@@ -509,7 +509,7 @@ tprun-<run-short-id>-plan-auth     # plan-phase Job consumes this
 tprun-<run-short-id>-apply-auth    # apply-phase Job consumes this
 ```
 
-The Job's pod spec references the token via `secretKeyRef` and exposes it as `TP_AUTH_TOKEN` — the raw token never appears in the Job spec, the listener logs, or `kubectl describe` output. The token is scoped to a single `run_id` and the matching phase, so a leaked apply token can't be replayed against an unrelated run or used to download a different workspace's state.
+The Job's pod spec references the token via `secretKeyRef` and exposes it as `TP_AUTH_TOKEN` — the raw token never appears in the Job spec, the listener logs, or `kubectl describe` output. The token is scoped to a single `run_id`, so a leaked token cannot be replayed against an unrelated run or used to download a different workspace's state. It is **not** bound to a phase: the token is `runtok:{run_id}:{ttl}:{timestamp}:{signature}` and carries no phase, so a plan-phase token remains usable against that same run's apply-phase endpoints until its TTL expires. The per-phase Secret naming above is collision avoidance between overlapping Jobs, not a narrower scope. Earlier text here claimed the phase binding; it has never existed, and the TTL (`runners.tokenTTLSeconds`, default 1h) is what actually bounds a leaked token's life.
 
 ### Per-phase vars Secret
 
@@ -592,6 +592,7 @@ For Tilt local development, `values-local.yaml` overrides `listener_cert_ttl_sec
 
 - **Manual identity reset.** Delete the credentials Secret to force a fresh join on the next pod start: `kubectl -n terrapod delete secret {release-fullname}-listener-credentials` (find the exact name with `kubectl get secret -l app.kubernetes.io/component=listener`). This invalidates all running pods' certs on the next renewal. Rotate the join token first if the old one is no longer trusted.
 - **Listener rename.** Because the Secret name follows the Deployment, changing `listener.name` rolls the API-registered identity but keeps the same Secret — the new identity simply overwrites it on next renewal. The old listener record in the API ages out of Redis when its heartbeats stop.
+- **A listener name cannot move between pools.** Names live in one global namespace, so a join under a name already registered to a **different** pool is refused with `409` rather than moving the listener. Re-joining the *same* pool is unaffected — that is what the re-join path is for — and so is a rename, which takes a new name with it. What this stops is the Helm-driven way of moving a listener between pools: swapping the join token while keeping `listener.name` now fails permanently. Delete the old registration first (`DELETE /api/terrapod/v1/listeners/{id}`, which needs admin on the pool currently holding the name — plausibly another team's), or give the listener a new name. A listener image older than v1.9.0 has never seen a `409` on join and will most likely retry rather than surface it, so check the listener's own logs if a move seems not to take.
 - **RBAC scope.** The listener ServiceAccount has `create` on Secrets in its own namespace and `get/list/watch/patch/update/delete` scoped by `resourceNames` to just the credentials Secret. The runner-namespace RBAC (Jobs, Pods, run-token Secrets) is separate.
 
 ---

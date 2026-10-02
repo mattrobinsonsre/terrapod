@@ -16,9 +16,23 @@ class TestBasicVocabulary:
         c = parse("terrapod unlock")
         assert c is not None and c.verb == "unlock"
 
-    def test_merge_matches(self):
+    def test_merge_is_not_a_verb(self):
+        """`terrapod merge` is gone, and must not be reinstated.
+
+        It force-merged the pull request through the App's own credentials,
+        skipping the cross-workspace gate, authorized by nothing but the
+        ability to type a comment. It now reads as an unrecognised word, so
+        anyone who types it gets the usage table and is told plainly that it
+        is not a command -- which beats a silent no-op.
+
+        Workspace-configured auto-merge is a different feature and is
+        untouched: it merges after a SUCCESSFUL apply, under the workspace's
+        own `auto_merge` setting.
+        """
         c = parse("terrapod merge")
-        assert c is not None and c.verb == "merge"
+        assert c is not None
+        assert c.verb == "help"
+        assert c.unrecognised == "merge"
 
     def test_help_matches(self):
         c = parse("terrapod help")

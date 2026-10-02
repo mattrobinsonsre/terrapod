@@ -615,6 +615,21 @@ async def upload_state(
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
+    # A plan-only run does not write state. `require_runner_for_run` proves the
+    # caller holds THIS run's token and nothing more, so without this a
+    # speculative pull-request plan could push a state version and have it
+    # become the workspace's canonical state — the run's own token is all it
+    # takes, and a speculative run is exactly the kind a stranger's pull
+    # request creates.
+    #
+    # The Pulumi route in this file has carried the same guard since it was
+    # written (`upload_pulumi_deployment`); the Terraform route never got it.
+    if run.plan_only:
+        raise HTTPException(
+            status_code=409,
+            detail="A plan-only run does not write state",
+        )
+
     # Stream the state body to a capped tempfile on the ephemeral PVC rather
     # than buffering it in the worker heap — runner state uploads can be
     # multi-MB and `await request.body()` would accumulate the whole thing in
@@ -637,6 +652,24 @@ async def upload_state(
             pass
 
 
+async def _latest_state_version(db: AsyncSession, workspace_id: uuid.UUID) -> StateVersion | None:
+    """The workspace's head state version, by serial.
+
+    Defined here rather than carried from the 2.x line, where the same helper
+    exists but was introduced by Pulumi work this line does not have. The query
+    is engine-agnostic and deliberately identical to it, so the two converge
+    rather than drift.
+    """
+    return (
+        await db.execute(
+            select(StateVersion)
+            .where(StateVersion.workspace_id == workspace_id)
+            .order_by(StateVersion.serial.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
 async def _persist_runner_state(
     db: AsyncSession,
     run: Run,
@@ -654,6 +687,31 @@ async def _persist_runner_state(
     caller's try/finally) stays small and the parsing/divergence logic reads
     linearly. The tempfile at `tmp_path` is owned by the caller.
     """
+    # Lineage identifies the state FILE; serial identifies a revision within it.
+    # A state carrying a different lineage is not a later revision of this
+    # workspace's state, it is somebody else's state — so serial ordering says
+    # nothing useful about it and accepting it would replace the workspace's
+    # history wholesale. The column has been stored since state versions existed
+    # and was never once compared.
+    #
+    # Compared only when BOTH sides are non-empty: the column defaults to "" and
+    # legacy rows predate it being populated, so a strict comparison would
+    # refuse every upload on a workspace whose head was written before then.
+    latest = await _latest_state_version(db, run.workspace_id)
+    # `latest.lineage` is relaxed because the column defaults to "" and legacy rows
+    # predate it being populated. The UPLOADED lineage is NOT relaxed: terraform and
+    # tofu always write one, so an empty value is not a legacy artefact — it is the
+    # one input an attacker controls, and treating it as "skip the check" turned the
+    # guard off for exactly the caller it exists to stop.
+    if latest is not None and latest.lineage and latest.lineage != lineage:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "State lineage does not match the recorded state for this "
+                "workspace. This state belongs to a different state file."
+            ),
+        )
+
     # tofu/terraform does NOT bump the state serial when an apply leaves the
     # persisted state byte-identical to the prior state. This happens whenever a
     # resource carries a *perpetual phantom diff* — write-only attributes that are
@@ -706,6 +764,22 @@ async def _persist_runner_state(
             )
             return Response(status_code=200)
         raise HTTPException(status_code=409, detail=_existing_serial_msg)
+
+    # Serial must move forward. The block above owns the equal-serial cases (an
+    # identical body is an idempotent no-op; a different one is divergence), so
+    # what is left here is a serial that does not yet exist — and a state
+    # claiming a serial BELOW the recorded head would quietly become the head,
+    # because the download path serves the highest serial. A forward gap is
+    # allowed: terraform normally increments by one, but a gap is not evidence
+    # of anything wrong, where going backwards always is.
+    if latest is not None and serial < latest.serial:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"State serial {serial} is behind the recorded serial "
+                f"{latest.serial} for this workspace."
+            ),
+        )
 
     # Create StateVersion record
     sv = StateVersion(

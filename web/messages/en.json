@@ -773,6 +773,23 @@
       "delete": "Delete"
     },
     "confirmDelete": "Delete this VCS connection? Workspaces using it will lose VCS integration. This cannot be undone.",
+    "access": {
+      "heading": "Who may use this connection",
+      "intro": "These three settings decide which workspaces may be pointed at this connection. The credential itself stays write-only.",
+      "ownerEmail": "Owner email",
+      "ownerEmailHint": "The owner may always use this connection. Leave it blank to leave the connection unowned.",
+      "labels": "Access labels",
+      "labelsHint": "A role whose rules match these labels may point a workspace at this connection.",
+      "allowedRepositories": "Allowed repositories",
+      "allowedRepositoriesHint": "Glob patterns matched against the repository a workspace asks to use.",
+      "addPattern": "Add a pattern",
+      "anyRepositoryWarning": "No patterns are listed, so this connection may be pointed at any repository.",
+      "restricted": "{count, plural, one {# pattern is listed} other {# patterns are listed}}, so a repository matching none of them is refused.",
+      "ownedBy": "Owned by {email}",
+      "unowned": "No owner is set",
+      "anyRepositorySummary": "Any repository is allowed",
+      "repositoryCount": "Restricted to {count, plural, one {# repository} other {# repositories}}"
+    },
     "form": {
       "name": "Name",
       "namePattern": "Letters, numbers, hyphens, and underscores only. Must start with a letter or number.",
@@ -1076,7 +1093,8 @@
       "terragruntVersion": "Terragrunt version",
       "noExpiry": "No expiry",
       "addDriftIgnoreRule": "Add rule",
-      "debugModeHint": "Hold failed runner pods open on the workspaces this rule creates. Off by default — a held pod keeps that workspace's credentials."
+      "debugModeHint": "Hold failed runner pods open on the workspaces this rule creates. Off by default — a held pod keeps that workspace's credentials.",
+      "allowForkPrPlansHint": "Applies to every workspace this rule creates. Off by default: a pull request from a fork gets no speculative plan, because it would run its author's code with the workspace's credentials."
     },
     "table": {
       "name": "Name",
@@ -2885,7 +2903,8 @@
       "uploadState": "Failed to upload state",
       "uploadStateFile": "Failed to upload state file",
       "updateSecurityScan": "Failed to update security scanning",
-      "updateDebugMode": "Failed to update debug mode"
+      "updateDebugMode": "Failed to update debug mode",
+      "updateForkPlans": "Failed to update fork pull request plans"
     },
     "applicableVarsets": {
       "title": "Variable sets",
@@ -2930,6 +2949,14 @@
       "bannerTitle": "Debug mode is on for this workspace",
       "bannerBody": "A failed run's pod is held open for inspection instead of exiting, and it keeps this workspace's credentials and decrypted variables while it is held. Turn debug mode off when you are finished troubleshooting.",
       "confirmEnable": "Turn on debug mode? A failed run's pod will be held open holding this workspace's credentials and decrypted variables until the window expires or you delete the pod."
+    },
+    "allowForkPrPlans": {
+      "title": "Plans on fork pull requests",
+      "description": "Whether a pull request opened from a fork gets a speculative plan. Off by default, because that plan runs the fork author's code with this workspace's credentials.",
+      "label": "Plan fork pull requests",
+      "hint": "A run receives this workspace's environment variables, sensitive values, any Vault-resolved secrets and the job's cloud identity. Someone opening a pull request from a fork has no write access and cannot merge, so a speculative plan is the only way their code reaches those credentials. Turn this on for a workspace that holds nothing worth taking — a public module repository accepting community contributions, say. Pull requests from branches in the repository itself are unaffected and always plan.",
+      "activeBadge": "On",
+      "confirmEnable": "Plan pull requests opened from forks? Their authors' code will run with this workspace's credentials and decrypted variables, without anyone approving it first."
     }
   },
   "graphs": {
