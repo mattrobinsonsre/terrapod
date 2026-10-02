@@ -626,6 +626,18 @@ api:
       # `location`, GCP `region`/`location`, then provider config). A plan can
       # span regions, so this default is used only when a resource has no region.
       default_region: "us-east-1"
+      # Integrity for the fetched sheet (GHSA-7486-vv55-jxhq). Empty means "verify
+      # against the `.sha256` published beside the sheet" — which catches
+      # corruption and a swapped asset, but not someone who can rewrite both. Pin
+      # the digest here for the check that survives that, having verified the
+      # release's attestation once:
+      #   gh attestation verify prices.yaml.gz --repo mattrobinsonsre/terrapod
+      prices_sha256: ""
+      # Bounds, so a hostile or broken upstream cannot fill the ephemeral PVC. The
+      # real sheet is ~2 MB compressed / ~20 MB decompressed, so both are far above
+      # any legitimate size and exist only to stop a decompression bomb.
+      prices_max_compressed_bytes: 268435456 # 256 MiB
+      prices_max_decompressed_bytes: 2147483648 # 2 GiB
 
     # Leader/follower role resolution (#960).
     #

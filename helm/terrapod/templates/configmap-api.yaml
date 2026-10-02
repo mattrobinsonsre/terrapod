@@ -416,6 +416,9 @@ data:
       enabled: {{ .Values.api.config.cost_estimation.enabled }}
       prices_url: {{ .Values.api.config.cost_estimation.prices_url | quote }}
       default_region: {{ .Values.api.config.cost_estimation.default_region | quote }}
+      prices_sha256: {{ .Values.api.config.cost_estimation.prices_sha256 | default "" | quote }}
+      prices_max_compressed_bytes: {{ .Values.api.config.cost_estimation.prices_max_compressed_bytes | default 268435456 | int64 }}
+      prices_max_decompressed_bytes: {{ .Values.api.config.cost_estimation.prices_max_decompressed_bytes | default 2147483648 | int64 }}
     {{- end }}
     {{- if .Values.api.config.ha }}
     ha:

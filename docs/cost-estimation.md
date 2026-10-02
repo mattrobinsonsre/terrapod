@@ -26,11 +26,56 @@ api:
       enabled: true          # default; set false to disable (endpoints then 404)
       # prices_url: ...       # override the upstream pricesheet (e.g. an internal mirror)
       # default_region: us-east-1   # fallback only — region is resolved per-resource
+      # prices_sha256: ...    # pin the sheet's digest (see "Trusting the pricesheet")
 ```
 
 - **Region is resolved per resource** — from the resource's own attributes (`region`/`location`), then its provider config, and only then the `default_region` fallback.
 - The pricesheet is a **pull-through cache**: it is mirrored into object storage on first use (no schedule, no extra Helm wiring), and a stale copy is served if a refresh fails so a transient upstream outage never breaks a run.
 - **Air-gapped / restricted-network** deployments pre-seed the cached object or point `cost_estimation.prices_url` at an internal mirror of the self-generated pricesheet (`prices.yaml.gz`).
+
+## Trusting the pricesheet
+
+The sheet is data, not code — it is parsed with a safe YAML loader and
+parameterised inserts, so there is no execution path through it. What a tampered
+sheet *can* do is skew every cost number, and anything reading those numbers:
+a policy or AI gate that keys on cost would be ruling on fiction.
+
+Three things guard it, and they are not equally strong. Say which one you are
+relying on:
+
+| | What it catches | What it does not |
+|---|---|---|
+| **Size caps** (always on) | A decompression bomb or runaway upstream filling the ephemeral PVC | Nothing about the sheet's *content* |
+| **The sibling `.sha256`** (automatic) | Corruption in transit, and an asset swapped on its own | Anyone who can rewrite the sheet *and* the file beside it |
+| **`prices_sha256`** (you set it) | All of the above, including a compromise of wherever the sheet is published | A sheet that was already wrong when you pinned it |
+
+Only the third is a real integrity guarantee, because it is the only one whose
+value lives in your deployment rather than next to the artifact. To use it,
+verify the release's build attestation once and then pin what it attests:
+
+```sh
+curl -fLO https://github.com/mattrobinsonsre/terrapod/releases/download/pricesheet/prices.yaml.gz
+# Sigstore-backed, and tied to the workflow run that produced these exact bytes.
+gh attestation verify prices.yaml.gz --repo mattrobinsonsre/terrapod
+sha256sum prices.yaml.gz          # -> api.config.cost_estimation.prices_sha256
+```
+
+A pinned sheet does not auto-update: the weekly publish will then fail its digest
+check and the cached sheet keeps serving, which is the trade you are making. Re-pin
+when you want the newer prices. A refusal is logged as `cost_pricesheet_rejected`
+and never replaces the cached copy, so a bad refresh degrades to stale numbers
+rather than wrong ones.
+
+Leaving `prices_sha256` empty is a reasonable default — Terrapod still fetches
+`<prices_url>.sha256` and refuses a mismatch — but it is weaker than it looks, so
+it is stated here rather than implied. An **air-gapped mirror that serves only the
+sheet** is unaffected: a missing or unparseable sibling digest is not fatal, by
+design, or every mirror predating this would have broken.
+
+The caps are `prices_max_compressed_bytes` (256 MiB) and
+`prices_max_decompressed_bytes` (2 GiB). The real sheet is ~2 MB and ~20 MB
+respectively, so neither is a limit you will meet; they exist so that a hostile
+sheet cannot spend your PVC. Both are enforced while streaming, not after.
 
 ## How it works
 

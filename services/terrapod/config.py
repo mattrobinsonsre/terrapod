@@ -1293,6 +1293,41 @@ class CostEstimationConfig(BaseModel):
             "mirror of either shape works for air-gapped deployments."
         ),
     )
+    prices_sha256: str = Field(
+        default="",
+        description=(
+            "Expected SHA-256 of the COMPRESSED pricesheet, hex. When set, a "
+            "refresh whose bytes do not match is discarded and the previously "
+            "cached sheet keeps serving. This is the strong integrity check and "
+            "the only one that survives a compromise of wherever the sheet is "
+            "published, because the operator holds the value: pin it to the "
+            "digest in the `prices.yaml.gz.sha256` asset beside the sheet, "
+            "having verified that release's build attestation once "
+            "(`gh attestation verify prices.yaml.gz --repo mattrobinsonsre/terrapod`). "
+            "Left empty, Terrapod still fetches the sibling `.sha256` and refuses "
+            "a mismatch, which catches corruption and a tampered asset but not a "
+            "publisher who can rewrite both."
+        ),
+    )
+    prices_max_compressed_bytes: int = Field(
+        default=256 * 1024 * 1024,
+        ge=1024,
+        description=(
+            "Hard cap on the compressed download. The sheet is ~2 MB, so this is "
+            "far above any legitimate size; it exists so a hostile or broken "
+            "upstream cannot fill the ephemeral PVC. Exceeding it aborts the "
+            "refresh mid-stream and leaves the cached sheet in place."
+        ),
+    )
+    prices_max_decompressed_bytes: int = Field(
+        default=2 * 1024 * 1024 * 1024,
+        ge=1024,
+        description=(
+            "Hard cap on the DECOMPRESSED sheet, which is what a decompression "
+            "bomb spends: gzip reaches ~1000:1, so the compressed cap alone "
+            "bounds this at a terabyte. The real sheet is ~20 MB decompressed."
+        ),
+    )
     default_region: str = Field(
         default="us-east-1",
         description=(

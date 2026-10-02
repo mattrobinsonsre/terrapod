@@ -2127,6 +2127,17 @@
             },
             "default_region": {
               "type": "string"
+            },
+            "prices_sha256": {
+              "type": "string"
+            },
+            "prices_max_compressed_bytes": {
+              "type": "integer",
+              "minimum": 1024
+            },
+            "prices_max_decompressed_bytes": {
+              "type": "integer",
+              "minimum": 1024
             }
           }
         },
