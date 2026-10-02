@@ -33,6 +33,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.credentials import extract_credential
 from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.api.prefixes import prefix_of
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -771,6 +773,63 @@ def _published_version_json(row, base: str, namespace: str, name: str, version: 
     }
 
 
+async def _require_collection_write(
+    db: AsyncSession,
+    user: AuthenticatedUser,
+    namespace: str,
+    name: str,
+    *,
+    must_exist: bool,
+) -> None:
+    """Authorise a write to one Galaxy collection, by its own owner and labels.
+
+    Publishing had **authentication only**, so any principal who could reach the
+    endpoint could publish into any namespace: an existing collection was looked
+    up and reused with nothing compared against it, and `owner_email` was used
+    only to stamp a row that did not yet exist. Reading the coordinate out of the
+    archive rather than off the request stops a caller *claiming* a namespace in
+    the URL, but it does not stop them building an archive that declares someone
+    else's.
+
+    `must_exist` is False for publish — an unclaimed namespace may be created by
+    any authenticated principal, the creator becoming its owner, which is the
+    rule the module and provider registries already follow — and True for
+    attaching a signature, which modifies an artifact that is already published.
+    """
+    from terrapod.services.registry_rbac_service import resolve_registry_capabilities_for
+
+    # A runner token is refused here rather than left to the capability resolver.
+    # On the registry axis a runner token gets a read *floor* (`caps |= read_caps`)
+    # which does not cap what follows, and an owner match grants the whole axis --
+    # and a runner token's email is the literal "runner", so a collection owned by
+    # that string would hand a run's own short-lived token publish rights. This
+    # refusal does not depend on that arithmetic holding.
+    if user.auth_method == "runner_token":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Runner tokens cannot publish collections",
+        )
+
+    existing = await collections.get_collection(db, namespace, name)
+    if existing is None:
+        if must_exist:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+        return
+
+    caps = await resolve_registry_capabilities_for(
+        db,
+        user,
+        f"{namespace}.{name}",
+        existing.labels or {},
+        existing.owner_email or "",
+    )
+    if not has_capability(caps, cap.REGISTRY_WRITE):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"registry:write is required on {namespace}.{name}",
+        )
+
+
 @galaxy_router.post("/galaxy/v3/artifacts/collections/", status_code=202)
 async def galaxy_publish(
     request: Request,
@@ -801,6 +860,14 @@ async def galaxy_publish(
     try:
         if size == 0:
             raise HTTPException(status_code=400, detail="Empty upload")
+        # The namespace is only knowable from inside the archive, so the
+        # coordinate is read first and the caller authorised against it before
+        # `publish` writes a row or an object.
+        try:
+            namespace, name, _version = await collections.read_coordinates(tmp_path)
+        except collections.PublishError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        await _require_collection_write(db, user, namespace, name, must_exist=False)
         try:
             row = await collections.publish(db, storage, tmp_path, owner_email=user.email or "")
         except collections.PublishError as exc:
@@ -847,6 +914,8 @@ async def galaxy_attach_signature(
     _galaxy_names(namespace, name)
     if not galaxy.valid_version(version):
         raise HTTPException(status_code=404, detail="Not found")
+
+    await _require_collection_write(db, user, namespace, name, must_exist=True)
 
     sig_bytes = await request.body()
     if not sig_bytes:

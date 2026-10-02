@@ -154,6 +154,20 @@ def _coordinates(info: dict) -> tuple[str, str, str]:
     return namespace, name, version  # type: ignore[return-value]
 
 
+async def read_coordinates(tmp_path: str) -> tuple[str, str, str]:
+    """`(namespace, name, version)` from the archive, without publishing it.
+
+    Exists so the router can authorise **before** anything is written. The
+    namespace is only knowable from inside the tarball — there is nowhere else in
+    `ansible-galaxy collection publish` for it to come from — so a caller cannot
+    be checked against the namespace they are claiming until the manifest has
+    been read. Raises :class:`PublishError` exactly as :func:`publish` does, so
+    the router turns a malformed archive into the same 400 either way.
+    """
+    info = await asyncio.to_thread(_read_manifest, tmp_path)
+    return _coordinates(info)
+
+
 async def get_collection(db: AsyncSession, namespace: str, name: str) -> RegistryCollection | None:
     result = await db.execute(
         select(RegistryCollection).where(

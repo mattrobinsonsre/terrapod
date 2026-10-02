@@ -201,6 +201,20 @@ A published version is **immutable**: republishing the same version is refused
 rather than replacing it, since a client that has already resolved it and cached
 its digest would otherwise receive different bytes under the same name.
 
+**Who may publish.** A namespace nobody has published to yet is open to any
+authenticated principal, and whoever creates it becomes its owner — the same rule
+the module and provider registries follow. Once a collection exists, publishing a
+further version into it requires **`registry:write` on that collection**, resolved
+from its owner and labels exactly as for a registry module. So a second publisher
+cannot add versions to someone else's namespace, which matters more here than
+elsewhere because the namespace is declared inside the archive rather than given
+in the URL: reading it from `MANIFEST.json` stops a caller *claiming* a namespace
+they do not own, but not building a tarball that declares one.
+
+**Runner tokens cannot publish or sign**, whatever capabilities their workspace
+would otherwise resolve to. A run's own short-lived token exists to download
+dependencies, not to add artifacts to the registry.
+
 Published collections are **not** cache entries and are never evicted by the
 retention sweep. A cached artifact is a copy of something upstream still has; a
 published one is the only copy there is.
@@ -216,6 +230,10 @@ curl -X PUT \
   --data-binary @manifest.sig \
   "$TERRAPOD/api/v1/package-cache/galaxy/v3/collections/acme/widgets/versions/1.0.0/signature"
 ```
+
+Signing requires **`registry:write` on the collection**, as publishing does, and
+the collection must already exist — there is no create-by-signing path, so an
+unknown collection is a 404 rather than a permission answer.
 
 The body is a detached OpenPGP signature over the collection's `MANIFEST.json`.
 Terrapod verifies it against a **public key already registered** with the
