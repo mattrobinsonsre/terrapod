@@ -1156,9 +1156,18 @@ class TestACredentialIsOnlyEverInstalledForItsOwnConnectionsHost:
         """An operator told "this repository is not allowed" would go and widen the
         allowlist, which would not help and would weaken the connection."""
         cid = uuid.uuid4()
-        detail = rbac.credential_scope_host_refusal_detail(cid, "evil.tld/myorg", "github.com")
-        assert "evil.tld" in detail and "github.com" in detail
+        # Deliberately NOT host-shaped literals. `"github.com" in detail` would pass on
+        # `notgithub.com`, so it asserts less than it appears to, and the rule
+        # `py/incomplete-url-substring-sanitization` is right about the shape even in a
+        # test — this is the third instance of it in this release. The names are built
+        # here and asserted quoted, which is both exact and what the message promises.
+        wrong, right = "wrong.invalid/myorg", "right.invalid"
+        detail = rbac.credential_scope_host_refusal_detail(cid, wrong, right)
+        assert repr(wrong) in detail, detail
+        assert repr(right) in detail, detail
         assert f"vcs-{cid}" in detail
+        # The remedy must not point at the allowlist: widening it would not help and
+        # would weaken the connection.
         assert "allowed-repositories" not in detail
 
 
