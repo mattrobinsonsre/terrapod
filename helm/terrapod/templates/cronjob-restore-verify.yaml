@@ -43,18 +43,37 @@ spec:
             {{- end }}
             # Native sidecar (restartPolicy: Always) — throwaway Postgres the
             # backup is restored INTO. Auto-terminates when the main container
-            # exits. Trust auth on loopback only; data on an emptyDir.
+            # exits. Data on an emptyDir.
+            #
+            # GHSA-mrqj-66jm-rjjr. `POSTGRES_HOST_AUTH_METHOD=trust` is what lets
+            # the restore run with no credential to manage, and it is fine only
+            # because nothing off this pod can reach the socket. That was NOT
+            # enforced: the comment here said "loopback only" while
+            # `listen_addresses` was set nowhere, so Postgres applied its default
+            # of `*` and a trust-auth SUPERUSER listened on the pod IP for the
+            # life of the job — reachable from anywhere in the cluster, and
+            # `networkPolicies.enabled` is false by default so nothing stopped it.
+            #
+            # `listen_addresses=127.0.0.1` makes the existing claim true. The CLI
+            # already connects to `localhost`, so nothing about the restore path
+            # changes; the unix socket on the `pgrun` volume is unaffected.
+            #
+            # `containerPort` is removed with it: it is declarative only and never
+            # controlled the binding, so leaving it would advertise a port that is
+            # now unreachable from outside the pod and mislead the next reader.
             - name: throwaway-postgres
               image: {{ $pgImage }}
               imagePullPolicy: {{ .Values.api.image.pullPolicy }}
               restartPolicy: Always
+              args:
+                - postgres
+                - -c
+                - listen_addresses=127.0.0.1
               env:
                 - name: POSTGRES_HOST_AUTH_METHOD
                   value: "trust"
                 - name: PGDATA
                   value: /var/lib/postgresql/data/pgdata
-              ports:
-                - containerPort: 5432
               volumeMounts:
                 - name: pgdata
                   mountPath: /var/lib/postgresql/data
