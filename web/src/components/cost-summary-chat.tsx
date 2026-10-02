@@ -22,6 +22,7 @@ import remarkGfm from 'remark-gfm'
 import { MessageCircle, Send, User, Sparkles } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { LoadingSpinner } from '@/components/loading-spinner'
+import { MARKDOWN_SAFETY } from '@/lib/markdown-safety'
 
 interface ChatMessage {
   id: string
@@ -226,7 +227,10 @@ function ChatRow({ msg }: { msg: ChatMessage }) {
           <div className="text-sm leading-relaxed text-slate-300">
             {/* singleTilde:false — cost prose is full of "~$X" (approximately);
                 without this, GFM pairs the tildes into strikethrough spans. */}
-            <ReactMarkdown remarkPlugins={[[remarkGfm, { singleTilde: false }]]}>
+            <ReactMarkdown
+              remarkPlugins={[[remarkGfm, { singleTilde: false }]]}
+              components={MARKDOWN_SAFETY}
+            >
               {msg.attributes.content}
             </ReactMarkdown>
           </div>

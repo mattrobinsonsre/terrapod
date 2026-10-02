@@ -176,6 +176,15 @@ terrapod-migrate cutover \
   --lock --write-handover cutover-handover.md
 ```
 
+**A self-hosted TFE address must be `https://`.** `--tfe-address` (or
+`TFE_ADDRESS`; the default is `https://app.terraform.io`) carries a TFE API token
+that is as long-lived and as privileged as the Terrapod token beside it, so an
+`http://` address is refused at client construction rather than sending the token
+across the network in the clear. Loopback is exempt. If plaintext is genuinely
+what you want, set `TERRAPOD_ALLOW_INSECURE_TRANSPORT=1` — the same variable the
+Terrapod side of the migration already honours, so one rule covers both halves
+of the command.
+
 ### From Atlantis
 
 ```bash

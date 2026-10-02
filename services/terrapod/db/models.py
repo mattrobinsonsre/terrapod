@@ -422,6 +422,36 @@ class Workspace(Base):
         String(20), nullable=False, server_default="merge_then_apply", default="merge_then_apply"
     )
 
+    # Whether a pull request opened from a FORK may trigger a speculative plan.
+    #
+    # OFF by default (GHSA-gp5w-76rw-c452). The control itself shipped in v1.7.7
+    # and v1.8.2 defaulting ON, because a patch must not stop a fork pull request
+    # that plans today; v1.9.0 flips the default for NEW rows and deliberately does
+    # not rewrite existing ones, so an operator upgrading audits rather than being
+    # surprised. A plan executes the PR
+    # author's code — provider configuration, `external` data sources,
+    # `local-exec` — with everything the run receives: env-category secrets,
+    # sensitive variables, Vault-resolved values, minted git credentials and the
+    # Job's cloud workload identity. There is no meaningful subset to hand it
+    # instead, because a plan needs the credentials to refresh state and the
+    # variables to evaluate the config at all.
+    #
+    # For a same-repository PR that is fine and is the entire point of the
+    # product: the author already has write access, can already get code
+    # applied by merging, and plan-on-PR is the safety property Terrapod
+    # exists to provide. Gating them would ask a reviewer to merge blind.
+    #
+    # A fork author is outside that boundary. They have no write access and
+    # cannot merge, so a speculative plan is the only path by which their code
+    # ever runs against these credentials. An operator who genuinely wants fork
+    # PRs planned — a public module repository taking community contributions,
+    # with a workspace holding nothing worth stealing — turns it on here, the
+    # same shape as naming a loopback destination in
+    # `outbound_requests.allowed_hosts`.
+    allow_fork_pr_plans: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+
     # Auto-merge after apply succeeds. Available in both modes; primary use is
     # apply_then_merge. When all PR-affected workspaces meet their per-mode
     # required state, the merge fires via the VCS provider's merge API.
@@ -1342,6 +1372,24 @@ class VCSConnection(Base):
     # encryption envelope never overflows it. App-encrypted at rest when enabled.
     webhook_secret: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
 
+    # GHSA-v8g7-pqrj-8mcm. A connection reaches every repository its credential
+    # can reach, and its id is serialised to anyone with read on a workspace using
+    # it — so the id is discoverable by design and naming one is a grant, not a
+    # reference. v1.8.2 closed the worst of it by requiring the caller to already
+    # own a workspace on the connection, which has a deliberate consequence: the
+    # FIRST workspace on a connection has to be created by an admin. These two
+    # columns are the general answer, so a connection can be delegated to a team
+    # the same way every other labelled resource is.
+    owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    labels: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    # The residual hole after per-connection RBAC: an entitled caller could still
+    # point the connection at ANY repository its credential can read. A non-empty
+    # list restricts it to these patterns (fnmatch against the repo URL and against
+    # `owner/name`); empty keeps today's behaviour of any reachable repository, so
+    # an existing deployment is unchanged until an operator narrows it.
+    allowed_repositories: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="active"
     )  # active, suspended, removed
@@ -1354,8 +1402,26 @@ class VCSConnection(Base):
     )
 
     __table_args__ = (
-        sa.UniqueConstraint(
-            "provider", "github_installation_id", name="uq_vcs_connections_install"
+        # One GitHub App installation, one connection — connecting the same
+        # installation twice would mean two credentials over the same
+        # repositories with no way to tell which a workspace is using.
+        #
+        # **Scoped to GitHub, and that is the whole point.** This was a blanket
+        # `UniqueConstraint("provider", "github_installation_id")` from the
+        # initial schema, and `github_installation_id` is `0` on every GitLab
+        # row — the column has no meaning there. So the pair `("gitlab", 0)`
+        # collided with itself and **a deployment could never hold more than
+        # one GitLab connection**, which the create route reported as a bare
+        # 409 "already exists" naming nothing. Nobody met it because nothing
+        # created two, and it made the documented remedy for a saturated GitLab
+        # token — give a busy repository its own connection, since the
+        # allowance is per token — impossible to follow.
+        sa.Index(
+            "uq_vcs_connections_install",
+            "provider",
+            "github_installation_id",
+            unique=True,
+            postgresql_where=sa.text("provider = 'github'"),
         ),
     )
 
@@ -1527,6 +1593,15 @@ class AutodiscoveryRule(Base):
         String(128), nullable=False, default="", server_default=""
     )
     debug_mode: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    #: Defaults FALSE, matching the workspace column rather than overriding it
+    #: like `drift_detection_enabled` above. An operator who decides fork PRs
+    #: should plan has to say so, and a rule is how they say it once for every
+    #: directory the repository grows later -- otherwise enabling it in bulk
+    #: holds only until autodiscovery creates the next workspace, which looks
+    #: exactly like the setting not working.
+    allow_fork_pr_plans: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
     # #314 deletion lifecycle: what to do when a discovered directory is

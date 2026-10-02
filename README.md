@@ -155,7 +155,7 @@ Everything below is implemented and shipped today.
 
 | Feature | Description |
 |---|---|
-| Label-based RBAC | Roles with granular `resource:verb` capabilities (e.g. `run:plan` without `run:apply`); read/plan/write/admin levels remain as authoring shorthand |
+| Label-based RBAC | Roles with granular `resource:verb` capabilities (e.g. `run:plan` without `run:apply`); read/plan/write/admin levels remain as authoring shorthand. Workspaces, agent pools, registry modules and providers, catalog items and **VCS connections** all carry `labels` and an owner, so a connection can be delegated to a team rather than being usable by anyone who can name it |
 | AI policy gate | The plan summary's own verdict as a post-plan gate: operator-written natural-language deny criteria plus a risk threshold, advisory or mandatory, with admin override. Rides the summary's existing model call, so gating costs no extra tokens. Off by default |
 | Policy-as-code (OPA) | Rego enforcement on plan JSON — the open-source equivalent of Sentinel. Advisory or mandatory sets, label-scoped to workspaces, evaluated on the runner, with admin override. Optional shared evaluation lets a set's policies share helper rules and data files |
 | IaC security scanning | Checkov/Trivy misconfiguration scanning of the plan JSON with maintained rule catalogues — per-workspace `off`/`advisory`/`enforced`, severity threshold, skip rules; enforced holds the run at the gate on a failed finding, with admin override |
@@ -182,7 +182,7 @@ Everything below is implemented and shipped today.
 
 | Feature | Description |
 |---|---|
-| VCS integration | GitHub App + GitLab token; inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, with outbound polling as the resilient default — so webhooks are optional, never required |
+| VCS integration | GitHub App + GitLab token; inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, with outbound polling as the resilient default — so webhooks are optional, never required. A pull request from a [fork](docs/vcs-integration.md#pull-requests-from-forks) plans only if the workspace sets `allow-fork-pr-plans`, which **defaults false** (`GHSA-gp5w-76rw-c452`), because such a plan runs its author's code with that workspace's credentials; pull requests raised within the repository always plan |
 | Workspace autodiscovery | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories, for Terraform/OpenTofu or Pulumi (one engine per rule; a Pulumi rule discovers each stack in a directory as its own workspace) |
 | Module autodiscovery | Rules that find the modules — the root and any submodules — in a repository, or across an org, group or repository-name pattern; preview them, register all or a picked subset, and automatically register directories and repositories that appear later ([docs](docs/registry.md#module-autodiscovery)) |
 | Registry submodules | Publish a module from a subdirectory of its repository — `subdirectory` on a VCS-sourced registry module, re-rooted so consumers need no `//subdir` suffix; one repository can hold many modules ([docs](docs/registry.md#submodules-a-module-in-a-subdirectory)) |

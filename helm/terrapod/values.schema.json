@@ -1728,6 +1728,21 @@
                         "items": {
                           "type": "object"
                         }
+                      },
+                      "validate_destination": {
+                        "type": "boolean"
+                      },
+                      "validate_in_response_to": {
+                        "type": "boolean"
+                      },
+                      "reject_replayed_assertions": {
+                        "type": "boolean"
+                      },
+                      "want_assertions_signed": {
+                        "type": "boolean"
+                      },
+                      "reject_deprecated_algorithm": {
+                        "type": "boolean"
                       }
                     }
                   }
@@ -2127,6 +2142,17 @@
             },
             "default_region": {
               "type": "string"
+            },
+            "prices_sha256": {
+              "type": "string"
+            },
+            "prices_max_compressed_bytes": {
+              "type": "integer",
+              "minimum": 1024
+            },
+            "prices_max_decompressed_bytes": {
+              "type": "integer",
+              "minimum": 1024
             }
           }
         },
@@ -2144,6 +2170,9 @@
             "module_poll_interval_seconds": {
               "type": "integer",
               "minimum": 1
+            },
+            "require_push_permission_for_commands": {
+              "type": "boolean"
             },
             "tmpdir": {
               "type": "string"
@@ -2177,8 +2206,15 @@
                 },
                 "existingSecretKey": {
                   "type": "string"
+                },
+                "allow_token_delivery_to_runners": {
+                  "type": "boolean"
                 }
               }
+            },
+            "require_connection_authorization": {
+              "type": "boolean",
+              "description": "Require a claim to a VCS connection before naming it (GHSA-v8g7-pqrj-8mcm)."
             }
           }
         },

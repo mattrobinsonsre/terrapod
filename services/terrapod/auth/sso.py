@@ -18,6 +18,10 @@ class AuthorizationRequest:
     state: str  # IDP-facing state (not the client-facing state)
     nonce: str | None = None  # OIDC nonce for replay protection
     code_verifier: str | None = None  # Upstream OIDC PKCE verifier for token exchange
+    # SAML AuthnRequest id. The assertion must name it in InResponseTo, which is
+    # the SAML counterpart of the OIDC nonce above and is checked for the same
+    # reason: an assertion that answers nobody's request answers anybody's.
+    request_id: str | None = None
 
 
 @dataclass

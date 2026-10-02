@@ -364,3 +364,89 @@ class TestResolveGitlabConnection:
                 "https://gitlab.com/acme/infra.git", "bbb"
             )
         assert got is b
+
+
+class TestTwoGitlabConnectionsOnOneHost:
+    """Reachable from v1.9.0: GitLab connections are no longer unique by installation
+    id, so two can share a host. A GitLab webhook carries no installation identity, so
+    the only thing distinguishing them is the presented `X-Gitlab-Token`.
+    """
+
+    def _db_returning(self, conns):
+        from contextlib import asynccontextmanager
+
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = conns
+        db = MagicMock()
+        db.execute = AsyncMock(return_value=result)
+
+        @asynccontextmanager
+        async def _ctx():
+            yield db
+
+        return _ctx
+
+    async def test_neither_is_chosen_when_no_own_secret_matches(self):
+        """The property that matters: an ambiguous event must be attributed to NEITHER
+        connection, not to whichever was created first. Attributing it to the wrong one
+        would run the wrong workspaces with the wrong credential.
+        """
+        from terrapod.api.routers import vcs_events
+
+        a = MagicMock(server_url="", webhook_secret=None)
+        b = MagicMock(server_url="", webhook_secret=None)
+        with patch.object(vcs_events, "get_db_session", self._db_returning([a, b])):
+            got = await vcs_events._resolve_gitlab_connection(
+                "https://gitlab.com/acme/infra.git", "the-global-secret"
+            )
+        assert got is None
+
+    async def test_a_connection_relying_on_the_global_secret_loses_to_one_with_its_own(self):
+        """Half-configured is the realistic state: one connection gets a secret, its
+        neighbour is left on the global one. The one that can be identified wins, and
+        the other is simply not matched — never silently swapped in."""
+        from terrapod.api.routers import vcs_events
+
+        with_own = MagicMock(server_url="", webhook_secret="distinct")
+        on_global = MagicMock(server_url="", webhook_secret=None)
+        with patch.object(vcs_events, "get_db_session", self._db_returning([on_global, with_own])):
+            got = await vcs_events._resolve_gitlab_connection(
+                "https://gitlab.com/acme/infra.git", "distinct"
+            )
+        assert got is with_own
+
+    async def test_the_ambiguity_is_logged_as_ambiguity_not_as_an_unknown_project(self):
+        """The receiver's own message is "unknown project", which is the right action
+        and the wrong explanation — the project is known and the connection is not.
+        The remedy is specific, so the log has to name it."""
+        from terrapod.api.routers import vcs_events
+
+        a = MagicMock(server_url="", webhook_secret=None)
+        b = MagicMock(server_url="", webhook_secret=None)
+        with (
+            patch.object(vcs_events, "get_db_session", self._db_returning([a, b])),
+            patch.object(vcs_events.logger, "warning") as warn,
+        ):
+            await vcs_events._resolve_gitlab_connection("https://gitlab.com/acme/infra.git", "tok")
+        assert warn.called, "an unattributable event must say why, not fail silently"
+        # The structured kwargs, compared exactly — not `"gitlab.com" in str(call_args)`.
+        # A substring test against a host is both weaker (it would pass on
+        # `notgitlab.com`) and flagged as incomplete URL sanitization, which is a true
+        # positive about the shape even in a test.
+        kwargs = warn.call_args.kwargs
+        assert kwargs["host"] == "gitlab.com"
+        assert kwargs["candidates"] == 2
+        assert kwargs["without_secret"] == 2
+        assert "webhook_secret" in warn.call_args.args[0]
+
+    async def test_one_connection_on_the_host_still_needs_no_secret_of_its_own(self):
+        """The common case must not regress: a single GitLab connection is unambiguous
+        and may rely on the global secret."""
+        from terrapod.api.routers import vcs_events
+
+        only = MagicMock(server_url="", webhook_secret=None)
+        with patch.object(vcs_events, "get_db_session", self._db_returning([only])):
+            got = await vcs_events._resolve_gitlab_connection(
+                "https://gitlab.com/acme/infra.git", "the-global-secret"
+            )
+        assert got is only

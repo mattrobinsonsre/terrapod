@@ -74,6 +74,20 @@ type VCSConnection struct {
 	// TopConsumers covers — the denominator for an entry's share. Dividing by
 	// CallsPerHour instead mixes bases and yields shares above 100%.
 	ConsumersWindowTotal *int64 `json:"consumers-window-total,omitempty"`
+
+	// Who may point a workspace at this connection, and where it may be
+	// pointed (GHSA-v8g7-pqrj-8mcm). None of the three is a secret — the
+	// credential is, and that stays write-only.
+	//
+	// OwnerEmail and Labels gate reach the way they do on an agent pool: the
+	// owner, and any role whose rules match these labels, may reference the
+	// connection.
+	OwnerEmail string            `json:"owner-email,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
+	// AllowedRepositories is a list of glob patterns bounding where the
+	// connection may be pointed. EMPTY MEANS ANY REPOSITORY — it is not
+	// "deny everything", so a reader must not treat len()==0 as a restriction.
+	AllowedRepositories []string `json:"allowed-repositories,omitempty"`
 }
 
 // VCSConsumer is one repo, workspace, module or policy set and the number of
@@ -106,6 +120,12 @@ type CreateVCSConnectionRequest struct {
 	PrivateKey           string // GitHub App PEM
 	Token                string // GitLab PAT
 	WebhookSecret        string // GitHub per-connection webhook secret (write-only, optional)
+	// Reach and scope (GHSA-v8g7-pqrj-8mcm). All three are optional; omitting
+	// one leaves the server's default — no owner, no labels, and an empty
+	// AllowedRepositories, which permits any repository.
+	OwnerEmail          string
+	Labels              map[string]string
+	AllowedRepositories []string
 }
 
 // UpdateVCSConnectionRequest patches a VCS connection — the
@@ -123,6 +143,17 @@ type UpdateVCSConnectionRequest struct {
 	// explicit empty string to clear (fall back to the global secret), or
 	// leave nil to keep the stored value untouched.
 	WebhookSecret *string
+	// Reach and scope (GHSA-v8g7-pqrj-8mcm). Pointer-typed for the same reason
+	// as the fields above: nil leaves the stored value alone, while a non-nil
+	// but empty value clears it. The distinction is load-bearing for
+	// AllowedRepositories in particular — &[]string{} means "allow any
+	// repository again", so an allowlist can be emptied by removing its last
+	// entry. An allowlist you cannot clear that way is a trap, and a
+	// value-typed []string here would make the two cases indistinguishable to
+	// anyone not thinking about nil-vs-empty.
+	OwnerEmail          *string
+	Labels              *map[string]string
+	AllowedRepositories *[]string
 }
 
 // CreateVCSConnection registers a new VCS connection. Requires
@@ -250,6 +281,15 @@ func vcsConnCreateAttrs(req CreateVCSConnectionRequest) map[string]any {
 	if req.WebhookSecret != "" {
 		attrs["webhook-secret"] = req.WebhookSecret
 	}
+	if req.OwnerEmail != "" {
+		attrs["owner-email"] = req.OwnerEmail
+	}
+	if req.Labels != nil {
+		attrs["labels"] = req.Labels
+	}
+	if req.AllowedRepositories != nil {
+		attrs["allowed-repositories"] = req.AllowedRepositories
+	}
 	return attrs
 }
 
@@ -280,6 +320,29 @@ func vcsConnUpdateAttrs(req UpdateVCSConnectionRequest) map[string]any {
 	// treats an explicit empty string as "clear" (fall back to global).
 	if req.WebhookSecret != nil {
 		attrs["webhook-secret"] = *req.WebhookSecret
+	}
+	// nil ↦ omit the key, which the server reads as "leave alone"; non-nil ↦
+	// send it, including when empty, which the server reads as "clear". For
+	// allowed-repositories, clearing restores "any repository".
+	if req.OwnerEmail != nil {
+		attrs["owner-email"] = *req.OwnerEmail
+	}
+	if req.Labels != nil {
+		labels := *req.Labels
+		if labels == nil {
+			labels = map[string]string{}
+		}
+		attrs["labels"] = labels
+	}
+	if req.AllowedRepositories != nil {
+		// An empty slice must marshal as [] and never as null: the server
+		// coerces null to [] too, but a reader of the wire would see "nothing
+		// sent", and the two have opposite meanings on this endpoint.
+		repos := *req.AllowedRepositories
+		if repos == nil {
+			repos = []string{}
+		}
+		attrs["allowed-repositories"] = repos
 	}
 	return attrs
 }
@@ -321,6 +384,9 @@ func vcsConnFromResource(res *Resource) *VCSConnection {
 		GithubAccountType:    GetStringAttr(res, "github-account-type"),
 		CreatedAt:            GetStringAttr(res, "created-at"),
 		UpdatedAt:            GetStringAttr(res, "updated-at"),
+		OwnerEmail:           GetStringAttr(res, "owner-email"),
+		Labels:               decodeJSONAttr[map[string]string](res, "labels"),
+		AllowedRepositories:  decodeJSONAttr[[]string](res, "allowed-repositories"),
 	}
 }
 

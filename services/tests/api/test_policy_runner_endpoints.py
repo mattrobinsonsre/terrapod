@@ -17,6 +17,7 @@ the FastAPI test client + a runner token) live under ``tests/api/``.
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -65,20 +66,33 @@ def _ws():
     return m
 
 
-def _mock_db_with_run(run, ws):
+def _policy_set(set_id, name="Production guardrails", enforcement="mandatory"):
+    """A stand-in for the stored definition of a set.
+
+    `SimpleNamespace`, not `MagicMock`: `.name` on a mock is the mock's own
+    name attribute, so a mock would silently satisfy an assertion about the
+    recorded name without ever carrying the value under test.
+    """
+    return SimpleNamespace(id=set_id, name=name, enforcement_level=enforcement)
+
+
+def _mock_db_with_run(run, ws, policy_sets=None):
     # Link the run to the workspace so db.get(Workspace, run.workspace_id)
     # returns ws — without this, the gate sees `ws is None` and short-
     # circuits to GATE_PASSED for the wrong reason.
     run.workspace_id = ws.id
     db = MagicMock()
+    sets_by_id = {ps.id: ps for ps in (policy_sets or [])}
 
     async def _get(model, key):
-        from terrapod.db.models import Run, Workspace
+        from terrapod.db.models import PolicySet, Run, Workspace
 
         if model is Run:
             return run if key == run.id else None
         if model is Workspace:
             return ws if key == ws.id else None
+        if model is PolicySet:
+            return sets_by_id.get(key)
         return None
 
     db.get = AsyncMock(side_effect=_get)
@@ -292,9 +306,10 @@ async def test_results_persists_valid_rows() -> None:
     run = _run()
     ws = _ws()
     run_id = f"run-{run.id}"
-    db = _mock_db_with_run(run, ws)
+    ps_uuid = uuid.uuid4()
+    db = _mock_db_with_run(run, ws, policy_sets=[_policy_set(ps_uuid)])
     user = _user(method="runner_token", run_id=run_id)
-    ps_id = f"polset-{uuid.uuid4()}"
+    ps_id = f"polset-{ps_uuid}"
 
     body = {
         "results": [
@@ -494,3 +509,132 @@ async def test_results_rejects_empty_policy_set_name() -> None:
         await router.post_policy_results(run_id=run_id, body=body, user=user, db=db)
     assert exc.value.status_code == 422
     assert "policy_set_name" in exc.value.detail.lower()
+
+
+# ── what a set IS is server-known, not runner-reported ──────────────
+
+
+@pytest.mark.asyncio
+async def test_the_enforcement_level_comes_from_the_database_not_the_body() -> None:
+    """`run_is_policy_blocked` filters on mandatory rows and nothing else, so a
+    body claiming `advisory` for a mandatory set lifts it out of the gate — and
+    the real evaluation that followed would be dropped by the ON CONFLICT."""
+    run, ws = _run(), _ws()
+    run_id = f"run-{run.id}"
+    ps_uuid = uuid.uuid4()
+    db = _mock_db_with_run(run, ws, policy_sets=[_policy_set(ps_uuid, enforcement="mandatory")])
+
+    body = {
+        "results": [
+            {
+                "policy_set_id": f"polset-{ps_uuid}",
+                "policy_set_name": "x",
+                "enforcement_level": "advisory",
+                "outcome": "passed",
+                "result": {},
+            }
+        ]
+    }
+
+    captured: list[dict] = []
+
+    async def _capture(_db, rows):
+        captured.extend(rows)
+
+    with patch.object(
+        router.policy_set_service, "_insert_evaluations", new=AsyncMock(side_effect=_capture)
+    ):
+        resp = await router.post_policy_results(
+            run_id=run_id, body=body, user=_user(method="runner_token", run_id=run_id), db=db
+        )
+
+    assert resp.status_code == 201
+    assert captured[0]["enforcement_level"] == "mandatory", (
+        "the runner's claim of 'advisory' was stored, which removes the set from the gate"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_recorded_name_comes_from_the_database_not_the_body() -> None:
+    """The name is what the Policy Checks panel shows an operator deciding
+    whether to override. A runner-supplied one can name a different set."""
+    run, ws = _run(), _ws()
+    run_id = f"run-{run.id}"
+    ps_uuid = uuid.uuid4()
+    db = _mock_db_with_run(
+        run, ws, policy_sets=[_policy_set(ps_uuid, name="Production guardrails")]
+    )
+
+    body = {
+        "results": [
+            {
+                "policy_set_id": f"polset-{ps_uuid}",
+                "policy_set_name": "Harmless looking set",
+                "enforcement_level": "mandatory",
+                "outcome": "passed",
+                "result": {},
+            }
+        ]
+    }
+
+    captured: list[dict] = []
+
+    async def _capture(_db, rows):
+        captured.extend(rows)
+
+    with patch.object(
+        router.policy_set_service, "_insert_evaluations", new=AsyncMock(side_effect=_capture)
+    ):
+        await router.post_policy_results(
+            run_id=run_id, body=body, user=_user(method="runner_token", run_id=run_id), db=db
+        )
+
+    assert captured[0]["policy_set_name"] == "Production guardrails"
+
+
+@pytest.mark.asyncio
+async def test_a_result_for_an_unknown_set_is_skipped_and_the_rest_survive() -> None:
+    """Deliberately not a 422. Failing the batch would discard the results for
+    every other set in it, and the gate's safety net would then record those as
+    missing mandatory evaluations and block the run — a forged row for a
+    non-existent set would become a denial of service."""
+    run, ws = _run(), _ws()
+    run_id = f"run-{run.id}"
+    known = uuid.uuid4()
+    db = _mock_db_with_run(run, ws, policy_sets=[_policy_set(known)])
+
+    body = {
+        "results": [
+            {
+                "policy_set_id": f"polset-{uuid.uuid4()}",
+                "policy_set_name": "invented",
+                "enforcement_level": "mandatory",
+                "outcome": "passed",
+                "result": {},
+            },
+            {
+                "policy_set_id": f"polset-{known}",
+                "policy_set_name": "x",
+                "enforcement_level": "mandatory",
+                "outcome": "failed",
+                "result": {},
+            },
+        ]
+    }
+
+    captured: list[dict] = []
+
+    async def _capture(_db, rows):
+        captured.extend(rows)
+
+    with patch.object(
+        router.policy_set_service, "_insert_evaluations", new=AsyncMock(side_effect=_capture)
+    ):
+        resp = await router.post_policy_results(
+            run_id=run_id, body=body, user=_user(method="runner_token", run_id=run_id), db=db
+        )
+
+    assert resp.status_code == 201
+    assert len(captured) == 1
+    assert captured[0]["policy_set_id"] == known
+    assert captured[0]["outcome"] == "failed"

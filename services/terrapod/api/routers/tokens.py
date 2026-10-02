@@ -192,6 +192,55 @@ async def _resolve_subject_email(db: AsyncSession, user_id: str) -> str:
     )
 
 
+def _reject_scope_escape(user: AuthenticatedUser, new_kind: str, pinned: list[str] | None) -> None:
+    """A scoped token may not mint or re-tag a credential wider than itself.
+
+    `service_bound` carries the intersection of its pinned roles and its
+    owner's live roles; `service_detached` carries its pin absolutely. Either
+    way the pin is the whole point of the kind, and both token endpoints could
+    step around it without needing any role the caller does not already hold:
+    creating an `interactive` token for the same owner yields that owner's
+    FULL live roles, and re-tagging the scoped token itself to `interactive`
+    nulls `pinned_roles` outright. No permission check catches that, because
+    the escalation is not from one role to another — it is from the
+    *credential's* scope back up to the *person's*.
+
+    Three callers are deliberately unaffected. A **session** is a person acting
+    as themselves, which is the thing a pin is measured against. An
+    **interactive token** already carries its owner's live roles, so it widens
+    nothing. And an **effectively-admin** caller already holds the maximum
+    scope, so there is nothing above it to escape to — without that case a
+    detached admin token could not pin a NARROWER role, which is the normal
+    administrative act this guard must not block.
+    """
+    if user.auth_method != "api_token" or user.kind == "interactive":
+        return
+
+    own = effective_platform_roles(user)
+    if "admin" in own:
+        return
+
+    if new_kind == "interactive":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "A scoped service token cannot create or convert a token to "
+                "'interactive'. That token would carry its owner's full live roles, "
+                "escaping the pin this credential was issued with. Manage tokens "
+                "from an interactive session or token instead."
+            ),
+        )
+
+    extra = sorted(set(pinned or []) - own)
+    if extra:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "A scoped service token cannot pin roles outside its own scope: " + ", ".join(extra)
+            ),
+        )
+
+
 @router.post("/users/{user_id}/authentication-tokens")
 async def create_user_token(
     user_id: str,
@@ -226,6 +275,8 @@ async def create_user_token(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid token kind: {kind}",
         )
+
+    _reject_scope_escape(user, kind, body.data.attributes.pinned_roles)
 
     if kind == "service_detached":
         # Detached tokens are admin-only and unbound (no owner); the admin
@@ -410,6 +461,8 @@ async def retag_token(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid token kind: {new_kind}",
         )
+
+    _reject_scope_escape(user, new_kind, body.data.attributes.pinned_roles)
 
     if (new_kind == "service_detached" or api_token.kind == "service_detached") and (
         "admin" not in effective_platform_roles(user)

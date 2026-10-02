@@ -1,6 +1,7 @@
 """Tests for variable CRUD and resolution service."""
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -374,3 +375,118 @@ class TestDeleteVariable:
         await delete_variable(db, var)
         db.delete.assert_called_once_with(var)
         db.flush.assert_called_once()
+
+
+class TestTheBlastRadiusViewAgreesWithTheMatcher:
+    """GHSA-49q6-pm68-3xgw refused two assignment-rule dimensions, and only the
+    matcher learned about it.
+
+    `_rule_matches` decides delivery and returns False for a rule selecting on
+    `drift_status` or `locked`. `workspaces_for_varset` answers "who currently receives
+    this variable set" — the screen an operator reads before rotating a credential —
+    and applied the rule anyway. So a set whose rule used a refused dimension reached
+    NOTHING while the view listed every workspace the rule would have selected.
+
+    The direction matters: the view over-reported reach, which reads as "this
+    credential is in use in twenty places" when it is in use in none. It is also
+    exactly the wrong report about the effect of the fix.
+    """
+
+    @staticmethod
+    def _varset(rule):
+        return SimpleNamespace(
+            id=uuid.uuid4(), global_set=False, assignment_rule=rule, name="creds"
+        )
+
+    @staticmethod
+    def _result(rows):
+        return MagicMock(
+            scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=rows)))
+        )
+
+    @classmethod
+    def _db(cls):
+        """No explicit assignments, but the RULE query would return a workspace.
+
+        The second half is load-bearing and the first version of these tests did not
+        have it: a mock that returns nothing for every query makes the guard unfirable,
+        so `out == []` held whether or not the refusal was applied and the tests passed
+        under the very mutation they exist to catch. With a row behind the rule query,
+        applying the rule yields one entry and refusing it yields none.
+        """
+        db = AsyncMock()
+        ws = SimpleNamespace(id=uuid.uuid4(), name="would-have-matched")
+        db.execute = AsyncMock(side_effect=[cls._result([]), cls._result([ws])])
+        return db
+
+    async def test_a_refused_dimension_reports_no_rule_derived_workspaces(self):
+        from terrapod.services.variable_service import workspaces_for_varset
+
+        db = self._db()
+        out = await workspaces_for_varset(db, self._varset({"drift_status": "drifted"}))
+        assert out == []
+
+    async def test_the_other_refused_dimension_too(self):
+        from terrapod.services.variable_service import workspaces_for_varset
+
+        db = self._db()
+        out = await workspaces_for_varset(db, self._varset({"locked": "true"}))
+        assert out == []
+
+    async def test_a_refused_dimension_mixed_with_a_good_one_still_reports_nothing(self):
+        """The matcher refuses the whole rule, not the refused clause — so must this."""
+        from terrapod.services.variable_service import workspaces_for_varset
+
+        db = self._db()
+        out = await workspaces_for_varset(
+            db, self._varset({"labels": {"team": "net"}, "locked": "true"})
+        )
+        assert out == []
+
+    async def test_an_ordinary_rule_is_unaffected(self):
+        """The guard must not turn every rule-assigned set into an empty report."""
+        from terrapod.services.variable_service import workspaces_for_varset
+
+        db = self._db()
+        with patch("terrapod.services.workspace_search_service.parse_filter") as pf:
+            pf.side_effect = RuntimeError("reached the rule path")
+            # Reaching the rule path at all is the assertion; the unusable-rule guard
+            # inside swallows it and returns [], so no raise escapes.
+            out = await workspaces_for_varset(db, self._varset({"labels": {"team": "net"}}))
+            assert pf.called, "an ordinary rule must still be evaluated"
+        assert out == []
+
+    def test_every_assignment_rule_consumer_refuses_the_same_dimensions(self):
+        """A fourth consumer added later would diverge in silence, exactly as the view
+        did — and no behavioural test can see a reader that does not exist yet."""
+        import pathlib
+        import re
+
+        from terrapod.services import varset_self_join
+
+        #: Files that mention an assignment rule without DECIDING anything from it.
+        #: Each needs a reason, or this becomes the place a diverging consumer hides.
+        not_deciders = {
+            "models.py": "declares the column; stores and returns it, never evaluates it",
+        }
+
+        root = pathlib.Path(varset_self_join.__file__).resolve().parents[1]
+        offenders = []
+        for path in root.rglob("*.py"):
+            if path.name == "varset_self_join.py" or path.name in not_deciders:
+                continue
+            src = path.read_text()
+            # A consumer is a file that reads an assignment rule to decide something.
+            if not re.search(r"assignment_rule|_rule_matches\(", src):
+                continue
+            if "rule_refused_dimensions" in src or "_rule_refused" in src:
+                continue
+            # Writers that only store or serialize the rule are not deciders.
+            if re.search(r"rule_refused_dimensions|RULE_DIMENSIONS_REFUSED", src):
+                continue
+            offenders.append(path.name)
+        assert not offenders, (
+            "these read an assignment rule without applying the refused-dimension "
+            "predicate, so they can disagree with the matcher about who receives a "
+            "credential:\n  " + "\n  ".join(sorted(offenders))
+        )

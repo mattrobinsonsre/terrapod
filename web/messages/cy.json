@@ -773,6 +773,23 @@
       "delete": "Dileu"
     },
     "confirmDelete": "Dileu'r cysylltiad VCS hwn? Bydd gweithfannau sy'n ei ddefnyddio'n colli integreiddiad VCS. Ni ellir dadwneud hyn.",
+    "access": {
+      "heading": "Pwy sy''n cael defnyddio''r cysylltiad hwn",
+      "intro": "Mae''r tair gosodiad hyn yn penderfynu pa fannau gwaith y gellir eu cyfeirio at y cysylltiad hwn. Mae''r cymhwysiad ei hun yn parhau i fod yn ysgrifennu-yn-unig.",
+      "ownerEmail": "E-bost y perchennog",
+      "ownerEmailHint": "Caiff y perchennog ddefnyddio''r cysylltiad hwn bob amser. Gadewch yn wag i adael y cysylltiad heb berchennog.",
+      "labels": "Labeli mynediad",
+      "labelsHint": "Caiff rôl y mae ei rheolau''n cyfateb i''r labeli hyn gyfeirio man gwaith at y cysylltiad hwn.",
+      "allowedRepositories": "Ystorfeydd a ganiateir",
+      "allowedRepositoriesHint": "Patrymau glob a gymharir â''r ystorfa y mae man gwaith yn gofyn am ei defnyddio.",
+      "addPattern": "Ychwanegu patrwm",
+      "anyRepositoryWarning": "Nid oes unrhyw batrymau wedi''u rhestru, felly gellir cyfeirio''r cysylltiad hwn at unrhyw ystorfa.",
+      "restricted": "{count, plural, one {Mae # patrwm wedi''i restru} other {Mae # patrwm wedi''u rhestru}}, felly gwrthodir ystorfa nad yw''n cyfateb i''r un ohonynt.",
+      "ownedBy": "Eiddo {email}",
+      "unowned": "Nid oes perchennog wedi''i osod",
+      "anyRepositorySummary": "Caniateir unrhyw ystorfa",
+      "repositoryCount": "Cyfyngedig i {count, plural, one {# ystorfa} other {# ystorfa}}"
+    },
     "form": {
       "name": "Enw",
       "namePattern": "Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig. Rhaid dechrau â llythyren neu rif.",
@@ -1076,7 +1093,8 @@
       "terragruntVersion": "Fersiwn Terragrunt",
       "noExpiry": "Dim dod i ben",
       "addDriftIgnoreRule": "Ychwanegu rheol",
-      "debugModeHint": "Cadw podiau rhedwyr a fethodd ar agor ar y gweithleoedd y mae'r rheol hon yn eu creu. I ffwrdd yn ddiofyn — mae pod sy'n cael ei gadw yn cadw tystlythyrau'r gweithle hwnnw."
+      "debugModeHint": "Cadw podiau rhedwyr a fethodd ar agor ar y gweithleoedd y mae'r rheol hon yn eu creu. I ffwrdd yn ddiofyn — mae pod sy'n cael ei gadw yn cadw tystlythyrau'r gweithle hwnnw.",
+      "allowForkPrPlansHint": "Mae'n berthnasol i bob gweithle y mae'r rheol hon yn ei greu. I ffwrdd yn ddiofyn: nid yw cais tynnu o fforch yn cael cynllun tybiannol, am y byddai'n rhedeg cod ei awdur gyda thystlythyrau'r gweithle."
     },
     "table": {
       "name": "Enw",
@@ -2877,7 +2895,8 @@
       "uploadState": "Methwyd llwytho'r cyflwr i fyny",
       "uploadStateFile": "Methwyd llwytho'r ffeil gyflwr i fyny",
       "updateSecurityScan": "Methwyd diweddaru'r sgan diogelwch",
-      "updateDebugMode": "Methwyd diweddaru'r modd dadfygio"
+      "updateDebugMode": "Methwyd diweddaru'r modd dadfygio",
+      "updateForkPlans": "Methwyd diweddaru cynlluniau ceisiadau tynnu o fforch"
     },
     "subtabs": {
       "state": "Cyflwr",
@@ -2930,6 +2949,14 @@
       "bannerTitle": "Mae'r modd dadfygio ymlaen ar gyfer y gweithle hwn",
       "bannerBody": "Caiff pod rhediad a fethodd ei gadw ar agor i'w archwilio yn lle gorffen, ac mae'n cadw tystlythyrau a newidynnau datgryptiedig y gweithle hwn tra'i fod ar gadw. Diffoddwch y modd dadfygio pan fyddwch wedi gorffen datrys problemau.",
       "confirmEnable": "Troi'r modd dadfygio ymlaen? Bydd pod rhediad a fethodd yn cael ei gadw ar agor gyda thystlythyrau a newidynnau datgryptiedig y gweithle hwn nes i'r ffenestr ddod i ben neu nes i chi ddileu'r pod."
+    },
+    "allowForkPrPlans": {
+      "title": "Cynlluniau ar geisiadau tynnu o fforch",
+      "description": "A yw cais tynnu a agorwyd o fforch yn cael cynllun tybiannol. I ffwrdd yn ddiofyn, am fod y cynllun hwnnw'n rhedeg cod awdur y fforch gyda thystlythyrau'r gweithle hwn.",
+      "label": "Cynllunio ceisiadau tynnu o fforch",
+      "hint": "Mae rhediad yn derbyn newidynnau amgylchedd y gweithle hwn, gwerthoedd sensitif, unrhyw gyfrinachau a ddatryswyd drwy Vault, a hunaniaeth cwmwl y swydd. Nid oes gan rywun sy'n agor cais tynnu o fforch fynediad ysgrifennu ac ni all gyfuno, felly cynllun tybiannol yw'r unig ffordd i'w god gyrraedd y tystlythyrau hynny. Trowch hyn ymlaen ar gyfer gweithle nad yw'n dal dim gwerth ei gymryd — storfa modiwlau gyhoeddus sy'n derbyn cyfraniadau'r gymuned, dyweder. Nid effeithir ar geisiadau tynnu o ganghennau yn y storfa ei hun, ac maent bob amser yn cael cynllun.",
+      "activeBadge": "Ymlaen",
+      "confirmEnable": "Cynllunio ceisiadau tynnu a agorwyd o fforchau? Bydd cod eu hawduron yn rhedeg gyda thystlythyrau a newidynnau datgryptiedig y gweithle hwn, heb i neb ei gymeradwyo ymlaen llaw."
     }
   },
   "graphs": {

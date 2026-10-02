@@ -78,6 +78,7 @@ func (c *Client) EmitWorkspaces(ctx context.Context) ([]ir.Workspace, []ir.VCSCo
 			}
 			labels[tb.Key] = tb.Value
 		}
+		withholdAccessGrant(labels)
 		if w.AgentPool != nil && w.AgentPool.ID != "" {
 			labels["terrapod-migration/tfe-agent-pool-id"] = w.AgentPool.ID
 		}
@@ -179,6 +180,37 @@ func tagNames(tags []*tfe.Tag) []string {
 		out = append(out, t.Name)
 	}
 	return out
+}
+
+// Terrapod's built-in `everyone` role grants read on any workspace labelled
+// `access: everyone`, to every authenticated user. A TFE tag spelled that way
+// is therefore not a label at all — it is a fleet-wide grant, and a migration
+// would apply it silently to every workspace carrying it, in bulk, with nobody
+// reviewing the result label by label. The source deployment's `access` tag
+// almost certainly meant something else; TFE has no such mechanism.
+//
+// Matched on key AND value exactly, because that is what the server matches
+// (`resource_labels.get("access") == "everyone"`). An `access: production` tag
+// grants nothing and is an ordinary label, so withholding it — or case-folding
+// the key — would lose a legitimate one to no purpose.
+//
+// The value is preserved under a `terrapod-migration/` key rather than dropped,
+// following the same convention as the other source-side context that has no
+// first-class IR field: the operator can see what the source said and grant it
+// deliberately if that is genuinely what they meant.
+//
+// Both TFE tag shapes can carry it — the flat `key:value` strings and the newer
+// key/value tag bindings — so this runs once over the assembled map rather than
+// inside either reader.
+func withholdAccessGrant(labels map[string]string) {
+	const (
+		accessKey   = "access"
+		accessGrant = "everyone"
+	)
+	if labels[accessKey] == accessGrant {
+		delete(labels, accessKey)
+		labels["terrapod-migration/withheld-access-tag"] = accessGrant
+	}
 }
 
 // translateTags converts TFE's flat string-tag list to Terrapod's

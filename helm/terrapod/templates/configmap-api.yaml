@@ -40,7 +40,13 @@ data:
     database:
       pool_size: {{ .Values.api.config.database.pool_size | default 10 | int64 }}
       max_overflow: {{ .Values.api.config.database.max_overflow | default 20 | int64 }}
-      pool_pre_ping: {{ .Values.api.config.database.pool_pre_ping | default true }}
+      {{/* hasKey, not `| default true`: the code default is TRUE and Go
+           templates treat `false` as empty, so `| default true` rendered an
+           operator's explicit `false` back as `true` -- silently, and in the
+           direction that leaves stale connections being handed out. */}}
+      {{- if hasKey .Values.api.config.database "pool_pre_ping" }}
+      pool_pre_ping: {{ .Values.api.config.database.pool_pre_ping }}
+      {{- end }}
       pool_recycle: {{ .Values.api.config.database.pool_recycle | default 1800 | int64 }}
       pool_timeout: {{ .Values.api.config.database.pool_timeout | default 30 | int64 }}
       connect_timeout: {{ .Values.api.config.database.connect_timeout | default 10 | int64 }}
@@ -178,6 +184,34 @@ data:
             {{- end }}
             {{- if .acs_url }}
             acs_url: {{ .acs_url | quote }}
+            {{- end }}
+            {{- /*
+              hasKey, not `| default`: all five default to **FALSE on this
+                release line** — they are opt-in here and strict only from 2.0,
+                which `tests/auth/test_saml.py::test_all_five_default_to_false`
+                enforces. `hasKey` is right either way, because Helm's `default`
+                treats false as empty and would discard whichever explicit value
+                an operator set. Omitting the key lets the code default stand,
+                which is what an unset value means.
+
+                (This previously said TRUE, carried in from the 2.0 line where
+                that is correct. Harmless to behaviour, and a trap for the next
+                person reasoning about SAML posture from the chart.)
+            */ -}}
+            {{- if hasKey . "validate_destination" }}
+            validate_destination: {{ .validate_destination }}
+            {{- end }}
+            {{- if hasKey . "validate_in_response_to" }}
+            validate_in_response_to: {{ .validate_in_response_to }}
+            {{- end }}
+            {{- if hasKey . "reject_replayed_assertions" }}
+            reject_replayed_assertions: {{ .reject_replayed_assertions }}
+            {{- end }}
+            {{- if hasKey . "want_assertions_signed" }}
+            want_assertions_signed: {{ .want_assertions_signed }}
+            {{- end }}
+            {{- if hasKey . "reject_deprecated_algorithm" }}
+            reject_deprecated_algorithm: {{ .reject_deprecated_algorithm }}
             {{- end }}
             {{- if .role_prefixes }}
             role_prefixes:
@@ -416,6 +450,9 @@ data:
       enabled: {{ .Values.api.config.cost_estimation.enabled }}
       prices_url: {{ .Values.api.config.cost_estimation.prices_url | quote }}
       default_region: {{ .Values.api.config.cost_estimation.default_region | quote }}
+      prices_sha256: {{ .Values.api.config.cost_estimation.prices_sha256 | default "" | quote }}
+      prices_max_compressed_bytes: {{ .Values.api.config.cost_estimation.prices_max_compressed_bytes | default 268435456 | int64 }}
+      prices_max_decompressed_bytes: {{ .Values.api.config.cost_estimation.prices_max_decompressed_bytes | default 2147483648 | int64 }}
     {{- end }}
     {{- if .Values.api.config.ha }}
     ha:
@@ -487,6 +524,23 @@ data:
       enabled: {{ .Values.api.config.vcs.enabled }}
       poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 | int64 }}
       module_poll_interval_seconds: {{ .Values.api.config.vcs.module_poll_interval_seconds | default 300 | int64 }}
+      {{/* hasKey, not `with` and not `| default true`: the code default is
+           TRUE, and both of those treat `false` as absent -- so an operator
+           who turned the gate off would have it rendered back on, which is
+           the opposite of what they asked for and silent. */}}
+      {{- if hasKey .Values.api.config.vcs "require_push_permission_for_commands" }}
+      require_push_permission_for_commands: {{ .Values.api.config.vcs.require_push_permission_for_commands }}
+      {{- end }}
+      {{/* Restored: the `| default true` cleanup deleted this line as collateral,
+           and nothing caught it — the values contract snapshots keys in
+           values.yaml, not rendered output. An operator who had set this false (the
+           documented remedy on 1.8.2 for "the first workspace on a connection must
+           be created by an admin") would have had it silently revert to true on
+           upgrade, and then met a 403 whose own text told them to set the key that
+           had stopped working. `hasKey` for the same reason as the line above. */}}
+      {{- if hasKey .Values.api.config.vcs "require_connection_authorization" }}
+      require_connection_authorization: {{ .Values.api.config.vcs.require_connection_authorization }}
+      {{- end }}
       # tmpdir tracks the ephemeralStorage mountPath so the VCS poller writes
       # streamed tarballs onto the PVC, not pod memory. Override
       # api.config.vcs.tmpdir if you remount the PVC elsewhere.
@@ -497,6 +551,13 @@ data:
       {{- with .Values.api.config.vcs.tmpdir_min_free_bytes }}
       tmpdir_min_free_bytes: {{ . | int64 }}
       {{- end }}
+      gitlab:
+        # Rendered unconditionally, and deliberately NOT via `with`: false is
+        # the safe state here, `with` treats false as empty and would render
+        # nothing, so an operator who read the warning and left it off would see
+        # their decision expressed only by omission. Rendering it keeps the
+        # pod's config and the values file agreeing on the answer.
+        allow_token_delivery_to_runners: {{ dig "gitlab" "allow_token_delivery_to_runners" false .Values.api.config.vcs }}
     {{- end }}
     {{- if .Values.api.config.audit }}
     audit:
@@ -557,7 +618,14 @@ data:
         username: {{ .Values.api.config.notifications.smtp.username | quote }}
         {{- end }}
         from_address: {{ .Values.api.config.notifications.smtp.from_address | default "notifications@terrapod.local" | quote }}
-        use_tls: {{ .Values.api.config.notifications.smtp.use_tls | default true }}
+        {{/* hasKey, not `| default true` -- same swallow as pool_pre_ping
+             above, and this one mattered more: an operator pointing Terrapod
+             at a relay that does not speak TLS set `use_tls: false`, had it
+             rendered back as `true`, and got a connection failure their own
+             values file said should not happen. */}}
+        {{- if hasKey .Values.api.config.notifications.smtp "use_tls" }}
+        use_tls: {{ .Values.api.config.notifications.smtp.use_tls }}
+        {{- end }}
       {{- end }}
     {{- end }}
     {{- if .Values.api.config.metrics }}
