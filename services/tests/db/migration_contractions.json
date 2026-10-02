@@ -6,6 +6,9 @@
   "0c328eb42b84_drop_oauth_clients": [
     "drop_table(oauth_clients)"
   ],
+  "15a8b636ea54_gitlab_connections_are_not_unique_by_installation": [
+    "drop_constraint(vcs_connections)"
+  ],
   "166efacb7b5d_ca_key_truthful_name": [
     "alter_column(certificate_authority, ca_key_encrypted)"
   ],

@@ -1204,8 +1204,26 @@ class VCSConnection(Base):
     )
 
     __table_args__ = (
-        sa.UniqueConstraint(
-            "provider", "github_installation_id", name="uq_vcs_connections_install"
+        # One GitHub App installation, one connection — connecting the same
+        # installation twice would mean two credentials over the same
+        # repositories with no way to tell which a workspace is using.
+        #
+        # **Scoped to GitHub, and that is the whole point.** This was a blanket
+        # `UniqueConstraint("provider", "github_installation_id")` from the
+        # initial schema, and `github_installation_id` is `0` on every GitLab
+        # row — the column has no meaning there. So the pair `("gitlab", 0)`
+        # collided with itself and **a deployment could never hold more than
+        # one GitLab connection**, which the create route reported as a bare
+        # 409 "already exists" naming nothing. Nobody met it because nothing
+        # created two, and it made the documented remedy for a saturated GitLab
+        # token — give a busy repository its own connection, since the
+        # allowance is per token — impossible to follow.
+        sa.Index(
+            "uq_vcs_connections_install",
+            "provider",
+            "github_installation_id",
+            unique=True,
+            postgresql_where=sa.text("provider = 'github'"),
         ),
     )
 

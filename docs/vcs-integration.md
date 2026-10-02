@@ -789,6 +789,15 @@ app or token is a second budget. Terrapod supports as many connections as you li
 and each workspace names the one it uses, so this needs no new concepts: create a
 second app or token, add it as a connection, and repoint some workspaces' `vcs-connection`.
 
+> **Before v1.9.0 this was impossible on GitLab.** A unique constraint carried over
+> from the initial schema covered `(provider, github_installation_id)`, and that
+> column is `0` on every GitLab row — so a second GitLab connection collided with
+> the first and was refused with a bare `409 Resource already exists or violates a
+> constraint`, naming neither the column nor the reason. The constraint is now
+> scoped to GitHub, where the installation id is what it is for. If you met that
+> 409 and concluded one GitLab connection was the limit, it was not: upgrade and
+> add the second.
+
 Split **by repository**, not by workspace. Workspaces sharing a repository already
 share one deduplicated lookup, so separating *them* across connections increases
 total calls; separating repositories divides the work. Putting the busiest monorepo
