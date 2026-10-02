@@ -283,7 +283,12 @@ class TestTheAllowlistBoundsTheCredentialNotTheWorkspaceRepo:
 
     async def _mint(self, key, allowed, *, repo_url="https://github.com/myorg/thing"):
         cid = uuid.uuid4()
-        conn = MagicMock(provider="github", allowed_repositories=allowed)
+        # A REAL VCSConnection, not a MagicMock: `credential_scope_host_allowed` reads
+        # `server_url`, and a Mock's attribute is a Mock — which is exactly how a
+        # fixture stops resembling the thing it stands in for.
+        from terrapod.db.models import VCSConnection
+
+        conn = VCSConnection(id=cid, provider="github", server_url="", allowed_repositories=allowed)
         db = await _db_returning(conn)
         resolved = [
             _var(

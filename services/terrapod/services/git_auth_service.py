@@ -174,9 +174,19 @@ async def _mint_from_connection(
     # a credential purely to fetch private module sources.
     if workspace is not None:
         from terrapod.services.vcs_connection_rbac import (
+            connection_git_host,
             credential_scope_allowed,
+            credential_scope_host_allowed,
+            credential_scope_host_refusal_detail,
             credential_scope_refusal_detail,
         )
+
+        # The host first, and with its own message: "this repository is not allowed"
+        # would send the operator to the allowlist, which is not what refused them.
+        if not credential_scope_host_allowed(conn, key):
+            raise GitAuthRefused(
+                credential_scope_host_refusal_detail(conn_uuid, key, connection_git_host(conn))
+            )
 
         if not credential_scope_allowed(conn, key):
             raise GitAuthRefused(
