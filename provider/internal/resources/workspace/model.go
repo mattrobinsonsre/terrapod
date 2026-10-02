@@ -98,6 +98,7 @@ type workspaceModel struct {
 	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
+	AllowForkPRPlans              types.Bool   `tfsdk:"allow_fork_pr_plans"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`

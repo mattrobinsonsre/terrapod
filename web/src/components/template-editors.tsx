@@ -74,8 +74,10 @@ export function emptyNotification(): NotificationSpec {
   }
 }
 
+// 16px text below `sm` so iOS does not zoom the page on focus, dropping to the
+// desktop size from `sm` up — identical on desktop, matching labels-editor.
 const inputCls =
-  'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent'
+  'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent'
 const labelCls = 'block text-xs font-medium text-slate-400 mb-1'
 
 function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
@@ -83,20 +85,24 @@ function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
     <button
       type="button"
       onClick={onClick}
-      className="px-3 py-1.5 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors"
+      className="px-3 py-1.5 min-h-11 sm:min-h-0 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors"
     >
       {label}
     </button>
   )
 }
 
+// A real button with a background and padding, not bare coloured text
+// (AGENTS.md → Responsive: an action is a button, and it needs a tap target).
+// It was the latter, which on a phone was a ~16px-tall run of red text sat
+// beside a full-height input.
 function RemoveButton({ onClick }: { onClick: () => void }) {
   const t = useTranslations('common')
   return (
     <button
       type="button"
       onClick={onClick}
-      className="text-xs text-red-400 hover:text-red-300"
+      className="shrink-0 px-3 py-1.5 min-h-11 sm:min-h-0 text-xs font-medium rounded-lg bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
     >
       {t('templateEditors.remove')}
     </button>

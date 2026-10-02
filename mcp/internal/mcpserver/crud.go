@@ -54,6 +54,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		VCSConnectionID  string            `json:"vcs_connection_id,omitempty" jsonschema:"VCS connection id to wire this workspace to a repo"`
 		VCSRepoURL       string            `json:"vcs_repo_url,omitempty" jsonschema:"git repo URL (requires vcs_connection_id)"`
 		VCSBranch        string            `json:"vcs_branch,omitempty" jsonschema:"tracked branch (empty = repo default)"`
+		AllowForkPRPlans *bool             `json:"allow_fork_pr_plans,omitempty" jsonschema:"allow a pull request opened from a FORK to get a speculative plan. **Off by default**, which is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it true only on a workspace that holds nothing worth taking, and note that an autodiscovery rule carries its own value for the workspaces it creates (GHSA-gp5w-76rw-c452)"`
 		OwnerEmail       string            `json:"owner_email,omitempty" jsonschema:"workspace owner email (defaults to the caller)"`
 		Labels           map[string]string `json:"labels,omitempty" jsonschema:"key/value labels for RBAC + filtering (reserved keys rejected)"`
 		PulumiBindPlan   *bool             `json:"pulumi_bind_plan,omitempty" jsonschema:"Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; setting it true is rejected on any other engine"`
@@ -94,6 +95,12 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			// no gain — and would answer for an engine list only the server
 			// knows. Omitted when unset, so a Terraform create is unchanged.
 			PulumiBindPlan: in.PulumiBindPlan,
+			// A pointer all the way through, so "leave it alone" stays
+			// distinguishable from "turn it off" (GHSA-gp5w-76rw-c452). Unset
+			// is omitted from the request, leaving the server's default — which
+			// is OFF — rather than asserting a value over whatever the operator
+			// chose.
+			AllowForkPRPlans: in.AllowForkPRPlans,
 		})
 		if err != nil {
 			return errResult(err), nil, nil
@@ -116,6 +123,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		WorkingDirectory string            `json:"working_directory,omitempty" jsonschema:"subdirectory within the repo"`
 		Labels           map[string]string `json:"labels,omitempty" jsonschema:"replace the label set (reserved keys rejected)"`
 		PulumiBindPlan   *bool             `json:"pulumi_bind_plan,omitempty" jsonschema:"Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; rejected on any other engine"`
+		AllowForkPRPlans *bool             `json:"allow_fork_pr_plans,omitempty" jsonschema:"allow a pull request opened from a FORK to get a speculative plan. **Off by default**, which is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it true only on a workspace that holds nothing worth taking, and note that an autodiscovery rule carries its own value for the workspaces it creates (GHSA-gp5w-76rw-c452)"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_workspace_update",
@@ -142,6 +150,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			WorkingDirectory: in.WorkingDirectory,
 			Labels:           in.Labels,
 			PulumiBindPlan:   in.PulumiBindPlan,
+			AllowForkPRPlans: in.AllowForkPRPlans,
 		})
 		if err != nil {
 			return errResult(err), nil, nil

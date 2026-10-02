@@ -390,7 +390,7 @@ the set name is retained for display).
     config:
       registry:
         platform_tools:
-          opa_version: "1.19.0"
+          opa_version: "1.21.1"
   ```
 
   One version for the whole deployment — there is no per-policy-set

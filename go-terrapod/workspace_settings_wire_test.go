@@ -22,19 +22,22 @@ import (
 
 func TestCreateSendsEverySettingItAccepts(t *testing.T) {
 	debug := true
+	forkPlans := true
 	attrs := workspaceCreateAttrs(CreateWorkspaceRequest{
 		Name:             "smoke",
 		DebugMode:        &debug,
+		AllowForkPRPlans: &forkPlans,
 		AIPolicyMode:     "enabled",
 		AISummaryMode:    "disabled",
 		AISummaryContext: "ctx",
 	})
 
 	for key, want := range map[string]any{
-		"debug-mode":         true,
-		"ai-policy-mode":     "enabled",
-		"ai-summary-mode":    "disabled",
-		"ai-summary-context": "ctx",
+		"debug-mode":          true,
+		"allow-fork-pr-plans": true,
+		"ai-policy-mode":      "enabled",
+		"ai-summary-mode":     "disabled",
+		"ai-summary-context":  "ctx",
 	} {
 		got, ok := attrs[key]
 		if !ok {
@@ -49,15 +52,22 @@ func TestCreateSendsEverySettingItAccepts(t *testing.T) {
 
 func TestUpdateSendsEverySettingItAccepts(t *testing.T) {
 	debug := false
+	forkPlans := false
 	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{
-		DebugMode:    &debug,
-		AIPolicyMode: "disabled",
+		DebugMode:        &debug,
+		AllowForkPRPlans: &forkPlans,
+		AIPolicyMode:     "disabled",
 	})
 
 	// false is the interesting case for a *bool: a naive `if req.DebugMode`
 	// guard would drop it and make "turn debug mode off" a silent no-op.
 	if got, ok := attrs["debug-mode"]; !ok || got != false {
 		t.Errorf("update dropped debug-mode=false (got %v, present=%v)", got, ok)
+	}
+	// Dropping this one silently leaves fork pull requests planning on a
+	// workspace whose operator has just asked for them to stop.
+	if got, ok := attrs["allow-fork-pr-plans"]; !ok || got != false {
+		t.Errorf("update dropped allow-fork-pr-plans=false (got %v, present=%v)", got, ok)
 	}
 	if got, ok := attrs["ai-policy-mode"]; !ok || got != "disabled" {
 		t.Errorf("update dropped ai-policy-mode (got %v, present=%v)", got, ok)
@@ -67,7 +77,7 @@ func TestUpdateSendsEverySettingItAccepts(t *testing.T) {
 func TestUnsetSettingsAreOmittedSoPatchLeavesThemAlone(t *testing.T) {
 	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{Name: "smoke"})
 
-	for _, key := range []string{"debug-mode", "ai-policy-mode"} {
+	for _, key := range []string{"debug-mode", "allow-fork-pr-plans", "ai-policy-mode"} {
 		if _, present := attrs[key]; present {
 			t.Errorf("update sent %q when the caller set nothing — PATCH would "+
 				"overwrite a value the caller never mentioned", key)
@@ -83,15 +93,19 @@ func TestWorkspaceDecodesTheSettingsItSends(t *testing.T) {
 		ID:   "ws-1",
 		Type: "workspaces",
 		Attributes: map[string]json.RawMessage{
-			"name":           json.RawMessage(`"smoke"`),
-			"debug-mode":     json.RawMessage(`true`),
-			"ai-policy-mode": json.RawMessage(`"enabled"`),
+			"name":                json.RawMessage(`"smoke"`),
+			"debug-mode":          json.RawMessage(`true`),
+			"allow-fork-pr-plans": json.RawMessage(`true`),
+			"ai-policy-mode":      json.RawMessage(`"enabled"`),
 		},
 	}
 	ws := workspaceFromResource(res)
 
 	if !ws.DebugMode {
 		t.Error("debug-mode did not decode")
+	}
+	if !ws.AllowForkPRPlans {
+		t.Error("allow-fork-pr-plans did not decode")
 	}
 	if ws.AIPolicyMode != "enabled" {
 		t.Errorf("ai-policy-mode decoded as %q, want %q", ws.AIPolicyMode, "enabled")

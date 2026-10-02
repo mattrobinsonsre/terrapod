@@ -25,15 +25,33 @@ The toggle lives on each workspace (`vcs_workflow`); flipping it is a deliberate
 
 In `apply_then_merge` mode, **Terrapod's role-based and label-based RBAC do not apply to comment-driven actions.** Authorization is delegated to your VCS provider:
 
-- Anyone who can comment on the PR can issue `terrapod apply`.
+- **Issuing a `terrapod ...` command requires push access to the repository.** On GitHub that is the collaborator permission API; on GitLab, Developer (access level 30) or above, including access inherited from the parent group. Being able to comment is not on its own enough — on a public repository that would be everyone.
 - The apply only proceeds when the PR's mergeability state is clean — branch protection (required reviews, status checks, code owner approval) becomes the gate.
 - Audit log entries for comment-driven actions reference the **VCS user id and login** directly; there is no Terrapod identity in the chain.
 
-This is deliberate and matches Atlantis exactly. It sidesteps a brittle mapping between VCS identities and Terrapod identities, and means there's a single source of truth for who can change infra: the repo's branch-protection settings.
+The two gates answer different questions and you want both. Branch protection governs *what may land*; the push check governs *who may ask Terrapod to act*. Branch protection says nothing at all about `terrapod unlock`, which releases a workspace lock and never touches the merge API — so without the push check that command had no gate whatsoever.
+
+A command from someone without push access is refused with a reply on the pull request saying so, rather than silently ignored. The check **fails closed**: if the provider cannot be asked — a rate limit, an outage — the command is refused and the reply says to try again.
+
+Set `api.config.vcs.require_push_permission_for_commands: false` to restore the older behaviour, where anyone who could comment could command. It is on by default, and there is no good reason to turn it off on a repository anyone outside your organisation can see.
+
+Delegating to the provider is deliberate, and follows Atlantis. It sidesteps a brittle mapping between VCS identities and Terrapod identities, and means there's a single source of truth for who can change infra: the repository's own permissions and branch-protection settings.
 
 **Recommended**: configure branch protection to **require a linear history** (rebase or squash before merge). Apply-then-merge applies against the PR head commit; if the PR is behind the default branch, the apply outcome may diverge from what eventually merges. With required-linear-history, the PR head is what gets merged, so the commit you applied is the commit that lands.
 
 The workspace settings page surfaces this contract as a banner when you switch a workspace into `apply_then_merge`.
+
+**Pull requests from forks sit outside that contract, so they do not run at
+all unless the workspace opts in.** "If you can merge the PR, you can apply
+it" rests on the PR author being inside the repository's write boundary; a
+fork author is not — they cannot push to the base repository and cannot merge.
+In this mode the stake is higher than elsewhere, because a PR push creates a
+full plan-and-apply-capable run rather than a speculative one. Terrapod
+therefore skips fork pull requests entirely unless the workspace sets
+`allow-fork-pr-plans`, which **defaults false** (`GHSA-gp5w-76rw-c452`) — and in this mode the run a fork
+pull request would get is apply-capable, not merely speculative. Pull requests raised from a branch in
+the repository itself are unaffected. See [Pull requests from
+forks](vcs-integration.md#pull-requests-from-forks).
 
 ## How apply-then-merge runs work
 
@@ -56,7 +74,7 @@ mergeability check (branch protection, required reviews, …)
     ↓
 apply phase runs against the saved tfplan
     ↓
-if auto_merge: merge PR; if not: comment prompts `terrapod merge`
+if auto_merge: merge PR; if not: merge it yourself when you are ready
     ↓
 workspace lock released
 ```
@@ -127,8 +145,9 @@ Commands must start with `terrapod` (or the configured mention prefix — e.g. `
 | `terrapod apply` | Apply the current `planned` run for all PR-affected workspaces |
 | `terrapod apply -W <workspace>` | Apply a single workspace |
 | `terrapod unlock` | Release the workspace lock if stuck |
-| `terrapod merge` | Force-merge despite incomplete applies (audit-logged) |
 | `terrapod help` | List commands |
+
+Every one of them **except `help`** requires the commenter to have push access to the repository — `help` only prints the table above, so gating it would refuse to tell someone why they were refused — see [Authorization model](#authorization-model-for-apply-then-merge--read-this-carefully).
 
 Code-fenced blocks don't match — discussing the bot in a code sample never accidentally triggers a command.
 
@@ -204,7 +223,7 @@ A PR can touch multiple workspaces. `terrapod apply` (no `-W`) operates on all a
 - `apply_then_merge` → successful applied run for the head SHA (or `has_changes=false`, which auto-counts)
 - `merge_then_apply` → speculative plan succeeded
 
-If the user wants to merge despite incomplete applies, `terrapod merge` is the force escape hatch. The per-workspace state at merge time is recorded in the audit log; unapplied workspaces get a banner on their detail page indicating known drift between code and infrastructure.
+If you want to merge despite incomplete applies, merge the pull request on the provider. There is no Terrapod command for it: a comment-driven force-merge would mean anyone able to type a comment could land a change whose applies had not finished, bypassing the gate above — so the decision stays with whoever the repository already trusts to press Merge. Unapplied workspaces get a banner on their detail page indicating known drift between code and infrastructure.
 
 ## Webhook + polling
 
@@ -219,9 +238,11 @@ If you're moving an existing Terrapod installation onto apply-then-merge, the Gi
 | Permission | Required for |
 |---|---|
 | **Issues: Read & Write** | Posting and reading PR comments (PR comments use GitHub's Issues API) |
-| **Contents: Read & Write** | Performing the auto-merge / `terrapod merge`. GitHub's `PUT /repos/{o}/{r}/pulls/{n}/merge` endpoint creates a commit on the target branch, which requires `contents: write` — verified via the `X-Accepted-GitHub-Permissions` response header. Note that this is *Contents*, not *Pull requests* (which `Read` is sufficient for, since the App reads PR state but doesn't modify it). |
+| **Contents: Read & Write** | Performing the auto-merge. GitHub's `PUT /repos/{o}/{r}/pulls/{n}/merge` endpoint creates a commit on the target branch, which requires `contents: write` — verified via the `X-Accepted-GitHub-Permissions` response header. Note that this is *Contents*, not *Pull requests* (which `Read` is sufficient for, since the App reads PR state but doesn't modify it). |
 
-If you only need apply-then-merge without auto-merge or `terrapod merge`, `Contents: Read` is sufficient — the apply phase doesn't touch the merge API.
+Checking a commenter's push access needs nothing beyond the `metadata: read` every installation grants, so it costs no permission upgrade.
+
+If you only need apply-then-merge without auto-merge, `Contents: Read` is sufficient — the apply phase doesn't touch the merge API.
 
 Webhook event subscriptions:
 - `issue_comment` — receive `terrapod ...` commands sub-second

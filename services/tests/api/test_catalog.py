@@ -30,11 +30,32 @@ def _user(email="u@test.com", roles=None):
     )
 
 
+def _no_rows():
+    """A result shaped like SQLAlchemy's, answering "nothing matched".
+
+    Needed because `provision_instance` is patched out in these tests while the
+    router still runs the GHSA-49q6-pm68-3xgw self-join check after it — and that
+    check asks real queries. A bare `AsyncMock` makes `.scalars().all()` a
+    coroutine, which fails in a way that names neither the check nor the mock.
+    """
+    r = MagicMock()
+    r.scalars.return_value.all.return_value = []
+    r.scalar_one_or_none.return_value = None
+    r.scalar_one.return_value = None
+    r.first.return_value = None
+    r.all.return_value = []
+    return r
+
+
 def _make_app(user, mock_db=None):
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: user
     if mock_db is None:
         mock_db = AsyncMock()
+        # Default to "no rows" rather than an AsyncMock's async children, so a
+        # router that asks an unrelated question gets a usable answer instead of a
+        # coroutine. Tests that script `execute` themselves override this.
+        mock_db.execute = AsyncMock(return_value=_no_rows())
     app.dependency_overrides[get_db] = lambda: mock_db
     return app, mock_db
 
@@ -850,3 +871,173 @@ class TestManagementRenameConflict:
             )
         assert resp.status_code == 409
         mock_db.rollback.assert_awaited()
+
+
+# ── The self-join guard on the provision path (GHSA-49q6-pm68-3xgw) ─────
+
+
+class TestProvisionConsultsTheSelfJoinGuard:
+    """Provisioning takes caller-supplied `labels` and needs only catalog `use` plus
+    pool `write` — nowhere near platform admin — so it is a second door to the
+    escalation the ordinary workspace-create path is gated against: label a
+    provisioned workspace into another team's rule-assigned variable set and receive
+    its secrets in the run the provision queues.
+
+    **The guard was pinned only by `inspect.getsource(catalog)` containing
+    `"refuse_varset_growth("`, and every provision test here runs on `_no_rows()`,
+    which answers "nothing matched" to every query the guard asks.** So the guard
+    could not fire in any test, and the only thing asserted was that a string
+    appeared in the module. Deleting the whole `refuse_varset_growth` block leaves
+    `test_provision_accepts_apool_prefixed_pool_id` green; so does leaving the call
+    in place and breaking anything it depends on.
+
+    These answer the guard's queries with the rows that make it fire, and assert the
+    effect: a 403 naming the set, and a rolled-back transaction. The fake reads each
+    statement instead of counting calls, so it cannot pass against a guard that
+    asks a different question — a fake that answers from a fixture regardless of the
+    query tests the fixture.
+    """
+
+    #: What the guard's three-query sequence asks, keyed on the rendered SQL.
+    @staticmethod
+    def _varset_rows(*, secret_name: str | None, set_id):
+        """Build a query-aware `execute` for the self-join check.
+
+        `applicable_varsets` asks for explicitly-assigned sets, then global sets,
+        then rule-bearing ones, then (per rule) `SELECT EXISTS (...)` for this
+        workspace; `_sets_holding_secrets` then asks which of the gained sets hold a
+        `sensitive` or brokered variable, and the refusal asks for their names.
+        """
+        varset = MagicMock()
+        varset.id = set_id
+        varset.name = secret_name or "plain-set"
+        varset.assignment_rule = {"labels": {"team": "a"}}
+        varset.global_set = False
+        varset.priority = False
+
+        def _execute(stmt, *_a, **_kw):
+            sql = " ".join(str(stmt).split())
+            r = MagicMock()
+            r.scalars.return_value.all.return_value = []
+            r.scalar_one_or_none.return_value = None
+            r.scalar.return_value = False
+            r.all.return_value = []
+            r.first.return_value = None
+
+            if "variable_set_workspaces" in sql:
+                pass  # no explicit assignment
+            elif "variable_sets.global_set IS true" in sql:
+                pass  # no global sets
+            elif "variable_sets.assignment_rule IS NOT NULL" in sql:
+                r.scalars.return_value.all.return_value = [varset]
+            elif sql.startswith("SELECT EXISTS"):
+                r.scalar.return_value = True  # the rule selects this workspace
+            elif "variable_set_variables.variable_set_id" in sql:
+                # Which gained sets hold something worth taking.
+                r.all.return_value = [(set_id,)] if secret_name else []
+            elif sql.startswith("SELECT variable_sets.name FROM"):
+                r.all.return_value = [(secret_name,)] if secret_name else []
+            return r
+
+        return AsyncMock(side_effect=_execute)
+
+    async def _provision(self, *, secret_name: str | None, roles=None):
+        """Drive the real provision route with the guard's rows in place."""
+        pool_uuid = uuid.uuid4()
+        set_id = uuid.uuid4()
+
+        item = MagicMock()
+        item.enabled = True
+        item.name = "vpc"
+        item.labels = {}
+        item.owner_email = ""
+        item.allowed_agent_pool_ids = None
+
+        pool = MagicMock()
+        pool.id = pool_uuid
+        pool.name = "p"
+        pool.labels = {}
+        pool.owner_email = None
+
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.name = "smoke"
+        ws.catalog_item_id = uuid.uuid4()
+        ws.catalog_version_pin = None
+        ws.agent_pool_links = [SimpleNamespace(agent_pool_id=pool_uuid, ordinal=0, agent_pool=None)]
+        ws.owner_email = "u@test.com"
+        ws.labels = {"team": "a"}
+
+        app, mock_db = _make_app(_user(roles=roles or ["everyone"]))
+        mock_db.get = AsyncMock(return_value=pool)
+        mock_db.execute = self._varset_rows(secret_name=secret_name, set_id=set_id)
+        mock_db.flush = AsyncMock()
+        mock_db.commit = AsyncMock()
+        mock_db.rollback = AsyncMock()
+        mock_db.refresh = AsyncMock()
+
+        with (
+            patch("terrapod.api.app.init_db"),
+            patch("terrapod.api.app.init_redis"),
+            patch("terrapod.api.app.init_storage", new_callable=AsyncMock),
+            patch(
+                "terrapod.api.routers.catalog.catalog_service.get_catalog_item",
+                AsyncMock(return_value=item),
+            ),
+            patch(
+                "terrapod.api.routers.catalog.resolve_catalog_capabilities_for",
+                AsyncMock(return_value=caps_for_level("use")),
+            ),
+            patch(
+                "terrapod.api.routers.catalog.resolve_pool_capabilities_for",
+                AsyncMock(return_value=caps_for_level("write")),
+            ),
+            patch(
+                "terrapod.api.routers.catalog.catalog_service.provision_instance",
+                AsyncMock(return_value=ws),
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/catalog-items/{uuid.uuid4()}/provision",
+                    json={
+                        "data": {
+                            "attributes": {
+                                "name": "smoke",
+                                "agent-pool-id": f"apool-{pool_uuid}",
+                                "labels": {"team": "a"},
+                            }
+                        }
+                    },
+                    headers=_AUTH,
+                )
+        return resp, mock_db
+
+    async def test_a_provision_that_joins_a_secret_bearing_set_is_refused(self):
+        resp, mock_db = await self._provision(secret_name="teamA-creds")
+        assert resp.status_code == 403, resp.text
+        assert "teamA-creds" in resp.text, "the refusal does not name the set to ask about"
+        assert "GHSA-49q6" in resp.text
+
+    async def test_and_the_provision_is_rolled_back(self):
+        """The guard runs after a flush and before the commit, so a refusal that did
+        not roll back would leave the workspace half-created — the router's own
+        `except: rollback; raise` is the thing being driven here."""
+        resp, mock_db = await self._provision(secret_name="teamA-creds")
+        assert resp.status_code == 403
+        mock_db.rollback.assert_awaited()
+        mock_db.commit.assert_not_awaited()
+
+    async def test_a_set_of_plain_configuration_still_provisions(self):
+        """The narrowing is deliberate: the catalog is entirely non-admin
+        self-service, so refusing every rule match would close the feature. Same
+        rows, no secret."""
+        resp, mock_db = await self._provision(secret_name=None)
+        assert resp.status_code == 201, resp.text
+        mock_db.commit.assert_awaited()
+
+    async def test_a_platform_admin_is_exempt(self):
+        """An admin already reads every variable set, so there is nothing to
+        escalate to — and they are the only principal who can set the rule up."""
+        resp, _ = await self._provision(secret_name="teamA-creds", roles=["admin", "everyone"])
+        assert resp.status_code == 201, resp.text

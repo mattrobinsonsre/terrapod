@@ -11,7 +11,7 @@ one-time value.
 
 import json
 import secrets
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
@@ -59,6 +59,9 @@ class AuthState:
     idp_state: str
     nonce: str | None = None
     idp_code_verifier: str | None = None
+    # The SAML AuthnRequest id this login sent, checked against the assertion's
+    # InResponseTo at the ACS endpoint.
+    saml_request_id: str | None = None
     # "session" for web UI, "api_token" for terraform login
     credential_type: str = "session"
 
@@ -131,7 +134,13 @@ async def consume_auth_state(idp_state: str) -> AuthState | None:
         return None
 
     parsed = json.loads(data)
-    return AuthState(**parsed)
+    # Only fields this build knows about. During a rolling upgrade a newer
+    # replica writes a state carrying a field an older one has never heard of,
+    # and `AuthState(**parsed)` would raise TypeError on the older pod — a login
+    # failing for no reason the operator can see. Dropping the unknown key
+    # leaves that pod behaving exactly as it did before it was added.
+    known = {f.name for f in fields(AuthState)}
+    return AuthState(**{k: v for k, v in parsed.items() if k in known})
 
 
 async def store_auth_code(code: str, auth_code: AuthCode) -> None:
