@@ -980,6 +980,102 @@ users, which is the right audience. **On a public repository, Actions logs and
 artifacts are world-readable too** — which is why the Semgrep step emits SARIF
 and is never uploaded as an artifact.
 
+## A security fix never costs a supported line its functionality (hard requirement)
+
+A fix shipped to a supported release line closes the hole **without removing
+anything an operator was legitimately doing with it**. The whole promise of a
+patch is that taking it is safe, so a patch that silently withdraws a capability
+is worse than useless: operators learn to delay security updates, which is the
+opposite of what the release exists to achieve.
+
+That does not mean preserving the bug. Sort each fix into one of three tiers and
+the answer follows.
+
+**Tier 1 — only an attacker can reach the behaviour.** Fix it outright, no
+switch. A request that only a forged or replayed credential could make; a code
+path reachable solely by skipping a check the surface already applies elsewhere;
+an input no honest client would ever send. Nothing legitimate depends on any of
+it, so a switch would exist only to re-enable a vulnerability. Do not add one.
+
+**Tier 2 — the behaviour is real but implausibly relied upon.** Fix it *by
+default*, and provide a switch for the rare operator who genuinely wants it
+back. Judge plausibility honestly rather than defensively — "somebody might
+conceivably" is not reliance. Where the capability remains available at a
+different level, point at that instead of adding a new knob: a per-request value
+that escapes an administrator's ceiling is a bypass, and the administrator's own
+setting is where "unlimited" belongs.
+
+**Tier 3 — the behaviour is plausibly relied upon.** The fix still ships, behind
+a switch that **defaults to existing behaviour on the supported lines** and to
+the secure value on the next major. Anything the product deliberately offers is
+tier 3 by definition — if a surface was designed to allow something, withdrawing
+it is a feature removal however good the reason.
+
+### One implementation, two defaults
+
+A tier 2 or tier 3 fix is written **once**. The release line and the development
+line carry the same code and the same switch; only the default differs. Never
+write two behaviours, and never leave a release line with no path to the fix at
+all.
+
+This matters for three reasons. The carry is a one-line default change rather
+than a divergent reimplementation, so the lines cannot drift. The advisory gets
+an honest answer for operators who cannot take a major upgrade today — *fixed by
+default in the next major, available now by setting this* — instead of telling
+them to wait. And the decision is recorded in a values file, where the operator
+who relaxed it and the auditor who reads it later can both see it.
+
+The switch is a config key or Helm value, which is explicitly patch material
+when its default changes nothing. It still needs all three legs of the
+config-channel contract and a documented default per line.
+
+### A credential that cannot be narrowed has no safe default
+
+Tiers 2 and 3 both assume a middle setting exists — that the fix can hand over
+*less* rather than nothing. Where the exposure is a credential we mint, that
+holds: ask the provider for a narrower one, scoped to the repositories and
+permissions the caller actually needs, and nothing is withdrawn.
+
+Where the credential is a **static secret an operator pasted in**, it does not.
+There is no operation that produces a narrower copy of a stored access token.
+The only choices are handing it over whole or not handing it over, so
+"preserve existing behaviour" and "stop disclosing the credential" are flatly
+incompatible and no default can satisfy both.
+
+So this is its own tier, and the rule is about the **default**, not about
+whether a switch exists: a non-attenuable credential disclosure is **off by
+default on every line, including the supported ones**. A switch may keep the
+capability available — an operator with a private runner fleet and a
+single-project token may be entirely content with the trade — but it is an
+informed opt-in, never the state someone inherits by upgrading.
+
+That is what separates this from tier 3. There, the supported line keeps its
+existing default because the behaviour is something operators legitimately
+built on. Here the existing default *is* the disclosure, so preserving it would
+be preserving the vulnerability; and unlike tier 3 there is no partial setting
+to land on, because the credential has no narrower form.
+
+The switch therefore carries the warning, not just the key: what is handed over,
+to whom, and what cannot be narrowed about it. An operator turning this on is
+accepting a specific disclosure and must be able to read what it is at the point
+of turning it on.
+
+Prefer removing the need for the judgement in the first place: where a surface
+can take either a mintable credential or a stored one, make the mintable path
+the supported one and put the stored path behind this kind of switch, rather
+than offering both as equals and explaining the difference in a footnote.
+
+### What a tier 3 default does not excuse
+
+Shipping the insecure default is a mitigation, not a fix, and the release notes
+and advisory must say exactly that — naming the key, its default on this line,
+and what remains exposed until it is set. A reader must never have to infer from
+a version number whether they are protected.
+
+Where a default is merely generous rather than unsafe, leave it alone in the
+patch and revisit it on the next major: a default change is the one thing a
+patch cannot carry quietly.
+
 ## Content hygiene (hard requirements)
 
 These protect the public repository. Git history, PRs, and source are
