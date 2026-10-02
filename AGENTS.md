@@ -845,8 +845,11 @@ What follows from this, in rough order of how much it saves:
 - **Never leave a persistently failing PR open.** It is re-run on every rebase for
   every other merge and never progresses, which is strictly worse than any choice
   about how many PRs to have in flight.
-- **A documentation-only change costs nothing** — see the merging convention above —
-  so it does not belong in the chain at all.
+- **A documentation-only change skips its own CI, but it is NOT free of the chain.**
+  It still advances the base branch, so it still puts every other open pull request
+  out of date and invalidates whatever they had in flight. Land one when nothing is
+  waiting, or batch it with the other documentation you are about to land — not in
+  the middle of driving a queue, which is how a "free" merge throws away two runs.
 
 Stacked PRs are not the answer here, for the reasons already given: a stacked PR
 shows a reviewer the wrong baseline and breaks when its base merges.
