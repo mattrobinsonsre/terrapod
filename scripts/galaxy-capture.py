@@ -231,9 +231,9 @@ def main() -> int:
             "rc": proc.returncode,
             "requests": list(LOG),
             "stderr": [
-                l
-                for l in (proc.stderr or "").splitlines()
-                if "unexpected" in l or "ERROR" in l
+                line
+                for line in (proc.stderr or "").splitlines()
+                if "unexpected" in line or "ERROR" in line
             ][-4:]
             or (proc.stderr or proc.stdout).strip().splitlines()[-4:],
         }

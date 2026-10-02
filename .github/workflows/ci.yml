@@ -884,6 +884,11 @@ jobs:
         run: python3 scripts/docs-audit/check_counts.py
       - name: Named targets, values and paths exist
         run: python3 scripts/docs-audit/check_references.py
+      # Not a docs gate, but it belongs to a job that sees the whole checkout:
+      # the pytest tiers run in an image that does not ship `scripts/`, and the
+      # two mints that regressed live there (GHSA-3m8x-ff8g-7x8c).
+      - name: Every token mint names its identity provider
+        run: python3 scripts/docs-audit/check_token_mints.py
       # Advisory: prints for human review, never fails. Telling a factual
       # boundary from a put-down is a judgement call.
       - name: Peer-fairness review list

@@ -1584,6 +1584,7 @@ method (*Client) OverridePolicyCheck(ctx context.Context, checkID string) (*Poli
 method (*Client) OverrideRunAIPolicy(ctx context.Context, runID string) (*AIPolicyEvaluation, error)
 method (*Client) OverrideRunSecurityScan(ctx context.Context, runID string) (*SecurityScan, error)
 method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
+method (*Client) PinIdentitySubject(ctx context.Context, providerName, email, subject string) error
 method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
 method (*Client) PostArchitectureCritiqueMessage( ctx context.Context, workspaceID, content string, ) (*ArchitectureCritiqueMessage, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)

@@ -233,7 +233,8 @@ def row_8_follower_inert(stamp: str) -> None:
     token = run(NS_A, """
 from terrapod.auth import api_tokens
 raw = await api_tokens.create_api_token(
-    db, bound_to='admin', created_by='admin', kind='interactive', lifespan_hours=2)
+    db, bound_to='admin', created_by='admin', kind='interactive',
+    identity_provider='local', lifespan_hours=2)
 await db.commit()
 print('TOKEN', raw[1])
 """).split("TOKEN ")[-1].strip()

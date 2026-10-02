@@ -31,7 +31,8 @@ async def main():
     await init_db()
     async with get_db_session() as db:
         _, raw = await api_tokens.create_api_token(
-            db, bound_to='admin', created_by='admin', kind='interactive', lifespan_hours=2)
+            db, bound_to='admin', created_by='admin', kind='interactive',
+            identity_provider='local', lifespan_hours=2)
         await db.commit()
         import sys; sys.stderr.write('TOKEN:'+raw+'\n')
 asyncio.run(main())
