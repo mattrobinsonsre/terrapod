@@ -215,7 +215,9 @@ TERRAPOD_AZURE_AD_CLIENT_SECRET="your-client-secret"
 
 When a user logs in via OIDC, roles are resolved from three sources (merged and deduplicated):
 
-1. **IDP groups** -- group names from the `groups_claim`, with `role_prefixes` stripped. For example, if the IDP returns `terrapod:developer` and the prefix is `terrapod:`, the role `developer` is assigned.
+1. **IDP groups** -- group names from the `groups_claim`. With `role_prefixes: ["terrapod:"]`, a group `terrapod:developer` becomes the role `developer`, and **a group carrying no configured prefix is ignored**: the prefixes are a filter, not just something to strip off. With `role_prefixes` empty -- the default -- every group is taken as a role name verbatim.
+
+   **This source cannot grant `admin` or `audit`.** An IdP group is a name in a directory Terrapod does not control: a group called `admin` may belong to another team, or be one anyone can self-join, so taking it at face value meant a directory membership was a platform-admin grant (`GHSA-22vg-4g2w-7w34`). A group named like a platform role is dropped and the refusal is logged. Grant those two deliberately, through source 2 or source 3 below -- both are written by someone administering Terrapod rather than the directory. The same rule applies to SAML.
 
 2. **Claims-to-roles mapping** -- explicit rules in the config. Each rule matches a claim name + value and assigns specific roles.
 

@@ -5,6 +5,7 @@ Uses python3-saml for metadata parsing and assertion validation.
 
 from typing import Any
 
+from terrapod.auth.idp_groups import roles_from_idp_groups
 from terrapod.auth.sso import AuthenticatedIdentity, AuthorizationRequest, SSOConnector
 from terrapod.config import SAMLProviderConfig
 from terrapod.logging_config import get_logger
@@ -153,6 +154,12 @@ class SAMLConnector(SSOConnector):
         groups = attributes.get("groups", []) or attributes.get(
             "http://schemas.xmlsoap.org/claims/Group", []
         )
+        # `role_prefixes` has always been a documented key on SAMLProviderConfig and
+        # this connector never read it (GHSA-22vg-4g2w-7w34), which is worse than not
+        # supporting it: an operator could set it, have it accepted by the schema,
+        # and get no filtering at all. Shared with the OIDC connector so the two
+        # cannot drift apart again — that asymmetry WAS the defect.
+        groups = roles_from_idp_groups(groups, self._config.role_prefixes, provider=self.name)
 
         # Build raw claims from all attributes
         raw_claims: dict[str, Any] = {"nameId": name_id}
