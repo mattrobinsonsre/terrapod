@@ -2103,3 +2103,89 @@ class TestAWorkspaceWriteThatViolatesAConstraintIsNotA500:
             "a db.flush() is not the first statement in a try:, so an IntegrityError "
             "from it escapes as a 500:\n  " + "\n  ".join(offenders)
         )
+
+
+class TestTheRoutesTranslateAConstraintViolationNotJustTheHelper:
+    """`TestAWorkspaceWriteThatViolatesAConstraintIsNotA500` above calls
+    `_workspace_integrity_error` directly with a hand-built exception, so it pins the
+    helper's mapping and nothing about whether any route reaches it. Deleting the
+    `except IntegrityError` block from either workspace path, or neutering the unique
+    branch in the state-version path, left every one of those tests green.
+
+    The positional gate covers the other half of the defect — that the `flush()` is
+    inside the `try` — and cannot see whether an `except IntegrityError` exists at all.
+    These drive the routes.
+    """
+
+    @staticmethod
+    def _integrity(sqlstate):
+        from sqlalchemy.exc import IntegrityError
+
+        orig = Exception("duplicate key value violates unique constraint")
+        orig.sqlstate = sqlstate
+        return IntegrityError("INSERT ...", {}, orig)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_racing_duplicate_name_on_create_is_409(self, *_mocks):
+        """The pre-insert SELECT finds nothing — two creates racing — and the flush is
+        where the database first disagrees."""
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        mock_db.flush = AsyncMock(side_effect=self._integrity("23505"))
+        mock_db.rollback = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={"data": {"type": "workspaces", "attributes": {"name": "raced"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 409, resp.text
+        assert "raced" in resp.text
+        mock_db.rollback.assert_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unknown_referenced_id_on_create_is_422(self, *_mocks):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        mock_db.flush = AsyncMock(side_effect=self._integrity("23503"))
+        mock_db.rollback = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={"data": {"type": "workspaces", "attributes": {"name": "bad-fk"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unexpected_integrity_error_on_create_stays_500(self, *_mocks):
+        """Guessing a 4xx for an unexpected SQLSTATE would hide a server-side bug
+        behind a message blaming the caller."""
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        mock_db.flush = AsyncMock(side_effect=self._integrity("23502"))
+        mock_db.rollback = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={"data": {"type": "workspaces", "attributes": {"name": "odd"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 500, resp.text
+        # And the driver's own text is not echoed to the caller.
+        assert "unique constraint" not in resp.text

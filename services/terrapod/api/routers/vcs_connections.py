@@ -231,14 +231,30 @@ def _rbac_attrs(attrs: dict, supplied: set[str] | None = None) -> tuple[str, dic
     # Stripping each one was the same provider-breaking transform as the fold above
     # and bought just as little: `repository_allowed` strips every pattern before
     # matching, so ` myorg/* ` already works.
-    cleaned = [r for r in repos if isinstance(r, str) and r.strip()]
+    # Entries are stored **exactly as sent**, blanks included.
+    #
+    # They used to be stripped out. An all-blank list is still refused below, because
+    # an empty result reads as "allow everything" — the opposite of the intent. But a
+    # list with ONE blank among real patterns was silently shortened, and that is the
+    # same provider-breaking transform the owner-email fold was removed for:
+    # `allowed_repositories = ["myorg/*", ""]` is a legal Terraform config (the
+    # provider's schema has no element validators), so it planned two elements, read
+    # back one, and failed the apply with "Provider produced inconsistent result after
+    # apply".
+    #
+    # Storing it costs nothing, because `_patterns_or_verdict` strips and ignores a
+    # blank at match time — so the row round-trips byte for byte AND still means what
+    # it says. Refusing with a 422 would also have worked, but it narrows validation on
+    # a minor for input that is not dangerous, only untidy.
+    cleaned = list(repos)
+    non_blank = [r for r in repos if isinstance(r, str) and r.strip()]
     # But dropping them must not turn a narrowing into a widening. An empty list
     # means ANY repository, so `["  "]` silently became "allow everything" — a
     # fat-fingered pattern answered 200 and left the connection WIDER than before,
     # which is the one direction a validation error is cheaper than. A caller who
     # meant "any" sends `[]` and gets it; a caller whose patterns all vanished gets
     # told.
-    if sent("allowed-repositories") and repos and not cleaned:
+    if sent("allowed-repositories") and repos and not non_blank:
         raise HTTPException(
             status_code=422,
             detail=(

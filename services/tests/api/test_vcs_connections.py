@@ -760,11 +760,30 @@ class TestTheAllowlistCannotBeWidenedByAccident:
 
         assert _rbac_attrs({"allowed-repositories": []})[2] == []
 
-    def test_blanks_mixed_with_a_real_pattern_are_dropped_not_refused(self):
-        """Still a narrowing, so there is nothing to warn about."""
-        from terrapod.api.routers.vcs_connections import _rbac_attrs
+    def test_blanks_mixed_with_a_real_pattern_are_STORED_not_dropped(self):
+        """This used to assert they were dropped, on the reasoning that the result is
+        still a narrowing so there is nothing to warn about. That reasoning was about
+        security and it holds — but it missed the provider: dropping an element makes
+        the plan disagree with the result, and
+        `allowed_repositories = ["myorg/*", ""]` is a legal Terraform config, so it
+        failed the apply with "Provider produced inconsistent result after apply".
 
-        assert _rbac_attrs({"allowed-repositories": ["myorg/*", "  "]})[2] == ["myorg/*"]
+        Storing verbatim costs nothing, because `_patterns_or_verdict` strips and
+        ignores a blank at match time — so the row round-trips byte for byte and still
+        means what it says. An ALL-blank list is still refused, because an empty result
+        would read as "allow everything".
+        """
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+        from terrapod.db.models import VCSConnection
+        from terrapod.services.vcs_connection_rbac import repository_allowed
+
+        stored = _rbac_attrs({"allowed-repositories": ["myorg/*", "  "]})[2]
+        assert stored == ["myorg/*", "  "]
+
+        # And the blank changes nothing about what the connection actually allows.
+        conn = VCSConnection(provider="github", allowed_repositories=stored)
+        assert repository_allowed(conn, "https://github.com/myorg/thing") is True
+        assert repository_allowed(conn, "https://github.com/other/thing") is False
 
     def test_the_docstring_lists_the_fields_the_handler_actually_edits(self):
         """The docstring named only name/server-url/status/App-ids while the code
@@ -904,3 +923,82 @@ class TestAStoredRowCannotBeMadeUneditable:
         with pytest.raises(HTTPException) as exc:
             _rbac_attrs({"labels": {"status": "nope"}}, supplied={"labels"})
         assert exc.value.status_code == 422
+
+
+class TestTheRouteItselfOnlyValidatesWhatTheCallerSent:
+    """`TestAStoredRowCannotBeMadeUneditable` above calls `_rbac_attrs` BY HAND with a
+    `supplied` set, so it pins what the helper does with the argument and nothing about
+    whether the route passes it. Deleting `supplied=` from the `update_connection` call
+    site — re-introducing the #316 uneditable-row bug in full — left all 43 tests in
+    this file green.
+
+    That is the same defect the two preceding commits in this release exist to remove,
+    re-created in the same session, so it gets the test that only a request can give.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_stored_blank_allowlist_entry_does_not_block_a_labels_patch(self, *_mocks):
+        conn = _mock_conn()
+        # Written by a migration or by hand — the API refuses this shape, so reaching
+        # it means the row came from somewhere else. It must stay editable.
+        conn.allowed_repositories = ["  "]
+        conn.labels = {}
+        conn.owner_email = ""
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_scalar_result(conn))
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/vcs-connections/vcs-{conn.id}",
+                json={"data": {"attributes": {"labels": {"team": "net"}}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert conn.labels == {"team": "net"}
+        # And the untouched allowlist is left exactly as it was, not silently cleaned.
+        assert conn.allowed_repositories == ["  "]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_stored_reserved_label_does_not_block_an_allowlist_patch(self, *_mocks):
+        conn = _mock_conn()
+        conn.labels = {"status": "stuck"}
+        conn.allowed_repositories = []
+        conn.owner_email = ""
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_scalar_result(conn))
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/vcs-connections/vcs-{conn.id}",
+                json={"data": {"attributes": {"allowed-repositories": ["myorg/*"]}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert conn.allowed_repositories == ["myorg/*"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_but_a_supplied_reserved_label_is_still_refused_through_the_route(self, *_mocks):
+        """The narrowing must not have turned the validation off."""
+        conn = _mock_conn()
+        conn.labels = {}
+        conn.allowed_repositories = []
+        conn.owner_email = ""
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_scalar_result(conn))
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/vcs-connections/vcs-{conn.id}",
+                json={"data": {"attributes": {"labels": {"status": "nope"}}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text

@@ -100,10 +100,12 @@ async def may_reference_connection(
         # existence check reports it; this must not report True.
         return False
 
-    # The connection's owner. Case-folded on both sides: the write path lower-cases
-    # from this release, but a row written before it — or by a migration, or by hand —
-    # may carry mixed case, and an owner grant that silently never matches is worse
-    # than no grant at all because nothing reports it.
+    # The connection's owner, case-folded on BOTH sides — and this fold is now the only
+    # thing that makes an owner grant work for any row, not a concession to legacy
+    # ones. The write path used to lower-case too; that was removed, because a server
+    # that alters a value a Terraform provider sent makes the resource unmanageable
+    # (see `_rbac_attrs`). So the tolerance lives here, on the read side, where it
+    # costs nothing — do not "tidy" it away, and do not restore the write-side fold.
     if conn.owner_email and conn.owner_email.strip().lower() == actor_email.strip().lower():
         return True
 
@@ -121,8 +123,6 @@ async def may_reference_connection(
         # has already decided against on the attenuated view. Dropping it costs a
         # genuine admin nothing, because that gate returned True long before here.
         actor_roles = [r for r in actor_roles if r != "admin"]
-        if not actor_roles:
-            actor_roles = []
 
         labels = dict(conn.labels or {})
 
@@ -159,10 +159,17 @@ async def may_reference_connection(
 class RepositoryNotAllowed(PermissionError):
     """A fetch was attempted against a repository outside the connection's allowlist.
 
-    `PermissionError` rather than a bare `Exception` so a caller that already handles
-    OS-level fetch failures treats it as what it is — a refusal, not a transport
-    problem — and so it cannot be swallowed by an `except OSError` meant for the
-    network while looking like one.
+    `PermissionError` so that a caller reading the TYPE can tell a refusal from a
+    transport failure — `RepositoryNotAllowed` is unambiguous where a bare `Exception`
+    would not be.
+
+    **It does NOT escape an `except OSError`.** `PermissionError` subclasses `OSError`,
+    so a handler written for the network catches this too; an earlier version of this
+    docstring claimed the opposite, which is the inverse of Python's own hierarchy and
+    would have had someone "fix" the base class on the strength of it. What contains a
+    refusal in practice is the poller's `except Exception`, which logs it per workspace
+    and moves on — that is asserted in
+    `TestARefusalAtTheCloneCostsOneWorkspaceNotTheCycle`.
     """
 
 
@@ -427,8 +434,17 @@ def credential_scope_allowed(conn: VCSConnection | None, scope: str) -> bool:
     at PATCH and at the config fetch, and checking it a fourth time here bounds
     nothing new.
 
-    Because the scope is a path PREFIX rather than a glob, containment is decidable
-    rather than approximated. Two probes settle it: a pattern must either match the
+    Containment here is a **conservative approximation**, not a decision. An earlier
+    version of this docstring claimed it was decidable because the scope is a path
+    prefix rather than a glob; two samples cannot decide a predicate that discriminates
+    on content, and `fnmatch` supports character classes. `prod/[!x]*` accepted the
+    scope `prod` while refusing `prod/x-secret`, so the credential reached a repository
+    the allowlist did not allow. A pattern containing `[` or `]` is therefore refused
+    outright — the same treatment `?`, `#` and `..` get in a scope — which removes the
+    class of pattern the approximation cannot reason about rather than pretending to
+    handle it.
+
+    Within what remains, two probes settle it: a pattern must either match the
     scope itself — `myorg` against the pattern `myorg`, or `myorg/repo` against
     `myorg/repo`, both of which name no more than the pattern does — or match
     everything one and two segments beneath it, which is what a prefix reaches. Two
@@ -457,6 +473,19 @@ def credential_scope_allowed(conn: VCSConnection | None, scope: str) -> bool:
         return decided
 
     key = _scope_repo_form(scope or "")
+
+    # A character class makes the two-probe containment argument unsound (see the
+    # docstring), so a pattern carrying one cannot bound a credential. Refusing is the
+    # conservative direction: the operator is told, rather than silently given a
+    # credential wider than the pattern they wrote.
+    classy = [p for p in patterns if "[" in p or "]" in p]
+    if classy:
+        logger.warning(
+            "an allowlist pattern uses a character class, which cannot bound a "
+            "credential scope; refusing",
+            patterns=classy,
+        )
+        return False
 
     # A credential scope carrying a query, a fragment or a path traversal is a
     # misconfiguration, and refused outright rather than reasoned about. Each of these

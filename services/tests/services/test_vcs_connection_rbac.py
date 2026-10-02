@@ -1009,7 +1009,18 @@ class TestARefusalAtTheCloneCostsOneWorkspaceNotTheCycle:
 
         src = inspect.getsource(vcs_poller)
         unwrapped = []
-        for m in re.finditer(r"\n([ \t]*)(?:\w+ = )?await (?:cache|meta)\.get_or_fetch\(", src):
+        matched = 0
+        # Two corrections to the original `(?:\w+ = )?await (?:cache|meta)\.`:
+        #
+        # `return await` is now matched, because a `return await cache.get_or_fetch(...)`
+        # would otherwise be invisible and the gate would go green with nothing checked.
+        #
+        # And `meta.` is NOT matched: `VCSMetadataCache.get_or_fetch` caches branch SHAs
+        # and default branches and clones nothing, so its three sites are irrelevant
+        # here and including them made the gate fail on code it has no business
+        # checking. The archive cache is the only one that fetches a repository.
+        for m in re.finditer(r"\n([ \t]*)(?:return |\w+ = )?await cache\.get_or_fetch\(", src):
+            matched += 1
             before = src[: m.start()].rstrip().splitlines()
             j = len(before) - 1
             while j >= 0 and (before[j].strip().startswith("#") or not before[j].strip()):
@@ -1020,6 +1031,40 @@ class TestARefusalAtTheCloneCostsOneWorkspaceNotTheCycle:
             "a get_or_fetch in the poller is not the first statement in a try:, so a "
             "repository refused by the allowlist would abort the poll cycle for every "
             "other workspace too:\n  " + "\n  ".join(unwrapped)
+        )
+        # A regex that silently stops matching turns this gate into a no-op that still
+        # reads as green. The first version matched 1 of 4 sites.
+        assert matched >= 1, "the get_or_fetch matcher found nothing — it has rotted"
+
+    def test_the_handler_containing_a_refusal_is_wide_enough_to_catch_one(self):
+        """The class docstring claims this stops someone narrowing the handler to
+        something that no longer catches a `PermissionError`. The positional check above
+        cannot see the `except` at all, so this is the half that can — verified by
+        narrowing the archive-cache site's `except Exception` to `except ValueError`,
+        which the positional gate passed while one out-of-scope repository would abort
+        the poll cycle for the whole deployment.
+        """
+        import inspect
+        import re
+
+        from terrapod.services import vcs_poller
+
+        src = inspect.getsource(vcs_poller)
+        wide = {"Exception", "BaseException", "OSError", "PermissionError"}
+        bad, seen = [], 0
+        for m in re.finditer(
+            r"try:\n\s*(?:return |\w+ = )?await cache\.get_or_fetch\("
+            r"[^\n]*\n\s*except\s+([A-Za-z_.]+)",
+            src,
+        ):
+            seen += 1
+            if m.group(1) not in wide:
+                bad.append(m.group(1))
+        assert seen >= 1, "found no guarded get_or_fetch — the matcher has rotted"
+        assert not bad, (
+            "a get_or_fetch is wrapped in a handler too narrow to catch "
+            "RepositoryNotAllowed (a PermissionError), so one out-of-scope repository "
+            f"would abort the whole poll cycle: {bad}"
         )
 
 
