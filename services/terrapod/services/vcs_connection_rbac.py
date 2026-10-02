@@ -143,17 +143,36 @@ async def may_reference_connection(
     return row is not None
 
 
-def _repo_forms(conn: VCSConnection | None, repo_url: str) -> list[str] | None:
-    """The spellings a pattern may legitimately be written against, or None.
+def _canonical_repo(conn: VCSConnection | None, repo_url: str) -> str | None:
+    """The ONE spelling a pattern is matched against: `owner/repo`, or None.
 
-    **Derived from the same parser the fetch uses**, not from a second URL parse.
-    That is the whole correctness argument here, and the first version of this
-    function got it wrong in a way that voided the allowlist entirely: it matched on
-    `urlparse(url).path`, which DROPS the query string and the fragment, while
-    `vcs_provider.parse_repo_url` splits on the first `://` anywhere in the string.
-    So `myorg/safe?x=a://host/evilorg/evil` matched the pattern `myorg/safe` and
-    cloned `evilorg/evil`. Two parsers disagreeing about what the repository is, is
-    the same failure as two matchers disagreeing about who receives a credential.
+    **Derived from the same parser the fetch uses**, and from nothing else. That is
+    the whole correctness argument here, and it has now been got wrong twice in two
+    different ways, so it is worth stating as a rule: the allowlist must compare
+    against *the repository the clone will actually use*, and against no other
+    string.
+
+    1. The first version matched `urlparse(url).path`, which DROPS the query string
+       and fragment while `vcs_provider.parse_repo_url` splits on the first `://`
+       anywhere in the string. So `myorg/safe?x=a://host/evil/evil` matched the
+       pattern `myorg/safe` and cloned `evil/evil`. Fixed by deriving from
+       `parse_repo_url`.
+    2. The second version derived the canonical form correctly and then ALSO offered
+       the raw URL as a form a pattern could match, for the convenience of an
+       operator writing a pattern against a full address. Because `fnmatch`'s `*`
+       crosses `/`, the ordinary pattern `myorg/*` matched the whole crafted string
+       — so `myorg/safe?x=a://github.com/othercorp/private` was allowed while
+       `othercorp/private` was cloned. Reproduced by execution; the allowlist was
+       defeated for any pattern containing `/` and `*`, which is the spelling the
+       documentation recommends.
+
+    Both failures are the same shape: a second string, derived differently from the
+    one the fetch uses, offered to the matcher. There is now exactly one, so a
+    pattern cannot be satisfied by a spelling the clone will not use.
+
+    A pattern written against a full address still works — see
+    `_pattern_repo_form`, which reduces the PATTERN to the same shape instead of
+    widening what the URL may match.
 
     `None` means "this URL does not name a repository", which callers must treat as
     refusal rather than as "no constraint".
@@ -162,15 +181,26 @@ def _repo_forms(conn: VCSConnection | None, repo_url: str) -> list[str] | None:
     if not parsed:
         return None
     owner, repo = parsed
-    canonical = f"{owner}/{repo}"
-    forms = [canonical]
-    # Operators write `myorg/*`, so the canonical form is the one that matters. The
-    # raw URL is offered as well for a pattern written against a full address, but
-    # ONLY when it parsed — an unparseable URL has no forms at all.
-    raw = (repo_url or "").strip()
-    if raw and raw != canonical:
-        forms.append(raw)
-    return forms
+    return f"{owner}/{repo}"
+
+
+def _pattern_repo_form(pattern: str) -> str:
+    """A pattern reduced to the `owner/repo` shape the canonical form has.
+
+    An operator may reasonably write `https://github.com/platform-team/*`. Rather
+    than letting the URL match in more shapes — which is what defeated the control
+    — the PATTERN is brought to the URL's shape: drop the scheme, then drop the host
+    segment. `https://gitlab.example.com/group/sub/*` becomes `group/sub/*`.
+
+    Deliberately NOT `parse_repo_url`: a pattern is a glob, not a URL, and
+    `platform-team/*` must survive untouched. A pattern with no `://` is already in
+    the right shape and is returned as given.
+    """
+    if "://" not in pattern:
+        return pattern
+    after = pattern.split("://", 1)[1]
+    host, slash, rest = after.partition("/")
+    return rest if slash else after
 
 
 def repository_allowed(conn: VCSConnection | None, repo_url: str) -> bool:
@@ -210,20 +240,25 @@ def repository_allowed(conn: VCSConnection | None, repo_url: str) -> bool:
         # loudly rather than silently become the widest possible setting.
         return not raw
 
-    forms = _repo_forms(conn, repo_url)
-    if not forms:
+    canonical = _canonical_repo(conn, repo_url)
+    if not canonical:
         # A narrowed connection must not accept a target nobody can resolve. The
         # fetch would fail anyway, but failing here means it fails as "out of
         # scope" rather than somewhere deeper as a parse error.
         return False
 
-    owner = forms[0].split("/", 1)[0]
-    for pattern in patterns:
-        for form in forms:
-            if fnmatch.fnmatch(form, pattern):
-                return True
+    owner = canonical.split("/", 1)[0]
+    for raw_pattern in patterns:
+        pattern = _pattern_repo_form(raw_pattern)
+        if not pattern:
+            # A pattern that reduced to nothing (`https://host/`) names no
+            # repository. Skipping it rather than matching everything keeps a
+            # malformed entry from widening the connection.
+            continue
+        if fnmatch.fnmatchcase(canonical, pattern):
+            return True
         # `myorg` on its own means the whole owner.
-        if "/" not in pattern and fnmatch.fnmatch(owner, pattern):
+        if "/" not in pattern and fnmatch.fnmatchcase(owner, pattern):
             return True
     return False
 

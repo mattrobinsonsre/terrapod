@@ -9,12 +9,15 @@ boundaries that accept a user-supplied connection id, and the one that does not.
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from terrapod.services import rbac_service as rbac_service_module
 from terrapod.services import vcs_connection_rbac as rbac
+from terrapod.services.vcs_connection_rbac import repository_allowed
+from terrapod.services.vcs_provider import parse_repo_url
 
 
 def _db(owns: bool, *, row_for: tuple[uuid.UUID, str] | None = None):
@@ -630,3 +633,100 @@ class TestBothSinksAreGuarded:
         assert src.count("_enforce_repository_allowlist(") >= 2, (
             "only one of workspace create / PATCH enforces the allowlist"
         )
+
+
+class TestTheAllowlistCannotBeBypassedByCraftingTheUrl:
+    """The matcher compares against the repository the CLONE will use, and nothing else.
+
+    This has been got wrong twice, in two different ways, and both times the
+    allowlist was wholly defeated rather than merely loosened:
+
+    1. Matching `urlparse(url).path`, which drops the query string, while
+       `parse_repo_url` splits on the first `://` anywhere in the string.
+    2. Matching the canonical form correctly and ALSO offering the raw URL as a
+       spelling a pattern could match. `fnmatch`'s `*` crosses `/`, so the ordinary
+       pattern `myorg/*` matched the whole of
+       `myorg/safe?x=a://github.com/othercorp/private` while the fetch cloned
+       `othercorp/private`.
+
+    So these assert the PROPERTY rather than either implementation: for every
+    spelling, the verdict must agree with what `parse_repo_url` resolves. A test that
+    only pinned "the crafted string is refused" would pass against a third wrong
+    matcher that happened to refuse that one input.
+    """
+
+    @staticmethod
+    def _conn(allowed):
+        c = SimpleNamespace()
+        c.provider = "github"
+        c.server_url = "https://api.github.com"
+        c.allowed_repositories = allowed
+        return c
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "myorg/safe?x=a://github.com/othercorp/private",
+            "myorg/anything://github.com/othercorp/private",
+            "myorg/x#y://github.com/othercorp/private",
+            "myorg/safe/../../othercorp/private://github.com/othercorp/private",
+        ],
+    )
+    def test_a_url_that_resolves_elsewhere_is_refused_however_it_is_spelled(self, url):
+        conn = self._conn(["myorg/*"])
+        resolved = parse_repo_url(conn, url)
+        assert resolved == ("othercorp", "private"), (
+            "the fixture no longer resolves out of scope, so it proves nothing"
+        )
+        assert repository_allowed(conn, url) is False, (
+            f"{url!r} was allowed by the pattern 'myorg/*' while the clone would "
+            f"fetch {resolved[0]}/{resolved[1]} — the allowlist is bypassable"
+        )
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "myorg/safe?x=a://github.com/othercorp/private",
+            "myorg/anything://github.com/othercorp/private",
+        ],
+    )
+    def test_nor_by_a_pattern_written_against_a_full_address(self, url):
+        """The crafted URL must not satisfy a full-address pattern either.
+
+        Matching the raw URL only when the pattern contains `://` looks like it
+        would close the hole and does not: `*` still crosses everything after the
+        host, so `https://github.com/myorg/*` would match the crafted string too.
+        """
+        conn = self._conn(["https://github.com/myorg/*"])
+        assert repository_allowed(conn, url) is False
+
+    def test_a_full_address_pattern_still_matches_what_it_should(self):
+        """The convenience the raw form existed for, kept by reducing the PATTERN."""
+        conn = self._conn(["https://github.com/myorg/*"])
+        assert repository_allowed(conn, "https://github.com/myorg/safe") is True
+        assert repository_allowed(conn, "https://github.com/othercorp/private") is False
+
+    def test_a_nested_group_pattern_written_as_an_address_still_matches(self):
+        conn = SimpleNamespace()
+        conn.provider = "gitlab"
+        conn.server_url = "https://gitlab.example.com"
+        conn.allowed_repositories = ["https://gitlab.example.com/group/sub/*"]
+        assert repository_allowed(conn, "https://gitlab.example.com/group/sub/proj") is True
+        assert repository_allowed(conn, "https://gitlab.example.com/other/proj") is False
+
+    def test_patterns_are_case_sensitive_on_every_platform(self):
+        """`fnmatch` case-folds via `os.path.normcase`, so it is case-INsensitive on
+        a macOS dev box and case-sensitive in production — a verdict that differs
+        between where a pattern is written and where it is enforced. The docs promise
+        case-sensitive, so the matcher uses `fnmatchcase`.
+        """
+        assert repository_allowed(self._conn(["MyOrg/*"]), "https://github.com/myorg/safe") is False
+        assert repository_allowed(self._conn(["myorg/*"]), "https://github.com/myorg/safe") is True
+
+    def test_a_pattern_naming_no_repository_does_not_widen_the_connection(self):
+        """`https://host/` reduces to the empty string. Matching everything with it
+        would turn a malformed entry into an allow-all, which is the direction a
+        narrowed connection must never fail in.
+        """
+        conn = self._conn(["https://github.com/"])
+        assert repository_allowed(conn, "https://github.com/othercorp/private") is False
