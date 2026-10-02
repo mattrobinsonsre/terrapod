@@ -610,11 +610,26 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
                 sign_request,
             )
 
-            _ts = str(int(_time.time()))
-            _nonce = _secrets.token_urlsafe(24)
-            headers[TIMESTAMP_HEADER] = _ts
-            headers[NONCE_HEADER] = _nonce
-            headers[SIGNATURE_HEADER] = sign_request(key_pem, "POST", renew_path, _ts, _nonce)
+            try:
+                _ts = str(int(_time.time()))
+                _nonce = _secrets.token_urlsafe(24)
+                headers[TIMESTAMP_HEADER] = _ts
+                headers[NONCE_HEADER] = _nonce
+                headers[SIGNATURE_HEADER] = sign_request(key_pem, "POST", renew_path, _ts, _nonce)
+            except Exception as exc:
+                # An unusable stored key must not raise out of here. This function's
+                # contract is "the new cert, or None if every attempt failed", and the
+                # caller answers None by falling back to the join token — which is
+                # exactly the right recovery for a corrupt key, because re-joining
+                # issues a fresh one. Raising instead would turn a self-healing case
+                # into a crash loop.
+                logger.warning(
+                    "Could not sign the renewal; sending unsigned, which the API will "
+                    "refuse if it requires proof of possession",
+                    error=str(exc),
+                )
+                for h in (TIMESTAMP_HEADER, NONCE_HEADER, SIGNATURE_HEADER):
+                    headers.pop(h, None)
         try:
             async with httpx.AsyncClient(base_url=identity.api_url, timeout=30) as client:
                 # This function already owns a bounded retry loop (3 attempts with
