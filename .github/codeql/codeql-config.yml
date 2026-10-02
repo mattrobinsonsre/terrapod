@@ -44,15 +44,20 @@ paths-ignore:
   # so the AI risk-analysis prompt has something to flag). Not product code,
   # never deployed — excluded from code scanning entirely (see also .semgrepignore).
   - services/ai_eval
-  # scripts/ is build, CI and developer tooling — linting, the eval stack, the
-  # release re-scan, and the protocol captures that drive real clients at a
-  # logging stub. No Dockerfile COPYs it, so none of it ships in an image or is
-  # reachable by anyone but whoever runs it. Alerts here are about a throwaway
-  # stub's return style, not about anything a deployment exposes, and they crowd
-  # out the product findings the tab exists to surface.
+  # NOTE on scripts/: this block used to argue for excluding it, and there has
+  # never been an entry doing so — the justification outlived whatever it was
+  # written for, which is the same shape of stale assertion that
+  # GHSA-9rfc-j5x9-p84w found in the filters above. So, plainly: `scripts/` IS
+  # scanned, by CodeQL and by Semgrep. That is the safer state and it stays. It is
+  # developer and CI tooling that no Dockerfile COPYs, so a finding there is not
+  # something a deployment exposes — dismiss per alert, which leaves a dated record
+  # naming the alert, rather than re-adding a directory-wide filter nobody re-reads.
   #
-  # Semgrep still scans it (see .semgrepignore, which excludes only ai_eval), so
-  # this narrows one tool's noise rather than leaving the directory unanalysed.
+  # The vendored OCI distribution-spec, by contrast, is not ours at all: it is
+  # third-party conformance code checked in to run the suite against. We cannot fix
+  # findings in it and would not ship a patch for them, so analysing it only crowds
+  # out the product findings the tab exists to surface (#1963).
+  - .conformance
 
 query-filters:
   - exclude:
