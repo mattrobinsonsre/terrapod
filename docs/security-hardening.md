@@ -450,16 +450,19 @@ Rows at the top accept any repository the credential can reach. A row with an
 empty `owner_email` **and** empty `labels` is one only an admin (or an existing
 workspace owner) can build on.
 
-**`allowed-repositories` bounds workspaces, not everything.** A VCS-sourced
-registry module names a connection and a repository URL too, and the registry
-pollers' clones are not checked against the allowlist — naming the connection on a
-module is claim-checked, so an unentitled caller cannot do it, but an entitled one
-can point a module at any repository the credential reaches. **Scope the
-credential itself** if you need a single bound across every path: install the
-GitHub App on only the repositories it needs, or use a project- or group-scoped
-GitLab token rather than one covering the whole instance. The allowlist is then
-defence in depth over an already-narrow credential, which is where it is worth the
-most.
+**One path is still not re-checked: the registry pollers' own clones.**
+Publishing a module version and running module-impact analysis clone the module's
+repository without consulting the allowlist again. A module's URL can only be
+*set* through a checked path — registry-module create, update and VCS-update all
+enforce it, as do workspace create and update, the refs endpoint, the config fetch
+and every minted git credential — so an entitled caller can no longer point a
+module somewhere out of scope. What remains is a module whose URL predates a
+narrowing: it keeps being cloned, where a workspace in the same position stops at
+its next config fetch. **Scope the credential itself** if you want a single bound
+across every path: install the GitHub App on only the repositories it needs, or
+use a project- or group-scoped GitLab token rather than one covering the whole
+instance. The allowlist is then defence in depth over an already-narrow
+credential, which is where it is worth the most.
 
 Before narrowing a connection, list the
 workspaces that would fall outside the new patterns — they keep their

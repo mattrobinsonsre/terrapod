@@ -1066,7 +1066,7 @@ Three details worth knowing before writing one:
   in the list matches nothing rather than everything — so a stray empty string
   cannot quietly turn a restriction into an allow-all.
 
-The allowlist is enforced at four points, not only where the URL is set:
+The allowlist is enforced at eight points, not only where the URL is set:
 
 | Where | Effect when the repository is out of scope |
 |---|---|
@@ -1074,23 +1074,30 @@ The allowlist is enforced at four points, not only where the URL is set:
 | Workspace **update** | **403**. Re-checked on **every** update that leaves a connection attached, not only when the connection changes — otherwise an entitled owner could repoint an allowlisted connection by editing `vcs-repo-url` alone. |
 | `GET /api/terrapod/v1/workspaces/{id}/vcs-refs` | **403**. This endpoint answers "which branches and tags does this repository have" at workspace-**read**, which makes it an existence oracle for private repositories the credential can reach. |
 | The **config fetch**, where the source actually arrives | The fetch fails and the run **errors with the reason**. This is the path the poller and run triggers take, where there is no live caller to refuse — so a workspace whose URL was set *before* an operator narrowed the connection stops fetching rather than quietly cloning something out of scope. |
+| **Every minted git credential** | The mint is refused. A `git_http_auth` / `git_ssh_auth` variable carries its own URL pattern, so the credential's scope is set on the *variable* rather than on a workspace's `vcs-repo-url` — checking only where a workspace names a repository would leave the connection mintable for anything the pattern covered, including the workspace's own connection. |
+| Registry module **create** | **403**. |
+| Registry module **update** | **403**. |
+| Registry module **VCS update** | **403**. |
 
 That last row is the one to plan for when narrowing an existing connection:
 workspaces already pointing outside the new patterns keep their configuration
 and start failing their next run. Find them first — see
 [the runbook](runbooks.md#a-run-cannot-fetch-its-repository).
 
-**Know what it does not cover.** All four sinks are **workspace** paths. A
-VCS-sourced **registry module** also names a connection and a repository URL, and
-the registry pollers clone that repository to publish versions and to run
-module-impact analysis — those fetches are **not** checked against
-`allowed-repositories`. Naming the connection on a module is authorized (create
-and update both check the claim), so this is not open to anyone; but a caller who
-*does* hold a claim can point a module at any repository the credential can reach,
-allowlist or not. So read `allowed-repositories` as "which repositories
-**workspaces** on this connection may use", and keep the connection's credential
-itself scoped — a GitHub App installed on only the repositories it needs is the
-control that bounds every path at once.
+**Know what it does not cover.** The registry pollers clone a module's
+repository to publish versions and to run module-impact analysis, and **those
+fetches are not re-checked** against `allowed-repositories`. A module's repository
+URL can only be *set* through a checked path — create, update and VCS-update all
+enforce the allowlist — so an entitled caller can no longer point a module at
+something out of scope. What remains is a module whose URL predates a narrowing:
+it keeps being cloned, where a workspace in exactly that position stops at its
+next config fetch. Find those the same way you find the workspaces, and fix or
+remove them in the same pass.
+
+Keep the connection's credential itself scoped regardless — a GitHub App installed
+on only the repositories it needs, or a project- or group-scoped GitLab token, is
+the control that bounds every path at once, and the allowlist is then defence in
+depth over an already-narrow credential.
 
 Clearing the list (`"allowed-repositories": []`) restores "any repository the
 credential can reach". Sending the attribute is what changes it; omitting it from
