@@ -82,9 +82,6 @@ spec:
                 secretKeyRef:
                   name: {{ $pgSecret }}
                   key: {{ include "terrapod.postgresql.secretKey" . }}
-            {{- else if .Values.postgresql.url }}
-            - name: DATABASE_URL
-              value: {{ .Values.postgresql.url | quote }}
             {{- end }}
             {{- if .Values.bootstrap.existingSecret }}
             - name: TERRAPOD_BOOTSTRAP_ADMIN_EMAIL
@@ -98,10 +95,17 @@ spec:
                   name: {{ .Values.bootstrap.existingSecret }}
                   key: {{ .Values.bootstrap.passwordKey | default "password" }}
             {{- else }}
+            {{/* The email is an identifier and stays a plain value; the password
+                 is a credential and comes from the chart-managed Secret
+                 (GHSA-93m3-v3h4-4qvw). It used to be a literal here, readable by
+                 anyone with `get` on Jobs in the namespace. */}}
             - name: TERRAPOD_BOOTSTRAP_ADMIN_EMAIL
               value: {{ .Values.bootstrap.adminEmail | quote }}
             - name: TERRAPOD_BOOTSTRAP_ADMIN_PASSWORD
-              value: {{ .Values.bootstrap.adminPassword | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-bootstrap" (include "terrapod.fullname" .) }}
+                  key: password
             {{- end }}
             {{- if $pools }}
             {{/* The count is declared so a hand-written Job cannot leave a gap
@@ -124,12 +128,33 @@ spec:
               value: {{ .Values.bootstrap.poolName | quote }}
             {{- end }}
             {{- if .Values.bootstrap.poolToken }}
-            {{/* Legacy inline token: kept working, but it renders into the Job
-                 spec. Prefer `pools` (or poolTokenExistingSecret), which do not. */}}
+            {{/* Legacy inline token: still accepted, and no longer rendered into
+                 the Job spec — it goes through the chart-managed Secret, like
+                 the admin password (GHSA-93m3-v3h4-4qvw). `pools` (or
+                 poolTokenExistingSecret) is still the better path, because a
+                 token given in values also passes through the release's own
+                 stored values, which this cannot fix. */}}
             - name: TERRAPOD_BOOTSTRAP_POOL_TOKEN
-              value: {{ .Values.bootstrap.poolToken | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-bootstrap" (include "terrapod.fullname" .) }}
+                  key: pool_token
             {{- end }}
             {{- end }}
+            {{/* How long a bootstrap join token lives, and how many times it may
+                 be used (GHSA-93m3-v3h4-4qvw). Always rendered, so the limits an
+                 operator sets cannot be silently inert.
+
+                 `dig`, never `| default`: 0 is the documented opt-out (unlimited
+                 uses / no expiry) and `| default 1` would coerce it back to 1 --
+                 turning an operator's deliberate "no limit" into the tightest
+                 possible one, which on a token a listener needs is an outage
+                 rather than a mere surprise. `dig` substitutes only when the key
+                 is genuinely absent. */}}
+            - name: TERRAPOD_BOOTSTRAP_POOL_TOKEN_MAX_USES
+              value: {{ dig "poolTokenMaxUses" 1 .Values.bootstrap | quote }}
+            - name: TERRAPOD_BOOTSTRAP_POOL_TOKEN_TTL_SECONDS
+              value: {{ dig "poolTokenTTLSeconds" 86400 .Values.bootstrap | quote }}
             {{- if .Values.bootstrap.sampleWorkspace }}
             - name: TERRAPOD_BOOTSTRAP_SAMPLE_WORKSPACE
               value: "true"

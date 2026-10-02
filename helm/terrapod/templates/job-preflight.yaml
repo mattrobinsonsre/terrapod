@@ -63,9 +63,6 @@ spec:
                 secretKeyRef:
                   name: {{ $pgSecret }}
                   key: {{ include "terrapod.postgresql.secretKey" . }}
-            {{- else if .Values.postgresql.url }}
-            - name: DATABASE_URL
-              value: {{ .Values.postgresql.url | quote }}
             {{- end }}
             {{- if $dbIam }}
             - name: TP_DB_AUTH_MODE

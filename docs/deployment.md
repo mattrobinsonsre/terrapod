@@ -430,7 +430,7 @@ Enable encryption on your managed database and object storage services. For file
 | `listener.replicas` | `1` | Number of listener replicas |
 | `listener.maxConcurrent` | `3` | **Pool-wide** max concurrent runner Jobs. Admission is gated on the **real** namespace-wide running-Job count, which every listener replica shares — so this is the pool ceiling regardless of `listener.replicas` (replicas are for HA, not extra concurrency; raise this, not replicas, for more). The primary knob for [sizing a fixed-resource cluster](#sizing-runner-concurrency-on-a-fixed-resource-cluster). |
 | `listener.name` | `"listener"` | Listener name (registered in the pool) |
-| `listener.joinToken` | `""` | Raw join token (use `existingSecret` for production) |
+| `listener.joinToken` | `""` | Raw join token. Delivered to the pod by `secretKeyRef` from a chart-managed Secret, not as a literal Deployment env — but still use `existingSecret` for production, because a token given here is in the release's own values |
 | `listener.existingSecret` | `""` | K8s Secret containing the join token |
 | `listener.joinTokenKey` | `"join_token"` | Key within the Secret for the join token |
 | `listener.runnerNamespace` | `""` | Namespace for runner Jobs (defaults to release namespace). **Set this to a namespace of its own** — see [Security hardening → Separate the runner namespace](security-hardening.md#separate-the-runner-namespace) for what the default costs |
@@ -589,19 +589,41 @@ The chart supports up to three Ingresses. See [Split-networking deployments](dep
 | `bootstrap.adminPassword` | | Initial admin password |
 | `bootstrap.existingSecret` | | K8s secret with admin credentials |
 | `bootstrap.poolName` | `""` | Optional: create a single agent pool with this name |
-| `bootstrap.poolToken` | `""` | Its join token, **as a literal in the Job spec** — prefer `poolTokenExistingSecret`. Generated and printed once if omitted |
+| `bootstrap.poolToken` | `""` | Its join token. Delivered to the Job by `secretKeyRef` from a chart-managed Secret, not as a literal in the Job spec — but still prefer `poolTokenExistingSecret`, because a token given here is in the release's own values. Generated and printed once if omitted |
 | `bootstrap.poolTokenExistingSecret` | `""` | Read `poolName`'s join token from a Secret instead of from values |
+| `bootstrap.poolTokenMaxUses` | `1` | Uses allowed on each bootstrap join token. `0` = unlimited |
+| `bootstrap.poolTokenTTLSeconds` | `86400` | How long each bootstrap join token lives. `0` = never expires |
 
-> **The bootstrap join token does not expire and has no use limit, on purpose.**
-> A listener keeps its certificate on an `emptyDir`, so a replaced pod has lost
-> it and re-joins with this token to be issued another. A token with two uses
-> would break the Deployment on its third pod, and one with an expiry would
-> break it on the first replacement afterwards — in both cases the agent pool
-> just goes quiet.
+> **The bootstrap join token is bounded: one use, 24 hours.** A listener holding
+> a valid join token registers itself in the pool, and a listener in the pool
+> claims runs and receives every variable those runs resolve — so an unlimited,
+> never-expiring one is a standing credential for reading every workspace's
+> secrets.
 >
-> It is bounded operationally instead: **once the pool is established, revoke the
-> bootstrap token** and issue per-listener tokens with whatever expiry you want.
-> Until you do, anyone holding it can join a listener to that pool.
+> One use is enough for what the token is for. A listener keeps its issued
+> certificate in a Secret in its own namespace (see
+> [Runners → Listener identity](runners.md#listener-identity)), so restarts,
+> rolling updates and scale-out all adopt the existing identity and never touch
+> the join token; when several replicas start together, the winner writes the
+> Secret and the others adopt it rather than joining again.
+>
+> Raise `poolTokenMaxUses` for one specific race: the first pod consumes the
+> single use, and if it dies between joining and writing its credentials Secret
+> nothing else can take over. The API's own default for tokens created through it
+> is 2, for exactly that tolerance.
+>
+> **An expired or spent token is not re-armed by a later `helm upgrade`** — that
+> would be the same permanent credential by another route. Issue a replacement
+> through the API if a listener needs to join after that. `0` on either value
+> restores the old unbounded behaviour; if you set it, revoke the token once the
+> pool is established, because until you do anyone holding it can join a listener
+> to that pool.
+>
+> *(Earlier releases created this token with no expiry and no use limit, and said
+> here that a listener kept its certificate on an `emptyDir` and so had to re-join
+> after every pod replacement. That had stopped being true — the certificate is
+> Secret-backed and survives replacement — so the reason the token was permanent
+> had outlived itself.)*
 | `bootstrap.poolTokenKey` | `join_token` | Key within that Secret |
 | `bootstrap.pools` | `[]` | Several pools at once — see below. Mutually exclusive with `poolName` |
 
@@ -637,6 +659,12 @@ Setting both `pools` and `poolName` fails at template time rather than silently
 ignoring one.
 
 **Security note:** The bootstrap admin credentials are used only for initial setup. After deploying, either change the admin password immediately or configure SSO (OIDC/SAML) and disable local auth (`auth.local_enabled: false`). For production, always use `bootstrap.existingSecret` with a Kubernetes Secret rather than plain-text values in Helm.
+
+A password or token given in values is no longer rendered into the Job spec — the
+chart puts it in a Secret and the Job reads it by `secretKeyRef`, so it is not
+readable by everyone with `get` on Jobs in the namespace. That is a floor, not a
+replacement for `existingSecret`: a value in `values.yaml` still passes through
+the release's own stored values, which `helm get values` returns.
 
 ### Migrations
 

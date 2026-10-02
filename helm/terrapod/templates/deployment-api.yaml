@@ -183,9 +183,6 @@ spec:
                 secretKeyRef:
                   name: {{ $pgSecret }}
                   key: {{ include "terrapod.postgresql.secretKey" . }}
-            {{- else if .Values.postgresql.url }}
-            - name: TERRAPOD_DATABASE_URL
-              value: {{ .Values.postgresql.url | quote }}
             {{- end }}
             {{- if .Values.redis.existingSecret }}
             - name: TERRAPOD_REDIS_URL

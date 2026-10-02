@@ -31,7 +31,15 @@ _TEMPLATES = _HELM_ROOT / "templates"
 #: Templates whose object is consumed by the API alone. Each must refuse to
 #: render when `api.enabled` is false, the same condition `deployment-api.yaml`
 #: uses for the Deployment that reads them.
-_API_ONLY_TEMPLATES = ("secret-token-signing.yaml",)
+_API_ONLY_TEMPLATES = (
+    "secret-token-signing.yaml",
+    # GHSA-93m3-v3h4-4qvw. The database URL is read by the API Deployment and the
+    # migrations, preflight, bootstrap and backup Jobs — every one of which is
+    # api-gated — and the bootstrap credentials by the bootstrap Job alone. A
+    # listener-only release holds neither and must render neither.
+    "secret-database-url.yaml",
+    "secret-bootstrap.yaml",
+)
 
 #: The gate as `deployment-api.yaml` writes it. Matching on the values path
 #: rather than the exact spelling keeps this from failing over whitespace while

@@ -133,6 +133,35 @@ and is unique per Helm release even if multiple releases share `listener.name`.
 {{- end -}}
 
 {{/*
+Name and key of the Secret holding the listener's JOIN token -- an operator's own
+`listener.existingSecret` when they have one, otherwise the chart-managed Secret
+rendered from `listener.joinToken` (GHSA-93m3-v3h4-4qvw).
+
+Distinct from terrapod.listenerCredentialsSecretName above, which is the Secret
+the LISTENER writes its issued certificate into. This one is the credential it
+presents to be issued that certificate in the first place.
+
+There is no empty case for the name and no literal fallback: the Deployment
+renders the env var only when a token is configured at all, so these are only
+consulted when one of the two paths applies.
+*/}}
+{{- define "terrapod.listener.joinTokenSecretName" -}}
+{{- if .Values.listener.existingSecret -}}
+{{- .Values.listener.existingSecret -}}
+{{- else -}}
+{{- printf "%s-listener-join-token" (include "terrapod.fullname" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "terrapod.listener.joinTokenSecretKey" -}}
+{{- if .Values.listener.existingSecret -}}
+{{- .Values.listener.joinTokenKey | default "join_token" -}}
+{{- else -}}
+join_token
+{{- end -}}
+{{- end -}}
+
+{{/*
 Get the API image reference, defaulting tag to appVersion
 */}}
 {{- define "terrapod.api.image" -}}
@@ -405,14 +434,29 @@ target so consumers (api, migrations, bootstrap) need no manual url/secret.
 
 {{/*
 Name of the Secret holding the database URL: an operator-provided existingSecret
-if set; otherwise the chart-managed embedded secret when postgresql.deploy=true;
-otherwise empty (the consumer falls back to postgresql.url).
+if set; the chart-managed embedded secret when postgresql.deploy=true; otherwise
+the chart-managed secret this chart renders from `postgresql.url`.
+
+**There is no longer a literal-env fallback, and that is the point
+(GHSA-93m3-v3h4-4qvw).** A URL supplied in `postgresql.url` used to be rendered
+straight into the env of the API Deployment and four Jobs, so anyone with read on
+Deployments or Jobs -- or running `helm get values` -- read the database
+credentials out of the manifest. It now goes into `secret-database-url.yaml` and
+reaches every consumer by `secretKeyRef`, which is the same channel
+`existingSecret` has always used.
+
+So this returns empty only when there is no database configured at all, and the
+`{{- else if .Values.postgresql.url }}` literal branch the consumers used to
+carry is unreachable. Do not re-add one: it would put the DSN back in the
+manifest for exactly the operators who did not supply their own Secret.
 */}}
 {{- define "terrapod.postgresql.secretName" -}}
 {{- if .Values.postgresql.existingSecret -}}
 {{- .Values.postgresql.existingSecret -}}
 {{- else if .Values.postgresql.deploy -}}
 {{- printf "%s-postgresql" (include "terrapod.fullname" .) -}}
+{{- else if .Values.postgresql.url -}}
+{{- printf "%s-database-url" (include "terrapod.fullname" .) -}}
 {{- end -}}
 {{- end -}}
 

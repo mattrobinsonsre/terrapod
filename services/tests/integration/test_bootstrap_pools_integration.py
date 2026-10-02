@@ -10,13 +10,15 @@ join.
 from __future__ import annotations
 
 import hashlib
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import func, select
 
-from terrapod.cli.bootstrap import PoolSpec, _bootstrap_pool
+from terrapod.cli.bootstrap import PoolSpec, TokenLimits, _bootstrap_pool
 from terrapod.db.models import AgentPool, AgentPoolToken
 from terrapod.db.session import get_db_session
+from terrapod.services.agent_pool_service import validate_join_token
 
 pytestmark = pytest.mark.asyncio
 
@@ -144,3 +146,94 @@ class TestPartialFailure:
 
         assert await _pool_names() == ["clashing", "existing", "fresh"]
         assert await _token_count() == 3
+
+
+class TestTheBootstrapTokenIsBounded:
+    """The row the bootstrap writes carries a use limit and an expiry.
+
+    GHSA-93m3-v3h4-4qvw. `max_uses` and `expires_at` are columns, and the whole
+    finding was that bootstrap left both null — a permanent, unlimited credential
+    for joining a listener to the pool, and a listener in the pool receives every
+    variable the runs it claims resolve. Mocking the session would prove the
+    arguments were passed; only the real insert proves the row carries them.
+    """
+
+    async def _token(self) -> AgentPoolToken:
+        async with get_db_session() as session:
+            rows = await session.execute(select(AgentPoolToken))
+            return rows.scalars().one()
+
+    async def test_the_default_row_is_one_use_and_expires_within_a_day(self, app) -> None:
+        before = datetime.now(UTC)
+        await _seed(PoolSpec("bounded", "a-token"))
+
+        token = await self._token()
+        assert token.max_uses == 1
+        assert token.use_count == 0
+        assert token.expires_at is not None
+        # A day, give or take the time the insert took. Asserting the window
+        # rather than the exact instant, but tightly enough that an hour or a
+        # year would both fail.
+        delta = token.expires_at - before
+        assert timedelta(hours=23, minutes=59) < delta < timedelta(hours=24, minutes=1)
+
+    async def test_the_bounded_token_still_validates_on_its_first_use(self, app) -> None:
+        """The bound has to be loose enough for the join it exists to allow.
+
+        A limit that refuses the very first join would turn this fix into an
+        install that never completes, and the pool would simply go quiet.
+        """
+        await _seed(PoolSpec("bounded", "a-token"))
+
+        async with get_db_session() as session:
+            assert await validate_join_token(session, "a-token") is not None
+
+    async def test_a_spent_token_stops_validating(self, app) -> None:
+        """One use means one, which is the property the advisory asked for."""
+        await _seed(PoolSpec("bounded", "a-token"))
+
+        async with get_db_session() as session, session.begin():
+            token = (await session.execute(select(AgentPoolToken))).scalars().one()
+            token.use_count = 1
+
+        async with get_db_session() as session:
+            assert await validate_join_token(session, "a-token") is None
+
+    async def test_an_expired_token_stops_validating(self, app) -> None:
+        await _seed(PoolSpec("bounded", "a-token"))
+
+        async with get_db_session() as session, session.begin():
+            token = (await session.execute(select(AgentPoolToken))).scalars().one()
+            token.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+
+        async with get_db_session() as session:
+            assert await validate_join_token(session, "a-token") is None
+
+    async def test_the_explicit_opt_out_writes_a_genuinely_unlimited_row(self, app) -> None:
+        """`0` on either limit is an operator's deliberate "no bound".
+
+        It has to reach the row as NULL, because that is what
+        `validate_join_token` reads as unlimited — storing 0 would instead mean
+        "zero uses allowed" and refuse every join.
+        """
+        async with get_db_session() as session, session.begin():
+            await _bootstrap_pool(
+                session,
+                PoolSpec("unbounded", "a-token"),
+                TokenLimits(max_uses=None, ttl_seconds=None),
+            )
+
+        token = await self._token()
+        assert token.max_uses is None
+        assert token.expires_at is None
+
+    async def test_limits_are_applied_to_every_pool_in_a_list(self, app) -> None:
+        """Not just the first — each pool gets its own bounded token."""
+        await _seed(PoolSpec("pool-a", "tok-a"), PoolSpec("pool-b", "tok-b"))
+
+        async with get_db_session() as session:
+            rows = await session.execute(select(AgentPoolToken))
+            tokens = list(rows.scalars().all())
+
+        assert len(tokens) == 2
+        assert all(t.max_uses == 1 and t.expires_at is not None for t in tokens)

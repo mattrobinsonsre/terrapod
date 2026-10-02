@@ -580,6 +580,16 @@ On startup each pod runs the same flow:
 
 The default join token policy (`api.config.agent_pools.default_join_token_*`) creates tokens with `max_uses: 2` and a 1h expiry. Set either field to `null` via the API for unlimited uses or no expiry. Setting `max_uses: 1` is also fine for single-replica deployments — the bootstrap-race retry only matters when you scale up before the first pod completes.
 
+**A token seeded by the bootstrap Job is bounded too** — one use and 24 hours, via
+`bootstrap.poolTokenMaxUses` / `poolTokenTTLSeconds`. Step 1 above is why one use
+is enough: the credentials Secret survives pod replacement, so only a listener
+with no Secret to read ever presents the join token. The case for raising it to 2
+is the same one the API's default exists for — the winning pod dying between
+step 2 and step 3, with no use left for another to take over. An expired or spent
+bootstrap token is not re-armed by a later `helm upgrade`; issue a replacement
+through the API. See
+[Security hardening → Bootstrap join tokens expire](security-hardening.md#bootstrap-join-tokens-expire).
+
 ### Renewal
 
 Each pod independently runs a renewal loop:

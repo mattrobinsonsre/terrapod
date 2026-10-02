@@ -2219,17 +2219,46 @@ migrations:
 # bootstrap:
 #   enabled: true      # set false to skip the bootstrap Job (admin already seeded)
 #   adminEmail: admin@example.com
-#   adminPassword: ""  # Required when enabled
+#   adminPassword: ""  # Required when enabled. A credential, so the chart puts it
+#                      # in a Secret and the Job reads it by secretKeyRef — it is
+#                      # no longer a literal in the Job spec
+#                      # (GHSA-93m3-v3h4-4qvw). It still passes through the
+#                      # release's own stored values, which only existingSecret
+#                      # avoids.
 #   existingSecret: ""  # Alternative: reference an existing K8s Secret
 #   emailKey: email
 #   passwordKey: password
 #   poolName: ""       # Optional: auto-create an agent pool with this name
-#   poolToken: ""      # Optional: the pool's join token. Rendered into the Job
-#                      # spec as a literal, so prefer poolTokenExistingSecret
-#                      # (or `pools` below), which do not.
+#   poolToken: ""      # Optional: the pool's join token. Delivered by secretKeyRef
+#                      # from a chart-managed Secret, not as a literal in the Job
+#                      # spec. Still prefer poolTokenExistingSecret (or `pools`
+#                      # below): a token given here is in the release's values.
 #   poolTokenExistingSecret: ""  # Preferred: read poolName's join token from a
 #                                # Secret instead of from values.
 #   poolTokenKey: "join_token"   # Key within that Secret.
+#
+#   # Bootstrap join-token limits (GHSA-93m3-v3h4-4qvw). A bootstrap token used
+#   # to be created with no expiry and no use limit — a permanent, unlimited
+#   # credential that lets any holder join a listener to the pool and claim every
+#   # run's variables. It now defaults to ONE use and TWENTY-FOUR HOURS, which is
+#   # what a bootstrap token is for: the first listener's first join.
+#   #
+#   # Raising the use limit is the knob to reach for if you need it. The one case
+#   # that wants it is a race during a green-field install: the first listener pod
+#   # consumes the single use, and if it dies between joining and writing its
+#   # credentials Secret, no other pod can take over and the Deployment waits out
+#   # its ~3-minute budget before failing. The API's own default for tokens
+#   # created through it is 2, for exactly that tolerance. Pod REPLACEMENT is not
+#   # a reason: a listener's certificate lives in a Secret in its own namespace
+#   # and survives restarts, rolling updates and scale-out, so a replaced pod
+#   # adopts the existing identity and never touches the join token.
+#   #
+#   # 0 means unlimited / no expiry on either. An expired or spent token is not
+#   # re-armed by a later `helm upgrade` — deliberately, since re-arming it on
+#   # every sync would be the same permanent credential by another route. To
+#   # rejoin after that, issue a token through the API.
+#   poolTokenMaxUses: 1        # 0 = unlimited
+#   poolTokenTTLSeconds: 86400 # 24h. 0 = never expires
 #
 #   # Several pools (#1411). bootstrap writes directly to the database, so it is
 #   # the only way to register a pool with no API running yet — and the listener's

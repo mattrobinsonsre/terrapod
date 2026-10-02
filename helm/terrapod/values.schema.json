@@ -796,6 +796,14 @@
         "poolTokenKey": {
           "type": "string"
         },
+        "poolTokenMaxUses": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "poolTokenTTLSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
         "pools": {
           "type": "array",
           "items": {

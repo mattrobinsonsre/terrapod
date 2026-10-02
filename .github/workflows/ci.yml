@@ -2028,6 +2028,117 @@ jobs:
 
           echo "the separated runner namespace renders a working topology, and the defaults are unmoved"
 
+      - name: No credential supplied in values is rendered into a manifest
+        run: |
+          # GHSA-93m3-v3h4-4qvw. Four credentials used to be rendered as literal
+          # env values: the database URL (the API Deployment plus the migrations,
+          # preflight, bootstrap and backup Jobs), the listener's join token, and
+          # the bootstrap admin password and pool token. A Deployment or Job spec
+          # is readable by anyone with `get` on it in the namespace, by
+          # `helm get values`, and by whatever stores the rendered manifest.
+          #
+          # This is the rendered half of the contract: pass each one through
+          # --set with a recognisable value, then assert it appears in no object
+          # whose kind is not Secret. Grepping for "secretKeyRef" would only show
+          # that SOME path uses one; this shows no path does not.
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+            --set postgresql.url='postgresql+asyncpg://u:TPDBSECRET@db:5432/terrapod' \
+            --set redis.url=redis://redis:6379 \
+            --set listener.joinToken=TPJOINSECRET \
+            --set bootstrap.adminEmail=a@example.com \
+            --set bootstrap.adminPassword=TPPWSECRET \
+            --set bootstrap.poolName=p1 \
+            --set bootstrap.poolToken=TPPOOLSECRET \
+            --set preflight.enabled=true \
+            --set backup.enabled=true)
+
+          # Split the manifest per document and check each one's kind.
+          printf '%s\n' "$out" | awk -v RS='\n---\n' '
+            { kind=""; for (i = 1; i <= NF; i++) if ($i == "kind:") { kind = $(i+1); break }
+              if ($0 ~ /TPDBSECRET|TPJOINSECRET|TPPWSECRET|TPPOOLSECRET/ && kind != "Secret")
+                { print "LEAK in kind=" kind; bad = 1 } }
+            END { exit bad ? 1 : 0 }' || {
+            echo "a credential supplied in values was rendered into a non-Secret object."
+            echo "it must reach its consumer by secretKeyRef from a chart-managed Secret."
+            exit 1; }
+
+          # And each one must actually be delivered, not merely absent: a
+          # credential that reaches nothing is a broken install, not a fix.
+          for want in TPDBSECRET TPJOINSECRET TPPWSECRET TPPOOLSECRET; do
+            printf '%s\n' "$out" | grep -q "$want" \
+              || { echo "$want is in no Secret at all — the value is being dropped"; exit 1; }
+          done
+          # Anchored and end-matched: `name: terrapod-bootstrap` unanchored would
+          # also match the bootstrap Job's own `terrapod-bootstrap-1`, so the
+          # check would pass with no Secret rendered at all.
+          for ref in '-database-url' '-listener-join-token' '-bootstrap'; do
+            printf '%s\n' "$out" | grep -qE "^  name: terrapod$ref\$" \
+              || { echo "the chart-managed Secret terrapod$ref was not rendered"; exit 1; }
+          done
+
+          # The Secrets that feed a pre-install hook must themselves be hooks at a
+          # lower weight, or the migrations Job (weight -5) starts with nothing to
+          # read. The join-token Secret is deliberately NOT a hook: its only
+          # consumer is an ordinary Deployment, and Secret sorts before Deployment.
+          printf '%s\n' "$out" | grep -B 20 'name: terrapod-database-url' | grep -q '"-25"' \
+            || { echo "the database-URL Secret is not a pre-install hook at weight -25"; exit 1; }
+
+          # An operator's own Secret must still win, and the chart must then
+          # render no Secret of its own for that credential.
+          own=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+            template terrapod helm/terrapod \
+            --set postgresql.existingSecret=my-db --set postgresql.existingSecretKey=dsn \
+            --set redis.url=redis://redis:6379 \
+            --set listener.existingSecret=my-listener)
+          echo "$own" | grep -q 'name: my-db' || { echo "postgresql.existingSecret is ignored"; exit 1; }
+          echo "$own" | grep -q 'name: my-listener' || { echo "listener.existingSecret is ignored"; exit 1; }
+          echo "$own" | grep -q 'name: terrapod-database-url' && {
+            echo "the chart rendered its own database Secret despite existingSecret"; exit 1; }
+          echo "$own" | grep -q 'name: terrapod-listener-join-token' && {
+            echo "the chart rendered its own join-token Secret despite existingSecret"; exit 1; }
+
+          echo "every credential supplied in values reaches its consumer from a Secret, and only from a Secret"
+
+      - name: Bootstrap join tokens are bounded, and an explicit 0 survives
+        run: |
+          # GHSA-93m3-v3h4-4qvw, second half. A bootstrap join token was created
+          # with no expiry and no use limit — a permanent, unlimited credential
+          # for joining a listener to the pool, and a listener in the pool
+          # receives every variable the runs it claims resolve.
+          B() { docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+                  template terrapod helm/terrapod \
+                  --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+                  --set redis.url=redis://redis:6379 \
+                  --set bootstrap.adminEmail=a@example.com --set bootstrap.adminPassword=p \
+                  --set bootstrap.poolName=p1 "$@" \
+                  --show-only templates/job-bootstrap.yaml; }
+
+          # Rendered unconditionally, so a limit an operator sets can never be
+          # silently inert, and the chart's defaults cannot drift from the CLI's.
+          B | grep -A1 'TERRAPOD_BOOTSTRAP_POOL_TOKEN_MAX_USES' | grep -q 'value: "1"' \
+            || { echo "the default use limit does not reach the Job"; exit 1; }
+          B | grep -A1 'TERRAPOD_BOOTSTRAP_POOL_TOKEN_TTL_SECONDS' | grep -q 'value: "86400"' \
+            || { echo "the default token lifetime does not reach the Job"; exit 1; }
+
+          # An operator's own values reach the Job.
+          B --set bootstrap.poolTokenMaxUses=3 --set bootstrap.poolTokenTTLSeconds=600 \
+            | grep -A1 'POOL_TOKEN_MAX_USES' | grep -q 'value: "3"' \
+            || { echo "poolTokenMaxUses does not reach the Job"; exit 1; }
+
+          # And the one that matters: an explicit 0 is the documented opt-out
+          # (unlimited / never expires), and Go templates treat 0 as empty — so
+          # `| default 1` here would render 1 and turn a deliberate "no limit"
+          # into the tightest limit there is, on a token a listener needs.
+          # `dig` is what keeps the two apart.
+          zero=$(B --set bootstrap.poolTokenMaxUses=0 --set bootstrap.poolTokenTTLSeconds=0)
+          echo "$zero" | grep -A1 'POOL_TOKEN_MAX_USES' | grep -q 'value: "0"' \
+            || { echo "an explicit poolTokenMaxUses=0 was swallowed — use dig, not | default"; exit 1; }
+          echo "$zero" | grep -A1 'POOL_TOKEN_TTL_SECONDS' | grep -q 'value: "0"' \
+            || { echo "an explicit poolTokenTTLSeconds=0 was swallowed"; exit 1; }
+
+          echo "bootstrap join tokens render bounded by default, and an explicit 0 survives"
+
   # ── Config-channel contract (#617) ────────────────────
   # Renders the chart (every values profile) and parses the rendered ConfigMaps
   # THROUGH the real Pydantic config models (Settings / RunnerConfig), asserting

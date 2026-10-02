@@ -145,3 +145,89 @@ class TestDuplicateTokens:
         bootstrap._reject_duplicate_tokens(
             [bootstrap.PoolSpec("a", None), bootstrap.PoolSpec("b", None)]
         )
+
+
+class TestBootstrapJoinTokenLimits:
+    """A bootstrap join token is bounded (GHSA-93m3-v3h4-4qvw).
+
+    It used to be created with no expiry and no use limit — a permanent,
+    unlimited credential, and a listener holding one joins the pool and receives
+    every variable the runs it claims resolve. The defence written into the code
+    for that was that a listener keeps its certificate on an `emptyDir` and so
+    must re-join after every pod replacement; by then that was no longer true
+    (`runner/identity.py` keeps it in a Secret in the listener's own namespace),
+    so the reason had outlived itself.
+
+    `0` and absent must stay distinguishable. Absent means nobody said, which
+    takes the bounded default; `0` means an operator deliberately asked for no
+    limit, and quietly tightening that to one use would break the listener they
+    set it for.
+    """
+
+    def test_the_default_is_one_use_and_a_day(self, monkeypatch) -> None:
+        limits = bootstrap._token_limits_from_environment()
+        assert limits.max_uses == 1
+        assert limits.ttl_seconds == 24 * 60 * 60
+
+    def test_the_dataclass_default_matches_what_the_environment_gives(self) -> None:
+        """`_bootstrap_pool` falls back to `TokenLimits()`, so the two must agree.
+
+        Otherwise a caller that passes nothing — a hand-run of the CLI, or a test
+        — gets a different bound from the Job, and only one of them is the one
+        anybody reviewed.
+        """
+        assert bootstrap.TokenLimits() == bootstrap._token_limits_from_environment()
+
+    def test_explicit_values_are_read(self, monkeypatch) -> None:
+        _set(
+            monkeypatch,
+            TERRAPOD_BOOTSTRAP_POOL_TOKEN_MAX_USES="5",
+            TERRAPOD_BOOTSTRAP_POOL_TOKEN_TTL_SECONDS="600",
+        )
+        limits = bootstrap._token_limits_from_environment()
+        assert limits.max_uses == 5
+        assert limits.ttl_seconds == 600
+
+    def test_zero_is_the_opt_out_and_is_not_confused_with_absent(self, monkeypatch) -> None:
+        _set(
+            monkeypatch,
+            TERRAPOD_BOOTSTRAP_POOL_TOKEN_MAX_USES="0",
+            TERRAPOD_BOOTSTRAP_POOL_TOKEN_TTL_SECONDS="0",
+        )
+        limits = bootstrap._token_limits_from_environment()
+        # None is what agent_pool_service already means by "no limit".
+        assert limits.max_uses is None
+        assert limits.ttl_seconds is None
+
+    def test_each_limit_is_independent(self, monkeypatch) -> None:
+        """Unlimited uses with an expiry, and vice versa, are both reasonable."""
+        _set(monkeypatch, TERRAPOD_BOOTSTRAP_POOL_TOKEN_MAX_USES="0")
+        limits = bootstrap._token_limits_from_environment()
+        assert limits.max_uses is None
+        assert limits.ttl_seconds == 24 * 60 * 60
+
+    def test_an_empty_value_takes_the_default(self, monkeypatch) -> None:
+        """An older chart, or a `null` in values, renders an empty string.
+
+        Reading that as "no limit" would hand back the unbounded token this
+        exists to remove, so empty has to mean the same as absent.
+        """
+        _set(monkeypatch, TERRAPOD_BOOTSTRAP_POOL_TOKEN_MAX_USES="")
+        assert bootstrap._token_limits_from_environment().max_uses == 1
+
+    def test_a_non_number_is_refused_rather_than_ignored(self, monkeypatch) -> None:
+        _set(monkeypatch, TERRAPOD_BOOTSTRAP_POOL_TOKEN_MAX_USES="two")
+        with pytest.raises(SystemExit) as exc:
+            bootstrap._token_limits_from_environment()
+        assert "TERRAPOD_BOOTSTRAP_POOL_TOKEN_MAX_USES" in str(exc.value)
+
+    def test_a_negative_value_is_refused(self, monkeypatch) -> None:
+        """`max_uses=-1` would compare as already-exhausted and refuse every join.
+
+        Silently accepting it produces a pool nothing can join, with a valid-
+        looking token row to explain it.
+        """
+        _set(monkeypatch, TERRAPOD_BOOTSTRAP_POOL_TOKEN_TTL_SECONDS="-1")
+        with pytest.raises(SystemExit) as exc:
+            bootstrap._token_limits_from_environment()
+        assert "TERRAPOD_BOOTSTRAP_POOL_TOKEN_TTL_SECONDS" in str(exc.value)

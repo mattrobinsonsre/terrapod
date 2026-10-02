@@ -122,6 +122,50 @@ redis:
   existingSecretKey: "url"
 ```
 
+The same applies to the listener's join token (`listener.existingSecret`), the
+bootstrap admin password (`bootstrap.existingSecret`) and each bootstrapped
+pool's join token (`bootstrap.pools[].existingSecret`).
+
+**What the chart does when you supply one in values anyway.** It puts it in a
+chart-managed Secret and references that, rather than rendering it into the
+manifest — so the database URL, the listener join token and the bootstrap admin
+password and pool token never appear in a Deployment or Job spec, where anyone
+with `get` on those objects could read them. That is a floor, not a substitute
+for `existingSecret`: a value given in `values.yaml` still passes through the
+release's own stored values, which `helm get values` returns and which a GitOps
+repository, CI log or Terraform state file may hold. Only an `existingSecret`
+keeps it out of that path.
+
+### Bootstrap join tokens expire
+
+A bootstrap join token is created with **one use and a 24-hour lifetime** by
+default. A listener holding a valid join token can register itself in the pool,
+and a listener in the pool claims runs and receives every variable those runs
+resolve — so a permanent, unlimited one is a standing credential for reading
+every workspace's secrets.
+
+One use is enough for what the token is for. A listener keeps its issued
+certificate in a Secret in its own namespace, so restarts, rolling updates and
+scale-out all adopt the existing identity and never touch the join token; and
+when several replicas start together the one that wins writes the Secret while
+the others adopt it.
+
+```yaml
+bootstrap:
+  poolTokenMaxUses: 1        # 0 = unlimited
+  poolTokenTTLSeconds: 86400 # 24h. 0 = never expires
+```
+
+Raise the use limit if you want tolerance for one particular race: the first
+listener pod consumes the single use, and if it dies between joining and writing
+its credentials Secret, nothing else can take over. The API's own default for
+tokens created through it is 2, for exactly that reason.
+
+An expired or spent token is **not** re-armed by a later `helm upgrade` — doing
+so would be the same permanent credential by another route. Issue a replacement
+through the API (`POST /api/v1/agent-pools/{pool_id}/tokens`) if a listener needs
+to join after that.
+
 For SSO provider client secrets, create a K8s Secret and reference it:
 
 ```bash

@@ -24,6 +24,15 @@ spec:
     metadata:
       annotations:
         checksum/runner-config: {{ include (print $.Template.BasePath "/configmap-runner.yaml") . | sha256sum }}
+        {{- /* Env from a secretKeyRef is snapshotted at pod start and never
+           refreshes, so rotating the join token under a running Deployment would
+           otherwise leave every pod holding the old one -- and the join path is
+           exactly where that bites, because it is only taken when the
+           credentials Secret is absent, which is long after the pod started.
+           This rolls the pods when the token changes. An operator-supplied
+           `existingSecret` is outside the chart's render, so its rotation is
+           still theirs to roll; the value we render is covered. */}}
+        checksum/join-token: {{ include (print $.Template.BasePath "/secret-listener-join-token.yaml") . | sha256sum }}
         {{- with .Values.listener.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -70,15 +79,18 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            {{- if .Values.listener.existingSecret }}
+            {{- /* The join token is a credential, so it reaches the pod by
+               secretKeyRef whichever way it was configured: an operator's own
+               `listener.existingSecret`, or the chart-managed Secret rendered
+               from `listener.joinToken` (GHSA-93m3-v3h4-4qvw). It was previously
+               a literal env value in this Deployment when supplied in values,
+               readable by anyone with `get` on Deployments. */}}
+            {{- if or .Values.listener.existingSecret .Values.listener.joinToken }}
             - name: TERRAPOD_JOIN_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.listener.existingSecret }}
-                  key: {{ .Values.listener.joinTokenKey | default "join_token" }}
-            {{- else if .Values.listener.joinToken }}
-            - name: TERRAPOD_JOIN_TOKEN
-              value: {{ .Values.listener.joinToken | quote }}
+                  name: {{ include "terrapod.listener.joinTokenSecretName" . }}
+                  key: {{ include "terrapod.listener.joinTokenSecretKey" . }}
             {{- end }}
             {{- include "terrapod.proxyEnv" . | nindent 12 }}
             {{- include "terrapod.caBundle.env" . | nindent 12 }}
