@@ -51,6 +51,12 @@ if TYPE_CHECKING:
 
 from cryptography import x509
 
+from terrapod.auth.listener_pop import (
+    NONCE_HEADER,
+    SIGNATURE_HEADER,
+    TIMESTAMP_HEADER,
+    sign_request,
+)
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -602,13 +608,6 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
         if key_pem:
             import secrets as _secrets
             import time as _time
-
-            from terrapod.auth.listener_pop import (
-                NONCE_HEADER,
-                SIGNATURE_HEADER,
-                TIMESTAMP_HEADER,
-                sign_request,
-            )
 
             try:
                 _ts = str(int(_time.time()))

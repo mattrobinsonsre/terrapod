@@ -31,6 +31,12 @@ import time
 
 import httpx
 
+from terrapod.auth.listener_pop import (
+    NONCE_HEADER,
+    SIGNATURE_HEADER,
+    TIMESTAMP_HEADER,
+    sign_request,
+)
 from terrapod.config import load_runner_config
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import configure_logging, get_logger
@@ -146,13 +152,6 @@ class RunnerListener:
         if isinstance(key_pem, str) and key_pem and path:
             import secrets as _secrets
             import time as _time
-
-            from terrapod.auth.listener_pop import (
-                NONCE_HEADER,
-                SIGNATURE_HEADER,
-                TIMESTAMP_HEADER,
-                sign_request,
-            )
 
             try:
                 ts = str(int(_time.time()))

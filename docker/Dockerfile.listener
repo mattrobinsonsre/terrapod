@@ -85,6 +85,11 @@ RUN rm -rf /usr/local/lib/python3.14/site-packages/pip \
 COPY services/terrapod/config.py ./terrapod/config.py
 COPY services/terrapod/logging_config.py ./terrapod/logging_config.py
 COPY services/terrapod/http_retry.py ./terrapod/http_retry.py
+# The listener signs every request with its private key, so it needs the shared
+# signing helper. Only the SIGNING half runs here: verify_request's replay check
+# imports terrapod.redis.client, which this image deliberately does not ship, and
+# that import is function-local so importing the module cannot pull it in.
+COPY services/terrapod/auth/listener_pop.py ./terrapod/auth/listener_pop.py
 # The engine strategy (#1407 phase 1). The listener builds its Job spec through
 # it, so the image must carry it. Deliberately dependency-light — it pulls in
 # no DB or SQLAlchemy — which is what makes it safe to ship here.
