@@ -27,8 +27,19 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-COPY services/pyproject-listener.toml pyproject.toml
-RUN pip install --no-cache-dir .
+
+# services/pyproject-listener.toml stays the declared manifest — the floors and
+# the reasoning live there — but it is no longer what the build resolves from.
+# `pip install .` re-resolved the whole closure from those floors on every build,
+# so the image shipped whatever the index happened to serve and the audited set
+# was a different resolution altogether (GHSA-rgvw-c74c-h75w).
+#
+# requirements-listener.txt is that manifest's lock: every package `==` pinned
+# with every published hash, regenerated and reviewed via
+# scripts/lock-python-deps.sh. `--require-hashes` makes pip refuse anything that
+# is not pinned and hashed, and refuse any transitive the file does not list.
+COPY services/requirements-listener.txt requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM ${BASE_IMAGE}

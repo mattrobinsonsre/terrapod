@@ -16,8 +16,11 @@ FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY web/package.json web/package-lock.json* ./
+# Copy package files. The lock is named outright rather than `package-lock.json*`
+# so a missing lock fails the COPY. `npm ci` would refuse to run without one
+# anyway — unlike the Python side, where the same glob silently enabled a fresh
+# resolution (GHSA-rgvw-c74c-h75w) — but the two should not read differently.
+COPY web/package.json web/package-lock.json ./
 
 # Install dependencies. The BuildKit cache mount persists npm's download cache
 # across CI runs so `npm ci` is fast even when the layer must re-run (e.g. a

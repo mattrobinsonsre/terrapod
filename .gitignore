@@ -103,3 +103,11 @@ junit.xml
 # `tilt dump api-docs` output. Root-anchored: a bare `api/` would also match
 # services/terrapod/api/, which is source.
 /api/
+
+# The api image's requirement set, exported from services/poetry.lock at build
+# time and by the Python Audit job. It is a derived artifact, not a lock — the
+# lock IS services/poetry.lock, which is committed. Ignored so a local
+# `poetry export` cannot leave a file that reads like one
+# (GHSA-rgvw-c74c-h75w). The three services/requirements-<image>.txt files are
+# NOT matched by this: those are committed locks for the minimal images.
+/services/requirements.txt

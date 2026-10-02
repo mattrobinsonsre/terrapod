@@ -61,8 +61,17 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 WORKDIR /app
 
-# Install ALL dependencies (main + dev)
-COPY services/pyproject.toml services/poetry.lock* ./
+# Install ALL dependencies (main + dev) from the committed lock.
+#
+# The lock is named outright, NOT `poetry.lock*`: while no lock was committed
+# that glob matched nothing and `poetry install` resolved a fresh closure every
+# build, so the suite ran against whatever the index served rather than against
+# the reviewed set (GHSA-rgvw-c74c-h75w). Named, a missing lock fails the COPY.
+#
+# `poetry install` from a lock verifies each file against the hash recorded in
+# it, and refuses outright when the lock no longer matches pyproject.toml — so
+# this needs no separate --require-hashes the way the pip-based images do.
+COPY services/pyproject.toml services/poetry.lock ./
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --no-root
 
@@ -90,6 +99,20 @@ COPY web/src/lib/phase-vocabulary.ts ./web/src/lib/phase-vocabulary.ts
 # The deprecation record, so a test can check the Sunset header the API emits
 # names the same date the docs publish (#1529).
 COPY docs/deprecations.md ./docs/deprecations.md
+
+# The three minimal images' declared manifests and their locks, so the
+# dependency-pin guards (tests/test_dependency_pins.py) can check that every
+# requirement is `==` pinned AND hashed — which is what `--require-hashes`
+# depends on — and that each manifest's CVE floors are actually satisfied by the
+# version pinned for it. Without these the guards would be skipped rather than
+# failing, so a stale lock would ship quietly (GHSA-rgvw-c74c-h75w).
+#
+# Deliberately AFTER the dependency-install layer above: putting them in that
+# COPY would bust the install cache whenever a minimal manifest changed.
+COPY services/pyproject-listener.toml services/pyproject-migrations.toml \
+     services/pyproject-runner.toml ./
+COPY services/requirements-listener.txt services/requirements-migrations.txt \
+     services/requirements-runner.txt ./
 # AI-analysis evaluation harness (#602) — committed eval suite. Imported by
 # the offline corpus/rubric tests and run live (model sweep) on demand.
 COPY services/ai_eval ./ai_eval

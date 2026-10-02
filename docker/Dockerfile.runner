@@ -41,8 +41,20 @@ FROM ${BASE_IMAGE} AS builder
 RUN pip install --no-cache-dir --upgrade "setuptools>=78.1.1"
 
 WORKDIR /build
-COPY services/pyproject-runner.toml pyproject.toml
-RUN pip install --no-cache-dir .
+
+# services/pyproject-runner.toml stays the declared manifest — the cryptography
+# CVE floor and the reasoning for it live there — but it is no longer what the
+# build resolves from. `pip install .` re-resolved from those floors on every
+# build, so the image shipped whatever the index happened to serve and the
+# audited set was a different resolution (GHSA-rgvw-c74c-h75w). This image runs
+# on every Job pod, so it is the widest-blast-radius of the five.
+#
+# requirements-runner.txt is that manifest's lock: every package `==` pinned
+# with every published hash, regenerated and reviewed via
+# scripts/lock-python-deps.sh. `--require-hashes` makes pip refuse anything that
+# is not pinned and hashed, and refuse any transitive the file does not list.
+COPY services/requirements-runner.txt requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt
 
 # ── Runtime ────────────────────────────────────────────────────────────
 FROM ${BASE_IMAGE}

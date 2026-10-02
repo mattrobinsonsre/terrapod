@@ -188,7 +188,13 @@ local_resource(
         'docker/Dockerfile.runner',
         'query/cmd',
         'query/internal',
+        # Both: the requirements file is what the image installs, so it is the
+        # one that changes the image, and without it a regenerated lock would
+        # not rebuild here (GHSA-rgvw-c74c-h75w). The manifest stays because it
+        # is where a floor is edited before regenerating, and rebuilding on that
+        # edit is harmless.
         'services/pyproject-runner.toml',
+        'services/requirements-runner.txt',
         'services/terrapod/http_retry.py',
         'services/terrapod/runner/__init__.py',
         'services/terrapod/runner/runner_config.py',

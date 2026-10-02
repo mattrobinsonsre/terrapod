@@ -638,16 +638,44 @@ jobs:
     container: ghcr.io/mattrobinsonsre/mirror/python:3.14-slim
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Install Poetry and export plugin
-        run: pip install poetry poetry-plugin-export
-      - name: Export requirements
-        run: poetry export -f requirements.txt -o requirements.txt --without-hashes
+      - name: Install Poetry
+        # Pinned to the SAME version the images build with (see the `poetry==`
+        # pins in docker/Dockerfile.api and docker/Dockerfile.test). Two reasons,
+        # and the second is the point of GHSA-rgvw-c74c-h75w: the lock format is
+        # version-specific (Poetry 2.x writes lock-version 2.1, which 1.8.4
+        # refuses to read), and the set audited here has to be the same
+        # projection of the same lock that the api image installs — otherwise
+        # this job is once again auditing a resolution nothing ships.
+        #
+        # `export` is built into 1.8.4, so poetry-plugin-export is not needed.
+        run: pip install 'poetry==1.8.4'
+      - name: Check the lock is current
+        # Load-bearing, not belt-and-braces. Measured against Poetry 1.8.4:
+        # `export` against a lock that no longer matches pyproject.toml prints a
+        # warning and exits 0, so without this the job would audit the stale
+        # closure and report it clean. The api image build runs the same check
+        # immediately before its own export, for the same reason.
+        run: poetry check --lock --no-interaction --no-ansi
+        working-directory: services
+      - name: Export the api image's requirement set from the lock
+        # `--only main` and WITH hashes: exactly what docker/Dockerfile.api does,
+        # so the file audited below is byte-for-byte the file that image
+        # installs. (`--only main` is also the default here — measured, 126
+        # packages either way — but being explicit is what keeps it true if the
+        # default ever moves.)
+        run: poetry export --only main -f requirements.txt -o requirements.txt
         working-directory: services
       - name: Run pip-audit
         # Accepted advisories live in pentest/pip-audit-ignore.txt, each with
         # its reasoning and exit condition. Read from the file rather than
         # inlined here so that release-rescan.yml — which re-checks supported
         # releases against current reasoning — cannot drift from this gate.
+        #
+        # All FOUR shipped Python dependency sets, not just the api image's. The
+        # three minimal images install committed hash-pinned requirements, and
+        # before this only trivy's image scan saw them — so an advisory against a
+        # migrations-only dependency (Mako, botocore, google-auth) was never
+        # weighed against the reasoning in the ignore file.
         run: |
           pip install pip-audit
           # POSIX sh, not bash: this job runs in a slim container whose shell
@@ -659,8 +687,23 @@ jobs:
             line="$(echo "$line" | tr -d '[:space:]')"
             [ -n "$line" ] && ignores="$ignores --ignore-vuln $line"
           done < pentest/pip-audit-ignore.txt
-          # shellcheck disable=SC2086
-          pip-audit -r services/requirements.txt --strict --desc $ignores
+          fail=0
+          for req in services/requirements.txt \
+                     services/requirements-listener.txt \
+                     services/requirements-migrations.txt \
+                     services/requirements-runner.txt; do
+            echo "── $req"
+            # shellcheck disable=SC2086
+            pip-audit -r "$req" --strict --desc $ignores || fail=1
+          done
+          if [ "$fail" != "0" ]; then
+            echo
+            echo "An advisory affects a set that ships. Bump the floor in the"
+            echo "matching services/pyproject*.toml, re-run scripts/lock-python-deps.sh,"
+            echo "and commit the regenerated lock — or add the id to"
+            echo "pentest/pip-audit-ignore.txt with its reasoning and exit condition."
+            exit 1
+          fi
 
   # ── Dependency Audit (npm) ────────────────────────────
   npm-audit:

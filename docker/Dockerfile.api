@@ -45,19 +45,32 @@ RUN python -m venv "$POETRY_HOME" \
 
 WORKDIR /app
 
-# Copy dependency files
-COPY services/pyproject.toml services/poetry.lock* ./
+# Copy dependency files. The lock is named outright, NOT as `poetry.lock*`:
+# while no lock was committed that glob matched nothing and the build quietly
+# resolved its own, which is the hole GHSA-rgvw-c74c-h75w describes. Named, a
+# missing lock fails the COPY instead of being papered over.
+COPY services/pyproject.toml services/poetry.lock ./
 
-# Resolve the project's `main` dependency closure with Poetry (running from
-# its isolated venv) and export it to a requirements file, then install ONLY
-# that closure into the system Python with pip. Poetry + its own deps stay in
-# /opt/poetry, which is never copied into the runtime image. The repo carries
-# no committed lock, so we resolve one at build time — same fresh resolution
-# the previous `poetry install` performed.
-RUN "$POETRY_HOME"/bin/poetry lock --no-interaction --no-ansi \
+# Project the committed lock's `main` group into a hash-pinned requirements file
+# and install exactly that. There is no `poetry lock` here any more: resolution
+# happens when a human runs scripts/lock-python-deps.sh and reviews the diff, so
+# what ships is what was reviewed rather than whatever the index served at build
+# time. Poetry + its own deps stay in /opt/poetry, never copied to runtime.
+#
+# `check --lock` is load-bearing, not belt-and-braces: measured against Poetry
+# 1.8.4, `export` on a lock that no longer matches pyproject.toml prints a
+# warning and exits 0, so without this the build would install the stale closure
+# and look entirely healthy. `check --lock` exits 1 on the same input.
+#
+# Dropping `--without-hashes` is what makes `--require-hashes` possible, and
+# that flag is the actual control: pip then refuses any requirement that is not
+# both `==` pinned and hashed, and refuses to install a transitive the file does
+# not list. A malicious upstream release cannot reach this image without the
+# committed lock changing first.
+RUN "$POETRY_HOME"/bin/poetry check --lock --no-interaction --no-ansi \
     && "$POETRY_HOME"/bin/poetry export \
-        --only main --without-hashes -f requirements.txt -o /tmp/requirements.txt \
-    && pip install --no-cache-dir -r /tmp/requirements.txt
+        --only main -f requirements.txt -o /tmp/requirements.txt \
+    && pip install --no-cache-dir --require-hashes -r /tmp/requirements.txt
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM ${BASE_IMAGE}

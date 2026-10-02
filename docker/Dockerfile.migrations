@@ -26,8 +26,19 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-COPY services/pyproject-migrations.toml pyproject.toml
-RUN pip install --no-cache-dir .
+
+# services/pyproject-migrations.toml stays the declared manifest — the CVE
+# floors on Mako and cryptography and the reasoning for them live there — but it
+# is no longer what the build resolves from. `pip install .` re-resolved from
+# those floors on every build, so the image shipped whatever the index happened
+# to serve and the audited set was a different resolution (GHSA-rgvw-c74c-h75w).
+#
+# requirements-migrations.txt is that manifest's lock: every package `==` pinned
+# with every published hash, regenerated and reviewed via
+# scripts/lock-python-deps.sh. `--require-hashes` makes pip refuse anything that
+# is not pinned and hashed, and refuse any transitive the file does not list.
+COPY services/requirements-migrations.txt requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM ${BASE_IMAGE}
