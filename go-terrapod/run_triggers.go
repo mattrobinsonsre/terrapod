@@ -27,8 +27,13 @@ type CreateRunTriggerRequest struct {
 	SourceWorkspaceID      string
 }
 
-// CreateRunTrigger registers a new trigger. Caller must hold write+
-// on the destination workspace.
+// CreateRunTrigger registers a new trigger. The caller must hold admin on the
+// destination workspace and read on the source.
+//
+// A source the caller cannot read returns *NotFoundError, identical to a source
+// that does not exist (GHSA-mc7f-xmq4-jgvw) — deliberately, so the endpoint
+// cannot be used to confirm which workspace ids exist. So a NotFoundError here
+// means "no such source, or not yours", and the two are not distinguishable.
 func (c *Client) CreateRunTrigger(ctx context.Context, req CreateRunTriggerRequest) (*RunTrigger, error) {
 	rels := map[string]any{
 		"sourceable": map[string]any{

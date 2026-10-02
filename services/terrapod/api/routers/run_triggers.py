@@ -99,7 +99,13 @@ async def create_run_trigger(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Create a run trigger. Requires admin on the destination workspace."""
+    """Create a run trigger.
+
+    Requires `run-trigger:manage` on the destination workspace and
+    `workspace:read` on the source — the source gate because the destination one
+    does not bound which workspaces may be named as a source
+    (GHSA-mc7f-xmq4-jgvw).
+    """
     ws = await _get_workspace(workspace_id, db)
     await _require_ws_capability(ws, cap.RUN_TRIGGER_MANAGE, user, db)
 
@@ -111,6 +117,23 @@ async def create_run_trigger(
         raise HTTPException(status_code=422, detail="sourceable relationship is required")
 
     source_ws = await _get_workspace(source_id, db)
+
+    # The source must be a workspace this caller can actually SEE
+    # (GHSA-mc7f-xmq4-jgvw). The gate above is on the DESTINATION, so without
+    # this a user holding `run-trigger:manage` on one workspace of their own
+    # could post arbitrary ids as the source and read the answer: a created
+    # trigger (and its `sourceable-name`) for an id that exists, a 404 for one
+    # that does not. An existence-and-name oracle over the whole fleet, from a
+    # grant on a single workspace.
+    #
+    # **404, not 403, and that is the point.** "Forbidden" would confirm the
+    # workspace exists, which is the one thing being withheld — so an unreadable
+    # source is reported exactly as a nonexistent one, with the same status and
+    # the same detail. The refusal is before any write, so nothing is created
+    # either way.
+    source_caps = await resolve_workspace_capabilities_for(db, user, source_ws)
+    if not has_capability(source_caps, cap.WORKSPACE_READ):
+        raise HTTPException(status_code=404, detail="Workspace not found")
 
     # Validate: not self-referential
     if ws.id == source_ws.id:

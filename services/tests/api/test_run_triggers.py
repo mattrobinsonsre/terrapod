@@ -271,6 +271,109 @@ class TestCreateRunTrigger:
             )
         assert resp.status_code == 403
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_an_unreadable_source_is_refused_and_nothing_is_created(
+        self, mock_publish, mock_resolve, *mocks
+    ):
+        """GHSA-mc7f-xmq4-jgvw: the destination gate bounded nothing about which
+        workspace could be named as the SOURCE, so a user holding
+        `run-trigger:manage` on one workspace of their own could post arbitrary
+        ids and read the answer — an existence-and-name oracle over the fleet.
+
+        The refusal is a 404 carrying the same detail as a nonexistent id, which
+        is the whole point: a 403 would confirm the workspace is there. So this
+        asserts the stronger property — the two answers are indistinguishable —
+        plus that nothing was written and no event published.
+        """
+        dest_ws = _mock_workspace(name="dest")
+        source_ws = _mock_workspace(name="someone-elses")
+        # manage on the destination, nothing at all on the source.
+        mock_resolve.side_effect = [caps_for_level("admin"), frozenset()]
+
+        app, mock_db = _make_app(_user())
+        mock_result_dest = MagicMock()
+        mock_result_dest.scalar_one_or_none.return_value = dest_ws
+        mock_result_source = MagicMock()
+        mock_result_source.scalar_one_or_none.return_value = source_ws
+        mock_db.execute.side_effect = [mock_result_dest, mock_result_source]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/terrapod/v1/workspaces/ws-{dest_ws.id}/run-triggers",
+                json={
+                    "data": {
+                        "relationships": {
+                            "sourceable": {
+                                "data": {"id": f"ws-{source_ws.id}", "type": "workspaces"}
+                            }
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Workspace not found"
+        assert "someone-elses" not in resp.text
+        mock_db.add.assert_not_called()
+        mock_db.commit.assert_not_called()
+        mock_publish.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
+    async def test_the_unreadable_source_answer_matches_the_nonexistent_one(
+        self, mock_resolve, *mocks
+    ):
+        """What makes the 404 a fix rather than a cosmetic status change: the
+        caller must not be able to tell "it exists but is not yours" from "there
+        is no such workspace". Both must be byte-identical."""
+        dest_ws = _mock_workspace(name="dest")
+        source_ws = _mock_workspace(name="someone-elses")
+
+        async def _post(app, mock_db, source_id):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                return await c.post(
+                    f"/api/terrapod/v1/workspaces/ws-{dest_ws.id}/run-triggers",
+                    json={
+                        "data": {
+                            "relationships": {
+                                "sourceable": {"data": {"id": source_id, "type": "workspaces"}}
+                            },
+                        }
+                    },
+                    headers=_AUTH,
+                )
+
+        # (a) exists, but the caller holds nothing on it
+        mock_resolve.side_effect = [caps_for_level("admin"), frozenset()]
+        app, mock_db = _make_app(_user())
+        r_dest = MagicMock()
+        r_dest.scalar_one_or_none.return_value = dest_ws
+        r_source = MagicMock()
+        r_source.scalar_one_or_none.return_value = source_ws
+        mock_db.execute.side_effect = [r_dest, r_source]
+        unreadable = await _post(app, mock_db, f"ws-{source_ws.id}")
+
+        # (b) no such workspace at all
+        mock_resolve.side_effect = None
+        mock_resolve.return_value = caps_for_level("admin")
+        app2, mock_db2 = _make_app(_user())
+        r_dest2 = MagicMock()
+        r_dest2.scalar_one_or_none.return_value = dest_ws
+        r_missing = MagicMock()
+        r_missing.scalar_one_or_none.return_value = None
+        mock_db2.execute.side_effect = [r_dest2, r_missing]
+        nonexistent = await _post(app2, mock_db2, f"ws-{uuid.uuid4()}")
+
+        assert unreadable.status_code == nonexistent.status_code == 404
+        assert unreadable.json() == nonexistent.json()
+
 
 # ── List Run Triggers ──────────────────────────────────────────────────
 

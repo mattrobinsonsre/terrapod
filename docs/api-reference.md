@@ -1212,9 +1212,20 @@ The stream sends `: keepalive` comments every ~1 second. Events are JSON-encoded
 GET /api/v1/workspace-events
 ```
 
-Server-Sent Events stream for the workspace list page. Emits events whenever any workspace changes (run status, lock, settings, state). The web UI uses this to refresh the workspace list without polling.
+Server-Sent Events stream for the workspace list page. Emits events whenever a workspace changes (run status, lock, settings, state). The web UI uses this to refresh the workspace list without polling.
 
-**Required permission:** Any authenticated user.
+**Required permission:** any authenticated user to subscribe — but **each event is
+filtered against the subscriber's own `workspace:read`**, so a stream only carries
+workspaces that principal can see.
+
+The filter is new in 2.0 (GHSA-mc7f-xmq4-jgvw). This is one global channel
+carrying every workspace's id and coarse status, so before it any authenticated
+user learned of the existence and state of every workspace in the deployment.
+A decision is cached per connection for 30 seconds, so a role change is felt
+within that window rather than at the next reconnect; an unresolvable workspace
+(deleted, or a transient database error) is treated as unreadable. The web UI is
+unaffected — it reloads the list on any event and ignores the payload, so a
+dropped event is a reload that would have found nothing changed.
 
 ### Plan Details
 
@@ -1676,7 +1687,16 @@ POST /api/v1/workspaces/{id}/run-triggers
 }
 ```
 
-**Required permission:** `admin` on the destination workspace.
+**Required permission:** `admin` on the destination workspace, **and `read` on
+the source workspace**.
+
+The source-side check is new in 2.0 (GHSA-mc7f-xmq4-jgvw). Without it the
+destination grant bounded nothing about which workspaces could be named as a
+source, so a user holding `admin` on one workspace of their own could post
+arbitrary ids and read the answer — an existence-and-name oracle over the whole
+fleet. A source the caller cannot read is reported as **404 Workspace not
+found**, identical to an id that does not exist: a 403 would confirm the
+workspace is there, which is the thing being withheld.
 
 **Validation:**
 - Source and destination must be different workspaces

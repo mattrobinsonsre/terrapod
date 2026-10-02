@@ -43,7 +43,10 @@ func (r *runTriggerResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"source_workspace_id": schema.StringAttribute{
-				Required: true, Description: "Source workspace ID.",
+				Required: true,
+				Description: "Source workspace ID. Requires read on it as well as " +
+					"admin on the destination; a source you cannot read reports " +
+					"\"not found\", the same as one that does not exist.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"workspace_name": schema.StringAttribute{

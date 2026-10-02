@@ -11,6 +11,7 @@ Endpoints:
 
 import asyncio
 import json
+import uuid
 
 import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
@@ -22,6 +23,7 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user, requi
 from terrapod.api.errors import vcs_unavailable
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import has_capability
+from terrapod.db.models import Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.workspace_rbac_service import (
@@ -37,19 +39,104 @@ logger = get_logger(__name__)
 # so FastAPI doesn't match "workspace-events" as a workspace_id parameter.
 
 
+#: How long a per-connection readability decision is reused before it is
+#: resolved again. The stream outlives a role change, so an answer cached for the
+#: life of the connection would keep delivering a workspace after the grant that
+#: allowed it was revoked — and would never deliver one newly granted. Short
+#: enough that a permission change is felt in seconds; long enough that a busy
+#: fleet does not resolve the same workspace on every event.
+_READABLE_CACHE_TTL = 30.0
+
+
+class _ReadableWorkspaces:
+    """Per-subscriber "may this principal read workspace X" decisions.
+
+    One instance per SSE connection. It exists because the alternative shapes
+    are both wrong: resolving on every event means a DB round trip per message
+    on a busy fleet, and resolving once at subscribe time freezes the answer for
+    a connection that may be open for hours.
+
+    A workspace that has disappeared, or any resolution failure, is **not
+    readable** — a stream whose filter fails open is a stream with no filter.
+    """
+
+    def __init__(self, user: AuthenticatedUser) -> None:
+        self._user = user
+        self._decisions: dict[str, tuple[bool, float]] = {}
+
+    async def allows(self, workspace_id: str | None) -> bool:
+        if not workspace_id:
+            # Every publisher on this channel sets `workspace_id`, so this is a
+            # malformed or future payload. It cannot be scoped, so it is dropped.
+            return False
+
+        now = asyncio.get_running_loop().time()
+        cached = self._decisions.get(workspace_id)
+        if cached is not None and cached[1] > now:
+            return cached[0]
+
+        allowed = await self._resolve(workspace_id)
+        self._decisions[workspace_id] = (allowed, now + _READABLE_CACHE_TTL)
+        return allowed
+
+    async def _resolve(self, workspace_id: str) -> bool:
+        """Resolve one decision on its own short-lived DB session.
+
+        Never `Depends(get_db)` here — an SSE handler holding a pooled session
+        for the life of the stream exhausts the pool, which is why the auth path
+        beside it is `authenticate_request` rather than the usual dependency.
+        """
+        from terrapod.db.session import get_db_session
+
+        try:
+            ws_uuid = uuid.UUID(str(workspace_id))
+        except ValueError:
+            return False
+
+        try:
+            async with get_db_session() as db:
+                ws = await db.get(Workspace, ws_uuid)
+                if ws is None:
+                    return False
+                caps = await resolve_workspace_capabilities_for(db, self._user, ws)
+                return has_capability(caps, cap.WORKSPACE_READ)
+        except Exception:
+            # Fail closed, and say so — a filter that leaks on a transient
+            # database error is a filter that leaks whenever it matters.
+            logger.warning(
+                "workspace_list_event_filter_failed",
+                workspace_id=str(workspace_id),
+                exc_info=True,
+            )
+            return False
+
+
 @router.get("/workspace-events")
 async def workspace_list_events(
     request: Request,
 ) -> EventSourceResponse:
     """Stream workspace list events via SSE for real-time updates.
 
-    Any authenticated user can subscribe. Uses short-lived DB session
-    for auth, then releases before SSE streaming.
+    Any authenticated user can subscribe, but **each event is filtered against
+    the subscriber's own `workspace:read`** (GHSA-mc7f-xmq4-jgvw). The channel is
+    one global Redis channel carrying every workspace's id and coarse status, so
+    before the filter any authenticated user learned of the existence and state
+    of every workspace in the deployment, RBAC notwithstanding.
+
+    Filtering here rather than at the publisher is deliberate: there is one
+    channel and N subscribers with different grants, so the decision belongs to
+    the reader. It costs the UI nothing — the workspace list page reloads on any
+    event and ignores the payload, so a dropped event is a reload that would
+    have found nothing changed.
+
+    Uses a short-lived DB session for auth, then releases it before streaming;
+    each filter decision takes its own, briefly (see `_ReadableWorkspaces`).
     """
     from terrapod.api.dependencies import authenticate_request
     from terrapod.redis.client import WORKSPACE_LIST_EVENTS_CHANNEL, subscribe_channel
 
-    await authenticate_request(request)
+    user = await authenticate_request(request)
+    readable = _ReadableWorkspaces(user)
 
     pubsub = await subscribe_channel(WORKSPACE_LIST_EVENTS_CHANNEL)
 
@@ -64,6 +151,8 @@ async def workspace_list_events(
                     if isinstance(data, bytes):
                         data = data.decode()
                     payload = json.loads(data)
+                    if not await readable.allows(payload.get("workspace_id")):
+                        continue
                     yield {
                         "event": payload.get("event", "update"),
                         "data": json.dumps(payload),
