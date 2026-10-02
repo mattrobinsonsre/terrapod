@@ -15,6 +15,8 @@ against the old constraint and pass against the new.
 
 import uuid
 
+from sqlalchemy import text
+
 from tests.integration.conftest import admin_user, set_auth
 
 CONNS = "/api/terrapod/v1/vcs-connections"
@@ -108,3 +110,92 @@ class TestOneConnectionPerGitHubInstallation:
         assert a.status_code in (200, 201), a.text
         b = await client.post(CONNS, json=_github(f"gh-d-{tag}", base + 1), headers=CT)
         assert b.status_code in (200, 201), b.text
+
+
+class TestTheIndexItselfIsPartial:
+    """The behavioural tests above cannot see the index at all, and that is not a
+    hypothesis — it is measured: **drop `uq_vcs_connections_install` entirely and
+    every one of them still passes.** The GitLab pair passes because nothing
+    collides, and the GitHub duplicate is refused by an explicit SELECT in the
+    create handler (`vcs_connections.create_vcs_connection`) before the insert, so
+    the index is the backstop and nothing drives it.
+
+    So the shape is asserted directly. A future migration that recreated this as a
+    blanket unique index would reintroduce "a deployment may hold only one GitLab
+    connection", and a non-unique one would drop the GitHub rule; neither shows up
+    in any behaviour this suite can reach through the API.
+
+    Read from `pg_indexes` rather than from the model, because the live schema is
+    what a deployment runs.
+    """
+
+    async def test_it_exists_is_unique_and_carries_the_github_predicate(self, app, client):
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as db:
+            row = (
+                await db.execute(
+                    # Constant SQL, no interpolation of any kind — this reads the
+                    # live schema to assert the index's own shape.
+                    # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+                    text(
+                        "SELECT indexdef FROM pg_indexes "
+                        "WHERE schemaname = current_schema() "
+                        "AND tablename = 'vcs_connections' "
+                        "AND indexname = 'uq_vcs_connections_install'"
+                    )
+                )
+            ).first()
+
+        assert row is not None, (
+            "uq_vcs_connections_install does not exist — the rule 'one connection "
+            "per GitHub App installation' has no backstop at all"
+        )
+        indexdef = row[0]
+
+        assert "CREATE UNIQUE INDEX" in indexdef, (
+            f"the index is not UNIQUE, so two connections may now cover the same "
+            f"GitHub App installation: {indexdef}"
+        )
+        for col in ("provider", "github_installation_id"):
+            assert col in indexdef, f"{col} is no longer part of the index: {indexdef}"
+
+        assert "WHERE" in indexdef, (
+            "the index has no predicate, so it is blanket again and a deployment "
+            f"can hold only one GitLab connection: {indexdef}"
+        )
+        predicate = indexdef.split("WHERE", 1)[1]
+        assert "provider" in predicate and "github" in predicate, (
+            "the predicate no longer scopes the rule to GitHub, which is the only "
+            f"provider the installation id identifies: {indexdef}"
+        )
+
+    async def test_and_nothing_else_re_imposes_the_blanket_rule(self, app, client):
+        """A second object over the same columns with no predicate would restore the
+        defect while leaving the partial index above looking correct."""
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as db:
+            rows = (
+                await db.execute(
+                    # Constant SQL, no interpolation of any kind — this reads the
+                    # live schema to assert the index's own shape.
+                    # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+                    text(
+                        "SELECT indexname, indexdef FROM pg_indexes "
+                        "WHERE schemaname = current_schema() "
+                        "AND tablename = 'vcs_connections' "
+                        "AND indexdef LIKE '%github_installation_id%'"
+                    )
+                )
+            ).all()
+
+        unconditional = [
+            name
+            for name, definition in rows
+            if "UNIQUE" in definition and "WHERE" not in definition
+        ]
+        assert not unconditional, (
+            f"{unconditional} constrain github_installation_id with no predicate, so "
+            "a second GitLab connection collides on the placeholder 0 again"
+        )
