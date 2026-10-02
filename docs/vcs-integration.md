@@ -963,6 +963,39 @@ permission change can take that long to take effect.
 - Ensure the webhook secret configured in Terrapod (`TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET`) exactly matches the one set in the GitHub App settings
 - The webhook secret is case-sensitive
 
+### GitLab webhooks are accepted but nothing happens (two connections, one host)
+
+The receiver answers `200 {"message": "unknown project"}` and no run is created,
+while **polling still picks the change up** a minute later. So the symptom is that
+webhooks stopped accelerating anything, not that the integration is broken.
+
+GitLab webhooks carry no installation identity, so Terrapod binds an event to a
+connection by **host**. With one GitLab connection on a host that is unambiguous.
+With two or more — which is possible from v1.9.0, because GitLab connections are no
+longer unique by installation id — the only thing that distinguishes them is the
+secret presented in `X-Gitlab-Token`.
+
+**Give every GitLab connection on the same host its own `webhook_secret`.** A
+connection relying on the global `vcs.gitlab.webhook_secret` cannot be told apart
+from its neighbours, and the event is dropped rather than attributed to the wrong
+one. The log line says so explicitly, naming the host and how many of the candidate
+connections have no secret of their own:
+
+```
+several GitLab connections share this host and none of their own webhook secrets
+matched the presented token, so the event cannot be attributed to one
+```
+
+```zsh
+curl -sX PATCH -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/vnd.api+json' \
+  "$TERRAPOD/api/terrapod/v1/vcs-connections/<connection-id>" \
+  -d '{"data":{"type":"vcs-connections","attributes":{"webhook-secret":"<distinct-secret>"}}}'
+```
+
+Then set the same value as the Secret Token on that project's webhook in GitLab. The
+attribute is write-only; `has-webhook-secret` on a read tells you whether one is set.
+
 ### Speculative plans not appearing for PRs/MRs
 
 - **Is the PR/MR from a fork?** Fork pull requests do not plan unless the

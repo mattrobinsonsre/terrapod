@@ -452,19 +452,33 @@ Rows at the top accept any repository the credential can reach. A row with an
 empty `owner_email` **and** empty `labels` is one only an admin (or an existing
 workspace owner) can build on.
 
-**One path is still not re-checked: the registry pollers' own clones.**
-Publishing a module version and running module-impact analysis clone the module's
-repository without consulting the allowlist again. A module's URL can only be
-*set* through a checked path — registry-module create, update and VCS-update all
-enforce it, as do workspace create and update, the refs endpoint, the config fetch
-and every minted git credential — so an entitled caller can no longer point a
-module somewhere out of scope. What remains is a module whose URL predates a
-narrowing: it keeps being cloned, where a workspace in the same position stops at
-its next config fetch. **Scope the credential itself** if you want a single bound
-across every path: install the GitHub App on only the repositories it needs, or
-use a project- or group-scoped GitLab token rather than one covering the whole
-instance. The allowlist is then defence in depth over an already-narrow
-credential, which is where it is worth the most.
+**The allowlist is enforced at the clone, so there is no path that escapes it.**
+It is checked at every path that *accepts* a repository URL — workspace create and
+update, the refs endpoint, the config fetch, registry-module create, update and
+VCS-update, and every minted git credential — and again inside the two functions
+that actually use the credential, so a URL stored before a narrowing stops being
+cloned rather than carrying on.
+
+That second layer is not belt and braces. Checking only the accepting paths left
+two holes. A URL set while a connection was wide kept being cloned afterwards, on
+every path. And the VCS poller clones to detect a change *before* anything a run
+would check, so a narrowed connection's credential had already read the
+out-of-scope repository by the time the config fetch refused the run — which is the
+thing the allowlist exists to prevent. Drift detection reached the archive cache the
+same way. Earlier releases described the residual gap as the registry pollers'
+clones alone; it was wider than that, and it is now closed.
+
+Two consequences worth planning for. A narrowing takes effect on the **next clone**,
+not at the moment you save it, so an in-flight run finishes against the old scope. And
+because the refusal happens where the credential is used, it surfaces in a poll cycle
+or a drift check — somewhere with no caller to receive a 403 — as a logged refusal
+rather than an HTTP error. `docs/runbooks.md` has the symptoms.
+
+**Scope the credential itself as well** for a bound that does not depend on Terrapod
+at all: install the GitHub App on only the repositories it needs, or use a project- or
+group-scoped GitLab token rather than one covering the whole instance. The allowlist is
+then defence in depth over an already-narrow credential, which is where it is worth
+the most.
 
 Before narrowing a connection, list the
 workspaces that would fall outside the new patterns — they keep their

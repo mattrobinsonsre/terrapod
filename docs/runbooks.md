@@ -2411,6 +2411,14 @@ patterns, because narrowing does not rewrite stored workspace rows.
 - Workspace `PATCH` returns **403** on an otherwise valid edit, because the
   allowlist is re-checked on every update that leaves a connection attached
 - Polling-driven runs keep failing on each cycle; nothing is cloned
+- **No HTTP error anywhere, but the workspace stops picking up commits.** The
+  allowlist is also enforced inside the two functions that use the credential, so a
+  VCS poll cycle or a drift check refuses the clone with nothing to return a 403 to.
+  Look for `its credential will not be used to clone it` in the API logs, naming the
+  connection and the `owner/repo` it refused. This is the case to know about, because
+  the workspace simply goes quiet
+- A minted `git_http_auth` credential fails the run with `a credential installed for
+  '…' would reach more than those` — a **different** problem, below
 
 Distinguish this from the other 403 on the same resource: *"Not authorized to use
 VCS connection vcs-…"* is a **claim** problem (who may name the connection), not a
@@ -2506,3 +2514,98 @@ Before narrowing a connection, run the query in step 4 and widen the patterns to
 cover every repository already in use; then remove entries as those workspaces are
 retired. See
 [security-hardening.md → Scope every VCS connection](security-hardening.md#scope-every-vcs-connection-to-an-owner-and-a-repository-set).
+
+## A minted git credential is refused for being too broadly scoped
+
+A run fails during `init` — or at variable resolution, before `init` — with
+`git credential '…' references VCS connection vcs-…: … a credential installed for
+'…' would reach more than those`.
+
+This is the repository allowlist again, but the subject is **the variable's key**,
+not the workspace's repository. A `git_http_auth` variable sourced from a VCS
+connection is installed by the runner as a git `[credential "https://<key>"]`
+section, and git applies such a section by host **and path prefix**. So a key of
+`github.com` installs the token for the whole host, and the workspace's own
+configuration can then clone anything that credential reaches — which is why the
+allowlist has to bound the key rather than the repository the workspace happens to
+be configured with. (GHSA-v8g7-pqrj-8mcm)
+
+### Symptoms
+
+- The message names a **key**, says "a credential installed for", and mentions
+  "path prefix" — the plain repository refusal says "and '…' is not one of them"
+- It appears for a workspace whose own repository **is** inside the allowlist, which
+  is what makes it confusing: the workspace is in scope and the credential is not
+- Only `source = "vcs_connection"` credentials are affected. A `static` credential
+  carries a token you scoped yourself and is never checked against the allowlist
+
+### Diagnosis
+
+Read the variable's key and the connection's patterns:
+
+```zsh
+curl -sH "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/workspaces/<workspace-id>/vars" \
+  | jq -r '.data[] | select(.attributes.category=="git_http_auth")
+           | "\(.attributes.key)"'
+
+curl -sH "Authorization: Bearer $TOKEN" \
+  "$TERRAPOD/api/terrapod/v1/vcs-connections/<connection-id>" \
+  | jq -r '.data.attributes["allowed-repositories"]'
+```
+
+A key is accepted when every repository it could reach is inside the allowlist. So
+`github.com/myorg` is accepted by `myorg/*` or by `myorg`, and refused by
+`myorg/safe` — because the key covers all of `myorg` and the pattern covers one
+repository. A bare `github.com` is refused by anything narrower than `*`.
+
+### Resolution
+
+**Narrow the key, which is almost always the right fix.** Set it to the owner or the
+repository the credential is actually for:
+
+| key | reaches | accepted by |
+|---|---|---|
+| `github.com` | the whole host | `*` only |
+| `github.com/myorg` | everything under `myorg` | `myorg`, `myorg/*` |
+| `github.com/myorg/safe` | that repository | `myorg/safe`, `myorg/*` |
+
+The alternatives are to widen `allowed-repositories` on the connection, which
+widens it for every workspace using that connection, or to switch the variable to
+`source = "static"` with a token you have scoped yourself — which is the better
+answer when the credential genuinely needs reach the connection should not have.
+
+### Verification
+
+Re-queue the run and confirm it reaches `planning`. The refusal happens while the
+server resolves variables, so it fails fast and the message names the key it
+refused — a run that gets past `init` has the credential it needs.
+
+## A listener re-join logs an orphaned name and gets a new id
+
+The API logs `listener name maps to a record that no longer exists; registering
+fresh rather than adopting an unverifiable id`, and the listener appears in the pool
+with a new id while the old one disappears from the list.
+
+This is expected and self-healing. A listener's name → id mapping and its own record
+are separate Redis keys with the same TTL, refreshed together by every heartbeat. If
+they diverge — an eviction under memory pressure, a cluster failover losing one slot,
+or the pipeline that writes them partially applying, which it can because the two
+prefixes hash to different slots in cluster mode — the name points at a record that
+is gone. Terrapod will not adopt that id, because there is no way to read which pool
+owned it, and writing the joining pool's id into it is precisely the cross-pool
+redirect the join check exists to refuse. (GHSA-vr88-c3hx-xr4h)
+
+### What to check
+
+Nothing, if it happens once. The listener re-registers, the stale name key is
+overwritten, and runs dispatch normally. If it repeats on every join, the Redis
+instance is losing keys — check `maxmemory-policy` (it should not be an `allkeys-*`
+eviction policy; Terrapod's keys all carry their own TTLs) and the instance's
+eviction counters.
+
+Distinguish it from the refusal on the same path: `A listener named '…' is already
+registered to a different agent pool` is a **409** and is not self-healing. That one
+means two pools are using the same listener name, which has no legitimate meaning —
+rename one listener, or delete the registration from the pool that holds it.
+
