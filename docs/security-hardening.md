@@ -415,10 +415,12 @@ curl -X PATCH "$TERRAPOD/api/terrapod/v1/vcs-connections/vcs-<id>" \
         "labels": {"team": "platform"}}}}'
 ```
 
-> **Never label a connection `access: everyone`.** That label is merged into every
-> caller's effective allow rules and every authenticated user implicitly holds the
-> `everyone` role, so it makes the connection — and every repository its
-> credential can reach — nameable by anyone.
+> **An `access` key is ignored on a connection** — deliberately, and unlike every
+> other labelled resource. Honouring `access: everyone` would make the connection,
+> and every repository its credential can reach, nameable by every authenticated
+> user. So it is stripped before the labels are evaluated: harmless, but it will
+> not delegate anything either. Use a role's `allow-labels` against the
+> connection's other labels, or set `owner-email`.
 
 **2. Narrow `allowed-repositories`.** This is **empty by default, and empty means
 any repository the credential can reach**, so an upgrade changes nothing until you
@@ -489,7 +491,7 @@ Run-time refusals (a `git_http_auth` credential naming a connection the workspac
 may not use) fail the run with the reason rather than running without the
 credential, so they surface on the run itself, not as a 403.
 
-Full semantics, including the four points the allowlist is enforced at, are in
+Full semantics, including the eight points the allowlist is enforced at, are in
 [vcs-integration.md → Naming a VCS
 connection](vcs-integration.md#naming-a-vcs-connection-is-authorized).
 

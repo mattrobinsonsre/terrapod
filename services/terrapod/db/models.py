@@ -389,8 +389,11 @@ class Workspace(Base):
 
     # Whether a pull request opened from a FORK may trigger a speculative plan.
     #
-    # ON by default on this release line, and that is deliberate: a patch must not
-    # stop a fork pull request that plans today. 2.0 defaults it off. A plan executes the PR
+    # OFF by default (GHSA-gp5w-76rw-c452). The control itself shipped in v1.7.7
+    # and v1.8.2 defaulting ON, because a patch must not stop a fork pull request
+    # that plans today; v1.9.0 flips the default for NEW rows and deliberately does
+    # not rewrite existing ones, so an operator upgrading audits rather than being
+    # surprised. A plan executes the PR
     # author's code — provider configuration, `external` data sources,
     # `local-exec` — with everything the run receives: env-category secrets,
     # sensitive variables, Vault-resolved values, minted git credentials and the

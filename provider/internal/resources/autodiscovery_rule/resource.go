@@ -395,7 +395,7 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				},
 			},
 			"allow_fork_pr_plans": schema.BoolAttribute{
-				Description: "Give fork pull requests a speculative plan on workspaces this rule creates. Defaults to true on this release line (false from 2.0): such a plan runs the pull request author's code with the workspace's full credential set, and a fork author cannot merge, so it is the only path by which their code reaches those credentials (GHSA-gp5w-76rw-c452). Pull requests opened from branches within the repository itself are unaffected and always plan.",
+				Description: "Give fork pull requests a speculative plan on workspaces this rule creates. Defaults to false: such a plan runs the pull request author's code with the workspace's full credential set, and a fork author cannot merge, so it is the only path by which their code reaches those credentials (GHSA-gp5w-76rw-c452). Pull requests opened from branches within the repository itself are unaffected and always plan.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{

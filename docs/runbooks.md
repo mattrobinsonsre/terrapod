@@ -2311,12 +2311,23 @@ and from a non-admin running the OpenTofu/Terraform provider.
    `GET /api/v2/organizations/default/varsets`. Compare its dimensions against
    the attributes the refused request was setting.
 
-3. **Work out which attribute did it.** Only these can move the answer: `labels`,
-   `name`, `execution-backend`, `execution-mode`, `terraform-version`,
-   `engine-version`, `agent-pool-id`/`agent-pool-ids`, `vcs-connection-id` (as
-   attribute *or* relationship), `vcs-repo-url` and `owner-email`. A request
-   touching none of them is never checked, so if the refusal appeared on what
-   looks like an unrelated edit, one of those is in the body.
+3. **Work out which attribute did it.** The usual suspects are the ones a rule can
+   select on: `labels`, `name`, `execution-backend`, `execution-mode`,
+   `terraform-version`, `engine-version`, `agent-pool-id`/`agent-pool-ids`,
+   `vcs-connection-id` (as attribute *or* relationship), `vcs-repo-url` and
+   `owner-email`.
+
+   But do **not** read that as a closed list — the guard is a *denylist* and fails
+   open on purpose. It skips the check only for attributes proven unable to move a
+   rule dimension (`description`, `auto-apply`, `slack-channel`, `debug-mode` and
+   about twenty others); **anything outside that list triggers it**, including an
+   attribute added after the list was written, and **any relationship in the body
+   triggers it unconditionally**. An allowlist of triggering keys was tried first and
+   was the bug: a new attribute silently escaped the check.
+
+   So a refusal on a seemingly unrelated edit is expected behaviour, not a puzzle —
+   the request still has to *grow* the set of secret-bearing rule-assigned sets to be
+   refused, which step 4 is how you confirm.
 
 4. **Confirm it is growth, not membership.** These are all still allowed, so if
    one of them is being refused, that is a bug worth reporting:

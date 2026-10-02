@@ -109,12 +109,6 @@ values are affected — `notifications.smtp.use_tls` and `database.pool_pre_ping
 and in both cases honouring the setting changes behaviour on upgrade. Check both
 before upgrading; the release notes have the table.
 
-## Announced behaviour changes for 2.0
-
-These are not deprecated surfaces. They are changes to what an existing field
-reports, so there is no `Deprecation` header to watch. Each keeps its current
-behaviour through every 1.x release.
-
 ### A mandatory AI policy gate holds a run whose plan it saw only in part
 
 A plan over `ai_summary.plan_json_max_bytes` is reduced before the model sees it,
@@ -154,6 +148,61 @@ one was protected while the other was not. Loopback is exempt; set
 `TERRAPOD_ALLOW_INSECURE_TRANSPORT=1` if plaintext is deliberate — the same
 variable the Terrapod side already honours.
 ([`GHSA-r98p-vq35-mcg2`](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-r98p-vq35-mcg2).)
+
+### A PR-comment command requires push access to the repository
+
+`vcs.require_push_permission_for_commands` defaults **true**, so a `terrapod plan`,
+`apply` or `unlock` comment from someone without push access is now refused with a
+reply saying so (`help` is exempt — it only prints the usage table). Previously
+commenting was enough.
+
+Who this stops that was previously succeeding: outside contributors on a public
+module repository, organisation members with triage or read, bots and CI tokens that
+are not collaborators, and GitLab Reporters (level 20) or anyone whose access
+`members/all/` cannot resolve. The check **fails closed**, so a provider rate limit
+or outage refuses commands rather than allowing them — which means a VCS rate-limit
+incident now also silences the comment surface. Set
+`api.config.vcs.require_push_permission_for_commands: false` to restore the previous
+behaviour. (`GHSA-x4jp-5g4j-f8rr`, critical.)
+
+### The pinned platform-tool versions moved
+
+`registry.platform_tools` now defaults to OPA **1.21.1**, Trivy **0.75.0** and
+Checkov **3.3.21** (from 1.21.0 / 0.74.0 / 3.3.19). These binaries are not in any
+image — they are fetched at run time, and a fetch failure is **fatal to the run**
+rather than a silently skipped gate.
+
+So on an air-gapped or egress-restricted deployment whose mirror holds only the old
+versions, every run with a policy set applied and every run with scanning on will
+error after `helm upgrade`, without the operator having changed anything. **Seed
+your mirror with the new versions first**, or pin the old ones in your values. A
+routine bump on a connected deployment; not routine behind a mirror.
+
+### A variable-set assignment rule naming `drift_status` or `locked` stops matching
+
+Both are self-assignable, so a rule selecting on either could be satisfied by the
+workspace's own owner — which is the escalation `GHSA-49q6-pm68-3xgw` is about. A
+new rule naming one is refused with `422`; a **rule stored before this release
+silently matches nothing**, so the set stops reaching its workspaces. The only
+signal is a warning in the API log, and if that set carried a required `TF_VAR` the
+next plan fails with an opaque Terraform error.
+
+Find them before upgrading:
+
+```sql
+SELECT id, name, assignment_rule
+FROM   variable_sets
+WHERE  assignment_rule ?| array['drift_status', 'locked'];
+```
+
+Re-express each rule on something an admin controls — a label is the usual answer —
+or assign the set explicitly.
+
+## Announced behaviour changes for 2.0
+
+These are not deprecated surfaces. They are changes to what an existing field
+reports, so there is no `Deprecation` header to watch. Each keeps its current
+behaviour through every 1.x release.
 
 ### A run held at a post-plan gate stops reporting `planning` (v1.7.2)
 

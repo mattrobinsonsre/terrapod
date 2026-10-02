@@ -48,7 +48,8 @@ fork author is not — they cannot push to the base repository and cannot merge.
 In this mode the stake is higher than elsewhere, because a PR push creates a
 full plan-and-apply-capable run rather than a speculative one. Terrapod
 therefore skips fork pull requests entirely unless the workspace sets
-`allow-fork-pr-plans` (on by default on this release line; off from 2.0). Pull requests raised from a branch in
+`allow-fork-pr-plans`, which **defaults false** (`GHSA-gp5w-76rw-c452`) — and in this mode the run a fork
+pull request would get is apply-capable, not merely speculative. Pull requests raised from a branch in
 the repository itself are unaffected. See [Pull requests from
 forks](vcs-integration.md#pull-requests-from-forks).
 
@@ -140,7 +141,7 @@ Commands must start with `terrapod` (or the configured mention prefix — e.g. `
 | `terrapod unlock` | Release the workspace lock if stuck |
 | `terrapod help` | List commands |
 
-Every one of them requires the commenter to have push access to the repository — see [Authorization model](#authorization-model-for-apply-then-merge--read-this-carefully).
+Every one of them **except `help`** requires the commenter to have push access to the repository — `help` only prints the table above, so gating it would refuse to tell someone why they were refused — see [Authorization model](#authorization-model-for-apply-then-merge--read-this-carefully).
 
 Code-fenced blocks don't match — discussing the bot in a code sample never accidentally triggers a command.
 

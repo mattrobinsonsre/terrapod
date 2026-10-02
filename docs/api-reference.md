@@ -354,7 +354,7 @@ checked on **create** and on **`PATCH`**, and both answer **403**.
 |---|---|---|
 | Not authorized to use VCS connection `vcs-…` | The body names a connection the caller has no claim to. Checked on create, and on update only when the connection actually **changes**. Both the `vcs-connection-id` attribute and the `vcs-connection` relationship are covered. | Ask a platform admin to set the connection's `owner-email` or `labels`, or create the workspace under someone who already has a claim. See [Authorization and repository scope](#connection-authorization-attributes). |
 | Connection `vcs-…` is restricted to specific repositories and `…` is not one of them | The named connection has a non-empty `allowed-repositories` that `vcs-repo-url` does not match. Re-checked on **every** update that leaves a connection attached, since `vcs-repo-url` is separately settable. | Use a repository inside the connection's scope, or ask a platform admin to widen `allowed-repositories`. |
-| This change would make the workspace match the assignment rule of variable set `…` | The attributes being set would pull in a **rule-assigned** variable set that is not already reaching this workspace, and the caller is not a platform admin. | Ask a platform admin to make the change, or to assign the set to the workspace explicitly. See [Assignment Rules](#assignment-rules). |
+| This change would make the workspace match the assignment rule of variable set `…` | The attributes being set would pull in a **rule-assigned** variable set **that carries a sensitive or broker-resolved value** and is not already reaching this workspace, and the caller is not a platform admin. A rule-assigned set of plain configuration joins freely — the refusal is scoped to the reported impact, because refusing every match would close the documented self-service workflow as well as the finding. | Ask a platform admin to make the change, or to assign the set to the workspace explicitly. See [Assignment Rules](#assignment-rules). |
 
 The variable-set refusal compares the rule-assigned sets reaching the workspace
 **before and after** the pending change, so:
@@ -1141,7 +1141,7 @@ Returns the **single-workspace resource dependency graph** behind the [State Res
 
 ### AI Architecture Critique (Terrapod Extension)
 
-State-based, whole-system critique (#1036 Part 2). Reviews the workspace's deployed system **as it exists** — inferred from its current Terraform state (+ the resource graph, the deterministic cost estimate, and the deterministic security-scan findings) and critiqued across resilience / security / cost / well-architected. Distinct from the per-run [Plan Summary](#plan-summary), which reviews a *change*. Enabled by the independent `ai_architecture` config (on by default on this release line; off from 2.0).
+State-based, whole-system critique (#1036 Part 2). Reviews the workspace's deployed system **as it exists** — inferred from its current Terraform state (+ the resource graph, the deterministic cost estimate, and the deterministic security-scan findings) and critiqued across resilience / security / cost / well-architected. Distinct from the per-run [Plan Summary](#plan-summary), which reviews a *change*. Enabled by the independent `ai_architecture` config, which is **off by default** — the surface self-gates to 404 until an operator turns it on. It is deliberately a separate switch from `ai_summary`: the critic reads whole-workspace **state**, so enabling it sends resource attributes to the configured model endpoint.
 
 ```
 GET  /api/terrapod/v1/workspaces/{workspace_id}/architecture-critique
@@ -2037,7 +2037,8 @@ Specifically:
 
 Terrapod enforces the one invariant it can without an entitlement to consult: a
 caller who is **not** a platform admin may not make a workspace match a
-rule-assigned set it does not already match. That covers workspace create and
+rule-assigned set **that holds a sensitive or broker-resolved value** and that it
+does not already match. A rule-assigned set of plain configuration joins freely. That covers workspace create and
 workspace `PATCH` — the paths where the attributes are chosen — and is a **403**;
 see [Refusals on create and update](#refusals-on-create-and-update). It is a
 behaviour change: a non-admin who previously created workspaces that joined a
@@ -2531,7 +2532,7 @@ it. Anything else is **403**. Patterns in `allowed-repositories` are matched
 against both the full URL as stored and the `owner/name` path with any `.git`
 suffix removed, so `platform-team/*` and
 `https://github.example.com/platform-team/*` both work; `*` crosses `/`, and
-patterns are case-sensitive. Full semantics, including the four points the
+patterns are case-sensitive. Full semantics, including the eight points the
 allowlist is enforced at, are in
 [VCS integration → Naming a VCS connection is authorized](vcs-integration.md#naming-a-vcs-connection-is-authorized).
 
@@ -2723,7 +2724,7 @@ These are editable in the UI under **Admin → Autodiscovery**, alongside the ru
 - `ai-summary-mode` / `ai-summary-context` — the AI plan-summary opt-in and its free-text context for every created workspace (#1763).
 - `ai-policy-mode` — the AI **policy gate** per-workspace override for every created workspace. `disabled` opts out of an advisory verdict only, and a mandatory deployment-wide gate ignores it; `enabled` is a synonym for `default` and has no effect (#1766).
 - `terragrunt-enabled` / `terragrunt-version`, `vcs-workflow`, `auto-merge` / `auto-merge-strategy`, `drift-detection-enabled` / `drift-detection-interval-seconds`, `drift-ignore-rules`, `plan-expiry-seconds` and `slack-channel` — the remaining per-workspace settings (#1763). `drift-detection-enabled` defaults **true** here, unlike the workspace column, because every autodiscovered workspace is VCS-connected.
-- `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **true** on this release line (false from 2.0), as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
+- `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **false**, as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
 - `allow-fork-pr-plans` — let a pull request opened from a fork plan on every created workspace. Defaults **false**, matching the workspace column rather than overriding it the way `drift-detection-enabled` does: an operator who decides fork pull requests should plan has to say so, and a rule is how they say it once for every directory the repository grows later. Without it, enabling the setting in bulk holds only until autodiscovery creates the next workspace — which reads as the setting not working. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks).
 
 These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template). The same pairing holds for the scan and AI-summary settings, and their values are validated by the same rules the workspace endpoint uses — so a rule cannot template a setting the workspace API would reject.

@@ -97,7 +97,7 @@ func (r *vcsConnectionResource) Metadata(_ context.Context, req resource.Metadat
 
 func (r *vcsConnectionResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a Terrapod VCS connection. This resource is immutable — any change forces replacement.",
+		Description: "Manages a Terrapod VCS connection. The access controls — `owner_email`, `labels` and `allowed_repositories` — are updated in place; everything that identifies the connection or authenticates it forces replacement. Adding an RBAC label or tightening a repository pattern therefore does NOT destroy the connection or unlink the workspaces using it.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The VCS connection ID (e.g. vcs-abc123).",

@@ -61,8 +61,8 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			// A pointer all the way through, so "leave it alone" stays
 			// distinguishable from "turn it off" (GHSA-gp5w-76rw-c452). Unset
 			// is omitted from the request, leaving the server's default — which
-			// on this release line is ON — rather than asserting a value over
-			// whatever the operator chose.
+			// is OFF — rather than asserting a value over whatever the operator
+			// chose.
 			AllowForkPRPlans: in.AllowForkPRPlans,
 		})
 		if err != nil {

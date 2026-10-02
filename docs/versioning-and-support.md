@@ -61,7 +61,7 @@ for every public surface below.
 > **v1.9.0 uses it more widely, and once outside its own wording.** Five tightenings
 > close reported findings: fork pull requests no longer plan by default, a non-admin
 > cannot join a secret-bearing variable set, using a VCS connection requires a claim,
-> a scoped token cannot widen itself, and every PR-comment command requires push
+> a scoped token cannot widen itself, and every PR-comment command that acts requires push
 > access. Those are permission tightenings, which is what this exception is for. The
 > sixth is not: **`terrapod merge` was removed outright**, and a comment verb is a
 > command surface, not a permission. It is recorded in

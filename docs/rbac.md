@@ -78,21 +78,27 @@ So a role grants "this team may build workspaces on this installation", never
 1. **Platform admin** → may name any connection
 2. **Connection owner** (`owner_email == user.email`) → may name it
 3. **Label-based RBAC** — the caller's custom roles matched against the
-   connection's `labels`, and against the connection's **name** via
-   `allow-names`/`deny-names`, with deny winning as always
+   connection's `labels` **only**, with deny winning as always. The connection's
+   **name is deliberately not matched**: `allow-names` is a flat namespace shared
+   across every resource type, so a role written `allow-names: ["prod-net"]` for a
+   workspace would otherwise also authorise the *connection* called `prod-net`
 4. **Already owns a workspace using it** → may name it again, since the access is
    one they already hold
 5. **Default** → **403**
 
-There is **no `everyone` floor in the sense of a read level** — there is nothing
-to read — but the `access: everyone` label behaves the same way it does elsewhere
-and is worth calling out:
+There is **no `everyone` floor here, and the label is ignored rather than
+honoured.** Everywhere else, `access: everyone` grants a read level to every
+authenticated user. On a VCS connection it is dropped before the labels are
+evaluated:
 
-> **Do not label a VCS connection `access: everyone`.** That label is merged into
-> every caller's effective allow rules, and every authenticated user implicitly
-> holds the `everyone` role — so it makes the connection, and therefore every
-> repository its credential can reach, nameable by any authenticated user. It
-> reopens the finding the owner/label columns exist to close.
+> **An `access` key on a VCS connection has no effect.** Honouring it would make
+> the connection — and therefore every repository its credential can reach —
+> nameable by every authenticated user, since all of them implicitly hold the
+> `everyone` role. That is a one-label revert of the finding the owner and label
+> columns exist to close, so the key is stripped. Labelling a connection
+> `access: everyone` is not dangerous; it simply does nothing, and the connection
+> stays reachable only by an admin, its owner, a role matching its *other* labels,
+> or someone who already owns a workspace on it.
 
 Two further asymmetries, both deliberate:
 
@@ -110,7 +116,8 @@ Two further asymmetries, both deliberate:
 workspace, pool, registry and catalog axes, so a connection's labels will not
 appear in its output. Review a connection's delegation by reading the connection
 itself (`GET /api/terrapod/v1/vcs-connections`, admin only) against the role's
-`allow-labels` and `allow-names`. Because the same allow/deny rules are used, a
+`allow-labels` and `deny-labels` — **not** `allow-names`, which is not consulted for
+a connection (see above). Because the same label rules are used, a
 preview of what the role reaches on the **workspace** axis is still a good proxy
 for which labels that role matches.
 

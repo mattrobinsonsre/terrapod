@@ -351,7 +351,7 @@ budget resets or an admin overrides — the budget is fleet-wide.
 
 ### It will not rule on a plan it was only partly shown
 
-A plan document larger than `ai_summary.plan_json_max_bytes` (default 600 KB) is
+A plan document larger than `ai_summary.plan_json_max_bytes` (600 KB in code, but **the Helm chart ships 500 KB** — size against what your deployment sets) is
 reduced before the model sees it. A **mandatory** gate handed a reduced plan
 records an un-ruled evaluation and holds the run, by the same principle as the
 section above: a gate cannot infer consent from evidence it was never shown, any
@@ -432,7 +432,7 @@ Set to `0` for unlimited.
 
 The counter is on output tokens only (cheaper to reason about than
 mixed input/output cost). Input-side cost is bounded by
-`plan_json_max_bytes` (default 600 KB) and `code_context_max_bytes`
+`plan_json_max_bytes` (600 KB in code, but **the Helm chart ships 500 KB** — size against what your deployment sets) and `code_context_max_bytes`
 (default 200 KB).
 
 ## Skipping and overrides
@@ -476,7 +476,7 @@ the bulk of the request):
   output by the runner, cleaned (`prior_state` stripped, no-op
   resource_changes pruned, drift partitioned, etc. — see
   `_clean_plan_json_bytes`). Bounded by
-  `ai_summary.plan_json_max_bytes` (default 600 KB): under the cap the
+  `ai_summary.plan_json_max_bytes` (600 KB in code, but **the Helm chart ships 500 KB** — size against what your deployment sets): under the cap the
   plan is sent unchanged; over it, `_fit_plan_json` reduces structurally
   — every change keeps its address and actions (destroys → creates →
   updates → sampled remainder) so a `destroy` is never hidden; only
