@@ -2,12 +2,13 @@ package terrapod
 
 import (
 	"context"
-	// nosemgrep: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-md5
 	// The TFE state-version API carries an `md5` attribute and go-tfe sends it, so
-	// this is a protocol field rather than a security primitive. Suppressed here
-	// rather than by --exclude-rule so the rule keeps covering the rest of the Go
-	// tree; the python equivalent is excluded repo-wide, which is broader than it
-	// needs to be.
+	// this is a protocol field rather than a security primitive. Suppressed at the
+	// line rather than by --exclude-rule so the rule keeps covering the rest of the
+	// Go tree; the python equivalent is excluded repo-wide, which is broader than it
+	// needs to be. The nosemgrep comment must sit on the finding's own line or the
+	// one IMMEDIATELY above it — further away and semgrep ignores it silently.
+	// nosemgrep: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-md5
 	"crypto/md5" //nolint:gosec // not a security primitive — TFE-compatible checksum
 	"encoding/hex"
 	"fmt"
