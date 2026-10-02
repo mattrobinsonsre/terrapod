@@ -121,7 +121,7 @@ async def test_linked_but_unauthorised_is_denied_without_mutation():
     )
     ws = SimpleNamespace(id="ws-1", name="prod")
     db = _db_with(run, ws)
-    link = SimpleNamespace(terrapod_email="dev@example.com")
+    link = SimpleNamespace(terrapod_email="dev@example.com", identity_provider="okta")
     confirm, nudge = AsyncMock(), AsyncMock()
     # caps without RUN_APPLY (e.g. read only)
     ps = _patches(db=db, link=link, caps=frozenset({"run:read"}), confirm=confirm, nudge=nudge)
@@ -149,7 +149,7 @@ async def test_authorised_approve_confirms_commits_and_updates_message():
     )
     ws = SimpleNamespace(id="ws-1", name="prod")
     db = _db_with(run, ws)
-    link = SimpleNamespace(terrapod_email="lead@example.com")
+    link = SimpleNamespace(terrapod_email="lead@example.com", identity_provider="okta")
     confirm, update = AsyncMock(), AsyncMock()
     ps = _patches(db=db, link=link, caps=frozenset({RUN_APPLY}), confirm=confirm, update=update)
     for p in ps:
@@ -179,7 +179,7 @@ async def test_authorised_discard_calls_discard_run():
     )
     ws = SimpleNamespace(id="ws-1", name="prod")
     db = _db_with(run, ws)
-    link = SimpleNamespace(terrapod_email="lead@example.com")
+    link = SimpleNamespace(terrapod_email="lead@example.com", identity_provider="okta")
     confirm, discard, update = AsyncMock(), AsyncMock(), AsyncMock()
     ps = _patches(
         db=db,
@@ -214,7 +214,7 @@ async def test_stale_run_valueerror_is_surfaced_not_crashed():
     )
     ws = SimpleNamespace(id="ws-1", name="prod")
     db = _db_with(run, ws)
-    link = SimpleNamespace(terrapod_email="lead@example.com")
+    link = SimpleNamespace(terrapod_email="lead@example.com", identity_provider="okta")
     confirm = AsyncMock(side_effect=ValueError("Can only confirm runs in 'planned' status"))
     nudge, update = AsyncMock(), AsyncMock()
     ps = _patches(
@@ -303,7 +303,7 @@ class TestASlackDrivenDecisionIsAudited:
         audit = AsyncMock()
         await _click(
             ACTION_APPROVE,
-            link=SimpleNamespace(terrapod_email="lead@example.com"),
+            link=SimpleNamespace(terrapod_email="lead@example.com", identity_provider="okta"),
             caps=frozenset({RUN_APPLY}),
             audit=audit,
         )
@@ -324,7 +324,7 @@ class TestASlackDrivenDecisionIsAudited:
         audit = AsyncMock()
         await _click(
             ACTION_DISCARD,
-            link=SimpleNamespace(terrapod_email="lead@example.com"),
+            link=SimpleNamespace(terrapod_email="lead@example.com", identity_provider="okta"),
             caps=frozenset({RUN_APPLY}),
             audit=audit,
         )
@@ -341,7 +341,7 @@ class TestASlackDrivenDecisionIsAudited:
         audit = AsyncMock()
         await _click(
             ACTION_APPROVE,
-            link=SimpleNamespace(terrapod_email="dev@example.com"),
+            link=SimpleNamespace(terrapod_email="dev@example.com", identity_provider="okta"),
             caps=frozenset({"run:read"}),
             audit=audit,
         )
@@ -383,7 +383,7 @@ class TestASlackDrivenDecisionIsAudited:
         audit = AsyncMock(side_effect=lambda *a, **k: order.append("audit"))
         await _click(
             ACTION_APPROVE,
-            link=SimpleNamespace(terrapod_email="lead@example.com"),
+            link=SimpleNamespace(terrapod_email="lead@example.com", identity_provider="okta"),
             caps=frozenset({RUN_APPLY}),
             audit=audit,
             db=db,
@@ -396,7 +396,7 @@ class TestASlackDrivenDecisionIsAudited:
         audit = AsyncMock()
         await _click(
             ACTION_APPROVE,
-            link=SimpleNamespace(terrapod_email="lead@example.com"),
+            link=SimpleNamespace(terrapod_email="lead@example.com", identity_provider="okta"),
             caps=frozenset({RUN_APPLY}),
             audit=audit,
             confirm=AsyncMock(side_effect=ValueError("Can only confirm runs in 'planned' status")),
@@ -411,7 +411,7 @@ class TestASlackDrivenDecisionIsAudited:
         update = AsyncMock()
         await _click(
             ACTION_APPROVE,
-            link=SimpleNamespace(terrapod_email="lead@example.com"),
+            link=SimpleNamespace(terrapod_email="lead@example.com", identity_provider="okta"),
             caps=frozenset({RUN_APPLY}),
             audit=AsyncMock(side_effect=RuntimeError("audit table is gone")),
             update=update,
@@ -440,7 +440,7 @@ class TestADestroyNeedsTheDestroyCapability:
         )
         ws = SimpleNamespace(id="ws-1", name="prod")
         db = _db_with(run, ws)
-        link = SimpleNamespace(terrapod_email="lead@example.com")
+        link = SimpleNamespace(terrapod_email="lead@example.com", identity_provider="okta")
         confirm, nudge = AsyncMock(), AsyncMock()
         ps = _patches(db=db, link=link, caps=frozenset({RUN_APPLY}), confirm=confirm, nudge=nudge)
         for p in ps:
@@ -468,7 +468,7 @@ class TestADestroyNeedsTheDestroyCapability:
         )
         ws = SimpleNamespace(id="ws-1", name="prod")
         db = _db_with(run, ws)
-        link = SimpleNamespace(terrapod_email="lead@example.com")
+        link = SimpleNamespace(terrapod_email="lead@example.com", identity_provider="okta")
         confirm, update = AsyncMock(), AsyncMock()
         ps = _patches(
             db=db,
@@ -485,3 +485,44 @@ class TestADestroyNeedsTheDestroyCapability:
             for p in reversed(ps):
                 p.stop()
         confirm.assert_awaited_once()
+
+
+class TestTheSlackPathIsProviderScoped:
+    """A Slack action resolves roles against the binding's IdP, not across all of them.
+
+    GHSA-3m8x-ff8g-7x8c. The binding is a long-lived email -> Slack-user mapping, and
+    resolving its roles by email alone gave every Slack action the union of what that
+    address was assigned under any configured provider. Every other test here patches
+    the resolver, so without this one the provider argument could be dropped from the
+    call and nothing would fail.
+    """
+
+    async def test_the_links_provider_is_passed_to_role_resolution(self):
+        resolver = AsyncMock(return_value=["everyone"])
+        run = SimpleNamespace(
+            id="run-1",
+            workspace_id="ws-1",
+            status="planned",
+            is_destroy=False,
+            configuration_version_id=None,
+        )
+        ws = SimpleNamespace(id="ws-1", name="prod")
+        db = _db_with(run, ws)
+        link = SimpleNamespace(terrapod_email="dev@example.com", identity_provider="okta")
+        ps = _patches(db=db, link=link, caps=frozenset())
+        ps = [p for p in ps if "_resolve_user_roles" not in str(p)]
+        ps.append(patch("terrapod.api.dependencies._resolve_user_roles", resolver))
+        for p in ps:
+            p.start()
+        try:
+            await si.handle_block_actions(_payload(ACTION_APPROVE))
+        finally:
+            for p in reversed(ps):
+                p.stop()
+
+        resolver.assert_awaited_once()
+        passed = resolver.await_args.args + tuple(resolver.await_args.kwargs.values())
+        assert "okta" in passed, (
+            "the binding's identity_provider is not reaching _resolve_user_roles, so "
+            f"Slack actions resolve roles across every provider again: {passed!r}"
+        )

@@ -84,7 +84,9 @@ async def authenticate_oci(request: Request) -> AuthenticatedUser:
             if api_token.kind == PEER_KIND:
                 raise OCIError(UNAUTHORIZED, message="authentication required")
             email = api_token.bound_to or ""
-            roles = await _resolve_user_roles(db, email) if email else []
+            roles = (
+                await _resolve_user_roles(db, email, api_token.identity_provider) if email else []
+            )
             request.state.user_email = email
             return AuthenticatedUser(
                 email=email,
@@ -92,6 +94,7 @@ async def authenticate_oci(request: Request) -> AuthenticatedUser:
                 roles=roles,
                 provider_name="api_token",
                 auth_method="api_token",
+                identity_provider=api_token.identity_provider,
                 kind=api_token.kind,
                 pinned_roles=api_token.pinned_roles,
             )
@@ -105,6 +108,7 @@ async def authenticate_oci(request: Request) -> AuthenticatedUser:
             roles=session.roles,
             provider_name=session.provider_name,
             auth_method="session",
+            identity_provider=session.provider_name,
         )
 
     raise OCIError(UNAUTHORIZED, message="authentication required")

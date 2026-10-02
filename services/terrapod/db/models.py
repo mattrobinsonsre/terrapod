@@ -197,6 +197,16 @@ class APIToken(Base):
     bound_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # The minter (audit). Always set, even for detached (its only creator record).
     created_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    # The IdP the owning identity authenticated with, matching
+    # `RoleAssignment.provider_name` / `PlatformRoleAssignment.provider_name`.
+    # Both assignment tables are keyed (provider, email), but token role
+    # resolution used to query on email alone, so a token minted after a login at
+    # a weak provider inherited every role assigned to that address under ANY
+    # provider, up to platform admin (GHSA-3m8x-ff8g-7x8c). Resolution now joins
+    # on this too. NULL means the token predates the column: it resolves to no
+    # roles rather than to all of them, because guessing a provider is how the
+    # original hole worked.
+    identity_provider: Mapped[str | None] = mapped_column(String(63), nullable=True)
     # Token's own pinned role set (service tokens). Resolved through label-RBAC.
     pinned_roles: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     # Legacy TFE-shaped field, superseded by `kind`. Retained (unread) for
@@ -2192,6 +2202,13 @@ class SlackIdentityLink(Base):
     # The bound Terrapod principal. Email-first identity; no FK (a user row may not
     # exist for SSO-only identities, mirroring role_assignments' email keying).
     terrapod_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    # The IdP the linking principal authenticated with, matching
+    # `RoleAssignment.provider_name`. Without it the Slack path resolved roles by
+    # email across every provider, so a Slack action carried the union of what
+    # that address was assigned anywhere (GHSA-3m8x-ff8g-7x8c). NULL (a link made
+    # before the column) resolves to no roles and the action is refused, rather
+    # than guessing a provider.
+    identity_provider: Mapped[str | None] = mapped_column(String(63), nullable=True)
     linked_via: Mapped[str] = mapped_column(String(32), nullable=False, default="slash_command")
     linked_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=now_utc

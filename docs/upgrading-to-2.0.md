@@ -609,6 +609,69 @@ more than 60 seconds either side of the API's clock, so a listener cluster whose
 clock has drifted further than that fails to authenticate. That is a real failure
 mode on long-running VMs and in nested virtualisation.
 
+### An OIDC login needs an email the provider vouches for
+
+The email claim is the principal everywhere in Terrapod: it selects role
+assignments, owns workspaces and names token owners. Before 2.0 the OIDC connector
+took it straight from the merged claims and checked nothing, so a provider that
+lets a user set their own address could hand an attacker a victim's identity.
+
+From 2.0 a login is refused when the claims carry no `sub`, carry no `email`, or
+report `email_verified` as false. **A login whose claims simply omit
+`email_verified` is also refused**, because an address nobody vouches for is one
+the person logging in may have chosen.
+
+That last case is the one that can stop a working deployment logging in: some
+providers verify email without sending the claim. If yours is one of them, set it
+per provider:
+
+```yaml
+api:
+  config:
+    auth:
+      sso:
+        oidc:
+          - name: my-idp
+            issuer_url: https://idp.example.com/
+            client_id: "..."
+            require_email_verified: false
+```
+
+An explicit `email_verified: false` is still refused with that set — the relaxation
+covers a missing claim, not a provider telling us the address is unverified. The
+key honours an explicit `false` (it is rendered with `hasKey`, not `| default`).
+
+### An API token's roles are resolved against the provider it was minted under
+
+Role assignments have always been keyed by provider *and* email. Token role
+resolution only ever matched on email, so a token inherited every role assigned to
+that address under **any** configured provider — up to platform admin. With more
+than one login source, an account at the weakest one was enough.
+
+From 2.0 a token records the provider of the identity it is bound to, and
+resolution joins on it. The same applies to the container registry, the package
+proxies and Slack-initiated actions, which resolved roles the same way.
+
+**Tokens minted before the upgrade have no recorded provider, and resolve to no
+roles at all.** They are not silently given every provider's roles, because
+guessing is what the original defect did. The migration attributes what it can
+prove — a token whose owner has a local account with a password is marked `local` —
+and leaves the rest unattributed. Anything unattributed logs a warning naming the
+token id when it is used, so:
+
+```sql
+SELECT id, bound_to, description FROM api_tokens WHERE identity_provider IS NULL;
+```
+
+Re-mint those, or expect 403s from automation that used them. A `terraform login`
+token is re-minted by logging in again.
+
+**`require_external_sso_for_roles` now applies to tokens too.** It was enforced
+only at login, on the session's roles, so a token minted by a local account carried
+the restricted roles regardless. A local-provider token now has them dropped from
+its resolved set — the token keeps working for everything else rather than being
+refused outright, since automation cannot be prompted to go and log in via SSO.
+
 ## Before you upgrade
 
 1. Read the sections above and make the edits they name.

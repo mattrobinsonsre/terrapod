@@ -295,10 +295,17 @@ async def create_user_token(
         bound_to = subject_email
         pinned = None
 
+    # The provider of the OWNING identity, not the minter's. Minting for yourself
+    # carries your own; a delegated mint resolved the subject out of the `users`
+    # table, which holds local accounts only (an SSO identity deliberately has no
+    # row there -- see _resolve_subject_email), so that owner is local. A detached
+    # token owns no identity and gets None.
+    owner_provider = user.identity_provider if is_self else (None if bound_to is None else "local")
     api_token, raw_token = await create_api_token(
         db=db,
         bound_to=bound_to,
         created_by=user.email,
+        identity_provider=owner_provider,
         kind=kind,
         description=body.data.attributes.description,
         lifespan_hours=body.data.attributes.lifespan_hours,

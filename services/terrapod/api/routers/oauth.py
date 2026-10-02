@@ -281,6 +281,7 @@ async def oauth_token(
         db=db,
         bound_to=auth_code.email,
         created_by=auth_code.email,
+        identity_provider=auth_code.provider_name,
         kind="interactive",
         description=f"terraform login ({auth_code.provider_name})",
         lifespan_hours=settings.auth.login_token_ttl_hours or None,

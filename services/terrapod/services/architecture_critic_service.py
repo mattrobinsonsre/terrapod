@@ -375,6 +375,11 @@ def _internal_reader() -> Any:
         roles=["admin"],
         provider_name="internal",
         auth_method="session",
+        # Not an IdP identity at all: this principal is synthesised in-process and
+        # never resolves roles from the assignment tables, so there is no provider
+        # to join on. Stated rather than defaulted so the parity guard can tell a
+        # deliberate internal principal from a forgotten call site.
+        identity_provider=None,
     )
 
 

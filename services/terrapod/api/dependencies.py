@@ -69,6 +69,13 @@ class AuthenticatedUser:
     # the kind-attenuated platform-role view is computed by effective_platform_roles().
     kind: str = "interactive"
     pinned_roles: list[str] | None = None
+    # The IdP this principal authenticated with, matching
+    # `RoleAssignment.provider_name`. NOT the same as `provider_name`, which for a
+    # token is the literal "api_token" (the auth METHOD) -- reading that as an IdP
+    # is how role resolution ended up provider-blind (GHSA-3m8x-ff8g-7x8c). None
+    # for a runner token, and for a credential minted before the provider was
+    # recorded; either way it resolves to no roles rather than to all of them.
+    identity_provider: str | None = None
 
 
 def effective_platform_roles(user: AuthenticatedUser) -> set[str]:
@@ -116,42 +123,108 @@ def label_reach_roles(user: AuthenticatedUser) -> set[str]:
     return roles
 
 
-async def _resolve_user_roles(db: AsyncSession, email: str) -> list[str]:
-    """Resolve a user's roles from role_assignments + platform_role_assignments.
+async def _resolve_user_roles(
+    db: AsyncSession, email: str, identity_provider: str | None
+) -> list[str]:
+    """Resolve a principal's roles from role_assignments + platform_role_assignments.
 
-    Checks Redis cache first (60s TTL). On miss, queries both tables and
-    caches the result.
+    **Both assignment tables are keyed (provider, email), and this must join on
+    both.** It used to query on email alone, so a token minted after a login at
+    one provider inherited every role assigned to that address under *any*
+    provider -- up to platform admin -- which is the whole of
+    GHSA-3m8x-ff8g-7x8c. An attacker needed only an account at the weakest
+    configured provider, using a victim's address.
+
+    ``identity_provider`` is the IdP the principal authenticated with.
+    **None resolves to no roles beyond ``everyone``**: a token minted before the
+    column existed cannot be attributed, and picking a provider for it would
+    reinstate the hole. Such tokens must be re-minted.
+
+    Cached in Redis for 60s. The cache key stays ``tp:token_roles:{email}`` and
+    the *value* holds a per-provider map, deliberately: five call sites already
+    invalidate by that exact key, and adding the provider to the key would mean
+    finding and fixing every one of them -- missing one leaves a stale role set
+    serving after a demotion, which is the failure this function exists to avoid.
     """
     from terrapod.db.models import PlatformRoleAssignment, RoleAssignment
     from terrapod.redis.client import get_redis_client
 
+    if not email or not identity_provider:
+        return ["everyone"] if email else []
+
     redis = get_redis_client()
     cache_key = _TOKEN_ROLES_PREFIX + email
 
-    # Check cache
     cached = await redis.get(cache_key)
+    by_provider: dict[str, list[str]] = {}
     if cached is not None:
-        return json.loads(cached)
+        try:
+            loaded = json.loads(cached)
+            # A list is the pre-provider-scoping shape. Discard it rather than
+            # reading it: it is the union across providers, which is the bug.
+            if isinstance(loaded, dict):
+                by_provider = loaded
+        except (TypeError, ValueError):
+            by_provider = {}
+        if identity_provider in by_provider:
+            return by_provider[identity_provider]
 
-    # Query platform roles (admin, audit)
+    # Platform roles (admin, audit)
     result = await db.execute(
-        select(PlatformRoleAssignment.role_name).where(PlatformRoleAssignment.email == email)
+        select(PlatformRoleAssignment.role_name).where(
+            PlatformRoleAssignment.email == email,
+            PlatformRoleAssignment.provider_name == identity_provider,
+        )
     )
     roles: set[str] = {row[0] for row in result.all()}
 
-    # Query custom role assignments
-    result = await db.execute(select(RoleAssignment.role_name).where(RoleAssignment.email == email))
+    # Custom role assignments
+    result = await db.execute(
+        select(RoleAssignment.role_name).where(
+            RoleAssignment.email == email,
+            RoleAssignment.provider_name == identity_provider,
+        )
+    )
     roles.update(row[0] for row in result.all())
 
-    # Always include 'everyone'
     roles.add("everyone")
+    role_list = _drop_roles_requiring_external_sso(sorted(roles), identity_provider, email)
 
-    role_list = sorted(roles)
-
-    # Cache for 60s
-    await redis.set(cache_key, json.dumps(role_list), ex=_TOKEN_ROLES_CACHE_TTL)
+    by_provider[identity_provider] = role_list
+    await redis.set(cache_key, json.dumps(by_provider), ex=_TOKEN_ROLES_CACHE_TTL)
 
     return role_list
+
+
+def _drop_roles_requiring_external_sso(
+    roles: list[str], identity_provider: str, email: str
+) -> list[str]:
+    """Apply ``require_external_sso_for_roles`` to a non-login principal.
+
+    The login path refuses outright (``_enforce_external_sso_requirement`` in
+    routers/auth.py), but it only ever saw the session's role set -- so a token
+    minted by a local account carried the restricted roles anyway and the policy
+    was advisory in practice (GHSA-3m8x-ff8g-7x8c).
+
+    Here the roles are ATTENUATED rather than the request refused. A token is used
+    by automation that cannot be prompted to go and log in via SSO, so a blanket
+    403 on every call would convert a policy violation into an outage; dropping
+    the restricted roles leaves the token doing exactly what it is still entitled
+    to. Acting with fewer roles than minted is survivable, acting with more is the
+    vulnerability.
+    """
+    restricted = settings.auth.require_external_sso_for_roles
+    if not restricted or identity_provider != "local":
+        return roles
+
+    kept = [r for r in roles if r not in restricted]
+    if len(kept) != len(roles):
+        logger.warning(
+            "Dropped roles requiring external SSO from a local principal",
+            email=email,
+            dropped=sorted(set(roles) - set(kept)),
+        )
+    return kept
 
 
 async def get_current_user(
@@ -201,7 +274,19 @@ async def get_current_user(
 
             # Resolve roles from DB (cached in Redis for 60s)
             email = api_token.bound_to or ""
-            roles = await _resolve_user_roles(db, email) if email else []
+            if email and api_token.identity_provider is None:
+                # Fails closed to no roles, which is right but undiagnosable from
+                # the outside: the caller just starts getting 403s. Name the token
+                # so an operator can find and re-mint it. Only reachable for a
+                # token minted before the provider was recorded.
+                logger.warning(
+                    "API token has no recorded identity provider; it resolves to no roles",
+                    token_id=api_token.id,
+                    bound_to=email,
+                )
+            roles = (
+                await _resolve_user_roles(db, email, api_token.identity_provider) if email else []
+            )
 
             request.state.user_email = email  # for audit middleware
             return AuthenticatedUser(
@@ -210,6 +295,7 @@ async def get_current_user(
                 roles=roles,
                 provider_name="api_token",
                 auth_method="api_token",
+                identity_provider=api_token.identity_provider,
                 kind=api_token.kind,
                 pinned_roles=api_token.pinned_roles,
             )
@@ -229,6 +315,7 @@ async def get_current_user(
                 roles=session.roles,
                 provider_name=session.provider_name,
                 auth_method="session",
+                identity_provider=session.provider_name,
             )
 
     if credentials is not None:
@@ -295,7 +382,9 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             email = api_token.bound_to or ""
-            roles = await _resolve_user_roles(db, email) if email else []
+            roles = (
+                await _resolve_user_roles(db, email, api_token.identity_provider) if email else []
+            )
             request.state.user_email = email
             return AuthenticatedUser(
                 email=email,
@@ -303,6 +392,7 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
                 roles=roles,
                 provider_name="api_token",
                 auth_method="api_token",
+                identity_provider=api_token.identity_provider,
                 kind=api_token.kind,
                 pinned_roles=api_token.pinned_roles,
             )
@@ -320,6 +410,7 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
             roles=session.roles,
             provider_name=session.provider_name,
             auth_method="session",
+            identity_provider=session.provider_name,
         )
 
     raise HTTPException(

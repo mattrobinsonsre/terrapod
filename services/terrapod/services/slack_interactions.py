@@ -169,13 +169,14 @@ async def _act(
             return
 
         # 2. LIVE roles for this email → AuthenticatedUser (identity ≠ entitlement).
-        roles = await _resolve_user_roles(db, email)
+        roles = await _resolve_user_roles(db, email, link.identity_provider)
         user = AuthenticatedUser(
             email=email,
             display_name=None,
             roles=roles,
             provider_name="slack",
             auth_method="session",
+            identity_provider=link.identity_provider,
             kind="interactive",
         )
 

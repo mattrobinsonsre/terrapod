@@ -109,6 +109,7 @@ async def create_api_token(
     *,
     bound_to: str | None,
     created_by: str,
+    identity_provider: str | None = None,
     kind: str = "interactive",
     description: str = "",
     lifespan_hours: int | None = None,
@@ -119,6 +120,12 @@ async def create_api_token(
     The raw token value is only available at creation time. ``bound_to`` is
     the owning identity (None for detached); ``created_by`` is the minter
     (audit). ``lifespan_hours`` is clamped to the kind's cap.
+
+    ``identity_provider`` is the IdP of the OWNING identity, and role resolution
+    joins on it (GHSA-3m8x-ff8g-7x8c): assignments are keyed (provider, email), so
+    without it a token inherited every role assigned to that address under any
+    provider. Leaving it None is safe but inert -- such a token resolves to no
+    roles at all -- so pass it whenever the owner's provider is actually known.
     """
     raw_token = _generate_raw_token()
     token_id = _generate_token_id()
@@ -140,6 +147,7 @@ async def create_api_token(
         kind=kind,
         bound_to=bound_to,
         created_by=created_by,
+        identity_provider=identity_provider,
         pinned_roles=pinned_roles,
         lifespan_hours=lifespan_hours,
     )

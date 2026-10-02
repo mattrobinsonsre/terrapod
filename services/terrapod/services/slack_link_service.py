@@ -240,9 +240,16 @@ async def create_link(
     team_id: str,
     user_id: str,
     email: str,
+    identity_provider: str | None = None,
     via: str = "slash_command",
 ) -> SlackIdentityLink:
-    """Upsert the (team, user) → email binding. Idempotent (re-link updates email)."""
+    """Upsert the (team, user) → email binding. Idempotent (re-link updates email).
+
+    ``identity_provider`` is the IdP the linking principal authenticated with. It
+    is recorded because role resolution must join on (provider, email): resolving
+    on email alone gave a Slack action the union of every role assigned to that
+    address under any provider (GHSA-3m8x-ff8g-7x8c).
+    """
     from terrapod.db.models import now_utc
 
     existing = (
@@ -256,12 +263,17 @@ async def create_link(
 
     if existing is not None:
         existing.terrapod_email = email
+        existing.identity_provider = identity_provider
         existing.linked_via = via
         existing.linked_at = now_utc()
         link = existing
     else:
         link = SlackIdentityLink(
-            slack_team_id=team_id, slack_user_id=user_id, terrapod_email=email, linked_via=via
+            slack_team_id=team_id,
+            slack_user_id=user_id,
+            terrapod_email=email,
+            identity_provider=identity_provider,
+            linked_via=via,
         )
         db.add(link)
     await db.commit()
