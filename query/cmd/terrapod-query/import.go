@@ -62,6 +62,7 @@ func runImport(_ context.Context, args []string) error {
 // readInput reads from a file, or stdin when path is empty.
 func readInput(path string) ([]byte, error) {
 	if path != "" {
+		//nolint:gosec // G304: `path` is the operator's own input flag (empty means stdin).
 		return os.ReadFile(path)
 	}
 	return io.ReadAll(os.Stdin)

@@ -93,6 +93,7 @@ func LoadDirectory(dir string, opts LoadOptions) (*Source, error) {
 		yamlPath = filepath.Join(absDir, yamlPath)
 	}
 
+	//nolint:gosec // G304: `yamlPath` is the operator's own atlantis.yaml, located relative to the directory they named.
 	data, err := os.ReadFile(yamlPath)
 	if err != nil {
 		return nil, fmt.Errorf("read atlantis.yaml at %s: %w", yamlPath, err)

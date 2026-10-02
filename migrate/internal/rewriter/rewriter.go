@@ -170,6 +170,7 @@ func RewriteDir(root string, opts Options) (*Report, error) {
 func rewriteFile(path string, opts Options) (FileChange, error) {
 	change := FileChange{Path: path}
 
+	//nolint:gosec // G304: `path` is a .tf file in the operator's own tree, which `rewrite` exists to edit in place.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return change, fmt.Errorf("read: %w", err)

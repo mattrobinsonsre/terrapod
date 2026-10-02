@@ -133,6 +133,7 @@ func DetectBackend(dir string) (*Backend, error) {
 	parser := hclparse.NewParser()
 	var found *Backend
 	for _, path := range tfFiles {
+		//nolint:gosec // G304: `path` comes from walking .tf files in the operator's own local clone, which is the point of the backend detector.
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", path, err)

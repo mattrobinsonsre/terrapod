@@ -262,6 +262,7 @@ func readLocalState(projectDir, configuredPath string) ([]byte, error) {
 		return nil, fmt.Errorf("local backend path %q escapes the project directory: %w", configuredPath, err)
 	}
 	path = joined
+	//nolint:gosec // G304: `path` has just been through assertContained() on the line above — it is checked for exactly the escape gosec is warning about.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

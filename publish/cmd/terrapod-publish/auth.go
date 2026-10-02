@@ -30,6 +30,7 @@ func tokenFromCredentialsFile(host string) string {
 	if err != nil {
 		return ""
 	}
+	//nolint:gosec // G304: the path is os.UserHomeDir() joined to two literals — there is no caller-supplied component to traverse with.
 	data, err := os.ReadFile(filepath.Join(home, ".terraform.d", "credentials.tfrc.json"))
 	if err != nil {
 		return ""

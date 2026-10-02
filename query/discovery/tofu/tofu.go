@@ -39,6 +39,7 @@ func (r *Runner) bin() string {
 // run executes tofu with the given arguments and returns stdout. On failure it
 // returns an error that carries stderr, since tofu writes diagnostics there.
 func (r *Runner) run(ctx context.Context, args ...string) ([]byte, error) {
+	//nolint:gosec // G204: no shell, and argv is passed as separate arguments, so there is nothing to inject into. `r.bin()` is a server-controlled constant at both in-product call sites (onboarding_service.QUERY_BIN / discovery.QUERY_BIN) and the operator's own --tofu flag standalone.
 	cmd := exec.CommandContext(ctx, r.bin(), args...)
 	cmd.Dir = r.Dir
 	var stdout, stderr bytes.Buffer
