@@ -801,6 +801,56 @@ multi-language implementation ships in the same PR**:
   flaky test: prove it's flaky, then **fix the flake** — re-running until green
   just hides it for the next person.
 
+## CI capacity is finite — keep the merge chain short
+
+This is a free, public project, so the CI runners are a limited and **contended**
+resource, and the contention is wall-clock time rather than just budget. Measured
+per-job queue delay (the gap between a run starting and its jobs actually starting)
+across four consecutive runs on this repository:
+
+| jobs in flight | median wait before a job starts | p90 |
+|---|---|---|
+| 80 | **788s** | 1312s |
+| 50 | 40s | 126s |
+| 40 | 16–32s | 17–111s |
+
+Thirteen minutes of queueing when the queue is busy, against sixteen seconds when it
+is quiet. That delay is paid by whichever run you are actually waiting on.
+
+**The dominant cost is the merge chain, not any single run.** Because branch
+protection requires branches to be up to date, the moment one PR merges every other
+open PR is out of date and must be updated and re-run. So landing N pull requests
+costs **N sequential CI cycles**, no matter how many are open at once. Opening them
+all early does not shorten that chain; it just adds runs that compete with it.
+
+**Do not reason about the cost from the check count.** The workflow is a DAG
+(`prepare` → tests and builds → scans → manifest → `ci-pass`), so the demand at any
+instant is the width of the layer currently executing, not the total number of
+checks. The measurements above are plainly non-linear for that reason, and a
+calculation of the form "N checks against M concurrent slots" will mislead you.
+
+What follows from this, in rough order of how much it saves:
+
+- **Reduce N — put related small changes in one pull request.** Collapsing a dozen
+  small fixes into five PRs removes seven whole CI cycles, and it is the only lever
+  that shortens the chain itself rather than trimming around it.
+- **Bundle by risk, not by size.** A bundle fails as a unit, so one flaky E2E shard
+  stalls everything in it. Group documentation and low-risk changes together freely;
+  keep anything touching the run lifecycle, the policy or scanning gates, or a
+  migration on its own.
+- **Don't start a run whose verdict will be thrown away.** In particular, do not
+  update a PR's branch until it is genuinely the next one you intend to merge:
+  updating early starts a full run that is invalidated the moment anything else
+  lands, while competing for the queue with the run you are waiting on.
+- **Never leave a persistently failing PR open.** It is re-run on every rebase for
+  every other merge and never progresses, which is strictly worse than any choice
+  about how many PRs to have in flight.
+- **A documentation-only change costs nothing** — see the merging convention above —
+  so it does not belong in the chain at all.
+
+Stacked PRs are not the answer here, for the reasons already given: a stacked PR
+shows a reviewer the wrong baseline and breaks when its base merges.
+
 ## Every minor release reviews the platform-tool versions
 
 `opa`, `trivy` and `checkov` are not baked into Terrapod's images — they are
