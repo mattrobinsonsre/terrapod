@@ -27,6 +27,7 @@
     "account": "계정",
     "apiTokens": "API 토큰",
     "sessions": "세션",
+    "slackLinks": "Slack 연결",
     "logOut": "로그아웃",
     "menu": "메뉴",
     "openMenu": "메뉴 열기",
@@ -371,6 +372,22 @@
         "load": "세션을 불러오지 못했습니다",
         "revoke": "세션을 취소하지 못했습니다 ({status})",
         "revokeGeneric": "세션을 취소하지 못했습니다"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack 연결",
+      "description": "당신으로서 행동할 수 있는 Slack 계정입니다. 연결된 Slack 계정은 당신의 권한으로 실행을 승인하고 폐기할 수 있으므로, 알지 못하는 것은 해지하십시오.",
+      "empty": "연결된 Slack 계정이 없습니다.",
+      "revoke": "해지",
+      "confirmRevoke": "Slack 사용자 {user}의 연결을 해지하시겠습니까? 해당 계정은 더 이상 Slack에서 당신으로서 행동할 수 없습니다.",
+      "columns": {
+        "slackUser": "Slack 사용자",
+        "team": "Slack 팀",
+        "linkedAt": "연결 시점"
+      },
+      "errors": {
+        "load": "Slack 연결을 불러올 수 없었습니다.",
+        "revoke": "해당 Slack 연결을 해지할 수 없었습니다."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "알 수 없음",
     "confirm": {
       "prompt": "이 Slack 계정을 <em>사용자</em>의 Terrapod ID에 연결하시겠습니까? 향후 모든 Slack 작업(승인/폐기)은 이 Terrapod 사용자로서 해당 권한으로 실행됩니다.",
+      "slackName": "Slack 계정",
       "slackUser": "Slack 사용자",
       "slackTeam": "Slack 팀",
       "terrapodAccount": "Terrapod 계정",
       "warning": "방금 Slack에서 직접 이 연결을 시작한 경우에만 계속하세요. 그렇지 않다면 이 탭을 닫고 연결하지 마세요 — 이 작업은 위의 Slack 계정을 <em>사용자</em>의 Terrapod ID에 바인딩합니다.",
-      "button": "확인 및 연결"
+      "button": "확인 및 연결",
+      "namesUnavailable": "Terrapod가 이 Slack 계정의 이름을 조회할 수 없었습니다. 위의 ID를 확인하고, 이 연결을 Slack에서 직접 시작한 경우에만 계속하십시오.",
+      "nameIsSelfChosen": "핸들은 Slack 작업 공간에서 고유합니다. 그 아래의 표시 이름은 본인이 직접 정하므로 핸들을 기준으로 판단하십시오."
     },
     "success": {
       "message": "이제 Slack 계정이 Terrapod에 연결되었습니다.",

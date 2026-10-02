@@ -27,6 +27,7 @@
     "account": "Compte",
     "apiTokens": "Tokens d'API",
     "sessions": "Sessions",
+    "slackLinks": "Liaisons Slack",
     "logOut": "Se déconnecter",
     "menu": "Menu",
     "openMenu": "Ouvrir le menu",
@@ -371,6 +372,22 @@
         "load": "Échec du chargement des sessions",
         "revoke": "Échec de la révocation des sessions ({status})",
         "revokeGeneric": "Échec de la révocation des sessions"
+      }
+    },
+    "slackLinks": {
+      "title": "Liaisons Slack",
+      "description": "Comptes Slack pouvant agir en votre nom. Un compte Slack lié peut approuver et rejeter des exécutions avec vos permissions — révoquez tout ce que vous ne reconnaissez pas.",
+      "empty": "Aucun compte Slack n'est lié à votre compte.",
+      "revoke": "Révoquer",
+      "confirmRevoke": "Révoquer la liaison de l'utilisateur Slack {user} ? Ce compte ne pourra plus agir en votre nom depuis Slack.",
+      "columns": {
+        "slackUser": "Utilisateur Slack",
+        "team": "Équipe Slack",
+        "linkedAt": "Liée"
+      },
+      "errors": {
+        "load": "Impossible de charger vos liaisons Slack.",
+        "revoke": "Impossible de révoquer cette liaison Slack."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "inconnu",
     "confirm": {
       "prompt": "Lier ce compte Slack à <em>votre</em> identité Terrapod ? Chaque future action Slack (approuver/abandonner) s'exécutera en tant que cet utilisateur Terrapod avec ses autorisations.",
+      "slackName": "Compte Slack",
       "slackUser": "Utilisateur Slack",
       "slackTeam": "Équipe Slack",
       "terrapodAccount": "Compte Terrapod",
       "warning": "Ne continuez que si vous venez de démarrer cette liaison depuis Slack vous-même. Si ce n'est pas le cas, fermez cet onglet et ne liez pas — cela lie le compte Slack ci-dessus à <em>votre</em> identité Terrapod.",
-      "button": "Confirmer et lier"
+      "button": "Confirmer et lier",
+      "namesUnavailable": "Terrapod n'a pas pu récupérer le nom de ce compte Slack. Vérifiez les identifiants ci-dessus et ne continuez que si vous avez vous-même lancé cette liaison depuis Slack.",
+      "nameIsSelfChosen": "L'identifiant est unique dans l'espace Slack ; le nom affiché en dessous est choisi par son propriétaire — fiez-vous à l'identifiant."
     },
     "success": {
       "message": "Votre compte Slack est maintenant lié à Terrapod.",

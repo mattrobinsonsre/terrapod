@@ -27,6 +27,7 @@
     "account": "Akkount",
     "apiTokens": "API Tokenz",
     "sessions": "Seshuns",
+    "slackLinks": "Slak linkz",
     "logOut": "Log owt",
     "menu": "Menu",
     "openMenu": "Opun menu",
@@ -371,6 +372,22 @@
         "load": "Failed ta lode seshunz",
         "revoke": "Failed ta revoke seshunz ({status})",
         "revokeGeneric": "Failed ta revoke seshunz"
+      }
+    },
+    "slackLinks": {
+      "title": "Slak linkz",
+      "description": "Slak akkountz wot can be U. A linkd Slak akkount can sez yes an sez no to runz wif UR permishunz, so yeet any U dont recognise. srsly.",
+      "empty": "No Slak akkountz r linkd 2 U.",
+      "revoke": "Yeet",
+      "confirmRevoke": "Yeet teh link 4 Slak yoozer {user}? Dat akkount can not be U from Slak no moar.",
+      "columns": {
+        "slackUser": "Slak yoozer",
+        "team": "Slak teem",
+        "linkedAt": "Linkd"
+      },
+      "errors": {
+        "load": "Culd not loadz UR Slak linkz.",
+        "revoke": "Culd not yeet dat Slak link."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "unknown",
     "confirm": {
       "prompt": "Link dis Slack account ta <em>ur</em> Terrapod identity? Evry futur Slack acshun (approov/discard) will run az dis Terrapod usur wif der permishuns.",
+      "slackName": "Slak akkount",
       "slackUser": "Slack usur",
       "slackTeam": "Slack team",
       "terrapodAccount": "Terrapod account",
       "warning": "Only continyoo if u jus startd dis link from Slack urself. If u didnt, close dis tab an dont link — dis bindz teh Slack account abuv ta <em>ur</em> Terrapod identity.",
-      "button": "Confirm & link"
+      "button": "Confirm & link",
+      "namesUnavailable": "Terrapod cud not findz dis Slak akkount's naem. Chek teh IDz up abuv, an only keeps goin if U startd dis linky from Slak urself. srsly.",
+      "nameIsSelfChosen": "Teh handul iz only won in dis Slak playse; teh naem unner it iz pikd by dat persun demselvz, so judge by teh handul. kthx."
     },
     "success": {
       "message": "Ur Slack account iz now linkd ta Terrapod.",

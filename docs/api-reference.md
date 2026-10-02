@@ -4172,12 +4172,25 @@ POST /api/v1/slack/link/preview
 ```
 
 Body `{"state": "<signed-state>"}`. Requires an authenticated Terrapod user.
-Describes **which** Slack identity the signed state would bind — returns
-`{data: {slack-team-id, slack-user-id, email}}` (the caller's email) — **without
+Describes **which** Slack identity the signed state would bind, **without
 consuming** the single-use state, so the browser can show an explicit confirm
-screen before binding (the confused-deputy defence). `422` if the state is
-missing, `400` if it is invalid/expired/already used. Binding still happens only
-on `POST /slack/link`.
+screen before binding. `422` if the state is missing, `400` if it is
+invalid/expired/already used. Binding still happens only on `POST /slack/link`.
+
+Returns `{data: {slack-team-id, slack-user-id, email, user-name, user-real-name,
+team-name, resolved}}` — `email` is the caller's, and the three name fields are the
+confused-deputy defence (`GHSA-5899-fm2p-88x3`). It used to return the ids alone,
+which nobody can recognise as not their own, so the confirm screen asked a question
+the reader could not answer. **`user-name` is the handle and is the one to judge
+by**: it is unique in the workspace, where `user-real-name` is set by its owner and
+can be made to match anyone.
+
+`resolved` is `"true"`/`"false"` and is explicit so a client can distinguish an
+absent display name from a failed lookup. The lookup needs the bot `users:read` and
+`team:read` scopes and is **best-effort** — without them, or during a Slack outage,
+the fields come back empty with `resolved: "false"` and linking still works. An app
+installed from a manifest predating those scopes must be reinstalled to grant them,
+or the screen falls back to ids.
 
 ### Link account
 
@@ -4205,6 +4218,11 @@ DELETE /api/v1/slack/links/{link_id}
 ```
 
 Removes one of the current user's own links (`404` if it isn't theirs).
+
+Both creating and removing a link write an audit entry (`slack.link.create` /
+`slack.link.revoke`) naming the actor and the Slack identity. A binding is a
+standing ability to act as that account from Slack, and it previously left no record
+at all, so "who attached that Slack account" had no answer.
 
 ## Execution Hooks
 

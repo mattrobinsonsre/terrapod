@@ -27,6 +27,7 @@
     "account": "Ratio",
     "apiTokens": "Tesserae API",
     "sessions": "Sessiones",
+    "slackLinks": "Nexus Slack",
     "logOut": "Exire",
     "menu": "Index",
     "openMenu": "Indicem aperire",
@@ -371,6 +372,22 @@
         "load": "Sessiones onerari non potuerunt",
         "revoke": "Sessiones revocari non potuerunt ({status})",
         "revokeGeneric": "Sessiones revocari non potuerunt"
+      }
+    },
+    "slackLinks": {
+      "title": "Nexus Slack",
+      "description": "Rationes Slack quae pro te agere possunt. Ratio Slack nexa cursus tuis permissionibus probare et abicere potest; ergo quodcumque non agnoscis revoca.",
+      "empty": "Nulla ratio Slack tibi nexa est.",
+      "revoke": "Revocare",
+      "confirmRevoke": "Nexum usoris Slack {user} revocare? Ea ratio pro te ex Slack amplius agere non poterit.",
+      "columns": {
+        "slackUser": "Usor Slack",
+        "team": "Grex Slack",
+        "linkedAt": "Nexum"
+      },
+      "errors": {
+        "load": "Nexus tui Slack legi non potuerunt.",
+        "revoke": "Ille nexus Slack revocari non potuit."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "ignotum",
     "confirm": {
       "prompt": "Hanc rationem Slack ad <em>tuam</em> identitatem Terrapod nectere? Omnis futura actio Slack (approbare/reicere) ut hic usor Terrapod cum permissionibus eius curret.",
+      "slackName": "Ratio Slack",
       "slackUser": "Usor Slack",
       "slackTeam": "Turma Slack",
       "terrapodAccount": "Ratio Terrapod",
       "warning": "Perge solum si hunc nexum modo ipse ex Slack incepisti. Si non fecisti, claude hanc scidam et ne nectas — hoc rationem Slack supra ad <em>tuam</em> identitatem Terrapod vincit.",
-      "button": "Confirmare et nectere"
+      "button": "Confirmare et nectere",
+      "namesUnavailable": "Terrapod nomen huius rationis Slack reperire non potuit. Identificatores supra inspice, et tantum perge si hanc coniunctionem ipse ex Slack incepisti.",
+      "nameIsSelfChosen": "Cognomen in spatio Slack unicum est; nomen infra ab ipso domino eligitur, ergo cognomine iudica."
     },
     "success": {
       "message": "Ratio tua Slack nunc cum Terrapod nexa est.",

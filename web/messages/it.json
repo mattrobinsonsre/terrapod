@@ -27,6 +27,7 @@
     "account": "Account",
     "apiTokens": "Token API",
     "sessions": "Sessioni",
+    "slackLinks": "Collegamenti Slack",
     "logOut": "Esci",
     "menu": "Menu",
     "openMenu": "Apri menu",
@@ -371,6 +372,22 @@
         "load": "Impossibile caricare le sessioni",
         "revoke": "Impossibile revocare le sessioni ({status})",
         "revokeGeneric": "Impossibile revocare le sessioni"
+      }
+    },
+    "slackLinks": {
+      "title": "Collegamenti Slack",
+      "description": "Account Slack che possono agire a tuo nome. Un account Slack collegato può approvare e scartare esecuzioni con i tuoi permessi, quindi revoca quelli che non riconosci.",
+      "empty": "Nessun account Slack è collegato a te.",
+      "revoke": "Revoca",
+      "confirmRevoke": "Revocare il collegamento per l'utente Slack {user}? Quell'account non potrà più agire a tuo nome da Slack.",
+      "columns": {
+        "slackUser": "Utente Slack",
+        "team": "Team Slack",
+        "linkedAt": "Collegato"
+      },
+      "errors": {
+        "load": "Non è stato possibile caricare i tuoi collegamenti Slack.",
+        "revoke": "Non è stato possibile revocare quel collegamento Slack."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "sconosciuto",
     "confirm": {
       "prompt": "Collegare questo account Slack alla <em>tua</em> identità Terrapod? Ogni futura azione Slack (approva/scarta) verrà eseguita come questo utente Terrapod con i suoi permessi.",
+      "slackName": "Account Slack",
       "slackUser": "Utente Slack",
       "slackTeam": "Team Slack",
       "terrapodAccount": "Account Terrapod",
       "warning": "Continua solo se hai appena avviato tu stesso questo collegamento da Slack. In caso contrario, chiudi questa scheda e non collegare — questo vincola l''account Slack sopra alla <em>tua</em> identità Terrapod.",
-      "button": "Conferma e collega"
+      "button": "Conferma e collega",
+      "namesUnavailable": "Terrapod non ha potuto recuperare il nome di questo account Slack. Controlla gli ID sopra e continua solo se hai avviato tu stesso questo collegamento da Slack.",
+      "nameIsSelfChosen": "L'handle è univoco nello spazio di lavoro Slack; il nome visualizzato sotto lo scegle il proprietario, quindi valuta in base all'handle."
     },
     "success": {
       "message": "Il tuo account Slack è ora collegato a Terrapod.",

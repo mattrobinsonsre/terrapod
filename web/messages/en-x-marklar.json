@@ -27,6 +27,7 @@
     "account": "Marklar",
     "apiTokens": "Marklar Marklars",
     "sessions": "Marklars",
+    "slackLinks": "Marklar marklars",
     "logOut": "Log out",
     "menu": "Marklar",
     "openMenu": "Open marklar",
@@ -371,6 +372,22 @@
         "load": "Failed to load marklars",
         "revoke": "Failed to revoke marklars ({status})",
         "revokeGeneric": "Failed to revoke marklars"
+      }
+    },
+    "slackLinks": {
+      "title": "Marklar marklars",
+      "description": "Marklar marklars that can act as you. A linked Marklar marklar can approve and discard marklars with your marklars, so revoke any you do not recognise.",
+      "empty": "No Marklar marklars are linked to you.",
+      "revoke": "Revoke",
+      "confirmRevoke": "Revoke the marklar for Marklar marklar {user}? That marklar will no longer be able to act as you from Marklar.",
+      "columns": {
+        "slackUser": "Marklar marklar",
+        "team": "Marklar marklar",
+        "linkedAt": "Marklared"
+      },
+      "errors": {
+        "load": "Could not load your Marklar marklars.",
+        "revoke": "Could not revoke that Marklar marklar."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "unknown",
     "confirm": {
       "prompt": "Link this Marklar marklar to <em>your</em> Terrapod marklar? Every future Marklar marklar (approve/discard) will run as this Terrapod marklar with their marklars.",
+      "slackName": "Marklar marklar",
       "slackUser": "Marklar marklar",
       "slackTeam": "Marklar marklar",
       "terrapodAccount": "Terrapod marklar",
       "warning": "Only continue if you just started this marklar from Marklar yourself. If you didn't, close this marklar and don't link — this binds the Marklar marklar above to <em>your</em> Terrapod marklar.",
-      "button": "Confirm & link"
+      "button": "Confirm & link",
+      "namesUnavailable": "Marklar could not look up this marklar marklar's marklar. Check the marklars above, and only continue if you started this marklar from Marklar yourself.",
+      "nameIsSelfChosen": "The marklar is unique in the Slack marklar; the marklar marklar beneath it is chosen by its marklar, so judge by the marklar."
     },
     "success": {
       "message": "Your Marklar marklar is now linked to Terrapod.",

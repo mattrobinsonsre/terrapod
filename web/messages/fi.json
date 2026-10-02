@@ -27,6 +27,7 @@
     "account": "Tili",
     "apiTokens": "API-tunnukset",
     "sessions": "Istunnot",
+    "slackLinks": "Slack-liitokset",
     "logOut": "Kirjaudu ulos",
     "menu": "Valikko",
     "openMenu": "Avaa valikko",
@@ -371,6 +372,22 @@
         "load": "Istuntojen lataaminen epäonnistui",
         "revoke": "Istuntojen peruuttaminen epäonnistui ({status})",
         "revokeGeneric": "Istuntojen peruuttaminen epäonnistui"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack-liitokset",
+      "description": "Slack-tilit, jotka voivat toimia sinuna. Liitetty Slack-tili voi hyväksyä ja hylätä ajoja sinun oikeuksillasi, joten peru kaikki, joita et tunnista.",
+      "empty": "Sinuun ei ole liitetty yhtään Slack-tiliä.",
+      "revoke": "Peru",
+      "confirmRevoke": "Perutaanko Slack-käyttäjän {user} liitos? Tili ei voi enää toimia sinuna Slackistä.",
+      "columns": {
+        "slackUser": "Slack-käyttäjä",
+        "team": "Slack-tiimi",
+        "linkedAt": "Liitetty"
+      },
+      "errors": {
+        "load": "Slack-liitoksiasi ei voitu ladata.",
+        "revoke": "Tätä Slack-liitosta ei voitu perua."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "tuntematon",
     "confirm": {
       "prompt": "Linkitetäänkö tämä Slack-tili <em>sinun</em> Terrapod-identiteettiisi? Jokainen tuleva Slack-toiminto (hyväksy/hylkää) suoritetaan tänä Terrapod-käyttäjänä hänen oikeuksillaan.",
+      "slackName": "Slack-tili",
       "slackUser": "Slack-käyttäjä",
       "slackTeam": "Slack-tiimi",
       "terrapodAccount": "Terrapod-tili",
       "warning": "Jatka vain, jos aloitit tämän linkin juuri itse Slackista. Jos et, sulje tämä välilehti äläkä linkitä — tämä sitoo yllä olevan Slack-tilin <em>sinun</em> Terrapod-identiteettiisi.",
-      "button": "Vahvista ja linkitä"
+      "button": "Vahvista ja linkitä",
+      "namesUnavailable": "Terrapod ei saanut haettua tämän Slack-tilin nimeä. Tarkista yllä olevat tunnukset ja jatka vain, jos aloitit tämän liitoksen itse Slackissä.",
+      "nameIsSelfChosen": "Tunnus on Slack-työtilassa yksilöllinen; sen alla oleva näyttönimi on omistajan itse valitsema, joten arvioi tunnuksen perusteella."
     },
     "success": {
       "message": "Slack-tilisi on nyt linkitetty Terrapodiin.",

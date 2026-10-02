@@ -3,9 +3,17 @@
 The "connect your Terrapod account" flow:
 
 1. From Slack (`/terrapod link`), Terrapod mints a **signed, single-use,
-   short-TTL state token** that encodes the Slack (team, user) — only Terrapod
-   (holding the signing key) can produce it, so a user can't forge a link
-   binding an arbitrary Slack id to their own account.
+   short-TTL state token** that encodes the Slack (team, user). Only Terrapod can
+   produce it, so nobody forges a state binding an arbitrary Slack id.
+
+   That signature is **not** what protects the account being bound, and reading it
+   as though it were is how `GHSA-5899-fm2p-88x3` happened. The state is minted for
+   whoever ran `/terrapod link` and the binding goes to whoever is *authenticated*
+   when the confirm is POSTed — so the dangerous direction is the reverse of the
+   obvious one: an attacker mints a perfectly valid state for their own Slack
+   identity and sends the URL to a victim, whose session completes the bind. What
+   defends against that is the confirm screen **naming a recognisable human**
+   (`describe_slack_identity` below), not the signature.
 2. The user opens the link in their browser and authenticates to Terrapod
    normally (existing session/SSO). The web page then POSTs the state with the
    user's auth; the API verifies + consumes the state and writes the binding to
@@ -25,10 +33,13 @@ import json
 import time
 import uuid
 
+import structlog
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import SlackIdentityLink
+
+logger = structlog.get_logger(__name__)
 
 _STATE_TTL_SECONDS = 600  # 10 minutes to complete the link
 _NONCE_PREFIX = "tp:slack:linkstate:"
@@ -36,6 +47,72 @@ _NONCE_PREFIX = "tp:slack:linkstate:"
 
 class LinkStateError(Exception):
     """Raised when a link-state token is invalid, expired, or already used."""
+
+
+def _bot_client():
+    """A Slack web client, built per call like `slack_notify_service._bot_client`.
+
+    Matching that pattern rather than reaching into `slack_service._socket_client`
+    keeps the lookup working when socket mode is not connected — a link confirm can
+    arrive while the socket is reconnecting, and failing it then would be a worse
+    outcome than one extra HTTP session.
+    """
+    from slack_sdk.web.async_client import AsyncWebClient
+
+    from terrapod.config import settings
+
+    return AsyncWebClient(token=settings.slack.bot_token)
+
+
+async def describe_slack_identity(team_id: str, user_id: str) -> dict[str, str]:
+    """Human-readable names for a Slack (team, user), for the confirm screen.
+
+    This is the fix for `GHSA-5899-fm2p-88x3`, so it is worth being explicit about
+    why a name rather than an id. The screen used to say "link `U04F2AB3C` in
+    `T01XYZ` to you@example.com". Nobody can tell whether `U04F2AB3C` is their own
+    Slack account, so a victim sent that URL by an attacker had nothing to go on and
+    confirmed a binding of the attacker's identity to their account. "Link **Dave
+    Smith** (@dave) in **Acme Corp**" is wrong at a glance to anyone who is not Dave.
+
+    **Best-effort by design.** `users.info` needs the `users:read` scope and
+    `team.info` needs `team:read`; an operator who has not granted them, or a Slack
+    API blip, must not make linking impossible — so a failure returns the ids and
+    says the names are unavailable, and the confirm page is responsible for telling
+    the user it could not name them. Returning a plausible-looking blank would be
+    worse than returning nothing: it would read as a name the victim does not
+    recognise either way.
+
+    Keys: `user-name` (handle), `user-real-name`, `team-name`, and `resolved`
+    ("true"/"false") so a caller never has to guess whether a blank is an absent
+    display name or a failed lookup.
+    """
+    out = {"user-name": "", "user-real-name": "", "team-name": "", "resolved": "false"}
+    from terrapod.config import settings
+
+    if not settings.slack.enabled or not settings.slack.bot_token:
+        return out
+    try:
+        client = _bot_client()
+        info = await client.users_info(user=user_id)
+        profile = (info.get("user") or {}) if info else {}
+        out["user-name"] = profile.get("name") or ""
+        out["user-real-name"] = (
+            (profile.get("profile") or {}).get("real_name") or profile.get("real_name") or ""
+        )
+        try:
+            team = await client.team_info(team=team_id)
+            out["team-name"] = ((team.get("team") or {}) if team else {}).get("name") or ""
+        except Exception as exc:  # noqa: BLE001 — the user name is the load-bearing half
+            logger.info("slack.team_info_failed", team=team_id, err=str(exc))
+        out["resolved"] = "true" if (out["user-name"] or out["user-real-name"]) else "false"
+    except Exception as exc:  # noqa: BLE001 — never block a link on a lookup
+        logger.warning(
+            "slack.users_info_failed",
+            user=user_id,
+            err=str(exc),
+            detail="the confirm screen will show opaque ids; grant users:read",
+        )
+    return out
 
 
 def _b64u(raw: bytes) -> str:

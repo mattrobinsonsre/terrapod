@@ -27,6 +27,7 @@
     "account": "Conta",
     "apiTokens": "Tokens de API",
     "sessions": "Sessões",
+    "slackLinks": "Vínculos do Slack",
     "logOut": "Sair",
     "menu": "Menu",
     "openMenu": "Abrir menu",
@@ -371,6 +372,22 @@
         "load": "Falha ao carregar as sessões",
         "revoke": "Falha ao revogar as sessões ({status})",
         "revokeGeneric": "Falha ao revogar as sessões"
+      }
+    },
+    "slackLinks": {
+      "title": "Vínculos do Slack",
+      "description": "Contas do Slack que podem agir como você. Uma conta vinculada pode aprovar e descartar execuções com as suas permissões, então revogue qualquer uma que você não reconheça.",
+      "empty": "Nenhuma conta do Slack está vinculada a você.",
+      "revoke": "Revogar",
+      "confirmRevoke": "Revogar o vínculo do usuário do Slack {user}? Essa conta não poderá mais agir como você pelo Slack.",
+      "columns": {
+        "slackUser": "Usuário do Slack",
+        "team": "Equipe do Slack",
+        "linkedAt": "Vinculada"
+      },
+      "errors": {
+        "load": "Não foi possível carregar seus vínculos do Slack.",
+        "revoke": "Não foi possível revogar esse vínculo do Slack."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "desconhecido",
     "confirm": {
       "prompt": "Vincular esta conta do Slack à <em>sua</em> identidade do Terrapod? Toda ação futura do Slack (aprovar/descartar) será executada como este usuário do Terrapod, com suas permissões.",
+      "slackName": "Conta do Slack",
       "slackUser": "Usuário do Slack",
       "slackTeam": "Equipe do Slack",
       "terrapodAccount": "Conta do Terrapod",
       "warning": "Continue apenas se você mesmo acabou de iniciar este vínculo pelo Slack. Se não foi você, feche esta aba e não vincule — isso vincula a conta do Slack acima à <em>sua</em> identidade do Terrapod.",
-      "button": "Confirmar e vincular"
+      "button": "Confirmar e vincular",
+      "namesUnavailable": "O Terrapod não conseguiu obter o nome desta conta do Slack. Confira os IDs acima e continue somente se você mesmo iniciou este vínculo pelo Slack.",
+      "nameIsSelfChosen": "O identificador é único no workspace do Slack; o nome exibido abaixo é escolhido pelo próprio dono, então avalie pelo identificador."
     },
     "success": {
       "message": "Sua conta do Slack agora está vinculada ao Terrapod.",

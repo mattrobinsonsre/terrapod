@@ -27,6 +27,7 @@
     "account": "4cc0un7",
     "apiTokens": "4P1 70k3n5",
     "sessions": "535510n5",
+    "slackLinks": "5l4ck l1nk5",
     "logOut": "L0g 0u7",
     "menu": "M3nu",
     "openMenu": "0p3n m3nu",
@@ -371,6 +372,22 @@
         "load": "F41l3d 70 l04d 535510n5",
         "revoke": "F41l3d 70 r3v0k3 535510n5 ({status})",
         "revokeGeneric": "F41l3d 70 r3v0k3 535510n5"
+      }
+    },
+    "slackLinks": {
+      "title": "5l4ck l1nk5",
+      "description": "5l4ck 4cc0un75 7h47 c4n 4c7 45 y0u. 4 l1nk3d 5l4ck 4cc0un7 c4n 4ppr0v3 4nd d15c4rd run5 w17h y0ur p3rm15510n5, 50 r3v0k3 4ny y0u d0 n07 r3c0gn153.",
+      "empty": "N0 5l4ck 4cc0un75 4r3 l1nk3d 70 y0u.",
+      "revoke": "R3v0k3",
+      "confirmRevoke": "R3v0k3 7h3 l1nk f0r 5l4ck u53r {u53r}? 7h47 4cc0un7 w1ll n0 l0ng3r b3 4bl3 70 4c7 45 y0u fr0m 5l4ck.",
+      "columns": {
+        "slackUser": "5l4ck u53r",
+        "team": "5l4ck 734m",
+        "linkedAt": "L1nk3d"
+      },
+      "errors": {
+        "load": "C0uld n07 l04d y0ur 5l4ck l1nk5.",
+        "revoke": "C0uld n07 r3v0k3 7h47 5l4ck l1nk."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "unkn0wn",
     "confirm": {
       "prompt": "L1nk 7h15 5l4ck 4cc0un7 70 <em>y0ur</em> 73rr4p0d 1d3n717y? 3v3ry fu7ur3 5l4ck 4c710n (4ppr0v3/d15c4rd) w1ll run 45 7h15 73rr4p0d u53r w17h 7h31r p3rm15510n5.",
+      "slackName": "5l4ck 4cc0un7",
       "slackUser": "5l4ck u53r",
       "slackTeam": "5l4ck 734m",
       "terrapodAccount": "73rr4p0d 4cc0un7",
       "warning": "0nly c0n71nu3 1f y0u ju57 574r73d 7h15 l1nk fr0m 5l4ck y0ur53lf. 1f y0u d1dn'7, cl053 7h15 74b 4nd d0n'7 l1nk — 7h15 b1nd5 7h3 5l4ck 4cc0un7 4b0v3 70 <em>y0ur</em> 73rr4p0d 1d3n717y.",
-      "button": "C0nf1rm & l1nk"
+      "button": "C0nf1rm & l1nk",
+      "namesUnavailable": "73rr4p0d c0uld n07 l00k up 7h15 5l4ck 4cc0un7'5 n4m3. Ch3ck 7h3 1d5 4b0v3, 4nd 0nly c0n71nu3 1f y0u 574r73d 7h15 l1nk fr0m 5l4ck y0ur53lf.",
+      "nameIsSelfChosen": "7h3 h4ndl3 15 un1qu3 1n 7h3 5l4ck w0rk5p4c3; 7h3 d15pl4y n4m3 b3n347h 17 15 ch053n by 175 0wn3r, 50 judg3 by 7h3 h4ndl3."
     },
     "success": {
       "message": "Y0ur 5l4ck 4cc0un7 15 n0w l1nk3d 70 73rr4p0d.",

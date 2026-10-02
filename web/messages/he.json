@@ -27,6 +27,7 @@
     "account": "חשבון",
     "apiTokens": "אסימוני API",
     "sessions": "הפעלות",
+    "slackLinks": "קישורי Slack",
     "logOut": "התנתקות",
     "menu": "תפריט",
     "openMenu": "פתיחת תפריט",
@@ -371,6 +372,22 @@
         "load": "טעינת ההפעלות נכשלה",
         "revoke": "ביטול ההפעלות נכשל ({status})",
         "revokeGeneric": "ביטול ההפעלות נכשל"
+      }
+    },
+    "slackLinks": {
+      "title": "קישורי Slack",
+      "description": "חשבונות Slack שיכולים לפעול בשמכם. חשבון Slack מקושר יכול לאשר ולבטל הרצות בהרשאות שלכם, לכן בטלו כל קישור שאינכם מזהים.",
+      "empty": "אין חשבון Slack מקושר אליכם.",
+      "revoke": "ביטול",
+      "confirmRevoke": "לבטל את הקישור של משתמש Slack ‏{user}? החשבון הזה לא יוכל עוד לפעול בשמכם מתוך Slack.",
+      "columns": {
+        "slackUser": "משתמש Slack",
+        "team": "צוות Slack",
+        "linkedAt": "קושר"
+      },
+      "errors": {
+        "load": "לא ניתן לטעון את קישורי ה-Slack שלכם.",
+        "revoke": "לא ניתן לבטל את קישור ה-Slack הזה."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "לא ידוע",
     "confirm": {
       "prompt": "לקשר את חשבון ה-Slack הזה לזהות ה-Terrapod<em>שלכם</em>? כל פעולת Slack עתידית (אישור/ביטול) תרוץ כמשתמש Terrapod זה עם ההרשאות שלו.",
+      "slackName": "חשבון Slack",
       "slackUser": "משתמש Slack",
       "slackTeam": "צוות Slack",
       "terrapodAccount": "חשבון Terrapod",
       "warning": "המשיכו רק אם התחלתם את הקישור הזה מ-Slack בעצמכם. אם לא, סגרו את הלשונית ואל תקשרו — פעולה זו כובלת את חשבון ה-Slack שלמעלה לזהות ה-Terrapod<em>שלכם</em>.",
-      "button": "אישור וקישור"
+      "button": "אישור וקישור",
+      "namesUnavailable": "Terrapod לא הצליח לאחזר את שם חשבון ה-Slack הזה. בדקו את המזהים שלמעלה, והמשיכו רק אם אתם בעצמכם התחלתם את הקישור הזה מתוך Slack.",
+      "nameIsSelfChosen": "הכינוי ייחודי במרחב העבודה של Slack; שם התצוגה שמתחתיו נבחר בידי בעליו, אז שפטו לפי הכינוי."
     },
     "success": {
       "message": "חשבון ה-Slack שלכם מקושר כעת ל-Terrapod.",

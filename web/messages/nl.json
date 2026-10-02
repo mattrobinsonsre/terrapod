@@ -27,6 +27,7 @@
     "account": "Account",
     "apiTokens": "API-tokens",
     "sessions": "Sessies",
+    "slackLinks": "Slack-koppelingen",
     "logOut": "Afmelden",
     "menu": "Menu",
     "openMenu": "Menu openen",
@@ -371,6 +372,22 @@
         "load": "Kan sessies niet laden",
         "revoke": "Kan sessies niet intrekken ({status})",
         "revokeGeneric": "Kan sessies niet intrekken"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack-koppelingen",
+      "description": "Slack-accounts die namens jou kunnen handelen. Een gekoppeld Slack-account kan runs goedkeuren en verwerpen met jouw rechten, dus trek alles in wat je niet herkent.",
+      "empty": "Er is geen Slack-account aan je gekoppeld.",
+      "revoke": "Intrekken",
+      "confirmRevoke": "De koppeling voor Slack-gebruiker {user} intrekken? Dat account kan dan niet langer namens jou handelen vanuit Slack.",
+      "columns": {
+        "slackUser": "Slack-gebruiker",
+        "team": "Slack-team",
+        "linkedAt": "Gekoppeld"
+      },
+      "errors": {
+        "load": "Je Slack-koppelingen konden niet worden geladen.",
+        "revoke": "Die Slack-koppeling kon niet worden ingetrokken."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "onbekend",
     "confirm": {
       "prompt": "Dit Slack-account koppelen aan <em>uw</em> Terrapod-identiteit? Elke toekomstige Slack-actie (goedkeuren/verwerpen) wordt uitgevoerd als deze Terrapod-gebruiker met diens rechten.",
+      "slackName": "Slack-account",
       "slackUser": "Slack-gebruiker",
       "slackTeam": "Slack-team",
       "terrapodAccount": "Terrapod-account",
       "warning": "Ga alleen verder als u deze koppeling zojuist zelf vanuit Slack hebt gestart. Als dat niet zo is, sluit dit tabblad en koppel niet — hiermee wordt het bovenstaande Slack-account aan <em>uw</em> Terrapod-identiteit gebonden.",
-      "button": "Bevestigen & koppelen"
+      "button": "Bevestigen & koppelen",
+      "namesUnavailable": "Terrapod kon de naam van dit Slack-account niet opzoeken. Controleer de ID's hierboven en ga alleen verder als je deze koppeling zelf vanuit Slack hebt gestart.",
+      "nameIsSelfChosen": "De handle is uniek in de Slack-werkruimte; de weergavenaam eronder kiest de eigenaar zelf — ga dus op de handle af."
     },
     "success": {
       "message": "Uw Slack-account is nu gekoppeld aan Terrapod.",

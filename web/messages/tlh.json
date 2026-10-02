@@ -27,6 +27,7 @@
     "account": "lo'wI' De'",
     "apiTokens": "API tokenmey",
     "sessions": "jojmey",
+    "slackLinks": "Slack rarmey",
     "logOut": "mej",
     "menu": "tetlh",
     "openMenu": "tetlh poSmoH",
@@ -371,6 +372,22 @@
         "load": "jojmey ghelmeH lujpu'",
         "revoke": "jojmey naghmoHmeH lujpu' ({status})",
         "revokeGeneric": "jojmey naghmoHmeH lujpu'"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack rarmey",
+      "description": "SoH rur vumlaHbogh Slack De'wI'mey. Slack De'wI' rarlu'bogh chenmoHmey DIlaH 'ej lajHa'laH, SoH chaw' lo'taHvIS. vaj Dayajbe'bogh rar yIchIl.",
+      "empty": "Slack De'wI' SoHvaD rarlu'be'.",
+      "revoke": "chIl",
+      "confirmRevoke": "Slack lo'wI' {user} rar DachIl'a'? Slack vo' SoH rur vumlaHbe' net De'wI'.",
+      "columns": {
+        "slackUser": "Slack lo'wI'",
+        "team": "Slack ghom",
+        "linkedAt": "rarlu'ta'"
+      },
+      "errors": {
+        "load": "Slack rarmeylIj laDlaHbe'.",
+        "revoke": "Slack rar chIllaHbe'."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "Sovbe'",
     "confirm": {
       "prompt": "<em>SoH</em> Terrapod De'lIjDaq Slack lo'wI' De' vam rar'a'? Slack vang veb Hoch (chaw'/woD) chaw'meyDaj ghajbogh Terrapod lo'wI' vam moj.",
+      "slackName": "Slack De'wI' pong",
       "slackUser": "Slack lo'wI'",
       "slackTeam": "Slack ghom",
       "terrapodAccount": "Terrapod lo' De'",
       "warning": "SlackvaD rarvam Dataghpu'chugh neH taH. DaghajHa'chugh, tabvam SoQmoH 'ej rarQo' — Dung Slack lo' De' <em>SoH</em> Terrapod De'lIjDaq rarvam.",
-      "button": "tob 'ej rar"
+      "button": "tob 'ej rar",
+      "namesUnavailable": "Slack De'wI' pong Terrapod tu'laHbe'. pongmey Dun yIlegh, 'ej Slack vo' SoH'e' bortaS bIrchoHta'chugh neH yIruch.",
+      "nameIsSelfChosen": "Slack qumwI' Daq wa' pong neH. pong bIng ghaj ghaH wIv; vaj qumwI' pong yIlo' 'e' yIwuq."
     },
     "success": {
       "message": "DaH TerrapodDaq Slack lo' De'lIj rarlu'.",

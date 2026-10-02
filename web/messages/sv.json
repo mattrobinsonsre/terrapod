@@ -27,6 +27,7 @@
     "account": "Konto",
     "apiTokens": "API-tokens",
     "sessions": "Sessioner",
+    "slackLinks": "Slack-kopplingar",
     "logOut": "Logga ut",
     "menu": "Meny",
     "openMenu": "Öppna meny",
@@ -371,6 +372,22 @@
         "load": "Det gick inte att läsa in sessioner",
         "revoke": "Det gick inte att återkalla sessioner ({status})",
         "revokeGeneric": "Det gick inte att återkalla sessioner"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack-kopplingar",
+      "description": "Slack-konton som kan agera som du. Ett kopplat Slack-konto kan godkänna och förkasta körningar med dina behörigheter, så återkalla allt du inte känner igen.",
+      "empty": "Inget Slack-konto är kopplat till dig.",
+      "revoke": "Återkalla",
+      "confirmRevoke": "Återkalla kopplingen för Slack-användaren {user}? Kontot kan då inte längre agera som du från Slack.",
+      "columns": {
+        "slackUser": "Slack-användare",
+        "team": "Slack-team",
+        "linkedAt": "Kopplad"
+      },
+      "errors": {
+        "load": "Dina Slack-kopplingar kunde inte hämtas.",
+        "revoke": "Den Slack-kopplingen kunde inte återkallas."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "okänd",
     "confirm": {
       "prompt": "Länka detta Slack-konto till <em>din</em> Terrapod-identitet? Varje framtida Slack-åtgärd (godkänn/kassera) körs som denna Terrapod-användare med deras behörigheter.",
+      "slackName": "Slack-konto",
       "slackUser": "Slack-användare",
       "slackTeam": "Slack-team",
       "terrapodAccount": "Terrapod-konto",
       "warning": "Fortsätt endast om du precis startade denna länkning från Slack själv. Om du inte gjorde det, stäng denna flik och länka inte — detta binder Slack-kontot ovan till <em>din</em> Terrapod-identitet.",
-      "button": "Bekräfta och länka"
+      "button": "Bekräfta och länka",
+      "namesUnavailable": "Terrapod kunde inte hämta namnet på det här Slack-kontot. Kontrollera id:na ovan och fortsätt bara om du själv startade den här länkningen från Slack.",
+      "nameIsSelfChosen": "Handtaget är unikt i Slack-arbetsytan; visningsnamnet under det väljs av ägaren själv, så döm efter handtaget."
     },
     "success": {
       "message": "Ditt Slack-konto är nu länkat till Terrapod.",

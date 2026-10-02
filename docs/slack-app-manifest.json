@@ -23,7 +23,9 @@
         "chat:write",
         "chat:write.public",
         "commands",
-        "files:write"
+        "files:write",
+        "team:read",
+        "users:read"
       ]
     }
   },

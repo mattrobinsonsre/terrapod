@@ -27,6 +27,7 @@
     "account": "Konto",
     "apiTokens": "API-tokener",
     "sessions": "Økter",
+    "slackLinks": "Slack-koblinger",
     "logOut": "Logg ut",
     "menu": "Meny",
     "openMenu": "Åpne meny",
@@ -371,6 +372,22 @@
         "load": "Kunne ikke laste økter",
         "revoke": "Kunne ikke tilbakekalle økter ({status})",
         "revokeGeneric": "Kunne ikke tilbakekalle økter"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack-koblinger",
+      "description": "Slack-kontoer som kan handle som deg. En koblet Slack-konto kan godkjenne og forkaste kjøringer med dine rettigheter, så trekk tilbake alt du ikke kjenner igjen.",
+      "empty": "Ingen Slack-konto er koblet til deg.",
+      "revoke": "Trekk tilbake",
+      "confirmRevoke": "Trekke tilbake koblingen for Slack-brukeren {user}? Kontoen kan da ikke lenger handle som deg fra Slack.",
+      "columns": {
+        "slackUser": "Slack-bruker",
+        "team": "Slack-team",
+        "linkedAt": "Koblet"
+      },
+      "errors": {
+        "load": "Slack-koblingene dine kunne ikke lastes.",
+        "revoke": "Den Slack-koblingen kunne ikke trekkes tilbake."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "ukjent",
     "confirm": {
       "prompt": "Koble denne Slack-kontoen til <em>din</em> Terrapod-identitet? Hver fremtidig Slack-handling (godkjenn/forkast) vil kjøre som denne Terrapod-brukeren med vedkommendes tillatelser.",
+      "slackName": "Slack-konto",
       "slackUser": "Slack-bruker",
       "slackTeam": "Slack-team",
       "terrapodAccount": "Terrapod-konto",
       "warning": "Fortsett bare hvis du nettopp startet denne koblingen fra Slack selv. Hvis du ikke gjorde det, lukk denne fanen og ikke koble til – dette binder Slack-kontoen ovenfor til <em>din</em> Terrapod-identitet.",
-      "button": "Bekreft og koble"
+      "button": "Bekreft og koble",
+      "namesUnavailable": "Terrapod kunne ikke finne navnet på denne Slack-kontoen. Kontroller ID-ene over, og fortsett bare hvis du selv startet denne koblingen fra Slack.",
+      "nameIsSelfChosen": "Brukernavnet er unikt i Slack-arbeidsområdet; visningsnavnet under velges av eieren selv, så vurder ut fra brukernavnet."
     },
     "success": {
       "message": "Slack-kontoen din er nå koblet til Terrapod.",

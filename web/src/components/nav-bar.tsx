@@ -37,6 +37,7 @@ import {
   ArchiveRestore,
   KeyRound,
   type LucideIcon,
+  Link2,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { clearAuth, isAdmin, isAdminOrAudit, getAuthState } from '@/lib/auth'
@@ -104,6 +105,9 @@ const VAULT_ITEM: NavItem = { href: '/admin/vault', labelKey: 'vault', icon: Key
 const ACCOUNT_ITEMS: NavItem[] = [
   { href: '/settings/tokens', labelKey: 'apiTokens', icon: Key },
   { href: '/settings/sessions', labelKey: 'sessions', icon: Activity },
+  // A Slack binding lets that Slack account act as you, so it belongs beside
+  // tokens and sessions — the things you revoke when something is wrong.
+  { href: '/settings/slack', labelKey: 'slackLinks', icon: Link2 },
 ]
 
 // Help / reference destinations — NOT account items. Grouped separately so

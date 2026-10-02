@@ -6,13 +6,18 @@ import { useTranslations } from 'next-intl'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
-// The link is a deliberate act, not an automatic bind on page load: we first
-// PREVIEW which Slack identity the signed state would bind (without consuming
-// it), show it against the logged-in Terrapod account, and only bind when the
-// user clicks Confirm. This is the confused-deputy defence — the protection is
-// that binding now requires an explicit, deliberate confirm (never a silent
-// bind from merely opening a link) and is always to the *acting* user; showing
-// the Slack id is a secondary cue.
+// The link is a deliberate act, not an automatic bind on page load: we PREVIEW
+// which Slack identity the signed state would bind (without consuming it), show it
+// against the logged-in Terrapod account, and bind only on Confirm.
+//
+// The deliberate click is necessary and is NOT sufficient, which this comment used
+// to get wrong by calling the Slack id "a secondary cue". It was the only cue, and
+// `U04F2AB3C` is not one: a victim sent this URL by an attacker had no way to tell
+// the identity was not their own, so the confirm was a click-through
+// (GHSA-5899-fm2p-88x3). The screen now leads with the handle, real name and team
+// name, because "Dave Smith (@dave) in Acme Corp" is wrong at a glance to anyone
+// who is not Dave. When the lookup fails we say so rather than quietly falling back
+// to ids, which would look like a choice instead of a gap.
 type Status = 'loading' | 'confirm' | 'linking' | 'success' | 'error'
 
 function SlackLinkInner() {
@@ -24,6 +29,10 @@ function SlackLinkInner() {
   const [email, setEmail] = useState('')
   const [slackTeam, setSlackTeam] = useState('')
   const [slackUser, setSlackUser] = useState('')
+  const [slackName, setSlackName] = useState('')
+  const [slackHandle, setSlackHandle] = useState('')
+  const [slackTeamName, setSlackTeamName] = useState('')
+  const [named, setNamed] = useState(false)
   const ran = useRef(false)
 
   useEffect(() => {
@@ -56,6 +65,10 @@ function SlackLinkInner() {
         const data = await res.json()
         setSlackTeam(data?.data?.['slack-team-id'] || '')
         setSlackUser(data?.data?.['slack-user-id'] || '')
+        setSlackName(data?.data?.['user-real-name'] || '')
+        setSlackHandle(data?.data?.['user-name'] || '')
+        setSlackTeamName(data?.data?.['team-name'] || '')
+        setNamed(data?.data?.resolved === 'true')
         setEmail(data?.data?.email || auth.email)
         setStatus('confirm')
       } catch {
@@ -110,6 +123,28 @@ function SlackLinkInner() {
                 })}
               </p>
               <dl className="mt-4 space-y-2">
+                {named ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-xs text-slate-500">{t('confirm.slackName')}</dt>
+                    <dd className="text-slate-100 font-medium text-right">
+                      {/* Handle first, deliberately. A Slack display name is set by
+                          its owner, so an attacker can set theirs to the victim's
+                          name — the one thing they cannot choose is the handle,
+                          which is unique in the workspace. */}
+                      {slackHandle ? `@${slackHandle}` : slackName}
+                      {slackHandle && slackName ? (
+                        <span className="block text-xs text-slate-400 font-normal">
+                          {slackName}
+                        </span>
+                      ) : null}
+                      {slackTeamName ? (
+                        <span className="block text-xs text-slate-400 font-normal">
+                          {slackTeamName}
+                        </span>
+                      ) : null}
+                    </dd>
+                  </div>
+                ) : null}
                 <div className="flex justify-between gap-4">
                   <dt className="text-xs text-slate-500">{t('confirm.slackUser')}</dt>
                   <dd className="text-slate-200 font-mono text-xs">{slackUser || t('unknown')}</dd>
@@ -123,6 +158,11 @@ function SlackLinkInner() {
                   <dd className="text-slate-200 font-medium">{email}</dd>
                 </div>
               </dl>
+              {!named ? (
+                <p className="mt-3 text-xs text-amber-400/90">{t('confirm.namesUnavailable')}</p>
+              ) : (
+                <p className="mt-3 text-xs text-slate-400">{t('confirm.nameIsSelfChosen')}</p>
+              )}
               <p className="mt-4 text-xs text-amber-400/90">
                 {t.rich('confirm.warning', {
                   em: (chunks) => <span className="font-medium">{chunks}</span>,

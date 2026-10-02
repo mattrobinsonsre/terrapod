@@ -27,6 +27,7 @@
     "account": "Account",
     "apiTokens": "API Doubloons",
     "sessions": "Sessions",
+    "slackLinks": "Slack lines",
     "logOut": "Abandon ship",
     "menu": "Menu",
     "openMenu": "Open th'' menu",
@@ -371,6 +372,22 @@
         "load": "Failed t'' load sessions",
         "revoke": "Failed t'' revoke sessions ({status})",
         "revokeGeneric": "Failed t'' revoke sessions"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack lines",
+      "description": "Slack hands that may sail under yer colours. A tied Slack hand can approve an' scuttle runs wi' yer own authority, so cut loose any ye don't know, matey.",
+      "empty": "Nay a Slack hand be tied to ye.",
+      "revoke": "Cut loose",
+      "confirmRevoke": "Cut loose the line for Slack hand {user}? That hand shall nay sail under yer colours from Slack again.",
+      "columns": {
+        "slackUser": "Slack hand",
+        "team": "Slack crew",
+        "linkedAt": "Tied"
+      },
+      "errors": {
+        "load": "Could nay haul in yer Slack lines.",
+        "revoke": "Could nay cut loose that Slack line."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "unknown t'' me",
     "confirm": {
       "prompt": "Link this Slack account t'' <em>yer</em> Terrapod identity? Every future Slack action (approve/discard) will run as this Terrapod user with their permissions.",
+      "slackName": "Slack colours",
       "slackUser": "Slack user",
       "slackTeam": "Slack crew",
       "terrapodAccount": "Terrapod account",
       "warning": "Only continue if ye just started this link from Slack yerself. If ye didn''t, close this tab an'' don''t link — this binds th'' Slack account above t'' <em>yer</em> Terrapod identity.",
-      "button": "Confirm & link"
+      "button": "Confirm & link",
+      "namesUnavailable": "Terrapod could nay spy the name o' this Slack hand. Squint at the marks above, an' only sail on if ye hoisted this line from Slack yerself, matey.",
+      "nameIsSelfChosen": "The handle be unique in this Slack crew; the name below it be chosen by its own owner, so judge by the handle, matey."
     },
     "success": {
       "message": "Yer Slack account be now linked t'' Terrapod.",

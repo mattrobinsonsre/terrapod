@@ -154,23 +154,42 @@ From any channel the bot is in:
 
 - **`/terrapod link`** — Terrapod replies (only to you) with a *Connect your
   Terrapod account* button. Click it, log in to Terrapod as you normally would,
-  and you land on a **confirmation screen** that names the Slack user + team
-  being linked to your Terrapod account. The binding is recorded only when you
-  click **Confirm & link** — so opening someone else's link never binds your
-  account silently. The link is **single-use and expires in 10 minutes**.
+  and you land on a **confirmation screen** naming the Slack account being linked —
+  its **handle** (`@dave`), display name and workspace. The binding is recorded only
+  when you click **Confirm & link**. The link is **single-use and expires in 10
+  minutes**.
+
+  **Read the handle before you confirm.** That screen is the only thing between you
+  and binding someone else's Slack account to your Terrapod identity: the state is
+  minted for whoever ran `/terrapod link`, while the binding goes to whoever is
+  logged in when Confirm is pressed. If you did not just run `/terrapod link`
+  yourself, close the tab. Judge by the handle rather than the display name — a
+  handle is unique in the workspace, a display name is chosen by its owner and can
+  be made to match yours.
 - **`/terrapod status`** — shows whether you're linked, and as whom.
 - **`/terrapod unlink`** — removes your binding.
 
 The binding is durable **identity**, not permission: every future Slack action
 re-checks your Terrapod RBAC live, so a link never grants standing access, and if
-your Terrapod permissions change the next action reflects it immediately. You can
-also view/remove your links from the Terrapod web UI. Under the hood the connect
-link carries a Terrapod-signed, single-use token, so no one can forge a binding
-for someone else's Slack id; and because binding requires an **explicit confirm**
-(never a silent bind from merely opening a link) and is always attributed to the
-**acting** Terrapod user, a link opened in someone else's browser can't bind their
-account to an attacker's Slack id. The confirm screen also shows the Slack
-user/team as a secondary cue.
+your Terrapod permissions change the next action reflects it immediately.
+
+**See and revoke your bindings** at **Account → Slack links** (`/settings/slack`),
+or with `/terrapod unlink` from Slack. Creating and revoking a link are both written
+to the audit log, so an operator can answer "who attached that Slack account".
+
+Under the hood the connect link carries a Terrapod-signed, single-use token, so
+nobody forges a state for an arbitrary Slack id. **That signature protects the Slack
+side, not the account being bound** — an earlier version of this page said the
+opposite, that "a link opened in someone else's browser can't bind their account to
+an attacker's Slack id", and that was exactly backwards (`GHSA-5899-fm2p-88x3`). An
+attacker mints a perfectly valid state for their own Slack identity and sends you
+the URL; your session completes the bind. What defends against that is the confirm
+screen naming a handle you can recognise, which is why the handle is shown first and
+why the screen tells you to judge by it.
+
+The name lookup needs the bot `users:read` and `team:read` scopes. An app created
+from a manifest predating them must be reinstalled, or the screen falls back to
+opaque ids and says it could not name the account.
 
 ## Run notifications (opt-in, per workspace)
 

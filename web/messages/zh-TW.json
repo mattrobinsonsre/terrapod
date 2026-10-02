@@ -27,6 +27,7 @@
     "account": "帳戶",
     "apiTokens": "API 令牌",
     "sessions": "會話",
+    "slackLinks": "Slack 連結",
     "logOut": "登出",
     "menu": "選單",
     "openMenu": "開啟選單",
@@ -371,6 +372,22 @@
         "load": "載入會話失敗",
         "revoke": "撤銷會話失敗（{status}）",
         "revokeGeneric": "撤銷會話失敗"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack 連結",
+      "description": "可以以您身分操作的 Slack 帳戶。已連結的 Slack 帳戶能以您的權限核准與丟棄執行，因此請撤銷任何您不認識的連結。",
+      "empty": "沒有 Slack 帳戶與您連結。",
+      "revoke": "撤銷",
+      "confirmRevoke": "撤銷 Slack 使用者 {user} 的連結？該帳戶將無法再從 Slack 以您的身分操作。",
+      "columns": {
+        "slackUser": "Slack 使用者",
+        "team": "Slack 團隊",
+        "linkedAt": "連結時間"
+      },
+      "errors": {
+        "load": "無法載入您的 Slack 連結。",
+        "revoke": "無法撤銷該 Slack 連結。"
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "未知",
     "confirm": {
       "prompt": "將此 Slack 帳戶關聯到<em>您的</em> Terrapod 身分？今後每個 Slack 操作（批准/丟棄）都將以此 Terrapod 使用者及其權限執行。",
+      "slackName": "Slack 帳戶",
       "slackUser": "Slack 使用者",
       "slackTeam": "Slack 團隊",
       "terrapodAccount": "Terrapod 帳戶",
       "warning": "僅當您本人剛剛從 Slack 發起此關聯時才繼續。如果不是，請關閉此標籤頁且不要關聯 — 這會將上方的 Slack 帳戶繫結到<em>您的</em> Terrapod 身分。",
-      "button": "確認並關聯"
+      "button": "確認並關聯",
+      "namesUnavailable": "Terrapod 無法取得此 Slack 帳戶的名稱。請核對上方的 ID，僅在您本人從 Slack 發起此連結時才繼續。",
+      "nameIsSelfChosen": "帳號代號在該 Slack 工作區內是唯一的；下方的顯示名稱由本人自行設定，因此請以代號為準。"
     },
     "success": {
       "message": "您的 Slack 帳戶現已關聯到 Terrapod。",

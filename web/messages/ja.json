@@ -27,6 +27,7 @@
     "account": "アカウント",
     "apiTokens": "APIトークン",
     "sessions": "セッション",
+    "slackLinks": "Slack 連携",
     "logOut": "ログアウト",
     "menu": "メニュー",
     "openMenu": "メニューを開く",
@@ -371,6 +372,22 @@
         "load": "セッションの読み込みに失敗しました",
         "revoke": "セッションの取り消しに失敗しました（{status}）",
         "revokeGeneric": "セッションの取り消しに失敗しました"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack 連携",
+      "description": "あなたとして操作できる Slack アカウントです。連携された Slack アカウントはあなたの権限で実行を承認・破棄できるため、見覚えのないものは取り消してください。",
+      "empty": "連携されている Slack アカウントはありません。",
+      "revoke": "取り消す",
+      "confirmRevoke": "Slack ユーザー {user} の連携を取り消しますか？このアカウントは Slack からあなたとして操作できなくなります。",
+      "columns": {
+        "slackUser": "Slack ユーザー",
+        "team": "Slack チーム",
+        "linkedAt": "連携日"
+      },
+      "errors": {
+        "load": "Slack 連携を読み込めませんでした。",
+        "revoke": "その Slack 連携を取り消せませんでした。"
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "不明",
     "confirm": {
       "prompt": "このSlackアカウントを<em>あなたの</em>Terrapodアイデンティティにリンクしますか？今後のすべてのSlackアクション（承認/破棄）は、このTerrapodユーザーとしてその権限で実行されます。",
+      "slackName": "Slack アカウント",
       "slackUser": "Slackユーザー",
       "slackTeam": "Slackチーム",
       "terrapodAccount": "Terrapodアカウント",
       "warning": "このリンクをSlackから自分で開始した場合にのみ続行してください。そうでない場合は、このタブを閉じてリンクしないでください — これにより上記のSlackアカウントが<em>あなたの</em>Terrapodアイデンティティにバインドされます。",
-      "button": "確認してリンク"
+      "button": "確認してリンク",
+      "namesUnavailable": "Terrapod はこの Slack アカウントの名前を取得できませんでした。上の ID を確認し、この連携を自分で Slack から開始した場合にのみ続行してください。",
+      "nameIsSelfChosen": "ハンドルは Slack ワークスペース内で一意です。その下の表示名は本人が自由に設定できるため、ハンドルで判断してください。"
     },
     "success": {
       "message": "SlackアカウントがTerrapodにリンクされました。",

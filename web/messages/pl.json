@@ -27,6 +27,7 @@
     "account": "Konto",
     "apiTokens": "Tokeny API",
     "sessions": "Sesje",
+    "slackLinks": "Powiązania Slack",
     "logOut": "Wyloguj",
     "menu": "Menu",
     "openMenu": "Otwórz menu",
@@ -371,6 +372,22 @@
         "load": "Nie udało się wczytać sesji",
         "revoke": "Nie udało się unieważnić sesji ({status})",
         "revokeGeneric": "Nie udało się unieważnić sesji"
+      }
+    },
+    "slackLinks": {
+      "title": "Powiązania Slack",
+      "description": "Konta Slack, które mogą działać jako ty. Powiązane konto Slack może zatwierdzać i odrzucać uruchomienia z twoimi uprawnieniami, więc unieważnij każde, którego nie rozpoznajesz.",
+      "empty": "Żadne konto Slack nie jest z tobą powiązane.",
+      "revoke": "Unieważnij",
+      "confirmRevoke": "Unieważnić powiązanie użytkownika Slack {user}? To konto nie będzie już mogło działać jako ty ze Slacka.",
+      "columns": {
+        "slackUser": "Użytkownik Slack",
+        "team": "Zespół Slack",
+        "linkedAt": "Powiązano"
+      },
+      "errors": {
+        "load": "Nie udało się wczytać twoich powiązań Slack.",
+        "revoke": "Nie udało się unieważnić tego powiązania Slack."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "nieznane",
     "confirm": {
       "prompt": "Połączyć to konto Slack z <em>Twoją</em> tożsamością Terrapod? Każda przyszła akcja Slack (zatwierdzenie/odrzucenie) będzie wykonywana jako ten użytkownik Terrapod z jego uprawnieniami.",
+      "slackName": "Konto Slack",
       "slackUser": "Użytkownik Slack",
       "slackTeam": "Zespół Slack",
       "terrapodAccount": "Konto Terrapod",
       "warning": "Kontynuuj tylko, jeśli samodzielnie rozpocząłeś to łączenie ze Slack. Jeśli tego nie zrobiłeś, zamknij tę kartę i nie łącz — powiąże to konto Slack powyżej z <em>Twoją</em> tożsamością Terrapod.",
-      "button": "Potwierdź i połącz"
+      "button": "Potwierdź i połącz",
+      "namesUnavailable": "Terrapod nie mógł odczytać nazwy tego konta Slack. Sprawdź identyfikatory powyżej i kontynuuj tylko wtedy, gdy samodzielnie rozpocząłeś to powiązanie ze Slacka.",
+      "nameIsSelfChosen": "Nazwa użytkownika jest unikalna w przestrzeni Slack; wyświetlaną nazwę poniżej wybiera jej właściciel, więc oceniaj po nazwie użytkownika."
     },
     "success": {
       "message": "Twoje konto Slack jest teraz połączone z Terrapod.",

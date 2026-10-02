@@ -27,6 +27,7 @@
     "account": "账户",
     "apiTokens": "API 令牌",
     "sessions": "会话",
+    "slackLinks": "Slack 关联",
     "logOut": "退出登录",
     "menu": "菜单",
     "openMenu": "打开菜单",
@@ -371,6 +372,22 @@
         "load": "加载会话失败",
         "revoke": "撤销会话失败（{status}）",
         "revokeGeneric": "撤销会话失败"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack 关联",
+      "description": "可以以您身份操作的 Slack 账户。已关联的 Slack 账户能以您的权限批准和丢弃运行，因此请撤销任何您不认识的关联。",
+      "empty": "没有 Slack 账户与您关联。",
+      "revoke": "撤销",
+      "confirmRevoke": "撤销 Slack 用户 {user} 的关联？该账户将无法再从 Slack 以您的身份操作。",
+      "columns": {
+        "slackUser": "Slack 用户",
+        "team": "Slack 团队",
+        "linkedAt": "关联时间"
+      },
+      "errors": {
+        "load": "无法加载您的 Slack 关联。",
+        "revoke": "无法撤销该 Slack 关联。"
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "未知",
     "confirm": {
       "prompt": "将此 Slack 账户关联到<em>您的</em> Terrapod 身份？今后每个 Slack 操作（批准/丢弃）都将以此 Terrapod 用户及其权限运行。",
+      "slackName": "Slack 账户",
       "slackUser": "Slack 用户",
       "slackTeam": "Slack 团队",
       "terrapodAccount": "Terrapod 账户",
       "warning": "仅当您本人刚刚从 Slack 发起此关联时才继续。如果不是，请关闭此标签页且不要关联 — 这会将上方的 Slack 账户绑定到<em>您的</em> Terrapod 身份。",
-      "button": "确认并关联"
+      "button": "确认并关联",
+      "namesUnavailable": "Terrapod 无法获取此 Slack 账户的名称。请核对上方的 ID，仅在您本人从 Slack 发起此关联时才继续。",
+      "nameIsSelfChosen": "句柄在该 Slack 工作区内是唯一的；下方的显示名称由本人自行设定，因此请以句柄为准。"
     },
     "success": {
       "message": "您的 Slack 账户现已关联到 Terrapod。",

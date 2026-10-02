@@ -27,6 +27,7 @@
     "account": "Hesap",
     "apiTokens": "API Belirteçleri",
     "sessions": "Oturumlar",
+    "slackLinks": "Slack bağlantıları",
     "logOut": "Çıkış yap",
     "menu": "Menü",
     "openMenu": "Menüyü aç",
@@ -371,6 +372,22 @@
         "load": "Oturumlar yüklenemedi",
         "revoke": "Oturumlar iptal edilemedi ({status})",
         "revokeGeneric": "Oturumlar iptal edilemedi"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack bağlantıları",
+      "description": "Sizin adınıza işlem yapabilen Slack hesapları. Bağlı bir Slack hesabı sizin izinlerinizle çalıştırmaları onaylayıp atabilir; tanımadığınız her bağlantıyı kaldırın.",
+      "empty": "Size bağlı bir Slack hesabı yok.",
+      "revoke": "Kaldır",
+      "confirmRevoke": "Slack kullanıcısı {user} için bağlantı kaldırılsın mı? Bu hesap artık Slack'ten sizin adınıza işlem yapamayacak.",
+      "columns": {
+        "slackUser": "Slack kullanıcısı",
+        "team": "Slack takımı",
+        "linkedAt": "Bağlandı"
+      },
+      "errors": {
+        "load": "Slack bağlantılarınız yüklenemedi.",
+        "revoke": "Bu Slack bağlantısı kaldırılamadı."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "bilinmiyor",
     "confirm": {
       "prompt": "Bu Slack hesabı <em>sizin</em> Terrapod kimliğinize bağlansın mı? Gelecekteki her Slack eylemi (onayla/iptal et) bu Terrapod kullanıcısı olarak ve onun izinleriyle çalışacak.",
+      "slackName": "Slack hesabı",
       "slackUser": "Slack kullanıcısı",
       "slackTeam": "Slack ekibi",
       "terrapodAccount": "Terrapod hesabı",
       "warning": "Yalnızca bu bağlantıyı Slack''ten kendiniz başlattıysanız devam edin. Başlatmadıysanız bu sekmeyi kapatın ve bağlamayın — bu, yukarıdaki Slack hesabını <em>sizin</em> Terrapod kimliğinize bağlar.",
-      "button": "Onayla ve bağla"
+      "button": "Onayla ve bağla",
+      "namesUnavailable": "Terrapod bu Slack hesabının adını alamadı. Yukarıdaki kimlikleri denetleyin ve bu bağlantıyı Slack'ten kendiniz başlattıysanız yalnızca o zaman sürdürün.",
+      "nameIsSelfChosen": "Kullanıcı adı Slack çalışma alanında tektir; altındaki görünen adı sahibi kendisi seçer, bu yüzden kullanıcı adına bakın."
     },
     "success": {
       "message": "Slack hesabınız artık Terrapod''a bağlı.",

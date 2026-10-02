@@ -27,6 +27,7 @@
     "account": "Account",
     "apiTokens": "API Tokens",
     "sessions": "Sessions",
+    "slackLinks": "Slack links",
     "logOut": "Log out",
     "menu": "Menu",
     "openMenu": "Open menu",
@@ -371,6 +372,22 @@
         "load": "Failed to load sessions",
         "revoke": "Failed to revoke sessions ({status})",
         "revokeGeneric": "Failed to revoke sessions"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack links",
+      "description": "Slack accounts that can act as you. A linked Slack account can approve and discard runs with your permissions, so revoke any you do not recognise.",
+      "empty": "No Slack accounts are linked to you.",
+      "revoke": "Revoke",
+      "confirmRevoke": "Revoke the link for Slack user {user}? That account will no longer be able to act as you from Slack.",
+      "columns": {
+        "slackUser": "Slack user",
+        "team": "Slack team",
+        "linkedAt": "Linked"
+      },
+      "errors": {
+        "load": "Could not load your Slack links.",
+        "revoke": "Could not revoke that Slack link."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "unknown",
     "confirm": {
       "prompt": "Link this Slack account to <em>your</em> Terrapod identity? Every future Slack action (approve/discard) will run as this Terrapod user with their permissions.",
+      "slackName": "Slack account",
       "slackUser": "Slack user",
       "slackTeam": "Slack team",
       "terrapodAccount": "Terrapod account",
       "warning": "Only continue if you just started this link from Slack yourself. If you didn't, close this tab and don't link — this binds the Slack account above to <em>your</em> Terrapod identity.",
-      "button": "Confirm & link"
+      "button": "Confirm & link",
+      "namesUnavailable": "Terrapod could not look up this Slack account's name. Check the ids above, and only continue if you started this link from Slack yourself.",
+      "nameIsSelfChosen": "The handle is unique in the Slack workspace; the display name beneath it is chosen by its owner, so judge by the handle."
     },
     "success": {
       "message": "Your Slack account is now linked to Terrapod.",

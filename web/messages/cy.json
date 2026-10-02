@@ -27,6 +27,7 @@
     "account": "Cyfrif",
     "apiTokens": "Tocynnau API",
     "sessions": "Sesiynau",
+    "slackLinks": "Cysylltiadau Slack",
     "logOut": "Allgofnodi",
     "menu": "Dewislen",
     "openMenu": "Agor y ddewislen",
@@ -371,6 +372,22 @@
         "load": "Methwyd llwytho'r sesiynau",
         "revoke": "Methwyd dirymu'r sesiynau ({status})",
         "revokeGeneric": "Methwyd dirymu'r sesiynau"
+      }
+    },
+    "slackLinks": {
+      "title": "Cysylltiadau Slack",
+      "description": "Cyfrifon Slack sy'n gallu gweithredu fel chi. Gall cyfrif Slack cysylltiedig gymeradwyo a gwrthod rhediadau â'ch caniatâd, felly dirymwch unrhyw un nad ydych yn ei adnabod.",
+      "empty": "Nid oes cyfrifon Slack wedi'u cysylltu â chi.",
+      "revoke": "Dirymu",
+      "confirmRevoke": "Dirymu'r cysylltiad ar gyfer defnyddiwr Slack {user}? Ni fydd y cyfrif hwnnw'n gallu gweithredu fel chi o Slack mwyach.",
+      "columns": {
+        "slackUser": "Defnyddiwr Slack",
+        "team": "Tîm Slack",
+        "linkedAt": "Cysylltwyd"
+      },
+      "errors": {
+        "load": "Methu llwytho eich cysylltiadau Slack.",
+        "revoke": "Methu dirymu'r cysylltiad Slack hwnnw."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "anhysbys",
     "confirm": {
       "prompt": "Cysylltu'r cyfrif Slack hwn â'ch adnabyddiaeth Terrapod <em>chi</em>? Bydd pob gweithred Slack yn y dyfodol (cymeradwyo/taflu) yn rhedeg fel y defnyddiwr Terrapod hwn gyda'i ganiatâd.",
+      "slackName": "Cyfrif Slack",
       "slackUser": "Defnyddiwr Slack",
       "slackTeam": "Tîm Slack",
       "terrapodAccount": "Cyfrif Terrapod",
       "warning": "Peidiwch â pharhau oni bai eich bod newydd ddechrau'r cyswllt hwn o Slack eich hun. Os na wnaethoch, caewch y tab hwn a pheidiwch â chysylltu — mae hyn yn rhwymo'r cyfrif Slack uchod i'ch adnabyddiaeth Terrapod <em>chi</em>.",
-      "button": "Cadarnhau a chysylltu"
+      "button": "Cadarnhau a chysylltu",
+      "namesUnavailable": "Ni allai Terrapod chwilio enw'r cyfrif Slack hwn. Gwiriwch yr IDau uchod, a pharhewch dim ond os dechreuoch y cysylltiad hwn o Slack eich hunan.",
+      "nameIsSelfChosen": "Mae'r llawenw yn unigryw yn y gweithle Slack; mae'r enw arddangos oddi tano wedi'i ddewis gan ei berchennog, felly barnwch wrth y llawenw."
     },
     "success": {
       "message": "Mae eich cyfrif Slack bellach wedi'i gysylltu â Terrapod.",

@@ -27,6 +27,7 @@
     "account": "Účet",
     "apiTokens": "API tokeny",
     "sessions": "Relace",
+    "slackLinks": "Propojení Slack",
     "logOut": "Odhlásit se",
     "menu": "Nabídka",
     "openMenu": "Otevřít nabídku",
@@ -371,6 +372,22 @@
         "load": "Nepodařilo se načíst relace",
         "revoke": "Nepodařilo se odvolat relace ({status})",
         "revokeGeneric": "Nepodařilo se odvolat relace"
+      }
+    },
+    "slackLinks": {
+      "title": "Propojení Slack",
+      "description": "Účty Slack, které mohou jednat za vás. Propojený účet Slack může potvrzovat a zahazovat běhy s vašimi oprávněními, takže odvolejte vše, co nepoznáváte.",
+      "empty": "S vámi není propojen žádný účet Slack.",
+      "revoke": "Odvolat",
+      "confirmRevoke": "Odvolat propojení uživatele Slack {user}? Tento účet už za vás ze Slacku jednat nebude.",
+      "columns": {
+        "slackUser": "Uživatel Slack",
+        "team": "Tým Slack",
+        "linkedAt": "Propojeno"
+      },
+      "errors": {
+        "load": "Vaše propojení Slack se nepodařilo načíst.",
+        "revoke": "Toto propojení Slack se nepodařilo odvolat."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "neznámé",
     "confirm": {
       "prompt": "Propojit tento Slack účet s <em>vaší</em> Terrapod identitou? Každá budoucí Slack akce (schválit/zahodit) poběží jako tento Terrapod uživatel s jeho oprávněními.",
+      "slackName": "Účet Slack",
       "slackUser": "Slack uživatel",
       "slackTeam": "Slack tým",
       "terrapodAccount": "Terrapod účet",
       "warning": "Pokračujte pouze v případě, že jste toto propojení právě sami zahájili ze Slacku. Pokud ne, zavřete tuto kartu a nepropojujte — toto sváže výše uvedený Slack účet s <em>vaší</em> Terrapod identitou.",
-      "button": "Potvrdit a propojit"
+      "button": "Potvrdit a propojit",
+      "namesUnavailable": "Terrapod nedokázal zjistit jméno tohoto účtu Slack. Zkontrolujte identifikátory výše a pokračujte pouze tehdy, pokud jste toto propojení ze Slacku začali vy sami.",
+      "nameIsSelfChosen": "Přezdívka je v pracovním prostoru Slack jedinečná; zobrazované jméno pod ní si volí její vlastník, posuzujte tedy podle přezdívky."
     },
     "success": {
       "message": "Váš Slack účet je nyní propojen s Terrapod.",

@@ -27,6 +27,7 @@
     "account": "Konto",
     "apiTokens": "API-tokens",
     "sessions": "Sessioner",
+    "slackLinks": "Slack-sammenkædninger",
     "logOut": "Log ud",
     "menu": "Menu",
     "openMenu": "Åbn menu",
@@ -371,6 +372,22 @@
         "load": "Kunne ikke indlæse sessioner",
         "revoke": "Kunne ikke tilbagekalde sessioner ({status})",
         "revokeGeneric": "Kunne ikke tilbagekalde sessioner"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack-sammenkædninger",
+      "description": "Slack-konti, der kan handle som dig. En sammenkædet Slack-konto kan godkende og forkaste kørsler med dine rettigheder, så tilbagekald alt, du ikke kan genkende.",
+      "empty": "Ingen Slack-konto er sammenkædet med dig.",
+      "revoke": "Tilbagekald",
+      "confirmRevoke": "Tilbagekald sammenkædningen for Slack-brugeren {user}? Kontoen kan derefter ikke længere handle som dig fra Slack.",
+      "columns": {
+        "slackUser": "Slack-bruger",
+        "team": "Slack-team",
+        "linkedAt": "Sammenkædet"
+      },
+      "errors": {
+        "load": "Dine Slack-sammenkædninger kunne ikke indlæses.",
+        "revoke": "Den Slack-sammenkædning kunne ikke tilbagekaldes."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "ukendt",
     "confirm": {
       "prompt": "Sammenkæd denne Slack-konto med <em>din</em> Terrapod-identitet? Enhver fremtidig Slack-handling (godkend/kassér) vil køre som denne Terrapod-bruger med deres tilladelser.",
+      "slackName": "Slack-konto",
       "slackUser": "Slack-bruger",
       "slackTeam": "Slack-team",
       "terrapodAccount": "Terrapod-konto",
       "warning": "Fortsæt kun, hvis du selv lige har startet denne sammenkædning fra Slack. Hvis du ikke gjorde det, så luk denne fane og sammenkæd ikke — dette binder Slack-kontoen ovenfor til <em>din</em> Terrapod-identitet.",
-      "button": "Bekræft og sammenkæd"
+      "button": "Bekræft og sammenkæd",
+      "namesUnavailable": "Terrapod kunne ikke finde navnet på denne Slack-konto. Kontrollér id'erne ovenfor, og fortsæt kun, hvis du selv startede denne sammenkædning fra Slack.",
+      "nameIsSelfChosen": "Brugernavnet er unikt i Slack-arbejdsområdet; visningsnavnet nedenunder vælges af ejeren selv, så bedøm ud fra brugernavnet."
     },
     "success": {
       "message": "Din Slack-konto er nu sammenkædet med Terrapod.",

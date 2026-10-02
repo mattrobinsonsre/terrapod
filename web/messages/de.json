@@ -27,6 +27,7 @@
     "account": "Konto",
     "apiTokens": "API-Tokens",
     "sessions": "Sitzungen",
+    "slackLinks": "Slack-Verknüpfungen",
     "logOut": "Abmelden",
     "menu": "Menü",
     "openMenu": "Menü öffnen",
@@ -371,6 +372,22 @@
         "load": "Sitzungen konnten nicht geladen werden",
         "revoke": "Sitzungen konnten nicht widerrufen werden ({status})",
         "revokeGeneric": "Sitzungen konnten nicht widerrufen werden"
+      }
+    },
+    "slackLinks": {
+      "title": "Slack-Verknüpfungen",
+      "description": "Slack-Konten, die in Ihrem Namen handeln können. Ein verknüpftes Slack-Konto kann Läufe mit Ihren Berechtigungen bestätigen und verwerfen — widerrufen Sie alles, was Sie nicht kennen.",
+      "empty": "Mit Ihnen ist kein Slack-Konto verknüpft.",
+      "revoke": "Widerrufen",
+      "confirmRevoke": "Verknüpfung für Slack-Benutzer {user} widerrufen? Dieses Konto kann dann nicht mehr aus Slack in Ihrem Namen handeln.",
+      "columns": {
+        "slackUser": "Slack-Benutzer",
+        "team": "Slack-Team",
+        "linkedAt": "Verknüpft"
+      },
+      "errors": {
+        "load": "Ihre Slack-Verknüpfungen konnten nicht geladen werden.",
+        "revoke": "Diese Slack-Verknüpfung konnte nicht widerrufen werden."
       }
     }
   },
@@ -3179,11 +3196,14 @@
     "unknown": "unbekannt",
     "confirm": {
       "prompt": "Möchten Sie dieses Slack-Konto mit <em>Ihrer</em> Terrapod-Identität verknüpfen? Jede zukünftige Slack-Aktion (Genehmigen/Verwerfen) wird als dieser Terrapod-Benutzer mit dessen Berechtigungen ausgeführt.",
+      "slackName": "Slack-Konto",
       "slackUser": "Slack-Benutzer",
       "slackTeam": "Slack-Team",
       "terrapodAccount": "Terrapod-Konto",
       "warning": "Fahren Sie nur fort, wenn Sie diese Verknüpfung soeben selbst in Slack gestartet haben. Falls nicht, schließen Sie diesen Tab und verknüpfen Sie nicht — dadurch wird das oben genannte Slack-Konto mit <em>Ihrer</em> Terrapod-Identität verbunden.",
-      "button": "Bestätigen & verknüpfen"
+      "button": "Bestätigen & verknüpfen",
+      "namesUnavailable": "Terrapod konnte den Namen dieses Slack-Kontos nicht abrufen. Prüfen Sie die IDs oben und fahren Sie nur fort, wenn Sie diese Verknüpfung selbst in Slack gestartet haben.",
+      "nameIsSelfChosen": "Das Handle ist im Slack-Workspace eindeutig; den Anzeigenamen darunter wählt der Inhaber selbst — richten Sie sich nach dem Handle."
     },
     "success": {
       "message": "Ihr Slack-Konto ist jetzt mit Terrapod verknüpft.",
