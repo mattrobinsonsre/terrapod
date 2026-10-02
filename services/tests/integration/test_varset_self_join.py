@@ -320,7 +320,17 @@ class TestTheSkipOptimisationCannotSilentlyGoStale:
             "name": "name_prefix",
             "execution-backend": "execution_backend",
             "execution-mode": "execution_mode",
-            "terraform-version": "terraform_version",
+            # One dimension, two wire spellings. `WorkspaceFilter` names the
+            # column (`engine_version`, #1559) while the router still accepts
+            # `terraform-version` and normalises it — so BOTH keys have to be
+            # checked. Mapping only the new one would leave a PATCH using the
+            # legacy spelling able to move the dimension without paying the
+            # self-join guard, which is exactly the hole this test exists to
+            # close. Confirmed against the router rather than assumed:
+            # `tfe_v2.py` reads `if "engine-version" in attrs or
+            # "terraform-version" in attrs`.
+            "engine-version": "engine_version",
+            "terraform-version": "engine_version",
             "agent-pool-id": "agent_pool_id",
             "vcs-connection-id": "vcs_connection_id",
             "owner-email": "owner_email",
