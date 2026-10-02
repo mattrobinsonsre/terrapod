@@ -251,6 +251,11 @@ class TestOutOfOrderChunkOnPut:
         session = MagicMock()
         session.id = uuid.uuid4()
         session.offset = 100
+        # Stated explicitly: a session is loaded only for the repository in the
+        # path (GHSA-mhhr-896g-4p33), and an unset MagicMock attribute is a
+        # truthy MagicMock — which is not `_REPO`, so the route would answer 404
+        # and this test would stop exercising the Content-Range gap at all.
+        session.repository_name = _REPO
         get_session.return_value = session
         caps.return_value = _WRITE
 

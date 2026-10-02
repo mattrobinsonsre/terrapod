@@ -102,6 +102,14 @@ func PublishModule(ctx context.Context, c *terrapod.Client, name, provider, vers
 	}
 	note(p, "uploading module tarball (%d bytes)", len(tarball))
 	if err := c.UploadModuleVersion(ctx, name, provider, version, tarball); err != nil {
+		// The comment above says a published version is immutable, and since
+		// GHSA-mhhr-896g-4p33 the server enforces it. Say so plainly: the fix is
+		// to pick a new version, not to retry.
+		if terrapod.IsConflict(err) {
+			return fmt.Errorf(
+				"version %s of %s/%s is already published and cannot be replaced: %w",
+				version, name, provider, err)
+		}
 		return fmt.Errorf("upload module: %w", err)
 	}
 	note(p, "published %s/%s %s", name, provider, version)

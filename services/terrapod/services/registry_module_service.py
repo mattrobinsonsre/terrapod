@@ -285,6 +285,15 @@ async def upsert_module_version(
     return mod_version
 
 
+class ModuleVersionAlreadyPublished(Exception):
+    """A published module version cannot be replaced (GHSA-mhhr-896g-4p33).
+
+    Carried as its own type so the router can answer 409 rather than the 500 a
+    bare ValueError would produce, and so the rule lives at the write chokepoint
+    instead of in whichever caller remembered it.
+    """
+
+
 async def upload_module_tarball(
     db: AsyncSession,
     storage: ObjectStore,
@@ -294,11 +303,24 @@ async def upload_module_tarball(
     version: str,
     tarball_path: str,
 ) -> RegistryModuleVersion:
-    """Upload a module tarball directly. Upserts version, stores tarball.
+    """Upload a module tarball directly. Creates the version, stores the tarball.
 
     `tarball_path` is a file on the API pod's ephemeral PVC (the caller
     streams the request body to it). The tarball is streamed into storage
     and parsed from disk — never buffered in the worker heap (CLAUDE.md #14).
+
+    **A version that has already been uploaded is refused**
+    (`ModuleVersionAlreadyPublished`, 409). It used to upsert, so re-posting
+    1.2.3 replaced the bytes of a published version in place — and module
+    consumers do not hash-lock, so every workspace pinned to `version = "1.2.3"`
+    silently picked up different source on its next init. "Registry module
+    versions are immutable" is a property the registry has to enforce, not a
+    convention to rely on. Republish as a new version; delete the old one first
+    if it must genuinely go (that is `registry:admin`, and audited).
+
+    The VCS tag poller does NOT come through here — it has its own path, and a
+    moved tag deliberately updates its version in place, which is a different and
+    deliberate contract (the tag, not the version, is the author's statement).
     """
     from terrapod.api.upload_stream import file_chunks
 
@@ -306,14 +328,28 @@ async def upload_module_tarball(
     if module is None:
         raise ValueError(f"Module {namespace}/{name}/{provider} not found")
 
-    is_new = (
-        await db.execute(
-            select(RegistryModuleVersion).where(
-                RegistryModuleVersion.module_id == module.id,
-                RegistryModuleVersion.version == version,
+    existing = (
+        (
+            await db.execute(
+                select(RegistryModuleVersion).where(
+                    RegistryModuleVersion.module_id == module.id,
+                    RegistryModuleVersion.version == version,
+                )
             )
         )
-    ).scalars().first() is None
+        .scalars()
+        .first()
+    )
+    is_new = existing is None
+
+    # An un-uploaded row (`pending`, from a create that never finished, or a
+    # failed first attempt) is still completable — that is a resumed publish, not
+    # an overwrite. Only a version that actually holds bytes is frozen.
+    if existing is not None and existing.upload_status == "uploaded":
+        raise ModuleVersionAlreadyPublished(
+            f"Version {version} of {namespace}/{name}/{provider} is already published. "
+            "Registry module versions are immutable; publish a new version."
+        )
 
     mod_version = await upsert_module_version(db, module.id, version)
 

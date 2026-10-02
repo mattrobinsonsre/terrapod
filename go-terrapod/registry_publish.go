@@ -54,8 +54,15 @@ func (c *Client) UploadProviderPlatform(ctx context.Context, name, version, goos
 }
 
 // UploadModuleVersion uploads a gzipped module source tarball for a version.
-// Upserts the version; the server extracts the module interface and triggers
+// Creates the version; the server extracts the module interface and triggers
 // runs on linked workspaces.
+//
+// Returns *ConflictError (HTTP 409) when the version has already been published
+// (GHSA-mhhr-896g-4p33). Registry module versions are immutable: this used to
+// upsert and replace the bytes of a published version in place, which silently
+// changed the source every pinned consumer resolves. Completing a version whose
+// first upload failed is still allowed — that is a resumed publish, not an
+// overwrite.
 func (c *Client) UploadModuleVersion(ctx context.Context, name, provider, version string, tarball []byte) error {
 	path := fmt.Sprintf("%s/%s/%s/versions/%s/upload", modulePublishBase, url.PathEscape(name), url.PathEscape(provider), url.PathEscape(version))
 	_, err := c.PutRaw(ctx, path, "application/gzip", tarball)

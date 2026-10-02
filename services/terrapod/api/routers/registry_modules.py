@@ -56,6 +56,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.module_subdirectory import SubdirectoryError, normalize_subdirectory
 from terrapod.services.registry_module_service import (
+    ModuleVersionAlreadyPublished,
     create_module,
     create_module_version,
     delete_module,
@@ -882,7 +883,15 @@ async def upload_module_version_endpoint(
     db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
-    """Upload a module tarball directly. Requires write. Idempotent."""
+    """Upload a module tarball directly. Requires write.
+
+    **Not idempotent against a published version** (GHSA-mhhr-896g-4p33): a
+    version that already holds bytes answers 409 rather than having them
+    replaced. Re-posting used to overwrite in place, and module consumers do not
+    hash-lock, so every workspace pinned to that version silently got different
+    source on its next init. Completing a version whose first attempt failed is
+    still allowed — that is a resumed publish, not an overwrite.
+    """
     module = await get_module(db, "default", name, provider)
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found")
@@ -911,9 +920,12 @@ async def upload_module_version_endpoint(
         if size == 0:
             raise HTTPException(status_code=400, detail="Empty request body")
 
-        mod_version = await upload_module_tarball(
-            db, storage, "default", name, provider, version, tmp_path
-        )
+        try:
+            mod_version = await upload_module_tarball(
+                db, storage, "default", name, provider, version, tmp_path
+            )
+        except ModuleVersionAlreadyPublished as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
         await db.commit()
     finally:
         try:

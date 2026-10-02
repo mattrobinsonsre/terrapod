@@ -62,6 +62,33 @@ SUPPORTED_DIGEST_ALGORITHMS: dict[str, int] = {"sha256": 64, "sha512": 128}
 _HEX = frozenset("0123456789abcdef")
 
 
+def looks_like_a_registry_host(component: str) -> bool:
+    """Whether a repository name's first path component names a registry.
+
+    Docker and containerd use exactly this test to decide whether the leading
+    component of a reference is a registry host rather than a namespace: it
+    contains a ``.``, or it is ``localhost``. (A ``:`` port would qualify too, but
+    the OCI repository grammar above forbids one, so it cannot occur here.)
+    Terrapod's own pull-through naming relies on the same convention —
+    ``quay.io/ansible/awx-ee`` means "quay.io's ansible/awx-ee".
+
+    Used to refuse *creating* a pushed repository under such a name
+    (GHSA-mhhr-896g-4p33). Pushing ``docker.io/library/nginx`` into a deployment
+    that has no ``docker.io`` upstream creates a local repository that
+    permanently shadows one — the database is consulted before the upstream list,
+    deliberately, so that a repository someone pushed is never overwritten by
+    upstream content. That protection becomes the attack when the pushed name was
+    chosen to impersonate the upstream, and it is permanent: adding the upstream
+    later does not dislodge it.
+
+    A rule rather than a list, because a list of public registries is a list to
+    maintain and to be wrong about. The cost is that a namespace with a dot in it
+    cannot be the first component of a pushed name, which is the same ambiguity
+    Docker lives with.
+    """
+    return "." in component or component == "localhost"
+
+
 class InvalidName(ValueError):
     """A repository name, tag or digest that does not satisfy the spec."""
 

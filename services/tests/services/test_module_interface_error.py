@@ -45,6 +45,14 @@ def _interface_enabled(monkeypatch):
 
 
 class TestDirectUpload:
+    """Every version here carries ``upload_status="pending"``.
+
+    That is not incidental: a version that already reads ``uploaded`` is refused
+    outright (GHSA-mhhr-896g-4p33, `ModuleVersionAlreadyPublished`), so an
+    interface-parse case has to be a first or retried publish to reach the parser
+    at all. The refusal itself is asserted at the end of this class.
+    """
+
     async def _upload(self, tmp_path, content: bytes, version):
         path = tmp_path / "m.tar.gz"
         path.write_bytes(content)
@@ -68,28 +76,49 @@ class TestDirectUpload:
             )
 
     async def test_an_unparseable_file_sets_the_reason(self, tmp_path):
-        version = SimpleNamespace(inputs=None, outputs=None, interface_error=None)
+        version = SimpleNamespace(
+            inputs=None, outputs=None, interface_error=None, upload_status="pending"
+        )
         await self._upload(tmp_path, _tarball(BROKEN), version)
         assert version.inputs == []
         assert version.interface_error == "variables.tf: invalid HCL at line 2, column 10"
 
     async def test_a_corrupt_archive_sets_the_reason(self, tmp_path):
-        version = SimpleNamespace(inputs=None, outputs=None, interface_error=None)
+        version = SimpleNamespace(
+            inputs=None, outputs=None, interface_error=None, upload_status="pending"
+        )
         await self._upload(tmp_path, b"definitely not a tarball", version)
         assert version.interface_error == (
             "The module archive could not be read as a gzip-compressed tar file."
         )
 
-    async def test_a_good_re_upload_clears_it(self, tmp_path):
+    async def test_a_good_retry_clears_it(self, tmp_path):
+        """A retried publish, not a republish — the first attempt left a parse
+        error on a version that never reached `uploaded`."""
         version = SimpleNamespace(
-            inputs=[], outputs=[], interface_error="variables.tf: invalid HCL"
+            inputs=[],
+            outputs=[],
+            interface_error="variables.tf: invalid HCL",
+            upload_status="pending",
         )
         await self._upload(tmp_path, _tarball(GOOD), version)
         assert [i["name"] for i in version.inputs] == ["region"]
         assert version.interface_error is None
 
+    async def test_a_published_version_is_refused_before_anything_is_parsed(self, tmp_path):
+        """The sibling of the cases above: once a version holds bytes it is frozen,
+        so there is no parse to record a reason for."""
+        version = SimpleNamespace(
+            inputs=[], outputs=[], interface_error=None, upload_status="uploaded"
+        )
+        with pytest.raises(registry_module_service.ModuleVersionAlreadyPublished):
+            await self._upload(tmp_path, _tarball(GOOD), version)
+        assert version.inputs == []  # untouched
+
     async def test_an_unexpected_parser_crash_is_still_recorded(self, tmp_path):
-        version = SimpleNamespace(inputs=None, outputs=None, interface_error=None)
+        version = SimpleNamespace(
+            inputs=None, outputs=None, interface_error=None, upload_status="pending"
+        )
         with patch(
             "terrapod.services.module_hcl_parser.extract_module_interface_result_from_file",
             side_effect=RuntimeError("boom at /var/lib/secret"),

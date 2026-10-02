@@ -2434,6 +2434,20 @@ section below).
 
 **Required permission:** `write` on the module (the owner has `admin`).
 
+**A published version is immutable, and the server enforces that** (new in 2.0,
+GHSA-mhhr-896g-4p33). Re-uploading a version that already holds bytes answers
+**409 Conflict** and stores nothing. It used to upsert and replace them in place
+— and module consumers do not hash-lock, so every workspace pinned to that
+version silently picked up different source on its next init. Publish a new
+version instead; if a published one genuinely has to go, delete it first (that is
+`registry:admin`, and audited).
+
+Completing a version whose first attempt failed is still allowed: a row that
+never reached `uploaded` is a resumed publish, not an overwrite, so a failed
+upload does not strand the version number. The VCS tag poller has its own path
+and is unaffected — a **moved tag** deliberately updates its version in place,
+because there the tag rather than the version is the author's statement.
+
 **Tooling:** the [`terrapod-publish`](registry-publishing.md) CLI packages
 the source directory and performs this upload.
 

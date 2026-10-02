@@ -67,6 +67,27 @@ through owner, labels and roles exactly as modules and providers are. A
 repository is created by the first push that is allowed to make it, and its
 creator becomes the owner.
 
+**An upload session belongs to its repository.** A chunked push is a sequence of
+calls carrying a session id, and that id is not a secret — it travels in the
+`Location` header of every chunk response. So each session call checks the
+session against the repository in the path, and a mismatch answers **404
+`BLOB_UPLOAD_UNKNOWN`**, exactly as an id that never existed would. Before 2.0
+(GHSA-mhhr-896g-4p33) the handlers authorised the path and then loaded the
+session by id alone, so a caller with write anywhere could append to, cancel, or
+complete someone else's in-progress push — and completing it wrote the blob
+wherever *their* path said.
+
+**A pushed repository cannot be named after a registry.** The first path
+component of a reference names a registry host when it contains a dot, or is
+`localhost` — Docker's own rule, and the one Terrapod's mirror naming below
+relies on. Pushing under such a name is refused with **403 `DENIED`** unless that
+host is a configured upstream, in which case it is a mirror and the push is to
+the mirror. The reason is the lookup order: the database is consulted before the
+upstream list, deliberately, so a repository someone pushed is never overwritten
+by upstream content — which means a locally pushed `docker.io/library/nginx`
+would **permanently** shadow a `docker.io` upstream added later. Repositories
+that already exist are unaffected; only creation is refused.
+
 ## Pull-through mirroring
 
 A repository whose first path component names a configured upstream is a mirror:

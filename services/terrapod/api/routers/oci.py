@@ -46,6 +46,7 @@ from terrapod.services.oci.errors import (
     BLOB_UPLOAD_INVALID,
     BLOB_UPLOAD_OUT_OF_ORDER,
     BLOB_UPLOAD_UNKNOWN,
+    DENIED,
     DIGEST_INVALID,
     MANIFEST_BLOB_UNKNOWN,
     MANIFEST_INVALID,
@@ -60,6 +61,7 @@ from terrapod.services.oci.errors import (
 )
 from terrapod.services.oci.names import (
     InvalidName,
+    looks_like_a_registry_host,
     parse_digest,
     parse_reference,
     validate_repository,
@@ -134,6 +136,27 @@ async def _authorised_repository(
             # Freshly created and owned by this user, so the capability check
             # below will pass — but it is left to run rather than
             # short-circuited, so there is exactly one place deciding access.
+            #
+            # Not under a name whose first component names a registry
+            # (GHSA-mhhr-896g-4p33). The branch above has already decided this is
+            # not a CONFIGURED upstream, so a host-shaped name here is one the
+            # deployment does not mirror — and a locally pushed
+            # `docker.io/library/nginx` would permanently shadow a `docker.io`
+            # upstream added later, because the database is consulted first by
+            # design. Refused rather than silently namespaced: the push names
+            # something it is not.
+            first, _, _rest = name.partition("/")
+            if _rest and looks_like_a_registry_host(first):
+                raise OCIError(
+                    DENIED,
+                    message=(
+                        f"'{first}' names a registry, so it cannot be the first "
+                        "component of a pushed repository. Configure it under "
+                        "registry.oci.upstreams to mirror it, or push under a "
+                        "name that is not a host."
+                    ),
+                    detail={"name": name},
+                )
             repository = OCIRepository(name=name, owner_email=user.email or None, labels={})
             db.add(repository)
             await db.flush()
@@ -367,8 +390,8 @@ async def upload_chunk(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Append a chunk to an open session."""
-    await _authorised_repository(db, user, name, cap.REGISTRY_WRITE)
-    session = await _open_session(db, session_id)
+    repository = await _authorised_repository(db, user, name, cap.REGISTRY_WRITE)
+    session = await _open_session(db, session_id, repository.name)
 
     _check_content_range(request, session)
 
@@ -396,7 +419,7 @@ async def finish_upload(
 ) -> Response:
     """Complete an upload, optionally with a final chunk in the body."""
     repository = await _authorised_repository(db, user, name, cap.REGISTRY_WRITE)
-    session = await _open_session(db, session_id)
+    session = await _open_session(db, session_id, repository.name)
 
     digest_param = request.query_params.get("digest")
     if not digest_param:
@@ -414,8 +437,8 @@ async def upload_status(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """How far an upload has got — what a client asks after a broken connection."""
-    await _authorised_repository(db, user, name, cap.REGISTRY_WRITE)
-    session = await _open_session(db, session_id)
+    repository = await _authorised_repository(db, user, name, cap.REGISTRY_WRITE)
+    session = await _open_session(db, session_id, repository.name)
     return Response(
         status_code=204,
         headers={
@@ -436,8 +459,8 @@ async def cancel_upload(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Abandon an upload and reclaim its chunks."""
-    await _authorised_repository(db, user, name, cap.REGISTRY_WRITE)
-    session = await _open_session(db, session_id)
+    repository = await _authorised_repository(db, user, name, cap.REGISTRY_WRITE)
+    session = await _open_session(db, session_id, repository.name)
     await upload_service.discard_session(db, storage, session)
     return Response(status_code=204, headers=dict(API_VERSION_HEADER))
 
@@ -470,18 +493,29 @@ def _check_content_range(request: Request, session) -> None:
         )
 
 
-async def _open_session(db: AsyncSession, session_id: str):
-    """Load a session, rejecting an unknown or malformed id identically.
+async def _open_session(db: AsyncSession, session_id: str, repository_name: str):
+    """Load a session **for this repository**, rejecting anything else identically.
 
-    A client cannot act differently on the two, and distinguishing them would
-    say whether an id had ever existed.
+    Three failures answer the same way — a malformed id, an unknown id, and a
+    session belonging to a different repository — because a client cannot act
+    differently on any of them and distinguishing them would say whether an id
+    had ever existed, or which repository owns it.
+
+    The repository check is the fix for GHSA-mhhr-896g-4p33. Every handler
+    authorised the repository in the PATH and then loaded the session by id
+    alone, so a caller with write on a repository of their own who learned
+    another session's id could append to it, cancel it, read its progress, or
+    complete it **into their own repository** — the blob is written wherever the
+    path says. The session id is not a secret (it travels in the `Location`
+    header of every chunk response), so "they would have to know the id" is not a
+    control.
     """
     try:
         parsed = uuid.UUID(session_id)
     except ValueError:
         raise OCIError(BLOB_UPLOAD_UNKNOWN, detail={"uuid": session_id}) from None
     session = await upload_service.get_session(db, parsed)
-    if session is None:
+    if session is None or session.repository_name != repository_name:
         raise OCIError(BLOB_UPLOAD_UNKNOWN, detail={"uuid": session_id})
     return session
 
