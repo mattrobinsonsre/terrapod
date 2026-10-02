@@ -813,3 +813,91 @@ class TestTheCredentialIsRefusedAtTheFetchItself:
                 assert repository_pair_allowed(conn, owner, repo) == repository_allowed(
                     conn, f"https://github.com/{owner}/{repo}"
                 ), (pats, owner, repo)
+
+
+class TestAPinnedTokenCannotEscapeItsPinThroughTheLabelPath:
+    """`check_access` short-circuits to True on `admin`, so handing it the LIVE role
+    set re-granted through the label path exactly the admin a pin had removed.
+
+    The explicit gate above is correct — it tests `"admin" in
+    effective_platform_roles(user)`, which attenuates. The label path then received
+    `list(user.roles)`, which does not, so a `service_bound` token pinned away from
+    `admin` and held by an admin was refused by the gate and granted by the label.
+
+    `user.roles` is also wider than a `service_bound` pin for CUSTOM roles, so the
+    escape was not limited to admin. `dependencies.label_reach_roles` intersects, and
+    this gate drops `admin` again as defence in depth.
+    """
+
+    async def test_admin_in_the_role_list_does_not_grant_through_labels(self):
+        conn = VCSConnection(id=uuid.uuid4(), owner_email="", labels={"team": "net"})
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=conn)
+        db.execute = AsyncMock(return_value=MagicMock(first=MagicMock(return_value=None)))
+
+        allowed = await rbac.may_reference_connection(
+            db,
+            conn_id=conn.id,
+            actor_email="pinned@example.com",
+            is_platform_admin=False,
+            actor_roles=["admin"],
+        )
+        assert allowed is False, (
+            "`admin` in the label-path role list re-grants what the pin removed"
+        )
+
+    def test_label_reach_roles_intersects_a_bound_pin(self):
+        from terrapod.api.dependencies import label_reach_roles
+
+        user = SimpleNamespace(
+            roles=["admin", "net-team", "db-team"],
+            kind="service_bound",
+            pinned_roles=["net-team"],
+        )
+        assert label_reach_roles(user) == {"net-team"}
+
+    def test_label_reach_roles_intersects_a_detached_pin_with_the_live_set(self):
+        """Pinned-only would keep a role the principal has since lost."""
+        from terrapod.api.dependencies import label_reach_roles
+
+        user = SimpleNamespace(
+            roles=["net-team"],
+            kind="service_detached",
+            pinned_roles=["net-team", "revoked-team"],
+        )
+        assert label_reach_roles(user) == {"net-team"}
+
+    def test_label_reach_roles_leaves_an_interactive_principal_alone(self):
+        from terrapod.api.dependencies import label_reach_roles
+
+        user = SimpleNamespace(roles=["net-team"], kind="interactive", pinned_roles=None)
+        assert label_reach_roles(user) == {"net-team"}
+
+    def test_label_reach_roles_drops_admin_for_an_interactive_admin_too(self):
+        """Costs a genuine admin nothing: `is_platform_admin` returns True long before
+        the label path is reached."""
+        from terrapod.api.dependencies import label_reach_roles
+
+        user = SimpleNamespace(roles=["admin"], kind="interactive", pinned_roles=None)
+        assert label_reach_roles(user) == set()
+
+    def test_every_call_site_narrows_the_role_set(self):
+        """A new caller passing `user.roles` would reopen this silently, and no
+        behavioural test can see a call site that does not exist yet."""
+        import pathlib
+        import re
+
+        root = pathlib.Path(rbac.__file__).resolve().parents[1]
+        offenders = []
+        for path in root.rglob("*.py"):
+            src = path.read_text()
+            if "may_reference_connection(" not in src:
+                continue
+            for m in re.finditer(r"actor_roles=([^,\n]+)", src):
+                expr = m.group(1).strip()
+                if "label_reach_roles" not in expr:
+                    offenders.append(f"{path.name}: actor_roles={expr}")
+        assert not offenders, (
+            "a call site passes an un-narrowed role set to the label path:\n  "
+            + "\n  ".join(offenders)
+        )

@@ -53,6 +53,7 @@ from terrapod.api.dependencies import (
     AuthenticatedUser,
     effective_platform_roles,
     get_current_user,
+    label_reach_roles,
     require_non_runner,
 )
 from terrapod.api.ids import parse_id
@@ -1207,7 +1208,7 @@ async def create_workspace(
             conn_id=vcs_connection_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
-            actor_roles=list(user.roles),
+            actor_roles=sorted(label_reach_roles(user)),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(vcs_connection_id))
 
@@ -2045,7 +2046,7 @@ async def update_workspace(
             conn_id=ws.vcs_connection_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
-            actor_roles=list(user.roles),
+            actor_roles=sorted(label_reach_roles(user)),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(ws.vcs_connection_id))
 

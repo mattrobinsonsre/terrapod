@@ -75,11 +75,14 @@ async def may_reference_connection(
     labels". A missing argument that widened access would be the whole finding
     again, in the fix for it.
 
-    Pass **`user.roles`**, not `effective_platform_roles(user)`. That derived set is
-    documented as being for platform gates only and never a substitute here — for a
-    `service_detached` token it is the PINNED roles, so using it would let a
-    detached token keep label reach to a connection through a role its user no
-    longer holds. This is a per-resource decision and wants the un-attenuated set.
+    Pass **`dependencies.label_reach_roles(user)`**, not `user.roles` and not
+    `effective_platform_roles(user)`. Each of those escapes in one direction: the live
+    set includes roles a `service_bound` token was deliberately not pinned to, and the
+    derived platform set is pinned-only for a `service_detached` token, so it includes
+    roles the principal no longer holds. The helper is the intersection, which escapes
+    in neither, and it drops `admin` because `check_access` short-circuits on it and
+    would re-grant through the label path the admin that `is_platform_admin` has
+    already decided against on the attenuated view.
     """
     if not settings.vcs.require_connection_authorization:
         return True
@@ -111,6 +114,16 @@ async def may_reference_connection(
     if actor_roles:
         from terrapod.services.rbac_service import check_access
 
+        # Defence in depth over `dependencies.label_reach_roles`, which callers use to
+        # narrow this set. `check_access` short-circuits to True on `admin`, so an
+        # `admin` arriving here — from a caller that forgot to narrow, or a future one
+        # — re-grants through the label path the admin that `is_platform_admin` above
+        # has already decided against on the attenuated view. Dropping it costs a
+        # genuine admin nothing, because that gate returned True long before here.
+        actor_roles = [r for r in actor_roles if r != "admin"]
+        if not actor_roles:
+            actor_roles = []
+
         labels = dict(conn.labels or {})
 
         # 1. The `access: everyone` floor is NOT honoured. `check_access` seeds it
@@ -125,7 +138,7 @@ async def may_reference_connection(
         #    for a workspace would otherwise also authorise the CONNECTION called
         #    `prod-net`. Passing an empty name leaves label matching as the only
         #    path, which is the one an operator writing connection delegation means.
-        if labels and await check_access(db, actor_email, "", labels, actor_roles):
+        if actor_roles and labels and await check_access(db, actor_email, "", labels, actor_roles):
             return True
 
     # Kept from v1.8.2: already owns a workspace using it, so the grant is one they

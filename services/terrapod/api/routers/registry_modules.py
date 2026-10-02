@@ -39,6 +39,7 @@ from terrapod.api.dependencies import (
     AuthenticatedUser,
     effective_platform_roles,
     get_current_user,
+    label_reach_roles,
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
@@ -380,7 +381,7 @@ async def create_module_endpoint(
             conn_id=conn_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
-            actor_roles=list(user.roles),
+            actor_roles=sorted(label_reach_roles(user)),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
 
@@ -685,7 +686,7 @@ async def update_module_endpoint(
                 conn_id=conn_id,
                 actor_email=user.email,
                 is_platform_admin="admin" in effective_platform_roles(user),
-                actor_roles=list(user.roles),
+                actor_roles=sorted(label_reach_roles(user)),
             ):
                 raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
 
@@ -1020,7 +1021,7 @@ async def update_module_vcs_endpoint(
             conn_id=conn_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
-            actor_roles=list(user.roles),
+            actor_roles=sorted(label_reach_roles(user)),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(conn_id))
 
