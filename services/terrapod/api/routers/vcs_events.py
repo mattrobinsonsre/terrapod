@@ -249,6 +249,22 @@ async def _resolve_gitlab_connection(project_url: str, token: str) -> VCSConnect
     for c in candidates:
         if c.webhook_secret and hmac.compare_digest(token.encode(), c.webhook_secret.encode()):
             return c
+    # Several connections on this host and none of their own secrets matched, so the
+    # event cannot be attributed. The caller treats None as "unknown project", which
+    # is the right action and the wrong explanation — the project is perfectly well
+    # known, the CONNECTION is ambiguous. Say so here, because the remedy is specific:
+    # give each connection on the host its own `webhook_secret`.
+    #
+    # This became reachable when GitLab connections stopped being unique by
+    # installation id, which is what allows two of them on one host at all.
+    logger.warning(
+        "several GitLab connections share this host and none of their own webhook "
+        "secrets matched the presented token, so the event cannot be attributed to "
+        "one; set a distinct webhook_secret on each connection",
+        host=host,
+        candidates=len(candidates),
+        without_secret=sum(1 for c in candidates if not c.webhook_secret),
+    )
     return None
 
 

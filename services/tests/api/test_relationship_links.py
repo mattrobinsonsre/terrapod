@@ -91,6 +91,7 @@ class TestAutodiscoveryRule:
             security_scan_severity_threshold="high",
             security_scan_skip_rules=[],
             debug_mode=False,
+            allow_fork_pr_plans=False,
             ai_policy_mode="default",
             ai_summary_mode="default",
             ai_summary_context="",

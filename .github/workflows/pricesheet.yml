@@ -119,6 +119,14 @@ jobs:
     # sheet). Requires at least the matrix to have been built.
     if: ${{ always() && needs.shards.result == 'success' }}
     runs-on: ubuntu-latest
+    # Scoped here rather than at the top level, where it would also hand the
+    # fan-out jobs a Sigstore signing identity they have no use for. A job-level
+    # block REPLACES the top-level one, so the two it already needs are repeated.
+    permissions:
+      contents: write # publish the rolling release
+      issues: write # open/refresh the drift issue
+      id-token: write # get a Sigstore signing certificate for the attestation
+      attestations: write # record it against the repository
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -178,6 +186,22 @@ jobs:
           echo "::error::Pricesheet drift is blocking — the collapsed sheet was NOT published."
           exit 1
 
+      # The digest the consumer holds the download to (GHSA-7486-vv55-jxhq). Written
+      # in `sha256sum` format so an operator can check it by hand with
+      # `sha256sum -c prices.yaml.gz.sha256`, and pin it in
+      # `cost_estimation.prices_sha256`. On its own this only proves the asset was
+      # not corrupted or swapped independently of the file beside it; the
+      # attestation below is what ties the bytes to this workflow run.
+      - name: Compute the pricesheet digest
+        run: |
+          sha256sum prices.yaml.gz > prices.yaml.gz.sha256
+          cat prices.yaml.gz.sha256
+
+      - name: Attest the pricesheet
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: prices.yaml.gz
+
       - name: Publish to the rolling release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -188,5 +212,5 @@ jobs:
               --notes "Auto-generated weekly from official cloud pricing APIs (#893), multi-region (#1025). The \`prices.yaml.gz\` asset is a stable URL for \`cost_estimation.prices_url\`; \`manifest.json\` is the drift manifest." \
               --latest=false
           fi
-          gh release upload "$RELEASE_TAG" prices.yaml.gz manifest.json --clobber
+          gh release upload "$RELEASE_TAG" prices.yaml.gz prices.yaml.gz.sha256 manifest.json --clobber
           echo "Published $(du -h prices.yaml.gz | cut -f1) pricesheet to the '$RELEASE_TAG' release."

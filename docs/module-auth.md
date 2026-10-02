@@ -63,12 +63,17 @@ The token can come from two sources:
 - **Static** — a personal access token you supply:
   `{"source":"static","username":"x-access-token","token":"ghp_…","rewrite":"to_https"}`
   (`username` defaults to `x-access-token` if omitted).
-- **VCS connection (recommended)** — reference an existing
-  [VCS connection](vcs-integration.md); Terrapod **mints a short-lived
-  git-HTTPS token** from it at run time (a GitHub-App installation token, or the
-  GitLab connection's access token):
+- **VCS connection** — reference an existing
+  [VCS connection](vcs-integration.md); Terrapod derives a git-HTTPS token from
+  it at run time:
   `{"source":"vcs_connection","vcs_connection_id":"vcs-…","rewrite":"to_https"}`.
-  No PAT to rotate — the token is minted per run.
+
+  **On GitHub this is the recommended source.** The connection is a GitHub App,
+  so Terrapod **mints a fresh installation token per run**, narrowed to
+  `contents: read` — the whole of what a clone needs. There is no PAT to rotate,
+  and the credential the runner holds can do nothing but read code.
+
+  **On GitLab it is off by default — see the warning below.**
 
 `git_ssh_auth` is static only (VCS connections mint HTTPS tokens, not SSH keys):
 `{"private_key":"-----BEGIN …","known_hosts":"github.com ssh-ed25519 …","rewrite":"none"}`.
@@ -80,9 +85,87 @@ are baked into the runner image (authoritative — github.com from the GitHub
 `known_hosts` only to pin a **self-hosted** GitHub Enterprise / GitLab host; for
 github.com/gitlab.com you can leave it blank.
 
+### GitLab: the connection's token cannot be narrowed
+
+A GitLab VCS connection does not hold an app identity Terrapod can mint from. It
+holds a **Personal or Group Access Token an operator pasted in**, and there is no
+GitLab call that returns a narrower copy of one. So a `vcs_connection` credential
+on GitLab means handing the runner Job **that token, whole** — with every
+permission and every project it covers, for as long as it is valid — into a
+container that is also executing the workspace's own IaC.
+
+Two things make that sharper than it first looks:
+
+- **The connection is chosen in a variable *value*.** It is named in a string
+  nothing in the workspace schema constrains, so the connection a run mints from
+  is not the one the workspace is configured with and need not be related to it.
+  Naming a connection **is** now authorized — see below — but the check is the
+  only thing standing between a workspace variable and an operator's standing
+  token, where on GitHub the token itself is also narrow and short-lived.
+- **Nothing expires it per run.** A GitHub installation token lives an hour and
+  reads code; this one is the operator's standing token.
+
+**Every minted credential is bounded by the connection's repository allowlist**, and
+that check applies even to the workspace's own connection. It has to: a
+`git_http_auth` credential is installed for the scope in its **`key`**, a bare URL
+pattern the workspace owner chooses, so `key = github.com` installs the token for
+the whole host and the workspace's own configuration can then clone anything the
+credential reaches. Without this the allowlist would bound the workspace's
+*repo URL* and not the *credential*, which is not what "restricts the connection to
+those repositories" means. A run whose repository is outside the allowlist is
+refused with a message naming both.
+
+**A connection other than the workspace's own is additionally authorized at mint
+time.** A workspace may always use the connection it is configured with. Anything
+else is checked against the **workspace owner**, since a run has no live caller, and
+the run is **refused with a message naming the credential and the connection**
+rather than run without it. Two of the four claims do not apply on this path: there are
+no roles to evaluate, so a label claim does not grant here, and nothing is treated
+as a platform admin — so a workspace whose claim to a connection rests only on
+labels cannot mint from it, and should name its own connection or use a `static`
+credential. See
+[VCS integration → Naming a VCS connection is authorized](vcs-integration.md#naming-a-vcs-connection-is-authorized).
+(GHSA-v8g7-pqrj-8mcm. The check itself arrived in v1.7.7 and v1.8.2; releases
+before those performed none. The repository allowlist above is newer still — it
+did not exist on either of them, so on those two releases this authorization
+check was the whole of the bound.)
+
+So it is **off by default on every supported release**, behind:
+
+```yaml
+api:
+  config:
+    vcs:
+      gitlab:
+        allow_token_delivery_to_runners: false   # the default
+```
+
+With it off, a run whose workspace carries such a variable **fails immediately**
+with a message naming the variable, this key, and the alternative — it is never
+dropped silently, because a credential that quietly vanishes leaves `init` to
+fail later against a private module source with an error naming neither the
+credential nor the cause.
+
+**The alternative needs nothing enabled, and is the better answer in most
+deployments:** use a **`static`** credential holding a project- or group-scoped
+GitLab token you minted for exactly this, with `read_repository` and nothing
+else. That is a narrowing GitLab *can* do — it just has to be done when the
+token is created, not when it is used.
+
+Turn the switch on only if you have read the above and accept it — a private
+runner fleet fetching modules from one group, with a connection token scoped to
+that group, is a perfectly reasonable place to. It is an informed opt-in, not a
+default anyone should inherit by upgrading.
+
 ## Enabling it
 
-Nothing to enable — it's on by default. Create the credential like any variable.
+Nothing to enable for **static** credentials or for **GitHub** VCS connections —
+they are on by default. Create the credential like any variable.
+
+**GitLab VCS connections are the exception**: they need
+`api.config.vcs.gitlab.allow_token_delivery_to_runners: true`, and you should
+read [the warning above](#gitlab-the-connections-token-cannot-be-narrowed)
+before setting it.
 
 ### Via the API / SDK
 

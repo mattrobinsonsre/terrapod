@@ -27,7 +27,9 @@ from terrapod.api.routers import tokens as router
 
 
 def _user(email="admin@example.com", roles=("admin",)):
-    return SimpleNamespace(email=email, roles=list(roles), kind="interactive")
+    return SimpleNamespace(
+        email=email, roles=list(roles), kind="interactive", auth_method="session"
+    )
 
 
 def _db(local_row=None):

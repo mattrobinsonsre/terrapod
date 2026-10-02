@@ -290,7 +290,25 @@ class VCSArchiveCache:
         means "whole repo" (full clone, all blobs). Two callers must
         agree on the same path set to share a cache entry — typically
         achieved by pre-computing the union at the poll-cycle level.
+
+        GHSA-v8g7-pqrj-8mcm: the allowlist is enforced here as well as at every path
+        that accepts a repository URL, because this is the other place the credential
+        is actually used — drift detection reaches it directly, before anything a run
+        would check. See `vcs_provider.download_archive` for the same guard and the
+        same reasoning.
         """
+        from terrapod.services.vcs_connection_rbac import (
+            RepositoryNotAllowed,
+            repository_pair_allowed,
+        )
+
+        if not repository_pair_allowed(conn, owner, repo):
+            raise RepositoryNotAllowed(
+                f"VCS connection vcs-{getattr(conn, 'id', None)} is restricted to specific repositories "
+                f"and {owner}/{repo} is not one of them, so its credential will not be "
+                "used to clone it. Widen `allowed-repositories` on the connection, or "
+                "clear it to allow any repository the credential can reach."
+            )
         ph = git_fetch.paths_hash(paths)
         cache_key = f"{conn.id}:{owner}/{repo}@{sha}#{ph}"
         if cache_key in self._known:

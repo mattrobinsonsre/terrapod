@@ -25,7 +25,7 @@ Each audit entry captures:
 | `actor-login` | VCS-side display login (e.g. GitHub username) when `actor-type=vcs_user`; empty otherwise |
 | `actor-id` | Provider-side immutable user id (e.g. GitHub user id) when `actor-type=vcs_user`; empty otherwise |
 | `origin` | How the request entered the system: `api` (default), `terrapod_ui`, `pr_comment`, `system` |
-| `action` | HTTP method (GET, POST, PATCH, DELETE) or comment verb (e.g. `vcs_apply`, `vcs_plan`, `vcs_force_merge`) for `actor-type=vcs_user` |
+| `action` | HTTP method (GET, POST, PATCH, DELETE) or comment verb (e.g. `vcs_apply`, `vcs_plan`, `vcs_unlock`) for `actor-type=vcs_user` |
 | `resource-type` | Extracted from URL (e.g. `workspaces`, `runs`) |
 | `resource-id` | Resource identifier from URL (empty for collection endpoints) |
 | `status-code` | HTTP response status code |
@@ -37,7 +37,7 @@ Logging is asynchronous — it does not block the API response.
 
 ### Dual-actor model
 
-Apply-then-merge workflows delegate authorization to the VCS provider (see [VCS Workflows](vcs-workflows.md#authorization-model-for-apply-then-merge--read-this-carefully)). Comment-driven actions (`terrapod plan`, `terrapod apply`, `terrapod merge`, etc.) are recorded with `actor-type=vcs_user` and the **VCS user's login and numeric id**, not a Terrapod identity. There is no mapping from VCS users to Terrapod users — the audit row is the authoritative trail of who acted, even if that person has no Terrapod account.
+Apply-then-merge workflows delegate authorization to the VCS provider (see [VCS Workflows](vcs-workflows.md#authorization-model-for-apply-then-merge--read-this-carefully)). Comment-driven actions (`terrapod plan`, `terrapod apply`, `terrapod unlock`) are recorded with `actor-type=vcs_user` and the **VCS user's login and numeric id**, not a Terrapod identity. Only a commenter with push access to the repository can produce one of these rows. There is no mapping from VCS users to Terrapod users — the audit row is the authoritative trail of who acted, even if that person has no Terrapod account.
 
 ---
 

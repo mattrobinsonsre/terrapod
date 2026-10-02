@@ -68,7 +68,13 @@ export function LabelsEditor({ labels, onChange, readOnly = false }: LabelsEdito
               <button
                 type="button"
                 onClick={() => removeLabel(k)}
-                className="ms-0.5 text-slate-400 hover:text-red-400"
+                /* A bare `×` measured 16px tall, against the 44px this project
+                   requires of any action (AGENTS.md -> Responsive: touch model).
+                   `min-w-11 min-h-11` gives it a real target at phone width and
+                   `sm:` returns it to chip size on a precise pointer, so the chip
+                   looks unchanged on desktop. `-my-0.5` keeps the taller target
+                   from stretching the pill. */
+                className="ms-0.5 -my-0.5 inline-flex items-center justify-center min-w-11 min-h-11 sm:min-w-0 sm:min-h-0 text-slate-400 hover:text-red-400"
                 aria-label={t('labelsEditor.removeAria', { key: k })}
               >
                 &times;

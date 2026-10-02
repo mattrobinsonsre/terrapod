@@ -646,7 +646,10 @@ async def join_listener(
     if token.pool_id != pool.id:
         raise HTTPException(status_code=403, detail="Token does not belong to this pool")
 
-    result = await agent_pool_service.join_listener(pool, token, name, db)
+    try:
+        result = await agent_pool_service.join_listener(pool, token, name, db)
+    except agent_pool_service.ListenerNameInUse as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     await db.commit()
 
     from terrapod.api.metrics import LISTENER_JOINS
@@ -687,7 +690,10 @@ async def join_listener_by_token(
     if pool is None:
         raise HTTPException(status_code=404, detail="Pool not found")
 
-    result = await agent_pool_service.join_listener(pool, token, name, db)
+    try:
+        result = await agent_pool_service.join_listener(pool, token, name, db)
+    except agent_pool_service.ListenerNameInUse as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     result["pool_id"] = str(pool.id)
     await db.commit()
 

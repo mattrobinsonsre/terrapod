@@ -61,7 +61,9 @@ If you are unable to use GitHub's reporting, email the maintainer directly.
 - `pip-audit` (Python) and `npm audit` (frontend) gate dependencies; Dependabot
   raises upgrade pull requests continuously.
 - Static analysis via CodeQL and Semgrep with OWASP Top 10 and custom project rules.
-- Dynamic application security testing via Nuclei with custom templates.
+- Dynamic application security testing via Nuclei with custom templates — run
+  on demand against a live stack, **not** in CI, because no CI job stands one
+  up. Treat it as a tool a maintainer reaches for, not a gate every change passes.
 
 **If you gate on HIGH/CRITICAL CVEs, read the [CVE policy](docs/cve-policy.md).**
 It states exactly what the image gate guarantees, the honest limits of
@@ -104,13 +106,13 @@ executable before it runs.
 
 ## Security Testing
 
-Terrapod includes a three-layer security testing framework:
+Terrapod includes a three-layer security testing framework. The first two layers also run in CI on every change; the third needs a live deployment to point at, so it is run on demand:
 
 | Layer | Tool | What it covers |
 |-------|------|----------------|
 | SAST | Semgrep | Source code analysis, OWASP Top 10, secrets detection, project-specific rules |
 | Container scanning | Trivy | CVEs in Docker images (HIGH/CRITICAL) |
-| DAST | Nuclei | Auth bypass, header injection, CORS, state endpoint security |
+| DAST | Nuclei | Auth bypass, header injection, CORS, state endpoint security — **local only, needs a running stack** |
 
 Run with:
 

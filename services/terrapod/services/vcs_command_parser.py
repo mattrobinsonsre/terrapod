@@ -24,7 +24,17 @@ from dataclasses import dataclass
 # Verbs we recognise. Anything else becomes "help" so the dispatcher can
 # respond with usage rather than silently ignoring a `terrapod ...`
 # comment that looks deliberate.
-_KNOWN_VERBS = frozenset({"plan", "apply", "unlock", "merge", "help"})
+#
+# `merge` is deliberately NOT here, and must not come back. It force-merged the
+# pull request with the App's own credentials, skipping the cross-workspace
+# gate, on nothing but the fact that someone could type a comment. Removing the
+# verb rather than gating it means `terrapod merge` now reads as an
+# unrecognised word and gets the usage table, which is the honest answer: the
+# command does not exist. A merge that should happen still has every ordinary
+# route to it -- the provider's own merge button, and the workspace's
+# `auto_merge` setting, which merges after a SUCCESSFUL apply under
+# configuration an operator wrote rather than under a comment anyone can post.
+_KNOWN_VERBS = frozenset({"plan", "apply", "unlock", "help"})
 
 
 @dataclass(frozen=True)

@@ -458,6 +458,27 @@ the same reason. Compare categories with the new `SameCategory` rather than `==`
 but your own comparisons are right only until something reads from the other
 prefix.
 
+### SAML assertion checks are still opt-in, and 2.0 is where that changes
+
+Five per-provider SAML checks arrived with the 1.7.7 and 1.8.2 security releases
+(`GHSA-hgx9-xwfp-5qcr`): `validate_destination`, `validate_in_response_to`,
+`reject_replayed_assertions`, `want_assertions_signed` and
+`reject_deprecated_algorithm`. **All five default to `false`,** because a patch
+release must not change what a running deployment does — a destination check that
+starts rejecting assertions mid-week is an outage, not a fix.
+
+That trade does not survive into a major. Flipping these defaults to `true` is 2.0
+work and is **not yet done**; this entry exists so the gap is a stated plan rather
+than something discovered later.
+
+**Turn them on now rather than waiting**, provided
+`auth.saml.<provider>.sp_acs_url` carries the real externally-reachable ACS URL.
+It has to: python3-saml decides what an assertion was addressed to by
+reconstructing the current URL, and an empty host makes that reconstruction the
+literal string `https://`, which every https URL starts with — so the destination
+and recipient checks run, pass, and accept an assertion minted for a different
+service provider entirely. Set the URL first, then the flags, or the checks are
+decoration.
 ### An IdP group can no longer grant `admin` or `audit`
 
 Role resolution took IdP group names verbatim, so a group called `admin` granted

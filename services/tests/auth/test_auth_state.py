@@ -178,3 +178,70 @@ class TestConsumeAuthCode:
 
         result = await consume_auth_code("expired-code")
         assert result is None
+
+
+class TestRollingUpgradeTolerance:
+    """A state written by a newer replica must not break an older one.
+
+    Auth state is JSON in a shared Redis, read by whichever API pod the browser
+    lands on. During a rolling upgrade the two builds disagree about the fields,
+    so a newer pod writes one the older pod has never heard of — and
+    `AuthState(**parsed)` would raise `TypeError: unexpected keyword argument`.
+    The user sees a login fail with nothing to explain it, on a pod that is
+    behaving perfectly.
+
+    `saml_request_id` is the field that made this concrete; the tolerance is
+    written once so the next one costs nothing.
+    """
+
+    @patch("terrapod.auth.auth_state.get_redis_client")
+    async def test_a_field_this_build_does_not_know_is_ignored(self, mock_get_redis):
+        redis = AsyncMock()
+        mock_get_redis.return_value = redis
+        redis.getdel = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "provider_name": "okta",
+                    "client_redirect_uri": "https://terrapod.example.com/auth/callback",
+                    "client_state": "cs",
+                    "code_challenge": "cc",
+                    "code_challenge_method": "S256",
+                    "idp_state": "idp-state-xyz",
+                    "a_field_from_a_future_release": "whatever",
+                }
+            )
+        )
+
+        result = await consume_auth_state("idp-state-xyz")
+
+        assert result is not None
+        assert result.provider_name == "okta"
+        assert not hasattr(result, "a_field_from_a_future_release")
+
+    @patch("terrapod.auth.auth_state.get_redis_client")
+    async def test_an_older_state_without_the_saml_request_id_still_loads(self, mock_get_redis):
+        """The other direction: a state written before this change.
+
+        It loads with `saml_request_id` unset, and the SAML ACS endpoint then
+        refuses the login rather than skipping the InResponseTo check — which is
+        the right way round for a window that lasts one deploy.
+        """
+        redis = AsyncMock()
+        mock_get_redis.return_value = redis
+        redis.getdel = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "provider_name": "azure-ad",
+                    "client_redirect_uri": "https://terrapod.example.com/auth/callback",
+                    "client_state": "cs",
+                    "code_challenge": "cc",
+                    "code_challenge_method": "S256",
+                    "idp_state": "idp-state-xyz",
+                }
+            )
+        )
+
+        result = await consume_auth_state("idp-state-xyz")
+
+        assert result is not None
+        assert result.saml_request_id is None

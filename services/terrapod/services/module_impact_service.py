@@ -74,12 +74,31 @@ async def _list_open_prs(
             head_sha=pr["head_sha"],
             head_ref=pr["head_ref"],
             title=pr["title"],
+            from_fork=bool(pr["from_fork"]),
         )
         for pr in prs
     ]
 
 
 async def _download_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
+    # GHSA-v8g7-pqrj-8mcm. This is one of the three clone dispatchers the allowlist
+    # did NOT reach: the guard added in this release sits on `vcs_provider`'s
+    # dispatcher, which these modules do not use — they call the provider services
+    # directly. So a module, policy set or registry entry whose URL predates a
+    # narrowing kept being cloned, and `docs/security-hardening.md` claimed otherwise.
+    from terrapod.services.vcs_connection_rbac import (
+        RepositoryNotAllowed,
+        repository_pair_allowed,
+    )
+
+    if not repository_pair_allowed(conn, owner, repo):
+        raise RepositoryNotAllowed(
+            f"VCS connection vcs-{getattr(conn, 'id', None)} is restricted to specific "
+            f"repositories and {owner}/{repo} is not one of them, so its credential will "
+            "not be used to clone it. Widen `allowed-repositories` on the connection, or "
+            "clear it to allow any repository the credential can reach."
+        )
+
     if conn.provider == "gitlab":
         return await gitlab_service.download_archive(conn, owner, repo, ref)
     return await github_service.download_repo_archive(conn, owner, repo, ref)
@@ -327,6 +346,23 @@ async def _create_module_test_runs(
     pr: PullRequest,
 ) -> None:
     """Download PR archive, upload override tarball, and create speculative runs."""
+    # A module PR from a fork reaches further than a workspace PR does: it
+    # creates a plan on every workspace that consumes the module, each with its
+    # own credentials. Each of those workspaces decides for itself (the per-
+    # workspace gate is in the run loop below); this early return just avoids
+    # downloading and storing an override tarball nobody will use.
+    if pr.from_fork and not any(
+        link.workspace is not None and link.workspace.allow_fork_pr_plans
+        for link in module.workspace_links
+    ):
+        logger.info(
+            "module_impact.fork_pr_skipped",
+            module=module.name,
+            pr_number=pr.number,
+            head_sha=pr.head_sha,
+        )
+        return
+
     # Download archive from PR head
     try:
         archive_bytes = await _download_archive(conn, owner, repo, pr.head_sha)
@@ -386,6 +422,17 @@ async def _create_module_test_runs(
     for link in module.workspace_links:
         ws = link.workspace
         if ws is None:
+            continue
+
+        # Per-workspace, because the setting is per-workspace: one consumer
+        # opting in to fork PRs does not volunteer the others' credentials.
+        if pr.from_fork and not ws.allow_fork_pr_plans:
+            logger.info(
+                "module_impact.fork_pr_skipped_for_workspace",
+                workspace=ws.name,
+                module=module.name,
+                pr_number=pr.number,
+            )
             continue
 
         # Fetch the workspace's own VCS code so the runner has configuration

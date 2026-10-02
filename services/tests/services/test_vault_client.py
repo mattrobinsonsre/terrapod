@@ -810,3 +810,92 @@ class TestTlsVerification:
         monkeypatch.setenv("SSL_CERT_FILE", str(ca))
         monkeypatch.delenv("SSL_CERT_DIR", raising=False)
         assert "Global Bundle CA" in _ca_cns(create_ssl_context(verify=True))
+
+
+class TestTokenEndpointsAreNeverReadable:
+    """Vault's built-in `default` policy grants `auth/token/lookup-self`, and
+    that response's `data.id` IS the token — so a reference to it extracts
+    Terrapod's own Vault identity into a runner the requester controls. The
+    person who writes a reference is anyone with write on one workspace, and the
+    default allow-list is empty, i.e. unrestricted."""
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "token/lookup-self",
+            "token/renew-self",
+            "token/revoke-self",
+            "token/create",
+            "token/create-orphan",
+            "token/lookup-accessor",  # the whole subtree, not a named few
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_a_token_endpoint_never_reaches_vault(self, path):
+        rec = _Recorder([])
+        with _patched(rec), pytest.raises(VaultError, match="never readable"):
+            await read_secret(
+                _inst(), mount="auth", path=path, field="id", engine="dynamic", static_token="t"
+            )
+        assert rec.seen == [], "a token self-management reference reached Vault"
+
+    @pytest.mark.asyncio
+    async def test_an_explicit_allow_list_cannot_permit_it(self):
+        """An operator who listed `auth` — or whose list happens to cover it —
+        must still not be able to hand the token out."""
+        rec = _Recorder([])
+        with _patched(rec), pytest.raises(VaultError, match="never readable"):
+            await read_secret(
+                _inst(paths=["auth"]),
+                mount="auth",
+                path="token/lookup-self",
+                field="id",
+                engine="dynamic",
+                static_token="t",
+            )
+        assert rec.seen == []
+
+    @pytest.mark.asyncio
+    async def test_it_is_refused_for_kv2_too(self):
+        """kv-v2 inserts a `/data/` segment and so could not reach the token
+        endpoint — but the guard does not read the engine, so a future engine
+        string cannot route around it."""
+        rec = _Recorder([])
+        with _patched(rec), pytest.raises(VaultError, match="never readable"):
+            await read_secret(
+                _inst(), mount="auth", path="token/lookup-self", field="id", static_token="t"
+            )
+        assert rec.seen == []
+
+    @pytest.mark.asyncio
+    async def test_a_dynamic_credential_read_still_works(self):
+        """The refusal is worthless if it also breaks the real case — a dynamic
+        engine minting a credential is the whole point of the value source."""
+        rec = _Recorder([(200, {"data": {"username": "v-root-demo-abc"}})])
+        with _patched(rec):
+            got = await read_secret(
+                _inst(),
+                mount="database",
+                path="creds/demo",
+                field="username",
+                engine="dynamic",
+                static_token="t",
+            )
+        assert got == "v-root-demo-abc"
+        assert rec.seen[-1].url.path == "/v1/database/creds/demo"
+
+    @pytest.mark.asyncio
+    async def test_another_auth_mount_path_is_untouched(self):
+        """Only `auth/token/` is refused. A reference under some other auth
+        mount is as readable (or not) as the policy makes it."""
+        rec = _Recorder([(200, {"data": {"k": "v"}})])
+        with _patched(rec):
+            got = await read_secret(
+                _inst(),
+                mount="auth",
+                path="approle/role/app/secret-id",
+                field="k",
+                engine="dynamic",
+                static_token="t",
+            )
+        assert got == "v"

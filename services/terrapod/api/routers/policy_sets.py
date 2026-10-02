@@ -268,6 +268,27 @@ async def create_policy_set(
                 status_code=422, detail="vcs-repo-url is required for VCS policy sets"
             )
 
+        # GHSA-v8g7-pqrj-8mcm. The policy-set poller now refuses to clone a repository
+        # outside its connection's allowlist, so without this an admin could store a
+        # policy set that silently never syncs — the refusal happens in a poll cycle,
+        # where there is no caller to receive it. Checking here turns that into a 403 at
+        # the point the URL is chosen, which is the whole reason the accepting paths
+        # carry the check as well as the clone.
+        from terrapod.services.vcs_connection_rbac import (
+            repository_allowed,
+            repository_refusal_detail,
+        )
+
+        if not repository_allowed(conn, attrs.get("vcs-repo-url") or ""):
+            raise HTTPException(
+                status_code=403,
+                detail=repository_refusal_detail(
+                    conn.id,
+                    attrs.get("vcs-repo-url") or "",
+                    list(conn.allowed_repositories or []),
+                ),
+            )
+
     ps = PolicySet(
         id=generate_uuid7(),
         name=name,
@@ -829,21 +850,46 @@ async def post_policy_results(
 
         ps_name = (item.get("policy_set_name") or "").strip()
         if not ps_name:
-            # The name is snapshotted onto the row and shown in the UI;
-            # an empty value would render as a blank set badge — a
-            # contract bug on the runner side.
+            # Still validated, though the stored value comes from the database
+            # above: an empty name is a contract bug on the runner side and a
+            # clear 422 is more use to whoever is debugging it than silently
+            # ignoring the field.
             raise HTTPException(
                 status_code=422,
                 detail="policy_set_name is required (must be a non-empty string)",
             )
+
+        # The runner reports WHICH sets it evaluated and what they said. It does
+        # not get to report what a set IS. `enforcement_level` is the gate's own
+        # filter — `run_is_policy_blocked` considers mandatory rows and nothing
+        # else — so a body claiming `advisory` for a mandatory set removes that
+        # set from the gate entirely, with the real evaluation then dropped by
+        # the ON CONFLICT. The set's definition is sitting in the database, so
+        # both it and the displayed name are read from there.
+        #
+        # An unknown id is skipped rather than 422'd. The set may simply have
+        # been deleted mid-run, and failing the whole batch would discard the
+        # results for every OTHER set in it — which the gate's safety net would
+        # then record as a missing mandatory evaluation and block the run on.
+        # A row for a set that does not exist has no gate effect in any case:
+        # the gate iterates the applicable sets, not the recorded rows.
+        policy_set = await db.get(PolicySet, ps_uuid)
+        if policy_set is None:
+            logger.warning(
+                "Policy result posted for an unknown policy set — ignored",
+                run_id=str(run_uuid),
+                policy_set_id=str(ps_uuid),
+            )
+            continue
 
         rows.append(
             {
                 "id": generate_uuid7(),
                 "run_id": run_uuid,
                 "policy_set_id": ps_uuid,
-                "policy_set_name": ps_name,
-                "enforcement_level": enf,
+                # Server-known facts, never the runner's word for them.
+                "policy_set_name": policy_set.name,
+                "enforcement_level": policy_set.enforcement_level,
                 "outcome": outcome,
                 "result": result,
                 "created_at": stamp,

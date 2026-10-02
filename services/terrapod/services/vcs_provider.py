@@ -80,6 +80,7 @@ class PullRequest:
         "author_login",
         "state",
         "merged",
+        "from_fork",
     )
 
     def __init__(
@@ -88,6 +89,8 @@ class PullRequest:
         head_sha: str,
         head_ref: str,
         title: str,
+        *,
+        from_fork: bool,
         draft: bool = False,
         author_login: str = "",
         state: str = "",
@@ -106,6 +109,18 @@ class PullRequest:
         # (workspace graduated) from a closed-unmerged one (orphan).
         self.state = state
         self.merged = merged
+        # Whether the head came from a different repository than the base —
+        # a fork on GitHub, a different source project on GitLab.
+        #
+        # Keyword-only and REQUIRED, with no default, deliberately. A fork
+        # author has no write access to the base repository and cannot merge,
+        # so a speculative plan is the only way their code ever executes with
+        # the workspace's credentials. That makes this a trust boundary, and a
+        # trust flag that defaults to "trusted" when a construction site forgets
+        # it fails open silently. Requiring it means a new provider, or a new
+        # path within an existing one, cannot omit it by accident — the same
+        # reasoning as the optional-parameter trap recorded in AGENTS.md.
+        self.from_fork = from_fork
 
 
 @dataclass(frozen=True)
@@ -367,8 +382,32 @@ async def get_default_branch(conn: VCSConnection, owner: str, repo: str) -> str 
 
 
 async def download_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
-    """Download repository tarball at a given ref."""
+    """Download repository tarball at a given ref.
+
+    GHSA-v8g7-pqrj-8mcm. The allowlist is enforced HERE, at the point the credential
+    is actually used, as well as at every path that accepts a repository URL. The
+    accepting paths are where an operator gets a useful error; this is what makes the
+    control true of the clone itself.
+
+    It was not enough to check only the accepting paths. A URL set while a connection
+    was wide keeps being cloned after the connection is narrowed, and the workspace
+    poller clones *before* anything a run would check — so the credential had already
+    read the out-of-scope repository by the time the config fetch refused the run. The
+    documentation described a narrower residual gap than existed.
+    """
     from terrapod.services import github_service, gitlab_service
+    from terrapod.services.vcs_connection_rbac import (
+        RepositoryNotAllowed,
+        repository_pair_allowed,
+    )
+
+    if not repository_pair_allowed(conn, owner, repo):
+        raise RepositoryNotAllowed(
+            f"VCS connection vcs-{getattr(conn, 'id', None)} is restricted to specific repositories and "
+            f"{owner}/{repo} is not one of them, so its credential will not be used to "
+            "clone it. Widen `allowed-repositories` on the connection, or clear it to "
+            "allow any repository the credential can reach."
+        )
 
     if conn.provider == "gitlab":
         return await gitlab_service.download_archive(conn, owner, repo, ref)

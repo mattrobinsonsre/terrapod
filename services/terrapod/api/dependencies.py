@@ -88,6 +88,34 @@ def effective_platform_roles(user: AuthenticatedUser) -> set[str]:
     return roles
 
 
+def label_reach_roles(user: AuthenticatedUser) -> set[str]:
+    """The narrowest defensible role set for a per-resource LABEL grant.
+
+    Neither `user.roles` nor `effective_platform_roles(user)` is right on its own,
+    and each is wrong in the opposite direction:
+
+    - `user.roles` is the LIVE set, so for a `service_bound` token it includes roles
+      the token was deliberately not pinned to — the pin is defeated.
+    - `effective_platform_roles` returns PINNED-only for a `service_detached` token,
+      so it includes roles the principal no longer holds.
+
+    The intersection is narrower than both and escapes in neither direction, which is
+    what a grant wants. For an interactive principal it is simply the live set.
+
+    `admin` is dropped because a caller that needs the admin bypass asks for it
+    explicitly, with the attenuated `effective_platform_roles` view. Leaving it in
+    means `rbac_service.check_access` short-circuits to True on it, re-granting
+    through the label path exactly the admin a pin had just removed. The other
+    built-in names contribute nothing to `check_access`'s allow/deny sets — it
+    subtracts them before loading roles — so they are harmless either way.
+    """
+    roles = set(user.roles)
+    if user.kind in ("service_bound", "service_detached"):
+        roles &= set(user.pinned_roles or [])
+    roles.discard("admin")
+    return roles
+
+
 async def _resolve_user_roles(db: AsyncSession, email: str) -> list[str]:
     """Resolve a user's roles from role_assignments + platform_role_assignments.
 
