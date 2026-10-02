@@ -505,7 +505,7 @@ Run-time refusals (a `git_http_auth` credential naming a connection the workspac
 may not use) fail the run with the reason rather than running without the
 credential, so they surface on the run itself, not as a 403.
 
-Full semantics, including the eight points the allowlist is enforced at, are in
+Full semantics, including every point the allowlist is enforced at, are in
 [vcs-integration.md → Naming a VCS
 connection](vcs-integration.md#naming-a-vcs-connection-is-authorized).
 

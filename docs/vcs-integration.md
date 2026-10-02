@@ -1088,14 +1088,27 @@ curl -X PATCH "$TERRAPOD/api/terrapod/v1/vcs-connections/vcs-<id>" \
         "allowed-repositories": ["platform-team/*", "shared/terraform-modules"]}}}'
 ```
 
-Patterns are globs, matched against **both** spellings of the target so an
-operator can write whichever reads better:
+Patterns are globs, matched against **one** spelling of the target: the
+repository's `owner/name` path, with any `.git` suffix removed. So
+`platform-team/*` matches `https://github.com/platform-team/service.git` and the
+SSH form of the same repository.
 
-- the repository's `owner/name` path, with any `.git` suffix removed — so
-  `platform-team/*` matches `https://github.com/platform-team/service.git` and
-  the SSH form of the same repository;
-- the full URL as stored — so `https://github.example.com/platform-team/*`
-  additionally pins the host.
+You may write a pattern against a full address — `https://github.example.com/platform-team/*`
+— and it will work, because the **pattern** is reduced to the same `owner/name`
+shape. But it does **not** pin the host, and nothing about a pattern does. An
+earlier version of this page said it did, and an earlier version of the matcher
+offered the raw URL as a second thing a pattern could match — which is what made the
+allowlist bypassable, since `*` crosses `/` and so `platform-team/*` matched an
+entire crafted URL.
+
+**The host is decided by the connection, not by a pattern**, and that is why a
+pattern does not need to pin it: a clone builds its URL from the connection's own
+server and takes only `owner` and `repo` from what you stored, so a repository URL
+naming some other host still clones from the connection's server. The one place a
+host mattered is a minted git credential, whose key is written verbatim into a git
+`[credential "https://<key>"]` section — and that is now checked against the
+connection's own host directly. See the runbook entry for a credential refused that
+way.
 
 Three details worth knowing before writing one:
 
@@ -1108,7 +1121,9 @@ Three details worth knowing before writing one:
   in the list matches nothing rather than everything — so a stray empty string
   cannot quietly turn a restriction into an allow-all.
 
-The allowlist is enforced at eight points, not only where the URL is set:
+The allowlist is enforced in two places, not only where the URL is set — at every
+path that **accepts** a repository URL, and again wherever the credential is
+actually **used** to clone:
 
 | Where | Effect when the repository is out of scope |
 |---|---|
@@ -1126,14 +1141,14 @@ connection: workspaces already pointing outside the new patterns keep their
 configuration and start failing their next run. Find them first — see
 [the runbook](runbooks.md#a-run-cannot-fetch-its-repository).
 
-**Know what it does not cover.** The registry pollers clone a module's
-repository to publish versions and to run module-impact analysis, and **those
-fetches are not re-checked** against `allowed-repositories`. A module's repository
-URL can only be *set* through a checked path — create, update and VCS-update all
-enforce the allowlist — so an entitled caller can no longer point a module at
-something out of scope. What remains is a module whose URL predates a narrowing:
-it keeps being cloned, where a workspace in exactly that position stops at its
-next config fetch. Find those the same way you find the workspaces, and fix or
+**The registry and policy-set pollers are covered too, from this release.** They
+clone through their own dispatchers rather than the shared one, so for a while they
+reached neither check: a module, policy set or registry entry whose URL predated a
+narrowing kept being cloned, where a workspace in exactly that position stopped at
+its next config fetch. All three now check before fetching. A refusal there has no
+HTTP caller to receive it, so it appears as a logged refusal and the module simply
+stops publishing new versions — find those the same way you find the workspaces,
+and fix or
 remove them in the same pass.
 
 Keep the connection's credential itself scoped regardless — a GitHub App installed

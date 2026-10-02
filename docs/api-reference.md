@@ -2532,7 +2532,7 @@ it. Anything else is **403**. Patterns in `allowed-repositories` are matched
 against both the full URL as stored and the `owner/name` path with any `.git`
 suffix removed, so `platform-team/*` and
 `https://github.example.com/platform-team/*` both work; `*` crosses `/`, and
-patterns are case-sensitive. Full semantics, including the eight points the
+patterns are case-sensitive. Full semantics, including every point the
 allowlist is enforced at, are in
 [VCS integration → Naming a VCS connection is authorized](vcs-integration.md#naming-a-vcs-connection-is-authorized).
 

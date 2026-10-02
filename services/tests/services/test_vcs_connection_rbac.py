@@ -1115,3 +1115,76 @@ class TestACredentialIsOnlyEverInstalledForItsOwnConnectionsHost:
         assert "evil.tld" in detail and "github.com" in detail
         assert f"vcs-{cid}" in detail
         assert "allowed-repositories" not in detail
+
+
+class TestEveryModuleThatClonesReachesTheAllowlist:
+    """The gate that would have caught the real gap, and the one the docs rest on.
+
+    The first attempt guarded `vcs_provider.download_archive` — a dispatcher with no
+    production caller at all — and `VCSArchiveCache.get_or_fetch`, then
+    `docs/security-hardening.md` claimed "there is no path that escapes it". Three
+    modules clone through their OWN dispatchers straight to the provider services and
+    reached neither guard: module-impact analysis, the registry tag poller and the
+    policy-set poller. `docs/vcs-integration.md`, in the same commit, still said so.
+
+    This asserts the property the documentation claims, derived from the tree rather
+    than from a list someone maintains: a module that calls a provider download
+    function must also reach the allowlist.
+    """
+
+    #: Modules that reference a provider download function without needing the guard.
+    #: Each entry is a claim, so each needs a reason.
+    NOT_A_CLONE_SITE = {
+        "github_service.py": "implements the download; the guard is on its callers",
+        "gitlab_service.py": "implements the download; the guard is on its callers",
+        "vcs_provider.py": "the dispatcher itself, and it carries the guard",
+    }
+
+    def test_no_module_clones_without_consulting_the_allowlist(self):
+        import pathlib
+        import re
+
+        from terrapod.services import vcs_connection_rbac
+
+        root = pathlib.Path(vcs_connection_rbac.__file__).resolve().parent
+        # The functions that actually fetch a repository from a provider.
+        #
+        # Deliberately NOT requiring a `(`: `registry_vcs_poller` obtains the function
+        # as a VALUE (`return github_service.download_repo_archive`) and calls it
+        # through a local name, so a call-shaped regex missed it entirely — which the
+        # mutation check caught, and which is the same module the real gap was in.
+        clone_call = re.compile(
+            r"\b(?:download_archive|download_repo_archive"
+            r"|download_archive_to_file|download_repo_archive_to_file)\b"
+        )
+        # Either the module checks the allowlist itself, OR it fetches through
+        # `VCSArchiveCache.get_or_fetch`, which checks on its behalf. Drift detection
+        # is the second kind — it names `download_archive` only in a docstring saying
+        # why it does NOT use the raw provider API — and crediting the cache route is
+        # more honest than exempting the module by name.
+        guard = re.compile(r"repository_pair_allowed|repository_allowed|get_or_fetch")
+
+        offenders = []
+        for path in sorted(root.glob("*.py")):
+            if path.name in self.NOT_A_CLONE_SITE:
+                continue
+            src = path.read_text()
+            if clone_call.search(src) and not guard.search(src):
+                offenders.append(path.name)
+        assert not offenders, (
+            "these call a provider download function without reaching the repository "
+            "allowlist, so a URL stored before a narrowing keeps being cloned — and "
+            "docs/security-hardening.md claims no path escapes it:\n  "
+            + "\n  ".join(offenders)
+            + "\n\nAdd a `repository_pair_allowed` check, or add the module to "
+            "NOT_A_CLONE_SITE with a reason."
+        )
+
+    def test_the_sparse_fetch_path_is_guarded_too(self):
+        """`git_fetch` is a different mechanism from an archive download, and the
+        archive cache is its only entry point."""
+        import inspect
+
+        from terrapod.services import vcs_archive_cache
+
+        assert "repository_pair_allowed(" in inspect.getsource(vcs_archive_cache)
