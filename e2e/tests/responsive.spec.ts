@@ -403,8 +403,16 @@ test.describe('Responsive harness (phone viewport)', () => {
 
       // Each card carries its own verdict, so locate within the card rather
       // than page-wide — page-wide would pass on either fixture's text.
-      const openCard = page.locator('div').filter({ hasText: open }).last()
-      const shutCard = page.locator('div').filter({ hasText: shut }).last()
+      //
+      // Scoped by test id, NOT by `locator('div').filter(...).last()`: that
+      // matches every ancestor and descendant div whose subtree contains the
+      // name, and `.last()` then takes the innermost — here the header div
+      // holding the <h3>, which contains the name and none of the verdicts. It
+      // failed as "element(s) not found" while the page rendered correctly.
+      const card = (name: string) =>
+        page.getByTestId('vcs-connection-card').filter({ hasText: name })
+      const openCard = card(open)
+      const shutCard = card(shut)
       await expect(openCard.getByText('Any repository is allowed')).toBeVisible()
       await expect(shutCard.getByText('Restricted to 2 repositories')).toBeVisible()
       // The patterns themselves are readable from the list — the question an

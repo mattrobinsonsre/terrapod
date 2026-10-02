@@ -467,6 +467,11 @@ export default function VCSConnectionsPage() {
               {sortedItems.map((conn) => (
                 <div
                   key={conn.id}
+                  /* A card is the unit an assertion needs to scope to: every
+                     verdict here is per connection, so a page-wide check would
+                     pass on a neighbouring card's text. Class names are styling
+                     and nesting is not a contract, so the handle is explicit. */
+                  data-testid="vcs-connection-card"
                   className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 flex flex-col gap-3 h-full"
                 >
                   <div className="flex flex-wrap items-center gap-2">
