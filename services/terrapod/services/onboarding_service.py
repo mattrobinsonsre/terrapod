@@ -62,15 +62,114 @@ _DISCOVERY_TIMEOUT_SECONDS = 300
 
 
 # ---------------------------------------------------------------------------
+# Subprocess environment (allowlist, never os.environ)
+# ---------------------------------------------------------------------------
+# The API process environment holds the key-encryption key, the token signing key
+# and the database DSN. `terrapod-query schema` makes the engine launch the
+# provider PLUGIN — third-party code we just downloaded from a registry — as a
+# child, so handing those subprocesses `os.environ` hands all of it to that
+# plugin. Schema introspection needs none of it (it is credential-less by
+# design), so the child environment is an explicit ALLOWLIST rather than a scrub:
+# a list of what to keep cannot go stale in the dangerous direction, whereas a
+# list of what to drop silently leaks every setting added after it was written.
+#
+# Everything here is present because the engine or its download path reads it
+# from the environment and nowhere else — which is also why these are the one
+# sanctioned class of env-only value in AGENTS.md:
+#   PATH / HOME / TMPDIR / XDG_*  process basics; the engine writes under $HOME
+#   TF_IN_AUTOMATION              we set it; suppresses interactive hints
+#   TF_CLI_CONFIG_FILE            points the engine at a provider mirror, which
+#                                 is how an air-gapped deployment resolves the
+#                                 provider at all
+#   TF_PLUGIN_CACHE_DIR           reuses an already-downloaded plugin
+#   TF_REGISTRY_* / TF_PROVIDER_DOWNLOAD_RETRY  registry timeout/retry tuning
+#   HTTP(S)_PROXY / NO_PROXY      both cases — Go, Python and curl read
+#                                 different ones, and the chart injects both
+#   SSL_CERT_* / *_CA_BUNDLE      the init-container-merged custom CA bundle
+#   GIT_SSL_CAINFO                git-sourced fetches trust the same bundle
+# Dropping any of the last three groups breaks every egress-proxied or custom-CA
+# deployment, so err towards keeping a harmless one rather than omitting it.
+_ENGINE_ENV_KEYS = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "TF_IN_AUTOMATION",
+        "TF_CLI_CONFIG_FILE",
+        "TF_PLUGIN_CACHE_DIR",
+        "TF_REGISTRY_CLIENT_TIMEOUT",
+        "TF_REGISTRY_DISCOVERY_RETRY",
+        "TF_PROVIDER_DOWNLOAD_RETRY",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "no_proxy",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "CURL_CA_BUNDLE",
+        "REQUESTS_CA_BUNDLE",
+        "NODE_EXTRA_CA_CERTS",
+        "GIT_SSL_CAINFO",
+    }
+)
+
+# Registry credentials an operator sets deliberately FOR the engine (an
+# authenticated private or air-gapped provider registry). Matched by prefix
+# because the suffix is the registry hostname. These are the engine's own
+# credentials, not Terrapod's, and without them an authenticated mirror cannot
+# serve the provider — but note they do reach the provider plugin, so the bound
+# on this fix is "the plugin can see what the operator gave the engine", not
+# "the plugin sees nothing".
+_ENGINE_ENV_PREFIXES = ("TF_TOKEN_", "TF_CLI_ARGS")
+
+
+# `TF_CLI_ARGS` / `TF_CLI_ARGS_init` are matched by the prefix above: they are how
+# an operator adds a flag the chart has no value for — `-plugin-dir` on an
+# air-gapped install being the usual one — and the engine reads them only from the
+# environment. Operator-placed and operator-trusted, like the registry tokens.
+
+
+def _engine_env() -> dict[str, str]:
+    """The explicit environment for the engine subprocesses — never ``os.environ``."""
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k in _ENGINE_ENV_KEYS or k.startswith(_ENGINE_ENV_PREFIXES)
+    }
+    env["TF_IN_AUTOMATION"] = "1"
+    return env
+
+
+# ---------------------------------------------------------------------------
 # Redis surface cache (pure — keyed by engine + version + provider)
 # ---------------------------------------------------------------------------
+def _normalise_version(value: str) -> str:
+    """Collapse surrounding + interior whitespace in a version or constraint.
+
+    ``_VERSION_CONSTRAINT_RE`` permits ``\\s``, and ``create_session`` only strips
+    the ends, so ``"<  6.0"`` and ``"< 6.0"`` are both accepted and mean exactly
+    the same thing to the engine — while producing *different* cache keys. That
+    makes the key space caller-controlled: each variant misses the cache and
+    re-downloads a provider into a fresh scratch directory. Normalising bounds the
+    key space to the constraints that genuinely differ.
+    """
+    return " ".join(value.split())
+
+
 def _surface_cache_key(
     engine: str, engine_version: str, provider: str, provider_version: str
 ) -> str:
     # provider_version is part of the key: a v5 and a v6 provider schema differ
     # (v6 adds a per-resource `region` attribute, etc.), so their surfaces must
-    # not collide. Empty constraint (latest) is its own key.
-    return f"tp:onboard:surface:{engine}:{engine_version}:{provider}:{provider_version}"
+    # not collide. Empty constraint (latest) is its own key. Both version segments
+    # are whitespace-normalised so equivalent spellings share one entry.
+    ev = _normalise_version(engine_version)
+    pv = _normalise_version(provider_version)
+    return f"tp:onboard:surface:{engine}:{ev}:{provider}:{pv}"
 
 
 async def get_cached_surface(
@@ -161,7 +260,9 @@ async def create_session(
     session = OnboardingSession(
         workspace_id=workspace_id,
         provider=provider.strip(),
-        provider_version=provider_version.strip(),
+        # Normalised, not just stripped: the stored constraint is what the cache
+        # key is built from, so interior whitespace here is unbounded key space.
+        provider_version=_normalise_version(provider_version),
         created_by=created_by,
         status="pending",
     )
@@ -324,7 +425,14 @@ def _local_platform() -> tuple[str, str]:
 
 
 def _resolve_tmpdir() -> str | None:
-    """The CSP-attached ephemeral PVC dir (Rule 14), or None for the system default."""
+    """The CSP-attached ephemeral PVC dir (Rule 14), or None for the system default.
+
+    None is the documented fallback for local dev and tests. On an API pod with no
+    PVC configured it means the system default — which is RAM-backed ``/tmp`` — so
+    anything written there counts against the pod's memory. That makes the
+    scratch-directory cleanup in ``run_schema_discovery`` load-bearing rather than
+    tidiness: a leaked engine binary or provider plugin is leaked memory.
+    """
     configured = settings.vcs.tmpdir
     if configured and os.path.isdir(configured):
         return configured
@@ -351,8 +459,14 @@ def _provider_config_hcl(provider: str, version_constraint: str = "") -> str:
     )
 
 
-async def _download_engine_binary(db: AsyncSession, engine: str, version: str) -> str:
-    """Resolve + fetch the tofu/terraform binary to the PVC, return its path.
+async def _download_engine_binary(db: AsyncSession, engine: str, version: str) -> tuple[str, str]:
+    """Resolve + fetch the tofu/terraform binary to the PVC.
+
+    Returns ``(binary_path, scratch_dir)``. The CALLER owns ``scratch_dir`` and must
+    remove it — it holds the extracted engine binary, so it cannot be reaped until
+    the discovery subprocesses are done with it. If anything fails in here the
+    directory is removed before re-raising, so a failed download leaks nothing and
+    the caller never has to clean up a dir it was never handed.
 
     The API image bakes no engine binary (removed in #824 P1); we pull the
     workspace's exact version through the binary cache, same as the runner.
@@ -369,21 +483,27 @@ async def _download_engine_binary(db: AsyncSession, engine: str, version: str) -
     tmpdir = _resolve_tmpdir()
     dest_dir = await asyncio.to_thread(tempfile.mkdtemp, prefix="onb-bin-", dir=tmpdir)
     dest = os.path.join(dest_dir, engine)
-
-    # Stream the (zip) release to the PVC, extract the single binary. Both the
-    # download and the unzip are blocking → threaded.
-    async with httpx.AsyncClient(timeout=_DISCOVERY_TIMEOUT_SECONDS) as client:
-        zip_path = os.path.join(dest_dir, f"{engine}.zip")
-        async with client.stream("GET", url) as resp:
-            resp.raise_for_status()
-            f = await asyncio.to_thread(open, zip_path, "wb")
-            try:
-                async for chunk in resp.aiter_bytes(1024 * 1024):
-                    await asyncio.to_thread(f.write, chunk)
-            finally:
-                await asyncio.to_thread(f.close)
-    await asyncio.to_thread(_unzip_engine, zip_path, dest, engine)
-    return dest
+    try:
+        # Stream the (zip) release to the PVC, extract the single binary. Both the
+        # download and the unzip are blocking → threaded.
+        async with httpx.AsyncClient(timeout=_DISCOVERY_TIMEOUT_SECONDS) as client:
+            zip_path = os.path.join(dest_dir, f"{engine}.zip")
+            async with client.stream("GET", url) as resp:
+                resp.raise_for_status()
+                f = await asyncio.to_thread(open, zip_path, "wb")
+                try:
+                    async for chunk in resp.aiter_bytes(1024 * 1024):
+                        await asyncio.to_thread(f.write, chunk)
+                finally:
+                    await asyncio.to_thread(f.close)
+        await asyncio.to_thread(_unzip_engine, zip_path, dest, engine)
+        # The archive is dead weight once extracted, and it is the same order of
+        # magnitude as the binary — drop it rather than hold both for the whole run.
+        await asyncio.to_thread(os.unlink, zip_path)
+    except BaseException:  # cleanup then re-raise, incl. cancellation
+        await asyncio.to_thread(shutil.rmtree, dest_dir, ignore_errors=True)
+        raise
+    return dest, dest_dir
 
 
 def _unzip_engine(zip_path: str, dest: str, engine: str) -> None:
@@ -413,12 +533,15 @@ def _discover_surface_blocking(
     """Run ``tofu init`` + ``terrapod-query schema`` in ``workdir`` (BLOCKING).
 
     Isolated so callers wrap it in ``asyncio.to_thread`` and tests can mock it.
-    Credential-less and read-only: schema introspection never touches the cloud.
+    Credential-less and read-only: schema introspection never touches the cloud,
+    so both children run with the ``_engine_env()`` allowlist rather than the API's
+    own environment — the schema read launches the provider plugin, and the plugin
+    has no business seeing Terrapod's keys.
     """
     with open(os.path.join(workdir, "providers.tf"), "w") as f:
         f.write(_provider_config_hcl(provider, version_constraint))
 
-    env = {**os.environ, "TF_IN_AUTOMATION": "1"}
+    env = _engine_env()
     init = subprocess.run(  # noqa: S603 — fixed argv, no shell, trusted binary
         [engine_bin, "init", "-no-color", "-input=false"],
         cwd=workdir,
@@ -488,8 +611,9 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
         return
 
     workdir: str | None = None
+    bindir: str | None = None
     try:
-        engine_bin = await _download_engine_binary(db, engine, version)
+        engine_bin, bindir = await _download_engine_binary(db, engine, version)
         tmpdir = _resolve_tmpdir()
         workdir = await asyncio.to_thread(tempfile.mkdtemp, prefix="onb-d1-", dir=tmpdir)
         surface = await asyncio.wait_for(
@@ -517,8 +641,13 @@ async def run_schema_discovery(db: AsyncSession, session_id: uuid.UUID) -> None:
             "onboarding_schema_discovery_failed", session_id=str(session_id), error=str(exc)
         )
     finally:
-        if workdir:
-            await asyncio.to_thread(shutil.rmtree, workdir, ignore_errors=True)
+        # BOTH scratch dirs, on every path: `workdir` holds the downloaded provider
+        # plugin (hundreds of MB) and `bindir` the engine binary. See
+        # `_resolve_tmpdir` — with no PVC configured these land on RAM-backed
+        # `/tmp`, so a leak is memory, not just disk.
+        for path in (workdir, bindir):
+            if path:
+                await asyncio.to_thread(shutil.rmtree, path, ignore_errors=True)
 
 
 async def handle_schema_discover_trigger(payload: dict) -> None:

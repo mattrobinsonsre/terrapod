@@ -150,6 +150,35 @@ credentials, and is also **baked into the Terrapod API and runner images**:
 - **Query execution** hits the real cloud with the workspace's identity, so it
   runs in a **runner Job**, the same execution split as every plan/apply.
 
+### The schema subprocesses get an allowlisted environment
+
+Schema introspection in the API runs `tofu init` and `terrapod-query schema`, and
+the second of those makes the engine **launch the provider plugin** — third-party
+code downloaded from a registry moments earlier — as a child process, which
+inherits whatever environment we pass. So from v1.9.0 these two subprocesses no
+longer inherit the API's own environment; they get an explicit allowlist instead
+(`GHSA-658f-j48w-w8m9`). Schema introspection is credential-less by design, so
+keeping almost nothing is the correct default rather than a compromise.
+
+What survives, because the engine or its download path reads it from the
+environment and nowhere else: process basics (`PATH`, `HOME`, `TMPDIR`, the
+`XDG_*` dirs), the engine's own `TF_*` settings (`TF_IN_AUTOMATION`,
+`TF_CLI_CONFIG_FILE`, `TF_PLUGIN_CACHE_DIR`, the registry timeout/retry tuning),
+**both cases of the proxy variables**, and the CA-bundle variables an egress
+proxy or a private CA needs (`SSL_CERT_FILE`, `SSL_CERT_DIR`, `CURL_CA_BUNDLE`,
+`REQUESTS_CA_BUNDLE`, `NODE_EXTRA_CA_CERTS`, `GIT_SSL_CAINFO` — the chart renders
+all but `SSL_CERT_DIR`). Two prefixes pass through whole because they are operator-placed and
+operator-trusted: `TF_TOKEN_*`, without which an authenticated or air-gapped
+registry cannot serve the provider at all, and `TF_CLI_ARGS*`, which is how an
+operator adds a flag the chart has no value for. `TF_TOKEN_*` does reach the
+plugin, so the honest bound is "the plugin sees what the operator deliberately
+gave the engine", not "the plugin sees nothing".
+
+**If discovery stops working after upgrading, this is the first place to look.**
+Anything you supply through `api.extraEnv` that is outside the lists above no
+longer reaches `tofu init` — the egress-proxied and custom-CA cases are covered,
+but a provider needing some other variable is not.
+
 ## AI config polish (optional)
 
 Machine-generated config is correct but hard to read: every resource carries an

@@ -82,6 +82,46 @@ def _sso_url_prefix() -> str:
     return NATIVE_LEGACY_PREFIX if settings.auth.legacy_callback_url else NATIVE_PREFIX
 
 
+def _saml_acs_url(connector: object) -> str:
+    """This deployment's externally-reachable SAML ACS URL.
+
+    One function for both sides of the flow. The AuthnRequest advertises it and
+    the ACS endpoint checks assertions against it, and those two have to be the
+    same string: what we advertise is what the IDP mirrors back as `Destination`
+    and `Recipient`.
+
+    `acs_url` on the provider wins — it is there for a deployment whose external
+    path is not the one it serves internally. Otherwise it is built from
+    `auth.callback_base_url`, which is what the operator registered with the IDP,
+    and only then from `external_url`. That order matters: checking an assertion
+    against a different base than the one we advertised is how a security check
+    turns into a login outage.
+
+    The prefix comes from `_sso_url_prefix`, not from `settings.terrapod_prefix`
+    directly: on this line both native prefixes are served, but only the one the
+    operator registered with the IDP may be *asserted*, and that is a deliberate
+    switch rather than a follow-on from the routing change.
+    """
+    override = getattr(connector, "configured_acs_url", "")
+    if override:
+        return str(override).rstrip("/")
+    base = (settings.auth.callback_base_url or settings.external_url or "").rstrip("/")
+    return f"{base}{_sso_url_prefix()}/auth/saml/acs"
+
+
+def _idp_callback_url(connector: object) -> str:
+    """Where the IDP sends the user back.
+
+    SAML posts its assertion to the ACS endpoint; OIDC redirects to the shared
+    callback. The SAML branch used to be missing, so the AuthnRequest advertised
+    `/auth/callback` — a GET-only route that cannot accept an assertion — while
+    the assertion actually arrives at `/auth/saml/acs`.
+    """
+    if getattr(connector, "provider_type", "") == "saml":
+        return _saml_acs_url(connector)
+    return f"{settings.auth.callback_base_url}{_sso_url_prefix()}/auth/callback"
+
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = get_logger(__name__)
 
@@ -201,7 +241,7 @@ async def authorize(
     idp_state = generate_state()
 
     # Build callback URL for the IDP
-    callback_url = f"{settings.auth.callback_base_url}{_sso_url_prefix()}/auth/callback"
+    callback_url = _idp_callback_url(connector)
 
     # Build authorization request to the provider
     auth_request = await connector.build_authorization_request(
@@ -219,6 +259,7 @@ async def authorize(
         idp_state=idp_state,
         nonce=auth_request.nonce,
         idp_code_verifier=auth_request.code_verifier,
+        saml_request_id=auth_request.request_id,
     )
     # store_auth_state validates client_redirect_uri. This route 302s the
     # authorization code straight at whatever is stored here, with no
@@ -395,7 +436,7 @@ async def cli_sso_redirect(
         )
 
     idp_state = generate_state()
-    callback_url = f"{settings.auth.callback_base_url}{_sso_url_prefix()}/auth/callback"
+    callback_url = _idp_callback_url(connector)
 
     auth_request = await connector.build_authorization_request(
         callback_url=callback_url,
@@ -412,6 +453,7 @@ async def cli_sso_redirect(
         idp_state=idp_state,
         nonce=auth_request.nonce,
         idp_code_verifier=auth_request.code_verifier,
+        saml_request_id=auth_request.request_id,
         credential_type="api_token",
     )
     # Re-validated on carry-forward: the credential type changes here, so a
@@ -536,13 +578,14 @@ async def saml_acs(
             detail=f"Provider {auth_state.provider_name} no longer configured",
         )
 
-    acs_url = f"{settings.auth.callback_base_url}{_sso_url_prefix()}/auth/saml/acs"
+    acs_url = _saml_acs_url(connector)
 
     try:
         identity = await connector.handle_callback(
             callback_url=acs_url,
             saml_response=str(saml_response),
             relay_state=str(relay_state),
+            expected_request_id=auth_state.saml_request_id,
         )
     except ValueError as e:
         logger.error("SAML callback failed", provider=auth_state.provider_name, error=str(e))

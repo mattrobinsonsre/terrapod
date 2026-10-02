@@ -29,8 +29,8 @@ from __future__ import annotations
 
 import asyncio
 import gzip
+import hashlib
 import os
-import shutil
 import tempfile
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
@@ -71,9 +71,66 @@ def _append_chunk(path: str, chunk: bytes) -> None:
         f.write(chunk)
 
 
-def _gunzip_file(gz_path: str, out_path: str) -> None:
+class PricesheetRejected(Exception):
+    """The fetched pricesheet was refused before anything was cached.
+
+    Separate from a transport error on purpose: a refusal means the bytes
+    arrived and were not acceptable, which is a different thing for an operator
+    to read in the logs than an upstream outage. Either way the caller keeps the
+    previously cached sheet, because the store only happens on success.
+    """
+
+
+def _gunzip_file(gz_path: str, out_path: str, max_bytes: int) -> int:
+    """Gunzip with a running cap, returning the decompressed size.
+
+    `shutil.copyfileobj` would copy until the member ends, which is what makes a
+    decompression bomb cheap: ~2 MB on the wire can become a terabyte on the PVC.
+    Reading in bounded chunks and counting as we go means the cap is enforced
+    while writing rather than discovered afterwards, so the bomb never lands.
+    """
+    written = 0
     with gzip.open(gz_path, "rb") as src, open(out_path, "wb") as dst:
-        shutil.copyfileobj(src, dst, length=_CHUNK)
+        while True:
+            chunk = src.read(_CHUNK)
+            if not chunk:
+                break
+            written += len(chunk)
+            if written > max_bytes:
+                raise PricesheetRejected(
+                    f"decompressed pricesheet exceeds {max_bytes} bytes "
+                    "(cost_estimation.prices_max_decompressed_bytes)"
+                )
+            dst.write(chunk)
+    return written
+
+
+async def _expected_digest(client: httpx.AsyncClient, url: str) -> str | None:
+    """The digest to hold the download to, or `None` if there is none to hold it to.
+
+    An operator-configured `prices_sha256` wins and is never overridden: it is the
+    only check that survives a compromise of wherever the sheet is published,
+    because the value lives in the deployment rather than next to the artifact.
+
+    Failing that, try the sibling `<url>.sha256`. This is deliberately weaker and
+    the docstring should say so rather than imply otherwise: anyone able to replace
+    the sheet at its URL can usually replace the file beside it, so it catches
+    corruption and a partial tamper, not a publisher. It is still worth doing — and
+    its absence must not be fatal, because `prices_url` may point at an air-gapped
+    mirror that only carries the sheet.
+    """
+    pinned = (settings.cost_estimation.prices_sha256 or "").strip().lower()
+    if pinned:
+        return pinned
+    try:
+        resp = await client.get(f"{url}.sha256", timeout=30.0)
+        if resp.status_code != 200:
+            return None
+        # `sha256sum` format is "<hex>  <name>"; a bare hex digest is also fine.
+        token = resp.text.strip().split()[0].lower() if resp.text.strip() else ""
+        return token if len(token) == 64 and all(c in "0123456789abcdef" for c in token) else None
+    except httpx.HTTPError:
+        return None
 
 
 async def _file_chunks(path: str) -> AsyncIterator[bytes]:
@@ -117,14 +174,35 @@ async def refresh_pricesheet(storage: ObjectStore) -> int:
     db_fd, db_path = await asyncio.to_thread(tempfile.mkstemp, suffix=".sqlite", dir=tmpdir)
     await asyncio.to_thread(os.close, db_fd)
     try:
+        cfg = settings.cost_estimation
         async with httpx.AsyncClient(follow_redirects=True) as client:
             # trust_env (httpx default) routes via the configured proxy/CA (#592).
+            expected = await _expected_digest(client, url)
+            digest = hashlib.sha256()
+            compressed = 0
             async with client.stream("GET", url, timeout=_DOWNLOAD_TIMEOUT) as resp:
                 resp.raise_for_status()
                 async for chunk in resp.aiter_bytes(_CHUNK):
+                    compressed += len(chunk)
+                    if compressed > cfg.prices_max_compressed_bytes:
+                        # Abort mid-stream rather than after: the point of the cap
+                        # is that the bytes never reach the PVC in the first place.
+                        raise PricesheetRejected(
+                            f"pricesheet download exceeds {cfg.prices_max_compressed_bytes} "
+                            "bytes (cost_estimation.prices_max_compressed_bytes)"
+                        )
+                    digest.update(chunk)
                     await asyncio.to_thread(_append_chunk, gz_path, chunk)
 
-        await asyncio.to_thread(_gunzip_file, gz_path, sheet_path)
+        got = digest.hexdigest()
+        if expected is not None and got != expected:
+            # Before the gunzip, so a sheet that fails its digest is never even
+            # decompressed — a mismatch and a bomb are plausibly the same event.
+            raise PricesheetRejected(f"pricesheet digest mismatch: expected {expected}, got {got}")
+
+        raw_size = await asyncio.to_thread(
+            _gunzip_file, gz_path, sheet_path, cfg.prices_max_decompressed_bytes
+        )
         # SQLite can't be built into via a stream, so build to the temp file then
         # (over)write the cache atomically at the DB key.
         await asyncio.to_thread(os.unlink, db_path)  # build_index creates fresh
@@ -136,7 +214,20 @@ async def refresh_pricesheet(storage: ObjectStore) -> int:
             _file_chunks(db_path),
             content_type="application/x-sqlite3",
         )
-        logger.info("cost_pricesheet_refreshed", url=url, rows=rows, size_bytes=size)
+        logger.info(
+            "cost_pricesheet_refreshed",
+            url=url,
+            rows=rows,
+            size_bytes=size,
+            compressed_bytes=compressed,
+            decompressed_bytes=raw_size,
+            sha256=got,
+            digest_source=(
+                "configured"
+                if (settings.cost_estimation.prices_sha256 or "").strip()
+                else ("sibling" if expected is not None else "none")
+            ),
+        )
         return size
     finally:
         for path in (gz_path, sheet_path, db_path):
@@ -175,6 +266,14 @@ async def ensure_pricesheet(storage: ObjectStore) -> bool:
     try:
         await refresh_pricesheet(storage)
         return True
+    except PricesheetRejected as exc:
+        # Logged distinctly from an outage on purpose. "Upstream is unreachable"
+        # and "upstream served us something we refused" call for different
+        # responses from an operator — the second may be an attack, and reading it
+        # as a flaky download is how it would be missed. Both fall back to the
+        # cached sheet, so the behaviour is the same and only the signal differs.
+        logger.warning("cost_pricesheet_rejected", error=str(exc), served_stale=had_copy)
+        return had_copy
     except Exception as exc:  # noqa: BLE001 - best-effort; fall back to any stale copy
         logger.warning("cost_pricesheet_refresh_failed", error=str(exc), served_stale=had_copy)
         return had_copy

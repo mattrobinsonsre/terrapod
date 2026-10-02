@@ -693,3 +693,94 @@ class TestCountListenerReplicasBulk:
         redis.scan_iter = fake_scan_iter
         with patch("terrapod.services.agent_pool_service.get_redis_client", return_value=redis):
             assert await count_listener_replicas_bulk({"aaa"}) == {"aaa": 1}
+
+
+# ── join_listener: the cross-pool name collision (GHSA-vr88-c3hx-xr4h) ────────
+
+
+class TestAReJoinCannotMoveAListenerBetweenPools:
+    """The refusal shipped with no test at all, which is how its one escape survived.
+
+    Listener names live in a single global namespace while the re-join path exists so
+    a restarting listener keeps its identity. Together they let a join token for pool
+    A re-join under a name held in pool B, and the re-join branch then writes pool A's
+    id over that record. The victim's listener goes on heartbeating under the same id
+    and starts claiming pool A's runs, on the victim's cluster, with the victim's
+    credentials. Certificate auth does not contain it, because it reads `pool_id` from
+    the mutable hash rather than from the certificate's pool SAN.
+    """
+
+    @staticmethod
+    def _pool(name="pool-a"):
+        return MagicMock(id=uuid.uuid4(), name=name)
+
+    @staticmethod
+    def _redis(*, name_maps_to=None, hash_pool_id=None):
+        r = AsyncMock()
+        r.get = AsyncMock(return_value=name_maps_to)
+        r.hget = AsyncMock(return_value=hash_pool_id)
+        r.hset = AsyncMock()
+        r.expire = AsyncMock()
+        r.setex = AsyncMock()
+        r.sadd = AsyncMock()
+        return r
+
+    async def _join(self, redis, pool):
+        from terrapod.services import agent_pool_service as svc
+
+        with (
+            patch.object(svc, "get_redis_client", return_value=redis),
+            patch.object(svc, "_register_fingerprint", new=AsyncMock()),
+        ):
+            return await svc.join_listener(pool, MagicMock(), "shared-name", AsyncMock())
+
+    async def test_a_name_held_by_another_pool_is_refused(self):
+        from terrapod.services.agent_pool_service import ListenerNameInUse
+
+        victim_id = str(uuid.uuid4())
+        redis = self._redis(name_maps_to=victim_id, hash_pool_id=str(uuid.uuid4()))
+        with pytest.raises(ListenerNameInUse):
+            await self._join(redis, self._pool())
+
+    async def test_the_victims_record_is_not_written_to_when_refused(self):
+        """The assertion that matters: the refusal must happen BEFORE the hset that
+        would move the record, not merely report afterwards."""
+        from terrapod.services.agent_pool_service import ListenerNameInUse
+
+        redis = self._redis(name_maps_to=str(uuid.uuid4()), hash_pool_id=str(uuid.uuid4()))
+        with pytest.raises(ListenerNameInUse):
+            await self._join(redis, self._pool())
+        redis.hset.assert_not_awaited()
+
+    async def test_the_same_pool_re_joining_is_still_allowed(self):
+        """A restarting listener must keep its identity — that is why the path exists."""
+        pool = self._pool()
+        existing = str(uuid.uuid4())
+        redis = self._redis(name_maps_to=existing, hash_pool_id=str(pool.id))
+        out = await self._join(redis, pool)
+        assert out["certificate"]
+        redis.hset.assert_awaited()
+
+    async def test_a_name_pointing_at_a_vanished_record_does_not_inherit_the_id(self):
+        """The escape. The refusal reads `pool_id` off the hash and compared only when
+        it was truthy, so a surviving name key with a vanished hash skipped the check
+        entirely and the re-join branch wrote this pool's id into the orphaned record —
+        the cross-pool redirect reached by bypassing the guard rather than passing it.
+
+        The two keys carry the same TTL and heartbeat refreshes both, so reaching this
+        needs an eviction, a cluster failover losing one slot, or the non-transactional
+        pipeline that writes them partially applying.
+        """
+        pool = self._pool()
+        orphan = str(uuid.uuid4())
+        redis = self._redis(name_maps_to=orphan, hash_pool_id=None)
+
+        out = await self._join(redis, pool)
+
+        assert out["certificate"]
+        written = [c.args[0] for c in redis.hset.await_args_list]
+        assert not any(orphan in str(k) for k in written), (
+            f"the orphaned id {orphan} was adopted: {written}"
+        )
+        # And a fresh name → id mapping was published, so the stale key self-heals.
+        redis.setex.assert_awaited()

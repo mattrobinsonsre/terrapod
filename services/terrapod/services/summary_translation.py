@@ -554,6 +554,14 @@ async def normalize_to_system_language(text: str, reader_locale: str | None) -> 
         return text
     if not text.strip():
         return text
+    # The budget gate every other path has. Without it this was the one model
+    # call in the module that neither checked the daily budget nor could be
+    # stopped by it — and it is the one a reader triggers on demand, once per
+    # follow-up prompt, so it is also the easiest to drive. Failing open here
+    # means an untranslated prompt joins the thread, which is this function's
+    # documented behaviour on any failure.
+    if not await _budget_ok():
+        return text
     try:
         translated, out_tok = await _translate_call(
             _TRANSLATE_SYSTEM.format(target=system_name),

@@ -193,6 +193,7 @@ local_resource(
         'services/terrapod/runner/__init__.py',
         'services/terrapod/runner/runner_config.py',
         'services/terrapod/runner/download.py',
+        'services/terrapod/runner/reserved_env.py',
         'services/terrapod/runner/exec_subprocess.py',
         'services/terrapod/runner/debug_linger.py',
         'services/terrapod/runner/lock_extender.py',

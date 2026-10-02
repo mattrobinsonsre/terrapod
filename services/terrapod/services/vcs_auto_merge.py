@@ -11,8 +11,15 @@ per-mode required state for the current head SHA:
   has_changes).
 
 If all PR-affected workspaces meet their bar AND at least one has
-`auto_merge=true`, fire the VCS merge API. Force-merge (the `terrapod
-merge` command) bypasses the gate but records the partial state.
+`auto_merge=true`, fire the VCS merge API.
+
+This is the ONLY route from Terrapod to a provider merge, and it is
+deliberately narrow: it fires from a completed apply, under a workspace
+setting an operator wrote, once every affected workspace has met its gate.
+There is no comment-driven force-merge -- `terrapod merge` used to bypass
+this gate on nothing but the fact that someone could type a comment, and was
+removed. A merge that should happen despite an incomplete apply is made on
+the provider, by someone the repository trusts to merge.
 
 Triggered task: `vcs_apply_completed`. Payload:
   { "run_id": "<uuid>", "workspace_id": "<uuid>", "pr_number": <int> }
@@ -120,7 +127,7 @@ async def handle_vcs_apply_completed(payload: dict[str, Any]) -> None:
         any_auto_merge = any(w.auto_merge for w in affected)
         if not any_auto_merge:
             # No workspace opted into auto-merge — even if the gate is
-            # green, the user has to comment `terrapod merge` (phase 8b).
+            # green, merging stays a decision someone makes on the provider.
             return
 
         # Evaluate the gate.
@@ -180,52 +187,3 @@ async def _execute_merge(conn: VCSConnection, sess: PRSession, strategy: str) ->
             pr_number=sess.pr_number,
             reason=result.error_reason,
         )
-
-
-async def force_merge(
-    db,
-    sess: PRSession,
-    conn: VCSConnection,
-    strategy: str,
-    actor_login: str,
-    actor_user_id: str,
-) -> tuple[bool, str]:
-    """Force-merge handler for the `terrapod merge` command (#282).
-
-    Records the per-workspace apply state at merge time in the audit
-    log so the partial state is reconstructible. Used by the dispatcher.
-    Returns (merged, error_reason) — error_reason populated on rejection.
-    """
-    from terrapod.services.audit_service import log_vcs_action
-
-    affected = await _affected_workspaces(db, sess)
-    # Snapshot per-workspace state at merge time so the audit entry
-    # captures what was / wasn't applied — the operational forensic
-    # surface the force-merge escape hatch exists for.
-    state_parts: list[str] = []
-    for w in affected:
-        run = await _latest_run_for_pr(db, w.id, sess.pr_number, sess.head_sha)
-        state_parts.append(f"{w.name}={(run.status if run else 'no-run')}")
-    state_summary = ", ".join(state_parts)
-    await log_vcs_action(
-        db,
-        verb="merge",
-        workspace_id="*",
-        actor_login=actor_login,
-        actor_user_id=actor_user_id,
-        pr_number=sess.pr_number,
-        repo=sess.repo,
-        detail=f"force-merge strategy={strategy}; per-workspace state: {state_summary}",
-    )
-    owner, repo = sess.repo.split("/", 1)
-    if conn.provider == "github":
-        merge_fn = github_service.merge_pull_request
-    elif conn.provider == "gitlab":
-        merge_fn = gitlab_service.merge_pull_request
-    else:
-        return False, f"unsupported provider {conn.provider}"
-    result = await merge_fn(conn, owner, repo, sess.pr_number, strategy)
-    if result.merged:
-        sess.state = "merged"
-        return True, ""
-    return False, result.error_reason

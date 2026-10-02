@@ -773,6 +773,23 @@
       "delete": "刪除"
     },
     "confirmDelete": "刪除此 VCS 連線？使用它的工作區將失去 VCS 整合。此操作無法撤銷。",
+    "access": {
+      "heading": "誰可以使用此連線",
+      "intro": "這三項設定決定哪些工作區可以指向此連線。憑證本身仍為唯寫。",
+      "ownerEmail": "擁有者電子郵件",
+      "ownerEmailHint": "擁有者一律可以使用此連線。留空可讓此連線沒有擁有者。",
+      "labels": "存取標籤",
+      "labelsHint": "規則與這些標籤相符的角色可以將工作區指向此連線。",
+      "allowedRepositories": "允許的存放庫",
+      "allowedRepositoriesHint": "與工作區要求使用的存放庫進行比對的 glob 模式。",
+      "addPattern": "新增模式",
+      "anyRepositoryWarning": "未列出任何模式，因此此連線可以指向任何存放庫。",
+      "restricted": "已列出 {count, plural, one {# 個模式} other {# 個模式}}，因此與其中任何一個都不相符的存放庫都會被拒絕。",
+      "ownedBy": "由 {email} 擁有",
+      "unowned": "未設定擁有者",
+      "anyRepositorySummary": "允許任何存放庫",
+      "repositoryCount": "僅限 {count, plural, one {# 個存放庫} other {# 個存放庫}}"
+    },
     "form": {
       "name": "名稱",
       "namePattern": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
@@ -1076,7 +1093,8 @@
       "terragruntVersion": "Terragrunt 版本",
       "noExpiry": "不過期",
       "addDriftIgnoreRule": "新增規則",
-      "debugModeHint": "在此規則建立的工作區上讓失敗執行器的 Pod 保持開啟。預設關閉 — 保持開啟的 Pod 會保留該工作區的憑證。"
+      "debugModeHint": "在此規則建立的工作區上讓失敗執行器的 Pod 保持開啟。預設關閉 — 保持開啟的 Pod 會保留該工作區的憑證。",
+      "allowForkPrPlansHint": "適用於此規則建立的每個工作區。預設關閉：來自 fork 的拉取請求不會取得推測性計畫，因為那會以工作區的憑證執行其作者的程式碼。"
     },
     "table": {
       "name": "名稱",
@@ -2877,7 +2895,8 @@
       "uploadState": "上傳狀態失敗",
       "uploadStateFile": "上傳狀態檔案失敗",
       "updateSecurityScan": "更新安全掃描失敗",
-      "updateDebugMode": "更新偵錯模式失敗"
+      "updateDebugMode": "更新偵錯模式失敗",
+      "updateForkPlans": "更新 fork 拉取請求計畫失敗"
     },
     "subtabs": {
       "state": "狀態",
@@ -2930,6 +2949,14 @@
       "bannerTitle": "此工作區已開啟偵錯模式",
       "bannerBody": "失敗執行的 Pod 不會結束，而是保持開啟供檢查，並在保持期間保留此工作區的憑證與已解密的變數。排查完畢後請關閉偵錯模式。",
       "confirmEnable": "要開啟偵錯模式嗎？失敗執行的 Pod 將保持開啟，並保留此工作區的憑證與已解密的變數，直到時間窗到期或你刪除該 Pod。"
+    },
+    "allowForkPrPlans": {
+      "title": "來自 fork 的拉取請求的計畫",
+      "description": "從 fork 發起的拉取請求是否會取得推測性計畫。預設關閉，因為該計畫會以此工作區的憑證執行 fork 作者的程式碼。",
+      "label": "為 fork 的拉取請求執行計畫",
+      "hint": "一次執行會取得此工作區的環境變數、敏感值、所有由 Vault 解析的密鑰，以及該工作的雲端身分。從 fork 發起拉取請求的人沒有寫入權限，也無法合併，因此推測性計畫是其程式碼接觸到這些憑證的唯一途徑。請只為沒有任何值得竊取之物的工作區開啟它 — 例如一個接受社群貢獻的公開模組儲存庫。來自儲存庫自身分支的拉取請求不受影響，始終會執行計畫。",
+      "activeBadge": "已開啟",
+      "confirmEnable": "要為從 fork 發起的拉取請求執行計畫嗎？其作者的程式碼將使用此工作區的憑證與已解密的變數執行，且無需任何人事先核准。"
     }
   },
   "graphs": {

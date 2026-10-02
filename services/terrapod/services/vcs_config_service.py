@@ -63,6 +63,20 @@ async def fetch_config_version(
     if not conn or conn.status != "active":
         raise VCSConfigError("VCS connection is not active")
 
+    # GHSA-v8g7-pqrj-8mcm. This is where the source actually arrives, which makes
+    # it the sink worth guarding even though the API paths are gated: the poller and
+    # a run trigger reach here without a live principal, and a workspace whose URL
+    # was set before an operator narrowed the connection would otherwise keep
+    # fetching. Failing here stops the fetch rather than the request, so the run
+    # errors with a reason instead of quietly cloning something out of scope.
+    from terrapod.services.vcs_connection_rbac import repository_allowed
+
+    if not repository_allowed(conn, ws.vcs_repo_url):
+        raise VCSConfigError(
+            f"VCS connection vcs-{conn.id} is restricted to specific repositories "
+            f"and {ws.vcs_repo_url!r} is not one of them"
+        )
+
     parsed = _parse_repo_url(conn, ws.vcs_repo_url)
     if not parsed:
         raise VCSConfigError("Cannot parse VCS repo URL")
