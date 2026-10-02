@@ -2182,12 +2182,24 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Install ${{ matrix.tool }}
         run: |
+          # Pinned by version AND verified by checksum. A version pin alone says
+          # which URL to fetch, not which bytes arrive: a release asset can be
+          # replaced, and kind.sigs.k8s.io/dl is a redirect. These binaries build
+          # the cluster that a tag-gating job boots the release candidate in, so
+          # an unverified download is a gate that can be rewritten from outside
+          # (the installer-pinning half of GHSA-34pp-q7wp-3j54). Bump the version
+          # and the checksum together — the upstream checksum files are
+          # <url>.sha256sum for kind and checksums.txt for k3d.
           if [ "${{ matrix.tool }}" = "kind" ]; then
             curl -fsSLo ./kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
+            echo "50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54  ./kind" \
+              | sha256sum -c -
             sudo install -m 0755 ./kind /usr/local/bin/kind && rm -f ./kind
           else
             # Download the pinned k3d release binary directly (no curl|bash).
             curl -fsSLo ./k3d https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-amd64
+            echo "06d8f25bc3a971c4eb29e0ff08429b180402db0f4dec838c9eac427e296800a0  ./k3d" \
+              | sha256sum -c -
             sudo install -m 0755 ./k3d /usr/local/bin/k3d && rm -f ./k3d
           fi
       # ── Get the amd64 images built by this run ───────────────────────────────
@@ -2883,8 +2895,16 @@ jobs:
 
           # crane and skopeo are stricter than docker about parts of the spec,
           # and skopeo copy exercises pull and push in one operation.
+          # To a file and checksummed, rather than piped straight into tar: a
+          # pipe cannot be verified before it is consumed, and this binary is one
+          # of the things asserting the registry is spec-compliant (the
+          # installer-pinning half of GHSA-34pp-q7wp-3j54). Bump the version and
+          # the checksum together — upstream publishes checksums.txt.
           crane_url=https://github.com/google/go-containerregistry/releases/download/v0.20.3/go-containerregistry_Linux_x86_64.tar.gz
-          curl -fsSL "$crane_url" | tar -xz -C /tmp crane
+          curl -fsSLo /tmp/crane.tar.gz "$crane_url"
+          echo "36c67a932f489b3f2724b64af90b599a8ef2aa7b004872597373c0ad694dc059  /tmp/crane.tar.gz" \
+            | sha256sum -c -
+          tar -xzf /tmp/crane.tar.gz -C /tmp crane
           /tmp/crane auth login localhost:3000 -u tp -p "$TOKEN"
           test "$(/tmp/crane ls localhost:3000/smoke/app)" = "v1"
           /tmp/crane digest localhost:3000/smoke/app:v1
@@ -3311,12 +3331,16 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write       # keyless cosign signing of the manifest (OIDC)
     strategy:
       fail-fast: false
       matrix:
         image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Log in to GHCR
         uses: ./.github/actions/ghcr-login
@@ -3325,12 +3349,54 @@ jobs:
           username: ${{ github.actor }}
 
       - name: Create multi-arch manifest
+        id: manifest
         run: |
           sha_short="${{ needs.prepare.outputs.sha_short }}"
           echo "Creating manifest for ${{ matrix.image }}:sha-$sha_short"
           docker buildx imagetools create -t "$REGISTRY/${{ matrix.image }}:sha-$sha_short" \
             "$REGISTRY/${{ matrix.image }}:sha-${sha_short}-amd64" \
             "$REGISTRY/${{ matrix.image }}:sha-${sha_short}-arm64"
+
+          digest=$(docker buildx imagetools inspect \
+            "$REGISTRY/${{ matrix.image }}:sha-$sha_short" --format '{{.Manifest.Digest}}')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Manifest digest: $digest"
+
+      # GHSA-34pp-q7wp-3j54. This job's `if:` is the whole gate set — lint, test,
+      # audits, CodeQL, trivy, secret scan — so a manifest built here is a
+      # manifest those checks passed on. Signing it is what makes that fact
+      # carryable: `sha-<short>` is a MUTABLE tag, and on a tag push whose images
+      # already exist every gate job is skipped, so the release job has nothing
+      # else left to distinguish a gated digest from one somebody pushed over the
+      # tag afterwards. It verifies this signature before it retags anything.
+      #
+      # Signed by digest, so the signature is attached to the bytes rather than
+      # to the name, and keyless so there is no key to hold: the Fulcio
+      # certificate names this workflow and this ref, which is precisely the
+      # claim the release job needs and precisely what an actor with
+      # packages:write cannot manufacture.
+      - name: Sign the manifest (cosign keyless)
+        env:
+          COSIGN_YES: "true"
+        run: |
+          subject="$REGISTRY/${{ matrix.image }}@${{ steps.manifest.outputs.digest }}"
+
+          # Same retry as the release job's signing step, for the same reason: a
+          # keyless sign reaches the Actions OIDC endpoint, Fulcio and Rekor, and
+          # with no ambient token cosign falls back to an interactive device flow
+          # that waits out its full code validity before failing.
+          for attempt in 1 2 3; do
+            if cosign sign "$subject"; then
+              echo "Signed $subject"
+              exit 0
+            fi
+            echo "cosign sign failed for $subject (attempt $attempt/3)"
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 15))
+            fi
+          done
+          echo "::error::cosign sign gave up on $subject after 3 attempts"
+          exit 1
 
   # ── Release ────────────────────────────────────────────
   # The release stage is five jobs — a tiny pre-create that owns the
@@ -3521,21 +3587,76 @@ jobs:
           username: ${{ github.actor }}
           helm: 'true'
 
-      - name: Retag images with version
+      # ── The release's trust anchor (GHSA-34pp-q7wp-3j54) ──────────────────────
+      #
+      # Everything below this step derives from `sha-<short>`, and that tag is
+      # MUTABLE: anyone with packages:write can push over it. Worse, a tag push
+      # whose images already exist deliberately SKIPS every gate job — that skip
+      # is what makes a same-commit release take minutes instead of a full
+      # rebuild — and the quality gate counts `skipped` as a pass. So on its own,
+      # "the short-SHA tag exists" says nothing about what is under it, and the
+      # retag, the cosign signatures and the SLSA provenance would all have
+      # attested whatever that was.
+      #
+      # `create-manifests` signs the manifest it builds, and it runs only when
+      # the whole gate set passed. Verifying that signature here is what carries
+      # the gates' verdict across the skip: a digest that verifies came out of a
+      # gated run. An actor with packages:write can push an image, but cannot
+      # make Fulcio issue a certificate naming this workflow.
+      #
+      # The identity is pinned to THIS repository's ci.yml on `main` or on a
+      # version tag — the only two refs that can legitimately build a manifest
+      # (PRs are excluded from create-manifests, and `release/**` only ever runs
+      # on pull_request). Hardcoded rather than built from `github.repository`,
+      # for the same reason REGISTRY is: it is a trust anchor, and a trust anchor
+      # read from the environment it is anchoring is not one. Move it with
+      # REGISTRY if this ever lives somewhere else.
+      #
+      # The digests resolved here are what every later step consumes, so nothing
+      # re-reads a mutable tag between the verification and the use of it.
+      - name: Verify the short-SHA manifests came from a gated run
+        id: digests
+        env:
+          COSIGN_OIDC_ISSUER: https://token.actions.githubusercontent.com
+          COSIGN_IDENTITY_RE: ^https://github\.com/mattrobinsonsre/terrapod/\.github/workflows/ci\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$
         run: |
           sha_short="${{ needs.prepare.outputs.sha_short }}"
+          : > "$RUNNER_TEMP/digests.txt"
+
+          for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
+            digest=$(docker buildx imagetools inspect \
+              "$REGISTRY/$image:sha-$sha_short" --format '{{.Manifest.Digest}}')
+            echo "── verifying $image@$digest"
+            cosign verify \
+              --certificate-oidc-issuer "$COSIGN_OIDC_ISSUER" \
+              --certificate-identity-regexp "$COSIGN_IDENTITY_RE" \
+              "$REGISTRY/$image@$digest"
+            echo "$image $digest" >> "$RUNNER_TEMP/digests.txt"
+            # Hyphens → underscores for the output key, consumed by the SLSA
+            # provenance and SBOM steps below.
+            echo "${image//-/_}_digest=$digest" >> "$GITHUB_OUTPUT"
+          done
+
+          echo "All five manifests verified as built by a gated run."
+
+      - name: Retag images with version
+        run: |
           version="${{ needs.prepare.outputs.version }}"
 
+          # By DIGEST, from the list the step above verified — NOT by re-reading
+          # `sha-<short>`. Re-reading the tag here would reopen the exact window
+          # the verification just closed (GHSA-34pp-q7wp-3j54).
+          #
           # GHCR occasionally returns 5xx on manifest reads/writes during
           # a retag — wrap with the shared 5/10/20/40s backoff helper.
-          for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
-            echo "Retagging $image:sha-$sha_short -> $version + latest"
+          while read -r image digest; do
+            echo "Retagging $image@$digest -> $version + latest"
             .github/scripts/with-retry.sh "imagetools create $image" -- \
               docker buildx imagetools create \
                 -t "$REGISTRY/$image:$version" \
                 -t "$REGISTRY/$image:latest" \
-                "$REGISTRY/$image:sha-$sha_short"
-          done
+                "$REGISTRY/$image@$digest"
+          done < "$RUNNER_TEMP/digests.txt"
 
       - name: Publish Helm chart
         run: |
@@ -3552,16 +3673,32 @@ jobs:
         run: |
           version="${{ needs.prepare.outputs.version }}"
 
-          # Install syft: fetch the installer pinned to a release tag (not main)
-          # to a file, then run it (no curl|sh pipe), installing a pinned version.
+          # Install syft: fetch the installer to a file, verify it, then run it
+          # (no curl|sh pipe), installing a pinned version.
+          #
+          # Fetched by COMMIT SHA, and checksummed. A release tag is a mutable
+          # ref — it can be moved, and `raw.githubusercontent.com/<org>/<repo>/
+          # <tag>/...` then serves different bytes under the same URL. This script
+          # runs with the release job's credentials, which is the second half of
+          # GHSA-34pp-q7wp-3j54: pinning the version it installs was never the
+          # same thing as pinning the thing doing the installing.
+          #
+          # The three values move together. SYFT_INSTALLER_COMMIT is the commit
+          # that anchore/syft's v1.46.0 tag points at (its install.sh is identical
+          # to the one that tag serves today — verified byte-for-byte); the sha256
+          # is of that file.
+          #
           # NOTE: `-s --` belongs ONLY to the piped `curl | sh -s -- ARGS` idiom
           # (where `-s` tells sh to read the script from stdin). When running the
           # installer as a FILE, the args go straight to syft's install.sh, whose
           # usage is `install.sh [-v] [-b DIR] [-d] [TAG]` — so pass `-b DIR TAG`
           # directly; `-s` is rejected as an illegal option.
           SYFT_VERSION=v1.46.0
+          SYFT_INSTALLER_COMMIT=b15c5dbfe2bb21c9d73002c1056a829c8c411c75
+          SYFT_INSTALLER_SHA256=8a277b4b4dc21809ecd9a0e4926f4d7319affc6451a607fdeb3e5e1fbd9bc573
           curl -sSfL -o "$RUNNER_TEMP/syft-install.sh" \
-            "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh"
+            "https://raw.githubusercontent.com/anchore/syft/${SYFT_INSTALLER_COMMIT}/install.sh"
+          echo "${SYFT_INSTALLER_SHA256}  $RUNNER_TEMP/syft-install.sh" | sha256sum -c -
           sh "$RUNNER_TEMP/syft-install.sh" -b /usr/local/bin "$SYFT_VERSION"
 
           for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
@@ -3572,9 +3709,11 @@ jobs:
       # Supply-chain attestation (#549): keyless cosign signatures + SBOM
       # attestations on every release image and the Helm chart, anchored to
       # this workflow's GitHub OIDC identity and logged in Rekor. Signing is
-      # done by immutable digest so it's independent of the retag above.
+      # done by immutable digest so it's independent of the retag above — and
+      # since GHSA-34pp-q7wp-3j54 that digest comes from the verified list rather
+      # than from inspecting the freshly-written `:$version` tag, so the subject
+      # signed here is provably the subject the gates ran against.
       - name: Sign images + Helm chart (cosign keyless)
-        id: digests
         env:
           COSIGN_YES: "true"
         run: |
@@ -3606,15 +3745,16 @@ jobs:
             return 1
           }
 
-          for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
-            digest=$(docker buildx imagetools inspect "$REGISTRY/$image:$version" --format '{{.Manifest.Digest}}')
+          # The verified digests, not a fresh `imagetools inspect` of `:$version`.
+          # Those resolve to the same thing today, but one reads a tag that was
+          # just written and the other reads the value a signature vouched for —
+          # and the SBOM and SLSA provenance steps below attest whichever one this
+          # loop used (they read `steps.digests.outputs.*`, now produced by the
+          # verification step).
+          while read -r image digest; do
             echo "Signing $image@$digest"
             sign "$REGISTRY/$image@$digest"
-            # Expose the digest (hyphens → underscores for the output key) so the
-            # SBOM + SLSA provenance steps below can attest the same immutable
-            # subject as OCI 1.1 referrers.
-            echo "${image//-/_}_digest=$digest" >> "$GITHUB_OUTPUT"
-          done
+          done < "$RUNNER_TEMP/digests.txt"
 
           # Helm chart OCI artifact (cosign resolves the tag to its digest).
           echo "Signing Helm chart terrapod:$chart_version"
@@ -3963,10 +4103,18 @@ jobs:
 
   release-finalize:
     name: Release — Finalize (notes + chart + SBOMs)
-    needs: [prepare, helm-eval-boot, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp]
+    # `create-manifests` is listed explicitly even though release-create and
+    # release-images already gate on it. It is now the job that SIGNS the digests
+    # the release verifies (GHSA-34pp-q7wp-3j54), so it is the release's trust
+    # anchor and should be a named condition here rather than an inherited one —
+    # which is also what the six-site rule asks of every job that runs on a tag.
+    # v1.2.2 published while `Migrate Lint` was red for exactly the opposite
+    # reason: a hand-listed subset that nobody extended.
+    needs: [prepare, helm-eval-boot, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-query, release-mcp]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
+      && (needs.create-manifests.result == 'success' || needs.create-manifests.result == 'skipped')
       && needs.release-create.result == 'success'
       && needs.release-images.result == 'success'
       && needs.release-provider.result == 'success'
