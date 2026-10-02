@@ -189,6 +189,42 @@ Get the runner namespace (defaults to release namespace)
 {{- end }}
 
 {{/*
+"true" when runner Jobs land in a namespace of their own, "" when they share the
+release namespace with the control plane (GHSA-p8xx-7rwg-9f72).
+
+Two things have to change shape in the separated topology and nothing else can
+tell them apart: the API's NetworkPolicy peer for runners needs a
+namespaceSelector, and the runner Namespace itself has to exist. An empty
+`listener.runnerNamespace` and one set to the release namespace are the same
+arrangement, so both answer "".
+*/}}
+{{- define "terrapod.runnerNamespaceIsSeparate" -}}
+{{- if and .Values.listener.runnerNamespace (ne .Values.listener.runnerNamespace .Release.Namespace) -}}
+true
+{{- end -}}
+{{- end }}
+
+{{/*
+The in-cluster API URL, fully qualified (GHSA-p8xx-7rwg-9f72).
+
+**Fully qualified on purpose, and the FQDN is the point.** This becomes
+`server_url` in runners.yaml, which the listener uses for its own calls AND
+hands to every runner Job as `TP_API_URL`. A bare Service name resolves only
+through the pod's own DNS search path, so it works from the release namespace
+and fails from anywhere else -- which is to say it fails in exactly the topology
+we recommend, where runner Jobs live in a namespace of their own. Making the
+default depend on a name that only resolves while the isolation is OFF is the
+wrong way round.
+
+Resolving a FQDN costs nothing from the release namespace either, so there is
+one form rather than a branch. `proxy.noProxy` already carries
+`.svc.cluster.local`, so this stays proxy-exempt.
+*/}}
+{{- define "terrapod.inClusterAPIURL" -}}
+{{- printf "http://%s-api.%s.svc.cluster.local:8000" (include "terrapod.fullname" .) .Release.Namespace -}}
+{{- end }}
+
+{{/*
 Web selector labels
 */}}
 {{- define "terrapod.web.selectorLabels" -}}

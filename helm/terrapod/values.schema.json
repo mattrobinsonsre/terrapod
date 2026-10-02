@@ -1132,6 +1132,12 @@
         },
         "labels": {
           "type": "object"
+        },
+        "createRunner": {
+          "type": "boolean"
+        },
+        "runnerLabels": {
+          "type": "object"
         }
       }
     },

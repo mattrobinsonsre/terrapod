@@ -1739,7 +1739,14 @@ runners:
     pullPolicy: IfNotPresent
 
   # Internal API URL for runner Jobs. Runner pods use this to reach the API
-  # for presigned storage URLs. Defaults to http://<release>-api:8000.
+  # for presigned storage URLs and to report results.
+  #
+  # Defaults to the FULLY QUALIFIED in-cluster Service name,
+  # http://<release>-api.<release-namespace>.svc.cluster.local:8000 — not a bare
+  # `<release>-api:8000`, which would resolve only from the release namespace
+  # and so would break every runner Job as soon as `listener.runnerNamespace`
+  # pointed somewhere else (GHSA-p8xx-7rwg-9f72). Set this when runners reach
+  # the API by some other route, such as a listener in another cluster.
   serverUrl: ""
 
   # Image pull secrets for runner Jobs (private registries).
@@ -1955,7 +1962,33 @@ listener:
       cpu: 500m
       memory: 512Mi
 
-  # Namespace where runner Jobs are created (defaults to release namespace)
+  # Namespace where runner Jobs are created (defaults to release namespace).
+  #
+  # RECOMMENDED: set this to a namespace of its own, create it with
+  # `namespace.createRunner: true`, and turn `networkPolicies.enabled` on
+  # (GHSA-p8xx-7rwg-9f72). The chart does not default it, because where a
+  # workload runs is the operator's call and a default that moved runner Jobs
+  # out from under an existing deployment's quotas, policies and node selectors
+  # would be a surprise on upgrade.
+  #
+  # What the default costs you, plainly. Runner Jobs run arbitrary Terraform/Tofu
+  # from your repositories, and left here they run in the same namespace as the
+  # control plane:
+  #
+  #   * The listener holds `jobs: create` and `secrets: create` in THIS
+  #     namespace. A compromised listener can therefore create a Job that mounts
+  #     any Secret here -- the token signing key, the database URL, OIDC, Slack,
+  #     Vault and webhook secrets, and every per-run variables Secret -- and read
+  #     it out through the pod's own logs. Separate the namespace and that same
+  #     grant reaches only per-run Secrets.
+  #   * With `networkPolicies.enabled: false` (the default) runner code can open
+  #     connections to Postgres, Redis and the API directly, bypassing the BFF.
+  #
+  # Neither is bounded by anything else in the chart, so if you leave both at
+  # their defaults, treat "can run a plan" as close to "can read the control
+  # plane's Secrets".
+  #
+  # See docs/security-hardening.md → "Separate the runner namespace".
   runnerNamespace: ""
 
   # ServiceAccount for the listener Deployment
@@ -2305,8 +2338,33 @@ storage:
 # ── Network Policies ────────────────────────────────────────────────────────
 # Restrict pod-to-pod and pod-to-external traffic.
 # Requires a CNI plugin that supports NetworkPolicy (Calico, Cilium, etc.).
+#
+# RECOMMENDED ON, together with a separate `listener.runnerNamespace`
+# (GHSA-p8xx-7rwg-9f72). Off by default because a policy set is only as good as
+# the CNI under it: on a cluster whose CNI does not enforce NetworkPolicy these
+# objects are accepted and ignored, and enabling them by default would read as a
+# control where there is none. On a cluster that DOES enforce them, a default-on
+# egress policy would cut off whatever outbound path an existing deployment
+# depends on (an on-prem registry, a proxy, a VCS on a non-443 port) on upgrade.
+#
+# What off costs you: nothing stops runner Jobs -- arbitrary Terraform/Tofu --
+# from opening connections to Postgres (5432), Redis (6379), or the API
+# directly, bypassing the BFF. Turning this on denies all three.
 networkPolicies:
   enabled: false
+
+  web:
+    # NetworkPolicy peers allowed to reach the web pod on 3000. REQUIRED when
+    # networkPolicies.enabled is true — the chart cannot guess where your
+    # ingress controller runs, and a rule with no `from:` admits every source,
+    # so leaving it empty fails the render rather than shipping a policy that
+    # reads as a restriction and enforces nothing.
+    #
+    #   ingressFrom:
+    #     - namespaceSelector:
+    #         matchLabels:
+    #           kubernetes.io/metadata.name: kube-system
+    ingressFrom: []
 
 # ── Priority Classes ─────────────────────────────────────────────────────────
 # Optional control-plane priority protection. OFF by default — enabling creates
@@ -2322,19 +2380,6 @@ networkPolicies:
 # own api/listener/web.priorityClassName (or runners.priorityClassName) is set,
 # which always wins. Values stay well below the reserved system classes
 # (system-cluster-critical = 2000000000).
-
-  web:
-    # NetworkPolicy peers allowed to reach the web pod on 3000. REQUIRED when
-    # networkPolicies.enabled is true — the chart cannot guess where your
-    # ingress controller runs, and a rule with no `from:` admits every source,
-    # so leaving it empty fails the render rather than shipping a policy that
-    # reads as a restriction and enforces nothing.
-    #
-    #   ingressFrom:
-    #     - namespaceSelector:
-    #         matchLabels:
-    #           kubernetes.io/metadata.name: kube-system
-    ingressFrom: []
 priorityClasses:
   create: false
   # Higher-priority class for the control plane (api, listener, web).
@@ -2364,6 +2409,29 @@ priorityClasses:
 namespace:
   create: false
   labels: {}
+
+  # Also create the runner namespace named by `listener.runnerNamespace`
+  # (GHSA-p8xx-7rwg-9f72). Only has an effect when that is set to something
+  # other than the release namespace.
+  #
+  # Running runner Jobs in a namespace of their own is the RECOMMENDED topology
+  # — see docs/security-hardening.md → "Separate the runner namespace". The
+  # listener's Role, RoleBinding, the runner ServiceAccount and the runner
+  # NetworkPolicy already render into that namespace; this creates the namespace
+  # so the install does not fail on the first of them. Leave it false and create
+  # the namespace yourself if your RBAC does not allow cluster-scoped writes, or
+  # if you manage namespaces outside Helm.
+  #
+  # NOTE: a chart-created namespace is DELETED by `helm uninstall`, taking any
+  # in-flight runner Job with it. That is also true of `create` above.
+  createRunner: false
+  # Labels for the runner namespace. Untrusted Terraform/Tofu code runs here, so
+  # the PSS restricted profile is worth setting — the runner pod and container
+  # security contexts are already compatible with it:
+  #   pod-security.kubernetes.io/enforce: restricted
+  #   pod-security.kubernetes.io/audit: restricted
+  #   pod-security.kubernetes.io/warn: restricted
+  runnerLabels: {}
 
 # ── Egress: forward proxy + custom CA trust (restricted-network deployments) ──
 # proxy.* and caBundle.* are a matched pair for high-security / restricted-egress

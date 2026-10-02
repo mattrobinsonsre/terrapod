@@ -3,7 +3,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ include "terrapod.fullname" . }}-runner
-  namespace: {{ .Values.listener.runnerNamespace | default .Release.Namespace }}
+  namespace: {{ include "terrapod.runnerNamespace" . }}
   labels:
     {{- include "terrapod.labels" . | nindent 4 }}
     app.kubernetes.io/component: runner
@@ -16,7 +16,16 @@ spec:
     - Egress
   ingress: []
   egress:
-    # API server (presigned URLs, status reporting)
+    # API server (presigned URLs, status reporting).
+    #
+    # `namespaceSelector: {}` is every namespace, and that breadth is
+    # deliberate rather than an oversight. Runner Jobs are in their own
+    # namespace, so the API is never a same-namespace peer; and a listener-only
+    # release reaches an API that belongs to a different release in a different
+    # namespace entirely. Pinning this to the release namespace would deny that
+    # topology, while narrowing it to the runner namespace would deny every
+    # topology. The peer is still scoped by the two API pod labels, so this is
+    # "an api pod of a terrapod release", not "anything".
     - to:
         - namespaceSelector: {}
           podSelector:

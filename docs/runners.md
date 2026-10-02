@@ -169,6 +169,36 @@ This is a straight pass-through to the pod's `hostAliases`, so it takes the shap
 
 ---
 
+## Where runner Jobs run
+
+Runner Jobs are created in `listener.runnerNamespace`, which **defaults to the
+release namespace** — the same namespace as the API, the listener and the web
+pod.
+
+**Give them a namespace of their own.** Runner Jobs execute arbitrary
+Terraform/Tofu, and while they share the release namespace the listener's
+`jobs: create` and `secrets: create` grants cover every Secret the control plane
+holds, and (with NetworkPolicies off) runner code can reach Postgres and Redis
+directly. `namespace.createRunner: true` has the chart create the namespace;
+everything else the topology needs — the listener's `Role` and `RoleBinding`, the
+runner `ServiceAccount`, the runner `NetworkPolicy` — already renders there.
+
+The full rationale, the exact values, and what you must create yourself if you do
+not let the chart do it are in
+[Security hardening → Separate the runner namespace](security-hardening.md#separate-the-runner-namespace).
+
+Two details worth knowing if you are debugging a separated deployment:
+
+- The runner's `TP_API_URL` is the **fully qualified** in-cluster Service name
+  (`<release>-api.<release-namespace>.svc.cluster.local:8000`) rather than a bare
+  one, because a bare name resolves only from the release namespace. Override it
+  with `runners.serverUrl` (or `listener.apiUrl`) if runners reach the API by
+  some other route.
+- With NetworkPolicies on, the API policy admits runners via a
+  `namespaceSelector` on the runner namespace. If you hand-write that policy,
+  remember that a bare `podSelector` matches only pods in the policy's own
+  namespace.
+
 ## Job Configuration
 
 All runner Jobs inherit the following settings from `runners.*` in Helm values:

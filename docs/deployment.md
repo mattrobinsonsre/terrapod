@@ -433,7 +433,9 @@ Enable encryption on your managed database and object storage services. For file
 | `listener.joinToken` | `""` | Raw join token (use `existingSecret` for production) |
 | `listener.existingSecret` | `""` | K8s Secret containing the join token |
 | `listener.joinTokenKey` | `"join_token"` | Key within the Secret for the join token |
-| `listener.runnerNamespace` | `""` | Namespace for runner Jobs (defaults to release namespace) |
+| `listener.runnerNamespace` | `""` | Namespace for runner Jobs (defaults to release namespace). **Set this to a namespace of its own** — see [Security hardening → Separate the runner namespace](security-hardening.md#separate-the-runner-namespace) for what the default costs |
+| `namespace.createRunner` | `false` | Have the chart create `listener.runnerNamespace`. No effect unless that names a namespace other than the release one. Leave false and create it yourself if your RBAC does not allow cluster-scoped writes |
+| `namespace.runnerLabels` | `{}` | Labels for the chart-created runner namespace — the PSS `restricted` profile is worth setting, since untrusted code runs there |
 | `listener.resources.requests.cpu` | `100m` | CPU request |
 | `listener.resources.requests.memory` | `256Mi` | Memory request |
 | `listener.autoscaling.enabled` | `false` | Enable HPA for listener |

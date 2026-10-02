@@ -1948,6 +1948,86 @@ jobs:
           echo "$stock" | grep -q "priorityClassName:" && { echo "FAIL: priorityClassName set by default"; exit 1; }
           echo "control-plane PriorityClasses render OK and are off by default (#751)"
 
+      - name: A separate runner namespace renders a working topology
+        run: |
+          # GHSA-p8xx-7rwg-9f72. Where runner Jobs run is the operator's call, so
+          # the DEFAULTS do not move: runnerNamespace stays empty and
+          # networkPolicies stays off. What has to hold is that CHOOSING the
+          # separated topology produces something that WORKS — both bugs below
+          # appear only once the isolation is on, which is the worst direction
+          # for a security control to fail in.
+          #
+          # `# Source: <template>` is the signal for "did this template render at
+          # all": helm drops an empty manifest entirely, marker and all.
+          H() { docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+                  template terrapod helm/terrapod \
+                  --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+                  --set redis.url=redis://redis:6379 "$@"; }
+          WEB_FROM='networkPolicies.web.ingressFrom[0].namespaceSelector.matchLabels.kubernetes\.io/metadata\.name=kube-system'
+
+          # 1. The in-cluster API URL is a FQDN, on EVERY profile. This value is
+          #    runners.yaml's server_url, which the listener hands to every
+          #    runner Job as TP_API_URL — and a bare Service name resolves only
+          #    from the release namespace, i.e. only while the isolation is off.
+          for f in values.yaml values-local.yaml values-eval.yaml; do
+            su=$(docker run --rm -v "$PWD:/chart" -w /chart "${HELM_IMAGE:-alpine/helm:3.17.2}" \
+                   template terrapod helm/terrapod -f "helm/terrapod/$f" \
+                 | grep 'server_url:' | head -1)
+            case "$su" in
+              *.svc.cluster.local:8000*) ;;
+              *) echo "$f: server_url is not a cluster-local FQDN: $su"
+                 echo "runner Jobs run in listener.runnerNamespace, where a bare Service name does not resolve"
+                 exit 1 ;;
+            esac
+          done
+
+          # 2. With the runners moved out, the API policy must admit them with a
+          #    namespaceSelector. A bare podSelector matches only pods in the
+          #    policy's OWN namespace, so without this the policy denies every
+          #    run's API call while looking perfectly correct.
+          api_np=$(H --set listener.runnerNamespace=tp-runners \
+                     --set networkPolicies.enabled=true --set "$WEB_FROM" \
+                     --show-only templates/networkpolicy-api.yaml)
+          echo "$api_np" | grep -q 'kubernetes.io/metadata.name: tp-runners' || {
+            echo "the API NetworkPolicy does not admit runners from their own namespace"; exit 1; }
+          echo "$api_np" | grep -q 'app.kubernetes.io/name: terrapod-runner' || {
+            echo "the API NetworkPolicy no longer selects runner pods at all"; exit 1; }
+
+          # 3. Every namespaced object the topology needs lands in that namespace:
+          #    the listener's Role + RoleBinding, the runner SA, the runner policy.
+          n=$(H --set listener.runnerNamespace=tp-runners --set networkPolicies.enabled=true \
+                --set "$WEB_FROM" | grep -c '^  namespace: tp-runners')
+          [ "$n" -ge 4 ] || { echo "expected >=4 objects in the runner namespace, got $n"; exit 1; }
+
+          # 4. The co-located arrangement must be UNCHANGED: a bare podSelector,
+          #    and no namespaceSelector naming a namespace it is already in.
+          same_np=$(H --set networkPolicies.enabled=true --set "$WEB_FROM" \
+                      --show-only templates/networkpolicy-api.yaml)
+          echo "$same_np" | grep -q 'app.kubernetes.io/name: terrapod-runner' || {
+            echo "the co-located API policy no longer admits runner pods"; exit 1; }
+          echo "$same_np" | grep -q 'namespaceSelector' && {
+            echo "a namespaceSelector is rendered when runners share the release namespace"; exit 1; }
+
+          # 5. The runner Namespace is created only on request, and only when it
+          #    is genuinely separate — otherwise two manifest entries would claim
+          #    the release namespace.
+          H --set namespace.createRunner=true --set listener.runnerNamespace=tp-runners \
+            | grep -q 'name: tp-runners' || { echo "namespace.createRunner did not create it"; exit 1; }
+          H --set namespace.createRunner=true | grep -q 'templates/namespace.yaml' && {
+            echo "a runner Namespace was rendered with no separate namespace to create"; exit 1; }
+          H --set listener.runnerNamespace=tp-runners | grep -q 'templates/namespace.yaml' && {
+            echo "a runner Namespace was rendered without namespace.createRunner"; exit 1; }
+
+          # 6. An explicit `false` must survive — `hasKey`/a plain `if`, never
+          #    `| default`, which would coerce it back to true.
+          H --set namespace.createRunner=false --set listener.runnerNamespace=tp-runners \
+            | grep -q 'templates/namespace.yaml' && {
+            echo "createRunner=false still created the namespace — a | default swallowed the false"; exit 1; }
+          H --set networkPolicies.enabled=false | grep -q 'kind: NetworkPolicy' && {
+            echo "networkPolicies.enabled=false still rendered policies"; exit 1; }
+
+          echo "the separated runner namespace renders a working topology, and the defaults are unmoved"
+
   # ── Config-channel contract (#617) ────────────────────
   # Renders the chart (every values profile) and parses the rendered ConfigMaps
   # THROUGH the real Pydantic config models (Settings / RunnerConfig), asserting

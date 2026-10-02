@@ -248,7 +248,23 @@ runner egress list does not contain: port 80. Cloud instance-metadata services l
 there, so a runner cannot reach one — denied by omission rather than by an explicit
 rule, which is worth knowing if you audit these policies expecting to find one.
 
+**Enable these together with a separate runner namespace** — see
+[Separate the runner namespace](#separate-the-runner-namespace). The two are the
+same control from different directions: the namespace bounds what the listener's
+Kubernetes grants reach, the policies bound what runner code can connect to.
+Either on its own leaves half of it open.
+
+The API policy's runner peer adapts to where the runners are: a bare
+`podSelector` when they share the release namespace, and a `namespaceSelector`
+scoped to `listener.runnerNamespace` when they do not. That matters because a
+bare `podSelector` matches only pods in the policy's own namespace — a detail
+that makes a policy look correct while denying every run.
+
 **Prerequisite:** Your cluster must have a CNI plugin that supports NetworkPolicy (Calico, Cilium, Weave Net, etc.).
+On a cluster whose CNI does not enforce NetworkPolicy these objects are accepted and
+silently ignored, which is why they are not on by default: a policy that is present
+but unenforced reads as a control where there is none. Confirm enforcement before
+relying on them.
 
 ## Pod Security Standards
 
@@ -321,6 +337,101 @@ Integrate with your log aggregator (Elasticsearch, Splunk, Datadog) by polling t
 ## Runner Isolation
 
 Runner Jobs execute untrusted Terraform/Tofu code. Harden them:
+
+### Separate the runner namespace
+
+**Run runner Jobs in a namespace of their own, and turn NetworkPolicies on. This
+is the single most valuable change on this page, and neither is the default.**
+
+```yaml
+listener:
+  runnerNamespace: terrapod-runners   # anything other than the release namespace
+
+namespace:
+  createRunner: true                  # let the chart create it
+  runnerLabels:                       # untrusted code runs here
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+networkPolicies:
+  enabled: true
+  web:
+    ingressFrom:                      # required when policies are on
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: ingress-nginx
+```
+
+`listener.runnerNamespace` defaults to the release namespace, so out of the box
+runner Jobs run beside the API, the listener and the web pod. Where a workload
+runs is your decision and the chart does not move it for you — a default that
+relocated runner Jobs out from under an existing deployment's quotas, policies
+and node selectors would be a surprise on upgrade. So this is a recommendation
+rather than a default, and what follows is what the default costs.
+
+**What you are exposed to while they share a namespace.** Two things, neither
+bounded by anything else in the chart:
+
+- **The listener can read every Secret in the namespace.** It holds
+  `jobs: create` and `secrets: create` there, which is what it needs to launch
+  runs. A compromised listener can use `jobs: create` to start a Job that mounts
+  any Secret in the namespace and print it to the pod's own logs — the token
+  signing key, the database URL, the OIDC, Slack, Vault and webhook secrets, and
+  every per-run variables Secret. Separating the namespace leaves the same grant
+  in place but points it at a namespace that holds only per-run Secrets; the
+  listener's access to its *own* namespace is already narrowed by
+  `resourceNames` to just its credentials Secret.
+- **With NetworkPolicies off, runner code can reach the datastores directly.**
+  Nothing stops a plan from opening a connection to Postgres (5432), Redis
+  (6379), or the API (8000) without going through the BFF. Turning policies on
+  denies all three; the runner policy permits only the API on 8000, HTTPS on
+  443, and DNS.
+
+Taken together: with both left at their defaults, treat "can queue a plan" as
+close to "can read the control plane's Secrets".
+
+**What the chart does for you once you choose it.** Every namespaced object the
+separated topology needs is already rendered into the runner namespace — the
+listener's `Role` and `RoleBinding` for Jobs, Pods, pod logs and Secrets, the
+runner `ServiceAccount` (including its cloud workload-identity annotations), and
+the runner `NetworkPolicy`. Two things are *about* the boundary and are handled
+for you:
+
+- The in-cluster API URL the runner receives is a FQDN
+  (`<release>-api.<release-namespace>.svc.cluster.local:8000`), not a bare
+  Service name, which would resolve only from the release namespace.
+- The API's NetworkPolicy admits runners with a `namespaceSelector` scoped to the
+  runner namespace. A bare `podSelector` matches only pods in the policy's own
+  namespace, so without it the policy would deny every run's API call.
+
+**What you must do yourself.** If `namespace.createRunner` is left false —
+because your RBAC does not allow cluster-scoped writes, or you manage namespaces
+outside Helm — create the namespace before installing, with the PSS labels above:
+
+```sh
+kubectl create namespace terrapod-runners
+kubectl label namespace terrapod-runners \
+  pod-security.kubernetes.io/enforce=restricted \
+  pod-security.kubernetes.io/audit=restricted \
+  pod-security.kubernetes.io/warn=restricted
+```
+
+Otherwise `helm install` fails on the first object the chart places there, with
+a message about a missing namespace rather than about the setting that asked for
+it. A `ResourceQuota` on that namespace is also worth setting — see
+[Deployment: sizing runner concurrency](deployment.md#sizing-runner-concurrency-on-a-fixed-resource-cluster).
+
+Note that a chart-created namespace is **deleted by `helm uninstall`**, taking
+any in-flight runner Job with it.
+
+**Cross-cluster is stronger still.** A listener can run in a different cluster
+entirely — the join flow is identical and the SSE connection is outbound — in
+which case runner Jobs never share an API server with the control plane. See
+[Architecture: agent pools](architecture.md).
+
+### Other runner hardening
+
 
 - **Short-lived runner tokens**: Each runner Job receives an HMAC-signed token scoped to its specific `run_id` with a configurable TTL (default 1h, max 2h). The token is stored in a K8s Secret with `ownerReference` to the Job — automatically garbage-collected when the Job is cleaned up. The raw token never appears in the Job spec (injected via `secretKeyRef`)
 - **Principle of least privilege**: Runner tokens carry only the `everyone` role. They can access binary cache downloads, provider mirror, and artifact endpoints for their own run — nothing else. Admin, write, and CRUD endpoints are inaccessible

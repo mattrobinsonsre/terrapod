@@ -25,9 +25,25 @@ spec:
             matchLabels:
               app.kubernetes.io/name: {{ include "terrapod.name" . }}
               app.kubernetes.io/component: listener
+        {{- if include "terrapod.runnerNamespaceIsSeparate" . }}
+        # Runner Jobs are in a namespace of their own (GHSA-p8xx-7rwg-9f72).
+        # A bare podSelector matches only pods in THIS namespace, so without
+        # the namespaceSelector this rule silently denies every run's calls to
+        # the API -- in the separated topology we recommend. The two selectors
+        # are one peer, so they AND: pods carrying the runner label, in that
+        # namespace, and nothing else. `kubernetes.io/metadata.name` is set on
+        # every Namespace by the API server, so it needs nothing of ours.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ include "terrapod.runnerNamespace" . }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: terrapod-runner
+        {{- else }}
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: terrapod-runner
+        {{- end }}
       ports:
         - protocol: TCP
           port: 8000

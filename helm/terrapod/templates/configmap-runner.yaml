@@ -12,7 +12,11 @@ data:
       repository: {{ include "terrapod.runner.imageRepo" . | quote }}
       tag: {{ .Values.runners.image.tag | default .Chart.AppVersion | quote }}
       pull_policy: {{ .Values.runners.image.pullPolicy | quote }}
-    server_url: {{ .Values.runners.serverUrl | default .Values.listener.apiUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}
+    {{- /* The in-cluster fallback is a FQDN, not a bare Service name
+       (GHSA-p8xx-7rwg-9f72): this value is also handed to every runner Job as
+       TP_API_URL, and runner Jobs run in `listener.runnerNamespace`, where a
+       bare name does not resolve. See terrapod.inClusterAPIURL. */}}
+    server_url: {{ .Values.runners.serverUrl | default .Values.listener.apiUrl | default (include "terrapod.inClusterAPIURL" .) | quote }}
     service_account_name: {{ include "terrapod.runnerServiceAccountName" . | quote }}
     azure_workload_identity: {{ .Values.runners.azureWorkloadIdentity | default false }}
     ttl_seconds_after_finished: {{ .Values.runners.ttlSecondsAfterFinished }}

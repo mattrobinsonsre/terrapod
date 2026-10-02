@@ -9,3 +9,32 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 {{- end }}
+{{- /*
+The runner namespace (GHSA-p8xx-7rwg-9f72). Opt-in, like the release namespace
+above, because creating a Namespace is a cluster-scoped write an operator's
+RBAC may not carry.
+
+Everything else the separated topology needs already renders into this namespace
+-- the listener's Jobs/Pods/Secrets Role and RoleBinding, the runner
+ServiceAccount, the runner NetworkPolicy -- so before this the only missing
+piece was the Namespace itself, and `helm install` failed on the first of those
+objects with a message about the namespace rather than about the setting that
+asked for it.
+
+Only when it is genuinely a separate namespace: emitting a second Namespace
+object with the release namespace's own name would make two manifest entries
+claim one object.
+*/}}
+{{- if and .Values.namespace.createRunner (include "terrapod.runnerNamespaceIsSeparate" .) }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "terrapod.runnerNamespace" . }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runner
+    {{- with .Values.namespace.runnerLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
