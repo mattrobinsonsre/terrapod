@@ -127,6 +127,7 @@
   "auth.peer_token_ttl_hours",
   "auth.require_external_sso_for_roles",
   "auth.service_token_max_ttl_hours",
+  "auth.session_absolute_ttl_hours",
   "auth.session_ttl_hours",
   "auth.sso.default_provider",
   "auth.sso.oidc[].audience",

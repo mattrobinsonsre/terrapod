@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
 from terrapod.api.pagination import build_meta
 from terrapod.auth.passwords import hash_password, validate_password_strength
+from terrapod.auth.sessions import revoke_all_user_sessions
 from terrapod.db.models import (
     PlatformRoleAssignment,
     RoleAssignment,
@@ -21,6 +22,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.role_change_propagation import invalidate_token_roles
 
 logger = get_logger(__name__)
 
@@ -226,6 +228,18 @@ async def update_user(
                 detail=str(e),
             ) from None
         target.password_hash = await hash_password(attrs.password)
+        # A reset is how an admin takes an account back, so the credentials
+        # issued under the old password must stop working (GHSA-pwrq-j4cv-w7qg).
+        # Without this the whole point is lost: whoever is already signed in
+        # stays signed in, with whatever roles their session carries.
+        #
+        # Sessions and the cached token-role set only — NOT the user's API
+        # tokens. Those are separate credentials the user minted deliberately,
+        # and a routine password rotation that silently broke someone's
+        # automation would be a worse trap than the one being closed. Offboarding
+        # is what revokes everything: see `_revoke_all_user_access`.
+        await revoke_all_user_sessions(email)
+        await invalidate_token_roles(email)
         logger.info("Reset password for user", target_email=email, by=user.email)
 
     if attrs.is_active is not None:

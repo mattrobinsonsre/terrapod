@@ -39,10 +39,15 @@ from terrapod.auth.capabilities import (
     normalize_capabilities,
     summarize_capabilities,
 )
-from terrapod.db.models import Role
+from terrapod.auth.sessions import revoke_user_sessions
+from terrapod.db.models import Role, RoleAssignment
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import role_reach_service
+from terrapod.services.role_change_propagation import (
+    invalidate_token_roles,
+    propagate_role_grant_reduction,
+)
 
 router = APIRouter(tags=["roles"])
 logger = get_logger(__name__)
@@ -115,6 +120,60 @@ def _apply_level_edits(role: Role, attrs: dict) -> None:
             caps -= axis_all_caps(axis)
             caps |= AXIS_LEVEL_MAPS[axis].get(level, frozenset())
     role.capabilities = sorted(caps)
+
+
+def _grant_snapshot(role: Role) -> dict:
+    """Everything about a role that decides what its holders may reach.
+
+    `description` is deliberately absent: renaming the prose must not sign anyone
+    out. Copied rather than referenced, because this is compared against the same
+    object after it has been mutated in place.
+    """
+    return {
+        "capabilities": set(role.capabilities or []),
+        "allow_all": bool(role.allow_all),
+        "allow_labels": dict(role.allow_labels or {}),
+        "allow_names": list(role.allow_names or []),
+        "deny_labels": dict(role.deny_labels or {}),
+        "deny_names": list(role.deny_names or []),
+    }
+
+
+def _grant_narrowed(before: dict, after: dict) -> bool:
+    """Could this edit have taken access away from someone holding the role?
+
+    A removed capability, `allow_all` switched off, or **any** change at all to
+    the scope rules. The scope test is deliberately coarse: whether editing
+    `allow_labels` widens or narrows depends on how the rule engine combines keys
+    and values, and a wrong answer here is a demotion that does not take effect.
+    Treating every scope edit as potentially narrowing costs an unnecessary sign-
+    out on a widening and cannot get the dangerous direction wrong.
+
+    A purely additive capability change — the common case of granting a role one
+    more thing — reads as not narrowed, so nobody is signed out for it.
+    """
+    if before["capabilities"] - after["capabilities"]:
+        return True
+    if before["allow_all"] and not after["allow_all"]:
+        return True
+    return any(
+        before[field] != after[field]
+        for field in ("allow_labels", "allow_names", "deny_labels", "deny_names")
+    )
+
+
+async def _role_holders(db: AsyncSession, role_name: str) -> list[tuple[str, str]]:
+    """The (provider, email) identities a custom role is assigned to.
+
+    Only `role_assignments`: a custom role cannot carry a built-in name (create
+    refuses one), so it can never appear in `platform_role_assignments`.
+    """
+    rows = await db.execute(
+        select(RoleAssignment.provider_name, RoleAssignment.email).where(
+            RoleAssignment.role_name == role_name
+        )
+    )
+    return sorted({(provider, email) for provider, email in rows.all()})
 
 
 def _role_json(role: Role) -> dict:
@@ -279,6 +338,8 @@ async def update_role(
     if role is None:
         raise HTTPException(status_code=404, detail="Role not found")
 
+    grant_before = _grant_snapshot(role)
+
     attrs = body.get("data", {}).get("attributes", {})
     if "description" in attrs:
         role.description = attrs["description"]
@@ -305,7 +366,15 @@ async def update_role(
     await db.commit()
     await db.refresh(role)
 
-    logger.info("Role updated", role=role_name)
+    # An edit that could take access away from anyone holding this role ends
+    # their sessions (GHSA-pwrq-j4cv-w7qg). A pure addition — a new capability, a
+    # description — does not, because logging a fleet out for a widening is cost
+    # with no benefit.
+    narrowed = _grant_narrowed(grant_before, _grant_snapshot(role))
+    if narrowed:
+        await propagate_role_grant_reduction(db, role_name)
+
+    logger.info("Role updated", role=role_name, narrowed=narrowed)
     return JSONResponse(content={"data": _role_json(role)})
 
 
@@ -324,10 +393,21 @@ async def delete_role(
     if role is None:
         raise HTTPException(status_code=404, detail="Role not found")
 
+    # Who holds it has to be read BEFORE the delete, because the assignments
+    # cascade away with the role and there would be nobody left to find.
+    holders = await _role_holders(db, role_name)
+
     await db.delete(role)
     await db.commit()
 
-    logger.info("Role deleted", role=role_name)
+    # The assignments are gone but the role NAME stays in every live session,
+    # which is the gap: recreate a role under that name later and those sessions
+    # pick up its new grant with nobody logging in again (GHSA-pwrq-j4cv-w7qg).
+    for provider_name, email in holders:
+        await revoke_user_sessions(email, provider_name=provider_name)
+        await invalidate_token_roles(email)
+
+    logger.info("Role deleted", role=role_name, identities_signed_out=len(holders))
 
 
 def _role_from_attrs(attrs: dict) -> Role:

@@ -295,6 +295,12 @@ curl -X PATCH https://terrapod.example.com/api/v1/roles/developer \
   }'
 ```
 
+An edit that could take access away — removing a capability, turning `allow-all`
+off, changing any of the label or name rules — **signs out everyone currently
+holding the role**, because a web session carries the roles resolved at sign-in.
+Adding a capability, or editing only the description, signs nobody out. See
+[Authentication → A session's roles](authentication.md#a-sessions-roles-and-when-they-change-under-it).
+
 ### Deleting a Role
 
 ```zsh
@@ -303,6 +309,10 @@ curl -X DELETE https://terrapod.example.com/api/v1/roles/developer \
 ```
 
 Built-in roles (`admin`, `audit`, `everyone`) cannot be deleted.
+
+Deleting a role signs out everyone who held it. The assignments go with the role,
+but the role *name* stays in a live session — so without this, recreating a role
+under the same name later would hand those sessions its new grant.
 
 ---
 
@@ -436,6 +446,12 @@ per-viewer filtering raises rather than quietly disclosing the estate.
 ## Role Assignments
 
 Role assignments bind a user (identified by provider + email) to a role.
+
+**Changing someone's assignments takes effect on their open browser sessions.**
+A session's roles are resolved at sign-in, so removing a role — or a PUT that
+drops one — signs that user out of the sessions belonging to that provider, while
+adding a role is applied in place without signing anyone out. The full table is in
+[Authentication → A session's roles](authentication.md#a-sessions-roles-and-when-they-change-under-it).
 
 ### Setting Roles for a User
 

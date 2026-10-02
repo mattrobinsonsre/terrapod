@@ -575,6 +575,23 @@ class AuthConfig(BaseSettings):
         default=12,
         description="Session TTL in hours",
     )
+    session_absolute_ttl_hours: int = Field(
+        default=24,
+        ge=0,
+        description=(
+            "Hard ceiling on a web session's life, measured from login rather "
+            "than from last activity. The sliding session_ttl_hours window is "
+            "clamped to it, so a session kept warm by a polling browser still "
+            "ends here and the user re-authenticates. That ceiling is what "
+            "bounds how long anything resolved at login — the session's roles "
+            "above all — can outlive a change to it (GHSA-pwrq-j4cv-w7qg); the "
+            "revocations on a demotion are the first line, and this is the "
+            "backstop for whatever they miss. Set it at or above "
+            "session_ttl_hours, or the sliding window never gets to slide. 0 "
+            "removes the ceiling and restores an indefinitely-slidable "
+            "session; not recommended."
+        ),
+    )
     peer_token_ttl_hours: int = Field(
         default=1,
         ge=1,

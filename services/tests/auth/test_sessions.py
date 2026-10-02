@@ -1,6 +1,7 @@
 """Tests for Redis-backed session management."""
 
 import json
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -15,6 +16,7 @@ from terrapod.auth.sessions import (
     get_session_ttl,
     revoke_session,
 )
+from terrapod.db.models import now_utc
 
 
 @pytest.fixture
@@ -96,14 +98,19 @@ class TestGetSession:
         redis = AsyncMock()
         mock_get_redis.return_value = redis
 
+        # `created_at` is relative to now, not a fixed date: since the absolute
+        # session ceiling landed (GHSA-pwrq-j4cv-w7qg) a record whose login was
+        # longer ago than `session_absolute_ttl_hours` is correctly refused, so a
+        # hardcoded date would turn into a failure as soon as it aged past it.
+        now = now_utc()
         session_data = {
             "email": "test@example.com",
             "display_name": "Test",
             "roles": ["admin"],
             "provider_name": "local",
-            "created_at": "2026-01-01T00:00:00+00:00",
-            "expires_at": "2026-01-01T12:00:00+00:00",
-            "last_active_at": "2026-01-01T00:00:00+00:00",
+            "created_at": now.isoformat(),
+            "expires_at": (now + timedelta(hours=12)).isoformat(),
+            "last_active_at": now.isoformat(),
         }
         redis.get.return_value = json.dumps(session_data)
 

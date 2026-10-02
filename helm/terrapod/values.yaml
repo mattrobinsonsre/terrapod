@@ -258,6 +258,14 @@ api:
       legacy_callback_url: true
 
       session_ttl_hours: 12
+      # Hard ceiling on a web session, measured from login rather than from last
+      # activity. The sliding session_ttl_hours window is clamped to it, so a
+      # session a polling browser keeps warm still ends here and the user signs in
+      # again. That is what bounds how long anything resolved at login — the
+      # session's roles above all — can outlive a change to it; the revocations on
+      # a demotion are the first line and this is the backstop. Set it at or above
+      # session_ttl_hours. 0 removes the ceiling (not recommended).
+      session_absolute_ttl_hours: 24
       api_token_max_ttl_hours: 8760  # 1 year; upper bound on any token. 0 = no limit
       # Lifespan of the token minted by `terraform login` — short-lived per-session
       # CLI credentials, distinct from the max cap above. 0 falls back to the cap.

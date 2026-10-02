@@ -29,6 +29,21 @@ def _user(email="admin@example.com", roles=None):
     )
 
 
+def _session_store_mock():
+    """A Redis mock the session-revocation path can walk without blowing up.
+
+    `smembers` has to return a real empty set: a bare `AsyncMock` hands back a
+    truthy `MagicMock`, which passes the "any sessions?" guard and then fails on
+    iteration — a crash that says nothing about the route. These tests are about
+    the route's status code, not about session handling; the sessions themselves
+    are covered in tests/api/test_role_change_propagation.py against a Redis fake
+    that actually stores things.
+    """
+    redis = AsyncMock()
+    redis.smembers.return_value = set()
+    return redis
+
+
 def _mock_role(name="dev-team", ws_perm="read", reg_perm="read", catalog_perm="none"):
     role = MagicMock()
     role.name = name
@@ -761,10 +776,16 @@ class TestRoleAssignments:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.redis.client.get_redis_client")
-    async def test_set_assignments_admin(self, mock_redis_fn, *mocks):
-        mock_redis = AsyncMock()
-        mock_redis_fn.return_value = mock_redis
+    # Both modules the route reaches Redis through, because each binds
+    # `get_redis_client` at import. Patching `terrapod.redis.client` alone stopped
+    # working when the route started carrying role changes to live sessions
+    # (GHSA-pwrq-j4cv-w7qg) — the lookup no longer goes through that name.
+    @patch("terrapod.services.role_change_propagation.get_redis_client")
+    @patch("terrapod.auth.sessions.get_redis_client")
+    async def test_set_assignments_admin(self, mock_sessions_redis, mock_prop_redis, *mocks):
+        mock_redis = _session_store_mock()
+        mock_sessions_redis.return_value = mock_redis
+        mock_prop_redis.return_value = mock_redis
 
         app, mock_db = _make_app(_user(roles=["admin"]))
         # Mock: existing assignments empty, role validation pass
@@ -814,10 +835,12 @@ class TestRoleAssignments:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.redis.client.get_redis_client")
-    async def test_delete_assignment(self, mock_redis_fn, *mocks):
-        mock_redis = AsyncMock()
-        mock_redis_fn.return_value = mock_redis
+    @patch("terrapod.services.role_change_propagation.get_redis_client")
+    @patch("terrapod.auth.sessions.get_redis_client")
+    async def test_delete_assignment(self, mock_sessions_redis, mock_prop_redis, *mocks):
+        mock_redis = _session_store_mock()
+        mock_sessions_redis.return_value = mock_redis
+        mock_prop_redis.return_value = mock_redis
 
         app, mock_db = _make_app(_user(roles=["admin"]))
         mock_pra = MagicMock()

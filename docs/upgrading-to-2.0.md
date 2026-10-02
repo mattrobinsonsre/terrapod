@@ -491,6 +491,47 @@ the defaults and your config agree. Relax one at a time if a login fails; each
 failure message names the check that refused it (see
 [`docs/authentication.md`](authentication.md#assertion-validation)).
 
+### A web session ends when the roles behind it change, and has a hard ceiling
+
+**Affects:** anyone signing in to the web UI. **Nothing to configure**, but your
+users will notice being signed out in cases where they previously were not.
+
+A session carried the roles resolved at sign-in and nothing pushed a change to it,
+so a demoted user kept their old roles — `admin` included — for the rest of the
+session (`GHSA-pwrq-j4cv-w7qg`). Two things change.
+
+**A role change now reaches live sessions.** A reduction signs the user out; a
+widening adds the role in place and signs nobody out. The full table is in
+[`docs/authentication.md`](authentication.md#a-sessions-roles-and-when-they-change-under-it);
+the cases that will be new to your users are:
+
+* removing a role assignment, or a PUT that drops one, signs that user out;
+* narrowing a custom role's grant — removing a capability, turning `allow-all`
+  off, editing its scope rules — signs out **everyone holding that role**;
+* deleting a custom role signs out everyone who held it;
+* an admin password reset signs that user out everywhere. Their API tokens are
+  left alone, because a routine rotation that broke someone's automation would be
+  a worse trap than the one being closed; *deactivate* is what revokes everything.
+
+Editing only a role's description, or adding a capability to it, signs nobody out.
+
+**And a session has an absolute ceiling.** `auth.session_absolute_ttl_hours`
+defaults to **24**, measured from sign-in, and the 12-hour sliding window is
+clamped to it — so a session a polling browser keeps warm now ends after a day
+instead of living indefinitely. Raise it if that is too short for you, or set it
+to `0` to restore the old unbounded behaviour (not recommended: it is what bounds
+how long anything resolved at sign-in can outlive a change to it).
+
+```yaml
+api:
+  config:
+    auth:
+      session_absolute_ttl_hours: 24   # or 0 for the pre-2.0 behaviour
+```
+
+Sessions open across the upgrade are capped from their own sign-in time, so some
+of them will end shortly after you upgrade rather than at the 24-hour mark.
+
 ### An IdP group can no longer grant `admin` or `audit`
 
 Role resolution took IdP group names verbatim, so a group called `admin` granted

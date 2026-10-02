@@ -254,7 +254,8 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 |---|---|---|
 | `api.config.auth.local_enabled` | `true` | Enable local password auth |
 | `api.config.auth.callback_base_url` | `""` | Externally-reachable URL for callbacks |
-| `api.config.auth.session_ttl_hours` | `12` | Session lifetime |
+| `api.config.auth.session_ttl_hours` | `12` | Session lifetime (sliding — refreshed on activity) |
+| `api.config.auth.session_absolute_ttl_hours` | `24` | Hard ceiling on a session, measured from sign-in; clamps the sliding window. 0 removes it |
 | `api.config.auth.api_token_max_ttl_hours` | `8760` | Max API token lifetime in hours (8760 = 1 year). Set 0 for no limit |
 | `api.config.auth.sso.default_provider` | `""` | Default SSO provider name |
 | `api.config.auth.sso.oidc` | `[]` | OIDC provider configurations |

@@ -1617,6 +1617,10 @@
               "type": "integer",
               "minimum": 1
             },
+            "session_absolute_ttl_hours": {
+              "type": "integer",
+              "minimum": 0
+            },
             "api_token_max_ttl_hours": {
               "type": "integer",
               "minimum": 0
