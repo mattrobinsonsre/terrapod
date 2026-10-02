@@ -339,11 +339,45 @@ async def join_listener(
 
     # Check if listener already exists (re-join after restart)
     existing_id = await redis.get(f"{_LISTENER_NAME_PREFIX}{name}")
+
+    # Decide the branch FIRST, then take it. Collapsing the two into one block is
+    # how this went wrong once already: clearing `existing_id` inside
+    # `if existing_id:` does not fall through to the fresh-registration `else`, so
+    # the re-join body ran on with `listener_id = None` and wrote a hash keyed on
+    # the literal string "None". A behavioural test caught it; reading the diff did
+    # not.
     if existing_id:
         # A re-join may refresh a listener's certificate; it may NOT move the
         # record into a different pool. See ListenerNameInUse.
         existing_pool = await redis.hget(f"{_LISTENER_PREFIX}{existing_id}", "pool_id")
-        if existing_pool and existing_pool != str(pool.id):
+        if not existing_pool:
+            # The name key survives but the hash it points at does not, so there is
+            # nothing to compare the pool against. Taking the re-join branch here
+            # would adopt an id whose owning pool cannot be read and then WRITE this
+            # pool's id into it — the exact cross-pool redirect the check below
+            # exists to refuse, reached by skipping the check rather than passing it.
+            #
+            # The two keys carry the same TTL and heartbeat refreshes both, so this
+            # needs them to diverge: an eviction under memory pressure, a cluster
+            # failover losing one slot, or the pipeline that writes them partially
+            # applying — it cannot be transactional, because the two prefixes hash to
+            # different slots in cluster mode.
+            #
+            # Falling through to a fresh registration rather than raising, because a
+            # listener whose hash is gone is not re-joining in any meaningful sense;
+            # it is in the same position as one whose record expired entirely, and
+            # that already yields a new id. The stale name key is overwritten by the
+            # registration below, so the condition self-heals instead of 409ing until
+            # a TTL runs out. What it must not do is inherit the id.
+            logger.warning(
+                "listener name maps to a record that no longer exists; registering "
+                "fresh rather than adopting an unverifiable id",
+                listener=name,
+                orphaned_id=existing_id,
+                pool=pool.name,
+            )
+            existing_id = None
+        elif existing_pool != str(pool.id):
             logger.warning(
                 "refusing a listener re-join that would move it between pools",
                 listener=name,
@@ -356,6 +390,8 @@ async def join_listener(
                 "the same name. Give this listener a distinct name, or remove the "
                 "existing registration from the pool that holds it."
             )
+
+    if existing_id:
         listener_id = existing_id
         # Update existing hash with fresh cert
         await redis.hset(
