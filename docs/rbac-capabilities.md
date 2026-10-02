@@ -87,7 +87,7 @@ capabilities).
 | Capability | Gates (method path — what it does) |
 |---|---|
 | `workspace:read` | GET workspace by id/name; GET org workspaces list (per-row filter); GET tag-bindings / effective-tag-bindings; POST/DELETE relationships/tags (no-op, gated read); GET vcs-refs |
-| `run:read` | GET run; GET workspace runs; GET run-events; GET plan/apply by id; GET plan log / json-output / apply log; GET run plan/apply (terrapod); GET+POST plan-summary, regenerate, chat messages (read-tier by design — no infra mutation); GET workspace runs SSE stream |
+| `run:read` | GET run; GET workspace runs; GET run-events; GET plan/apply by id; GET plan log / apply log; GET run plan/apply (terrapod); GET+POST plan-summary, regenerate, chat messages (read-tier by design — no infra mutation); GET workspace runs SSE stream |
 | `state:read-metadata` | GET workspace state-versions list; GET current-state-version; GET state-version metadata (mints upload URL) |
 | `var:read` | GET workspace vars (sensitive values masked) |
 | `config:read` | GET configuration-versions list; GET cv download; POST cv download-ticket; GET cv diff |
@@ -102,9 +102,20 @@ capabilities).
 | `run:plan` | POST runs (plan-only branch: `plan_only=true`); POST runs/{id}/actions/retry of a plan-only run |
 | `run:cancel` | POST runs/{id}/actions/discard; .../cancel |
 | `workspace:lock` | POST workspaces/{id}/actions/lock; .../unlock (own lock) |
-| `state:read` | GET state-versions/{id}/download (**raw** state JSON — contains secrets) |
+| `state:read` | GET state-versions/{id}/download (**raw** state JSON — contains secrets); GET plans/{id}/json-output (**structured plan** — embeds `prior_state.values` and root variable values, sensitive included) |
 | `drift:dismiss` | POST workspaces/{id}/actions/dismiss-drift |
 | `workspace:onboard` | Onboard existing resources (#824): discover with the workspace's pool identity → import blocks / config (endpoints land with the discovery run type). Plan tier because it's read-only discovery run with the same pool creds a plan already uses; a dedicated token, so it's independently revocable. |
+
+> **Changed in 2.0 (GHSA-gwwq-5v7q-h3f4).** `GET plans/{id}/json-output` used to
+> need only `run:read`, so it sat in the `read` preset. It is state-grade data —
+> the document embeds `prior_state.values` (the whole state in cleartext,
+> resource secrets included) and the root `variables` with their values,
+> sensitive ones among them — so serving it a tier below raw state download gave
+> a `read`-tier role exactly what `state:read` and the sensitive-variable masking
+> exist to withhold. It now needs `state:read`, matching raw state download.
+> A `read`-tier role gets a 403; grant `state:read` (or use a `plan`-tier role).
+> This is also what TFE does: it does not grant structured plan output to its
+> read tier.
 
 > **Changed in v1.7.0.** Retrying a run used to need `run:cancel`, which is in
 > the `plan` preset. It now needs what *creating* that run needs — `run:plan`

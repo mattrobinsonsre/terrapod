@@ -344,6 +344,12 @@ func (c *Client) RetryRun(ctx context.Context, runID string) (*Run, error) {
 // to a presigned storage URL; the client follows it and returns the raw JSON
 // bytes. Returns *NotFoundError when the run produced no JSON plan output (never
 // planned, an engine/version that didn't emit it, or the artifact expired).
+//
+// Requires the state:read capability on the workspace — the plan tier, not the
+// read tier (GHSA-gwwq-5v7q-h3f4). The document embeds prior_state.values and
+// the root variables' values, sensitive included, so it is state-grade data and
+// is gated like raw state download. A read-tier principal gets
+// *AuthorizationError.
 func (c *Client) GetRunPlanJSON(ctx context.Context, runID string) ([]byte, error) {
 	id := strings.TrimPrefix(strings.TrimPrefix(runID, "plan-"), "run-")
 	if id == "" {

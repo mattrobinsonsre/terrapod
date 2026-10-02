@@ -234,7 +234,8 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 			"The default view=changes is compact, usually a few KB: tofu's add/change/destroy counts, then each resource the plan acts on with only the attributes that change (before and after), sensitive values redacted and values not known until apply marked as such. " +
 			"Narrow it with `address` (a prefix, or a glob) and `actions`; `matched` and `truncated` say whether there is more, and `start`/`limit` page through it. " +
 			"view=full returns the whole document: as the parsed `plan_json` object when it fits in max_bytes, otherwise as a `plan_json_text` chunk to page through with `offset` (pass back `next_offset`). A full plan is often megabytes. Sensitive values are redacted in both views. " +
-			"An error saying no JSON plan is available means the run has not finished planning, or produced none; terrapod_run_logs has the text plan.",
+			"An error saying no JSON plan is available means the run has not finished planning, or produced none; terrapod_run_logs has the text plan. " +
+			"Needs the state:read capability on the workspace (the plan tier, the same as downloading raw state) — the document carries resolved values, so a read-only principal is refused.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in planJSONIn) (*mcp.CallToolResult, planJSONOut, error) {
 		if in.RunID == "" {

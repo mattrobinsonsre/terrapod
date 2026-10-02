@@ -1546,7 +1546,8 @@ class TestPlanJsonOutput:
     """The plan JSON is the full resolved plan, secrets included. It used to
     treat the plan UUID as a capability; go-tfe authenticates this endpoint
     (`Plans.ReadJSONOutput` builds its request with `client.NewRequest`), so it
-    now takes an ordinary credential and a run-read capability."""
+    now takes an ordinary credential — and, since GHSA-gwwq-5v7q-h3f4, the
+    PLAN-tier `state:read` capability rather than the read-tier `run:read`."""
 
     @pytest.fixture(autouse=True)
     def _can_read_the_run(self):
@@ -1675,6 +1676,80 @@ class TestPlanJsonOutput:
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/plans/plan-{uuid.uuid4()}/json-output", headers=_AUTH)
         assert resp.status_code == 404
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.get_storage")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_the_read_tier_is_refused_the_plan_json(
+        self, mock_get_run, mock_get_storage, *_mocks
+    ):
+        """GHSA-gwwq-5v7q-h3f4: the plan JSON is state-grade and must cost the
+        PLAN tier, not the read tier.
+
+        `read` holds `run:read` and not `state:read`, and the document embeds
+        `prior_state.values` (the whole state in cleartext) plus the root
+        variables' values, sensitive included — so a read-tier caller reaching it
+        obtained exactly what `state:read` and the sensitive-variable masking
+        exist to withhold.
+
+        403, not 404: the finding is about authorization, and a 404 would mean
+        the handler had already decided it was allowed to look.
+        """
+        run = _mock_run()
+        run.has_json_output = True
+        mock_get_run.return_value = run
+        mock_storage = AsyncMock()
+        mock_storage.exists = AsyncMock(return_value=True)  # would serve if asked
+        mock_get_storage.return_value = mock_storage
+
+        app, _db = _make_app(_user())
+        with patch(
+            "terrapod.api.routers.runs.resolve_workspace_capabilities_for",
+            new=AsyncMock(return_value=caps_for_level("read")),
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url=_BASE, follow_redirects=False
+            ) as c:
+                resp = await c.get(f"/api/v2/plans/plan-{run.id}/json-output", headers=_AUTH)
+
+        assert resp.status_code == 403
+        mock_storage.exists.assert_not_called()
+        mock_storage.presigned_get_url.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.get_storage")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_the_plan_tier_still_gets_the_plan_json(
+        self, mock_get_run, mock_get_storage, *_mocks
+    ):
+        """The other half of the narrowing: `plan` holds `state:read`, so the
+        tier that may download raw state may still read the plan JSON. Without
+        this the refusal above would also pass if the endpoint simply broke."""
+        run = _mock_run()
+        run.has_json_output = True
+        mock_get_run.return_value = run
+        mock_storage = AsyncMock()
+        mock_storage.exists = AsyncMock(return_value=True)
+        presigned = MagicMock()
+        presigned.url = "https://storage.example/plans/x.json-output?sig=abc"
+        mock_storage.presigned_get_url = AsyncMock(return_value=presigned)
+        mock_get_storage.return_value = mock_storage
+
+        app, _db = _make_app(_user())
+        with patch(
+            "terrapod.api.routers.runs.resolve_workspace_capabilities_for",
+            new=AsyncMock(return_value=caps_for_level("plan")),
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url=_BASE, follow_redirects=False
+            ) as c:
+                resp = await c.get(f"/api/v2/plans/plan-{run.id}/json-output", headers=_AUTH)
+
+        assert resp.status_code == 302
 
 
 # ── _plan_json json-output attribute gating (#280) ─────────────────────

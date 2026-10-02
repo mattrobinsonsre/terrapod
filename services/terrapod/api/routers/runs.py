@@ -3057,12 +3057,26 @@ async def plan_json_output(
     the `json-output` attribute — so it needs no capability, and it used to
     treat the plan UUID as one. A plan JSON is the full resolved plan, secrets
     included, so a guessable id was a worse exposure here than in the logs.
+
+    **It is gated on `state:read`, NOT `run:read` (GHSA-gwwq-5v7q-h3f4).** The
+    document embeds `prior_state.values` — the whole state in cleartext,
+    resource secrets included — and the root `variables` with their values,
+    sensitive ones among them. So it is state-grade data, and serving it a tier
+    below raw state download handed a read-tier user exactly what the
+    `state:read` gate and the sensitive-variable masking exist to withhold.
+    TFE does not grant structured plan output at its read tier either.
+
+    Not redacted for the read tier instead: a redacted plan is a second,
+    weaker-but-plausible artifact to keep correct for ever, and the AI channel
+    already redacts (there, because a third party receives the document — a
+    different reason that does not generalise to serving it to a human who may
+    not read the state).
     """
     run_uuid = parse_id(plan_id, "plan-", "run-", detail="Plan not found")
     run = await run_service.get_run(db, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Plan not found")
-    await _require_run_ws_capability(run, cap.RUN_READ, user, db, request=request)
+    await _require_run_ws_capability(run, cap.STATE_READ, user, db, request=request)
 
     # Fast path: the flag is the source of truth. Avoid a storage call
     # for runs that never produced JSON (errored, older, upload failed).
