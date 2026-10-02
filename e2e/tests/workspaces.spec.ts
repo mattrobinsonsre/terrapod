@@ -638,13 +638,16 @@ test.describe("AI policy gate (#1766)", () => {
   });
 });
 
-// The workspace reads below use `/api/v2`, not `/api/v1` or `/api/terrapod/v1`.
-// On this release line the bare workspace resource is GET and PATCH on the
-// TFE-compatible surface and DELETE on the native one, so the prefix is
-// per-ROUTE and is not guessable from a neighbouring call;
-// `services/tests/api/api_route_contract.json` is the authority. A wrong prefix
-// is a silent 404 that no contract gate can see — these two calls arrived from a
-// branch where `/api/v1` is canonical and 404'd here until E2E caught them.
+// The workspace reads below use `/api/v1`, the canonical native surface. They
+// arrived from the 1.9 line on `/api/v2`, where that was correct because the bare
+// workspace resource had no native GET or PATCH at all. Here it does, and `/api/v2`
+// is a deprecated alias (see `docs/deprecations.md`), so leaving them on it would
+// have them break at its removal rather than now. `web/tests/engine-scoped-prefixes.test.ts`
+// does not catch this: it scans `web/`, not `e2e/`.
+//
+// The prefix is still per-ROUTE and not guessable from a neighbour —
+// `services/tests/api/api_route_contract.json` is the authority, and a wrong one
+// is a silent 404 no contract gate can see.
 test.describe("Fork pull request plans (GHSA-gp5w-76rw-c452)", () => {
   test("a new workspace defaults to off and the toggle round-trips", async ({
     page,
@@ -679,7 +682,7 @@ test.describe("Fork pull request plans (GHSA-gp5w-76rw-c452)", () => {
       ).toBeChecked();
     }).toPass({ timeout: 20_000 });
 
-    const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
+    const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(res.status()).toBe(200);
@@ -704,7 +707,7 @@ test.describe("Fork pull request plans (GHSA-gp5w-76rw-c452)", () => {
     // The off direction is the one a naive `if value` guard drops, leaving the
     // operator looking at an unchecked box over a workspace that still plans.
     await expect(async () => {
-      const res = await page.request.get(`/api/v2/workspaces/${wsId}`, {
+      const res = await page.request.get(`/api/v1/workspaces/${wsId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect((await res.json()).data.attributes["allow-fork-pr-plans"]).toBe(

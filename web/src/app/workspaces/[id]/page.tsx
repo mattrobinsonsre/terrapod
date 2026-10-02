@@ -1364,12 +1364,12 @@ function WorkspaceDetailContent() {
     if (next && isTouch && !window.confirm(t('allowForkPrPlans.confirmEnable'))) return
     setSavingForkPlans(true)
     try {
-      // The BARE workspace resource is PATCHed on the TFE surface on this
-      // release line — `PATCH /api/terrapod/v1/workspaces/{id}` does not exist, so
-      // the native spelling 404s and the toggle silently never persists. Checked
-      // against api_route_contract.json; the DELETE a few hundred lines below IS
-      // native, which is exactly what makes copying a neighbour's prefix wrong.
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+      // `/api/v1`, not the `/api/v2` this arrived from the 1.9 line carrying. The
+      // TFE surface serves only Terraform, so on a Pulumi workspace the toggle
+      // would 404 with nothing shown (#1905/#1910) — and unlike on 1.9, where the
+      // native spelling genuinely did not exist for this verb, main does serve
+      // `PATCH /api/v1/workspaces/{id}`. Checked against api_route_contract.json.
+      const res = await apiFetch(`/api/v1/workspaces/${workspaceId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
