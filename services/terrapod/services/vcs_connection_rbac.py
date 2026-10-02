@@ -369,6 +369,21 @@ def credential_scope_allowed(conn: VCSConnection | None, scope: str) -> bool:
         return decided
 
     key = _scope_repo_form(scope or "")
+
+    # A credential scope carrying a query, a fragment or a path traversal is a
+    # misconfiguration, and refused outright rather than reasoned about. Each of these
+    # already fails the containment test for any sensible pattern — `myorg?x=1` does not
+    # match `myorg/*` — but only incidentally, and "incidentally refused" is not a
+    # property worth relying on in a security check. `..` in particular invites an
+    # argument about what git normalises, which is an argument not worth having when
+    # the answer is that no legitimate key contains one.
+    if any(c in key for c in "?#") or ".." in key.split("/"):
+        logger.warning(
+            "a git credential scope carries a query, fragment or traversal; refusing",
+            scope=scope,
+        )
+        return False
+
     for raw_pattern in patterns:
         pattern = _pattern_repo_form(raw_pattern)
         if not pattern:

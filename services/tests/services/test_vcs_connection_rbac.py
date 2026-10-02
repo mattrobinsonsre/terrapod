@@ -932,6 +932,52 @@ class TestAPinnedTokenCannotEscapeItsPinThroughTheLabelPath:
         )
 
 
+class TestAMalformedCredentialScopeIsRefusedOnPurpose:
+    """A key carrying a query, a fragment or a path traversal is refused explicitly
+    rather than left to fall out of the containment test.
+
+    Each already failed for any sensible pattern — `myorg?x=1` does not match
+    `myorg/*` — but only incidentally, and a security check should not rest on an
+    incidental outcome. With a deliberately broad pattern the incidental refusal
+    disappears: `myorg*` matches `myorg?x=1` outright, because `fnmatch`'s `*` happily
+    eats a query string.
+
+    `..` is refused for a different reason: it invites an argument about what git
+    normalises, and that argument is not worth having when no legitimate key contains
+    one.
+    """
+
+    @staticmethod
+    def _conn(patterns):
+        return VCSConnection(provider="github", allowed_repositories=patterns)
+
+    def test_a_query_string_is_refused_even_against_a_broad_pattern(self):
+        assert (
+            rbac.credential_scope_allowed(self._conn(["myorg*"]), "github.com/myorg?x=1") is False
+        )
+
+    def test_a_fragment_is_refused(self):
+        assert (
+            rbac.credential_scope_allowed(self._conn(["myorg*"]), "github.com/myorg#frag") is False
+        )
+
+    def test_a_traversal_is_refused_even_against_an_allow_most_pattern(self):
+        assert rbac.credential_scope_allowed(self._conn(["*/*"]), "github.com/../other") is False
+
+    def test_dots_inside_a_name_are_not_a_traversal(self):
+        """`my..org` is a legal path segment. Refusing it would be an over-reach that
+        quietly breaks a working configuration."""
+        assert rbac.credential_scope_allowed(self._conn(["my..org"]), "github.com/my..org") is True
+
+    def test_an_ordinary_key_is_untouched(self):
+        assert rbac.credential_scope_allowed(self._conn(["myorg/*"]), "github.com/myorg") is True
+
+    def test_an_empty_allowlist_still_short_circuits_before_the_shape_check(self):
+        """A deployment that has not opted in must be unaffected, even by a key shape
+        this would otherwise refuse."""
+        assert rbac.credential_scope_allowed(self._conn([]), "github.com/myorg?x=1") is True
+
+
 class TestARefusalAtTheCloneCostsOneWorkspaceNotTheCycle:
     """The blast radius of enforcing the allowlist at the clone, asserted rather than
     assumed — this is the property that would make the change dangerous if wrong.
