@@ -21,11 +21,17 @@ from terrapod.db.session import get_db
 from terrapod.services.replication import ReplicationStatus
 
 
-def _app(roles: list[str] | None = None) -> FastAPI:
+def _app(roles: list[str] | None = None, auth_method: str = "session") -> FastAPI:
     app = FastAPI()
     app.include_router(router, prefix="/api/terrapod/v1")
+    # `auth_method` is not optional padding: the endpoint depends on
+    # `require_non_runner`, which reads it (GHSA-cpqm-6fr7-5fwc). A stand-in that
+    # omits an attribute the code reads fails deep inside the handler rather than
+    # at the override, and reads like a product bug.
     app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
-        email="a@x.com", roles=roles if roles is not None else ["admin"]
+        email="a@x.com",
+        roles=roles if roles is not None else ["admin"],
+        auth_method=auth_method,
     )
     app.dependency_overrides[get_db] = lambda: AsyncMock()
     return app
@@ -52,7 +58,12 @@ def _ha(
     )
 
 
-async def _get(state: ReplicationStatus, ha=None, roles: list[str] | None = None):
+async def _get(
+    state: ReplicationStatus,
+    ha=None,
+    roles: list[str] | None = None,
+    auth_method: str = "session",
+):
     cfg = ha or _ha()
     with (
         patch("terrapod.services.replication.read_status", new_callable=AsyncMock) as mock_state,
@@ -62,7 +73,7 @@ async def _get(state: ReplicationStatus, ha=None, roles: list[str] | None = None
         mock_state.return_value = state
         mock_settings.ha = cfg
         mock_role.return_value = cfg.role
-        transport = ASGITransport(app=_app(roles))
+        transport = ASGITransport(app=_app(roles, auth_method=auth_method))
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             return await client.get("/api/terrapod/v1/ha/status")
 
@@ -165,6 +176,37 @@ class TestNoPeerCall:
         source = inspect.getsource(ha)
         assert "httpx" not in source
         assert "arequest_with_retry" not in source
+
+
+class TestARunnerTokenCannotReadTheReplicationTopology:
+    """GHSA-cpqm-6fr7-5fwc.
+
+    The advisory's headline — that the peer ADDRESS is disclosed — does not hold:
+    `peer-configured` is `bool(cfg.peer.url)`, a bare boolean, and the in-cluster
+    detail sits behind the admin-or-audit check and is not even fetched for an
+    unprivileged caller. The residual point is fair, and this pins it: a run's own
+    short-lived token reached this endpoint like any other credential, and it has
+    no business reading the replication topology or the inbound client id.
+
+    Refused at the dependency rather than filtered from the payload, so the
+    Kubernetes reads and the config access do not happen either.
+    """
+
+    async def test_it_is_refused(self):
+        resp = await _get(
+            ReplicationStatus(last_sync_at=datetime.now(UTC)),
+            auth_method="runner_token",
+        )
+        assert resp.status_code == 403, resp.text
+
+    async def test_an_ordinary_session_is_unaffected(self):
+        """The negative path: this removes one principal, not the endpoint."""
+        resp = await _get(
+            ReplicationStatus(last_sync_at=datetime.now(UTC)),
+            roles=["everyone"],
+            auth_method="session",
+        )
+        assert resp.status_code == 200, resp.text
 
 
 class TestWhoMaySeeWhat:
