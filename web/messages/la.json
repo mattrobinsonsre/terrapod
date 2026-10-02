@@ -763,6 +763,23 @@
       "delete": "Delere"
     },
     "confirmDelete": "Hunc nexum VCS delere? Loca operis eo utentia integrationem VCS amittent. Hoc revocari non potest.",
+    "access": {
+      "heading": "Quis hac coniunctione uti potest",
+      "intro": "Hae tres optiones decernunt quae spatia operis ad hanc coniunctionem dirigi possint. Fides ipsa tantum scribenda manet.",
+      "ownerEmail": "Inscriptio possessoris",
+      "ownerEmailHint": "Possessor hac coniunctione semper uti potest. Vacuum relinque ut coniunctio sine possessore maneat.",
+      "labels": "Titulis accessus",
+      "labelsHint": "Munus cuius regulae his titulis congruunt spatium operis ad hanc coniunctionem dirigere potest.",
+      "allowedRepositories": "Promptuaria permissa",
+      "allowedRepositoriesHint": "Formulae glob cum promptuario comparatae quod spatium operis uti petit.",
+      "addPattern": "Formulam addere",
+      "anyRepositoryWarning": "Nullae formulae enumeratae sunt, itaque haec coniunctio ad quodlibet promptuarium dirigi potest.",
+      "restricted": "{count, plural, one {# formula enumerata est} other {# formulae enumeratae sunt}}, itaque promptuarium quod nulli earum congruit recusatur.",
+      "ownedBy": "Possidetur a {email}",
+      "unowned": "Nullus possessor constitutus est",
+      "anyRepositorySummary": "Quodlibet promptuarium permittitur",
+      "repositoryCount": "Circumscriptum ad {count, plural, one {# promptuarium} other {# promptuaria}}"
+    },
     "form": {
       "name": "Nomen",
       "namePattern": "Litterae, numeri, lineolae et lineolae subiectae solum. A littera vel numero incipiat necesse est.",
@@ -1065,7 +1082,7 @@
       "noExpiry": "Nulla expiratio",
       "addDriftIgnoreRule": "Regulam addere",
       "debugModeHint": "Podes cursorum defectorum apertos tenere in locis operis quos haec regula creat. Praedefinite exstinctus — pod retentus credentias illius loci operis servat.",
-      "allowForkPrPlansHint": "Ad omnem locum operis quem haec regula creat pertinet. In hac linea editionis praedefinite accensum, quia illud consilium codicem auctoris furcae cum credentiis huius loci operis exsequitur."
+      "allowForkPrPlansHint": "Ad omnem locum operis quem haec regula creat pertinet. Praedefinite exstinctum: rogatio tractionis e furca nullum consilium speculativum accipit, quia codicem auctoris sui cum credentiis loci operis exsequeretur."
     },
     "table": {
       "name": "Nomen",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "Consilia in rogationibus tractionis e furca",
-      "description": "Utrum rogatio tractionis e furca aperta consilium speculativum accipiat. In hac linea editionis praedefinite accensum, quia illud consilium codicem auctoris furcae cum credentiis huius loci operis exsequitur.",
+      "description": "Utrum rogatio tractionis e furca aperta consilium speculativum accipiat. Praedefinite exstinctum, quia illud consilium codicem auctoris furcae cum credentiis huius loci operis exsequitur.",
       "label": "Rogationes tractionis e furca consiliari",
       "hint": "Exsecutio accipit variabiles ambitus huius loci operis, valores sensibiles, arcana quaelibet per Vault resoluta, atque identitatem nubis operis. Qui rogationem tractionis e furca aperit neque scribendi potestatem habet neque conflare potest; itaque consilium speculativum sola via est qua codex eius ad illas credentias pervenit. Hoc accende pro loco operis qui nihil auferendum continet — exempli gratia, pro repositorio modulorum publico quod conlationes communitatis accipit. Rogationes tractionis e ramis ipsius repositorii non afficiuntur et semper consilium accipiunt.",
       "activeBadge": "Accensum",

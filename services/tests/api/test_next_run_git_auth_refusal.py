@@ -71,7 +71,10 @@ async def _claim(resolved, *, provider="gitlab") -> _Claim:
     ws.engine = "terraform"
     ws.name = "smoke"
     ws.pulumi_bind_plan = False
-    conn = MagicMock(provider=provider, token=TOKEN)
+    # `server_url` must be real and must match KEY's host: a minted credential is
+    # only installed for its own connection's host, and a MagicMock's attribute is a
+    # Mock, which resolves to no host at all and is refused.
+    conn = MagicMock(provider=provider, token=TOKEN, server_url="https://gitlab.example.com")
 
     async def _get(model, _id):
         # One `db.get` serves two lookups: the workspace, and the VCS connection

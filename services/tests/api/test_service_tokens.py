@@ -301,3 +301,147 @@ def test_no_token_path_under_api_v2():
         if getattr(route, "path", "").startswith("/api/v2") and "authentication-token" in route.path
     ]
     assert offenders == [], f"token paths leaked under /api/v2: {offenders}"
+
+
+# ── a scoped token cannot widen itself ───────────────────────────────
+#
+# `service_bound` carries the intersection of its pinned roles and its owner's
+# live roles. Both token endpoints could step around that pin without needing a
+# single role the caller did not already hold: minting an `interactive` token
+# for the same owner yields that owner's FULL live roles, and re-tagging the
+# scoped token itself to `interactive` nulls `pinned_roles` outright. The
+# escalation is from the credential's scope back up to the person's, so no
+# permission check sees it.
+
+
+def _scoped_token_user(pinned, roles=None, kind="service_bound"):
+    """A caller authenticating WITH a scoped service token, not a session."""
+    return AuthenticatedUser(
+        email="dev@example.com",
+        display_name="Dev",
+        roles=roles if roles is not None else ["plan-only", "deployer"],
+        provider_name="local",
+        auth_method="api_token",
+        kind=kind,
+        pinned_roles=pinned,
+    )
+
+
+@_app_patched
+@patch("terrapod.api.routers.tokens.create_api_token")
+async def test_a_scoped_token_cannot_mint_an_interactive_one(mock_create, *_):
+    app = _make_app(_scoped_token_user(["plan-only"]))
+    async with _client(app) as c:
+        r = await c.post(
+            "/api/terrapod/v1/users/dev/authentication-tokens",
+            json={"data": {"attributes": {"kind": "interactive"}}},
+            headers={"Authorization": "Bearer x"},
+        )
+    assert r.status_code == 403, "a pinned token minted a credential with the owner's live roles"
+    assert "escaping the pin" in r.json()["detail"]
+    mock_create.assert_not_called()
+
+
+@_app_patched
+@patch("terrapod.api.routers.tokens.get_redis_client")
+@patch("terrapod.api.routers.tokens.get_token_by_id")
+async def test_a_scoped_token_cannot_retag_a_token_to_interactive(mock_get, mock_redis, *_):
+    """The same escape in one step: `interactive` nulls `pinned_roles`."""
+    mock_get.return_value = _token_mock(kind="service_bound", bound_to="dev@example.com")
+    mock_redis.return_value = MagicMock(delete=AsyncMock())
+    app = _make_app(_scoped_token_user(["plan-only"]))
+    async with _client(app) as c:
+        r = await c.patch(
+            "/api/terrapod/v1/authentication-tokens/at-svc",
+            json={"data": {"attributes": {"kind": "interactive"}}},
+            headers={"Authorization": "Bearer x"},
+        )
+    assert r.status_code == 403
+
+
+@_app_patched
+@patch("terrapod.api.routers.tokens.create_api_token")
+async def test_a_scoped_token_cannot_pin_outside_its_own_scope(mock_create, *_):
+    """`deployer` is one of the owner's live roles but NOT in this credential's
+    pin, so a token pinned to it would be wider than the one minting it."""
+    app = _make_app(_scoped_token_user(["plan-only"]))
+    async with _client(app) as c:
+        r = await c.post(
+            "/api/terrapod/v1/users/dev/authentication-tokens",
+            json={"data": {"attributes": {"kind": "service_bound", "pinned_roles": ["deployer"]}}},
+            headers={"Authorization": "Bearer x"},
+        )
+    assert r.status_code == 403
+    assert "deployer" in r.json()["detail"]
+    mock_create.assert_not_called()
+
+
+@_app_patched
+@patch("terrapod.api.routers.tokens.create_api_token")
+async def test_a_scoped_token_can_still_mint_a_token_within_its_scope(mock_create, *_):
+    """The negative path. Narrowing is the legitimate act this must not block."""
+    mock_create.return_value = (
+        _token_mock(kind="service_bound", pinned_roles=["plan-only"]),
+        "raw.tpod.secret",
+    )
+    app = _make_app(_scoped_token_user(["plan-only", "deployer"]))
+    async with _client(app) as c:
+        r = await c.post(
+            "/api/terrapod/v1/users/dev/authentication-tokens",
+            json={"data": {"attributes": {"kind": "service_bound", "pinned_roles": ["plan-only"]}}},
+            headers={"Authorization": "Bearer x"},
+        )
+    assert r.status_code == 201
+
+
+@_app_patched
+@patch("terrapod.api.routers.tokens.create_api_token")
+async def test_a_session_is_unaffected(mock_create, *_):
+    """A person acting as themselves is the thing a pin is measured against."""
+    mock_create.return_value = (_token_mock(kind="interactive"), "raw.tpod.secret")
+    app = _make_app(_user())
+    async with _client(app) as c:
+        r = await c.post(
+            "/api/terrapod/v1/users/dev/authentication-tokens",
+            json={"data": {"attributes": {"kind": "interactive"}}},
+            headers={"Authorization": "Bearer x"},
+        )
+    assert r.status_code == 201
+
+
+@_app_patched
+@patch("terrapod.api.routers.tokens.create_api_token")
+async def test_an_interactive_token_is_unaffected(mock_create, *_):
+    """It already carries its owner's live roles, so it widens nothing."""
+    mock_create.return_value = (_token_mock(kind="interactive"), "raw.tpod.secret")
+    app = _make_app(
+        _scoped_token_user(None, kind="interactive"),
+    )
+    async with _client(app) as c:
+        r = await c.post(
+            "/api/terrapod/v1/users/dev/authentication-tokens",
+            json={"data": {"attributes": {"kind": "interactive"}}},
+            headers={"Authorization": "Bearer x"},
+        )
+    assert r.status_code == 201
+
+
+@_app_patched
+@patch("terrapod.api.routers.tokens.create_api_token")
+async def test_an_effectively_admin_service_token_can_pin_a_narrower_role(mock_create, *_):
+    """Without the admin short-circuit a detached admin token could not pin a
+    NARROWER scope — the ordinary administrative act this guard must not block."""
+    mock_create.return_value = (
+        _token_mock(kind="service_detached", pinned_roles=["plan-only"]),
+        "raw.tpod.secret",
+    )
+    app = _make_app(_scoped_token_user(["admin"], roles=["admin"], kind="service_detached"))
+    async with _client(app) as c:
+        r = await c.post(
+            "/api/terrapod/v1/users/dev/authentication-tokens",
+            json={
+                "data": {"attributes": {"kind": "service_detached", "pinned_roles": ["plan-only"]}}
+            },
+            headers={"Authorization": "Bearer x"},
+        )
+    assert r.status_code == 201

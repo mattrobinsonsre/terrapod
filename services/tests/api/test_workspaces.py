@@ -2018,3 +2018,174 @@ class TestNamingAVcsConnectionIsAuthorized:
         """The gate must not fire where no connection was named at all."""
         resp, _ = await self._post({"data": {"type": "workspaces", "attributes": {"name": "w"}}})
         assert resp.status_code != 403, resp.text
+
+
+class TestAWorkspaceWriteThatViolatesAConstraintIsNotA500:
+    """Two things the caller gets wrong answered "Internal server error": a name
+    already taken (or two creates racing for it) and a `vcs-connection-id` naming a
+    connection that does not exist.
+
+    Neither is new — `db.commit()` raised the same `IntegrityError` before the varset
+    self-join check added a `flush()` — but the flush sat OUTSIDE the `try`, so the
+    one place with somewhere to catch it did not.
+    """
+
+    @staticmethod
+    def _integrity(sqlstate):
+        from sqlalchemy.exc import IntegrityError
+
+        orig = Exception("constraint violated")
+        orig.sqlstate = sqlstate
+        return IntegrityError("INSERT ...", {}, orig)
+
+    def test_a_duplicate_name_is_a_409(self):
+        from terrapod.api.routers.tfe_v2 import _workspace_integrity_error
+
+        exc = _workspace_integrity_error(self._integrity("23505"), "prod-net")
+        assert exc.status_code == 409
+        assert "prod-net" in exc.detail
+
+    def test_an_unknown_referenced_id_is_a_422(self):
+        from terrapod.api.routers.tfe_v2 import _workspace_integrity_error
+
+        exc = _workspace_integrity_error(self._integrity("23503"), "prod-net")
+        assert exc.status_code == 422
+        assert "vcs-connection-id" in exc.detail
+
+    def test_an_unexpected_integrity_error_stays_a_500(self):
+        """Guessing a 4xx would hide a server-side bug behind a message blaming the
+        caller."""
+        from terrapod.api.routers.tfe_v2 import _workspace_integrity_error
+
+        exc = _workspace_integrity_error(self._integrity("23502"), "prod-net")
+        assert exc.status_code == 500
+
+    def test_a_driver_without_sqlstate_stays_a_500(self):
+        from sqlalchemy.exc import IntegrityError
+
+        from terrapod.api.routers.tfe_v2 import _workspace_integrity_error
+
+        exc = _workspace_integrity_error(
+            IntegrityError("INSERT ...", {}, Exception("no sqlstate")), "prod-net"
+        )
+        assert exc.status_code == 500
+
+    def test_the_constraint_name_is_not_echoed_back(self):
+        from terrapod.api.routers.tfe_v2 import _workspace_integrity_error
+
+        for state in ("23505", "23503", "23502"):
+            exc = _workspace_integrity_error(self._integrity(state), "prod-net")
+            assert "constraint violated" not in str(exc.detail)
+
+    def test_the_flush_is_inside_the_try_on_both_write_paths(self):
+        """The defect was positional, so the guard has to be too: a `flush()` sitting
+        above its `try` cannot be caught however good the handler is."""
+        import inspect
+        import re
+
+        from terrapod.api.routers import tfe_v2
+
+        src = inspect.getsource(tfe_v2)
+        # Every `await db.flush()` that is followed by `refuse_varset_growth` must be
+        # preceded by a `try:` at a lower-or-equal indent with nothing but comments
+        # between them.
+        offenders = []
+        for m in re.finditer(r"\n([ \t]*)await db\.flush\(\)", src):
+            indent, start = m.group(1), m.start()
+            before = src[:start].rstrip().splitlines()
+            # walk back over comments to the first real statement
+            j = len(before) - 1
+            while j >= 0 and before[j].strip().startswith("#"):
+                j -= 1
+            if j >= 0 and before[j].strip() != "try:":
+                offenders.append(before[j].strip()[:60] + f"  (indent {len(indent)})")
+        assert not offenders, (
+            "a db.flush() is not the first statement in a try:, so an IntegrityError "
+            "from it escapes as a 500:\n  " + "\n  ".join(offenders)
+        )
+
+
+class TestTheRoutesTranslateAConstraintViolationNotJustTheHelper:
+    """`TestAWorkspaceWriteThatViolatesAConstraintIsNotA500` above calls
+    `_workspace_integrity_error` directly with a hand-built exception, so it pins the
+    helper's mapping and nothing about whether any route reaches it. Deleting the
+    `except IntegrityError` block from either workspace path, or neutering the unique
+    branch in the state-version path, left every one of those tests green.
+
+    The positional gate covers the other half of the defect — that the `flush()` is
+    inside the `try` — and cannot see whether an `except IntegrityError` exists at all.
+    These drive the routes.
+    """
+
+    @staticmethod
+    def _integrity(sqlstate):
+        from sqlalchemy.exc import IntegrityError
+
+        orig = Exception("duplicate key value violates unique constraint")
+        orig.sqlstate = sqlstate
+        return IntegrityError("INSERT ...", {}, orig)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_racing_duplicate_name_on_create_is_409(self, *_mocks):
+        """The pre-insert SELECT finds nothing — two creates racing — and the flush is
+        where the database first disagrees."""
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        mock_db.flush = AsyncMock(side_effect=self._integrity("23505"))
+        mock_db.rollback = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={"data": {"type": "workspaces", "attributes": {"name": "raced"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 409, resp.text
+        assert "raced" in resp.text
+        mock_db.rollback.assert_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unknown_referenced_id_on_create_is_422(self, *_mocks):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        mock_db.flush = AsyncMock(side_effect=self._integrity("23503"))
+        mock_db.rollback = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={"data": {"type": "workspaces", "attributes": {"name": "bad-fk"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422, resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_an_unexpected_integrity_error_on_create_stays_500(self, *_mocks):
+        """Guessing a 4xx for an unexpected SQLSTATE would hide a server-side bug
+        behind a message blaming the caller."""
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        mock_db.flush = AsyncMock(side_effect=self._integrity("23502"))
+        mock_db.rollback = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/organizations/default/workspaces",
+                json={"data": {"type": "workspaces", "attributes": {"name": "odd"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 500, resp.text
+        # And the driver's own text is not echoed to the caller.
+        assert "unique constraint" not in resp.text

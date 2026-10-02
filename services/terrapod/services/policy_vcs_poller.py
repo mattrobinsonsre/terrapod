@@ -203,6 +203,24 @@ async def _download_archive(conn: VCSConnection, owner: str, repo: str, ref: str
     Tempfile lands on the CSP-attached PVC (`settings.vcs.tmpdir`) rather
     than node tmpfs — see `_resolve_tmpdir`.
     """
+    # GHSA-v8g7-pqrj-8mcm. This is one of the three clone dispatchers the allowlist
+    # did NOT reach: the guard added in this release sits on `vcs_provider`'s
+    # dispatcher, which these modules do not use — they call the provider services
+    # directly. So a module, policy set or registry entry whose URL predates a
+    # narrowing kept being cloned, and `docs/security-hardening.md` claimed otherwise.
+    from terrapod.services.vcs_connection_rbac import (
+        RepositoryNotAllowed,
+        repository_pair_allowed,
+    )
+
+    if not repository_pair_allowed(conn, owner, repo):
+        raise RepositoryNotAllowed(
+            f"VCS connection vcs-{getattr(conn, 'id', None)} is restricted to specific "
+            f"repositories and {owner}/{repo} is not one of them, so its credential will "
+            "not be used to clone it. Widen `allowed-repositories` on the connection, or "
+            "clear it to allow any repository the credential can reach."
+        )
+
     with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False, dir=_resolve_tmpdir()) as tmp:
         tmp_path = tmp.name
 

@@ -763,6 +763,23 @@
       "delete": "Qaw'"
     },
     "confirmDelete": "VCS rar vam Qaw''a'? 'oH lo'bogh Qumwo'mey VCS numtaH Hutlh. choHlaHbe'lu'.",
+    "access": {
+      "heading": "''Iv rarmeH lo''laH",
+      "intro": "wej Dochvam yIn nuqDaq Qu''mey rar. mIllogh ghItlh neH lo''lu''.",
+      "ownerEmail": "ghajwI'' QIn De''wI''",
+      "ownerEmailHint": "reH rarvam lo''laH ghajwI''. rarvam ghajwI'' Hutlh ''e'' DaneHchugh, chIm yIlan.",
+      "labels": "chaw'' permey",
+      "labelsHint": "Qu'' permeyvam rurchugh, Qu''vam rarvam Daq Qu''Daq lo''laH.",
+      "allowedRepositories": "chaw''lu''bogh ghItlhmey",
+      "allowedRepositoriesHint": "Qu'' poQbogh ghItlh rurmeH glob permey.",
+      "addPattern": "per chel",
+      "anyRepositoryWarning": "pagh per lughItlhlu'', vaj Hoch ghItlh rarvam lo''laH.",
+      "restricted": "{count, plural, one {# per lughItlhlu''} other {# permey lughItlhlu''}}, vaj pagh rurbogh ghItlh lajbe''lu''.",
+      "ownedBy": "{email} ghaj",
+      "unowned": "pagh ghajwI'' lughItlhlu''",
+      "anyRepositorySummary": "Hoch ghItlh chaw''lu''",
+      "repositoryCount": "{count, plural, one {# ghItlh} other {# ghItlhmey}} neH chaw''lu''"
+    },
     "form": {
       "name": "pong",
       "namePattern": "ghItlh mI' HIvje' je neH. ghItlh mI' joq taghnIS.",
@@ -1065,7 +1082,7 @@
       "noExpiry": "van Hutlh",
       "addDriftIgnoreRule": "chu'wI' chel",
       "debugModeHint": "Qumwo'mey chenmoHbogh chu'wI'vam, pa' poSqu'moH vumwI' pod lujpu'bogh. motlh chu'Ha'lu' — pod pollu'bogh Qumwo'vetlh pegh pol.",
-      "allowForkPrPlansHint": "Qumwo'mey chenmoHbogh chu'wI'vam Hoch chel. motlh chu'lu' qo'vam chovnatlhvaD, qaStaHvIS nabvam fork qonwI' ngoq vumqu' 'ej Qumwo'vam pegh lo'."
+      "allowForkPrPlansHint": "Qumwo'mey chenmoHbogh chu'wI'vam Hoch chel. motlh chu'Ha'lu': fork-vo' PR Hech nab Hevbe', qaStaHvIS Qumwo' pegh lo'taHvIS qonwI'Daj ngoq vumqu'."
     },
     "table": {
       "name": "pong",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "fork PRmey nabmey",
-      "description": "fork-vo' poSmoHlu'bogh PR Hech nab Hev'a'. motlh chu'lu' qo'vam chovnatlhvaD, qaStaHvIS nabvam fork qonwI' ngoq vumqu' 'ej Qumwo'vam pegh lo'.",
+      "description": "fork-vo' poSmoHlu'bogh PR Hech nab Hev'a'. motlh chu'Ha'lu', qaStaHvIS nabvam fork qonwI' ngoq vumqu' 'ej Qumwo'vam pegh lo'.",
       "label": "fork PRmey yInab",
       "hint": "Qumwo'vam choHlaHmey, pegh De'mey, Vault-vo' Sambogh peghmey, je Qu' 'eng pong Hev Sar. fork-vo' PR poSmoHbogh ghot ghItlh chaw' ghajbe' 'ej merge laHbe'; vaj Hech nab neH 'oH He'e' ngoqDaj pegh ghoSmeH. pagh ngaSbogh Qumwo'vaD wa' yIchu' — ghom boQ Hevbogh qawHaq pegh Hutlhbogh. qawHaq paQmeyvo' poSmoHlu'bogh PRmey choHbe'lu', 'ej reH nab Hevlu'.",
       "activeBadge": "chu'lu'",

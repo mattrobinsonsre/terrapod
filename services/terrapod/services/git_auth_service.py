@@ -158,6 +158,44 @@ async def _mint_from_connection(
     # named. REFUSED rather than dropped, for the reason the GitLab gate below
     # gives — a silently absent credential spends the operator's attention on an
     # `init` failure that names neither the credential nor the cause.
+    # The allowlist, checked for EVERY minted credential — including the workspace's
+    # own connection, which the authorization check below deliberately skips.
+    #
+    # **The subject is the credential's KEY, not the workspace's repository URL.** The
+    # key is the scope the runner installs the token at (`[credential "https://<key>"]`,
+    # matched by git on host and path prefix), and the workspace owner chooses it, so
+    # `key = github.com` installs the token host-wide and the workspace's own
+    # configuration can then clone anything the credential reaches. The first version
+    # of this check said exactly that in its comment and then passed
+    # `workspace.vcs_repo_url` anyway, so it bounded the one thing already checked at
+    # create, at PATCH and at the config fetch, and bounded the credential not at all
+    # — net new protection approximately none. It also refused outright on a workspace
+    # with no repository URL of its own, which is the normal shape for one that mints
+    # a credential purely to fetch private module sources.
+    if workspace is not None:
+        from terrapod.services.vcs_connection_rbac import (
+            connection_git_host,
+            credential_scope_allowed,
+            credential_scope_host_allowed,
+            credential_scope_host_refusal_detail,
+            credential_scope_refusal_detail,
+        )
+
+        # The host first, and with its own message: "this repository is not allowed"
+        # would send the operator to the allowlist, which is not what refused them.
+        if not credential_scope_host_allowed(conn, key):
+            raise GitAuthRefused(
+                credential_scope_host_refusal_detail(conn_uuid, key, connection_git_host(conn))
+            )
+
+        if not credential_scope_allowed(conn, key):
+            raise GitAuthRefused(
+                f"git credential {key!r} references VCS connection vcs-{conn_uuid}: "
+                + credential_scope_refusal_detail(
+                    conn_uuid, key, list(conn.allowed_repositories or [])
+                )
+            )
+
     if workspace is not None and conn_uuid != getattr(workspace, "vcs_connection_id", None):
         from terrapod.services.vcs_connection_rbac import may_reference_connection
 

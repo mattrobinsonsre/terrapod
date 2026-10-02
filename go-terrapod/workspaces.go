@@ -116,7 +116,7 @@ type Workspace struct {
 	// workspace's — the pod keeps the run's credentials for that window.
 	DebugMode bool `json:"debug-mode"`
 	// AllowForkPRPlans permits a speculative plan for a pull request opened
-	// from a fork (GHSA-gp5w-76rw-c452). True by default on this release line (false from 2.0): such a plan runs
+	// from a fork (GHSA-gp5w-76rw-c452). Off by default: such a plan runs
 	// the fork author's code with this workspace's credentials, and the
 	// author has neither write access nor the ability to merge. Pull requests
 	// from branches in the repository itself are unaffected.

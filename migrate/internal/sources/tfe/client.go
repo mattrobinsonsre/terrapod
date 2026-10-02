@@ -36,7 +36,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/hashicorp/go-tfe"
@@ -138,6 +140,11 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		return nil, ErrMissingOrg
 	}
 	addr := normaliseAddress(cfg.Address)
+	if err := checkTFEAddressTransport(
+		addr, os.Getenv("TERRAPOD_ALLOW_INSECURE_TRANSPORT") == "1",
+	); err != nil {
+		return nil, err
+	}
 
 	api, err := tfe.NewClient(&tfe.Config{
 		Address: addr,
@@ -198,6 +205,46 @@ func probeTokenTier(ctx context.Context, api *tfe.Client, orgName string) (Token
 	// false-positive (thinking we can read sensitive values when we
 	// can't) is silent data loss, which isn't.
 	return TokenTierWorker, nil
+}
+
+// errInsecureTFEAddress explains the refusal and how to accept the risk.
+//
+// The two halves of a migration were asymmetric: go-terrapod refuses an http://
+// base URL unless `TERRAPOD_ALLOW_INSECURE_TRANSPORT=1`, because the bearer
+// would cross the network in the clear — and this client, carrying a TFE API
+// token that is every bit as long-lived and as privileged, accepted http://
+// silently. One credential was protected and the other was not, in the same
+// command, for no stated reason.
+//
+// Same shape as the SDK's gate on purpose, including the loopback exemption and
+// the environment-variable escape hatch, so an operator meets one rule rather
+// than two. "Same shape" is load-bearing and the first version of this function
+// did not honour it: it found the host by splitting on the first "/" or ":",
+// which on an IPv6 literal cuts inside the brackets — `http://[::1]:8080` gave
+// the host `"["` and was refused, while the SDK accepts it. It also refused
+// anything in 127/8 other than 127.0.0.1, and its bare `"::1"` arm was
+// unreachable because that spelling is not valid in a URL authority. So this
+// parses with net/url and asks net.IP, exactly as the SDK's isLoopback does.
+func checkTFEAddressTransport(addr string, allowInsecure bool) error {
+	if !strings.HasPrefix(addr, "http://") || allowInsecure {
+		return nil
+	}
+	if u, err := url.Parse(addr); err == nil {
+		host := u.Hostname()
+		if strings.EqualFold(host, "localhost") {
+			return nil
+		}
+		if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+			return nil
+		}
+	}
+	return fmt.Errorf(
+		"TFE address %q uses http:// — your TFE API token would cross the network "+
+			"in the clear. Use https://, or set TERRAPOD_ALLOW_INSECURE_TRANSPORT=1 "+
+			"to accept that risk deliberately (the same variable the Terrapod side "+
+			"of the migration already honours)",
+		addr,
+	)
 }
 
 // normaliseAddress trims trailing slashes and adds the https:// scheme

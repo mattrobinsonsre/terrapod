@@ -332,6 +332,7 @@
   "vcs.module_poll_interval_seconds",
   "vcs.poll_interval_seconds",
   "vcs.require_connection_authorization",
+  "vcs.require_push_permission_for_commands",
   "vcs.tmpdir",
   "vcs.tmpdir_min_free_bytes",
   "version"

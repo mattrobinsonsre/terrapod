@@ -487,7 +487,7 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"allow_fork_pr_plans": schema.BoolAttribute{
-				Description: "Give a pull request opened from a fork a speculative plan. Defaults to true on this release line (false from 2.0): that plan runs the pull request author's code against this workspace's whole credential set — env variables, secret-manager-resolved values, minted git credentials and the runner Job's cloud workload identity — and a fork author cannot merge, so it is the only path by which their code ever reaches those credentials (GHSA-gp5w-76rw-c452). Pull requests opened from branches within the repository itself are unaffected and always plan; turn this on only for a workspace holding nothing worth taking, such as one backing a public module repository.",
+				Description: "Give a pull request opened from a fork a speculative plan. Defaults to false: that plan runs the pull request author's code against this workspace's whole credential set — env variables, secret-manager-resolved values, minted git credentials and the runner Job's cloud workload identity — and a fork author cannot merge, so it is the only path by which their code ever reaches those credentials (GHSA-gp5w-76rw-c452). Pull requests opened from branches within the repository itself are unaffected and always plan; turn this on only for a workspace holding nothing worth taking, such as one backing a public module repository.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{

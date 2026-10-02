@@ -763,6 +763,23 @@
       "delete": "Usuń"
     },
     "confirmDelete": "Usunąć to połączenie VCS? Obszary robocze, które go używają, utracą integrację z VCS. Tej operacji nie można cofnąć.",
+    "access": {
+      "heading": "Kto może używać tego połączenia",
+      "intro": "Te trzy ustawienia decydują, które przestrzenie robocze mogą wskazywać na to połączenie. Same dane uwierzytelniające pozostają tylko do zapisu.",
+      "ownerEmail": "E-mail właściciela",
+      "ownerEmailHint": "Właściciel może zawsze używać tego połączenia. Pozostaw puste, aby połączenie pozostało bez właściciela.",
+      "labels": "Etykiety dostępu",
+      "labelsHint": "Rola, której reguły pasują do tych etykiet, może wskazać przestrzeń roboczą na to połączenie.",
+      "allowedRepositories": "Dozwolone repozytoria",
+      "allowedRepositoriesHint": "Wzorce glob porównywane z repozytorium, o które prosi przestrzeń robocza.",
+      "addPattern": "Dodaj wzorzec",
+      "anyRepositoryWarning": "Nie wymieniono żadnych wzorców, więc to połączenie może wskazywać na dowolne repozytorium.",
+      "restricted": "{count, plural, one {Wymieniono # wzorzec} few {Wymieniono # wzorce} many {Wymieniono # wzorców} other {Wymieniono # wzorca}}, więc repozytorium niepasujące do żadnego z nich jest odrzucane.",
+      "ownedBy": "Należy do {email}",
+      "unowned": "Nie ustawiono właściciela",
+      "anyRepositorySummary": "Dozwolone jest dowolne repozytorium",
+      "repositoryCount": "Ograniczone do {count, plural, one {# repozytorium} few {# repozytoriów} many {# repozytoriów} other {# repozytorium}}"
+    },
     "form": {
       "name": "Nazwa",
       "namePattern": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",
@@ -1065,7 +1082,7 @@
       "noExpiry": "Bez wygaśnięcia",
       "addDriftIgnoreRule": "Dodaj regułę",
       "debugModeHint": "Utrzymuj pody nieudanych runnerów otwarte w przestrzeniach roboczych tworzonych przez tę regułę. Domyślnie wyłączone — utrzymywany pod przechowuje poświadczenia tej przestrzeni roboczej.",
-      "allowForkPrPlansHint": "Dotyczy każdej przestrzeni roboczej tworzonej przez tę regułę. Domyślnie włączone w tej linii wydań, ponieważ taki plan uruchamia kod autora forka z poświadczeniami tej przestrzeni roboczej."
+      "allowForkPrPlansHint": "Dotyczy każdej przestrzeni roboczej tworzonej przez tę regułę. Domyślnie wyłączone: pull request z forka nie otrzymuje planu spekulatywnego, ponieważ uruchomiłby kod swojego autora z poświadczeniami przestrzeni roboczej."
     },
     "table": {
       "name": "Nazwa",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plany dla pull requestów z forków",
-      "description": "Czy pull request otwarty z forka otrzymuje plan spekulatywny. Domyślnie włączone w tej linii wydań, ponieważ taki plan uruchamia kod autora forka z poświadczeniami tej przestrzeni roboczej.",
+      "description": "Czy pull request otwarty z forka otrzymuje plan spekulatywny. Domyślnie wyłączone, ponieważ taki plan uruchamia kod autora forka z poświadczeniami tej przestrzeni roboczej.",
       "label": "Planuj pull requesty z forków",
       "hint": "Uruchomienie otrzymuje zmienne środowiskowe tej przestrzeni roboczej, wartości wrażliwe, wszystkie sekrety pobrane przez Vault oraz tożsamość chmurową zadania. Kto otwiera pull request z forka, nie ma uprawnień do zapisu i nie może scalić zmian, więc plan spekulatywny to jedyna droga, którą jego kod dociera do tych poświadczeń. Włącz to dla przestrzeni roboczej, w której nie ma nic wartego zabrania — na przykład dla publicznego repozytorium modułów przyjmującego wkład społeczności. Pull requesty z gałęzi samego repozytorium nie są tym objęte i zawsze otrzymują plan.",
       "activeBadge": "Wł.",

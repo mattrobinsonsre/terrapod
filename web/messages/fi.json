@@ -763,6 +763,23 @@
       "delete": "Poista"
     },
     "confirmDelete": "Poistetaanko tämä VCS-yhteys? Sitä käyttävät työtilat menettävät VCS-integraation. Tätä ei voi kumota.",
+    "access": {
+      "heading": "Kuka voi käyttää tätä yhteyttä",
+      "intro": "Nämä kolme asetusta ratkaisevat, mitkä työtilat voivat osoittaa tähän yhteyteen. Tunnistetieto itse pysyy vain kirjoitettavana.",
+      "ownerEmail": "Omistajan sähköposti",
+      "ownerEmailHint": "Omistaja voi aina käyttää tätä yhteyttä. Jätä tyhjäksi, jos yhteys saa jäädä ilman omistajaa.",
+      "labels": "Käyttöoikeustunnisteet",
+      "labelsHint": "Rooli, jonka säännöt vastaavat näitä tunnisteita, voi osoittaa työtilan tähän yhteyteen.",
+      "allowedRepositories": "Sallitut tietovarastot",
+      "allowedRepositoriesHint": "Glob-mallit, joita verrataan tietovarastoon, jota työtila pyytää käyttöönsä.",
+      "addPattern": "Lisää malli",
+      "anyRepositoryWarning": "Yhtään mallia ei ole luetteloitu, joten tämä yhteys voi osoittaa mihin tahansa tietovarastoon.",
+      "restricted": "{count, plural, one {# malli on luetteloitu} other {# mallia on luetteloitu}}, joten tietovarasto, joka ei vastaa yhtäkään niistä, hylätään.",
+      "ownedBy": "Omistaja {email}",
+      "unowned": "Omistajaa ei ole asetettu",
+      "anyRepositorySummary": "Mikä tahansa tietovarasto on sallittu",
+      "repositoryCount": "Rajattu {count, plural, one {# tietovarastoon} other {# tietovarastoon}}"
+    },
     "form": {
       "name": "Nimi",
       "namePattern": "Vain kirjaimet, numerot, tavuviivat ja alaviivat. Alettava kirjaimella tai numerolla.",
@@ -1065,7 +1082,7 @@
       "noExpiry": "Ei vanhenemista",
       "addDriftIgnoreRule": "Lisää sääntö",
       "debugModeHint": "Pidä epäonnistuneiden suorittajien podit auki työtiloissa, jotka tämä sääntö luo. Oletuksena pois päältä – auki pidetty podi säilyttää kyseisen työtilan tunnukset.",
-      "allowForkPrPlansHint": "Koskee jokaista työtilaa, jonka tämä sääntö luo. Oletuksena päällä tässä julkaisulinjassa, koska tuo suunnitelma ajaa forkin tekijän koodin tämän työtilan tunnuksilla."
+      "allowForkPrPlansHint": "Koskee jokaista työtilaa, jonka tämä sääntö luo. Oletuksena pois päältä: forkista avattu pull request ei saa spekulatiivista suunnitelmaa, koska se ajaisi tekijänsä koodin työtilan tunnuksilla."
     },
     "table": {
       "name": "Nimi",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "Suunnitelmat forkista avatuille pull requesteille",
-      "description": "Saako forkista avattu pull request spekulatiivisen suunnitelman. Oletuksena päällä tässä julkaisulinjassa, koska tuo suunnitelma ajaa forkin tekijän koodin tämän työtilan tunnuksilla.",
+      "description": "Saako forkista avattu pull request spekulatiivisen suunnitelman. Oletuksena pois päältä, koska tuo suunnitelma ajaa forkin tekijän koodin tämän työtilan tunnuksilla.",
       "label": "Suunnittele forkista avatut pull requestit",
       "hint": "Ajo saa tämän työtilan ympäristömuuttujat, arkaluonteiset arvot, kaikki Vaultista haetut salaisuudet ja työn pilvi-identiteetin. Forkista pull requestin avaavalla ei ole kirjoitusoikeutta eikä hän voi yhdistää, joten spekulatiivinen suunnitelma on ainoa reitti, jota pitkin hänen koodinsa pääsee noihin tunnuksiin. Ota tämä käyttöön työtilassa, jossa ei ole mitään viemisen arvoista — vaikkapa julkisessa moduulirepositoriossa, joka ottaa vastaan yhteisön kontribuutioita. Repositorion omista haaroista avatut pull requestit eivät muutu, ja ne suunnitellaan aina.",
       "activeBadge": "Päällä",

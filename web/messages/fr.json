@@ -763,6 +763,23 @@
       "delete": "Supprimer"
     },
     "confirmDelete": "Supprimer cette connexion VCS ? Les espaces de travail qui l'utilisent perdront l'intégration VCS. Cette action est irréversible.",
+    "access": {
+      "heading": "Qui peut utiliser cette connexion",
+      "intro": "Ces trois paramètres déterminent quels espaces de travail peuvent pointer vers cette connexion. L''identifiant lui-même reste en écriture seule.",
+      "ownerEmail": "E-mail du propriétaire",
+      "ownerEmailHint": "Le propriétaire peut toujours utiliser cette connexion. Laissez vide pour que la connexion reste sans propriétaire.",
+      "labels": "Étiquettes d''accès",
+      "labelsHint": "Un rôle dont les règles correspondent à ces étiquettes peut faire pointer un espace de travail vers cette connexion.",
+      "allowedRepositories": "Dépôts autorisés",
+      "allowedRepositoriesHint": "Motifs glob comparés au dépôt qu''un espace de travail demande à utiliser.",
+      "addPattern": "Ajouter un motif",
+      "anyRepositoryWarning": "Aucun motif n''est répertorié, donc cette connexion peut pointer vers n''importe quel dépôt.",
+      "restricted": "{count, plural, one {# motif est répertorié} other {# motifs sont répertoriés}}, donc un dépôt qui ne correspond à aucun d''entre eux est refusé.",
+      "ownedBy": "Propriété de {email}",
+      "unowned": "Aucun propriétaire n''est défini",
+      "anyRepositorySummary": "N''importe quel dépôt est autorisé",
+      "repositoryCount": "Limité à {count, plural, one {# dépôt} other {# dépôts}}"
+    },
     "form": {
       "name": "Nom",
       "namePattern": "Lettres, chiffres, traits d'union et traits de soulignement uniquement. Doit commencer par une lettre ou un chiffre.",
@@ -1064,8 +1081,8 @@
       "terragruntVersion": "Version de Terragrunt",
       "noExpiry": "Pas d'expiration",
       "addDriftIgnoreRule": "Ajouter une règle",
-      "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Activé par défaut sur cette ligne de version — un pod maintenu ouvert conserve les identifiants de cet espace de travail.",
-      "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Activé par défaut sur cette ligne de version, car ce plan exécute le code de l'auteur du fork avec les identifiants de cet espace de travail."
+      "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Désactivé par défaut — un pod maintenu ouvert conserve les identifiants de cet espace de travail.",
+      "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Désactivé par défaut : une pull request depuis un fork ne reçoit aucun plan spéculatif, car cela exécuterait le code de son auteur avec les identifiants de l'espace de travail."
     },
     "table": {
       "name": "Nom",
@@ -2570,7 +2587,7 @@
     },
     "planExpiry": {
       "title": "Expiration du plan",
-      "description": "Abandonne automatiquement un plan non confirmé une fois qu'il est plus ancien que cela, afin qu'un plan périmé ne puisse pas être appliqué contre un monde qui a évolué. Activé par défaut sur cette ligne de version ; le plan doit alors être réexécuté. (S'applique uniquement aux exécutions capables d'application.)",
+      "description": "Abandonne automatiquement un plan non confirmé une fois qu'il est plus ancien que cela, afin qu'un plan périmé ne puisse pas être appliqué contre un monde qui a évolué. Désactivé par défaut ; le plan doit alors être réexécuté. (S'applique uniquement aux exécutions capables d'application.)",
       "expireAfter": "Expire après"
     },
     "aiSummary": {
@@ -2933,7 +2950,7 @@
       "title": "Mode débogage du runner",
       "description": "Maintenir ouvert le pod d'une exécution en échec pour pouvoir y entrer. L'échec de l'exécution est signalé d'abord ; le conteneur ne reste actif qu'ensuite.",
       "label": "Mode débogage",
-      "hint": "Activé par défaut sur cette ligne de version. Lorsqu'il est actif, le pod d'un runner en échec reste accessible par exec pendant la fenêtre configurée par votre opérateur, et il conserve pendant tout ce temps les identifiants et les variables déchiffrées de cet espace de travail.",
+      "hint": "Désactivé par défaut. Lorsqu'il est actif, le pod d'un runner en échec reste accessible par exec pendant la fenêtre configurée par votre opérateur, et il conserve pendant tout ce temps les identifiants et les variables déchiffrées de cet espace de travail.",
       "activeBadge": "Actif",
       "bannerTitle": "Le mode débogage est activé pour cet espace de travail",
       "bannerBody": "Le pod d'une exécution en échec est maintenu ouvert pour inspection au lieu de se terminer, et il conserve pendant ce temps les identifiants et les variables déchiffrées de cet espace de travail. Désactivez le mode débogage une fois le diagnostic terminé.",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plans sur les pull requests depuis un fork",
-      "description": "Détermine si une pull request ouverte depuis un fork reçoit un plan spéculatif. Activé par défaut sur cette ligne de version, car ce plan exécute le code de l'auteur du fork avec les identifiants de cet espace de travail.",
+      "description": "Détermine si une pull request ouverte depuis un fork reçoit un plan spéculatif. Désactivé par défaut, car ce plan exécute le code de l'auteur du fork avec les identifiants de cet espace de travail.",
       "label": "Lancer un plan sur les pull requests depuis un fork",
       "hint": "Une exécution reçoit les variables d'environnement de cet espace de travail, les valeurs sensibles, tous les secrets résolus via Vault et l'identité cloud du job. Qui ouvre une pull request depuis un fork n'a pas d'accès en écriture et ne peut pas fusionner : un plan spéculatif est donc le seul moyen pour son code d'atteindre ces identifiants. Activez ceci pour un espace de travail qui ne contient rien à dérober — un dépôt de modules public ouvert aux contributions de la communauté, par exemple. Les pull requests issues de branches du dépôt lui-même ne sont pas concernées et donnent toujours lieu à un plan.",
       "activeBadge": "Activé",

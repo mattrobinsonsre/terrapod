@@ -45,6 +45,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import and_, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.capability_access import resolve_capability_or_authenticate
@@ -53,6 +54,7 @@ from terrapod.api.dependencies import (
     AuthenticatedUser,
     effective_platform_roles,
     get_current_user,
+    label_reach_roles,
     require_non_runner,
 )
 from terrapod.api.ids import parse_id
@@ -1122,6 +1124,32 @@ async def _resolve_pool_set_attrs(
     return requested
 
 
+async def _enforce_repository_allowlist(db, *, conn_id, repo_url: str) -> None:
+    """403 if this connection may not be pointed at this repository.
+
+    GHSA-v8g7-pqrj-8mcm's second half. Separate from the connection gate because
+    the two have different remedies: "you may not use this connection" is a claim
+    problem and "this connection may not go there" is a scoping one, and collapsing
+    them sends the operator to ask for the wrong thing.
+    """
+    from terrapod.db.models import VCSConnection as _VCSConnection
+    from terrapod.services.vcs_connection_rbac import (
+        repository_allowed,
+        repository_refusal_detail,
+    )
+
+    conn = await db.get(_VCSConnection, conn_id)
+    if conn is None:
+        return  # the caller's own existence check reports this
+    if not repository_allowed(conn, repo_url):
+        raise HTTPException(
+            status_code=403,
+            detail=repository_refusal_detail(
+                conn_id, repo_url, list(conn.allowed_repositories or [])
+            ),
+        )
+
+
 @router.post("/organizations/default/workspaces")
 async def create_workspace(
     body: dict = Body(...),
@@ -1181,8 +1209,17 @@ async def create_workspace(
             conn_id=vcs_connection_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
+            actor_roles=sorted(label_reach_roles(user)),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(vcs_connection_id))
+
+        # The residual half of the same finding: being entitled to the connection
+        # says nothing about WHICH repository it may be pointed at, and the URL is
+        # just a string on the workspace. An empty allowlist means any, so this is
+        # inert until an operator narrows a connection.
+        await _enforce_repository_allowlist(
+            db, conn_id=vcs_connection_id, repo_url=attrs.get("vcs-repo-url", "")
+        )
 
     from terrapod.config import settings
 
@@ -1252,13 +1289,14 @@ async def create_workspace(
         auto_merge=_422(
             workspace_settings.validate_bool, attrs.get("auto-merge", False), "auto-merge"
         ),
-        # Defaults ON on this release line (2.0 defaults it off). A fork PR's speculative plan executes its author's code
+        # Defaults OFF — see the fallback on the next line, which is what sets it
+        # (GHSA-gp5w-76rw-c452). A fork PR's speculative plan executes its author's code
         # with the workspace's full credential set, and that author has no write
         # access and cannot merge — so this is the only path by which their code
         # reaches those credentials. Same-repository PRs are unaffected.
         allow_fork_pr_plans=_422(
             workspace_settings.validate_bool,
-            attrs.get("allow-fork-pr-plans", True),
+            attrs.get("allow-fork-pr-plans", False),
             "allow-fork-pr-plans",
         ),
         auto_merge_strategy=auto_merge_strategy,
@@ -1330,7 +1368,38 @@ async def create_workspace(
     )
     pool_set.set_workspace_pools(ws, requested_pool_ids)
     db.add(ws)
-    await db.commit()
+
+    # GHSA-49q6-pm68-3xgw. An assignment rule selects on attributes this caller
+    # just chose, so a new workspace can be shaped to match another team's
+    # rule-assigned variable set and receive its secrets. Flush — not commit — so
+    # the real selector can be asked about the pending row, then refuse any
+    # rule-assigned set it pulls in. A new workspace starts from nothing, so every
+    # match is growth.
+    from terrapod.services.varset_self_join import refuse_varset_growth
+
+    try:
+        # Inside the try, not above it. A flush is where the database first sees the
+        # row, so it is where a duplicate name or an unknown `vcs-connection-id`
+        # surfaces — and an uncaught `IntegrityError` here is a 500 for two things the
+        # caller got wrong and can fix. The commit below raised the same way before
+        # this flush existed, so the 500 is not new; it is simply now in a place with
+        # somewhere to catch it.
+        await db.flush()
+        await refuse_varset_growth(
+            db,
+            workspace_id=ws.id,
+            before=set(),
+            is_platform_admin="admin" in effective_platform_roles(user),
+            actor_email=user.email,
+        )
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise _workspace_integrity_error(exc, name) from exc
+    except Exception:
+        await db.rollback()
+        raise
+
     await db.refresh(ws)
 
     logger.info("Workspace created", workspace=name, owner=user.email)
@@ -1348,6 +1417,38 @@ async def create_workspace(
         status_code=201,
         headers=_tfe_headers(),
     )
+
+
+#: Postgres SQLSTATEs, read off the driver exception rather than matched in the
+#: message text — a constraint name in a message is not a contract and differs
+#: between backends, while these codes are in the SQL standard.
+_UNIQUE_VIOLATION = "23505"
+_FOREIGN_KEY_VIOLATION = "23503"
+
+
+def _workspace_integrity_error(exc: IntegrityError, name: str) -> HTTPException:
+    """Translate a workspace write's `IntegrityError` into the status it deserves.
+
+    Both of these are the caller's input, not a server fault, and both answered 500
+    before: a duplicate name (two creates racing, or simply a name already taken) and
+    an `vcs-connection-id` naming a connection that does not exist. The constraint
+    name is deliberately not echoed back — it is an internal detail, and the caller
+    does not need it to fix either case.
+    """
+    sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+    if sqlstate == _UNIQUE_VIOLATION:
+        return HTTPException(status_code=409, detail=f"A workspace named {name!r} already exists")
+    if sqlstate == _FOREIGN_KEY_VIOLATION:
+        return HTTPException(
+            status_code=422,
+            detail=(
+                "A referenced resource does not exist. Check `vcs-connection-id` and "
+                "`agent-pool-id` name resources that are present."
+            ),
+        )
+    # An integrity error that is neither is a genuine surprise, and guessing a 4xx for
+    # it would hide a server-side bug behind a message blaming the caller.
+    return HTTPException(status_code=500, detail="Could not save the workspace")
 
 
 async def _get_workspace_by_id(workspace_id: str, db: AsyncSession) -> Workspace:
@@ -1623,6 +1724,24 @@ async def update_workspace(
 ) -> JSONResponse:
     """Update workspace settings. Requires admin on workspace."""
     ws, old_caps = await _require_ws_capability(workspace_id, cap.WORKSPACE_SETTINGS, user, db)
+
+    # GHSA-49q6-pm68-3xgw. Snapshotted BEFORE any attribute moves, because an
+    # assignment rule selects on the very attributes this PATCH may change, so the
+    # comparison has to straddle the whole edit rather than one field of it.
+    #
+    # Skipped entirely when the body cannot move the answer — a description edit, a
+    # notification toggle — because this costs three queries and a workspace PATCH
+    # should not pay them to learn nothing. `touches_rule_selectable` fails OPEN, so
+    # an attribute nobody has classified counts as touching.
+    from terrapod.services.varset_self_join import (
+        rule_assigned_varset_ids,
+        touches_rule_selectable,
+    )
+
+    _patch_attrs = body.get("data", {}).get("attributes", {}) or {}
+    _patch_rels = body.get("data", {}).get("relationships", {}) or {}
+    _varsets_checked = touches_rule_selectable(_patch_attrs, _patch_rels)
+    _varsets_before_patch = await rule_assigned_varset_ids(db, ws.id) if _varsets_checked else set()
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -1969,8 +2088,42 @@ async def update_workspace(
             conn_id=ws.vcs_connection_id,
             actor_email=user.email,
             is_platform_admin="admin" in effective_platform_roles(user),
+            actor_roles=sorted(label_reach_roles(user)),
         ):
             raise HTTPException(status_code=403, detail=refusal_detail(ws.vcs_connection_id))
+
+    # Re-checked on every PATCH that leaves a connection attached, not only when the
+    # connection itself changes: the repo URL is separately settable, so an entitled
+    # owner could otherwise repoint an allowlisted connection at anything its
+    # credential can read without the connection gate ever firing.
+    if ws.vcs_connection_id is not None:
+        await _enforce_repository_allowlist(
+            db, conn_id=ws.vcs_connection_id, repo_url=ws.vcs_repo_url or ""
+        )
+
+    # GHSA-49q6-pm68-3xgw, the edit path. `_varsets_before_patch` was taken before
+    # any attribute moved; growing the set of rule-assigned variable sets reaching
+    # this workspace is the escalation, shrinking it is a de-escalation and allowed.
+    from terrapod.services.varset_self_join import refuse_varset_growth
+
+    if _varsets_checked:
+        try:
+            # Inside the try for the same reason as the create path: a rename can
+            # collide and an `IntegrityError` escaping here is a 500 for a 409.
+            await db.flush()
+            await refuse_varset_growth(
+                db,
+                workspace_id=ws.id,
+                before=_varsets_before_patch,
+                is_platform_admin="admin" in effective_platform_roles(user),
+                actor_email=user.email,
+            )
+        except IntegrityError as exc:
+            await db.rollback()
+            raise _workspace_integrity_error(exc, ws.name) from exc
+        except Exception:
+            await db.rollback()
+            raise
 
     await db.commit()
     await db.refresh(ws)
@@ -2388,17 +2541,30 @@ async def create_state_version(
         run_id=run_uuid,
     )
     db.add(sv)
-    await db.flush()
 
     # A new state version landed → any other apply-capable planned run on this
     # workspace now has a stale plan; auto-discard them (#647).
     from terrapod.services import run_service
 
-    await run_service.discard_stale_plans_for_state_change(
-        db, ws.id, serial, exclude_run_id=run_uuid
-    )
-
-    await db.commit()
+    try:
+        # The serial check above is check-then-act, so two concurrent uploads for the
+        # same serial both pass it and the second violates the unique constraint. That
+        # is a 409 — the same 409 the check itself raises — and it answered 500. The
+        # race is not theoretical here: this is the CLI's state-upload path, and two
+        # applies finishing together is how it is reached.
+        await db.flush()
+        await run_service.discard_stale_plans_for_state_change(
+            db, ws.id, serial, exclude_run_id=run_uuid
+        )
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+        if sqlstate == _UNIQUE_VIOLATION:
+            raise HTTPException(
+                status_code=409, detail="State version serial already exists"
+            ) from exc
+        raise HTTPException(status_code=500, detail="Could not save the state version") from exc
     await db.refresh(sv)
 
     from terrapod.api.metrics import STATE_VERSIONS_CREATED

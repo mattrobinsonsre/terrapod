@@ -294,9 +294,12 @@ field CreateUserRequest.DisplayName string
 field CreateUserRequest.Email string
 field CreateUserRequest.IsActive *bool
 field CreateUserRequest.Password string
+field CreateVCSConnectionRequest.AllowedRepositories []string
 field CreateVCSConnectionRequest.GithubAppID int64
 field CreateVCSConnectionRequest.GithubInstallationID int64
+field CreateVCSConnectionRequest.Labels map[string]string
 field CreateVCSConnectionRequest.Name string
+field CreateVCSConnectionRequest.OwnerEmail string
 field CreateVCSConnectionRequest.PrivateKey string
 field CreateVCSConnectionRequest.Provider string
 field CreateVCSConnectionRequest.ServerURL string
@@ -1004,9 +1007,12 @@ field UpdateRunTaskRequest.URL string
 field UpdateUserRequest.DisplayName *string
 field UpdateUserRequest.IsActive *bool
 field UpdateUserRequest.Password string
+field UpdateVCSConnectionRequest.AllowedRepositories *[]string
 field UpdateVCSConnectionRequest.GithubAppID *int64
 field UpdateVCSConnectionRequest.GithubInstallationID *int64
+field UpdateVCSConnectionRequest.Labels *map[string]string
 field UpdateVCSConnectionRequest.Name string
+field UpdateVCSConnectionRequest.OwnerEmail *string
 field UpdateVCSConnectionRequest.PrivateKey string
 field UpdateVCSConnectionRequest.ServerURL string
 field UpdateVCSConnectionRequest.Token string
@@ -1082,6 +1088,7 @@ field User.HasPassword bool `json:"has-password"`
 field User.IsActive bool `json:"is-active"`
 field User.LastLoginAt string `json:"last-login-at,omitempty"`
 field User.UpdatedAt string `json:"updated-at,omitempty"`
+field VCSConnection.AllowedRepositories []string `json:"allowed-repositories,omitempty"`
 field VCSConnection.BudgetWindowSeconds *int64 `json:"budget-window-seconds,omitempty"`
 field VCSConnection.CallsPerHour *int64 `json:"calls-per-hour,omitempty"`
 field VCSConnection.ConsumersWindowTotal *int64 `json:"consumers-window-total,omitempty"`
@@ -1095,7 +1102,9 @@ field VCSConnection.HasToken bool `json:"has-token"`
 field VCSConnection.HasWebhookSecret bool `json:"has-webhook-secret"`
 field VCSConnection.ID string `json:"id"`
 field VCSConnection.LabelTotals []VCSLabelTotal `json:"label-totals,omitempty"`
+field VCSConnection.Labels map[string]string `json:"labels,omitempty"`
 field VCSConnection.Name string `json:"name"`
+field VCSConnection.OwnerEmail string `json:"owner-email,omitempty"`
 field VCSConnection.Provider string `json:"provider"`
 field VCSConnection.RateLimit *int64 `json:"rate-limit,omitempty"`
 field VCSConnection.RateLimitObservedAt string `json:"rate-limit-observed-at,omitempty"`

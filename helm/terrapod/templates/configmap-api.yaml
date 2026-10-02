@@ -38,13 +38,19 @@ data:
     {{- end }}
     {{- if .Values.api.config.database }}
     database:
-      pool_size: {{ .Values.api.config.database.pool_size | default 10 }}
-      max_overflow: {{ .Values.api.config.database.max_overflow | default 20 }}
-      pool_pre_ping: {{ .Values.api.config.database.pool_pre_ping | default true }}
-      pool_recycle: {{ .Values.api.config.database.pool_recycle | default 1800 }}
-      pool_timeout: {{ .Values.api.config.database.pool_timeout | default 30 }}
-      connect_timeout: {{ .Values.api.config.database.connect_timeout | default 10 }}
-      command_timeout: {{ .Values.api.config.database.command_timeout | default 30 }}
+      pool_size: {{ .Values.api.config.database.pool_size | default 10 | int64 }}
+      max_overflow: {{ .Values.api.config.database.max_overflow | default 20 | int64 }}
+      {{/* hasKey, not `| default true`: the code default is TRUE and Go
+           templates treat `false` as empty, so `| default true` rendered an
+           operator's explicit `false` back as `true` -- silently, and in the
+           direction that leaves stale connections being handed out. */}}
+      {{- if hasKey .Values.api.config.database "pool_pre_ping" }}
+      pool_pre_ping: {{ .Values.api.config.database.pool_pre_ping }}
+      {{- end }}
+      pool_recycle: {{ .Values.api.config.database.pool_recycle | default 1800 | int64 }}
+      pool_timeout: {{ .Values.api.config.database.pool_timeout | default 30 | int64 }}
+      connect_timeout: {{ .Values.api.config.database.connect_timeout | default 10 | int64 }}
+      command_timeout: {{ .Values.api.config.database.command_timeout | default 30 | int64 }}
       auth_mode: {{ .Values.api.config.database.auth_mode | default "password" | quote }}
       aws_iam_region: {{ .Values.api.config.database.aws_iam_region | default "" | quote }}
       ssl_mode: {{ .Values.api.config.database.ssl_mode | default "" | quote }}
@@ -73,7 +79,7 @@ data:
         {{- if .Values.api.config.storage.s3.endpoint_url }}
         endpoint_url: {{ .Values.api.config.storage.s3.endpoint_url | quote }}
         {{- end }}
-        presigned_url_expiry_seconds: {{ .Values.api.config.storage.s3.presigned_url_expiry_seconds }}
+        presigned_url_expiry_seconds: {{ .Values.api.config.storage.s3.presigned_url_expiry_seconds | int64 }}
       {{- end }}
       {{- if eq .Values.api.config.storage.backend "azure" }}
       azure:
@@ -82,7 +88,7 @@ data:
         {{- if .Values.api.config.storage.azure.prefix }}
         prefix: {{ .Values.api.config.storage.azure.prefix | quote }}
         {{- end }}
-        presigned_url_expiry_seconds: {{ .Values.api.config.storage.azure.presigned_url_expiry_seconds }}
+        presigned_url_expiry_seconds: {{ .Values.api.config.storage.azure.presigned_url_expiry_seconds | int64 }}
       {{- end }}
       {{- if eq .Values.api.config.storage.backend "gcs" }}
       gcs:
@@ -96,12 +102,12 @@ data:
         {{- if .Values.api.config.storage.gcs.service_account_email }}
         service_account_email: {{ .Values.api.config.storage.gcs.service_account_email | quote }}
         {{- end }}
-        presigned_url_expiry_seconds: {{ .Values.api.config.storage.gcs.presigned_url_expiry_seconds }}
+        presigned_url_expiry_seconds: {{ .Values.api.config.storage.gcs.presigned_url_expiry_seconds | int64 }}
       {{- end }}
       {{- if eq .Values.api.config.storage.backend "filesystem" }}
       filesystem:
         root_dir: {{ .Values.api.config.storage.filesystem.root_dir | quote }}
-        presigned_url_expiry_seconds: {{ .Values.api.config.storage.filesystem.presigned_url_expiry_seconds }}
+        presigned_url_expiry_seconds: {{ .Values.api.config.storage.filesystem.presigned_url_expiry_seconds | int64 }}
         {{- if .Values.api.config.storage.filesystem.base_url }}
         base_url: {{ .Values.api.config.storage.filesystem.base_url | quote }}
         {{- end }}
@@ -112,14 +118,17 @@ data:
       {{- if .Values.api.config.auth.callback_base_url }}
       callback_base_url: {{ .Values.api.config.auth.callback_base_url | quote }}
       {{- end }}
-      session_ttl_hours: {{ .Values.api.config.auth.session_ttl_hours | default 12 }}
-      api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 8760 }}
+      {{- if hasKey .Values.api.config.auth "legacy_callback_url" }}
+      legacy_callback_url: {{ .Values.api.config.auth.legacy_callback_url }}
+      {{- end }}
+      session_ttl_hours: {{ .Values.api.config.auth.session_ttl_hours | default 12 | int64 }}
+      api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 8760 | int64 }}
       {{- /* Rendered directly (no `| default`): 0 is meaningful for these and
              Helm's `default` would silently rewrite a configured 0 to the default. */}}
-      login_token_ttl_hours: {{ .Values.api.config.auth.login_token_ttl_hours }}
-      service_token_max_ttl_hours: {{ .Values.api.config.auth.service_token_max_ttl_hours }}
-      token_expiry_warning_days: {{ .Values.api.config.auth.token_expiry_warning_days }}
-      bound_token_idle_days: {{ .Values.api.config.auth.bound_token_idle_days }}
+      login_token_ttl_hours: {{ .Values.api.config.auth.login_token_ttl_hours | int64 }}
+      service_token_max_ttl_hours: {{ .Values.api.config.auth.service_token_max_ttl_hours | int64 }}
+      token_expiry_warning_days: {{ .Values.api.config.auth.token_expiry_warning_days | int64 }}
+      bound_token_idle_days: {{ .Values.api.config.auth.bound_token_idle_days | int64 }}
       {{- if .Values.api.config.auth.require_external_sso_for_roles }}
       require_external_sso_for_roles:
         {{- range .Values.api.config.auth.require_external_sso_for_roles }}
@@ -177,11 +186,17 @@ data:
             acs_url: {{ .acs_url | quote }}
             {{- end }}
             {{- /*
-              hasKey, not `| default`: these default to FALSE on this release line, and Helm's
-              `default` treats false as empty — so `| default true` would render
-              true for an operator who explicitly set false, and their opt-out
-              would be silently inert. Omitting the key entirely lets the code
-              default stand, which is what an unset value means.
+              hasKey, not `| default`: all five default to **FALSE on this
+                release line** — they are opt-in here and strict only from 2.0,
+                which `tests/auth/test_saml.py::test_all_five_default_to_false`
+                enforces. `hasKey` is right either way, because Helm's `default`
+                treats false as empty and would discard whichever explicit value
+                an operator set. Omitting the key lets the code default stand,
+                which is what an unset value means.
+
+                (This previously said TRUE, carried in from the 2.0 line where
+                that is correct. Harmless to behaviour, and a trap for the next
+                person reasoning about SAML posture from the chart.)
             */ -}}
             {{- if hasKey . "validate_destination" }}
             validate_destination: {{ .validate_destination }}
@@ -212,11 +227,93 @@ data:
         {{- end }}
       {{- end }}
     {{- end }}
+    {{- with .Values.api.config.engines }}
+    engines:
+      {{- if hasKey . "ansible" }}
+      ansible:
+        enabled: {{ .ansible.enabled }}
+      {{- end }}
+      {{- if hasKey . "pulumi" }}
+      pulumi:
+        enabled: {{ .pulumi.enabled }}
+      {{- end }}
+    {{- end }}
     {{- if .Values.api.config.registry }}
     registry:
       enabled: {{ .Values.api.config.registry.enabled }}
       {{- if hasKey .Values.api.config.registry "cache_only" }}
       cache_only: {{ .Values.api.config.registry.cache_only }}
+      {{- end }}
+      {{- with .Values.api.config.registry.oci }}
+      oci:
+        enabled: {{ .enabled }}
+        {{- with .upload_session_timeout_hours }}
+        upload_session_timeout_hours: {{ . | int64 }}
+        {{- end }}
+        {{- with .gc }}
+        gc:
+          enabled: {{ .enabled }}
+          {{- with .grace_hours }}
+          grace_hours: {{ . | int64 }}
+          {{- end }}
+        {{- end }}
+        {{/* hasKey, not `with`: 0 is a MEANINGFUL value here (never re-check)
+             and `with` treats it as empty, so the key would silently vanish and
+             the code default would win — turning "never expire" into "expire
+             daily", which is the opposite of what was asked for. */}}
+        {{- if hasKey . "mirror_tag_ttl_hours" }}
+        {{/* int64, because a values FILE yields float64 and a large number then
+             renders in scientific notation — 1000000 becomes 1e+06, which the
+             API rejects as an integer at startup. `--set` is unaffected, so this
+             only bites the way operators actually configure things. */}}
+        mirror_tag_ttl_hours: {{ int64 .mirror_tag_ttl_hours }}
+        {{- end }}
+        {{- if .upstreams }}
+        upstreams:
+          {{- range .upstreams }}
+          - host: {{ .host | quote }}
+            {{- if .api_url }}
+            api_url: {{ .api_url | quote }}
+            {{- end }}
+            {{- if .username }}
+            username: {{ .username | quote }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.api.config.registry.package_cache }}
+      package_cache:
+        enabled: {{ .enabled }}
+        {{- with .pypi }}
+        pypi:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
+        {{- with .npm }}
+        npm:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
+        {{- with .pulumi }}
+        pulumi:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
+        {{- with .go }}
+        go:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
+        {{- with .nuget }}
+        nuget:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
+        {{- with .galaxy }}
+        galaxy:
+          enabled: {{ .enabled }}
+          upstream: {{ .upstream | quote }}
+        {{- end }}
       {{- end }}
       {{- if .Values.api.config.registry.provider_cache }}
       provider_cache:
@@ -262,6 +359,30 @@ data:
         {{- end }}
         {{- if .Values.api.config.registry.binary_cache.terragrunt_version_index_url }}
         terragrunt_version_index_url: {{ .Values.api.config.registry.binary_cache.terragrunt_version_index_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.pulumi_mirror_url }}
+        pulumi_mirror_url: {{ .Values.api.config.registry.binary_cache.pulumi_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.pulumi_version_index_url }}
+        pulumi_version_index_url: {{ .Values.api.config.registry.binary_cache.pulumi_version_index_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.node_mirror_url }}
+        node_mirror_url: {{ .Values.api.config.registry.binary_cache.node_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.node_version_index_url }}
+        node_version_index_url: {{ .Values.api.config.registry.binary_cache.node_version_index_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.go_mirror_url }}
+        go_mirror_url: {{ .Values.api.config.registry.binary_cache.go_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.go_version_index_url }}
+        go_version_index_url: {{ .Values.api.config.registry.binary_cache.go_version_index_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.dotnet_mirror_url }}
+        dotnet_mirror_url: {{ .Values.api.config.registry.binary_cache.dotnet_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.dotnet_version_index_url }}
+        dotnet_version_index_url: {{ .Values.api.config.registry.binary_cache.dotnet_version_index_url | quote }}
         {{- end }}
         {{- if .Values.api.config.registry.binary_cache.allow_prerelease }}
         allow_prerelease: {{ .Values.api.config.registry.binary_cache.allow_prerelease | quote }}
@@ -337,8 +458,8 @@ data:
       probe_url:
         internal: {{ .Values.api.config.ha.probe_url.internal | default "" | quote }}
         external: {{ .Values.api.config.ha.probe_url.external | default "" | quote }}
-      probe_interval_seconds: {{ .Values.api.config.ha.probe_interval_seconds | default 60 }}
-      probe_threshold: {{ .Values.api.config.ha.probe_threshold | default 3 }}
+      probe_interval_seconds: {{ .Values.api.config.ha.probe_interval_seconds | default 60 | int64 }}
+      probe_threshold: {{ .Values.api.config.ha.probe_threshold | default 3 | int64 }}
       {{- with .Values.api.config.ha.peer }}
       peer:
         url: {{ .url | default "" | quote }}
@@ -357,7 +478,7 @@ data:
       {{- with .Values.api.config.ha.component_status }}
       component_status:
         enabled: {{ .enabled | default false }}
-        interval_seconds: {{ .interval_seconds | default 60 }}
+        interval_seconds: {{ .interval_seconds | default 60 | int64 }}
         read_nodes: {{ .read_nodes | default false }}
         namespace: {{ .namespace | default "" | quote }}
         instance: {{ .instance | default $.Release.Name | quote }}
@@ -365,14 +486,14 @@ data:
       {{- with .Values.api.config.ha.replication }}
       replication:
         enabled: {{ .enabled | default false }}
-        interval_seconds: {{ .interval_seconds | default 60 }}
-        batch_size: {{ .batch_size | default 500 }}
-        retention_days: {{ .retention_days | default 7 }}
+        interval_seconds: {{ .interval_seconds | default 60 | int64 }}
+        batch_size: {{ .batch_size | default 500 | int64 }}
+        retention_days: {{ .retention_days | default 7 | int64 }}
       {{- end }}
       {{- with .Values.api.config.ha.blobs }}
       blobs:
         mode: {{ .mode | default "verify" | quote }}
-        interval_seconds: {{ .interval_seconds | default 300 }}
+        interval_seconds: {{ .interval_seconds | default 300 | int64 }}
         concurrency: {{ .concurrency | default 4 }}
         {{- /* Two traps in one line each.
                No `| default`: 0 is meaningful for both (it disables the throttle
@@ -397,14 +518,26 @@ data:
     {{- end }}
     {{- if .Values.api.config.vcs }}
     vcs:
-      # Rendered unconditionally via `dig`, for the reason the gitlab key below
-      # gives: the answer belongs in the pod's config either way. `dig` returns a
-      # stored false rather than treating it as empty, so an operator turning this
-      # off is not silently overruled.
-      require_connection_authorization: {{ dig "require_connection_authorization" true .Values.api.config.vcs }}
       enabled: {{ .Values.api.config.vcs.enabled }}
-      poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 }}
-      module_poll_interval_seconds: {{ .Values.api.config.vcs.module_poll_interval_seconds | default 300 }}
+      poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 | int64 }}
+      module_poll_interval_seconds: {{ .Values.api.config.vcs.module_poll_interval_seconds | default 300 | int64 }}
+      {{/* hasKey, not `with` and not `| default true`: the code default is
+           TRUE, and both of those treat `false` as absent -- so an operator
+           who turned the gate off would have it rendered back on, which is
+           the opposite of what they asked for and silent. */}}
+      {{- if hasKey .Values.api.config.vcs "require_push_permission_for_commands" }}
+      require_push_permission_for_commands: {{ .Values.api.config.vcs.require_push_permission_for_commands }}
+      {{- end }}
+      {{/* Restored: the `| default true` cleanup deleted this line as collateral,
+           and nothing caught it — the values contract snapshots keys in
+           values.yaml, not rendered output. An operator who had set this false (the
+           documented remedy on 1.8.2 for "the first workspace on a connection must
+           be created by an admin") would have had it silently revert to true on
+           upgrade, and then met a 403 whose own text told them to set the key that
+           had stopped working. `hasKey` for the same reason as the line above. */}}
+      {{- if hasKey .Values.api.config.vcs "require_connection_authorization" }}
+      require_connection_authorization: {{ .Values.api.config.vcs.require_connection_authorization }}
+      {{- end }}
       # tmpdir tracks the ephemeralStorage mountPath so the VCS poller writes
       # streamed tarballs onto the PVC, not pod memory. Override
       # api.config.vcs.tmpdir if you remount the PVC elsewhere.
@@ -425,23 +558,27 @@ data:
     {{- end }}
     {{- if .Values.api.config.audit }}
     audit:
-      retention_days: {{ .Values.api.config.audit.retention_days | default 90 }}
+      retention_days: {{ .Values.api.config.audit.retention_days | default 90 | int64 }}
     {{- end }}
     {{- if .Values.api.config.agent_pools }}
     agent_pools:
-      listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 }}
+      listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 | int64 }}
       {{- with .Values.api.config.agent_pools.default_join_token_max_uses }}
-      default_join_token_max_uses: {{ . }}
+      default_join_token_max_uses: {{ . | int64 }}
       {{- end }}
       {{- with .Values.api.config.agent_pools.default_join_token_ttl_seconds }}
-      default_join_token_ttl_seconds: {{ . }}
+      default_join_token_ttl_seconds: {{ . | int64 }}
       {{- end }}
     {{- end }}
     {{- if .Values.api.config.drift_detection }}
     drift_detection:
       enabled: {{ .Values.api.config.drift_detection.enabled }}
-      poll_interval_seconds: {{ .Values.api.config.drift_detection.poll_interval_seconds | default 300 }}
-      min_workspace_interval_seconds: {{ .Values.api.config.drift_detection.min_workspace_interval_seconds | default 3600 }}
+      poll_interval_seconds: {{ .Values.api.config.drift_detection.poll_interval_seconds | default 300 | int64 }}
+      min_workspace_interval_seconds: {{ .Values.api.config.drift_detection.min_workspace_interval_seconds | default 3600 | int64 }}
+    {{- end }}
+    {{- if .Values.api.config.runs }}
+    runs:
+      tfe_post_plan_decisions: {{ .Values.api.config.runs.tfe_post_plan_decisions | default false }}
     {{- end }}
     {{- if .Values.api.config.slack }}
     slack:
@@ -466,8 +603,8 @@ data:
     {{- if .Values.api.config.notifications }}
     notifications:
       enabled: {{ .Values.api.config.notifications.enabled }}
-      delivery_timeout_seconds: {{ .Values.api.config.notifications.delivery_timeout_seconds | default 30 }}
-      max_delivery_responses: {{ .Values.api.config.notifications.max_delivery_responses | default 10 }}
+      delivery_timeout_seconds: {{ .Values.api.config.notifications.delivery_timeout_seconds | default 30 | int64 }}
+      max_delivery_responses: {{ .Values.api.config.notifications.max_delivery_responses | default 10 | int64 }}
       {{- if .Values.api.config.notifications.smtp }}
       smtp:
         {{- if .Values.api.config.notifications.smtp.host }}
@@ -478,7 +615,14 @@ data:
         username: {{ .Values.api.config.notifications.smtp.username | quote }}
         {{- end }}
         from_address: {{ .Values.api.config.notifications.smtp.from_address | default "notifications@terrapod.local" | quote }}
-        use_tls: {{ .Values.api.config.notifications.smtp.use_tls | default true }}
+        {{/* hasKey, not `| default true` -- same swallow as pool_pre_ping
+             above, and this one mattered more: an operator pointing Terrapod
+             at a relay that does not speak TLS set `use_tls: false`, had it
+             rendered back as `true`, and got a connection failure their own
+             values file said should not happen. */}}
+        {{- if hasKey .Values.api.config.notifications.smtp "use_tls" }}
+        use_tls: {{ .Values.api.config.notifications.smtp.use_tls }}
+        {{- end }}
       {{- end }}
     {{- end }}
     {{- if .Values.api.config.metrics }}
@@ -502,21 +646,21 @@ data:
     {{- if .Values.api.config.artifact_retention }}
     artifact_retention:
       enabled: {{ .Values.api.config.artifact_retention.enabled }}
-      poll_interval_seconds: {{ .Values.api.config.artifact_retention.poll_interval_seconds | default 86400 }}
-      batch_size: {{ .Values.api.config.artifact_retention.batch_size | default 100 }}
-      state_versions_keep: {{ .Values.api.config.artifact_retention.state_versions_keep | default 20 }}
-      run_artifacts_retention_days: {{ .Values.api.config.artifact_retention.run_artifacts_retention_days | default 90 }}
-      config_versions_retention_days: {{ .Values.api.config.artifact_retention.config_versions_retention_days | default 90 }}
-      provider_cache_retention_days: {{ .Values.api.config.artifact_retention.provider_cache_retention_days | default 30 }}
-      binary_cache_retention_days: {{ .Values.api.config.artifact_retention.binary_cache_retention_days | default 30 }}
-      module_overrides_retention_days: {{ .Values.api.config.artifact_retention.module_overrides_retention_days | default 14 }}
-      deleted_workspace_retention_days: {{ .Values.api.config.artifact_retention.deleted_workspace_retention_days | default 30 }}
+      poll_interval_seconds: {{ .Values.api.config.artifact_retention.poll_interval_seconds | default 86400 | int64 }}
+      batch_size: {{ .Values.api.config.artifact_retention.batch_size | default 100 | int64 }}
+      state_versions_keep: {{ .Values.api.config.artifact_retention.state_versions_keep | default 20 | int64 }}
+      run_artifacts_retention_days: {{ .Values.api.config.artifact_retention.run_artifacts_retention_days | default 90 | int64 }}
+      config_versions_retention_days: {{ .Values.api.config.artifact_retention.config_versions_retention_days | default 90 | int64 }}
+      provider_cache_retention_days: {{ .Values.api.config.artifact_retention.provider_cache_retention_days | default 30 | int64 }}
+      binary_cache_retention_days: {{ .Values.api.config.artifact_retention.binary_cache_retention_days | default 30 | int64 }}
+      module_overrides_retention_days: {{ .Values.api.config.artifact_retention.module_overrides_retention_days | default 14 | int64 }}
+      deleted_workspace_retention_days: {{ .Values.api.config.artifact_retention.deleted_workspace_retention_days | default 30 | int64 }}
     {{- end }}
     {{- if .Values.backup }}
     backup:
       prefix: {{ .Values.backup.prefix | default "backups/" | quote }}
       retention_keep: {{ (.Values.backup.retention).keep | default 0 }}
-      retention_days: {{ (.Values.backup.retention).days | default 0 }}
+      retention_days: {{ (.Values.backup.retention).days | default 0 | int64 }}
     {{- end }}
     {{- if .Values.api.config.encryption }}
     # App-layer encryption at rest (#553) — non-secret config only; the static
@@ -708,11 +852,11 @@ data:
       enabled: {{ .Values.api.config.rate_limit.enabled }}
       {{- /* Rendered directly (no `| default`): 0 means "unlimited" for these
              rates and Helm's `default` would silently rewrite a configured 0. */}}
-      requests_per_minute: {{ .Values.api.config.rate_limit.requests_per_minute }}
-      authenticated_requests_per_minute: {{ .Values.api.config.rate_limit.authenticated_requests_per_minute }}
-      runner_requests_per_minute: {{ .Values.api.config.rate_limit.runner_requests_per_minute }}
-      auth_requests_per_minute: {{ .Values.api.config.rate_limit.auth_requests_per_minute }}
-      distinct_credentials_per_minute: {{ .Values.api.config.rate_limit.distinct_credentials_per_minute }}
+      requests_per_minute: {{ .Values.api.config.rate_limit.requests_per_minute | int64 }}
+      authenticated_requests_per_minute: {{ .Values.api.config.rate_limit.authenticated_requests_per_minute | int64 }}
+      runner_requests_per_minute: {{ .Values.api.config.rate_limit.runner_requests_per_minute | int64 }}
+      auth_requests_per_minute: {{ .Values.api.config.rate_limit.auth_requests_per_minute | int64 }}
+      distinct_credentials_per_minute: {{ .Values.api.config.rate_limit.distinct_credentials_per_minute | int64 }}
       trusted_proxy_cidrs: {{ .Values.api.config.rate_limit.trusted_proxy_cidrs | default list | toJson }}
     {{- end }}
 {{- end }}

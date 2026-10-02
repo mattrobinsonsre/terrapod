@@ -82,6 +82,16 @@ def _validated_value_source(attrs: dict, current: str = "static") -> str:
     if "value-source" not in attrs:
         return current
     src = attrs["value-source"] or "static"
+    # A non-string reaches `in VALUE_SOURCES` as an unhashable key and raises
+    # TypeError, which the global handler turns into a 500 — so a caller sending the
+    # object shape this field looks like it should take got "Internal server error"
+    # instead of being told the field is a string. Found by a test that guessed the
+    # shape wrong, which is exactly what a caller would do.
+    if not isinstance(src, str):
+        raise HTTPException(
+            status_code=422,
+            detail=f"value-source must be a string, one of {sorted(VALUE_SOURCES)}",
+        )
     if src not in VALUE_SOURCES:
         raise HTTPException(
             status_code=422, detail=f"value-source must be one of {sorted(VALUE_SOURCES)}"
@@ -552,6 +562,29 @@ def _validated_assignment_rule(attrs: dict) -> dict | None:
     # Normalise first: parse_filter accepts hyphens, so an underscore-only guard
     # below would be decorative — `workspace-ids` sailed straight past it.
     rule = {str(k).replace("-", "_"): v for k, v in rule.items()}
+
+    # GHSA-49q6-pm68-3xgw. Some dimensions are platform STATE, not identity, and a
+    # workspace's own owner can move them through endpoints that have no business
+    # paying a variable-set check — `dismiss-drift` needs only `drift:dismiss`,
+    # lock/unlock only `workspace:lock`. A rule keyed on one of those is
+    # self-joinable whatever the create/PATCH guard does, so the dimension is
+    # refused rather than five more endpoints gated.
+    from terrapod.services.varset_self_join import (
+        RULE_DIMENSIONS_REFUSED,
+        rule_refused_dimensions,
+    )
+
+    refused = rule_refused_dimensions(rule)
+    if refused:
+        why = "; ".join(f"{k}: {RULE_DIMENSIONS_REFUSED[k]}" for k in refused)
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"assignment-rule cannot select on {', '.join(refused)} — {why}. "
+                "Select on something the workspace's owner cannot change, such as "
+                "labels an admin applies, or assign the set explicitly."
+            ),
+        )
 
     if "workspace_ids" in rule:
         # A literal list of ids is not a rule — it is explicit assignment, which

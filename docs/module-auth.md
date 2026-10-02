@@ -96,13 +96,39 @@ container that is also executing the workspace's own IaC.
 
 Two things make that sharper than it first looks:
 
-- **The connection is chosen in a variable *value*.** Anyone who can set a
-  workspace variable can name any connection an admin created, including ones
-  covering projects they have no access to themselves. There is no per-connection
-  permission check, because a credential nobody can narrow has nothing to check
-  *against*.
+- **The connection is chosen in a variable *value*.** It is named in a string
+  nothing in the workspace schema constrains, so the connection a run mints from
+  is not the one the workspace is configured with and need not be related to it.
+  Naming a connection **is** now authorized — see below — but the check is the
+  only thing standing between a workspace variable and an operator's standing
+  token, where on GitHub the token itself is also narrow and short-lived.
 - **Nothing expires it per run.** A GitHub installation token lives an hour and
   reads code; this one is the operator's standing token.
+
+**Every minted credential is bounded by the connection's repository allowlist**, and
+that check applies even to the workspace's own connection. It has to: a
+`git_http_auth` credential is installed for the scope in its **`key`**, a bare URL
+pattern the workspace owner chooses, so `key = github.com` installs the token for
+the whole host and the workspace's own configuration can then clone anything the
+credential reaches. Without this the allowlist would bound the workspace's
+*repo URL* and not the *credential*, which is not what "restricts the connection to
+those repositories" means. A run whose repository is outside the allowlist is
+refused with a message naming both.
+
+**A connection other than the workspace's own is additionally authorized at mint
+time.** A workspace may always use the connection it is configured with. Anything
+else is checked against the **workspace owner**, since a run has no live caller, and
+the run is **refused with a message naming the credential and the connection**
+rather than run without it. Two of the four claims do not apply on this path: there are
+no roles to evaluate, so a label claim does not grant here, and nothing is treated
+as a platform admin — so a workspace whose claim to a connection rests only on
+labels cannot mint from it, and should name its own connection or use a `static`
+credential. See
+[VCS integration → Naming a VCS connection is authorized](vcs-integration.md#naming-a-vcs-connection-is-authorized).
+(GHSA-v8g7-pqrj-8mcm. The check itself arrived in v1.7.7 and v1.8.2; releases
+before those performed none. The repository allowlist above is newer still — it
+did not exist on either of them, so on those two releases this authorization
+check was the whole of the bound.)
 
 So it is **off by default on every supported release**, behind:
 

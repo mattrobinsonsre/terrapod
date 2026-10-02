@@ -763,6 +763,23 @@
       "delete": "Eliminar"
     },
     "confirmDelete": "Eliminar esta ligação VCS? Os workspaces que a utilizam perderão a integração com o VCS. Isto não pode ser anulado.",
+    "access": {
+      "heading": "Quem pode utilizar esta ligação",
+      "intro": "Estas três definições decidem quais os espaços de trabalho que podem apontar para esta ligação. A credencial em si mantém-se apenas de escrita.",
+      "ownerEmail": "E-mail do proprietário",
+      "ownerEmailHint": "O proprietário pode sempre utilizar esta ligação. Deixe em branco para que a ligação fique sem proprietário.",
+      "labels": "Etiquetas de acesso",
+      "labelsHint": "Um papel cujas regras correspondam a estas etiquetas pode apontar um espaço de trabalho para esta ligação.",
+      "allowedRepositories": "Repositórios permitidos",
+      "allowedRepositoriesHint": "Padrões glob comparados com o repositório que um espaço de trabalho pede para utilizar.",
+      "addPattern": "Adicionar um padrão",
+      "anyRepositoryWarning": "Não está listado nenhum padrão, pelo que esta ligação pode apontar para qualquer repositório.",
+      "restricted": "{count, plural, one {Está listado # padrão} other {Estão listados # padrões}}, pelo que um repositório que não corresponda a nenhum deles é recusado.",
+      "ownedBy": "Pertence a {email}",
+      "unowned": "Não está definido nenhum proprietário",
+      "anyRepositorySummary": "Qualquer repositório é permitido",
+      "repositoryCount": "Restrito a {count, plural, one {# repositório} other {# repositórios}}"
+    },
     "form": {
       "name": "Nome",
       "namePattern": "Apenas letras, números, hífenes e sublinhados. Deve começar com uma letra ou número.",
@@ -1065,7 +1082,7 @@
       "noExpiry": "Sem expiração",
       "addDriftIgnoreRule": "Adicionar regra",
       "debugModeHint": "Manter abertos os pods de runners falhados nos espaços de trabalho criados por esta regra. Desativado por predefinição — um pod mantido aberto conserva as credenciais desse espaço de trabalho.",
-      "allowForkPrPlansHint": "Aplica-se a todos os espaços de trabalho que esta regra cria. Ativado por predefinição nesta linha de versões, porque esse plano executa o código do autor do fork com as credenciais deste espaço de trabalho."
+      "allowForkPrPlansHint": "Aplica-se a todos os espaços de trabalho que esta regra cria. Desativado por predefinição: uma pull request de um fork não recebe plano especulativo, porque executaria o código do seu autor com as credenciais do espaço de trabalho."
     },
     "table": {
       "name": "Nome",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "Planos em pull requests de forks",
-      "description": "Se uma pull request aberta a partir de um fork recebe um plano especulativo. Ativado por predefinição nesta linha de versões, porque esse plano executa o código do autor do fork com as credenciais deste espaço de trabalho.",
+      "description": "Se uma pull request aberta a partir de um fork recebe um plano especulativo. Desativado por predefinição, porque esse plano executa o código do autor do fork com as credenciais deste espaço de trabalho.",
       "label": "Planear pull requests de forks",
       "hint": "Uma execução recebe as variáveis de ambiente deste espaço de trabalho, os valores sensíveis, quaisquer segredos resolvidos pelo Vault e a identidade na nuvem do job. Quem abre uma pull request a partir de um fork não tem acesso de escrita nem pode fazer merge, por isso um plano especulativo é a única via pela qual o seu código chega a essas credenciais. Ative isto num espaço de trabalho que não guarde nada que valha a pena levar — um repositório público de módulos que aceita contribuições da comunidade, por exemplo. As pull requests de ramos do próprio repositório não são afetadas e geram sempre plano.",
       "activeBadge": "Ligado",

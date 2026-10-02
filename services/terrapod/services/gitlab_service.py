@@ -1010,3 +1010,66 @@ def parse_repo_url(repo_url: str) -> tuple[str, str] | None:
                 return parts[0], parts[1]
 
     return None
+
+
+#: GitLab's Developer role. The lowest access level that can push to a
+#: protected-branch-free branch and open a merge request from one; Reporter
+#: (20) and Guest (10) cannot push at all. Matches the GitHub side's "push",
+#: which is also the lowest level that can write to the repository.
+DEVELOPER_ACCESS_LEVEL = 30
+
+
+async def actor_has_push_access(
+    conn: VCSConnection, owner: str, repo: str, user_id: str
+) -> bool | None:
+    """Whether the GitLab user `user_id` may push to `owner/repo`.
+
+    True / False / **None when we could not establish it** — see the GitHub
+    twin for why None is not False at the call site.
+
+    Keyed on the numeric user id rather than the username because that is what
+    `members` takes, and it is what both the webhook payload and the comment
+    poller already carry. A username would need a second lookup and would
+    follow a rename to whoever took the handle.
+
+    `members/all/` rather than `members/`: the `/all/` variant resolves
+    membership **inherited from the parent group**, which is how most GitLab
+    installations grant repository access. The direct-members endpoint would
+    answer "not a member" for a group Maintainer and refuse every command they
+    issued.
+    """
+    if not user_id:
+        return False
+    try:
+        resp = await _gitlab_request(
+            "GET",
+            f"{_api_url(conn)}/projects/{_project_path(owner, repo)}"
+            f"/members/all/{url_quote(str(user_id), safe='')}",
+            conn,
+        )
+    except Exception as e:
+        logger.warning(
+            "could not establish push access",
+            repo=f"{owner}/{repo}",
+            user_id=user_id,
+            error=repr(e),
+        )
+        return None
+    if resp.status_code == 404:
+        # Not a member, directly or by inheritance. Definitive.
+        return False
+    if resp.status_code != 200:
+        logger.warning(
+            "could not establish push access",
+            repo=f"{owner}/{repo}",
+            user_id=user_id,
+            status=resp.status_code,
+        )
+        return None
+    try:
+        level = (resp.json() or {}).get("access_level")
+    except Exception:
+        return None
+    if not isinstance(level, int):
+        return None
+    return level >= DEVELOPER_ACCESS_LEVEL

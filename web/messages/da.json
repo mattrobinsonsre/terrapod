@@ -763,6 +763,23 @@
       "delete": "Slet"
     },
     "confirmDelete": "Slet denne VCS-forbindelse? Arbejdsområder, der bruger den, mister VCS-integration. Dette kan ikke fortrydes.",
+    "access": {
+      "heading": "Hvem der må bruge denne forbindelse",
+      "intro": "Disse tre indstillinger afgør, hvilke arbejdsområder der må pege på denne forbindelse. Selve legitimationsoplysningen forbliver kun skrivbar.",
+      "ownerEmail": "Ejerens e-mail",
+      "ownerEmailHint": "Ejeren må altid bruge denne forbindelse. Lad feltet være tomt for at lade forbindelsen stå uden ejer.",
+      "labels": "Adgangsetiketter",
+      "labelsHint": "En rolle, hvis regler matcher disse etiketter, må pege et arbejdsområde på denne forbindelse.",
+      "allowedRepositories": "Tilladte depoter",
+      "allowedRepositoriesHint": "Glob-mønstre, der matches mod det depot, et arbejdsområde beder om at bruge.",
+      "addPattern": "Tilføj et mønster",
+      "anyRepositoryWarning": "Der er ikke angivet nogen mønstre, så denne forbindelse må pege på et vilkårligt depot.",
+      "restricted": "{count, plural, one {# mønster er angivet} other {# mønstre er angivet}}, så et depot, der ikke matcher nogen af dem, afvises.",
+      "ownedBy": "Ejes af {email}",
+      "unowned": "Der er ikke angivet nogen ejer",
+      "anyRepositorySummary": "Et vilkårligt depot er tilladt",
+      "repositoryCount": "Begrænset til {count, plural, one {# depot} other {# depoter}}"
+    },
     "form": {
       "name": "Navn",
       "namePattern": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",
@@ -1065,7 +1082,7 @@
       "noExpiry": "Ingen udløb",
       "addDriftIgnoreRule": "Tilføj regel",
       "debugModeHint": "Hold mislykkede runner-pods åbne på de arbejdsområder, denne regel opretter. Slået fra som standard – en tilbageholdt pod beholder det arbejdsområdes legitimationsoplysninger.",
-      "allowForkPrPlansHint": "Gælder for alle arbejdsområder, denne regel opretter. Slået til som standard i denne udgivelseslinje, fordi den plan kører fork-forfatterens kode med dette arbejdsområdes legitimationsoplysninger."
+      "allowForkPrPlansHint": "Gælder for alle arbejdsområder, denne regel opretter. Slået fra som standard: en pull request fra en fork får ingen spekulativ plan, fordi den ville køre forfatterens kode med arbejdsområdets legitimationsoplysninger."
     },
     "table": {
       "name": "Navn",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "Planer på pull requests fra forks",
-      "description": "Om en pull request åbnet fra en fork får en spekulativ plan. Slået til som standard i denne udgivelseslinje, fordi den plan kører fork-forfatterens kode med dette arbejdsområdes legitimationsoplysninger.",
+      "description": "Om en pull request åbnet fra en fork får en spekulativ plan. Slået fra som standard, fordi den plan kører fork-forfatterens kode med dette arbejdsområdes legitimationsoplysninger.",
       "label": "Planlæg pull requests fra forks",
       "hint": "En kørsel modtager dette arbejdsområdes miljøvariabler, følsomme værdier, alle hemmeligheder hentet via Vault og jobbets cloud-identitet. Den, der åbner en pull request fra en fork, har ingen skriveadgang og kan ikke merge, så en spekulativ plan er den eneste vej, ad hvilken deres kode når frem til de legitimationsoplysninger. Slå dette til for et arbejdsområde, der ikke rummer noget værd at tage — for eksempel et offentligt modul-repository, der tager imod bidrag fra fællesskabet. Pull requests fra grene i selve repositoryet er upåvirkede og planlægges altid.",
       "activeBadge": "Til",

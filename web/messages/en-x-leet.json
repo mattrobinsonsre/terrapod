@@ -763,6 +763,23 @@
       "delete": "D3l373"
     },
     "confirmDelete": "D3l373 7h15 VC5 c0nn3c710n? W0rk5p4c35 u51ng 17 w1ll l053 VC5 1n73gr4710n. 7h15 c4nn07 b3 und0n3.",
+    "access": {
+      "heading": "Wh0 m4y u53 7h15 c0nn3c710n",
+      "intro": "7h353 7hr33 53771ng5 d3c1d3 wh1ch w0rk5p4c35 m4y b3 p01n73d 47 7h15 c0nn3c710n. 7h3 cr3d3n714l 1753lf 574y5 wr173-0nly.",
+      "ownerEmail": "0wn3r 3m41l",
+      "ownerEmailHint": "7h3 0wn3r m4y 4lw4y5 u53 7h15 c0nn3c710n. L34v3 17 bl4nk 70 l34v3 7h3 c0nn3c710n un0wn3d.",
+      "labels": "4cc355 l4b3l5",
+      "labelsHint": "4 r0l3 wh053 rul35 m47ch 7h353 l4b3l5 m4y p01n7 4 w0rk5p4c3 47 7h15 c0nn3c710n.",
+      "allowedRepositories": "4ll0w3d r3p05170r135",
+      "allowedRepositoriesHint": "Gl0b p4773rn5 m47ch3d 4g41n57 7h3 r3p05170ry 4 w0rk5p4c3 45k5 70 u53.",
+      "addPattern": "4dd 4 p4773rn",
+      "anyRepositoryWarning": "N0 p4773rn5 4r3 l1573d, 50 7h15 c0nn3c710n m4y b3 p01n73d 47 4ny r3p05170ry.",
+      "restricted": "{count, plural, one {# pattern is listed} other {# patterns are listed}}, 50 4 r3p05170ry m47ch1ng n0n3 0f 7h3m 15 r3fu53d.",
+      "ownedBy": "0wn3d by {email}",
+      "unowned": "N0 0wn3r 15 537",
+      "anyRepositorySummary": "4ny r3p05170ry 15 4ll0w3d",
+      "repositoryCount": "R357r1c73d 70 {count, plural, one {# repository} other {# repositories}}"
+    },
     "form": {
       "name": "N4m3",
       "namePattern": "L3773r5, numb3r5, hyph3n5, 4nd und3r5c0r35 0nly. Mu57 574r7 w17h 4 l3773r 0r numb3r.",
@@ -1065,7 +1082,7 @@
       "noExpiry": "N0 3xp1ry",
       "addDriftIgnoreRule": "4dd rul3",
       "debugModeHint": "H0ld f41l3d runn3r p0d5 0p3n 0n 7h3 w0rk5p4c35 7h15 rul3 cr34735. 0ff by d3f4ul7 — 4 h3ld p0d k33p5 7h47 w0rk5p4c3'5 cr3d3n714l5.",
-      "allowForkPrPlansHint": "4ppl135 70 3v3ry w0rk5p4c3 7h15 rul3 cr34735. 0n by d3f4ul7 0n 7h15 r3l3453 l1n3, b3c4u53 7h47 pl4n run5 7h3 f0rk 4u7h0r'5 c0d3 w17h 7h15 w0rk5p4c3'5 cr3d3n714l5."
+      "allowForkPrPlansHint": "4ppl135 70 3v3ry w0rk5p4c3 7h15 rul3 cr34735. 0ff by d3f4ul7: 4 pull r3qu357 fr0m 4 f0rk g375 n0 5p3cul471v3 pl4n, b3c4u53 17 w0uld run 175 4u7h0r'5 c0d3 w17h 7h3 w0rk5p4c3'5 cr3d3n714l5."
     },
     "table": {
       "name": "N4m3",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "Pl4n5 0n f0rk pull r3qu3575",
-      "description": "Wh37h3r 4 pull r3qu357 0p3n3d fr0m 4 f0rk g375 4 5p3cul471v3 pl4n. 0n by d3f4ul7 0n 7h15 r3l3453 l1n3, b3c4u53 7h47 pl4n run5 7h3 f0rk 4u7h0r'5 c0d3 w17h 7h15 w0rk5p4c3'5 cr3d3n714l5.",
+      "description": "Wh37h3r 4 pull r3qu357 0p3n3d fr0m 4 f0rk g375 4 5p3cul471v3 pl4n. 0ff by d3f4ul7, b3c4u53 7h47 pl4n run5 7h3 f0rk 4u7h0r'5 c0d3 w17h 7h15 w0rk5p4c3'5 cr3d3n714l5.",
       "label": "Pl4n f0rk pull r3qu3575",
       "hint": "4 run r3c31v35 7h15 w0rk5p4c3'5 3nv1r0nm3n7 v4r14bl35, 53n5171v3 v4lu35, 4ny V4ul7-r350lv3d 53cr375 4nd 7h3 j0b'5 cl0ud 1d3n717y. 50m30n3 0p3n1ng 4 pull r3qu357 fr0m 4 f0rk h45 n0 wr173 4cc355 4nd c4nn07 m3rg3, 50 4 5p3cul471v3 pl4n 15 7h3 0nly w4y 7h31r c0d3 r34ch35 7h053 cr3d3n714l5. 7urn 7h15 0n f0r 4 w0rk5p4c3 7h47 h0ld5 n07h1ng w0r7h 74k1ng — 4 publ1c m0dul3 r3p05170ry 4cc3p71ng c0mmun17y c0n7r1bu710n5, 54y. Pull r3qu3575 fr0m br4nch35 1n 7h3 r3p05170ry 1753lf 4r3 un4ff3c73d 4nd 4lw4y5 pl4n.",
       "activeBadge": "0n",

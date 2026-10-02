@@ -342,6 +342,36 @@ Create accepts the same settings `PATCH` does, including `vcs-workflow`, `auto-m
 
 **Required permission:** Any authenticated user can create workspaces (creator becomes owner).
 
+<a id="workspace-write-refusals"></a>
+
+#### Refusals on create and update
+
+Create is open to any authenticated user and the creator becomes owner, so two
+things a caller chooses in the body are grants rather than preferences. Both are
+checked on **create** and on **`PATCH`**, and both answer **403**.
+
+| Refusal | When | What to do |
+|---|---|---|
+| Not authorized to use VCS connection `vcs-…` | The body names a connection the caller has no claim to. Checked on create, and on update only when the connection actually **changes**. Both the `vcs-connection-id` attribute and the `vcs-connection` relationship are covered. | Ask a platform admin to set the connection's `owner-email` or `labels`, or create the workspace under someone who already has a claim. See [Authorization and repository scope](#connection-authorization-attributes). |
+| Connection `vcs-…` is restricted to specific repositories and `…` is not one of them | The named connection has a non-empty `allowed-repositories` that `vcs-repo-url` does not match. Re-checked on **every** update that leaves a connection attached, since `vcs-repo-url` is separately settable. | Use a repository inside the connection's scope, or ask a platform admin to widen `allowed-repositories`. |
+| This change would make the workspace match the assignment rule of variable set `…` | The attributes being set would pull in a **rule-assigned** variable set **that carries a sensitive or broker-resolved value** and is not already reaching this workspace, and the caller is not a platform admin. A rule-assigned set of plain configuration joins freely — the refusal is scoped to the reported impact, because refusing every match would close the documented self-service workflow as well as the finding. | Ask a platform admin to make the change, or to assign the set to the workspace explicitly. See [Assignment Rules](#assignment-rules). |
+
+The variable-set refusal compares the rule-assigned sets reaching the workspace
+**before and after** the pending change, so:
+
+- **shrinking is allowed** — dropping a label that was pulling a set in is a
+  de-escalation and needs no admin;
+- an **unrelated edit** to a workspace that already matches is allowed; the test
+  is growth, not membership;
+- **global** and **explicitly-assigned** sets never count. A global set already
+  reaches every workspace, and an explicit assignment was an admin's deliberate
+  act on this workspace;
+- a refusal is **atomic**: the change is rolled back, so a refused create leaves
+  no workspace behind.
+
+The refusal names the variable sets it would have pulled in — the names are not
+secret, the values are.
+
 ### Agent pool set
 
 A workspace routes its runs to a **set** of agent pools. The set is **flat**:
@@ -402,6 +432,11 @@ PATCH /api/v2/workspaces/{id}
 Same body format as create. Only include attributes to change.
 
 **Required permission:** `admin` on the workspace.
+
+**403 refusals:** a changed `vcs-connection-id`/`vcs-connection` the caller has no
+claim to, a `vcs-repo-url` outside the connection's `allowed-repositories`, and a
+change that would pull in a rule-assigned variable set. All three are shared with
+create — see [Refusals on create and update](#refusals-on-create-and-update).
 
 **Self-lockout protection:** If the request changes `labels` and the new labels would reduce the caller's own access level, the API returns **409 Conflict** with a descriptive error. Re-submit with `"force": true` in the attributes to confirm the change. Platform admins and workspace owners are immune (their access doesn't depend on labels).
 
@@ -1106,7 +1141,7 @@ Returns the **single-workspace resource dependency graph** behind the [State Res
 
 ### AI Architecture Critique (Terrapod Extension)
 
-State-based, whole-system critique (#1036 Part 2). Reviews the workspace's deployed system **as it exists** — inferred from its current Terraform state (+ the resource graph, the deterministic cost estimate, and the deterministic security-scan findings) and critiqued across resilience / security / cost / well-architected. Distinct from the per-run [Plan Summary](#plan-summary), which reviews a *change*. Enabled by the independent `ai_architecture` config (on by default on this release line; off from 2.0).
+State-based, whole-system critique (#1036 Part 2). Reviews the workspace's deployed system **as it exists** — inferred from its current Terraform state (+ the resource graph, the deterministic cost estimate, and the deterministic security-scan findings) and critiqued across resilience / security / cost / well-architected. Distinct from the per-run [Plan Summary](#plan-summary), which reviews a *change*. Enabled by the independent `ai_architecture` config, which is **off by default** — the surface self-gates to 404 until an operator turns it on. It is deliberately a separate switch from `ai_summary`: the critic reads whole-workspace **state**, so enabling it sends resource attributes to the configured model endpoint.
 
 ```
 GET  /api/terrapod/v1/workspaces/{workspace_id}/architecture-critique
@@ -1978,6 +2013,39 @@ A rule that no longer parses matches **nothing** rather than everything, so a
 filter dimension removed in a later version cannot silently widen a scoped
 credential set to the whole estate.
 
+<a id="labels-are-not-a-credential-trust-boundary"></a>
+
+#### Labels are not a credential trust boundary
+
+**An assignment rule selects on attributes a workspace's own owner controls.**
+Labels, name, execution mode, engine version, agent pool, VCS connection and the
+rest are all settable by whoever has `admin` on the workspace — and workspace
+creation is open, with the creator becoming owner. So a rule is a convenient way
+to describe a fleet; it is **not** an authorization check, and a variable set has
+no per-set permissions for one to appeal to.
+
+Treat a rule-scoped set exactly as widely trusted as the attribute it selects on.
+Specifically:
+
+- **Do not** rely on a label to keep a credential away from someone who can
+  create or administer a workspace. If the set holds something only one team may
+  have, assign it to that team's workspaces **explicitly**, or keep it in those
+  workspaces' own variables.
+- **Review the rule, not just the membership**, when you add a credential to an
+  existing set. The blast radius is "every workspace that can be made to match",
+  which is larger than "every workspace that matches today".
+
+Terrapod enforces the one invariant it can without an entitlement to consult: a
+caller who is **not** a platform admin may not make a workspace match a
+rule-assigned set **that holds a sensitive or broker-resolved value** and that it
+does not already match. A rule-assigned set of plain configuration joins freely. That covers workspace create and
+workspace `PATCH` — the paths where the attributes are chosen — and is a **403**;
+see [Refusals on create and update](#refusals-on-create-and-update). It is a
+behaviour change: a non-admin who previously created workspaces that joined a
+rule-scoped set now needs an admin to make the change, or an explicit assignment.
+Shrinking is always allowed, as is any edit to a workspace that already matches.
+(GHSA-49q6-pm68-3xgw)
+
 ### Association Views
 
 Read-only views of which workspaces a set reaches, and which sets reach a
@@ -2021,6 +2089,14 @@ DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versi
 **Submodules.** Create, `PATCH …/{name}/{provider}` and `PATCH …/{name}/{provider}/vcs` accept an optional `subdirectory`: the path within the module's repository to publish it from, for a submodule (see [Submodules](registry.md#submodules-a-module-in-a-subdirectory)). It needs a `vcs-repo-url`; a path with `..`, `.` or empty segments is refused with `422`, and a repository subdirectory that is already registered with `409`. Modules report it as the `subdirectory` attribute, `""` for a module at the repository root. On `PATCH …/vcs`, omitting it leaves it unchanged; removing the repository clears it.
 
 **Autodiscovery.** To find the modules in a repository — the root and any submodules — and register them in bulk, use [Module Autodiscovery Rules](#module-autodiscovery-rules).
+
+**Naming a VCS connection is authorized.** Module creation is open to any
+authenticated user, and a VCS-sourced module names a connection plus an arbitrary
+`vcs-repo-url` that the registry poller then clones with that connection's
+credential. So create, `PATCH …/{name}/{provider}` and `PATCH …/{name}/{provider}/vcs`
+all check the caller's claim to the connection and answer **403** without one, on
+the same four claims the workspace paths use — see
+[Authorization and repository scope](#connection-authorization-attributes).
 
 ### Update Module
 
@@ -2435,6 +2511,44 @@ POST /api/terrapod/v1/vcs-connections
 
 **Required permission:** Platform `admin`.
 
+<a id="connection-authorization-attributes"></a>
+
+#### Authorization and repository scope
+
+Read-write, on every connection in the create, update, list and show responses.
+They decide **who** may point a workspace or registry module at this connection
+and **where** it may be pointed. None of the three is a secret — the credential
+is, and that is still write-only. (GHSA-v8g7-pqrj-8mcm)
+
+| Attribute | Type | Description |
+|---|---|---|
+| `owner-email` | string | The connection's owner, who may name it. `""` when unset. |
+| `labels` | object | Key-value labels. A caller whose roles reach them may name the connection — the same allow/deny evaluation every labelled resource gets. Validated on create as well as update, so a reserved label key cannot be accepted on one path and then trap the connection on the other. |
+| `allowed-repositories` | array of strings | Glob patterns this connection may be pointed at. **Empty means any repository the credential can reach** — narrowing is opt-in, so an upgraded deployment is unchanged until an operator sets it. |
+
+A connection may be named by a platform admin, by its `owner-email`, by a caller
+whose roles reach its `labels`, or by a caller who already owns a workspace using
+it. Anything else is **403**. Patterns in `allowed-repositories` are matched
+against both the full URL as stored and the `owner/name` path with any `.git`
+suffix removed, so `platform-team/*` and
+`https://github.example.com/platform-team/*` both work; `*` crosses `/`, and
+patterns are case-sensitive. Full semantics, including every point the
+allowlist is enforced at, are in
+[VCS integration → Naming a VCS connection is authorized](vcs-integration.md#naming-a-vcs-connection-is-authorized).
+
+On `PATCH` each of the three is applied only when its key is **present**:
+omitting one leaves it alone, and an explicitly empty value clears it — so
+`"allowed-repositories": []` means "allow any repository again".
+
+A `labels` value that is not an object, and an `allowed-repositories` that is not
+a list of strings, are both rejected with `422`. So is a **reserved** label key,
+and so is an `allowed-repositories` whose entries are all blank — that one matters
+because blanks are stripped, and an empty list means *any* repository, so silently
+dropping them would answer `200` having made the connection **wider** than it was.
+Send `[]` when you mean "any". Reserved keys are listed under
+[RBAC → Reserved Label Keys](rbac.md#reserved-label-keys) and there is no reason
+to send one.
+
 ### Show Connection
 
 ```
@@ -2481,7 +2595,7 @@ Partial update — only the attributes you include are changed. Notes:
 
 - `provider` is **immutable**. A different provider is a different connection; delete and recreate to change it (sending a different `provider` returns `422`).
 - Credentials (`private-key` for GitHub, `token` for GitLab) are **write-only**: they are never returned, and are only rotated when you send a non-empty value. Omit them to change the name/server-url/status without touching the stored credential.
-- Editable: `name`, `server-url`, `status` (`active`/`disabled`), and the GitHub App identifiers (`github-app-id`, `github-installation-id`, `github-account-login`, `github-account-type`). Changing `github-installation-id` to one already used by another connection returns `422`.
+- Editable: `name`, `server-url`, `status` (`active`/`disabled`), the GitHub App identifiers (`github-app-id`, `github-installation-id`, `github-account-login`, `github-account-type`), and the three authorization attributes `owner-email`, `labels` and `allowed-repositories` (see [Authorization and repository scope](#connection-authorization-attributes)). Changing `github-installation-id` to one already used by another connection returns `422`.
 
 ```json
 {
@@ -2610,8 +2724,8 @@ These are editable in the UI under **Admin → Autodiscovery**, alongside the ru
 - `ai-summary-mode` / `ai-summary-context` — the AI plan-summary opt-in and its free-text context for every created workspace (#1763).
 - `ai-policy-mode` — the AI **policy gate** per-workspace override for every created workspace. `disabled` opts out of an advisory verdict only, and a mandatory deployment-wide gate ignores it; `enabled` is a synonym for `default` and has no effect (#1766).
 - `terragrunt-enabled` / `terragrunt-version`, `vcs-workflow`, `auto-merge` / `auto-merge-strategy`, `drift-detection-enabled` / `drift-detection-interval-seconds`, `drift-ignore-rules`, `plan-expiry-seconds` and `slack-channel` — the remaining per-workspace settings (#1763). `drift-detection-enabled` defaults **true** here, unlike the workspace column, because every autodiscovered workspace is VCS-connected.
-- `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **true** on this release line (false from 2.0), as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
-- `allow-fork-pr-plans` — let a pull request opened from a fork plan on every created workspace. Defaults **true** on this release line (false from 2.0), matching the workspace column rather than overriding it the way `drift-detection-enabled` does: an operator who decides fork pull requests should plan has to say so, and a rule is how they say it once for every directory the repository grows later. Without it, enabling the setting in bulk holds only until autodiscovery creates the next workspace — which reads as the setting not working. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks).
+- `debug-mode` — hold failed runner pods open for every created workspace (#1764). Defaults **false**, as on a workspace: a rule can materialise hundreds of workspaces, and this one is worth turning on deliberately.
+- `allow-fork-pr-plans` — let a pull request opened from a fork plan on every created workspace. Defaults **false**, matching the workspace column rather than overriding it the way `drift-detection-enabled` does: an operator who decides fork pull requests should plan has to say so, and a rule is how they say it once for every directory the repository grows later. Without it, enabling the setting in bulk holds only until autodiscovery creates the next workspace — which reads as the setting not working. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks).
 
 These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template). The same pairing holds for the scan and AI-summary settings, and their values are validated by the same rules the workspace endpoint uses — so a rule cannot template a setting the workspace API would reject.
 

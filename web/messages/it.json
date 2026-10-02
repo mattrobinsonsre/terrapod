@@ -763,6 +763,23 @@
       "delete": "Elimina"
     },
     "confirmDelete": "Eliminare questa connessione VCS? I workspace che la utilizzano perderanno l''integrazione VCS. Questa azione non può essere annullata.",
+    "access": {
+      "heading": "Chi può usare questa connessione",
+      "intro": "Queste tre impostazioni decidono quali spazi di lavoro possono puntare a questa connessione. La credenziale stessa resta di sola scrittura.",
+      "ownerEmail": "E-mail del proprietario",
+      "ownerEmailHint": "Il proprietario può sempre usare questa connessione. Lascia vuoto per lasciare la connessione senza proprietario.",
+      "labels": "Etichette di accesso",
+      "labelsHint": "Un ruolo le cui regole corrispondono a queste etichette può puntare uno spazio di lavoro a questa connessione.",
+      "allowedRepositories": "Repository consentiti",
+      "allowedRepositoriesHint": "Pattern glob confrontati con il repository che uno spazio di lavoro chiede di usare.",
+      "addPattern": "Aggiungi un pattern",
+      "anyRepositoryWarning": "Non è elencato alcun pattern, quindi questa connessione può puntare a qualsiasi repository.",
+      "restricted": "{count, plural, one {È elencato # pattern} other {Sono elencati # pattern}}, quindi un repository che non corrisponde a nessuno di essi viene rifiutato.",
+      "ownedBy": "Di proprietà di {email}",
+      "unowned": "Non è impostato alcun proprietario",
+      "anyRepositorySummary": "È consentito qualsiasi repository",
+      "repositoryCount": "Limitato a {count, plural, one {# repository} other {# repository}}"
+    },
     "form": {
       "name": "Nome",
       "namePattern": "Solo lettere, numeri, trattini e trattini bassi. Deve iniziare con una lettera o un numero.",
@@ -1065,7 +1082,7 @@
       "noExpiry": "Nessuna scadenza",
       "addDriftIgnoreRule": "Aggiungi regola",
       "debugModeHint": "Mantenere aperti i pod dei runner falliti sugli spazi di lavoro creati da questa regola. Disattivato per impostazione predefinita: un pod mantenuto aperto conserva le credenziali di quello spazio di lavoro.",
-      "allowForkPrPlansHint": "Si applica a ogni spazio di lavoro creato da questa regola. Attivato per impostazione predefinita in questa linea di rilascio, perché quel plan esegue il codice dell''autore del fork con le credenziali di questo workspace."
+      "allowForkPrPlansHint": "Si applica a ogni spazio di lavoro creato da questa regola. Disattivato per impostazione predefinita: una pull request da un fork non riceve alcun plan speculativo, perché eseguirebbe il codice del suo autore con le credenziali dello spazio di lavoro."
     },
     "table": {
       "name": "Nome",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plan sulle pull request da fork",
-      "description": "Se una pull request aperta da un fork riceve un plan speculativo. Attivato per impostazione predefinita in questa linea di rilascio, perché quel plan esegue il codice dell''autore del fork con le credenziali di questo workspace.",
+      "description": "Se una pull request aperta da un fork riceve un plan speculativo. Disattivato per impostazione predefinita, perché quel plan esegue il codice dell''autore del fork con le credenziali di questo spazio di lavoro.",
       "label": "Esegui il plan sulle pull request da fork",
       "hint": "Un''esecuzione riceve le variabili d''ambiente di questo spazio di lavoro, i valori sensibili, tutti i segreti risolti tramite Vault e l''identità cloud del job. Chi apre una pull request da un fork non ha accesso in scrittura e non può fare merge, quindi un plan speculativo è l''unico modo in cui il suo codice raggiunge quelle credenziali. Attivalo per uno spazio di lavoro che non custodisce nulla che valga la pena rubare — un repository pubblico di moduli aperto ai contributi della comunità, per esempio. Le pull request dai branch del repository stesso non sono interessate e generano sempre un plan.",
       "activeBadge": "Attivo",

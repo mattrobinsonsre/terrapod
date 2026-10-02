@@ -763,6 +763,23 @@
       "delete": "删除"
     },
     "confirmDelete": "删除此 VCS 连接？使用它的工作区将失去 VCS 集成。此操作无法撤销。",
+    "access": {
+      "heading": "谁可以使用此连接",
+      "intro": "这三项设置决定哪些工作区可以指向此连接。凭据本身仍为只写。",
+      "ownerEmail": "所有者邮箱",
+      "ownerEmailHint": "所有者始终可以使用此连接。留空可让此连接没有所有者。",
+      "labels": "访问标签",
+      "labelsHint": "规则与这些标签匹配的角色可以将工作区指向此连接。",
+      "allowedRepositories": "允许的仓库",
+      "allowedRepositoriesHint": "与工作区请求使用的仓库进行匹配的 glob 模式。",
+      "addPattern": "添加模式",
+      "anyRepositoryWarning": "未列出任何模式，因此此连接可以指向任何仓库。",
+      "restricted": "已列出 {count, plural, one {# 个模式} other {# 个模式}}，因此与其中任何一个都不匹配的仓库都会被拒绝。",
+      "ownedBy": "由 {email} 拥有",
+      "unowned": "未设置所有者",
+      "anyRepositorySummary": "允许任何仓库",
+      "repositoryCount": "仅限 {count, plural, one {# 个仓库} other {# 个仓库}}"
+    },
     "form": {
       "name": "名称",
       "namePattern": "仅限字母、数字、连字符和下划线。必须以字母或数字开头。",
@@ -1065,7 +1082,7 @@
       "noExpiry": "不过期",
       "addDriftIgnoreRule": "添加规则",
       "debugModeHint": "在此规则创建的工作区上保持失败运行器的 Pod 打开。默认关闭 — 被保持的 Pod 会保留该工作区的凭据。",
-      "allowForkPrPlansHint": "适用于此规则创建的每个工作区。在此发布线上默认开启，因为该计划会用此工作区的凭据运行 fork 作者的代码。"
+      "allowForkPrPlansHint": "适用于此规则创建的每个工作区。默认关闭：来自 fork 的拉取请求不会获得推测性计划，因为那会用工作区的凭据运行其作者的代码。"
     },
     "table": {
       "name": "名称",
@@ -2570,7 +2587,7 @@
     },
     "planExpiry": {
       "title": "计划过期",
-      "description": "当未确认的计划超过此时长后自动丢弃，以防止过时的计划针对已变化的环境被应用。默认关闭；关闭时计划必须重新运行。（仅适用于可应用的运行。）",
+      "description": "当未确认的计划超过此时长后自动丢弃，以防止过时的计划针对已变化的环境被应用。默认关闭；之后计划必须重新运行。（仅适用于可应用的运行。）",
       "expireAfter": "过期时长"
     },
     "aiSummary": {
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "来自 fork 的拉取请求的计划",
-      "description": "从 fork 发起的拉取请求是否会获得推测性计划。在此发布线上默认开启，因为该计划会用此工作区的凭据运行 fork 作者的代码。",
+      "description": "从 fork 发起的拉取请求是否会获得推测性计划。默认关闭，因为该计划会用此工作区的凭据运行 fork 作者的代码。",
       "label": "为 fork 的拉取请求运行计划",
       "hint": "一次运行会获得此工作区的环境变量、敏感值、所有由 Vault 解析的密钥，以及该任务的云身份。从 fork 发起拉取请求的人没有写入权限，也无法合并，因此推测性计划是其代码接触到这些凭据的唯一途径。请只为没有任何值得窃取之物的工作区开启它 — 例如一个接受社区贡献的公开模块仓库。来自仓库自身分支的拉取请求不受影响，始终会执行计划。",
       "activeBadge": "已开启",

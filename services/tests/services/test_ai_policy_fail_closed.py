@@ -11,6 +11,7 @@ These pin the fixes. Each is mutation-checked against the shipped behaviour.
 
 from __future__ import annotations
 
+import json
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -193,3 +194,275 @@ class TestOverrideReleasesARunThatWasNeverRuledOn:
         # overruled it, it does not erase what was decided.
         assert row.outcome == "denied"
         record.assert_not_awaited()
+
+
+# ── 4. a gate ruling on a plan it was only partly shown ──────────────
+
+
+class TestAMandatoryGateRefusesAReducedPlan:
+    """`_fit_plan_json` reduces an over-cap plan to address+actions skeletons.
+    The gate still reported a clean pass on the part it could see, so padding a
+    plan past `ai_summary.plan_json_max_bytes` pushed the offending change out
+    of the model's view and through a MANDATORY gate — and the size of the plan
+    is something whoever authors the configuration controls.
+
+    Treated as the existing "no verdict" case is: un-ruled. That holds the run
+    and leaves an admin to override after reading the plan themselves, which is
+    the same machinery `decide_outcome` already uses for silence.
+    """
+
+    @staticmethod
+    def _ws(enforcement: str):
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            ai_summary_policy_enforcement=enforcement,
+            ai_summary_context="",
+        )
+
+    async def _settle(self, enforcement: str, *, incomplete: str | None):
+        """Drive `_settle_ai_policy_gate` and return the recorded kwargs."""
+        from terrapod.services import summariser
+
+        run = SimpleNamespace(id=uuid.uuid4(), workspace_id=uuid.uuid4())
+        ws = self._ws(enforcement)
+        recorded = AsyncMock()
+        db = AsyncMock()
+        with (
+            patch.object(ai_policy_service, "record_evaluation", recorded),
+            patch.object(ai_policy_service, "gate_applies_to", lambda *_a: True),
+            patch.object(ai_policy_service, "effective_enforcement", lambda *_a: enforcement),
+            patch.object(summariser, "_redrive_after_gate", AsyncMock(), create=True),
+            patch("terrapod.services.run_service.complete_plan", AsyncMock(), create=True),
+        ):
+            await summariser._settle_ai_policy_gate(
+                db,
+                run,
+                ws,
+                kind="plan_summary",
+                verdict={"decision": "allow", "reason": "looks fine"},
+                risk_level="low",
+                evidence_incomplete=incomplete,
+            )
+        recorded.assert_awaited_once()
+        return recorded.await_args.kwargs
+
+    @pytest.mark.asyncio
+    async def test_a_mandatory_gate_is_un_ruled_when_the_plan_was_reduced(self):
+        from terrapod.services.summariser import INCOMPLETE_EVIDENCE_ERROR
+
+        kw = await self._settle("mandatory", incomplete=INCOMPLETE_EVIDENCE_ERROR)
+        assert kw["outcome"] == "errored", "a model allow on a partial plan was honoured"
+        assert "plan_json_max_bytes" in kw["error"]
+
+    @pytest.mark.asyncio
+    async def test_the_model_s_opinion_is_still_recorded(self):
+        """The human deciding whether to override needs to see what the model
+        made of the part it did read. Erroring must not discard it."""
+        from terrapod.services.summariser import INCOMPLETE_EVIDENCE_ERROR
+
+        kw = await self._settle("mandatory", incomplete=INCOMPLETE_EVIDENCE_ERROR)
+        assert kw["verdict"] == {"decision": "allow", "reason": "looks fine"}
+
+    @pytest.mark.asyncio
+    async def test_an_advisory_gate_keeps_its_verdict(self):
+        """Deliberately narrow: advisory never blocks, so overwriting its
+        verdict with an error would lose the opinion and protect nothing. The
+        prompt has already told the model which parts it could not see."""
+        from terrapod.services.summariser import INCOMPLETE_EVIDENCE_ERROR
+
+        kw = await self._settle("advisory", incomplete=INCOMPLETE_EVIDENCE_ERROR)
+        assert kw["outcome"] == "passed"
+
+    @pytest.mark.asyncio
+    async def test_a_complete_plan_rules_normally_under_mandatory(self):
+        kw = await self._settle("mandatory", incomplete=None)
+        assert kw["outcome"] == "passed"
+
+    def test_the_detector_fires_on_both_reduction_keys(self):
+        from terrapod.services.summariser import _plan_evidence_withheld
+
+        assert _plan_evidence_withheld('{"_reduced_changes": 3}')
+        assert _plan_evidence_withheld('{"_omitted_changes": 1}')
+
+    def test_the_detector_is_silent_on_a_whole_plan(self):
+        """The fitter returns an over-cap plan byte-identical when it fits, so
+        an ordinary plan must not be read as reduced."""
+        from terrapod.services.summariser import _plan_evidence_withheld
+
+        assert not _plan_evidence_withheld(
+            '{"resource_changes": [{"address": "aws_s3_bucket.a", "change": {"actions": ["create"]}}]}'
+        )
+
+    def test_the_message_names_all_three_ways_out(self):
+        from terrapod.services.summariser import INCOMPLETE_EVIDENCE_ERROR
+
+        assert "override" in INCOMPLETE_EVIDENCE_ERROR
+        assert "plan_json_max_bytes" in INCOMPLETE_EVIDENCE_ERROR
+        assert "advisory" in INCOMPLETE_EVIDENCE_ERROR
+
+
+class TestTheReducedPlanDetectorIsWiredIntoTheSummariser:
+    """The class above drives `_settle_ai_policy_gate` directly, passing
+    `evidence_incomplete` in by hand — so it pins what the settle function does with
+    the flag and nothing about whether anything ever sets it.
+
+    **Measured: replace the one call site with `evidence_incomplete=None` and every
+    test above still passes.** That is the whole control, because the detector, the
+    fitter and the settle function are three separate pieces and only the third was
+    driven. A mandatory gate would then go back to reporting a clean pass on a plan
+    it was shown a fraction of.
+
+    So these drive `handle_ai_plan_summary` — the real entry point, through the real
+    `_summarise_one` — and assert what the caller does with the flag: the recorded
+    outcome. The reduced document is produced by the REAL `_fit_plan_json` over a
+    genuinely over-cap plan rather than by typing `_reduced_changes` into a string,
+    so the chain from "the plan did not fit" to "the gate did not rule" is tested end
+    to end.
+    """
+
+    @staticmethod
+    def _plan(n_changes: int, pad: int) -> bytes:
+        return json.dumps(
+            {
+                "resource_changes": [
+                    {
+                        "address": f"aws_s3_bucket.b{i}",
+                        "type": "aws_s3_bucket",
+                        "name": f"b{i}",
+                        "change": {
+                            "actions": ["create"],
+                            "after": {"bucket": f"b{i}", "tags": {"pad": "x" * pad}},
+                        },
+                    }
+                    for i in range(n_changes)
+                ]
+            }
+        ).encode()
+
+    @classmethod
+    def _reduced(cls) -> str:
+        """A document the real fitter had to reduce."""
+        from terrapod.services.summariser import _fit_plan_json
+
+        out = _fit_plan_json(cls._plan(60, 400), 4_000)
+        assert '"_reduced_changes":' in out or '"_omitted_changes":' in out, (
+            "this fixture no longer produces a reduced plan, so the test below would pass vacuously"
+        )
+        return out
+
+    @classmethod
+    def _whole(cls) -> str:
+        """The contrast: a plan that fitted, so nothing was withheld."""
+        from terrapod.services.summariser import _fit_plan_json
+
+        out = _fit_plan_json(cls._plan(2, 10), 1_000_000)
+        assert '"_reduced_changes":' not in out and '"_omitted_changes":' not in out
+        return out
+
+    @staticmethod
+    async def _drive(enforcement: str, primary: str):
+        """Run the real handler and return `record_evaluation`'s kwargs."""
+        from terrapod.services import summariser
+
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.workspace_id = uuid.uuid4()
+        run.plan_only = False
+        run.is_drift_detection = False
+        run.runner_exit_status = None
+        run.vcs_pull_request_number = None
+        ws = MagicMock()
+        ws.id = run.workspace_id
+        ws.ai_summary_mode = "default"
+        ws.ai_summary_context = ""
+        ws.ai_policy_mode = "default"
+        ws.state_diverged = False
+
+        db = AsyncMock()
+        db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=run)),
+                MagicMock(scalar_one_or_none=MagicMock(return_value=ws)),
+            ]
+        )
+        # No Run row for the re-drive: the hold release is a separate concern and
+        # returning None keeps it a no-op without patching `complete_plan`.
+        db.get = AsyncMock(return_value=None)
+        db.commit = AsyncMock()
+
+        recorded = AsyncMock()
+        policy = ai_policy_service.settings.ai_summary.policy
+        with (
+            patch.object(summariser.settings.ai_summary, "enabled", True),
+            patch.object(summariser.settings.ai_summary, "daily_token_budget", 0),
+            patch.object(policy, "enabled", True),
+            patch.object(policy, "enforcement_level", enforcement),
+            patch.object(policy, "deny_criteria", "no public buckets"),
+            patch.object(policy, "risk_threshold", "off"),
+            patch.object(ai_policy_service, "record_evaluation", recorded),
+            patch("terrapod.services.summariser.get_db_session") as session,
+            patch("terrapod.services.summariser._upsert_summary", AsyncMock()),
+            patch("terrapod.services.summariser._emit_summary_event", AsyncMock()),
+            patch("terrapod.services.summariser._emit_ready_event", AsyncMock()),
+            patch(
+                "terrapod.services.summariser._gather_inputs",
+                AsyncMock(return_value=(primary, "PLAN_JSON", "json", "", "")),
+            ),
+            patch(
+                "terrapod.services.summariser._call_model",
+                AsyncMock(
+                    return_value=(
+                        {
+                            "description": "Creates buckets.",
+                            "risk_level": "low",
+                            "risk_factors": [],
+                            "policy_verdict": {"decision": "allow", "reason": "looks fine"},
+                        },
+                        10,
+                        10,
+                    )
+                ),
+            ),
+        ):
+            session.return_value.__aenter__ = AsyncMock(return_value=db)
+            session.return_value.__aexit__ = AsyncMock(return_value=False)
+            await summariser.handle_ai_plan_summary({"run_id": str(run.id), "kind": "plan_summary"})
+
+        recorded.assert_awaited_once()
+        return recorded.await_args.kwargs
+
+    @pytest.mark.asyncio
+    async def test_a_reduced_plan_reaches_the_gate_as_un_ruled(self):
+        kw = await self._drive("mandatory", self._reduced())
+        assert kw["outcome"] == "errored", (
+            "the summariser accepted a model allow on a plan it only partly showed "
+            "it — nothing sets evidence_incomplete on the real path"
+        )
+        assert "plan_json_max_bytes" in (kw["error"] or "")
+
+    @pytest.mark.asyncio
+    async def test_and_the_model_s_opinion_survives(self):
+        kw = await self._drive("mandatory", self._reduced())
+        assert kw["verdict"] == {"decision": "allow", "reason": "looks fine"}
+
+    @pytest.mark.asyncio
+    async def test_a_whole_plan_rules_normally(self):
+        """The contrast is the test: same handler, same verdict, a plan that fitted."""
+        kw = await self._drive("mandatory", self._whole())
+        assert kw["outcome"] == "passed", kw.get("error")
+
+    @pytest.mark.asyncio
+    async def test_an_advisory_gate_keeps_its_verdict_on_the_real_path_too(self):
+        kw = await self._drive("advisory", self._reduced())
+        assert kw["outcome"] == "passed"
+
+    @pytest.mark.asyncio
+    async def test_a_failure_analysis_is_not_ruled_on_at_all(self):
+        """Only a plan is gated. Asserted here rather than only in the settle
+        function, because `evidence_withheld` is computed `kind == "plan_summary"
+        and ...` and dropping that conjunct would make an apply-phase failure
+        overwrite the plan's recorded verdict with an evidence error."""
+        from terrapod.services.summariser import _plan_evidence_withheld
+
+        assert _plan_evidence_withheld(self._reduced())
+        assert not _plan_evidence_withheld(self._whole())

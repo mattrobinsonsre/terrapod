@@ -763,6 +763,23 @@
       "delete": "Delete"
     },
     "confirmDelete": "This VCS connection, delete? Workspaces using it, VCS integration lose they will. Undone, this cannot be.",
+    "access": {
+      "heading": "Use this connection, who may",
+      "intro": "Which workspaces may be pointed at this connection, these three settings decide. Write-only, the credential itself stays.",
+      "ownerEmail": "Email, owner",
+      "ownerEmailHint": "Always use this connection, the owner may. To leave the connection unowned, blank it leave.",
+      "labels": "Labels, access",
+      "labelsHint": "Point a workspace at this connection, a role whose rules match these labels may.",
+      "allowedRepositories": "Repositories, allowed",
+      "allowedRepositoriesHint": "Against the repository a workspace asks to use, glob patterns matched they are.",
+      "addPattern": "A pattern, add",
+      "anyRepositoryWarning": "Listed, no patterns are. Pointed at any repository, this connection may be.",
+      "restricted": "{count, plural, one {Listed, # pattern is} other {Listed, # patterns are}}. Refused, a repository matching none of them is.",
+      "ownedBy": "By {email}, owned",
+      "unowned": "Set, no owner is",
+      "anyRepositorySummary": "Allowed, any repository is",
+      "repositoryCount": "To {count, plural, one {# repository} other {# repositories}}, restricted it is"
+    },
     "form": {
       "name": "Name",
       "namePattern": "Letters, numbers, hyphens, and underscores only, there must be. With a letter or number, start it must.",
@@ -1064,8 +1081,8 @@
       "terragruntVersion": "Version, Terragrunt",
       "noExpiry": "Expiry, there is none",
       "addDriftIgnoreRule": "A rule, add",
-      "debugModeHint": "Open failed runner pods hold, on the workspaces this rule creates. On by default on this release line — that workspace's credentials, a held pod keeps.",
-      "allowForkPrPlansHint": "To every workspace this rule creates, applies it. On by default on this release line, it is, because run the fork author's code with this workspace's credentials, that plan does."
+      "debugModeHint": "Open failed runner pods hold, on the workspaces this rule creates. Off by default, it is — that workspace's credentials, a held pod keeps.",
+      "allowForkPrPlansHint": "To every workspace this rule creates, applies it. Off by default, it is: no speculative plan a pull request from a fork gets, because run its author's code with the workspace's credentials, it would."
     },
     "table": {
       "name": "Name",
@@ -2570,7 +2587,7 @@
     },
     "planExpiry": {
       "title": "Expiry, Plan",
-      "description": "Once older than this it is, an unconfirmed plan auto-discard, so against a moved world, applied a stale plan cannot be. On by default on this release line, it is; re-run then the plan must be. (To apply-capable runs only, this applies.)",
+      "description": "Once older than this it is, an unconfirmed plan auto-discard, so against a moved world, applied a stale plan cannot be. Off by default, it is; re-run then the plan must be. (To apply-capable runs only, this applies.)",
       "expireAfter": "after, Expire"
     },
     "aiSummary": {
@@ -2933,7 +2950,7 @@
       "title": "Mode, Runner Debug",
       "description": "Open the pod of a failed run, hold you must, so inside it get you can. As failed, reported first the run is; only then stay up, the container does.",
       "label": "Mode, Debug",
-      "hint": "On by default on this release line, it is. While on, exec-able a failed runner pod stays, for the window your operator configured, and this workspace's credentials and decrypted variables, keep it does, for that whole time.",
+      "hint": "Off by default, it is. While on, exec-able a failed runner pod stays, for the window your operator configured, and this workspace's credentials and decrypted variables, keep it does, for that whole time.",
       "activeBadge": "Active",
       "bannerTitle": "On for this workspace, debug mode is",
       "bannerBody": "Held open for inspection instead of exiting, a failed run's pod is, and this workspace's credentials and decrypted variables it keeps, while held it is. Off turn debug mode, when finished troubleshooting you are.",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "Plans, on fork pull requests",
-      "description": "Whether a speculative plan a pull request opened from a fork gets. On by default on this release line, it is, because run the fork author's code with this workspace's credentials, that plan does.",
+      "description": "Whether a speculative plan a pull request opened from a fork gets. Off by default, it is, because run the fork author's code with this workspace's credentials, that plan does.",
       "label": "Fork pull requests, plan",
       "hint": "This workspace's environment variables, sensitive values, any Vault-resolved secrets and the job's cloud identity, a run receives. No write access has someone opening a pull request from a fork, and merge they cannot, so the only way their code reaches those credentials, a speculative plan is. For a workspace that holds nothing worth taking, turn this on — a public module repository accepting community contributions, say. Unaffected are pull requests from branches in the repository itself, and always plan they do.",
       "activeBadge": "On",

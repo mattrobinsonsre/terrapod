@@ -763,6 +763,23 @@
       "delete": "Sil"
     },
     "confirmDelete": "Bu VCS bağlantısı silinsin mi? Onu kullanan çalışma alanları VCS entegrasyonunu kaybeder. Bu geri alınamaz.",
+    "access": {
+      "heading": "Bu bağlantıyı kimler kullanabilir",
+      "intro": "Bu üç ayar, hangi çalışma alanlarının bu bağlantıya yönlendirilebileceğini belirler. Kimlik bilgisinin kendisi yalnızca yazılabilir kalır.",
+      "ownerEmail": "Sahibinin e-postası",
+      "ownerEmailHint": "Sahibi bu bağlantıyı her zaman kullanabilir. Bağlantıyı sahipsiz bırakmak için boş bırakın.",
+      "labels": "Erişim etiketleri",
+      "labelsHint": "Kuralları bu etiketlerle eşleşen bir rol, bir çalışma alanını bu bağlantıya yönlendirebilir.",
+      "allowedRepositories": "İzin verilen depolar",
+      "allowedRepositoriesHint": "Bir çalışma alanının kullanmak istediği depoyla karşılaştırılan glob desenleri.",
+      "addPattern": "Desen ekle",
+      "anyRepositoryWarning": "Hiçbir desen listelenmemiş, bu nedenle bu bağlantı herhangi bir depoya yönlendirilebilir.",
+      "restricted": "{count, plural, one {# desen listelenmiş} other {# desen listelenmiş}}, bu nedenle bunlardan hiçbiriyle eşleşmeyen bir depo reddedilir.",
+      "ownedBy": "{email} sahibi",
+      "unowned": "Hiçbir sahip ayarlanmamış",
+      "anyRepositorySummary": "Herhangi bir depoya izin verilir",
+      "repositoryCount": "{count, plural, one {# depoyla} other {# depoyla}} sınırlı"
+    },
     "form": {
       "name": "Ad",
       "namePattern": "Yalnızca harfler, sayılar, tireler ve alt çizgiler. Bir harf veya sayı ile başlamalıdır.",
@@ -1065,7 +1082,7 @@
       "noExpiry": "Süre dolumu yok",
       "addDriftIgnoreRule": "Kural ekle",
       "debugModeHint": "Bu kuralın oluşturduğu çalışma alanlarında başarısız çalıştırıcı pod'larını açık tutun. Varsayılan olarak kapalı — açık tutulan bir pod o çalışma alanının kimlik bilgilerini barındırır.",
-      "allowForkPrPlansHint": "Bu kuralın oluşturduğu her çalışma alanı için geçerlidir. Bu sürüm hattında varsayılan olarak açık, çünkü bu plan fork sahibinin kodunu bu çalışma alanının kimlik bilgileriyle çalıştırır."
+      "allowForkPrPlansHint": "Bu kuralın oluşturduğu her çalışma alanı için geçerlidir. Varsayılan olarak kapalı: bir fork''tan gelen pull request spekülatif plan almaz, çünkü yazarının kodunu çalışma alanının kimlik bilgileriyle çalıştırırdı."
     },
     "table": {
       "name": "Ad",
@@ -2941,7 +2958,7 @@
     },
     "allowForkPrPlans": {
       "title": "Fork pull request''lerinde planlar",
-      "description": "Bir fork''tan açılan pull request''in spekülatif plan alıp almayacağı. Bu sürüm hattında varsayılan olarak açık, çünkü bu plan fork sahibinin kodunu bu çalışma alanının kimlik bilgileriyle çalıştırır.",
+      "description": "Bir fork''tan açılan pull request''in spekülatif plan alıp almayacağı. Varsayılan olarak kapalı, çünkü bu plan fork sahibinin kodunu bu çalışma alanının kimlik bilgileriyle çalıştırır.",
       "label": "Fork pull request''lerini planla",
       "hint": "Bir çalıştırma, bu çalışma alanının ortam değişkenlerini, hassas değerlerini, Vault''tan çözümlenen tüm gizli bilgileri ve işin bulut kimliğini alır. Bir fork''tan pull request açan kişinin yazma erişimi yoktur ve birleştirme yapamaz; dolayısıyla spekülatif plan, kodunun bu kimlik bilgilerine ulaşmasının tek yoludur. Bunu, alınmaya değer hiçbir şey barındırmayan bir çalışma alanı için açın — örneğin topluluk katkılarını kabul eden herkese açık bir modül deposu. Deponun kendi dallarından açılan pull request''ler bundan etkilenmez ve her zaman plan alır.",
       "activeBadge": "Açık",

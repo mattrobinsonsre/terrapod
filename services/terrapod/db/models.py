@@ -389,8 +389,11 @@ class Workspace(Base):
 
     # Whether a pull request opened from a FORK may trigger a speculative plan.
     #
-    # ON by default on this release line, and that is deliberate: a patch must not
-    # stop a fork pull request that plans today. 2.0 defaults it off. A plan executes the PR
+    # OFF by default (GHSA-gp5w-76rw-c452). The control itself shipped in v1.7.7
+    # and v1.8.2 defaulting ON, because a patch must not stop a fork pull request
+    # that plans today; v1.9.0 flips the default for NEW rows and deliberately does
+    # not rewrite existing ones, so an operator upgrading audits rather than being
+    # surprised. A plan executes the PR
     # author's code — provider configuration, `external` data sources,
     # `local-exec` — with everything the run receives: env-category secrets,
     # sensitive variables, Vault-resolved values, minted git credentials and the
@@ -411,7 +414,7 @@ class Workspace(Base):
     # same shape as naming a loopback destination in
     # `outbound_requests.allowed_hosts`.
     allow_fork_pr_plans: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true", default=True
+        Boolean, nullable=False, server_default="false", default=False
     )
 
     # Auto-merge after apply succeeds. Available in both modes; primary use is
@@ -1174,6 +1177,24 @@ class VCSConnection(Base):
     # encryption envelope never overflows it. App-encrypted at rest when enabled.
     webhook_secret: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
 
+    # GHSA-v8g7-pqrj-8mcm. A connection reaches every repository its credential
+    # can reach, and its id is serialised to anyone with read on a workspace using
+    # it — so the id is discoverable by design and naming one is a grant, not a
+    # reference. v1.8.2 closed the worst of it by requiring the caller to already
+    # own a workspace on the connection, which has a deliberate consequence: the
+    # FIRST workspace on a connection has to be created by an admin. These two
+    # columns are the general answer, so a connection can be delegated to a team
+    # the same way every other labelled resource is.
+    owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    labels: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    # The residual hole after per-connection RBAC: an entitled caller could still
+    # point the connection at ANY repository its credential can read. A non-empty
+    # list restricts it to these patterns (fnmatch against the repo URL and against
+    # `owner/name`); empty keeps today's behaviour of any reachable repository, so
+    # an existing deployment is unchanged until an operator narrows it.
+    allowed_repositories: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="active"
     )  # active, suspended, removed
@@ -1186,8 +1207,26 @@ class VCSConnection(Base):
     )
 
     __table_args__ = (
-        sa.UniqueConstraint(
-            "provider", "github_installation_id", name="uq_vcs_connections_install"
+        # One GitHub App installation, one connection — connecting the same
+        # installation twice would mean two credentials over the same
+        # repositories with no way to tell which a workspace is using.
+        #
+        # **Scoped to GitHub, and that is the whole point.** This was a blanket
+        # `UniqueConstraint("provider", "github_installation_id")` from the
+        # initial schema, and `github_installation_id` is `0` on every GitLab
+        # row — the column has no meaning there. So the pair `("gitlab", 0)`
+        # collided with itself and **a deployment could never hold more than
+        # one GitLab connection**, which the create route reported as a bare
+        # 409 "already exists" naming nothing. Nobody met it because nothing
+        # created two, and it made the documented remedy for a saturated GitLab
+        # token — give a busy repository its own connection, since the
+        # allowance is per token — impossible to follow.
+        sa.Index(
+            "uq_vcs_connections_install",
+            "provider",
+            "github_installation_id",
+            unique=True,
+            postgresql_where=sa.text("provider = 'github'"),
         ),
     )
 
@@ -1333,14 +1372,14 @@ class AutodiscoveryRule(Base):
     debug_mode: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
-    #: Defaults TRUE on this release line, matching the workspace column rather than overriding it
+    #: Defaults FALSE, matching the workspace column rather than overriding it
     #: like `drift_detection_enabled` above. An operator who decides fork PRs
     #: should plan has to say so, and a rule is how they say it once for every
     #: directory the repository grows later -- otherwise enabling it in bulk
     #: holds only until autodiscovery creates the next workspace, which looks
     #: exactly like the setting not working.
     allow_fork_pr_plans: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default="true"
+        Boolean, nullable=False, default=False, server_default="false"
     )
     # #314 deletion lifecycle: what to do when a discovered directory is
     # removed on the tracked branch. "flag" (default, safe) marks the

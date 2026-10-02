@@ -57,9 +57,6 @@ from terrapod.services.vcs_provider import (
     PullRequest,
 )
 from terrapod.services.vcs_provider import (
-    download_archive as _provider_download_archive,
-)
-from terrapod.services.vcs_provider import (
     get_branch_sha as _provider_get_branch_sha,
 )
 from terrapod.services.vcs_provider import (
@@ -200,10 +197,6 @@ async def _remember_pr_decision(
             pr_number=pr_number,
             error=repr(e),
         )
-
-
-async def _download_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
-    return await _provider_download_archive(conn, owner, repo, ref)
 
 
 async def _get_changed_files(

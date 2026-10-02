@@ -379,3 +379,97 @@ class TestValidateWebhookToken:
             assert validate_webhook_token("nope", None) is False
         finally:
             settings.vcs.gitlab.webhook_secret = original
+
+
+class TestActorHasPushAccess:
+    """Who may drive a `terrapod ...` comment command on GitLab.
+
+    Three-valued, matching the GitHub twin: True, False, and None for "could
+    not establish", which the dispatcher refuses on.
+    """
+
+    @staticmethod
+    def _resp(status, body=None):
+        r = MagicMock()
+        r.status_code = status
+        r.json = MagicMock(return_value=body if body is not None else {})
+        return r
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.gitlab_service._gitlab_request")
+    async def test_developer_can_push(self, req):
+        from terrapod.services.gitlab_service import actor_has_push_access
+
+        req.return_value = self._resp(200, {"access_level": 30})
+        assert await actor_has_push_access(_mock_conn(), "grp", "proj", "77") is True
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.gitlab_service._gitlab_request")
+    async def test_maintainer_and_owner_can_push(self, req):
+        from terrapod.services.gitlab_service import actor_has_push_access
+
+        for level in (40, 50):
+            req.return_value = self._resp(200, {"access_level": level})
+            assert await actor_has_push_access(_mock_conn(), "grp", "proj", "77") is True, level
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.gitlab_service._gitlab_request")
+    async def test_reporter_and_guest_cannot(self, req):
+        from terrapod.services.gitlab_service import actor_has_push_access
+
+        for level in (10, 20):
+            req.return_value = self._resp(200, {"access_level": level})
+            assert await actor_has_push_access(_mock_conn(), "grp", "proj", "77") is False, level
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.gitlab_service._gitlab_request")
+    async def test_not_a_member_is_a_definitive_no(self, req):
+        from terrapod.services.gitlab_service import actor_has_push_access
+
+        req.return_value = self._resp(404)
+        assert await actor_has_push_access(_mock_conn(), "grp", "proj", "77") is False
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.gitlab_service._gitlab_request")
+    async def test_membership_inherited_from_the_group_is_resolved(self, req):
+        """`members/all/` rather than `members/`. Most GitLab installations
+        grant repository access at the group, and the direct-members endpoint
+        answers "not a member" for a group Maintainer -- which would refuse
+        every command the people who actually run the project issued."""
+        from terrapod.services.gitlab_service import actor_has_push_access
+
+        req.return_value = self._resp(200, {"access_level": 40})
+        await actor_has_push_access(_mock_conn(), "grp", "proj", "77")
+        assert "/members/all/77" in req.call_args.args[1]
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.gitlab_service._gitlab_request")
+    async def test_a_server_error_is_not_an_answer(self, req):
+        from terrapod.services.gitlab_service import actor_has_push_access
+
+        req.return_value = self._resp(500)
+        assert await actor_has_push_access(_mock_conn(), "grp", "proj", "77") is None
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.gitlab_service._gitlab_request")
+    async def test_a_transport_error_is_not_an_answer(self, req):
+        from terrapod.services.gitlab_service import actor_has_push_access
+
+        req.side_effect = RuntimeError("connection reset")
+        assert await actor_has_push_access(_mock_conn(), "grp", "proj", "77") is None
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.gitlab_service._gitlab_request")
+    async def test_a_missing_access_level_is_not_an_answer(self, req):
+        from terrapod.services.gitlab_service import actor_has_push_access
+
+        req.return_value = self._resp(200, {"username": "octocat"})
+        assert await actor_has_push_access(_mock_conn(), "grp", "proj", "77") is None
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.gitlab_service._gitlab_request")
+    async def test_an_empty_user_id_needs_no_call(self, req):
+        from terrapod.services.gitlab_service import actor_has_push_access
+
+        assert await actor_has_push_access(_mock_conn(), "grp", "proj", "") is False
+        req.assert_not_called()
