@@ -15,6 +15,7 @@ from authlib.jose import JsonWebKey
 from authlib.jose import jwt as authlib_jwt
 from authlib.jose.errors import JoseError
 
+from terrapod.auth.idp_groups import roles_from_idp_groups
 from terrapod.auth.pkce import s256_challenge
 from terrapod.auth.sso import AuthenticatedIdentity, AuthorizationRequest, SSOConnector
 from terrapod.config import OIDCProviderConfig
@@ -190,7 +191,7 @@ class OIDCConnector(SSOConnector):
             )
 
         # Strip configured role prefixes
-        groups = _strip_role_prefixes(groups, self._config.role_prefixes)
+        groups = roles_from_idp_groups(groups, self._config.role_prefixes, provider=self.name)
 
         # Extract id_token expiry to cap session TTL
         id_token_expires_at = None
@@ -290,25 +291,3 @@ class OIDCConnector(SSOConnector):
                 exc_info=True,
             )
             return []
-
-
-def _strip_role_prefixes(groups: list[str], prefixes: list[str]) -> list[str]:
-    """Strip configured prefixes from group names to derive role names.
-
-    e.g., with prefix 'terrapod-', group 'terrapod-admin' becomes role 'admin'.
-    Groups without a matching prefix are passed through unchanged.
-    """
-    if not prefixes:
-        return groups
-
-    result = []
-    for g in groups:
-        stripped = False
-        for prefix in prefixes:
-            if g.startswith(prefix):
-                result.append(g[len(prefix) :])
-                stripped = True
-                break
-        if not stripped:
-            result.append(g)
-    return result

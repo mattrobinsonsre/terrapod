@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.metrics import AUTH_LOGIN
+from terrapod.auth.builtin_roles import PLATFORM_ROLE_NAMES
 from terrapod.auth.claims_mapper import map_claims_to_roles
 from terrapod.auth.recent_users import mark_user_seen, record_recent_user
 from terrapod.auth.sso import AuthenticatedIdentity
@@ -45,7 +46,8 @@ async def process_login(
 
     This function is read-only with respect to roles — it never writes to
     the role_assignments table. Role resolution merges three sources:
-    1. IDP groups from connector (already prefix-stripped by the connector)
+    1. IDP groups from connector (prefix-filtered there; platform roles refused
+       here — see Source 1 below)
     2. claims_to_roles config mapping
     3. Internal role_assignments table query by (provider_name, email)
 
@@ -87,8 +89,33 @@ async def process_login(
     # Resolve roles from three sources (read-only — no writes)
     roles: set[str] = set()
 
-    # Source 1: IDP groups from connector
-    roles.update(identity.groups)
+    # Source 1: IDP groups from connector.
+    #
+    # Platform roles are refused from this source (GHSA-22vg-4g2w-7w34). An IdP
+    # group is a name in someone else's directory: a group called `admin` may be
+    # the cloud team's, or one anybody can self-join, and unioning it verbatim
+    # turned that into Terrapod platform admin. `role_prefixes` narrows which
+    # groups are considered, but it is empty by default — so in most deployments
+    # filtering protects nobody and this floor is what actually closes it.
+    #
+    # Granting admin or audit stays possible and stays deliberate: a
+    # claims-to-roles rule (source 2) or a platform role assignment (source 3).
+    # Both are written by someone who administers Terrapod, which is the
+    # distinction that matters — not whether a group name happens to match.
+    idp_roles = {g for g in identity.groups if g not in PLATFORM_ROLE_NAMES}
+    refused = sorted(set(identity.groups) - idp_roles)
+    if refused:
+        logger.warning(
+            "Refused platform roles asserted by an IdP group",
+            provider=identity.provider_name,
+            email=identity.email,
+            refused=refused,
+            detail=(
+                "grant these with a claims_to_roles rule or a platform role "
+                "assignment instead; an IdP group name is not an authorization"
+            ),
+        )
+    roles.update(idp_roles)
 
     # Source 2: claims_to_roles config mapping
     if claims_rules:

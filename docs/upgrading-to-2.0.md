@@ -479,6 +479,45 @@ literal string `https://`, which every https URL starts with — so the destinat
 and recipient checks run, pass, and accept an assertion minted for a different
 service provider entirely. Set the URL first, then the flags, or the checks are
 decoration.
+### An IdP group can no longer grant `admin` or `audit`
+
+Role resolution took IdP group names verbatim, so a group called `admin` granted
+platform admin (`GHSA-22vg-4g2w-7w34`). It no longer does, from either OIDC or
+SAML, however the group is named or prefixed.
+
+**Check this before upgrading if your admins get their role from a group.** Run
+
+```sql
+SELECT provider_name, email, role_name FROM platform_role_assignments;
+```
+
+and if that returns nothing while your administrators currently sign in through an
+IdP group, they will lose `admin` at the upgrade. Grant it deliberately first,
+either with a platform role assignment or with a `claims_to_roles` rule:
+
+```yaml
+auth:
+  sso:
+    oidc:
+      - name: okta
+        claims_to_roles:
+          - claim: groups
+            value: "platform-engineering"   # the group, named as the IdP names it
+            roles: ["admin"]
+```
+
+A rule is written by whoever administers Terrapod; a group name is written by
+whoever administers the directory. That difference is the whole point, and it is
+why a rule naming the same group is accepted while the bare group is not.
+
+The local admin account is unaffected, so a deployment is not lockable out of
+itself — but recovering that way is worse than spending a minute on the query above.
+
+**`role_prefixes` is also a filter now,** where it used to strip a matching prefix
+and pass everything else through. If you set it, a group without one of those
+prefixes is ignored rather than taken as a role name. That is what the setting
+always read as, and it narrows rather than widens — but if you relied on the
+pass-through, those roles stop arriving.
 
 ## Before you upgrade
 
