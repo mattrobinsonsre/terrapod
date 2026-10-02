@@ -268,6 +268,27 @@ async def create_policy_set(
                 status_code=422, detail="vcs-repo-url is required for VCS policy sets"
             )
 
+        # GHSA-v8g7-pqrj-8mcm. The policy-set poller now refuses to clone a repository
+        # outside its connection's allowlist, so without this an admin could store a
+        # policy set that silently never syncs — the refusal happens in a poll cycle,
+        # where there is no caller to receive it. Checking here turns that into a 403 at
+        # the point the URL is chosen, which is the whole reason the accepting paths
+        # carry the check as well as the clone.
+        from terrapod.services.vcs_connection_rbac import (
+            repository_allowed,
+            repository_refusal_detail,
+        )
+
+        if not repository_allowed(conn, attrs.get("vcs-repo-url") or ""):
+            raise HTTPException(
+                status_code=403,
+                detail=repository_refusal_detail(
+                    conn.id,
+                    attrs.get("vcs-repo-url") or "",
+                    list(conn.allowed_repositories or []),
+                ),
+            )
+
     ps = PolicySet(
         id=generate_uuid7(),
         name=name,
