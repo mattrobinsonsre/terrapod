@@ -45,6 +45,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import and_, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.capability_access import resolve_capability_or_authenticate
@@ -1376,8 +1377,14 @@ async def create_workspace(
     # match is growth.
     from terrapod.services.varset_self_join import refuse_varset_growth
 
-    await db.flush()
     try:
+        # Inside the try, not above it. A flush is where the database first sees the
+        # row, so it is where a duplicate name or an unknown `vcs-connection-id`
+        # surfaces — and an uncaught `IntegrityError` here is a 500 for two things the
+        # caller got wrong and can fix. The commit below raised the same way before
+        # this flush existed, so the 500 is not new; it is simply now in a place with
+        # somewhere to catch it.
+        await db.flush()
         await refuse_varset_growth(
             db,
             workspace_id=ws.id,
@@ -1385,11 +1392,14 @@ async def create_workspace(
             is_platform_admin="admin" in effective_platform_roles(user),
             actor_email=user.email,
         )
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise _workspace_integrity_error(exc, name) from exc
     except Exception:
         await db.rollback()
         raise
 
-    await db.commit()
     await db.refresh(ws)
 
     logger.info("Workspace created", workspace=name, owner=user.email)
@@ -1407,6 +1417,38 @@ async def create_workspace(
         status_code=201,
         headers=_tfe_headers(),
     )
+
+
+#: Postgres SQLSTATEs, read off the driver exception rather than matched in the
+#: message text — a constraint name in a message is not a contract and differs
+#: between backends, while these codes are in the SQL standard.
+_UNIQUE_VIOLATION = "23505"
+_FOREIGN_KEY_VIOLATION = "23503"
+
+
+def _workspace_integrity_error(exc: IntegrityError, name: str) -> HTTPException:
+    """Translate a workspace write's `IntegrityError` into the status it deserves.
+
+    Both of these are the caller's input, not a server fault, and both answered 500
+    before: a duplicate name (two creates racing, or simply a name already taken) and
+    an `vcs-connection-id` naming a connection that does not exist. The constraint
+    name is deliberately not echoed back — it is an internal detail, and the caller
+    does not need it to fix either case.
+    """
+    sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+    if sqlstate == _UNIQUE_VIOLATION:
+        return HTTPException(status_code=409, detail=f"A workspace named {name!r} already exists")
+    if sqlstate == _FOREIGN_KEY_VIOLATION:
+        return HTTPException(
+            status_code=422,
+            detail=(
+                "A referenced resource does not exist. Check `vcs-connection-id` and "
+                "`agent-pool-id` name resources that are present."
+            ),
+        )
+    # An integrity error that is neither is a genuine surprise, and guessing a 4xx for
+    # it would hide a server-side bug behind a message blaming the caller.
+    return HTTPException(status_code=500, detail="Could not save the workspace")
 
 
 async def _get_workspace_by_id(workspace_id: str, db: AsyncSession) -> Workspace:
@@ -2065,8 +2107,10 @@ async def update_workspace(
     from terrapod.services.varset_self_join import refuse_varset_growth
 
     if _varsets_checked:
-        await db.flush()
         try:
+            # Inside the try for the same reason as the create path: a rename can
+            # collide and an `IntegrityError` escaping here is a 500 for a 409.
+            await db.flush()
             await refuse_varset_growth(
                 db,
                 workspace_id=ws.id,
@@ -2074,6 +2118,9 @@ async def update_workspace(
                 is_platform_admin="admin" in effective_platform_roles(user),
                 actor_email=user.email,
             )
+        except IntegrityError as exc:
+            await db.rollback()
+            raise _workspace_integrity_error(exc, ws.name) from exc
         except Exception:
             await db.rollback()
             raise
@@ -2494,17 +2541,30 @@ async def create_state_version(
         run_id=run_uuid,
     )
     db.add(sv)
-    await db.flush()
 
     # A new state version landed → any other apply-capable planned run on this
     # workspace now has a stale plan; auto-discard them (#647).
     from terrapod.services import run_service
 
-    await run_service.discard_stale_plans_for_state_change(
-        db, ws.id, serial, exclude_run_id=run_uuid
-    )
-
-    await db.commit()
+    try:
+        # The serial check above is check-then-act, so two concurrent uploads for the
+        # same serial both pass it and the second violates the unique constraint. That
+        # is a 409 — the same 409 the check itself raises — and it answered 500. The
+        # race is not theoretical here: this is the CLI's state-upload path, and two
+        # applies finishing together is how it is reached.
+        await db.flush()
+        await run_service.discard_stale_plans_for_state_change(
+            db, ws.id, serial, exclude_run_id=run_uuid
+        )
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+        if sqlstate == _UNIQUE_VIOLATION:
+            raise HTTPException(
+                status_code=409, detail="State version serial already exists"
+            ) from exc
+        raise HTTPException(status_code=500, detail="Could not save the state version") from exc
     await db.refresh(sv)
 
     from terrapod.api.metrics import STATE_VERSIONS_CREATED
