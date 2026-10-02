@@ -922,6 +922,50 @@ jobs:
             && { echo "must not be set via env; it is non-sensitive config"; exit 1; }
           echo "the GitLab git-credential switch renders off on every profile and is ConfigMap-only"
 
+      - name: An explicit false reaches the pod, and nothing unmodelled is rendered
+        run: |
+          # The config CHANNEL contract, both directions, in the job that has a helm
+          # binary. There is an equivalent pytest (tests/helm/
+          # test_rendered_config_matches_settings.py) and it can only ever SKIP in
+          # CI, because docker/Dockerfile.test deliberately ships no helm — so this
+          # is the leg that actually runs. Both failures it exists for have happened
+          # in one release:
+          #
+          #  - a `| default true` cleanup deleted the render line for
+          #    vcs.require_connection_authorization as collateral. The key stayed in
+          #    values.yaml and in the values snapshot, so every gate stayed green
+          #    while an operator's explicit `false` silently stopped reaching the pod
+          #    -- and they would then have met a 403 whose own text told them to set
+          #    the key that had stopped working.
+          #  - four keys carried in from the 2.0 line were rendered to every
+          #    deployment while `Settings` modelled none of them, and
+          #    values.schema.json is additionalProperties:false, so an operator could
+          #    not even override one.
+          #
+          # Direction 1: a deliberate `false` survives. Go templates treat false as
+          # empty, so this is the half `| default true` and `with` silently break.
+          for k in \
+            vcs.require_connection_authorization \
+            vcs.require_push_permission_for_commands \
+            database.pool_pre_ping \
+            notifications.smtp.use_tls
+          do
+            leaf="${k##*.}"
+            helm template ./helm/terrapod --set "api.config.${k}=false" \
+              | grep -q "${leaf}: false" \
+              || { echo "setting ${k}=false does not reach the ConfigMap"; exit 1; }
+          done
+          echo "an explicit false reaches the pod for all four keys"
+
+          # Direction 2: every key rendered into config.yaml is one Settings accepts,
+          # on all three profiles -- the eval profile included, because a key behind
+          # a `with` block only appears when a profile sets it.
+          for f in values.yaml values-local.yaml values-eval.yaml; do
+            helm template ./helm/terrapod -f "helm/terrapod/$f" \
+              | python3 scripts/ci/check_rendered_config_keys.py \
+              || { echo "rendered config disagrees with Settings on $f"; exit 1; }
+          done
+
       - name: The comment-command push gate reaches the pod and stays on by default
         run: |
           # Config-channel contract for the PR-comment authorization gate. The

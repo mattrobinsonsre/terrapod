@@ -27,6 +27,7 @@ in `config.yaml`, whether `Settings` has somewhere to put it.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -52,10 +53,40 @@ ROOT = _root()
 RENDERED_BUT_NOT_SETTINGS: dict[str, str] = {}
 
 
-def _rendered_config() -> dict:
+def _require_helm() -> str:
+    """The helm binary, or an honest outcome.
+
+    **This file cannot run in CI and that is by design of the test image**, not an
+    oversight to work around here: `docker/Dockerfile.test` ships the chart but no
+    helm binary ("Chart only (values + templates); no helm binary is invoked in the
+    Python image"), and CI runs `tests/helm` inside it. So in CI these tests skip —
+    which is exactly how a gate becomes decorative, and the regression this file was
+    written for would have sailed through.
+
+    The real gate is therefore the `helm-smoke` job, which has a helm binary and
+    runs both directions of this check (`scripts/ci/check_rendered_config_keys.py`
+    plus an explicit-`false` loop). This file is the local-dev convenience: a
+    developer who has helm gets the same check for free before pushing.
+
+    `TERRAPOD_REQUIRE_HELM=1` turns the skip into a failure, so an image that later
+    gains helm starts enforcing instead of quietly continuing to skip.
+    """
     helm = shutil.which("helm")
     if helm is None:
-        pytest.skip("helm is not on PATH")
+        if os.environ.get("TERRAPOD_REQUIRE_HELM") == "1":
+            pytest.fail(
+                "TERRAPOD_REQUIRE_HELM=1 but no helm binary is on PATH. The CI gate "
+                "for this is the `helm-smoke` job; see this function's docstring."
+            )
+        pytest.skip(
+            "helm is not on PATH — the CI gate for this is the `helm-smoke` job, "
+            "which runs scripts/ci/check_rendered_config_keys.py"
+        )
+    return helm
+
+
+def _rendered_config() -> dict:
+    helm = _require_helm()
     out = subprocess.run(
         [helm, "template", str(ROOT / "helm" / "terrapod")],
         capture_output=True,
@@ -172,9 +203,7 @@ class TestTheKeysOperatorsSetActuallyReachThePod:
     def test_an_explicit_value_reaches_the_rendered_config(self, path, value, why):
         if ROOT is None:
             pytest.skip("chart is not shipped in this image")
-        helm = shutil.which("helm")
-        if helm is None:
-            pytest.skip("helm is not on PATH")
+        helm = _require_helm()
 
         out = subprocess.run(
             [
