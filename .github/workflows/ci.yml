@@ -1261,12 +1261,18 @@ jobs:
         run: |
           # The config-channel contract for the SAML hardening switches.
           #
-          # These default to TRUE in the code, which makes the render line the
-          # part that can silently fail: `{{ if .validate_destination }}` would
-          # drop the key for an operator who set it to FALSE, the code default
-          # would stand, and their deliberate opt-out would be inert — the exact
-          # failure the contract exists to catch, in the one direction a naive
-          # render gets wrong. So both positions are asserted.
+          # These default to FALSE in the code (config.py: `Field(default=False)`
+          # on all five), so the operator's action is to turn them ON, and the
+          # render line is the part that can silently fail: `{{ if .want_assertions_signed }}`
+          # would drop the key for an operator who set it, the code default would
+          # stand, and their deliberate opt-IN would be inert — a deployment less
+          # protected than its own values.yaml says. The opposite position is
+          # asserted too, because `| default` treats false as empty and would
+          # render the wrong value for someone who has deliberately written one:
+          # harmless while the default is false, a lockout the moment it is not.
+          #
+          # (The carried version of this comment said these default to TRUE, which
+          # contradicted the loop below it and is not what the code does.)
           #
           # Both halves matter for a different reason too: `validate_destination`
           # is what makes an assertion's Destination and Recipient mean anything,
