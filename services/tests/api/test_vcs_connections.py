@@ -778,3 +778,129 @@ class TestTheAllowlistCannotBeWidenedByAccident:
         doc = inspect.getdoc(update_connection) or ""
         for attr in ("owner-email", "labels", "allowed-repositories"):
             assert attr in doc, f"{attr} is editable here but the docstring omits it"
+
+
+class TestTheServerDoesNotTransformWhatTheProviderSends:
+    """`terrapod_vcs_connection` manages these three attributes, and a provider
+    writes the server's response back into state. So a server-side transform makes
+    the plan disagree with the result and the apply fails with "Provider produced
+    inconsistent result after apply" — the resource becomes unmanageable as code,
+    which for a security control means it stops being adjusted.
+
+    Both transforms these tests pin were added for a reason that turned out to be
+    already handled on the read side: `may_reference_connection` folds case on both
+    sides of the owner comparison, and `repository_allowed` strips every pattern
+    before matching. So the fix costs nothing at all.
+    """
+
+    def test_a_mixed_case_owner_is_stored_exactly_as_sent(self):
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        owner, _, _ = _rbac_attrs({"owner-email": "Owner@Example.COM"})
+        assert owner == "Owner@Example.COM"
+
+    def test_surrounding_whitespace_on_the_owner_survives(self):
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        owner, _, _ = _rbac_attrs({"owner-email": " owner@example.com "})
+        assert owner == " owner@example.com "
+
+    def test_a_mixed_case_owner_still_matches_at_read_time(self):
+        """The reason the fold is safe to remove, asserted rather than assumed."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from terrapod.db.models import VCSConnection
+        from terrapod.services.vcs_connection_rbac import may_reference_connection
+
+        conn = VCSConnection(id=uuid.uuid4(), owner_email="Owner@Example.COM")
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=conn)
+        allowed = asyncio.run(
+            may_reference_connection(
+                db,
+                conn_id=conn.id,
+                actor_email="owner@example.com",
+                is_platform_admin=False,
+            )
+        )
+        assert allowed is True
+
+    def test_a_pattern_keeps_its_whitespace_and_still_matches(self):
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+        from terrapod.db.models import VCSConnection
+        from terrapod.services.vcs_connection_rbac import repository_allowed
+
+        _, _, repos = _rbac_attrs({"allowed-repositories": [" myorg/* "]})
+        assert repos == [" myorg/* "]
+
+        conn = VCSConnection(provider="github", allowed_repositories=repos)
+        assert repository_allowed(conn, "https://github.com/myorg/thing") is True
+
+    def test_a_non_string_owner_is_refused_not_a_500(self):
+        from fastapi import HTTPException
+
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        with pytest.raises(HTTPException) as exc:
+            _rbac_attrs({"owner-email": 123})
+        assert exc.value.status_code == 422
+        assert "owner-email" in str(exc.value.detail)
+
+    def test_an_over_length_owner_is_refused_not_truncated(self):
+        from fastapi import HTTPException
+
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        with pytest.raises(HTTPException) as exc:
+            _rbac_attrs({"owner-email": "a" * 300})
+        assert exc.value.status_code == 422
+
+
+class TestAStoredRowCannotBeMadeUneditable:
+    """The partial-update path builds a merged dict carrying STORED values for the
+    keys the caller omitted. Validating those is the #316 trap: a row written by a
+    migration or by hand is refused on every subsequent edit, so the only way to fix
+    it is the one way that is blocked. Validation applies to what was sent.
+    """
+
+    def test_patching_labels_is_not_refused_by_a_stored_blank_pattern(self):
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        # What a PATCH of `labels` alone builds when the row holds `["  "]`.
+        merged = {
+            "owner-email": "",
+            "labels": {"team": "net"},
+            "allowed-repositories": ["  "],
+        }
+        _, labels, _ = _rbac_attrs(merged, supplied={"labels"})
+        assert labels == {"team": "net"}
+
+    def test_patching_labels_is_not_refused_by_a_stored_reserved_label(self):
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        merged = {
+            "owner-email": "",
+            "labels": {"status": "stuck"},
+            "allowed-repositories": ["myorg/*"],
+        }
+        _, _, repos = _rbac_attrs(merged, supplied={"allowed-repositories"})
+        assert repos == ["myorg/*"]
+
+    def test_but_a_supplied_blank_allowlist_is_still_refused(self):
+        from fastapi import HTTPException
+
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        with pytest.raises(HTTPException) as exc:
+            _rbac_attrs({"allowed-repositories": ["  "]}, supplied={"allowed-repositories"})
+        assert exc.value.status_code == 422
+
+    def test_and_a_supplied_reserved_label_is_still_refused(self):
+        from fastapi import HTTPException
+
+        from terrapod.api.routers.vcs_connections import _rbac_attrs
+
+        with pytest.raises(HTTPException) as exc:
+            _rbac_attrs({"labels": {"status": "nope"}}, supplied={"labels"})
+        assert exc.value.status_code == 422

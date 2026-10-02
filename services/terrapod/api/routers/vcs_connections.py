@@ -145,13 +145,33 @@ def _connection_json(
     }
 
 
-def _rbac_attrs(attrs: dict) -> tuple[str, dict, list]:
+def _rbac_attrs(attrs: dict, supplied: set[str] | None = None) -> tuple[str, dict, list]:
     """Parse and validate `owner-email`, `labels` and `allowed-repositories`.
 
     GHSA-v8g7-pqrj-8mcm. Shared by create and update so the two cannot drift —
     they have drifted before, and the shape of that bug is a reserved label
     accepted on create and then rejected on every subsequent edit, leaving the
     entity uneditable.
+
+    **Validate, never transform a value a Terraform provider sends.** All three of
+    these are provider-managed attributes (`terrapod_vcs_connection`), and a provider
+    writes the server's response back into state. So any value the server *changes*
+    on the way in — folding case, stripping whitespace, truncating, reordering,
+    deduplicating — makes the plan disagree with the result and fails the apply with
+    "Provider produced inconsistent result after apply". The resource then cannot be
+    managed as code at all, which for a security control means it does not get
+    adjusted. Refuse what is unacceptable with a 422 and store the rest byte for
+    byte; where tolerance is wanted, put it on the **read** side, where it costs
+    nothing. Both transforms removed here had a read-side equivalent already.
+
+    `supplied` names the keys the CALLER actually sent; `None` means all of them
+    (the create path). The partial-update path passes it, because the merged dict it
+    builds carries **stored** values for the keys the caller omitted — and refusing a
+    stored value makes the connection uneditable: a PATCH of `labels` alone would
+    answer 422 about an `allowed-repositories` entry the caller never mentioned. That
+    is the #316 shape exactly, accepted by one path and refused by every later edit
+    until the entity is stuck. Validation therefore applies only to what was sent, so
+    a row written by hand or by a migration can always be edited back into shape.
     """
     # The HTTP-translating wrapper, not the raw service function. The raw one raises
     # LabelValidationError (a ValueError), which has no handler, so a reserved label
@@ -159,36 +179,66 @@ def _rbac_attrs(attrs: dict) -> tuple[str, dict, list]:
     # operator which key is reserved. Every other labelled entity uses this wrapper.
     from terrapod.api.labels import validate_labels
 
-    # Lower-cased, because the comparison in `may_reference_connection` is equality
-    # and an admin typing `Owner@Example.com` would otherwise create a grant that can
-    # never match an identity presented as `owner@example.com` — a security control
-    # that silently does nothing, with no feedback anywhere.
-    owner_email = (attrs.get("owner-email") or "").strip().lower()[:255]
+    def sent(key: str) -> bool:
+        return supplied is None or key in supplied
+
+    # **Validated, never transformed** — see this function's own rule below. An
+    # earlier version lower-cased and truncated here, reasoning that
+    # `may_reference_connection` compares for equality so `Owner@Example.com` would
+    # create a grant that never matches `owner@example.com`. The premise was wrong:
+    # that comparison folds case on BOTH sides precisely so a row written before this
+    # release, or by hand, still matches. So the fold bought nothing and cost the
+    # provider: `terraform apply` with `owner_email = "Owner@Example.com"` planned one
+    # value, read back another, and failed with "Provider produced inconsistent result
+    # after apply" — a resource that cannot be managed as code at all.
+    raw_owner = attrs.get("owner-email")
+    if raw_owner is None:
+        raw_owner = ""
+    if sent("owner-email") and not isinstance(raw_owner, str):
+        # Without this, `.strip()` raised AttributeError and the operator got a 500
+        # with no indication of which attribute was wrong. Every sibling attribute
+        # here answers 422; this one answered "Internal server error".
+        raise HTTPException(status_code=422, detail="owner-email must be a string")
+    owner_email = raw_owner if isinstance(raw_owner, str) else str(raw_owner)
+    if sent("owner-email") and len(owner_email) > 255:
+        # The column is String(255). Truncating silently stored a DIFFERENT owner
+        # than the caller asked for — and an owner grant is a security control, so
+        # a quietly altered one is worse than a refused one.
+        raise HTTPException(
+            status_code=422,
+            detail=f"owner-email must be at most 255 characters (got {len(owner_email)})",
+        )
 
     labels = attrs.get("labels")
     if labels is None:
         labels = {}
     if not isinstance(labels, dict):
         raise HTTPException(status_code=422, detail="labels must be an object")
-    validate_labels(labels)
+    if sent("labels"):
+        validate_labels(labels)
 
     repos = attrs.get("allowed-repositories")
     if repos is None:
         repos = []
-    if not isinstance(repos, list) or not all(isinstance(r, str) for r in repos):
+    if sent("allowed-repositories") and (
+        not isinstance(repos, list) or not all(isinstance(r, str) for r in repos)
+    ):
         raise HTTPException(
             status_code=422, detail="allowed-repositories must be a list of strings"
         )
-    # A blank pattern would match nothing while looking like a restriction, which
-    # reads as the allowlist being broken rather than empty — so blanks are dropped.
-    cleaned = [r.strip() for r in repos if r and r.strip()]
+    # Blank entries are dropped, because one would match nothing while looking like
+    # a restriction — but the entries that remain are stored **exactly as sent**.
+    # Stripping each one was the same provider-breaking transform as the fold above
+    # and bought just as little: `repository_allowed` strips every pattern before
+    # matching, so ` myorg/* ` already works.
+    cleaned = [r for r in repos if isinstance(r, str) and r.strip()]
     # But dropping them must not turn a narrowing into a widening. An empty list
     # means ANY repository, so `["  "]` silently became "allow everything" — a
     # fat-fingered pattern answered 200 and left the connection WIDER than before,
     # which is the one direction a validation error is cheaper than. A caller who
     # meant "any" sends `[]` and gets it; a caller whose patterns all vanished gets
     # told.
-    if repos and not cleaned:
+    if sent("allowed-repositories") and repos and not cleaned:
         raise HTTPException(
             status_code=422,
             detail=(
@@ -432,7 +482,8 @@ async def update_connection(
                 "allowed-repositories": attrs.get(
                     "allowed-repositories", conn.allowed_repositories
                 ),
-            }
+            },
+            supplied={k for k in ("owner-email", "labels", "allowed-repositories") if k in attrs},
         )
         if "owner-email" in attrs:
             conn.owner_email = owner_email
