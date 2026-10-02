@@ -125,7 +125,10 @@ as a platform admin — so a workspace whose claim to a connection rests only on
 labels cannot mint from it, and should name its own connection or use a `static`
 credential. See
 [VCS integration → Naming a VCS connection is authorized](vcs-integration.md#naming-a-vcs-connection-is-authorized).
-(GHSA-v8g7-pqrj-8mcm; earlier releases performed no check here.)
+(GHSA-v8g7-pqrj-8mcm. The check itself arrived in v1.7.7 and v1.8.2; releases
+before those performed none. The repository allowlist above is newer still — it
+did not exist on either of them, so on those two releases this authorization
+check was the whole of the bound.)
 
 So it is **off by default on every supported release**, behind:
 

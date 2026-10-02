@@ -1081,7 +1081,7 @@
       "terragruntVersion": "Terragrunt-Version",
       "noExpiry": "Kein Ablauf",
       "addDriftIgnoreRule": "Regel hinzufügen",
-      "debugModeHint": "Pods fehlgeschlagener Runner auf den von dieser Regel erstellten Arbeitsbereichen offen halten. Auf dieser Release-Linie standardmäßig ein – ein offen gehaltener Pod behält die Zugangsdaten dieses Arbeitsbereichs.",
+      "debugModeHint": "Pods fehlgeschlagener Runner auf den von dieser Regel erstellten Arbeitsbereichen offen halten. Standardmäßig deaktiviert – ein offen gehaltener Pod behält die Zugangsdaten dieses Arbeitsbereichs.",
       "allowForkPrPlansHint": "Gilt für jeden Arbeitsbereich, den diese Regel erstellt. Standardmäßig aus: Ein Pull Request aus einem Fork erhält keinen spekulativen Plan, weil dabei der Code seines Autors mit den Zugangsdaten des Arbeitsbereichs ausgeführt würde."
     },
     "table": {
@@ -2950,7 +2950,7 @@
       "title": "Runner-Debugmodus",
       "description": "Den Pod eines fehlgeschlagenen Laufs offen halten, damit Sie hineinschauen können. Der Lauf wird zuerst als fehlgeschlagen gemeldet; erst danach bleibt der Container stehen.",
       "label": "Debugmodus",
-      "hint": "Auf dieser Release-Linie standardmäßig ein. Solange er aktiv ist, bleibt der Pod eines fehlgeschlagenen Runners für das von Ihrem Betreiber konfigurierte Zeitfenster per exec erreichbar und behält währenddessen die Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs.",
+      "hint": "Standardmäßig deaktiviert. Solange er aktiv ist, bleibt der Pod eines fehlgeschlagenen Runners für das von Ihrem Betreiber konfigurierte Zeitfenster per exec erreichbar und behält währenddessen die Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs.",
       "activeBadge": "Aktiv",
       "bannerTitle": "Der Debugmodus ist für diesen Arbeitsbereich aktiviert",
       "bannerBody": "Der Pod eines fehlgeschlagenen Laufs wird zur Untersuchung offen gehalten, statt sich zu beenden, und behält dabei die Zugangsdaten und entschlüsselten Variablen dieses Arbeitsbereichs. Schalten Sie den Debugmodus aus, sobald Sie mit der Fehlersuche fertig sind.",

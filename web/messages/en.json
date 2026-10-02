@@ -1081,7 +1081,7 @@
       "terragruntVersion": "Terragrunt version",
       "noExpiry": "No expiry",
       "addDriftIgnoreRule": "Add rule",
-      "debugModeHint": "Hold failed runner pods open on the workspaces this rule creates. On by default on this release line — a held pod keeps that workspace's credentials.",
+      "debugModeHint": "Hold failed runner pods open on the workspaces this rule creates. Off by default — a held pod keeps that workspace's credentials.",
       "allowForkPrPlansHint": "Applies to every workspace this rule creates. Off by default: a pull request from a fork gets no speculative plan, because it would run its author's code with the workspace's credentials."
     },
     "table": {
@@ -2595,7 +2595,7 @@
     },
     "planExpiry": {
       "title": "Plan Expiry",
-      "description": "Auto-discard an unconfirmed plan once it is older than this, so a stale plan can't be applied against a moved world. On by default on this release line; the plan must then be re-run. (Applies to apply-capable runs only.)",
+      "description": "Auto-discard an unconfirmed plan once it is older than this, so a stale plan can't be applied against a moved world. Off by default; the plan must then be re-run. (Applies to apply-capable runs only.)",
       "expireAfter": "Expire after"
     },
     "aiSummary": {
@@ -2950,7 +2950,7 @@
       "title": "Runner debug mode",
       "description": "Hold a failed run's pod open so you can get inside it. The run is reported as failed first; only then does the container stay up.",
       "label": "Debug mode",
-      "hint": "On by default on this release line. While on, a failed runner pod stays exec-able for the window your operator configured, and it keeps this workspace's credentials and decrypted variables for that whole time.",
+      "hint": "Off by default. While on, a failed runner pod stays exec-able for the window your operator configured, and it keeps this workspace's credentials and decrypted variables for that whole time.",
       "activeBadge": "Active",
       "bannerTitle": "Debug mode is on for this workspace",
       "bannerBody": "A failed run's pod is held open for inspection instead of exiting, and it keeps this workspace's credentials and decrypted variables while it is held. Turn debug mode off when you are finished troubleshooting.",

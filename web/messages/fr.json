@@ -1081,7 +1081,7 @@
       "terragruntVersion": "Version de Terragrunt",
       "noExpiry": "Pas d'expiration",
       "addDriftIgnoreRule": "Ajouter une règle",
-      "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Activé par défaut sur cette ligne de version — un pod maintenu ouvert conserve les identifiants de cet espace de travail.",
+      "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Désactivé par défaut — un pod maintenu ouvert conserve les identifiants de cet espace de travail.",
       "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Désactivé par défaut : une pull request depuis un fork ne reçoit aucun plan spéculatif, car cela exécuterait le code de son auteur avec les identifiants de l'espace de travail."
     },
     "table": {
@@ -2587,7 +2587,7 @@
     },
     "planExpiry": {
       "title": "Expiration du plan",
-      "description": "Abandonne automatiquement un plan non confirmé une fois qu'il est plus ancien que cela, afin qu'un plan périmé ne puisse pas être appliqué contre un monde qui a évolué. Activé par défaut sur cette ligne de version ; le plan doit alors être réexécuté. (S'applique uniquement aux exécutions capables d'application.)",
+      "description": "Abandonne automatiquement un plan non confirmé une fois qu'il est plus ancien que cela, afin qu'un plan périmé ne puisse pas être appliqué contre un monde qui a évolué. Désactivé par défaut ; le plan doit alors être réexécuté. (S'applique uniquement aux exécutions capables d'application.)",
       "expireAfter": "Expire après"
     },
     "aiSummary": {
@@ -2950,7 +2950,7 @@
       "title": "Mode débogage du runner",
       "description": "Maintenir ouvert le pod d'une exécution en échec pour pouvoir y entrer. L'échec de l'exécution est signalé d'abord ; le conteneur ne reste actif qu'ensuite.",
       "label": "Mode débogage",
-      "hint": "Activé par défaut sur cette ligne de version. Lorsqu'il est actif, le pod d'un runner en échec reste accessible par exec pendant la fenêtre configurée par votre opérateur, et il conserve pendant tout ce temps les identifiants et les variables déchiffrées de cet espace de travail.",
+      "hint": "Désactivé par défaut. Lorsqu'il est actif, le pod d'un runner en échec reste accessible par exec pendant la fenêtre configurée par votre opérateur, et il conserve pendant tout ce temps les identifiants et les variables déchiffrées de cet espace de travail.",
       "activeBadge": "Actif",
       "bannerTitle": "Le mode débogage est activé pour cet espace de travail",
       "bannerBody": "Le pod d'une exécution en échec est maintenu ouvert pour inspection au lieu de se terminer, et il conserve pendant ce temps les identifiants et les variables déchiffrées de cet espace de travail. Désactivez le mode débogage une fois le diagnostic terminé.",

@@ -2587,7 +2587,7 @@
     },
     "planExpiry": {
       "title": "Marklar Marklar",
-      "description": "Auto-discard an unconfirmed marklar once it is older than this, so a stale marklar can't be applied against a moved marklar. On by default on this release line; the marklar must then be re-run. (Applies to apply-capable marklars only.)",
+      "description": "Auto-discard an unconfirmed marklar once it is older than this, so a stale marklar can't be applied against a moved marklar. Off by marklar; the marklar must then be re-run. (Applies to apply-capable marklars only.)",
       "expireAfter": "Expire after"
     },
     "aiSummary": {

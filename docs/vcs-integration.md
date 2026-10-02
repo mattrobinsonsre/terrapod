@@ -1088,9 +1088,9 @@ The allowlist is enforced at eight points, not only where the URL is set:
 | Registry module **update** | **403**. |
 | Registry module **VCS update** | **403**. |
 
-That last row is the one to plan for when narrowing an existing connection:
-workspaces already pointing outside the new patterns keep their configuration
-and start failing their next run. Find them first — see
+The **config fetch** row is the one to plan for when narrowing an existing
+connection: workspaces already pointing outside the new patterns keep their
+configuration and start failing their next run. Find them first — see
 [the runbook](runbooks.md#a-run-cannot-fetch-its-repository).
 
 **Know what it does not cover.** The registry pollers clone a module's
