@@ -154,6 +154,7 @@ async def download_config(
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """Download the configuration archive for a run."""
+    # No phase: both phases download the configuration tarball.
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
@@ -173,6 +174,7 @@ async def download_state(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Download the current state for the run's workspace."""
+    # No phase: the plan reads state to refresh, the apply to apply onto.
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
@@ -210,7 +212,7 @@ async def download_plan_file(
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """Download the plan file from the plan phase."""
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="apply")
     run = await _get_run(run_id, db)
 
     storage = get_storage()
@@ -236,7 +238,7 @@ async def download_lock_file(
     apply phase still works (with the today-behaviour drift risk) when
     the plan ran on an older runner that didn't upload a lock file.
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="apply")
     run = await _get_run(run_id, db)
 
     storage = get_storage()
@@ -256,7 +258,7 @@ async def upload_plan_log(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Upload the plan log."""
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     run = await _get_run(run_id, db)
 
     storage = get_storage()
@@ -276,7 +278,7 @@ async def upload_plan_file(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Upload the plan file."""
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     run = await _get_run(run_id, db)
 
     storage = get_storage()
@@ -299,7 +301,7 @@ async def upload_lock_file(
     upload as best-effort — a failure here just means the apply phase
     falls back to re-resolving providers (today's behaviour).
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     run = await _get_run(run_id, db)
 
     storage = get_storage()
@@ -321,7 +323,7 @@ async def upload_plan_json_output(
     the read URL with confidence (errored / older / failed-upload runs
     leave the flag at its default `false`).
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     run = await _get_run(run_id, db)
 
     # Stream the plan JSON to a capped tempfile on the ephemeral PVC instead
@@ -521,7 +523,7 @@ async def upload_cost_estimate(
     caches the plan-total monthly range for cheap list display. Advisory: a
     parse failure still stores the artifact, just without the cached totals.
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     run = await _get_run(run_id, db)
 
     # Small artifact (bounded by resource count) but streamed to a tempfile for
@@ -588,7 +590,7 @@ async def upload_apply_log(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Upload the apply log."""
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="apply")
     run = await _get_run(run_id, db)
 
     storage = get_storage()
@@ -612,7 +614,7 @@ async def upload_state(
     stores the state at the canonical key so that subsequent plans can
     find it via the standard state download path.
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="apply")
     run = await _get_run(run_id, db)
 
     # A plan-only run does not write state. `require_runner_for_run` proves the
@@ -975,6 +977,7 @@ async def download_pulumi_deployment(
     from terrapod.crypto.service import get_encryption
     from terrapod.services.pulumi_state_service import UnreadableSecretsError, reveal_secrets
 
+    # No phase: the preview and the update both read the stack.
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
     ws = await _pulumi_workspace(run, db)
@@ -1039,7 +1042,7 @@ async def upload_pulumi_deployment(
         service_provider,
     )
 
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="apply")
     run = await _get_run(run_id, db)
     ws = await _pulumi_workspace(run, db)
     if run.plan_only:
@@ -1193,6 +1196,7 @@ async def record_resource_profile(
 
     Runner-token auth, scoped to this run_id.
     """
+    # No phase: every phase posts its own exit profile on the way out.
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
@@ -1268,7 +1272,7 @@ async def mark_state_diverged(
     Called by the runner entrypoint when a state upload fails after a
     successful apply. The workspace is flagged so the UI can warn users.
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="apply")
     run = await _get_run(run_id, db)
 
     ws = await db.get(Workspace, run.workspace_id)
@@ -1324,7 +1328,7 @@ async def download_plan_artifacts(
     expected (older plans, plans that produced no new files); the
     apply phase proceeds without the restore.
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="apply")
     run = await _get_run(run_id, db)
 
     storage = get_storage()
@@ -1354,7 +1358,7 @@ async def upload_plan_artifacts(
     it under chunked transfer encoding). The runner treats 413 as a
     skip-the-restore signal — apply proceeds without it.
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     run = await _get_run(run_id, db)
 
     max_bytes = settings.runner_artifacts.plan_artifacts_max_bytes
@@ -1462,7 +1466,7 @@ async def upload_onboarding_config(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """The cleaned, import-only generated `resource {}` config (D3 + clean)."""
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     session = await _get_onboarding_session_for_run(run_id, db)
     session.generated_config = await _read_capped_text(request)
     await db.commit()
@@ -1477,7 +1481,7 @@ async def upload_onboarding_imports(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """The candidate `import {}` blocks (D3)."""
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     session = await _get_onboarding_session_for_run(run_id, db)
     session.import_blocks = await _read_capped_text(request)
     await db.commit()
@@ -1492,7 +1496,7 @@ async def post_onboarding_query_results(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """The raw D2 query results + the import-only verdict (JSON)."""
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     session = await _get_onboarding_session_for_run(run_id, db)
     try:
         payload = await request.json()

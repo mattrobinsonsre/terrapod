@@ -734,7 +734,7 @@ async def get_policy_bundle(
     runner does no evaluation and posts no results, which the API gate
     treats as PASSED.
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     try:
         run_uuid = uuid.UUID(run_id.removeprefix("run-"))
     except ValueError as exc:
@@ -804,7 +804,7 @@ async def post_policy_results(
     via ON CONFLICT DO NOTHING on ``(run_id, policy_set_id)``, so a
     retried POST after a transient failure is safely idempotent.
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     try:
         run_uuid = uuid.UUID(run_id.removeprefix("run-"))
     except ValueError as exc:

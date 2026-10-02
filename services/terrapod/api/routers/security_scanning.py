@@ -176,7 +176,7 @@ async def get_security_scan_config(
 
     ``enabled: false`` (enforcement ``off``) tells the runner to skip the stage.
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     run = await db.get(Run, _run_uuid(run_id))
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -200,7 +200,7 @@ async def post_security_scan_results(
     (not trusted from the runner) so a buggy or compromised runner can't post
     ``advisory`` to slip past a ``enforced`` gate.
     """
-    require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id, phase="plan")
     run = await db.get(Run, _run_uuid(run_id))
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")

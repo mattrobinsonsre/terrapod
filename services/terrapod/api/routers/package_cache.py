@@ -87,7 +87,8 @@ async def authenticate_package_request(request: Request) -> AuthenticatedUser:
     is held open across an artifact transfer.
     """
     from terrapod.api.dependencies import PEER_KIND, _resolve_user_roles, validate_api_token
-    from terrapod.auth.runner_tokens import verify_runner_token
+    from terrapod.auth.runner_token_state import is_run_token_usable_on_its_own_session
+    from terrapod.auth.runner_tokens import verify_runner_token_claims
     from terrapod.auth.sessions import get_session
     from terrapod.db.session import get_db_session
 
@@ -106,8 +107,13 @@ async def authenticate_package_request(request: Request) -> AuthenticatedUser:
         raise _unauthorised()
 
     if token.startswith("runtok:"):
-        run_id = verify_runner_token(token)
-        if run_id is not None:
+        claims = verify_runner_token_claims(token)
+        if claims is not None:
+            # A token whose run has ended is not a credential here either
+            # (GHSA-xmrf-hxq9-m59m) — this surface has its own auth path, so it
+            # needs its own call rather than inheriting `get_current_user`'s.
+            if not await is_run_token_usable_on_its_own_session(claims.run_id):
+                raise _unauthorised()
             request.state.user_email = "runner"
             return AuthenticatedUser(
                 email="runner",
@@ -115,7 +121,8 @@ async def authenticate_package_request(request: Request) -> AuthenticatedUser:
                 roles=["everyone"],
                 provider_name="runner_token",
                 auth_method="runner_token",
-                run_id=run_id,
+                run_id=claims.run_id,
+                run_phase=claims.phase,
             )
 
     async with get_db_session() as db:

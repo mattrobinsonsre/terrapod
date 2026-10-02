@@ -64,6 +64,12 @@ class AuthenticatedUser:
     provider_name: str
     auth_method: str  # "session", "api_token", or "runner_token"
     run_id: str | None = None  # Set only for runner_token auth
+    #: The Job phase a runner token claims (GHSA-xmrf-hxq9-m59m). `plan` or
+    #: `apply` for a token minted with one; **None means the token makes no
+    #: claim**, which is what a listener older than the claim produces — read it
+    #: as "skip the phase check", never as a mismatch. Only ever set alongside
+    #: `run_id`, for runner_token auth.
+    run_phase: str | None = None
     # Token kind (#495). For service tokens, `roles` stays the owner's live
     # roles and `pinned_roles` carries the token's own scope; the per-resource
     # min()/detached resolution happens in the resolve_*_for() wrappers, and
@@ -280,12 +286,25 @@ async def get_current_user(
     if credentials is not None:
         token = credentials.credentials
 
-        # Try runner token first (fast HMAC check, no DB/Redis)
+        # Try runner token first (HMAC check, then one Redis read — and a single
+        # indexed column read only when that misses, see runner_token_state).
         if token.startswith("runtok:"):
-            from terrapod.auth.runner_tokens import verify_runner_token
+            from terrapod.auth.runner_token_state import is_run_token_usable
+            from terrapod.auth.runner_tokens import verify_runner_token_claims
 
-            run_id = verify_runner_token(token)
-            if run_id is not None:
+            claims = verify_runner_token_claims(token)
+            if claims is not None:
+                # A signature-valid token for a run that has ended is not a
+                # credential (GHSA-xmrf-hxq9-m59m). Checked here rather than per
+                # endpoint so it covers everything a runner reaches — the binary
+                # cache and provider mirror as much as the artifact routes.
+                if not await is_run_token_usable(claims.run_id, db):
+                    AUTH_FAILURES.labels(method="runner_token", reason="run_not_active").inc()
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid or expired token",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
                 request.state.user_email = "runner"  # for audit middleware
                 return AuthenticatedUser(
                     email="runner",
@@ -293,7 +312,8 @@ async def get_current_user(
                     roles=["everyone"],
                     provider_name="runner_token",
                     auth_method="runner_token",
-                    run_id=run_id,
+                    run_id=claims.run_id,
+                    run_phase=claims.phase,
                 )
 
         # Try API token (fast hash + indexed DB lookup)
@@ -396,12 +416,21 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
         )
     token = auth_header[7:]  # strip "Bearer "
 
-    # Try runner token first (no DB needed)
+    # Try runner token first. Its own short-lived session for the run-state
+    # check, so nothing is held across an SSE stream.
     if token.startswith("runtok:"):
-        from terrapod.auth.runner_tokens import verify_runner_token
+        from terrapod.auth.runner_token_state import is_run_token_usable_on_its_own_session
+        from terrapod.auth.runner_tokens import verify_runner_token_claims
 
-        run_id = verify_runner_token(token)
-        if run_id is not None:
+        claims = verify_runner_token_claims(token)
+        if claims is not None:
+            if not await is_run_token_usable_on_its_own_session(claims.run_id):
+                AUTH_FAILURES.labels(method="runner_token", reason="run_not_active").inc()
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or expired token",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
             request.state.user_email = "runner"
             return AuthenticatedUser(
                 email="runner",
@@ -409,7 +438,8 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
                 roles=["everyone"],
                 provider_name="runner_token",
                 auth_method="runner_token",
-                run_id=run_id,
+                run_id=claims.run_id,
+                run_phase=claims.phase,
             )
 
     # Try API token and session with a short-lived DB session
@@ -665,14 +695,28 @@ async def require_admin_or_audit(
     return user
 
 
-def require_runner_for_run(user: AuthenticatedUser, run_id: str) -> None:
+def require_runner_for_run(
+    user: AuthenticatedUser, run_id: str, *, phase: str | None = None
+) -> None:
     """Reject the request unless the caller is a runner-token authenticated
-    for this exact run.
+    for this exact run — and, where ``phase`` is given, for that phase.
 
     Used by runner-protocol endpoints (artifact upload/download, OPA
     policy bundle/results) so a leaked token from one run can't drive
     actions on another. Not a FastAPI dependency — call it inside the
     handler with the path's ``run_id`` after resolving the user.
+
+    ``phase`` is the Job phase this endpoint belongs to — ``plan`` or ``apply``
+    — and is passed only where the endpoint genuinely belongs to one. A run has
+    two Jobs and each gets its own token, so without it a plan-phase token drove
+    the apply-phase routes and vice versa (GHSA-xmrf-hxq9-m59m): a speculative
+    pull-request plan's own token could post an apply result or an apply log.
+
+    **A token carrying no phase claim passes any phase.** That is a listener
+    older than the claim, and refusing it would break every run on a lagging
+    listener image for a defence in depth — the run-scoping above still holds,
+    and `upload_state` keeps its own plan-only guard. Absence is "no claim", not
+    "wrong claim".
     """
     if user.auth_method != "runner_token":
         raise HTTPException(
@@ -690,6 +734,11 @@ def require_runner_for_run(user: AuthenticatedUser, run_id: str) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Token not scoped to this run",
+        )
+    if phase is not None and user.run_phase is not None and user.run_phase != phase:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Token not scoped to the {phase} phase of this run",
         )
 
 

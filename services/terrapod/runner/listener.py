@@ -742,7 +742,7 @@ class RunnerListener:
         engine = strategy_for(attrs.get("engine"))
 
         try:
-            runner_token = await self._get_runner_token(run_id)
+            runner_token = await self._get_runner_token(run_id, phase=phase)
         except Exception as e:
             logger.error("Failed to fetch runner token", run_id=run_id, error=str(e))
             await self._report_launch_failed(run_id, f"Could not obtain runner token: {e}")
@@ -1209,15 +1209,25 @@ class RunnerListener:
 
     # ── Shared Helpers ───────────────────────────────────────────────
 
-    async def _get_runner_token(self, run_id: str) -> str:
-        """Request a short-lived runner token from the API."""
+    async def _get_runner_token(self, run_id: str, *, phase: str | None = None) -> str:
+        """Request a short-lived runner token from the API.
+
+        The Job's phase is sent so the API can bind it into the token
+        (GHSA-xmrf-hxq9-m59m) — a plan-phase token then cannot drive the
+        apply-phase routes. An API older than the claim ignores the field and
+        returns an unphased token, which works exactly as it always did; the
+        field is additive in both directions.
+        """
+        body: dict = {}
+        if phase:
+            body["phase"] = phase
         response = await arequest_with_retry(
             self._http_client,
             "POST",
             f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
             f"/runs/run-{run_id}/runner-token",
             idempotent=True,  # per-run token mint is safe/repeatable — retry on timeout/5xx
-            json={},
+            json=body,
             headers_factory=self._sign_headers,
         )
         response.raise_for_status()

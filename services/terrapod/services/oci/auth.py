@@ -54,7 +54,8 @@ async def authenticate_oci(request: Request) -> AuthenticatedUser:
     held open across a large blob transfer.
     """
     from terrapod.api.dependencies import PEER_KIND, _resolve_user_roles, validate_api_token
-    from terrapod.auth.runner_tokens import verify_runner_token
+    from terrapod.auth.runner_token_state import is_run_token_usable_on_its_own_session
+    from terrapod.auth.runner_tokens import verify_runner_token_claims
     from terrapod.auth.sessions import get_session
     from terrapod.db.session import get_db_session
 
@@ -62,10 +63,15 @@ async def authenticate_oci(request: Request) -> AuthenticatedUser:
     if not token:
         raise OCIError(UNAUTHORIZED, message="authentication required")
 
-    # Runner token first: pure HMAC verification, no I/O.
+    # Runner token first: HMAC verification, then the run-liveness check every
+    # runner-token path makes (GHSA-xmrf-hxq9-m59m). This surface has its own auth
+    # function, so it needs its own call — a token whose run has ended must not
+    # keep pulling images any more than it keeps uploading artifacts.
     if token.startswith("runtok:"):
-        run_id = verify_runner_token(token)
-        if run_id is not None:
+        claims = verify_runner_token_claims(token)
+        if claims is not None:
+            if not await is_run_token_usable_on_its_own_session(claims.run_id):
+                raise OCIError(UNAUTHORIZED, message="authentication required")
             request.state.user_email = "runner"
             return AuthenticatedUser(
                 email="runner",
@@ -73,7 +79,8 @@ async def authenticate_oci(request: Request) -> AuthenticatedUser:
                 roles=["everyone"],
                 provider_name="runner_token",
                 auth_method="runner_token",
-                run_id=run_id,
+                run_id=claims.run_id,
+                run_phase=claims.phase,
             )
 
     async with get_db_session() as db:

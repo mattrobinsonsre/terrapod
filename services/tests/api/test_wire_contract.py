@@ -46,6 +46,7 @@ _UPLOADS = _ROOT / "runner" / "phases" / "uploads.py"
 _RUN_SERVICE = _ROOT / "services" / "run_service.py"
 _RECONCILER = _ROOT / "services" / "run_reconciler.py"
 _OPA_PHASE = _ROOT / "runner" / "phases" / "opa.py"
+_RUNS_ROUTER = _ROOT / "api" / "routers" / "runs.py"
 _SNAPSHOT = Path(__file__).parent / "api_wire_contract.json"
 
 
@@ -100,12 +101,36 @@ def _policy_bundle_keys() -> set[str]:
     return keys
 
 
+def _runner_token_request_keys() -> set[str]:
+    """The keys the API reads off the LISTENER's runner-token mint request.
+
+    A fifth runner-facing surface, and the only one that travels
+    listener→API rather than the other way, so none of the extractors above can
+    see it: the body is built in `listener._get_runner_token` and read as
+    `body.get("...")` in `runs.create_runner_token`. Renaming one here breaks
+    every listener still sending the old name — `ttl` has been on this wire since
+    the mint endpoint existed, and `phase` joined it with the phase claim
+    (GHSA-xmrf-hxq9-m59m).
+
+    Read from the API side, because that is the half that decides: a key the
+    listener sends and the API no longer reads is silently ignored, which for
+    `phase` means every token is minted unphased and the binding quietly stops
+    applying.
+    """
+    src = _RUNS_ROUTER.read_text()
+    marker = "async def create_runner_token("
+    start = src.index(marker)
+    end = src.index("\n@", start)
+    return set(re.findall(r'body\.get\("([a-z][a-z0-9_]*)"', src[start:end]))
+
+
 def wire_contract() -> dict[str, list[str]]:
     return {
         "sse_event_names": sorted(_sse_event_names()),
         "runs_next_attributes": sorted(_runs_next_attributes()),
         "listener_read_keys": sorted(_listener_read_keys()),
         "policy_bundle_keys": sorted(_policy_bundle_keys()),
+        "runner_token_request_keys": sorted(_runner_token_request_keys()),
     }
 
 

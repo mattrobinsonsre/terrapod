@@ -2722,21 +2722,31 @@ Generates a short-lived HMAC-signed runner token scoped to the specified run. Ca
 **Request body (optional):**
 ```json
 {
-  "ttl": 3600
+  "ttl": 3600,
+  "phase": "plan"
 }
 ```
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `ttl` | integer | `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. Clamped to `runners.maxTokenTTLSeconds` (default 7200) |
+| `phase` | string | — | The Job's phase, `plan` or `apply`. Bound into the token so it cannot drive the other phase's endpoints (GHSA-xmrf-hxq9-m59m, new in 2.0). Omitted or unrecognised mints an unphased token |
 
 **Response:**
 ```json
 {
-  "token": "runtok:{run_id}:{ttl}:{timestamp}:{hmac_sig}",
-  "expires_in": 3600
+  "token": "runtok:{run_id}:{phase}:{ttl}:{timestamp}:{hmac_sig}",
+  "expires_in": 3600,
+  "phase": "plan"
 }
 ```
+
+A request that sends no `phase` gets the older four-field token
+(`runtok:{run_id}:{ttl}:{timestamp}:{hmac_sig}`) and `"phase": null` — which is
+what a listener image older than the claim produces, and it keeps working: an
+absent claim is read as "no claim", so the phase checks are skipped rather than
+failing. Both parts of the wire are additive, so neither upgrade order breaks a
+run.
 
 **Auth:** Listener certificate.
 
@@ -3671,6 +3681,25 @@ DELETE /api/v1/authentication-tokens/{id}
 ## Run Artifacts (Runner)
 
 Authenticated endpoints for runner Jobs to download inputs and upload outputs. All endpoints require a runner token (`Authorization: Bearer runtok:...`) scoped to the specified `run_id`.
+
+Since 2.0 (GHSA-xmrf-hxq9-m59m) a token is also scoped to its **phase** and to
+the time its run is **live**:
+
+- An endpoint that belongs to one phase refuses a token from the other with
+  **403**. Plan phase: `PUT plan-log`, `PUT plan-file`, `PUT lock-file`,
+  `PUT plan-json-output`, `PUT plan-artifacts`, `PUT cost-estimate`, the
+  `onboarding-*` uploads, `POST plan-result`, and the policy + security-scan
+  runner protocol. Apply phase: `GET plan-file`, `GET lock-file`,
+  `GET plan-artifacts`, `PUT apply-log`, `PUT state`, `PUT pulumi-deployment`,
+  `POST state-diverged`, `POST apply-result`. Both: `GET config`, `GET state`,
+  `GET pulumi-deployment`, `POST resource-profile`.
+- A token whose run has reached a terminal state — or has been deleted — fails
+  **authentication** (401), on every runner-reachable surface including the
+  binary cache, the provider mirror, the package-cache proxy and the container
+  registry.
+- A token carrying no phase claim passes every phase, because that is what a
+  listener older than the claim mints. See
+  [Listener Runner Token](#listener-runner-token).
 
 ### Download Config Archive
 

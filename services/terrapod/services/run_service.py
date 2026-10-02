@@ -1343,6 +1343,17 @@ async def transition_run(
     if target_status in TERMINAL_STATES:
         await _enqueue_pulumi_run_ended(db, run)
 
+    # The run's own runner tokens stop working here (GHSA-xmrf-hxq9-m59m). A
+    # runner token is a stateless HMAC good for its whole TTL — up to two hours —
+    # so without this a token from a finished run, or one sitting in a lingering
+    # debug pod, kept authenticating long after there was anything legitimate
+    # left for it to do. Best-effort: the auth path also checks the run's status,
+    # so this makes the revocation PROMPT rather than making it correct.
+    if target_status in TERMINAL_STATES:
+        from terrapod.auth.runner_token_state import revoke_run_tokens
+
+        await revoke_run_tokens(run.id)
+
     # Enqueue notification for this status change
     await _enqueue_notification(run, target_status)
 

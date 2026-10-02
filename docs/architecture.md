@@ -221,9 +221,11 @@ Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: 
         |
 3. Listener receives SSE event → claims run: GET /api/v1/listeners/{id}/runs/next
         |
-4. Listener requests a runner token:
-   POST /api/v1/listeners/{id}/runs/{run_id}/runner-token
-   - Returns short-lived HMAC-signed token scoped to run_id
+4. Listener requests a runner token, naming the Job's phase:
+   POST /api/v1/listeners/{id}/runs/{run_id}/runner-token  {"phase": "plan"}
+   - Returns a short-lived HMAC-signed token scoped to run_id AND that phase
+   - A listener older than the phase claim sends none and gets an unphased
+     token, which still works (the claim is additive on the wire)
         |
 5. Listener creates K8s Job in runner namespace
    - Image: terrapod-runner (slim Debian + python + git + opa)
@@ -471,10 +473,13 @@ Incoming request
   |
   v
 1. If Authorization: Bearer <token> header present:
-   a. Try runner token (fast, no I/O):
+   a. Try runner token:
       - Token starts with "runtok:" prefix?
       - Verify HMAC-SHA256 signature + check expiry
-      - Return AuthenticatedUser with auth_method="runner_token", run_id={scoped_run_id}
+      - Check the run is still live: a revocation marker in Redis, else one
+        indexed read of the run's status (terminal or missing => 401)
+      - Return AuthenticatedUser with auth_method="runner_token",
+        run_id={scoped_run_id}, run_phase={plan|apply|None}
    b. Try API token lookup:
       - SHA-256 hash the token
       - Query api_tokens table by hash

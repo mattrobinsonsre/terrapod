@@ -408,6 +408,14 @@ Things worth knowing before you turn it on:
   workspace admin can ask for a debug pod, but only the deployment operator
   decides how long one may survive, and `runners.debugLingerSeconds: 0` refuses
   the request outright no matter what any workspace is set to.
+
+  **The token in a held pod is still live, and the terminal-state revocation
+  does not change that** — the hold is precisely the window in which the run has
+  *not* reached a terminal state, so there is nothing to revoke yet. What the
+  phase binding does change is its reach: a held plan pod's token is a
+  plan-phase token, so it cannot write state or post an apply result for that
+  run. It is still the full plan-phase credential until the pod is deleted,
+  which is the point of `debugLingerSeconds` being bounded and opt-in.
 - **It does not catch an OOM, deliberately.** An OOMKill is a SIGKILL from the
   kernel — nothing in the runner gets to run, so nothing could hold the
   container. It does not need to: an OOM is already answerable from the run page
@@ -539,7 +547,23 @@ tprun-<run-short-id>-plan-auth     # plan-phase Job consumes this
 tprun-<run-short-id>-apply-auth    # apply-phase Job consumes this
 ```
 
-The Job's pod spec references the token via `secretKeyRef` and exposes it as `TP_AUTH_TOKEN` — the raw token never appears in the Job spec, the listener logs, or `kubectl describe` output. The token is scoped to a single `run_id`, so a leaked token cannot be replayed against an unrelated run or used to download a different workspace's state. It is **not** bound to a phase: the token is `runtok:{run_id}:{ttl}:{timestamp}:{signature}` and carries no phase, so a plan-phase token remains usable against that same run's apply-phase endpoints until its TTL expires. The per-phase Secret naming above is collision avoidance between overlapping Jobs, not a narrower scope. Earlier text here claimed the phase binding; it has never existed, and the TTL (`runners.tokenTTLSeconds`, default 1h) is what actually bounds a leaked token's life.
+The Job's pod spec references the token via `secretKeyRef` and exposes it as `TP_AUTH_TOKEN` — the raw token never appears in the Job spec, the listener logs, or `kubectl describe` output.
+
+**The token is scoped to one `run_id`, to one phase of that run, and to the time that run is live** (GHSA-xmrf-hxq9-m59m, from 2.0):
+
+```
+runtok:{run_id}:{phase}:{ttl}:{timestamp}:{signature}
+```
+
+- **Run.** A leaked token cannot be replayed against an unrelated run or used to download a different workspace's state. This has always held.
+- **Phase.** `phase` is `plan` or `apply`, it is inside the signed message so the holder cannot edit it, and each endpoint that belongs to one phase checks it. So a plan-phase token can no longer post an apply result, upload an apply log, write state, or fetch the saved plan — and an apply-phase token cannot post a plan result or a policy/scan result. The four endpoints both phases genuinely use (config download, state download, Pulumi deployment read, resource profile) are not phase-checked, and say so at the call site.
+- **Lifetime.** The run's tokens are revoked when it reaches a terminal state, so a token sitting in a finished Job — or in a [debug-linger](#debug-mode-inspecting-a-failed-runner-pod) pod — stops working at that moment rather than at the end of its TTL. The auth path also refuses a token whose run is terminal or gone, which is what covers a token whose revocation was never recorded.
+
+`runners.tokenTTLSeconds` (default 1h, clamped by `runners.maxTokenTTLSeconds`) remains the outer bound.
+
+**Version skew.** The phase claim is additive on the wire in both directions. A listener older than it sends no `phase` when it asks for a token, gets the four-field unphased form, and works exactly as before — an absent claim is read as "no claim" and the phase check is skipped, never as a mismatch. A listener newer than its API sends a `phase` the API ignores, and gets an unphased token. **The run-lifetime check is server-side only, so it applies whatever the runner and listener images are.** Upgrade the API first, then the listeners, to get the phase binding; neither order breaks a run.
+
+Earlier text here claimed the phase binding before it existed. The per-phase Secret naming above is still collision avoidance between overlapping Jobs; it is now matched by a real per-phase scope.
 
 ### Per-phase vars Secret
 

@@ -102,5 +102,9 @@
     "policy_sets",
     "shared_evaluation",
     "support_files"
+  ],
+  "runner_token_request_keys": [
+    "phase",
+    "ttl"
   ]
 }
