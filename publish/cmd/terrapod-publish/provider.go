@@ -60,6 +60,7 @@ func providerCmd(args []string) int {
 			fmt.Fprintf(os.Stderr, "invalid --binary %q, want OS/ARCH=PATH\n", spec)
 			return 2
 		}
+		//nolint:gosec // G304: `path` is the right-hand side of the operator's own --binary OS/ARCH=PATH flag.
 		data, err := os.ReadFile(path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "read binary %s: %v\n", path, err)

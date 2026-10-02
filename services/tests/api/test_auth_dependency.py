@@ -2,6 +2,7 @@
 
 import base64
 import uuid
+from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -209,6 +210,34 @@ def _test_ca() -> CertificateAuthority:
     return CertificateAuthority.generate()
 
 
+class _StubRequest:
+    """Minimal stand-in for the parts of Request the listener auth path reads."""
+
+    def __init__(self, method: str = "GET", path: str = "/api/v1/x", headers: dict | None = None):
+        self.method = method
+        self.headers = headers or {}
+        self.url = type("U", (), {"path": path})()
+
+
+@contextmanager
+def _pop(enabled: bool):
+    """Turn listener proof-of-possession on or off for one block.
+
+    Explicit rather than an autouse fixture: a file-wide switch that disables a
+    security control would silently cover every test added here later, including
+    ones that ought to be asserting it.
+    """
+    from terrapod.config import settings
+
+    cfg = settings.agent_pools
+    old = cfg.require_listener_proof_of_possession
+    cfg.require_listener_proof_of_possession = enabled
+    try:
+        yield
+    finally:
+        cfg.require_listener_proof_of_possession = old
+
+
 def _cert_header(cert) -> str:
     """Encode a cert as the X-Terrapod-Client-Cert header value."""
     return base64.b64encode(serialize_certificate(cert)).decode()
@@ -250,6 +279,7 @@ class TestGetListenerIdentity:
             return fp in (fp_a, fp_b)
 
         with (
+            _pop(False),
             patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
             patch(
                 "terrapod.services.agent_pool_service.get_listener_by_name",
@@ -260,8 +290,8 @@ class TestGetListenerIdentity:
                 side_effect=fake_is_valid,
             ),
         ):
-            id_a = await get_listener_identity(_cert_header(cert_a))
-            id_b = await get_listener_identity(_cert_header(cert_b))
+            id_a = await get_listener_identity(_StubRequest(), _cert_header(cert_a))
+            id_b = await get_listener_identity(_StubRequest(), _cert_header(cert_b))
 
         assert str(id_a.listener_id) == listener_id
         assert str(id_b.listener_id) == listener_id
@@ -280,6 +310,7 @@ class TestGetListenerIdentity:
         cert, _ = _test_ca.issue_listener_certificate(listener_name, "pool-1")
 
         with (
+            _pop(False),
             patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
             patch(
                 "terrapod.services.agent_pool_service.get_listener_by_name",
@@ -297,7 +328,7 @@ class TestGetListenerIdentity:
             ),
         ):
             with pytest.raises(HTTPException) as exc_info:
-                await get_listener_identity(_cert_header(cert))
+                await get_listener_identity(_StubRequest(), _cert_header(cert))
 
         assert exc_info.value.status_code == 401
         assert "not registered" in exc_info.value.detail.lower()
@@ -308,6 +339,7 @@ class TestGetListenerIdentity:
         cert, _ = _test_ca.issue_listener_certificate("ghost", "pool-1")
 
         with (
+            _pop(False),
             patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
             patch(
                 "terrapod.services.agent_pool_service.get_listener_by_name",
@@ -315,7 +347,7 @@ class TestGetListenerIdentity:
             ),
         ):
             with pytest.raises(HTTPException) as exc_info:
-                await get_listener_identity(_cert_header(cert))
+                await get_listener_identity(_StubRequest(), _cert_header(cert))
 
         assert exc_info.value.status_code == 401
 
@@ -353,6 +385,7 @@ class TestAuthenticateListener:
         request_b.headers = {"x-terrapod-client-cert": _cert_header(cert_b)}
 
         with (
+            _pop(False),
             patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
             patch(
                 "terrapod.services.agent_pool_service.get_listener_by_name",
@@ -376,6 +409,7 @@ class TestAuthenticateListener:
         request.headers = {"x-terrapod-client-cert": _cert_header(cert)}
 
         with (
+            _pop(False),
             patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
             patch(
                 "terrapod.services.agent_pool_service.get_listener_by_name",
@@ -397,3 +431,100 @@ class TestAuthenticateListener:
 
         assert exc_info.value.status_code == 401
         assert "not registered" in exc_info.value.detail.lower()
+
+
+class TestListenerProofOfPossessionIsEnforcedOnBothPaths:
+    """With the setting on, a certificate on its own must not authenticate.
+
+    Both paths are covered deliberately. `authenticate_listener` exists because
+    SSE endpoints cannot hold a yield-dependency, so it is a second, separate
+    implementation of listener auth — and a replay hole in it would be just as
+    complete as one in the dependency, while being easy to miss.
+    """
+
+    @staticmethod
+    def _patches(listener_dict, _test_ca):
+        return (
+            patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
+            patch(
+                "terrapod.services.agent_pool_service.get_listener_by_name",
+                AsyncMock(return_value=listener_dict),
+            ),
+            patch(
+                "terrapod.services.agent_pool_service.is_fingerprint_valid",
+                AsyncMock(return_value=True),
+            ),
+        )
+
+    @staticmethod
+    def _listener():
+        return {"id": str(uuid.uuid4()), "name": "listener-1", "pool_id": str(uuid.uuid4())}
+
+    def _signed_headers(self, key_pem, cert, method, path):
+        import secrets
+        import time
+
+        from terrapod.auth.listener_pop import (
+            NONCE_HEADER,
+            SIGNATURE_HEADER,
+            TIMESTAMP_HEADER,
+            sign_request,
+        )
+
+        ts, nonce = str(int(time.time())), secrets.token_urlsafe(24)
+        return {
+            "x-terrapod-client-cert": _cert_header(cert),
+            TIMESTAMP_HEADER.lower(): ts,
+            NONCE_HEADER.lower(): nonce,
+            SIGNATURE_HEADER.lower(): sign_request(key_pem, method, path, ts, nonce),
+        }
+
+    async def test_the_dependency_refuses_a_certificate_with_no_signature(self, _test_ca):
+        cert, _key = _test_ca.issue_listener_certificate("listener-1", "pool-1")
+        ld = self._listener()
+        p1, p2, p3 = self._patches(ld, _test_ca)
+        with _pop(True), p1, p2, p3:
+            with pytest.raises(HTTPException) as exc:
+                await get_listener_identity(_StubRequest(), _cert_header(cert))
+        assert exc.value.status_code == 401
+        assert "proof of possession" in exc.value.detail.lower()
+
+    async def test_the_sse_path_refuses_a_certificate_with_no_signature(self, _test_ca):
+        cert, _key = _test_ca.issue_listener_certificate("listener-1", "pool-1")
+        ld = self._listener()
+        req = _StubRequest(headers={"x-terrapod-client-cert": _cert_header(cert)})
+        p1, p2, p3 = self._patches(ld, _test_ca)
+        with _pop(True), p1, p2, p3:
+            with pytest.raises(HTTPException) as exc:
+                await authenticate_listener(req)
+        assert exc.value.status_code == 401
+        assert "proof of possession" in exc.value.detail.lower()
+
+    async def test_a_signed_request_is_accepted_on_the_sse_path(self, monkeypatch, _test_ca):
+        cert, key = _test_ca.issue_listener_certificate("listener-1", "pool-1")
+        from cryptography.hazmat.primitives import serialization
+
+        key_pem = key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).decode()
+
+        class _R:
+            def __init__(self):
+                self.store: dict[str, str] = {}
+
+            async def set(self, k, v, nx=False, ex=None):
+                if nx and k in self.store:
+                    return None
+                self.store[k] = v
+                return True
+
+        monkeypatch.setattr("terrapod.redis.client.get_redis_client", lambda: _R())
+        path = "/api/v1/listeners/listener-1/events"
+        req = _StubRequest(path=path, headers=self._signed_headers(key_pem, cert, "GET", path))
+        ld = self._listener()
+        p1, p2, p3 = self._patches(ld, _test_ca)
+        with _pop(True), p1, p2, p3:
+            ident = await authenticate_listener(req)
+        assert str(ident.listener_id) == ld["id"]

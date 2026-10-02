@@ -920,7 +920,7 @@ async def confirm_run(
     run = await _get_run(run_id, db)
     await _require_run_ws_capability(
         run,
-        cap.RUN_APPLY_DESTROY if run.is_destroy else cap.RUN_APPLY,
+        cap.confirm_capability(run.is_destroy),
         user,
         db,
         request=request,

@@ -51,6 +51,12 @@ if TYPE_CHECKING:
 
 from cryptography import x509
 
+from terrapod.auth.listener_pop import (
+    NONCE_HEADER,
+    SIGNATURE_HEADER,
+    TIMESTAMP_HEADER,
+    sign_request,
+)
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -589,9 +595,40 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
     import httpx
 
     cert_b64 = base64.b64encode(identity.certificate_pem.encode()).decode()
-    headers = {"X-Terrapod-Client-Cert": cert_b64}
+    renew_path = f"/api/terrapod/v1/listeners/listener-{identity.listener_id}/renew"
     backoff = 1.0
     for attempt in range(3):
+        # Signed INSIDE the loop: the nonce is single-use, so headers built once
+        # and reused would have attempts 2 and 3 rejected as replays. That would
+        # be quiet and bad — a 401 here is deliberately not retried and returns
+        # None, so the caller falls back to the join token and the listener
+        # re-registers under a fresh name on every renewal cycle.
+        headers = {"X-Terrapod-Client-Cert": cert_b64}
+        key_pem = getattr(identity, "private_key_pem", "")
+        if key_pem:
+            import secrets as _secrets
+            import time as _time
+
+            try:
+                _ts = str(int(_time.time()))
+                _nonce = _secrets.token_urlsafe(24)
+                headers[TIMESTAMP_HEADER] = _ts
+                headers[NONCE_HEADER] = _nonce
+                headers[SIGNATURE_HEADER] = sign_request(key_pem, "POST", renew_path, _ts, _nonce)
+            except Exception as exc:
+                # An unusable stored key must not raise out of here. This function's
+                # contract is "the new cert, or None if every attempt failed", and the
+                # caller answers None by falling back to the join token — which is
+                # exactly the right recovery for a corrupt key, because re-joining
+                # issues a fresh one. Raising instead would turn a self-healing case
+                # into a crash loop.
+                logger.warning(
+                    "Could not sign the renewal; sending unsigned, which the API will "
+                    "refuse if it requires proof of possession",
+                    error=str(exc),
+                )
+                for h in (TIMESTAMP_HEADER, NONCE_HEADER, SIGNATURE_HEADER):
+                    headers.pop(h, None)
         try:
             async with httpx.AsyncClient(base_url=identity.api_url, timeout=30) as client:
                 # This function already owns a bounded retry loop (3 attempts with
@@ -599,10 +636,7 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
                 # up, 200 → adopt new cert). Don't wrap the call in the shared retry
                 # helper too — that would nest retries (3×3). The outer loop here is
                 # this client call's retry.
-                r = await client.post(
-                    f"/api/terrapod/v1/listeners/listener-{identity.listener_id}/renew",
-                    headers=headers,
-                )
+                r = await client.post(renew_path, headers=headers)
             if r.status_code == 200:
                 return r.json()["data"]
             if r.status_code in (401, 403):

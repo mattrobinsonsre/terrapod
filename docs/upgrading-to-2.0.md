@@ -479,6 +479,82 @@ literal string `https://`, which every https URL starts with — so the destinat
 and recipient checks run, pass, and accept an assertion minted for a different
 service provider entirely. Set the URL first, then the flags, or the checks are
 decoration.
+### An IdP group can no longer grant `admin` or `audit`
+
+Role resolution took IdP group names verbatim, so a group called `admin` granted
+platform admin (`GHSA-22vg-4g2w-7w34`). It no longer does, from either OIDC or
+SAML, however the group is named or prefixed.
+
+**Check this before upgrading if your admins get their role from a group.** Run
+
+```sql
+SELECT provider_name, email, role_name FROM platform_role_assignments;
+```
+
+and if that returns nothing while your administrators currently sign in through an
+IdP group, they will lose `admin` at the upgrade. Grant it deliberately first,
+either with a platform role assignment or with a `claims_to_roles` rule:
+
+```yaml
+auth:
+  sso:
+    oidc:
+      - name: okta
+        claims_to_roles:
+          - claim: groups
+            value: "platform-engineering"   # the group, named as the IdP names it
+            roles: ["admin"]
+```
+
+A rule is written by whoever administers Terrapod; a group name is written by
+whoever administers the directory. That difference is the whole point, and it is
+why a rule naming the same group is accepted while the bare group is not.
+
+The local admin account is unaffected, so a deployment is not lockable out of
+itself — but recovering that way is worse than spending a minute on the query above.
+
+**`role_prefixes` is also a filter now,** where it used to strip a matching prefix
+and pass everything else through. If you set it, a group without one of those
+prefixes is ignored rather than taken as a role name. That is what the setting
+always read as, and it narrows rather than widens — but if you relied on the
+pass-through, those roles stop arriving.
+
+### Listeners must prove they hold their certificate's private key
+
+**Affects:** any pool still running a listener image older than 2.0.
+
+A listener authenticates with `X-Terrapod-Client-Cert`, the certificate the CA
+issued it at join. A certificate is **public material** and it travels on every
+request, so until 2.0 that header was effectively a bearer token: anyone who
+observed one call could replay it until the certificate expired, and every check
+the API made — CA signature, expiry, name lookup, fingerprint — was satisfied by
+the copy just as well as by the holder.
+
+From 2.0 each request is also signed with the private key the CA returns once at
+join, binding it to one method, one path and a single-use nonce inside a 60-second
+window. Both listener authentication paths enforce it, including the SSE event
+stream.
+
+**A listener image older than 2.0 does not sign, so it gets `401` on every call —
+including `renew`, which is not retried and falls back to the join token.** The
+effect is not a clean failure: the listener re-registers under a fresh name on
+every renewal cycle and churns pool membership. So either upgrade every listener
+in every pool before the API, or set:
+
+```yaml
+api:
+  config:
+    agent_pools:
+      require_listener_proof_of_possession: false
+```
+
+and remove it once the fleet is upgraded. The setting honours an explicit
+`false` — it is rendered with `hasKey`, not `| default`.
+
+**Clock skew matters now.** The signature carries a timestamp and is rejected
+more than 60 seconds either side of the API's clock, so a listener cluster whose
+clock has drifted further than that fails to authenticate. That is a real failure
+mode on long-running VMs and in nested virtualisation.
 
 ## Before you upgrade
 

@@ -58,9 +58,30 @@ def _identity():
         pool_id=uuid.uuid4(),
         api_url="http://test",
         certificate_pem="-----BEGIN CERT-----\nfoo\n-----END CERT-----\n",
-        private_key_pem="key",
+        private_key_pem=_TEST_KEY_PEM,
         ca_cert_pem="ca",
     )
+
+
+def _make_key_pem() -> str:
+    """A real key, so the renewal tests exercise the signing path rather than
+    skipping it. A placeholder string made sign_request raise, which is how the
+    unusable-key case below went unnoticed."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    return (
+        Ed25519PrivateKey.generate()
+        .private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        .decode()
+    )
+
+
+_TEST_KEY_PEM = _make_key_pem()
 
 
 class TestCallRenewWithRetries:
@@ -301,3 +322,39 @@ class TestEstablishIdentity:
         ):
             with pytest.raises(RuntimeError, match="TERRAPOD_JOIN_TOKEN"):
                 await identity_mod.establish_identity(_RC)
+
+
+class TestAnUnusableKeyDoesNotCrashRenewal:
+    """A corrupt stored key must leave the join-token fallback reachable.
+
+    `_call_renew_with_retries` promises "the new cert, or None if every attempt
+    failed", and the caller answers None by re-joining — which issues a fresh key
+    and is exactly the right recovery for a corrupt one. If signing raised out of
+    here instead, that self-healing case would become a crash loop, so the signing
+    is best-effort and an unsigned request is sent (which an API requiring proof of
+    possession then refuses, giving the same None).
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_malformed_key_sends_unsigned_rather_than_raising(self):
+        ident = _identity()
+        ident.private_key_pem = "not a pem at all"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_response.text = "no"
+        client = MagicMock()
+        client.post = AsyncMock(return_value=mock_response)
+        cm = MagicMock()
+        cm.__aenter__ = AsyncMock(return_value=client)
+        cm.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("httpx.AsyncClient", return_value=cm):
+            result = await identity_mod._call_renew_with_retries(ident)
+
+        assert result is None, "a refused renewal returns None so the caller re-joins"
+        sent = client.post.await_args.kwargs["headers"]
+        assert "X-Terrapod-Client-Cert" in sent
+        assert "X-Terrapod-Listener-Signature" not in sent, (
+            "a key that will not load must not leave a half-built signature behind"
+        )

@@ -155,6 +155,7 @@ func TarGzDir(dir string) ([]byte, []string, error) {
 		if !info.Mode().IsRegular() {
 			return nil
 		}
+		//nolint:gosec // G304: `path` comes from walking the module directory the operator named; packing those files is the function's job.
 		f, err := os.Open(path)
 		if err != nil {
 			return err

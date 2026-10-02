@@ -1,19 +1,32 @@
-# CodeQL configuration — suppress triaged false positives.
+# CodeQL configuration.
 #
-# All alerts below were reviewed in PR #40 and confirmed as false positives.
-# Inline suppression comments (# codeql[rule-id]) do not reliably close
-# pre-existing alerts, so we exclude queries at the config level.
+# A repo-wide `exclude` is an assertion about EVERY file, now and in future, and
+# six of the ones here were assertions about a codebase that no longer exists
+# (GHSA-9rfc-j5x9-p84w). Each was written in PR #40 naming a single call site —
+# "provider cache: hostname validated against an admin-configured allowlist" was
+# true of the one fetch there was. Since then the tree gained an OCI pull-through
+# registry, PyPI and npm package proxies, operator-supplied webhook and run-task
+# URLs, Vault and OpenBao clients and a cost-pricesheet fetch: SSRF and
+# path-injection sinks, excluded sight unseen by a filter whose stated reason had
+# never been re-read. The CVE policy meanwhile claimed CodeQL gates the source.
 #
-# py/ineffectual-statement             — PEP 544 Protocol stubs use `...` (Ellipsis)
-# py/path-injection                    — filesystem keys are HMAC-signed; traversal check is defense-in-depth
-# py/stack-trace-exposure              — verify endpoint returns fixed strings, not exception text
-# py/clear-text-logging-sensitive-data — bootstrap prints one-time credential via print(), not logger
-# py/full-ssrf                         — provider cache: hostname validated against admin-configured allowlist
-# py/partial-ssrf                      — binary cache: base URLs are admin-configured mirror URLs
-# py/weak-sensitive-data-hashing       — SHA-256 on high-entropy secrets.token_urlsafe() output, not passwords
-# py/unnecessary-lambda                — FastAPI dependency overrides need fresh mock per request
-# py/multiple-definition               — intentional re-fetch after DB mutation
-# py/empty-except                      — intentional fail-open patterns (Redis, K8s, URL parsing)
+# So the security-relevant filters are gone, and anything they were right about is
+# now dismissed per alert — which costs a click and leaves a dated, auditable
+# record naming the alert, instead of a comment that silently stops being true.
+#
+# What is left is deliberately not security analysis. These flag an idiom the
+# codebase uses on purpose, in hundreds of places, and per-alert dismissal would be
+# churn with no judgement in it:
+#
+# py/ineffectual-statement — PEP 544 Protocol stubs use `...` (Ellipsis)
+# py/unnecessary-lambda    — FastAPI dependency overrides need a fresh mock per request
+# py/multiple-definition   — intentional re-fetch after a DB mutation
+#
+# `py/empty-except` is the one judgement call in that list. It stays because the
+# fail-open patterns it flags (Redis, K8s, URL parsing) are deliberate and
+# documented, and because the thing that actually governs them is the rule that a
+# best-effort handler must not swallow a DB mutation — which is gated by a test
+# that reads the code, not by CodeQL. Revisit it if that stops being true.
 #
 # alembic/versions — Alembic migration boilerplate. The module globals
 # `revision`, `down_revision`, `branch_labels`, `depends_on` are required
@@ -44,18 +57,6 @@ paths-ignore:
 query-filters:
   - exclude:
       id: py/ineffectual-statement
-  - exclude:
-      id: py/path-injection
-  - exclude:
-      id: py/stack-trace-exposure
-  - exclude:
-      id: py/clear-text-logging-sensitive-data
-  - exclude:
-      id: py/full-ssrf
-  - exclude:
-      id: py/partial-ssrf
-  - exclude:
-      id: py/weak-sensitive-data-hashing
   - exclude:
       id: py/unnecessary-lambda
   - exclude:

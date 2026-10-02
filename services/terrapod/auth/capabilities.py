@@ -74,6 +74,22 @@ WORKSPACE_ONBOARD = "workspace:onboard"  # onboard existing resources (#824): po
 # ── Workspace / runs — write tier ───────────────────────────────────────────
 RUN_APPLY = "run:apply"  # create or retry an apply-capable run + confirm apply
 RUN_APPLY_DESTROY = "run:apply-destroy"  # create/retry/confirm a destroy run (is_destroy)
+
+
+def confirm_capability(is_destroy: bool) -> str:
+    """The capability required to confirm a run for apply.
+
+    One function because the rule was inlined in two places and they drifted: the
+    API route required RUN_APPLY_DESTROY for a destroy run while the Slack
+    approve button checked RUN_APPLY for everything, so a role holding
+    `run:apply` but not `run:apply-destroy` could confirm from Slack a destroy
+    the API would have refused. The Slack code's own comment said it was "the
+    same gate the API/UI use", which is exactly the kind of claim that stops
+    anyone checking.
+    """
+    return RUN_APPLY_DESTROY if is_destroy else RUN_APPLY
+
+
 VAR_WRITE = "var:write"  # create / update / delete variables
 STATE_WRITE = "state:write"  # create state version, manual upload, rollback
 CONFIG_UPLOAD = "config:upload"  # create a configuration version

@@ -329,6 +329,46 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
     )
 
 
+async def _enforce_listener_pop(request: "Request", cert) -> None:
+    """Require the caller to hold the private key behind `cert`.
+
+    Called from BOTH listener auth paths — `authenticate_listener` (the SSE one,
+    which cannot use yield-dependencies) and `get_listener_identity` (everything
+    else). It is one function on purpose: every check those two perform before
+    this point is satisfied by a COPY of the certificate, which is public and is
+    sent on every request, so a path that skipped this would accept a replayed
+    header indefinitely while looking fully authenticated. A guard that lives in
+    one entry point and not its sibling is enforced only where someone happens to
+    be looking.
+    """
+    from terrapod.auth.listener_pop import (
+        NONCE_HEADER,
+        SIGNATURE_HEADER,
+        TIMESTAMP_HEADER,
+        ProofOfPossessionError,
+        verify_request,
+    )
+    from terrapod.config import settings
+
+    if not settings.agent_pools.require_listener_proof_of_possession:
+        return
+    h = request.headers
+    try:
+        await verify_request(
+            cert,
+            method=request.method,
+            path=request.url.path,
+            timestamp=h.get(TIMESTAMP_HEADER.lower(), ""),
+            nonce=h.get(NONCE_HEADER.lower(), ""),
+            signature=h.get(SIGNATURE_HEADER.lower(), ""),
+        )
+    except ProofOfPossessionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Listener proof of possession failed: {exc}",
+        ) from None
+
+
 async def authenticate_listener(request: Request) -> "ListenerIdentity":
     """Authenticate a listener via certificate, looking up identity in Redis.
 
@@ -403,6 +443,8 @@ async def authenticate_listener(request: Request) -> "ListenerIdentity":
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Certificate fingerprint not registered",
         )
+
+    await _enforce_listener_pop(request, cert)
 
     return ListenerIdentity(
         listener_id=uuid.UUID(listener["id"]),
@@ -527,6 +569,7 @@ class ListenerIdentity:
 
 
 async def get_listener_identity(
+    request: Request,
     x_terrapod_client_cert: str = Header(None),
 ) -> ListenerIdentity:
     """Authenticate a runner listener via X-Terrapod-Client-Cert header.
@@ -610,6 +653,8 @@ async def get_listener_identity(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Certificate fingerprint not registered",
         )
+
+    await _enforce_listener_pop(request, cert)
 
     return ListenerIdentity(
         listener_id=uuid.UUID(listener["id"]),

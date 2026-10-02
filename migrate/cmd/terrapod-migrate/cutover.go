@@ -59,7 +59,13 @@ func cutoverCmd(args []string) int {
 	if handoverPath == "" {
 		handoverPath = filepath.Join(filepath.Dir(*statePath), "MIGRATION-HANDOVER.md")
 	}
-	if err := os.WriteFile(handoverPath, framework.RenderHandoverMarkdown(state), 0o644); err != nil {
+	// 0600, matching the migration state file this is rendered from
+	// (framework/state.go chmods it 0600). The handover carries the source host,
+	// the source organisation and every workspace name — the same inventory, in
+	// prose — so it being world-readable beside a 0600 state file was an
+	// inconsistency rather than a decision. Found by gosec on its first run
+	// (GHSA-9rfc-j5x9-p84w).
+	if err := os.WriteFile(handoverPath, framework.RenderHandoverMarkdown(state), 0o600); err != nil {
 		fmt.Fprintf(os.Stderr, "cutover: write handover doc %s: %v\n", handoverPath, err)
 		return 1
 	}

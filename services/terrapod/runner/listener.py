@@ -31,6 +31,12 @@ import time
 
 import httpx
 
+from terrapod.auth.listener_pop import (
+    NONCE_HEADER,
+    SIGNATURE_HEADER,
+    TIMESTAMP_HEADER,
+    sign_request,
+)
 from terrapod.config import load_runner_config
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import configure_logging, get_logger
@@ -104,23 +110,63 @@ class RunnerListener:
             registry=self._metrics_registry,
         )
 
-    def _auth_headers(self) -> dict[str, str]:
-        """Build authentication headers for API calls.
+    def _sign_headers(self, method: str, url: str) -> dict[str, str]:
+        """Adapter for `arequest_with_retry`'s per-attempt `headers_factory`.
 
-        The cert is renewed in the background by `renew_loop`, which mutates
-        `self.identity` in place. Cache by the cert PEM identity (id() is
-        stable while the same string object is held in memory) so we
-        re-encode only on rotation, not every request.
+        Takes the url the helper is about to send and signs its path, so the
+        signature is always for the request actually being made — and is minted
+        fresh on every retry, because the nonce is single-use.
+        """
+        import httpx as _httpx
+
+        return self._auth_headers(method, _httpx.URL(url).path)
+
+    def _auth_headers(self, method: str = "GET", path: str = "") -> dict[str, str]:
+        """Build authentication headers for one API call.
+
+        The certificate is public material, so on its own it is a bearer token
+        anyone who sees a request can replay. Each call is therefore also signed
+        with the private key the CA issued at join, binding it to this method,
+        this path, and a single-use nonce inside a narrow time window.
+
+        Only the certificate encoding is cached — keyed on the PEM, which
+        `renew_loop` replaces in place on rotation. The signature cannot be
+        cached: caching it is the same thing as not signing.
         """
         cert_pem = self.identity.certificate_pem if self.identity else ""
         cached = getattr(self, "_cached_auth_headers_for_cert", None)
         if cached is not None and cached[0] is cert_pem:
-            return cached[1]
-        headers: dict[str, str] = {}
-        if cert_pem:
-            cert_b64 = base64.b64encode(cert_pem.encode()).decode()
-            headers["X-Terrapod-Client-Cert"] = cert_b64
-        self._cached_auth_headers_for_cert = (cert_pem, headers)
+            headers = dict(cached[1])
+        else:
+            headers = {}
+            if cert_pem:
+                headers["X-Terrapod-Client-Cert"] = base64.b64encode(cert_pem.encode()).decode()
+            self._cached_auth_headers_for_cert = (cert_pem, dict(headers))
+
+        key_pem = getattr(self.identity, "private_key_pem", "") if self.identity else ""
+        # isinstance, not truthiness: anything that is not actually a PEM string
+        # cannot be signed with, and attempting it raises from inside the request
+        # path. The listener's loops are long-lived, so a raise here takes the whole
+        # listener down; an unsigned request merely gets 401 from an API that
+        # requires the proof, which is visible and recoverable.
+        if isinstance(key_pem, str) and key_pem and path:
+            import secrets as _secrets
+            import time as _time
+
+            try:
+                ts = str(int(_time.time()))
+                nonce = _secrets.token_urlsafe(24)
+                headers[TIMESTAMP_HEADER] = ts
+                headers[NONCE_HEADER] = nonce
+                headers[SIGNATURE_HEADER] = sign_request(key_pem, method, path, ts, nonce)
+            except Exception as exc:
+                logger.warning(
+                    "Could not sign the request; sending unsigned, which the API will "
+                    "refuse if it requires proof of possession",
+                    error=str(exc),
+                )
+                for h in (TIMESTAMP_HEADER, NONCE_HEADER, SIGNATURE_HEADER):
+                    headers.pop(h, None)
         return headers
 
     async def _establish_identity(self) -> None:
@@ -399,7 +445,7 @@ class RunnerListener:
                 "active_runs": self._active_runs_observed,
                 "pod_name": os.environ.get("POD_NAME") or os.environ.get("HOSTNAME") or "",
             },
-            headers=self._auth_headers(),
+            headers_factory=self._sign_headers,
         )
         self._last_heartbeat_at = time.monotonic()
 
@@ -487,7 +533,9 @@ class RunnerListener:
         url = f"{self.identity.api_url}/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/events"
         logger.info("SSE connecting", url=url)
 
-        async with self._sse_client.stream("GET", url, headers=self._auth_headers()) as response:
+        async with self._sse_client.stream(
+            "GET", url, headers=self._sign_headers("GET", url)
+        ) as response:
             response.raise_for_status()
             logger.info("SSE connected")
             connected_at = time.monotonic()
@@ -651,7 +699,7 @@ class RunnerListener:
                 self._http_client,
                 "GET",
                 f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/runs/next",
-                headers=self._auth_headers(),
+                headers_factory=self._sign_headers,
             )
 
             if response.status_code == 204:
@@ -902,7 +950,7 @@ class RunnerListener:
                 f"/runs/run-{run_id}/job-launched",
                 idempotent=True,  # idempotent upsert of the run's job_name — safe to retry
                 json={"job_name": job_name, "job_namespace": namespace},
-                headers=self._auth_headers(),
+                headers_factory=self._sign_headers,
             )
         except Exception as e:
             logger.error("Failed to report job-launched", run_id=run_id, error=str(e))
@@ -974,7 +1022,7 @@ class RunnerListener:
                 f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/runs/run-{run_id}",
                 idempotent=True,  # idempotent status set (errored) — safe to retry on timeout/5xx
                 json={"status": "errored", "error_message": error_message},
-                headers=self._auth_headers(),
+                headers_factory=self._sign_headers,
             )
             logger.info(
                 "Reported launch failure to API",
@@ -1072,7 +1120,7 @@ class RunnerListener:
                 f"/runs/run-{run_id}/job-status",
                 idempotent=True,  # idempotent status report — safe to retry on timeout/5xx
                 json=body,
-                headers=self._auth_headers(),
+                headers_factory=self._sign_headers,
             )
         except Exception as e:
             logger.warning("Failed to report Job status", run_id=run_id, error=str(e))
@@ -1126,8 +1174,8 @@ class RunnerListener:
                 f"/runs/run-{run_id}/log-stream",
                 params={"phase": phase},
                 content=log_bytes,
-                headers={
-                    **self._auth_headers(),
+                headers_factory=lambda m, u: {
+                    **self._sign_headers(m, u),
                     "Content-Type": "application/octet-stream",
                 },
             )
@@ -1170,7 +1218,7 @@ class RunnerListener:
             f"/runs/run-{run_id}/runner-token",
             idempotent=True,  # per-run token mint is safe/repeatable — retry on timeout/5xx
             json={},
-            headers=self._auth_headers(),
+            headers_factory=self._sign_headers,
         )
         response.raise_for_status()
         return response.json()["token"]

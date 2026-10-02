@@ -59,6 +59,7 @@ func runSchema(ctx context.Context, args []string) error {
 // loadSchema returns the raw schema JSON, either from a file or by running tofu.
 func loadSchema(ctx context.Context, from, dir, bin string) ([]byte, error) {
 	if from != "" {
+		//nolint:gosec // G304: `from` is the operator's own --from flag (empty means run tofu instead).
 		return os.ReadFile(from)
 	}
 	r := &tofu.Runner{Bin: bin, Dir: dir}

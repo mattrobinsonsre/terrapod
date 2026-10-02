@@ -876,4 +876,6 @@ oidc:
         roles: ["platform-team", "platform-prod"]
 ```
 
-With `role_prefixes: ["terrapod:"]`, an IDP group named `terrapod:developer` automatically maps to the Terrapod role `developer` without needing an explicit `claims_to_roles` entry.
+With `role_prefixes: ["terrapod:"]`, an IDP group named `terrapod:developer` automatically maps to the Terrapod role `developer` without needing an explicit `claims_to_roles` entry. A group that carries none of the configured prefixes is **ignored** -- so `developer` on its own grants nothing while the prefix is set. With `role_prefixes` empty, every group is taken verbatim.
+
+**`admin` and `audit` are never granted this way**, however the group is named or prefixed (`GHSA-22vg-4g2w-7w34`): a directory membership is not a Terrapod authorization. Use a `claims_to_roles` rule or a platform role assignment, which is a deliberate act by whoever administers Terrapod. **Labels are not a credential trust boundary and neither are group names.**

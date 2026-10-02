@@ -8,6 +8,24 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+    # Security analysis for the Go side (GHSA-9rfc-j5x9-p84w). The CVE policy
+    # claimed the source was gated and the Go modules had no security linter at
+    # all — six modules carrying the SDK, the provider, the publish and migration
+    # CLIs and the MCP server.
+    - gosec
+
+  exclusions:
+    rules:
+      # A test writing 0644 into its own `t.TempDir()`, or launching a subprocess
+      # from a table of its own fixtures, is not a finding — it is the test doing
+      # its job, and there is no privilege boundary anywhere near it. 25 of the 36
+      # findings at the time gosec was turned on were this, and a gate whose output
+      # is 70% noise is a gate nobody reads.
+      #
+      # Scoped to test files only, NOT to rules: a G306 in shipped code still fails.
+      - path: _test\.go
+        linters:
+          - gosec
 
 # Formatting is a linter, not a habit. These files drifted out of gofmt
 # across several modules without CI noticing, because v2 keeps formatters

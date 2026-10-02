@@ -450,6 +450,9 @@ data:
       enabled: {{ .Values.api.config.cost_estimation.enabled }}
       prices_url: {{ .Values.api.config.cost_estimation.prices_url | quote }}
       default_region: {{ .Values.api.config.cost_estimation.default_region | quote }}
+      prices_sha256: {{ .Values.api.config.cost_estimation.prices_sha256 | default "" | quote }}
+      prices_max_compressed_bytes: {{ .Values.api.config.cost_estimation.prices_max_compressed_bytes | default 268435456 | int64 }}
+      prices_max_decompressed_bytes: {{ .Values.api.config.cost_estimation.prices_max_decompressed_bytes | default 2147483648 | int64 }}
     {{- end }}
     {{- if .Values.api.config.ha }}
     ha:
@@ -568,6 +571,14 @@ data:
       {{- end }}
       {{- with .Values.api.config.agent_pools.default_join_token_ttl_seconds }}
       default_join_token_ttl_seconds: {{ . | int64 }}
+      {{- end }}
+      {{- /* hasKey, NOT `| default true`: this is a boolean an operator may need
+             to set FALSE during a mixed-fleet upgrade, and `| default` treats an
+             explicit false as empty and renders true — the exact defect v1.9.0
+             fixed for smtp.use_tls and database.pool_pre_ping. Omitting the key
+             when unset lets the Settings default stand. */}}
+      {{- if hasKey .Values.api.config.agent_pools "require_listener_proof_of_possession" }}
+      require_listener_proof_of_possession: {{ .Values.api.config.agent_pools.require_listener_proof_of_possession }}
       {{- end }}
     {{- end }}
     {{- if .Values.api.config.drift_detection }}

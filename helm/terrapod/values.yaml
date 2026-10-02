@@ -64,7 +64,8 @@ api:
   # either inline (the chart creates the ConfigMap for you) or by referencing an
   # existing one. The chart mounts it read-only and wires
   # config.database.ssl_root_cert to the mounted path automatically. Leave unset
-  # for ssl_mode require / a system-trusted CA.
+  # only if you set ssl_mode to require, or the server's CA is already in the
+  # system trust store — unset plus the verify-full default means system CAs.
   databaseCA:
     inline: ""                       # paste the CA bundle PEM here; the chart creates a ConfigMap for it
     existingConfigMap: ""            # OR reference an existing ConfigMap holding the CA bundle
@@ -157,7 +158,10 @@ api:
       #   azure_ad  — Azure Database for PostgreSQL Entra auth (Azure Workload Identity)
       auth_mode: password
       aws_iam_region: ""       # AWS region for RDS IAM signing ("" = AWS_REGION env); aws_iam only
-      ssl_mode: ""             # IAM-auth TLS: "" / require (encrypt) | verify-ca | verify-full
+      # "" means verify-full (chain + hostname) — NOT encrypt-only. IAM auth sends
+      # the cloud token as the password, so the default verifies the peer; set
+      # require explicitly to encrypt without verifying (the pre-2.0 behaviour).
+      ssl_mode: ""             # "" = verify-full | verify-ca | require (encrypt only)
       ssl_root_cert: ""        # CA bundle path for verify-ca/verify-full (mount via api.extraVolumes); "" = system CAs
 
     # Redis/Valkey auth (#579). "password" (default — static auth string in the
@@ -674,6 +678,18 @@ api:
       # `location`, GCP `region`/`location`, then provider config). A plan can
       # span regions, so this default is used only when a resource has no region.
       default_region: "us-east-1"
+      # Integrity for the fetched sheet (GHSA-7486-vv55-jxhq). Empty means "verify
+      # against the `.sha256` published beside the sheet" — which catches
+      # corruption and a swapped asset, but not someone who can rewrite both. Pin
+      # the digest here for the check that survives that, having verified the
+      # release's attestation once:
+      #   gh attestation verify prices.yaml.gz --repo mattrobinsonsre/terrapod
+      prices_sha256: ""
+      # Bounds, so a hostile or broken upstream cannot fill the ephemeral PVC. The
+      # real sheet is ~2 MB compressed / ~20 MB decompressed, so both are far above
+      # any legitimate size and exist only to stop a decompression bomb.
+      prices_max_compressed_bytes: 268435456 # 256 MiB
+      prices_max_decompressed_bytes: 2147483648 # 2 GiB
 
     # Leader/follower role resolution (#960).
     #
@@ -913,6 +929,12 @@ api:
       # no expiry).
       default_join_token_max_uses: 2
       default_join_token_ttl_seconds: 3600
+      # A listener authenticates with its certificate — PUBLIC material, sent on
+      # every request — so it also signs each request with the private key the CA
+      # issued it at join, proving possession rather than presenting a copy. Set
+      # false ONLY while a pool still runs listener images older than 2.0, which
+      # do not sign; see docs/upgrading-to-2.0.md.
+      require_listener_proof_of_possession: true
 
     # AI plan-summary (#401). Off by default. When enabled, every
     # plan-phase terminal transition triggers an asynchronous LLM call

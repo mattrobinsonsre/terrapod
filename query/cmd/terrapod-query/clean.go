@@ -47,6 +47,7 @@ func runClean(ctx context.Context, args []string) error {
 	}
 
 	if *out != "" {
+		//nolint:gosec // G703: `*out` is the operator's own --out flag. Checked both in-product callers rather than assuming: the API never invokes `clean`, and the runner passes the literal "cleaned_config.tf" (runner/phases/discovery.py). So no request-derived value reaches this path.
 		if err := os.WriteFile(*out, cleaned, 0o600); err != nil {
 			return fmt.Errorf("write %s: %w", *out, err)
 		}

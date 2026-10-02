@@ -84,6 +84,7 @@ async def test_unlinked_click_nudges_and_never_mutates():
     run = SimpleNamespace(
         id="run-1",
         workspace_id="ws-1",
+        is_destroy=False,
         resource_additions=1,
         resource_changes=0,
         resource_destructions=0,
@@ -113,6 +114,7 @@ async def test_linked_but_unauthorised_is_denied_without_mutation():
     run = SimpleNamespace(
         id="run-1",
         workspace_id="ws-1",
+        is_destroy=False,
         resource_additions=1,
         resource_changes=0,
         resource_destructions=0,
@@ -140,6 +142,7 @@ async def test_authorised_approve_confirms_commits_and_updates_message():
     run = SimpleNamespace(
         id="run-1",
         workspace_id="ws-1",
+        is_destroy=False,
         resource_additions=1,
         resource_changes=0,
         resource_destructions=0,
@@ -169,6 +172,7 @@ async def test_authorised_discard_calls_discard_run():
     run = SimpleNamespace(
         id="run-1",
         workspace_id="ws-1",
+        is_destroy=False,
         resource_additions=1,
         resource_changes=0,
         resource_destructions=0,
@@ -203,6 +207,7 @@ async def test_stale_run_valueerror_is_surfaced_not_crashed():
     run = SimpleNamespace(
         id="run-1",
         workspace_id="ws-1",
+        is_destroy=False,
         resource_additions=1,
         resource_changes=0,
         resource_destructions=0,
@@ -259,6 +264,7 @@ def _run_and_ws():
     run = SimpleNamespace(
         id="run-1",
         workspace_id="ws-1",
+        is_destroy=False,
         resource_additions=1,
         resource_changes=0,
         resource_destructions=0,
@@ -411,3 +417,71 @@ class TestASlackDrivenDecisionIsAudited:
             update=update,
         )
         update.assert_awaited_once()
+
+
+class TestADestroyNeedsTheDestroyCapability:
+    """Slack must apply the same capability rule as the API route.
+
+    The route requires `run:apply-destroy` to confirm a destroy run; Slack checked
+    `run:apply` for everything, so a role holding apply but not apply-destroy could
+    confirm from Slack a destroy the API would have refused. Both now call
+    `confirm_capability`.
+    """
+
+    @pytest.mark.asyncio
+    async def test_apply_without_apply_destroy_cannot_confirm_a_destroy(self):
+        run = SimpleNamespace(
+            id="run-1",
+            workspace_id="ws-1",
+            is_destroy=True,
+            resource_additions=0,
+            resource_changes=0,
+            resource_destructions=7,
+        )
+        ws = SimpleNamespace(id="ws-1", name="prod")
+        db = _db_with(run, ws)
+        link = SimpleNamespace(terrapod_email="lead@example.com")
+        confirm, nudge = AsyncMock(), AsyncMock()
+        ps = _patches(db=db, link=link, caps=frozenset({RUN_APPLY}), confirm=confirm, nudge=nudge)
+        for p in ps:
+            p.start()
+        try:
+            await si.handle_block_actions(_payload(ACTION_APPROVE))
+        finally:
+            for p in reversed(ps):
+                p.stop()
+        confirm.assert_not_awaited()
+        db.commit.assert_not_awaited()
+        nudge.assert_awaited()
+
+    @pytest.mark.asyncio
+    async def test_apply_destroy_can_confirm_a_destroy(self):
+        from terrapod.auth.capabilities import RUN_APPLY_DESTROY
+
+        run = SimpleNamespace(
+            id="run-1",
+            workspace_id="ws-1",
+            is_destroy=True,
+            resource_additions=0,
+            resource_changes=0,
+            resource_destructions=7,
+        )
+        ws = SimpleNamespace(id="ws-1", name="prod")
+        db = _db_with(run, ws)
+        link = SimpleNamespace(terrapod_email="lead@example.com")
+        confirm, update = AsyncMock(), AsyncMock()
+        ps = _patches(
+            db=db,
+            link=link,
+            caps=frozenset({RUN_APPLY, RUN_APPLY_DESTROY}),
+            confirm=confirm,
+            update=update,
+        )
+        for p in ps:
+            p.start()
+        try:
+            await si.handle_block_actions(_payload(ACTION_APPROVE))
+        finally:
+            for p in reversed(ps):
+                p.stop()
+        confirm.assert_awaited_once()

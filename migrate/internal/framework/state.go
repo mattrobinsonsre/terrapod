@@ -273,6 +273,7 @@ var ErrUnknownSchema = errors.New("migration state file has an unknown schema ve
 // not exist — that's the normal case for the first `apply` run. Other
 // I/O errors and schema-version mismatches return non-nil errors.
 func Load(path string) (*State, error) {
+	//nolint:gosec // G304: `path` is the operator's own --state flag. A CLI run by the operator, reading a file they named: the operator IS the trust boundary, so there is nothing to escalate to.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

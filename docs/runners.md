@@ -607,3 +607,31 @@ For Tilt local development, `values-local.yaml` overrides `listener_cert_ttl_sec
 - [Cloud Credentials](cloud-credentials.md) -- workload identity setup
 - [Deployment](deployment.md) -- full Helm configuration reference
 - [Agent Pools](api-reference.md) -- pool and listener management
+
+## Listener request signing
+
+A listener's certificate is public material and is sent on every request, so the
+certificate alone cannot prove who is calling — a captured header would be
+replayable until it expired. Each listener request is therefore also signed with
+the private key the CA issues at join:
+
+| header | contents |
+|---|---|
+| `X-Terrapod-Client-Cert` | the certificate, base64 PEM (unchanged) |
+| `X-Terrapod-Listener-Timestamp` | unix seconds, accepted within 60s of the API's clock |
+| `X-Terrapod-Listener-Nonce` | single-use random value, remembered for 120s |
+| `X-Terrapod-Listener-Signature` | Ed25519 over `v1\n<METHOD>\n<path>\n<timestamp>\n<nonce>` |
+
+The signature binds the request to one method and one path, so a captured
+signature cannot be pointed at a different endpoint, and the nonce means it
+cannot be presented twice. Each retry re-signs, because the nonce is spent by the
+first attempt.
+
+The request body is deliberately not part of the signature. The weakness being
+closed is replay of a credential rather than tampering with a payload — TLS
+already covers integrity — and hashing bodies would mean buffering pod-log
+uploads in an async handler.
+
+Controlled by `api.config.agent_pools.require_listener_proof_of_possession`,
+on by default. Turn it off only while a pool still runs pre-2.0 listeners, which
+do not sign; see [upgrading to 2.0](upgrading-to-2.0.md).
