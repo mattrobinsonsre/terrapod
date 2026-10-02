@@ -85,10 +85,20 @@ def token_expires_at(token: APIToken) -> datetime | None:
     """
     cap = _max_ttl_hours_for_kind(token.kind)
     ttl = token.lifespan_hours if token.lifespan_hours is not None else cap
-    if token.kind in _SERVICE_KINDS and ttl <= 0:
-        # service tokens never go unbounded
+    # GHSA-4frx-7xrc-c96g. A non-positive per-token lifespan falls back to the
+    # kind's cap for EVERY kind, not just service kinds. It used to be rescued
+    # only for service tokens, so `lifespan_hours = 0` on an interactive token
+    # reached the `ttl <= 0` branch below and minted one that never expires --
+    # defeating the maximum-TTL cap through the field meant to be bounded by it.
+    #
+    # Applied here, at interpretation, rather than only at the write: that bounds
+    # rows already stored with a non-positive value, which a create-time check
+    # alone cannot reach.
+    if ttl <= 0:
         ttl = cap
     if ttl <= 0:
+        # Only an operator's own `auth.api_token_max_ttl_hours = 0` -- the
+        # documented "no limit" -- gets here now.
         return None
     basis = token.rotated_at or token.created_at
     return basis + timedelta(hours=ttl)
@@ -114,6 +124,12 @@ async def create_api_token(
     token_id = _generate_token_id()
 
     cap = _max_ttl_hours_for_kind(kind)
+    if lifespan_hours is not None and lifespan_hours <= 0:
+        # Stored as "unset" so the kind's cap applies, rather than persisting a
+        # value whose only possible readings are "never expires" or "already
+        # expired". The router should refuse it outright; this is the floor that
+        # does not depend on which caller reached us.
+        lifespan_hours = None
     if lifespan_hours is not None and cap > 0:
         lifespan_hours = min(lifespan_hours, cap)
 

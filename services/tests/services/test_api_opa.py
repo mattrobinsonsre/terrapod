@@ -60,6 +60,54 @@ class TestOpaBinary:
         assert set(results) == {str(tmp_path / f"opa-{version}")}
 
 
+class TestASealedNodeDoesNotFetchOPA:
+    """GHSA-rfxh-5gwg-px2g.
+
+    `registry.cache_only` is documented as "a hard guarantee that the caches never
+    reach upstream" (docs/deployment-network-isolation.md), and every other cache
+    honours it — this module was the one that did not, so a policy-set write on an
+    air-gapped deployment made an outbound request.
+
+    `_tool_dir` is redirected in all of these: the real tool dir may hold an OPA
+    from earlier work, in which case `dest.exists()` short-circuits first and the
+    sealed branch is never reached. That is exactly how this file's neighbouring
+    download test comes to fail on a developer machine and pass in the container.
+    """
+
+    async def test_it_does_not_download(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(api_opa, "_tool_dir", lambda: tmp_path)
+        monkeypatch.setattr(api_opa.settings.registry, "cache_only", True)
+        download = AsyncMock()
+        with patch.object(api_opa, "_download", download):
+            assert await api_opa.opa_binary() is None
+        download.assert_not_awaited()
+
+    async def test_a_binary_already_on_the_pvc_is_still_used(self, tmp_path, monkeypatch):
+        """Sealing stops the fetch, not the cache — the whole point of a sealed
+        node is that it answers from what it already holds."""
+        monkeypatch.setattr(api_opa, "_tool_dir", lambda: tmp_path)
+        monkeypatch.setattr(api_opa.settings.registry, "cache_only", True)
+        version = api_opa.configured_version("opa")
+        (tmp_path / f"opa-{version}").write_text("#!/opa")
+        download = AsyncMock()
+        with patch.object(api_opa, "_download", download):
+            assert await api_opa.opa_binary() == str(tmp_path / f"opa-{version}")
+        download.assert_not_awaited()
+
+    async def test_an_unsealed_node_still_fetches(self, tmp_path, monkeypatch):
+        """The negative path: this must not have turned the fetch off for everyone."""
+        monkeypatch.setattr(api_opa, "_tool_dir", lambda: tmp_path)
+        monkeypatch.setattr(api_opa.settings.registry, "cache_only", False)
+        version = api_opa.configured_version("opa")
+
+        async def _fake(v, dest):
+            dest.write_text("#!/opa")
+
+        with patch.object(api_opa, "_download", AsyncMock(side_effect=_fake)) as download:
+            assert await api_opa.opa_binary() == str(tmp_path / f"opa-{version}")
+        download.assert_awaited_once()
+
+
 class TestCheckRegoDegrades:
     async def test_reports_unavailable_rather_than_a_compile_error(self):
         """The distinction matters: the caller accepts one and rejects the

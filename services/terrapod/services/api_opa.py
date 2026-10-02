@@ -135,6 +135,24 @@ async def opa_binary() -> str | None:
             _cached_path = str(dest)
             return _cached_path
 
+        # GHSA-rfxh-5gwg-px2g. A sealed node answers a cache miss from what it
+        # already holds and never reaches upstream -- `docs/deployment-network-
+        # isolation.md` calls that "a hard guarantee that the caches never reach
+        # upstream". This module was the one cache that did not honour it, so a
+        # policy-set write on an air-gapped deployment made an outbound request.
+        #
+        # Checked AFTER `dest.exists()` above, so a binary already on the PVC is
+        # still used: sealing stops the fetch, not the cache.
+        if settings.registry.cache_only:
+            logger.info(
+                "OPA is not cached and this node is sealed (registry.cache_only), so "
+                "write-time Rego validation is unavailable rather than fetched from "
+                "upstream. Rego is still checked at evaluation time on the runner, "
+                "which fails closed.",
+                version=version,
+            )
+            return None
+
         try:
             await asyncio.to_thread(dest.parent.mkdir, parents=True, exist_ok=True)
             await _download(version, dest)
