@@ -164,6 +164,44 @@ were settable through create and update and never returned, so a caller could sc
 a policy set and then be unable to read back the scoping it had just applied. That
 is an addition, not a break.
 
+### A pull request gets one Terrapod comment, not one per workspace per push
+
+**Affects:** every VCS-connected deployment. Nothing to change before
+upgrading; this is a behaviour change to read about rather than act on.
+
+A pull request used to accumulate two kinds of Terrapod comment with opposite
+update semantics. The status table was edited in place for ever. The
+per-workspace comment — the one carrying the AI plan summary, the gate verdicts
+and the run link — had the commit SHA in its hidden identity marker, so a push
+could never match the previous comment and always posted another. The
+per-workspace comments therefore multiplied as *workspaces x pushes*: four
+workspaces and four pushes measured seventeen Terrapod comments on one pull
+request.
+
+There is one comment now, and everything is in it. Each affected workspace is a
+row of the table, and that row's AI summary and gate verdicts share the
+workspace's own collapsed block beneath it, with the risk level and the first
+failing gate in the summary line so the whole pull request triages without
+expanding anything. A push edits that comment.
+
+**Module pull requests change most.** Their comment was keyed on the workspace
+id, so a module with ten linked workspaces put ten comments on one pull
+request, each reposted on every push for the same reason. Every consuming
+workspace is a row of one comment now.
+
+**What happens to comments already posted.** They carry the old marker and will
+never be matched again, so an open pull request keeps whatever per-workspace
+comments it has collected and they stop updating. No cleanup is attempted:
+Terrapod posts its one comment and edits that from then on. The stale ones are
+harmless and finite — delete them by hand if they bother you, or let the pull
+request merge. New pull requests after the upgrade only ever see one comment.
+
+**Per-push visibility is unchanged**, which is what the per-commit identity was
+introduced for. The commit status is still posted per commit, and a `terrapod
+...` command is still acknowledged with a reaction on receipt and a reply when
+it is dropped — so "did Terrapod see my push" and "did Terrapod see my command"
+are both still answered next to the thing you did, without a comment per push.
+
 ### What does not break
 
 - **The HTTP API accepts both shapes.** A scalar value is read as a one-element
