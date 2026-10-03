@@ -1,5 +1,7 @@
 """Tests for the VCS PR status comment — plan counts, cost delta, gate details."""
 
+import asyncio
+import contextlib
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -993,3 +995,491 @@ class TestAMergedSessionIsStillEditable:
         # A PR abandoned without merging sets off no runs; there is nothing
         # further to learn, so its comment is left alone.
         assert "closed" not in _LIVE_SESSION_STATES
+
+
+# ── one PR, one comment (#1940) ───────────────────────────────────────
+#
+# Terrapod used to put two kinds of comment on a PR with opposite update
+# semantics: this status table, edited in place for ever, and a per-workspace
+# comment whose identity included the commit SHA, so a push could never match
+# the previous one and always posted a new comment. The per-workspace
+# comments multiplied as workspaces x pushes — four workspaces and four
+# pushes measured seventeen Terrapod comments on one PR.
+#
+# The narrative those comments carried now folds into this table's own
+# per-workspace block, and this is the only comment Terrapod writes.
+
+
+def _summary(**kw):
+    """A PlanSummary stand-in. Plain object, not a Mock: a Mock answers every
+    attribute, so a renderer reading the wrong field would still pass."""
+    from types import SimpleNamespace
+
+    base = {
+        "status": "ready",
+        "kind": "plan_summary",
+        "risk_level": "medium",
+        "description": "Widens the subnet group to a second AZ.",
+        "risk_factors": [],
+    }
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+def _row(**kw):
+    from terrapod.services.vcs_status_comment import _Row
+
+    base = {
+        "workspace_name": "prod-vpc",
+        "mode": "apply_then_merge",
+        "plan_summary": "+3 ~1 -2",
+        "apply_summary": "not applied",
+        "mergeable_summary": "yes",
+    }
+    base.update(kw)
+    return _Row(**base)
+
+
+class TestTheNarrativeIsInTheTable:
+    """The AI summary renders inside the workspace's own block, not beside it.
+
+    This is what makes the second comment unnecessary. If the narrative stopped
+    reaching this comment the feature would not break loudly — the table would
+    simply stop carrying it, and the content would be gone rather than
+    relocated, so each half is asserted.
+    """
+
+    def test_the_narrative_renders_in_the_comment(self):
+        from terrapod.services.vcs_status_comment import render_comment
+
+        out = render_comment([_row(ai_summary=_summary())])
+        assert "AI summary" in out
+        assert "Widens the subnet group" in out
+
+    def test_the_risk_pill_is_in_the_summary_line_so_triage_needs_no_click(self):
+        from terrapod.services.vcs_status_comment import render_comment
+
+        out = render_comment([_row(ai_summary=_summary(risk_level="critical"))])
+        line = [ln for ln in out.splitlines() if "<summary>" in ln][0]
+        assert "critical" in line
+        assert "prod-vpc" in line
+
+    def test_a_failure_analysis_is_labelled_as_one(self):
+        """Same row, same fields, opposite meaning — `kind` is the only thing
+        that distinguishes an explanation of a failure from a description of a
+        change, and mislabelling it would invert the comment's message."""
+        from terrapod.services.vcs_status_comment import render_comment
+
+        out = render_comment(
+            [_row(ai_summary=_summary(kind="failure_analysis", risk_factors=[{"title": "Fix it"}]))]
+        )
+        assert "Failure analysis" in out
+        assert "AI summary" not in out
+        assert "Suggested fixes:" in out
+
+    def test_narrative_and_gates_share_one_disclosure_triangle(self):
+        """Two blocks per workspace would be the split this issue closes, in
+        miniature: the same two clicks, on the same comment."""
+        from terrapod.services.vcs_status_comment import GateVerdict, render_comment
+
+        out = render_comment(
+            [
+                _row(
+                    ai_summary=_summary(),
+                    gates=(GateVerdict("policy", "tagging", True, "mandatory"),),
+                )
+            ]
+        )
+        assert out.count("<details>") == 1, out
+        assert "Widens the subnet group" in out
+        assert "tagging" in out
+
+    def test_an_unready_summary_discloses_nothing(self):
+        """pending / skipped / errored have nothing a reviewer can act on."""
+        from terrapod.services.vcs_status_comment import render_comment
+
+        for status in ("pending", "skipped", "errored"):
+            out = render_comment([_row(ai_summary=_summary(status=status))])
+            assert "<details>" not in out, status
+
+    def test_a_malformed_risk_factor_is_skipped_not_dumped(self):
+        """`risk_factors` is model-authored JSON, so a non-mapping element is
+        possible; a PR comment is the wrong place to surface its repr."""
+        from terrapod.services.vcs_status_comment import render_comment
+
+        out = render_comment(
+            [_row(ai_summary=_summary(risk_factors=["just a string", {"title": "Real one"}]))]
+        )
+        assert "just a string" not in out
+        assert "Real one" in out
+
+
+class _FakeRedis:
+    """In-memory async Redis stand-in, moved here with the comment machinery.
+
+    Implements only what `_post_or_update` uses, with real SETNX semantics so
+    the lock is actually exercised: `set(nx=)` returns False when the key
+    exists, and `eval` emulates the compare-and-delete release rather than
+    running the Lua.
+
+    Every operation yields. Without that, `asyncio.gather` runs each coroutine
+    to completion in one slice and a contention test cannot contend.
+    """
+
+    def __init__(self):
+        self._store: dict[str, str] = {}
+
+    async def set(self, key, value, *, nx=False, ex=None):
+        await asyncio.sleep(0)
+        if nx and key in self._store:
+            return False
+        self._store[key] = str(value)
+        return True
+
+    async def get(self, key):
+        await asyncio.sleep(0)
+        return self._store.get(key)
+
+    async def delete(self, key):
+        await asyncio.sleep(0)
+        self._store.pop(key, None)
+        return 1
+
+    async def eval(self, script, numkeys, key, arg):
+        await asyncio.sleep(0)
+        if self._store.get(key) == arg:
+            self._store.pop(key, None)
+            return 1
+        return 0
+
+
+class _FakeGitHub:
+    """Records what was posted, and serves it back from the listing — so a
+    marker search sees what a create actually wrote."""
+
+    def __init__(self):
+        self.posted: list[dict] = []
+        self.created: list[str] = []
+        self.updated: list[tuple[int, str]] = []
+        self.listed = 0
+
+    async def create(self, conn, owner, repo, pr_number, body):
+        # Must yield: without it each coroutine runs create-to-completion in
+        # one slice and `asyncio.gather` cannot interleave, so a concurrency
+        # test passes with the lock removed.
+        await asyncio.sleep(0)
+        self.created.append(body)
+        cid = 100 + len(self.created)
+        self.posted.append({"id": cid, "body": body})
+        return cid
+
+    async def update(self, conn, owner, repo, comment_id, body):
+        await asyncio.sleep(0)
+        if not any(c["id"] == comment_id for c in self.posted):
+            raise RuntimeError("no such comment")
+        self.updated.append((comment_id, body))
+        for c in self.posted:
+            if c["id"] == comment_id:
+                c["body"] = body
+        return comment_id
+
+    async def list(self, conn, owner, repo, pr_number):
+        await asyncio.sleep(0)
+        self.listed += 1
+        return self.posted
+
+
+class _CommentHarness:
+    """Drives `_post_or_update` against the fakes above."""
+
+    def __init__(self):
+        self.redis = _FakeRedis()
+        self.gh = _FakeGitHub()
+        self.conn = SimpleNamespace(id=uuid.uuid4(), provider="github")
+
+    def patches(self):
+        from terrapod.services import vcs_status_comment as mod
+
+        return (
+            patch("terrapod.redis.client.get_redis_client", return_value=self.redis),
+            patch.object(mod.github_service, "list_pr_comments", new=self.gh.list),
+            patch.object(mod.github_service, "create_pr_comment", new=self.gh.create),
+            patch.object(mod.github_service, "update_pr_comment", new=self.gh.update),
+        )
+
+    async def post(self, body, recorded_id=None):
+        from terrapod.services.vcs_status_comment import _COMMENT_MARKER, _post_or_update
+
+        with contextlib.ExitStack() as stack:
+            for p in self.patches():
+                stack.enter_context(p)
+            return await _post_or_update(
+                self.conn, "org/repo", 7, f"{_COMMENT_MARKER}\n{body}", recorded_id
+            )
+
+
+class TestOnePrOneComment:
+    """A push edits the comment; it does not add one.
+
+    The inverse of this was asserted deliberately before #1940 — the commit
+    SHA was part of the comment's identity, so `test_a_second_push_gets_its
+    _own_comment` was a passing test of the behaviour this issue removes.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_second_push_edits_the_one_comment(self):
+        h = _CommentHarness()
+        first = await h.post("plan for sha1111")
+        second = await h.post("plan for sha2222")
+
+        assert len(h.gh.created) == 1, h.gh.created
+        assert len(h.gh.updated) == 1, h.gh.updated
+        assert first == second
+        assert "sha2222" in h.gh.posted[0]["body"]
+
+    @pytest.mark.asyncio
+    async def test_four_workspaces_and_four_pushes_make_one_comment(self):
+        """The measurement from the issue: this used to be seventeen."""
+        h = _CommentHarness()
+        for _push in range(4):
+            for _ws in range(4):
+                await h.post("a refresh")
+        assert len(h.gh.created) == 1
+        assert len(h.gh.posted) == 1
+
+    @pytest.mark.asyncio
+    async def test_the_recorded_id_spares_the_listing(self):
+        """The common path must not cost a comment listing on every refresh."""
+        h = _CommentHarness()
+        recorded = await h.post("first")
+        before = h.gh.listed
+        await h.post("second", recorded_id=recorded)
+        assert h.gh.listed == before
+
+    @pytest.mark.asyncio
+    async def test_a_deleted_comment_is_found_again_by_its_marker(self):
+        """`_COMMENT_MARKER` was written into every comment for years with a
+        docstring saying it existed as this fallback, while nothing read it.
+        A stale recorded id used to mean a second comment."""
+        h = _CommentHarness()
+        await h.post("first")
+        real_id = h.gh.posted[0]["id"]
+
+        got = await h.post("second", recorded_id="999999")
+
+        assert got == str(real_id)
+        assert len(h.gh.created) == 1, "a stale id posted a second comment"
+        assert h.gh.listed >= 1, "the marker search did not run"
+
+    @pytest.mark.asyncio
+    async def test_concurrent_refreshes_create_one_comment_not_several(self):
+        """Three runner uploads land separately and a module PR refreshes once
+        per consumer, so concurrent refreshes are the normal case, not an edge.
+        Without the per-PR lock each races through "nothing found" and posts."""
+        from terrapod.services.vcs_status_comment import _COMMENT_MARKER, _post_or_update
+
+        h = _CommentHarness()
+        with contextlib.ExitStack() as stack:
+            for p in h.patches():
+                stack.enter_context(p)
+            await asyncio.gather(
+                *(
+                    _post_or_update(h.conn, "org/repo", 7, f"{_COMMENT_MARKER}\nrefresh {i}")
+                    for i in range(5)
+                )
+            )
+        assert len(h.gh.created) == 1, h.gh.created
+
+
+class TestTheSessionRecordsTheCommentId:
+    """The handler must persist the id `_post_or_update` ends up using.
+
+    Without this the recorded id never updates, so every refresh falls through
+    to a comment listing — correct, but a listing per refresh on every PR.
+    """
+
+    @staticmethod
+    def _db(sess, conn):
+        db = MagicMock()
+
+        async def _get(model, _id):
+            from terrapod.db.models import PRSession, VCSConnection
+
+            return {PRSession: sess, VCSConnection: conn}.get(model)
+
+        db.get = AsyncMock(side_effect=_get)
+        db.commit = AsyncMock()
+        return db
+
+    @pytest.mark.asyncio
+    async def test_the_id_is_written_back_to_the_session(self):
+        from terrapod.services import vcs_status_comment as mod
+
+        h = _CommentHarness()
+        sess = SimpleNamespace(
+            id=uuid.uuid4(),
+            state="open",
+            repo="org/repo",
+            pr_number=7,
+            vcs_connection_id=h.conn.id,
+            status_comment_id=None,
+            merge_commit_sha=None,
+        )
+        db = self._db(sess, h.conn)
+
+        class _Ctx:
+            async def __aenter__(self_inner):
+                return db
+
+            async def __aexit__(self_inner, *a):
+                return False
+
+        with contextlib.ExitStack() as stack:
+            for p in h.patches():
+                stack.enter_context(p)
+            stack.enter_context(patch.object(mod, "get_db_session", return_value=_Ctx()))
+            stack.enter_context(
+                patch.object(mod, "_collect_rows", new=AsyncMock(return_value=[_row()]))
+            )
+            await mod.handle_vcs_status_comment_update({"session_id": str(sess.id)})
+
+        assert sess.status_comment_id is not None
+        assert sess.status_comment_id == str(h.gh.posted[0]["id"])
+        db.commit.assert_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_failed_post_leaves_the_recorded_id_alone(self):
+        """Clearing it on a transient failure would make the next refresh
+        believe there is no comment and post a second one."""
+        from terrapod.services import vcs_status_comment as mod
+
+        h = _CommentHarness()
+        sess = SimpleNamespace(
+            id=uuid.uuid4(),
+            state="open",
+            repo="org/repo",
+            pr_number=7,
+            vcs_connection_id=h.conn.id,
+            status_comment_id="4242",
+            merge_commit_sha=None,
+        )
+        db = self._db(sess, h.conn)
+
+        class _Ctx:
+            async def __aenter__(self_inner):
+                return db
+
+            async def __aexit__(self_inner, *a):
+                return False
+
+        async def _boom(*a, **k):
+            raise RuntimeError("GitHub is having a day")
+
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(
+                patch("terrapod.redis.client.get_redis_client", return_value=h.redis)
+            )
+            stack.enter_context(patch.object(mod.github_service, "update_pr_comment", new=_boom))
+            stack.enter_context(patch.object(mod.github_service, "list_pr_comments", new=_boom))
+            stack.enter_context(patch.object(mod.github_service, "create_pr_comment", new=_boom))
+            stack.enter_context(patch.object(mod, "get_db_session", return_value=_Ctx()))
+            stack.enter_context(
+                patch.object(mod, "_collect_rows", new=AsyncMock(return_value=[_row()]))
+            )
+            await mod.handle_vcs_status_comment_update({"session_id": str(sess.id)})
+
+        assert sess.status_comment_id == "4242"
+
+
+class TestAModulePrAlsoGetsOneComment:
+    """A module PR used to carry one comment per consuming workspace.
+
+    Keyed on the workspace id, so a module with ten linked workspaces put ten
+    comments on one PR — and each was reposted per push, for the same
+    per-commit-identity reason. They are rows of one table now.
+    """
+
+    @pytest.mark.asyncio
+    async def test_every_consumer_is_a_row_of_one_comment(self):
+        from terrapod.services import vcs_status_comment as mod
+
+        h = _CommentHarness()
+        rows = [_row(workspace_name="app-a"), _row(workspace_name="app-b")]
+        with contextlib.ExitStack() as stack:
+            for p in h.patches():
+                stack.enter_context(p)
+            stack.enter_context(
+                patch.object(mod, "_collect_module_rows", new=AsyncMock(return_value=rows))
+            )
+            # Once per consuming workspace, as the module-impact path calls it.
+            for _ in range(2):
+                await mod.refresh_module_pr_comment(
+                    MagicMock(), h.conn, "org/module", 42, [uuid.uuid4(), uuid.uuid4()]
+                )
+
+        assert len(h.gh.created) == 1, h.gh.created
+        body = h.gh.posted[0]["body"]
+        assert "app-a" in body and "app-b" in body
+
+    @pytest.mark.asyncio
+    async def test_no_rows_posts_nothing_rather_than_an_empty_table(self):
+        from terrapod.services import vcs_status_comment as mod
+
+        h = _CommentHarness()
+        with contextlib.ExitStack() as stack:
+            for p in h.patches():
+                stack.enter_context(p)
+            stack.enter_context(
+                patch.object(mod, "_collect_module_rows", new=AsyncMock(return_value=[]))
+            )
+            await mod.refresh_module_pr_comment(
+                MagicMock(), h.conn, "org/module", 42, [uuid.uuid4()]
+            )
+        assert h.gh.created == []
+
+    @pytest.mark.asyncio
+    async def test_a_failure_does_not_escape_onto_the_analysis_path(self):
+        from terrapod.services import vcs_status_comment as mod
+
+        h = _CommentHarness()
+        with patch.object(
+            mod, "_collect_module_rows", new=AsyncMock(side_effect=RuntimeError("nope"))
+        ):
+            await mod.refresh_module_pr_comment(
+                MagicMock(), h.conn, "org/module", 42, [uuid.uuid4()]
+            )
+
+    @pytest.mark.asyncio
+    async def test_no_linked_workspaces_queries_nothing(self):
+        from terrapod.services.vcs_status_comment import _collect_module_rows
+
+        db = MagicMock()
+        db.execute = AsyncMock(side_effect=AssertionError("must not query"))
+        assert await _collect_module_rows(db, [], 42) == []
+
+    @pytest.mark.asyncio
+    async def test_the_query_is_scoped_to_module_test_runs(self):
+        """PR numbers are per-repository and nothing on a run records which
+        repository its number came from, so without the source filter a
+        workspace's own PR #7 would appear on a module's PR #7.
+
+        Asserted against the compiled statement: a fake that returns rows
+        regardless of the query would pass with the filter removed.
+        """
+        from terrapod.services.vcs_status_comment import _collect_module_rows
+
+        seen = {}
+
+        async def _execute(stmt):
+            seen["sql"] = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+            result = MagicMock()
+            result.all = MagicMock(return_value=[])
+            return result
+
+        db = MagicMock()
+        db.execute = AsyncMock(side_effect=_execute)
+        await _collect_module_rows(db, [uuid.uuid4()], 42)
+
+        sql = seen["sql"]
+        assert "module-test" in sql, sql
+        assert "42" in sql, sql

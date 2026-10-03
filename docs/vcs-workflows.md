@@ -118,9 +118,9 @@ The AI policy gate is the one that can hold a run **without having ruled**: its 
 
 A workspace whose mandatory gate failed is **not** offered an apply — `terrapod apply` would be refused while the gate holds the run. Override the gate (or fix the finding and push), and the next comment update offers it.
 
-**How many comments a PR gets.** Where this table is present, the per-workspace comment Terrapod also posts (`### Terrapod — <workspace>`) drops to the one thing the table cannot carry — the AI plan summary — and is not posted at all when there is none. Since [AI plan summaries](ai-plan-summary.md) are off by default, **a default deployment gets exactly one Terrapod comment per PR**; turn them on and each affected workspace adds its narrative alongside the table, once the summary lands.
+**How many comments a PR gets: one.** Every affected workspace is a row of this table, and each row's [AI plan summary](ai-plan-summary.md) and gate verdicts sit together in that workspace's own collapsed block beneath it. Terrapod writes no second comment, and it edits this one in place on every push rather than adding another — however many workspaces the PR touches and however many times you push, a PR carries exactly one Terrapod comment.
 
-A run that carries a PR number but has no table keeps the full per-workspace comment, status line and link included — a module-impact run is the case that does this, because its PR number belongs to the module's repository rather than the workspace's. A PR that touches no workspace gets neither comment.
+A **module** PR gets the same single comment, with a row for each workspace that consumes the module. A PR that touches no workspace gets no comment at all.
 
 To keep Terrapod off PRs that change nothing it manages, set `trigger_prefixes` (or `working_directory`) on the workspace: a PR touching no matching path never creates a run at all, so it costs no plan and produces no comment.
 

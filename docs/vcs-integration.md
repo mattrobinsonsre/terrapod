@@ -582,7 +582,7 @@ Terrapod automatically posts **commit statuses** back to your VCS provider for a
 Whenever a VCS-triggered run changes state (queued, planning, planned, applied, errored, etc.), Terrapod posts a commit status to the VCS provider. For PR/MR runs, Terrapod also posts (or updates) a **comment on the PR/MR** with a summary of the run status and a link to the run page.
 
 - **Commit statuses** appear as status checks on the commit (e.g. the green checkmark or red X on a PR)
-- **PR/MR comments** are updated in place -- one comment per workspace per PR, not a new comment on every status change
+- **PR/MR comments** are updated in place -- **one comment per PR**, with a row per affected workspace, not a new comment on every status change or push
 - Clicking the status link or comment link navigates directly to the run page in Terrapod
 
 ### Configuration
@@ -630,7 +630,9 @@ Without `external_url`, commit statuses are still posted but without clickable l
 
 ### PR/MR Comment Format
 
-PR comments include a hidden HTML marker so Terrapod can find and update them. Each workspace gets its own comment on a PR -- if multiple workspaces track the same repo, each posts its own comment.
+PR comments include a hidden HTML marker so Terrapod can find and update them, which is how a PR keeps to a single comment even if the recorded comment id is lost.
+
+**One comment per PR.** Every affected workspace is a row of one table, with its AI summary and gate verdicts in that workspace's own collapsed block. Several workspaces tracking the same repository share the comment rather than each posting one, and a new push edits it rather than adding another.
 
 When a PR is updated with a new commit, old speculative runs are automatically **canceled** (the old comment is updated to show the canceled status), and a new run is created for the latest commit.
 

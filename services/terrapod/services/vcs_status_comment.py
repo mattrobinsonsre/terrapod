@@ -18,6 +18,7 @@ comment body.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -27,6 +28,7 @@ from typing import Any
 from sqlalchemy import select
 
 from terrapod.db.models import (
+    PlanSummary,
     PolicyEvaluation,
     PRSession,
     Run,
@@ -64,6 +66,25 @@ _COMMENT_MARKER = "<!-- terrapod:status-comment -->"
 #: speaks for one workspace, this one for every workspace the PR touches.
 #: Worded without "pull request" so it reads the same on a GitLab MR.
 _HEADING = "### Terrapod — all affected workspaces"
+
+
+#: Redis key prefix caching this PR's one comment id, so the common refresh
+#: costs no comment listing. Moved here from `vcs_status_dispatcher` with the
+#: rest of the posting machinery when that module stopped owning a comment.
+_COMMENT_CACHE_PREFIX = "tp:vcs_comment:"
+_COMMENT_CACHE_TTL = 7 * 24 * 3600  # 7 days
+
+_COMMENT_LOCK_PREFIX = "tp:vcs_comment_lock:"
+_COMMENT_LOCK_TTL = 10  # seconds — generous bound on one create/update round-trip
+_COMMENT_LOCK_MAX_ATTEMPTS = 20  # x 0.1s = ~2s total wait
+_COMMENT_LOCK_INTERVAL = 0.1
+
+#: Atomic release: delete only while the lock still carries our token, so a
+#: worker whose TTL lapsed cannot delete the lock its successor now holds.
+_LOCK_RELEASE_LUA = (
+    "if redis.call('get', KEYS[1]) == ARGV[1] then "
+    "return redis.call('del', KEYS[1]) else return 0 end"
+)
 
 
 @dataclass(frozen=True)
@@ -109,6 +130,11 @@ class _Row:
     #: PR is merged — so an open PR's table is exactly what it was.
     post_merge_summary: str = ""
     post_merge_url: str | None = None
+    #: The AI summary for this row's run (#401), folded into this workspace's
+    #: own `<details>` block rather than posted as a second comment (#1940).
+    #: None when the summariser is off (its default), when no row has landed
+    #: yet, or when the row it landed is not `ready`.
+    ai_summary: PlanSummary | None = None
 
 
 def _plan_summary(run: Run | None) -> str:
@@ -183,6 +209,10 @@ def _mergeable_summary(run: Run | None) -> str:
 #: Policy-evaluation outcomes that mean the set did not object. Anything else
 #: — `failed`, and the synthetic `errored` the gate writes when a mandatory set
 #: produced no evidence — is a block unless it was overridden.
+#: Risk pill per AI-summary level and per risk-factor severity. Shared by
+#: both so one level cannot render as two different colours in one block.
+_RISK_EMOJI = {"low": "🟢", "medium": "🟡", "high": "🟠", "critical": "🔴"}
+
 _POLICY_PASS_OUTCOMES = frozenset({"passed"})
 
 
@@ -399,35 +429,92 @@ def _cost_delta(run: Run) -> str | None:
     return f"{_signed_amount(low)} to {_signed_amount(high)}{unit}"
 
 
-def _render_gate_details(row: _Row) -> str:
-    """A collapsed per-workspace block listing the gates that can block.
+def _render_ai_narrative(s: PlanSummary) -> list[str]:
+    """The AI summary's body lines, for nesting inside a workspace block.
 
-    Empty string when the workspace has no enforcing gates — a PR touching a
-    workspace with no mandatory policy set and no enforced scan should not grow
-    an empty disclosure triangle.
+    Returns lines rather than a joined string, and deliberately opens no
+    `<details>` of its own: this is folded into the single per-workspace block
+    `_render_workspace_details` builds, and a disclosure triangle inside
+    another renders as a second click for the same content.
 
-    The summary line names the first failing gate so a reviewer can triage
-    without expanding. Gates arrive in the order `post_plan_hold` evaluates
-    them, so "first failing" is the same gate the run's `blocked-by` attribute
-    reports.
+    Moved here from `vcs_status_dispatcher` when the per-workspace comment was
+    retired (#1940). The narrative's only home is now this comment, so the
+    renderer lives beside it rather than being imported across modules.
 
-    Follows the `<details>` convention already established for the AI summary
-    in `vcs_status_dispatcher._ai_details_block`: single-line summary tag,
-    `&mdash;` rather than a literal em dash, status emoji, blank line before
-    the close.
+    A risk factor that is not a mapping is skipped rather than rendered as its
+    repr: `risk_factors` is model-authored JSON, so a malformed element is
+    possible and a PR comment is the wrong place to surface it.
     """
-    if not row.gates:
+    lines = [(s.description or "").strip()]
+    if s.risk_factors:
+        heading = "**Suggested fixes:**" if s.kind == "failure_analysis" else "**Risk factors:**"
+        lines.extend(["", heading, ""])
+        for rf in s.risk_factors:
+            if not isinstance(rf, dict):
+                continue
+            sev = (rf.get("severity") or "").lower()
+            head = f"- {_RISK_EMOJI.get(sev, '⚪')} **{_escape(rf.get('title', ''))}**"
+            addr = rf.get("resource_address", "")
+            if addr:
+                head += f" — `{_escape(addr)}`"
+            lines.append(head)
+            detail = (rf.get("detail", "") or "").strip()
+            if detail:
+                lines.append(f"  {detail}")
+    return lines
+
+
+def _render_workspace_details(row: _Row) -> str:
+    """One collapsed block per workspace: its AI narrative and its gates.
+
+    This function is the whole of #1940. The narrative and the gate verdicts
+    used to live on two different comments with two opposite update semantics
+    — this table edited in place for ever, the narrative reposted on every
+    push because the commit SHA was part of its identity — so a
+    four-workspace PR with four pushes carried seventeen Terrapod comments.
+    Both now render here, inside the row they describe, on the one comment
+    this module edits.
+
+    Empty string when the workspace has neither a narrative nor an enforcing
+    gate: a PR touching a workspace with no mandatory policy set, no enforced
+    scan and no summariser should not grow an empty disclosure triangle.
+
+    The summary line carries the risk pill and names the first failing gate, so
+    a reviewer can triage the whole PR without expanding anything. Gates arrive
+    in the order `post_plan_hold` evaluates them, so "first failing" is the same
+    gate the run's `blocked-by` attribute reports.
+    """
+    summary = row.ai_summary
+    ready = summary is not None and summary.status == "ready"
+    if not row.gates and not ready:
         return ""
-    failed = [g for g in row.gates if not g.passed]
-    headline = f"blocked by {failed[0].gate}" if failed else "all gates passed"
+
+    bits: list[str] = []
+    if ready:
+        level = summary.risk_level or "unknown"
+        pill = _RISK_EMOJI.get(summary.risk_level or "", "⚪")
+        bits.append(f"{pill} risk: <strong>{_escape(level)}</strong>")
+    if row.gates:
+        failed = [g for g in row.gates if not g.passed]
+        bits.append(f"blocked by {failed[0].gate}" if failed else "all gates passed")
+
     lines = [
         f"<details><summary><code>{_escape(row.workspace_name)}</code> "
-        f"&mdash; {headline}</summary>",
+        f"&mdash; {' &middot; '.join(bits)}</summary>",
         "",
     ]
-    for g in row.gates:
-        mark = "🔴" if not g.passed else "🟢"
-        lines.append(f"- {mark} `{_escape(g.name)}` &mdash; {g.gate}, {g.enforcement}")
+    if ready:
+        kind_label = "Failure analysis" if summary.kind == "failure_analysis" else "AI summary"
+        lines.extend([f"**🤖 {kind_label}**", ""])
+        lines.extend(_render_ai_narrative(summary))
+    if row.gates:
+        # The heading only earns its place when a narrative sits above it;
+        # on a gates-only block the list is the whole content.
+        if ready:
+            lines.extend(["", "**Gates:**", ""])
+        for g in row.gates:
+            mark = "🔴" if not g.passed else "🟢"
+            lines.append(f"- {mark} `{_escape(g.name)}` &mdash; {g.gate}, {g.enforcement}")
     lines.extend(["", "</details>"])
     return "\n".join(lines)
 
@@ -480,7 +567,7 @@ def render_comment(rows: list[_Row]) -> str:
         blocked = any(not g.passed for g in r.gates)
         if r.mode == "apply_then_merge" and r.apply_summary == "not applied" and not blocked:
             pending_apply.append(r.workspace_name)
-        block = _render_gate_details(r)
+        block = _render_workspace_details(r)
         if block:
             detail_blocks.append(block)
 
@@ -511,6 +598,96 @@ def render_comment(rows: list[_Row]) -> str:
 def _escape(text: str) -> str:
     """Minimal Markdown / table-cell escaping for user-controlled cells."""
     return (text or "").replace("|", "\\|").replace("\n", " ").strip()
+
+
+async def _ready_ai_summary(db, run: Run) -> PlanSummary | None:
+    """This run's AI summary when there is one worth showing (#1940).
+
+    Only a `ready` row. The other three statuses — pending, skipped,
+    errored — have nothing a PR reader can act on, and disclosing an empty
+    or failed row would make this comment noisier than the two comments it
+    replaced, which is the opposite of the point.
+
+    `PlanSummary` is one-to-one with `Run` and upserted on `run_id`, so there
+    is at most one row to find and `kind` distinguishes a plan summary from a
+    failure analysis within it.
+
+    Failure answers None. The narrative is the one part of this comment that
+    enhances rather than reports — losing it degrades the comment, where
+    raising here would cost the whole table.
+    """
+    try:
+        return (
+            await db.execute(
+                select(PlanSummary).where(
+                    PlanSummary.run_id == run.id,
+                    PlanSummary.status == "ready",
+                )
+            )
+        ).scalar_one_or_none()
+    except Exception as e:
+        logger.debug(
+            "Could not load the AI summary for the PR comment",
+            run_id=str(run.id),
+            error=str(e),
+        )
+        return None
+
+
+async def _row_for(db, ws: Workspace, run: Run, merged_run: Run | None = None) -> _Row:
+    """One table row for a (workspace, run) pair.
+
+    Shared by both collectors so a workspace PR and a module PR cannot end up
+    reporting the same run differently — which is the whole point of there
+    being one comment and one renderer.
+    """
+    return _Row(
+        workspace_name=ws.name,
+        mode=ws.vcs_workflow,
+        plan_summary=_plan_summary(run),
+        apply_summary=_apply_summary(run),
+        mergeable_summary=_mergeable_summary(run),
+        cost_delta=_cost_delta(run),
+        gates=await _collect_gates(db, run),
+        ai_summary=await _ready_ai_summary(db, run),
+        run_url=run_links.run_url(ws.id, run.id),
+        post_merge_summary=_post_merge_summary(merged_run),
+        post_merge_url=(run_links.run_url(ws.id, merged_run.id) if merged_run else None),
+    )
+
+
+async def _collect_module_rows(db, workspace_ids, pr_number: int) -> list[_Row]:
+    """Rows for a module PR: every consuming workspace's module-impact run.
+
+    A module PR has no `PRSession` — the poller opens those for workspace
+    repositories, and this PR belongs to the module's — so the rows come from
+    the runs directly and the comment is found by its marker.
+
+    Scoped to `source == "module-test"` as well as the number. PR numbers are
+    per-repository and nothing on a run records which repository its number
+    came from, so without the source filter a workspace's own PR #7 would
+    appear on a module's PR #7.
+    """
+    ids = list(workspace_ids or [])
+    if not ids:
+        return []
+    result = await db.execute(
+        select(Run, Workspace)
+        .join(Workspace, Workspace.id == Run.workspace_id)
+        .where(
+            Run.workspace_id.in_(ids),
+            Run.source == "module-test",
+            Run.vcs_pull_request_number == pr_number,
+        )
+        .order_by(Workspace.name, Run.created_at.desc())
+    )
+    latest: dict[uuid.UUID, tuple[Workspace, Run]] = {}
+    for run, ws in result.all():
+        latest.setdefault(ws.id, (ws, run))
+    return [
+        await _row_for(db, ws, run)
+        for ws, run in sorted(latest.values(), key=lambda pair: pair[0].name)
+    ]
 
 
 async def _collect_rows(db, sess: PRSession) -> list[_Row]:
@@ -548,20 +725,7 @@ async def _collect_rows(db, sess: PRSession) -> list[_Row]:
         # the post-merge run is all there is to report.
         run = pair[1] if pair else merged_pair[1]  # type: ignore[index]
         merged_run = merged_pair[1] if merged_pair else None
-        rows.append(
-            _Row(
-                workspace_name=ws.name,
-                mode=ws.vcs_workflow,
-                plan_summary=_plan_summary(run),
-                apply_summary=_apply_summary(run),
-                mergeable_summary=_mergeable_summary(run),
-                cost_delta=_cost_delta(run),
-                gates=await _collect_gates(db, run),
-                run_url=run_links.run_url(ws.id, run.id),
-                post_merge_summary=_post_merge_summary(merged_run),
-                post_merge_url=(run_links.run_url(ws.id, merged_run.id) if merged_run else None),
-            )
-        )
+        rows.append(await _row_for(db, ws, run, merged_run))
     return rows
 
 
@@ -621,43 +785,192 @@ def _post_merge_summary(run: Run | None) -> str:
     return run.status
 
 
+async def _acquire_comment_lock(redis, key: str) -> str | None:
+    """Bounded-retry SETNX lock; the token on success, None on timeout.
+
+    Keyed per PR, not per run or per status. Two triggers for the same PR can
+    be in flight at once — three runner uploads land separately, and a module
+    PR refreshes once per consuming workspace — and without this they race
+    through "no comment found" and each POST one, leaving duplicates that no
+    later edit can merge. Serialising confines that window to one worker.
+    """
+    token = uuid.uuid4().hex
+    for _ in range(_COMMENT_LOCK_MAX_ATTEMPTS):
+        if await redis.set(key, token, nx=True, ex=_COMMENT_LOCK_TTL):
+            return token
+        await asyncio.sleep(_COMMENT_LOCK_INTERVAL)
+    return None
+
+
+async def _release_comment_lock(redis, key: str, token: str) -> None:
+    """Atomic release — delete only while the lock still carries our token."""
+    try:
+        await redis.eval(_LOCK_RELEASE_LUA, 1, key, token)
+    except Exception as e:
+        logger.debug("Failed to release the PR comment lock", error=str(e))
+
+
+async def _find_comment_by_marker(
+    conn: VCSConnection, owner: str, repo_name: str, pr_number: int
+) -> int | None:
+    """This PR's Terrapod comment, found by the marker in its body.
+
+    `_COMMENT_MARKER` has been written into every comment this module posts
+    since it was introduced, with a docstring saying it exists so we can find
+    our own comment when the recorded id is missing — but until #1940 nothing
+    read it, so that fallback did not exist. It does now, and it is what lets
+    a PR with no `PRSession` row keep to one comment: a module PR belongs to
+    the module's repository, so the poller never opens a session for it.
+
+    None on any failure, which the caller treats as "not found" and posts a
+    new one. That can duplicate a comment if a listing fails transiently,
+    which is why the caller holds the per-PR lock and caches the id it ends
+    up with.
+    """
+    try:
+        if conn.provider == "gitlab":
+            comments = await gitlab_service.list_mr_comments(conn, owner, repo_name, pr_number)
+        else:
+            comments = await github_service.list_pr_comments(conn, owner, repo_name, pr_number)
+    except Exception as e:
+        logger.warning("Could not list PR comments to find ours", error=str(e))
+        return None
+    for c in comments:
+        if _COMMENT_MARKER in (c.get("body") or ""):
+            return c["id"]
+    return None
+
+
 async def _post_or_update(
     conn: VCSConnection,
     repo: str,
     pr_number: int,
-    sess: PRSession,
     body: str,
-) -> None:
-    """Provider-dispatched post-or-update via the existing comment helpers."""
+    recorded_id: str | None = None,
+) -> str | None:
+    """Post or edit THE one Terrapod comment on this PR. Returns its id.
+
+    Three ways to find it, cheapest first: the id the caller recorded, the id
+    cached in Redis, then a listing matched on `_COMMENT_MARKER`. Only when
+    all three come up empty is a comment created — which is what makes this
+    "one comment per PR" rather than "one comment per thing that posts".
+
+    The returned id is for the caller to persist where it has somewhere to
+    persist it (`PRSession.status_comment_id`); a module PR has nowhere, and
+    relies on the Redis cache plus the marker instead.
+
+    Failure returns None and is logged, never raised: a comment nobody gets is
+    worth less than the run that was trying to report itself.
+    """
+    from terrapod.redis.client import get_redis_client
+
     owner, repo_name = repo.split("/", 1)
-    if conn.provider == "github":
-        post = github_service.create_pr_comment
-        update = github_service.update_pr_comment
-    elif conn.provider == "gitlab":
-        post = gitlab_service.create_mr_comment
-        update = gitlab_service.update_mr_comment
+    if conn.provider == "gitlab":
+        create, update = gitlab_service.create_mr_comment, gitlab_service.update_mr_comment
+    elif conn.provider == "github":
+        create, update = github_service.create_pr_comment, github_service.update_pr_comment
     else:
         logger.warning("status comment: unknown provider", provider=conn.provider)
-        return
+        return None
+
+    async def _edit(comment_id: int) -> None:
+        if conn.provider == "gitlab":
+            await update(conn, owner, repo_name, pr_number, comment_id, body)
+        else:
+            await update(conn, owner, repo_name, comment_id, body)
+
+    redis = get_redis_client()
+    cache_key = f"{_COMMENT_CACHE_PREFIX}{repo}:{pr_number}"
+    lock_key = f"{_COMMENT_LOCK_PREFIX}{repo}:{pr_number}"
+
+    token = await _acquire_comment_lock(redis, lock_key)
+    if token is None:
+        # Another worker is mid-flight on this PR. Every refresh renders the
+        # whole comment from current rows, so dropping this one loses nothing
+        # the lock holder is not already about to write.
+        logger.warning(
+            "Could not acquire the PR-comment lock; another worker is updating",
+            repo=repo,
+            pr_number=pr_number,
+        )
+        return recorded_id
 
     try:
-        if sess.status_comment_id:
-            if conn.provider == "gitlab":
-                # GitLab update takes (conn, owner, repo, mr_number, note_id, body)
-                await update(conn, owner, repo_name, pr_number, int(sess.status_comment_id), body)
-            else:
-                await update(conn, owner, repo_name, int(sess.status_comment_id), body)
+        candidate: int | None = None
+        if recorded_id:
+            try:
+                candidate = int(recorded_id)
+            except (TypeError, ValueError):
+                candidate = None
+        if candidate is None:
+            try:
+                cached = await redis.get(cache_key)
+                candidate = int(cached) if cached else None
+            except Exception as e:
+                logger.debug("Comment-id cache unreadable", error=str(e))
+
+        if candidate is not None:
+            try:
+                await _edit(candidate)
+                await redis.set(cache_key, str(candidate), ex=_COMMENT_CACHE_TTL)
+                return str(candidate)
+            except Exception:
+                # Deleted by hand, or the cache is stale. Fall through and
+                # look for it properly rather than posting a second one.
+                logger.debug("Known comment id did not accept an edit", comment_id=candidate)
+
+        found = await _find_comment_by_marker(conn, owner, repo_name, pr_number)
+        if found is not None:
+            try:
+                await _edit(found)
+                await redis.set(cache_key, str(found), ex=_COMMENT_CACHE_TTL)
+                return str(found)
+            except Exception as e:
+                logger.warning("Failed to update the PR status comment", error=str(e))
+                return recorded_id
+
+        try:
+            new_id = await create(conn, owner, repo_name, pr_number, body)
+            await redis.set(cache_key, str(new_id), ex=_COMMENT_CACHE_TTL)
+            return str(new_id)
+        except Exception as e:
+            logger.warning(
+                "Failed to create the PR status comment",
+                provider=conn.provider,
+                pr_number=pr_number,
+                error=str(e),
+            )
+            return recorded_id
+    finally:
+        await _release_comment_lock(redis, lock_key, token)
+
+
+async def refresh_module_pr_comment(
+    db, conn: VCSConnection, repo: str, pr_number: int, workspace_ids
+) -> None:
+    """Refresh the one Terrapod comment on a module's PR (#1940).
+
+    A module PR used to carry one comment per consuming workspace, keyed on
+    the workspace id — so a module with ten consumers put ten comments on one
+    PR, each reposted on every push because the commit SHA was part of its
+    identity too. This renders every consumer as a row of the same table the
+    workspace PRs get, into one comment, edited in place.
+
+    Best-effort in both directions: no rows means nothing is posted rather
+    than an empty table, and a failure is logged rather than raised, because
+    this runs on the module-impact path and must not fail an analysis run.
+    """
+    try:
+        rows = await _collect_module_rows(db, workspace_ids, pr_number)
+        if not rows:
             return
-        new_id = await post(conn, owner, repo_name, pr_number, body)
-        sess.status_comment_id = str(new_id)
+        await _post_or_update(conn, repo, pr_number, render_comment(rows))
     except Exception as e:
-        # Status comment failure must never break the run lifecycle. Log
-        # and move on; the next state-change trigger will retry.
         logger.warning(
-            "status comment post/update failed",
-            provider=conn.provider,
+            "Failed to refresh the module PR status comment",
+            repo=repo,
             pr_number=pr_number,
-            error=str(e),
+            error=repr(e),
         )
 
 
@@ -747,5 +1060,12 @@ async def handle_vcs_status_comment_update(payload: dict[str, Any]) -> None:
             return
         rows = await _collect_rows(db, sess)
         body = render_comment(rows)
-        await _post_or_update(conn, sess.repo, sess.pr_number, sess, body)
+        comment_id = await _post_or_update(
+            conn, sess.repo, sess.pr_number, body, recorded_id=sess.status_comment_id
+        )
+        # Recorded so the next refresh costs no comment listing. Left alone on
+        # failure rather than cleared: a transient listing error must not make
+        # the next refresh believe there is no comment and post a second one.
+        if comment_id:
+            sess.status_comment_id = comment_id
         await db.commit()
