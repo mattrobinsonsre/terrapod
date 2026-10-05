@@ -63,6 +63,12 @@ class AuthenticatedUser:
     provider_name: str
     auth_method: str  # "session", "api_token", or "runner_token"
     run_id: str | None = None  # Set only for runner_token auth
+    #: The Job phase a runner token claims. `plan` or `apply` for a token minted
+    #: with one; **None means the token makes no claim**, which is what a
+    #: listener older than the claim produces — read it as "skip the phase
+    #: check", never as a mismatch. Only ever set alongside `run_id`, for
+    #: runner_token auth.
+    run_phase: str | None = None
     # Token kind (#495). For service tokens, `roles` stays the owner's live
     # roles and `pinned_roles` carries the token's own scope; the per-resource
     # min()/detached resolution happens in the resolve_*_for() wrappers, and
@@ -173,10 +179,10 @@ async def get_current_user(
 
         # Try runner token first (fast HMAC check, no DB/Redis)
         if token.startswith("runtok:"):
-            from terrapod.auth.runner_tokens import verify_runner_token
+            from terrapod.auth.runner_tokens import verify_runner_token_claims
 
-            run_id = verify_runner_token(token)
-            if run_id is not None:
+            claims = verify_runner_token_claims(token)
+            if claims is not None:
                 request.state.user_email = "runner"  # for audit middleware
                 return AuthenticatedUser(
                     email="runner",
@@ -184,7 +190,8 @@ async def get_current_user(
                     roles=["everyone"],
                     provider_name="runner_token",
                     auth_method="runner_token",
-                    run_id=run_id,
+                    run_id=claims.run_id,
+                    run_phase=claims.phase,
                 )
 
         # Try API token (fast hash + indexed DB lookup)
@@ -269,10 +276,10 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
 
     # Try runner token first (no DB needed)
     if token.startswith("runtok:"):
-        from terrapod.auth.runner_tokens import verify_runner_token
+        from terrapod.auth.runner_tokens import verify_runner_token_claims
 
-        run_id = verify_runner_token(token)
-        if run_id is not None:
+        claims = verify_runner_token_claims(token)
+        if claims is not None:
             request.state.user_email = "runner"
             return AuthenticatedUser(
                 email="runner",
@@ -280,7 +287,8 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
                 roles=["everyone"],
                 provider_name="runner_token",
                 auth_method="runner_token",
-                run_id=run_id,
+                run_id=claims.run_id,
+                run_phase=claims.phase,
             )
 
     # Try API token and session with a short-lived DB session
