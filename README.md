@@ -143,6 +143,7 @@ Everything below is implemented and shipped today.
 | SSO (OIDC / SAML) | Pluggable identity providers (Auth0, Okta, Azure AD, any standards-compliant IdP) |
 | Audit logging | Immutable event log with configurable retention |
 | Cloud credentials | Zero static keys — dynamic credentials via K8s workload identity (AWS IRSA, GCP WIF, Azure WI); passwordless DB and Redis IAM auth |
+| Per-workspace cloud identity | Terrapod as an OIDC issuer for its own runs: a short-lived JWT claiming the workspace and phase, which your cloud federates to — so the credential boundary is the workspace, not the agent pool, and cloud audit logs name the workspace. Put write permissions behind the `apply` phase and a pull-request plan cannot assume them. Fall-through: a workspace that sets no audiences keeps using the pool's ServiceAccount. Off by default |
 | Supply-chain verification | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS (pinned keys); the runner re-verifies the executable before running it |
 | Signed releases | Every release image + the Helm chart is keyless-signed with cosign, with per-image SBOM (SPDX) + SLSA build-provenance attestations — verifiable with `cosign verify` / `gh attestation verify` |
 

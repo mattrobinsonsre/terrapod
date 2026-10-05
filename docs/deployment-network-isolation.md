@@ -172,6 +172,22 @@ listener:
   # publicApiUrl == apiUrl == external_url — runner sees no asymmetry, no host{} redirect.
 ```
 
+> **Recipe B and [per-workspace cloud identity](cloud-identity.md) are mutually
+> exclusive.** That feature makes Terrapod an OIDC issuer, and a cloud fetches
+> the discovery document (`/.well-known/openid-configuration`) and the signing
+> keys (`/.well-known/jwks.json`) **anonymously, from the public internet**,
+> before any token exists — it has to, because that is how it decides whether to
+> trust one. There is no credential to hand it and no private path to route it
+> over, so a deployment with no public surface cannot publish a trust root the
+> clouds can reach.
+>
+> If you want both, you want recipe A: keep the management plane private and add
+> `webhookIngress` with the two issuer paths in its allow-list (the issuer rides
+> that Ingress rather than getting one of its own, precisely because its `paths`
+> allow-list is already the right granularity). Runs on workspaces that name no
+> audiences are unaffected either way — they use the agent pool's ServiceAccount,
+> which needs no public surface at all.
+
 ### C. Single public hostname (smallest deployment)
 
 ```yaml
