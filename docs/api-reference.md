@@ -462,6 +462,7 @@ All workspace responses (show and list) include a `permissions` object reflectin
     "can-read-settings": true
   }
 }
+```
 
 ### Delete Workspace
 
@@ -537,6 +538,12 @@ Workspaces support the following drift detection attributes (settable on create 
 | Attribute | Type | Default | Description |
 |---|---|---|---|
 | `allow-fork-pr-plans` | boolean | `false` | Whether a pull request opened **from a fork** gets a speculative plan ([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)). Off by default: that plan runs the pull request author's code with the workspace's full credential set — `env`-category variables, sensitive values, OpenBao/Vault-resolved values, minted git credentials and the Job's cloud workload identity — and a fork author has neither write access nor the ability to merge, so the plan is the only path by which their code reaches any of it. **Pull requests from a branch in the repository itself are unaffected and always plan.** It gates [module-impact](registry.md#module-impact-analysis) runs the same way, per consuming workspace. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks) |
+
+### Cloud Identity Attributes
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `oidc-audiences` | array&lt;string&gt; | `[]` | The audiences a run identity token is minted for, and **the opt-in** for [per-workspace cloud identity](cloud-identity.md). Empty means this workspace mints nothing and its runs authenticate to the cloud with the agent pool's own ServiceAccount, exactly as before — which is why an empty list is valid rather than an error. At most 10 entries, each at most 255 characters; a blank entry is **refused**, not dropped, and a duplicate is refused. Stored byte-for-byte and never normalised: an audience is an opaque string the federation target chose (`sts.amazonaws.com`, `api://AzureADTokenExchange`, whatever a JWT auth role's `bound_audiences` says), so there is nothing to canonicalise. Prefer **one** audience — a token audienced for two targets is replayable between them. Inert unless the deployment also sets `api.config.auth.oidc_issuer.enabled`. Settable on create and update, in the autodiscovery rule template, and via [bulk update](#bulk-workspace-operations). See [Per-Workspace Cloud Identity](#per-workspace-cloud-identity-oidc-federation) for the endpoints |
 
 ### Terragrunt Attributes
 
@@ -3594,6 +3601,138 @@ same status shape as above. **409** when encryption is disabled.
 > Rotation propagates to all API replicas within ~30s via the
 > `encryption_key_refresh` background task (no restart needed); see the
 > [rotation notes](encryption-at-rest.md#key-rotation).
+
+---
+
+## Per-Workspace Cloud Identity (OIDC Federation)
+
+Terrapod can publish an OIDC discovery document and JWKS so a cloud federates to
+it as an identity provider, and mint a short-lived RS256 JWT per run describing
+the workspace and phase. Off by default
+(`api.config.auth.oidc_issuer.enabled`); when off, the two `/.well-known`
+routes below are **not mounted at all** rather than mounted and refusing.
+
+A workspace opts in with [`oidc-audiences`](#cloud-identity-attributes). See
+[cloud-identity.md](cloud-identity.md) for the per-provider configuration, which
+is the operator's own — Terrapod mints a token and writes it to
+`/var/run/terrapod/oidc/token`, and holds nothing cloud-specific.
+
+### Discovery Document
+
+```
+GET /.well-known/openid-configuration
+```
+
+**Unauthenticated**, by necessity: a cloud fetches this anonymously, before any
+token exists, to decide whether to trust one. Publishes only the issuer's own URL
+and the claim names. Deliberately minimal — there is no authorization endpoint,
+no token endpoint and no client registration, because the only consumer is a
+target validating a token Terrapod already minted.
+
+`issuer` is resolved from `api.config.auth.oidc_issuer.public_url`, falling back
+to the public webhook URL and then `external_url`. OIDC issuer matching is
+**exact**, so this value must equal what the cloud is configured with, trailing
+slash included.
+
+### JWKS
+
+```
+GET /.well-known/jwks.json
+```
+
+**Unauthenticated**, same reason. Public key material only. Returns a key *set*,
+not one key: a rotation publishes the incoming key before it starts signing and
+keeps the retired one until the tokens it signed expire. A cloud selects by the
+token's `kid`, which is an RFC 7638 thumbprint of the key itself.
+
+### Mint Run Identity Token
+
+```
+POST /api/terrapod/v1/runs/{run_id}/cloud-identity-token
+```
+
+**Runner token, scoped to that run.** Called unconditionally by the runner before
+`init` — it has no other way to know whether the workspace opted in.
+
+| Status | Meaning | What the runner does |
+|---|---|---|
+| **200** | Token minted | Writes it to `/var/run/terrapod/oidc/token` (mode `0600`) and exports `TERRAPOD_OIDC_TOKEN_FILE`, `TERRAPOD_RUN_PHASE` and `TF_VAR_terrapod_run_phase` |
+| **204** | This workspace mints nothing — empty `oidc-audiences`, or the issuer is not enabled deployment-wide | Takes no action. The run authenticates with the agent pool's identity, exactly as before |
+| **4xx / 5xx** | Credentials were asked for and could not be had | **Fails the run.** Continuing would mean silently running under broader permissions than the operator chose |
+
+The `204` is load-bearing: "not opted in" has to be distinguishable from
+"broken", because those two require opposite behaviour from the runner.
+
+**Response** (200):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `token` | string | The signed JWT |
+| `expires_in` | int | `api.config.auth.oidc_issuer.token_ttl_seconds` |
+| `phase` | string \| null | `plan` or `apply`, taken from the presented runner token |
+| `audiences` | array&lt;string&gt; | The workspace's audience list, verbatim |
+
+**The phase comes from the presented runner token, never from the request body.**
+A plan-phase runner asking for the apply identity is what this guards: put write
+permissions behind a trust condition on `phase: apply` and a speculative
+pull-request plan structurally cannot assume that role, because every PR-driven
+run is plan-only.
+
+**Claims:** `iss`, `sub` (`workspace:<name>:phase:<plan|apply>`), `aud`,
+`workspace`, `workspace_id`, `phase`, `run_id`, `terrapod_organization` (always
+the literal `default`), plus `iat`, `nbf`, `exp`, `jti`. `sub` carries the phase
+as well as the discrete `phase` claim because Azure federated identity
+credentials match on issuer, subject and audience only, with no access to
+arbitrary claims — so `sub` is the one place a phase condition can be expressed
+there. Targets that can read arbitrary claims should condition on the discrete
+ones, which needs no wildcard. See
+[the claim set](cloud-identity.md#the-claim-set).
+
+### List Signing Keys
+
+```
+GET /api/terrapod/v1/oidc/signing-keys
+```
+
+Platform `admin`. **Public key material only** — the private half never leaves
+the API.
+
+**Response attributes** (`data[].type` = `oidc-signing-keys`, `id` = `kid`):
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `kid` | string | RFC 7638 JWK thumbprint — the same value a cloud sees in a token header |
+| `created-at` | string | RFC3339 |
+| `activates-at` | string | When this key starts signing. A rotated-in key is published immediately but signs only from here |
+| `retired-at` | string \| null | When it stopped signing. It stays published for `retired_key_grace_seconds` after this |
+| `signing` | bool | Whether this is the key currently signing |
+
+`meta.signing-kid` repeats the signing key's `kid`, or is `null` when nothing is
+loaded.
+
+### Rotate Signing Key
+
+```
+POST /api/terrapod/v1/oidc/signing-keys/actions/rotate
+```
+
+Platform `admin`. Adds a key and retires the one currently signing. **201** with
+the new key in the same shape as above, and a `meta.note`.
+
+A published trust root cannot be swapped atomically, because the clouds fetch the
+JWKS on their own schedule and cache it. So the new key is published immediately
+and starts signing only after `key_propagation_seconds`, with the **retired key
+signing across that window** — it is already in the published JWKS, so its
+tokens verify. The retired key then stays published for
+`retired_key_grace_seconds`, which must exceed both `token_ttl_seconds` and
+`key_propagation_seconds`.
+
+**409** on a deployment that supplies its own key
+(`api.oidcSigningKey.existingSecret`): the key is the operator's and so is
+rotating it — replace the Secret and restart the API.
+
+See [runbooks.md → Rotating the OIDC issuer signing
+key](runbooks.md#rotating-the-oidc-issuer-signing-key).
 
 ---
 

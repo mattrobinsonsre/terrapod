@@ -1049,6 +1049,8 @@
       "labels": "Labeli (etifeddir gan weithfannau a grëir)",
       "varFiles": "Ffeiliau var (etifeddir gan weithfannau a grëir)",
       "varFilesHint": "Llwybrau <code>.tfvars</code> perthynol a drosglwyddir i gynllunio/gweithredu.",
+      "oidcAudiences": "Cynulleidfaoedd hunaniaeth rhediad (etifeddir gan weithfannau a grëir)",
+      "oidcAudiencesHint": "Cynulleidfaoedd y mae pob gweithle a grëir gan y rheol hon yn cyhoeddi tocyn hunaniaeth rhediad ar eu cyfer. Gadewch yn wag ac ni fyddant yn cyhoeddi dim.",
       "addVarFile": "Ychwanegu ffeil var",
       "executionHooks": "Bachau gweithredu (cysylltir â phob gweithfan newydd)",
       "executionHooksHint": "Dewiswch o'r bachau a ddiffinnir ar dudalen weinyddol <page>Bachau Gweithredu</page> — cysylltir pob bach a ddewiswyd â phob gweithfan y mae'r rheol hon yn ei chreu.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Gosod labeli (yn amnewid map y labeli ar bob gweithfan gyfatebol)",
       "setVarFiles": "Gosod ffeiliau var",
       "addVarFile": "Ychwanegu ffeil var",
+      "setOidcAudiences": "Gosod cynulleidfaoedd hunaniaeth rhediad (yn disodli'r rhestr ar bob gweithle sy'n cyfateb; mae rhestr wag yn diffodd hunaniaeth rhediad)",
       "setRunTasks": "Gosod tasgau rhediad (upsertir yn ôl enw ar bob gweithfan gyfatebol)",
       "setNotifications": "Gosod ffurfweddiadau hysbysu (upsertir yn ôl enw)",
       "dryRun": "Rhediad sych (rhagolwg yn unig — ni ysgrifennir unrhyw newidiadau)",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "Dim (yn defnyddio'r cyfeiriadur gwaith)",
       "driftIgnoreRules": "Rheolau Anwybyddu Drifft",
       "driftIgnoreRulesHint": "Llwybrau cyfeiriad Terraform + priodwedd sy'n ymwybodol o globiau a atalir gan y dosbarthwr drifft. Mae <star></star> yn cyfateb i sero neu ragor o nodau nad ydynt yn <dot></dot> (yn rhychwantu <n></n> mynegai); mae <starIdx></starIdx> yn cyfateb i unrhyw fynegai mewn cromfachau. Mae cyfeiriad moel heb ôl-ddodiad priodwedd yn distewi unrhyw newid i'r adnodd hwnnw — gan gynnwys dinistriadau. Yn effeithio ar ddrifft yn unig, nid cynllun/gweithredu arferol. Gweler <docs>drift-ignore-rules.md</docs> am y gramadeg llawn.",
-      "driftIgnoreRulesNone": "Dim (mae pob gwahaniaeth cynllun yn cyfrif fel drifft)"
+      "driftIgnoreRulesNone": "Dim (mae pob gwahaniaeth cynllun yn cyfrif fel drifft)",
+      "oidcAudiences": "Cynulleidfaoedd hunaniaeth rhediad",
+      "oidcAudiencesHint": "Mae Terrapod yn cyhoeddi tocyn OpenID Connect byrhoedlog ar gyfer pob rhediad o'r gweithle hwn ac yn ei ysgrifennu i ffeil y gall y rhediad ei darllen. Mae cynulleidfa yn enwi at beth y mae'r tocyn, ac mae pob targed ffederasiwn yn dewis ei llinyn afloyw ei hun — sts.amazonaws.com, api://AzureADTokenExchange, neu beth bynnag y mae'r targed yr ydych yn ffedereiddio ato yn ei dderbyn. Gadewch y rhestr yn wag ac nid yw'r gweithle hwn yn cyhoeddi dim: mae ei rediadau yn dilysu yn union fel heddiw, gyda hunaniaeth y pwll asiantau ei hun. Pa provider sy'n defnyddio'r tocyn, a sut, yw eich cyfluniad eich hun.",
+      "oidcAudiencesPlaceholder": "e.e. sts.amazonaws.com",
+      "oidcAudiencesNone": "Dim (mae rhediadau yn defnyddio hunaniaeth y pwll asiantau ei hun)",
+      "oidcAudiencesAdd": "Ychwanegu cynulleidfa"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

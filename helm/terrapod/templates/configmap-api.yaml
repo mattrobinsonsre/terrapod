@@ -122,6 +122,16 @@ data:
       legacy_callback_url: {{ .Values.api.config.auth.legacy_callback_url }}
       {{- end }}
       session_ttl_hours: {{ .Values.api.config.auth.session_ttl_hours | default 12 | int64 }}
+      {{- /* Per-workspace cloud identity (#1901). `signing_key_pem` is
+             deliberately ABSENT here and always will be: it is a private key,
+             so it arrives via secretKeyRef on the Deployment
+             (api.oidcSigningKey) and must never reach a ConfigMap. */}}
+      oidc_issuer:
+        enabled: {{ ((.Values.api.config.auth).oidc_issuer).enabled | default false }}
+        public_url: {{ ((.Values.api.config.auth).oidc_issuer).public_url | default "" | quote }}
+        token_ttl_seconds: {{ ((.Values.api.config.auth).oidc_issuer).token_ttl_seconds | default 900 | int64 }}
+        key_propagation_seconds: {{ ((.Values.api.config.auth).oidc_issuer).key_propagation_seconds | default 600 | int64 }}
+        retired_key_grace_seconds: {{ ((.Values.api.config.auth).oidc_issuer).retired_key_grace_seconds | default 3600 | int64 }}
       api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 8760 | int64 }}
       {{- /* Rendered directly (no `| default`): 0 is meaningful for these and
              Helm's `default` would silently rewrite a configured 0 to the default. */}}

@@ -550,6 +550,80 @@ class SSOConfig(BaseModel):
     )
 
 
+class OIDCIssuerConfig(BaseSettings):
+    """Terrapod as an OIDC issuer for runs (#1901).
+
+    Off by default, and off means the routes are **not mounted** rather than
+    mounted and refusing: a deployment that has not opted in publishes no trust
+    root at all, which is a stronger statement than a 404.
+
+    Opting in is two decisions, not one. The operator decides whether the
+    install publishes an issuer (here); a workspace admin decides whether a
+    given workspace may mint a token (its audience list). Neither implies the
+    other, and a published issuer with no workspace opted in grants nothing.
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description=(
+            "Publish an OIDC discovery document and JWKS so clouds can federate "
+            "to this Terrapod as an identity provider. Requires the two issuer "
+            "paths on a publicly reachable Ingress — the clouds fetch them "
+            "anonymously, so a tailnet-only hostname will not do."
+        ),
+    )
+    public_url: str = Field(
+        default="",
+        description=(
+            "The issuer URL, exactly as the cloud is configured with it. One "
+            "source for three consumers inside the API — the token's `iss`, the "
+            "discovery document's `issuer`, and its `jwks_uri` — because OIDC "
+            "issuer matching is exact and computing it three times means one of "
+            "them uses the private hostname. Empty derives it from "
+            "webhookIngress.hostname, falling back to external_url."
+        ),
+    )
+    signing_key_pem: str = Field(
+        default="",
+        description=(
+            "An operator-supplied RSA private key (PKCS8 PEM) to sign with. Wins "
+            "on every startup and is never stored, so rotating it means replacing "
+            "the secret. Empty means Terrapod generates one on first startup and "
+            "persists it, which is what most deployments want."
+        ),
+    )
+    token_ttl_seconds: int = Field(
+        default=900,
+        ge=60,
+        le=43200,
+        description=(
+            "Lifetime of a run identity token. Short because the cloud exchanges "
+            "it for its own credentials immediately and never needs it again; "
+            "note azurerm reads the token file exactly once, at provider init."
+        ),
+    )
+    key_propagation_seconds: int = Field(
+        default=600,
+        ge=0,
+        description=(
+            "How long a rotated-in key is published before it starts signing. A "
+            "published trust root cannot be swapped atomically: the clouds cache "
+            "the JWKS, so signing with a brand-new key produces tokens they "
+            "cannot verify until they next fetch it. Raise this if your cloud "
+            "caches for longer."
+        ),
+    )
+    retired_key_grace_seconds: int = Field(
+        default=3600,
+        ge=0,
+        description=(
+            "How long a retired key stays in the published JWKS. It has to outlive "
+            "token_ttl_seconds, or a token signed moments before a rotation stops "
+            "verifying while it is still inside its own lifetime."
+        ),
+    )
+
+
 class AuthConfig(BaseSettings):
     """Authentication configuration."""
 
@@ -559,6 +633,7 @@ class AuthConfig(BaseSettings):
         description="Base URL for IDP callbacks (externally-reachable URL)",
     )
     sso: SSOConfig = Field(default_factory=SSOConfig)
+    oidc_issuer: OIDCIssuerConfig = Field(default_factory=OIDCIssuerConfig)
     session_ttl_hours: int = Field(
         default=12,
         description="Session TTL in hours",

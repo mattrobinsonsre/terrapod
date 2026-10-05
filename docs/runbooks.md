@@ -2640,3 +2640,160 @@ registered to a different agent pool` is a **409** and is not self-healing. That
 means two pools are using the same listener name, which has no legitimate meaning —
 rename one listener, or delete the registration from the pool that holds it.
 
+
+---
+
+## Rotating the OIDC issuer signing key
+
+The key behind [per-workspace cloud identity](cloud-identity.md). This is a
+planned procedure, not a failure scenario — but it touches a **published trust
+root**, so the clouds' own JWKS caches are part of the system and the two
+configured windows exist because of them.
+
+Not applicable to a deployment that supplies its own key
+(`api.oidcSigningKey.existingSecret`): the rotate endpoint returns `409` there,
+and rotating means replacing that Secret and restarting the API.
+
+### What the two windows mean
+
+| Setting | Default | What it governs |
+|---|---|---|
+| `key_propagation_seconds` | 600 | How long the new key is published **before it starts signing**, so no token is signed with a key the clouds have not fetched. **The retired key keeps signing across this window** — it is still in the published JWKS, so its tokens verify |
+| `retired_key_grace_seconds` | 3600 | How long the previous key **stays published** after being retired, because the tokens it already signed are still inside their own `token_ttl_seconds` |
+
+Only the operator knows how long their clouds cache, which is why both are
+configuration rather than constants. Two constraints:
+
+- **`retired_key_grace_seconds` > `token_ttl_seconds`**, or a token signed moments
+  before a rotation stops verifying while still inside its own lifetime.
+- **`retired_key_grace_seconds` > `key_propagation_seconds`**, because the retired
+  key is what carries the signing load until the new one activates.
+
+A rotation needs no downtime and no coordination with the clouds: the handover
+happens on its own, and at no point is a token signed with a key that is not
+already published.
+
+### Procedure
+
+1. **Record what is published now**, so you can tell the new key from the old:
+
+   ```sh
+   curl -s -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+     https://terrapod.example.com/api/terrapod/v1/oidc/signing-keys \
+     | jq '{signing: .meta["signing-kid"], keys: [.data[].attributes]}'
+   ```
+
+2. **Rotate:**
+
+   ```sh
+   curl -sX POST -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+     https://terrapod.example.com/api/terrapod/v1/oidc/signing-keys/actions/rotate | jq .
+   ```
+
+   `201` with the new `kid`, its `created-at` and its `activates-at`. The
+   `activates-at` value is when it starts signing; until then the key you
+   recorded in step 1 is still doing it, which is why the admin listing still
+   reports that older `kid` as `signing: true`. That is correct, not a failed
+   rotation.
+
+3. **Confirm the new key is in the published JWKS** — this is what the clouds
+   read, and it is a different surface from the admin endpoint above:
+
+   ```sh
+   curl -s https://terrapod-webhooks.example.com/.well-known/jwks.json | jq '.keys[].kid'
+   ```
+
+   Both the new and the retired `kid` should be listed. Fetch it from **outside**
+   your network, over the public issuer hostname, not from inside the cluster —
+   an in-cluster fetch proves nothing about what a cloud can reach.
+
+4. **Run a federated plan** on a workspace that names audiences, and confirm it
+   reaches the cloud. This is the only check that exercises the whole path
+   (mint → token file → provider → exchange).
+
+5. **After `key_propagation_seconds`**, confirm the handover happened: the admin
+   listing should now report the **new** `kid` as `signing: true`. Run another
+   federated plan — this is the first one signed with the new key, so it is the
+   one that proves the clouds picked it up.
+
+6. **After `retired_key_grace_seconds`**, confirm the retired key has dropped out
+   of the JWKS. Re-run step 3; only the new `kid` should remain. The set is
+   re-read by a periodic task, so a rotation on one replica reaches the others
+   without a restart.
+
+### Verification
+
+```sh
+# The admin view: exactly one key reports signing: true
+curl -s -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  https://terrapod.example.com/api/terrapod/v1/oidc/signing-keys \
+  | jq '[.data[] | select(.attributes.signing)] | length'   # => 1
+
+# The public view agrees with it
+curl -s https://terrapod-webhooks.example.com/.well-known/jwks.json \
+  | jq '[.keys[].kid]'
+```
+
+A token's header carries the `kid` it was signed with, and `kid` is an RFC 7638
+thumbprint of the key itself — so the value in a token header, in the JWKS, and
+in the admin listing are all the same string, and a mismatch is conclusive rather
+than suggestive.
+
+### A cloud starts rejecting tokens after a rotation
+
+**Symptoms.** Federated runs fail at provider init or at assume-role time, with
+an error from the *cloud*, not from Terrapod — an invalid identity token, an
+unknown key id, a signature that cannot be verified. Runs on non-federated
+workspaces are unaffected, because they never ask for a token.
+
+**Diagnosis.** Work from the outside in; the failure is almost always a cache or
+a URL mismatch, not the key.
+
+1. **Is the signing key in the published JWKS?** Compare the `kid` the admin
+   endpoint reports as `signing: true` against
+   `/.well-known/jwks.json`. If the signing `kid` is absent from the JWKS, the
+   clouds cannot verify anything it signs.
+2. **Is the cloud's cached copy stale?** The cloud fetched the JWKS before the
+   rotation and has not re-fetched. Nothing in Terrapod can force it. Normally
+   the two windows cover this — the retired key signs until the new one has
+   propagated, and stays published after — so suspect it where a cloud caches
+   for longer than `key_propagation_seconds`, which is the knob to raise.
+3. **Does `iss` still match?** `curl -s …/.well-known/openid-configuration | jq
+   .issuer` must equal what the cloud is configured with, character for
+   character, trailing slash included. If `public_url` is empty the issuer is
+   derived from `webhookIngress.hostname` and falls back to `external_url`, so a
+   change to either can move it under you — that produces the same
+   token-rejected symptom with nothing wrong with the key.
+4. **Check the API log** for either of two warnings, both of which mean the
+   windows did not cover you:
+   - `No OIDC signing key has finished propagating; signing with the newest
+     unretired key anyway` — reached when no retired key is still published, so
+     there was nothing to sign with but the un-propagated one. In practice this
+     means `retired_key_grace_seconds` is shorter than the time between two
+     rotations: **raise it**, and do not rotate twice inside that window.
+   - `Every OIDC issuer signing key is retired` — a different and more serious
+     state; see Resolution.
+
+**Resolution.**
+
+- **Stale cache, which is most cases:** make the cloud re-fetch. On AWS, updating
+  the IAM OIDC identity provider's thumbprint list forces a refresh; on GCP and
+  Azure the pool provider or federated credential can be re-read the same way. If
+  the cloud offers no lever, the cache expires on its own — the retired key stays
+  published for `retired_key_grace_seconds`, which is the window that covers
+  exactly this, so **raise `retired_key_grace_seconds` before the next rotation**
+  rather than rotating again now.
+- **Issuer URL moved:** set `api.config.auth.oidc_issuer.public_url` explicitly
+  so it stops being derived, and reconcile the cloud's configured issuer to
+  match. Do not change it in one place only.
+- **Every key retired** (`Every OIDC issuer signing key is retired` at startup,
+  and the API refuses to start): rotate to create one, or supply your own via
+  `api.oidcSigningKey.existingSecret`. This is reachable only by retiring the
+  last key by hand.
+- **Do not rotate again to fix a rotation.** A second rotation adds a third key
+  and retires the one the clouds may just have picked up, which makes the window
+  worse rather than shorter.
+
+**Verification.** A federated plan on an affected workspace reaches the cloud,
+and `GET /api/terrapod/v1/oidc/signing-keys` shows one key with
+`signing: true` whose `kid` appears in the public JWKS.

@@ -342,6 +342,7 @@ field CreateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,om
 field CreateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
 field CreateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field CreateWorkspaceRequest.Name string `json:"name"`
+field CreateWorkspaceRequest.OIDCAudiences []string `json:"oidc-audiences,omitempty"`
 field CreateWorkspaceRequest.OwnerEmail string `json:"owner-email,omitempty"`
 field CreateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
@@ -606,6 +607,15 @@ field NotificationConfiguration.Triggers []string `json:"triggers,omitempty"`
 field NotificationConfiguration.URL string `json:"url,omitempty"`
 field NotificationConfiguration.UpdatedAt string `json:"updated-at,omitempty"`
 field NotificationConfiguration.WorkspaceID string `json:"workspace-id,omitempty"`
+field OIDCSigningKey.ActivatesAt string `json:"activates-at,omitempty"`
+field OIDCSigningKey.CreatedAt string `json:"created-at,omitempty"`
+field OIDCSigningKey.Kid string `json:"kid"`
+field OIDCSigningKey.RetiredAt string `json:"retired-at,omitempty"`
+field OIDCSigningKey.Signing bool `json:"signing"`
+field OIDCSigningKeyRotation.Key OIDCSigningKey
+field OIDCSigningKeyRotation.Note string
+field OIDCSigningKeySet.Keys []OIDCSigningKey
+field OIDCSigningKeySet.SigningKID string
 field OnboardingAvailability.AIAvailable bool `json:"ai-available"`
 field OnboardingAvailability.AIModelConfigured bool `json:"ai-model-configured"`
 field OnboardingDataSource.HasFilter bool `json:"has_filter"`
@@ -1054,6 +1064,7 @@ field UpdateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,om
 field UpdateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
 field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field UpdateWorkspaceRequest.Name string `json:"name,omitempty"`
+field UpdateWorkspaceRequest.OIDCAudiences []string `json:"oidc-audiences,omitempty"`
 field UpdateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field UpdateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
@@ -1251,6 +1262,7 @@ field Workspace.LifecycleReason string `json:"lifecycle-reason,omitempty"`
 field Workspace.LifecycleState string `json:"lifecycle-state,omitempty"`
 field Workspace.Locked bool `json:"locked"`
 field Workspace.Name string `json:"name"`
+field Workspace.OIDCAudiences []string `json:"oidc-audiences,omitempty"`
 field Workspace.OwnerEmail string `json:"owner-email,omitempty"`
 field Workspace.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`
@@ -1499,6 +1511,7 @@ method (*Client) ListModuleAutodiscoveryRuleRepositories(ctx context.Context, id
 method (*Client) ListModuleAutodiscoveryRules(ctx context.Context) ([]ModuleAutodiscoveryRule, error)
 method (*Client) ListModuleWorkspaceLinks(ctx context.Context, moduleName, moduleProvider string) ([]ModuleWorkspaceLink, error)
 method (*Client) ListNotificationConfigurations(ctx context.Context, workspaceID string) ([]NotificationConfiguration, error)
+method (*Client) ListOIDCSigningKeys(ctx context.Context) (*OIDCSigningKeySet, error)
 method (*Client) ListOnboardingSessions(ctx context.Context, workspaceID string) ([]OnboardingSession, error)
 method (*Client) ListOutboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error)
 method (*Client) ListPlanSummaryMessages(ctx context.Context, runID string) ([]*PlanSummaryMessage, error)
@@ -1554,6 +1567,7 @@ method (*Client) RevokeAllAPITokensForUser(ctx context.Context, email string) (i
 method (*Client) RevokeGPGKey(ctx context.Context, id, revocationCertificate string) (*GPGKey, error)
 method (*Client) RotateAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
 method (*Client) RotateDEK(ctx context.Context) (*EncryptionStatus, error)
+method (*Client) RotateOIDCSigningKey(ctx context.Context) (*OIDCSigningKeyRotation, error)
 method (*Client) ScanModuleAutodiscoveryRule(ctx context.Context, id string, subdirectories []string) (*ModuleAutodiscoveryScan, error)
 method (*Client) ScanModuleAutodiscoveryRuleSelections(ctx context.Context, id string, selections []ModuleAutodiscoverySelection) (*ModuleAutodiscoveryScan, error)
 method (*Client) SearchWorkspaces(ctx context.Context, filter WorkspaceFilter) (*SearchWorkspacesResult, error)
@@ -1696,6 +1710,9 @@ type ModuleInterface struct
 type ModuleWorkspaceLink struct
 type NotFoundError struct
 type NotificationConfiguration struct
+type OIDCSigningKey struct
+type OIDCSigningKeyRotation struct
+type OIDCSigningKeySet struct
 type OnboardingAvailability struct
 type OnboardingDataSource struct
 type OnboardingSession struct

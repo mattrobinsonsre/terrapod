@@ -134,6 +134,11 @@ export default function BulkUpdatePage() {
   const [uLabels, setULabels] = useState<Record<string, string>>({})
   const [uSetVarFiles, setUSetVarFiles] = useState(false)
   const [uVarFiles, setUVarFiles] = useState<string[]>([])
+  // A checkbox gate, not a bare list: an EMPTY list is a meaningful value here
+  // (it turns run identity off), so there is no in-band way to say "leave this
+  // alone" (#1901). Same shape as var-files for the same reason.
+  const [uSetOidcAudiences, setUSetOidcAudiences] = useState(false)
+  const [uOidcAudiences, setUOidcAudiences] = useState<string[]>([])
   const [uSetRunTasks, setUSetRunTasks] = useState(false)
   const [uRunTasks, setURunTasks] = useState<RunTaskSpec[]>([])
   const [uSetNotifications, setUSetNotifications] = useState(false)
@@ -216,6 +221,10 @@ export default function BulkUpdatePage() {
     if (uAllowForkPrPlans) u['allow-fork-pr-plans'] = uAllowForkPrPlans === 'true'
     if (uSetLabels) u.labels = uLabels
     if (uSetVarFiles) u['var-files'] = uVarFiles.map((s) => s.trim()).filter(Boolean)
+    // Blank entries are refused by the server rather than dropped, so an empty
+    // row left in the editor would 422 the whole fleet update.
+    if (uSetOidcAudiences)
+      u['oidc-audiences'] = uOidcAudiences.map((s) => s.trim()).filter(Boolean)
     if (uSetRunTasks) u['run-tasks'] = uRunTasks
     if (uSetNotifications) u['notification-configurations'] = uNotifications
     return u
@@ -828,6 +837,28 @@ export default function BulkUpdatePage() {
                 placeholder="env/prod.tfvars"
                 addLabel={t('update.addVarFile')}
               />
+            )}
+          </div>
+
+          <div className="pt-3 border-t border-slate-800">
+            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+              <input
+                type="checkbox"
+                checked={uSetOidcAudiences}
+                onChange={(e) => setUSetOidcAudiences(e.target.checked)}
+              />
+              {t('update.setOidcAudiences')}
+            </label>
+            {uSetOidcAudiences && (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400">{tWs('fields.oidcAudiencesHint')}</p>
+                <StringListEditor
+                  values={uOidcAudiences}
+                  onChange={setUOidcAudiences}
+                  placeholder={tWs('fields.oidcAudiencesPlaceholder')}
+                  addLabel={tWs('fields.oidcAudiencesAdd')}
+                />
+              </div>
             )}
           </div>
 

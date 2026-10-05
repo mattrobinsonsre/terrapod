@@ -686,7 +686,7 @@ class RunnerListener:
         phase = attrs.get("phase", "plan")
 
         try:
-            runner_token = await self._get_runner_token(run_id)
+            runner_token = await self._get_runner_token(run_id, phase)
         except Exception as e:
             logger.error("Failed to fetch runner token", run_id=run_id, error=str(e))
             await self._report_launch_failed(run_id, f"Could not obtain runner token: {e}")
@@ -1123,15 +1123,22 @@ class RunnerListener:
 
     # ── Shared Helpers ───────────────────────────────────────────────
 
-    async def _get_runner_token(self, run_id: str) -> str:
-        """Request a short-lived runner token from the API."""
+    async def _get_runner_token(self, run_id: str, phase: str) -> str:
+        """Request a short-lived runner token from the API.
+
+        The phase is named here because this Job runs exactly one of them, and
+        the API binds it into the token so a plan-phase Job cannot drive the
+        apply-phase routes or ask for the apply cloud identity (#1901). An API
+        older than the claim ignores the field and returns the unphased form,
+        which still verifies — so this is safe to send unconditionally.
+        """
         response = await arequest_with_retry(
             self._http_client,
             "POST",
             f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
             f"/runs/run-{run_id}/runner-token",
             idempotent=True,  # per-run token mint is safe/repeatable — retry on timeout/5xx
-            json={},
+            json={"phase": phase},
             headers=self._auth_headers(),
         )
         response.raise_for_status()

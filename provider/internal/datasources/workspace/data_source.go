@@ -55,6 +55,7 @@ type workspaceDataSourceModel struct {
 	SecurityScanEngine            types.String `tfsdk:"security_scan_engine"`
 	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
 	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
+	OIDCAudiences                 types.List   `tfsdk:"oidc_audiences"`
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
@@ -121,6 +122,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"security_scan_engine":             computedString("Security-scan engine (#1036): 'checkov' (default), 'trivy', or 'both'."),
 			"security_scan_severity_threshold": computedString("Lowest severity that counts as a scan failure (#1036): 'critical', 'high' (default), 'medium', or 'low'."),
 			"security_scan_skip_rules":         computedList("Scanner rule-ids to suppress (#1036; Checkov CKV_* / Trivy AVD-*)."),
+			"oidc_audiences":                   computedList("Audiences a run identity token is minted for, and the per-workspace cloud identity opt-in (#1901). Empty means this workspace mints nothing and its runs authenticate with the agent pool's own identity. Each entry is an opaque string the federation target itself names."),
 			"plan_expiry_seconds":              computedInt64("Per-workspace plan expiry TTL in seconds (#646); null/0 = disabled."),
 			"ai_policy_mode":                   computedString("Per-workspace AI policy gate override: 'default', 'enabled', or 'disabled'. 'disabled' opts out of an advisory verdict only -- a mandatory gate ignores it."),
 			"ai_summary_mode":                  computedString("Per-workspace AI plan-summary mode: 'default' (follow deployment global), 'enabled' (always summarise), or 'disabled' (never summarise)."),
@@ -304,6 +306,14 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		m.SecurityScanSkipRules = val
 	} else {
 		m.SecurityScanSkipRules = types.ListNull(types.StringType)
+	}
+
+	if auds := terrapod.GetListAttr(res, "oidc-audiences"); len(auds) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, auds)
+		diags.Append(d...)
+		m.OIDCAudiences = val
+	} else {
+		m.OIDCAudiences = types.ListNull(types.StringType)
 	}
 
 	if labels := terrapod.GetMapAttr(res, "labels"); len(labels) > 0 {

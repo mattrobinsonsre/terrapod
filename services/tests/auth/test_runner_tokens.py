@@ -10,6 +10,7 @@ from terrapod.auth.runner_tokens import (
     _get_signing_key,
     generate_runner_token,
     verify_runner_token,
+    verify_runner_token_claims,
 )
 
 
@@ -119,6 +120,9 @@ class TestVerifyRunnerToken:
     def test_rejects_wrong_part_count(self, _mock_settings):
         assert verify_runner_token("runtok:a:b:c") is None
         assert verify_runner_token("runtok:a:b:c:d:e") is None
+        # Six fields IS a shape now (the phase claim), but `b` is not a phase a
+        # Job runs, so this stays refused.
+        assert verify_runner_token("runtok:a:plan:b:c:d:e") is None
 
     def test_rejects_non_numeric_ttl(self, _mock_settings):
         assert verify_runner_token("runtok:run-1:abc:123:deadbeef") is None
@@ -168,3 +172,102 @@ class TestVerifyRunnerToken:
         assert verify_runner_token(token1) == id1
         assert verify_runner_token(token2) == id2
         assert verify_runner_token(token1) != id2
+
+
+# ── The phase claim ────────────────────────────────────────────────────
+
+
+class TestThePhaseClaim:
+    """A token says which Job phase it may act in, so a plan-phase token cannot
+    ask for the apply cloud identity (#1901). The claim is inside the signed
+    message, which is the only reason it is worth anything."""
+
+    def test_a_phased_token_round_trips_its_phase(self, _mock_settings, _mock_runner_config):
+        run_id = str(uuid.uuid4())
+        token = generate_runner_token(run_id, ttl=3600, phase="apply")
+
+        parts = token.split(":")
+        assert len(parts) == 6
+        assert parts[1] == run_id
+        assert parts[2] == "apply"
+        assert parts[3] == "3600"
+
+        claims = verify_runner_token_claims(token)
+        assert claims is not None
+        assert claims.run_id == run_id
+        assert claims.phase == "apply"
+
+    def test_both_phases_are_mintable_and_distinct(self, _mock_settings, _mock_runner_config):
+        run_id = str(uuid.uuid4())
+        plan = verify_runner_token_claims(generate_runner_token(run_id, phase="plan"))
+        apply = verify_runner_token_claims(generate_runner_token(run_id, phase="apply"))
+        assert plan is not None and apply is not None
+        assert plan.phase == "plan"
+        assert apply.phase == "apply"
+
+    def test_the_phase_cannot_be_edited_by_the_holder(self, _mock_settings, _mock_runner_config):
+        """The whole point. Rewriting `plan` to `apply` must invalidate the
+        signature, or the claim is a suggestion."""
+        token = generate_runner_token(str(uuid.uuid4()), ttl=3600, phase="plan")
+
+        # Assert the honest token verifies FIRST. Without this the test passes
+        # under any mutation that breaks six-field verification outright, since
+        # a wholly broken verifier also answers None — which is not the same
+        # claim at all.
+        honest = verify_runner_token_claims(token)
+        assert honest is not None and honest.phase == "plan"
+
+        parts = token.split(":")
+        parts[2] = "apply"
+        assert verify_runner_token_claims(":".join(parts)) is None
+
+    def test_an_unphased_token_verifies_and_claims_nothing(
+        self, _mock_settings, _mock_runner_config
+    ):
+        """The skew case, and the one that must not regress: a listener older than
+        the claim sends no phase, so the API mints the five-field form. It has to
+        keep verifying, and its phase has to be None — which every reader takes as
+        "no claim" rather than as a mismatch."""
+        run_id = str(uuid.uuid4())
+        token = generate_runner_token(run_id, ttl=3600)
+        assert len(token.split(":")) == 5
+
+        claims = verify_runner_token_claims(token)
+        assert claims is not None
+        assert claims.run_id == run_id
+        assert claims.phase is None
+
+    def test_an_unrecognised_phase_mints_the_unphased_form(
+        self, _mock_settings, _mock_runner_config
+    ):
+        """A listener sending something unexpected gets a working token rather
+        than a 500 or a token nothing accepts."""
+        token = generate_runner_token(str(uuid.uuid4()), ttl=3600, phase="destroy")
+        assert len(token.split(":")) == 5
+        claims = verify_runner_token_claims(token)
+        assert claims is not None
+        assert claims.phase is None
+
+    def test_a_signed_token_claiming_an_unknown_phase_is_refused(
+        self, _mock_settings, _mock_runner_config
+    ):
+        """Refused, NOT downgraded to "no claim" — that would turn an unknown
+        phase into a token every phase-checked reader accepts, which is the
+        opposite of what the claim is for. Signed with the real key, so only the
+        phase vocabulary can reject it."""
+        import hashlib
+        import hmac
+
+        rid = str(uuid.uuid4())
+        msg = f"runtok:{rid}:destroy:3600:{int(time.time())}"
+        sig = hmac.new(_get_signing_key(), msg.encode(), hashlib.sha256).hexdigest()
+        assert verify_runner_token_claims(f"{msg}:{sig}") is None
+
+    def test_verify_runner_token_still_returns_the_bare_run_id(
+        self, _mock_settings, _mock_runner_config
+    ):
+        """The old helper stays, because the rate limiter only needs to know
+        whether a credential is a runner token at all."""
+        run_id = str(uuid.uuid4())
+        assert verify_runner_token(generate_runner_token(run_id, phase="plan")) == run_id
+        assert verify_runner_token(generate_runner_token(run_id)) == run_id

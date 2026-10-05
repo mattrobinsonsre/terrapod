@@ -425,6 +425,20 @@ func registerObserve(s *mcp.Server, c *terrapod.Client) {
 		return nil, st, nil
 	})
 
+	// ── terrapod_oidc_signing_keys ───────────────────────────────────
+	type oidcSigningKeysIn struct{}
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "terrapod_oidc_signing_keys",
+		Description: "Report the OIDC signing keys Terrapod publishes as an identity provider for run identity tokens (#1901) -- the first thing to read when a federated run cannot authenticate to a cloud or secret store. Public key material only; the private half never leaves the API. Per key: `kid` (an RFC 7638 thumbprint, so it is the same value the federation target reads out of a token header and matches against the published JWKS), `created-at`, `activates-at`, `retired-at`, and `signing`. `meta.signing-kid` names the key signing right now, and is NULL when nothing is -- the issuer is off, or every key's activation window is still ahead of it, which is not the same as an error. Read `signing` per key rather than inferring it from the timestamps: a rotation is a SET, not a swap, so the newest key is published immediately and starts signing only after the propagation window, because a federation target caches the JWKS on its own schedule and cannot verify a token signed with a key it has not fetched. A retired key stays published for its grace window, because the tokens it already signed are still inside their own lifetime. So the diagnosis for a rejected token is usually one of: no key is signing; the signing key is newer than the target's cached JWKS; or the workspace names no audiences and mints nothing at all (read that from the workspace's `oidc-audiences`, not from here). Read-only; requires platform admin. Rotating a key is deliberately NOT exposed as a tool -- it changes a published trust root for every federated workspace at once, so it belongs in a Terraform plan or an operator's own hands, not an agent's.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ oidcSigningKeysIn) (*mcp.CallToolResult, *terrapod.OIDCSigningKeySet, error) {
+		set, err := c.ListOIDCSigningKeys(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, set, nil
+	})
+
 	// ── terrapod_vault_status ────────────────────────────────────────
 	type vaultStatusIn struct{}
 	mcp.AddTool(s, &mcp.Tool{

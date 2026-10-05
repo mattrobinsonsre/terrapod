@@ -31,6 +31,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		VCSRepoURL       string            `json:"vcs_repo_url,omitempty" jsonschema:"git repo URL (requires vcs_connection_id)"`
 		VCSBranch        string            `json:"vcs_branch,omitempty" jsonschema:"tracked branch (empty = repo default)"`
 		AllowForkPRPlans *bool             `json:"allow_fork_pr_plans,omitempty" jsonschema:"allow a pull request opened from a FORK to get a speculative plan. **Off by default**, which is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it true only on a workspace that holds nothing worth taking, and note that an autodiscovery rule carries its own value for the workspaces it creates (GHSA-gp5w-76rw-c452)"`
+		OIDCAudiences    []string          `json:"oidc_audiences,omitempty" jsonschema:"audiences a run identity token is minted for, and this workspace's cloud identity opt-in (#1901). Empty (the default) means the workspace mints nothing and its runs authenticate with the agent pool's own identity, exactly as before. Each entry is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. At most 10 entries of 255 characters. A token audienced for two targets is replayable between them, so name only the targets this workspace federates to. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do"`
 		OwnerEmail       string            `json:"owner_email,omitempty" jsonschema:"workspace owner email (defaults to the caller)"`
 		Labels           map[string]string `json:"labels,omitempty" jsonschema:"key/value labels for RBAC + filtering (reserved keys rejected)"`
 	}
@@ -56,6 +57,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			VCSConnectionID:  in.VCSConnectionID,
 			VCSRepoURL:       in.VCSRepoURL,
 			VCSBranch:        in.VCSBranch,
+			OIDCAudiences:    in.OIDCAudiences,
 			OwnerEmail:       in.OwnerEmail,
 			Labels:           in.Labels,
 			// A pointer all the way through, so "leave it alone" stays
@@ -84,6 +86,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		AgentPoolIDs     []string          `json:"agent_pool_ids,omitempty" jsonschema:"replace the workspace''s agent-pool set (apool-...). Flat set — every pool is equally eligible to claim a run. Mutually exclusive with agent_pool_id"`
 		WorkingDirectory string            `json:"working_directory,omitempty" jsonschema:"subdirectory within the repo"`
 		Labels           map[string]string `json:"labels,omitempty" jsonschema:"replace the label set (reserved keys rejected)"`
+		OIDCAudiences    []string          `json:"oidc_audiences,omitempty" jsonschema:"replace the audiences this workspace's run identity tokens are minted for -- its cloud identity opt-in (#1901). Empty (the default) means the workspace mints nothing and its runs authenticate with the agent pool's own identity, exactly as before. Each entry is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. At most 10 entries of 255 characters. A token audienced for two targets is replayable between them, so name only the targets this workspace federates to. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do. Omitting the field leaves the existing audiences alone; pass an EMPTY array to clear them, which opts the workspace back out of minting an identity token"`
 		AllowForkPRPlans *bool             `json:"allow_fork_pr_plans,omitempty" jsonschema:"allow a pull request opened from a FORK to get a speculative plan. **Off by default**, which is the safe setting: such a plan runs the fork author's code with this workspace's full credential set (env variables, secret-manager values, git credentials, the runner's cloud identity), and that author has no write access and cannot merge, so the plan is the only path by which their code reaches those credentials. Pull requests from branches in the repository itself always plan and are unaffected. Set it true only on a workspace that holds nothing worth taking, and note that an autodiscovery rule carries its own value for the workspaces it creates (GHSA-gp5w-76rw-c452)"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
@@ -106,6 +109,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			AgentPoolIDs:     in.AgentPoolIDs,
 			WorkingDirectory: in.WorkingDirectory,
 			Labels:           in.Labels,
+			OIDCAudiences:    in.OIDCAudiences,
 			AllowForkPRPlans: in.AllowForkPRPlans,
 		})
 		if err != nil {

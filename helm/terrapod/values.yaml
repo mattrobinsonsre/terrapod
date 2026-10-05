@@ -53,6 +53,21 @@ api:
     existingSecret: ""               # name of a K8s Secret holding the key
     existingSecretKey: "token_signing_key"  # key within that Secret
 
+  # The RSA private key Terrapod signs run identity tokens with (#1901), when
+  # you want to hold it yourself rather than let Terrapod generate and persist
+  # one. A key supplied here WINS ON EVERY STARTUP and is never copied into the
+  # database, so rotating it means replacing this Secret and restarting the API
+  # — and `POST /oidc/signing-keys/actions/rotate` is refused, because the key
+  # is yours. Leave unset unless you have a key-custody requirement: the
+  # generated key is persisted, shared across replicas, and rotatable in place.
+  #
+  # Must be an RSA private key in PKCS8 PEM form. An Ed25519 or EC key is
+  # refused at startup by name, because workload identity federation does not
+  # accept EdDSA at every cloud.
+  oidcSigningKey:
+    existingSecret: ""                      # name of a K8s Secret holding the PEM
+    existingSecretKey: "oidc_signing_key"   # key within that Secret
+
     # NOTE: leaving tokenSigningKey unset is reported at startup as a warning
     # (GHSA-hc47-q72v-4vcm). Set api.config.require_strong_secrets to make it
     # fatal instead, once the key is set and any static encryption key is
@@ -228,6 +243,47 @@ api:
 
       session_ttl_hours: 12
       api_token_max_ttl_hours: 8760  # 1 year; upper bound on any token. 0 = no limit
+
+      # Terrapod as an OIDC issuer for runs (#1901) — per-workspace cloud
+      # identity. A run gets a short-lived RS256 JWT describing itself (which
+      # workspace, which phase) and a cloud federates to Terrapod as an
+      # identity provider, so two workspaces on one agent pool can hold
+      # different cloud permissions without a second listener. Terrapod writes
+      # the token to a file and knows nothing about any cloud; the provider
+      # configuration is yours. See docs/cloud-identity.md.
+      #
+      # Enabling this publishes TWO PUBLIC PATHS that the clouds fetch
+      # ANONYMOUSLY, so they must be reachable from the internet — add them to
+      # `webhookIngress.paths` (below), which is the surface that exists for
+      # exactly this. A tailnet-only management hostname will not do.
+      #
+      #   /.well-known/openid-configuration
+      #   /.well-known/jwks.json
+      #
+      # Off means those routes are NOT MOUNTED, not mounted-and-404ing: a
+      # deployment that has not opted in publishes no trust root at all. And
+      # enabling it alone grants nothing — a workspace mints a token only once
+      # someone sets its `oidc-audiences`.
+      oidc_issuer:
+        enabled: false
+        # The issuer URL, exactly as the cloud is configured with it. OIDC
+        # issuer matching is EXACT. Empty derives it from
+        # webhookIngress.hostname, falling back to external_url — which is the
+        # right answer for almost everyone, and wrong only if the clouds reach
+        # you on a third hostname.
+        public_url: ""
+        # A run identity token's lifetime. Short because the cloud exchanges it
+        # for its own credentials at provider init and never reads it again.
+        token_ttl_seconds: 900
+        # How long a rotated-in key is PUBLISHED before it starts SIGNING. A
+        # published trust root cannot be swapped atomically: the clouds cache
+        # the JWKS, so a token signed with a brand-new key cannot be verified
+        # until they next fetch it. Raise this if your cloud caches longer.
+        key_propagation_seconds: 600
+        # How long a retired key stays published. Must exceed
+        # token_ttl_seconds, or a token signed moments before a rotation stops
+        # verifying while it is still inside its own lifetime.
+        retired_key_grace_seconds: 3600
       # Lifespan of the token minted by `terraform login` — short-lived per-session
       # CLI credentials, distinct from the max cap above. 0 falls back to the cap.
       login_token_ttl_hours: 12
@@ -1864,9 +1920,26 @@ webhookIngress:
   # routing to the web Service (the BFF). Defaults to the full set of
   # inbound-from-public-internet endpoints Terrapod exposes; operators
   # who don't use external run tasks can trim that out.
+  #
+  # "Webhook" undersells this block: it is THE PUBLIC SURFACE, and webhooks are
+  # one use of it. Per-workspace cloud identity (#1901) is another — enabling
+  # the OIDC issuer means adding the two paths below, because the clouds fetch
+  # the discovery document and the JWKS anonymously and cannot reach a
+  # tailnet-only hostname. Enabling this block with ONLY those two paths, and
+  # no webhook path at all, is a first-class configuration rather than a corner:
+  # the allow-list is what decides, so a deployment that polls VCS and wants no
+  # webhook exposed can publish an issuer and nothing else.
+  #
+  # List the issuer paths EXACTLY, never as `/.well-known`. The prefix would
+  # bring `/.well-known/terraform.json` along with it — harmless, since CLI
+  # clients already reach it, but it should be a decision rather than a side
+  # effect of a shorter string.
   paths:
     - /api/terrapod/v1/vcs-events       # GitHub / GitLab webhook receivers
     - /api/terrapod/v1/task-stage-results # external run-task callback receiver
+    # Uncomment together with api.config.auth.oidc_issuer.enabled:
+    # - /.well-known/openid-configuration
+    # - /.well-known/jwks.json
 
 # ── Internal Ingress (optional) ─────────────────────────────────────────────
 # Optional THIRD Ingress for the internal-only surface: listener pods

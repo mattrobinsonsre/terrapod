@@ -1049,6 +1049,8 @@
       "labels": "Etiketter (ärvs av skapade arbetsytor)",
       "varFiles": "Var-filer (ärvs av skapade arbetsytor)",
       "varFilesHint": "Relativa <code>.tfvars</code>-sökvägar som skickas till plan/apply.",
+      "oidcAudiences": "Audiences för körningsidentitet (ärvs av skapade arbetsytor)",
+      "oidcAudiencesHint": "Audiences som varje arbetsyta den här regeln skapar utfärdar ett körningsidentitetstoken för. Lämna tomt och de utfärdar ingenting.",
       "addVarFile": "Lägg till var-fil",
       "executionHooks": "Exekveringskrokar (associeras med varje ny arbetsyta)",
       "executionHooksHint": "Välj bland krokar som definierats på admin-sidan <page>Exekveringskrokar</page> — varje vald krok associeras med varje arbetsyta som denna regel skapar.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Ange etiketter (ersätter etikettkartan på varje matchad arbetsyta)",
       "setVarFiles": "Ange var-filer",
       "addVarFile": "Lägg till var-fil",
+      "setOidcAudiences": "Ange audiences för körningsidentitet (ersätter listan i varje matchad arbetsyta; en tom lista stänger av körningsidentitet)",
       "setRunTasks": "Ange körningsuppgifter (uppdateras/skapas efter namn på varje matchad arbetsyta)",
       "setNotifications": "Ange aviseringskonfigurationer (uppdateras/skapas efter namn)",
       "dryRun": "Torrkörning (endast förhandsgranskning — inga ändringar skrivs)",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "Ingen (använder arbetskatalog)",
       "driftIgnoreRules": "Regler för att ignorera drift",
       "driftIgnoreRulesHint": "Glob-medvetna Terraform-adresser + attributsökvägar som undertrycks av driftklassificeraren. <star></star> matchar noll eller fler tecken som inte är <dot></dot> (spänner över <n></n> index); <starIdx></starIdx> matchar valfritt index inom hakparenteser. En ren adress utan attributsuffix tystar alla ändringar av den resursen — inklusive förstörelser. Påverkar endast drift, inte vanlig plan/apply. Se <docs>drift-ignore-rules.md</docs> för den fullständiga grammatiken.",
-      "driftIgnoreRulesNone": "Ingen (varje plandiff räknas som drift)"
+      "driftIgnoreRulesNone": "Ingen (varje plandiff räknas som drift)",
+      "oidcAudiences": "Audiences för körningsidentitet",
+      "oidcAudiencesHint": "Terrapod utfärdar ett kortlivat OpenID Connect-token för varje körning i den här arbetsytan och skriver det till en fil som körningen kan läsa. En audience anger vad tokenet gäller för, och varje federationsmål väljer sin egen opaka sträng — sts.amazonaws.com, api://AzureADTokenExchange, eller vad nu målet du federerar mot accepterar. Lämna listan tom och den här arbetsytan utfärdar ingenting: dess körningar autentiserar precis som i dag, med agentpoolens egen identitet. Vilken provider som använder tokenet, och hur, är din egen konfiguration.",
+      "oidcAudiencesPlaceholder": "t.ex. sts.amazonaws.com",
+      "oidcAudiencesNone": "Ingen (körningar använder agentpoolens egen identitet)",
+      "oidcAudiencesAdd": "Lägg till audience"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

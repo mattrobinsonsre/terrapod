@@ -60,6 +60,7 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 		m.TriggerPrefixes = types.ListNull(types.StringType)
 		m.DriftIgnoreRules = types.ListNull(types.StringType)
 		m.SecurityScanSkipRules = types.ListNull(types.StringType)
+		m.OIDCAudiences = types.ListNull(types.StringType)
 
 		switch target.name {
 		case "agent_pool_ids":
@@ -72,6 +73,8 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 			m.DriftIgnoreRules = strList("aws_iam_role.foo")
 		case "security_scan_skip_rules":
 			m.SecurityScanSkipRules = strList("CKV_AWS_24")
+		case "oidc_audiences":
+			m.OIDCAudiences = strList("sts.example.com")
 		default:
 			t.Fatalf("unmanagedCollections gained %q with no case here — extend this test", target.name)
 		}

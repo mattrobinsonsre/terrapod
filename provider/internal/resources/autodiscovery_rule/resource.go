@@ -110,6 +110,7 @@ type autodiscoveryRuleModel struct {
 	SecurityScanEngine            types.String `tfsdk:"security_scan_engine"`
 	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
 	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
+	OIDCAudiences                 types.List   `tfsdk:"oidc_audiences"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
@@ -358,6 +359,15 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Description: "Scanner rule ids (Checkov `CKV_*` / Trivy `AVD-*`) to ignore on workspaces this rule creates.",
 				Optional:    true,
 				ElementType: types.StringType,
+			},
+			"oidc_audiences": schema.ListAttribute{
+				Description: "Audiences a run identity token is minted for on workspaces this rule creates (#1901), and their cloud identity opt-in. Empty (the default) means those workspaces mint nothing and authenticate with the agent pool's own identity. Each entry is an opaque string the federation target itself names; nothing here is specific to any one cloud. Changing it affects workspaces the rule creates from now on, not ones it has already created.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"ai_summary_mode": schema.StringAttribute{
 				Description: "AI plan-summary opt-in for workspaces this rule creates: `default` (follow the deployment setting), `enabled`, or `disabled`.",
@@ -815,6 +825,13 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		}
 		attrs["security-scan-skip-rules"] = rules
 	}
+	if !m.OIDCAudiences.IsNull() && !m.OIDCAudiences.IsUnknown() {
+		auds := make([]string, 0, len(m.OIDCAudiences.Elements()))
+		for _, v := range m.OIDCAudiences.Elements() {
+			auds = append(auds, v.(types.String).ValueString())
+		}
+		attrs["oidc-audiences"] = auds
+	}
 	for _, f := range []struct {
 		key string
 		val types.Bool
@@ -1043,6 +1060,13 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		m.SecurityScanSkipRules = v
 	} else {
 		m.SecurityScanSkipRules = types.ListNull(types.StringType)
+	}
+	if auds := terrapod.GetListAttr(res, "oidc-audiences"); len(auds) > 0 {
+		v, d := types.ListValueFrom(ctx, types.StringType, auds)
+		diags.Append(d...)
+		m.OIDCAudiences = v
+	} else {
+		m.OIDCAudiences = types.ListNull(types.StringType)
 	}
 
 	// Optional templating fields (#318). Tolerate missing/empty: an

@@ -31,6 +31,7 @@ import {
   parseVaultReference,
   type VaultReferenceValue,
 } from '@/components/vault-reference-fields'
+import { StringListEditor } from '@/components/template-editors'
 import { VariableEditPanel } from '@/components/variable-edit-panel'
 import { ApplicableVarsets } from '@/components/applicable-varsets'
 import { useSortable } from '@/lib/use-sortable'
@@ -82,6 +83,10 @@ interface WorkspaceAttrs {
   'var-files': string[]
   'trigger-prefixes': string[]
   'drift-ignore-rules': string[]
+  // The audiences a run identity token is minted for (#1901). Empty is the
+  // opt-OUT: the workspace mints nothing and its runs authenticate with the
+  // agent pool's own identity, exactly as before.
+  'oidc-audiences': string[]
   'vcs-repo-url': string
   'vcs-branch': string
   'vcs-connection-id': string | null
@@ -317,6 +322,7 @@ function WorkspaceDetailContent() {
   const [newTriggerPrefix, setNewTriggerPrefix] = useState('')
   const [editDriftIgnoreRules, setEditDriftIgnoreRules] = useState<string[]>([])
   const [newDriftIgnoreRule, setNewDriftIgnoreRule] = useState('')
+  const [editOidcAudiences, setEditOidcAudiences] = useState<string[]>([])
   const [editWorkingDir, setEditWorkingDir] = useState('')
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
@@ -1077,6 +1083,7 @@ function WorkspaceDetailContent() {
     setNewTriggerPrefix('')
     setEditDriftIgnoreRules(workspace.attributes['drift-ignore-rules'] || [])
     setNewDriftIgnoreRule('')
+    setEditOidcAudiences(workspace.attributes['oidc-audiences'] || [])
     setEditWorkingDir(workspace.attributes['working-directory'] || '')
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
@@ -1138,6 +1145,10 @@ function WorkspaceDetailContent() {
               'var-files': editVarFiles,
               'trigger-prefixes': editTriggerPrefixes,
               'drift-ignore-rules': editDriftIgnoreRules,
+              // Sent trimmed and blank-free: the server REFUSES a blank entry
+              // rather than dropping it, so an empty row left in the editor would
+              // 422 the whole save.
+              'oidc-audiences': editOidcAudiences.map((v) => v.trim()).filter(Boolean),
               'vcs-repo-url': editVcsRepoUrl,
               'vcs-branch': editVcsBranch,
               'vcs-workflow': editVcsWorkflow,
@@ -2701,6 +2712,32 @@ function WorkspaceDetailContent() {
                         </div>
                       ) : (
                         <span className="text-slate-500">{t('fields.driftIgnoreRulesNone')}</span>
+                      )}
+                    </dd>
+                  )}
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-slate-500 mb-1">{t('fields.oidcAudiences')}</dt>
+                  {editing && perms['can-update'] ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-400">{t('fields.oidcAudiencesHint')}</p>
+                      <StringListEditor
+                        values={editOidcAudiences}
+                        onChange={setEditOidcAudiences}
+                        placeholder={t('fields.oidcAudiencesPlaceholder')}
+                        addLabel={t('fields.oidcAudiencesAdd')}
+                      />
+                    </div>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200" data-testid="oidc-audiences">
+                      {(attrs['oidc-audiences'] || []).length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {attrs['oidc-audiences'].map((aud) => (
+                            <code key={aud} className="bg-slate-700 px-2 py-0.5 rounded text-xs break-all">{aud}</code>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">{t('fields.oidcAudiencesNone')}</span>
                       )}
                     </dd>
                   )}

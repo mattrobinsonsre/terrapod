@@ -1049,6 +1049,8 @@
       "labels": "Labels (overgenomen door aangemaakte workspaces)",
       "varFiles": "Var-bestanden (overgenomen door aangemaakte workspaces)",
       "varFilesHint": "Relatieve <code>.tfvars</code>-paden die aan plan/apply worden doorgegeven.",
+      "oidcAudiences": "Audiences van de uitvoeringsidentiteit (overgenomen door aangemaakte workspaces)",
+      "oidcAudiencesHint": "Audiences waarvoor elke werkruimte die deze regel aanmaakt een uitvoeringsidentiteitstoken uitgeeft. Laat leeg en ze geven niets uit.",
       "addVarFile": "Var-bestand toevoegen",
       "executionHooks": "Uitvoerings-hooks (gekoppeld aan elke nieuwe workspace)",
       "executionHooksHint": "Kies uit hooks die zijn gedefinieerd op de beheerpagina <page>Uitvoerings-hooks</page> — elke geselecteerde hook wordt gekoppeld aan elke workspace die deze regel aanmaakt.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Labels instellen (vervangt de labelmap op elke overeengekomen workspace)",
       "setVarFiles": "Var-bestanden instellen",
       "addVarFile": "Var-bestand toevoegen",
+      "setOidcAudiences": "Audiences van de uitvoeringsidentiteit instellen (vervangt de lijst in elke overeenkomende werkruimte; een lege lijst zet de uitvoeringsidentiteit uit)",
       "setRunTasks": "Run-tasks instellen (op naam bijgewerkt of toegevoegd op elke overeengekomen workspace)",
       "setNotifications": "Notificatieconfiguraties instellen (op naam bijgewerkt of toegevoegd)",
       "dryRun": "Proefdraaien (alleen voorbeeld — geen wijzigingen weggeschreven)",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "Geen (gebruikt werkmap)",
       "driftIgnoreRules": "Drift-negeerregels",
       "driftIgnoreRulesHint": "Glob-bewuste Terraform-adres- + attribuutpaden die door de drift-classificator worden onderdrukt. <star></star> komt overeen met nul of meer niet-<dot></dot>-tekens (overspant <n></n> indices); <starIdx></starIdx> komt overeen met elke index tussen haakjes. Een kaal adres zonder attribuutachtervoegsel dempt elke wijziging aan die resource — inclusief destroys. Beïnvloedt alleen drift, niet gewone plan/apply. Zie <docs>drift-ignore-rules.md</docs> voor de volledige grammatica.",
-      "driftIgnoreRulesNone": "Geen (elk planverschil telt als drift)"
+      "driftIgnoreRulesNone": "Geen (elk planverschil telt als drift)",
+      "oidcAudiences": "Audiences van de uitvoeringsidentiteit",
+      "oidcAudiencesHint": "Terrapod geeft voor elke uitvoering van deze werkruimte een kortlevend OpenID Connect-token uit en schrijft het naar een bestand dat de uitvoering kan lezen. Een audience benoemt waarvoor het token geldt, en elk federatiedoel kiest zijn eigen ondoorzichtige tekenreeks — sts.amazonaws.com, api://AzureADTokenExchange, of wat het doel waarmee je federeert ook accepteert. Laat de lijst leeg en deze werkruimte geeft niets uit: haar uitvoeringen authenticeren zoals nu, met de eigen identiteit van de agent-pool. Welke provider het token gebruikt, en hoe, blijft je eigen configuratie.",
+      "oidcAudiencesPlaceholder": "bijv. sts.amazonaws.com",
+      "oidcAudiencesNone": "Geen (uitvoeringen gebruiken de eigen identiteit van de agent-pool)",
+      "oidcAudiencesAdd": "Audience toevoegen"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

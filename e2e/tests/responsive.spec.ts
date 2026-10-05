@@ -1417,3 +1417,66 @@ test.describe('AI policy gate (#1766)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 })
+
+test.describe('Per-workspace run identity (#1901)', () => {
+  // The mobile guard for the three surfaces #1901 adds an audience-list editor
+  // to. A row is an input plus a Remove button on one line, and an audience is
+  // a long opaque string (`api://AzureADTokenExchange`) — exactly the shape
+  // that pushes a page sideways when a value is allowed to set the row width.
+
+  test('the workspace audience list reads and edits at phone width', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespoidc'), {
+      'oidc-audiences': ['sts.amazonaws.com', 'api://AzureADTokenExchange'],
+    })
+
+    // Read-only: both audiences stay visible, not hidden behind a breakpoint
+    // to make the grid fit. Someone checking which audiences a workspace mints
+    // for on a phone is the whole point of showing them.
+    await page.goto(`/workspaces/${wsId}`)
+    const shown = page.getByTestId('oidc-audiences')
+    await expect(shown).toBeVisible({ timeout: 15_000 })
+    await expect(shown).toContainText('api://AzureADTokenExchange')
+    await expectNoHorizontalPageScroll(page)
+
+    // Editing it is a reversible settings write, not a single-tap mutation, so
+    // tier 2 of the #719 confirm policy does not apply and it must NOT prompt.
+    let dialogFired = false
+    const spy = async (d: Dialog) => { dialogFired = true; await d.dismiss() }
+    page.on('dialog', spy)
+
+    await page.getByRole('button', { name: 'Edit' }).first().click()
+    const add = page.getByRole('button', { name: 'Add audience' })
+    await expect(add).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // The row's action is a real button with a tap target, not bare coloured
+    // text, and adding one keeps the page inside the viewport.
+    await add.click()
+    await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    expect(dialogFired).toBe(false)
+    page.off('dialog', spy)
+  })
+
+  // The two admin forms that also carry this editor -- /admin/bulk-update and
+  // /admin/autodiscovery -- are covered in `admin.spec.ts` at desktop width
+  // instead, and deliberately NOT here.
+  //
+  // On /admin/bulk-update the controls are provably unreachable at 412px:
+  // Playwright reports `<div class="grid grid-cols-1 sm:grid-cols-2 ...">
+  // intercepts pointer events` through every retry of a check on the gate
+  // checkbox, and both that grid and the `<form>` it also named belong to that
+  // page. So no retry, locator or wait can get a pointer to it. That is
+  // pre-existing and affects every control there, not just this one:
+  // `web/RESPONSIVE-AUDIT.md` lists the page under "1-2 unwrapped tables" at
+  // **Stage 4** of #719, undone. Clearing it means doing Stage 4.
+  //
+  // On /admin/autodiscovery the field sits inside the collapsed "Workspace
+  // template defaults" <details>, which the desktop test expands first.
+  //
+  // Nothing is lost by their absence here: the editor's own phone-width
+  // behaviour, scroll assertions included, is covered by the workspace test
+  // above, which renders the same component.
+})
