@@ -775,13 +775,51 @@ jobs:
         #
         # It also found two modules Dependabot missed entirely (`publish`,
         # `query`), so it is not merely duplicating the alerts.
+        #
+        # The vulnerability DB is downloaded ONCE, up front, into a shared
+        # cache, and the six scans then run with `--skip-db-update`. Before
+        # this each `docker run` fetched the DB itself — six independent
+        # chances for a transient registry failure, and when one hit (a 404
+        # from mirror.gcr.io on the DB layer, 2026-10-05) the job reported
+        # "High/critical advisories in a Go module" and exited 1. `--exit-code
+        # 1` means findings, but a FATAL init error also exits non-zero, so
+        # `|| fail=1` could not tell "found a CVE" from "never scanned", and
+        # the gate named the wrong cause. Separating the download makes a DB
+        # failure its own attributable failure, before any module is scanned.
         run: |
+          set -u
+          TRIVY="${TRIVY_IMAGE:-ghcr.io/aquasecurity/trivy:0.72.0}"
+          CACHE="${RUNNER_TEMP:-/tmp}/trivy-cache"
+          mkdir -p "$CACHE"
+
+          # Bounded retry: a registry hiccup here is infrastructure, not a
+          # finding, and must not be reported as one. Three attempts with
+          # backoff, then fail with a message that says what actually broke.
+          db_ok=0
+          for attempt in 1 2 3; do
+            echo "── vulnerability DB (attempt $attempt/3)"
+            if docker run --rm -v "$CACHE:/cache" "$TRIVY" \
+                 fs --cache-dir /cache --scanners vuln --download-db-only --quiet; then
+              db_ok=1; break
+            fi
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 15))
+          done
+          if [ "$db_ok" != "1" ]; then
+            echo
+            echo "Could not download the Trivy vulnerability database after 3 attempts."
+            echo "NO MODULE WAS SCANNED — this is an infrastructure failure, not a"
+            echo "finding. Re-run the job; if it persists, check Trivy DB registry"
+            echo "availability (ghcr.io / mirror.gcr.io)."
+            exit 1
+          fi
+
           fail=0
           for m in go-terrapod provider migrate publish query mcp; do
             echo "── $m"
-            docker run --rm -v "$PWD:/src" -w /src \
-              "${TRIVY_IMAGE:-ghcr.io/aquasecurity/trivy:0.72.0}" \
-              fs --scanners vuln --severity HIGH,CRITICAL \
+            docker run --rm -v "$PWD:/src" -v "$CACHE:/cache" -w /src \
+              "$TRIVY" \
+              fs --cache-dir /cache --skip-db-update \
+              --scanners vuln --severity HIGH,CRITICAL \
               --ignorefile /src/pentest/trivy/.trivyignore \
               --exit-code 1 --quiet "$m/go.mod" || fail=1
           done
