@@ -289,10 +289,15 @@ yourself**:
 kubectl -n terrapod rollout restart deploy/<release>-api
 ```
 
-If a supplied Secret is pruned, pods already running keep the key in their
-environment while any pod started afterwards falls back to Terrapod's stored key,
-and requests return `401` wherever they land on the wrong half. Recreate the
-Secret and roll the API.
+If a supplied Secret is pruned, the deployment does not fail cleanly, and it is
+worth knowing exactly what it falls back to. Pods already running keep the key in
+their environment; any pod started afterwards finds nothing configured, and
+because supplying a key means Terrapod never stored one of its own, it has no
+strong key to fall back on — so on a deployment that has executed runs it
+**adopts `sha256(database_url)`** and warns. Requests then return `401` wherever
+they land on the wrong half, and once the last pod holding your key retires the
+fleet agrees again, on the weaker derived key. Recreate the Secret and roll the
+API.
 
 ## Network Policies
 
