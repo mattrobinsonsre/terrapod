@@ -9,7 +9,7 @@ writing real rows — is in `tests/integration/test_oidc_signing_lifecycle.py`.
 import base64
 import hashlib
 import json
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import jwt
 import pytest
@@ -153,14 +153,20 @@ class TestSigning:
         `jti` is what makes two tokens for one run distinguishable in a cloud
         audit log."""
         self._install(key)
+        # Verified, not `verify_signature: False`. The published key is right
+        # here, so skipping verification buys nothing and asserts less -- this
+        # way the test also proves the token it is reading is one a cloud would
+        # accept.
+        pub = jwt.PyJWK(oidc_signing.get_jwks()["keys"][0]).key
         token = oidc_signing.sign_identity_token({"sub": "x", "aud": ["a"]}, ttl_seconds=60)
-        claims = jwt.decode(token, options={"verify_signature": False})
+        claims = jwt.decode(token, pub, algorithms=["RS256"], audience="a")
         assert claims["exp"] - claims["iat"] == 60
         assert claims["nbf"] == claims["iat"]
         assert claims["jti"]
 
         second = oidc_signing.sign_identity_token({"sub": "x", "aud": ["a"]}, ttl_seconds=60)
-        assert jwt.decode(second, options={"verify_signature": False})["jti"] != claims["jti"]
+        second_claims = jwt.decode(second, pub, algorithms=["RS256"], audience="a")
+        assert second_claims["jti"] != claims["jti"]
 
     def test_signing_before_initialisation_raises_rather_than_improvising(self):
         with pytest.raises(RuntimeError, match="not initialised"):
@@ -183,14 +189,24 @@ class TestTheOperatorSuppliedKey:
         with patch.object(oidc_signing, "_configured_key_pem", return_value=pem):
             import asyncio
 
+            # Records rather than raises. Raising from `__getattr__` is both
+            # flagged (`py/unexpected-raise-in-special-method`, which expects
+            # AttributeError) and weaker: an AssertionError thrown here could be
+            # swallowed by a `try`/`except Exception` in the code under test,
+            # and the test would then pass while the database HAD been touched.
+            touched: list[str] = []
+
             class _DBThatMustNotBeTouched:
                 def __getattr__(self, name):
-                    raise AssertionError(
-                        f"a BYO deployment must not touch the database on this path, "
-                        f"but db.{name} was called"
-                    )
+                    touched.append(name)
+                    return MagicMock()
 
             keys = asyncio.run(oidc_signing.init_oidc_signing(_DBThatMustNotBeTouched()))
+
+        assert not touched, (
+            "a BYO deployment must not touch the database on this path, but "
+            f"these attributes were used: {touched}"
+        )
 
         assert len(keys) == 1
         assert keys[0].kid == oidc_signing.compute_kid(key)

@@ -133,14 +133,20 @@ class TestTheWorkspaceMintsAToken:
         captured at all.
         """
         secret = "eyJhbGciOiJSUzI1NiJ9.SECRETPAYLOAD.SIGNATURE"
+        # A deliberately NON-host audience. An audience is an opaque string that
+        # each federation target chooses, so nothing here needs to look like a
+        # URL -- and a containment check against a host-shaped literal is the
+        # `py/incomplete-url-substring-sanitization` pattern, which this project
+        # has already had to remove twice.
+        audience = "audience-under-test"
         cloud_identity.run(
             _cfg(),
             token_path=tmp_path / "token",
-            client=_client(self._ok(token=secret)),
+            client=_client(self._ok(token=secret, audiences=(audience,))),
         )
         out = capsys.readouterr().out
         assert "cloud identity token delivered" in out, "the log line under test was not captured"
-        assert "sts.amazonaws.com" in out, "the audiences are meant to be logged"
+        assert audience in out, "the audiences are meant to be logged"
         assert secret not in out
         assert "SECRETPAYLOAD" not in out
 
