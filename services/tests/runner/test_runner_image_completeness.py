@@ -82,8 +82,22 @@ NOT_IN_THE_JOB = {
 }
 
 
+#: Non-runner `terrapod.*` modules the Job imports, filled by the walk below.
+#: Separate from the runner set because they live elsewhere in the tree and are
+#: COPIED by their own lines in the Dockerfile.
+_OTHER_TERRAPOD: set[str] = set()
+
+
 def _runner_imports_reachable_from(start: pathlib.Path) -> set[str]:
-    """Every `terrapod.runner.*` module reachable from `start`, transitively."""
+    """Every `terrapod.runner.*` module reachable from `start`, transitively.
+
+    Also records every OTHER `terrapod.*` module seen on the way, in
+    `_OTHER_TERRAPOD`. That second half exists because the first version of this
+    test followed `terrapod.runner.*` only, so a phase importing
+    `terrapod.logging_config` -- which the image does not ship -- was invisible
+    to it. Every runner Job died at import and this gate stayed green.
+    """
+    _OTHER_TERRAPOD.clear()
     seen: set[str] = set()
     queue = [start]
     while queue:
@@ -94,6 +108,10 @@ def _runner_imports_reachable_from(start: pathlib.Path) -> set[str]:
         for node in ast.walk(tree):
             mods: list[str] = []
             if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.startswith("terrapod.") and not node.module.startswith(
+                    "terrapod.runner"
+                ):
+                    _OTHER_TERRAPOD.add(node.module.removeprefix("terrapod."))
                 if node.module.startswith("terrapod.runner"):
                     tail = node.module.removeprefix("terrapod.runner").lstrip(".")
                     # Both the module and each imported NAME, because a name may
@@ -112,6 +130,8 @@ def _runner_imports_reachable_from(start: pathlib.Path) -> set[str]:
                 for a in node.names:
                     if a.name.startswith("terrapod.runner."):
                         mods.append(a.name.removeprefix("terrapod.runner."))
+                    elif a.name.startswith("terrapod."):
+                        _OTHER_TERRAPOD.add(a.name.removeprefix("terrapod."))
             for m in mods:
                 name = m.replace(".", "/")
                 if name in seen:
@@ -149,6 +169,65 @@ def test_every_module_the_job_imports_is_in_the_runner_image() -> None:
         f"image, so every Job would die at import: {missing}. Add a COPY line to "
         "docker/Dockerfile.runner (and the path to the Tiltfile's "
         "build-runner-image deps)."
+    )
+
+
+def test_every_other_terrapod_module_the_job_imports_is_in_the_runner_image() -> None:
+    """The same check for `terrapod.*` modules that are NOT under `runner/`.
+
+    The Job legitimately imports a few modules from elsewhere in the tree, and
+    the Dockerfile COPIES each by its own line. Nothing checked that, so adding
+    one import was enough to break every Job: a phase took
+    `terrapod.logging_config`, which the image does not ship, and the sibling
+    test above could not see it because it follows `terrapod.runner.*` only.
+    The runner-side convention is `structlog.get_logger(...)` directly, which
+    `debug_linger` spells out and every phase but that one already followed.
+
+    Judged on whether the module is COPIED, not on whether it exists -- the
+    whole point is that it exists in the tree the tests import from.
+    """
+    if ROOT is None or RUNNER is None or ENTRYPOINT is None:
+        pytest.skip("this tree has no docker/ or no runner package to check")
+    dockerfile = DOCKERFILE.read_text()
+
+    # Populates _OTHER_TERRAPOD as a side effect of the same walk.
+    _runner_imports_reachable_from(ENTRYPOINT)
+    assert _OTHER_TERRAPOD, (
+        "the walk found no non-runner terrapod imports at all, which cannot be "
+        "right -- the Job imports terrapod.http_retry among others. The walk has "
+        "stopped collecting them, so this gate is inert; fix it rather than "
+        "deleting it."
+    )
+
+    missing = []
+    for mod in sorted(_OTHER_TERRAPOD):
+        path = mod.replace(".", "/")
+        # A `from terrapod.x import y` where y is a symbol, not a submodule.
+        src = RUNNER.parent
+        if not (src / f"{path}.py").exists() and not (src / path).is_dir():
+            continue
+        # An ancestor directory COPY ships it too: the Dockerfile takes
+        # `services/terrapod/services/cost/` wholesale, so `services.cost.x` is
+        # present without a line of its own. Checking only the exact path made
+        # this gate report `terrapod.services.cost.pricesheet_db` as missing
+        # when it ships -- a gate that is too wide gets weakened or deleted
+        # rather than fixed, so it checks every prefix.
+        parts = path.split("/")
+        shipped = f"terrapod/{path}.py" in dockerfile or f"terrapod/{path}/" in dockerfile
+        for i in range(1, len(parts)):
+            if f"terrapod/{'/'.join(parts[:i])}/" in dockerfile:
+                shipped = True
+                break
+        if shipped:
+            continue
+        missing.append(f"terrapod.{mod}")
+
+    assert not missing, (
+        "these non-runner modules are imported by the runner Job but never "
+        f"COPIED into the image, so every Job would die at import: {missing}. "
+        "Either COPY them in docker/Dockerfile.runner, or -- for logging, which "
+        "is the usual case -- use `structlog.get_logger(...)` directly as every "
+        "phase and `debug_linger` do."
     )
 
 

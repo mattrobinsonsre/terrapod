@@ -191,19 +191,26 @@ class TestItMintsAndFails:
             )
 
     def test_an_unwritable_path_raises_naming_the_path(self, tmp_path):
-        unwritable = tmp_path / "ro"
-        unwritable.mkdir()
-        os.chmod(unwritable, 0o500)
-        try:
-            with pytest.raises(cloud_identity.CloudIdentityUnavailable, match="Could not write"):
-                cloud_identity.run(
-                    _cfg(),
-                    token_path=unwritable / "sub" / "token",
-                    client=_client(
-                        lambda r: httpx.Response(
-                            200, json={"token": "a.b.c", "expires_in": 900, "phase": "plan"}
-                        )
-                    ),
-                )
-        finally:
-            os.chmod(unwritable, 0o700)
+        """A path we cannot write must fail closed, and say which path.
+
+        The obstruction is a regular file standing where a parent directory
+        would have to be, so `mkdir` fails with ENOTDIR. That is deliberate:
+        the first version of this test chmod'ed a directory to 0o500, which
+        passes locally and is INERT in CI, because `docker/Dockerfile.test`
+        has no `USER` line and root ignores the permission bits — root
+        happily created the subdirectory and no exception was raised. ENOTDIR
+        is refused for every uid, so this holds in both places.
+        """
+        blocker = tmp_path / "not-a-dir"
+        blocker.write_text("a regular file, so nothing can be created beneath it")
+
+        with pytest.raises(cloud_identity.CloudIdentityUnavailable, match="Could not write"):
+            cloud_identity.run(
+                _cfg(),
+                token_path=blocker / "sub" / "token",
+                client=_client(
+                    lambda r: httpx.Response(
+                        200, json={"token": "a.b.c", "expires_in": 900, "phase": "plan"}
+                    )
+                ),
+            )

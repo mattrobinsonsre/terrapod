@@ -47,10 +47,14 @@ import time
 from pathlib import Path
 
 import httpx
+import structlog
 
-from terrapod.logging_config import get_logger
-
-logger = get_logger(__name__)
+# `structlog` directly, not `terrapod.logging_config`: the runner image ships
+# only the modules Dockerfile.runner names, and that one is not among them.
+# Importing it raises ModuleNotFoundError inside every runner Job while every
+# test on a full checkout passes -- which is exactly how it got here. Matches
+# every sibling phase, and `debug_linger`, which says the same thing.
+logger = structlog.get_logger("runner.phase.cloud_identity")
 
 #: The one path, for every cloud. Under the directory the per-run Secret mount
 #: already uses, so the runner's own writable area and its delivered-file area
