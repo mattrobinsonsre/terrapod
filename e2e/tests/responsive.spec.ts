@@ -1460,73 +1460,16 @@ test.describe('Per-workspace run identity (#1901)', () => {
     page.off('dialog', spy)
   })
 
-  // The two admin forms below assert the editor is REACHABLE and usable at
-  // phone width, and deliberately do NOT call `expectNoHorizontalPageScroll`.
-  // Both pages already overflow horizontally before this feature touched them:
-  // `web/RESPONSIVE-AUDIT.md` lists `/admin/bulk-update` under "1-2 unwrapped
-  // tables" and `/admin/autodiscovery` as "2 tables + 2 inner-scroll", both at
-  // **Stage 4** of #719, which has not been done. A page-level scroll
-  // assertion here fails on that pre-existing debt rather than on anything the
-  // audience editor does, so it would have to be fixed by doing Stage 4 -- not
-  // something to smuggle into a feature PR. The editor's own responsive
-  // behaviour IS asserted, with the scroll checks, on the workspace detail
-  // page above, which is the same component.
-
-  test('the fleet form gates the list behind a checkbox', async ({ page }) => {
-    // The gate is load-bearing, not decoration: an empty list is a real value
-    // here (it turns run identity off), so it cannot also mean "leave alone".
-    await page.goto('/admin/bulk-update')
-
-    // The checkbox INSIDE its label, not the label's text. Clicking the text
-    // timed out after 10s -- the label is a long flex row on a page already
-    // wider than the viewport, so its centre point is a poor click target.
-    // `.check()` drives the input and waits for actionability. Addressed
-    // structurally rather than by role+name on purpose: this checkbox has no
-    // `aria-label` (it is named by the label that wraps it), and the one
-    // checkbox this suite already locates by name -- the module-discovery one
-    // -- carries an explicit `aria-label`, so it is no precedent for relying
-    // on wrapped-label name computation here.
-    const gate = page
-      .locator('label', { hasText: /Set run identity audiences/i })
-      .locator('input[type="checkbox"]')
-    await expect(gate).toBeVisible({ timeout: 15_000 })
-
-    const add = page.getByRole('button', { name: 'Add audience' })
-    await expect(add).toHaveCount(0)
-
-    // Retried, and only while the list is still closed, so a handler that
-    // hydrates after the first click cannot toggle it back shut. Same shape as
-    // the mobile-nav and module-discovery panels above, for the same reason.
-    await expect(async () => {
-      if ((await add.count()) === 0) await gate.check()
-      await expect(add).toBeVisible({ timeout: 1_000 })
-    }).toPass({ timeout: 15_000 })
-  })
-
-  test('the autodiscovery rule form carries the audience list', async ({ page }) => {
-    await page.goto('/admin/autodiscovery')
-
-    // Anchored on the Add button's ROLE, not on the label text. An earlier
-    // version used `getByText(/Run identity audiences/i).first()`, which
-    // resolved to the label nineteen times and still failed `toBeVisible` --
-    // a locator that finds something it cannot assert on is worse than one
-    // that finds nothing, because the failure names visibility rather than the
-    // locator. The button is unique and is what a user taps.
-    const add = page.getByRole('button', { name: 'Add audience' })
-
-    // The New Rule click is retried while the form is still shut: on the run
-    // that reported the button "not found" the click had been swallowed before
-    // hydration, so the form never opened at all. The guard is natural here --
-    // the same button becomes "Cancel" once the form is open, so it cannot be
-    // clicked twice by accident.
-    await expect(async () => {
-      if ((await add.count()) === 0) {
-        await page.getByRole('button', { name: 'New Rule' }).click()
-      }
-      await expect(add).toBeVisible({ timeout: 1_000 })
-    }).toPass({ timeout: 20_000 })
-
-    await add.click()
-    await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
-  })
+  // The two admin forms that also carry this editor -- /admin/bulk-update and
+  // /admin/autodiscovery -- are covered in `admin.spec.ts` at desktop width
+  // instead, and deliberately NOT here. They cannot be driven at phone width at
+  // all: Playwright reports `<div class="grid grid-cols-1 sm:grid-cols-2 ...">
+  // intercepts pointer events` on every click and check, so the controls
+  // physically overlap at 412px. That is pre-existing and is true of every
+  // control on those pages, not just this one -- `web/RESPONSIVE-AUDIT.md` lists
+  // /admin/bulk-update under "1-2 unwrapped tables" and /admin/autodiscovery as
+  // "2 tables + 2 inner-scroll", both at **Stage 4** of #719, undone. A
+  // phone-width interaction test there is attempting the impossible until Stage
+  // 4 lands. The editor's own phone-width behaviour, scroll assertions included,
+  // is covered by the workspace test above -- the same component.
 })

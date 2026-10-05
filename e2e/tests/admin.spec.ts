@@ -128,3 +128,52 @@ test.describe('Bulk update — auto-apply mode (#1276)', () => {
     await expect(table).toContainText('auto_apply');
   });
 });
+
+test.describe('Per-workspace run identity on the admin forms (#1901)', () => {
+  // Desktop width, deliberately. The phone-width coverage of this editor lives
+  // in responsive.spec.ts against the workspace detail page, which renders the
+  // same component; these two admin forms cannot be driven at 412px at all --
+  // Playwright reports a sibling grid `intercepts pointer events` on every
+  // click, because the controls physically overlap there. That is pre-existing
+  // #719 Stage 4 debt (see web/RESPONSIVE-AUDIT.md) affecting every control on
+  // those pages, so the functional assertions belong here.
+
+  test('the fleet form gates the audience list behind a checkbox', async ({ adminPage }) => {
+    // The gate is load-bearing rather than decoration: an empty list is a real
+    // value on this form -- it turns run identity OFF on every matched
+    // workspace -- so it cannot also mean "leave this setting alone". Without
+    // the checkbox there is no way to express the difference, and a fleet
+    // update aimed at hundreds of workspaces would silently opt them all out.
+    await adminPage.goto('/admin/bulk-update');
+
+    // The checkbox inside its label. Structural rather than by role+name: this
+    // input carries no `aria-label` and would be named by the label wrapping
+    // it, and the only checkbox this suite already finds by name has an
+    // explicit one -- so that is no precedent. This form of the locator is the
+    // one observed resolving correctly in CI.
+    const gate = adminPage
+      .locator('label', { hasText: /Set run identity audiences/i })
+      .locator('input[type="checkbox"]');
+    await expect(gate).toBeVisible({ timeout: 15_000 });
+
+    // Closed by default: the editor is absent until the operator asks for it.
+    const add = adminPage.getByRole('button', { name: 'Add audience' });
+    await expect(add).toHaveCount(0);
+
+    await gate.check();
+    await expect(add).toBeVisible();
+  });
+
+  test('the autodiscovery rule form carries the audience list', async ({ adminPage }) => {
+    // Templated onto the workspaces the rule creates, so a monorepo's new
+    // directories inherit the audiences rather than being configured by hand.
+    await adminPage.goto('/admin/autodiscovery');
+    await adminPage.getByRole('button', { name: 'New Rule' }).click();
+
+    const add = adminPage.getByRole('button', { name: 'Add audience' });
+    await expect(add).toBeVisible({ timeout: 15_000 });
+
+    await add.click();
+    await expect(adminPage.getByRole('button', { name: 'Remove' }).first()).toBeVisible();
+  });
+});
