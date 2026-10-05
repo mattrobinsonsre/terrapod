@@ -4,9 +4,10 @@ GHSA-hc47-q72v-4vcm. Two secrets: the token signing key (which signs four
 stateless token families) and the static KEK (which wraps every DEK).
 """
 
+import asyncio
 import base64
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -74,77 +75,81 @@ class TestTheDsnIsNotCaughtByScoring:
         assert ss.estimate_bits(dsn) > ss.MINIMUM_BITS
 
 
-class TestTheSigningKeyReportsTheFallback:
-    def _reset(self):
-        from terrapod.auth import token_signing
+class TestTheSigningKeyReportsItsProvenance:
+    """Was `TestTheSigningKeyReportsTheFallback`.
 
-        token_signing._reset_cache_for_tests()
+    There is no fallback any more: the key is stored rather than derived
+    (#1994). What replaced it is the provenance of the live key, and the
+    reporting still has to be driven by that rather than by a strength score —
+    an adopted database-URL key measures as strong and is weak anyway, because
+    the URL is shared with every client of that database.
+    """
 
-    def test_an_unset_key_is_reported_although_the_dsn_scores_well(self):
-        from terrapod.auth.token_signing import report_key_strength
+    def test_an_adopted_key_is_reported_although_the_dsn_scores_well(self):
+        from terrapod.auth.token_signing import (
+            PROVENANCE_DATABASE_URL,
+            describe_live_key_problem,
+        )
 
-        self._reset()
-        problem = report_key_strength("", strict=False)
+        problem = describe_live_key_problem(configured="", provenance=PROVENANCE_DATABASE_URL)
         assert problem is not None
         assert "database URL" in problem
 
-    def test_a_generated_key_is_not_reported(self):
-        from terrapod.auth.token_signing import report_key_strength
+    def test_a_key_terrapod_generated_is_not_reported(self):
+        """The normal case now, and it must be silent or the warning is noise."""
+        from terrapod.auth.token_signing import PROVENANCE_GENERATED, describe_live_key_problem
 
-        self._reset()
+        assert describe_live_key_problem(configured="", provenance=PROVENANCE_GENERATED) is None
+
+    def test_a_generated_supplied_key_is_not_reported(self):
+        from terrapod.auth.token_signing import PROVENANCE_CONFIG, describe_live_key_problem
+
         strong = base64.b64encode(os.urandom(32)).decode()
-        assert report_key_strength(strong, strict=False) is None
+        assert describe_live_key_problem(configured=strong, provenance=PROVENANCE_CONFIG) is None
 
-    def test_a_weak_configured_key_is_reported(self):
-        from terrapod.auth.token_signing import report_key_strength
+    def test_a_weak_supplied_key_is_reported(self):
+        from terrapod.auth.token_signing import PROVENANCE_CONFIG, describe_live_key_problem
 
-        self._reset()
-        assert report_key_strength("changeme", strict=False) is not None
-
-    def test_strict_mode_raises_on_the_fallback(self):
-        from terrapod.auth.token_signing import report_key_strength
-
-        self._reset()
-        with pytest.raises(ValueError, match="database URL"):
-            report_key_strength("", strict=True)
-
-    def test_strict_mode_raises_on_a_weak_key(self):
-        from terrapod.auth.token_signing import report_key_strength
-
-        self._reset()
-        with pytest.raises(ValueError):
-            report_key_strength("changeme", strict=True)
+        assert (
+            describe_live_key_problem(configured="changeme", provenance=PROVENANCE_CONFIG)
+            is not None
+        )
 
 
-class TestTheFallbackStillDerivesTheSameKey:
-    """The whole reason the weak path is reported rather than removed: changing
-    the derivation would invalidate every token in flight, which on a patch means
-    killing running plans and applies."""
+class TestASuppliedKeyStillDerivesTheSameKey:
+    """Changing the derivation would invalidate every token in flight.
 
-    def test_an_unset_key_still_derives_from_the_database_url(self):
+    The adoption half of this — that a deployment arriving on the old
+    `sha256(database_url)` derivation keeps exactly that key — is pinned against
+    the literal formula in `tests/auth/test_token_signing.py`, which can drive
+    initialization with a session. This is the half that needs no database: a
+    key an operator supplies is still hashed, not used raw.
+    """
+
+    def test_a_supplied_key_is_hashed_not_used_raw(self):
         import hashlib
 
         from terrapod.auth import token_signing
 
         token_signing._reset_cache_for_tests()
         with patch("terrapod.config.settings") as st:
-            st.token_signing_key = ""
+            st.token_signing_key = "changeme"
             st.database_url = "postgresql+asyncpg://u:p@h:5432/d"
             st.require_strong_secrets = False
-            key = token_signing.get_token_signing_key()
+            key = asyncio.run(token_signing.init_token_signing_key(MagicMock()))
         token_signing._reset_cache_for_tests()
-        assert key == hashlib.sha256(b"postgresql+asyncpg://u:p@h:5432/d").digest()
+        assert key == hashlib.sha256(b"changeme").digest()
 
-    def test_strict_mode_refuses_to_derive_at_all(self):
+    def test_strict_mode_refuses_a_weak_supplied_key_before_it_is_used(self):
         from terrapod.auth import token_signing
 
         token_signing._reset_cache_for_tests()
         with patch("terrapod.config.settings") as st:
-            st.token_signing_key = ""
+            st.token_signing_key = "changeme"
             st.database_url = "postgresql+asyncpg://u:p@h:5432/d"
             st.require_strong_secrets = True
             with pytest.raises(ValueError):
-                token_signing.get_token_signing_key()
+                asyncio.run(token_signing.init_token_signing_key(MagicMock()))
         token_signing._reset_cache_for_tests()
 
 
@@ -199,7 +204,7 @@ class TestAWeakSecretStillWorksWhenNotStrict:
     stopped minting are the ones running plans and applies depend on.
     """
 
-    def test_a_weak_configured_key_still_derives_a_usable_key(self):
+    def test_a_weak_configured_key_still_yields_a_usable_key(self):
         import hashlib
 
         from terrapod.auth import token_signing
@@ -209,12 +214,12 @@ class TestAWeakSecretStillWorksWhenNotStrict:
             st.token_signing_key = "changeme"
             st.database_url = "postgresql+asyncpg://u:p@h:5432/d"
             st.require_strong_secrets = False
-            key = token_signing.get_token_signing_key()
+            key = asyncio.run(token_signing.init_token_signing_key(MagicMock()))
         token_signing._reset_cache_for_tests()
         assert key == hashlib.sha256(b"changeme").digest()
 
-    def test_a_runner_token_still_round_trips_on_the_fallback(self):
-        # The end that matters: an in-flight run's token must still verify.
+    def test_a_runner_token_still_round_trips_on_a_weak_key(self):
+        """The end that matters: an in-flight run's token must still verify."""
         import uuid
 
         from terrapod.auth import runner_tokens, token_signing
@@ -222,11 +227,12 @@ class TestAWeakSecretStillWorksWhenNotStrict:
         token_signing._reset_cache_for_tests()
         run_id = uuid.uuid4()
         with patch("terrapod.config.settings") as st:
-            st.token_signing_key = ""
+            st.token_signing_key = "changeme"
             st.database_url = "postgresql+asyncpg://u:p@h:5432/d"
             st.require_strong_secrets = False
             st.runners.token_ttl_seconds = 3600
             st.runners.max_token_ttl_seconds = 7200
+            asyncio.run(token_signing.init_token_signing_key(MagicMock()))
             token = runner_tokens.generate_runner_token(run_id)
             assert runner_tokens.verify_runner_token(token) == str(run_id)
         token_signing._reset_cache_for_tests()

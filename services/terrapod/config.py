@@ -3371,16 +3371,18 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Token signing — dedicated secret for stateless HMAC tokens (runner
-    # tokens + run-task callback tokens). When empty, the signing key falls
-    # back to sha256(database_url) for backward compatibility (no in-flight
-    # token is invalidated by upgrading). Set this (Helm: api.tokenSigningKey
-    # / env TERRAPOD_TOKEN_SIGNING_KEY) to decouple token-forgery resistance
-    # from database credentials. See auth/token_signing.py.
+    # Token signing — OPTIONAL bring-your-own secret for the four stateless
+    # HMAC token families (runner tokens, run-task callback tokens, download
+    # tickets, Slack link tokens). Empty is the normal case: Terrapod generates
+    # its own key on first startup and persists it in the database, the way it
+    # does the listener CA (#1994). Set this (Helm: api.tokenSigningKey / env
+    # TERRAPOD_TOKEN_SIGNING_KEY) when your own secret management is the system
+    # of record — it then wins on every startup and the stored key is not read
+    # at all, so rotating your secret takes effect. See auth/token_signing.py.
     token_signing_key: str = Field(
         default="",
-        description="Dedicated HMAC secret for runner + run-task tokens "
-        "(falls back to sha256(database_url) when empty).",
+        description="Optional bring-your-own HMAC secret for the stateless token "
+        "families; when empty Terrapod generates and stores its own.",
     )
 
     # Whether weak secret material is fatal at startup rather than a warning

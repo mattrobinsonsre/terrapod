@@ -41,8 +41,9 @@ _CALLBACK_TOKEN_TTL = 3600
 def _get_signing_key() -> bytes:
     """Get the stable HMAC signing key for callback tokens.
 
-    Uses the dedicated `token_signing_key` secret when configured, else
-    falls back to `sha256(database_url)` (see auth.token_signing).
+    Resolved once at startup — from an operator-supplied `token_signing_key`
+    when there is one, otherwise from the key Terrapod generated and stored
+    (see auth.token_signing).
     """
     from terrapod.auth.token_signing import get_token_signing_key
 

@@ -15,13 +15,17 @@ survives to the first byte. The path segment that already holds the id is reused
 so the route template is unchanged and no new route is added.
 
 **Why the signing key is derived from the CA key.** The obvious home,
-`download_tickets`, signs with `get_token_signing_key()`, which defaults to
-`sha256(database_url)` — the weakness GHSA-hc47-q72v-4vcm reports, and one we
-deliberately do not rotate on the release lines because rotating invalidates
-every in-flight token. Signing capabilities with it would make this fix circular:
-anyone who knows the DSN could mint their own. The CA private key is generated on
-first startup, persisted, encrypted at rest, stable across restarts, shared
-across replicas, and not derivable from the DSN — so it gives a strong
+`download_tickets`, signs with `get_token_signing_key()`, which at the time was
+derived from `sha256(database_url)` — the weakness GHSA-hc47-q72v-4vcm reports,
+and one the release lines deliberately do not rotate because rotating invalidates
+every in-flight token. Signing capabilities with it would have made this fix
+circular: anyone who knew the DSN could mint their own. (That key is now
+generated and stored like the CA itself, #1994, so the circularity is gone —
+but there is no reason to re-point this at it, and a capability URL and a
+download ticket being independently keyed is a property worth keeping.) The CA
+private key is generated on first startup, persisted, encrypted at rest, stable
+across restarts, shared across replicas, and not derivable from the DSN — so it
+gives a strong
 per-deployment secret with no new configuration and no migration.
 
 **Do not "tidy" this into reusing the token signing key.** That is the

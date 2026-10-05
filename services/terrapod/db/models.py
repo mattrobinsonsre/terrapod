@@ -1337,6 +1337,50 @@ class CertificateAuthorityModel(Base):
     )
 
 
+class TokenSigningKey(Base):
+    """The HMAC key for stateless tokens, persisted so every replica agrees.
+
+    Signs four stateless token families — runner tokens, run-task callback
+    tokens, download tickets and Slack link tokens. Created on first startup by
+    `init_token_signing_key()`, exactly as `init_ca()` creates the CA row, and
+    for the same reason: the application owns the key so no rendered manifest
+    has to contain a random value (GHSA-hc47-q72v-4vcm).
+
+    **An operator-supplied key is NOT stored here.** `token_signing_key`
+    (Helm: `api.tokenSigningKey`) wins on every startup and this table is not
+    even read, so bring-your-own stays authoritative and a rotation of the
+    operator's own Secret takes effect. Storing it would make the first value
+    win for ever and silently ignore every later change.
+
+    **Newest row wins**, mirroring the CA's read, so a future rotation can add
+    a row without a schema change. Rotation is deliberately NOT implemented:
+    nothing accepts a previous key, so adding a row today invalidates every
+    token in flight.
+    """
+
+    __tablename__ = "token_signing_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    #: The derived 32-byte HMAC key, hex-encoded. Stored via EncryptedText
+    #: (#553) like the CA private key: envelope-encrypted when app-layer
+    #: encryption at rest is on, otherwise plaintext with the database's own
+    #: at-rest protection. The column is TEXT either way.
+    key: Mapped[str] = mapped_column(EncryptedText, nullable=False)
+    #: Where the key came from — "generated" (32 random bytes, strong by
+    #: construction) or "database-url" (adopted from the pre-2.0
+    #: sha256(database_url) derivation to keep in-flight tokens valid across
+    #: the upgrade). Load-bearing, not bookkeeping: without it a stored key is
+    #: an opaque blob and the weakness the adoption carries forward becomes
+    #: invisible, which would silently close GHSA-hc47-q72v-4vcm rather than
+    #: fix it.
+    provenance: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+
 class CryptoKey(Base):
     """Wrapped data-encryption keys for app-layer encryption at rest (#553).
 

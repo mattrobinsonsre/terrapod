@@ -741,6 +741,54 @@ than clearing it. Set it on one of them, or on all of them to the same value.
 The UI shows a pin read-only. A `sub` is an opaque provider-issued string, so it is
 set as code or through the API rather than typed into a form.
 
+### Terrapod owns the token signing key, and a used deployment adopts its old one
+
+**Affects:** every deployment. Most need to do nothing before upgrading.
+
+One key signs runner tokens, run-task callback tokens, download tickets and
+Slack link tokens. It used to come from the Helm chart, and failing that was
+derived from `sha256(database_url)` — which hands token forgery to anyone
+holding database credentials (GHSA-hc47-q72v-4vcm). Terrapod now generates it
+and stores it in the database, read on every startup, the same way it has always
+owned the listener certificate authority.
+
+**What happens on upgrade, with nothing configured.** A deployment that has
+executed runs **adopts** its existing `sha256(database_url)` key rather than
+minting a new one, so tokens already in flight keep verifying — a key change
+mid-apply means an apply that succeeds and then cannot upload its state, which
+leaves the workspace flagged as diverged. The adopted key is still derivable
+from the database URL, so **startup warns until you replace it**. A deployment
+that has never executed a run has nothing in flight and generates a strong key
+immediately.
+
+**What to do before upgrading:** nothing, unless you set
+`api.config.require_strong_secrets`. That switch used to fire whenever no key
+was *configured*; it now fires on an adopted key, which is the state an upgrade
+of a used deployment lands in. So either supply a key at the same time as the
+upgrade, or leave the switch off until you have. An unset `api.tokenSigningKey`
+is the normal, strong case from here on and the switch does not object to it.
+
+**If you already supply `api.tokenSigningKey.existingSecret`, nothing changes.**
+A supplied key still wins, on every startup, and Terrapod does not read its
+stored key at all — so rotating your own Secret still takes effect. Your key is
+deliberately not copied into Terrapod's table: that would make the first value
+you ever supplied win for ever and silently ignore every later change.
+
+**The generated Secret is gone.** The chart no longer renders
+`<release>-token-signing`, because a random value in a rendered manifest is not
+a pure function of its inputs — under `helm template`, which is what Argo CD and
+Flux run, the generating branch minted a fresh key on every render. If you
+deploy through a GitOps controller, the whole class of problem goes with it:
+there is nothing to re-mint and nothing for a pruning controller to delete.
+The existing Secret carries `helm.sh/resource-policy: keep`, so Helm leaves it
+behind rather than deleting it. It is inert once you are on 2.0 — **but delete
+it only after confirming you do not reference it** from
+`api.tokenSigningKey.existingSecret`, because if you do, it is your key and
+still live.
+
+`api.tokenSigningKey.existingSecret` and `existingSecretKey` are unchanged, so
+no values edit is required.
+
 ## Before you upgrade
 
 1. Read the sections above and make the edits they name.

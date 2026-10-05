@@ -3,23 +3,27 @@
 Two secrets decide how much of Terrapod an attacker can forge or decrypt, and
 both shipped with a weak default (GHSA-hc47-q72v-4vcm):
 
-* **The token signing key.** `get_token_signing_key()` falls back to
-  `sha256(database_url)`, and that one key signs four stateless token families —
-  runner tokens, run-task callback tokens, download tickets and Slack link
-  tokens. Anyone who learns the DSN can mint all four.
+* **The token signing key.** It used to be derived from `sha256(database_url)`,
+  and that one key signs four stateless token families — runner tokens, run-task
+  callback tokens, download tickets and Slack link tokens, so anyone who learned
+  the DSN could mint all four. Terrapod now generates and stores its own
+  (#1994); what remains to measure is a key an operator supplies, and a
+  deployment that upgraded in and **adopted** its old DSN-derived value, which is
+  reported by provenance (below).
 * **The static KEK.** `StaticKEKProvider` derives its key as
   `sha256(master_secret)` and its own docstring invited "any sufficiently-strong
   passphrase", which is precisely the input a single unsalted SHA-256 does not
   protect.
 
-**The DSN fallback is not an entropy problem, and measuring entropy will not
+**A DSN-derived key is not an entropy problem, and measuring entropy will not
 catch it.** Measured against the shipped default,
 `postgresql+asyncpg://terrapod:terrapod@…` scores zxcvbn 4 and ~192 bits — it is
 long and structured, so a strength estimator calls it strong. It is weak because
 of *where it goes*, not how it looks: a DSN is handed to every client of the
 database, sits in env, Helm values, backups and support bundles, and is rotated
-on a schedule nothing to do with token forgery. So the fallback is reported by
-**identity** — the fact that it is the fallback — and never by score.
+on a schedule nothing to do with token forgery. So an adopted key is reported by
+**provenance** — the fact that it came from the DSN — and never by score. See
+`auth/token_signing.describe_live_key_problem`.
 
 For a secret the operator actually chose, a score is meaningful, and zxcvbn does
 the job on its own. Measured:
