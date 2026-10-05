@@ -30,6 +30,11 @@ from terrapod.config import settings
 from terrapod.db.models import ReplicationCursor
 from terrapod.http_retry import arequest_with_retry
 from terrapod.services import replication
+from terrapod.services.role_change_propagation import (
+    IDENTITY_ROLE_CLASSES,
+    identity_role_names,
+    propagate_identity_role_change,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -163,6 +168,72 @@ async def _apply_event(
         return
     resp.raise_for_status()
     await replication.apply_upsert(db, spec, resp.json()["data"]["attributes"])
+
+
+async def _note_identity_before_apply(
+    db: AsyncSession, event: dict, pending: dict[tuple[str, str], set[str]]
+) -> None:
+    """Record an identity's role set BEFORE a delta changes it (#1981).
+
+    `propagate_identity_role_change` compares a before and an after, and the
+    apply path has to read the before itself: `role_name` is part of the primary
+    key, so one event is ONE role, while the decision needs the identity's whole
+    set across both tables. After the write there is nothing left to compare.
+
+    First writer wins per identity, so several events for the same person in one
+    batch compare against the state before the batch — the net change, which is
+    what the session owner experiences.
+    """
+    spec = replication.get(event["entity-class"])
+    if spec is None or spec.name not in IDENTITY_ROLE_CLASSES:
+        return
+    parts = replication.decode_entity_id(spec, event["entity-id"])
+    if parts is None or len(parts) < 2:
+        return
+    identity = (parts[0], parts[1])
+    if identity in pending:
+        return
+    pending[identity] = await identity_role_names(db, *identity)
+
+
+async def _propagate_identity_changes(
+    db: AsyncSession, pending: dict[tuple[str, str], set[str]]
+) -> None:
+    """Carry applied role deltas to the sessions THIS node is serving (#1981).
+
+    Called after the commit, matching the write path: the change has to be
+    durable before anyone is signed out on the strength of it.
+
+    A reduction revokes and a widening refreshes, exactly as on the write path —
+    the asymmetry is `propagate_identity_role_change`'s, not restated here. An
+    identity whose set did not actually move reports "unchanged" and costs only
+    the token-cache drop.
+
+    Nothing here is allowed to fail the cycle. A row has already landed; losing
+    the stream over a Redis blip would turn a session-revocation miss into a
+    replication outage, and the absolute session ceiling is the backstop that
+    makes that trade safe.
+    """
+    for (provider_name, email), previous in pending.items():
+        try:
+            current = await identity_role_names(db, provider_name, email)
+            outcome = await propagate_identity_role_change(
+                provider_name, email, previous=previous, current=current
+            )
+            if outcome != "unchanged":
+                logger.info(
+                    "Carried a replicated role change to local sessions",
+                    provider=provider_name,
+                    email=email,
+                    outcome=outcome,
+                )
+        except Exception:
+            logger.warning(
+                "Could not carry a replicated role change to local sessions",
+                provider=provider_name,
+                email=email,
+                exc_info=True,
+            )
 
 
 async def _try_apply(db: AsyncSession, client: httpx.AsyncClient, token: str, event: dict) -> bool:
@@ -424,6 +495,11 @@ async def sync_cycle() -> None:
             own = settings.ha.node_name
             applied = 0
             deferred: list[dict] = []
+            # identity -> its role set before this batch touched it (#1981).
+            # A deferred event leaves an entry whose before and after match,
+            # which reports "unchanged" and costs only the token-cache drop —
+            # cheaper than tracking which notes to withdraw.
+            pending_identities: dict[tuple[str, str], set[str]] = {}
             # The cursor may only advance across a contiguous run of settled
             # events: the first deferred one caps it, so it is re-fetched next
             # cycle rather than lost. Re-applying the events after it costs
@@ -439,6 +515,7 @@ async def sync_cycle() -> None:
                     if not blocked:
                         safe_cursor = event["id"]
                     continue
+                await _note_identity_before_apply(db, event, pending_identities)
                 if await _try_apply(db, client, token, event):
                     applied += 1
                     if not blocked:
@@ -472,6 +549,15 @@ async def sync_cycle() -> None:
             # version whose workspace did not exist yet (#1180).
             await backfill_pending_classes(db, client, token)
             await db.commit()
+
+            # AFTER the commit, and only for rows that arrived as DELTAS.
+            # Backfill deliberately does not propagate: a fresh follower
+            # inserts every row, so each identity would read as a widening and
+            # refresh sessions fleet-wide, and `reconcile_deletions` removes in
+            # bulk statements that bypass the ORM entirely. Backfill is
+            # recovery, and the absolute session ceiling bounds what it leaves
+            # stale (#1981).
+            await _propagate_identity_changes(db, pending_identities)
 
             if deferred:
                 # Holding the cursor is also what makes this visible without a

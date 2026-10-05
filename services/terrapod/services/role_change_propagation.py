@@ -41,7 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # silently stops being invalidated.
 from terrapod.api.dependencies import _TOKEN_ROLES_PREFIX
 from terrapod.auth.sessions import grant_roles_to_user_sessions, revoke_user_sessions
-from terrapod.db.models import RoleAssignment
+from terrapod.db.models import PlatformRoleAssignment, RoleAssignment
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
 
@@ -51,6 +51,38 @@ logger = get_logger(__name__)
 async def invalidate_token_roles(email: str) -> None:
     """Drop the cached API-token role set for one identity."""
     await get_redis_client().delete(_TOKEN_ROLES_PREFIX + email)
+
+
+#: The replicated classes whose rows ARE an identity's authorization.
+#:
+#: A follower applying a delta for one of these has changed what a signed-in
+#: user on that node may do, so the apply path owes the same propagation the
+#: write path does (#1981). Named here rather than in the sync loop because the
+#: set belongs with the propagation it triggers.
+IDENTITY_ROLE_CLASSES = frozenset({"role_assignments", "platform_role_assignments"})
+
+
+async def identity_role_names(db: AsyncSession, provider_name: str, email: str) -> set[str]:
+    """Every role name currently stored for one (provider, email).
+
+    The union of BOTH assignment tables, because that is what an identity's
+    role set is — `set_assignments` builds `previous` exactly this way, and a
+    comparison drawn from one table alone would read moving a user from a
+    platform role to a custom one as a pure reduction.
+
+    `everyone` is implicit and never stored, so it is absent here and must stay
+    absent from anything compared against this.
+    """
+    names: set[str] = set()
+    for model in (PlatformRoleAssignment, RoleAssignment):
+        rows = await db.execute(
+            select(model.role_name).where(
+                model.provider_name == provider_name,
+                model.email == email,
+            )
+        )
+        names.update(rows.scalars().all())
+    return names
 
 
 async def propagate_identity_role_change(
