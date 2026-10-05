@@ -173,6 +173,7 @@ async def init_oidc_signing(db: AsyncSession) -> list[SigningKey]:
     Generates and persists one when the table is empty, under the advisory lock
     so concurrent replicas queue rather than each creating their own.
     """
+    from terrapod.config import settings
     from terrapod.db.models import OIDCSigningKey
 
     global _keys, _signing_kid  # noqa: PLW0603
@@ -207,8 +208,13 @@ async def init_oidc_signing(db: AsyncSession) -> list[SigningKey]:
         # done; nothing was written.
         await db.commit()
 
-    _keys = [SigningKey(kid=r.kid, private_key_pem=r.private_key_pem, row_id=r.id) for r in rows]
-    _signing_kid = _choose_signing_kid(rows)
+    # Grace-filter here too. `init` reads every row, and a key retired longer ago
+    # than the window is no longer published, so it must not be selectable.
+    grace = settings.auth.oidc_issuer.retired_key_grace_seconds
+    live_cutoff = datetime.now(UTC) - timedelta(seconds=grace)
+    live = [r for r in rows if r.retired_at is None or r.retired_at > live_cutoff]
+    _keys = [SigningKey(kid=r.kid, private_key_pem=r.private_key_pem, row_id=r.id) for r in live]
+    _signing_kid = _choose_signing_kid(live, grace_seconds=grace)
     logger.info(
         "Loaded OIDC issuer signing keys",
         count=len(_keys),
@@ -217,33 +223,64 @@ async def init_oidc_signing(db: AsyncSession) -> list[SigningKey]:
     return _keys
 
 
-def _choose_signing_kid(rows: list) -> str:
-    """The newest key that is activated and not retired.
+def _choose_signing_kid(rows: list, *, grace_seconds: int) -> str:
+    """Which key signs right now, preferring one the clouds can already verify.
 
-    A key published but still inside its propagation window is deliberately NOT
-    chosen: signing with it would produce tokens the clouds cannot verify until
-    they next fetch the JWKS, which is the failure rotation exists to avoid.
+    Three tiers, in this order, and the middle one is the whole point:
+
+    1. **Active and not retired** — the normal case. Newest wins.
+    2. **Retired but still inside its grace window.** This is what holds during
+       a rotation's propagation window, when tier 1 is empty BY CONSTRUCTION:
+       the incoming key is published but not yet active, and the outgoing key
+       was retired the moment the rotation happened. A retired key is still in
+       the published JWKS until its grace expires, so tokens it signs verify —
+       whereas the new key is precisely the one the clouds have not fetched yet.
+       So keep signing with the old one until the new one has propagated.
+    3. **Newest unretired, whatever its activation.** A genuine last resort, and
+       warned about: every key is retired past its grace, or the only key has a
+       future activation. Signing with a key the clouds may not hold beats not
+       signing at all, but an operator needs to know.
+
+    Tier 2 is why this takes the grace window rather than reading config: a key
+    retired longer ago than that is no longer published, so signing with it
+    would produce tokens nothing can verify — tier 3's failure with none of its
+    warning.
+
+    Getting tiers 2 and 3 the wrong way round made `key_propagation_seconds`
+    dead in the only path that ever produces a not-yet-active key, so every
+    rotation was a hard cutover while the warning blamed the operator for a
+    state `rotate_signing_key` creates every time. Found by running it.
     """
     now = datetime.now(UTC)
-    eligible = [r for r in rows if r.retired_at is None and r.activates_at <= now]
-    if not eligible:
-        # Every key is either retired or not yet active — which can only happen if
-        # an operator retired the last one by hand. Fall back to the newest
-        # unretired key rather than refusing to sign, and say so.
-        unretired = [r for r in rows if r.retired_at is None]
-        if not unretired:
-            raise RuntimeError(
-                "Every OIDC issuer signing key is retired. Rotate to create one, "
-                "or supply api.config.auth.oidc_issuer.signing_key_pem."
-            )
-        chosen = max(unretired, key=lambda r: r.created_at)
-        logger.warning(
-            "No OIDC signing key has finished propagating; signing with the newest "
-            "unretired key anyway",
+
+    active = [r for r in rows if r.retired_at is None and r.activates_at <= now]
+    if active:
+        return max(active, key=lambda r: r.created_at).kid
+
+    cutoff = now - timedelta(seconds=grace_seconds)
+    still_published = [r for r in rows if r.retired_at is not None and r.retired_at > cutoff]
+    if still_published:
+        chosen = max(still_published, key=lambda r: r.retired_at)
+        logger.info(
+            "Signing with the previous OIDC key while the incoming one propagates",
             kid=chosen.kid,
         )
         return chosen.kid
-    return max(eligible, key=lambda r: r.created_at).kid
+
+    unretired = [r for r in rows if r.retired_at is None]
+    if not unretired:
+        raise RuntimeError(
+            "Every OIDC issuer signing key is retired and past its grace window. "
+            "Rotate to create one, or supply "
+            "api.config.auth.oidc_issuer.signing_key_pem."
+        )
+    chosen = max(unretired, key=lambda r: r.created_at)
+    logger.warning(
+        "No OIDC signing key is active and no retired key is still published; "
+        "signing with the newest even though the clouds may not hold it yet",
+        kid=chosen.kid,
+    )
+    return chosen.kid
 
 
 def get_signing_key() -> SigningKey:
@@ -352,7 +389,9 @@ async def reload_signing_keys(db: AsyncSession) -> list[SigningKey]:
         raise RuntimeError("No live OIDC issuer signing key after reload")
 
     _keys = [SigningKey(kid=r.kid, private_key_pem=r.private_key_pem, row_id=r.id) for r in live]
-    _signing_kid = _choose_signing_kid(live)
+    _signing_kid = _choose_signing_kid(
+        live, grace_seconds=settings.auth.oidc_issuer.retired_key_grace_seconds
+    )
     return _keys
 
 

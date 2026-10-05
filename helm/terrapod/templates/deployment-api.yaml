@@ -122,6 +122,17 @@ spec:
                   key: token_signing_key
                   optional: true
             {{- end }}
+            {{- if .Values.api.oidcSigningKey.existingSecret }}
+            # The operator's own OIDC issuer signing key (#1901). A private key,
+            # so it never touches the ConfigMap. Supplied here it wins on every
+            # startup and is never stored, which is what makes replacing this
+            # Secret a real rotation rather than a value the database ignores.
+            - name: TERRAPOD_AUTH__OIDC_ISSUER__SIGNING_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.oidcSigningKey.existingSecret }}
+                  key: {{ .Values.api.oidcSigningKey.existingSecretKey | default "oidc_signing_key" }}
+            {{- end }}
             {{- if ((.Values.api.config.ha).peer).existingSecret }}
             # HA peer link (#960 phase 3) — the follower's client_credentials
             # secret. A credential, so it never touches the ConfigMap.

@@ -41,6 +41,7 @@ import structlog
 from terrapod.runner import debug_linger, lock_extender, plan_artifacts
 from terrapod.runner.phases import (
     backend_backstop,
+    cloud_identity,
     cost,
     discovery,
     execution_hooks,
@@ -693,6 +694,25 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         raise
     except Exception as exc:  # noqa: BLE001
         log.warning("git module auth setup skipped", error=str(exc))
+
+    # 4c. Per-workspace cloud identity (#1901): mint this run's OIDC token and
+    # write it where the operator's provider configuration expects it. Here for
+    # the same reason as 4b — before init, and before the pre_init hooks, so an
+    # operator hook that talks to the cloud sees it too.
+    #
+    # `{}` when this workspace mints nothing, which is most of them: the run then
+    # authenticates with the agent pool's own identity exactly as before. The
+    # raise is NOT advisory, and the reason differs from git auth's: falling
+    # through here does not mean no credentials, it means the POOL's — broader
+    # than the ones this workspace was deliberately moved off — so the run would
+    # succeed against real infrastructure under permissions nobody chose.
+    try:
+        for _k, _v in cloud_identity.run(cfg).items():
+            os.environ[_k] = _v
+    except cloud_identity.CloudIdentityUnavailable:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        log.warning("cloud identity setup skipped", error=str(exc))
 
     # 5. State download — AFTER chdir so terraform.tfstate lands beside
     # the user's .tf files.
