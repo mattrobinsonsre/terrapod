@@ -62,9 +62,10 @@ MAX_TTL_SECONDS = 1800
 def _get_signing_key() -> bytes:
     """Get the stable HMAC signing key (shared with runner + run-task tokens).
 
-    Uses the dedicated `token_signing_key` secret when configured, else falls
-    back to `sha256(database_url)` (see auth.token_signing) — so a configured
-    secret decouples download-ticket forgery from the database credentials too.
+    Resolved once at startup — from an operator-supplied `token_signing_key`
+    when there is one, otherwise from the key Terrapod generated and stored
+    (see auth.token_signing). There is no derivation here and no lazy fallback:
+    this raises if nothing initialized the key.
     """
     from terrapod.auth.token_signing import get_token_signing_key
 

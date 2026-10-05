@@ -39,21 +39,23 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap-api.yaml") . | sha256sum }}
-        {{- /* The signing key is injected from a Secret via env, and env is
-             snapshotted at pod start -- it never refreshes. So a Secret that
-             changes under a running Deployment leaves older pods on the old key
-             while newer ones use the new one, and a runner token minted by one
-             is rejected by the other. Nothing detects that: the key is a
-             per-process module global, not Redis-backed state like sessions or
-             the scheduler, so the fleet has no way to notice it disagrees.
-             Half of every run's API calls then 401 until someone restarts.
-             Rolling on a change makes a key rotation atomic instead. */}}
+        {{- /* Only for an operator-supplied key. Terrapod generates and stores its
+             own in the database now (#1994), read on every startup, so there is
+             nothing injected via env for the default case and no manifest for a
+             GitOps renderer to re-mint.
+
+             A supplied key still needs this, because env from a secretKeyRef is
+             snapshotted at pod start and never refreshes. A Secret that changes
+             under a running Deployment would leave older pods on the old key and
+             newer ones on the new, and a runner token minted by one is rejected
+             by the other -- with nothing detecting it, because the key is a
+             per-process global rather than Redis-backed state like sessions.
+             Half of every run's API calls then 401 until someone restarts
+             (v1.7.3). Rolling on a change makes the rotation atomic instead. */}}
         {{- if .Values.api.tokenSigningKey.existingSecret }}
         {{- with (lookup "v1" "Secret" .Release.Namespace .Values.api.tokenSigningKey.existingSecret) }}
         checksum/token-signing: {{ .data | toYaml | sha256sum }}
         {{- end }}
-        {{- else }}
-        checksum/token-signing: {{ include (print $.Template.BasePath "/secret-token-signing.yaml") . | sha256sum }}
         {{- end }}
         {{- if .Values.api.config.metrics.enabled }}
         prometheus.io/scrape: "true"
@@ -103,24 +105,17 @@ spec:
                   name: {{ include "terrapod.fullname" . }}-storage
                   key: hmac-secret
                   optional: true
+            {{- /* Bring-your-own only, and it wins on every startup: when this is
+                   set Terrapod uses it and does not read its own stored key at all
+                   (#1994). Unset is the normal case -- the key is generated and
+                   persisted in the database by the API, so the chart neither holds
+                   nor injects one. */}}
             {{- if .Values.api.tokenSigningKey.existingSecret }}
             - name: TERRAPOD_TOKEN_SIGNING_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.api.tokenSigningKey.existingSecret }}
                   key: {{ .Values.api.tokenSigningKey.existingSecretKey | default "token_signing_key" }}
-            {{- else }}
-            {{- /* The generated per-install key (GHSA-hc47-q72v-4vcm). Optional,
-                   because it exists only for installs from the fix onward: an
-                   older deployment upgrading in has no such Secret and must keep
-                   its existing derivation rather than have every in-flight token
-                   invalidated. See templates/secret-token-signing.yaml. */}}
-            - name: TERRAPOD_TOKEN_SIGNING_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ printf "%s-token-signing" (include "terrapod.fullname" .) }}
-                  key: token_signing_key
-                  optional: true
             {{- end }}
             {{- if ((.Values.api.config.ha).peer).existingSecret }}
             # HA peer link (#960 phase 3) — the follower's client_credentials

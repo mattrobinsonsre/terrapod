@@ -307,10 +307,10 @@ class TestTheDispatcherAsksForARefresh:
         session = self._session(run, ws, conn)
 
         class _Ctx:
-            async def __aenter__(self_inner):
+            async def __aenter__(self):
                 return session
 
-            async def __aexit__(self_inner, *a):
+            async def __aexit__(self, *a):
                 return False
 
         with (

@@ -28,4 +28,10 @@ ENCRYPTED_COLUMNS: list[tuple[str, str]] = [
     # compromised DEK still decrypts both.
     ("gpg_keys", "private_key"),
     ("run_tasks", "hmac_key"),
+    # The HMAC key for the four stateless token families (#1994). Listed with
+    # the CA key above for the same reason, and the consequence of omitting it is
+    # sharper than for most: `auth.token_signing` REFUSES a stored value it
+    # cannot decode, so a DEK rotation that skipped this column would not degrade
+    # quietly — the API would fail to start.
+    ("token_signing_keys", "key"),
 ]

@@ -944,7 +944,7 @@ These platform secrets are read from K8s Secrets / env and can therefore be sour
 | **Database URL** | `TERRAPOD_DATABASE_URL` via `secretKeyRef` | `postgresql.existingSecret` / `postgresql.existingSecretKey` (default key `url`) |
 | **Redis URL** | `TERRAPOD_REDIS_URL` via `secretKeyRef` | `redis.existingSecret` / `redis.existingSecretKey` (default key `url`) |
 | **OIDC client secrets** | `TERRAPOD_<NAME>_CLIENT_SECRET` via `secretKeyRef` | `existingSecret` / `existingSecretKey` per OIDC provider entry (default key `client_secret`) |
-| **API token signing key** | `TERRAPOD_TOKEN_SIGNING_KEY` via `secretKeyRef` | `api.tokenSigningKey.existingSecret` / `existingSecretKey` (default key `token_signing_key`) |
+| **API token signing key** (optional — Terrapod generates and stores its own if you supply none) | `TERRAPOD_TOKEN_SIGNING_KEY` via `secretKeyRef` | `api.tokenSigningKey.existingSecret` / `existingSecretKey` (default key `token_signing_key`) |
 | **GitHub webhook secret** | `TERRAPOD_GITHUB_WEBHOOK_SECRET` via `secretKeyRef` | `api.config.vcs.github.existingSecret` / `existingSecretKey` (default key `webhook_secret`) |
 
 Example ESO `ExternalSecret` rendering the DB URL Secret that the chart then consumes:

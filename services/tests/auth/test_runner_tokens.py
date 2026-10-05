@@ -1,5 +1,6 @@
 """Tests for runner token system — HMAC-SHA256 generation, verification, TTL, scoping."""
 
+import hashlib
 import time
 import uuid
 from unittest.mock import MagicMock, patch
@@ -13,13 +14,21 @@ from terrapod.auth.runner_tokens import (
     verify_runner_token_claims,
 )
 
+#: A fixed key for this file. These tests only need the signing key to be
+#: STABLE, not to come from anywhere in particular — it used to arrive via the
+#: database-URL derivation, which #1994 removed. `get_token_signing_key()` now
+#: raises when nothing has initialized it, so install one directly rather than
+#: leaning on a derivation that no longer exists.
+_TEST_KEY = hashlib.sha256(b"token-signing-key-for-tests").digest()
+
 
 @pytest.fixture(autouse=True)
 def _reset_signing_key():
-    """Reset the shared signing-key cache between tests."""
+    """Install a deterministic signing key, and clear it afterwards."""
     from terrapod.auth import token_signing
 
     token_signing._reset_cache_for_tests()
+    token_signing._set_key_for_tests(_TEST_KEY)
     yield
     token_signing._reset_cache_for_tests()
 
@@ -47,10 +56,17 @@ def _mock_runner_config():
 
 
 class TestSigningKey:
-    def test_derives_from_database_url(self, _mock_settings):
+    def test_uses_the_initialized_key(self, _mock_settings):
+        """Was `test_derives_from_database_url`.
+
+        There is no derivation here any more: the key is resolved once at
+        startup from the database (or from an operator's own secret) and this
+        module just uses it (#1994).
+        """
         key = _get_signing_key()
         assert isinstance(key, bytes)
-        assert len(key) == 32  # SHA-256 output
+        assert len(key) == 32
+        assert key == _TEST_KEY
 
     def test_cached_across_calls(self, _mock_settings):
         key1 = _get_signing_key()

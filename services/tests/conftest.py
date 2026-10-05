@@ -118,3 +118,34 @@ def _capability_signing_ca():
         yield
     finally:
         ca_module._ca = previous
+
+
+# The token signing key is no longer derived lazily from the database URL — it is
+# resolved once in the app lifespan and `get_token_signing_key()` raises before
+# that (#1994). Runner tokens, run-task callbacks, download tickets and Slack
+# link tokens all sign with it, so without this fixture every one of those paths
+# would fail in tests for a reason that has nothing to do with what they assert.
+#
+# A deployment always has one: the lifespan resolves it before serving traffic and
+# crashes if it cannot, so installing one here matches production rather than
+# papering over a state the API never serves in.
+#
+# Only installed when nothing else has set it, and restored afterwards, so a test
+# that drives initialization itself keeps the state it sets.
+
+
+@pytest.fixture(autouse=True)
+def _stateless_token_signing_key():
+    import secrets
+
+    from terrapod.auth import token_signing
+
+    previous_key = token_signing._signing_key
+    previous_provenance = token_signing._provenance
+    if previous_key is None:
+        token_signing._set_key_for_tests(secrets.token_bytes(32))
+    try:
+        yield
+    finally:
+        token_signing._signing_key = previous_key
+        token_signing._provenance = previous_provenance

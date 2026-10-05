@@ -7,6 +7,7 @@ key, mint/verify roundtrip, TTL clamping, tampering detection,
 expiry handling.
 """
 
+import hashlib
 import time
 from unittest.mock import patch
 
@@ -19,13 +20,21 @@ from terrapod.auth.download_tickets import (
     verify_ticket,
 )
 
+#: A fixed key for this file. These tests only need the signing key to be
+#: STABLE, not to come from anywhere in particular — it used to arrive via the
+#: database-URL derivation, which #1994 removed. `get_token_signing_key()` now
+#: raises when nothing has initialized it, so install one directly rather than
+#: leaning on a derivation that no longer exists.
+_TEST_KEY = hashlib.sha256(b"token-signing-key-for-tests").digest()
+
 
 @pytest.fixture(autouse=True)
 def _reset_signing_key():
-    """Reset the shared signing-key cache between tests."""
+    """Install a deterministic signing key, and clear it afterwards."""
     from terrapod.auth import token_signing
 
     token_signing._reset_cache_for_tests()
+    token_signing._set_key_for_tests(_TEST_KEY)
     yield
     token_signing._reset_cache_for_tests()
 
@@ -141,12 +150,19 @@ class TestVerificationFailures:
         assert verify_ticket(ticket) is None
 
     def test_signing_key_change_invalidates_old_tickets(self, _mock_settings):
+        """A different signing key must not verify an older ticket.
+
+        This used to be driven by rotating the database password, because the
+        key was derived from the DSN. The key is now stored rather than derived
+        (#1994), so the equivalent — and the thing that actually matters — is
+        that the key itself changed. It is also why rotation is deliberately not
+        implemented: nothing accepts a previous key, so adding one invalidates
+        every token in flight.
+        """
         from terrapod.auth import token_signing
 
         ticket = mint_ticket("cv", "abc-123", "u@example.com")
-        # Pretend the database password rotated — derived key changes.
-        token_signing._reset_cache_for_tests()
-        _mock_settings.database_url = "postgresql+asyncpg://test:OTHER@localhost/test"
+        token_signing._set_key_for_tests(hashlib.sha256(b"a-different-key").digest())
         assert verify_ticket(ticket) is None
 
 

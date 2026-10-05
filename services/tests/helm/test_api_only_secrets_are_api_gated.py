@@ -1,9 +1,5 @@
 """A Secret only the API consumes is rendered only where the API is deployed.
 
-The token signing key signs and verifies four stateless token families entirely
-inside the API. A listener asks the API for runner tokens over HTTP and never
-signs anything -- the listener image does not even ship `terrapod.auth`.
-
 `secret-token-signing.yaml` was gated only on whether an operator had supplied
 their own secret, not on whether this release deploys an API. So a listener-only
 release (`api.enabled: false`) rendered it too: a randomly generated key that
@@ -11,6 +7,12 @@ nothing in that release reads, labelled `component: api`, carrying
 `helm.sh/resource-policy: keep` so it outlived the release that made it. Pointed
 at a namespace the API release also targets, two releases each declared the same
 Secret with different generated values and fought over owning it.
+
+**That template is gone** (#1994) -- Terrapod generates its own signing key and
+persists it in the database, so no manifest contains one. The gate it needed is
+still enforced below for the two Secrets that remain API-only, and the test that
+used to check how the key was generated has been inverted into a check that the
+chart never generates one again.
 
 Source-level rather than rendered: these are Go templates and the unit tier has
 no helm binary. What matters is whether the gate is *written*, which is exactly
@@ -32,7 +34,6 @@ _TEMPLATES = _HELM_ROOT / "templates"
 #: render when `api.enabled` is false, the same condition `deployment-api.yaml`
 #: uses for the Deployment that reads them.
 _API_ONLY_TEMPLATES = (
-    "secret-token-signing.yaml",
     # GHSA-93m3-v3h4-4qvw. The database URL is read by the API Deployment and the
     # migrations, preflight, bootstrap and backup Jobs — every one of which is
     # api-gated — and the bootstrap credentials by the bootstrap Job alone. A
@@ -46,8 +47,16 @@ _API_ONLY_TEMPLATES = (
 #: still requiring the condition to be present.
 _API_GATE = re.compile(r"\.Values\.api\.enabled")
 
+#: A Secret in this chart declaring the signing key as its own data. Deliberately
+#: NOT a search for `randAlphaNum`: `embedded-postgresql.yaml` legitimately
+#: generates a dev password with it, so a gate that wide would fail on an
+#: unrelated template. What must never come back is the chart *holding* this key.
+_KEY_DECLARATION = re.compile(r"^\s*token_signing_key:", re.MULTILINE)
+
 
 def test_api_only_secrets_do_not_render_without_an_api():
+    assert _API_ONLY_TEMPLATES, "every subject has been removed; this guard now proves nothing"
+
     offenders = []
     for name in _API_ONLY_TEMPLATES:
         path = _TEMPLATES / name
@@ -75,46 +84,52 @@ def test_the_api_deployment_still_gates_on_the_same_value():
     )
 
 
-def test_a_signing_key_change_rolls_the_api_pods():
-    """A Secret injected as env must roll the Deployment when it changes.
+def test_a_supplied_signing_key_change_rolls_the_api_pods():
+    """An operator-supplied key injected as env must roll the Deployment.
 
-    Env from a `secretKeyRef` is snapshotted at pod start and never refreshes,
-    and the signing key is a per-process module global -- not Redis-backed
-    state like sessions or the scheduler, so the fleet has no way to notice it
-    disagrees. A Secret that changes under a running Deployment therefore
-    leaves older pods on the old key while newer ones use the new one, and a
-    runner token minted by one is rejected by the other: half of every run's
-    API calls 401 until a human restarts it.
+    Terrapod's own key is read from the database on every startup, so replicas
+    cannot disagree about it. A *supplied* key is still env from a `secretKeyRef`,
+    which is snapshotted at pod start and never refreshes, and the key is a
+    per-process module global -- not Redis-backed state like sessions or the
+    scheduler, so the fleet has no way to notice it disagrees. A Secret that
+    changes under a running Deployment therefore leaves older pods on the old key
+    while newer ones use the new one, and a runner token minted by one is rejected
+    by the other: half of every run's API calls 401 until a human restarts it
+    (v1.7.3).
 
-    The `checksum/` pod-template annotation is what makes a rotation atomic.
-    `configmap-api.yaml` already had one; the signing key did not.
+    The `checksum/` pod-template annotation is what makes that rotation atomic.
     """
     body = (_TEMPLATES / "deployment-api.yaml").read_text()
     assert "checksum/token-signing" in body, (
         "deployment-api.yaml has no checksum annotation for the token signing "
-        "key, so changing the key leaves running pods on the old one and half "
-        "of every run's calls 401. Add a checksum/ annotation over the key, as "
-        "checksum/config does for the ConfigMap."
+        "key, so changing a supplied key leaves running pods on the old one and "
+        "half of every run's calls 401. Add a checksum/ annotation over the key, "
+        "as checksum/config does for the ConfigMap."
     )
 
 
-def test_a_key_is_never_minted_without_the_means_to_check_for_one_first():
-    """Generation must be conditional on `lookup` actually working.
+def test_the_chart_never_mints_a_signing_key():
+    """The chart must not hold the signing key -- the application owns it.
 
-    A rendered manifest has to be a pure function of its inputs and
-    `randAlphaNum` is not. Under `helm install` the `lookup` rescues that by
-    finding the existing key and reusing it. Under a GitOps renderer --
-    `helm template`, which is what Argo CD and Flux run -- `lookup` returns
-    nothing and `.Release.IsInstall` is ALWAYS true, so an unguarded branch
-    mints a fresh key on every render against a running deployment.
+    This replaces a test that checked *how* the chart generated one. It generated
+    it with `randAlphaNum`, which makes a rendered manifest something other than a
+    pure function of its inputs; under `helm install` a `lookup` for the existing
+    Secret rescued that, but under `helm template` -- which is what Argo CD and
+    Flux run -- `lookup` returns nothing and `.Release.IsInstall` is ALWAYS true,
+    so every render minted a fresh key and rotated it under the running fleet.
+
+    An application-generated key cannot have that problem, so the fix was to
+    remove the generation rather than tighten its guard. This asserts it stays
+    removed: the failure mode is someone re-adding a template "so the key exists
+    before the API starts", which reintroduces the whole class.
     """
-    body = (_TEMPLATES / "secret-token-signing.yaml").read_text()
-    gen = [ln for ln in body.splitlines() if "randAlphaNum" in ln]
-    assert gen, "the generation branch has moved; update this test rather than deleting it"
-
-    assert re.search(r"IsInstall.*lookup|lookup.*IsInstall", body), (
-        "the key is generated without first proving `lookup` works. Under "
-        "`helm template` lookup returns nothing and IsInstall is always true, "
-        "so every render mints a new key and rotates it under the running "
-        "fleet. Gate generation on a lookup that must succeed."
+    offenders = [
+        p.name for p in sorted(_TEMPLATES.glob("*.yaml")) if _KEY_DECLARATION.search(p.read_text())
+    ]
+    assert not offenders, (
+        f"these templates declare a token signing key: {offenders}. The chart must "
+        "not hold this key -- the API generates it on first startup and persists "
+        "it in the database (#1994), which is what keeps a random value out of a "
+        "rendered manifest. An operator-supplied key is referenced through "
+        "`api.tokenSigningKey.existingSecret`; it is never created here."
     )

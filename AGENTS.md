@@ -696,6 +696,22 @@ multi-language implementation ships in the same PR**:
     Secret is left exactly as it is. The question the probe answers is the one
     that matters: can we see the cluster well enough to know whether a
     credential already exists?
+
+    **Better still, do not generate it in the chart at all.** A credential the
+    *application* generates on first startup and persists -- in the database,
+    behind a transaction-scoped advisory lock so concurrent replicas cannot each
+    create one -- cannot have this problem, because no manifest contains a random
+    value for a renderer to re-mint or a pruning controller to delete. That is
+    how the listener certificate authority has always worked (`auth/ca.py`) and
+    where the token signing key ended up (`auth/token_signing.py`), after the
+    guarded-generation approach above. Prefer it for anything Terrapod can
+    generate for itself; the probe is for a credential that genuinely has to
+    exist as a Kubernetes Secret before the application starts.
+
+    An operator-supplied credential is a separate matter and must stay
+    authoritative: let it win on every startup and do not copy it into the
+    application's own store, or the first value supplied wins for ever and every
+    later rotation is silently ignored.
   - **Render an API-only object only where the API is deployed.** A Secret or
     ConfigMap consumed by one component must carry that component's own gate
     (`{{- if ne .Values.api.enabled false }}`, matching

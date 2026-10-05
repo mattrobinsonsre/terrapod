@@ -81,24 +81,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
         replication.install_outbox_hooks()
 
-    # Initialize app-layer encryption at rest (#553) BEFORE the CA — the CA
-    # private key column is EncryptedText, so the service must be ready first.
-    # Fail CLOSED when encryption is enabled (a wrong/missing key must crash);
-    # tolerate errors only when disabled (e.g. table missing pre-migration).
-    # Report weak secret material HERE, at startup, rather than leaving it to the
-    # first token mint (GHSA-hc47-q72v-4vcm). The derivation checks too and is the
-    # real chokepoint, but it is lazy and cached, so on a quiet deployment the
-    # warning might not appear for hours -- and under `require_strong_secrets` an
-    # operator wants the pod to fail immediately and visibly, not once a run
-    # happens to start.
-    from terrapod.auth.token_signing import report_key_strength
+    # Initialize app-layer encryption at rest (#553) BEFORE the CA and the token
+    # signing key — both store material in EncryptedText columns, so the service
+    # must be ready first. Fail CLOSED when encryption is enabled (a wrong/missing
+    # key must crash); tolerate errors only when disabled (e.g. table missing
+    # pre-migration).
     from terrapod.config import settings as _settings
     from terrapod.crypto.service import init_encryption
-
-    report_key_strength(
-        (_settings.token_signing_key or "").strip(),
-        strict=bool(_settings.require_strong_secrets),
-    )
 
     try:
         async with get_db_session() as db:
@@ -117,6 +106,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         logger.info("Certificate Authority initialized")
     except Exception as e:
         logger.warning("CA initialization skipped (migration may be pending)", error=str(e))
+
+    # Resolve the token signing key (GHSA-hc47-q72v-4vcm). Four stateless token
+    # families depend on it, and it is resolved HERE rather than lazily on the
+    # first mint so that a weak key is reported before a run starts and
+    # `require_strong_secrets` fails the pod immediately and visibly.
+    #
+    # **Deliberately fatal, unlike the CA above.** A pod that cannot sign tokens
+    # can run nothing, so swallowing the error buys an API that serves the UI and
+    # fails every run — and stays broken after the database recovers, because the
+    # getter is synchronous and cannot retry. Crashing lets Kubernetes restart us
+    # and self-heal. A deployment that supplies its own `token_signing_key` never
+    # reaches the database here at all, so it cannot be affected by this.
+    from terrapod.auth.token_signing import init_token_signing_key
+
+    async with get_db_session() as db:
+        await init_token_signing_key(db)
 
     # Register and start distributed scheduler (multi-replica safe)
     from terrapod.services.engine_gating import engine_enabled as _engine_enabled
