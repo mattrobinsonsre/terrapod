@@ -87,6 +87,7 @@ var unmanagedCollections = []struct {
 	{"trigger_prefixes", func(m *workspaceModel) attr.Value { return m.TriggerPrefixes }},
 	{"drift_ignore_rules", func(m *workspaceModel) attr.Value { return m.DriftIgnoreRules }},
 	{"security_scan_skip_rules", func(m *workspaceModel) attr.Value { return m.SecurityScanSkipRules }},
+	{"oidc_audiences", func(m *workspaceModel) attr.Value { return m.OIDCAudiences }},
 }
 
 // agentPoolIDsForRequest returns the pool set to put on the wire, or nil when it
@@ -463,6 +464,15 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"security_scan_skip_rules": schema.ListAttribute{
 				Description: "Scanner rule-ids to suppress (Checkov `CKV_*` / Trivy `AVD-*`). Empty list (default) skips nothing. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `security_scan_skip_rules = []` to clear.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"oidc_audiences": schema.ListAttribute{
+				Description: "Audiences a run identity token is minted for, and the per-workspace cloud identity opt-in (#1901). Empty (the default) means this workspace mints nothing and its runs authenticate with the agent pool's own identity, exactly as before. Each entry is an opaque string the federation target itself names — whatever your cloud's or secret store's trust configuration expects — and Terrapod stores it verbatim; nothing here is specific to any one cloud. Terrapod mints an OIDC JWT and the runner writes it to a file; which provider reads that file, and what it does with it, is your own provider configuration. At most 10 entries, 255 characters each. A token audienced for two targets is replayable between them, so name only the targets this workspace federates to. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `oidc_audiences = []` to clear, which opts the workspace back out.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
@@ -920,6 +930,16 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.SecurityScanSeverityThreshold.IsNull() && !m.SecurityScanSeverityThreshold.IsUnknown() {
 		req.SecurityScanSeverityThreshold = m.SecurityScanSeverityThreshold.ValueString()
 	}
+	if !m.OIDCAudiences.IsNull() && !m.OIDCAudiences.IsUnknown() {
+		// A non-nil slice even when the list is empty: an explicit
+		// `oidc_audiences = []` is how a workspace opts back OUT, and the SDK
+		// only sends the attribute when the slice is non-nil.
+		auds := []string{}
+		for _, v := range m.OIDCAudiences.Elements() {
+			auds = append(auds, v.(types.String).ValueString())
+		}
+		req.OIDCAudiences = auds
+	}
 	if !m.SecurityScanSkipRules.IsNull() && !m.SecurityScanSkipRules.IsUnknown() {
 		rules := []string{}
 		for _, v := range m.SecurityScanSkipRules.Elements() {
@@ -1068,6 +1088,16 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	}
 	if !m.SecurityScanSeverityThreshold.IsNull() && !m.SecurityScanSeverityThreshold.IsUnknown() {
 		req.SecurityScanSeverityThreshold = m.SecurityScanSeverityThreshold.ValueString()
+	}
+	if !m.OIDCAudiences.IsNull() && !m.OIDCAudiences.IsUnknown() {
+		// A non-nil slice even when the list is empty: an explicit
+		// `oidc_audiences = []` is how a workspace opts back OUT, and the SDK
+		// only sends the attribute when the slice is non-nil.
+		auds := []string{}
+		for _, v := range m.OIDCAudiences.Elements() {
+			auds = append(auds, v.(types.String).ValueString())
+		}
+		req.OIDCAudiences = auds
 	}
 	if !m.SecurityScanSkipRules.IsNull() && !m.SecurityScanSkipRules.IsUnknown() {
 		rules := []string{}
@@ -1333,6 +1363,17 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		ssVal, ssDiag := types.ListValueFrom(ctx, types.StringType, ws.SecurityScanSkipRules)
 		diags.Append(ssDiag...)
 		m.SecurityScanSkipRules = ssVal
+	}
+
+	// OIDC audiences (#1901) — same null-vs-empty rule as security_scan_skip_rules.
+	// The server stores an audience byte-for-byte, so the read-back is exactly
+	// what was sent and the plan cannot disagree with its own apply.
+	if m.OIDCAudiences.IsNull() && len(ws.OIDCAudiences) == 0 {
+		m.OIDCAudiences = types.ListNull(types.StringType)
+	} else {
+		oaVal, oaDiag := types.ListValueFrom(ctx, types.StringType, ws.OIDCAudiences)
+		diags.Append(oaDiag...)
+		m.OIDCAudiences = oaVal
 	}
 
 	// Labels — same null-vs-empty-map rule as trigger_prefixes above.

@@ -28,6 +28,7 @@
 //	"agent-pool-ids"                    → agent_pool_ids      (list, optional+computed)
 //	"var-files"                         → var_files           (list,   optional)
 //	"trigger-prefixes"                  → trigger_prefixes    (list,   optional)
+//	"oidc-audiences"                    → oidc_audiences      (list, optional+computed)
 //	"drift-detection-enabled"           → drift_detection_enabled (bool, optional)
 //	"drift-detection-interval-seconds"  → drift_detection_interval_seconds (int, optional)
 //
@@ -86,6 +87,7 @@ type workspaceModel struct {
 	SecurityScanEngine            types.String `tfsdk:"security_scan_engine"`
 	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
 	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
+	OIDCAudiences                 types.List   `tfsdk:"oidc_audiences"`
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	AllowForkPRPlans              types.Bool   `tfsdk:"allow_fork_pr_plans"`

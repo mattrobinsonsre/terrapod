@@ -35,17 +35,26 @@ type Workspace struct {
 	// TerragruntEnabled wraps tofu/terraform with terragrunt for agent-mode
 	// runs; TerragruntVersion pins the terragrunt CLI version (partial like
 	// "1.0" allowed — the binary cache resolves it). See docs/terragrunt.md.
-	TerragruntEnabled bool     `json:"terragrunt-enabled"`
-	TerragruntVersion string   `json:"terragrunt-version,omitempty"`
-	WorkingDirectory  string   `json:"working-directory,omitempty"`
-	ResourceCPU       string   `json:"resource-cpu,omitempty"`
-	ResourceMemory    string   `json:"resource-memory,omitempty"`
-	VCSRepoURL        string   `json:"vcs-repo-url,omitempty"`
-	VCSBranch         string   `json:"vcs-branch,omitempty"`
-	VCSWorkflow       string   `json:"vcs-workflow,omitempty"`
-	VCSConnectionID   string   `json:"vcs-connection-id,omitempty"` // resolved from `vcs-connection` relationship
-	AgentPoolID       string   `json:"agent-pool-id,omitempty"`
-	AgentPoolIDs      []string `json:"agent-pool-ids,omitempty"` // flat pool set (#1085); AgentPoolID is element 0
+	TerragruntEnabled bool   `json:"terragrunt-enabled"`
+	TerragruntVersion string `json:"terragrunt-version,omitempty"`
+	WorkingDirectory  string `json:"working-directory,omitempty"`
+	ResourceCPU       string `json:"resource-cpu,omitempty"`
+	ResourceMemory    string `json:"resource-memory,omitempty"`
+	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901): the
+	// audiences a run's identity token is minted for. Empty means this
+	// workspace mints nothing and its runs authenticate to the cloud with the
+	// agent pool's own identity, exactly as before.
+	//
+	// An entry is an opaque string the federation target chose, so the server
+	// stores it byte-for-byte and the SDK passes it through unaltered — there
+	// is nothing cloud-specific here, and nothing to canonicalise.
+	OIDCAudiences   []string `json:"oidc-audiences,omitempty"`
+	VCSRepoURL      string   `json:"vcs-repo-url,omitempty"`
+	VCSBranch       string   `json:"vcs-branch,omitempty"`
+	VCSWorkflow     string   `json:"vcs-workflow,omitempty"`
+	VCSConnectionID string   `json:"vcs-connection-id,omitempty"` // resolved from `vcs-connection` relationship
+	AgentPoolID     string   `json:"agent-pool-id,omitempty"`
+	AgentPoolIDs    []string `json:"agent-pool-ids,omitempty"` // flat pool set (#1085); AgentPoolID is element 0
 	// AgentPoolNames is read-only: the pools' names, positionally matching
 	// AgentPoolIDs. Served so a consumer can render a pool without fetching the
 	// whole pool list purely to turn ids into labels.
@@ -156,13 +165,17 @@ type CreateWorkspaceRequest struct {
 	AutoApply        *bool  `json:"auto-apply,omitempty"`
 	// Set AutoApplyMode OR AutoApply, never both — the API rejects the
 	// pair with 422 rather than guessing which the caller meant.
-	AutoApplyMode                 *string           `json:"auto-apply-mode,omitempty"`
-	TerraformVersion              string            `json:"terraform-version,omitempty"`
-	TerragruntEnabled             *bool             `json:"terragrunt-enabled,omitempty"`
-	TerragruntVersion             string            `json:"terragrunt-version,omitempty"`
-	WorkingDirectory              string            `json:"working-directory,omitempty"`
-	ResourceCPU                   string            `json:"resource-cpu,omitempty"`
-	ResourceMemory                string            `json:"resource-memory,omitempty"`
+	AutoApplyMode     *string `json:"auto-apply-mode,omitempty"`
+	TerraformVersion  string  `json:"terraform-version,omitempty"`
+	TerragruntEnabled *bool   `json:"terragrunt-enabled,omitempty"`
+	TerragruntVersion string  `json:"terragrunt-version,omitempty"`
+	WorkingDirectory  string  `json:"working-directory,omitempty"`
+	ResourceCPU       string  `json:"resource-cpu,omitempty"`
+	ResourceMemory    string  `json:"resource-memory,omitempty"`
+	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901). A nil
+	// slice leaves the server-side value alone; an empty non-nil slice
+	// (`[]string{}`) clears it, which is how a workspace opts back out.
+	OIDCAudiences                 []string          `json:"oidc-audiences,omitempty"`
 	VCSRepoURL                    string            `json:"vcs-repo-url,omitempty"`
 	VCSBranch                     string            `json:"vcs-branch,omitempty"`
 	VCSWorkflow                   string            `json:"vcs-workflow,omitempty"`
@@ -227,13 +240,17 @@ type UpdateWorkspaceRequest struct {
 	AutoApply        *bool  `json:"auto-apply,omitempty"`
 	// Set AutoApplyMode OR AutoApply, never both — the API rejects the
 	// pair with 422 rather than guessing which the caller meant.
-	AutoApplyMode                 *string           `json:"auto-apply-mode,omitempty"`
-	TerraformVersion              string            `json:"terraform-version,omitempty"`
-	TerragruntEnabled             *bool             `json:"terragrunt-enabled,omitempty"`
-	TerragruntVersion             string            `json:"terragrunt-version,omitempty"`
-	WorkingDirectory              string            `json:"working-directory,omitempty"`
-	ResourceCPU                   string            `json:"resource-cpu,omitempty"`
-	ResourceMemory                string            `json:"resource-memory,omitempty"`
+	AutoApplyMode     *string `json:"auto-apply-mode,omitempty"`
+	TerraformVersion  string  `json:"terraform-version,omitempty"`
+	TerragruntEnabled *bool   `json:"terragrunt-enabled,omitempty"`
+	TerragruntVersion string  `json:"terragrunt-version,omitempty"`
+	WorkingDirectory  string  `json:"working-directory,omitempty"`
+	ResourceCPU       string  `json:"resource-cpu,omitempty"`
+	ResourceMemory    string  `json:"resource-memory,omitempty"`
+	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901). A nil
+	// slice leaves the server-side value alone; an empty non-nil slice
+	// (`[]string{}`) clears it, which is how a workspace opts back out.
+	OIDCAudiences                 []string          `json:"oidc-audiences,omitempty"`
 	VCSRepoURL                    string            `json:"vcs-repo-url,omitempty"`
 	VCSBranch                     string            `json:"vcs-branch,omitempty"`
 	VCSWorkflow                   string            `json:"vcs-workflow,omitempty"`
@@ -526,6 +543,11 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.Labels != nil {
 		attrs["labels"] = req.Labels
 	}
+	if req.OIDCAudiences != nil {
+		// `!= nil` not `len() > 0`: an explicit empty list is how a workspace
+		// opts back OUT of minting an identity token, so it has to travel.
+		attrs["oidc-audiences"] = req.OIDCAudiences
+	}
 	if req.VarFiles != nil {
 		attrs["var-files"] = req.VarFiles
 	}
@@ -641,6 +663,11 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.Labels != nil {
 		attrs["labels"] = req.Labels
 	}
+	if req.OIDCAudiences != nil {
+		// `!= nil` not `len() > 0`: an explicit empty list is how a workspace
+		// opts back OUT of minting an identity token, so it has to travel.
+		attrs["oidc-audiences"] = req.OIDCAudiences
+	}
 	if req.VarFiles != nil {
 		attrs["var-files"] = req.VarFiles
 	}
@@ -749,6 +776,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		OwnerEmail:                    GetStringAttr(res, "owner-email"),
 		Locked:                        GetBoolAttr(res, "locked"),
 		Labels:                        GetMapAttr(res, "labels"),
+		OIDCAudiences:                 GetListAttr(res, "oidc-audiences"),
 		VarFiles:                      GetListAttr(res, "var-files"),
 		TriggerPrefixes:               GetListAttr(res, "trigger-prefixes"),
 		DriftIgnoreRules:              GetListAttr(res, "drift-ignore-rules"),

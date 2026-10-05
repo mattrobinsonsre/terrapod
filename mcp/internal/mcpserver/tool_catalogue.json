@@ -179,6 +179,14 @@
     }
   },
   {
+    "name": "terrapod_oidc_signing_keys",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_onboard_availability",
     "read_only": true,
     "input_schema": {
@@ -960,6 +968,16 @@
           "description": "the workspace name (unique within the org)",
           "type": "string"
         },
+        "oidc_audiences": {
+          "description": "audiences a run identity token is minted for, and this workspace's cloud identity opt-in (#1901). Empty (the default) means the workspace mints nothing and its runs authenticate with the agent pool's own identity, exactly as before. Each entry is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. At most 10 entries of 255 characters. A token audienced for two targets is replayable between them, so name only the targets this workspace federates to. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
         "owner_email": {
           "description": "workspace owner email (defaults to the caller)",
           "type": "string"
@@ -1101,6 +1119,16 @@
         "name": {
           "description": "rename the workspace (empty = leave)",
           "type": "string"
+        },
+        "oidc_audiences": {
+          "description": "replace the audiences this workspace's run identity tokens are minted for -- its cloud identity opt-in (#1901). Empty (the default) means the workspace mints nothing and its runs authenticate with the agent pool's own identity, exactly as before. Each entry is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. At most 10 entries of 255 characters. A token audienced for two targets is replayable between them, so name only the targets this workspace federates to. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do. Omitting the field leaves the existing audiences alone; pass an EMPTY array to clear them, which opts the workspace back out of minting an identity token",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
         },
         "terraform_version": {
           "description": "partial version like 1.15",
