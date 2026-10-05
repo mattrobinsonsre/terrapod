@@ -31,19 +31,6 @@ _STATUS_MAP: dict[str, tuple[str, str, str]] = {
 # is what lets a late writer be corrected rather than trusted (#1372).
 _TERMINAL_STATUSES = frozenset({"applied", "errored", "discarded", "canceled"})
 
-# Status → emoji for PR comments
-_STATUS_EMOJI: dict[str, str] = {
-    "pending": ":hourglass:",
-    "queued": ":hourglass:",
-    "planning": ":gear:",
-    "planned": ":white_check_mark:",
-    "applying": ":rocket:",
-    "applied": ":white_check_mark:",
-    "errored": ":x:",
-    "discarded": ":no_entry_sign:",
-    "canceled": ":stop_sign:",
-}
-
 
 # A run held at a post-plan gate stays in `planning`, so the status map alone
 # reported "Plan in progress" for as long as it was held — which is to say

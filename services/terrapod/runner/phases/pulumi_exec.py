@@ -96,6 +96,36 @@ def plugin_override_env(api_url: str, token: str, proxy_port: int) -> dict[str, 
     return env
 
 
+def _cache_url(upstream: str, path: str) -> httpx.URL | None:
+    """Join a client-supplied path onto the cache prefix, or None if it escapes it.
+
+    **This is a privilege boundary, not tidiness.** `httpx` normalises `..`
+    segments, so `upstream + "/../../../../api/v1/tokens"` resolves to the API's
+    own token endpoint — and the shim attaches the run's runner token to whatever
+    it forwards. `exec_subprocess.run` deliberately SCRUBS that token out of the
+    engine's environment, so that a provider plugin (third-party code running
+    against the operator's credentials by design) cannot also hold the credential
+    that writes this run's state. A traversal here hands it straight back, over
+    loopback, to exactly the process the scrub exists to deny it.
+
+    Checked against the **resolved** URL rather than by pattern-matching the path,
+    so whatever normalisation httpx applies is what gets verified rather than what
+    we guessed it would be. The base keeps a trailing slash on purpose: without
+    one, a path of `http://evil/` concatenates to `.../gohttp://evil/`, which
+    prefix-matches the `go` segment and would pass.
+    """
+    base = httpx.URL(upstream + "/")
+    try:
+        target = httpx.URL(upstream + path)
+    except Exception:
+        return None
+    if (target.scheme, target.host, target.port) != (base.scheme, base.host, base.port):
+        return None
+    if not str(target.path).startswith(str(base.path)):
+        return None
+    return target
+
+
 class CacheProxy(threading.Thread):
     """A loopback shim that holds the run's token so a client need not carry it.
 
@@ -148,6 +178,13 @@ class CacheProxy(threading.Thread):
                 return
 
             def do_GET(self) -> None:  # noqa: N802
+                target = _cache_url(upstream, self.path)
+                if target is None:
+                    # Refused, not forwarded — see `_cache_url`. 404 rather than
+                    # 403 so a probing client learns nothing about what is behind.
+                    self.send_response(404)
+                    self.end_headers()
+                    return
                 headers = {"Authorization": f"Bearer {token}"}
                 try:
                     # Redirects are followed HERE, not handed to the client.
@@ -158,7 +195,7 @@ class CacheProxy(threading.Thread):
                     # client out of it.
                     with httpx.stream(
                         "GET",
-                        upstream + self.path,
+                        target,
                         headers=headers,
                         timeout=120.0,
                         follow_redirects=True,

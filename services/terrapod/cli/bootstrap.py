@@ -105,6 +105,17 @@ async def bootstrap() -> None:
                 session.add(user)
                 logger.info("Created user: %s", admin_email)
                 if generated:
+                    # The one channel by which an operator receives the generated
+                    # initial password: printed once, to this Job's own log, with
+                    # the warning below. Accepted deliberately (2026-10-05) rather
+                    # than fixed — CodeQL #75
+                    # (`py/clear-text-logging-sensitive-data`) is dismissed as
+                    # won't-fix, not a false positive, because the alert is
+                    # factually right about what this does. Anyone with read
+                    # access to pod logs in this namespace can read it. Changing
+                    # that means writing the password to a Secret the operator
+                    # reads once, which is a product change; if that is ever made,
+                    # remove this comment and the dismissal with it.
                     print(f"Generated password: {admin_password}")  # noqa: T201 — intentional one-time credential output
                     print("IMPORTANT: Save this password now. It will not be shown again.")  # noqa: T201
 

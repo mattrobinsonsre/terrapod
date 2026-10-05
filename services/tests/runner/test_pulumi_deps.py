@@ -406,7 +406,10 @@ class TestGo:
 
         assert got == b"module-bytes"
         assert seen["auth"] == f"Bearer {self.SECRET}"
-        assert seen["url"].endswith("/package-cache/go/rsc.io/quote/@v/list")
+        # `str(...)`: the shim now hands httpx the already-validated `httpx.URL`
+        # rather than a string, so the URL that was checked is literally the one
+        # sent instead of being re-parsed (#490).
+        assert str(seen["url"]).endswith("/package-cache/go/rsc.io/quote/@v/list")
         # The proxy answers a module download with a 302 to presigned storage,
         # and the go command does not follow one — it reports the 302 as the
         # error. The shim follows it so Go only ever sees bytes.
@@ -621,3 +624,100 @@ class TestEveryRuntimeIsNowSupported:
         # than an install that guesses.
         got = pulumi_deps.classify(_program(tmp_path, "runtime: haskell\n"))
         assert got == pulumi_deps.Runtime(name="haskell", supported=False)
+
+
+class TestTheShimCannotBeWalkedOutOfItsCachePrefix:
+    """CodeQL #490 (`py/partial-ssrf`), and it was a true positive.
+
+    The shim attaches the run's runner token to whatever it forwards, and
+    `exec_subprocess.run` deliberately SCRUBS that token out of the engine's
+    environment so a provider plugin — third-party code running against the
+    operator's credentials by design — cannot hold the credential that writes
+    this run's state. `httpx` normalises `..`, so a crafted request line turned
+    the loopback shim into an authenticated proxy for the whole API and handed
+    the token back to exactly the process the scrub exists to deny it.
+    """
+
+    UPSTREAM = "http://terrapod-api:8000/api/v1/package-cache/go"
+
+    def test_a_legitimate_module_path_resolves(self):
+        got = pulumi_exec._cache_url(self.UPSTREAM, "/rsc.io/quote/@v/list")
+        assert got is not None
+        assert str(got) == self.UPSTREAM + "/rsc.io/quote/@v/list"
+
+    def test_a_query_string_survives(self):
+        got = pulumi_exec._cache_url(self.UPSTREAM, "/x/@v/list?a=1")
+        assert got is not None and got.query == b"a=1"
+
+    def test_the_bare_root_resolves(self):
+        # BaseHTTPRequestHandler never hands us an empty path, but "/" is what a
+        # client asking for the cache root sends.
+        assert pulumi_exec._cache_url(self.UPSTREAM, "/") is not None
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/../../../../api/v1/tokens",
+            "/../../../api/v1/runs/r/artifacts/state",
+            "/a/../../../../api/v1/tokens",
+            "/../",
+            "/..",
+        ],
+    )
+    def test_a_traversal_is_refused(self, path):
+        assert pulumi_exec._cache_url(self.UPSTREAM, path) is None, (
+            f"{path!r} escaped the cache prefix; the shim would forward the run's "
+            "runner token to it"
+        )
+
+    def test_an_absolute_uri_request_form_is_refused(self):
+        """`GET http://evil/ HTTP/1.1` — the proxy request form.
+
+        This is why the base keeps a trailing slash: concatenation yields
+        `.../gohttp://evil/`, which prefix-matches the bare `go` segment.
+        """
+        assert pulumi_exec._cache_url(self.UPSTREAM, "http://evil.example/x") is None
+
+    def test_a_percent_encoded_traversal_stays_inside(self):
+        # Not normalised by httpx, so it stays a literal path segment and is
+        # forwarded — which is correct: the API resolves it as a 404, and the
+        # shim has not left its prefix.
+        got = pulumi_exec._cache_url(self.UPSTREAM, "/..%2f..%2fapi/v1/tokens")
+        assert got is not None
+        assert str(got.path).startswith("/api/v1/package-cache/go/")
+
+    def test_the_running_shim_refuses_a_traversal_and_forwards_nothing(self):
+        """Driven over a RAW SOCKET, because that is the only way to send it.
+
+        An HTTP client normalises `..` before the request leaves it, so a test
+        written with `urllib` or `httpx` would never put a traversal on the wire
+        and would pass with the guard removed.
+        """
+        import socket
+
+        calls: list[object] = []
+
+        def fake_stream(method, url, **kw):  # pragma: no cover - must not run
+            calls.append(str(url))
+            raise RuntimeError("must not be reached")
+
+        with patch.object(pulumi_exec.httpx, "stream", fake_stream):
+            proxy = pulumi_exec.CacheProxy("http://terrapod-api:8000", "s3cr3t", "go")
+            proxy.start()
+            try:
+                s = socket.create_connection(("127.0.0.1", proxy.port), timeout=10)
+                s.sendall(
+                    b"GET /../../../../api/v1/tokens HTTP/1.1\r\n"
+                    b"Host: 127.0.0.1\r\nConnection: close\r\n\r\n"
+                )
+                status = s.recv(64).decode(errors="replace").split("\r\n")[0]
+                s.close()
+            finally:
+                proxy.stop()
+
+        # Asserted FIRST: it is the property that matters, and it names the URL
+        # the shim would have sent the runner token to. (Checking the status
+        # first reports a 502 instead -- the forward was attempted and the fake
+        # raised -- which reads like a refusal.)
+        assert calls == [], f"the shim forwarded a traversal to {calls}"
+        assert "404" in status, f"expected a refusal, got {status!r}"
