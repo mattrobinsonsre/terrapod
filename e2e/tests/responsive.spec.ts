@@ -1462,14 +1462,21 @@ test.describe('Per-workspace run identity (#1901)', () => {
 
   // The two admin forms that also carry this editor -- /admin/bulk-update and
   // /admin/autodiscovery -- are covered in `admin.spec.ts` at desktop width
-  // instead, and deliberately NOT here. They cannot be driven at phone width at
-  // all: Playwright reports `<div class="grid grid-cols-1 sm:grid-cols-2 ...">
-  // intercepts pointer events` on every click and check, so the controls
-  // physically overlap at 412px. That is pre-existing and is true of every
-  // control on those pages, not just this one -- `web/RESPONSIVE-AUDIT.md` lists
-  // /admin/bulk-update under "1-2 unwrapped tables" and /admin/autodiscovery as
-  // "2 tables + 2 inner-scroll", both at **Stage 4** of #719, undone. A
-  // phone-width interaction test there is attempting the impossible until Stage
-  // 4 lands. The editor's own phone-width behaviour, scroll assertions included,
-  // is covered by the workspace test above -- the same component.
+  // instead, and deliberately NOT here.
+  //
+  // On /admin/bulk-update the controls are provably unreachable at 412px:
+  // Playwright reports `<div class="grid grid-cols-1 sm:grid-cols-2 ...">
+  // intercepts pointer events` through every retry of a check on the gate
+  // checkbox, and both that grid and the `<form>` it also named belong to that
+  // page. So no retry, locator or wait can get a pointer to it. That is
+  // pre-existing and affects every control there, not just this one:
+  // `web/RESPONSIVE-AUDIT.md` lists the page under "1-2 unwrapped tables" at
+  // **Stage 4** of #719, undone. Clearing it means doing Stage 4.
+  //
+  // On /admin/autodiscovery the field sits inside the collapsed "Workspace
+  // template defaults" <details>, which the desktop test expands first.
+  //
+  // Nothing is lost by their absence here: the editor's own phone-width
+  // behaviour, scroll assertions included, is covered by the workspace test
+  // above, which renders the same component.
 })

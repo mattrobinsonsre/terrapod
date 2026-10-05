@@ -170,6 +170,17 @@ test.describe('Per-workspace run identity on the admin forms (#1901)', () => {
     await adminPage.goto('/admin/autodiscovery');
     await adminPage.getByRole('button', { name: 'New Rule' }).click();
 
+    // The field lives inside the collapsed "Workspace template defaults"
+    // <details>, so it must be expanded first. Worth stating because the
+    // failure is misleading in two different ways depending on the locator:
+    // a closed <details> keeps its content in the DOM, so a getByText finds
+    // the label and then fails `toBeVisible`, while getByRole reports
+    // "element(s) not found" because browsers drop that content from the
+    // accessibility tree entirely. Neither message mentions the section.
+    const summary = adminPage.getByText('Workspace template defaults');
+    await expect(summary).toBeVisible({ timeout: 15_000 });
+    await summary.click();
+
     const add = adminPage.getByRole('button', { name: 'Add audience' });
     await expect(add).toBeVisible({ timeout: 15_000 });
 
