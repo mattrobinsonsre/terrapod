@@ -1476,26 +1476,55 @@ test.describe('Per-workspace run identity (#1901)', () => {
     // The gate is load-bearing, not decoration: an empty list is a real value
     // here (it turns run identity off), so it cannot also mean "leave alone".
     await page.goto('/admin/bulk-update')
-    const gate = page.getByText(/Set run identity audiences/i)
-    await expect(gate).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByRole('button', { name: 'Add audience' })).toHaveCount(0)
 
-    await gate.click()
-    await expect(page.getByRole('button', { name: 'Add audience' })).toBeVisible()
+    // The checkbox INSIDE its label, not the label's text. Clicking the text
+    // timed out after 10s -- the label is a long flex row on a page already
+    // wider than the viewport, so its centre point is a poor click target.
+    // `.check()` drives the input and waits for actionability. Addressed
+    // structurally rather than by role+name on purpose: this checkbox has no
+    // `aria-label` (it is named by the label that wraps it), and the one
+    // checkbox this suite already locates by name -- the module-discovery one
+    // -- carries an explicit `aria-label`, so it is no precedent for relying
+    // on wrapped-label name computation here.
+    const gate = page
+      .locator('label', { hasText: /Set run identity audiences/i })
+      .locator('input[type="checkbox"]')
+    await expect(gate).toBeVisible({ timeout: 15_000 })
+
+    const add = page.getByRole('button', { name: 'Add audience' })
+    await expect(add).toHaveCount(0)
+
+    // Retried, and only while the list is still closed, so a handler that
+    // hydrates after the first click cannot toggle it back shut. Same shape as
+    // the mobile-nav and module-discovery panels above, for the same reason.
+    await expect(async () => {
+      if ((await add.count()) === 0) await gate.check()
+      await expect(add).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 15_000 })
   })
 
   test('the autodiscovery rule form carries the audience list', async ({ page }) => {
     await page.goto('/admin/autodiscovery')
-    await page.getByRole('button', { name: 'New Rule' }).click()
 
-    // Anchored on the Add button's ROLE, not on the label text. The first
+    // Anchored on the Add button's ROLE, not on the label text. An earlier
     // version used `getByText(/Run identity audiences/i).first()`, which
     // resolved to the label nineteen times and still failed `toBeVisible` --
     // a locator that finds something it cannot assert on is worse than one
-    // that finds nothing, because the failure names visibility rather than
-    // the locator. The button is unique and is what a user taps.
+    // that finds nothing, because the failure names visibility rather than the
+    // locator. The button is unique and is what a user taps.
     const add = page.getByRole('button', { name: 'Add audience' })
-    await expect(add).toBeVisible({ timeout: 15_000 })
+
+    // The New Rule click is retried while the form is still shut: on the run
+    // that reported the button "not found" the click had been swallowed before
+    // hydration, so the form never opened at all. The guard is natural here --
+    // the same button becomes "Cancel" once the form is open, so it cannot be
+    // clicked twice by accident.
+    await expect(async () => {
+      if ((await add.count()) === 0) {
+        await page.getByRole('button', { name: 'New Rule' }).click()
+      }
+      await expect(add).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 20_000 })
 
     await add.click()
     await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
