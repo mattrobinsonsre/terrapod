@@ -1049,6 +1049,8 @@
       "labels": "Labels (hérités par les espaces de travail créés)",
       "varFiles": "Fichiers de variables (hérités par les espaces de travail créés)",
       "varFilesHint": "Chemins <code>.tfvars</code> relatifs passés au plan/apply.",
+      "oidcAudiences": "Audiences de l''identité d''exécution (héritées par les espaces de travail créés)",
+      "oidcAudiencesHint": "Audiences pour lesquelles chaque espace de travail créé par cette règle émet un jeton d''identité d''exécution. Laissez vide et ils n''émettent rien.",
       "addVarFile": "Ajouter un fichier de variables",
       "executionHooks": "Hooks d'exécution (associés à chaque nouvel espace de travail)",
       "executionHooksHint": "Choisissez parmi les hooks définis sur la page d'administration <page>Hooks d'exécution</page> — chaque hook sélectionné est associé à chaque espace de travail que cette règle crée.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Définir les labels (remplace la carte de labels sur chaque espace de travail correspondant)",
       "setVarFiles": "Définir les fichiers de variables",
       "addVarFile": "Ajouter un fichier de variables",
+      "setOidcAudiences": "Définir les audiences de l''identité d''exécution (remplace la liste dans chaque espace de travail correspondant ; une liste vide désactive l''identité d''exécution)",
       "setRunTasks": "Définir les tâches d'exécution (insérées ou mises à jour par nom sur chaque espace de travail correspondant)",
       "setNotifications": "Définir les configurations de notification (insérées ou mises à jour par nom)",
       "dryRun": "Simulation (aperçu uniquement — aucune modification écrite)",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "Aucun (utilise le répertoire de travail)",
       "driftIgnoreRules": "Règles d'ignorance de dérive",
       "driftIgnoreRulesHint": "Chemins d'adresses Terraform + attributs, avec prise en charge des globs, supprimés par le classificateur de dérive. <star></star> correspond à zéro ou plusieurs caractères non-<dot></dot> (couvre <n></n> indices) ; <starIdx></starIdx> correspond à tout indice entre crochets. Une adresse seule sans suffixe d'attribut fait taire toute modification de cette ressource — y compris les destructions. N'affecte que la dérive, pas le plan/apply normal. Voir <docs>drift-ignore-rules.md</docs> pour la grammaire complète.",
-      "driftIgnoreRulesNone": "Aucune (chaque écart de plan compte comme une dérive)"
+      "driftIgnoreRulesNone": "Aucune (chaque écart de plan compte comme une dérive)",
+      "oidcAudiences": "Audiences de l''identité d''exécution",
+      "oidcAudiencesHint": "Terrapod émet un jeton OpenID Connect de courte durée pour chaque exécution de cet espace de travail et l''écrit dans un fichier que l''exécution peut lire. Une audience désigne à quoi sert le jeton, et chaque cible de fédération choisit sa propre chaîne opaque — sts.amazonaws.com, api://AzureADTokenExchange, ou ce que la cible vers laquelle vous fédérez accepte. Laissez la liste vide et cet espace de travail n''émet rien : ses exécutions s''authentifient comme aujourd''hui, avec l''identité propre du pool d''agents. Quel provider consomme le jeton, et comment, reste votre propre configuration.",
+      "oidcAudiencesPlaceholder": "par ex. sts.amazonaws.com",
+      "oidcAudiencesNone": "Aucune (les exécutions utilisent l''identité propre du pool d''agents)",
+      "oidcAudiencesAdd": "Ajouter une audience"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

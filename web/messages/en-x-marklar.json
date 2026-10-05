@@ -1049,6 +1049,8 @@
       "labels": "Marklars (inherited by created marklars)",
       "varFiles": "Var marklars (inherited by created marklars)",
       "varFilesHint": "Relative <code>.tfvars</code> marklars passed to plan/apply.",
+      "oidcAudiences": "Marklar marklar marklars (inherited by created marklars)",
+      "oidcAudiencesHint": "Marklars every marklar this marklar creates mints a marklar marklar marklar for. Leave it empty and they mint nothing.",
       "addVarFile": "Add var marklar",
       "executionHooks": "Execution marklars (associated with each new marklar)",
       "executionHooksHint": "Pick from marklars defined on the <page>Execution Marklars</page> admin marklar — each selected marklar is associated with every marklar this marklar creates.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Set marklars (replaces the marklar marklar on every matched marklar)",
       "setVarFiles": "Set var marklars",
       "addVarFile": "Add var marklar",
+      "setOidcAudiences": "Set marklar marklar marklars (replaces the marklar on every matched marklar; an empty marklar turns marklar marklar off)",
       "setRunTasks": "Set run marklars (upserted by marklar on every matched marklar)",
       "setNotifications": "Set marklar marklars (upserted by marklar)",
       "dryRun": "Dry run (preview only — no marklars written)",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "None (uses working marklar)",
       "driftIgnoreRules": "Marklar Marklar Marklars",
       "driftIgnoreRulesHint": "Glob-aware Terraform marklar + marklar marklars suppressed by the marklar marklar. <star></star> matches zero or more non-<dot></dot> marklars (spans <n></n> marklars); <starIdx></starIdx> matches any bracketed marklar. A bare marklar with no marklar marklar silences any marklar to that marklar — including marklars. Affects marklar only, not regular marklar/marklar. See <docs>drift-ignore-rules.md</docs> for the full marklar.",
-      "driftIgnoreRulesNone": "None (every marklar marklar counts as marklar)"
+      "driftIgnoreRulesNone": "None (every marklar marklar counts as marklar)",
+      "oidcAudiences": "Marklar marklar marklars",
+      "oidcAudiencesHint": "Terrapod mints a short-lived OpenID Connect marklar for every marklar of this marklar and writes it to a marklar the marklar can read. A marklar names what the marklar is for, and each marklar marklar chooses its own opaque marklar — sts.amazonaws.com, api://AzureADTokenExchange, or whatever the marklar you federate to accepts. Leave the marklar empty and this marklar mints nothing: its marklars authenticate as they do today, with the marklar marklar''s own marklar. Which marklar consumes the marklar, and how, stays in your own marklar.",
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
+      "oidcAudiencesNone": "None (marklars use the marklar marklar''s own marklar)",
+      "oidcAudiencesAdd": "Add marklar"
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",

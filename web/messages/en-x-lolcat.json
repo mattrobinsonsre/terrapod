@@ -1049,6 +1049,8 @@
       "labels": "Labels (inheritd by createded workspaces)",
       "varFiles": "Var files (inheritd by createded workspaces)",
       "varFilesHint": "Relativ <code>.tfvars</code> paths passd ta plan/apply.",
+      "oidcAudiences": "Run identitee audiencez (inheritd by createded werkspaces)",
+      "oidcAudiencesHint": "Audiencez evry werkspace dis rool makez mintz a run identitee tokin fer. Leev it empty an dey mint nuffin.",
       "addVarFile": "Add var file",
       "executionHooks": "Execushun hooks (assoshiated wif each new workspace)",
       "executionHooksHint": "Pick frum hooks defind on teh <page>Execushun Hooks</page> admin page — each selectd hook iz assoshiated wif every workspace dis rule creates.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Set labels (replacez teh labels map on every matchd workspace)",
       "setVarFiles": "Set var files",
       "addVarFile": "Add var file",
+      "setOidcAudiences": "Set run identitee audiencez (replacez da list on evry matchd werkspace; an empty list turnz run identitee off)",
       "setRunTasks": "Set run tasks (upsertd by naem on every matchd workspace)",
       "setNotifications": "Set notificashun configurashuns (upsertd by naem)",
       "dryRun": "Dry run (preview only — no chaenges writtn)",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "Noes (usez workin directory)",
       "driftIgnoreRules": "Drift Ignor Rulez",
       "driftIgnoreRulesHint": "Glob-aware Terraform addresz + attribyoot pathz supprest by teh drift classifiur. <star></star> matchez zero or moar non-<dot></dot> charz (spanz <n></n> indicez); <starIdx></starIdx> matchez any brackeded indeks. A bare addresz wif no attribyoot suffiks silencez any change ta dat resorce — includin destroyz. Affectz drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> fer teh full grammur.",
-      "driftIgnoreRulesNone": "Noes (evry plan diff countz az drift)"
+      "driftIgnoreRulesNone": "Noes (evry plan diff countz az drift)",
+      "oidcAudiences": "Run Identitee Audiencez",
+      "oidcAudiencesHint": "Terrapod mintz a short-livd OpenID Connect tokin fer evry run ov dis werkspace an ritez it ta a file da run can reed. An audienz namez wut da tokin iz fer, an evry federashun targit choozez itz own opayk string — sts.amazonaws.com, api://AzureADTokenExchange, or wutevr da targit u federate ta akceptz. Leev da list empty an dis werkspace mintz nuffin: itz runz authentikate jus like dey do todai, wif da agent pool''z own identitee. Wich providr yuzez da tokin, an how, stayz in ur own configurashun.",
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
+      "oidcAudiencesNone": "Noes (runz yuze da agent pool''z own identitee)",
+      "oidcAudiencesAdd": "Add audienz"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

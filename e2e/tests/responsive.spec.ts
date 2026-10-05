@@ -1417,3 +1417,72 @@ test.describe('AI policy gate (#1766)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 })
+
+test.describe('Per-workspace run identity (#1901)', () => {
+  // The mobile guard for the three surfaces #1901 adds an audience-list editor
+  // to. A row is an input plus a Remove button on one line, and an audience is
+  // a long opaque string (`api://AzureADTokenExchange`) — exactly the shape
+  // that pushes a page sideways when a value is allowed to set the row width.
+
+  test('the workspace audience list reads and edits at phone width', async ({ page }) => {
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespoidc'), {
+      'oidc-audiences': ['sts.amazonaws.com', 'api://AzureADTokenExchange'],
+    })
+
+    // Read-only: both audiences stay visible, not hidden behind a breakpoint
+    // to make the grid fit. Someone checking which audiences a workspace mints
+    // for on a phone is the whole point of showing them.
+    await page.goto(`/workspaces/${wsId}`)
+    const shown = page.getByTestId('oidc-audiences')
+    await expect(shown).toBeVisible({ timeout: 15_000 })
+    await expect(shown).toContainText('api://AzureADTokenExchange')
+    await expectNoHorizontalPageScroll(page)
+
+    // Editing it is a reversible settings write, not a single-tap mutation, so
+    // tier 2 of the #719 confirm policy does not apply and it must NOT prompt.
+    let dialogFired = false
+    const spy = async (d: Dialog) => { dialogFired = true; await d.dismiss() }
+    page.on('dialog', spy)
+
+    await page.getByRole('button', { name: 'Edit' }).first().click()
+    const add = page.getByRole('button', { name: 'Add audience' })
+    await expect(add).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    // The row's action is a real button with a tap target, not bare coloured
+    // text, and adding one keeps the page inside the viewport.
+    await add.click()
+    await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    expect(dialogFired).toBe(false)
+    page.off('dialog', spy)
+  })
+
+  test('the fleet form gates the list behind a checkbox and fits a phone', async ({ page }) => {
+    // The gate is load-bearing, not decoration: an empty list is a real value
+    // here (it turns run identity off), so it cannot also mean "leave alone".
+    await page.goto('/admin/bulk-update')
+    const gate = page.getByText(/Set run identity audiences/i)
+    await expect(gate).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Add audience' })).toHaveCount(0)
+    await expectNoHorizontalPageScroll(page)
+
+    await gate.click()
+    await expect(page.getByRole('button', { name: 'Add audience' })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('the autodiscovery rule form carries the audience list at phone width', async ({ page }) => {
+    await page.goto('/admin/autodiscovery')
+    await page.getByRole('button', { name: 'New Rule' }).click()
+    const label = page.getByText(/Run identity audiences/i).first()
+    await expect(label).toBeVisible({ timeout: 15_000 })
+    await expectNoHorizontalPageScroll(page)
+
+    await page.getByRole('button', { name: 'Add audience' }).click()
+    await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+})

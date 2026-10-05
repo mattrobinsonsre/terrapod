@@ -1049,6 +1049,8 @@
       "labels": "permey (Qumwo'mey chenmoHlu'bogh Hev)",
       "varFiles": "choHlaH teywI'mey (Qumwo'mey chenmoHlu'bogh Hev)",
       "varFilesHint": "nab/lo' nobbogh <code>.tfvars</code> Hemmey.",
+      "oidcAudiences": "vum pong HevwI''mey (Qumwo''mey chenmoHlu''bogh Hev)",
+      "oidcAudiencesHint": "HevwI''mey, nabvam chenmoHbogh Hoch Qumwo'' vum pong chaw'' chenmoH. chIm yIlan ''ej pagh chenmoH.",
       "addVarFile": "choHlaH teywI' chel",
       "executionHooks": "vangmeH ghItlhmey (Qumwo' chu' Hoch rarlu')",
       "executionHooksHint": "<page>vangmeH ghItlhmey</page> che'wI' navDaq maQlu'bogh ghItlhmeyvo' wIv — wIvlu'bogh ghItlh Hoch chut vam chenmoHbogh Qumwo' rarlu'.",
@@ -1267,6 +1269,7 @@
       "setLabels": "permey choq (Hoch rurbogh Qumwo' permey chartlh DIvI')",
       "setVarFiles": "choHlaH teywI'mey choq",
       "addVarFile": "choHlaH teywI' chel",
+      "setOidcAudiences": "vum pong HevwI''mey choq (Hoch rurbogh Qumwo'' tetlh chartlh; tetlh chIm vum pong chu''Ha'')",
       "setRunTasks": "Sar Qu'mey choq (Hoch rurbogh Qumwo' pongmo' choHlu')",
       "setNotifications": "QIn numtaHmey choq (pongmo' choHlu')",
       "dryRun": "QaD Sar (tI'ang neH — choH ghItlhbe'lu')",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "pagh (vum tetlh lo')",
       "driftIgnoreRules": "tlhotlh buSHa' chutmey",
       "driftIgnoreRulesHint": "glob-Sovbogh Terraform Sum + Sep Hemmey, tlhotlh chevwI' So'lu'. <star></star> pagh joq law' <dot></dot>-Hutlhbogh ghItlhmey rur (<n></n> Summey Suq); <starIdx></starIdx> HIvje' Sum vay' rur. Sep neH ghajbogh Sum tuHHa' Sep vaH Doch — Qaw'mey je. tlhotlh neH qaS, motlh nab/lo' qaSbe'. tlhegh naQ legh <docs>drift-ignore-rules.md</docs>.",
-      "driftIgnoreRulesNone": "pagh (Hoch nab pImmoH tlhotlh moj)"
+      "driftIgnoreRulesNone": "pagh (Hoch nab pImmoH tlhotlh moj)",
+      "oidcAudiences": "vum pong HevwI''mey",
+      "oidcAudiencesHint": "Qumwo''vam vum Hoch, Terrapod OpenID Connect chaw'' ngaj chenmoH ''ej vum laDlaHbogh teywI''Daq lan. chaw'' Qu'' pong ''oH HevwI'', ''ej Hoch DIvI'' ghoch ngaD pegh wIv — sts.amazonaws.com, api://AzureADTokenExchange, pagh ghoch DaghoSbogh Hevbogh vay''. tetlh chIm yIlan ''ej Qumwo''vam pagh chenmoH: vummeyDaj DaHjaj rur, Duy bIQ''a'' pong lo''taH. nuq provider chaw'' lo'', ''ej chay'', chenmoHghachlIj ngaS.",
+      "oidcAudiencesPlaceholder": "Da sts.amazonaws.com",
+      "oidcAudiencesNone": "pagh (vummey Duy bIQ''a'' pong lo'')",
+      "oidcAudiencesAdd": "HevwI'' chel"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

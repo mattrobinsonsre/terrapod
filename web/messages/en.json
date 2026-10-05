@@ -1049,6 +1049,8 @@
       "labels": "Labels (inherited by created workspaces)",
       "varFiles": "Var files (inherited by created workspaces)",
       "varFilesHint": "Relative <code>.tfvars</code> paths passed to plan/apply.",
+      "oidcAudiences": "Run identity audiences (inherited by created workspaces)",
+      "oidcAudiencesHint": "Audiences every workspace this rule creates mints a run identity token for. Leave it empty and they mint nothing.",
       "addVarFile": "Add var file",
       "executionHooks": "Execution hooks (associated with each new workspace)",
       "executionHooksHint": "Pick from hooks defined on the <page>Execution Hooks</page> admin page — each selected hook is associated with every workspace this rule creates.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Set labels (replaces the labels map on every matched workspace)",
       "setVarFiles": "Set var files",
       "addVarFile": "Add var file",
+      "setOidcAudiences": "Set run identity audiences (replaces the list on every matched workspace; an empty list turns run identity off)",
       "setRunTasks": "Set run tasks (upserted by name on every matched workspace)",
       "setNotifications": "Set notification configurations (upserted by name)",
       "dryRun": "Dry run (preview only — no changes written)",
@@ -2539,7 +2542,12 @@
       "triggerPrefixesNone": "None (uses working directory)",
       "driftIgnoreRules": "Drift Ignore Rules",
       "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths suppressed by the drift classifier. <star></star> matches zero or more non-<dot></dot> chars (spans <n></n> indices); <starIdx></starIdx> matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys. Affects drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> for the full grammar.",
-      "driftIgnoreRulesNone": "None (every plan diff counts as drift)"
+      "driftIgnoreRulesNone": "None (every plan diff counts as drift)",
+      "oidcAudiences": "Run identity audiences",
+      "oidcAudiencesHint": "Terrapod mints a short-lived OpenID Connect token for every run of this workspace and writes it to a file the run can read. An audience names what the token is for, and each federation target chooses its own opaque string — sts.amazonaws.com, api://AzureADTokenExchange, or whatever the target you federate to accepts. Leave the list empty and this workspace mints nothing: its runs authenticate as they do today, with the agent pool's own identity. Which provider consumes the token, and how, stays in your own configuration.",
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
+      "oidcAudiencesNone": "None (runs use the agent pool's own identity)",
+      "oidcAudiencesAdd": "Add audience"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",

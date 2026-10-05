@@ -1049,6 +1049,8 @@
       "labels": "Etiketter (arves av opprettede arbeidsområder)",
       "varFiles": "Var-filer (arves av opprettede arbeidsområder)",
       "varFilesHint": "Relative <code>.tfvars</code>-stier gitt til plan/apply.",
+      "oidcAudiences": "Audiences for kjøringsidentitet (arves av opprettede arbeidsområder)",
+      "oidcAudiencesHint": "Audiences hvert arbeidsområde denne regelen oppretter utsteder et kjøringsidentitetstoken for. La den stå tom, så utsteder de ingenting.",
       "addVarFile": "Legg til var-fil",
       "executionHooks": "Kjøringskroker (knyttet til hvert nytt arbeidsområde)",
       "executionHooksHint": "Velg fra kroker definert på admin-siden <page>Kjøringskroker</page> – hver valgt krok knyttes til hvert arbeidsområde denne regelen oppretter.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Sett etiketter (erstatter etikettkartet på hvert samsvarende arbeidsområde)",
       "setVarFiles": "Sett var-filer",
       "addVarFile": "Legg til var-fil",
+      "setOidcAudiences": "Sett audiences for kjøringsidentitet (erstatter listen i hvert treffende arbeidsområde; en tom liste slår av kjøringsidentitet)",
       "setRunTasks": "Sett kjøringsoppgaver (oppdateres/settes inn etter navn på hvert samsvarende arbeidsområde)",
       "setNotifications": "Sett varselkonfigurasjoner (oppdateres/settes inn etter navn)",
       "dryRun": "Prøvekjøring (kun forhåndsvisning – ingen endringer skrives)",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "Ingen (bruker arbeidskatalog)",
       "driftIgnoreRules": "Regler for å ignorere avdrift",
       "driftIgnoreRulesHint": "Glob-bevisste Terraform-adresser + attributtstier som undertrykkes av avdriftsklassifisereren. <star></star> samsvarer med null eller flere ikke-<dot></dot>-tegn (spenner over <n></n> indekser); <starIdx></starIdx> samsvarer med enhver indeks i hakeparenteser. En bar adresse uten attributtsuffiks demper enhver endring på den ressursen – inkludert nedrivinger. Påvirker kun avdrift, ikke vanlig plan/apply. Se <docs>drift-ignore-rules.md</docs> for den fullstendige grammatikken.",
-      "driftIgnoreRulesNone": "Ingen (hvert plandiff regnes som avdrift)"
+      "driftIgnoreRulesNone": "Ingen (hvert plandiff regnes som avdrift)",
+      "oidcAudiences": "Audiences for kjøringsidentitet",
+      "oidcAudiencesHint": "Terrapod utsteder et kortlevd OpenID Connect-token for hver kjøring i dette arbeidsområdet og skriver det til en fil kjøringen kan lese. En audience angir hva tokenet gjelder for, og hvert føderasjonsmål velger sin egen ugjennomsiktige streng — sts.amazonaws.com, api://AzureADTokenExchange, eller hva nå målet du fødererer mot godtar. La listen stå tom, og dette arbeidsområdet utsteder ingenting: kjøringene autentiserer akkurat som i dag, med agentpuljens egen identitet. Hvilken provider som bruker tokenet, og hvordan, er din egen konfigurasjon.",
+      "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com",
+      "oidcAudiencesNone": "Ingen (kjøringer bruker agentpuljens egen identitet)",
+      "oidcAudiencesAdd": "Legg til audience"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

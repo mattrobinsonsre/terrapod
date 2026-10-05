@@ -1049,6 +1049,8 @@
       "labels": "Etiketler (oluşturulan çalışma alanlarına devralınır)",
       "varFiles": "Var dosyaları (oluşturulan çalışma alanlarına devralınır)",
       "varFilesHint": "plan/apply''a iletilen göreli <code>.tfvars</code> yolları.",
+      "oidcAudiences": "Çalıştırma kimliği audience''ları (oluşturulan çalışma alanlarına devralınır)",
+      "oidcAudiencesHint": "Bu kuralın oluşturduğu her çalışma alanının çalıştırma kimliği token''ı ürettiği audience''lar. Boş bırakın, hiçbir şey üretmezler.",
       "addVarFile": "Var dosyası ekle",
       "executionHooks": "Yürütme kancaları (her yeni çalışma alanıyla ilişkilendirilir)",
       "executionHooksHint": "<page>Yürütme Kancaları</page> yönetim sayfasında tanımlanan kancalardan seçin — seçilen her kanca, bu kuralın oluşturduğu her çalışma alanıyla ilişkilendirilir.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Etiketleri ayarla (eşleşen her çalışma alanındaki etiket eşlemesini değiştirir)",
       "setVarFiles": "Var dosyalarını ayarla",
       "addVarFile": "Var dosyası ekle",
+      "setOidcAudiences": "Çalıştırma kimliği audience''larını ayarla (eşleşen her çalışma alanındaki listeyi değiştirir; boş liste çalıştırma kimliğini kapatır)",
       "setRunTasks": "Çalıştırma görevlerini ayarla (eşleşen her çalışma alanında ada göre eklenir/güncellenir)",
       "setNotifications": "Bildirim yapılandırmalarını ayarla (ada göre eklenir/güncellenir)",
       "dryRun": "Deneme çalıştırması (yalnızca önizleme — hiçbir değişiklik yazılmaz)",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "Yok (çalışma dizinini kullanır)",
       "driftIgnoreRules": "Sürüklenme Yoksayma Kuralları",
       "driftIgnoreRulesHint": "Sürüklenme sınıflandırıcısı tarafından bastırılan glob duyarlı Terraform adres + öznitelik yolları. <star></star> sıfır veya daha fazla <dot></dot> olmayan karakterle eşleşir (<n></n> dizin boyunca yayılır); <starIdx></starIdx> herhangi bir köşeli parantezli dizinle eşleşir. Öznitelik son eki olmayan çıplak bir adres, o kaynağa yapılan her değişikliği — yok etmeler dahil — susturur. Yalnızca sürüklenmeyi etkiler, normal plan/apply''ı değil. Tam dilbilgisi için <docs>drift-ignore-rules.md</docs> bölümüne bakın.",
-      "driftIgnoreRulesNone": "Yok (her plan farkı sürüklenme sayılır)"
+      "driftIgnoreRulesNone": "Yok (her plan farkı sürüklenme sayılır)",
+      "oidcAudiences": "Çalıştırma kimliği audience''ları",
+      "oidcAudiencesHint": "Terrapod bu çalışma alanının her çalıştırması için kısa ömürlü bir OpenID Connect token''ı üretir ve onu çalıştırmanın okuyabileceği bir dosyaya yazar. Bir audience, token''ın ne için olduğunu adlandırır ve her federasyon hedefi kendi opak dizesini seçer — sts.amazonaws.com, api://AzureADTokenExchange ya da federe olduğunuz hedef ne kabul ediyorsa. Listeyi boş bırakın, bu çalışma alanı hiçbir şey üretmez: çalıştırmaları bugün olduğu gibi, agent havuzunun kendi kimliğiyle kimlik doğrular. Token''ı hangi provider''ın nasıl kullandığı sizin kendi yapılandırmanızda kalır.",
+      "oidcAudiencesPlaceholder": "örn. sts.amazonaws.com",
+      "oidcAudiencesNone": "Yok (çalıştırmalar agent havuzunun kendi kimliğini kullanır)",
+      "oidcAudiencesAdd": "Audience ekle"
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

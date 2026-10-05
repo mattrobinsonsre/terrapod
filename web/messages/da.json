@@ -1049,6 +1049,8 @@
       "labels": "Labels (nedarves af oprettede arbejdsområder)",
       "varFiles": "Var-filer (nedarves af oprettede arbejdsområder)",
       "varFilesHint": "Relative <code>.tfvars</code>-stier videregivet til plan/apply.",
+      "oidcAudiences": "Audiences for kørselsidentitet (nedarves af oprettede arbejdsområder)",
+      "oidcAudiencesHint": "Audiences, som hvert arbejdsområde denne regel opretter udsteder et kørselsidentitetstoken til. Lad den være tom, så udsteder de ingenting.",
       "addVarFile": "Tilføj var-fil",
       "executionHooks": "Eksekverings-hooks (tilknyttet hvert nyt arbejdsområde)",
       "executionHooksHint": "Vælg blandt hooks defineret på administrationssiden <page>Eksekverings-hooks</page> — hvert valgt hook tilknyttes hvert arbejdsområde, denne regel opretter.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Angiv labels (erstatter labelkortet på hvert matchet arbejdsområde)",
       "setVarFiles": "Angiv var-filer",
       "addVarFile": "Tilføj var-fil",
+      "setOidcAudiences": "Angiv audiences for kørselsidentitet (erstatter listen i hvert matchet arbejdsområde; en tom liste slår kørselsidentitet fra)",
       "setRunTasks": "Angiv kørselsopgaver (upsertes efter navn på hvert matchet arbejdsområde)",
       "setNotifications": "Angiv notifikationskonfigurationer (upsertes efter navn)",
       "dryRun": "Prøvekørsel (kun forhåndsvisning — ingen ændringer skrives)",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "Ingen (bruger arbejdsmappe)",
       "driftIgnoreRules": "Regler for ignorering af afdrift",
       "driftIgnoreRulesHint": "Glob-bevidste Terraform-adresse- + attributstier, der undertrykkes af afdriftsklassificeringen. <star></star> matcher nul eller flere ikke-<dot></dot>-tegn (spænder over <n></n> indekser); <starIdx></starIdx> matcher ethvert indeks i firkantede parenteser. En bar adresse uden attributsuffiks lyddæmper enhver ændring af den ressource — inklusive nedrivninger. Påvirker kun afdrift, ikke almindelig plan/apply. Se <docs>drift-ignore-rules.md</docs> for den fulde grammatik.",
-      "driftIgnoreRulesNone": "Ingen (hver plan-diff tæller som afdrift)"
+      "driftIgnoreRulesNone": "Ingen (hver plan-diff tæller som afdrift)",
+      "oidcAudiences": "Audiences for kørselsidentitet",
+      "oidcAudiencesHint": "Terrapod udsteder et kortlivet OpenID Connect-token til hver kørsel i dette arbejdsområde og skriver det til en fil, som kørslen kan læse. En audience angiver, hvad tokenet gælder for, og hvert føderationsmål vælger sin egen uigennemsigtige streng — sts.amazonaws.com, api://AzureADTokenExchange, eller hvad målet, du fødererer mod, nu accepterer. Lad listen være tom, og dette arbejdsområde udsteder ingenting: dets kørsler autentificerer præcis som i dag, med agentpuljens egen identitet. Hvilken provider der bruger tokenet, og hvordan, er din egen konfiguration.",
+      "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com",
+      "oidcAudiencesNone": "Ingen (kørsler bruger agentpuljens egen identitet)",
+      "oidcAudiencesAdd": "Tilføj audience"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

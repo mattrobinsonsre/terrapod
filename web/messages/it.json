@@ -1049,6 +1049,8 @@
       "labels": "Etichette (ereditate dai workspace creati)",
       "varFiles": "File di variabili (ereditati dai workspace creati)",
       "varFilesHint": "Percorsi <code>.tfvars</code> relativi passati a plan/apply.",
+      "oidcAudiences": "Audience dell''identità di esecuzione (ereditate dai workspace creati)",
+      "oidcAudiencesHint": "Audience per cui ogni spazio di lavoro creato da questa regola emette un token di identità di esecuzione. Lasciale vuote e non emetteranno nulla.",
       "addVarFile": "Aggiungi file di variabili",
       "executionHooks": "Hook di esecuzione (associati a ogni nuovo workspace)",
       "executionHooksHint": "Scegli tra gli hook definiti nella pagina di amministrazione <page>Hook di esecuzione</page> — ogni hook selezionato viene associato a ogni workspace che questa regola crea.",
@@ -1267,6 +1269,7 @@
       "setLabels": "Imposta etichette (sostituisce la mappa delle etichette su ogni workspace corrispondente)",
       "setVarFiles": "Imposta file di variabili",
       "addVarFile": "Aggiungi file di variabili",
+      "setOidcAudiences": "Imposta le audience dell''identità di esecuzione (sostituisce l''elenco in ogni spazio di lavoro corrispondente; un elenco vuoto disattiva l''identità di esecuzione)",
       "setRunTasks": "Imposta run task (upsert per nome su ogni workspace corrispondente)",
       "setNotifications": "Imposta configurazioni di notifica (upsert per nome)",
       "dryRun": "Dry run (solo anteprima — nessuna modifica scritta)",
@@ -2531,7 +2534,12 @@
       "triggerPrefixesNone": "Nessuno (usa la directory di lavoro)",
       "driftIgnoreRules": "Regole di ignoramento della deriva",
       "driftIgnoreRulesHint": "Percorsi di indirizzi Terraform + attributi con supporto glob soppressi dal classificatore di deriva. <star></star> corrisponde a zero o più caratteri diversi da <dot></dot> (copre <n></n> indici); <starIdx></starIdx> corrisponde a qualsiasi indice tra parentesi. Un indirizzo nudo senza suffisso di attributo silenzia qualsiasi modifica a quella risorsa — incluse le distruzioni. Riguarda solo la deriva, non il normale plan/apply. Consulta <docs>drift-ignore-rules.md</docs> per la grammatica completa.",
-      "driftIgnoreRulesNone": "Nessuna (ogni diff del plan conta come deriva)"
+      "driftIgnoreRulesNone": "Nessuna (ogni diff del plan conta come deriva)",
+      "oidcAudiences": "Audience dell''identità di esecuzione",
+      "oidcAudiencesHint": "Terrapod emette un token OpenID Connect di breve durata per ogni esecuzione di questo spazio di lavoro e lo scrive in un file che l''esecuzione può leggere. Un''audience indica a cosa serve il token, e ogni destinazione di federazione scelta la propria stringa opaca — sts.amazonaws.com, api://AzureADTokenExchange, o qualunque cosa accetti la destinazione verso cui federi. Lascia l''elenco vuoto e questo spazio di lavoro non emette nulla: le sue esecuzioni si autenticano come oggi, con l''identità propria del pool di agenti. Quale provider consuma il token, e come, resta la tua configurazione.",
+      "oidcAudiencesPlaceholder": "es. sts.amazonaws.com",
+      "oidcAudiencesNone": "Nessuna (le esecuzioni usano l''identità propria del pool di agenti)",
+      "oidcAudiencesAdd": "Aggiungi audience"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",
