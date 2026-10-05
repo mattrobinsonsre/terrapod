@@ -94,6 +94,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "terragrunt_version": ws.terragrunt_version,
         "working_directory": ws.working_directory,
         "var_files": list(ws.var_files or []),
+        "oidc_audiences": list(ws.oidc_audiences or []),
         "resource_cpu": ws.resource_cpu,
         "resource_memory": ws.resource_memory,
         "auto_apply": ws.auto_apply,
@@ -462,6 +463,11 @@ async def restore_workspace(
         terragrunt_version=settings.get("terragrunt_version") or "1.0",
         working_directory=settings.get("working_directory") or "",
         var_files=list(settings.get("var_files") or []),
+        # Empty for a snapshot taken before this column existed, which is the
+        # opted-OUT direction on purpose. Restoring a workspace must never hand
+        # it a cloud identity nobody granted it — the mirror of the fork-PR flag
+        # whose restore path defaulted the permissive way.
+        oidc_audiences=settings.get("oidc_audiences") or [],
         resource_cpu=settings.get("resource_cpu") or "1",
         resource_memory=settings.get("resource_memory") or "2Gi",
         drift_ignore_rules=list(settings.get("drift_ignore_rules") or []),

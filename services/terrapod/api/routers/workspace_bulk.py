@@ -71,6 +71,9 @@ _FIELD_MAP: dict[str, str] = {
     # separately (_validate_pool_set / _validate_auto_apply below).
     "resource-cpu": "resource_cpu",
     "resource-memory": "resource_memory",
+    # Per-workspace cloud identity (#1901). An ordinary mapped field: one input
+    # key, one column, and the same validator the single-workspace API uses.
+    "oidc-audiences": "oidc_audiences",
     "var-files": "var_files",
     "labels": "labels",
     # Security scanning (#1036) and the AI plan summary (#401), added here by
@@ -343,6 +346,7 @@ _SETTING_RULES: dict[str, Any] = {
     "terragrunt-version": workspace_settings.validate_terragrunt_version,
     "trigger-prefixes": workspace_settings.validate_trigger_prefixes,
     "auto-merge-strategy": workspace_settings.validate_auto_merge_strategy,
+    "oidc-audiences": workspace_settings.validate_oidc_audiences,
     "plan-expiry-seconds": workspace_settings.validate_plan_expiry_seconds,
     "drift-detection-interval-seconds": workspace_settings.clamp_drift_interval,
     "drift-ignore-rules": workspace_settings.validate_drift_ignore_rules,

@@ -296,3 +296,51 @@ def validate_bool(raw: object, field: str) -> bool:
     if not isinstance(raw, bool):
         raise ValueError(f"{field} must be true or false, not a string or number")
     return raw
+
+
+#: A deployment that lets a workspace name unlimited audiences is one where a
+#: single token is replayable against every federation target at once. Ten is
+#: already generous for a real workspace.
+MAX_OIDC_AUDIENCES = 10
+MAX_OIDC_AUDIENCE_LEN = 255
+
+
+def validate_oidc_audiences(raw: object) -> list[str]:
+    """The audiences a run identity token is minted for, and the opt-in (#1901).
+
+    Empty means this workspace mints nothing and its runs authenticate to the
+    cloud with the agent pool's own identity, exactly as before — which is why
+    an empty list is valid rather than an error.
+
+    Stored byte-for-byte after rejecting the unacceptable, never normalised: the
+    Terraform provider writes the server's response back into state, so
+    lower-casing or trimming an entry here would make every plan disagree with
+    its own apply ("Provider produced inconsistent result after apply"). An
+    audience is an opaque string the federation target chose — `sts.amazonaws.com`,
+    `api://AzureADTokenExchange`, whatever a Vault role's `bound_audiences` says
+    — so there is nothing for us to canonicalise even if it were safe to.
+    """
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("oidc-audiences must be a list of strings")
+    if len(raw) > MAX_OIDC_AUDIENCES:
+        raise ValueError(f"oidc-audiences accepts at most {MAX_OIDC_AUDIENCES} entries")
+
+    out: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str):
+            raise ValueError("every oidc-audiences entry must be a string")
+        if not entry.strip():
+            # Refused rather than dropped. A blank entry is a mistake, and a
+            # silently-dropped one means an operator who believes they granted
+            # an audience did not.
+            raise ValueError("oidc-audiences entries cannot be blank")
+        if len(entry) > MAX_OIDC_AUDIENCE_LEN:
+            raise ValueError(
+                f"oidc-audiences entries must be {MAX_OIDC_AUDIENCE_LEN} characters or fewer"
+            )
+        if entry in out:
+            raise ValueError(f"oidc-audiences contains {entry!r} twice")
+        out.append(entry)
+    return out

@@ -684,6 +684,7 @@ def _workspace_json(
                 "locked": ws.locked,
                 "resource-cpu": ws.resource_cpu,
                 "resource-memory": ws.resource_memory,
+                "oidc-audiences": list(ws.oidc_audiences or []),
                 "vcs-repo-url": ws.vcs_repo_url,
                 "vcs-branch": ws.vcs_branch,
                 "vcs-connection-id": f"vcs-{ws.vcs_connection_id}"
@@ -1319,6 +1320,9 @@ async def create_workspace(
         working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),
         resource_cpu=attrs.get("resource-cpu", "1"),
         resource_memory=attrs.get("resource-memory", "2Gi"),
+        oidc_audiences=_422(
+            workspace_settings.validate_oidc_audiences, attrs.get("oidc-audiences")
+        ),
         labels=validate_labels(attrs.get("labels", {})),
         owner_email=user.email,
         vcs_connection_id=vcs_connection_id,
@@ -1917,6 +1921,10 @@ async def update_workspace(
         ws.resource_cpu = attrs["resource-cpu"]
     if "resource-memory" in attrs:
         ws.resource_memory = attrs["resource-memory"]
+    if "oidc-audiences" in attrs:
+        ws.oidc_audiences = _422(
+            workspace_settings.validate_oidc_audiences, attrs["oidc-audiences"]
+        )
     if "labels" in attrs:
         # Validate up-front (size limits + reserved-key check). Raises 422
         # before any self-lockout logic so the error path stays simple and

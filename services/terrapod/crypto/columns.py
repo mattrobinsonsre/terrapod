@@ -9,6 +9,7 @@ model columns are EncryptedText, and the migration drives off this list.
 # (table_name, column_name) — all TEXT columns; id is the uuid primary key.
 ENCRYPTED_COLUMNS: list[tuple[str, str]] = [
     ("certificate_authority", "ca_key_pem"),
+    ("oidc_signing_keys", "private_key_pem"),
     ("variables", "value"),
     ("variable_set_variables", "value"),
     ("vcs_connections", "token"),

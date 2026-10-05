@@ -109,6 +109,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     except Exception as e:
         logger.warning("CA initialization skipped (migration may be pending)", error=str(e))
 
+    # Resolve the OIDC issuer signing key (#1901), only when an issuer is
+    # published. Tolerant like the CA above rather than fatal: a deployment that
+    # has not opted in must not be prevented from starting, and one that has can
+    # still serve everything except the two issuer routes, which fail loudly on
+    # their own when nothing is loaded.
+    if _settings.auth.oidc_issuer.enabled:
+        from terrapod.auth.oidc_signing import init_oidc_signing
+
+        try:
+            async with get_db_session() as db:
+                await init_oidc_signing(db)
+            logger.info("OIDC issuer signing key initialized")
+        except Exception as e:
+            logger.warning(
+                "OIDC issuer signing key initialization skipped "
+                "(migration may be pending); the issuer routes will refuse until "
+                "it succeeds",
+                error=str(e),
+            )
+
     # Register and start distributed scheduler (multi-replica safe)
     from terrapod.services.scheduler import (
         AI_LANE,
@@ -1272,6 +1292,26 @@ def create_application() -> FastAPI:
 
     include_terrapod(security_scanning_router)
     include_terrapod(ai_policy_router)
+
+    # Per-workspace cloud identity (#1901). The mint and the key admin ride the
+    # native surface; the two issuer GETs are mounted at the ROOT, beside
+    # `/.well-known/terraform.json`, because a cloud fetches them at a fixed
+    # well-known path and cannot be told to look under an API prefix.
+    #
+    # Mounted only when an issuer is published, and that is the opt-in: a
+    # deployment that has not enabled it serves no discovery document and no
+    # JWKS at all, which says "there is no trust root here" far more clearly
+    # than a 404 on a path that exists.
+    from terrapod.api.routers.cloud_identity import router as cloud_identity_router
+
+    include_terrapod(cloud_identity_router)
+
+    from terrapod.config import settings as _issuer_settings
+
+    if _issuer_settings.auth.oidc_issuer.enabled:
+        from terrapod.api.routers.oidc_issuer import router as oidc_issuer_router
+
+        app.include_router(oidc_issuer_router)
 
     # Audit log query endpoint — Terrapod-specific.
     from terrapod.api.routers.audit import router as audit_router

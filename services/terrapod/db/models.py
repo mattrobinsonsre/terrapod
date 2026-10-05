@@ -331,6 +331,18 @@ class Workspace(Base):
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
 
+    # Per-workspace cloud identity (#1901). The audiences a run identity token is
+    # minted for, and the opt-in: empty means this workspace mints no token and
+    # its runs authenticate to the cloud exactly as before, with the agent pool's
+    # own ServiceAccount. There is nothing cloud-specific here on purpose — the
+    # audience is the one value every federation target names for itself
+    # (`sts.amazonaws.com`, `api://AzureADTokenExchange`, whatever a Vault role's
+    # `bound_audiences` says) and it cannot be a deployment-wide constant,
+    # because a token audienced for two targets is replayable between them.
+    oidc_audiences: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
+
     # RBAC
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
@@ -1088,6 +1100,51 @@ class CachedBinary(Base):
 # --- Certificate Authority ---
 
 
+class OIDCSigningKey(Base):
+    """An RSA keypair Terrapod signs run identity tokens with (#1901).
+
+    Several rows, not one: a published trust root cannot be swapped atomically,
+    because the clouds fetch the JWKS on their own schedule and cache it. So a
+    rotation adds a key, waits for it to propagate, and only then starts signing
+    with it — which means more than one key is live at a time and the JWKS is a
+    set rather than a single entry.
+
+    Three timestamps say which is which:
+
+    * `activates_at` — the earliest this key may SIGN. A freshly rotated key is
+      published immediately and signs only once the propagation window passes,
+      so no token is ever signed with a key the clouds have not had a chance to
+      see. The signing key is the newest activated, unretired row.
+    * `retired_at` — the moment it stopped signing. It stays in the JWKS for the
+      grace window afterwards, because tokens it already signed are still valid.
+    * `created_at` — ordering, and nothing else.
+
+    An operator-supplied key (BYO) is never stored here at all: it wins on every
+    startup and rotating it is something the operator does to their own secret.
+    """
+
+    __tablename__ = "oidc_signing_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    #: RFC 7638 JWK thumbprint. Derived from the key itself rather than assigned,
+    #: so it is stable, collision-free, and computed the same way for a generated
+    #: key and an operator's own.
+    kid: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    #: PKCS8 PEM. EncryptedText for the same reason as the CA key (#553) — this
+    #: is the private half of a published trust root, so whoever holds it can
+    #: mint an identity for any workspace in the deployment.
+    private_key_pem: Mapped[str] = mapped_column(EncryptedText, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=now_utc
+    )
+    activates_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=now_utc
+    )
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class CertificateAuthorityModel(Base):
     """CA certificate and key, persisted for cross-restart identity.
 
@@ -1281,6 +1338,10 @@ class AutodiscoveryRule(Base):
     terraform_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.12")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
+    # Templated onto workspaces this rule materialises (#1901).
+    oidc_audiences: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
     auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Templated onto workspaces this rule materialises (#1274).
     auto_apply_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="never")
@@ -2023,6 +2084,13 @@ class Run(Base):
     terragrunt_version: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
+    # Snapshotted at creation, like the resources above and for the same reason
+    # (#1901): an operator editing the workspace's audiences mid-run would
+    # otherwise let the plan phase mint a token and the apply phase be refused,
+    # so a run carries the audiences it was created under for both its phases.
+    oidc_audiences: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
     # `pool_id` is the pool this run is currently associated with: at creation
     # it is element 0 of the workspace's pool set, and on claim it is rewritten
     # to the pool that actually took the run — so cancellation, job-status

@@ -887,6 +887,11 @@ async def create_run(
         terragrunt_version=workspace.terragrunt_version,
         resource_cpu=workspace.resource_cpu,
         resource_memory=workspace.resource_memory,
+        # Snapshotted for the same reason as the resources above (#1901): the
+        # mint reads the run, not the workspace, so editing the audiences
+        # mid-run cannot let the plan phase get a token and the apply phase be
+        # refused.
+        oidc_audiences=list(workspace.oidc_audiences or []),
         pool_id=pool_id,
         pool_extra_ids=pool_extra_ids,
         created_by=created_by,
