@@ -40,21 +40,28 @@ type Workspace struct {
 	WorkingDirectory  string `json:"working-directory,omitempty"`
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
-	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901): the
-	// audiences a run's identity token is minted for. Empty means this
-	// workspace mints nothing and its runs authenticate to the cloud with the
-	// agent pool's own identity, exactly as before.
+	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901), keyed
+	// on the provider configuration a token is for: `aws`, or `aws.west` for
+	// one aliased configuration. Empty means this workspace mints nothing and
+	// its runs authenticate with the agent pool's own identity, exactly as
+	// before.
 	//
-	// An entry is an opaque string the federation target chose, so the server
-	// stores it byte-for-byte and the SDK passes it through unaltered — there
-	// is nothing cloud-specific here, and nothing to canonicalise.
-	OIDCAudiences   []string `json:"oidc-audiences,omitempty"`
-	VCSRepoURL      string   `json:"vcs-repo-url,omitempty"`
-	VCSBranch       string   `json:"vcs-branch,omitempty"`
-	VCSWorkflow     string   `json:"vcs-workflow,omitempty"`
-	VCSConnectionID string   `json:"vcs-connection-id,omitempty"` // resolved from `vcs-connection` relationship
-	AgentPoolID     string   `json:"agent-pool-id,omitempty"`
-	AgentPoolIDs    []string `json:"agent-pool-ids,omitempty"` // flat pool set (#1085); AgentPoolID is element 0
+	// **This is the MERGED view, not the workspace's own override.** The server
+	// merges the workspace's map over the deployment's catalogue per key, so a
+	// key the workspace does not set is still present here with the
+	// deployment's value. A consumer writing this field back wholesale would
+	// therefore promote every inherited entry into an override.
+	//
+	// An audience is an opaque string the federation target chose, so the
+	// server stores it byte-for-byte and the SDK passes it through unaltered —
+	// there is nothing cloud-specific here, and nothing to canonicalise.
+	OIDCAudiences   map[string][]string `json:"oidc-audiences,omitempty"`
+	VCSRepoURL      string              `json:"vcs-repo-url,omitempty"`
+	VCSBranch       string              `json:"vcs-branch,omitempty"`
+	VCSWorkflow     string              `json:"vcs-workflow,omitempty"`
+	VCSConnectionID string              `json:"vcs-connection-id,omitempty"` // resolved from `vcs-connection` relationship
+	AgentPoolID     string              `json:"agent-pool-id,omitempty"`
+	AgentPoolIDs    []string            `json:"agent-pool-ids,omitempty"` // flat pool set (#1085); AgentPoolID is element 0
 	// AgentPoolNames is read-only: the pools' names, positionally matching
 	// AgentPoolIDs. Served so a consumer can render a pool without fetching the
 	// whole pool list purely to turn ids into labels.
@@ -172,30 +179,41 @@ type CreateWorkspaceRequest struct {
 	WorkingDirectory  string  `json:"working-directory,omitempty"`
 	ResourceCPU       string  `json:"resource-cpu,omitempty"`
 	ResourceMemory    string  `json:"resource-memory,omitempty"`
-	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901). A nil
-	// slice leaves the server-side value alone; an empty non-nil slice
-	// (`[]string{}`) clears it, which is how a workspace opts back out.
-	OIDCAudiences                 []string          `json:"oidc-audiences,omitempty"`
-	VCSRepoURL                    string            `json:"vcs-repo-url,omitempty"`
-	VCSBranch                     string            `json:"vcs-branch,omitempty"`
-	VCSWorkflow                   string            `json:"vcs-workflow,omitempty"`
-	VCSConnectionID               string            `json:"-"` // → relationship, not attribute
-	AgentPoolID                   string            `json:"agent-pool-id,omitempty"`
-	AgentPoolIDs                  []string          `json:"agent-pool-ids,omitempty"` // whole pool set; mutually exclusive with AgentPoolID (422)
-	AutoMerge                     *bool             `json:"auto-merge,omitempty"`
-	AutoMergeStrategy             string            `json:"auto-merge-strategy,omitempty"`
-	OwnerEmail                    string            `json:"owner-email,omitempty"`
-	Labels                        map[string]string `json:"labels,omitempty"`
-	VarFiles                      []string          `json:"var-files,omitempty"`
-	TriggerPrefixes               []string          `json:"trigger-prefixes,omitempty"`
-	DriftIgnoreRules              []string          `json:"drift-ignore-rules,omitempty"`
-	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
-	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
-	SecurityScanEnforcement       string            `json:"security-scan-enforcement,omitempty"`
-	SecurityScanEngine            string            `json:"security-scan-engine,omitempty"`
-	SecurityScanSeverityThreshold string            `json:"security-scan-severity-threshold,omitempty"`
-	SecurityScanSkipRules         []string          `json:"security-scan-skip-rules,omitempty"`
-	PlanExpirySeconds             *int64            `json:"plan-expiry-seconds,omitempty"`
+	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
+	// on the provider configuration: `aws`, or `aws.west` for one aliased
+	// configuration. It is MERGED over the deployment's catalogue per key, so
+	// setting one key does not restate the rest and removing one falls back to
+	// the deployment's value.
+	//
+	// A nil map leaves the server-side value alone; an empty non-nil map
+	// (`map[string][]string{}`) clears it, which is how a workspace drops every
+	// override and inherits the catalogue wholesale.
+	//
+	// A key present with an EMPTY list is refused (422). "No audiences for this
+	// target" is expressed by removing the key, which falls back to the
+	// deployment's configured value — an empty list would otherwise be an
+	// opt-out that looks identical to a typo.
+	OIDCAudiences                 map[string][]string `json:"oidc-audiences,omitempty"`
+	VCSRepoURL                    string              `json:"vcs-repo-url,omitempty"`
+	VCSBranch                     string              `json:"vcs-branch,omitempty"`
+	VCSWorkflow                   string              `json:"vcs-workflow,omitempty"`
+	VCSConnectionID               string              `json:"-"` // → relationship, not attribute
+	AgentPoolID                   string              `json:"agent-pool-id,omitempty"`
+	AgentPoolIDs                  []string            `json:"agent-pool-ids,omitempty"` // whole pool set; mutually exclusive with AgentPoolID (422)
+	AutoMerge                     *bool               `json:"auto-merge,omitempty"`
+	AutoMergeStrategy             string              `json:"auto-merge-strategy,omitempty"`
+	OwnerEmail                    string              `json:"owner-email,omitempty"`
+	Labels                        map[string]string   `json:"labels,omitempty"`
+	VarFiles                      []string            `json:"var-files,omitempty"`
+	TriggerPrefixes               []string            `json:"trigger-prefixes,omitempty"`
+	DriftIgnoreRules              []string            `json:"drift-ignore-rules,omitempty"`
+	DriftDetectionEnabled         *bool               `json:"drift-detection-enabled,omitempty"`
+	DriftDetectionIntervalSeconds *int64              `json:"drift-detection-interval-seconds,omitempty"`
+	SecurityScanEnforcement       string              `json:"security-scan-enforcement,omitempty"`
+	SecurityScanEngine            string              `json:"security-scan-engine,omitempty"`
+	SecurityScanSeverityThreshold string              `json:"security-scan-severity-threshold,omitempty"`
+	SecurityScanSkipRules         []string            `json:"security-scan-skip-rules,omitempty"`
+	PlanExpirySeconds             *int64              `json:"plan-expiry-seconds,omitempty"`
 	// AISummaryMode is the three-state per-workspace override (#401):
 	// "default" | "enabled" | "disabled". Empty string omits the field
 	// (server-side default applies — "default").
@@ -247,29 +265,40 @@ type UpdateWorkspaceRequest struct {
 	WorkingDirectory  string  `json:"working-directory,omitempty"`
 	ResourceCPU       string  `json:"resource-cpu,omitempty"`
 	ResourceMemory    string  `json:"resource-memory,omitempty"`
-	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901). A nil
-	// slice leaves the server-side value alone; an empty non-nil slice
-	// (`[]string{}`) clears it, which is how a workspace opts back out.
-	OIDCAudiences                 []string          `json:"oidc-audiences,omitempty"`
-	VCSRepoURL                    string            `json:"vcs-repo-url,omitempty"`
-	VCSBranch                     string            `json:"vcs-branch,omitempty"`
-	VCSWorkflow                   string            `json:"vcs-workflow,omitempty"`
-	VCSConnectionID               string            `json:"-"`
-	AgentPoolID                   string            `json:"agent-pool-id,omitempty"`
-	AgentPoolIDs                  []string          `json:"agent-pool-ids,omitempty"` // whole pool set; mutually exclusive with AgentPoolID (422)
-	AutoMerge                     *bool             `json:"auto-merge,omitempty"`
-	AutoMergeStrategy             string            `json:"auto-merge-strategy,omitempty"`
-	Labels                        map[string]string `json:"labels,omitempty"`
-	VarFiles                      []string          `json:"var-files,omitempty"`
-	TriggerPrefixes               []string          `json:"trigger-prefixes,omitempty"`
-	DriftIgnoreRules              []string          `json:"drift-ignore-rules,omitempty"`
-	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
-	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
-	SecurityScanEnforcement       string            `json:"security-scan-enforcement,omitempty"`
-	SecurityScanEngine            string            `json:"security-scan-engine,omitempty"`
-	SecurityScanSeverityThreshold string            `json:"security-scan-severity-threshold,omitempty"`
-	SecurityScanSkipRules         []string          `json:"security-scan-skip-rules,omitempty"`
-	PlanExpirySeconds             *int64            `json:"plan-expiry-seconds,omitempty"`
+	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
+	// on the provider configuration: `aws`, or `aws.west` for one aliased
+	// configuration. It is MERGED over the deployment's catalogue per key, so
+	// setting one key does not restate the rest and removing one falls back to
+	// the deployment's value.
+	//
+	// A nil map leaves the server-side value alone; an empty non-nil map
+	// (`map[string][]string{}`) clears it, which is how a workspace drops every
+	// override and inherits the catalogue wholesale.
+	//
+	// A key present with an EMPTY list is refused (422). "No audiences for this
+	// target" is expressed by removing the key, which falls back to the
+	// deployment's configured value — an empty list would otherwise be an
+	// opt-out that looks identical to a typo.
+	OIDCAudiences                 map[string][]string `json:"oidc-audiences,omitempty"`
+	VCSRepoURL                    string              `json:"vcs-repo-url,omitempty"`
+	VCSBranch                     string              `json:"vcs-branch,omitempty"`
+	VCSWorkflow                   string              `json:"vcs-workflow,omitempty"`
+	VCSConnectionID               string              `json:"-"`
+	AgentPoolID                   string              `json:"agent-pool-id,omitempty"`
+	AgentPoolIDs                  []string            `json:"agent-pool-ids,omitempty"` // whole pool set; mutually exclusive with AgentPoolID (422)
+	AutoMerge                     *bool               `json:"auto-merge,omitempty"`
+	AutoMergeStrategy             string              `json:"auto-merge-strategy,omitempty"`
+	Labels                        map[string]string   `json:"labels,omitempty"`
+	VarFiles                      []string            `json:"var-files,omitempty"`
+	TriggerPrefixes               []string            `json:"trigger-prefixes,omitempty"`
+	DriftIgnoreRules              []string            `json:"drift-ignore-rules,omitempty"`
+	DriftDetectionEnabled         *bool               `json:"drift-detection-enabled,omitempty"`
+	DriftDetectionIntervalSeconds *int64              `json:"drift-detection-interval-seconds,omitempty"`
+	SecurityScanEnforcement       string              `json:"security-scan-enforcement,omitempty"`
+	SecurityScanEngine            string              `json:"security-scan-engine,omitempty"`
+	SecurityScanSeverityThreshold string              `json:"security-scan-severity-threshold,omitempty"`
+	SecurityScanSkipRules         []string            `json:"security-scan-skip-rules,omitempty"`
+	PlanExpirySeconds             *int64              `json:"plan-expiry-seconds,omitempty"`
 	// AISummaryMode see CreateWorkspaceRequest. On UPDATE, empty string
 	// leaves the existing value untouched — to explicitly set "follow
 	// deployment default", pass "default".
@@ -544,8 +573,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 		attrs["labels"] = req.Labels
 	}
 	if req.OIDCAudiences != nil {
-		// `!= nil` not `len() > 0`: an explicit empty list is how a workspace
-		// opts back OUT of minting an identity token, so it has to travel.
+		// `!= nil` not `len() > 0`: an explicit empty map is how a workspace
+		// drops every override, so it has to travel. Omitting it would leave
+		// the server-side value alone and the opt-out would silently not apply.
 		attrs["oidc-audiences"] = req.OIDCAudiences
 	}
 	if req.VarFiles != nil {
@@ -664,8 +694,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 		attrs["labels"] = req.Labels
 	}
 	if req.OIDCAudiences != nil {
-		// `!= nil` not `len() > 0`: an explicit empty list is how a workspace
-		// opts back OUT of minting an identity token, so it has to travel.
+		// `!= nil` not `len() > 0`: an explicit empty map is how a workspace
+		// drops every override, so it has to travel. Omitting it would leave
+		// the server-side value alone and the opt-out would silently not apply.
 		attrs["oidc-audiences"] = req.OIDCAudiences
 	}
 	if req.VarFiles != nil {
@@ -776,7 +807,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		OwnerEmail:                    GetStringAttr(res, "owner-email"),
 		Locked:                        GetBoolAttr(res, "locked"),
 		Labels:                        GetMapAttr(res, "labels"),
-		OIDCAudiences:                 GetListAttr(res, "oidc-audiences"),
+		OIDCAudiences:                 GetAudienceMapAttr(res, "oidc-audiences"),
 		VarFiles:                      GetListAttr(res, "var-files"),
 		TriggerPrefixes:               GetListAttr(res, "trigger-prefixes"),
 		DriftIgnoreRules:              GetListAttr(res, "drift-ignore-rules"),

@@ -190,35 +190,46 @@ func TestListOIDCSigningKeysSurfacesAnAuthorizationFailure(t *testing.T) {
 // ── oidc-audiences on the workspace ──────────────────────────────────
 //
 // The reflective gates in wire_completeness_test.go cover the REQUEST builders
-// for any new field, because `fill` synthesises a slice. They do NOT cover the
-// decode side for a slice: TestEveryWorkspaceFieldIsDecoded skips any type its
-// harness cannot synthesise, and `[]string` is one of them. So the read-back —
-// the half that silently returned nil for `plan-expiry-seconds` and broke the
-// provider's apply — needs its own assertion here.
+// for any new field, because `fill` synthesises a value. They do NOT cover the
+// decode side for a map of slices: TestEveryWorkspaceFieldIsDecoded skips any
+// type its harness cannot synthesise, and `map[string][]string` is one of them.
+// So the read-back — the half that silently returned nil for
+// `plan-expiry-seconds` and broke the provider's apply — needs its own
+// assertion here.
 
 func TestWorkspaceDecodesOIDCAudiences(t *testing.T) {
 	res := resourceWithAttrs("ws-1", "workspaces", map[string]any{
-		"name":           "my-workspace",
-		"oidc-audiences": []string{"sts.example.com", "api://example-exchange"},
+		"name": "my-workspace",
+		"oidc-audiences": map[string]any{
+			"aws":      []string{"sts.example.com"},
+			"aws.west": []string{"sts.example.com"},
+			"vault":    []string{"https://vault.example.com"},
+		},
 	})
 
 	ws := workspaceFromResource(res)
-	if len(ws.OIDCAudiences) != 2 {
-		t.Fatalf("oidc-audiences decoded as %v, want two entries", ws.OIDCAudiences)
+	if len(ws.OIDCAudiences) != 3 {
+		t.Fatalf("oidc-audiences decoded as %v, want three targets", ws.OIDCAudiences)
 	}
 	// Byte-for-byte: an audience is an opaque string the federation target
 	// chose, so lower-casing or trimming one here would make a provider plan
 	// disagree with its own apply.
-	if ws.OIDCAudiences[0] != "sts.example.com" || ws.OIDCAudiences[1] != "api://example-exchange" {
-		t.Errorf("oidc-audiences = %q, want the values verbatim", ws.OIDCAudiences)
+	if got := ws.OIDCAudiences["vault"]; len(got) != 1 || got[0] != "https://vault.example.com" {
+		t.Errorf("oidc-audiences[vault] = %q, want the value verbatim", got)
+	}
+	// An alias is part of the KEY, not a nested structure. `aws` and `aws.west`
+	// are two independent targets that happen to share a prefix, and a decoder
+	// that split on the dot would merge them.
+	if _, ok := ws.OIDCAudiences["aws.west"]; !ok {
+		t.Error("an aliased target was not decoded as its own key")
 	}
 }
 
 // Empty is the opted-OUT state and must decode as such rather than as "unknown".
-func TestWorkspaceDecodesAnEmptyOIDCAudienceList(t *testing.T) {
+func TestWorkspaceDecodesAnEmptyOIDCAudienceMap(t *testing.T) {
 	res := resourceWithAttrs("ws-1", "workspaces", map[string]any{
 		"name":           "my-workspace",
-		"oidc-audiences": []string{},
+		"oidc-audiences": map[string]any{},
 	})
 
 	if ws := workspaceFromResource(res); len(ws.OIDCAudiences) != 0 {
@@ -226,17 +237,34 @@ func TestWorkspaceDecodesAnEmptyOIDCAudienceList(t *testing.T) {
 	}
 }
 
-// An explicit empty list is how a workspace opts back OUT, so it has to reach
-// the wire. A `len() > 0` guard in the builder would drop it and leave the
-// workspace minting tokens after an operator had removed every audience —
-// which is the failure this asserts against, in both directions.
-func TestOIDCAudiencesClearsWithAnExplicitEmptyList(t *testing.T) {
+// A multi-entry list is legal and must survive. It means "these audiences are
+// interchangeable for this target" — correct for a target that accepts any one
+// of them, and refused outright by some (AWS rejects a multi-valued `aud`), so
+// the SDK must neither collapse it nor reorder it.
+func TestWorkspaceDecodesSeveralAudiencesForOneTarget(t *testing.T) {
+	res := resourceWithAttrs("ws-1", "workspaces", map[string]any{
+		"name":           "my-workspace",
+		"oidc-audiences": map[string]any{"vault": []string{"https://a", "https://b"}},
+	})
+
+	got := workspaceFromResource(res).OIDCAudiences["vault"]
+	if len(got) != 2 || got[0] != "https://a" || got[1] != "https://b" {
+		t.Errorf("oidc-audiences[vault] = %v, want both entries in order", got)
+	}
+}
+
+// An explicit empty map is how a workspace drops every override, so it has to
+// reach the wire. A `len() > 0` guard in the builder would drop it and leave
+// the overrides in place after an operator had removed them — which is the
+// failure this asserts against, in both directions.
+func TestOIDCAudiencesClearsWithAnExplicitEmptyMap(t *testing.T) {
+	empty := map[string][]string{}
 	for _, tc := range []struct {
 		name  string
 		attrs map[string]any
 	}{
-		{"create", workspaceCreateAttrs(CreateWorkspaceRequest{Name: "w", OIDCAudiences: []string{}})},
-		{"update", workspaceUpdateAttrs(UpdateWorkspaceRequest{OIDCAudiences: []string{}})},
+		{"create", workspaceCreateAttrs(CreateWorkspaceRequest{Name: "w", OIDCAudiences: empty})},
+		{"update", workspaceUpdateAttrs(UpdateWorkspaceRequest{OIDCAudiences: empty})},
 	} {
 		got, sent := tc.attrs["oidc-audiences"]
 		if !sent {
@@ -244,14 +272,14 @@ func TestOIDCAudiencesClearsWithAnExplicitEmptyList(t *testing.T) {
 				"cannot be opted back out", tc.name)
 			continue
 		}
-		if list, ok := got.([]string); !ok || len(list) != 0 {
-			t.Errorf("%s sent oidc-audiences = %#v, want an empty []string", tc.name, got)
+		if m, ok := got.(map[string][]string); !ok || len(m) != 0 {
+			t.Errorf("%s sent oidc-audiences = %#v, want an empty map", tc.name, got)
 		}
 	}
 }
 
 // nil means "leave the server-side value alone". Asserting it separately from
-// the empty-list case is the whole point: collapsing the two would make every
+// the empty-map case is the whole point: collapsing the two would make every
 // PATCH that does not mention audiences clear them.
 func TestOIDCAudiencesOmittedWhenNil(t *testing.T) {
 	if _, sent := workspaceCreateAttrs(CreateWorkspaceRequest{Name: "w"})["oidc-audiences"]; sent {
@@ -266,7 +294,7 @@ func TestOIDCAudiencesOmittedWhenNil(t *testing.T) {
 // the value reaches the server in the shape it expects.
 func TestOIDCAudiencesMarshalsIntoTheRequestBody(t *testing.T) {
 	attrs := workspaceUpdateAttrs(UpdateWorkspaceRequest{
-		OIDCAudiences: []string{"sts.example.com"},
+		OIDCAudiences: map[string][]string{"aws": {"sts.example.com"}},
 	})
 	body, err := MarshalResourceWithID("ws-1", "workspaces", attrs)
 	if err != nil {
@@ -275,15 +303,15 @@ func TestOIDCAudiencesMarshalsIntoTheRequestBody(t *testing.T) {
 	var doc struct {
 		Data struct {
 			Attributes struct {
-				OIDCAudiences []string `json:"oidc-audiences"`
+				OIDCAudiences map[string][]string `json:"oidc-audiences"`
 			} `json:"attributes"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &doc); err != nil {
 		t.Fatalf("unmarshal body: %v", err)
 	}
-	if len(doc.Data.Attributes.OIDCAudiences) != 1 ||
-		doc.Data.Attributes.OIDCAudiences[0] != "sts.example.com" {
+	got := doc.Data.Attributes.OIDCAudiences["aws"]
+	if len(got) != 1 || got[0] != "sts.example.com" {
 		t.Errorf("body carried oidc-audiences = %v", doc.Data.Attributes.OIDCAudiences)
 	}
 }
@@ -294,12 +322,12 @@ func TestOIDCAudiencesMarshalsIntoTheRequestBody(t *testing.T) {
 // actually makes, which is where a mismatch surfaces as "Provider produced
 // inconsistent result after apply".
 func TestUpdateWorkspaceRoundTripsOIDCAudiences(t *testing.T) {
-	var sent []string
+	var sent map[string][]string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Data struct {
 				Attributes struct {
-					OIDCAudiences []string `json:"oidc-audiences"`
+					OIDCAudiences map[string][]string `json:"oidc-audiences"`
 				} `json:"attributes"`
 			} `json:"data"`
 		}
@@ -308,9 +336,17 @@ func TestUpdateWorkspaceRoundTripsOIDCAudiences(t *testing.T) {
 		}
 		sent = in.Data.Attributes.OIDCAudiences
 		w.Header().Set("Content-Type", "application/vnd.api+json")
+		// The server echoes the MERGED view, which is wider than what was sent:
+		// the workspace set `aws`, and `vault` is inherited from the
+		// deployment's catalogue. A consumer must be able to read that back
+		// without mistaking the inherited entry for one it owns.
+		merged := map[string][]string{"vault": {"https://vault.example.com"}}
+		for k, v := range sent {
+			merged[k] = v
+		}
 		out, _ := json.Marshal(map[string]any{"data": map[string]any{
 			"id": "ws-1", "type": "workspaces",
-			"attributes": map[string]any{"name": "my-workspace", "oidc-audiences": sent},
+			"attributes": map[string]any{"name": "my-workspace", "oidc-audiences": merged},
 		}})
 		_, _ = w.Write(out)
 	}))
@@ -321,15 +357,18 @@ func TestUpdateWorkspaceRoundTripsOIDCAudiences(t *testing.T) {
 	}
 
 	ws, err := c.UpdateWorkspace(context.Background(), "ws-1", UpdateWorkspaceRequest{
-		OIDCAudiences: []string{"sts.example.com", "api://example-exchange"},
+		OIDCAudiences: map[string][]string{"aws": {"sts.example.com"}},
 	})
 	if err != nil {
 		t.Fatalf("UpdateWorkspace: %v", err)
 	}
-	if len(sent) != 2 || sent[0] != "sts.example.com" {
+	if len(sent) != 1 || len(sent["aws"]) != 1 || sent["aws"][0] != "sts.example.com" {
 		t.Fatalf("server received oidc-audiences = %v", sent)
 	}
-	if len(ws.OIDCAudiences) != 2 || ws.OIDCAudiences[1] != "api://example-exchange" {
-		t.Errorf("read back oidc-audiences = %v", ws.OIDCAudiences)
+	if got := ws.OIDCAudiences["aws"]; len(got) != 1 || got[0] != "sts.example.com" {
+		t.Errorf("read back oidc-audiences[aws] = %v", got)
+	}
+	if _, ok := ws.OIDCAudiences["vault"]; !ok {
+		t.Error("the inherited target was lost on read-back")
 	}
 }
