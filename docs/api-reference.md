@@ -3707,7 +3707,7 @@ which comes from the presented runner token.
 
 | Status | Meaning | What the runner does |
 |---|---|---|
-| **200** | `{"tokens": [{"target", "token", "audiences"}], "phase", "expires_in"}` | Writes each to `/var/run/terrapod/oidc/<target>/token` (mode `0600`) and exports `TERRAPOD_OIDC_TOKEN_DIR`, `TF_VAR_terrapod_oidc_token_dir`, `TERRAPOD_RUN_PHASE` and `TF_VAR_terrapod_run_phase` |
+| **200** | `{"tokens": [{"target", "token", "audiences"}], "phase", "expires_in"}` | Writes each to `/var/run/terrapod/oidc/<target>/token` (mode `0600`) and exports `TERRAPOD_OIDC_TOKEN_DIR`, `TERRAPOD_RUN_PHASE` and `TF_VAR_terrapod_run_phase` |
 | **204** | The workspace maps nothing; the issuer is not enabled deployment-wide; the configuration declares no provider; or nothing it uses is mapped | Takes no action. The run authenticates with the agent pool's identity, exactly as before |
 | **404** | This API does not serve the route | Read as "nothing to do" — an API older than the runner image, which in agent mode upgrades independently |
 | **409** | The resolved audiences changed since the run was created, **or** discovery was not `ok` for a workspace that maps targets | **Fails the run**, carrying the reason |
@@ -3775,8 +3775,8 @@ catalogue (`api.config.auth.oidc_issuer.audiences`) that a workspace's own
 `oidc-audiences` map merges over, plus whether the issuer is published at all.
 
 It exists because the two-level merge is otherwise hard to observe: a workspace
-read returns that workspace's **override**, so it says what the workspace owns
-but nothing about what it inherits. Reading the catalogue beside it is what makes
+read returns the **merged** map, so it says what the workspace will actually
+mint for but not which of those entries the workspace itself owns. Reading the catalogue beside it is what makes
 the effective mapping visible.
 
 **Response:**

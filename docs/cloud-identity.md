@@ -76,6 +76,15 @@ are read-only `GET`s that take no parameters. The audiences in particular stay
 off this surface on purpose — an audience is the value a trust policy matches
 on, so the *set* of them names the roles a deployment can ask to assume.
 
+**Runners still need no outbound reach, and that is worth stating plainly**,
+because "network isolation is traded here" invites the opposite reading. What
+this feature needs is the *issuer* reachable **inbound** by the cloud's identity
+provider — two read-only paths fetched by the cloud, on its own schedule. The
+runner's own traffic is unchanged: it POSTs to the Terrapod API it already talks
+to, and the provider makes the same cloud-API calls it made before. Nothing in a
+run newly reaches the public internet, and the provider mirror and binary cache
+are untouched.
+
 **There is deliberately no air-gapped variant**, and there will not be one. The
 major clouds cannot federate to an issuer they cannot fetch, so a
 "locally-provided JWKS" mode would work for a minority of targets and fail for
@@ -191,10 +200,10 @@ exposed as a side effect.
 >     - /.well-known/jwks.json
 > ```
 >
-> List them explicitly here: the chart **refuses an empty `paths`** (an Ingress
-> that accepts nothing is almost certainly a mistake), and because the automatic
+> List them explicitly here if you also want webhook paths. Because the automatic
 > addition de-duplicates, naming them yourself yields exactly these two and no
-> webhook path.
+> webhook path — and `paths: []` with the issuer enabled is a first-class
+> configuration meaning "publish the issuer and no webhook path at all".
 >
 > The issuer deliberately rides this Ingress rather than getting one of its own,
 > because its `paths` allow-list is already the right granularity.
@@ -435,26 +444,22 @@ uses, mints one token per matching target, and writes each to its own path:
 |---|---|---|
 | `/var/run/terrapod/oidc/<target>/token` | **One JWT per provider configuration**, mode `0600`. `<target>` is the map key — `aws`, or `aws.west` | **file** |
 | `TERRAPOD_OIDC_TOKEN_DIR` | `/var/run/terrapod/oidc` — the **directory**, for a configuration that would rather not hard-code it | env |
-| `TF_VAR_terrapod_oidc_token_dir` | The same value as a Terraform variable — declare `variable "terrapod_oidc_token_dir" {}` and it arrives with no wiring | env |
 | `TERRAPOD_RUN_PHASE` | `plan` or `apply` | env |
 | `TF_VAR_terrapod_run_phase` | The same value as a Terraform variable | env |
 
-A provider block builds its own path from the directory:
+A provider block names the path directly:
 
 ```hcl
-variable "terrapod_oidc_token_dir" {
-  type    = string
-  default = "/var/run/terrapod/oidc"
-}
-
-# -> /var/run/terrapod/oidc/aws/token
-web_identity_token_file = "${var.terrapod_oidc_token_dir}/aws/token"
+web_identity_token_file = "/var/run/terrapod/oidc/aws/token"
 ```
 
-**Give the variable a default.** The environment variables are exported only
-once at least one token has been delivered, so a workspace whose resolved map is
-empty — or a `tofu plan` run outside Terrapod — leaves them unset. A declared
-variable with no default would then fail to resolve.
+**The path is the contract, and there is deliberately no Terraform variable for
+it.** Exporting one would reserve a name inside your configuration in order to
+say something the documented path already says, and a configuration should not
+have to accept a variable it did not choose. `TERRAPOD_OIDC_TOKEN_DIR` remains
+for a shell [execution hook](execution-hooks.md) or script, which cannot read a
+Terraform variable at all; it is exported only once at least one token has been
+delivered, so treat its absence as "this run mints nothing" rather than an error.
 
 **There is deliberately no per-target environment variable.** A target name may
 carry a dot (`aws.west`) and there is no sane environment variable name for that,
@@ -600,7 +605,7 @@ provider "aws" {
   assume_role_with_web_identity {
     role_arn                = "arn:aws:iam::123456789012:role/terrapod-prod-dns"
     session_name            = "terrapod"
-    web_identity_token_file = "${var.terrapod_oidc_token_dir}/aws/token"
+    web_identity_token_file = "/var/run/terrapod/oidc/aws/token"
   }
 }
 ```
@@ -649,7 +654,7 @@ provider "aws" {
 
   assume_role_with_web_identity {
     role_arn                = "arn:aws:iam::123456789012:role/terrapod-prod-dns-west"
-    web_identity_token_file = "${var.terrapod_oidc_token_dir}/aws.west/token"
+    web_identity_token_file = "/var/run/terrapod/oidc/aws.west/token"
   }
 }
 ```
@@ -674,7 +679,7 @@ provider "azurerm" {
   features {}
 
   use_oidc             = true
-  oidc_token_file_path = "${var.terrapod_oidc_token_dir}/azurerm/token"
+  oidc_token_file_path = "/var/run/terrapod/oidc/azurerm/token"
 
   client_id       = "00000000-0000-0000-0000-000000000000"
   tenant_id       = "11111111-1111-1111-1111-111111111111"
@@ -712,7 +717,7 @@ provider "google" {
   external_credentials {
     audience              = "//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/terrapod/providers/terrapod"
     service_account_email = "terrapod-prod-dns@my-project.iam.gserviceaccount.com"
-    identity_token        = file("${var.terrapod_oidc_token_dir}/google/token")
+    identity_token        = file("/var/run/terrapod/oidc/google/token")
   }
 }
 ```
@@ -772,7 +777,7 @@ file and gets a short-lived OpenBao/Vault token scoped to that workspace:
 provider "vault" {
   auth_login_jwt {
     role = "prod-dns"
-    jwt  = file("${var.terrapod_oidc_token_dir}/vault/token")
+    jwt  = file("/var/run/terrapod/oidc/vault/token")
   }
 }
 ```
@@ -844,7 +849,7 @@ variable "terrapod_run_phase" {
 provider "aws" {
   assume_role_with_web_identity {
     role_arn                = var.terrapod_run_phase == "apply" ? var.apply_role_arn : var.plan_role_arn
-    web_identity_token_file = "${var.terrapod_oidc_token_dir}/aws/token"
+    web_identity_token_file = "/var/run/terrapod/oidc/aws/token"
   }
 }
 ```

@@ -429,11 +429,21 @@ class TestOneFilePerTarget:
         assert env[cloud_identity.PHASE_ENV] == "apply"
         assert env[cloud_identity.PHASE_TFVAR_ENV] == "apply"
 
-    def test_the_directory_is_exported_as_a_tfvar_too(self, tmp_path):
-        """So a configuration builds `"${var.terrapod_oidc_token_dir}/aws/token"`
-        rather than hard-coding the path."""
+    def test_the_directory_is_never_exported_as_a_terraform_variable(self, tmp_path):
+        """Inverted from a test that asserted the opposite, and kept rather than
+        deleted because it is what protects the decision.
+
+        Exporting `TF_VAR_terrapod_oidc_token_dir` reserved a name inside the
+        operator's own configuration in order to say something the documented
+        path already says. A provider block names
+        `/var/run/terrapod/oidc/<target>/token` directly. The plain env var
+        survives for a shell hook, which cannot read a Terraform variable at
+        all; what must not come back is a second, Terraform-shaped way to spell
+        the same path.
+        """
         env, _ = self._run(tmp_path, mint=["aws"])
-        assert env[cloud_identity.TOKEN_DIR_TFVAR_ENV] == str(tmp_path / "oidc")
+        assert env[cloud_identity.TOKEN_DIR_ENV] == str(tmp_path / "oidc")
+        assert not [k for k in env if k.startswith("TF_VAR_") and "token_dir" in k]
 
     def test_no_per_cloud_env_is_set(self, tmp_path):
         """Setting AWS_WEB_IDENTITY_TOKEN_FILE and friends is what would break

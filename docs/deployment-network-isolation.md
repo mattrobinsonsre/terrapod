@@ -195,9 +195,9 @@ listener:
 > so there is nothing to uncomment — the issuer rides that Ingress rather than
 > getting one of its own, precisely because its `paths` allow-list is already the
 > right granularity. Enabling it with **only** those two paths in `paths` and no
-> webhook path at all is a first-class configuration — list them explicitly,
-> because the chart refuses an empty `paths` and the automatic addition
-> de-duplicates.
+> webhook path at all is a first-class configuration — set `paths: []` with the
+> issuer enabled, which the chart accepts for exactly this case, or list the two
+> explicitly, since the automatic addition de-duplicates either way.
 >
 > Runs on workspaces whose resolved audience map is empty are unaffected either
 > way — they use the agent pool's ServiceAccount, which needs no public surface at
