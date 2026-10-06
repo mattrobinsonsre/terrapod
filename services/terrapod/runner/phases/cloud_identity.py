@@ -213,6 +213,7 @@ def _request(
     *,
     what: str,
     not_found_ok: bool = False,
+    params: dict[str, str] | None = None,
 ) -> dict | None:
     """One retried API call. Returns the body, or None on 204.
 
@@ -231,7 +232,7 @@ def _request(
     last = "no attempt made"
     for attempt in (1, 2, 3):
         try:
-            resp = client.request(method, url, headers=headers)
+            resp = client.request(method, url, headers=headers, params=params)
             if resp.status_code == 204:
                 return None
             if resp.status_code == 404 and not_found_ok:
@@ -344,7 +345,12 @@ def run(
                 cfg,
                 client,
                 "POST",
-                f"{_base(cfg)}/cloud-identity-token?target={target}",
+                f"{_base(cfg)}/cloud-identity-token",
+                # Through `params`, not interpolated into the URL. A target name
+                # is derived from the engine's graph output rather than written
+                # by us, so letting it reach the query string unencoded would
+                # make the engine's output able to shape the request.
+                params={"target": target},
                 what=f"minting the cloud identity token for {target!r}",
             )
             if minted is None:
