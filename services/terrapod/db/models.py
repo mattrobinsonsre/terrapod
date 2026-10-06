@@ -2128,6 +2128,23 @@ class Run(Base):
     oidc_audiences: Mapped[dict[str, list[str]]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
     )
+    # Which targets a token was ACTUALLY minted for on this run, appended by the
+    # mint endpoint as it serves each one (#1901).
+    #
+    # Recorded rather than derived, because the two sets differ in a way that
+    # matters. `oidc_audiences` above is the snapshot of CONFIGURED targets, and
+    # it is the merged map — so it carries deployment-wide entries a workspace
+    # may never use. Scoping the confirm-time staleness check to the configured
+    # set would mean one edit to the deployment catalogue refusing every pending
+    # apply in the fleet, including runs whose own identity had not moved. This
+    # is the set the check is actually about: what the plan presented.
+    #
+    # Written sequentially by the runner (one mint at a time per phase), so the
+    # read-modify-write here needs no locking. It only ever grows, so a retry
+    # that re-mints is harmless and a superset is still sound.
+    oidc_minted_targets: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
     # `pool_id` is the pool this run is currently associated with: at creation
     # it is element 0 of the workspace's pool set, and on claim it is rewritten
     # to the pool that actually took the run — so cancellation, job-status

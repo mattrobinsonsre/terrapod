@@ -689,16 +689,56 @@ def _plan_expired(run: Run, workspace: Workspace | None) -> bool:
     return (now_utc() - run.plan_finished_at).total_seconds() > ttl
 
 
+def _cloud_identity_moved_since_plan(run: Run, workspace: Workspace | None) -> str | None:
+    """The cloud identities this run's plan presented, if any have changed (#1901).
+
+    The apply would otherwise run against real infrastructure under a different
+    identity from the one its plan was reviewed under. The runner's mint path
+    refuses this too, per target — but that happens inside a Job, after it has
+    been scheduled and after `init`, so catching it here fails before anything
+    exists and names what moved.
+
+    **Scoped to what the run actually MINTED for, not what it was configured
+    for.** The configured snapshot is the merged map, so it carries
+    deployment-wide catalogue entries a workspace may never use; checking
+    against that set would mean one edit to the catalogue refusing every pending
+    apply in the fleet, including runs whose own identity had not moved at all.
+
+    A target the catalogue has gained since the plan is deliberately NOT a
+    staleness cause: the mint reads the run's snapshot, so a new target yields
+    no token at apply exactly as it yielded none at plan, and the identity the
+    apply presents is unchanged.
+    """
+    if workspace is None:
+        return None
+    minted = [str(t) for t in (run.oidc_minted_targets or [])]
+    if not minted:
+        return None
+
+    from terrapod.config import settings
+    from terrapod.services import cloud_identity_resolver
+
+    live = cloud_identity_resolver.resolve_for_workspace(workspace, settings=settings)
+    changed = cloud_identity_resolver.changed_targets(run.oidc_audiences or {}, live, minted)
+    if not changed:
+        return None
+    return "cloud identity configuration changed since plan (" + ", ".join(changed) + ")"
+
+
 async def _staleness_reason(db: AsyncSession, run: Run, workspace: Workspace | None) -> str | None:
     """The reason an apply-capable planned run may no longer be applied, or None
     if it is still fresh. State drift (#647) is a correctness guard checked first;
-    time-based expiry (#646) second. Plan-only / drift / speculative runs never
-    go stale (they never apply)."""
+    cloud identity drift (#1901) second, because both are "the world moved" and a
+    named cause beats a generic timeout; time-based expiry (#646) last. Plan-only
+    / drift / speculative runs never go stale (they never apply)."""
     if not _is_supersedeable_kind(run):
         return None
     moved_to = await _state_moved_since_plan(db, run)
     if moved_to is not None:
         return f"state changed since plan (serial {run.plan_state_serial} -> {moved_to})"
+    identity_moved = _cloud_identity_moved_since_plan(run, workspace)
+    if identity_moved is not None:
+        return identity_moved
     if _plan_expired(run, workspace):
         return f"plan expired after {workspace.plan_expiry_seconds}s"
     return None

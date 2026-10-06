@@ -198,6 +198,10 @@
   "catalog.show_catalog_instance": [
     "input-values"
   ],
+  "cloud_identity.get_oidc_audience_defaults": [
+    "audiences",
+    "issuer-enabled"
+  ],
   "cloud_identity.list_signing_keys": [
     "activates-at",
     "created-at",

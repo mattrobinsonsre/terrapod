@@ -65,8 +65,24 @@ def upgrade() -> None:
             ),
         )
 
+    # An ARRAY here, unlike the object above: what a run actually minted for, as
+    # opposed to what it was configured for. Separate because the configured
+    # snapshot is the MERGED map and so includes deployment-wide targets a
+    # workspace may never use -- scoping the confirm-time check to it would let
+    # one catalogue edit refuse every pending apply in the fleet.
+    op.add_column(
+        "runs",
+        sa.Column(
+            "oidc_minted_targets",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default="[]",
+        ),
+    )
+
 
 def downgrade() -> None:
+    op.drop_column("runs", "oidc_minted_targets")
     for table in ("runs", "autodiscovery_rules", "workspaces"):
         op.drop_column(table, "oidc_audiences")
 

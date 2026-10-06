@@ -100,6 +100,11 @@ def _db(run, ws):
         return None
 
     db.get = AsyncMock(side_effect=_get)
+    # The mint WRITES now — it records the target it served, which is what the
+    # confirm-time staleness check is scoped to. A MagicMock here is not
+    # awaitable, so this fixture has to match production rather than the route's
+    # earlier read-only shape.
+    db.commit = AsyncMock()
     return db
 
 
@@ -543,3 +548,62 @@ class TestTheAudienceDefaults:
         runner, and does not need to — the runner never calls it."""
         resp = await _call_defaults(_user(run_id="r", phase="plan"), cfg=_enabled(audiences={}))
         assert resp.status_code == 200
+
+
+class TestTheMintRecordsWhatItServed:
+    """`Run.oidc_minted_targets` is what the confirm-time staleness check is
+    scoped to, so it has to be written by the only thing that knows: the mint.
+
+    Recorded rather than derived from the configured snapshot, because that
+    snapshot is the MERGED map and carries deployment-wide catalogue entries a
+    workspace may never use. Checking against it would let one edit to the
+    catalogue refuse every pending apply in the fleet.
+    """
+
+    async def test_a_served_target_is_recorded(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        run.oidc_minted_targets = []
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, target="aws", cfg=cfg
+        )
+        assert resp.status_code == 200
+        assert run.oidc_minted_targets == ["aws"]
+
+    async def test_several_targets_accumulate(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azure": [AZURE]})
+        run.oidc_minted_targets = []
+        for t in ("aws", "azure"):
+            await _call(_user(run_id=str(run.id), phase="plan"), run, ws, target=t, cfg=cfg)
+        assert run.oidc_minted_targets == ["aws", "azure"]
+
+    async def test_a_repeat_mint_does_not_duplicate(self):
+        """An apply phase re-mints the same targets the plan did, and a retry
+        re-mints too. The set only grows, so a duplicate would be harmless —
+        but it would also make the recorded list unbounded over a long run."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        run.oidc_minted_targets = []
+        for _ in range(3):
+            await _call(_user(run_id=str(run.id), phase="plan"), run, ws, target="aws", cfg=cfg)
+        assert run.oidc_minted_targets == ["aws"]
+
+    async def test_a_target_that_maps_to_nothing_is_not_recorded(self):
+        """204, so nothing was served. Recording it would make the confirm check
+        refuse an apply over an identity the plan never presented."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        run.oidc_minted_targets = []
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, target="gcp", cfg=cfg
+        )
+        assert resp.status_code == 204
+        assert run.oidc_minted_targets == []
+
+    async def test_a_refused_mint_is_not_recorded(self):
+        """A 409 means the configuration moved, so no token was issued."""
+        from fastapi import HTTPException
+
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, snapshot={"aws": ["sts.old.example"]})
+        run.oidc_minted_targets = []
+        with pytest.raises(HTTPException) as exc:
+            await _call(_user(run_id=str(run.id), phase="plan"), run, ws, target="aws", cfg=cfg)
+        assert exc.value.status_code == 409
+        assert run.oidc_minted_targets == []

@@ -180,6 +180,22 @@ async def mint_cloud_identity_token(
         claims["phase"] = phase
 
     token = sign_identity_token(claims, ttl_seconds=settings.auth.oidc_issuer.token_ttl_seconds)
+
+    # Record what was actually minted, so the confirm-time staleness check can
+    # be scoped to the identities this run PRESENTED rather than to the ones it
+    # was configured for. The configured snapshot is the merged map and carries
+    # deployment-wide targets a workspace may never use, so checking against it
+    # would let one catalogue edit refuse every pending apply in the fleet.
+    #
+    # Appended after signing, never before: a recorded target that was never
+    # served would make the confirm check refuse an apply over an identity the
+    # plan never presented.
+    minted = list(run.oidc_minted_targets or [])
+    if target not in minted:
+        minted.append(target)
+        run.oidc_minted_targets = minted
+        await db.commit()
+
     logger.info(
         "minted cloud identity token",
         run_id=str(run.id),
