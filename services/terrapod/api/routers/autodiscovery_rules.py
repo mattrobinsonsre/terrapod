@@ -644,7 +644,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         # defaults to satisfy the in-memory construction.
         execution_mode=fields.get("execution_mode", "agent"),
         execution_backend=fields.get("execution_backend", "tofu"),
-        terraform_version=fields.get("terraform_version", "1.12"),
+        terraform_version=fields.get("terraform_version", "1.13"),
         resource_cpu=fields.get("resource_cpu", "1"),
         resource_memory=fields.get("resource_memory", "2Gi"),
         oidc_audiences=fields.get("oidc_audiences", {}),

@@ -2659,7 +2659,7 @@ POST /api/terrapod/v1/autodiscovery-rules
       "execution-mode": "agent",
       "execution-backend": "tofu",
       "agent-pool-id": "apool-019e01db-...",
-      "terraform-version": "1.12",
+      "terraform-version": "1.13",
       "resource-cpu": "1",
       "resource-memory": "2Gi",
       "auto-apply": false,
@@ -2972,7 +2972,7 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
 ```json
 { "filter": { "labels": {"team": "foundations"} },
   "update": {
-    "terraform-version": "1.12",
+    "terraform-version": "1.13",
     "execution-backend": "tofu",
     "auto-apply": false,
     "agent-pool-id": "apool-...",

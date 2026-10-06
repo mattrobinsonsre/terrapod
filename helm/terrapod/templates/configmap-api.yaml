@@ -844,7 +844,7 @@ data:
       {{- end }}
     {{- end }}
     default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
-    default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.12" | quote }}
+    default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.13" | quote }}
     {{- with .Values.api.config.cors }}
     {{- /* Only emit `cors:` when at least one child renders — a bare `cors:`
            serialises to null, which Settings (CORSConfig) rejects. The common

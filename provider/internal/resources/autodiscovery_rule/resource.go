@@ -23,7 +23,7 @@
 //	"execution-mode"     -> execution_mode      (string, optional, default "agent")
 //	"execution-backend"  -> execution_backend   (string, optional, default "tofu")
 //	"agent-pool-id"      -> agent_pool_id       (string, optional)
-//	"terraform-version"  -> terraform_version   (string, optional, default "1.11")
+//	"terraform-version"  -> terraform_version   (string, optional, default "1.13")
 //	"resource-cpu"       -> resource_cpu        (string, optional, default "1")
 //	"resource-memory"    -> resource_memory     (string, optional, default "2Gi")
 //	"auto-apply"         -> auto_apply          (bool, optional, default false)
@@ -254,10 +254,10 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				},
 			},
 			"terraform_version": schema.StringAttribute{
-				Description: "Default terraform/tofu version for created workspaces. Defaults to \"1.11\".",
+				Description: "Default terraform/tofu version for created workspaces. Defaults to \"1.13\".",
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("1.11"),
+				Default:     stringdefault.StaticString("1.13"),
 			},
 			"resource_cpu": schema.StringAttribute{
 				Description: "Default CPU request for runner Jobs in created workspaces. Defaults to \"1\".",

@@ -95,7 +95,7 @@ class RunnerConfig(BaseSettings):
         "(e.g. http://terrapod-api:8000). Also the base for presigned storage URLs. "
         "Env override: TERRAPOD_SERVER_URL.",
     )
-    default_terraform_version: str = Field(default="1.12")
+    default_terraform_version: str = Field(default="1.13")
     default_execution_backend: str = Field(default="tofu")
     # --- Listener operational settings (non-sensitive; from runners.yaml) ---
     # Previously read by the listener directly from os.environ; now layered
@@ -3157,7 +3157,7 @@ class Settings(BaseSettings):
         description="Default execution backend for new workspaces (tofu or terraform)",
     )
     default_terraform_version: str = Field(
-        default="1.12",
+        default="1.13",
         description="Default terraform/tofu version for new workspaces",
     )
 

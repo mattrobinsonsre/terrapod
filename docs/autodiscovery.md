@@ -55,7 +55,7 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `execution-mode` | enum | no | Must be `agent` (default). Autodiscovery is VCS-driven; `local` mode would create workspaces with queued runs and no executor. |
 | `agent-pool-id` | UUID | no | Inherited by created workspaces in `agent` mode. |
 | `execution-backend` | enum | no | `tofu` or `terraform`. Default `tofu`. |
-| `terraform-version` | string | no | Default `1.12`. |
+| `terraform-version` | string | no | Default `1.13`. |
 | `resource-cpu` / `resource-memory` | string | no | Defaults `1` / `2Gi`. |
 | `auto-apply` | bool | no | Default `false`. Superseded by `auto-apply-mode` when that is set. |
 | `auto-apply-mode` | string | no | Conditional auto-apply templated onto created workspaces: `never`, `always`, `create`, `create_update`. `create`/`create_update` never auto-apply a plan that destroys or replaces a resource. Set this **or** `auto-apply`, not both (422). |
