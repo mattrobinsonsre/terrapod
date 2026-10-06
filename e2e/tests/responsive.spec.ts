@@ -1527,7 +1527,7 @@ test.describe('Per-workspace run identity (#1901)', () => {
     // that is no precedent. `.check()` also drives the input and waits for
     // actionability, where clicking the long label row did not.
     const gate = page
-      .locator('label', { hasText: /Set run identity audiences/i })
+      .locator('label', { hasText: /Set OIDC run identity audiences/i })
       .locator('input[type="checkbox"]')
     await expect(gate).toBeVisible({ timeout: 15_000 })
 
