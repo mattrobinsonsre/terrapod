@@ -305,7 +305,7 @@ class Workspace(Base):
     execution_backend: Mapped[str] = mapped_column(
         String(20), nullable=False, default="tofu"
     )  # tofu, terraform
-    terraform_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.12")
+    terraform_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.13")
     # Terragrunt single-unit support (#534): when enabled the runner invokes
     # `terragrunt` wrapping the tofu/terraform binary (via TG_TF_PATH). Version
     # is partial (e.g. "0.67"), resolved via the binary cache like
@@ -1352,7 +1352,7 @@ class AutodiscoveryRule(Base):
         nullable=True,
     )
     execution_backend: Mapped[str] = mapped_column(String(20), nullable=False, default="tofu")
-    terraform_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.12")
+    terraform_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.13")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
     # Templated onto workspaces this rule materialises (#1901). Same override

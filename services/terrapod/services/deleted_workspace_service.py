@@ -458,7 +458,7 @@ async def restore_workspace(
         owner_email=settings.get("owner_email") or restored_by,
         execution_mode=settings.get("execution_mode") or "local",
         execution_backend=settings.get("execution_backend") or "tofu",
-        terraform_version=settings.get("terraform_version") or "1.12",
+        terraform_version=settings.get("terraform_version") or "1.13",
         terragrunt_enabled=bool(settings.get("terragrunt_enabled")),
         terragrunt_version=settings.get("terragrunt_version") or "1.0",
         working_directory=settings.get("working_directory") or "",

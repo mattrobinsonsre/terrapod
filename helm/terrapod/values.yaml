@@ -190,7 +190,7 @@ api:
 
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform
-    default_terraform_version: "1.12"
+    default_terraform_version: "1.13"
 
     # Storage configuration — exactly one backend must be configured.
     # IMPORTANT: Filesystem storage is for dev/single-instance only.
@@ -1675,7 +1675,7 @@ runners:
   launchTimeoutSeconds: 300
   # Default terraform/tofu version + backend for runner Jobs when a workspace
   # doesn't pin one. Runs snapshot the resolved version at creation time.
-  defaultTerraformVersion: "1.12"
+  defaultTerraformVersion: "1.13"
   defaultExecutionBackend: "tofu"  # tofu | terraform
   # Maximum wall-clock seconds a drift-detection run may spend in `planning`
   # before the reconciler errors it out. Independent of staleTimeoutSeconds:
