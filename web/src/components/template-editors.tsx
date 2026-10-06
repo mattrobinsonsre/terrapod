@@ -603,7 +603,7 @@ export function OidcAudiencesEditor({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="oidc-audience-editor">
       {inert && (
         // Said rather than left to be discovered: with no issuer published, an
         // empty map here looks configurable and is not, and an entry an

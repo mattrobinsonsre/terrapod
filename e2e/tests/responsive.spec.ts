@@ -1550,9 +1550,15 @@ test.describe('Per-workspace run identity (#1901)', () => {
     await page.getByTestId('oidc-provider-input').fill('aws.west')
     await add.click()
     await expect(page.getByRole('button', { name: 'Add audience' })).toBeVisible()
-    // A fleet template is a pure override — nothing is merged into it — so a
-    // new entry is the workspace's own and carries that badge.
-    await expect(page.getByText('Workspace', { exact: true }).first()).toBeVisible()
+    // A fleet template is a pure override with nothing to merge against, so it
+    // has no provenance to report. The badge the workspace read view carries
+    // must NOT appear here, or the form asserts an ownership it cannot know --
+    // the defect `showProvenance` was added to fix, and this is its only guard.
+    // Scoped to the editor: a bare negative on an admin page could pass or fail
+    // on any other element that happens to render the exact word.
+    const editor = page.getByTestId('oidc-audience-editor')
+    await expect(editor.getByText('Workspace', { exact: true })).toHaveCount(0)
+    await expect(editor.getByText('Deployment default')).toHaveCount(0)
     await expectNoHorizontalPageScroll(page)
   })
 
