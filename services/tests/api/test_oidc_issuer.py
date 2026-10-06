@@ -133,3 +133,61 @@ class TestTheJWKSResponse:
                 resp = await router.jwks()
             age = int(resp.headers["cache-control"].rsplit("=", 1)[1])
             assert age <= window, f"advertised a {age}s cache inside a {window}s window"
+
+
+class TestTheTwoPublicPathsCannotMove:
+    """The published trust root. These two strings are frozen harder than
+    anything under `/api/v2`, and nothing else in the suite was watching them.
+
+    **The route contract cannot see them.** `app.py` mounts this router inside
+    `if settings.auth.oidc_issuer.enabled:` and that setting defaults to false,
+    so the snapshot generator builds the app with the issuer off and the two
+    paths never reach `api_route_contract.json`. It is the only conditionally
+    mounted router in the application, which makes it the only place the route
+    gate is structurally blind — and it happens to be the place where a rename
+    is least recoverable.
+
+    Least recoverable because a cloud is CONFIGURED with the issuer URL and
+    then fetches these exact paths itself, so renaming either one breaks every
+    federated workspace across every cloud at once, and the breakage surfaces
+    inside the cloud's token exchange rather than anywhere on the Terrapod
+    side. There is no deprecation window available: a trust root cannot be
+    served at two addresses and migrated.
+    """
+
+    def _mounted(self) -> set[str]:
+        return {r.path for r in router.router.routes}
+
+    def test_the_two_paths_are_exactly_these_strings(self):
+        assert self._mounted() == {
+            "/.well-known/openid-configuration",
+            "/.well-known/jwks.json",
+        }
+
+    def test_the_router_serves_nothing_else(self):
+        """A third route added here would be anonymous and public by
+        construction, since these are the only endpoints mounted outside the
+        authenticated prefixes. That has to be a deliberate act with a test
+        change, not a decorator someone adds while editing the file."""
+        assert len(self._mounted()) == 2
+
+    async def test_the_advertised_jwks_uri_is_a_path_that_is_actually_SERVED(self):
+        """The JWKS path exists as TWO independent literals — the
+        `@router.get` decorator, and an f-string building `jwks_uri` inside the
+        discovery document. Renaming one leaves the document advertising a path
+        that 404s, which is the agreement failure this file exists for: the
+        cloud reads `jwks_uri` from the document and fetches it, so it believes
+        the document over the router.
+        """
+        with patch(
+            "terrapod.config.settings", _settings(public_url="https://terrapod.example.com")
+        ):
+            resp = await router.openid_configuration()
+        doc = json.loads(resp.body)
+
+        advertised = doc["jwks_uri"].removeprefix("https://terrapod.example.com")
+        assert advertised in self._mounted(), (
+            f"the discovery document advertises {advertised!r}, which this router "
+            f"does not serve — a cloud would fetch it and get a 404"
+        )
+        assert doc["issuer"] == "https://terrapod.example.com"
