@@ -1966,9 +1966,12 @@ webhookIngress:
   paths:
     - /api/terrapod/v1/vcs-events       # GitHub / GitLab webhook receivers
     - /api/terrapod/v1/task-stage-results # external run-task callback receiver
-    # Uncomment together with api.config.auth.oidc_issuer.enabled:
-    # - /.well-known/openid-configuration
-    # - /.well-known/jwks.json
+    # The two issuer paths are added AUTOMATICALLY when
+    # api.config.auth.oidc_issuer.enabled is true -- you do not list them here.
+    # Publishing a trust root the clouds cannot fetch is not a degraded
+    # configuration but a broken one, and the failure surfaces at the cloud's
+    # token exchange rather than anywhere on the Terrapod side. Listing them
+    # by hand as well is harmless (the template de-duplicates).
 
 # ── Internal Ingress (optional) ─────────────────────────────────────────────
 # Optional THIRD Ingress for the internal-only surface: listener pods

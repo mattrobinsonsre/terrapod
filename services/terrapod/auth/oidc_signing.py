@@ -85,6 +85,17 @@ class SigningKey:
 _keys: list[SigningKey] | None = None
 _signing_kid: str | None = None
 
+#: The published JWKS, memoised against the set of `kid`s it was built from.
+#:
+#: Rendering it means parsing every private key PEM, and the discovery and JWKS
+#: documents are the two endpoints a deployment must expose publicly for
+#: federation to work at all -- so without this an unauthenticated caller can
+#: make the API do RSA key parsing at whatever rate they like. The cache key is
+#: the tuple of `kid`s, which is sound rather than approximate: a `kid` is an
+#: RFC 7638 thumbprint DERIVED from the key material, so identical kids mean
+#: identical keys and changed material cannot reuse a kid.
+_jwks_cache: tuple[tuple[str, ...], dict[str, list[dict[str, str]]]] | None = None
+
 
 def generate_private_key() -> rsa.RSAPrivateKey:
     return rsa.generate_private_key(public_exponent=_RSA_PUBLIC_EXPONENT, key_size=_RSA_KEY_SIZE)
@@ -302,13 +313,27 @@ def get_jwks() -> dict[str, list[dict[str, str]]]:
     Everything currently loaded, which is the current key plus any retired key
     still inside its grace window — a token signed before a rotation has to keep
     verifying until it expires.
+
+    Memoised: this is served unauthenticated by necessity, and building it parses
+    every private key PEM. See `_jwks_cache` for why the kid tuple is a sound
+    cache key. The returned dict is the cached one and callers must not mutate
+    it — the route serialises it and does not.
     """
+    global _jwks_cache  # noqa: PLW0603
+
     if _keys is None:
         raise RuntimeError(
             "OIDC issuer signing key not initialised — init_oidc_signing() runs in "
             "the app lifespan."
         )
-    return {"keys": [public_jwk(load_private_key(k.private_key_pem), k.kid) for k in _keys]}
+
+    kids = tuple(k.kid for k in _keys)
+    if _jwks_cache is not None and _jwks_cache[0] == kids:
+        return _jwks_cache[1]
+
+    jwks = {"keys": [public_jwk(load_private_key(k.private_key_pem), k.kid) for k in _keys]}
+    _jwks_cache = (kids, jwks)
+    return jwks
 
 
 async def rotate_signing_key(db: AsyncSession) -> SigningKey:
@@ -396,9 +421,10 @@ async def reload_signing_keys(db: AsyncSession) -> list[SigningKey]:
 
 
 def _reset_for_tests() -> None:
-    global _keys, _signing_kid  # noqa: PLW0603
+    global _keys, _signing_kid, _jwks_cache  # noqa: PLW0603
     _keys = None
     _signing_kid = None
+    _jwks_cache = None
 
 
 def sign_identity_token(claims: dict, *, ttl_seconds: int) -> str:
