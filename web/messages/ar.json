@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws أو aws.west",
       "providerInvalid": "اسم provider لا يحتوي على مسافات، وبه نقطة واحدة على الأكثر — aws أو aws.west.",
       "providerDuplicate": "تهيئة provider هذه لها مُدخل بالفعل.",
-      "removeProviderAria": "إزالة تهيئة provider {provider}"
+      "removeProviderAria": "إزالة تهيئة provider {provider}",
+      "badgeOwned": "مساحة العمل",
+      "badgeInherited": "قيمة النشر الافتراضية",
+      "override": "تجاوز",
+      "overrideAria": "تجاوز جماهير {provider} في مساحة العمل هذه",
+      "issuerDisabled": "لا ينشر هذا النشر أي مُصدِر OpenID Connect، ولذلك لا يمكن لأي شيء يُهيَّأ هنا أن يصبح ساريًا."
     },
     "autoApplyMode": {
       "never": "أبدًا",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "جماهير هوية التشغيل",
       "oidcAudiencesHint": "يُصدر Terrapod رمز OpenID Connect قصير العمر لكل تهيئة provider يستخدمها التشغيل، ويكتبه في ملف يمكن للتشغيل قراءته. اجعل مفتاح المُدخل هو provider بالاسم الذي تسميه به تهيئتك — aws، أو aws.west لتهيئة ذات اسم بديل — ثم اسرد الجماهير التي يقبلها ذلك الهدف. كل مُدخل يتجاوز تهيئة النشر نفسها لذلك provider؛ أزِله فيعود ذلك provider إلى جماهير النشر. الجمهور سلسلة معتمة اختارها هدف الاتحاد، ولذلك يُخزَّن تمامًا كما تكتبه.",
       "oidcAudiencesPlaceholder": "مثال: sts.amazonaws.com",
-      "oidcAudiencesNone": "لا تجاوزات (تستخدم مساحة العمل هذه الجماهير المهيّأة في النشر)",
-      "oidcAudiencesAdd": "إضافة جمهور"
+      "oidcAudiencesNone": "لا شيء (تستخدم عمليات التشغيل هوية مجموعة الوكلاء الخاصة)",
+      "oidcAudiencesAdd": "إضافة جمهور",
+      "oidcAudiencesLoading": "يجري التحقق من الجماهير المهيّأة في النشر …"
     },
     "vcsWorkflowWarning": {
       "title": "تم تفويض الترخيص إلى مستودع VCS الخاص بك.",

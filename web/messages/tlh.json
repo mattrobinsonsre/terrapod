@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "Da aws, pagh aws.west",
       "providerInvalid": "provider pong: Daq chIm Hutlh ''ej wa'' per neH ghaj — aws, pagh aws.west.",
       "providerDuplicate": "provider chenmoHghachvam ngoD ghajtaH.",
-      "removeProviderAria": "{provider} provider chenmoHghach teq"
+      "removeProviderAria": "{provider} provider chenmoHghach teq",
+      "badgeOwned": "Qumwo''",
+      "badgeInherited": "nISwI'' motlh",
+      "override": "chartlh",
+      "overrideAria": "Qumwo''vamDaq {provider} HevwI''mey chartlh",
+      "issuerDisabled": "nISwI''vam OpenID Connect nobwI'' pagh ngeH; vaj naDev chenmoHlu''bogh pagh Qap."
     },
     "autoApplyMode": {
       "never": "not",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "vum pong HevwI''mey",
       "oidcAudiencesHint": "vum lo''bogh Hoch provider chenmoHghachvaD, Terrapod OpenID Connect chaw'' ngaj chenmoH ''ej vum laDlaHbogh teywI''Daq lan. chenmoHghachlIj provider pongbogh rur ngoD ngaQHa''wI'' yIlan — aws, pagh pongqa''bogh chenmoHghachvaD aws.west — ''ej ghochvetlh Hevbogh HevwI''mey yItetlh. Hoch ngoD provider''vetlhvaD nISwI'' chenmoHghach chartlh; yIteq ''ej provider''vetlh nISwI'' HevwI''meyDaq chegh. HevwI'' ''oH DIvI'' ghoch wIvbogh pegh ngaD; vaj DaghItlhbogh rur lan.",
       "oidcAudiencesPlaceholder": "Da sts.amazonaws.com",
-      "oidcAudiencesNone": "ngoD pagh (Qumwo''vam nISwI''Daq chenmoHlu''bogh HevwI''mey lo'')",
-      "oidcAudiencesAdd": "HevwI'' chel"
+      "oidcAudiencesNone": "pagh (vummey Duy bIQ''a'' pong lo'')",
+      "oidcAudiencesAdd": "HevwI'' chel",
+      "oidcAudiencesLoading": "nISwI''Daq chenmoHlu''bogh HevwI''mey wIlegh …"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

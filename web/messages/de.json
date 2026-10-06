@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws oder aws.west",
       "providerInvalid": "Ein Provider-Name enthält keine Leerzeichen und höchstens einen Punkt — aws oder aws.west.",
       "providerDuplicate": "Für diese Provider-Konfiguration gibt es bereits einen Eintrag.",
-      "removeProviderAria": "Provider-Konfiguration {provider} entfernen"
+      "removeProviderAria": "Provider-Konfiguration {provider} entfernen",
+      "badgeOwned": "Arbeitsbereich",
+      "badgeInherited": "Standard der Bereitstellung",
+      "override": "Überschreiben",
+      "overrideAria": "Audiences für {provider} in diesem Arbeitsbereich überschreiben",
+      "issuerDisabled": "Diese Bereitstellung veröffentlicht keinen OpenID-Connect-Issuer, daher kann hier nichts Konfiguriertes wirksam werden."
     },
     "autoApplyMode": {
       "never": "nie",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audiences der Lauf-Identität",
       "oidcAudiencesHint": "Terrapod stellt für jede Provider-Konfiguration, die ein Lauf verwendet, ein kurzlebiges OpenID-Connect-Token aus und schreibt es in eine Datei, die der Lauf lesen kann. Schlüsseln Sie einen Eintrag auf den Provider, wie ihn Ihre Konfiguration benennt — aws, oder aws.west für eine mit Alias versehene Konfiguration — und listen Sie die Audiences auf, die dieses Ziel akzeptiert. Jeder Eintrag überschreibt die Konfiguration der Bereitstellung für diesen Provider; entfernen Sie ihn, und dieser Provider fällt auf die Audiences der Bereitstellung zurück. Eine Audience ist eine opake Zeichenfolge, die das Föderationsziel gewählt hat, und wird daher genau so gespeichert, wie sie eingegeben wurde.",
       "oidcAudiencesPlaceholder": "z. B. sts.amazonaws.com",
-      "oidcAudiencesNone": "Keine Überschreibungen (dieser Arbeitsbereich übernimmt die in der Bereitstellung konfigurierten Audiences)",
-      "oidcAudiencesAdd": "Audience hinzufügen"
+      "oidcAudiencesNone": "Keine (Läufe verwenden die eigene Identität des Agent-Pools)",
+      "oidcAudiencesAdd": "Audience hinzufügen",
+      "oidcAudiencesLoading": "Die in der Bereitstellung konfigurierten Audiences werden geprüft …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

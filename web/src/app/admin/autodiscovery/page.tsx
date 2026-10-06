@@ -22,6 +22,7 @@ import {
 } from '@/components/template-editors'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
+import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import { useSortable } from '@/lib/use-sortable'
 import { useFormat } from '@/lib/format'
 
@@ -130,6 +131,11 @@ export default function AutodiscoveryPage() {
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [ownerEmail, setOwnerEmail] = useState('')
   const [varFiles, setVarFiles] = useState<string[]>([])
+  // Only to tell the operator when the deployment publishes no issuer, so an
+  // entry added here could never be minted for. No partition on this surface:
+  // the value IS the override — unlike a workspace read, nothing is merged
+  // into it — so there is nothing to subtract and nothing to inherit.
+  const oidcDefaults = useOidcAudienceDefaults()
   // Templated onto every workspace the rule creates (#1901), keyed on the
   // provider configuration a token is for. Empty is the default and overrides
   // nothing: those workspaces take the deployment's configured audiences.
@@ -785,6 +791,7 @@ export default function AutodiscoveryPage() {
                 <p className="text-xs text-slate-500 mb-2">{t('form.oidcAudiencesHint')}</p>
                 <OidcAudiencesEditor
                   value={oidcAudiences}
+                  inert={!oidcDefaults.issuerEnabled}
                   onChange={setOidcAudiences}
                   audiencePlaceholder={tWs('fields.oidcAudiencesPlaceholder')}
                   addAudienceLabel={tWs('fields.oidcAudiencesAdd')}

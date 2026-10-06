@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, oppure aws.west",
       "providerInvalid": "Un nome di provider non contiene spazi e al massimo un punto — aws, oppure aws.west.",
       "providerDuplicate": "Quella configurazione di provider ha già una voce.",
-      "removeProviderAria": "Rimuovi la configurazione di provider {provider}"
+      "removeProviderAria": "Rimuovi la configurazione di provider {provider}",
+      "badgeOwned": "Spazio di lavoro",
+      "badgeInherited": "Valore del deployment",
+      "override": "Sovrascrivi",
+      "overrideAria": "Sovrascrivi le audience di {provider} in questo spazio di lavoro",
+      "issuerDisabled": "Questo deployment non pubblica alcun issuer OpenID Connect, quindi nulla di ciò che viene configurato qui può avere effetto."
     },
     "autoApplyMode": {
       "never": "mai",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audience dell''identità di esecuzione",
       "oidcAudiencesHint": "Terrapod emette un token OpenID Connect di breve durata per ogni configurazione di provider che un''esecuzione utilizza e lo scrive in un file che l''esecuzione può leggere. Indicizza una voce sul provider come lo chiama la tua configurazione — aws, oppure aws.west per una configurazione con alias — ed elenca le audience che quel target accetta. Ogni voce sovrascrive la configurazione propria del deployment per quel provider; rimuovila e quel provider torna alle audience del deployment. Un''audience è una stringa opaca scelta dal target di federazione, quindi viene salvata esattamente come la digiti.",
       "oidcAudiencesPlaceholder": "es. sts.amazonaws.com",
-      "oidcAudiencesNone": "Nessuna sovrascrittura (questo spazio di lavoro usa le audience configurate nel deployment)",
-      "oidcAudiencesAdd": "Aggiungi audience"
+      "oidcAudiencesNone": "Nessuna (le esecuzioni usano l''identità propria del pool di agenti)",
+      "oidcAudiencesAdd": "Aggiungi audience",
+      "oidcAudiencesLoading": "Controllo delle audience configurate nel deployment …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizzazione delegata al tuo repository VCS.",

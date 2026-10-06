@@ -18,6 +18,7 @@ import {
   type RunTaskSpec,
   type NotificationSpec,
 } from '@/components/template-editors'
+import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 
@@ -137,6 +138,12 @@ export default function BulkUpdatePage() {
   const [uLabels, setULabels] = useState<Record<string, string>>({})
   const [uSetVarFiles, setUSetVarFiles] = useState(false)
   const [uVarFiles, setUVarFiles] = useState<string[]>([])
+  // Only to tell the operator when the deployment publishes no issuer, so an
+  // entry added here could never be minted for. No partition on this surface:
+  // the value IS the override — unlike a workspace read, nothing is merged
+  // into it — so there is nothing to subtract and nothing to inherit.
+  const oidcDefaults = useOidcAudienceDefaults()
+
   // A checkbox gate, not a bare editor: an EMPTY map is a meaningful value
   // here — it clears every override, so each provider falls back to the
   // deployment's own configured audiences — and there is therefore no in-band
@@ -869,6 +876,7 @@ export default function BulkUpdatePage() {
                 <p className="text-xs text-slate-400">{tWs('fields.oidcAudiencesHint')}</p>
                 <OidcAudiencesEditor
                   value={uOidcAudiences}
+                  inert={!oidcDefaults.issuerEnabled}
                   onChange={setUOidcAudiences}
                   audiencePlaceholder={tWs('fields.oidcAudiencesPlaceholder')}
                   addAudienceLabel={tWs('fields.oidcAudiencesAdd')}

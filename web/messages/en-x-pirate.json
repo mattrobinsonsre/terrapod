@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, or aws.west",
       "providerInvalid": "A provider name bears no spaces an'' one dot at most — aws, or aws.west.",
       "providerDuplicate": "That provider riggin'' be already on th'' books.",
-      "removeProviderAria": "Remove th'' {provider} provider riggin''"
+      "removeProviderAria": "Remove th'' {provider} provider riggin''",
+      "badgeOwned": "Work-deck",
+      "badgeInherited": "Deployment''s own",
+      "override": "Override",
+      "overrideAria": "Override th'' {provider} audiences fer this work-deck",
+      "issuerDisabled": "This deployment hoists no OpenID Connect issuer, so naught rigged here can ever bite."
     },
     "autoApplyMode": {
       "never": "nary",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Voyage colours audiences",
       "oidcAudiencesHint": "Terrapod strikes a short-lived OpenID Connect token fer every provider riggin'' a voyage uses an'' scrawls it t'' a file th'' voyage can read. Key an entry on th'' provider as yer riggin'' names it — aws, or aws.west fer a riggin'' wi'' an alias — an'' list th'' audiences that port will accept. Every entry overrides th'' deployment''s own riggin'' fer that provider; strike it off an'' that provider falls back t'' th'' deployment''s audiences. An audience be an opaque string th'' federation port chose, so it be stowed exactly as ye typed it.",
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
-      "oidcAudiencesNone": "None (this work-deck takes th'' deployment''s configured audiences)",
-      "oidcAudiencesAdd": "Add an audience"
+      "oidcAudiencesNone": "None (voyages sail under th'' Agent Crew''s own colours)",
+      "oidcAudiencesAdd": "Add an audience",
+      "oidcAudiencesLoading": "Checkin'' th'' audiences th'' deployment has rigged …"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

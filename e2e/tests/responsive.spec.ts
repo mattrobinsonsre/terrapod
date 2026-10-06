@@ -1421,9 +1421,20 @@ test.describe('AI policy gate (#1766)', () => {
 test.describe('Per-workspace run identity (#1901)', () => {
   // The mobile guard for the three surfaces #1901 adds the audience editor to.
   // The value is a MAP of provider configuration -> audiences, so each entry is
-  // a card holding its own key and its own list of rows, and an audience is a
-  // long opaque string (`api://AzureADTokenExchange`) — exactly the shape that
-  // pushes a page sideways when a value is allowed to set a card's width.
+  // a card holding its own key, a provenance badge and its own list of rows,
+  // and an audience is a long opaque string (`api://AzureADTokenExchange`) —
+  // exactly the shape that pushes a page sideways when a value is allowed to
+  // set a card's width.
+  //
+  // What this suite CANNOT reach: the inherited half. A workspace read returns
+  // the deployment catalogue merged over the workspace's own map, so an entry
+  // only reads as inherited when the deployment configures one — and
+  // `auth.oidc_issuer.audiences` defaults to empty with the issuer OFF, which
+  // the e2e stack does not override. Configuring it is a compose/Helm change,
+  // so the subtraction is pinned by unit test (`web/tests/oidc-audiences.test.ts`)
+  // and what is asserted here is the half this stack can actually produce:
+  // every entry workspace-owned, and the issuer-disabled notice shown rather
+  // than an empty editor that looks configurable.
 
   test('the workspace audience map reads and edits at phone width', async ({ page }) => {
     const token = getStoredToken()
@@ -1452,13 +1463,28 @@ test.describe('Per-workspace run identity (#1901)', () => {
     const spy = async (d: Dialog) => { dialogFired = true; await d.dismiss() }
     page.on('dialog', spy)
 
+    // Provenance is rendered, not inferred from absence: this stack configures
+    // no catalogue, so both entries are the workspace's own and both say so.
+    // A badge on each side is what makes "which of these did I set" answerable
+    // at a glance, and the read view is where someone asks it.
+    await expect(shown.getByText('Workspace', { exact: true }).first()).toBeVisible()
+    await expect(shown.getByText('Deployment default')).toHaveCount(0)
+
     await page.getByRole('button', { name: 'Edit' }).first().click()
 
     // Each existing entry carries its own audience list, so 'Add audience'
     // belongs to a card while 'Add provider configuration' is the top-level one.
+    // The editor appears only once the catalogue probe has settled — before
+    // that the partition would mark every inherited entry as owned — so this
+    // wait is load-bearing, not incidental.
     const addProvider = page.getByRole('button', { name: 'Add provider configuration' })
     await expect(addProvider).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('button', { name: 'Add audience' }).first()).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // The issuer is off by default, so the editor says it is inert rather than
+    // letting an operator configure something that can never be minted for.
+    await expect(page.getByTestId('oidc-issuer-disabled')).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 
     // A row's action is a real button with a tap target, not bare coloured
@@ -1509,6 +1535,9 @@ test.describe('Per-workspace run identity (#1901)', () => {
     await page.getByTestId('oidc-provider-input').fill('aws.west')
     await add.click()
     await expect(page.getByRole('button', { name: 'Add audience' })).toBeVisible()
+    // A fleet template is a pure override — nothing is merged into it — so a
+    // new entry is the workspace's own and carries that badge.
+    await expect(page.getByText('Workspace', { exact: true }).first()).toBeVisible()
     await expectNoHorizontalPageScroll(page)
   })
 

@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, or aws.west",
       "providerInvalid": "A provider name has no spaces and at most one dot — aws, or aws.west.",
       "providerDuplicate": "That provider configuration already has an entry.",
-      "removeProviderAria": "Remove the {provider} provider configuration"
+      "removeProviderAria": "Remove the {provider} provider configuration",
+      "badgeOwned": "Workspace",
+      "badgeInherited": "Deployment default",
+      "override": "Override",
+      "overrideAria": "Override the {provider} audiences for this workspace",
+      "issuerDisabled": "This deployment publishes no OpenID Connect issuer, so nothing configured here can take effect."
     },
     "autoApplyMode": {
       "never": "never",
@@ -2554,8 +2559,9 @@
       "oidcAudiences": "Run identity audiences",
       "oidcAudiencesHint": "Terrapod mints a short-lived OpenID Connect token for each provider configuration a run uses and writes it to a file the run can read. Key an entry on the provider as your configuration names it — aws, or aws.west for an aliased configuration — and list the audiences that target accepts. Each entry overrides the deployment's own configuration for that provider; remove it and that provider falls back to the deployment's audiences. An audience is an opaque string the federation target chose, so it is stored exactly as typed.",
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
-      "oidcAudiencesNone": "No overrides (this workspace takes the deployment's configured audiences)",
-      "oidcAudiencesAdd": "Add audience"
+      "oidcAudiencesNone": "None (runs use the agent pool's own identity)",
+      "oidcAudiencesAdd": "Add audience",
+      "oidcAudiencesLoading": "Checking the deployment's configured audiences…"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",

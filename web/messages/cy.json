@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, neu aws.west",
       "providerInvalid": "Nid oes bylchau yn enw provider, ac un dot ar y mwyaf — aws, neu aws.west.",
       "providerDuplicate": "Mae cofnod gan y cyfluniad provider hwnnw'n barod.",
-      "removeProviderAria": "Tynnu cyfluniad provider {provider}"
+      "removeProviderAria": "Tynnu cyfluniad provider {provider}",
+      "badgeOwned": "Gweithle",
+      "badgeInherited": "Rhagosodiad y defnydd",
+      "override": "Disodli",
+      "overrideAria": "Disodli cynulleidfaoedd {provider} yn y gweithle hwn",
+      "issuerDisabled": "Nid yw'r defnydd hwn yn cyhoeddi unrhyw gyhoeddwr OpenID Connect, felly ni all unrhyw beth a gyflunnir yma gael effaith."
     },
     "autoApplyMode": {
       "never": "byth",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Cynulleidfaoedd hunaniaeth rhediad",
       "oidcAudiencesHint": "Mae Terrapod yn cyhoeddi tocyn OpenID Connect byrhoedlog ar gyfer pob cyfluniad provider y mae rhediad yn ei ddefnyddio, ac yn ei ysgrifennu i ffeil y gall y rhediad ei darllen. Allweddwch gofnod ar y provider fel y mae eich cyfluniad yn ei enwi — aws, neu aws.west ar gyfer cyfluniad ag alias — a rhestrwch y cynulleidfaoedd y mae'r targed hwnnw'n eu derbyn. Mae pob cofnod yn disodli cyfluniad y defnydd ei hun ar gyfer y provider hwnnw; tynnwch e ac mae'r provider hwnnw'n dychwelyd at gynulleidfaoedd y defnydd. Llinyn afloyw a ddewiswyd gan y targed ffederasiwn yw cynulleidfa, felly caiff ei storio yn union fel yr ydych yn ei deipio.",
       "oidcAudiencesPlaceholder": "e.e. sts.amazonaws.com",
-      "oidcAudiencesNone": "Dim disodlo (mae'r gweithle hwn yn defnyddio'r cynulleidfaoedd a gyflunnir yn y defnydd)",
-      "oidcAudiencesAdd": "Ychwanegu cynulleidfa"
+      "oidcAudiencesNone": "Dim (mae rhediadau yn defnyddio hunaniaeth y pwll asiantau ei hun)",
+      "oidcAudiencesAdd": "Ychwanegu cynulleidfa",
+      "oidcAudiencesLoading": "Yn gwirio'r cynulleidfaoedd a gyflunnir yn y defnydd …"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

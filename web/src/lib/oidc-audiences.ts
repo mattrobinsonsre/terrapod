@@ -64,3 +64,77 @@ export function sanitizeOidcAudiences(value: OidcAudiences): OidcAudiences {
   }
   return out
 }
+
+/** What `GET /api/terrapod/v1/oidc/audience-defaults` carries, flattened. */
+export interface OidcAudienceDefaults {
+  /** The deployment-wide catalogue a workspace's own map merges over. Empty
+   *  when the deployment configures none, which is the default. */
+  audiences: OidcAudiences
+  /** False when the deployment publishes no OpenID Connect issuer at all, so
+   *  nothing configured here can take effect. Distinct from an empty
+   *  catalogue: the issuer can be on with nothing configured. */
+  issuerEnabled: boolean
+}
+
+/** Order-sensitive list equality. Order matters and is not an implementation
+ *  detail: the entries are what goes into `aud`, and the server treats a
+ *  reorder as a change for exactly that reason, so treating one as equal here
+ *  would hide a real difference. */
+export function sameAudiences(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((v, i) => v === b[i])
+}
+
+export interface OidcAudiencePartition {
+  /**
+   * The entries this workspace OWNS — present in the effective map and either
+   * absent from the catalogue or differing from it. This is the set that goes
+   * back on the wire, and sending only this is what stops a save promoting
+   * every inherited entry into an override.
+   */
+  owned: OidcAudiences
+  /**
+   * The catalogue value for every key the effective map contains — including
+   * the keys currently owned, which is deliberate: it is what each key would
+   * FALL BACK to, so removing an owned entry can reveal the default in place
+   * rather than making the key vanish. The editor renders the ones not present
+   * in `owned`, so the two cannot show the same key twice.
+   *
+   * A catalogue entry the server dropped as malformed is absent from the
+   * effective map and so absent here too, which is right — it is not in force,
+   * and showing it as inherited would claim otherwise.
+   */
+  fallbacks: OidcAudiences
+}
+
+/**
+ * Split the merged map a workspace read returns into what the workspace owns
+ * and what it inherits (#1901).
+ *
+ * The workspace endpoint returns the catalogue with the workspace's own map
+ * merged over it per key, with no marker saying which is which — so the only
+ * way to tell them apart is to fetch the catalogue and subtract. Without this
+ * the UI cannot show provenance, and worse, writing the merged value back
+ * wholesale would turn every inherited entry into an override.
+ *
+ * **One accepted fidelity loss, deliberate — do not try to engineer round it.**
+ * An override whose value happens to EQUAL the default is indistinguishable
+ * from an inherited entry, so it reads as inherited and is dropped from the
+ * next save. The effective audiences do not change (the key falls back to the
+ * identical default), so the outcome is benign. This is the same loss AWS's
+ * `tags`/`default_tags` has lived with for years, and it is accepted on the
+ * provider side too.
+ */
+export function partitionOidcAudiences(
+  merged: OidcAudiences,
+  defaults: OidcAudiences,
+): OidcAudiencePartition {
+  const owned: OidcAudiences = {}
+  const fallbacks: OidcAudiences = {}
+  for (const [key, list] of Object.entries(merged || {})) {
+    const fallback = (defaults || {})[key]
+    if (fallback) fallbacks[key] = [...fallback]
+    if (!fallback || !sameAudiences(list || [], fallback)) owned[key] = [...(list || [])]
+  }
+  return { owned, fallbacks }
+}

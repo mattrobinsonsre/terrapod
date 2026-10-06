@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws ya da aws.west",
       "providerInvalid": "Bir provider adında boşluk olmaz ve en fazla bir nokta bulunur — aws ya da aws.west.",
       "providerDuplicate": "Bu provider yapılandırmasının zaten bir kaydı var.",
-      "removeProviderAria": "{provider} provider yapılandırmasını kaldır"
+      "removeProviderAria": "{provider} provider yapılandırmasını kaldır",
+      "badgeOwned": "Çalışma alanı",
+      "badgeInherited": "Dağıtım varsayılanı",
+      "override": "Geçersiz kıl",
+      "overrideAria": "Bu çalışma alanında {provider} audience''larını geçersiz kıl",
+      "issuerDisabled": "Bu dağıtım hiçbir OpenID Connect sağlayıcısı yayımlamıyor; bu nedenle burada yapılandırılan hiçbir şey etkili olamaz."
     },
     "autoApplyMode": {
       "never": "asla",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Çalıştırma kimliği audience''ları",
       "oidcAudiencesHint": "Terrapod, bir çalıştırmanın kullandığı her provider yapılandırması için kısa ömürlü bir OpenID Connect token''ı üretir ve onu çalıştırmanın okuyabileceği bir dosyaya yazar. Bir kaydı, yapılandırmanızın provider''ı adlandırdığı biçimde anahtarlayın — aws ya da alias''lı bir yapılandırma için aws.west — ve o hedefin kabul ettiği audience''ları listeleyin. Her kayıt, o provider için dağıtımın kendi yapılandırmasını geçersiz kılar; kaydı kaldırırsanız o provider dağıtımın audience''larına geri döner. Audience, federasyon hedefinin seçtiği opak bir dizedir; bu yüzden tam yazdığınız gibi saklanır.",
       "oidcAudiencesPlaceholder": "örn. sts.amazonaws.com",
-      "oidcAudiencesNone": "Geçersiz kılma yok (bu çalışma alanı dağıtımda yapılandırılmış audience''ları kullanır)",
-      "oidcAudiencesAdd": "Audience ekle"
+      "oidcAudiencesNone": "Yok (çalıştırmalar agent havuzunun kendi kimliğini kullanır)",
+      "oidcAudiencesAdd": "Audience ekle",
+      "oidcAudiencesLoading": "Dağıtımda yapılandırılmış audience''lar denetleniyor …"
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

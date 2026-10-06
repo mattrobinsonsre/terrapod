@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, vel aws.west",
       "providerInvalid": "Nomen provider spatia non habet et ad summum unum punctum — aws, vel aws.west.",
       "providerDuplicate": "Illa configuratio provider iam inscriptionem habet.",
-      "removeProviderAria": "Configurationem provider {provider} removere"
+      "removeProviderAria": "Configurationem provider {provider} removere",
+      "badgeOwned": "Locus operis",
+      "badgeInherited": "Praedefinitum instructionis",
+      "override": "Supervertere",
+      "overrideAria": "Auditores pro {provider} in hoc loco operis supervertere",
+      "issuerDisabled": "Haec instructio nullum emissorem OpenID Connect publicat, ideo nihil hic configuratum valere potest."
     },
     "autoApplyMode": {
       "never": "numquam",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Auditores identitatis exsecutionis",
       "oidcAudiencesHint": "Terrapod pro omni configuratione provider quam exsecutio adhibet tesseram OpenID Connect brevis aevi emittit eamque in tabulam scribit quam exsecutio legere potest. Inscriptionem sub provider pone, sicut configuratio tua eum nominat — aws, vel aws.west pro configuratione cum alias — et auditores quos illud propositum accipit enumera. Omnis inscriptio configurationem propriam instructionis pro illo provider supervertit; eam remove, et ille provider ad auditores instructionis redit. Auditor chorda opaca est quam propositum foederationis elegit, ideo prorsus ut eam scribis servatur.",
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
-      "oidcAudiencesNone": "Nullae superscriptiones (hic locus operis auditores in instructione configuratos adhibet)",
-      "oidcAudiencesAdd": "Auditorem addere"
+      "oidcAudiencesNone": "Nulli (exsecutiones propria identitate copiae actorum utuntur)",
+      "oidcAudiencesAdd": "Auditorem addere",
+      "oidcAudiencesLoading": "Auditores in instructione configurati examinantur …"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

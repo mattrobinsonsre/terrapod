@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws eller aws.west",
       "providerInvalid": "Ett providernamn innehåller inga blanksteg och högst en punkt — aws eller aws.west.",
       "providerDuplicate": "Den providerkonfigurationen har redan en post.",
-      "removeProviderAria": "Ta bort providerkonfigurationen {provider}"
+      "removeProviderAria": "Ta bort providerkonfigurationen {provider}",
+      "badgeOwned": "Arbetsyta",
+      "badgeInherited": "Deploymentets standard",
+      "override": "Åsidosätt",
+      "overrideAria": "Åsidosätt audiences för {provider} i den här arbetsytan",
+      "issuerDisabled": "Det här deploymentet publicerar ingen OpenID Connect-utfärdare, så inget som konfigureras här kan få effekt."
     },
     "autoApplyMode": {
       "never": "aldrig",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audiences för körningsidentitet",
       "oidcAudiencesHint": "Terrapod utfärdar ett kortlivat OpenID Connect-token för varje providerkonfiguration en körning använder och skriver det till en fil som körningen kan läsa. Nyckla en post på providern så som din konfiguration namnger den — aws, eller aws.west för en konfiguration med alias — och lista de audiences som målet accepterar. Varje post åsidosätter deploymentets egen konfiguration för den providern; ta bort den och providern faller tillbaka på deploymentets audiences. En audience är en opak sträng som federationsmålet har valt, så den lagras exakt som du skriver den.",
       "oidcAudiencesPlaceholder": "t.ex. sts.amazonaws.com",
-      "oidcAudiencesNone": "Inga åsidosättanden (den här arbetsytan använder de audiences som är konfigurerade i deploymentet)",
-      "oidcAudiencesAdd": "Lägg till audience"
+      "oidcAudiencesNone": "Ingen (körningar använder agentpoolens egen identitet)",
+      "oidcAudiencesAdd": "Lägg till audience",
+      "oidcAudiencesLoading": "Kontrollerar de audiences som är konfigurerade i deploymentet …"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

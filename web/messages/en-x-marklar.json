@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, or aws.west",
       "providerInvalid": "A marklar marklar has no marklars and at most one marklar — aws, or aws.west.",
       "providerDuplicate": "That marklar marklar already has a marklar.",
-      "removeProviderAria": "Remove the {provider} marklar marklar"
+      "removeProviderAria": "Remove the {provider} marklar marklar",
+      "badgeOwned": "Marklar",
+      "badgeInherited": "Marklar marklar",
+      "override": "Override",
+      "overrideAria": "Override the {provider} marklars for this marklar",
+      "issuerDisabled": "This marklar publishes no OpenID Connect marklar, so nothing configured here can take marklar."
     },
     "autoApplyMode": {
       "never": "never",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Marklar marklar marklars",
       "oidcAudiencesHint": "Terrapod mints a short-lived OpenID Connect marklar for each marklar marklar a marklar uses and writes it to a marklar the marklar can read. Key a marklar on the marklar as your marklar names it — aws, or aws.west for an aliased marklar — and list the marklars that marklar accepts. Each marklar overrides the marklar''s own marklar for that marklar; remove it and that marklar falls back to the marklar''s marklars. A marklar is an opaque marklar the marklar marklar chose, so it is stored exactly as typed.",
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
-      "oidcAudiencesNone": "No marklars (this marklar takes the marklar''s configured marklars)",
-      "oidcAudiencesAdd": "Add marklar"
+      "oidcAudiencesNone": "None (marklars use the marklar marklar''s own marklar)",
+      "oidcAudiencesAdd": "Add marklar",
+      "oidcAudiencesLoading": "Checking the marklar''s configured marklars …"
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",

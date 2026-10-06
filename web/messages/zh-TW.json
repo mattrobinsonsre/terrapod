@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws，或 aws.west",
       "providerInvalid": "provider 名稱不含空格，且最多一個點 — aws，或 aws.west。",
       "providerDuplicate": "該 provider 設定已有一筆項目。",
-      "removeProviderAria": "移除 provider 設定 {provider}"
+      "removeProviderAria": "移除 provider 設定 {provider}",
+      "badgeOwned": "工作區",
+      "badgeInherited": "部署預設值",
+      "override": "覆寫",
+      "overrideAria": "在此工作區覆寫 {provider} 的受眾",
+      "issuerDisabled": "此部署未簽發任何 OpenID Connect 簽發者，因此這裡設定的任何內容都不會生效。"
     },
     "autoApplyMode": {
       "never": "從不",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "執行身分受眾",
       "oidcAudiencesHint": "Terrapod 為執行所使用的每個 provider 設定簽發一個短期的 OpenID Connect 權杖，並寫入執行可讀取的檔案。項目的鍵使用你的設定對該 provider 的命名 — aws，或帶別名的設定用 aws.west — 然後列出該目標接受的受眾。每筆項目會覆寫部署自身針對該 provider 的設定；移除它，該 provider 便回退到部署的受眾。受眾是聯合目標自行選定的不透明字串，因此會依你輸入的原樣儲存。",
       "oidcAudiencesPlaceholder": "例如 sts.amazonaws.com",
-      "oidcAudiencesNone": "無覆寫（此工作區使用部署中設定的受眾）",
-      "oidcAudiencesAdd": "新增受眾"
+      "oidcAudiencesNone": "無（執行使用代理池自身的身分）",
+      "oidcAudiencesAdd": "新增受眾",
+      "oidcAudiencesLoading": "正在檢查部署中設定的受眾 …"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",

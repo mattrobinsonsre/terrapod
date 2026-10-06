@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws eller aws.west",
       "providerInvalid": "Et providernavn inneholder ingen mellomrom og høyst ett punktum — aws eller aws.west.",
       "providerDuplicate": "Den providerkonfigurasjonen har allerede en oppføring.",
-      "removeProviderAria": "Fjern providerkonfigurasjonen {provider}"
+      "removeProviderAria": "Fjern providerkonfigurasjonen {provider}",
+      "badgeOwned": "Arbeidsområde",
+      "badgeInherited": "Utrullingens standard",
+      "override": "Overstyr",
+      "overrideAria": "Overstyr audiences for {provider} i dette arbeidsområdet",
+      "issuerDisabled": "Denne utrullingen publiserer ingen OpenID Connect-utsteder, så ingenting som konfigureres her kan få virkning."
     },
     "autoApplyMode": {
       "never": "aldri",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audiences for kjøringsidentitet",
       "oidcAudiencesHint": "Terrapod utsteder et kortlevd OpenID Connect-token for hver providerkonfigurasjon en kjøring bruker, og skriver det til en fil kjøringen kan lese. Nøkle en oppføring på provideren slik konfigurasjonen din navngir den — aws, eller aws.west for en konfigurasjon med alias — og list opp audiences målet godtar. Hver oppføring overstyrer utrullingens egen konfigurasjon for den provideren; fjern den, og provideren faller tilbake til utrullingens audiences. En audience er en ugjennomsiktig streng føderasjonsmålet har valgt, så den lagres nøyaktig slik du skriver den.",
       "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com",
-      "oidcAudiencesNone": "Ingen overstyringer (dette arbeidsområdet bruker audiences som er konfigurert i utrullingen)",
-      "oidcAudiencesAdd": "Legg til audience"
+      "oidcAudiencesNone": "Ingen (kjøringer bruker agentpuljens egen identitet)",
+      "oidcAudiencesAdd": "Legg til audience",
+      "oidcAudiencesLoading": "Sjekker audiences som er konfigurert i utrullingen …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

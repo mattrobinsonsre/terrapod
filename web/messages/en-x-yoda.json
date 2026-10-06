@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, or aws.west",
       "providerInvalid": "No spaces a provider name has, and at most one dot — aws, or aws.west.",
       "providerDuplicate": "An entry that provider configuration already has.",
-      "removeProviderAria": "{provider} provider configuration, Remove"
+      "removeProviderAria": "{provider} provider configuration, Remove",
+      "badgeOwned": "Workspace",
+      "badgeInherited": "Deployment default",
+      "override": "Override",
+      "overrideAria": "For this workspace, the {provider} audiences override",
+      "issuerDisabled": "No OpenID Connect issuer, this deployment publishes, so take effect, nothing configured here can."
     },
     "autoApplyMode": {
       "never": "never",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audiences, run identity",
       "oidcAudiencesHint": "A short-lived OpenID Connect token for each provider configuration a run uses, Terrapod mints, and to a file the run can read, it writes. On the provider as your configuration names it, an entry key — aws, or aws.west for an aliased configuration — and the audiences that target accepts, list. The deployment''s own configuration for that provider, each entry overrides; remove it, and to the deployment''s audiences that provider falls back. An opaque string the federation target chose, an audience is, so exactly as typed, stored it is.",
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
-      "oidcAudiencesNone": "None (the deployment''s configured audiences, this workspace takes)",
-      "oidcAudiencesAdd": "audience, Add"
+      "oidcAudiencesNone": "None (the agent pool''s own identity, runs use)",
+      "oidcAudiencesAdd": "audience, Add",
+      "oidcAudiencesLoading": "The deployment''s configured audiences, checking …"
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",

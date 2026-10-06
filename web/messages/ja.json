@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws、または aws.west",
       "providerInvalid": "プロバイダー名に空白は入れられず、ドットは最大 1 つです — aws、または aws.west。",
       "providerDuplicate": "そのプロバイダー設定のエントリはすでにあります。",
-      "removeProviderAria": "プロバイダー設定 {provider} を削除"
+      "removeProviderAria": "プロバイダー設定 {provider} を削除",
+      "badgeOwned": "ワークスペース",
+      "badgeInherited": "デプロイメントの既定値",
+      "override": "上書き",
+      "overrideAria": "このワークスペースで {provider} のオーディエンスを上書き",
+      "issuerDisabled": "このデプロイメントは OpenID Connect の発行者を公開していないため、ここで設定したものは一切有効になりません。"
     },
     "autoApplyMode": {
       "never": "なし",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "実行アイデンティティのオーディエンス",
       "oidcAudiencesHint": "Terrapod は実行が使用するプロバイダー設定ごとに短命な OpenID Connect トークンを発行し、実行が読み取れるファイルに書き出します。エントリのキーには、あなたの設定がそのプロバイダーを呼ぶ名前を指定します — aws、またはエイリアス付き設定なら aws.west — そのうえで、その宛先が受け付けるオーディエンスを列挙します。各エントリはそのプロバイダーについてデプロイメント自身の設定を上書きします。エントリを削除すれば、そのプロバイダーはデプロイメントのオーディエンスに戻ります。オーディエンスはフェデレーション先が選んだ不透明な文字列なので、入力したとおりに保存されます。",
       "oidcAudiencesPlaceholder": "例: sts.amazonaws.com",
-      "oidcAudiencesNone": "上書きなし（このワークスペースはデプロイメントで設定されたオーディエンスを使用）",
-      "oidcAudiencesAdd": "オーディエンスを追加"
+      "oidcAudiencesNone": "なし（実行はエージェントプール自身のアイデンティティを使用）",
+      "oidcAudiencesAdd": "オーディエンスを追加",
+      "oidcAudiencesLoading": "デプロイメントで設定されたオーディエンスを確認しています …"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

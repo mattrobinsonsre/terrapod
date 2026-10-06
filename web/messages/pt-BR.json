@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, ou aws.west",
       "providerInvalid": "Um nome de provider não tem espaços e tem no máximo um ponto — aws, ou aws.west.",
       "providerDuplicate": "Essa configuração de provider já tem uma entrada.",
-      "removeProviderAria": "Remover a configuração de provider {provider}"
+      "removeProviderAria": "Remover a configuração de provider {provider}",
+      "badgeOwned": "Espaço de trabalho",
+      "badgeInherited": "Valor da implantação",
+      "override": "Sobrepor",
+      "overrideAria": "Sobrepor as audiences de {provider} neste espaço de trabalho",
+      "issuerDisabled": "Esta implantação não publica nenhum emissor OpenID Connect, portanto nada configurado aqui pode entrar em vigor."
     },
     "autoApplyMode": {
       "never": "nunca",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audiences da identidade de execução",
       "oidcAudiencesHint": "O Terrapod emite um token OpenID Connect de curta duração para cada configuração de provider que uma execução usa e o grava em um arquivo que a execução pode ler. Indexe cada entrada pelo provider como a sua configuração o nomeia — aws, ou aws.west para uma configuração com alias — e liste as audiences que esse destino aceita. Cada entrada sobrepõe a configuração própria da implantação para aquele provider; remova-a e aquele provider volta às audiences da implantação. Uma audience é uma string opaca escolhida pelo destino de federação, por isso é armazenada exatamente como você a digita.",
       "oidcAudiencesPlaceholder": "ex.: sts.amazonaws.com",
-      "oidcAudiencesNone": "Nenhuma sobreposição (este espaço de trabalho usa as audiences configuradas na implantação)",
-      "oidcAudiencesAdd": "Adicionar audience"
+      "oidcAudiencesNone": "Nenhuma (as execuções usam a identidade própria do agent pool)",
+      "oidcAudiencesAdd": "Adicionar audience",
+      "oidcAudiencesLoading": "Verificando as audiences configuradas na implantação …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

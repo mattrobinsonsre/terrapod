@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws tai aws.west",
       "providerInvalid": "Provider-nimessä ei ole välilyöntejä ja enintään yksi piste — aws tai aws.west.",
       "providerDuplicate": "Tällä provider-konfiguraatiolla on jo merkintä.",
-      "removeProviderAria": "Poista provider-konfiguraatio {provider}"
+      "removeProviderAria": "Poista provider-konfiguraatio {provider}",
+      "badgeOwned": "Työtila",
+      "badgeInherited": "Käyttöönoton oletus",
+      "override": "Ohita",
+      "overrideAria": "Ohita {provider}-audiencet tässä työtilassa",
+      "issuerDisabled": "Tämä käyttöönotto ei julkaise lainkaan OpenID Connect -myöntäjää, joten mikään tässä määritetty ei voi tulla voimaan."
     },
     "autoApplyMode": {
       "never": "ei koskaan",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Ajoidentiteetin audiencet",
       "oidcAudiencesHint": "Terrapod myöntää lyhytikäisen OpenID Connect -tokenin jokaiselle provider-konfiguraatiolle, jota ajo käyttää, ja kirjoittaa sen tiedostoon, jonka ajo voi lukea. Avaimena merkinnässä on provider sellaisena kuin konfiguraatiosi sen nimeää — aws tai aws.west alias-konfiguraatiolle — ja luettele audiencet, jotka kohde hyväksyy. Jokainen merkintä ohittaa käyttöönoton oman konfiguraation kyseiselle providerille; poista se, niin provider palaa käyttöönoton audienceihin. Audience on läpinäkymätön merkkijono, jonka federaatiokohde valitsi, joten se tallennetaan täsmälleen kirjoittamassasi muodossa.",
       "oidcAudiencesPlaceholder": "esim. sts.amazonaws.com",
-      "oidcAudiencesNone": "Ei ohituksia (tämä työtila käyttää käyttöönotossa konfiguroituja audienceja)",
-      "oidcAudiencesAdd": "Lisää audience"
+      "oidcAudiencesNone": "Ei mitään (ajot käyttävät agenttipoolin omaa identiteettiä)",
+      "oidcAudiencesAdd": "Lisää audience",
+      "oidcAudiencesLoading": "Tarkistetaan käyttöönotossa määritetyt audiencet …"
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

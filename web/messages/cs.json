@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, nebo aws.west",
       "providerInvalid": "Název provideru neobsahuje mezery a nejvýše jednu tečku — aws, nebo aws.west.",
       "providerDuplicate": "Tato konfigurace provideru už má záznam.",
-      "removeProviderAria": "Odebrat konfiguraci provideru {provider}"
+      "removeProviderAria": "Odebrat konfiguraci provideru {provider}",
+      "badgeOwned": "Pracovní prostor",
+      "badgeInherited": "Výchozí nastavení nasazení",
+      "override": "Přepsat",
+      "overrideAria": "Přepsat audience pro {provider} v tomto pracovním prostoru",
+      "issuerDisabled": "Toto nasazení nepublikuje žádného vydavatele OpenID Connect, takže nic, co se zde nastaví, nemůže nabýt účinnosti."
     },
     "autoApplyMode": {
       "never": "nikdy",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audience identity běhu",
       "oidcAudiencesHint": "Terrapod vydává krátkodobý token OpenID Connect pro každou konfiguraci provideru, kterou běh používá, a zapisuje ho do souboru, který si běh může přečíst. Záznam zaklíčujte na provider tak, jak ho pojmenovává vaše konfigurace — aws, nebo aws.west pro konfiguraci s aliasem — a vypište audience, které ten cíl přijímá. Každý záznam přepisuje vlastní konfiguraci nasazení pro daný provider; odeberte ho a ten provider se vrátí k audience nasazení. Audience je neprůhledný řetězec, který si vybral cíl federace, takže se ukládá přesně tak, jak ji napíšete.",
       "oidcAudiencesPlaceholder": "např. sts.amazonaws.com",
-      "oidcAudiencesNone": "Žádné přepisy (tento pracovní prostor používá audience nakonfigurované v nasazení)",
-      "oidcAudiencesAdd": "Přidat audience"
+      "oidcAudiencesNone": "Žádné (běhy používají vlastní identitu fondu agentů)",
+      "oidcAudiencesAdd": "Přidat audience",
+      "oidcAudiencesLoading": "Kontrolují se audience nakonfigurované v nasazení …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

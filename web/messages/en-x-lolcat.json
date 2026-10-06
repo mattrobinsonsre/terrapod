@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, or aws.west",
       "providerInvalid": "A providr naim haz no spacez an at most wun dot — aws, or aws.west.",
       "providerDuplicate": "Dat providr configurashun awreddy haz an entree.",
-      "removeProviderAria": "Remoov da {provider} providr configurashun"
+      "removeProviderAria": "Remoov da {provider} providr configurashun",
+      "badgeOwned": "Werkspace",
+      "badgeInherited": "Deployment defawlt",
+      "override": "Overrid",
+      "overrideAria": "Overrid da {provider} audiencez fer dis werkspace",
+      "issuerDisabled": "Dis deployment publishez no OpenID Connect issuer, so nuffin configurd heer can do anyfing."
     },
     "autoApplyMode": {
       "never": "nevr",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Run Identitee Audiencez",
       "oidcAudiencesHint": "Terrapod mintz a short-livd OpenID Connect tokin fer evry providr configurashun a run yuzez an ritez it ta a file da run can reed. Key an entree on da providr liek ur configurashun namez it — aws, or aws.west fer an aliasd configurashun — an list da audiencez dat targit akceptz. Evry entree overridez da deployment''z own configurashun fer dat providr; remoov it an dat providr fallz bak ta da deployment''z audiencez. An audienz iz an opayk string da federashun targit choze, so itz stord exackly as typd.",
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
-      "oidcAudiencesNone": "Noes overridez (dis werkspace takez da deployment''z configurd audiencez)",
-      "oidcAudiencesAdd": "Add audienz"
+      "oidcAudiencesNone": "Noes (runz yuze da agent pool''z own identitee)",
+      "oidcAudiencesAdd": "Add audienz",
+      "oidcAudiencesLoading": "Checkin da deployment''z configurd audiencez …"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

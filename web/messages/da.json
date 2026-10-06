@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws eller aws.west",
       "providerInvalid": "Et providernavn indeholder ingen mellemrum og højst ét punktum — aws eller aws.west.",
       "providerDuplicate": "Den providerkonfiguration har allerede en post.",
-      "removeProviderAria": "Fjern providerkonfigurationen {provider}"
+      "removeProviderAria": "Fjern providerkonfigurationen {provider}",
+      "badgeOwned": "Arbejdsområde",
+      "badgeInherited": "Deploymentets standard",
+      "override": "Tilsidesæt",
+      "overrideAria": "Tilsidesæt audiences for {provider} i dette arbejdsområde",
+      "issuerDisabled": "Dette deployment udsteder ingen OpenID Connect-issuer, så intet, der konfigureres her, kan få virkning."
     },
     "autoApplyMode": {
       "never": "aldrig",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audiences for kørselsidentitet",
       "oidcAudiencesHint": "Terrapod udsteder et kortlivet OpenID Connect-token for hver providerkonfiguration en kørsel bruger og skriver det til en fil, kørslen kan læse. Angiv en post med provideren som nøgle, som din konfiguration kalder den — aws, eller aws.west for en konfiguration med alias — og angiv de audiences, det mål accepterer. Hver post tilsidesætter deploymentets egen konfiguration for den provider; fjern den, og provideren falder tilbage til deploymentets audiences. En audience er en uigennemsigtig streng, som føderationsmålet har valgt, så den gemmes præcis som du skriver den.",
       "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com",
-      "oidcAudiencesNone": "Ingen tilsidesættelser (dette arbejdsområde bruger de audiences, der er konfigureret i deploymentet)",
-      "oidcAudiencesAdd": "Tilføj audience"
+      "oidcAudiencesNone": "Ingen (kørsler bruger agentpuljens egen identitet)",
+      "oidcAudiencesAdd": "Tilføj audience",
+      "oidcAudiencesLoading": "Kontrollerer de audiences, der er konfigureret i deploymentet …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation delegeret til dit VCS-repository.",

@@ -421,19 +421,59 @@ export function NotificationTemplatesEditor({
 export {
   isValidOidcProvider,
   sanitizeOidcAudiences,
+  partitionOidcAudiences,
+  sameAudiences,
   type OidcAudiences,
+  type OidcAudienceDefaults,
+  type OidcAudiencePartition,
 } from '@/lib/oidc-audiences'
+
+/** One entry's chip row: the provider key, and which side of the merge it came
+ *  from. A badge on BOTH sides rather than marking only the inherited ones —
+ *  "no badge means ours" is an inference, and this setting decides which cloud
+ *  role a run can assume, so it is worth saying outright. */
+function ProviderHeading({ provider, inherited }: { provider: string; inherited: boolean }) {
+  const t = useTranslations('common')
+  return (
+    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+      <code className="text-xs font-mono text-slate-200 break-all min-w-0">{provider}</code>
+      <span
+        className={
+          inherited
+            ? 'shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-700 text-slate-300'
+            : 'shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-900/50 text-brand-300'
+        }
+      >
+        {inherited ? t('oidcAudiences.badgeInherited') : t('oidcAudiences.badgeOwned')}
+      </span>
+    </div>
+  )
+}
 
 export function OidcAudiencesEditor({
   value,
+  fallbacks = {},
   onChange,
   readOnly = false,
+  inert = false,
   audiencePlaceholder,
   addAudienceLabel,
 }: {
+  /** The entries this workspace OWNS — the set that goes on the wire. */
   value: OidcAudiences
+  /**
+   * What each key would fall back to if it were not owned, i.e. the deployment
+   * catalogue restricted to the keys in force. Keys present in `value` are
+   * filtered out here, so an entry is never shown twice and removing an owned
+   * entry reveals the default in its place — which is the specified
+   * behaviour, not a side effect.
+   */
+  fallbacks?: OidcAudiences
   onChange?: (next: OidcAudiences) => void
   readOnly?: boolean
+  /** The deployment publishes no issuer, so nothing configured here can take
+   *  effect. Shows a notice; the controls stay usable (see below). */
+  inert?: boolean
   audiencePlaceholder?: string
   addAudienceLabel?: string
 }) {
@@ -443,6 +483,9 @@ export function OidcAudiencesEditor({
   // Object key order is insertion order for string keys, and every write below
   // spreads the existing object, so a card never jumps position while editing.
   const entries = Object.entries(value)
+  const inheritedEntries = Object.entries(fallbacks).filter(
+    ([k]) => !Object.prototype.hasOwnProperty.call(value, k),
+  )
   const typed = newProvider.trim()
   const duplicate = typed !== '' && Object.prototype.hasOwnProperty.call(value, typed)
   const malformed = typed !== '' && !isValidOidcProvider(typed)
@@ -477,25 +520,40 @@ export function OidcAudiencesEditor({
     onChange({ ...value, [key]: list })
   }
 
+  // Copy the default into the owned set rather than editing it in place: the
+  // inherited value belongs to the deployment, and an override has to be an
+  // explicit act or an operator cannot tell which they changed.
+  function overrideProvider(key: string) {
+    if (!onChange) return
+    onChange({ ...value, [key]: [...(fallbacks[key] || [])] })
+  }
+
+  function audienceChips(list: string[]) {
+    return (
+      <div className="flex flex-wrap gap-1 min-w-0">
+        {(list || []).map((aud) => (
+          <code key={aud} className="bg-slate-700 px-2 py-0.5 rounded text-xs break-all">
+            {aud}
+          </code>
+        ))}
+      </div>
+    )
+  }
+
   if (readOnly) {
-    // Nothing when empty: each page words its own "no overrides" line, because
-    // what the fallback means differs between a workspace and a rule template.
-    if (entries.length === 0) return null
+    // Nothing when nothing is in force: each page words its own empty line,
+    // because what it means differs between a workspace (its runs mint nothing)
+    // and a rule template (its workspaces override nothing).
+    if (entries.length === 0 && inheritedEntries.length === 0) return null
     return (
       <div className="flex flex-col gap-2">
-        {entries.map(([k, list]) => (
-          <div key={k} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2 min-w-0">
-            <code className="shrink-0 text-xs font-mono text-slate-400">{k}</code>
-            <div className="flex flex-wrap gap-1 min-w-0">
-              {(list || []).map((aud) => (
-                <code
-                  key={aud}
-                  className="bg-slate-700 px-2 py-0.5 rounded text-xs break-all"
-                >
-                  {aud}
-                </code>
-              ))}
-            </div>
+        {[
+          ...entries.map(([k, l]) => [k, l, false] as const),
+          ...inheritedEntries.map(([k, l]) => [k, l, true] as const),
+        ].map(([k, list, inherited]) => (
+          <div key={k} className="flex flex-col gap-1 min-w-0">
+            <ProviderHeading provider={k} inherited={inherited} />
+            {audienceChips(list)}
           </div>
         ))}
       </div>
@@ -504,6 +562,20 @@ export function OidcAudiencesEditor({
 
   return (
     <div className="space-y-3">
+      {inert && (
+        // Said rather than left to be discovered: with no issuer published, an
+        // empty map here looks configurable and is not, and an entry an
+        // operator adds will never be minted for.
+        //
+        // A notice, NOT a lockout, and deliberately so: configuring the
+        // audiences before turning the issuer on is a reasonable order of
+        // operations, and the probe fails soft to "enabled", so disabling the
+        // controls would also lock the editor whenever the probe could not be
+        // reached. Do not "fix" this by disabling the inputs.
+        <p className="text-xs text-amber-400" data-testid="oidc-issuer-disabled">
+          {t('oidcAudiences.issuerDisabled')}
+        </p>
+      )}
       {entries.map(([k, list]) => (
         <div
           key={k}
@@ -513,8 +585,8 @@ export function OidcAudiencesEditor({
              scroll). */
           className="p-3 rounded-lg bg-slate-900/60 border border-slate-700/60 space-y-2 min-w-0"
         >
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <code className="text-xs font-mono text-slate-200 break-all min-w-0">{k}</code>
+          <div className="flex items-start justify-between gap-2 min-w-0">
+            <ProviderHeading provider={k} inherited={false} />
             <button
               type="button"
               onClick={() => removeProvider(k)}
@@ -532,6 +604,33 @@ export function OidcAudiencesEditor({
               placeholder={audiencePlaceholder}
               addLabel={addAudienceLabel}
             />
+          </div>
+        </div>
+      ))}
+      {/* Inherited entries are the deployment's, so they are shown rather than
+          edited: 'Override' copies the value into this workspace's own set,
+          where the card above then owns it. Removing that card drops back to
+          here, which is how a fallback is undone. */}
+      {inheritedEntries.map(([k, list]) => (
+        <div
+          key={k}
+          className="p-3 rounded-lg bg-slate-900/40 border border-dashed border-slate-700/60 space-y-2 min-w-0"
+        >
+          <div className="flex items-start justify-between gap-2 min-w-0">
+            <ProviderHeading provider={k} inherited />
+            <button
+              type="button"
+              onClick={() => overrideProvider(k)}
+              disabled={!onChange}
+              aria-label={t('oidcAudiences.overrideAria', { provider: k })}
+              className="shrink-0 px-3 py-1.5 min-h-11 sm:min-h-0 text-xs font-medium rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {t('oidcAudiences.override')}
+            </button>
+          </div>
+          <div>
+            <span className={labelCls}>{t('oidcAudiences.audiences')}</span>
+            {audienceChips(list)}
           </div>
         </div>
       ))}

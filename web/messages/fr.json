@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, ou aws.west",
       "providerInvalid": "Un nom de provider ne contient pas d''espace et au plus un point — aws, ou aws.west.",
       "providerDuplicate": "Cette configuration de provider a déjà une entrée.",
-      "removeProviderAria": "Retirer la configuration de provider {provider}"
+      "removeProviderAria": "Retirer la configuration de provider {provider}",
+      "badgeOwned": "Espace de travail",
+      "badgeInherited": "Valeur du déploiement",
+      "override": "Surcharger",
+      "overrideAria": "Surcharger les audiences de {provider} dans cet espace de travail",
+      "issuerDisabled": "Ce déploiement ne publie aucun émetteur OpenID Connect ; rien de ce qui est configuré ici ne peut donc prendre effet."
     },
     "autoApplyMode": {
       "never": "jamais",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audiences de l''identité d''exécution",
       "oidcAudiencesHint": "Terrapod émet un jeton OpenID Connect de courte durée pour chaque configuration de provider qu''une exécution utilise et l''écrit dans un fichier que l''exécution peut lire. Indexez une entrée sur le provider tel que votre configuration le nomme — aws, ou aws.west pour une configuration avec alias — puis listez les audiences que cette cible accepte. Chaque entrée surcharge la configuration propre du déploiement pour ce provider ; retirez-la et ce provider revient aux audiences du déploiement. Une audience est une chaîne opaque choisie par la cible de fédération : elle est donc enregistrée exactement telle que vous la saisissez.",
       "oidcAudiencesPlaceholder": "par ex. sts.amazonaws.com",
-      "oidcAudiencesNone": "Aucune surcharge (cet espace de travail utilise les audiences configurées dans le déploiement)",
-      "oidcAudiencesAdd": "Ajouter une audience"
+      "oidcAudiencesNone": "Aucune (les exécutions utilisent l''identité propre du pool d''agents)",
+      "oidcAudiencesAdd": "Ajouter une audience",
+      "oidcAudiencesLoading": "Vérification des audiences configurées dans le déploiement …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

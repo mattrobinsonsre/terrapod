@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws או aws.west",
       "providerInvalid": "שם provider אינו מכיל רווחים ובו נקודה אחת לכל היותר — aws או aws.west.",
       "providerDuplicate": "לתצורת provider זו יש כבר רשומה.",
-      "removeProviderAria": "הסרת תצורת provider {provider}"
+      "removeProviderAria": "הסרת תצורת provider {provider}",
+      "badgeOwned": "סביבת עבודה",
+      "badgeInherited": "ברירת המחדל של הפריסה",
+      "override": "דריסה",
+      "overrideAria": "דריסת הקהלים של {provider} בסביבת העבודה הזו",
+      "issuerDisabled": "הפריסה הזו אינה מפרסמת מנפיק OpenID Connect כלשהו, ולכן שום דבר שמוגדר כאן אינו יכול להיכנס לתוקף."
     },
     "autoApplyMode": {
       "never": "לעולם לא",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "קהלים של זהות הריצה",
       "oidcAudiencesHint": "Terrapod מנפיק אסימון OpenID Connect קצר-מועד לכל תצורת provider שהריצה משתמשת בה, וכותב אותו לקובץ שהריצה יכולה לקרוא. מפתח הרשומה הוא ה-provider בשם שהתצורה שלך נותנת לו — aws, או aws.west לתצורה עם כינוי — ואחריו רשימת הקהלים שאותו יעד מקבל. כל רשומה דורסת את התצורה של הפריסה עצמה עבור אותו provider; הסר אותה ואותו provider חוזר לקהלים של הפריסה. קהל הוא מחרוזת אטומה שיעד הפדרציה בחר, ולכן הוא נשמר בדיוק כפי שהקלדת אותו.",
       "oidcAudiencesPlaceholder": "לדוגמה sts.amazonaws.com",
-      "oidcAudiencesNone": "ללא דריסות (סביבת העבודה הזו משתמשת בקהלים המוגדרים בפריסה)",
-      "oidcAudiencesAdd": "הוספת קהל"
+      "oidcAudiencesNone": "ללא (ריצות משתמשות בזהות של מאגר הסוכנים עצמו)",
+      "oidcAudiencesAdd": "הוספת קהל",
+      "oidcAudiencesLoading": "בודק את הקהלים המוגדרים בפריסה …"
     },
     "vcsWorkflowWarning": {
       "title": "ההרשאה הואצלה למאגר ה-VCS שלכם.",

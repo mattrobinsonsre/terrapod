@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws, o aws.west",
       "providerInvalid": "Un nombre de provider no lleva espacios y admite un punto como máximo: aws, o aws.west.",
       "providerDuplicate": "Esa configuración de provider ya tiene una entrada.",
-      "removeProviderAria": "Quitar la configuración de provider {provider}"
+      "removeProviderAria": "Quitar la configuración de provider {provider}",
+      "badgeOwned": "Espacio de trabajo",
+      "badgeInherited": "Valor del despliegue",
+      "override": "Sustituir",
+      "overrideAria": "Sustituir las audiencias de {provider} en este espacio de trabajo",
+      "issuerDisabled": "Este despliegue no publica ningún emisor de OpenID Connect, así que nada de lo configurado aquí puede surtir efecto."
     },
     "autoApplyMode": {
       "never": "nunca",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audiencias de la identidad de ejecución",
       "oidcAudiencesHint": "Terrapod emite un token OpenID Connect de vida corta para cada configuración de provider que usa una ejecución y lo escribe en un archivo que la ejecución puede leer. Indexa cada entrada por el provider tal como lo nombra tu configuración —aws, o aws.west para una configuración con alias— y enumera las audiencias que acepta ese destino. Cada entrada sustituye la configuración propia del despliegue para ese provider; quítala y ese provider vuelve a las audiencias del despliegue. Una audiencia es una cadena opaca que eligió el destino de federación, así que se guarda exactamente como la escribes.",
       "oidcAudiencesPlaceholder": "p. ej. sts.amazonaws.com",
-      "oidcAudiencesNone": "Sin sustituciones (este espacio de trabajo usa las audiencias configuradas en el despliegue)",
-      "oidcAudiencesAdd": "Añadir audiencia"
+      "oidcAudiencesNone": "Ninguna (las ejecuciones usan la identidad propia del grupo de agentes)",
+      "oidcAudiencesAdd": "Añadir audiencia",
+      "oidcAudiencesLoading": "Comprobando las audiencias configuradas en el despliegue …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",

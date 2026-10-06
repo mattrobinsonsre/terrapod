@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "4w5, 0r 4w5.w357",
       "providerInvalid": "4 pr0v1d3r n4m3 h45 n0 5p4c35 4nd 47 m057 0n3 d07 — 4w5, 0r 4w5.w357.",
       "providerDuplicate": "7h47 pr0v1d3r c0nf1gur4710n 4lr34dy h45 4n 3n7ry.",
-      "removeProviderAria": "R3m0v3 7h3 {provider} pr0v1d3r c0nf1gur4710n"
+      "removeProviderAria": "R3m0v3 7h3 {provider} pr0v1d3r c0nf1gur4710n",
+      "badgeOwned": "W0rk5p4c3",
+      "badgeInherited": "D3pl0ym3n7 d3f4ul7",
+      "override": "0v3rr1d3",
+      "overrideAria": "0v3rr1d3 7h3 {provider} 4ud13nc35 f0r 7h15 w0rk5p4c3",
+      "issuerDisabled": "7h15 d3pl0ym3n7 publ15h35 n0 0p3n1D C0nn3c7 155u3r, 50 n07h1ng c0nf1gur3d h3r3 c4n 74k3 3ff3c7."
     },
     "autoApplyMode": {
       "never": "n3v3r",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Run 1d3n717y 4ud13nc35",
       "oidcAudiencesHint": "73rr4p0d m1n75 4 5h0r7-l1v3d 0p3n1D C0nn3c7 70k3n f0r 34ch pr0v1d3r c0nf1gur4710n 4 run u535 4nd wr1735 17 70 4 f1l3 7h3 run c4n r34d. K3y 4n 3n7ry 0n 7h3 pr0v1d3r 45 y0ur c0nf1gur4710n n4m35 17 — 4w5, 0r 4w5.w357 f0r 4n 4l1453d c0nf1gur4710n — 4nd l157 7h3 4ud13nc35 7h47 74rg37 4cc3p75. 34ch 3n7ry 0v3rr1d35 7h3 d3pl0ym3n7'5 0wn c0nf1gur4710n f0r 7h47 pr0v1d3r; r3m0v3 17 4nd 7h47 pr0v1d3r f4ll5 b4ck 70 7h3 d3pl0ym3n7'5 4ud13nc35. 4n 4ud13nc3 15 4n 0p4qu3 57r1ng 7h3 f3d3r4710n 74rg37 ch053, 50 17 15 570r3d 3x4c7ly 45 7yp3d.",
       "oidcAudiencesPlaceholder": "3.g. 575.4m4z0n4w5.c0m",
-      "oidcAudiencesNone": "N0 0v3rr1d35 (7h15 w0rk5p4c3 74k35 7h3 d3pl0ym3n7'5 c0nf1gur3d 4ud13nc35)",
-      "oidcAudiencesAdd": "4dd 4ud13nc3"
+      "oidcAudiencesNone": "N0n3 (run5 u53 7h3 4g3n7 p00l'5 0wn 1d3n717y)",
+      "oidcAudiencesAdd": "4dd 4ud13nc3",
+      "oidcAudiencesLoading": "Ch3ck1ng 7h3 d3pl0ym3n7'5 c0nf1gur3d 4ud13nc35…"
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",

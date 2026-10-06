@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws，或 aws.west",
       "providerInvalid": "provider 名称不含空格，且最多一个点 — aws，或 aws.west。",
       "providerDuplicate": "该 provider 配置已有一条条目。",
-      "removeProviderAria": "移除 provider 配置 {provider}"
+      "removeProviderAria": "移除 provider 配置 {provider}",
+      "badgeOwned": "工作区",
+      "badgeInherited": "部署默认值",
+      "override": "覆盖",
+      "overrideAria": "在此工作区覆盖 {provider} 的受众",
+      "issuerDisabled": "此部署未发布任何 OpenID Connect 颁发者，因此这里配置的任何内容都不会生效。"
     },
     "autoApplyMode": {
       "never": "从不",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "运行身份受众",
       "oidcAudiencesHint": "Terrapod 为运行所使用的每个 provider 配置颁发一个短期的 OpenID Connect 令牌，并写入运行可读取的文件。条目的键使用你的配置对该 provider 的命名 — aws，或带别名的配置用 aws.west — 然后列出该目标接受的受众。每条条目会覆盖部署自身针对该 provider 的配置；移除它，该 provider 便回退到部署的受众。受众是联合目标自行选定的不透明字符串，因此会按你输入的原样存储。",
       "oidcAudiencesPlaceholder": "例如 sts.amazonaws.com",
-      "oidcAudiencesNone": "无覆盖（此工作区使用部署中配置的受众）",
-      "oidcAudiencesAdd": "添加受众"
+      "oidcAudiencesNone": "无（运行使用代理池自身的身份）",
+      "oidcAudiencesAdd": "添加受众",
+      "oidcAudiencesLoading": "正在检查部署中配置的受众 …"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

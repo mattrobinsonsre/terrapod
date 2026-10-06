@@ -1928,7 +1928,12 @@
       "providerPlaceholder": "aws of aws.west",
       "providerInvalid": "Een providernaam bevat geen spaties en maximaal één punt — aws of aws.west.",
       "providerDuplicate": "Voor deze providerconfiguratie bestaat al een vermelding.",
-      "removeProviderAria": "Providerconfiguratie {provider} verwijderen"
+      "removeProviderAria": "Providerconfiguratie {provider} verwijderen",
+      "badgeOwned": "Werkruimte",
+      "badgeInherited": "Standaard van deployment",
+      "override": "Overschrijven",
+      "overrideAria": "Audiences voor {provider} in deze werkruimte overschrijven",
+      "issuerDisabled": "Dit deployment publiceert geen OpenID Connect-issuer, dus niets wat hier is geconfigureerd kan effect hebben."
     },
     "autoApplyMode": {
       "never": "nooit",
@@ -2546,8 +2551,9 @@
       "oidcAudiences": "Audiences van de uitvoeringsidentiteit",
       "oidcAudiencesHint": "Terrapod geeft voor elke providerconfiguratie die een uitvoering gebruikt een kortlevend OpenID Connect-token uit en schrijft het naar een bestand dat de uitvoering kan lezen. Geef een vermelding de provider als sleutel zoals je configuratie die noemt — aws, of aws.west voor een configuratie met alias — en noem de audiences die dat doel accepteert. Elke vermelding overschrijft de eigen configuratie van het deployment voor die provider; verwijder hem en die provider valt terug op de audiences van het deployment. Een audience is een ondoorzichtige tekenreeks die het federatiedoel heeft gekozen, dus hij wordt precies zo opgeslagen als je hem typt.",
       "oidcAudiencesPlaceholder": "bijv. sts.amazonaws.com",
-      "oidcAudiencesNone": "Geen overschrijvingen (deze werkruimte neemt de in het deployment geconfigureerde audiences over)",
-      "oidcAudiencesAdd": "Audience toevoegen"
+      "oidcAudiencesNone": "Geen (uitvoeringen gebruiken de eigen identiteit van de agent-pool)",
+      "oidcAudiencesAdd": "Audience toevoegen",
+      "oidcAudiencesLoading": "De in het deployment geconfigureerde audiences worden gecontroleerd …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",
