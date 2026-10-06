@@ -279,7 +279,7 @@ async def find_or_autocreate_workspace(
         execution_mode=rule.execution_mode,
         execution_backend=rule.execution_backend,
         terraform_version=rule.terraform_version,
-        oidc_audiences=list(rule.oidc_audiences or []),
+        oidc_audiences=dict(rule.oidc_audiences or {}),
         resource_cpu=rule.resource_cpu,
         resource_memory=rule.resource_memory,
         auto_apply=rule.auto_apply,

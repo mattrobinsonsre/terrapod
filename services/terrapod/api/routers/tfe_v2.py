@@ -684,7 +684,7 @@ def _workspace_json(
                 "locked": ws.locked,
                 "resource-cpu": ws.resource_cpu,
                 "resource-memory": ws.resource_memory,
-                "oidc-audiences": list(ws.oidc_audiences or []),
+                "oidc-audiences": dict(ws.oidc_audiences or {}),
                 "vcs-repo-url": ws.vcs_repo_url,
                 "vcs-branch": ws.vcs_branch,
                 "vcs-connection-id": f"vcs-{ws.vcs_connection_id}"

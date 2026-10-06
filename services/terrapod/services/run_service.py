@@ -27,7 +27,13 @@ from terrapod.db.models import (
     now_utc,
 )
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service, ha_role, pool_set
+from terrapod.services import (
+    cloud_identity_resolver,
+    github_service,
+    gitlab_service,
+    ha_role,
+    pool_set,
+)
 from terrapod.services.notification_service import STATUS_TO_TRIGGER
 
 logger = get_logger(__name__)
@@ -806,6 +812,10 @@ async def create_run(
     The run starts in 'pending' status and transitions to 'queued'
     when a configuration version is uploaded (or immediately if none needed).
     """
+    # Imported here rather than at module scope, matching this module's own
+    # convention for `settings` (see the other local import above).
+    from terrapod.config import settings
+
     await ha_role.ensure_leader("create runs")
 
     # A run against a SPECULATIVE configuration version is always plan-only.
@@ -887,11 +897,18 @@ async def create_run(
         terragrunt_version=workspace.terragrunt_version,
         resource_cpu=workspace.resource_cpu,
         resource_memory=workspace.resource_memory,
-        # Snapshotted for the same reason as the resources above (#1901): the
-        # mint reads the run, not the workspace, so editing the audiences
-        # mid-run cannot let the plan phase get a token and the apply phase be
-        # refused.
-        oidc_audiences=list(workspace.oidc_audiences or []),
+        # The RESOLVED mapping — the workspace's override already merged over
+        # the deployment catalogue — snapshotted for the same reason as the
+        # resources above (#1901). Resolved here rather than at mint time so
+        # both phases of a run agree, and so this is a record of what the plan
+        # was reviewed under.
+        #
+        # It is NOT a licence to mint from a stale value: the mint path
+        # re-resolves the requested target and refuses when it no longer matches
+        # this, because minting from the snapshot alone would hand the apply a
+        # token the cloud has since stopped accepting and the failure would land
+        # inside the engine, possibly after a partial apply.
+        oidc_audiences=cloud_identity_resolver.resolve_for_workspace(workspace, settings=settings),
         pool_id=pool_id,
         pool_extra_ids=pool_extra_ids,
         created_by=created_by,
