@@ -1762,7 +1762,8 @@
                   "type": "object",
                   "additionalProperties": {
                     "type": "array",
-                    "items": {
+                    "minItems": 1,
+              "items": {
                       "type": "string"
                     }
                   }
