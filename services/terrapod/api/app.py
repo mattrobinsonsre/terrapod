@@ -511,6 +511,53 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Propagate rotated DEKs to all replicas (multi-replica safe)",
         )
 
+    # OIDC issuer signing-key refresh (#1901). Without this a rotation reaches
+    # only the replica that served it: `_keys` and `_signing_kid` are module
+    # globals, `get_signing_key()` never touches the database, and
+    # `reload_signing_keys` had exactly one caller -- `rotate_signing_key`
+    # itself. Two things were broken by that, and both are invisible from the
+    # Terrapod side because the failure lands at the cloud's token exchange:
+    #
+    #   * the published JWKS differed by pod behind a load balancer, so a cloud
+    #     fetching it got the new `kid` or not depending on which replica
+    #     answered;
+    #   * `_signing_kid` is a point-in-time choice. At rotation it correctly
+    #     picks the RETIRED key, because the new one does not activate until
+    #     `key_propagation_seconds` has passed -- and nothing recomputed it, so
+    #     the handover the whole design exists for never happened without a
+    #     restart. The runbook told the operator to confirm a handover that
+    #     could not occur.
+    #
+    # **The distributed scheduler is a mutex, so this converges rather than
+    # fanning out.** `try_claim_periodic` is SET NX EX: exactly one replica runs
+    # any given interval, so a single pass refreshes one pod, not all of them.
+    # At 30s against a 600s default propagation window there are ~20 claim slots
+    # before the handover is due, so every replica of a small deployment is
+    # overwhelmingly likely to have reloaded by then -- and the design tolerates
+    # the straggler, because both keys stay published across the propagation and
+    # grace windows, so a pod that has not reloaded signs with a key its own
+    # JWKS still advertises. This is the same primitive, and the same
+    # probabilistic convergence, as `encryption_key_refresh` above; the
+    # scheduler has no per-replica task type, and `asyncio.create_task` for
+    # background work is forbidden.
+    #
+    # Best-effort by construction: `reload_signing_keys` raises before it
+    # assigns, so a transient database error leaves the working cache intact.
+    if settings.auth.oidc_issuer.enabled:
+
+        async def _oidc_signing_refresh() -> None:
+            from terrapod.auth.oidc_signing import reload_signing_keys
+
+            async with get_db_session() as db:
+                await reload_signing_keys(db)
+
+        register_periodic_task(
+            "oidc_signing_refresh",
+            interval_seconds=30,
+            handler=_oidc_signing_refresh,
+            description="Re-read the OIDC signing keys so a rotation reaches every replica",
+        )
+
     # Leadership probe (#960). Registered only under `ha.role=auto` — a static
     # role needs no probing at all, which is the overwhelmingly common case.
     #
