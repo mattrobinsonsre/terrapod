@@ -1489,11 +1489,26 @@ test.describe('Per-workspace run identity (#1901)', () => {
 
     // A row's action is a real button with a tap target, not bare coloured
     // text, and adding a third entry keeps the page inside the viewport.
+    //
+    // Counted by the per-card remove's OWN accessible name, not by the word
+    // "Remove": that button carries an aria-label naming its provider, which
+    // overrides its text content, so `{ name: 'Remove' }` matches the
+    // per-AUDIENCE removes inside each card instead and counts rows rather
+    // than cards. Asserting the aria-label is also the stronger check, since
+    // it is what a screen-reader user hears for a control that would otherwise
+    // be one of several identical "Remove"s on the page.
+    const removeProvider = page.getByRole('button', {
+      name: /^Remove the .+ provider configuration$/,
+    })
+    await expect(removeProvider).toHaveCount(2)
     await expect(addProvider).toBeDisabled()
     await page.getByTestId('oidc-provider-input').fill('vault')
     await expect(addProvider).toBeEnabled()
     await addProvider.click()
-    await expect(page.getByRole('button', { name: 'Remove' })).toHaveCount(3)
+    await expect(removeProvider).toHaveCount(3)
+    await expect(
+      page.getByRole('button', { name: 'Remove the vault provider configuration' })
+    ).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 
     expect(dialogFired).toBe(false)
