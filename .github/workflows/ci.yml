@@ -1716,6 +1716,39 @@ jobs:
           done
           echo "cloud identity audience catalogue renders OK and is empty by default (#1901)"
 
+      - name: An issuer-only webhook Ingress is a renderable configuration
+        run: |
+          # values.yaml advertises "enabling this block with ONLY those two
+          # paths, and no webhook path at all" as first-class, for a deployment
+          # that polls VCS and wants nothing else public. The chart supplies the
+          # two issuer paths itself, so the way to express that is an empty
+          # allow-list -- which the validation guard refused outright, because it
+          # judged the operator's list rather than the resolved set. The chart
+          # contradicting its own documented configuration is the kind of thing
+          # only a render catches.
+          out=$(helm template tp ./helm/terrapod \
+            --set webhookIngress.enabled=true \
+            --set webhookIngress.hostname=hooks.example.com \
+            --set 'webhookIngress.paths=null' \
+            --set api.config.auth.oidc_issuer.enabled=true) \
+            || { echo "FAIL: an issuer-only webhook Ingress does not render"; exit 1; }
+          echo "$out" | grep -q 'path: /.well-known/openid-configuration' \
+            || { echo "FAIL: the discovery path is missing from the issuer-only Ingress"; exit 1; }
+          echo "$out" | grep -q 'path: /.well-known/jwks.json' \
+            || { echo "FAIL: the JWKS path is missing from the issuer-only Ingress"; exit 1; }
+          echo "$out" | grep -q 'path: /api/terrapod/v1/vcs-events' \
+            && { echo "FAIL: a webhook path leaked into an issuer-only Ingress"; exit 1; }
+          # And the guard still fires where it should: with the issuer off, an
+          # empty allow-list really would accept nothing.
+          if helm template tp ./helm/terrapod \
+            --set webhookIngress.enabled=true \
+            --set webhookIngress.hostname=hooks.example.com \
+            --set 'webhookIngress.paths=null' >/dev/null 2>&1; then
+            echo "FAIL: an empty allow-list with no issuer rendered an Ingress that accepts nothing"
+            exit 1
+          fi
+          echo "issuer-only webhook Ingress renders, and an empty allow-list is still refused (#1901)"
+
   # ── Config-channel contract (#617) ────────────────────
   # Renders the chart (every values profile) and parses the rendered ConfigMaps
   # THROUGH the real Pydantic config models (Settings / RunnerConfig), asserting

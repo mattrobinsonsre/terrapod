@@ -321,7 +321,7 @@ def validate_oidc_audiences(raw: object) -> dict[str, list[str]]:
 
     **An empty map is valid and is the common case.** It does not mean "mints
     nothing": this is an override *over* the deployment catalogue in
-    `api.config.cloud_identity.audiences`, so an empty map means "take the
+    `api.config.auth.oidc_issuer.audiences`, so an empty map means "take the
     catalogue as it stands". A workspace mints nothing only when the resolved
     merge is empty, and then its runs authenticate with the agent pool's own
     identity exactly as before.

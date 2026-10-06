@@ -1972,6 +1972,10 @@ webhookIngress:
     # configuration but a broken one, and the failure surfaces at the cloud's
     # token exchange rather than anywhere on the Terrapod side. Listing them
     # by hand as well is harmless (the template de-duplicates).
+    #
+    # To publish the issuer and NO webhook path, set this to `[]` with the
+    # issuer enabled. The chart supplies the two paths, so the resulting
+    # Ingress serves exactly them.
 
 # ── Internal Ingress (optional) ─────────────────────────────────────────────
 # Optional THIRD Ingress for the internal-only surface: listener pods
