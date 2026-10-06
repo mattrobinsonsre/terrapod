@@ -48,6 +48,12 @@ def upgrade() -> None:
     )
     op.create_index("ix_oidc_signing_keys_kid", "oidc_signing_keys", ["kid"])
 
+    # A JSON **object**, not an array: provider name (optionally
+    # `provider.alias`) to that target's audiences, because one token is minted
+    # per target. Edited in place rather than altered by a follow-up migration —
+    # this revision has never shipped (v1.10 is unreleased and untagged), so
+    # there is no deployment holding the array shape and no contraction to
+    # ledger. Do NOT edit it again once a tag exists.
     for table in ("workspaces", "autodiscovery_rules", "runs"):
         op.add_column(
             table,
@@ -55,12 +61,28 @@ def upgrade() -> None:
                 "oidc_audiences",
                 postgresql.JSONB(astext_type=sa.Text()),
                 nullable=False,
-                server_default="[]",
+                server_default="{}",
             ),
         )
 
+    # An ARRAY here, unlike the object above: what a run actually minted for, as
+    # opposed to what it was configured for. Separate because the configured
+    # snapshot is the MERGED map and so includes deployment-wide targets a
+    # workspace may never use -- scoping the confirm-time check to it would let
+    # one catalogue edit refuse every pending apply in the fleet.
+    op.add_column(
+        "runs",
+        sa.Column(
+            "oidc_minted_targets",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default="[]",
+        ),
+    )
+
 
 def downgrade() -> None:
+    op.drop_column("runs", "oidc_minted_targets")
     for table in ("runs", "autodiscovery_rules", "workspaces"):
         op.drop_column(table, "oidc_audiences")
 

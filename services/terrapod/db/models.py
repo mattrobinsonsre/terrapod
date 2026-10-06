@@ -331,16 +331,33 @@ class Workspace(Base):
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
 
-    # Per-workspace cloud identity (#1901). The audiences a run identity token is
-    # minted for, and the opt-in: empty means this workspace mints no token and
-    # its runs authenticate to the cloud exactly as before, with the agent pool's
-    # own ServiceAccount. There is nothing cloud-specific here on purpose — the
-    # audience is the one value every federation target names for itself
-    # (`sts.amazonaws.com`, `api://AzureADTokenExchange`, whatever a Vault role's
-    # `bound_audiences` says) and it cannot be a deployment-wide constant,
-    # because a token audienced for two targets is replayable between them.
-    oidc_audiences: Mapped[list[str]] = mapped_column(
-        JSONB, nullable=False, default=list, server_default="[]"
+    # Per-workspace cloud identity (#1901). **The workspace's OVERRIDE**, merged
+    # over the deployment catalogue in `api.config.auth.oidc_issuer.audiences` —
+    # see `services/cloud_identity_resolver.py`. Keyed on the provider name as
+    # the configuration writes it, optionally with an alias
+    # (`aws`, `vault`, `vault.eu`), each value the audiences for that one target.
+    #
+    # A map rather than a flat list because **one token is minted per target,
+    # each carrying only that target's audience**: a token audienced for two
+    # targets is replayable between them, and AWS refuses a multi-valued `aud`
+    # outright (its `aud` condition key maps to `azp` when present, and the real
+    # claim is exposed as `oaud`). A list *within* one entry is the deliberate
+    # "these are interchangeable" statement, which is safe for a Vault-like
+    # consumer whose `bound_audiences` intersects and unsafe for AWS — Terrapod
+    # cannot tell which, so the docs say one audience per entry is the norm.
+    #
+    # Empty here does NOT mean "mints nothing": the catalogue still applies.
+    # A workspace mints nothing only when the resolved merge is empty, in which
+    # case its runs authenticate with the agent pool's own ServiceAccount
+    # exactly as before — the permanent fall-through, not a degraded state.
+    #
+    # Nothing cloud-specific lives here on purpose. The audience is the one value
+    # every federation target names for itself (`sts.amazonaws.com`,
+    # `api://AzureADTokenExchange`, whatever a Vault role's `bound_audiences`
+    # says), and which provider maps to which audience is entirely the
+    # operator's — Terrapod assumes none of it.
+    oidc_audiences: Mapped[dict[str, list[str]]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
     )
 
     # RBAC
@@ -1338,9 +1355,12 @@ class AutodiscoveryRule(Base):
     terraform_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.12")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
-    # Templated onto workspaces this rule materialises (#1901).
-    oidc_audiences: Mapped[list[str]] = mapped_column(
-        JSONB, nullable=False, default=list, server_default="[]"
+    # Templated onto workspaces this rule materialises (#1901). Same override
+    # shape as `Workspace.oidc_audiences` — provider name (optionally
+    # `provider.alias`) to that target's audiences — and merged over the
+    # deployment catalogue the same way once materialised.
+    oidc_audiences: Mapped[dict[str, list[str]]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
     )
     auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Templated onto workspaces this rule materialises (#1274).
@@ -2084,11 +2104,45 @@ class Run(Base):
     terragrunt_version: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
-    # Snapshotted at creation, like the resources above and for the same reason
-    # (#1901): an operator editing the workspace's audiences mid-run would
-    # otherwise let the plan phase mint a token and the apply phase be refused,
-    # so a run carries the audiences it was created under for both its phases.
-    oidc_audiences: Mapped[list[str]] = mapped_column(
+    # The **RESOLVED** map — the workspace's override already merged over the
+    # deployment catalogue — snapshotted at creation like the resources above
+    # (#1901).
+    #
+    # Snapshotted so a run executes against the configuration it was created
+    # under: both phases mint from this, so a catalogue edit between a plan and
+    # the apply a human spent twenty minutes reviewing cannot silently change
+    # which identity the apply presents.
+    #
+    # **But the snapshot is what the apply CHECKS AGAINST, not a licence to use
+    # a stale value.** Minting from it blindly would hand the apply a token that
+    # agrees with the reviewed plan while the *cloud* has moved on, and it would
+    # then be rejected at `AssumeRoleWithWebIdentity` deep inside the engine,
+    # possibly after a partial apply. So the mint path re-resolves the requested
+    # target and refuses when it no longer matches this snapshot — a controlled
+    # failure before anything executes, the same shape as a saved plan refused
+    # because the state serial moved.
+    #
+    # Each phase still mints its OWN tokens: the apply runs in its own Job and
+    # presents `phase: apply`, which resolves to the base identity plus any
+    # extra apply identity. Plan and apply are *supposed* to differ.
+    oidc_audiences: Mapped[dict[str, list[str]]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
+    # Which targets a token was ACTUALLY minted for on this run, appended by the
+    # mint endpoint as it serves each one (#1901).
+    #
+    # Recorded rather than derived, because the two sets differ in a way that
+    # matters. `oidc_audiences` above is the snapshot of CONFIGURED targets, and
+    # it is the merged map — so it carries deployment-wide entries a workspace
+    # may never use. Scoping the confirm-time staleness check to the configured
+    # set would mean one edit to the deployment catalogue refusing every pending
+    # apply in the fleet, including runs whose own identity had not moved. This
+    # is the set the check is actually about: what the plan presented.
+    #
+    # Written sequentially by the runner (one mint at a time per phase), so the
+    # read-modify-write here needs no locking. It only ever grows, so a retry
+    # that re-mints is harmless and a superset is still sound.
+    oidc_minted_targets: Mapped[list[str]] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"
     )
     # `pool_id` is the pool this run is currently associated with: at creation

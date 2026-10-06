@@ -1050,7 +1050,7 @@
       "varFiles": "Tabulae variabilium (a locis operis creatis hereditatae)",
       "varFilesHint": "Semitae relativae <code>.tfvars</code> ad plan/apply transmissae.",
       "oidcAudiences": "Auditores identitatis exsecutionis (a locis operis creatis hereditati)",
-      "oidcAudiencesHint": "Auditores pro quibus omnis locus operis hac regula creatus tesseram identitatis exsecutionis emittit. Vacuos relinque et nihil emittent.",
+      "oidcAudiencesHint": "Superscriptiones auditorum omni loco operis quem haec regula creat impositae, sub configuratione provider ad quam tessera pertinet — aws, vel aws.west pro configuratione cum alias. Vacuas relinque et illi loci operis configurationem propriam instructionis adhibent.",
       "addVarFile": "Tabulam variabilium addere",
       "executionHooks": "Unci exsecutionis (cum quolibet novo loco operis sociati)",
       "executionHooksHint": "Elige ex uncis in pagina administrationis <page>Uncorum Exsecutionis</page> definitis — quisque uncus selectus cum omni loco operis quod haec regula creat sociatur.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Titulos ponere (chartam titulorum in omni loco operis conveniente substituit)",
       "setVarFiles": "Tabulas variabilium ponere",
       "addVarFile": "Tabulam variabilium addere",
-      "setOidcAudiences": "Auditores identitatis exsecutionis ponere (indicem in omni loco operis congruenti substituit; index vacuus identitatem exsecutionis exstinguit)",
+      "setOidcAudiences": "Auditores OIDC identitatis exsecutionis statuere (chartam in omni loco operis conveniente substituit)",
       "setRunTasks": "Munera exsecutionis ponere (per nomen in omni loco operis conveniente inserta-vel-renovata)",
       "setNotifications": "Configurationes nuntiationum ponere (per nomen insertae-vel-renovatae)",
       "dryRun": "Cursus siccus (sola praevisio — nullae mutationes scriptae)",
@@ -1922,6 +1922,19 @@
       "triggers": "Concitatores",
       "addNotification": "Nuntiationem addere"
     },
+    "oidcAudiences": {
+      "audiences": "Auditores",
+      "addProvider": "Configurationem provider addere",
+      "providerPlaceholder": "aws, vel aws.west",
+      "providerInvalid": "Nomen provider spatia non habet et ad summum unum punctum — aws, vel aws.west.",
+      "providerDuplicate": "Illa configuratio provider iam inscriptionem habet.",
+      "removeProviderAria": "Configurationem provider {provider} removere",
+      "badgeOwned": "Locus operis",
+      "badgeInherited": "Praedefinitum instructionis",
+      "override": "Supervertere",
+      "overrideAria": "Auditores pro {provider} in hoc loco operis supervertere",
+      "issuerDisabled": "Haec instructio nullum emissorem OpenID Connect publicat, ideo nihil hic configuratum valere potest."
+    },
     "autoApplyMode": {
       "never": "numquam",
       "always": "semper",
@@ -2536,10 +2549,11 @@
       "driftIgnoreRulesHint": "Semitae inscriptionum et attributorum Terraform globi-gnarae a classificatore aberrationis suppressae. <star></star> zero aut plures characteres non-<dot></dot> convenit (spatium <n></n> indicum); <starIdx></starIdx> quemvis indicem uncinatum convenit. Inscriptio nuda sine suffixo attributi quamvis mutationem illius facultatis silet — destructiones inclusas. Solam aberrationem afficit, non normale plan/apply. Vide <docs>drift-ignore-rules.md</docs> pro grammatica plena.",
       "driftIgnoreRulesNone": "Nulla (omnis differentia consilii ut aberratio numeratur)",
       "oidcAudiences": "Auditores identitatis exsecutionis",
-      "oidcAudiencesHint": "Terrapod pro omni exsecutione huius loci operis tesseram OpenID Connect brevis aevi emittit eamque in tabulam scribit quam exsecutio legere potest. Auditor nominat ad quid tessera valeat, et unumquodque propositum foederationis suum chordam opacam eligit — sts.amazonaws.com, api://AzureADTokenExchange, vel quidquid propositum ad quod foederas accipit. Indicem vacuum relinque et hic locus operis nihil emittit: exsecutiones eius se probant sicut hodie, propria identitate copiae actorum. Quis provider tesseram adhibeat, et quomodo, tua propria configuratio manet.",
+      "oidcAudiencesHint": "Terrapod pro omni configuratione provider quam exsecutio adhibet tesseram OpenID Connect brevis aevi emittit eamque in tabulam scribit quam exsecutio legere potest. Inscriptionem sub provider pone, sicut configuratio tua eum nominat — aws, vel aws.west pro configuratione cum alias — et auditores quos illud propositum accipit enumera. Omnis inscriptio configurationem propriam instructionis pro illo provider supervertit; eam remove, et ille provider ad auditores instructionis redit. Auditor chorda opaca est quam propositum foederationis elegit, ideo prorsus ut eam scribis servatur.",
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
       "oidcAudiencesNone": "Nulli (exsecutiones propria identitate copiae actorum utuntur)",
-      "oidcAudiencesAdd": "Auditorem addere"
+      "oidcAudiencesAdd": "Auditorem addere",
+      "oidcAudiencesLoading": "Auditores in instructione configurati examinantur …"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",

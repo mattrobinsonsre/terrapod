@@ -318,3 +318,146 @@ class TestWhichKeySigns:
         # capture — `caplog.text` is empty, so asserting against it would pass
         # whatever the code did.
         assert "may not hold it yet" in capsys.readouterr().out
+
+
+class TestThePublishedJWKCarriesNothingPrivate:
+    """The JWKS is served anonymously to anyone who can reach the deployment, so
+    a leak here is the signing key itself. `public_jwk` is an explicit
+    allow-list rather than a filter over the key's own members, and this pins
+    the exact set — a filter is the shape that silently starts passing a new
+    member through when a library adds one.
+    """
+
+    def test_the_key_set_is_exactly_the_six_published_members(self):
+        from terrapod.auth.oidc_signing import compute_kid, generate_private_key, public_jwk
+
+        key = generate_private_key()
+        jwk = public_jwk(key, compute_kid(key))
+        assert set(jwk) == {"kty", "use", "alg", "kid", "n", "e"}
+
+    def test_no_private_rsa_member_is_present(self):
+        """`d`, `p`, `q`, `dp`, `dq`, `qi` are the private half of an RSA JWK.
+        Named individually because the point is that each is absent, not that
+        some filter happened to run."""
+        from terrapod.auth.oidc_signing import compute_kid, generate_private_key, public_jwk
+
+        key = generate_private_key()
+        jwk = public_jwk(key, compute_kid(key))
+        for private_member in ("d", "p", "q", "dp", "dq", "qi", "oth"):
+            assert private_member not in jwk
+
+    def test_no_value_contains_pem_material(self):
+        from terrapod.auth.oidc_signing import compute_kid, generate_private_key, public_jwk
+
+        key = generate_private_key()
+        jwk = public_jwk(key, compute_kid(key))
+        blob = "".join(jwk.values())
+        assert "PRIVATE KEY" not in blob
+        assert "BEGIN" not in blob
+
+    def test_the_jwks_is_served_from_cache_without_reparsing(self, monkeypatch):
+        """The two issuer documents are necessarily unauthenticated, and
+        building the JWKS parses every private key PEM. Without memoisation an
+        anonymous caller can make the API do RSA key parsing at whatever rate
+        they like."""
+        from terrapod.auth import oidc_signing
+
+        key = oidc_signing.generate_private_key()
+        kid = oidc_signing.compute_kid(key)
+        pem = oidc_signing.serialize_private_key(key)
+
+        monkeypatch.setattr(
+            oidc_signing, "_keys", [oidc_signing.SigningKey(kid=kid, private_key_pem=pem)]
+        )
+        monkeypatch.setattr(oidc_signing, "_jwks_cache", None)
+
+        parses = []
+        real = oidc_signing.load_private_key
+
+        def counting(pem_text):
+            parses.append(1)
+            return real(pem_text)
+
+        monkeypatch.setattr(oidc_signing, "load_private_key", counting)
+
+        first = oidc_signing.get_jwks()
+        for _ in range(20):
+            oidc_signing.get_jwks()
+        assert len(parses) == 1, "the PEM was re-parsed on a repeat fetch"
+        assert oidc_signing.get_jwks() == first
+
+    def test_a_changed_key_set_is_not_served_from_a_stale_cache(self, monkeypatch):
+        """The cache key is the tuple of kids, and a kid is derived from the key
+        material — so new material cannot reuse a kid and be served stale."""
+        from terrapod.auth import oidc_signing
+
+        def loaded(key):
+            return oidc_signing.SigningKey(
+                kid=oidc_signing.compute_kid(key),
+                private_key_pem=oidc_signing.serialize_private_key(key),
+            )
+
+        first = loaded(oidc_signing.generate_private_key())
+        monkeypatch.setattr(oidc_signing, "_keys", [first])
+        monkeypatch.setattr(oidc_signing, "_jwks_cache", None)
+        before = oidc_signing.get_jwks()
+
+        second = loaded(oidc_signing.generate_private_key())
+        monkeypatch.setattr(oidc_signing, "_keys", [first, second])
+        after = oidc_signing.get_jwks()
+
+        assert [k["kid"] for k in before["keys"]] == [first.kid]
+        assert [k["kid"] for k in after["keys"]] == [first.kid, second.kid]
+
+
+class TestAnExhaustedKeyTableNeverPublishesAnEmptyTrustRoot:
+    """`init_oidc_signing` must raise BEFORE assigning `_keys`.
+
+    The ordering is the whole test. `_choose_signing_kid` raises on an empty
+    `live`, and the app lifespan catches that and only WARNS — so assigning
+    first leaves `_keys == []` rather than None. `get_jwks` guards on `is None`,
+    so an empty list sails straight through it and the issuer serves
+    `{"keys": []}` with a 300s cache. Every federation target then caches an
+    empty trust root and a later successful rotation does not take effect until
+    those caches expire.
+
+    Reachable after the emergency `propagation=0 / grace=0` rotation the chart
+    advertises, or on a restart following a long outage. `reload_signing_keys`
+    already had this order; `init` did not, and nothing looked at it.
+    """
+
+    def _db_returning(self, rows):
+        import asyncio  # noqa: F401
+
+        scalars = MagicMock()
+        scalars.all.return_value = rows
+        result = MagicMock()
+        result.scalars.return_value = scalars
+
+        class _DB:
+            async def execute(self, *a, **k):
+                return result
+
+            async def commit(self):
+                return None
+
+        return _DB()
+
+    def test_init_raises_and_leaves_the_published_set_unset(self, key):
+        import asyncio
+        from datetime import UTC, datetime, timedelta
+
+        long_ago = datetime.now(UTC) - timedelta(days=365)
+        row = MagicMock()
+        row.kid = "stale"
+        row.private_key_pem = oidc_signing.serialize_private_key(key)
+        row.id = 1
+        row.retired_at = long_ago
+
+        with patch.object(oidc_signing, "_configured_key_pem", return_value=None):
+            with pytest.raises(RuntimeError, match="No live OIDC issuer signing key"):
+                asyncio.run(oidc_signing.init_oidc_signing(self._db_returning([row])))
+
+        # The property the ordering exists for: NOT `{"keys": []}`.
+        with pytest.raises(RuntimeError, match="not initialised"):
+            oidc_signing.get_jwks()

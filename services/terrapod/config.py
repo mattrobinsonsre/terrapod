@@ -558,9 +558,10 @@ class OIDCIssuerConfig(BaseSettings):
     root at all, which is a stronger statement than a 404.
 
     Opting in is two decisions, not one. The operator decides whether the
-    install publishes an issuer (here); a workspace admin decides whether a
-    given workspace may mint a token (its audience list). Neither implies the
-    other, and a published issuer with no workspace opted in grants nothing.
+    install publishes an issuer and which audiences each provider maps to
+    (here); a workspace may then override that mapping for itself. Neither
+    implies the other, and a published issuer whose resolved mapping is empty
+    grants nothing.
     """
 
     enabled: bool = Field(
@@ -581,6 +582,19 @@ class OIDCIssuerConfig(BaseSettings):
             "issuer matching is exact and computing it three times means one of "
             "them uses the private hostname. Empty derives it from "
             "webhookIngress.hostname, falling back to external_url."
+        ),
+    )
+    audiences: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description=(
+            "The deployment's audience catalogue: a provider name to the "
+            "audiences a token minted for it should carry. Keyed on the provider "
+            "name as a configuration writes it (`aws`, `google`, `vault`); one "
+            "token is minted per key, carrying only that key's audiences. A "
+            "workspace's own oidc-audiences is MERGED OVER this, so removing a "
+            "workspace override falls back to the value here. Terrapod assumes "
+            "nothing per-cloud — any provider may be mapped to any audience, and "
+            "the cloud-side trust policy is the gate."
         ),
     )
     signing_key_pem: str = Field(

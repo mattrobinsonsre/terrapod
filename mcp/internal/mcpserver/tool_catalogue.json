@@ -179,6 +179,14 @@
     }
   },
   {
+    "name": "terrapod_oidc_signing_key_rotate",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_oidc_signing_keys",
     "read_only": true,
     "input_schema": {
@@ -969,14 +977,17 @@
           "type": "string"
         },
         "oidc_audiences": {
-          "description": "audiences a run identity token is minted for, and this workspace's cloud identity opt-in (#1901). Empty (the default) means the workspace mints nothing and its runs authenticate with the agent pool's own identity, exactly as before. Each entry is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. At most 10 entries of 255 characters. A token audienced for two targets is replayable between them, so name only the targets this workspace federates to. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do",
-          "items": {
-            "type": "string"
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
           },
-          "type": [
-            "null",
-            "array"
-          ]
+          "description": "the per-provider audiences this workspace's run identity tokens are minted with -- its cloud identity opt-in (#1901). Omit it (the default) and the workspace overrides nothing, inheriting the deployment's catalogue; a deployment that configures no audiences mints nothing and its runs authenticate with the agent pool's own identity, exactly as before. A MAP keyed on the provider configuration a token is for, never a flat list: the bare provider type exactly as a provider block writes it (aws, vault), or type.alias for one aliased configuration (aws.west). The alias is part of the KEY -- do not split on the dot and do not fold aws.west into aws; they are separate targets, and the runner asks for whichever its configuration actually uses. Each value is ALWAYS a list even for a single entry, because a federation target's audience is one value and a list of several is a deliberate these-are-interchangeable statement; the runner mints one token per target carrying only that target's audiences. An audience is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. What you pass is this workspace's OVERRIDE, merged per key OVER the deployment's own catalogue, so naming one target does not restate the rest. The read side differs and this is the trap: a workspace reports its oidc-audiences as the MERGED view, so writing back what you read would promote every inherited entry into an override. A key whose list is EMPTY is refused (422) -- express no-audiences-for-this-target by leaving the key out, which falls back to the deployment's value, because an empty list is indistinguishable from a typo. A token audienced for two targets is replayable between them, so give a target only its own audiences. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do.",
+          "type": "object"
         },
         "owner_email": {
           "description": "workspace owner email (defaults to the caller)",
@@ -1121,14 +1132,17 @@
           "type": "string"
         },
         "oidc_audiences": {
-          "description": "replace the audiences this workspace's run identity tokens are minted for -- its cloud identity opt-in (#1901). Empty (the default) means the workspace mints nothing and its runs authenticate with the agent pool's own identity, exactly as before. Each entry is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. At most 10 entries of 255 characters. A token audienced for two targets is replayable between them, so name only the targets this workspace federates to. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do. Omitting the field leaves the existing audiences alone; pass an EMPTY array to clear them, which opts the workspace back out of minting an identity token",
-          "items": {
-            "type": "string"
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
           },
-          "type": [
-            "null",
-            "array"
-          ]
+          "description": "replace this workspace's per-provider audience overrides for its run identity tokens -- its cloud identity opt-in (#1901). Omitting the field leaves the existing overrides alone; pass an EMPTY object to clear every one of them, which drops the workspace back to inheriting the deployment's catalogue wholesale. A MAP keyed on the provider configuration a token is for, never a flat list: the bare provider type exactly as a provider block writes it (aws, vault), or type.alias for one aliased configuration (aws.west). The alias is part of the KEY -- do not split on the dot and do not fold aws.west into aws; they are separate targets, and the runner asks for whichever its configuration actually uses. Each value is ALWAYS a list even for a single entry, because a federation target's audience is one value and a list of several is a deliberate these-are-interchangeable statement; the runner mints one token per target carrying only that target's audiences. An audience is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. What you pass is this workspace's OVERRIDE, merged per key OVER the deployment's own catalogue, so naming one target does not restate the rest. The read side differs and this is the trap: a workspace reports its oidc-audiences as the MERGED view, so writing back what you read would promote every inherited entry into an override. A key whose list is EMPTY is refused (422) -- express no-audiences-for-this-target by leaving the key out, which falls back to the deployment's value, because an empty list is indistinguishable from a typo. A token audienced for two targets is replayable between them, so give a target only its own audiences. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do.",
+          "type": "object"
         },
         "terraform_version": {
           "description": "partial version like 1.15",

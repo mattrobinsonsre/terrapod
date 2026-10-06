@@ -1689,6 +1689,66 @@ jobs:
           echo "$stock" | grep -q "priorityClassName:" && { echo "FAIL: priorityClassName set by default"; exit 1; }
           echo "control-plane PriorityClasses render OK and are off by default (#751)"
 
+      - name: The cloud identity audience catalogue reaches the ConfigMap
+        run: |
+          # Leg 3 of the config-channel contract. A values key with no render
+          # line is SILENTLY INERT -- the operator sets it, it never reaches the
+          # pod, and the code default wins. For this key that failure is
+          # invisible in the worst way: every workspace would fall through to the
+          # agent pool's identity while the chart says otherwise.
+          out=$(helm template tp ./helm/terrapod \
+            --set api.config.auth.oidc_issuer.enabled=true \
+            --set-json 'api.config.auth.oidc_issuer.audiences={"aws":["sts.amazonaws.com"],"vault":["https://vault.example.com"]}')
+          echo "$out" | grep -q 'audiences:' \
+            || { echo "FAIL: oidc_issuer.audiences does not render into config.yaml"; exit 1; }
+          echo "$out" | grep -q 'sts.amazonaws.com' \
+            || { echo "FAIL: a configured audience value is missing from config.yaml"; exit 1; }
+          echo "$out" | grep -q 'https://vault.example.com' \
+            || { echo "FAIL: a second target's audience is missing from config.yaml"; exit 1; }
+          # Absent by default, on every profile: an empty map is what makes the
+          # whole feature opt-in, and a stray default would hand every workspace
+          # an audience nobody chose.
+          for prof in values.yaml values-local.yaml values-eval.yaml; do
+            stock=$(helm template tp ./helm/terrapod -f "helm/terrapod/$prof") \
+              || { echo "FAIL: $prof does not render"; exit 1; }
+            echo "$stock" | grep -q 'audiences:' \
+              && { echo "FAIL: $prof renders an audience catalogue by default"; exit 1; }
+          done
+          echo "cloud identity audience catalogue renders OK and is empty by default (#1901)"
+
+      - name: An issuer-only webhook Ingress is a renderable configuration
+        run: |
+          # values.yaml advertises "enabling this block with ONLY those two
+          # paths, and no webhook path at all" as first-class, for a deployment
+          # that polls VCS and wants nothing else public. The chart supplies the
+          # two issuer paths itself, so the way to express that is an empty
+          # allow-list -- which the validation guard refused outright, because it
+          # judged the operator's list rather than the resolved set. The chart
+          # contradicting its own documented configuration is the kind of thing
+          # only a render catches.
+          out=$(helm template tp ./helm/terrapod \
+            --set webhookIngress.enabled=true \
+            --set webhookIngress.hostname=hooks.example.com \
+            --set 'webhookIngress.paths=null' \
+            --set api.config.auth.oidc_issuer.enabled=true) \
+            || { echo "FAIL: an issuer-only webhook Ingress does not render"; exit 1; }
+          echo "$out" | grep -q 'path: /.well-known/openid-configuration' \
+            || { echo "FAIL: the discovery path is missing from the issuer-only Ingress"; exit 1; }
+          echo "$out" | grep -q 'path: /.well-known/jwks.json' \
+            || { echo "FAIL: the JWKS path is missing from the issuer-only Ingress"; exit 1; }
+          echo "$out" | grep -q 'path: /api/terrapod/v1/vcs-events' \
+            && { echo "FAIL: a webhook path leaked into an issuer-only Ingress"; exit 1; }
+          # And the guard still fires where it should: with the issuer off, an
+          # empty allow-list really would accept nothing.
+          if helm template tp ./helm/terrapod \
+            --set webhookIngress.enabled=true \
+            --set webhookIngress.hostname=hooks.example.com \
+            --set 'webhookIngress.paths=null' >/dev/null 2>&1; then
+            echo "FAIL: an empty allow-list with no issuer rendered an Ingress that accepts nothing"
+            exit 1
+          fi
+          echo "issuer-only webhook Ingress renders, and an empty allow-list is still refused (#1901)"
+
   # ── Config-channel contract (#617) ────────────────────
   # Renders the chart (every values profile) and parses the rendered ConfigMaps
   # THROUGH the real Pydantic config models (Settings / RunnerConfig), asserting

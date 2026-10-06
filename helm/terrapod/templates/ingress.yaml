@@ -76,7 +76,20 @@ spec:
     - host: {{ .Values.webhookIngress.hostname }}
       http:
         paths:
-          {{- range .Values.webhookIngress.paths }}
+          {{- /* The issuer's two documents are added automatically when the
+                 issuer is enabled, rather than left as an uncomment-this step.
+                 Publishing a trust root the clouds cannot fetch is not a
+                 degraded configuration, it is a broken one: every federated run
+                 fails at the cloud's token exchange, with nothing wrong on the
+                 Terrapod side to look at. `uniq` keeps it idempotent for an
+                 operator who already listed them by hand. Listed EXACTLY, never
+                 as `/.well-known`, so the terraform service-discovery document
+                 is not exposed as a side effect (#1901). */}}
+          {{- $paths := .Values.webhookIngress.paths | default list }}
+          {{- if ((.Values.api.config.auth).oidc_issuer).enabled }}
+          {{- $paths = concat $paths (list "/.well-known/openid-configuration" "/.well-known/jwks.json") | uniq }}
+          {{- end }}
+          {{- range $paths }}
           - path: {{ . }}
             pathType: {{ $.Values.webhookIngress.pathType | default "Prefix" }}
             backend:

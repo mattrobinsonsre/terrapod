@@ -7,6 +7,12 @@ Both are **unauthenticated by necessity, not by oversight**: a cloud fetches the
 anonymously, before any token exists, to decide whether to trust one. They
 publish only public key material and the issuer's own URL.
 
+Both are also deliberately **cacheable**, and the JWKS max-age is DERIVED from
+`key_propagation_seconds` rather than configured separately -- see
+`_jwks_max_age`. Caching is both a correctness requirement for rotation and the
+mitigation for the endpoints being open: without it an anonymous caller can make
+the API parse RSA keys at whatever rate they like.
+
 Both are mounted only when `auth.oidc_issuer.enabled` — and off means the router
 is not mounted at all rather than mounted and refusing. A deployment that has not
 opted in publishes no trust root, which is a stronger and more legible statement
@@ -25,6 +31,40 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 router = APIRouter(tags=["oidc-issuer"])
+
+#: How long a client may cache the discovery document. It changes only when the
+#: issuer URL or the claim set does, and a stale copy is harmless because it
+#: carries no key material -- but keep it modest so a corrected issuer URL takes
+#: effect in minutes rather than hours.
+_DISCOVERY_MAX_AGE = 300
+
+#: Floor for the JWKS max-age, so a deployment that sets a very short
+#: propagation window still gets the caching this relies on.
+_JWKS_MIN_MAX_AGE = 60
+
+
+def _jwks_max_age() -> int:
+    """Half the key propagation window.
+
+    **Derived, not configured, because the two numbers describe the same
+    commitment from opposite ends.** `key_propagation_seconds` is how long a
+    rotated-in key is published BEFORE it starts signing, and the only reason
+    that wait exists is that the clouds cache this document -- so advertising a
+    cache lifetime longer than the wait would mean a cloud still holding the old
+    key set at the moment we begin signing with the new one, and rejecting every
+    token until its cache happened to expire.
+
+    Half rather than all of it: a cache that expires exactly at the boundary is
+    a clock-skew race, and halving buys a guaranteed refresh strictly inside the
+    window for the cost of one extra fetch of a small document.
+
+    Caching is also the mitigation for the endpoint being necessarily
+    unauthenticated -- a cloud fetches it anonymously, before any token exists.
+    """
+    from terrapod.config import settings
+
+    window = int(settings.auth.oidc_issuer.key_propagation_seconds or 0)
+    return max(_JWKS_MIN_MAX_AGE, window // 2)
 
 
 def issuer_url() -> str:
@@ -69,6 +109,7 @@ async def openid_configuration() -> JSONResponse:
     """
     base = issuer_url()
     return JSONResponse(
+        headers={"Cache-Control": f"public, max-age={_DISCOVERY_MAX_AGE}"},
         content={
             "issuer": base,
             "jwks_uri": f"{base}/.well-known/jwks.json",
@@ -89,7 +130,7 @@ async def openid_configuration() -> JSONResponse:
                 "run_id",
                 "terrapod_organization",
             ],
-        }
+        },
     )
 
 
@@ -103,4 +144,7 @@ async def jwks() -> JSONResponse:
     """
     from terrapod.auth.oidc_signing import get_jwks
 
-    return JSONResponse(content=get_jwks())
+    return JSONResponse(
+        headers={"Cache-Control": f"public, max-age={_jwks_max_age()}"},
+        content=get_jwks(),
+    )

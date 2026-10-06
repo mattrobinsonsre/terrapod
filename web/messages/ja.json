@@ -1050,7 +1050,7 @@
       "varFiles": "変数ファイル（作成されるワークスペースに継承）",
       "varFilesHint": "plan/applyに渡される相対的な<code>.tfvars</code>パスです。",
       "oidcAudiences": "実行アイデンティティのオーディエンス（作成されるワークスペースに継承）",
-      "oidcAudiencesHint": "このルールが作成する各ワークスペースが実行アイデンティティトークンを発行する対象のオーディエンス。空にすれば何も発行しません。",
+      "oidcAudiencesHint": "このルールが作成する各ワークスペースに適用されるオーディエンスの上書き。キーはトークンの対象となるプロバイダー設定です — aws、またはエイリアス付き設定なら aws.west。空にすれば、それらのワークスペースはデプロイメント自身の設定を使用します。",
       "addVarFile": "変数ファイルを追加",
       "executionHooks": "実行フック（各新規ワークスペースに関連付け）",
       "executionHooksHint": "<page>実行フック</page>管理ページで定義されたフックから選択します — 選択した各フックは、このルールが作成するすべてのワークスペースに関連付けられます。",
@@ -1269,7 +1269,7 @@
       "setLabels": "ラベルを設定（一致したすべてのワークスペースのラベルマップを置き換えます）",
       "setVarFiles": "変数ファイルを設定",
       "addVarFile": "変数ファイルを追加",
-      "setOidcAudiences": "実行アイデンティティのオーディエンスを設定（一致するすべてのワークスペースでリストを置き換えます。空のリストは実行アイデンティティを無効にします）",
+      "setOidcAudiences": "実行アイデンティティの OIDC オーディエンスを設定（一致したすべてのワークスペースのマップを置き換えます）",
       "setRunTasks": "実行タスクを設定（一致したすべてのワークスペースで名前によりupsert）",
       "setNotifications": "通知設定を設定（名前によりupsert）",
       "dryRun": "ドライラン（プレビューのみ — 変更は書き込まれません）",
@@ -1922,6 +1922,19 @@
       "triggers": "トリガー",
       "addNotification": "通知を追加"
     },
+    "oidcAudiences": {
+      "audiences": "オーディエンス",
+      "addProvider": "プロバイダー設定を追加",
+      "providerPlaceholder": "aws、または aws.west",
+      "providerInvalid": "プロバイダー名に空白は入れられず、ドットは最大 1 つです — aws、または aws.west。",
+      "providerDuplicate": "そのプロバイダー設定のエントリはすでにあります。",
+      "removeProviderAria": "プロバイダー設定 {provider} を削除",
+      "badgeOwned": "ワークスペース",
+      "badgeInherited": "デプロイメントの既定値",
+      "override": "上書き",
+      "overrideAria": "このワークスペースで {provider} のオーディエンスを上書き",
+      "issuerDisabled": "このデプロイメントは OpenID Connect の発行者を公開していないため、ここで設定したものは一切有効になりません。"
+    },
     "autoApplyMode": {
       "never": "なし",
       "always": "常に",
@@ -2536,10 +2549,11 @@
       "driftIgnoreRulesHint": "ドリフト分類器によって抑制される、glob対応のTerraformアドレス + 属性パスです。<star></star>は非<dot></dot>文字の0個以上に一致します（<n></n>個のインデックスにまたがります）。<starIdx></starIdx>は任意の括弧付きインデックスに一致します。属性の接尾辞なしの単なるアドレスは、そのリソースへのあらゆる変更（破棄を含む）を抑制します。ドリフトのみに影響し、通常のplan/applyには影響しません。完全な文法については<docs>drift-ignore-rules.md</docs>を参照してください。",
       "driftIgnoreRulesNone": "なし（すべてのプラン差分がドリフトとして扱われます）",
       "oidcAudiences": "実行アイデンティティのオーディエンス",
-      "oidcAudiencesHint": "Terrapod はこのワークスペースの実行ごとに短命な OpenID Connect トークンを発行し、実行が読み取れるファイルに書き出します。オーディエンスはそのトークンが何のためのものかを示し、フェデレーション先はそれぞれ独自の不透明な文字列を選びます — sts.amazonaws.com、api://AzureADTokenExchange、あるいはフェデレーションする相手が受け付けるものは何であれ。リストを空のままにすればこのワークスペースは何も発行せず、その実行は今日と同じく、エージェントプール自身のアイデンティティで認証します。どのプロバイダーがトークンをどう利用するかは、あなた自身の設定のままです。",
+      "oidcAudiencesHint": "Terrapod は実行が使用するプロバイダー設定ごとに短命な OpenID Connect トークンを発行し、実行が読み取れるファイルに書き出します。エントリのキーには、あなたの設定がそのプロバイダーを呼ぶ名前を指定します — aws、またはエイリアス付き設定なら aws.west — そのうえで、その宛先が受け付けるオーディエンスを列挙します。各エントリはそのプロバイダーについてデプロイメント自身の設定を上書きします。エントリを削除すれば、そのプロバイダーはデプロイメントのオーディエンスに戻ります。オーディエンスはフェデレーション先が選んだ不透明な文字列なので、入力したとおりに保存されます。",
       "oidcAudiencesPlaceholder": "例: sts.amazonaws.com",
       "oidcAudiencesNone": "なし（実行はエージェントプール自身のアイデンティティを使用）",
-      "oidcAudiencesAdd": "オーディエンスを追加"
+      "oidcAudiencesAdd": "オーディエンスを追加",
+      "oidcAudiencesLoading": "デプロイメントで設定されたオーディエンスを確認しています …"
     },
     "vcsWorkflowWarning": {
       "title": "認可はVCSリポジトリに委譲されます。",

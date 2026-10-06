@@ -1419,23 +1419,41 @@ test.describe('AI policy gate (#1766)', () => {
 })
 
 test.describe('Per-workspace run identity (#1901)', () => {
-  // The mobile guard for the three surfaces #1901 adds an audience-list editor
-  // to. A row is an input plus a Remove button on one line, and an audience is
-  // a long opaque string (`api://AzureADTokenExchange`) — exactly the shape
-  // that pushes a page sideways when a value is allowed to set the row width.
+  // The mobile guard for the three surfaces #1901 adds the audience editor to.
+  // The value is a MAP of provider configuration -> audiences, so each entry is
+  // a card holding its own key, a provenance badge and its own list of rows,
+  // and an audience is a long opaque string (`api://AzureADTokenExchange`) —
+  // exactly the shape that pushes a page sideways when a value is allowed to
+  // set a card's width.
+  //
+  // What this suite CANNOT reach: the inherited half. A workspace read returns
+  // the deployment catalogue merged over the workspace's own map, so an entry
+  // only reads as inherited when the deployment configures one — and
+  // `auth.oidc_issuer.audiences` defaults to empty with the issuer OFF, which
+  // the e2e stack does not override. Configuring it is a compose/Helm change,
+  // so the subtraction is pinned by unit test (`web/tests/oidc-audiences.test.ts`)
+  // and what is asserted here is the half this stack can actually produce:
+  // every entry workspace-owned, and the issuer-disabled notice shown rather
+  // than an empty editor that looks configurable.
 
-  test('the workspace audience list reads and edits at phone width', async ({ page }) => {
+  test('the workspace audience map reads and edits at phone width', async ({ page }) => {
     const token = getStoredToken()
+    // Two entries, and the second is ALIASED: `aws.west` is one key, never
+    // split on the dot, so the read view has to show it whole.
     const wsId = await createWorkspace(token, uniqueName('e2erespoidc'), {
-      'oidc-audiences': ['sts.amazonaws.com', 'api://AzureADTokenExchange'],
+      'oidc-audiences': {
+        aws: ['sts.amazonaws.com'],
+        'aws.west': ['api://AzureADTokenExchange'],
+      },
     })
 
-    // Read-only: both audiences stay visible, not hidden behind a breakpoint
-    // to make the grid fit. Someone checking which audiences a workspace mints
-    // for on a phone is the whole point of showing them.
+    // Read-only: both the provider keys and every audience stay visible, not
+    // hidden behind a breakpoint to make the grid fit. Someone checking which
+    // audiences a workspace mints for on a phone is the whole point.
     await page.goto(`/workspaces/${wsId}`)
     const shown = page.getByTestId('oidc-audiences')
     await expect(shown).toBeVisible({ timeout: 15_000 })
+    await expect(shown).toContainText('aws.west')
     await expect(shown).toContainText('api://AzureADTokenExchange')
     await expectNoHorizontalPageScroll(page)
 
@@ -1445,15 +1463,52 @@ test.describe('Per-workspace run identity (#1901)', () => {
     const spy = async (d: Dialog) => { dialogFired = true; await d.dismiss() }
     page.on('dialog', spy)
 
+    // Provenance is rendered, not inferred from absence: this stack configures
+    // no catalogue, so both entries are the workspace's own and both say so.
+    // A badge on each side is what makes "which of these did I set" answerable
+    // at a glance, and the read view is where someone asks it.
+    await expect(shown.getByText('Workspace', { exact: true }).first()).toBeVisible()
+    await expect(shown.getByText('Deployment default')).toHaveCount(0)
+
     await page.getByRole('button', { name: 'Edit' }).first().click()
-    const add = page.getByRole('button', { name: 'Add audience' })
-    await expect(add).toBeVisible({ timeout: 15_000 })
+
+    // Each existing entry carries its own audience list, so 'Add audience'
+    // belongs to a card while 'Add provider configuration' is the top-level one.
+    // The editor appears only once the catalogue probe has settled — before
+    // that the partition would mark every inherited entry as owned — so this
+    // wait is load-bearing, not incidental.
+    const addProvider = page.getByRole('button', { name: 'Add provider configuration' })
+    await expect(addProvider).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Add audience' }).first()).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 
-    // The row's action is a real button with a tap target, not bare coloured
-    // text, and adding one keeps the page inside the viewport.
-    await add.click()
-    await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
+    // The issuer is off by default, so the editor says it is inert rather than
+    // letting an operator configure something that can never be minted for.
+    await expect(page.getByTestId('oidc-issuer-disabled')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // A row's action is a real button with a tap target, not bare coloured
+    // text, and adding a third entry keeps the page inside the viewport.
+    //
+    // Counted by the per-card remove's OWN accessible name, not by the word
+    // "Remove": that button carries an aria-label naming its provider, which
+    // overrides its text content, so `{ name: 'Remove' }` matches the
+    // per-AUDIENCE removes inside each card instead and counts rows rather
+    // than cards. Asserting the aria-label is also the stronger check, since
+    // it is what a screen-reader user hears for a control that would otherwise
+    // be one of several identical "Remove"s on the page.
+    const removeProvider = page.getByRole('button', {
+      name: /^Remove the .+ provider configuration$/,
+    })
+    await expect(removeProvider).toHaveCount(2)
+    await expect(addProvider).toBeDisabled()
+    await page.getByTestId('oidc-provider-input').fill('vault')
+    await expect(addProvider).toBeEnabled()
+    await addProvider.click()
+    await expect(removeProvider).toHaveCount(3)
+    await expect(
+      page.getByRole('button', { name: 'Remove the vault provider configuration' })
+    ).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 
     expect(dialogFired).toBe(false)
@@ -1472,11 +1527,13 @@ test.describe('Per-workspace run identity (#1901)', () => {
     // that is no precedent. `.check()` also drives the input and waits for
     // actionability, where clicking the long label row did not.
     const gate = page
-      .locator('label', { hasText: /Set run identity audiences/i })
+      .locator('label', { hasText: /Set OIDC run identity audiences/i })
       .locator('input[type="checkbox"]')
     await expect(gate).toBeVisible({ timeout: 15_000 })
 
-    const add = page.getByRole('button', { name: 'Add audience' })
+    // An empty map has no entries, so the only control the gate reveals is the
+    // top-level one; 'Add audience' lives inside an entry and does not exist yet.
+    const add = page.getByRole('button', { name: 'Add provider configuration' })
     await expect(add).toHaveCount(0)
 
     // Retried, and only while the list is still closed, so a handler that
@@ -1486,6 +1543,22 @@ test.describe('Per-workspace run identity (#1901)', () => {
       await expect(add).toBeVisible({ timeout: 1_000 })
     }).toPass({ timeout: 15_000 })
 
+    await expectNoHorizontalPageScroll(page)
+
+    // Naming a provider reveals that entry's own audience list, still inside
+    // the viewport once a card and its row are both on the page.
+    await page.getByTestId('oidc-provider-input').fill('aws.west')
+    await add.click()
+    await expect(page.getByRole('button', { name: 'Add audience' })).toBeVisible()
+    // A fleet template is a pure override with nothing to merge against, so it
+    // has no provenance to report. The badge the workspace read view carries
+    // must NOT appear here, or the form asserts an ownership it cannot know --
+    // the defect `showProvenance` was added to fix, and this is its only guard.
+    // Scoped to the editor: a bare negative on an admin page could pass or fail
+    // on any other element that happens to render the exact word.
+    const editor = page.getByTestId('oidc-audience-editor')
+    await expect(editor.getByText('Workspace', { exact: true })).toHaveCount(0)
+    await expect(editor.getByText('Deployment default')).toHaveCount(0)
     await expectNoHorizontalPageScroll(page)
   })
 
@@ -1503,7 +1576,7 @@ test.describe('Per-workspace run identity (#1901)', () => {
     //
     // Both steps are inside the retry and both are guarded on the editor still
     // being absent: clicking the summary a second time would collapse it again.
-    const add = page.getByRole('button', { name: 'Add audience' })
+    const add = page.getByRole('button', { name: 'Add provider configuration' })
     await expect(async () => {
       if ((await add.count()) > 0) {
         await expect(add).toBeVisible({ timeout: 1_000 })
@@ -1518,8 +1591,12 @@ test.describe('Per-workspace run identity (#1901)', () => {
 
     await expectNoHorizontalPageScroll(page)
 
+    // An aliased key is one key: typing the dot must not split it into a
+    // nested anything, and the card's heading carries it whole.
+    await page.getByTestId('oidc-provider-input').fill('vault.eu')
     await add.click()
     await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
+    await expect(page.getByText('vault.eu', { exact: true })).toBeVisible()
     await expectNoHorizontalPageScroll(page)
   })
 })

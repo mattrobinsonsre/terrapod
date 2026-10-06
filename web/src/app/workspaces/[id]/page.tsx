@@ -31,7 +31,13 @@ import {
   parseVaultReference,
   type VaultReferenceValue,
 } from '@/components/vault-reference-fields'
-import { StringListEditor } from '@/components/template-editors'
+import {
+  OidcAudiencesEditor,
+  sanitizeOidcAudiences,
+  partitionOidcAudiences,
+  type OidcAudiences,
+} from '@/components/template-editors'
+import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import { VariableEditPanel } from '@/components/variable-edit-panel'
 import { ApplicableVarsets } from '@/components/applicable-varsets'
 import { useSortable } from '@/lib/use-sortable'
@@ -83,10 +89,19 @@ interface WorkspaceAttrs {
   'var-files': string[]
   'trigger-prefixes': string[]
   'drift-ignore-rules': string[]
-  // The audiences a run identity token is minted for (#1901). Empty is the
-  // opt-OUT: the workspace mints nothing and its runs authenticate with the
-  // agent pool's own identity, exactly as before.
-  'oidc-audiences': string[]
+  // The audiences a run identity token is minted for (#1901), keyed on the
+  // provider configuration the token is for — `aws`, or `aws.west` for one
+  // aliased configuration.
+  //
+  // **This is the MERGED map, not the workspace's own override**: the server
+  // returns the deployment catalogue with the workspace's map merged over it
+  // per key, carrying no marker saying which is which. So it must never be
+  // written back wholesale — that would promote every inherited entry into an
+  // override. `partitionOidcAudiences` subtracts the catalogue (fetched
+  // separately) to recover what the workspace actually owns, and only that is
+  // sent. Empty here means nothing is in force at all, and the runs then
+  // authenticate with the agent pool's own identity exactly as before.
+  'oidc-audiences': OidcAudiences
   'vcs-repo-url': string
   'vcs-branch': string
   'vcs-connection-id': string | null
@@ -322,7 +337,17 @@ function WorkspaceDetailContent() {
   const [newTriggerPrefix, setNewTriggerPrefix] = useState('')
   const [editDriftIgnoreRules, setEditDriftIgnoreRules] = useState<string[]>([])
   const [newDriftIgnoreRule, setNewDriftIgnoreRule] = useState('')
-  const [editOidcAudiences, setEditOidcAudiences] = useState<string[]>([])
+  // Only the entries this workspace OWNS; `null` until the deployment
+  // catalogue has settled, because the partition is meaningless without it.
+  //
+  // The sentinel is load-bearing rather than tidiness. Partitioning against a
+  // catalogue that has not arrived yet classifies EVERY inherited entry as
+  // owned, and the next save would then write them all into the override
+  // column — the precise promotion this split exists to prevent. So nothing is
+  // seeded until the probe settles (on success or failure), the editor is not
+  // offered before then, and an unseeded save omits the attribute entirely,
+  // which the API treats as leave-alone.
+  const [editOidcAudiences, setEditOidcAudiences] = useState<OidcAudiences | null>(null)
   const [editWorkingDir, setEditWorkingDir] = useState('')
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
@@ -390,6 +415,11 @@ function WorkspaceDetailContent() {
   // meeting a 422 on save, so it is not offered at all.
   const vaultOfferable =
     vaultAvailable && workspace?.attributes['execution-mode'] === 'agent'
+
+  // The deployment's audience catalogue: what this workspace's `oidc-audiences`
+  // is merged OVER, and the only way to tell an inherited entry from an
+  // override (#1901).
+  const oidcDefaults = useOidcAudienceDefaults()
 
   const [editVarSource, setEditVarSource] = useState<'static' | 'vault'>('static')
   // The whole stored reference, not just the fields on screen — so an edit
@@ -644,6 +674,24 @@ function WorkspaceDetailContent() {
     if (activeTab === 'run-triggers') loadRunTriggers()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loads are dispatched by the active tab; the loaders are hoisted function declarations recreated each render, so depending on them would re-fetch on every render
   }, [activeTab, workspace, loadRuns])
+
+  // Seed the owned half of `oidc-audiences` once the catalogue has settled
+  // (#1901). Deliberately NOT done where edit mode opens: the probe may still
+  // be in flight there, and partitioning against an absent catalogue marks
+  // every inherited entry as owned, which the next save would then write into
+  // the override column. Guarded on `=== null` so it seeds once per edit
+  // session and never clobbers what the operator has since typed.
+  useEffect(() => {
+    if (!editing || !workspace || !oidcDefaults.loaded) return
+    setEditOidcAudiences((current) =>
+      current === null
+        ? partitionOidcAudiences(
+            workspace.attributes['oidc-audiences'] || {},
+            oidcDefaults.audiences,
+          ).owned
+        : current,
+    )
+  }, [editing, workspace, oidcDefaults.loaded, oidcDefaults.audiences])
 
   // Load VCS refs when plan options panel opens on a VCS-connected workspace
   useEffect(() => {
@@ -1083,7 +1131,7 @@ function WorkspaceDetailContent() {
     setNewTriggerPrefix('')
     setEditDriftIgnoreRules(workspace.attributes['drift-ignore-rules'] || [])
     setNewDriftIgnoreRule('')
-    setEditOidcAudiences(workspace.attributes['oidc-audiences'] || [])
+    setEditOidcAudiences(null)
     setEditWorkingDir(workspace.attributes['working-directory'] || '')
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
@@ -1145,10 +1193,19 @@ function WorkspaceDetailContent() {
               'var-files': editVarFiles,
               'trigger-prefixes': editTriggerPrefixes,
               'drift-ignore-rules': editDriftIgnoreRules,
-              // Sent trimmed and blank-free: the server REFUSES a blank entry
-              // rather than dropping it, so an empty row left in the editor would
-              // 422 the whole save.
-              'oidc-audiences': editOidcAudiences.map((v) => v.trim()).filter(Boolean),
+              // Only the OWNED entries, never the merged map the read
+              // returned — sending the merge back would turn every inherited
+              // entry into an override, and an entry dropped from here falls
+              // back to the deployment's own value, which is the point.
+              //
+              // Blank-free but NOT trimmed: the server refuses a blank entry
+              // rather than dropping it (so an empty row left in the editor
+              // would 422 the whole save), while a kept audience is an opaque
+              // string stored byte-for-byte, so trimming one would store
+              // something other than what was typed.
+              ...(editOidcAudiences !== null
+                ? { 'oidc-audiences': sanitizeOidcAudiences(editOidcAudiences) }
+                : {}),
               'vcs-repo-url': editVcsRepoUrl,
               'vcs-branch': editVcsBranch,
               'vcs-workflow': editVcsWorkflow,
@@ -1988,6 +2045,16 @@ function WorkspaceDetailContent() {
   const attrs = workspace.attributes
   const perms = attrs.permissions || {} as WorkspacePermissions
 
+  // `oidc-audiences` arrives MERGED, so provenance only exists by subtracting
+  // the deployment catalogue. Derived on every render rather than stored: the
+  // catalogue arrives asynchronously, and a value captured before it landed
+  // would show every entry as workspace-owned for ever. The edit state is
+  // seeded from `.owned` separately, when edit mode opens.
+  const oidcAudienceSplit = partitionOidcAudiences(
+    attrs['oidc-audiences'] || {},
+    oidcDefaults.audiences,
+  )
+
   // VCS polling is stalled when the most recent ATTEMPT is newer than the most
   // recent SUCCESS. Comparing the two needs no knowledge of the poll interval,
   // and it catches the case an error message alone misses (#1089).
@@ -2721,21 +2788,33 @@ function WorkspaceDetailContent() {
                   {editing && perms['can-update'] ? (
                     <div className="space-y-2">
                       <p className="text-xs text-slate-400">{t('fields.oidcAudiencesHint')}</p>
-                      <StringListEditor
-                        values={editOidcAudiences}
-                        onChange={setEditOidcAudiences}
-                        placeholder={t('fields.oidcAudiencesPlaceholder')}
-                        addLabel={t('fields.oidcAudiencesAdd')}
-                      />
+                      {/* `value` is the owned set and `fallbacks` the catalogue
+                          for the keys in force, so an inherited entry is shown
+                          and offered for override rather than edited in place,
+                          and only the owned set is saved. */}
+                      {editOidcAudiences === null ? (
+                        <p className="text-xs text-slate-500">
+                          {t('fields.oidcAudiencesLoading')}
+                        </p>
+                      ) : (
+                        <OidcAudiencesEditor
+                          value={editOidcAudiences}
+                          fallbacks={oidcAudienceSplit.fallbacks}
+                          onChange={setEditOidcAudiences}
+                          inert={!oidcDefaults.issuerEnabled}
+                          audiencePlaceholder={t('fields.oidcAudiencesPlaceholder')}
+                          addAudienceLabel={t('fields.oidcAudiencesAdd')}
+                        />
+                      )}
                     </div>
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200" data-testid="oidc-audiences">
-                      {(attrs['oidc-audiences'] || []).length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {attrs['oidc-audiences'].map((aud) => (
-                            <code key={aud} className="bg-slate-700 px-2 py-0.5 rounded text-xs break-all">{aud}</code>
-                          ))}
-                        </div>
+                      {Object.keys(attrs['oidc-audiences'] || {}).length > 0 ? (
+                        <OidcAudiencesEditor
+                          value={oidcAudienceSplit.owned}
+                          fallbacks={oidcAudienceSplit.fallbacks}
+                          readOnly
+                        />
                       ) : (
                         <span className="text-slate-500">{t('fields.oidcAudiencesNone')}</span>
                       )}

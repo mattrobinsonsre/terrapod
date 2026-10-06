@@ -1050,7 +1050,7 @@
       "varFiles": "Var soubory (zděděné vytvořenými pracovními prostory)",
       "varFilesHint": "Relativní cesty <code>.tfvars</code> předané do plan/apply.",
       "oidcAudiences": "Audience identity běhu (zděděné vytvořenými pracovními prostory)",
-      "oidcAudiencesHint": "Audience, pro které každý pracovní prostor vytvořený tímto pravidlem vydává token identity běhu. Nechte prázdné a nic nevydají.",
+      "oidcAudiencesHint": "Přepisy audience vložené do každého pracovního prostoru, který toto pravidlo vytvoří, zaklíčované na konfiguraci provideru, pro kterou token platí — aws, nebo aws.west pro konfiguraci s aliasem. Nechte prázdné a tyto pracovní prostory použijí vlastní konfiguraci nasazení.",
       "addVarFile": "Přidat var soubor",
       "executionHooks": "Prováděcí háčky (přiřazené každému novému pracovnímu prostoru)",
       "executionHooksHint": "Vyberte z háčků definovaných na admin stránce <page>Prováděcí háčky</page> — každý vybraný háček je přiřazen každému pracovnímu prostoru, který toto pravidlo vytvoří.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Nastavit štítky (nahradí mapu štítků na každém odpovídajícím pracovním prostoru)",
       "setVarFiles": "Nastavit var soubory",
       "addVarFile": "Přidat var soubor",
-      "setOidcAudiences": "Nastavit audience identity běhu (nahradí seznam v každém odpovídajícím pracovním prostoru; prázdný seznam identitu běhu vypne)",
+      "setOidcAudiences": "Nastavit OIDC audience identity běhu (nahradí mapu na každém odpovídajícím pracovním prostoru)",
       "setRunTasks": "Nastavit run tasky (upsertovány podle názvu na každém odpovídajícím pracovním prostoru)",
       "setNotifications": "Nastavit konfigurace oznámení (upsertovány podle názvu)",
       "dryRun": "Zkušební běh (pouze náhled — žádné změny nezapsány)",
@@ -1922,6 +1922,19 @@
       "triggers": "Triggery",
       "addNotification": "Přidat oznámení"
     },
+    "oidcAudiences": {
+      "audiences": "Audience",
+      "addProvider": "Přidat konfiguraci provideru",
+      "providerPlaceholder": "aws, nebo aws.west",
+      "providerInvalid": "Název provideru neobsahuje mezery a nejvýše jednu tečku — aws, nebo aws.west.",
+      "providerDuplicate": "Tato konfigurace provideru už má záznam.",
+      "removeProviderAria": "Odebrat konfiguraci provideru {provider}",
+      "badgeOwned": "Pracovní prostor",
+      "badgeInherited": "Výchozí nastavení nasazení",
+      "override": "Přepsat",
+      "overrideAria": "Přepsat audience pro {provider} v tomto pracovním prostoru",
+      "issuerDisabled": "Toto nasazení nepublikuje žádného vydavatele OpenID Connect, takže nic, co se zde nastaví, nemůže nabýt účinnosti."
+    },
     "autoApplyMode": {
       "never": "nikdy",
       "always": "vždy",
@@ -2536,10 +2549,11 @@
       "driftIgnoreRulesHint": "Glob-aware cesty Terraform adres + atributů potlačené klasifikátorem odchýlení. <star></star> odpovídá nule nebo více ne-<dot></dot> znakům (překlenuje <n></n> indexů); <starIdx></starIdx> odpovídá jakémukoli indexu v hranatých závorkách. Holá adresa bez přípony atributu umlčí jakoukoli změnu tohoto prostředku — včetně zničení. Ovlivňuje pouze odchýlení, nikoli běžný plan/apply. Úplnou gramatiku viz <docs>drift-ignore-rules.md</docs>.",
       "driftIgnoreRulesNone": "Žádná (každý rozdíl v plánu se počítá jako odchýlení)",
       "oidcAudiences": "Audience identity běhu",
-      "oidcAudiencesHint": "Terrapod vydává pro každý běh tohoto pracovního prostoru krátkodobý token OpenID Connect a zapisuje ho do souboru, který si běh může přečíst. Audience říká, k čemu token je, a každý cíl federace si volí vlastní neprůhledný řetězec — sts.amazonaws.com, api://AzureADTokenExchange nebo cokoli, co přijímá cíl, s nímž federujete. Nechte seznam prázdný a tento pracovní prostor nevydává nic: jeho běhy se ověřují přesně jako dnes, vlastní identitou fondu agentů. Který provider token používá a jak, zůstává vaší vlastní konfigurací.",
+      "oidcAudiencesHint": "Terrapod vydává krátkodobý token OpenID Connect pro každou konfiguraci provideru, kterou běh používá, a zapisuje ho do souboru, který si běh může přečíst. Záznam zaklíčujte na provider tak, jak ho pojmenovává vaše konfigurace — aws, nebo aws.west pro konfiguraci s aliasem — a vypište audience, které ten cíl přijímá. Každý záznam přepisuje vlastní konfiguraci nasazení pro daný provider; odeberte ho a ten provider se vrátí k audience nasazení. Audience je neprůhledný řetězec, který si vybral cíl federace, takže se ukládá přesně tak, jak ji napíšete.",
       "oidcAudiencesPlaceholder": "např. sts.amazonaws.com",
       "oidcAudiencesNone": "Žádné (běhy používají vlastní identitu fondu agentů)",
-      "oidcAudiencesAdd": "Přidat audience"
+      "oidcAudiencesAdd": "Přidat audience",
+      "oidcAudiencesLoading": "Kontrolují se audience nakonfigurované v nasazení …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

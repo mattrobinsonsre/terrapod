@@ -70,6 +70,7 @@
   "api.config.auth.callback_base_url",
   "api.config.auth.local_enabled",
   "api.config.auth.login_token_ttl_hours",
+  "api.config.auth.oidc_issuer.audiences",
   "api.config.auth.oidc_issuer.enabled",
   "api.config.auth.oidc_issuer.key_propagation_seconds",
   "api.config.auth.oidc_issuer.public_url",

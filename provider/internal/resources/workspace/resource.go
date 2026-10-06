@@ -14,10 +14,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
@@ -78,16 +80,21 @@ func (r *workspaceResource) ValidateConfig(ctx context.Context, req resource.Val
 // *removing* the attribute from a config is indistinguishable from never having
 // declared it, so it plans as no-change and the server-side value survives
 // (#1091). ModifyPlan below makes that visible rather than silent.
+// `empty` is the literal that clears the attribute, which differs by shape —
+// `[]` for a list, `{}` for the map of lists that oidc_audiences is. It is
+// carried here rather than derived because both the warning and the
+// description guard have to name the one a practitioner can actually write.
 var unmanagedCollections = []struct {
 	name  string
+	empty string
 	value func(*workspaceModel) attr.Value
 }{
-	{"agent_pool_ids", func(m *workspaceModel) attr.Value { return m.AgentPoolIDs }},
-	{"var_files", func(m *workspaceModel) attr.Value { return m.VarFiles }},
-	{"trigger_prefixes", func(m *workspaceModel) attr.Value { return m.TriggerPrefixes }},
-	{"drift_ignore_rules", func(m *workspaceModel) attr.Value { return m.DriftIgnoreRules }},
-	{"security_scan_skip_rules", func(m *workspaceModel) attr.Value { return m.SecurityScanSkipRules }},
-	{"oidc_audiences", func(m *workspaceModel) attr.Value { return m.OIDCAudiences }},
+	{"agent_pool_ids", "[]", func(m *workspaceModel) attr.Value { return m.AgentPoolIDs }},
+	{"var_files", "[]", func(m *workspaceModel) attr.Value { return m.VarFiles }},
+	{"trigger_prefixes", "[]", func(m *workspaceModel) attr.Value { return m.TriggerPrefixes }},
+	{"drift_ignore_rules", "[]", func(m *workspaceModel) attr.Value { return m.DriftIgnoreRules }},
+	{"security_scan_skip_rules", "[]", func(m *workspaceModel) attr.Value { return m.SecurityScanSkipRules }},
+	{"oidc_audiences", "{}", func(m *workspaceModel) attr.Value { return m.OIDCAudiences }},
 }
 
 // agentPoolIDsForRequest returns the pool set to put on the wire, or nil when it
@@ -126,13 +133,102 @@ func onlyPool(v attr.Value, id string) bool {
 	return ok && s.ValueString() == id
 }
 
-// hasElements reports whether a list attribute holds at least one element.
+// hasElements reports whether a collection attribute holds at least one
+// element. Both shapes in unmanagedCollections are covered: a list, and the map
+// of lists that oidc_audiences is (#1901). A null, unknown or empty collection
+// is not "a value the config is not managing", so none of them warn.
 func hasElements(v attr.Value) bool {
-	l, ok := v.(types.List)
-	if !ok || l.IsNull() || l.IsUnknown() {
+	switch c := v.(type) {
+	case types.List:
+		return !c.IsNull() && !c.IsUnknown() && len(c.Elements()) > 0
+	case types.Map:
+		return !c.IsNull() && !c.IsUnknown() && len(c.Elements()) > 0
+	default:
 		return false
 	}
-	return len(l.Elements()) > 0
+}
+
+// audienceMapForRequest converts a planned oidc_audiences map into the wire
+// shape, returning nil when the attribute must be omitted from the request
+// entirely (#1901).
+//
+// nil and an empty map are different instructions and both have to survive the
+// trip. nil means "the configuration does not mention this attribute, leave the
+// server's value alone"; an explicit `{}` is how a workspace drops every
+// override and falls back to the deployment's audience catalogue. go-terrapod
+// sends the attribute on `!= nil`, so collapsing the two here would make the
+// opt-out a silent no-op — the shape of bug that leaves a workspace minting
+// after an operator removed every audience.
+func audienceMapForRequest(m types.Map) map[string][]string {
+	if m.IsNull() || m.IsUnknown() {
+		return nil
+	}
+	out := make(map[string][]string, len(m.Elements()))
+	for k, v := range m.Elements() {
+		l, ok := v.(types.List)
+		if !ok || l.IsNull() || l.IsUnknown() {
+			// Send the key with no audiences rather than dropping it. The
+			// server refuses an empty list (422) because "none for this target"
+			// is said by REMOVING the key, and its own error names the key —
+			// which is more use than silently omitting what the config wrote.
+			out[k] = []string{}
+			continue
+		}
+		auds := make([]string, 0, len(l.Elements()))
+		for _, e := range l.Elements() {
+			auds = append(auds, e.(types.String).ValueString())
+		}
+		out[k] = auds
+	}
+	return out
+}
+
+// ownedAudiences narrows the server's MERGED oidc-audiences down to the keys
+// this configuration owns (#1901).
+//
+// This attribute's read is wider than its write: the server merges the
+// workspace's override over a deployment-wide audience catalogue and returns
+// the result, so keys the practitioner never configured come back too. Writing
+// that whole map into state would do two bad things at once — promote every
+// inherited entry into a workspace override on the next apply, and make the
+// planned value (the configuration's own map) disagree with the applied value
+// (the merged map), which Terraform core reports as "Provider produced
+// inconsistent result after apply" and which re-running never fixes.
+//
+// So the configuration decides WHICH keys are the practitioner's and the server
+// decides their VALUES. That is the AWS provider's `tags` behaviour when
+// provider-level `default_tags` is set: `tags` holds what the resource itself
+// declared, and the merged view lives elsewhere — here, the terrapod_workspace
+// data source, which has no plan to be consistent with.
+//
+// The accepted cost, which `tags` has lived with for years: an inherited entry
+// and one set out-of-band (the UI, the bulk-update endpoint) are
+// indistinguishable from here, so neither is adopted into state. ModifyPlan's
+// #1091 warning still covers the case that matters — keys this configuration
+// declared once and has since removed.
+func ownedAudiences(ctx context.Context, owned types.Map, merged map[string][]string) (types.Map, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	// Null means the configuration does not manage the attribute at all;
+	// Unknown is what a create with no prior state plans. Either way nothing is
+	// owned, so state records nothing rather than adopting the deployment's
+	// catalogue — and a null state keeps the next plan from diffing against a
+	// null config.
+	if owned.IsNull() || owned.IsUnknown() {
+		return types.MapNull(audienceElemType), diags
+	}
+	out := make(map[string][]string, len(owned.Elements()))
+	for k := range owned.Elements() {
+		// A key the merge does not answer is left OUT rather than written back
+		// as empty. Terraform core then fails the apply with "inconsistent
+		// result", which is the honest outcome: the server took the write and
+		// did not store it.
+		if v, ok := merged[k]; ok {
+			out[k] = v
+		}
+	}
+	val, d := types.MapValueFrom(ctx, audienceElemType, out)
+	diags.Append(d...)
+	return val, diags
 }
 
 // ModifyPlan warns when the workspace holds a value for an Optional+Computed
@@ -203,7 +299,7 @@ func (r *workspaceResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 				"declare it, so Terraform will report no changes and the existing value "+
 				"will be left in place.\n\n"+
 				"If you removed `"+a.name+"` from the configuration intending to clear it, "+
-				"set `"+a.name+" = []` instead — omitting the attribute means \"leave "+
+				"set `"+a.name+" = "+a.empty+"` instead — omitting the attribute means \"leave "+
 				"alone\", not \"clear\".\n\n"+
 				"If the value is managed outside Terraform (the UI or the bulk-update "+
 				"endpoint), this warning is expected; declare the attribute explicitly to "+
@@ -471,13 +567,16 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					listplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"oidc_audiences": schema.ListAttribute{
-				Description: "Audiences a run identity token is minted for, and the per-workspace cloud identity opt-in (#1901). Empty (the default) means this workspace mints nothing and its runs authenticate with the agent pool's own identity, exactly as before. Each entry is an opaque string the federation target itself names — whatever your cloud's or secret store's trust configuration expects — and Terrapod stores it verbatim; nothing here is specific to any one cloud. Terrapod mints an OIDC JWT and the runner writes it to a file; which provider reads that file, and what it does with it, is your own provider configuration. At most 10 entries, 255 characters each. A token audienced for two targets is replayable between them, so name only the targets this workspace federates to. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `oidc_audiences = []` to clear, which opts the workspace back out.",
+			"oidc_audiences": schema.MapAttribute{
+				Description: "Per-provider-configuration audiences a run's identity token is minted for, and this workspace's cloud identity override (#1901). A key is the provider configuration the token is for, exactly as written in a `provider` block — `aws`, `vault`, or `aws.west` for one aliased configuration; the alias is part of the key, not a nested structure. The value is always a list, even for a single audience: a list of several is a deliberate \"these are interchangeable for this target\" statement, and some targets refuse a multi-valued `aud` outright. Each audience is an opaque string the federation target itself names — whatever your cloud's or secret store's trust configuration expects — and Terrapod stores it verbatim; nothing here is specific to any one cloud. Terrapod mints one OIDC JWT per key and the runner writes it to a file; which provider reads that file, and what it does with it, is your own provider configuration.\n\nThis attribute is an OVERRIDE over the deployment's own audience catalogue, so it holds only the keys you set here — a key the deployment supplies and this configuration does not is used by the workspace but is deliberately not recorded in state, exactly as the AWS provider's `tags` does not absorb `default_tags`. Read the effective merged set from the `terrapod_workspace` data source. Say \"no audiences for this target\" by REMOVING the key, which falls back to the deployment value; an empty list under a key is refused. At most 10 keys, 10 audiences each, 255 characters per audience. A token audienced for two targets is replayable between them, so name only the targets this workspace federates to. Omitting this attribute leaves any existing server-side value untouched — it does not clear it; set `oidc_audiences = {}` to clear every override, which falls the workspace back to the deployment catalogue alone.",
 				Optional:    true,
 				Computed:    true,
-				ElementType: types.StringType,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
+				ElementType: audienceElemType,
+				// Plan-time, so an empty list is refused before anything is
+				// applied rather than by the server's 422 mid-apply.
+				Validators: []validator.Map{audienceListsAreNonEmpty{}},
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"plan_expiry_seconds": schema.Int64Attribute{
@@ -930,16 +1029,7 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.SecurityScanSeverityThreshold.IsNull() && !m.SecurityScanSeverityThreshold.IsUnknown() {
 		req.SecurityScanSeverityThreshold = m.SecurityScanSeverityThreshold.ValueString()
 	}
-	if !m.OIDCAudiences.IsNull() && !m.OIDCAudiences.IsUnknown() {
-		// A non-nil slice even when the list is empty: an explicit
-		// `oidc_audiences = []` is how a workspace opts back OUT, and the SDK
-		// only sends the attribute when the slice is non-nil.
-		auds := []string{}
-		for _, v := range m.OIDCAudiences.Elements() {
-			auds = append(auds, v.(types.String).ValueString())
-		}
-		req.OIDCAudiences = auds
-	}
+	req.OIDCAudiences = audienceMapForRequest(m.OIDCAudiences)
 	if !m.SecurityScanSkipRules.IsNull() && !m.SecurityScanSkipRules.IsUnknown() {
 		rules := []string{}
 		for _, v := range m.SecurityScanSkipRules.Elements() {
@@ -1089,16 +1179,7 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.SecurityScanSeverityThreshold.IsNull() && !m.SecurityScanSeverityThreshold.IsUnknown() {
 		req.SecurityScanSeverityThreshold = m.SecurityScanSeverityThreshold.ValueString()
 	}
-	if !m.OIDCAudiences.IsNull() && !m.OIDCAudiences.IsUnknown() {
-		// A non-nil slice even when the list is empty: an explicit
-		// `oidc_audiences = []` is how a workspace opts back OUT, and the SDK
-		// only sends the attribute when the slice is non-nil.
-		auds := []string{}
-		for _, v := range m.OIDCAudiences.Elements() {
-			auds = append(auds, v.(types.String).ValueString())
-		}
-		req.OIDCAudiences = auds
-	}
+	req.OIDCAudiences = audienceMapForRequest(m.OIDCAudiences)
 	if !m.SecurityScanSkipRules.IsNull() && !m.SecurityScanSkipRules.IsUnknown() {
 		rules := []string{}
 		for _, v := range m.SecurityScanSkipRules.Elements() {
@@ -1365,16 +1446,12 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.SecurityScanSkipRules = ssVal
 	}
 
-	// OIDC audiences (#1901) — same null-vs-empty rule as security_scan_skip_rules.
-	// The server stores an audience byte-for-byte, so the read-back is exactly
-	// what was sent and the plan cannot disagree with its own apply.
-	if m.OIDCAudiences.IsNull() && len(ws.OIDCAudiences) == 0 {
-		m.OIDCAudiences = types.ListNull(types.StringType)
-	} else {
-		oaVal, oaDiag := types.ListValueFrom(ctx, types.StringType, ws.OIDCAudiences)
-		diags.Append(oaDiag...)
-		m.OIDCAudiences = oaVal
-	}
+	// OIDC audiences (#1901) — a SELECTIVE read, unlike every other collection
+	// here, because this is the one attribute whose read is wider than its
+	// write. See ownedAudiences.
+	oaVal, oaDiag := ownedAudiences(ctx, m.OIDCAudiences, ws.OIDCAudiences)
+	diags.Append(oaDiag...)
+	m.OIDCAudiences = oaVal
 
 	// Labels — same null-vs-empty-map rule as trigger_prefixes above.
 	// `len(nil-map) == 0` so an empty server map collapses to the

@@ -945,3 +945,82 @@ class TestDebugModeBoundsTheLinger1764:
         env = self._env(self._spec(debug_linger_seconds=600, cost_default_region="eu-west-1"))
         assert env["TP_COST_DEFAULT_REGION"] == "eu-west-1"
         assert env["TP_DEBUG_LINGER_SECONDS"] == "600"
+
+
+class TestEveryPathTheRunnerWritesToIsWritable:
+    """`readOnlyRootFilesystem: True` means a path is writable only if something
+    is mounted there — and a phase that writes elsewhere fails EROFS at runtime
+    while every unit test passes.
+
+    This has now happened twice. #1442 was `$HOME`, which silently broke
+    private-git-module auth. #1901 was `/var/run/terrapod/oidc`, where the
+    credential phase writes one token per provider configuration: its own tests
+    all injected `token_dir=tmp_path`, so the production constant was never once
+    exercised and the feature would have failed every federated run.
+
+    So the assertion is on the PRODUCTION constant against the REAL Job spec,
+    which is the only pairing that can catch this class.
+    """
+
+    def _writable_mounts(self, spec) -> list[str]:
+        """The mount paths the runner container can actually write to.
+
+        A mount is writable unless it says `readOnly` — which is how the vars,
+        files and merged-CA Secret mounts are declared, and they must not count.
+        """
+        container = spec["spec"]["template"]["spec"]["containers"][0]
+        return [m["mountPath"] for m in container.get("volumeMounts", []) if not m.get("readOnly")]
+
+    def _spec(self):
+        from terrapod.runner.job_template import build_job_spec
+
+        return build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+
+    def test_the_cloud_identity_token_dir_is_under_a_writable_mount(self):
+        from terrapod.runner.phases.cloud_identity import TOKEN_DIR
+
+        writable = self._writable_mounts(self._spec())
+        token_dir = str(TOKEN_DIR)
+        assert any(token_dir == m or token_dir.startswith(m.rstrip("/") + "/") for m in writable), (
+            f"the credential phase writes to {token_dir}, which is not under any "
+            f"writable mount {writable} — every federated run would fail EROFS"
+        )
+
+    def test_the_mount_is_backed_by_a_volume(self):
+        """A volumeMount naming a volume the pod does not declare makes the pod
+        unschedulable, which is a different failure with the same cause."""
+        spec = self._spec()
+        container = spec["spec"]["template"]["spec"]["containers"][0]
+        declared = {v["name"] for v in spec["spec"]["template"]["spec"]["volumes"]}
+        for m in container.get("volumeMounts", []):
+            assert m["name"] in declared, f"volumeMount {m['name']!r} has no matching volume"
+
+    def test_the_token_dir_is_memory_backed(self):
+        """The tokens are bearer credentials for the workspace's cloud identity,
+        so they stay off the node's disk."""
+        from terrapod.runner.phases.cloud_identity import TOKEN_DIR
+
+        spec = self._spec()
+        container = spec["spec"]["template"]["spec"]["containers"][0]
+        name = next(
+            m["name"] for m in container["volumeMounts"] if m["mountPath"] == str(TOKEN_DIR)
+        )
+        vol = next(v for v in spec["spec"]["template"]["spec"]["volumes"] if v["name"] == name)
+        assert vol.get("emptyDir", {}).get("medium") == "Memory", (
+            f"the cloud identity token volume is {vol!r}; a bearer credential "
+            f"should not land on the node's disk"
+        )
+
+    def test_the_read_only_secret_mounts_do_not_count_as_writable(self):
+        """Guards the helper itself: if `readOnly` stopped being honoured, the
+        assertion above would pass against a Secret mount and prove nothing."""
+        writable = self._writable_mounts(self._spec())
+        assert "/var/run/terrapod/files" not in writable
+        assert "/var/run/terrapod/vars" not in writable

@@ -1050,7 +1050,7 @@
       "varFiles": "Var files (inherited by created work-decks)",
       "varFilesHint": "Relative <code>.tfvars</code> paths passed t'' plan/apply.",
       "oidcAudiences": "Voyage colours audiences (inherited by created work-decks)",
-      "oidcAudiencesHint": "Audiences every work-deck this rule creates strikes a voyage colours token fer. Leave it empty an'' they strike naught.",
+      "oidcAudiencesHint": "Audience overrides lashed onto every work-deck this rule creates, keyed on th'' provider riggin'' a token be fer — aws, or aws.west fer a riggin'' wi'' an alias. Leave it empty an'' those work-decks take th'' deployment''s own riggin''.",
       "addVarFile": "Add a var file",
       "executionHooks": "Execution hooks (bound t'' each new work-deck)",
       "executionHooksHint": "Pick from hooks defined on th'' <page>Execution Hooks</page> admin page — each chosen hook be bound t'' every work-deck this rule creates.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Set labels (replaces th'' labels map on every matched work-deck)",
       "setVarFiles": "Set var files",
       "addVarFile": "Add a var file",
-      "setOidcAudiences": "Set voyage colours audiences (replaces th'' list on every matched work-deck; an empty list douses th'' voyage colours)",
+      "setOidcAudiences": "Set OIDC voyage colours audiences (replaces th'' map on every matched work-deck)",
       "setRunTasks": "Set run tasks (upserted by name on every matched work-deck)",
       "setNotifications": "Set notification configurations (upserted by name)",
       "dryRun": "Dry run (preview only — nay changes written)",
@@ -1922,6 +1922,19 @@
       "triggers": "Triggers",
       "addNotification": "Add notification"
     },
+    "oidcAudiences": {
+      "audiences": "Audiences",
+      "addProvider": "Add a provider riggin''",
+      "providerPlaceholder": "aws, or aws.west",
+      "providerInvalid": "A provider name bears no spaces an'' one dot at most — aws, or aws.west.",
+      "providerDuplicate": "That provider riggin'' be already on th'' books.",
+      "removeProviderAria": "Remove th'' {provider} provider riggin''",
+      "badgeOwned": "Work-deck",
+      "badgeInherited": "Deployment''s own",
+      "override": "Override",
+      "overrideAria": "Override th'' {provider} audiences fer this work-deck",
+      "issuerDisabled": "This deployment hoists no OpenID Connect issuer, so naught rigged here can ever bite."
+    },
     "autoApplyMode": {
       "never": "nary",
       "always": "allus",
@@ -2536,10 +2549,11 @@
       "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths hushed by th'' drift classifier. <star></star> matches zero or more non-<dot></dot> chars (spans <n></n> indices); <starIdx></starIdx> matches any bracketed index. A bare address with no attribute suffix silences any change t'' that resource — includin'' sendin'' t'' Davy Jones. Affects drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> fer th'' full grammar.",
       "driftIgnoreRulesNone": "None (every plan diff counts as drift)",
       "oidcAudiences": "Voyage colours audiences",
-      "oidcAudiencesHint": "Terrapod strikes a short-lived OpenID Connect token fer every voyage o'' this work-deck an'' scrawls it t'' a file th'' voyage can read. An audience names wha'' th'' token be fer, an'' every federation port picks its own opaque string — sts.amazonaws.com, api://AzureADTokenExchange, or whatever th'' port ye federate t'' will accept. Leave th'' list empty an'' this work-deck strikes naught: its voyages prove themselves jus'' as they do today, wi'' th'' Agent Crew''s own colours. Which provider swallows th'' token, an'' how, stays in yer own riggin''.",
+      "oidcAudiencesHint": "Terrapod strikes a short-lived OpenID Connect token fer every provider riggin'' a voyage uses an'' scrawls it t'' a file th'' voyage can read. Key an entry on th'' provider as yer riggin'' names it — aws, or aws.west fer a riggin'' wi'' an alias — an'' list th'' audiences that port will accept. Every entry overrides th'' deployment''s own riggin'' fer that provider; strike it off an'' that provider falls back t'' th'' deployment''s audiences. An audience be an opaque string th'' federation port chose, so it be stowed exactly as ye typed it.",
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
       "oidcAudiencesNone": "None (voyages sail under th'' Agent Crew''s own colours)",
-      "oidcAudiencesAdd": "Add an audience"
+      "oidcAudiencesAdd": "Add an audience",
+      "oidcAudiencesLoading": "Checkin'' th'' audiences th'' deployment has rigged …"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

@@ -260,4 +260,37 @@ func registerAct(s *mcp.Server, c *terrapod.Client) {
 		}
 		return nil, w, nil
 	})
+
+	// ── terrapod_oidc_signing_key_rotate ─────────────────────────────
+	//
+	// Destructive rather than merely mutating: it retires the key every
+	// federation target has already fetched, and it is the whole deployment's
+	// trust root, not one workspace's setting. Nothing is destroyed in the
+	// infrastructure sense, so the blast radius is the reason — a mishandled
+	// rotation stops every federated run authenticating at once, which is
+	// exactly the class of call a host must put in front of a human.
+	type oidcRotateIn struct{}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "terrapod_oidc_signing_key_rotate",
+		Description: "Add a new OIDC signing key for run identity tokens and retire the one currently signing (#1901). " +
+			"Requires platform admin. CONFIRM WITH THE USER FIRST: this replaces the signing half of a published trust " +
+			"root for EVERY federated workspace at once, and getting the timing wrong stops every federated run " +
+			"authenticating to its cloud or secret store. Read terrapod_oidc_signing_keys first — a rotation is only " +
+			"safe to judge against which key is signing now. A rotation is a SET, not a swap: the new key is published " +
+			"immediately and begins signing only after the deployment's propagation window, so the returned key's " +
+			"`signing` is FALSE and that is correct, not a failure. Report `meta.note` verbatim rather than restating " +
+			"the window — its length is the operator's configuration and only the server knows the value. The retired " +
+			"key stays published for its grace window because the tokens it already signed are still inside their own " +
+			"lifetime, so do NOT rotate again to 'finish' the first one: that retires the key that has only just " +
+			"started signing and is the way to break federation with two individually-correct calls. Fails with a " +
+			"conflict when the deployment signs with an operator-supplied key — there is nothing for Terrapod to " +
+			"rotate, and replacing it is the operator's own key management, not something to retry.",
+		Annotations: destructive,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ oidcRotateIn) (*mcp.CallToolResult, *terrapod.OIDCSigningKeyRotation, error) {
+		rot, err := c.RotateOIDCSigningKey(ctx)
+		if err != nil {
+			return errResult(err), nil, nil
+		}
+		return nil, rot, nil
+	})
 }

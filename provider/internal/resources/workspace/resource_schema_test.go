@@ -93,9 +93,13 @@ func TestUnmanagedCollectionDescriptionsDocumentClearing(t *testing.T) {
 			t.Fatalf("attribute %q missing from schema", a.name)
 		}
 		desc := attr.GetDescription()
-		if !strings.Contains(desc, a.name+" = []") {
-			t.Errorf("attribute %q description must tell the reader to set `%s = []` to clear (#1091); got: %s",
-				a.name, a.name, desc)
+		// The clearing literal differs by shape — `[]` for a list, `{}` for
+		// the map of lists that oidc_audiences is (#1901) — so the entry
+		// carries it. Hardcoding `[]` here would tell a map's reader to write
+		// something the schema rejects.
+		if !strings.Contains(desc, a.name+" = "+a.empty) {
+			t.Errorf("attribute %q description must tell the reader to set `%s = %s` to clear (#1091); got: %s",
+				a.name, a.name, a.empty, desc)
 		}
 		if !strings.Contains(desc, "does not clear it") {
 			t.Errorf("attribute %q description must state that omitting it does NOT clear the value (#1091); got: %s",
@@ -105,8 +109,13 @@ func TestUnmanagedCollectionDescriptionsDocumentClearing(t *testing.T) {
 }
 
 // TestUnmanagedCollectionsCoversEveryOptionalComputedCollection stops a future
-// Optional+Computed list attribute from being added with the same silent-no-op
-// removal behaviour and no warning or documentation (#1091).
+// Optional+Computed collection attribute from being added with the same
+// silent-no-op removal behaviour and no warning or documentation (#1091).
+//
+// Maps are scanned as well as lists. When oidc_audiences became a map of lists
+// (#1901) a list-only scan stopped seeing it, which is exactly the hole this
+// guard exists to close: an attribute can leave the guard's sight by changing
+// shape, without anybody removing it from anywhere.
 func TestUnmanagedCollectionsCoversEveryOptionalComputedCollection(t *testing.T) {
 	var resp resource.SchemaResponse
 	NewResource().Schema(context.Background(), resource.SchemaRequest{}, &resp)
@@ -120,16 +129,22 @@ func TestUnmanagedCollectionsCoversEveryOptionalComputedCollection(t *testing.T)
 	}
 
 	for name, attr := range resp.Schema.Attributes {
-		if _, isList := attr.(schema.ListAttribute); !isList {
+		var shape string
+		switch attr.(type) {
+		case schema.ListAttribute:
+			shape = "list"
+		case schema.MapAttribute:
+			shape = "map"
+		default:
 			continue
 		}
 		if !attr.IsOptional() || !attr.IsComputed() {
 			continue
 		}
 		if !covered[name] {
-			t.Errorf("list attribute %q is Optional+Computed but is not in unmanagedCollections — "+
+			t.Errorf("%s attribute %q is Optional+Computed but is not in unmanagedCollections — "+
 				"removing it from a config would be a silent no-op with no warning and no "+
-				"documentation (#1091). Add it, or make it Optional-only.", name)
+				"documentation (#1091). Add it, or make it Optional-only.", shape, name)
 		}
 	}
 }

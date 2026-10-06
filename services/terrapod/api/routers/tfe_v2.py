@@ -634,6 +634,20 @@ async def _resolve_live_pools(workspaces: list[Workspace]) -> frozenset[uuid.UUI
     return None if live is None else frozenset(live)
 
 
+def _merged_oidc_audiences(ws: Workspace) -> dict[str, list[str]]:
+    """This workspace's effective audience map (#1901).
+
+    Its own override merged over the deployment catalogue, per key, which is
+    the shape every read consumer is promised. Kept as a named helper rather
+    than inlined because the merge is also what `run_service` snapshots at run
+    creation, and the two must not drift.
+    """
+    from terrapod.config import settings
+    from terrapod.services import cloud_identity_resolver
+
+    return cloud_identity_resolver.resolve_for_workspace(ws, settings=settings)
+
+
 def _workspace_json(
     ws: Workspace,
     caps: frozenset[str] | None = None,
@@ -684,7 +698,23 @@ def _workspace_json(
                 "locked": ws.locked,
                 "resource-cpu": ws.resource_cpu,
                 "resource-memory": ws.resource_memory,
-                "oidc-audiences": list(ws.oidc_audiences or []),
+                # The MERGED view, not the stored override: the workspace's own
+                # map resolved over the deployment catalogue, per key. Clients
+                # see what this workspace would actually mint for, because the
+                # override alone is unreadable on its own — a key's absence
+                # means "inherit", and without the merge a reader cannot tell
+                # that from "nothing here".
+                #
+                # No DB access: the resolver is a dict merge over
+                # `settings.auth.oidc_issuer.audiences`, so this adds no query
+                # and cannot desynchronise a test that scripts `db.execute` in
+                # order (the #1565 trap).
+                #
+                # The consequence is the provider's, and it is handled there:
+                # a read is a SUPERSET of what was written, so a consumer must
+                # reconcile only the keys it owns rather than storing this
+                # wholesale. See the `oidc_audiences` attribute.
+                "oidc-audiences": _merged_oidc_audiences(ws),
                 "vcs-repo-url": ws.vcs_repo_url,
                 "vcs-branch": ws.vcs_branch,
                 "vcs-connection-id": f"vcs-{ws.vcs_connection_id}"

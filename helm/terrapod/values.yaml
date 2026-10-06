@@ -284,6 +284,35 @@ api:
         # token_ttl_seconds, or a token signed moments before a rotation stops
         # verifying while it is still inside its own lifetime.
         retired_key_grace_seconds: 3600
+        # ── The audience catalogue: deployment defaults, per provider ──
+        #
+        # Keyed on the BARE PROVIDER TYPE exactly as it appears in a `provider`
+        # block — `aws`, `azurerm`, `google`, `vault` — optionally with an alias
+        # (`aws.west`). The runner discovers which provider configurations a
+        # root module actually uses and asks for one token per used target, so a
+        # key nothing references costs nothing.
+        #
+        # The value is the `aud` claim for that target, ALWAYS A LIST even when
+        # it holds one entry. Keep it to one entry unless you genuinely mean
+        # "these are interchangeable": a multi-valued `aud` is replayable
+        # between the targets it names, and AWS refuses one outright — it fails
+        # at the cloud's token exchange, not here, so Terrapod cannot warn you.
+        #
+        # A workspace's own `oidc_audiences` is MERGED OVER this, per key, so
+        # one workspace can point `vault` at a different instance without
+        # restating the rest. Removing the key from the workspace falls back to
+        # what is here.
+        #
+        # Terrapod attaches no meaning to any of these strings. There is no
+        # built-in `sts.amazonaws.com`, because any provider may be federated to
+        # any audience and the only gate is the cloud's own trust policy.
+        #
+        # Example:
+        #   audiences:
+        #     aws: ["sts.amazonaws.com"]
+        #     azurerm: ["api://AzureADTokenExchange"]
+        #     vault: ["https://vault.example.com"]
+        audiences: {}
       # Lifespan of the token minted by `terraform login` — short-lived per-session
       # CLI credentials, distinct from the max cap above. 0 falls back to the cap.
       login_token_ttl_hours: 12
@@ -1937,9 +1966,16 @@ webhookIngress:
   paths:
     - /api/terrapod/v1/vcs-events       # GitHub / GitLab webhook receivers
     - /api/terrapod/v1/task-stage-results # external run-task callback receiver
-    # Uncomment together with api.config.auth.oidc_issuer.enabled:
-    # - /.well-known/openid-configuration
-    # - /.well-known/jwks.json
+    # The two issuer paths are added AUTOMATICALLY when
+    # api.config.auth.oidc_issuer.enabled is true -- you do not list them here.
+    # Publishing a trust root the clouds cannot fetch is not a degraded
+    # configuration but a broken one, and the failure surfaces at the cloud's
+    # token exchange rather than anywhere on the Terrapod side. Listing them
+    # by hand as well is harmless (the template de-duplicates).
+    #
+    # To publish the issuer and NO webhook path, set this to `[]` with the
+    # issuer enabled. The chart supplies the two paths, so the resulting
+    # Ingress serves exactly them.
 
 # ── Internal Ingress (optional) ─────────────────────────────────────────────
 # Optional THIRD Ingress for the internal-only surface: listener pods

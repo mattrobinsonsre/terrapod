@@ -1050,7 +1050,7 @@
       "varFiles": "변수 파일 (생성된 워크스페이스에 상속됨)",
       "varFilesHint": "plan/apply에 전달되는 상대 <code>.tfvars</code> 경로입니다.",
       "oidcAudiences": "실행 ID 대상 (생성된 워크스페이스에 상속됨)",
-      "oidcAudiencesHint": "이 규칙이 생성하는 각 워크스페이스가 실행 ID 토큰을 발급할 대상. 비워 두면 아무것도 발급하지 않습니다.",
+      "oidcAudiencesHint": "이 규칙이 생성하는 각 워크스페이스에 적용되는 대상 재정의. 키는 토큰이 해당하는 프로바이더 구성입니다 — aws, 별칭이 있는 구성이면 aws.west. 비워 두면 해당 워크스페이스는 배포 자체의 구성을 사용합니다.",
       "addVarFile": "변수 파일 추가",
       "executionHooks": "실행 훅 (각 새 워크스페이스와 연결됨)",
       "executionHooksHint": "<page>실행 훅</page> 관리 페이지에서 정의된 훅 중에서 선택하세요 — 선택한 각 훅은 이 규칙이 생성하는 모든 워크스페이스와 연결됩니다.",
@@ -1269,7 +1269,7 @@
       "setLabels": "라벨 설정 (일치하는 모든 워크스페이스의 라벨 맵을 대체)",
       "setVarFiles": "변수 파일 설정",
       "addVarFile": "변수 파일 추가",
-      "setOidcAudiences": "실행 ID 대상 설정 (일치하는 모든 워크스페이스의 목록을 대체하며, 빈 목록은 실행 ID를 끕니다)",
+      "setOidcAudiences": "실행 ID의 OIDC 대상 설정 (일치하는 모든 워크스페이스의 맵을 대체)",
       "setRunTasks": "실행 작업 설정 (일치하는 모든 워크스페이스에서 이름으로 업서트)",
       "setNotifications": "알림 구성 설정 (이름으로 업서트)",
       "dryRun": "드라이 런 (미리 보기만 — 변경 사항 저장 안 함)",
@@ -1922,6 +1922,19 @@
       "triggers": "트리거",
       "addNotification": "알림 추가"
     },
+    "oidcAudiences": {
+      "audiences": "대상",
+      "addProvider": "프로바이더 구성 추가",
+      "providerPlaceholder": "aws 또는 aws.west",
+      "providerInvalid": "프로바이더 이름에는 공백이 없고 점은 최대 하나입니다 — aws 또는 aws.west.",
+      "providerDuplicate": "해당 프로바이더 구성에는 이미 항목이 있습니다.",
+      "removeProviderAria": "프로바이더 구성 {provider} 제거",
+      "badgeOwned": "워크스페이스",
+      "badgeInherited": "배포 기본값",
+      "override": "재정의",
+      "overrideAria": "이 워크스페이스에서 {provider} 대상 재정의",
+      "issuerDisabled": "이 배포는 OpenID Connect 발급자를 전혀 공개하지 않으므로, 여기서 구성한 어떤 것도 적용될 수 없습니다."
+    },
     "autoApplyMode": {
       "never": "안 함",
       "always": "항상",
@@ -2536,10 +2549,11 @@
       "driftIgnoreRulesHint": "드리프트 분류기가 억제하는 글롭 인식 Terraform 주소 + 속성 경로입니다. <star></star>는 0개 이상의 비-<dot></dot> 문자와 일치합니다(<n></n>개 인덱스에 걸침). <starIdx></starIdx>는 대괄호로 묶인 모든 인덱스와 일치합니다. 속성 접미사가 없는 순수 주소는 해당 리소스에 대한 모든 변경(삭제 포함)을 억제합니다. 일반 plan/apply가 아니라 드리프트에만 영향을 줍니다. 전체 문법은 <docs>drift-ignore-rules.md</docs>를 참조하세요.",
       "driftIgnoreRulesNone": "없음 (모든 계획 차이가 드리프트로 계산됨)",
       "oidcAudiences": "실행 ID 대상(audience)",
-      "oidcAudiencesHint": "Terrapod는 이 워크스페이스의 모든 실행마다 단기 OpenID Connect 토큰을 발급하고, 실행이 읽을 수 있는 파일에 기록합니다. 대상(audience)은 그 토큰이 무엇을 위한 것인지 지정하며, 각 페더레이션 대상은 자신만의 불투명한 문자열을 선택합니다 — sts.amazonaws.com, api://AzureADTokenExchange, 또는 페더레이션하는 대상이 받아들이는 무엇이든. 목록을 비워 두면 이 워크스페이스는 아무것도 발급하지 않고, 실행은 지금과 똑같이 에이전트 풀 자신의 ID로 인증합니다. 어떤 프로바이더가 토큰을 어떻게 사용하는지는 여전히 사용자 본인의 구성에 달려 있습니다.",
+      "oidcAudiencesHint": "Terrapod는 실행이 사용하는 각 프로바이더 구성마다 단기 OpenID Connect 토큰을 발급하고, 실행이 읽을 수 있는 파일에 기록합니다. 항목의 키는 사용자의 구성이 그 프로바이더를 부르는 이름으로 지정하고 — aws, 별칭이 있는 구성이면 aws.west — 그 대상이 받아들이는 대상(audience)을 나열하세요. 각 항목은 그 프로바이더에 대해 배포 자체의 구성을 재정의합니다. 항목을 제거하면 그 프로바이더는 배포의 대상으로 되돌아갑니다. 대상은 페더레이션 대상이 선택한 불투명한 문자열이므로, 입력한 그대로 저장됩니다.",
       "oidcAudiencesPlaceholder": "예: sts.amazonaws.com",
       "oidcAudiencesNone": "없음 (실행은 에이전트 풀 자신의 ID를 사용)",
-      "oidcAudiencesAdd": "대상 추가"
+      "oidcAudiencesAdd": "대상 추가",
+      "oidcAudiencesLoading": "배포에 구성된 대상을 확인하고 있습니다 …"
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",

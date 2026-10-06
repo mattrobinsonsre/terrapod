@@ -342,7 +342,7 @@ field CreateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,om
 field CreateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
 field CreateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field CreateWorkspaceRequest.Name string `json:"name"`
-field CreateWorkspaceRequest.OIDCAudiences []string `json:"oidc-audiences,omitempty"`
+field CreateWorkspaceRequest.OIDCAudiences map[string][]string `json:"oidc-audiences,omitempty"`
 field CreateWorkspaceRequest.OwnerEmail string `json:"owner-email,omitempty"`
 field CreateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
@@ -607,6 +607,8 @@ field NotificationConfiguration.Triggers []string `json:"triggers,omitempty"`
 field NotificationConfiguration.URL string `json:"url,omitempty"`
 field NotificationConfiguration.UpdatedAt string `json:"updated-at,omitempty"`
 field NotificationConfiguration.WorkspaceID string `json:"workspace-id,omitempty"`
+field OIDCAudienceDefaults.Audiences map[string][]string `json:"audiences"`
+field OIDCAudienceDefaults.IssuerEnabled bool `json:"issuer-enabled"`
 field OIDCSigningKey.ActivatesAt string `json:"activates-at,omitempty"`
 field OIDCSigningKey.CreatedAt string `json:"created-at,omitempty"`
 field OIDCSigningKey.Kid string `json:"kid"`
@@ -1064,7 +1066,7 @@ field UpdateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,om
 field UpdateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
 field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
 field UpdateWorkspaceRequest.Name string `json:"name,omitempty"`
-field UpdateWorkspaceRequest.OIDCAudiences []string `json:"oidc-audiences,omitempty"`
+field UpdateWorkspaceRequest.OIDCAudiences map[string][]string `json:"oidc-audiences,omitempty"`
 field UpdateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
 field UpdateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
@@ -1262,7 +1264,7 @@ field Workspace.LifecycleReason string `json:"lifecycle-reason,omitempty"`
 field Workspace.LifecycleState string `json:"lifecycle-state,omitempty"`
 field Workspace.Locked bool `json:"locked"`
 field Workspace.Name string `json:"name"`
-field Workspace.OIDCAudiences []string `json:"oidc-audiences,omitempty"`
+field Workspace.OIDCAudiences map[string][]string `json:"oidc-audiences,omitempty"`
 field Workspace.OwnerEmail string `json:"owner-email,omitempty"`
 field Workspace.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
 field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`
@@ -1335,6 +1337,7 @@ field WorkspaceVarset.Name string `json:"name"`
 field WorkspaceVarset.Priority bool `json:"priority"`
 field WorkspaceVarset.VariableCount int64 `json:"variable-count"`
 func AddPrefix(id, prefix string) string
+func GetAudienceMapAttr(r *Resource, key string) map[string][]string
 func GetBoolAttr(r *Resource, key string) bool
 func GetFloat64Attr(r *Resource, key string) float64
 func GetIntAttr(r *Resource, key string) int64
@@ -1449,6 +1452,7 @@ method (*Client) GetModuleAutodiscoveryRule(ctx context.Context, id string) (*Mo
 method (*Client) GetModuleInterface(ctx context.Context, name, provider, version string) (*ModuleInterface, error)
 method (*Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) (*ModuleWorkspaceLink, error)
 method (*Client) GetNotificationConfiguration(ctx context.Context, id string) (*NotificationConfiguration, error)
+method (*Client) GetOIDCAudienceDefaults(ctx context.Context) (*OIDCAudienceDefaults, error)
 method (*Client) GetOnboardingAvailability(ctx context.Context) (*OnboardingAvailability, error)
 method (*Client) GetOnboardingSession(ctx context.Context, sessionID string) (*OnboardingSession, error)
 method (*Client) GetPlanLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error)
@@ -1710,6 +1714,7 @@ type ModuleInterface struct
 type ModuleWorkspaceLink struct
 type NotFoundError struct
 type NotificationConfiguration struct
+type OIDCAudienceDefaults struct
 type OIDCSigningKey struct
 type OIDCSigningKeyRotation struct
 type OIDCSigningKeySet struct

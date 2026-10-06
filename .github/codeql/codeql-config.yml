@@ -1,16 +1,45 @@
-# CodeQL configuration — suppress triaged false positives.
+# CodeQL configuration.
 #
-# All alerts below were reviewed in PR #40 and confirmed as false positives.
-# Inline suppression comments (# codeql[rule-id]) do not reliably close
-# pre-existing alerts, so we exclude queries at the config level.
+# **The six security-rule exclusions that used to live here are gone, and the
+# reason is worth keeping, because the obvious repair would be the dangerous
+# one.** They were added in PR #40 under the heading "reviewed and confirmed as
+# false positives", with a rationale written PER INSTANCE -- "binary cache: base
+# URLs are admin-configured mirror URLs", "provider cache: hostname validated
+# against an allowlist" -- while the mechanism was a FLEET-WIDE `query-filters`
+# exclusion by rule id. So a genuinely new SSRF or path traversal anywhere in
+# `services/` would never have been reported.
+#
+# Two things were measured at the v1.10.0 pre-release audit (2026-10-06):
+#
+#   * **The premise was false.** Of the 40 alerts carrying one of those rule
+#     ids, the 2026-03-10 batch is almost entirely `state=fixed` -- the code was
+#     changed, so they were real findings, not false positives.
+#   * **The filters were not taking effect anyway.** Three alerts for excluded
+#     rules were raised on 2026-10-02, months after this file was last touched,
+#     including alert #490: a CRITICAL `py/partial-ssrf` in shipped runner code
+#     (`runner/phases/pulumi_exec.py`) that was real and was fixed in #1996.
+#
+# That second point is why the exclusions are removed rather than left in place
+# as harmless: a future change that "repaired" the syntax so they worked would
+# silence the next #490. Removing an exclusion can only make scanning more
+# sensitive, and `github/codeql-action/analyze` does not fail on findings, so
+# this cannot break CI.
+#
+# **The replacement is per-alert dismissal**, which costs a click and leaves a
+# dated, auditable record naming the alert -- instead of a comment in this file
+# that silently stops being true. That is already the practice for everything
+# else (see the `scripts/` note below).
+#
+# `query-filters` are reserved for an idiom used deliberately in hundreds of
+# places, where a per-alert record would be pure noise. Exactly one qualifies:
 #
 # py/ineffectual-statement             — PEP 544 Protocol stubs use `...` (Ellipsis)
-# py/path-injection                    — filesystem keys are HMAC-signed; traversal check is defense-in-depth
-# py/stack-trace-exposure              — verify endpoint returns fixed strings, not exception text
-# py/clear-text-logging-sensitive-data — bootstrap prints one-time credential via print(), not logger
-# py/full-ssrf                         — provider cache: hostname validated against admin-configured allowlist
-# py/partial-ssrf                      — binary cache: base URLs are admin-configured mirror URLs
-# py/weak-sensitive-data-hashing       — SHA-256 on high-entropy secrets.token_urlsafe() output, not passwords
+#
+# The three below are retained pending per-alert dismissal. Each rationale is
+# also per-instance rather than idiomatic, so they belong in the same cleanup;
+# they stay for now only because they are note-severity, where a blanket filter
+# cannot hide a vulnerability:
+#
 # py/unnecessary-lambda                — FastAPI dependency overrides need fresh mock per request
 # py/multiple-definition               — intentional re-fetch after DB mutation
 # py/empty-except                      — intentional fail-open patterns (Redis, K8s, URL parsing)
@@ -35,18 +64,6 @@ paths-ignore:
 query-filters:
   - exclude:
       id: py/ineffectual-statement
-  - exclude:
-      id: py/path-injection
-  - exclude:
-      id: py/stack-trace-exposure
-  - exclude:
-      id: py/clear-text-logging-sensitive-data
-  - exclude:
-      id: py/full-ssrf
-  - exclude:
-      id: py/partial-ssrf
-  - exclude:
-      id: py/weak-sensitive-data-hashing
   - exclude:
       id: py/unnecessary-lambda
   - exclude:

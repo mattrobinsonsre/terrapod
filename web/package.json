@@ -46,17 +46,17 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.4",
     "postcss": "^8.5.28",
-    "source-map-js": "^1.2.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   },
   "overrides": {
+    "source-map-js": "^1.2.2",
     "postcss": "^8.5.28",
     "@babel/core": "^7.29.6",
     "brace-expansion": "^2.1.7",
-    "sharp": "^0.35.3",
-    "js-yaml": "^4.3.1",
-    "nanoid": "^3.3.17",
+    "sharp": "^0.35.5",
+    "js-yaml": "^4.3.2",
+    "nanoid": "^3.3.18",
     "browserslist": "^4.28.8"
   }
 }

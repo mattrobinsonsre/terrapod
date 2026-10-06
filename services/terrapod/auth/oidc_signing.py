@@ -85,6 +85,17 @@ class SigningKey:
 _keys: list[SigningKey] | None = None
 _signing_kid: str | None = None
 
+#: The published JWKS, memoised against the set of `kid`s it was built from.
+#:
+#: Rendering it means parsing every private key PEM, and the discovery and JWKS
+#: documents are the two endpoints a deployment must expose publicly for
+#: federation to work at all -- so without this an unauthenticated caller can
+#: make the API do RSA key parsing at whatever rate they like. The cache key is
+#: the tuple of `kid`s, which is sound rather than approximate: a `kid` is an
+#: RFC 7638 thumbprint DERIVED from the key material, so identical kids mean
+#: identical keys and changed material cannot reuse a kid.
+_jwks_cache: tuple[tuple[str, ...], dict[str, list[dict[str, str]]]] | None = None
+
 
 def generate_private_key() -> rsa.RSAPrivateKey:
     return rsa.generate_private_key(public_exponent=_RSA_PUBLIC_EXPONENT, key_size=_RSA_KEY_SIZE)
@@ -213,6 +224,20 @@ async def init_oidc_signing(db: AsyncSession) -> list[SigningKey]:
     grace = settings.auth.oidc_issuer.retired_key_grace_seconds
     live_cutoff = datetime.now(UTC) - timedelta(seconds=grace)
     live = [r for r in rows if r.retired_at is None or r.retired_at > live_cutoff]
+    # Raise BEFORE assigning, exactly as `reload_signing_keys` does, and for a
+    # sharper reason here. `_choose_signing_kid` raises on an empty `live`, and
+    # the lifespan catches that and only WARNS — so assigning first would leave
+    # `_keys == []` rather than None. `get_jwks` guards on `is None`, so the
+    # empty list sails through it and the issuer publishes `{"keys": []}` with a
+    # 300s cache: every federation target caches an empty trust root, and a
+    # later successful rotation does not take effect until those caches expire.
+    # Failing here keeps `_keys` None, which `get_jwks` refuses loudly.
+    if not live:
+        raise RuntimeError(
+            "No live OIDC issuer signing key — every row is retired beyond "
+            "retired_key_grace_seconds. Rotate to mint a new one."
+        )
+
     _keys = [SigningKey(kid=r.kid, private_key_pem=r.private_key_pem, row_id=r.id) for r in live]
     _signing_kid = _choose_signing_kid(live, grace_seconds=grace)
     logger.info(
@@ -302,13 +327,27 @@ def get_jwks() -> dict[str, list[dict[str, str]]]:
     Everything currently loaded, which is the current key plus any retired key
     still inside its grace window — a token signed before a rotation has to keep
     verifying until it expires.
+
+    Memoised: this is served unauthenticated by necessity, and building it parses
+    every private key PEM. See `_jwks_cache` for why the kid tuple is a sound
+    cache key. The returned dict is the cached one and callers must not mutate
+    it — the route serialises it and does not.
     """
+    global _jwks_cache  # noqa: PLW0603
+
     if _keys is None:
         raise RuntimeError(
             "OIDC issuer signing key not initialised — init_oidc_signing() runs in "
             "the app lifespan."
         )
-    return {"keys": [public_jwk(load_private_key(k.private_key_pem), k.kid) for k in _keys]}
+
+    kids = tuple(k.kid for k in _keys)
+    if _jwks_cache is not None and _jwks_cache[0] == kids:
+        return _jwks_cache[1]
+
+    jwks = {"keys": [public_jwk(load_private_key(k.private_key_pem), k.kid) for k in _keys]}
+    _jwks_cache = (kids, jwks)
+    return jwks
 
 
 async def rotate_signing_key(db: AsyncSession) -> SigningKey:
@@ -396,9 +435,10 @@ async def reload_signing_keys(db: AsyncSession) -> list[SigningKey]:
 
 
 def _reset_for_tests() -> None:
-    global _keys, _signing_kid  # noqa: PLW0603
+    global _keys, _signing_kid, _jwks_cache  # noqa: PLW0603
     _keys = None
     _signing_kid = None
+    _jwks_cache = None
 
 
 def sign_identity_token(claims: dict, *, ttl_seconds: int) -> str:

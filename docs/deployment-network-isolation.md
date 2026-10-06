@@ -181,12 +181,27 @@ listener:
 > over, so a deployment with no public surface cannot publish a trust root the
 > clouds can reach.
 >
-> If you want both, you want recipe A: keep the management plane private and add
-> `webhookIngress` with the two issuer paths in its allow-list (the issuer rides
-> that Ingress rather than getting one of its own, precisely because its `paths`
-> allow-list is already the right granularity). Runs on workspaces that name no
-> audiences are unaffected either way — they use the agent pool's ServiceAccount,
-> which needs no public surface at all.
+> **This is a deliberate trade, not an oversight: network isolation for
+> fine-grained, per-workspace cloud authorization.** There is no air-gapped
+> variant and there will not be one, because the major clouds cannot federate to
+> an issuer they cannot fetch. What those two paths expose is the issuer URL, the
+> claim *names*, the signing algorithm and **public** key material — no tokens,
+> no private key material, no audiences, no workspace names, and nothing that
+> accepts a write.
+>
+> If you want both, you want recipe A: keep the management plane private and
+> enable `webhookIngress`. **The chart adds the two issuer paths to its
+> allow-list automatically** while `api.config.auth.oidc_issuer.enabled` is true,
+> so there is nothing to uncomment — the issuer rides that Ingress rather than
+> getting one of its own, precisely because its `paths` allow-list is already the
+> right granularity. Enabling it with **only** those two paths in `paths` and no
+> webhook path at all is a first-class configuration — set `paths: []` with the
+> issuer enabled, which the chart accepts for exactly this case, or list the two
+> explicitly, since the automatic addition de-duplicates either way.
+>
+> Runs on workspaces whose resolved audience map is empty are unaffected either
+> way — they use the agent pool's ServiceAccount, which needs no public surface at
+> all, and that fall-through is permanent.
 
 ### C. Single public hostname (smallest deployment)
 

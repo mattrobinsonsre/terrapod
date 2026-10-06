@@ -1050,7 +1050,7 @@
       "varFiles": "变量文件（由所创建的工作区继承）",
       "varFilesHint": "传递给 plan/apply 的相对 <code>.tfvars</code> 路径。",
       "oidcAudiences": "运行身份受众（由所创建的工作区继承）",
-      "oidcAudiencesHint": "此规则创建的每个工作区为之颁发运行身份令牌的受众。留空则不颁发任何令牌。",
+      "oidcAudiencesHint": "施加到此规则创建的每个工作区上的受众覆盖，以令牌所对应的 provider 配置为键 — aws，或带别名的配置用 aws.west。留空则这些工作区使用部署自身的配置。",
       "addVarFile": "添加变量文件",
       "executionHooks": "执行钩子（与每个新工作区关联）",
       "executionHooksHint": "从<page>执行钩子</page>管理页面定义的钩子中选择 — 每个选中的钩子都会与此规则创建的每个工作区关联。",
@@ -1269,7 +1269,7 @@
       "setLabels": "设置标签（替换每个匹配工作区上的标签映射）",
       "setVarFiles": "设置变量文件",
       "addVarFile": "添加变量文件",
-      "setOidcAudiences": "设置运行身份受众（替换每个匹配工作区上的列表；空列表将关闭运行身份）",
+      "setOidcAudiences": "设置运行身份的 OIDC 受众（替换每个匹配工作区上的映射）",
       "setRunTasks": "设置运行任务（在每个匹配工作区上按名称更新插入）",
       "setNotifications": "设置通知配置（按名称更新插入）",
       "dryRun": "试运行（仅预览 — 不写入任何更改）",
@@ -1922,6 +1922,19 @@
       "triggers": "触发器",
       "addNotification": "添加通知"
     },
+    "oidcAudiences": {
+      "audiences": "受众",
+      "addProvider": "添加 provider 配置",
+      "providerPlaceholder": "aws，或 aws.west",
+      "providerInvalid": "provider 名称不含空格，且最多一个点 — aws，或 aws.west。",
+      "providerDuplicate": "该 provider 配置已有一条条目。",
+      "removeProviderAria": "移除 provider 配置 {provider}",
+      "badgeOwned": "工作区",
+      "badgeInherited": "部署默认值",
+      "override": "覆盖",
+      "overrideAria": "在此工作区覆盖 {provider} 的受众",
+      "issuerDisabled": "此部署未发布任何 OpenID Connect 颁发者，因此这里配置的任何内容都不会生效。"
+    },
     "autoApplyMode": {
       "never": "从不",
       "always": "始终",
@@ -2536,10 +2549,11 @@
       "driftIgnoreRulesHint": "由漂移分类器抑制的、支持通配符的 Terraform 地址 + 属性路径。<star></star> 匹配零个或多个非 <dot></dot> 字符（跨越 <n></n> 个索引）；<starIdx></starIdx> 匹配任意方括号索引。没有属性后缀的裸地址会静默该资源的任何更改 — 包括销毁。仅影响漂移，不影响常规 plan/apply。完整语法见 <docs>drift-ignore-rules.md</docs>。",
       "driftIgnoreRulesNone": "无（每个计划差异都计为漂移）",
       "oidcAudiences": "运行身份受众",
-      "oidcAudiencesHint": "Terrapod 为此工作区的每一次运行颁发一个短期的 OpenID Connect 令牌，并写入运行可读取的文件。受众说明该令牌的用途，而每个联合目标都会选择自己的不透明字符串 — sts.amazonaws.com、api://AzureADTokenExchange，或你所联合的目标接受的任何值。将列表留空，此工作区便不颁发任何令牌：它的运行仍与今天一样，使用代理池自身的身份进行认证。哪个 provider 使用该令牌、以何种方式使用，仍由你自己的配置决定。",
+      "oidcAudiencesHint": "Terrapod 为运行所使用的每个 provider 配置颁发一个短期的 OpenID Connect 令牌，并写入运行可读取的文件。条目的键使用你的配置对该 provider 的命名 — aws，或带别名的配置用 aws.west — 然后列出该目标接受的受众。每条条目会覆盖部署自身针对该 provider 的配置；移除它，该 provider 便回退到部署的受众。受众是联合目标自行选定的不透明字符串，因此会按你输入的原样存储。",
       "oidcAudiencesPlaceholder": "例如 sts.amazonaws.com",
       "oidcAudiencesNone": "无（运行使用代理池自身的身份）",
-      "oidcAudiencesAdd": "添加受众"
+      "oidcAudiencesAdd": "添加受众",
+      "oidcAudiencesLoading": "正在检查部署中配置的受众 …"
     },
     "vcsWorkflowWarning": {
       "title": "授权已委托给您的 VCS 仓库。",

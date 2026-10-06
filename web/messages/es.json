@@ -1050,7 +1050,7 @@
       "varFiles": "Archivos de variables (heredados por los espacios de trabajo creados)",
       "varFilesHint": "Rutas <code>.tfvars</code> relativas pasadas a plan/apply.",
       "oidcAudiences": "Audiencias de la identidad de ejecución (heredadas por los espacios de trabajo creados)",
-      "oidcAudiencesHint": "Audiencias para las que cada espacio de trabajo que crea esta regla emite un token de identidad de ejecución. Déjala vacía y no emitirán nada.",
+      "oidcAudiencesHint": "Sustituciones de audiencias aplicadas a cada espacio de trabajo que crea esta regla, indexadas por la configuración de provider a la que corresponde un token: aws, o aws.west para una configuración con alias. Déjalas vacías y esos espacios de trabajo usan la configuración propia del despliegue.",
       "addVarFile": "Añadir archivo de variables",
       "executionHooks": "Hooks de ejecución (asociados a cada nuevo espacio de trabajo)",
       "executionHooksHint": "Elija entre los hooks definidos en la página de administración <page>Hooks de ejecución</page> — cada hook seleccionado se asocia a cada espacio de trabajo que crea esta regla.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Establecer etiquetas (reemplaza el mapa de etiquetas en cada espacio de trabajo coincidente)",
       "setVarFiles": "Establecer archivos de variables",
       "addVarFile": "Añadir archivo de variables",
-      "setOidcAudiences": "Establecer audiencias de la identidad de ejecución (reemplaza la lista en cada espacio de trabajo coincidente; una lista vacía desactiva la identidad de ejecución)",
+      "setOidcAudiences": "Establecer audiencias OIDC de la identidad de ejecución (reemplaza el mapa en cada espacio de trabajo coincidente)",
       "setRunTasks": "Establecer tareas de ejecución (insertadas o actualizadas por nombre en cada espacio de trabajo coincidente)",
       "setNotifications": "Establecer configuraciones de notificación (insertadas o actualizadas por nombre)",
       "dryRun": "Simulación (solo vista previa — no se escriben cambios)",
@@ -1922,6 +1922,19 @@
       "triggers": "Disparadores",
       "addNotification": "Añadir notificación"
     },
+    "oidcAudiences": {
+      "audiences": "Audiencias",
+      "addProvider": "Añadir configuración de provider",
+      "providerPlaceholder": "aws, o aws.west",
+      "providerInvalid": "Un nombre de provider no lleva espacios y admite un punto como máximo: aws, o aws.west.",
+      "providerDuplicate": "Esa configuración de provider ya tiene una entrada.",
+      "removeProviderAria": "Quitar la configuración de provider {provider}",
+      "badgeOwned": "Espacio de trabajo",
+      "badgeInherited": "Valor del despliegue",
+      "override": "Sustituir",
+      "overrideAria": "Sustituir las audiencias de {provider} en este espacio de trabajo",
+      "issuerDisabled": "Este despliegue no publica ningún emisor de OpenID Connect, así que nada de lo configurado aquí puede surtir efecto."
+    },
     "autoApplyMode": {
       "never": "nunca",
       "always": "siempre",
@@ -2536,10 +2549,11 @@
       "driftIgnoreRulesHint": "Rutas de dirección de Terraform + atributo compatibles con globs, suprimidas por el clasificador de desviación. <star></star> coincide con cero o más caracteres que no sean <dot></dot> (abarca <n></n> índices); <starIdx></starIdx> coincide con cualquier índice entre corchetes. Una dirección simple sin sufijo de atributo silencia cualquier cambio en ese recurso — incluidas las destrucciones. Solo afecta a la desviación, no al plan/apply normal. Consulte <docs>drift-ignore-rules.md</docs> para la gramática completa.",
       "driftIgnoreRulesNone": "Ninguna (cada diferencia del plan cuenta como desviación)",
       "oidcAudiences": "Audiencias de la identidad de ejecución",
-      "oidcAudiencesHint": "Terrapod emite un token OpenID Connect de corta duración para cada ejecución de este espacio de trabajo y lo escribe en un archivo que la ejecución puede leer. Una audiencia nombra para qué sirve el token, y cada destino de federación elige su propia cadena opaca — sts.amazonaws.com, api://AzureADTokenExchange, o lo que acepte el destino con el que federas. Deja la lista vacía y este espacio de trabajo no emite nada: sus ejecuciones se autentican igual que hoy, con la identidad propia del grupo de agentes. Qué provider consume el token, y cómo, sigue siendo tu propia configuración.",
+      "oidcAudiencesHint": "Terrapod emite un token OpenID Connect de vida corta para cada configuración de provider que usa una ejecución y lo escribe en un archivo que la ejecución puede leer. Indexa cada entrada por el provider tal como lo nombra tu configuración —aws, o aws.west para una configuración con alias— y enumera las audiencias que acepta ese destino. Cada entrada sustituye la configuración propia del despliegue para ese provider; quítala y ese provider vuelve a las audiencias del despliegue. Una audiencia es una cadena opaca que eligió el destino de federación, así que se guarda exactamente como la escribes.",
       "oidcAudiencesPlaceholder": "p. ej. sts.amazonaws.com",
       "oidcAudiencesNone": "Ninguna (las ejecuciones usan la identidad propia del grupo de agentes)",
-      "oidcAudiencesAdd": "Añadir audiencia"
+      "oidcAudiencesAdd": "Añadir audiencia",
+      "oidcAudiencesLoading": "Comprobando las audiencias configuradas en el despliegue …"
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",

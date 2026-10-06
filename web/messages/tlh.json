@@ -1050,7 +1050,7 @@
       "varFiles": "choHlaH teywI'mey (Qumwo'mey chenmoHlu'bogh Hev)",
       "varFilesHint": "nab/lo' nobbogh <code>.tfvars</code> Hemmey.",
       "oidcAudiences": "vum pong HevwI''mey (Qumwo''mey chenmoHlu''bogh Hev)",
-      "oidcAudiencesHint": "HevwI''mey, nabvam chenmoHbogh Hoch Qumwo'' vum pong chaw'' chenmoH. chIm yIlan ''ej pagh chenmoH.",
+      "oidcAudiencesHint": "HevwI'' ngoDmey, nabvam chenmoHbogh Hoch Qumwo''Daq lanlu''; chaw'' ngaSbogh provider chenmoHghach ngaQHa''wI'' — aws, pagh pongqa''bogh chenmoHghachvaD aws.west. chIm yIlan ''ej Qumwo''mey nISwI'' chenmoHghach lo''.",
       "addVarFile": "choHlaH teywI' chel",
       "executionHooks": "vangmeH ghItlhmey (Qumwo' chu' Hoch rarlu')",
       "executionHooksHint": "<page>vangmeH ghItlhmey</page> che'wI' navDaq maQlu'bogh ghItlhmeyvo' wIv — wIvlu'bogh ghItlh Hoch chut vam chenmoHbogh Qumwo' rarlu'.",
@@ -1269,7 +1269,7 @@
       "setLabels": "permey choq (Hoch rurbogh Qumwo' permey chartlh DIvI')",
       "setVarFiles": "choHlaH teywI'mey choq",
       "addVarFile": "choHlaH teywI' chel",
-      "setOidcAudiences": "vum pong HevwI''mey choq (Hoch rurbogh Qumwo'' tetlh chartlh; tetlh chIm vum pong chu''Ha'')",
+      "setOidcAudiences": "OIDC vum pong HevwI''mey choq (Hoch rurbogh Qumwo''Daq chart chartlh)",
       "setRunTasks": "Sar Qu'mey choq (Hoch rurbogh Qumwo' pongmo' choHlu')",
       "setNotifications": "QIn numtaHmey choq (pongmo' choHlu')",
       "dryRun": "QaD Sar (tI'ang neH — choH ghItlhbe'lu')",
@@ -1922,6 +1922,19 @@
       "triggers": "taghwI'mey",
       "addNotification": "QIn chel"
     },
+    "oidcAudiences": {
+      "audiences": "HevwI''mey",
+      "addProvider": "provider chenmoHghach chel",
+      "providerPlaceholder": "Da aws, pagh aws.west",
+      "providerInvalid": "provider pong: Daq chIm Hutlh ''ej wa'' per neH ghaj — aws, pagh aws.west.",
+      "providerDuplicate": "provider chenmoHghachvam ngoD ghajtaH.",
+      "removeProviderAria": "{provider} provider chenmoHghach teq",
+      "badgeOwned": "Qumwo''",
+      "badgeInherited": "nISwI'' motlh",
+      "override": "chartlh",
+      "overrideAria": "Qumwo''vamDaq {provider} HevwI''mey chartlh",
+      "issuerDisabled": "nISwI''vam OpenID Connect nobwI'' pagh ngeH; vaj naDev chenmoHlu''bogh pagh Qap."
+    },
     "autoApplyMode": {
       "never": "not",
       "always": "reH",
@@ -2536,10 +2549,11 @@
       "driftIgnoreRulesHint": "glob-Sovbogh Terraform Sum + Sep Hemmey, tlhotlh chevwI' So'lu'. <star></star> pagh joq law' <dot></dot>-Hutlhbogh ghItlhmey rur (<n></n> Summey Suq); <starIdx></starIdx> HIvje' Sum vay' rur. Sep neH ghajbogh Sum tuHHa' Sep vaH Doch — Qaw'mey je. tlhotlh neH qaS, motlh nab/lo' qaSbe'. tlhegh naQ legh <docs>drift-ignore-rules.md</docs>.",
       "driftIgnoreRulesNone": "pagh (Hoch nab pImmoH tlhotlh moj)",
       "oidcAudiences": "vum pong HevwI''mey",
-      "oidcAudiencesHint": "Qumwo''vam vum Hoch, Terrapod OpenID Connect chaw'' ngaj chenmoH ''ej vum laDlaHbogh teywI''Daq lan. chaw'' Qu'' pong ''oH HevwI'', ''ej Hoch DIvI'' ghoch ngaD pegh wIv — sts.amazonaws.com, api://AzureADTokenExchange, pagh ghoch DaghoSbogh Hevbogh vay''. tetlh chIm yIlan ''ej Qumwo''vam pagh chenmoH: vummeyDaj DaHjaj rur, Duy bIQ''a'' pong lo''taH. nuq provider chaw'' lo'', ''ej chay'', chenmoHghachlIj ngaS.",
+      "oidcAudiencesHint": "vum lo''bogh Hoch provider chenmoHghachvaD, Terrapod OpenID Connect chaw'' ngaj chenmoH ''ej vum laDlaHbogh teywI''Daq lan. chenmoHghachlIj provider pongbogh rur ngoD ngaQHa''wI'' yIlan — aws, pagh pongqa''bogh chenmoHghachvaD aws.west — ''ej ghochvetlh Hevbogh HevwI''mey yItetlh. Hoch ngoD provider''vetlhvaD nISwI'' chenmoHghach chartlh; yIteq ''ej provider''vetlh nISwI'' HevwI''meyDaq chegh. HevwI'' ''oH DIvI'' ghoch wIvbogh pegh ngaD; vaj DaghItlhbogh rur lan.",
       "oidcAudiencesPlaceholder": "Da sts.amazonaws.com",
       "oidcAudiencesNone": "pagh (vummey Duy bIQ''a'' pong lo'')",
-      "oidcAudiencesAdd": "HevwI'' chel"
+      "oidcAudiencesAdd": "HevwI'' chel",
+      "oidcAudiencesLoading": "nISwI''Daq chenmoHlu''bogh HevwI''mey wIlegh …"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

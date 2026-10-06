@@ -54,6 +54,55 @@ type OIDCSigningKeyRotation struct {
 	Note string
 }
 
+// OIDCAudienceDefaults is the deployment-wide audience catalogue that a
+// workspace's own `OIDCAudiences` map merges OVER, per key (#1901).
+//
+// It exists because the merge is otherwise unobservable: a workspace read
+// returns the merged map with no marker saying which entries the workspace owns,
+// so without the catalogue beside it an operator cannot tell an inherited entry
+// from one of their own -- and a consumer that writes the merged value back
+// wholesale promotes every inherited entry into an override.
+//
+// IssuerEnabled is reported separately because an empty catalogue and a
+// disabled issuer are different states that produce the same symptom ("my
+// workspace minted nothing"), and only one of them is fixed by adding audiences.
+type OIDCAudienceDefaults struct {
+	Audiences     map[string][]string `json:"audiences"`
+	IssuerEnabled bool                `json:"issuer-enabled"`
+}
+
+// GetOIDCAudienceDefaults reports the deployment-wide audience catalogue.
+//
+// Any authenticated user. A workspace read already discloses that workspace's
+// merged audiences to anyone who can read it, so this adds only the entries a
+// workspace does not override -- and knowing an audience grants nothing on its
+// own, because the federation target's own trust policy is the gate and minting
+// needs a phase-bound runner token scoped to a run.
+//
+// Audiences is empty when the deployment configures no catalogue, which is the
+// default and is not an error.
+func (c *Client) GetOIDCAudienceDefaults(ctx context.Context) (*OIDCAudienceDefaults, error) {
+	body, err := c.Get(ctx, "/api/terrapod/v1/oidc/audience-defaults")
+	if err != nil {
+		return nil, err
+	}
+	var doc struct {
+		Data struct {
+			Attributes OIDCAudienceDefaults `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return nil, fmt.Errorf("parse oidc audience defaults response: %w", err)
+	}
+	out := doc.Data.Attributes
+	if out.Audiences == nil {
+		// A nil map and an empty one mean the same thing here, and a consumer
+		// ranging over the result should not have to tell them apart.
+		out.Audiences = map[string][]string{}
+	}
+	return &out, nil
+}
+
 // ListOIDCSigningKeys reports the published signing keys and which one is
 // signing.
 //
