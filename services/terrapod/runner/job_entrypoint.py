@@ -14,10 +14,14 @@ Owns the whole life of a single Terrapod run inside a Job pod:
   10. Build var-file / target / replace argv pieces
   11. Run init (FATAL on non-zero)
   12. Backend backstop (FATAL if backend != local)
-  13. Plan phase only: lock-file h1 injection + lock-file upload
-  14. Plan: run plan; on success run show -json + OPA + plan-result
+  13. Per-workspace cloud identity: discover the provider configurations
+      this root module uses and mint one OIDC token each (FATAL if the
+      workspace mints and a token cannot be had). After init because
+      discovery asks the engine, and after any Terragrunt relocation
+  14. Plan phase only: lock-file h1 injection + lock-file upload
+  15. Plan: run plan; on success run show -json + OPA + plan-result
       + plan-file + plan-json upload
-  15. Apply: download plan file (if exists); run apply; upload state
+  16. Apply: download plan file (if exists); run apply; upload state
       (FATAL on state upload failure); apply-result
 
 EXIT trap equivalent: a try/finally around the entire body uploads
@@ -695,25 +699,6 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     except Exception as exc:  # noqa: BLE001
         log.warning("git module auth setup skipped", error=str(exc))
 
-    # 4c. Per-workspace cloud identity (#1901): mint this run's OIDC token and
-    # write it where the operator's provider configuration expects it. Here for
-    # the same reason as 4b — before init, and before the pre_init hooks, so an
-    # operator hook that talks to the cloud sees it too.
-    #
-    # `{}` when this workspace mints nothing, which is most of them: the run then
-    # authenticates with the agent pool's own identity exactly as before. The
-    # raise is NOT advisory, and the reason differs from git auth's: falling
-    # through here does not mean no credentials, it means the POOL's — broader
-    # than the ones this workspace was deliberately moved off — so the run would
-    # succeed against real infrastructure under permissions nobody chose.
-    try:
-        for _k, _v in cloud_identity.run(cfg).items():
-            os.environ[_k] = _v
-    except cloud_identity.CloudIdentityUnavailable:
-        raise
-    except Exception as exc:  # noqa: BLE001
-        log.warning("cloud identity setup skipped", error=str(exc))
-
     # 5. State download — AFTER chdir so terraform.tfstate lands beside
     # the user's .tf files.
     state_present = download_state(cfg, strip_dir=cwd)
@@ -782,6 +767,33 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     except backend_backstop.BackendBackstopError as exc:
         log.error("backend backstop failed", err=str(exc))
         return 1
+
+    # 10b. Per-workspace cloud identity (#1901): mint this run's OIDC tokens and
+    # write one per provider configuration where the operator's provider blocks
+    # expect them.
+    #
+    # AFTER init, unlike the git auth at 4b, and the position is load-bearing
+    # twice over. Discovering which provider configurations this root module
+    # actually uses means asking the engine, which cannot answer before the
+    # providers are installed; and with Terragrunt step 9b moves the working
+    # directory after init, so `cwd` here is the only one that holds the
+    # configuration the run will execute. It is also after the backend backstop
+    # deliberately: a run that is about to be failed for a remote backend should
+    # not mint credentials first.
+    #
+    # The cost of the position is that a pre_init hook can no longer see the
+    # tokens. A hook that talks to a cloud belongs at pre_plan or pre_apply,
+    # both of which run after this point.
+    #
+    # `{}` when this workspace mints nothing, which is most of them: the run then
+    # authenticates with the agent pool's own identity exactly as before, and
+    # does not invoke the engine for discovery at all. Anything else propagates
+    # — there is deliberately no warn-and-continue here, because falling through
+    # does not mean no credentials, it means the POOL's, broader than the ones
+    # this workspace was moved off, so the run would succeed against real
+    # infrastructure under permissions nobody chose.
+    for _k, _v in cloud_identity.run(cfg, binary=binary, cwd=cwd).items():
+        os.environ[_k] = _v
 
     # 11. Phase-specific execution.
     if cfg.phase == "plan":

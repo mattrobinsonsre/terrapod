@@ -120,6 +120,7 @@
   "auth.callback_base_url",
   "auth.local_enabled",
   "auth.login_token_ttl_hours",
+  "auth.oidc_issuer.audiences",
   "auth.oidc_issuer.enabled",
   "auth.oidc_issuer.key_propagation_seconds",
   "auth.oidc_issuer.public_url",

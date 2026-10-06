@@ -14,6 +14,7 @@ config anywhere in this file.
 
 Endpoints (all under /api/terrapod/v1):
     Runner protocol (runner token, run_id-scoped):
+        GET  /runs/{run_id}/cloud-identity-targets  which providers this run mints for
         POST /runs/{run_id}/cloud-identity-token    mint this run's identity token
     Signing keys (platform admin):
         GET  /oidc/signing-keys                     what is published, and when it signs
@@ -197,6 +198,59 @@ async def mint_cloud_identity_token(
             "audiences": audiences,
         }
     )
+
+
+@router.get("/runs/{run_id}/cloud-identity-targets")
+async def list_cloud_identity_targets(
+    run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Which provider configurations this run mints a token for.
+
+    **This exists so the runner does not have to run `tofu graph` on every run
+    in the fleet.** Discovering which provider configurations a root module uses
+    means asking the engine, and the overwhelming majority of workspaces
+    configure no cloud identity at all. Answering "nothing" here costs one
+    indexed row read and lets those runs skip discovery entirely -- so the
+    feature adds no cost, and no new failure mode, to a run that does not use
+    it. That is also what makes failing closed on a discovery error correct
+    rather than reckless: by the time the runner reaches for the engine, the
+    operator has asked for federation.
+
+    **Target names only -- never the audiences.** An audience is the value a
+    cloud trust policy matches on, so the set of them is worth more to an
+    attacker than any one token: it names the roles this deployment can ask to
+    assume. The runner does not need them (it writes a file and the engine reads
+    it), so they stay in the per-target mint response and are never enumerable.
+
+    **The run's snapshot, not live configuration.** A target added to the
+    workspace after this run was created is deliberately absent: the plan was
+    reviewed without it, and the mint endpoint would refuse it anyway. Reading
+    live configuration here would have the runner discover a target it then
+    could not mint.
+
+    204 when there is nothing -- the issuer is not published, or this run maps
+    no providers. The runner treats that exactly as it treats a 204 from the
+    mint: fall through to the agent pool's own identity, as before this feature
+    existed.
+    """
+    from terrapod.config import settings
+
+    require_runner_for_run(user, run_id)
+
+    if not settings.auth.oidc_issuer.enabled:
+        return Response(status_code=204)
+
+    run = await db.get(Run, parse_id(run_id, "run-", detail="Run not found"))
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    targets = sorted(run.oidc_audiences or {})
+    if not targets:
+        return Response(status_code=204)
+
+    return JSONResponse(content={"targets": targets})
 
 
 @router.get("/oidc/signing-keys")

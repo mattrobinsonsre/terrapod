@@ -380,3 +380,81 @@ class TestTheAuthBoundary:
         with pytest.raises(HTTPException) as exc:
             await _call(_user(run_id=other, phase="plan"), run, ws, target="aws", cfg=cfg)
         assert exc.value.status_code == 403
+
+
+async def _call_targets(user, run, ws, *, cfg=None):
+    settings = MagicMock()
+    settings.auth.oidc_issuer = cfg or _enabled()
+    with patch("terrapod.config.settings", settings):
+        return await router.list_cloud_identity_targets(
+            run_id=f"run-{run.id}", user=user, db=_db(run, ws)
+        )
+
+
+class TestTheTargetsRoute:
+    """Names only, from the snapshot, so the runner can skip the engine.
+
+    This route exists so a workspace that mints nothing never invokes `tofu
+    graph` — which is what keeps the feature from adding cost, or a new way to
+    fail, to the overwhelming majority of runs. It is also why failing closed on
+    a discovery error is correct: by the time the runner asks the engine, this
+    route has already said the operator asked for federation.
+    """
+
+    async def test_the_configured_targets_are_listed_sorted(self):
+        ws, run, cfg = _scenario(catalogue={"vault": ["https://vault"], "aws": [AWS]})
+        resp = await _call_targets(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg)
+        assert resp.status_code == 200
+        import json
+
+        assert json.loads(resp.body)["targets"] == ["aws", "vault"]
+
+    async def test_the_audiences_are_never_returned(self):
+        """An audience is the value a cloud trust policy matches on, so the set
+        of them names the roles this deployment can ask to assume. The runner
+        writes a file and the engine reads it — it has no use for them, so they
+        stay in the mint response and are never enumerable."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azure": [AZURE]})
+        resp = await _call_targets(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg)
+        body = resp.body.decode()
+        assert AWS not in body
+        assert AZURE not in body
+
+    async def test_an_empty_mapping_is_204(self):
+        ws, run, cfg = _scenario()
+        resp = await _call_targets(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg)
+        assert resp.status_code == 204
+
+    async def test_a_disabled_issuer_is_204(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        cfg.enabled = False
+        resp = await _call_targets(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg)
+        assert resp.status_code == 204
+
+    async def test_the_snapshot_is_listed_not_live_configuration(self):
+        """A target added to the workspace after this run was created is
+        deliberately absent: the plan was reviewed without it, and the mint
+        would refuse it anyway. Listing live configuration would have the runner
+        discover a target it then could not mint."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, snapshot={"aws": [AWS]})
+        ws.oidc_audiences = {"azure": [AZURE]}  # added since the run was created
+        resp = await _call_targets(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg)
+        import json
+
+        assert json.loads(resp.body)["targets"] == ["aws"]
+
+    async def test_a_session_user_is_refused(self):
+        from fastapi import HTTPException
+
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        with pytest.raises(HTTPException) as exc:
+            await _call_targets(_user(method="session"), run, ws, cfg=cfg)
+        assert exc.value.status_code == 403
+
+    async def test_a_runner_token_for_a_different_run_is_refused(self):
+        from fastapi import HTTPException
+
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        with pytest.raises(HTTPException) as exc:
+            await _call_targets(_user(run_id=str(uuid.uuid4()), phase="plan"), run, ws, cfg=cfg)
+        assert exc.value.status_code == 403

@@ -132,6 +132,15 @@ data:
         token_ttl_seconds: {{ ((.Values.api.config.auth).oidc_issuer).token_ttl_seconds | default 900 | int64 }}
         key_propagation_seconds: {{ ((.Values.api.config.auth).oidc_issuer).key_propagation_seconds | default 600 | int64 }}
         retired_key_grace_seconds: {{ ((.Values.api.config.auth).oidc_issuer).retired_key_grace_seconds | default 3600 | int64 }}
+        {{- with ((.Values.api.config.auth).oidc_issuer).audiences }}
+        audiences:
+          {{- range $target, $auds := . }}
+          {{ $target | quote }}:
+            {{- range $auds }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
       api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 8760 | int64 }}
       {{- /* Rendered directly (no `| default`): 0 is meaningful for these and
              Helm's `default` would silently rewrite a configured 0 to the default. */}}
