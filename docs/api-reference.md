@@ -543,7 +543,7 @@ Workspaces support the following drift detection attributes (settable on create 
 
 | Attribute | Type | Default | Description |
 |---|---|---|---|
-| `oidc-audiences` | array&lt;string&gt; | `[]` | The audiences a run identity token is minted for, and **the opt-in** for [per-workspace cloud identity](cloud-identity.md). Empty means this workspace mints nothing and its runs authenticate to the cloud with the agent pool's own ServiceAccount, exactly as before — which is why an empty list is valid rather than an error. At most 10 entries, each at most 255 characters; a blank entry is **refused**, not dropped, and a duplicate is refused. Stored byte-for-byte and never normalised: an audience is an opaque string the federation target chose (`sts.amazonaws.com`, `api://AzureADTokenExchange`, whatever a JWT auth role's `bound_audiences` says), so there is nothing to canonicalise. Prefer **one** audience — a token audienced for two targets is replayable between them. Inert unless the deployment also sets `api.config.auth.oidc_issuer.enabled`. Settable on create and update, in the autodiscovery rule template, and via [bulk update](#bulk-workspace-operations). See [Per-Workspace Cloud Identity](#per-workspace-cloud-identity-oidc-federation) for the endpoints |
+| `oidc-audiences` | object | `{}` | The workspace's **override** of the deployment's cloud-identity audience catalogue, and its half of the opt-in for [per-workspace cloud identity](cloud-identity.md). A map keyed on the provider configuration a token is for — the bare provider type as a `provider` block writes it (`aws`, `azurerm`, `vault`), optionally with an alias (`aws.west`, where the alias is part of the key). Each value is **always a list**, even for one entry. One token is minted per key: a token audienced for two targets is replayable between them, and AWS refuses a multi-valued `aud` outright. Lookup is specific-then-general, so `vault.eu` is answered by an entry for `vault.eu` if there is one and by `vault` otherwise. **Merged over** `api.config.auth.oidc_issuer.audiences` per key, replacing that key's whole list — so an empty map is valid and common, and means "take the catalogue as it stands"; removing a key is the defined way to stop overriding it, and an explicitly empty list for a key is **refused** because it is neither. **This attribute returns the override, not the merged result** — the merge happens at run creation and at mint time. At most 10 keys, 10 audiences per key, 255 characters per audience and 128 per key; a key carries no whitespace and at most one `.`; a blank or duplicate audience is **refused**, not dropped. Stored byte-for-byte and never normalised: an audience is an opaque string the federation target chose. Terrapod attaches no meaning to any of them — any provider may be mapped to any audience, and the cloud's own trust policy is the only gate. Inert unless the deployment also sets `api.config.auth.oidc_issuer.enabled`. Settable on create and update, in the autodiscovery rule template, and via [bulk update](#bulk-workspace-operations). See [Per-Workspace Cloud Identity](#per-workspace-cloud-identity-oidc-federation) for the endpoints |
 
 ### Terragrunt Attributes
 
@@ -3612,10 +3612,21 @@ the workspace and phase. Off by default
 (`api.config.auth.oidc_issuer.enabled`); when off, the two `/.well-known`
 routes below are **not mounted at all** rather than mounted and refusing.
 
-A workspace opts in with [`oidc-audiences`](#cloud-identity-attributes). See
-[cloud-identity.md](cloud-identity.md) for the per-provider configuration, which
-is the operator's own — Terrapod mints a token and writes it to
-`/var/run/terrapod/oidc/token`, and holds nothing cloud-specific.
+Configuration is two levels, merged per key: the deployment's catalogue in
+`api.config.auth.oidc_issuer.audiences`, and a workspace's own
+[`oidc-audiences`](#cloud-identity-attributes) override over it. A workspace
+mints nothing when the **resolved** map is empty, and its runs then authenticate
+with the agent pool's own identity exactly as before.
+
+**One token is minted per provider configuration**, each carrying only that
+target's audiences, and the runner writes each to its own path
+(`/var/run/terrapod/oidc/<target>/token`). A token audienced for several targets
+is replayable between them, and AWS refuses a multi-valued `aud` outright — at
+the cloud's token exchange, not at configuration time.
+
+See [cloud-identity.md](cloud-identity.md) for the per-provider configuration,
+which is the operator's own: Terrapod mints a token and writes it to a file, and
+holds nothing cloud-specific.
 
 ### Discovery Document
 
@@ -3634,6 +3645,9 @@ to the public webhook URL and then `external_url`. OIDC issuer matching is
 **exact**, so this value must equal what the cloud is configured with, trailing
 slash included.
 
+**Cacheable**: `Cache-Control: public, max-age=300`. Modest, because the document
+carries no key material but a corrected issuer URL should take effect in minutes.
+
 ### JWKS
 
 ```
@@ -3645,23 +3659,85 @@ not one key: a rotation publishes the incoming key before it starts signing and
 keeps the retired one until the tokens it signed expire. A cloud selects by the
 token's `kid`, which is an RFC 7638 thumbprint of the key itself.
 
-### Mint Run Identity Token
+**Cacheable, and the lifetime is derived rather than configured**:
+`Cache-Control: public, max-age=<key_propagation_seconds / 2>`, with a floor of
+60 seconds. The propagation window exists *because* the clouds cache this
+document, so advertising a longer lifetime would mean a cloud still holding the
+old key set at the moment we begin signing with the new one; half rather than all
+of it avoids a clock-skew race at the boundary.
+
+Both issuer documents also have **their own rate-limit bucket**, at
+`authenticated_requests_per_minute` rather than the anonymous per-IP limit. A
+`429` on the JWKS would fail token verification for every federated run at once,
+including runs whose own traffic had nothing to do with filling the bucket.
+
+### List Run Identity Targets
 
 ```
-POST /api/terrapod/v1/runs/{run_id}/cloud-identity-token
+GET /api/terrapod/v1/runs/{run_id}/cloud-identity-targets
 ```
 
-**Runner token, scoped to that run.** Called unconditionally by the runner before
-`init` — it has no other way to know whether the workspace opted in.
+**Runner token, scoped to that run.** Which provider configurations this run
+mints a token for, read from the run's own snapshot — so a target added to the
+workspace after the run was created is deliberately absent.
+
+**Target names only, never the audiences.** An audience is the value a trust
+policy matches on, so the set of them names the roles this deployment can ask to
+assume; the runner does not need them, so they stay in the per-target mint
+response and are never enumerable.
 
 | Status | Meaning | What the runner does |
 |---|---|---|
-| **200** | Token minted | Writes it to `/var/run/terrapod/oidc/token` (mode `0600`) and exports `TERRAPOD_OIDC_TOKEN_FILE`, `TERRAPOD_RUN_PHASE` and `TF_VAR_terrapod_run_phase` |
-| **204** | This workspace mints nothing — empty `oidc-audiences`, or the issuer is not enabled deployment-wide | Takes no action. The run authenticates with the agent pool's identity, exactly as before |
-| **4xx / 5xx** | Credentials were asked for and could not be had | **Fails the run.** Continuing would mean silently running under broader permissions than the operator chose |
+| **200** | `{"targets": ["aws", "vault.eu"]}` | Asks the engine which provider configurations the root module uses, then mints the intersection |
+| **204** | This run maps no targets, or the issuer is not enabled deployment-wide | Takes no action **and does not invoke the engine**. The run authenticates with the agent pool's identity, exactly as before |
+| **404** | This API does not serve the route | Read as "nothing to do" — an API older than the runner image, which in agent mode upgrades independently |
 
-The `204` is load-bearing: "not opted in" has to be distinguishable from
-"broken", because those two require opposite behaviour from the runner.
+The endpoint exists so the runner does not have to run the engine's graph command
+on every run in the fleet: the overwhelming majority of workspaces configure no
+cloud identity, and answering "nothing" here costs one indexed row read. That is
+also what makes failing closed on a later discovery error correct rather than
+reckless — by the time the runner reaches for the engine, federation has been
+asked for.
+
+### Mint Run Identity Token
+
+```
+POST /api/terrapod/v1/runs/{run_id}/cloud-identity-token?target=<target>
+```
+
+**Runner token, scoped to that run.** Called once per target the runner
+discovered, **after `init`** — discovery asks the engine, which cannot answer
+before the providers are installed.
+
+`target` is the audience-map key: `aws`, or `provider.alias` for one aliased
+configuration. It is resolved specific-then-general, so `vault.eu` is answered by
+an entry for `vault.eu` if there is one and by `vault` otherwise.
+
+| Status | Meaning | What the runner does |
+|---|---|---|
+| **200** | Token minted for that one target | Writes it to `/var/run/terrapod/oidc/<target>/token` (mode `0600`). Once any token is delivered it exports `TERRAPOD_OIDC_TOKEN_DIR`, `TF_VAR_terrapod_oidc_token_dir`, `TERRAPOD_RUN_PHASE` and `TF_VAR_terrapod_run_phase` |
+| **204** | Nothing maps to this target; the issuer is not enabled deployment-wide; **or the request named no target at all** | Skips that target. The run falls through to the agent pool's identity for it, exactly as before |
+| **409** | The resolved audiences for this target have changed since the run was created | **Fails the run.** The identity it would present is no longer the one its plan was reviewed under — queue a new run |
+| **Other 4xx / 5xx** | Credentials were asked for and could not be had | **Fails the run.** Continuing would mean silently running under broader permissions than the operator chose |
+
+The `204` is load-bearing twice over: "not opted in" has to be distinguishable
+from "broken", because those require opposite behaviour from the runner; and a
+request carrying **no** target is a runner image older than per-target minting, so
+it answers `204` rather than `400` — a `400` would fail every run on such a
+runner, when the designed behaviour is the same permanent fall-through.
+
+**The `409` compares the run's snapshot against live configuration.**
+`Run.oidc_audiences` is the mapping resolved when the run was created; this
+endpoint re-resolves the requested target and refuses when the two disagree,
+order included. Minting from the snapshot alone would hand an apply a token
+matching the reviewed plan while the cloud had moved on, and the rejection would
+land inside the engine, possibly after a partial apply.
+
+The same comparison runs **at confirm time** as well, beside the state-drift and
+plan-expiry staleness guards, so an apply is refused before a Job is scheduled —
+scoped to the targets the run actually minted for, so one edit to the deployment
+catalogue does not refuse every pending apply in the fleet. See
+[cloud-identity.md](cloud-identity.md#when-the-configuration-moves-between-plan-and-apply).
 
 **Response** (200):
 
@@ -3669,8 +3745,9 @@ The `204` is load-bearing: "not opted in" has to be distinguishable from
 |---|---|---|
 | `token` | string | The signed JWT |
 | `expires_in` | int | `api.config.auth.oidc_issuer.token_ttl_seconds` |
-| `phase` | string \| null | `plan` or `apply`, taken from the presented runner token |
-| `audiences` | array&lt;string&gt; | The workspace's audience list, verbatim |
+| `phase` | string \| null | `plan` or `apply`, taken from the presented runner token. `null` when the token made no phase claim |
+| `target` | string | Echoed, so the runner writes the file under the name it asked for |
+| `audiences` | array&lt;string&gt; | **This target's** audiences, verbatim and in order |
 
 **The phase comes from the presented runner token, never from the request body.**
 A plan-phase runner asking for the apply identity is what this guards: put write
@@ -3678,15 +3755,57 @@ permissions behind a trust condition on `phase: apply` and a speculative
 pull-request plan structurally cannot assume that role, because every PR-driven
 run is plan-only.
 
-**Claims:** `iss`, `sub` (`workspace:<name>:phase:<plan|apply>`), `aud`,
-`workspace`, `workspace_id`, `phase`, `run_id`, `terrapod_organization` (always
-the literal `default`), plus `iat`, `nbf`, `exp`, `jti`. `sub` carries the phase
+**Claims:** `iss`, `sub` (`workspace:<name>:phase:<plan|apply>`), `aud` (this
+target's audiences only), `workspace`, `workspace_id`, `phase` (absent when the
+runner token made no phase claim), `run_id`, `terrapod_organization` (always the
+literal `default`), plus `iat`, `nbf`, `exp`, `jti`. The header carries `kid`. `sub` carries the phase
 as well as the discrete `phase` claim because Azure federated identity
 credentials match on issuer, subject and audience only, with no access to
 arbitrary claims — so `sub` is the one place a phase condition can be expressed
 there. Targets that can read arbitrary claims should condition on the discrete
 ones, which needs no wildcard. See
 [the claim set](cloud-identity.md#the-claim-set).
+
+### Audience Defaults
+
+```
+GET /api/terrapod/v1/oidc/audience-defaults
+```
+
+**Any authenticated user** — not platform admin. The deployment-wide audience
+catalogue (`api.config.auth.oidc_issuer.audiences`) that a workspace's own
+`oidc-audiences` map merges over, plus whether the issuer is published at all.
+
+It exists because the two-level merge is otherwise hard to observe: a workspace
+read returns that workspace's **override**, so it says what the workspace owns
+but nothing about what it inherits. Reading the catalogue beside it is what makes
+the effective mapping visible.
+
+**Response:**
+
+```json
+{"data": {"type": "oidc-audience-defaults", "id": "default",
+  "attributes": {"audiences": {"aws": ["sts.amazonaws.com"]}, "issuer-enabled": true}}}
+```
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `audiences` | object | The catalogue: provider configuration → its audiences. `{}` by default, which is not an error |
+| `issuer-enabled` | bool | `api.config.auth.oidc_issuer.enabled`. Reported separately because an empty catalogue and a disabled issuer are different states with the same symptom, and only one is fixed by adding audiences |
+
+The gate is reasoned rather than lax: a workspace read already discloses that
+workspace's audiences to anyone who can read it, so this adds only the entries a
+workspace does not override — and requiring admin would put it out of reach of
+exactly the person it is for, a workspace owner deciding whether to override a
+key. Knowing an audience grants nothing on its own: the federation target's own
+trust policy is the gate, and minting needs a phase-bound runner token scoped to
+a run on that workspace.
+
+Note the deliberate asymmetry with
+[List Run Identity Targets](#list-run-identity-targets), which returns target
+**names only**. A runner writes a file and the engine reads it, so it has no use
+for the values; the set of audiences names the roles this deployment can ask to
+assume, so it stays off the runner-facing surface.
 
 ### List Signing Keys
 

@@ -117,7 +117,7 @@ Runner Jobs use a separate ServiceAccount for Terraform workload permissions:
 
 | Priority | Source | Configured Via |
 |---|---|---|
-| 1 | **The workspace's own federated identity** | `oidc-audiences` on the workspace + your own provider block — see [per-workspace cloud identity](cloud-identity.md) |
+| 1 | **The workspace's own federated identity** | the resolved `oidc-audiences` map (deployment catalogue + workspace override) + your own provider block — see [per-workspace cloud identity](cloud-identity.md) |
 | 2 | **Global runner SA** | `runners.serviceAccount.name` in Helm values |
 | 3 | **K8s default SA** | Implicit namespace default |
 
@@ -140,11 +140,13 @@ For multi-cloud or multi-account setups, deploy separate listener Deployments (a
 > concerned, and cloud audit logs name the ServiceAccount rather than the
 > workspace. [Per-workspace cloud identity](cloud-identity.md) closes that by
 > having Terrapod mint a short-lived OIDC token describing the run, which your
-> cloud federates to. It is **fall-through, not replacement**: a workspace that
-> names no audiences keeps using the pool's ServiceAccount exactly as described
+> cloud federates to — one token per provider configuration, each written to its
+> own file. It is **fall-through, not replacement**: a workspace whose resolved
+> audience map is empty keeps using the pool's ServiceAccount exactly as described
 > above, permanently, and partial adoption is the expected posture. The runner pod
-> keeps the pool's ServiceAccount in every case, so an IRSA-annotated pool and a
-> federated workspace coexist.
+> keeps the pool's ServiceAccount in every case, and Terrapod sets no cloud
+> credential environment variable at all, so an IRSA-annotated pool and a
+> federated workspace coexist by **absence** rather than by precedence.
 
 ---
 
@@ -802,13 +804,15 @@ now three ways to get there, and the first is usually the right one:
 2. **Workload identity on the runner SA** (IRSA/WIF/WI), documented above. Still
    the right answer for everything that does not need per-workspace separation,
    and still what a workspace falls through to when it names no audiences.
-3. **A credential the run fetches itself**, via a [`pre_init` execution
+3. **A credential the run fetches itself**, via an [execution
    hook](execution-hooks.md) whose script reads the secret and exports it into
    the run environment, associated with the workspaces that need it. Reach for
    this when you specifically want OpenBao/Vault to broker the credential — for
    a target with no OIDC federation, or to reuse an existing dynamic secrets
    engine and its audit trail. (Execution hooks supersede the earlier,
-   never-fully-wired `setup_script`/`TP_SETUP_SCRIPT` runner slot.)
+   never-fully-wired `setup_script`/`TP_SETUP_SCRIPT` runner slot.) Use
+   `pre_plan` rather than `pre_init` if the hook authenticates with the run's own
+   federated identity — those tokens are delivered after `init`.
 
 **Option 1 also improves option 3**, which is the part worth knowing: a hook
 previously had to log in to OpenBao/Vault with a credential that was the same for
@@ -816,7 +820,8 @@ every workspace, so the role it bound to could not be narrower than the pool. Th
 run identity token authenticates against a [JWT auth
 role](cloud-identity.md#openbao-or-hashicorp-vault) whose `bound_claims` name the
 workspace and phase, so the login itself is now per-workspace and the hook needs
-no shared secret to perform it.
+no shared secret to perform it — from `pre_plan` onwards, where the token file
+exists.
 
 Terrapod still does not fetch a dynamic secret on your behalf — options 1 and 3
 are both things the run does, which is what keeps the credential out of

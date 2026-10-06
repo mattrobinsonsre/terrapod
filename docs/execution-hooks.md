@@ -18,15 +18,24 @@ with, so no single hook can reach every workspace's secrets or state.
 ## Hook points
 
 Each hook fires at one of five points, inside the runner Job, with the run's
-environment, working directory, and cloud identity already established:
+environment and working directory already established:
 
 | Point | Runs | Typical use |
 |---|---|---|
-| `pre_init` | before `init` | cloud/secret auth, `/etc/hosts`, extra tooling, cert fetch |
-| `pre_plan` | after `init`, before `plan` | pre-plan validation |
+| `pre_init` | before `init` | `/etc/hosts`, extra tooling, cert fetch |
+| `pre_plan` | after `init`, before `plan` | pre-plan validation, cloud/secret auth |
 | `post_plan` | after a successful `plan` | export/inspect the plan, external gate |
 | `pre_apply` | after confirm, before `apply` | last-mile checks (apply phase only) |
 | `post_apply` | after a successful `apply` + state upload | notify, register, cleanup |
+
+> **A hook that talks to a cloud or a secret store belongs at `pre_plan` or
+> later, not `pre_init`.** The agent pool's own ServiceAccount identity is
+> available at every point — but [per-workspace cloud
+> identity](cloud-identity.md) delivers its tokens **after `init`**, because
+> discovering which provider configurations a run uses means asking the engine,
+> which cannot answer before the providers are installed. So a `pre_init` hook
+> sees no token file; `pre_plan`, `post_plan`, `pre_apply` and `post_apply` all
+> run after the credential step.
 
 When several hooks share a point on a workspace, they run in `(priority, name)`
 order — lower `priority` first, ties broken by name.
@@ -41,7 +50,9 @@ run is marked errored with an "apply succeeded; post-apply hook failed" message
 ## Security
 
 A hook is operator-supplied shell that runs with the **runner's cloud identity**
-and can read the run's environment — including resolved workspace variables
+— the agent pool's ServiceAccount, plus any [per-workspace federated
+identity](cloud-identity.md) token, from `pre_plan` onwards — and can read the
+run's environment — including resolved workspace variables
 (env-category secrets among them) and the short-lived runner API token. The
 trust boundary is the same as "who can run `terraform` here", so:
 
