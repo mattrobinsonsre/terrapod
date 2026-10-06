@@ -607,3 +607,56 @@ class TestTheMintRecordsWhatItServed:
             await _call(_user(run_id=str(run.id), phase="plan"), run, ws, target="aws", cfg=cfg)
         assert exc.value.status_code == 409
         assert run.oidc_minted_targets == []
+
+
+class TestTheWorkspaceReadIsMerged:
+    """What a client gets back is the workspace's override resolved OVER the
+    deployment catalogue, per key — not the stored override.
+
+    The override alone is unreadable on its own: a key's absence means
+    "inherit", which a reader cannot distinguish from "nothing here". So the
+    read has to be the effective map, and the cost of that lands on the
+    provider, which reconciles only the keys it owns.
+    """
+
+    def _serialized(self, *, override, catalogue):
+        from terrapod.api.routers import tfe_v2
+
+        ws = MagicMock()
+        ws.oidc_audiences = override
+        settings = MagicMock()
+        settings.auth.oidc_issuer = _enabled(audiences=catalogue)
+        with patch("terrapod.config.settings", settings):
+            return tfe_v2._merged_oidc_audiences(ws)
+
+    def test_an_inherited_key_appears_in_the_read(self):
+        got = self._serialized(override={"aws": [AWS]}, catalogue={"vault": ["https://v"]})
+        assert got == {"aws": [AWS], "vault": ["https://v"]}
+
+    def test_the_workspace_override_wins_per_key(self):
+        got = self._serialized(
+            override={"aws": ["sts.override"]}, catalogue={"aws": [AWS], "vault": ["https://v"]}
+        )
+        assert got["aws"] == ["sts.override"]
+        assert got["vault"] == ["https://v"], "an unrelated catalogue key was lost"
+
+    def test_removing_a_key_falls_back_to_the_catalogue(self):
+        """The decided semantics: an absent override key inherits rather than
+        meaning 'none here'."""
+        got = self._serialized(override={}, catalogue={"aws": [AWS]})
+        assert got == {"aws": [AWS]}
+
+    def test_no_catalogue_returns_the_override_alone(self):
+        got = self._serialized(override={"aws": [AWS]}, catalogue={})
+        assert got == {"aws": [AWS]}
+
+    def test_neither_configured_is_empty_not_an_error(self):
+        assert self._serialized(override={}, catalogue={}) == {}
+
+    def test_the_read_cannot_mutate_the_stored_override(self):
+        """The serializer runs on every workspace of every list response, so a
+        shared list handed out here would be editable through any one of them."""
+        override = {"aws": [AWS]}
+        got = self._serialized(override=override, catalogue={})
+        got["aws"].append("injected")
+        assert override["aws"] == [AWS], "mutating the served value reached the ORM object"
