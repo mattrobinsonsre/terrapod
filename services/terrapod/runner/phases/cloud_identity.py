@@ -1,15 +1,27 @@
 """Fetch this run's cloud identity tokens, after `init` (#1901).
 
 The step that turns per-workspace cloud identity into something the operator's
-provider configuration can use. It asks the API which provider configurations
-this run mints for, discovers which of them the root module actually uses, and
-writes one short-lived RS256 JWT per target to its own path.
+provider configuration can use. It discovers which provider configurations the
+root module actually uses, asks the API once, and writes one short-lived RS256
+JWT per target to its own path.
 
 **One token per target, each carrying one audience set.** A token audienced for
 several targets is replayable between them -- anything that can read the file
 can present it to any of them -- and AWS refuses a multi-valued `aud` outright.
 So there is no combined token and no shared file: `<dir>/<target>/token`, and a
 provider block names the one it needs.
+
+**Discovery is unconditional, and the API is asked exactly once.** Which
+provider configurations a run uses is a property of the configuration, so the
+runner is the only party that can answer it; which identities a workspace holds
+is a property of the platform, so the API is the only party that can answer
+that. Resolving the intersection therefore needs one hop whichever way round it
+is done, and sending the discovered list up is the cheaper direction: a gate
+request first ("does this run mint anything?") would make it two hops for every
+federated run to save one engine invocation on the rest -- and `graph` is a
+static walk of the configuration, needing no network, no credentials and no
+state. The honest reading of a gate is that it optimises the common case by
+making the feature's own case worse.
 
 **Nothing here knows AWS from Azure from Vault**, and that is the design rather
 than a stage of it. Every federation target reads a token from a file, so
@@ -34,21 +46,18 @@ asked for and could not be had.
 The outcomes are deliberately distinguishable, and the middle ones are why this
 phase cannot simply swallow failures:
 
-* **The API does not serve this at all** -- a 404 on the targets request, which
-  is an API older than this runner image. Read as "nothing to do", because in
-  agent mode the control plane and a runner in another cluster upgrade
-  independently and the absence of the route is information rather than a fault.
-  Every other failure of that request IS fatal: the runner cannot complete a run
-  without the API in any case, so failing adds no realistic new failure mode,
-  and treating it as advisory would let anyone able to disrupt one call downgrade
-  a workspace to the pool's broader identity without trace.
-* **The workspace mints nothing** -- the API answers 204 to the targets request
-  and this returns `{}` without ever invoking the engine. The run then
-  authenticates with the agent pool's own identity, exactly as it did before
-  this feature existed. That is the normal posture for most workspaces, not a
-  degraded one, and it is why discovery is gated behind that request rather than
-  run unconditionally: a workspace not using this feature pays nothing for it
-  and gains no new way to fail.
+* **The API does not serve this at all** -- a 404, which is an API older than
+  this runner image. Read as "nothing to do", because in agent mode the control
+  plane and a runner in another cluster upgrade independently and the absence of
+  the route is information rather than a fault. Every other failure of that
+  request IS fatal: the runner cannot complete a run without the API in any
+  case, so failing adds no realistic new failure mode, and treating it as
+  advisory would let anyone able to disrupt one call downgrade a workspace to
+  the pool's broader identity without trace.
+* **The workspace mints nothing** -- the API answers 204 and this returns `{}`.
+  The run then authenticates with the agent pool's own identity, exactly as it
+  did before this feature existed. That is the normal posture for most
+  workspaces, not a degraded one.
 * **The workspace mints and something fails** -- raise. Falling through would
   not mean "no credentials", it would mean *the pool's* credentials, which are
   broader than the ones the operator deliberately moved this workspace off. A
@@ -60,6 +69,24 @@ phase cannot simply swallow failures:
   is an accepted, documented degradation: no runner-image version reaches the
   API, so it cannot be detected server-side. It is distinguishable from the case
   above only in that the runner never asked.
+
+**Because discovery now runs before the API has said whether anything is
+configured, the runner reports what it saw rather than deciding on it.** Three
+outcomes, and only the API can judge them, because only the API knows whether
+this workspace holds any identity at all:
+
+* `ok` -- the graph was read. The target list is authoritative, and may be
+  empty for a configuration that declares no provider.
+* `failed` -- the graph command errored or timed out.
+* `unparsed` -- the graph ran and its output mentions provider nodes, but none
+  matched. That is our pattern or the engine's output having moved, never an
+  empty answer, and it is the one case a target list cannot express.
+
+The last two are only a problem for a workspace that holds identity, and they
+are a serious one: both produce an empty target list, which is indistinguishable
+from a provider-less configuration and would otherwise be a silent fall-through
+to the pool's identity. Sending the outcome up is what lets the API refuse them
+while leaving every workspace that configures nothing completely unaffected.
 """
 
 from __future__ import annotations
@@ -70,6 +97,7 @@ import re
 import stat
 import subprocess
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
@@ -106,6 +134,12 @@ PHASE_TFVAR_ENV = "TF_VAR_terrapod_run_phase"
 #: should not be failed for being slow.
 DISCOVER_TIMEOUT_SECONDS = 180
 
+#: Cap on what one run may ask to mint. Target names come out of the engine's
+#: output rather than from us, so the request is bounded here rather than
+#: trusting the graph to be reasonable -- the API bounds it again, because a
+#: runner is not a trusted input either.
+MAX_TARGETS = 100
+
 #: A provider configuration as the engine's DOT output spells it, with the
 #: source address quote-escaped inside the node string:
 #:
@@ -116,10 +150,15 @@ DISCOVER_TIMEOUT_SECONDS = 180
 #: second is the one that matters: the engine prunes provider configurations
 #: nothing references, so every occurrence is a configuration the root module
 #: actually uses; and keying on a cosmetic attribute would mean a future change
-#: to it yields an empty discovery, which is a silent fall-through to the pool's
-#: identity. The shape of this pattern cannot change without the graph becoming
-#: unreadable.
+#: to it yields an empty discovery.
 _PROVIDER_NODE = re.compile(r'provider\[\\"([^\\"]+)\\"\](\.[A-Za-z0-9_-]+)?')
+
+#: The bare node prefix, unescaped and unanchored. Its presence in output that
+#: produced no `_PROVIDER_NODE` match is what separates "this configuration
+#: declares no provider" from "we can no longer read the graph" -- the one
+#: distinction a target list cannot carry, and the one that decides whether an
+#: empty result is an answer or a defect.
+_PROVIDER_MENTION = "provider["
 
 
 class CloudIdentityUnavailable(RuntimeError):
@@ -130,6 +169,20 @@ class CloudIdentityUnavailable(RuntimeError):
     -- so continuing would run against real infrastructure under permissions the
     operator did not choose, and would succeed while doing it.
     """
+
+
+@dataclass(frozen=True)
+class Discovery:
+    """What the engine's graph said, and how much to trust it.
+
+    `outcome` is sent to the API verbatim, because whether a bad outcome matters
+    depends on something only the API knows: a graph we cannot read is fatal for
+    a workspace that holds identity and irrelevant for one that does not.
+    """
+
+    outcome: str
+    targets: set[str] = field(default_factory=set)
+    detail: str = ""
 
 
 def _write_private(path: Path, content: str) -> None:
@@ -165,19 +218,20 @@ def parse_graph(output: str) -> set[str]:
     return {_target_name(m.group(1), m.group(2)) for m in _PROVIDER_NODE.finditer(output)}
 
 
-def discover_targets(*, binary: str, cwd: Path) -> set[str]:
-    """Which provider configurations the root module actually uses.
+def discover(*, binary: str, cwd: Path) -> Discovery:
+    """Which provider configurations the root module uses, and how sure we are.
 
     Runs the engine's own graph command, which answers exactly the question and
     prunes configurations nothing references -- so a `provider "aws" { alias =
-    "unused" }` nobody points at yields no token, correctly.
+    "unused" }` nobody points at yields no token, correctly. It is a static walk
+    of the configuration: measured against OpenTofu 1.12.6 it needs no network,
+    no credentials and no state, and succeeds on a configuration whose `plan`
+    refuses for a missing required variable.
 
-    Raises on failure. By the time this is reached the API has already said this
-    run mints for something, so the operator has asked for federation and a
-    graph we cannot read means we cannot tell which identity to present. A root
-    module whose graph will not build cannot be planned either, so the run is
-    doomed regardless and failing here says why in one line instead of at the
-    cloud's token exchange.
+    Never raises. This runs before the API has said whether the workspace holds
+    any identity, so a graph failure is not yet known to matter -- the outcome
+    goes up and the API, which does know, decides. Raising here would fail runs
+    that configure no cloud identity at all.
     """
     try:
         proc = subprocess.run(  # noqa: S603 - the engine binary the run already uses
@@ -188,21 +242,25 @@ def discover_targets(*, binary: str, cwd: Path) -> set[str]:
             timeout=DISCOVER_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise CloudIdentityUnavailable(
-            f"Could not discover this run's provider configurations: {binary} graph "
-            f"failed to run ({exc}). This workspace is configured for cloud identity "
-            f"federation, so the run is failed here rather than continuing under the "
-            f"agent pool's own identity."
-        ) from exc
+        return Discovery(outcome="failed", detail=f"{binary} graph failed to run: {exc}")
 
     if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "").strip()[-400:]
-        raise CloudIdentityUnavailable(
-            f"Could not discover this run's provider configurations: {binary} graph "
-            f"exited {proc.returncode}. {tail}"
+        tail = (proc.stderr or proc.stdout or "").strip()[-300:]
+        return Discovery(
+            outcome="failed", detail=f"{binary} graph exited {proc.returncode}. {tail}"
         )
 
-    return parse_graph(proc.stdout or "")
+    output = proc.stdout or ""
+    targets = parse_graph(output)
+    if not targets and _PROVIDER_MENTION in output:
+        return Discovery(
+            outcome="unparsed",
+            detail=(
+                f"{binary} graph named provider nodes but none could be read. The "
+                f"engine's graph format has moved, or the pattern that reads it has."
+            ),
+        )
+    return Discovery(outcome="ok", targets=targets)
 
 
 def _request(
@@ -213,26 +271,28 @@ def _request(
     *,
     what: str,
     not_found_ok: bool = False,
-    params: dict[str, str] | None = None,
+    json_body: dict | None = None,
 ) -> dict | None:
     """One retried API call. Returns the body, or None on 204.
 
     Retries what is worth retrying -- a transient 5xx or a connection error is
-    not an answer -- and treats a 4xx as final, because the run being gone or
-    this token not being scoped to it cannot be fixed by asking again.
+    not an answer -- and treats a 4xx as final, because the run being gone, this
+    token not being scoped to it, or the configuration having moved since the
+    plan cannot be fixed by asking again.
 
-    `not_found_ok` reads a 404 as None rather than a failure, for the one call
-    where the route's absence is information: an API older than this runner
-    image does not serve the targets endpoint at all, and in agent mode the
-    control plane and a runner in another cluster upgrade independently. "This
-    API has no such feature" is the same answer as "this run mints nothing", and
-    both mean fall through to the agent pool's identity.
+    `not_found_ok` reads a 404 as None rather than a failure, because the
+    route's absence is information: an API older than this runner image does not
+    serve it at all, and in agent mode the control plane and a runner in another
+    cluster upgrade independently. "This API has no such feature" is the same
+    answer as "this run mints nothing", and both mean fall through to the agent
+    pool's identity. The API's own "run not found" is also a 404 and is read the
+    same way, which is harmless: a run that does not exist is not executing.
     """
     headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
     last = "no attempt made"
     for attempt in (1, 2, 3):
         try:
-            resp = client.request(method, url, headers=headers, params=params)
+            resp = client.request(method, url, headers=headers, json=json_body)
             if resp.status_code == 204:
                 return None
             if resp.status_code == 404 and not_found_ok:
@@ -245,7 +305,7 @@ def _request(
                     last = f"200 with a body that is not JSON: {exc}"
                     break
             if 400 <= resp.status_code < 500:
-                last = f"HTTP {resp.status_code}: {resp.text[:300]}"
+                last = f"HTTP {resp.status_code}: {resp.text[:400]}"
                 break
             last = f"HTTP {resp.status_code}"
             logger.info(f"{what} non-200 — will retry", attempt=attempt, status=resp.status_code)
@@ -263,10 +323,6 @@ def _request(
     )
 
 
-def _base(cfg) -> str:
-    return f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}"
-
-
 def run(
     cfg,
     *,
@@ -274,7 +330,7 @@ def run(
     cwd: Path,
     token_dir: Path | None = None,
     client: httpx.Client | None = None,
-    discover=None,
+    discover_fn=None,
 ) -> dict[str, str]:
     """Mint and deliver this run's cloud identity tokens.
 
@@ -282,11 +338,23 @@ def run(
     nothing. Raises `CloudIdentityUnavailable` when it mints and the tokens could
     not be obtained or written.
 
-    `discover` is injectable so a test can drive the whole phase without an
-    engine binary; production passes nothing and gets `discover_targets`.
+    `discover_fn` is injectable so a test can drive the whole phase without an
+    engine binary; production passes nothing and gets `discover`.
     """
     if not cfg.has_api:
         return {}
+
+    found = (discover_fn or discover)(binary=binary, cwd=cwd)
+    # Sorted and capped before it leaves. The names come from the engine's
+    # output, so the request is bounded on the way out as well as on the way in,
+    # and a stable order makes the API's log line and ours comparable.
+    asking = sorted(found.targets)[:MAX_TARGETS]
+    logger.info(
+        "cloud identity discovery",
+        outcome=found.outcome,
+        used=asking,
+        detail=found.detail or None,
+    )
 
     own_client = client is None
     if client is None:
@@ -295,108 +363,61 @@ def run(
         body = _request(
             cfg,
             client,
-            "GET",
-            f"{_base(cfg)}/cloud-identity-targets",
-            what="the cloud identity targets request",
+            "POST",
+            f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/cloud-identity-tokens",
+            what="minting this run's cloud identity tokens",
             not_found_ok=True,
+            json_body={
+                "providers": asking,
+                "discovery": found.outcome,
+                "discovery-detail": found.detail[:400],
+            },
         )
-        # 204, or a body naming no targets: this run mints nothing. Return
-        # before touching the engine -- see the module docstring on why the
-        # gating matters.
-        configured = [str(t) for t in (body or {}).get("targets") or []]
-        if not configured:
-            return {}
-
-        used = (discover or discover_targets)(binary=binary, cwd=cwd)
-        if not used:
-            # The run mints for something and the graph named no provider at
-            # all. A configuration that reaches a cloud with no provider
-            # configuration does not exist, so this is our parser or the
-            # engine's output having moved -- not an empty answer. Failing here
-            # is what stops that becoming a silent fall-through to the pool's
-            # identity.
-            raise CloudIdentityUnavailable(
-                "This workspace is configured for cloud identity federation but no "
-                "provider configuration could be read out of the dependency graph, "
-                "so there is no way to tell which identity to present. The run is "
-                "failed here rather than continuing under the agent pool's own "
-                "identity."
-            )
-
-        # Only the intersection. A configured target the root module never uses
-        # is not an error -- the mapping is per workspace and a configuration
-        # need not use every provider in it -- and a used provider nothing maps
-        # to is the common case for most providers in most workspaces.
-        wanted = sorted(set(configured) & used)
-        logger.info(
-            "cloud identity discovery",
-            configured=sorted(configured),
-            used=sorted(used),
-            minting_for=wanted,
-        )
-        if not wanted:
-            return {}
-
-        directory = token_dir or TOKEN_DIR
-        phase = ""
-        delivered: list[str] = []
-        for target in wanted:
-            minted = _request(
-                cfg,
-                client,
-                "POST",
-                f"{_base(cfg)}/cloud-identity-token",
-                # Through `params`, not interpolated into the URL. A target name
-                # is derived from the engine's graph output rather than written
-                # by us, so letting it reach the query string unencoded would
-                # make the engine's output able to shape the request.
-                params={"target": target},
-                what=f"minting the cloud identity token for {target!r}",
-            )
-            if minted is None:
-                # Raced: the mapping lost this target between the two calls.
-                # Not a failure -- nothing now maps to it, which is the same
-                # answer as never having been configured for it.
-                logger.info("cloud identity target no longer maps", target=target)
-                continue
-
-            token = minted.get("token") or ""
-            if not token:
-                raise CloudIdentityUnavailable(
-                    f"The API answered 200 for {target!r} but the response carried no token."
-                )
-
-            path = directory / target / "token"
-            try:
-                _write_private(path, token)
-            except OSError as exc:
-                raise CloudIdentityUnavailable(
-                    f"Could not write this run's cloud identity token for {target!r} "
-                    f"to {path}: {exc}."
-                ) from exc
-
-            phase = phase or (minted.get("phase") or "")
-            delivered.append(target)
-            # The audiences, not the token. Which identity a run presented is
-            # exactly what a cloud audit log cannot tell you today, so it is
-            # worth having on our side; the token itself never reaches a log,
-            # because the runner streams stdout verbatim and a JWT in a log line
-            # is a credential in a log line.
-            logger.info(
-                "cloud identity token delivered",
-                target=target,
-                path=str(path),
-                audiences=minted.get("audiences"),
-                expires_in=minted.get("expires_in"),
-            )
     finally:
         if own_client:
             client.close()
 
-    if not delivered:
+    # 204, or a body carrying no tokens: this run mints nothing -- the issuer is
+    # not published, the workspace holds no identity, or nothing it holds is
+    # used by this configuration. Fall through to the agent pool's identity,
+    # exactly as before this feature existed.
+    minted = (body or {}).get("tokens") or []
+    if not minted:
         return {}
 
-    phase = phase or cfg.phase or ""
+    directory = token_dir or TOKEN_DIR
+    delivered: list[str] = []
+    for entry in minted:
+        target = str(entry.get("target") or "")
+        token = entry.get("token") or ""
+        if not target or not token:
+            raise CloudIdentityUnavailable(
+                "The API returned a cloud identity entry with no target or no token, "
+                "so there is no way to tell which identity it is for."
+            )
+
+        path = directory / target / "token"
+        try:
+            _write_private(path, token)
+        except OSError as exc:
+            raise CloudIdentityUnavailable(
+                f"Could not write this run's cloud identity token for {target!r} to {path}: {exc}."
+            ) from exc
+
+        delivered.append(target)
+        # The audiences, not the token. Which identity a run presented is
+        # exactly what a cloud audit log cannot tell you today, so it is worth
+        # having on our side; the token itself never reaches a log, because the
+        # runner streams stdout verbatim and a JWT in a log line is a credential
+        # in a log line.
+        logger.info(
+            "cloud identity token delivered",
+            target=target,
+            path=str(path),
+            audiences=entry.get("audiences"),
+        )
+
+    phase = (body or {}).get("phase") or cfg.phase or ""
     env = {TOKEN_DIR_ENV: str(directory), TOKEN_DIR_TFVAR_ENV: str(directory)}
     if phase:
         env[PHASE_ENV] = phase

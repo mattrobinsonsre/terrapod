@@ -11,11 +11,17 @@ a multi-valued `aud` outright, so a test that lets a second target's audience
 into `aud` is testing the bug this shape exists to remove.
 
 The third is that the outcomes stay distinguishable. The runner behaves
-completely differently on each — take no action, deliver the token, fail the run
-— so collapsing "nothing maps here" into an error, or an error into a 204,
-breaks the feature in opposite directions. **A target-less request is 204 and
-not 400**, because that is a lagging runner image and the designed behaviour is
-that it falls through to the agent pool's identity rather than failing the run.
+completely differently on each — take no action, deliver the tokens, fail the
+run — so collapsing "nothing maps here" into an error, or an error into a 204,
+breaks the feature in opposite directions. **A request naming no providers is
+204 and not 400**, because a configuration may legitimately declare none, and
+failing it would break a run that was never using this feature.
+
+The fourth arrived with the restructure: the runner discovers unconditionally
+and reports whether it could trust its own answer, because only this end knows
+whether a graph it could not read matters. **The order is load-bearing** — a
+workspace holding no identity is answered 204 before the outcome is examined,
+so a graph failure never fails a run that does not federate.
 
 Fixtures are production-shaped on purpose: the run's snapshot is DERIVED from
 the catalogue and the workspace override by the same resolver the API uses, so
@@ -108,25 +114,56 @@ def _db(run, ws):
     return db
 
 
-async def _call(user, run, ws, *, target="aws", issuer="https://terrapod.example.com", cfg=None):
+async def _call(
+    user,
+    run,
+    ws,
+    *,
+    target="aws",
+    providers=None,
+    discovery="ok",
+    detail="",
+    issuer="https://terrapod.example.com",
+    cfg=None,
+):
+    """Drive the batched mint.
+
+    `target` is the single-target convenience most tests want; `providers` sends
+    a list verbatim, including the empty one. `captured["claims"]` is the last
+    claim set signed, and `captured["all"]` every one -- so a single-target test
+    reads as it always did and a batched test can check each.
+    """
     settings = MagicMock()
     settings.auth.oidc_issuer = cfg or _enabled()
-    captured: dict = {}
+    captured: dict = {"all": []}
 
     def _sign(claims, *, ttl_seconds):
         captured["claims"] = claims
         captured["ttl"] = ttl_seconds
+        captured["all"].append(claims)
         return "signed.jwt.value"
+
+    if providers is None:
+        providers = [target] if target else []
+    payload = router.CloudIdentityMintRequest(
+        providers=providers, discovery=discovery, **{"discovery-detail": detail}
+    )
 
     with (
         patch("terrapod.config.settings", settings),
         patch("terrapod.auth.oidc_signing.sign_identity_token", _sign),
         patch("terrapod.api.routers.oidc_issuer.issuer_url", return_value=issuer),
     ):
-        resp = await router.mint_cloud_identity_token(
-            run_id=f"run-{run.id}", target=target, user=user, db=_db(run, ws)
+        resp = await router.mint_cloud_identity_tokens(
+            payload=payload, run_id=f"run-{run.id}", user=user, db=_db(run, ws)
         )
     return resp, captured
+
+
+def _tokens(resp) -> list[dict]:
+    import json
+
+    return json.loads(resp.body)["tokens"]
 
 
 class TestNothingToDeliver:
@@ -157,18 +194,18 @@ class TestNothingToDeliver:
         assert resp.status_code == 204
         assert "claims" not in captured
 
-    async def test_a_request_with_NO_target_is_204_not_400(self):
-        """A runner image older than per-target minting sends no target.
+    async def test_a_request_naming_NO_PROVIDERS_is_204_not_400(self):
+        """A configuration that declares no provider, reported as `ok`.
 
-        400 is the obvious answer and it would make every run on a lagging
-        runner FAIL, when the designed behaviour is falling through to the agent
-        pool's own identity exactly as before this feature existed. The
-        fall-through is permanent and supported, so a request we cannot serve
-        has to look like "nothing here" rather than like a fault.
+        It cannot reach a cloud, so it needs no token -- and 400 would make
+        every such run FAIL when the designed behaviour is falling through to
+        the agent pool's own identity exactly as before this feature existed.
+        The fall-through is permanent and supported, so a request we cannot
+        serve has to look like "nothing here" rather than like a fault.
         """
         ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
         resp, captured = await _call(
-            _user(run_id=str(run.id), phase="plan"), run, ws, target="", cfg=cfg
+            _user(run_id=str(run.id), phase="plan"), run, ws, providers=[], cfg=cfg
         )
         assert resp.status_code == 204
         assert "claims" not in captured
@@ -294,21 +331,25 @@ class TestThePhaseComesFromTheToken:
         assert captured["claims"]["phase"] == phase
         assert captured["claims"]["sub"] == f"workspace:dns-prod:phase:{phase}"
 
-    async def test_the_endpoint_takes_no_body_at_all(self):
-        """Asserted on the signature rather than behaviourally: a `body`
-        parameter is the thing that would let a runner name its own phase, so
-        its ABSENCE is the guarantee. A behavioural test cannot see a parameter
-        that was added but ignored today and read tomorrow.
+    async def test_the_body_cannot_NAME_A_PHASE_or_anything_else(self):
+        """The endpoint takes a body now, so the guarantee moves to its shape.
 
-        `target` is a query parameter and names a provider configuration, not an
-        identity — it selects which of the run's own already-resolved entries to
-        mint, and cannot introduce one.
+        Asserted on the model rather than behaviourally, because a behavioural
+        test cannot see a field that was added but ignored today and read
+        tomorrow. Two halves: the field set is exactly what discovery reports,
+        and `extra="forbid"` means a runner cannot smuggle a phase past it even
+        as an unknown key. `providers` names provider configurations, not
+        identities -- it selects which of the run's own already-resolved entries
+        to mint, and cannot introduce one.
         """
-        import inspect
+        fields = set(router.CloudIdentityMintRequest.model_fields)
+        assert fields == {"providers", "discovery", "discovery_detail"}
+        assert "phase" not in fields
+        assert router.CloudIdentityMintRequest.model_config["extra"] == "forbid"
+        import pydantic
 
-        params = inspect.signature(router.mint_cloud_identity_token).parameters
-        assert "body" not in params
-        assert set(params) == {"run_id", "target", "user", "db"}
+        with pytest.raises(pydantic.ValidationError):
+            router.CloudIdentityMintRequest(providers=["aws"], phase="apply")
 
     async def test_a_token_with_no_phase_claim_mints_a_token_with_no_phase(self):
         """A runner token minted before the phase claim existed carries none.
@@ -348,9 +389,7 @@ class TestTheClaimSet:
         resp, _c = await _call(
             _user(run_id=str(run.id), phase="plan"), run, ws, target="vault.eu", cfg=cfg
         )
-        import json
-
-        assert json.loads(resp.body)["target"] == "vault.eu"
+        assert _tokens(resp)[0]["target"] == "vault.eu"
 
     async def test_no_credential_material_is_in_the_claims(self):
         """Claims are published to a third party by definition — the cloud reads
@@ -387,82 +426,224 @@ class TestTheAuthBoundary:
         assert exc.value.status_code == 403
 
 
-async def _call_targets(user, run, ws, *, cfg=None):
-    settings = MagicMock()
-    settings.auth.oidc_issuer = cfg or _enabled()
-    with patch("terrapod.config.settings", settings):
-        return await router.list_cloud_identity_targets(
-            run_id=f"run-{run.id}", user=user, db=_db(run, ws)
-        )
+class TestOneRequestNotOnePerTarget:
+    """The restructure. The runner discovers unconditionally and sends its list
+    once; the API holds the mapping, so computing the intersection is its job.
 
-
-class TestTheTargetsRoute:
-    """Names only, from the snapshot, so the runner can skip the engine.
-
-    This route exists so a workspace that mints nothing never invokes `tofu
-    graph` — which is what keeps the feature from adding cost, or a new way to
-    fail, to the overwhelming majority of runs. It is also why failing closed on
-    a discovery error is correct: by the time the runner asks the engine, this
-    route has already said the operator asked for federation.
+    This replaces a gate route that answered "which targets does this run mint
+    for?" so the runner could skip the engine. The gate was the wrong trade: it
+    made every federated run pay two hops to save one engine invocation on the
+    runs that are not federated, and the engine's graph is a static walk needing
+    no network, no credentials and no state.
     """
 
-    async def test_the_configured_targets_are_listed_sorted(self):
-        ws, run, cfg = _scenario(catalogue={"vault": ["https://vault"], "aws": [AWS]})
-        resp = await _call_targets(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg)
+    async def test_every_discovered_provider_that_maps_gets_its_own_token(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azurerm": [AZURE]})
+        resp, captured = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["aws", "azurerm"],
+            cfg=cfg,
+        )
         assert resp.status_code == 200
+        assert [t["target"] for t in _tokens(resp)] == ["aws", "azurerm"]
+        assert [c["aud"] for c in captured["all"]] == [[AWS], [AZURE]]
+
+    async def test_each_token_carries_only_its_own_audience(self):
+        """The same property as the single-target case, which the batch is the
+        place it could regress: one loop body reusing the previous `aud` would
+        hand both targets a token the other could replay."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azurerm": [AZURE]})
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["aws", "azurerm"],
+            cfg=cfg,
+        )
+        by_target = {t["target"]: t["audiences"] for t in _tokens(resp)}
+        assert by_target == {"aws": [AWS], "azurerm": [AZURE]}
+
+    async def test_only_the_intersection_is_minted(self):
+        """Discovered three, the workspace maps two. Not an error either way: a
+        mapping need not cover every provider a configuration uses, and a
+        configuration need not use every provider in the mapping."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "vault": ["tp"]})
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["aws", "vault", "google"],
+            cfg=cfg,
+        )
+        assert [t["target"] for t in _tokens(resp)] == ["aws", "vault"]
+
+    async def test_an_ALIASED_provider_resolves_through_the_general_entry(self):
+        """The bug the batch introduced, and the reason the intersection is a
+        resolver call rather than a set operation.
+
+        `vault.eu` is answered by the `vault` entry -- which is what lets an
+        operator alias a provider five times without naming every alias -- so
+        `set(providers) & set(snapshot)` looks equivalent and silently mints
+        nothing for every aliased configuration in the fleet.
+        """
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "vault": ["tp"]})
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["aws", "vault.eu"],
+            cfg=cfg,
+        )
+        assert resp.status_code == 200
+        by_target = {t["target"]: t["audiences"] for t in _tokens(resp)}
+        assert by_target == {"aws": [AWS], "vault.eu": ["tp"]}
+
+    async def test_a_specific_alias_entry_still_wins_in_a_batch(self):
+        ws, run, cfg = _scenario(catalogue={"vault": ["general"], "vault.eu": ["eu-only"]})
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["vault", "vault.eu"],
+            cfg=cfg,
+        )
+        by_target = {t["target"]: t["audiences"] for t in _tokens(resp)}
+        assert by_target == {"vault": ["general"], "vault.eu": ["eu-only"]}
+
+    async def test_nothing_in_common_is_204(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        resp, captured = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, providers=["google"], cfg=cfg
+        )
+        assert resp.status_code == 204
+        assert captured["all"] == []
+
+    async def test_the_tokens_come_back_in_a_stable_order(self):
+        """So the runner's log and ours can be compared, and so a test that
+        reads `tokens[0]` is not a coin toss."""
+        ws, run, cfg = _scenario(catalogue={"vault": ["v"], "aws": [AWS], "azurerm": [AZURE]})
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["vault", "aws", "azurerm"],
+            cfg=cfg,
+        )
+        assert [t["target"] for t in _tokens(resp)] == ["aws", "azurerm", "vault"]
+
+    async def test_a_repeated_provider_mints_once(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        resp, captured = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=["aws", "aws", "aws"],
+            cfg=cfg,
+        )
+        assert len(_tokens(resp)) == 1
+        assert len(captured["all"]) == 1
+
+    async def test_the_request_is_bounded(self):
+        """The names come out of the engine's graph rather than from us, and a
+        runner token is a credential a run holds rather than a reason to trust
+        its body. The runner caps its list too; this caps it again."""
+        import pydantic
+
+        with pytest.raises(pydantic.ValidationError):
+            router.CloudIdentityMintRequest(
+                providers=[f"p{i}" for i in range(router.MAX_TARGETS + 1)]
+            )
+
+    async def test_the_phase_is_the_tokens_once_for_the_whole_batch(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "vault": ["v"]})
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, providers=["aws", "vault"], cfg=cfg
+        )
         import json
 
-        assert json.loads(resp.body)["targets"] == ["aws", "vault"]
+        assert json.loads(resp.body)["phase"] == "apply"
 
-    async def test_the_audiences_are_never_returned(self):
-        """An audience is the value a cloud trust policy matches on, so the set
-        of them names the roles this deployment can ask to assume. The runner
-        writes a file and the engine reads it — it has no use for them, so they
-        stay in the mint response and are never enumerable."""
-        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azure": [AZURE]})
-        resp = await _call_targets(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg)
-        body = resp.body.decode()
-        assert AWS not in body
-        assert AZURE not in body
 
-    async def test_an_empty_mapping_is_204(self):
+class TestADiscoveryTheRunnerCouldNotTrust:
+    """`failed` and `unparsed` both arrive as an empty provider list, which is
+    indistinguishable from a provider-less configuration -- so taking them at
+    face value would be a silent fall-through to the agent pool's broader
+    identity for exactly the workspaces deliberately moved off it.
+
+    The ORDER is the whole design: a workspace holding no identity is answered
+    204 before the outcome is examined, so a graph failure can never fail a run
+    that was not using this feature. That is what makes reporting the outcome
+    safe rather than a new way for every run in the fleet to break.
+    """
+
+    @pytest.mark.parametrize("outcome", ["failed", "unparsed"])
+    async def test_it_is_refused_when_the_workspace_holds_identity(self, outcome):
+        from fastapi import HTTPException
+
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        with pytest.raises(HTTPException) as exc:
+            await _call(
+                _user(run_id=str(run.id), phase="apply"),
+                run,
+                ws,
+                providers=[],
+                discovery=outcome,
+                detail="tofu graph exited 1. Error: Could not load plugin",
+                cfg=cfg,
+            )
+        assert exc.value.status_code == 409
+        assert outcome in exc.value.detail
+        # The runner's own words, so the operator can see which graph failed and
+        # why rather than being told only that something did.
+        assert "Could not load plugin" in exc.value.detail
+
+    @pytest.mark.parametrize("outcome", ["failed", "unparsed"])
+    async def test_it_is_IGNORED_when_the_workspace_holds_none(self, outcome):
+        """The ordering, pinned. Examining the outcome first would fail every
+        run whose engine hiccupped, in a fleet where almost no workspace uses
+        this feature at all."""
         ws, run, cfg = _scenario()
-        resp = await _call_targets(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg)
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=[],
+            discovery=outcome,
+            cfg=cfg,
+        )
         assert resp.status_code == 204
 
-    async def test_a_disabled_issuer_is_204(self):
+    async def test_a_disabled_issuer_short_circuits_before_everything(self):
+        """An operator who has not published an issuer has not opted in, so a
+        graph failure cannot possibly matter to them."""
         ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
         cfg.enabled = False
-        resp = await _call_targets(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg)
+        resp, _c = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=[],
+            discovery="failed",
+            cfg=cfg,
+        )
         assert resp.status_code == 204
 
-    async def test_the_snapshot_is_listed_not_live_configuration(self):
-        """A target added to the workspace after this run was created is
-        deliberately absent: the plan was reviewed without it, and the mint
-        would refuse it anyway. Listing live configuration would have the runner
-        discover a target it then could not mint."""
-        ws, run, cfg = _scenario(catalogue={"aws": [AWS]}, snapshot={"aws": [AWS]})
-        ws.oidc_audiences = {"azure": [AZURE]}  # added since the run was created
-        resp = await _call_targets(_user(run_id=str(run.id), phase="plan"), run, ws, cfg=cfg)
-        import json
+    async def test_an_unknown_outcome_is_rejected_by_the_model(self):
+        """Not silently treated as `ok`. An outcome we do not recognise is a
+        runner newer than this API, and reading it as "the list is
+        authoritative" is the fall-through this whole mechanism prevents."""
+        import pydantic
 
-        assert json.loads(resp.body)["targets"] == ["aws"]
+        with pytest.raises(pydantic.ValidationError):
+            router.CloudIdentityMintRequest(providers=[], discovery="probably-fine")
 
-    async def test_a_session_user_is_refused(self):
-        from fastapi import HTTPException
-
-        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
-        with pytest.raises(HTTPException) as exc:
-            await _call_targets(_user(method="session"), run, ws, cfg=cfg)
-        assert exc.value.status_code == 403
-
-    async def test_a_runner_token_for_a_different_run_is_refused(self):
-        from fastapi import HTTPException
-
-        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
-        with pytest.raises(HTTPException) as exc:
-            await _call_targets(_user(run_id=str(uuid.uuid4()), phase="plan"), run, ws, cfg=cfg)
-        assert exc.value.status_code == 403
+    async def test_the_default_outcome_is_ok(self):
+        """So a body that omits it reads as "the list is authoritative" -- which
+        is correct for any caller that sends a list at all, and keeps the field
+        from being load-bearing for a client that does not know about it."""
+        assert router.CloudIdentityMintRequest(providers=["aws"]).discovery == "ok"
 
 
 async def _call_defaults(user, *, cfg=None):
@@ -569,11 +750,23 @@ class TestTheMintRecordsWhatItServed:
         assert resp.status_code == 200
         assert run.oidc_minted_targets == ["aws"]
 
-    async def test_several_targets_accumulate(self):
+    async def test_every_target_in_one_batch_is_recorded(self):
         ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azure": [AZURE]})
         run.oidc_minted_targets = []
-        for t in ("aws", "azure"):
-            await _call(_user(run_id=str(run.id), phase="plan"), run, ws, target=t, cfg=cfg)
+        await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, providers=["aws", "azure"], cfg=cfg
+        )
+        assert run.oidc_minted_targets == ["aws", "azure"]
+
+    async def test_a_second_batch_accumulates_rather_than_replacing(self):
+        """The apply phase re-mints what the plan did, and may use more. The
+        confirm check reads the union, so the plan's identities must survive."""
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS], "azure": [AZURE]})
+        run.oidc_minted_targets = []
+        await _call(_user(run_id=str(run.id), phase="plan"), run, ws, providers=["aws"], cfg=cfg)
+        await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, providers=["aws", "azure"], cfg=cfg
+        )
         assert run.oidc_minted_targets == ["aws", "azure"]
 
     async def test_a_repeat_mint_does_not_duplicate(self):
@@ -584,6 +777,14 @@ class TestTheMintRecordsWhatItServed:
         run.oidc_minted_targets = []
         for _ in range(3):
             await _call(_user(run_id=str(run.id), phase="plan"), run, ws, target="aws", cfg=cfg)
+        assert run.oidc_minted_targets == ["aws"]
+
+    async def test_a_batch_naming_a_target_twice_records_it_once(self):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        run.oidc_minted_targets = []
+        await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, providers=["aws", "aws"], cfg=cfg
+        )
         assert run.oidc_minted_targets == ["aws"]
 
     async def test_a_target_that_maps_to_nothing_is_not_recorded(self):

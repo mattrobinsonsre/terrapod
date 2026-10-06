@@ -1,24 +1,34 @@
 """The runner's cloud-identity credential phase (#1901).
 
-The phase makes two kinds of call and the split is the design: it asks the API
-which provider configurations this run mints for, and only then asks the engine
-which of them the root module actually uses. A workspace that mints nothing
-never reaches the engine at all, which is what keeps the feature from adding
-cost or a failure mode to the overwhelming majority of runs.
+Discovery is unconditional and the API is asked exactly once. That ordering is
+the design and these tests pin it: which providers a run uses is a property of
+the configuration, so only the runner can answer it, and which identities a
+workspace holds is a property of the platform, so only the API can -- so the
+intersection costs one hop whichever end sends its half. A gate request first
+("does this run mint anything?") would make every federated run pay two hops to
+save one engine invocation on the runs that are not federated, and the engine's
+graph is a static walk needing no network, no credentials and no state.
 
 The outcomes that must stay apart:
 
-* mints nothing (204, an empty list, or a 404 from an API that predates the
-  feature) -- no env, no files, no engine invocation, and the run proceeds on
-  the agent pool's identity;
+* mints nothing (204, no tokens, or a 404 from an API that predates the
+  feature) -- no env and no files, and the run proceeds on the agent pool's
+  identity;
 * mints and succeeds -- one private file per used target, under its own name;
 * mints and fails -- raises, because falling through does not mean no
   credentials, it means the pool's, which are broader than the ones the
   workspace was deliberately moved off.
+
+And the one the restructure introduced: because discovery now runs before the
+API has said whether anything is configured, a graph the runner could not read
+must be *reported* rather than acted on. The runner cannot know whether it
+matters; the API can.
 """
 
+import json
 import os
 import stat
+import subprocess
 
 import httpx
 import pytest
@@ -41,6 +51,18 @@ GRAPH = r"""digraph {
 }
 """
 
+# The same graph with the engine no longer escaping the quotes inside the node
+# string. Nothing matches, yet `provider[` is plainly there -- which is exactly
+# the distinction that separates "this configuration declares no provider" from
+# "we can no longer read the graph", and the only reason an empty result can be
+# trusted at all.
+GRAPH_FORMAT_MOVED = """digraph {
+\t\t"[root] provider["registry.opentofu.org/hashicorp/aws"]" [shape = "diamond"]
+}
+"""
+
+GRAPH_NO_PROVIDERS = 'digraph { "[root] terraform_data.a" -> "[root] root" }'
+
 
 def _cfg(**overrides):
     from terrapod.runner.runner_config import RunnerConfig as RC
@@ -61,52 +83,42 @@ def _client(handler) -> httpx.Client:
     return httpx.Client(transport=httpx.MockTransport(handler), base_url="https://api.example.com")
 
 
-def _api(*, targets, token_for=None, phase="plan"):
-    """An API that lists `targets` and mints for each one in `token_for`.
+def _api(*, mint=None, phase="plan"):
+    """An API that mints for each name in `mint`; `None` answers 204.
 
-    `token_for` defaults to every listed target. A target listed but absent from
-    it answers 204, which is the mapping having lost it between the two calls.
+    Returns the handler and a list the request bodies land in, so a test can
+    assert what the runner actually told the API -- which is the whole contract
+    now that the runner reports its discovery rather than acting on it.
     """
-    listed = (targets or []) if token_for is None else token_for
-    minted = {t: f"jwt-for-{t}" for t in listed}
-    seen: list[str] = []
+    sent: list[dict] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path.endswith("/cloud-identity-targets"):
-            seen.append("targets")
-            if targets is None:
-                return httpx.Response(204)
-            return httpx.Response(200, json={"targets": list(targets)})
-        target = request.url.params.get("target", "")
-        seen.append(f"mint:{target}")
-        if target not in minted:
+        sent.append(json.loads(request.content or b"{}"))
+        if mint is None:
             return httpx.Response(204)
         return httpx.Response(
             200,
             json={
-                "token": minted[target],
-                "target": target,
+                "tokens": [
+                    {"target": t, "token": f"jwt-for-{t}", "audiences": [f"aud-{t}"]} for t in mint
+                ],
                 "phase": phase,
-                "audiences": [f"aud-{target}"],
                 "expires_in": 900,
             },
         )
 
-    return handler, seen
+    return handler, sent
 
 
-def _never_discover(**_kwargs):
-    raise AssertionError(
-        "the engine must not be invoked when the workspace mints nothing — that "
-        "gating is what keeps this feature free for runs that do not use it"
-    )
+def _found(targets=(), *, outcome="ok", detail=""):
+    """A canned `Discovery`, with a counter so a test can prove it was called."""
+    calls: list[dict] = []
 
+    def discover_fn(*, binary, cwd):
+        calls.append({"binary": binary, "cwd": cwd})
+        return cloud_identity.Discovery(outcome=outcome, targets=set(targets), detail=detail)
 
-def _discover(targets):
-    def discover(*, binary, cwd):
-        return set(targets)
-
-    return discover
+    return discover_fn, calls
 
 
 class TestParsingTheGraph:
@@ -129,33 +141,209 @@ class TestParsingTheGraph:
         assert all("/" not in t for t in cloud_identity.parse_graph(GRAPH))
 
     def test_output_with_no_provider_node_reads_as_empty(self):
-        assert cloud_identity.parse_graph('digraph { "[root] x" -> "[root] y" }') == set()
+        assert cloud_identity.parse_graph(GRAPH_NO_PROVIDERS) == set()
+
+
+class TestClassifyingTheDiscovery:
+    """`discover` never raises, and the outcome it reports is the whole basis on
+    which the API decides whether an empty answer can be believed."""
+
+    def _proc(self, monkeypatch, *, rc=0, stdout="", stderr="", raises=None):
+        def fake_run(*args, **kwargs):
+            if raises is not None:
+                raise raises
+            return subprocess.CompletedProcess(args[0], rc, stdout=stdout, stderr=stderr)
+
+        monkeypatch.setattr(cloud_identity.subprocess, "run", fake_run)
+
+    def test_a_readable_graph_is_ok_and_authoritative(self, monkeypatch, tmp_path):
+        self._proc(monkeypatch, stdout=GRAPH)
+        found = cloud_identity.discover(binary="tofu", cwd=tmp_path)
+        assert found.outcome == "ok"
+        assert found.targets == {"aws", "aws.west", "vault"}
+
+    def test_a_configuration_with_no_provider_is_ok_and_empty(self, monkeypatch, tmp_path):
+        """A real answer, not a defect: a configuration declaring no provider
+        cannot reach a cloud, so it needs no token."""
+        self._proc(monkeypatch, stdout=GRAPH_NO_PROVIDERS)
+        found = cloud_identity.discover(binary="tofu", cwd=tmp_path)
+        assert found.outcome == "ok"
+        assert found.targets == set()
+
+    def test_provider_nodes_that_cannot_be_read_are_unparsed_not_empty(self, monkeypatch, tmp_path):
+        """The one case a target list cannot express. Reporting it as `ok` with
+        no targets would be a silent fall-through to the pool's identity for
+        exactly the workspaces that were moved off it."""
+        self._proc(monkeypatch, stdout=GRAPH_FORMAT_MOVED)
+        found = cloud_identity.discover(binary="tofu", cwd=tmp_path)
+        assert found.outcome == "unparsed"
+        assert found.targets == set()
+        assert "moved" in found.detail
+
+    def test_a_non_zero_exit_is_failed_and_carries_the_reason(self, monkeypatch, tmp_path):
+        self._proc(monkeypatch, rc=1, stderr="Error: Could not load plugin")
+        found = cloud_identity.discover(binary="tofu", cwd=tmp_path)
+        assert found.outcome == "failed"
+        assert "Could not load plugin" in found.detail
+
+    def test_a_missing_binary_is_failed_not_an_exception(self, monkeypatch, tmp_path):
+        self._proc(monkeypatch, raises=OSError("No such file or directory"))
+        found = cloud_identity.discover(binary="tofu", cwd=tmp_path)
+        assert found.outcome == "failed"
+
+    def test_a_timeout_is_failed_not_an_exception(self, monkeypatch, tmp_path):
+        self._proc(monkeypatch, raises=subprocess.TimeoutExpired("tofu", 180))
+        found = cloud_identity.discover(binary="tofu", cwd=tmp_path)
+        assert found.outcome == "failed"
+
+    def test_it_never_raises_whatever_the_engine_does(self, monkeypatch, tmp_path):
+        """It runs before the API has said whether this workspace holds any
+        identity, so raising here would fail runs that configure none."""
+        for boom in (
+            OSError("boom"),
+            subprocess.TimeoutExpired("tofu", 1),
+            subprocess.SubprocessError("boom"),
+        ):
+            self._proc(monkeypatch, raises=boom)
+            assert cloud_identity.discover(binary="tofu", cwd=tmp_path).outcome == "failed"
+
+
+class TestTheEngineIsAlwaysAsked:
+    """The restructure, pinned. Discovery is not gated behind a request to the
+    API, because only the runner can answer what the configuration uses and
+    sending that list up costs one hop rather than two."""
+
+    def test_discovery_runs_even_when_the_workspace_mints_nothing(self, tmp_path):
+        handler, sent = _api(mint=None)
+        discover_fn, calls = _found({"aws"})
+        env = cloud_identity.run(
+            _cfg(),
+            binary="tofu",
+            cwd=tmp_path,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+            discover_fn=discover_fn,
+        )
+        assert env == {}
+        assert len(calls) == 1, "the engine is asked before the API, unconditionally"
+        assert len(sent) == 1, "and the API is asked exactly once"
+
+    def test_the_discovered_providers_are_what_is_sent(self, tmp_path):
+        handler, sent = _api(mint=["aws"])
+        discover_fn, _ = _found({"vault", "aws", "aws.west"})
+        cloud_identity.run(
+            _cfg(),
+            binary="tofu",
+            cwd=tmp_path,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+            discover_fn=discover_fn,
+        )
+        assert sent[0]["providers"] == ["aws", "aws.west", "vault"], "sorted, for a stable log"
+        assert sent[0]["discovery"] == "ok"
+
+    def test_the_engine_is_asked_in_the_working_directory_it_is_given(self, tmp_path):
+        """Terragrunt moves the working directory during `init`, so discovery
+        must run against the relocated one rather than the original."""
+        handler, _ = _api(mint=None)
+        discover_fn, calls = _found()
+        moved = tmp_path / "relocated"
+        moved.mkdir()
+        cloud_identity.run(
+            _cfg(),
+            binary="tofu",
+            cwd=moved,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+            discover_fn=discover_fn,
+        )
+        assert calls[0]["cwd"] == moved
+        assert calls[0]["binary"] == "tofu"
+
+    def test_a_bad_discovery_is_reported_not_acted_on(self, tmp_path):
+        """The runner does not know whether it matters. A workspace holding no
+        identity must not have its run failed by a graph it never needed."""
+        handler, sent = _api(mint=None)
+        discover_fn, _ = _found(outcome="failed", detail="tofu graph exited 1. boom")
+        env = cloud_identity.run(
+            _cfg(),
+            binary="tofu",
+            cwd=tmp_path,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+            discover_fn=discover_fn,
+        )
+        assert env == {}
+        assert sent[0]["discovery"] == "failed"
+        assert "exited 1" in sent[0]["discovery-detail"]
+
+    def test_an_unparsed_discovery_is_reported_as_such(self, tmp_path):
+        handler, sent = _api(mint=None)
+        discover_fn, _ = _found(outcome="unparsed", detail="format moved")
+        cloud_identity.run(
+            _cfg(),
+            binary="tofu",
+            cwd=tmp_path,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+            discover_fn=discover_fn,
+        )
+        assert sent[0]["discovery"] == "unparsed"
+
+    def test_the_target_list_is_capped_on_the_way_out(self, tmp_path):
+        """The names come out of the engine's output rather than from us, so the
+        request is bounded here as well as at the API."""
+        handler, sent = _api(mint=None)
+        discover_fn, _ = _found({f"p{i:04d}" for i in range(cloud_identity.MAX_TARGETS + 50)})
+        cloud_identity.run(
+            _cfg(),
+            binary="tofu",
+            cwd=tmp_path,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+            discover_fn=discover_fn,
+        )
+        assert len(sent[0]["providers"]) == cloud_identity.MAX_TARGETS
+
+    def test_the_detail_is_truncated(self, tmp_path):
+        handler, sent = _api(mint=None)
+        discover_fn, _ = _found(outcome="failed", detail="x" * 5000)
+        cloud_identity.run(
+            _cfg(),
+            binary="tofu",
+            cwd=tmp_path,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+            discover_fn=discover_fn,
+        )
+        assert len(sent[0]["discovery-detail"]) == 400
 
 
 class TestTheWorkspaceMintsNothing:
-    def test_a_204_returns_no_env_and_never_touches_the_engine(self, tmp_path):
-        handler, seen = _api(targets=None)
+    def test_a_204_returns_no_env_and_writes_nothing(self, tmp_path):
+        handler, _ = _api(mint=None)
+        discover_fn, _ = _found({"aws"})
         env = cloud_identity.run(
             _cfg(),
             binary="tofu",
             cwd=tmp_path,
             token_dir=tmp_path / "oidc",
             client=_client(handler),
-            discover=_never_discover,
+            discover_fn=discover_fn,
         )
         assert env == {}
-        assert seen == ["targets"]
         assert not (tmp_path / "oidc").exists()
 
-    def test_an_empty_target_list_returns_no_env(self, tmp_path):
-        handler, _ = _api(targets=[])
+    def test_an_empty_token_list_returns_no_env(self, tmp_path):
+        handler, _ = _api(mint=[])
+        discover_fn, _ = _found({"aws"})
         env = cloud_identity.run(
             _cfg(),
             binary="tofu",
             cwd=tmp_path,
             token_dir=tmp_path / "oidc",
             client=_client(handler),
-            discover=_never_discover,
+            discover_fn=discover_fn,
         )
         assert env == {}
 
@@ -168,60 +356,48 @@ class TestTheWorkspaceMintsNothing:
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(404, text="Not Found")
 
+        discover_fn, _ = _found({"aws"})
         env = cloud_identity.run(
             _cfg(),
             binary="tofu",
             cwd=tmp_path,
             token_dir=tmp_path / "oidc",
             client=_client(handler),
-            discover=_never_discover,
+            discover_fn=discover_fn,
         )
         assert env == {}
 
-    def test_no_api_configured_returns_no_env(self, tmp_path):
+    def test_no_api_configured_returns_before_the_engine_is_touched(self, tmp_path):
+        """A degenerate invocation with no listener context. Nothing to ask and
+        nobody to ask, so there is no reason to pay for a graph."""
+        discover_fn, calls = _found({"aws"})
         env = cloud_identity.run(
             _cfg(TP_API_URL=""),
             binary="tofu",
             cwd=tmp_path,
             token_dir=tmp_path / "oidc",
-            discover=_never_discover,
+            discover_fn=discover_fn,
         )
         assert env == {}
-
-    def test_nothing_used_overlaps_what_is_configured(self, tmp_path):
-        """Configured for `gcp`, root module uses `aws`. Not an error: the
-        mapping is per workspace and a configuration need not use every
-        provider in it."""
-        handler, seen = _api(targets=["gcp"])
-        env = cloud_identity.run(
-            _cfg(),
-            binary="tofu",
-            cwd=tmp_path,
-            token_dir=tmp_path / "oidc",
-            client=_client(handler),
-            discover=_discover({"aws"}),
-        )
-        assert env == {}
-        assert seen == ["targets"]
+        assert calls == []
 
 
 class TestOneFilePerTarget:
-    def _run(self, tmp_path, *, targets, used, token_for=None):
-        handler, seen = _api(targets=targets, token_for=token_for)
+    def _run(self, tmp_path, *, mint, used=None, phase="plan"):
+        handler, sent = _api(mint=mint, phase=phase)
+        discover_fn, _ = _found(used if used is not None else mint)
         env = cloud_identity.run(
             _cfg(),
             binary="tofu",
             cwd=tmp_path,
             token_dir=tmp_path / "oidc",
             client=_client(handler),
-            discover=_discover(used),
+            discover_fn=discover_fn,
         )
-        return env, seen
+        return env, sent
 
-    def test_each_used_target_gets_its_own_file_under_its_own_name(self, tmp_path):
-        env, _ = self._run(
-            tmp_path, targets=["aws", "aws.west", "vault"], used={"aws", "aws.west", "vault"}
-        )
+    def test_each_target_gets_its_own_file_under_its_own_name(self, tmp_path):
+        env, _ = self._run(tmp_path, mint=["aws", "aws.west", "vault"])
         assert env[cloud_identity.TOKEN_DIR_ENV] == str(tmp_path / "oidc")
         for target in ("aws", "aws.west", "vault"):
             assert (tmp_path / "oidc" / target / "token").read_text() == f"jwt-for-{target}"
@@ -230,37 +406,34 @@ class TestOneFilePerTarget:
         """A token audienced for several targets is replayable between them, and
         AWS refuses a multi-valued `aud` outright — so there is deliberately no
         shared file beside the per-target ones."""
-        self._run(tmp_path, targets=["aws", "vault"], used={"aws", "vault"})
+        self._run(tmp_path, mint=["aws", "vault"])
         assert not (tmp_path / "oidc" / "token").exists()
         assert sorted(p.name for p in (tmp_path / "oidc").iterdir()) == ["aws", "vault"]
 
-    def test_only_the_intersection_is_minted(self, tmp_path):
-        """Configured for three, root module uses two: exactly two requests."""
-        _, seen = self._run(tmp_path, targets=["aws", "vault", "gcp"], used={"aws", "vault"})
-        assert seen == ["targets", "mint:aws", "mint:vault"]
-
-    def test_an_unused_alias_mints_nothing(self, tmp_path):
-        _, seen = self._run(tmp_path, targets=["aws", "aws.west"], used={"aws"})
-        assert seen == ["targets", "mint:aws"]
-        assert not (tmp_path / "oidc" / "aws.west").exists()
+    def test_only_what_the_api_served_is_written(self, tmp_path):
+        """The intersection is the API's to compute, not the runner's: it holds
+        the mapping. The runner writes exactly what came back."""
+        self._run(tmp_path, mint=["aws"], used={"aws", "aws.west", "vault"})
+        assert sorted(p.name for p in (tmp_path / "oidc").iterdir()) == ["aws"]
 
     def test_every_file_is_private(self, tmp_path):
-        self._run(tmp_path, targets=["aws", "vault"], used={"aws", "vault"})
+        self._run(tmp_path, mint=["aws", "vault"])
         for target in ("aws", "vault"):
             mode = (tmp_path / "oidc" / target / "token").stat().st_mode
             assert stat.S_IMODE(mode) == 0o600
 
-    def test_the_phase_is_exported_both_ways(self, tmp_path):
+    def test_the_phase_comes_from_the_api_not_the_runner(self, tmp_path):
         """HCL cannot otherwise see which phase it is in, and switching role by
-        phase is the whole point of the apply increment."""
-        env, _ = self._run(tmp_path, targets=["aws"], used={"aws"})
-        assert env[cloud_identity.PHASE_ENV] == "plan"
-        assert env[cloud_identity.PHASE_TFVAR_ENV] == "plan"
+        phase is the whole point of the apply increment. The API derives it from
+        the presented runner token, so its answer is the authority."""
+        env, _ = self._run(tmp_path, mint=["aws"], phase="apply")
+        assert env[cloud_identity.PHASE_ENV] == "apply"
+        assert env[cloud_identity.PHASE_TFVAR_ENV] == "apply"
 
     def test_the_directory_is_exported_as_a_tfvar_too(self, tmp_path):
         """So a configuration builds `"${var.terrapod_oidc_token_dir}/aws/token"`
         rather than hard-coding the path."""
-        env, _ = self._run(tmp_path, targets=["aws"], used={"aws"})
+        env, _ = self._run(tmp_path, mint=["aws"])
         assert env[cloud_identity.TOKEN_DIR_TFVAR_ENV] == str(tmp_path / "oidc")
 
     def test_no_per_cloud_env_is_set(self, tmp_path):
@@ -268,31 +441,15 @@ class TestOneFilePerTarget:
         coexistence with the pod's own IRSA: the Job spec carries no cloud
         credential env at all, and absence is what leaves a non-federating
         workspace's pool identity untouched."""
-        env, _ = self._run(tmp_path, targets=["aws"], used={"aws"})
+        env, _ = self._run(tmp_path, mint=["aws"])
         forbidden = ("AWS_", "AZURE_", "GOOGLE_", "GCP_", "VAULT_")
         assert not [k for k in env if k.startswith(forbidden)]
-
-    def test_a_target_that_stops_mapping_mid_phase_is_skipped_not_fatal(self, tmp_path):
-        """The two calls are not atomic. A 204 on the mint means nothing maps to
-        that target now, which is the same answer as never having been
-        configured for it — so the other targets still deliver."""
-        env, seen = self._run(
-            tmp_path, targets=["aws", "vault"], used={"aws", "vault"}, token_for=["aws"]
-        )
-        assert env[cloud_identity.TOKEN_DIR_ENV] == str(tmp_path / "oidc")
-        assert (tmp_path / "oidc" / "aws" / "token").exists()
-        assert not (tmp_path / "oidc" / "vault").exists()
-        assert seen == ["targets", "mint:aws", "mint:vault"]
-
-    def test_every_target_losing_its_mapping_returns_no_env(self, tmp_path):
-        env, _ = self._run(tmp_path, targets=["aws"], used={"aws"}, token_for=[])
-        assert env == {}
 
     def test_no_token_ever_reaches_a_log(self, tmp_path, capsys):
         """The runner streams stdout verbatim into the run log, so a JWT in a
         log line is a credential in a run log a reader with read access can
         fetch. The audiences are logged; the token is not."""
-        self._run(tmp_path, targets=["aws", "vault"], used={"aws", "vault"})
+        self._run(tmp_path, mint=["aws", "vault"])
         out = capsys.readouterr()
         combined = out.out + out.err
         assert "jwt-for-aws" not in combined
@@ -304,19 +461,20 @@ class TestItMintsAndFails:
     pool's identity, which is broader than the one the workspace was moved off,
     and the run would then succeed against real infrastructure."""
 
-    def _expect_raise(self, tmp_path, handler, *, discover=None):
+    def _expect_raise(self, tmp_path, handler, *, token_dir=None):
+        discover_fn, _ = _found({"aws"})
         with pytest.raises(cloud_identity.CloudIdentityUnavailable) as exc:
             cloud_identity.run(
                 _cfg(),
                 binary="tofu",
                 cwd=tmp_path,
-                token_dir=tmp_path / "oidc",
+                token_dir=token_dir or (tmp_path / "oidc"),
                 client=_client(handler),
-                discover=discover or _discover({"aws"}),
+                discover_fn=discover_fn,
             )
         return str(exc.value)
 
-    def test_a_500_on_the_targets_request_raises(self, tmp_path):
+    def test_a_500_raises_after_retrying(self, tmp_path):
         """Not advisory. Treating it as such would let anyone able to disrupt
         one call downgrade a workspace to the pool's identity without trace,
         and the runner cannot complete a run without the API in any case."""
@@ -326,80 +484,56 @@ class TestItMintsAndFails:
             calls.append(request.url.path)
             return httpx.Response(500, text="boom")
 
-        msg = self._expect_raise(tmp_path, handler, discover=_never_discover)
-        assert "targets" in msg
+        assert self._expect_raise(tmp_path, handler)
         assert len(calls) == 3, "retried three times"
 
-    def test_a_500_on_a_mint_raises_naming_the_target(self, tmp_path):
-        def handler(request: httpx.Request) -> httpx.Response:
-            if request.url.path.endswith("/cloud-identity-targets"):
-                return httpx.Response(200, json={"targets": ["aws"]})
-            return httpx.Response(500, text="boom")
-
-        assert "'aws'" in self._expect_raise(tmp_path, handler)
-
-    def test_a_4xx_on_a_mint_is_final_and_not_retried(self, tmp_path):
-        """A 409 is the configuration having moved under the run. Retrying a
-        refusal only delays the failure."""
-        mints = []
+    def test_a_409_is_final_and_not_retried_and_carries_the_reason(self, tmp_path):
+        """The API refuses for two reasons the operator must be able to tell
+        apart — the configuration moved under the run, or the graph could not be
+        read for a workspace that holds identity — so its own words are what
+        reach the run log. Retrying a refusal only delays the failure."""
+        calls = []
 
         def handler(request: httpx.Request) -> httpx.Response:
-            if request.url.path.endswith("/cloud-identity-targets"):
-                return httpx.Response(200, json={"targets": ["aws"]})
-            mints.append(1)
-            return httpx.Response(409, text="configuration changed, queue a new run")
+            calls.append(1)
+            return httpx.Response(409, text="has changed since this run was created")
 
         msg = self._expect_raise(tmp_path, handler)
-        assert len(mints) == 1
+        assert len(calls) == 1
         assert "409" in msg
+        assert "has changed since this run was created" in msg
 
     def test_a_connection_error_raises(self, tmp_path):
         def handler(request: httpx.Request) -> httpx.Response:
             raise httpx.ConnectError("no route to host")
 
-        assert self._expect_raise(tmp_path, handler, discover=_never_discover)
+        assert self._expect_raise(tmp_path, handler)
 
-    def test_a_200_with_no_token_raises(self, tmp_path):
+    def test_an_entry_with_no_token_raises(self, tmp_path):
         def handler(request: httpx.Request) -> httpx.Response:
-            if request.url.path.endswith("/cloud-identity-targets"):
-                return httpx.Response(200, json={"targets": ["aws"]})
-            return httpx.Response(200, json={"target": "aws", "expires_in": 900})
+            return httpx.Response(200, json={"tokens": [{"target": "aws"}], "phase": "plan"})
 
-        assert "no token" in self._expect_raise(tmp_path, handler)
+        assert "no target or no token" in self._expect_raise(tmp_path, handler)
+
+    def test_an_entry_with_no_target_raises(self, tmp_path):
+        """There would be no way to tell which identity the file is for, and
+        writing it under a guessed name is worse than failing."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"tokens": [{"token": "jwt"}], "phase": "plan"})
+
+        assert "no target or no token" in self._expect_raise(tmp_path, handler)
 
     def test_an_unwritable_path_raises_naming_the_path(self, tmp_path):
+        """The release blocker this very nearly shipped as: the container runs
+        with a read-only root filesystem, so the token directory must be under a
+        writable mount or every federated run fails here."""
         blocked = tmp_path / "blocked"
         blocked.mkdir(mode=0o500)
-        handler, _ = _api(targets=["aws"])
+        handler, _ = _api(mint=["aws"])
         try:
-            with pytest.raises(cloud_identity.CloudIdentityUnavailable) as exc:
-                cloud_identity.run(
-                    _cfg(),
-                    binary="tofu",
-                    cwd=tmp_path,
-                    token_dir=blocked / "oidc",
-                    client=_client(handler),
-                    discover=_discover({"aws"}),
-                )
-            assert "aws" in str(exc.value)
+            msg = self._expect_raise(tmp_path, handler, token_dir=blocked / "oidc")
+            assert "aws" in msg
+            assert str(blocked) in msg
         finally:
             os.chmod(blocked, 0o700)
-
-    def test_a_graph_naming_no_provider_at_all_raises(self, tmp_path):
-        """The run mints for something and discovery found nothing. A
-        configuration that reaches a cloud with no provider configuration does
-        not exist, so this is the parser or the engine's output having moved —
-        and failing is what stops that becoming a silent fall-through."""
-        handler, _ = _api(targets=["aws"])
-        msg = self._expect_raise(tmp_path, handler, discover=_discover(set()))
-        assert "dependency graph" in msg
-
-    def test_a_discovery_failure_raises(self, tmp_path):
-        """By this point the operator has asked for federation, so a graph we
-        cannot read means we cannot tell which identity to present."""
-
-        def broken(*, binary, cwd):
-            raise cloud_identity.CloudIdentityUnavailable("tofu graph exited 1")
-
-        handler, _ = _api(targets=["aws"])
-        assert "graph" in self._expect_raise(tmp_path, handler, discover=broken)
