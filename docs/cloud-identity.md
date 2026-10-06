@@ -327,10 +327,22 @@ and accepting it would let an operator believe they had suppressed a target when
 they had not. An empty *map* still means something different again — it drops
 every override — and is valid.
 
-> **The API returns the workspace's own override, not the merged result.** The
-> merge happens when a run is created (snapshotted onto the run) and again at
-> mint time. So reading `oidc-audiences` off a workspace tells you what that
-> workspace overrides, and the catalogue tells you what it inherits.
+> **A workspace read returns the MERGED map, not the stored override.** Reading
+> `oidc-audiences` off a workspace tells you the audiences that workspace would
+> actually present, which is the question almost everyone is asking — an absent
+> key would otherwise be ambiguous between "inherits the catalogue" and "there is
+> nothing here". The catalogue endpoint below is how you tell the two apart.
+>
+> **A client that writes the merged map straight back promotes every inherited
+> entry into an override.** A `PATCH` replaces the stored override wholesale, so
+> a consumer that round-trips the read has to subtract the catalogue first and
+> send only what the workspace owns. The Terraform provider does exactly this:
+> it reconciles only the keys the practitioner declared and ignores the rest,
+> the same way `aws_instance.tags` round-trips what you set while
+> `default_tags` are merged in beneath it. The one case neither can
+> distinguish is an override whose value happens to equal the catalogue's —
+> it reads as inherited, which changes nothing, because dropping it falls back
+> to the identical default.
 
 ### Seeing what you would inherit
 
@@ -364,10 +376,30 @@ minted nothing"), and only one of them is fixed by adding audiences. An empty
 
 Knowing an audience grants nothing on its own — the federation target's own
 trust policy is the gate, and minting needs a phase-bound runner token scoped to
-a run on that workspace. Note the deliberate asymmetry with the runner-facing
-targets endpoint, which returns target **names only**: a runner writes a file
-and the engine reads it, so it has no use for the values, whereas the set of
-audiences names the roles this deployment can ask to assume.
+a run on that workspace. What the runner-facing mint does *not* return is the
+catalogue: it echoes the audiences for the targets that run actually uses,
+because it asked for exactly those, and never enumerates the rest. The whole set
+names the roles this deployment can ask to assume, so it stays on the surface a
+person reads rather than the one a Job holds a token for.
+
+The same catalogue is a Terraform data source, which is how you compose a trust
+policy from it without hard-coding the audience in two places:
+
+```hcl
+data "terrapod_oidc_audience_defaults" "deployment" {}
+
+output "what_i_would_inherit" {
+  value = data.terrapod_oidc_audience_defaults.deployment.audiences
+}
+```
+
+**`terrapod_workspace.oidc_audiences` holds what you set, not the effective
+map.** The API returns the merged result, so the resource reconciles only the
+keys your configuration declares and ignores the rest — otherwise a plan would
+disagree with its own apply the moment the catalogue held a key the workspace
+did not override. It is the same arrangement as `aws_instance.tags` beside the
+provider's `default_tags`. The effective map is on the `terrapod_workspace`
+**data source**, which has no round-trip requirement and so can carry it.
 
 ### Limits and validation
 
@@ -452,27 +484,54 @@ and a JWT in a log is a credential in a log — so the run log records which
 
 ## How the runner knows which tokens to fetch
 
-Three steps, all after `init`:
+Two steps, both after `init`:
 
-1. **Ask the API which targets this run mints for.** `GET
-   /api/terrapod/v1/runs/{run_id}/cloud-identity-targets` returns the target
-   *names* from the run's snapshot. `204` means this run mints nothing, and the
-   runner stops here without invoking the engine at all — which is why the
-   feature adds no cost and no new failure mode to a run that does not use it.
-   The response carries **names only, never audiences**.
-2. **Ask the engine which provider configurations the root module uses**, by
+1. **Ask the engine which provider configurations the root module uses**, by
    running its own graph command (`tofu graph`, or `terraform graph`, whichever
    binary the run uses). The engine prunes provider configurations nothing
    references, so a `provider "aws" { alias = "unused" }` nobody points at
-   yields no token, correctly. The graph build is allowed **180 seconds**.
-3. **Mint the intersection.** `POST
-   /api/terrapod/v1/runs/{run_id}/cloud-identity-token?target=<target>`, once per
-   target that is both configured and used, writing each answer to its own path.
+   yields no token, correctly. The graph build is allowed **180 seconds**. It is
+   a static walk of the configuration: it needs no network, no credentials and
+   no state, and it answers even for a configuration whose `plan` would refuse
+   for a missing required variable.
+2. **Ask the API for the tokens, once.** `POST
+   /api/terrapod/v1/runs/{run_id}/cloud-identity-tokens`, carrying the
+   discovered list, returns one token per provider configuration that is both
+   discovered and mapped. `204` means there is nothing to deliver.
 
-A configured target the root module never uses is not an error — the mapping is
-per workspace and a configuration need not use every provider in it. A used
-provider that nothing maps to is the common case for most providers in most
-workspaces.
+**This runs on every run, not only on federated ones**, and that is deliberate.
+Which providers a run uses is a property of the configuration, so only the runner
+can answer it; which identities a workspace holds is a property of the platform,
+so only the API can. Resolving the intersection therefore costs one request
+whichever end sends its half — and asking the API first ("does this run mint
+anything?") would make every federated run pay two round trips in order to save
+one graph invocation on the runs that are not federated. The graph is close to
+free; the extra round trip is not.
+
+A mapped target the root module never uses is not an error — the mapping is per
+workspace and a configuration need not use every provider in it. A used provider
+that nothing maps to is the common case for most providers in most workspaces.
+
+### What the runner reports about its own discovery
+
+Because discovery now runs *before* the API has said whether this workspace
+holds any identity, the runner reports **how much it trusts its own answer**
+rather than acting on it. The request carries one of three outcomes:
+
+| `discovery` | Meaning |
+|---|---|
+| `ok` | The graph was read. The list is authoritative, and may be empty — a configuration that declares no provider needs no token |
+| `failed` | The graph command errored or timed out |
+| `unparsed` | The graph ran and names provider nodes, but none could be read — the engine's output format has moved, or the pattern that reads it has |
+
+The last two matter because **both arrive as an empty list**, which is
+indistinguishable from a provider-less configuration. Taken at face value they
+would be a silent fall-through to the agent pool's broader identity for exactly
+the workspaces that were deliberately moved off it. Only the API can judge them,
+because only the API knows whether the workspace holds any identity — so it
+answers `204` for a workspace that holds none **before** it looks at the outcome,
+and `409` for one that does. A graph failure therefore cannot fail a run that was
+not using this feature.
 
 ### Why after `init`, and what it costs
 
@@ -494,12 +553,14 @@ be failed for a non-local backend should not mint credentials first.
 
 | Situation | What happens |
 |---|---|
-| The run maps no targets (`204`) | The runner takes no action and does not invoke the engine. The run uses the pool's identity. **Normal, and permanent** |
+| The run maps no targets (`204`) | The runner takes no action. The run uses the pool's identity. **Normal, and permanent** |
 | The issuer is not enabled deployment-wide (`204`) | The same outcome — an operator who has not published an issuer has not opted this deployment in |
-| The API does not serve the targets endpoint (`404`) | Read as "nothing to do". An API older than this runner image, and in agent mode the control plane and a runner in another cluster upgrade independently |
-| Nothing maps to one requested target (`204`) | That target is skipped. The others are still delivered |
-| The run maps targets, but the root module uses none of them | No token is written, and no environment variable is exported. The run uses the pool's identity — a configured target a configuration never uses is not an error |
-| The graph command fails, or names no provider at all | **The run fails**, naming the engine's own error. A configuration that reaches a cloud with no provider configuration does not exist, so an empty graph means our parser or the engine's output has moved — and failing is what stops that becoming a silent fall-through |
+| The API does not serve the endpoint (`404`) | Read as "nothing to do". An API older than this runner image, and in agent mode the control plane and a runner in another cluster upgrade independently |
+| The configuration declares no provider (`204`) | Nothing to mint. It cannot reach a cloud, so it needs no token |
+| The run maps targets, but the root module uses none of them (`204`) | No token is written, and no environment variable is exported. The run uses the pool's identity — a mapped target a configuration never uses is not an error |
+| The graph fails or cannot be read, and the workspace maps **nothing** | Nothing happens. The outcome is reported and ignored, because it cannot matter to a run that was not going to mint anything |
+| The graph fails or cannot be read, and the workspace **maps targets** (`409`) | **The run fails**, carrying the engine's own error. There is no way to tell which identity to present, and falling through would hand the run the pool's broader credentials |
+| The configuration moved since the run was created (`409`) | **The run fails**, naming the targets whose audiences changed. Queue a new run |
 | The run maps targets and **anything else fails** | **The run fails.** Credentials were asked for and could not be had |
 | The runner image predates the feature | Nothing is asked for. The run uses the pool's identity and reports success. **See [the honest limitation](#the-honest-limitation-a-runner-image-that-predates-this-feature)** |
 
@@ -1054,8 +1115,7 @@ quietly widening it.
 |---|---|---|
 | `GET /.well-known/openid-configuration` | **None** | Discovery document. Mounted only when enabled. `Cache-Control: max-age=300` |
 | `GET /.well-known/jwks.json` | **None** | The published signing keys. `max-age` is half `key_propagation_seconds` |
-| `GET /api/terrapod/v1/runs/{run_id}/cloud-identity-targets` | Runner token, scoped to that run | Which provider configurations this run mints for — **names only, never audiences**. `204` when it mints nothing |
-| `POST /api/terrapod/v1/runs/{run_id}/cloud-identity-token?target=<target>` | Runner token, scoped to that run | Mint one target's token. `204` when nothing maps to it; `409` when the configuration moved since the run was created |
+| `POST /api/terrapod/v1/runs/{run_id}/cloud-identity-tokens` | Runner token, scoped to that run | Mint one token per provider configuration the run discovered. `204` when there is nothing to deliver; `409` when the configuration moved since the run was created, or when the graph could not be read for a workspace that maps targets |
 | `GET /api/terrapod/v1/oidc/audience-defaults` | Any authenticated user | The deployment's audience catalogue a workspace's map merges over, plus `issuer-enabled` |
 | `GET /api/terrapod/v1/oidc/signing-keys` | Platform admin | What is published, and which key signs. Public key material only |
 | `POST /api/terrapod/v1/oidc/signing-keys/actions/rotate` | Platform admin | Add a key, retire the current one |

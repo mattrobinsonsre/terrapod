@@ -18,6 +18,7 @@ import (
 	catalogInstancesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_instances"
 	catalogItemInterfaceDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_item_interface"
 	moduleRuleRepositoriesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/module_autodiscovery_rule_repositories"
+	oidcAudienceDefaultsDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/oidc_audience_defaults"
 	roleDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/role"
 	userDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/user"
 	vcsConnectionDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/vcs_connection"
@@ -205,5 +206,6 @@ func (p *terrapodProvider) DataSources(_ context.Context) []func() datasource.Da
 		moduleRuleRepositoriesDS.NewDataSource,
 		vcsConnectionDS.NewDataSource,
 		userDS.NewDataSource,
+		oidcAudienceDefaultsDS.NewDataSource,
 	}
 }
