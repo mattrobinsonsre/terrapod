@@ -1050,7 +1050,7 @@
       "varFiles": "變數檔案（由所建立的工作區繼承）",
       "varFilesHint": "傳遞給 plan/apply 的相對 <code>.tfvars</code> 路徑。",
       "oidcAudiences": "執行身分受眾（由所建立的工作區繼承）",
-      "oidcAudiencesHint": "此規則建立的每個工作區為之簽發執行身分權杖的受眾。留空則不簽發任何權杖。",
+      "oidcAudiencesHint": "套用到此規則建立的每個工作區上的受眾覆寫，以權杖所對應的 provider 設定為鍵 — aws，或帶別名的設定用 aws.west。留空則這些工作區使用部署自身的設定。",
       "addVarFile": "新增變數檔案",
       "executionHooks": "執行鉤子（與每個新工作區關聯）",
       "executionHooksHint": "從<page>執行鉤子</page>管理頁面定義的鉤子中選擇 — 每個選中的鉤子都會與此規則建立的每個工作區關聯。",
@@ -1269,7 +1269,7 @@
       "setLabels": "設定標籤（替換每個匹配工作區上的標籤對映）",
       "setVarFiles": "設定變數檔案",
       "addVarFile": "新增變數檔案",
-      "setOidcAudiences": "設定執行身分受眾（替換每個相符工作區上的清單；空清單會關閉執行身分）",
+      "setOidcAudiences": "設定執行身分受眾（替換每個相符工作區上的覆寫；空映射會將其清除，於是每個 provider 回退到部署的設定）",
       "setRunTasks": "設定執行任務（在每個匹配工作區上按名稱更新插入）",
       "setNotifications": "設定通知配置（按名稱更新插入）",
       "dryRun": "試執行（僅預覽 — 不寫入任何更改）",
@@ -1922,6 +1922,14 @@
       "triggers": "觸發器",
       "addNotification": "新增通知"
     },
+    "oidcAudiences": {
+      "audiences": "受眾",
+      "addProvider": "新增 provider 設定",
+      "providerPlaceholder": "aws，或 aws.west",
+      "providerInvalid": "provider 名稱不含空格，且最多一個點 — aws，或 aws.west。",
+      "providerDuplicate": "該 provider 設定已有一筆項目。",
+      "removeProviderAria": "移除 provider 設定 {provider}"
+    },
     "autoApplyMode": {
       "never": "從不",
       "always": "一律",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "由漂移分類器抑制的、支援萬用字元的 Terraform 地址 + 屬性路徑。<star></star> 匹配零個或多個非 <dot></dot> 字元（跨越 <n></n> 個索引）；<starIdx></starIdx> 匹配任意方括號索引。沒有屬性字尾的裸地址會靜默該資源的任何更改 — 包括銷毀。僅影響漂移，不影響常規 plan/apply。完整語法見 <docs>drift-ignore-rules.md</docs>。",
       "driftIgnoreRulesNone": "無（每個計畫差異都計為漂移）",
       "oidcAudiences": "執行身分受眾",
-      "oidcAudiencesHint": "Terrapod 為此工作區的每一次執行簽發一個短期的 OpenID Connect 權杖，並寫入執行可讀取的檔案。受眾說明該權杖的用途，而每個聯合目標都會選擇自己的不透明字串 — sts.amazonaws.com、api://AzureADTokenExchange，或你所聯合的目標接受的任何值。將清單留空，此工作區便不簽發任何權杖：它的執行仍與今天一樣，使用代理池自身的身分進行驗證。哪個 provider 使用該權杖、以何種方式使用，仍由你自己的設定決定。",
+      "oidcAudiencesHint": "Terrapod 為執行所使用的每個 provider 設定簽發一個短期的 OpenID Connect 權杖，並寫入執行可讀取的檔案。項目的鍵使用你的設定對該 provider 的命名 — aws，或帶別名的設定用 aws.west — 然後列出該目標接受的受眾。每筆項目會覆寫部署自身針對該 provider 的設定；移除它，該 provider 便回退到部署的受眾。受眾是聯合目標自行選定的不透明字串，因此會依你輸入的原樣儲存。",
       "oidcAudiencesPlaceholder": "例如 sts.amazonaws.com",
-      "oidcAudiencesNone": "無（執行使用代理池自身的身分）",
+      "oidcAudiencesNone": "無覆寫（此工作區使用部署中設定的受眾）",
       "oidcAudiencesAdd": "新增受眾"
     },
     "vcsWorkflowWarning": {

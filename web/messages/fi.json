@@ -1050,7 +1050,7 @@
       "varFiles": "Muuttujatiedostot (peritään luoduille työtiloille)",
       "varFilesHint": "Suhteelliset <code>.tfvars</code>-polut, jotka välitetään suunnitteluun/käyttöönottoon.",
       "oidcAudiences": "Ajoidentiteetin audiencet (peritään luoduille työtiloille)",
-      "oidcAudiencesHint": "Audiencet, joille jokainen tämän säännön luoma työtila myöntää ajoidentiteettitokenin. Jätä tyhjäksi, niin ne eivät myönnä mitään.",
+      "oidcAudiencesHint": "Audience-ohitukset, jotka asetetaan jokaiseen tämän säännön luomaan työtilaan, avaimena provider-konfiguraatio, jota token koskee — aws tai aws.west alias-konfiguraatiolle. Jätä tyhjäksi, niin nämä työtilat käyttävät käyttöönoton omaa konfiguraatiota.",
       "addVarFile": "Lisää muuttujatiedosto",
       "executionHooks": "Suorituskoukut (liitetään jokaiseen uuteen työtilaan)",
       "executionHooksHint": "Valitse <page>Suorituskoukut</page>-hallintasivulla määritetyistä koukuista — jokainen valittu koukku liitetään jokaiseen tämän säännön luomaan työtilaan.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Aseta tunnisteet (korvaa tunnistekartan jokaisessa vastaavassa työtilassa)",
       "setVarFiles": "Aseta muuttujatiedostot",
       "addVarFile": "Lisää muuttujatiedosto",
-      "setOidcAudiences": "Aseta ajoidentiteetin audiencet (korvaa luettelon jokaisessa osuvassa työtilassa; tyhjä luettelo kytkee ajoidentiteetin pois)",
+      "setOidcAudiences": "Aseta ajoidentiteetin audiencet (korvaa ohitukset jokaisessa osuvassa työtilassa; tyhjä map tyhjentää ne, joten jokainen provider palaa käyttöönoton konfiguraatioon)",
       "setRunTasks": "Aseta ajotehtävät (päivitetään nimen mukaan jokaisessa vastaavassa työtilassa)",
       "setNotifications": "Aseta ilmoitusmääritykset (päivitetään nimen mukaan)",
       "dryRun": "Testiajo (vain esikatselu — muutoksia ei kirjoiteta)",
@@ -1922,6 +1922,14 @@
       "triggers": "Käynnistimet",
       "addNotification": "Lisää ilmoitus"
     },
+    "oidcAudiences": {
+      "audiences": "Audiencet",
+      "addProvider": "Lisää provider-konfiguraatio",
+      "providerPlaceholder": "aws tai aws.west",
+      "providerInvalid": "Provider-nimessä ei ole välilyöntejä ja enintään yksi piste — aws tai aws.west.",
+      "providerDuplicate": "Tällä provider-konfiguraatiolla on jo merkintä.",
+      "removeProviderAria": "Poista provider-konfiguraatio {provider}"
+    },
     "autoApplyMode": {
       "never": "ei koskaan",
       "always": "aina",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Glob-tietoiset Terraform-osoite- ja attribuuttipolut, jotka ajautumaluokitin vaimentaa. <star></star> vastaa nollaa tai useampaa ei-<dot></dot>-merkkiä (kattaa <n></n> indeksiä); <starIdx></starIdx> vastaa mitä tahansa hakasulkeissa olevaa indeksiä. Pelkkä osoite ilman attribuuttipäätettä vaimentaa minkä tahansa muutoksen kyseiseen resurssiin — mukaan lukien tuhot. Vaikuttaa vain ajautumaan, ei tavalliseen suunnitteluun/käyttöönottoon. Katso koko kielioppi kohdasta <docs>drift-ignore-rules.md</docs>.",
       "driftIgnoreRulesNone": "Ei mitään (jokainen suunnitelmaero lasketaan ajautumaksi)",
       "oidcAudiences": "Ajoidentiteetin audiencet",
-      "oidcAudiencesHint": "Terrapod myöntää tämän työtilan jokaiselle ajolle lyhytikäisen OpenID Connect -tokenin ja kirjoittaa sen tiedostoon, jonka ajo voi lukea. Audience kertoo, mihin token on tarkoitettu, ja jokainen federaatiokohde valitsee oman läpinäkymättömän merkkijononsa — sts.amazonaws.com, api://AzureADTokenExchange tai mitä tahansa kohde, johon federoit, hyväksyy. Jätä luettelo tyhjäksi, niin tämä työtila ei myönnä mitään: sen ajot tunnistautuvat täsmälleen kuten tänään, agenttipoolin omalla identiteetillä. Mikä provider tokenia käyttää ja miten, on sinun oma konfiguraatiosi.",
+      "oidcAudiencesHint": "Terrapod myöntää lyhytikäisen OpenID Connect -tokenin jokaiselle provider-konfiguraatiolle, jota ajo käyttää, ja kirjoittaa sen tiedostoon, jonka ajo voi lukea. Avaimena merkinnässä on provider sellaisena kuin konfiguraatiosi sen nimeää — aws tai aws.west alias-konfiguraatiolle — ja luettele audiencet, jotka kohde hyväksyy. Jokainen merkintä ohittaa käyttöönoton oman konfiguraation kyseiselle providerille; poista se, niin provider palaa käyttöönoton audienceihin. Audience on läpinäkymätön merkkijono, jonka federaatiokohde valitsi, joten se tallennetaan täsmälleen kirjoittamassasi muodossa.",
       "oidcAudiencesPlaceholder": "esim. sts.amazonaws.com",
-      "oidcAudiencesNone": "Ei mitään (ajot käyttävät agenttipoolin omaa identiteettiä)",
+      "oidcAudiencesNone": "Ei ohituksia (tämä työtila käyttää käyttöönotossa konfiguroituja audienceja)",
       "oidcAudiencesAdd": "Lisää audience"
     },
     "vcsWorkflowWarning": {

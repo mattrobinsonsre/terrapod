@@ -1050,7 +1050,7 @@
       "varFiles": "files, Var (by created workspaces, inherited)",
       "varFilesHint": "Relative <code>.tfvars</code> paths, to plan/apply passed they are.",
       "oidcAudiences": "Audiences, run identity (by created workspaces, inherited)",
-      "oidcAudiencesHint": "A run identity token, every workspace this rule creates mints, for these audiences. Empty it leave, and nothing they mint.",
+      "oidcAudiencesHint": "Audience overrides templated onto every workspace this rule creates, keyed on the provider configuration a token is for — aws, or aws.west for an aliased configuration. Empty it leave, and the deployment''s own configuration those workspaces take.",
       "addVarFile": "file, Add var",
       "executionHooks": "hooks, Execution (with each new workspace, associated)",
       "executionHooksHint": "From hooks defined on the <page>Execution Hooks</page> admin page, pick them — with every workspace this rule creates, each selected hook associated it is.",
@@ -1269,7 +1269,7 @@
       "setLabels": "labels, Set (on every matched workspace, the labels map replaces)",
       "setVarFiles": "files, Set var",
       "addVarFile": "file, Add var",
-      "setOidcAudiences": "audiences, Set run identity (on every matched workspace, the list replaces; run identity off, an empty list turns)",
+      "setOidcAudiences": "audiences, Set run identity (on every matched workspace, the overrides replaces; an empty map clears them, so to the deployment''s configuration each provider falls back)",
       "setRunTasks": "tasks, Set run (by name on every matched workspace, upserted)",
       "setNotifications": "configurations, Set notification (by name, upserted)",
       "dryRun": "run, Dry (preview only — no changes written, there are)",
@@ -1922,6 +1922,14 @@
       "triggers": "Triggers",
       "addNotification": "notification, Add"
     },
+    "oidcAudiences": {
+      "audiences": "Audiences",
+      "addProvider": "provider configuration, Add",
+      "providerPlaceholder": "aws, or aws.west",
+      "providerInvalid": "No spaces a provider name has, and at most one dot — aws, or aws.west.",
+      "providerDuplicate": "An entry that provider configuration already has.",
+      "removeProviderAria": "{provider} provider configuration, Remove"
+    },
     "autoApplyMode": {
       "never": "never",
       "always": "always",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths, by the drift classifier suppressed. Zero or more non-<dot></dot> chars, <star></star> matches (spans <n></n> indices); any bracketed index, <starIdx></starIdx> matches. A bare address with no attribute suffix, any change to that resource silences it — including destroys. Drift only, this affects, not regular plan/apply. For the full grammar, <docs>drift-ignore-rules.md</docs> see.",
       "driftIgnoreRulesNone": "None (as drift, every plan diff counts)",
       "oidcAudiences": "Audiences, run identity",
-      "oidcAudiencesHint": "A short-lived OpenID Connect token for every run of this workspace, Terrapod mints, and to a file the run can read, it writes. What the token is for, an audience names, and its own opaque string, each federation target chooses — sts.amazonaws.com, api://AzureADTokenExchange, or whatever the target you federate to accepts. Empty, the list leave, and nothing this workspace mints: as they do today, its runs authenticate, with the agent pool''s own identity. Which provider consumes the token, and how, in your own configuration stays.",
+      "oidcAudiencesHint": "A short-lived OpenID Connect token for each provider configuration a run uses, Terrapod mints, and to a file the run can read, it writes. On the provider as your configuration names it, an entry key — aws, or aws.west for an aliased configuration — and the audiences that target accepts, list. The deployment''s own configuration for that provider, each entry overrides; remove it, and to the deployment''s audiences that provider falls back. An opaque string the federation target chose, an audience is, so exactly as typed, stored it is.",
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
-      "oidcAudiencesNone": "None (the agent pool''s own identity, runs use)",
+      "oidcAudiencesNone": "None (the deployment''s configured audiences, this workspace takes)",
       "oidcAudiencesAdd": "audience, Add"
     },
     "vcsWorkflowWarning": {

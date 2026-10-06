@@ -1050,7 +1050,7 @@
       "varFiles": "Variablendateien (von angelegten Arbeitsbereichen geerbt)",
       "varFilesHint": "Relative <code>.tfvars</code>-Pfade, die an plan/apply übergeben werden.",
       "oidcAudiences": "Audiences der Lauf-Identität (von angelegten Arbeitsbereichen geerbt)",
-      "oidcAudiencesHint": "Audiences, für die jeder von dieser Regel angelegte Arbeitsbereich ein Lauf-Identitäts-Token ausstellt. Leer lassen, dann stellen sie nichts aus.",
+      "oidcAudiencesHint": "Audience-Überschreibungen, die auf jeden von dieser Regel angelegten Arbeitsbereich übertragen werden, geschlüsselt auf die Provider-Konfiguration, für die ein Token gilt — aws, oder aws.west für eine mit Alias versehene Konfiguration. Leer lassen, dann übernehmen diese Arbeitsbereiche die Konfiguration der Bereitstellung.",
       "addVarFile": "Var-Datei hinzufügen",
       "executionHooks": "Ausführungs-Hooks (jedem neuen Arbeitsbereich zugeordnet)",
       "executionHooksHint": "Wählen Sie aus den auf der Verwaltungsseite <page>Ausführungs-Hooks</page> definierten Hooks — jeder ausgewählte Hook wird jedem Arbeitsbereich zugeordnet, den diese Regel anlegt.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Beschriftungen setzen (ersetzt die Beschriftungszuordnung auf jedem getroffenen Arbeitsbereich)",
       "setVarFiles": "Variablendateien setzen",
       "addVarFile": "Var-Datei hinzufügen",
-      "setOidcAudiences": "Audiences der Lauf-Identität setzen (ersetzt die Liste in jedem zutreffenden Arbeitsbereich; eine leere Liste schaltet die Lauf-Identität ab)",
+      "setOidcAudiences": "Audiences der Lauf-Identität setzen (ersetzt die Überschreibungen in jedem zutreffenden Arbeitsbereich; eine leere Zuordnung löscht sie, sodass jeder Provider auf die Konfiguration der Bereitstellung zurückfällt)",
       "setRunTasks": "Ausführungsaufgaben setzen (per Name auf jedem getroffenen Arbeitsbereich aktualisiert/eingefügt)",
       "setNotifications": "Benachrichtigungskonfigurationen setzen (per Name aktualisiert/eingefügt)",
       "dryRun": "Probelauf (nur Vorschau — keine Änderungen geschrieben)",
@@ -1922,6 +1922,14 @@
       "triggers": "Auslöser",
       "addNotification": "Benachrichtigung hinzufügen"
     },
+    "oidcAudiences": {
+      "audiences": "Audiences",
+      "addProvider": "Provider-Konfiguration hinzufügen",
+      "providerPlaceholder": "aws oder aws.west",
+      "providerInvalid": "Ein Provider-Name enthält keine Leerzeichen und höchstens einen Punkt — aws oder aws.west.",
+      "providerDuplicate": "Für diese Provider-Konfiguration gibt es bereits einen Eintrag.",
+      "removeProviderAria": "Provider-Konfiguration {provider} entfernen"
+    },
     "autoApplyMode": {
       "never": "nie",
       "always": "immer",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Glob-fähige Terraform-Adress- und Attributpfade, die vom Drift-Klassifikator unterdrückt werden. <star></star> passt auf null oder mehr Zeichen außer <dot></dot> (umfasst <n></n>-Indizes); <starIdx></starIdx> passt auf jeden eingeklammerten Index. Eine bloße Adresse ohne Attributsuffix unterdrückt jede Änderung an dieser Ressource — einschließlich Löschungen. Betrifft nur den Drift, nicht das reguläre plan/apply. Die vollständige Grammatik finden Sie unter <docs>drift-ignore-rules.md</docs>.",
       "driftIgnoreRulesNone": "Keine (jede Plan-Differenz zählt als Drift)",
       "oidcAudiences": "Audiences der Lauf-Identität",
-      "oidcAudiencesHint": "Terrapod stellt für jeden Lauf dieses Arbeitsbereichs ein kurzlebiges OpenID-Connect-Token aus und schreibt es in eine Datei, die der Lauf lesen kann. Eine Audience benennt, wofür das Token gilt, und jedes Föderationsziel wählt seine eigene undurchsichtige Zeichenfolge — sts.amazonaws.com, api://AzureADTokenExchange oder was auch immer das Ziel akzeptiert, zu dem Sie föderieren. Lassen Sie die Liste leer, stellt dieser Arbeitsbereich nichts aus: seine Läufe authentifizieren sich wie bisher, mit der eigenen Identität des Agent-Pools. Welcher Provider das Token verwendet und wie, bleibt Ihre eigene Konfiguration.",
+      "oidcAudiencesHint": "Terrapod stellt für jede Provider-Konfiguration, die ein Lauf verwendet, ein kurzlebiges OpenID-Connect-Token aus und schreibt es in eine Datei, die der Lauf lesen kann. Schlüsseln Sie einen Eintrag auf den Provider, wie ihn Ihre Konfiguration benennt — aws, oder aws.west für eine mit Alias versehene Konfiguration — und listen Sie die Audiences auf, die dieses Ziel akzeptiert. Jeder Eintrag überschreibt die Konfiguration der Bereitstellung für diesen Provider; entfernen Sie ihn, und dieser Provider fällt auf die Audiences der Bereitstellung zurück. Eine Audience ist eine opake Zeichenfolge, die das Föderationsziel gewählt hat, und wird daher genau so gespeichert, wie sie eingegeben wurde.",
       "oidcAudiencesPlaceholder": "z. B. sts.amazonaws.com",
-      "oidcAudiencesNone": "Keine (Läufe verwenden die eigene Identität des Agent-Pools)",
+      "oidcAudiencesNone": "Keine Überschreibungen (dieser Arbeitsbereich übernimmt die in der Bereitstellung konfigurierten Audiences)",
       "oidcAudiencesAdd": "Audience hinzufügen"
     },
     "vcsWorkflowWarning": {

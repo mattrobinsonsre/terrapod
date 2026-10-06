@@ -31,7 +31,11 @@ import {
   parseVaultReference,
   type VaultReferenceValue,
 } from '@/components/vault-reference-fields'
-import { StringListEditor } from '@/components/template-editors'
+import {
+  OidcAudiencesEditor,
+  sanitizeOidcAudiences,
+  type OidcAudiences,
+} from '@/components/template-editors'
 import { VariableEditPanel } from '@/components/variable-edit-panel'
 import { ApplicableVarsets } from '@/components/applicable-varsets'
 import { useSortable } from '@/lib/use-sortable'
@@ -83,10 +87,15 @@ interface WorkspaceAttrs {
   'var-files': string[]
   'trigger-prefixes': string[]
   'drift-ignore-rules': string[]
-  // The audiences a run identity token is minted for (#1901). Empty is the
-  // opt-OUT: the workspace mints nothing and its runs authenticate with the
-  // agent pool's own identity, exactly as before.
-  'oidc-audiences': string[]
+  // The audiences a run identity token is minted for (#1901), keyed on the
+  // provider configuration the token is for — `aws`, or `aws.west` for one
+  // aliased configuration. This is the workspace's own OVERRIDE of the
+  // deployment's configured audiences, per key: an empty map overrides
+  // nothing and the workspace takes the deployment's configuration as it
+  // stands. A workspace mints nothing only when that resolved answer is
+  // empty, and then its runs authenticate with the agent pool's own identity
+  // exactly as before.
+  'oidc-audiences': OidcAudiences
   'vcs-repo-url': string
   'vcs-branch': string
   'vcs-connection-id': string | null
@@ -322,7 +331,7 @@ function WorkspaceDetailContent() {
   const [newTriggerPrefix, setNewTriggerPrefix] = useState('')
   const [editDriftIgnoreRules, setEditDriftIgnoreRules] = useState<string[]>([])
   const [newDriftIgnoreRule, setNewDriftIgnoreRule] = useState('')
-  const [editOidcAudiences, setEditOidcAudiences] = useState<string[]>([])
+  const [editOidcAudiences, setEditOidcAudiences] = useState<OidcAudiences>({})
   const [editWorkingDir, setEditWorkingDir] = useState('')
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
@@ -1083,7 +1092,7 @@ function WorkspaceDetailContent() {
     setNewTriggerPrefix('')
     setEditDriftIgnoreRules(workspace.attributes['drift-ignore-rules'] || [])
     setNewDriftIgnoreRule('')
-    setEditOidcAudiences(workspace.attributes['oidc-audiences'] || [])
+    setEditOidcAudiences(workspace.attributes['oidc-audiences'] || {})
     setEditWorkingDir(workspace.attributes['working-directory'] || '')
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
@@ -1145,10 +1154,12 @@ function WorkspaceDetailContent() {
               'var-files': editVarFiles,
               'trigger-prefixes': editTriggerPrefixes,
               'drift-ignore-rules': editDriftIgnoreRules,
-              // Sent trimmed and blank-free: the server REFUSES a blank entry
-              // rather than dropping it, so an empty row left in the editor would
-              // 422 the whole save.
-              'oidc-audiences': editOidcAudiences.map((v) => v.trim()).filter(Boolean),
+              // Sent blank-free but NOT trimmed: the server refuses a blank
+              // entry rather than dropping it (so an empty row left in the
+              // editor would 422 the whole save), while a kept audience is an
+              // opaque string stored byte-for-byte, so trimming one would
+              // store something other than what was typed.
+              'oidc-audiences': sanitizeOidcAudiences(editOidcAudiences),
               'vcs-repo-url': editVcsRepoUrl,
               'vcs-branch': editVcsBranch,
               'vcs-workflow': editVcsWorkflow,
@@ -2721,21 +2732,17 @@ function WorkspaceDetailContent() {
                   {editing && perms['can-update'] ? (
                     <div className="space-y-2">
                       <p className="text-xs text-slate-400">{t('fields.oidcAudiencesHint')}</p>
-                      <StringListEditor
-                        values={editOidcAudiences}
+                      <OidcAudiencesEditor
+                        value={editOidcAudiences}
                         onChange={setEditOidcAudiences}
-                        placeholder={t('fields.oidcAudiencesPlaceholder')}
-                        addLabel={t('fields.oidcAudiencesAdd')}
+                        audiencePlaceholder={t('fields.oidcAudiencesPlaceholder')}
+                        addAudienceLabel={t('fields.oidcAudiencesAdd')}
                       />
                     </div>
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200" data-testid="oidc-audiences">
-                      {(attrs['oidc-audiences'] || []).length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {attrs['oidc-audiences'].map((aud) => (
-                            <code key={aud} className="bg-slate-700 px-2 py-0.5 rounded text-xs break-all">{aud}</code>
-                          ))}
-                        </div>
+                      {Object.keys(attrs['oidc-audiences'] || {}).length > 0 ? (
+                        <OidcAudiencesEditor value={attrs['oidc-audiences']} readOnly />
                       ) : (
                         <span className="text-slate-500">{t('fields.oidcAudiencesNone')}</span>
                       )}

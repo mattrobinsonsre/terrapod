@@ -1050,7 +1050,7 @@
       "varFiles": "V4r f1l35 (1nh3r173d by cr3473d w0rk5p4c35)",
       "varFilesHint": "R3l471v3 <code>.7fv4r5</code> p47h5 p4553d 70 pl4n/4pply.",
       "oidcAudiences": "Run 1d3n717y 4ud13nc35 (1nh3r173d by cr3473d w0rk5p4c35)",
-      "oidcAudiencesHint": "4ud13nc35 3v3ry w0rk5p4c3 7h15 rul3 cr34735 m1n75 4 run 1d3n717y 70k3n f0r. L34v3 17 3mp7y 4nd 7h3y m1n7 n07h1ng.",
+      "oidcAudiencesHint": "4ud13nc3 0v3rr1d35 73mpl473d 0n70 3v3ry w0rk5p4c3 7h15 rul3 cr34735, k3y3d 0n 7h3 pr0v1d3r c0nf1gur4710n 4 70k3n 15 f0r — 4w5, 0r 4w5.w357 f0r 4n 4l1453d c0nf1gur4710n. L34v3 17 3mp7y 4nd 7h053 w0rk5p4c35 74k3 7h3 d3pl0ym3n7'5 0wn c0nf1gur4710n.",
       "addVarFile": "4dd v4r f1l3",
       "executionHooks": "3x3cu710n h00k5 (4550c1473d w17h 34ch n3w w0rk5p4c3)",
       "executionHooksHint": "P1ck fr0m h00k5 d3f1n3d 0n 7h3 <page>3x3cu710n H00k5</page> 4dm1n p4g3 — 34ch 53l3c73d h00k 15 4550c1473d w17h 3v3ry w0rk5p4c3 7h15 rul3 cr34735.",
@@ -1269,7 +1269,7 @@
       "setLabels": "537 l4b3l5 (r3pl4c35 7h3 l4b3l5 m4p 0n 3v3ry m47ch3d w0rk5p4c3)",
       "setVarFiles": "537 v4r f1l35",
       "addVarFile": "4dd v4r f1l3",
-      "setOidcAudiences": "537 run 1d3n717y 4ud13nc35 (r3pl4c35 7h3 l157 0n 3v3ry m47ch3d w0rk5p4c3; 4n 3mp7y l157 7urn5 run 1d3n717y 0ff)",
+      "setOidcAudiences": "537 run 1d3n717y 4ud13nc35 (r3pl4c35 7h3 0v3rr1d35 0n 3v3ry m47ch3d w0rk5p4c3; 4n 3mp7y m4p cl34r5 7h3m, 50 34ch pr0v1d3r f4ll5 b4ck 70 7h3 d3pl0ym3n7'5 c0nf1gur4710n)",
       "setRunTasks": "537 run 745k5 (up53r73d by n4m3 0n 3v3ry m47ch3d w0rk5p4c3)",
       "setNotifications": "537 n071f1c4710n c0nf1gur4710n5 (up53r73d by n4m3)",
       "dryRun": "Dry run (pr3v13w 0nly — n0 ch4ng35 wr1773n)",
@@ -1922,6 +1922,14 @@
       "triggers": "7r1gg3r5",
       "addNotification": "4dd n071f1c4710n"
     },
+    "oidcAudiences": {
+      "audiences": "4ud13nc35",
+      "addProvider": "4dd pr0v1d3r c0nf1gur4710n",
+      "providerPlaceholder": "4w5, 0r 4w5.w357",
+      "providerInvalid": "4 pr0v1d3r n4m3 h45 n0 5p4c35 4nd 47 m057 0n3 d07 — 4w5, 0r 4w5.w357.",
+      "providerDuplicate": "7h47 pr0v1d3r c0nf1gur4710n 4lr34dy h45 4n 3n7ry.",
+      "removeProviderAria": "R3m0v3 7h3 {provider} pr0v1d3r c0nf1gur4710n"
+    },
     "autoApplyMode": {
       "never": "n3v3r",
       "always": "4lw4y5",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Gl0b-4w4r3 73rr4f0rm 4ddr355 + 477r1bu73 p47h5 5uppr3553d by 7h3 dr1f7 cl4551f13r. <star></star> m47ch35 z3r0 0r m0r3 n0n-<dot></dot> ch4r5 (5p4n5 <n></n> 1nd1c35); <starIdx></starIdx> m47ch35 4ny br4ck373d 1nd3x. 4 b4r3 4ddr355 w17h n0 477r1bu73 5uff1x 51l3nc35 4ny ch4ng3 70 7h47 r350urc3 — 1nclud1ng d357r0y5. 4ff3c75 dr1f7 0nly, n07 r3gul4r pl4n/4pply. 533 <docs>dr1f7-1gn0r3-rul35.md</docs> f0r 7h3 full gr4mm4r.",
       "driftIgnoreRulesNone": "N0n3 (3v3ry pl4n d1ff c0un75 45 dr1f7)",
       "oidcAudiences": "Run 1d3n717y 4ud13nc35",
-      "oidcAudiencesHint": "73rr4p0d m1n75 4 5h0r7-l1v3d 0p3n1D C0nn3c7 70k3n f0r 3v3ry run 0f 7h15 w0rk5p4c3 4nd wr1735 17 70 4 f1l3 7h3 run c4n r34d. 4n 4ud13nc3 n4m35 wh47 7h3 70k3n 15 f0r, 4nd 34ch f3d3r4710n 74rg37 ch00535 175 0wn 0p4qu3 57r1ng — 575.4m4z0n4w5.c0m, 4p1://4zur34D70k3n3xch4ng3, 0r wh473v3r 7h3 74rg37 y0u f3d3r473 70 4cc3p75. L34v3 7h3 l157 3mp7y 4nd 7h15 w0rk5p4c3 m1n75 n07h1ng: 175 run5 4u7h3n71c473 45 7h3y d0 70d4y, w17h 7h3 4g3n7 p00l'5 0wn 1d3n717y. Wh1ch pr0v1d3r c0n5um35 7h3 70k3n, 4nd h0w, 574y5 1n y0ur 0wn c0nf1gur4710n.",
+      "oidcAudiencesHint": "73rr4p0d m1n75 4 5h0r7-l1v3d 0p3n1D C0nn3c7 70k3n f0r 34ch pr0v1d3r c0nf1gur4710n 4 run u535 4nd wr1735 17 70 4 f1l3 7h3 run c4n r34d. K3y 4n 3n7ry 0n 7h3 pr0v1d3r 45 y0ur c0nf1gur4710n n4m35 17 — 4w5, 0r 4w5.w357 f0r 4n 4l1453d c0nf1gur4710n — 4nd l157 7h3 4ud13nc35 7h47 74rg37 4cc3p75. 34ch 3n7ry 0v3rr1d35 7h3 d3pl0ym3n7'5 0wn c0nf1gur4710n f0r 7h47 pr0v1d3r; r3m0v3 17 4nd 7h47 pr0v1d3r f4ll5 b4ck 70 7h3 d3pl0ym3n7'5 4ud13nc35. 4n 4ud13nc3 15 4n 0p4qu3 57r1ng 7h3 f3d3r4710n 74rg37 ch053, 50 17 15 570r3d 3x4c7ly 45 7yp3d.",
       "oidcAudiencesPlaceholder": "3.g. 575.4m4z0n4w5.c0m",
-      "oidcAudiencesNone": "N0n3 (run5 u53 7h3 4g3n7 p00l'5 0wn 1d3n717y)",
+      "oidcAudiencesNone": "N0 0v3rr1d35 (7h15 w0rk5p4c3 74k35 7h3 d3pl0ym3n7'5 c0nf1gur3d 4ud13nc35)",
       "oidcAudiencesAdd": "4dd 4ud13nc3"
     },
     "vcsWorkflowWarning": {

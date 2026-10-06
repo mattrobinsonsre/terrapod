@@ -1,6 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
+
+import { isValidOidcProvider, type OidcAudiences } from '@/lib/oidc-audiences'
 
 /**
  * Repeatable nested editors shared by the autodiscovery rule form (#318)
@@ -80,12 +83,21 @@ const inputCls =
   'w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent'
 const labelCls = 'block text-xs font-medium text-slate-400 mb-1'
 
-function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
+function AddButton({
+  onClick,
+  label,
+  disabled = false,
+}: {
+  onClick: () => void
+  label: string
+  disabled?: boolean
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="px-3 py-1.5 min-h-11 sm:min-h-0 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors"
+      disabled={disabled}
+      className="shrink-0 px-3 py-1.5 min-h-11 sm:min-h-0 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {label}
     </button>
@@ -395,6 +407,162 @@ export function NotificationTemplatesEditor({
         onClick={() => onChange([...items, emptyNotification()])}
         label={t('templateEditors.addNotification')}
       />
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* oidc-audiences: provider configuration -> its audiences (#1901)     */
+/* ------------------------------------------------------------------ */
+
+/* The shape and the two wire helpers live in `lib/oidc-audiences.ts` so the
+   unit suite can import them (node strips types from a `.ts`, not the JSX in a
+   `.tsx`). Re-exported here so a page needs only this one import. */
+export {
+  isValidOidcProvider,
+  sanitizeOidcAudiences,
+  type OidcAudiences,
+} from '@/lib/oidc-audiences'
+
+export function OidcAudiencesEditor({
+  value,
+  onChange,
+  readOnly = false,
+  audiencePlaceholder,
+  addAudienceLabel,
+}: {
+  value: OidcAudiences
+  onChange?: (next: OidcAudiences) => void
+  readOnly?: boolean
+  audiencePlaceholder?: string
+  addAudienceLabel?: string
+}) {
+  const t = useTranslations('common')
+  const [newProvider, setNewProvider] = useState('')
+
+  // Object key order is insertion order for string keys, and every write below
+  // spreads the existing object, so a card never jumps position while editing.
+  const entries = Object.entries(value)
+  const typed = newProvider.trim()
+  const duplicate = typed !== '' && Object.prototype.hasOwnProperty.call(value, typed)
+  const malformed = typed !== '' && !isValidOidcProvider(typed)
+
+  function addProvider() {
+    if (!onChange || !typed || duplicate || malformed) return
+    // Seeded with one blank row so there is somewhere to type. A row still
+    // blank at save time is dropped by `sanitizeOidcAudiences`, and with it the
+    // provider — the server refuses an empty list, so a half-finished entry
+    // cannot be sent.
+    onChange({ ...value, [typed]: [''] })
+    setNewProvider('')
+  }
+
+  // Enter adds the provider. Without preventDefault it would also submit the
+  // form the editor sits in, saving before the provider is added.
+  function onEnter(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    addProvider()
+  }
+
+  function removeProvider(key: string) {
+    if (!onChange) return
+    const next = { ...value }
+    delete next[key]
+    onChange(next)
+  }
+
+  function setAudiences(key: string, list: string[]) {
+    if (!onChange) return
+    onChange({ ...value, [key]: list })
+  }
+
+  if (readOnly) {
+    // Nothing when empty: each page words its own "no overrides" line, because
+    // what the fallback means differs between a workspace and a rule template.
+    if (entries.length === 0) return null
+    return (
+      <div className="flex flex-col gap-2">
+        {entries.map(([k, list]) => (
+          <div key={k} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2 min-w-0">
+            <code className="shrink-0 text-xs font-mono text-slate-400">{k}</code>
+            <div className="flex flex-wrap gap-1 min-w-0">
+              {(list || []).map((aud) => (
+                <code
+                  key={aud}
+                  className="bg-slate-700 px-2 py-0.5 rounded text-xs break-all"
+                >
+                  {aud}
+                </code>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {entries.map(([k, list]) => (
+        <div
+          key={k}
+          /* `min-w-0` so a long opaque audience (`api://AzureADTokenExchange`)
+             cannot set the card's intrinsic width and push the page sideways
+             at phone width (AGENTS.md -> Responsive: no horizontal page
+             scroll). */
+          className="p-3 rounded-lg bg-slate-900/60 border border-slate-700/60 space-y-2 min-w-0"
+        >
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <code className="text-xs font-mono text-slate-200 break-all min-w-0">{k}</code>
+            <button
+              type="button"
+              onClick={() => removeProvider(k)}
+              aria-label={t('oidcAudiences.removeProviderAria', { provider: k })}
+              className="shrink-0 px-3 py-1.5 min-h-11 sm:min-h-0 text-xs font-medium rounded-lg bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
+            >
+              {t('templateEditors.remove')}
+            </button>
+          </div>
+          <div>
+            <span className={labelCls}>{t('oidcAudiences.audiences')}</span>
+            <StringListEditor
+              values={list || []}
+              onChange={(next) => setAudiences(k, next)}
+              placeholder={audiencePlaceholder}
+              addLabel={addAudienceLabel}
+            />
+          </div>
+        </div>
+      ))}
+      <div className="space-y-1">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newProvider}
+            onChange={(e) => setNewProvider(e.target.value)}
+            onKeyDown={onEnter}
+            placeholder={t('oidcAudiences.providerPlaceholder')}
+            data-testid="oidc-provider-input"
+            /* `min-w-0` because a flex item's default `min-width: auto` is its
+               content-based minimum, and an input's is its intrinsic `size` —
+               enough to push this row past a phone viewport once the Add
+               button sits beside it. */
+            className={`${inputCls} min-w-0 font-mono`}
+          />
+          <AddButton
+            onClick={addProvider}
+            label={t('oidcAudiences.addProvider')}
+            disabled={!onChange || !typed || duplicate || malformed}
+          />
+        </div>
+        {malformed && (
+          <p className="text-xs text-amber-400">{t('oidcAudiences.providerInvalid')}</p>
+        )}
+        {duplicate && (
+          <p className="text-xs text-amber-400">{t('oidcAudiences.providerDuplicate')}</p>
+        )}
+      </div>
     </div>
   )
 }

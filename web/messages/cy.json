@@ -1050,7 +1050,7 @@
       "varFiles": "Ffeiliau var (etifeddir gan weithfannau a grëir)",
       "varFilesHint": "Llwybrau <code>.tfvars</code> perthynol a drosglwyddir i gynllunio/gweithredu.",
       "oidcAudiences": "Cynulleidfaoedd hunaniaeth rhediad (etifeddir gan weithfannau a grëir)",
-      "oidcAudiencesHint": "Cynulleidfaoedd y mae pob gweithle a grëir gan y rheol hon yn cyhoeddi tocyn hunaniaeth rhediad ar eu cyfer. Gadewch yn wag ac ni fyddant yn cyhoeddi dim.",
+      "oidcAudiencesHint": "Disodliadau cynulleidfa a roddir ar bob gweithle a grëir gan y rheol hon, wedi'u hallweddu ar y cyfluniad provider y mae tocyn ar ei gyfer — aws, neu aws.west ar gyfer cyfluniad ag alias. Gadewch yn wag ac mae'r gweithleoedd hynny'n defnyddio cyfluniad y defnydd ei hun.",
       "addVarFile": "Ychwanegu ffeil var",
       "executionHooks": "Bachau gweithredu (cysylltir â phob gweithfan newydd)",
       "executionHooksHint": "Dewiswch o'r bachau a ddiffinnir ar dudalen weinyddol <page>Bachau Gweithredu</page> — cysylltir pob bach a ddewiswyd â phob gweithfan y mae'r rheol hon yn ei chreu.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Gosod labeli (yn amnewid map y labeli ar bob gweithfan gyfatebol)",
       "setVarFiles": "Gosod ffeiliau var",
       "addVarFile": "Ychwanegu ffeil var",
-      "setOidcAudiences": "Gosod cynulleidfaoedd hunaniaeth rhediad (yn disodli'r rhestr ar bob gweithle sy'n cyfateb; mae rhestr wag yn diffodd hunaniaeth rhediad)",
+      "setOidcAudiences": "Gosod cynulleidfaoedd hunaniaeth rhediad (yn disodli'r disodliadau ar bob gweithle sy'n cyfateb; mae map gwag yn eu clirio, felly mae pob provider yn dychwelyd at gyfluniad y defnydd)",
       "setRunTasks": "Gosod tasgau rhediad (upsertir yn ôl enw ar bob gweithfan gyfatebol)",
       "setNotifications": "Gosod ffurfweddiadau hysbysu (upsertir yn ôl enw)",
       "dryRun": "Rhediad sych (rhagolwg yn unig — ni ysgrifennir unrhyw newidiadau)",
@@ -1922,6 +1922,14 @@
       "triggers": "Sbardunau",
       "addNotification": "Ychwanegu hysbysiad"
     },
+    "oidcAudiences": {
+      "audiences": "Cynulleidfaoedd",
+      "addProvider": "Ychwanegu cyfluniad provider",
+      "providerPlaceholder": "aws, neu aws.west",
+      "providerInvalid": "Nid oes bylchau yn enw provider, ac un dot ar y mwyaf — aws, neu aws.west.",
+      "providerDuplicate": "Mae cofnod gan y cyfluniad provider hwnnw'n barod.",
+      "removeProviderAria": "Tynnu cyfluniad provider {provider}"
+    },
     "autoApplyMode": {
       "never": "byth",
       "always": "bob amser",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Llwybrau cyfeiriad Terraform + priodwedd sy'n ymwybodol o globiau a atalir gan y dosbarthwr drifft. Mae <star></star> yn cyfateb i sero neu ragor o nodau nad ydynt yn <dot></dot> (yn rhychwantu <n></n> mynegai); mae <starIdx></starIdx> yn cyfateb i unrhyw fynegai mewn cromfachau. Mae cyfeiriad moel heb ôl-ddodiad priodwedd yn distewi unrhyw newid i'r adnodd hwnnw — gan gynnwys dinistriadau. Yn effeithio ar ddrifft yn unig, nid cynllun/gweithredu arferol. Gweler <docs>drift-ignore-rules.md</docs> am y gramadeg llawn.",
       "driftIgnoreRulesNone": "Dim (mae pob gwahaniaeth cynllun yn cyfrif fel drifft)",
       "oidcAudiences": "Cynulleidfaoedd hunaniaeth rhediad",
-      "oidcAudiencesHint": "Mae Terrapod yn cyhoeddi tocyn OpenID Connect byrhoedlog ar gyfer pob rhediad o'r gweithle hwn ac yn ei ysgrifennu i ffeil y gall y rhediad ei darllen. Mae cynulleidfa yn enwi at beth y mae'r tocyn, ac mae pob targed ffederasiwn yn dewis ei llinyn afloyw ei hun — sts.amazonaws.com, api://AzureADTokenExchange, neu beth bynnag y mae'r targed yr ydych yn ffedereiddio ato yn ei dderbyn. Gadewch y rhestr yn wag ac nid yw'r gweithle hwn yn cyhoeddi dim: mae ei rediadau yn dilysu yn union fel heddiw, gyda hunaniaeth y pwll asiantau ei hun. Pa provider sy'n defnyddio'r tocyn, a sut, yw eich cyfluniad eich hun.",
+      "oidcAudiencesHint": "Mae Terrapod yn cyhoeddi tocyn OpenID Connect byrhoedlog ar gyfer pob cyfluniad provider y mae rhediad yn ei ddefnyddio, ac yn ei ysgrifennu i ffeil y gall y rhediad ei darllen. Allweddwch gofnod ar y provider fel y mae eich cyfluniad yn ei enwi — aws, neu aws.west ar gyfer cyfluniad ag alias — a rhestrwch y cynulleidfaoedd y mae'r targed hwnnw'n eu derbyn. Mae pob cofnod yn disodli cyfluniad y defnydd ei hun ar gyfer y provider hwnnw; tynnwch e ac mae'r provider hwnnw'n dychwelyd at gynulleidfaoedd y defnydd. Llinyn afloyw a ddewiswyd gan y targed ffederasiwn yw cynulleidfa, felly caiff ei storio yn union fel yr ydych yn ei deipio.",
       "oidcAudiencesPlaceholder": "e.e. sts.amazonaws.com",
-      "oidcAudiencesNone": "Dim (mae rhediadau yn defnyddio hunaniaeth y pwll asiantau ei hun)",
+      "oidcAudiencesNone": "Dim disodlo (mae'r gweithle hwn yn defnyddio'r cynulleidfaoedd a gyflunnir yn y defnydd)",
       "oidcAudiencesAdd": "Ychwanegu cynulleidfa"
     },
     "vcsWorkflowWarning": {

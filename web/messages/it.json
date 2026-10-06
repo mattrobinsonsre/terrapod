@@ -1050,7 +1050,7 @@
       "varFiles": "File di variabili (ereditati dai workspace creati)",
       "varFilesHint": "Percorsi <code>.tfvars</code> relativi passati a plan/apply.",
       "oidcAudiences": "Audience dell''identità di esecuzione (ereditate dai workspace creati)",
-      "oidcAudiencesHint": "Audience per cui ogni spazio di lavoro creato da questa regola emette un token di identità di esecuzione. Lasciale vuote e non emetteranno nulla.",
+      "oidcAudiencesHint": "Sovrascritture di audience applicate a ogni spazio di lavoro creato da questa regola, indicizzate sulla configurazione di provider a cui corrisponde un token — aws, oppure aws.west per una configurazione con alias. Lasciale vuote e quegli spazi di lavoro usano la configurazione propria del deployment.",
       "addVarFile": "Aggiungi file di variabili",
       "executionHooks": "Hook di esecuzione (associati a ogni nuovo workspace)",
       "executionHooksHint": "Scegli tra gli hook definiti nella pagina di amministrazione <page>Hook di esecuzione</page> — ogni hook selezionato viene associato a ogni workspace che questa regola crea.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Imposta etichette (sostituisce la mappa delle etichette su ogni workspace corrispondente)",
       "setVarFiles": "Imposta file di variabili",
       "addVarFile": "Aggiungi file di variabili",
-      "setOidcAudiences": "Imposta le audience dell''identità di esecuzione (sostituisce l''elenco in ogni spazio di lavoro corrispondente; un elenco vuoto disattiva l''identità di esecuzione)",
+      "setOidcAudiences": "Imposta le audience dell''identità di esecuzione (sostituisce le sovrascritture in ogni spazio di lavoro corrispondente; una map vuota le cancella, così ogni provider torna alla configurazione del deployment)",
       "setRunTasks": "Imposta run task (upsert per nome su ogni workspace corrispondente)",
       "setNotifications": "Imposta configurazioni di notifica (upsert per nome)",
       "dryRun": "Dry run (solo anteprima — nessuna modifica scritta)",
@@ -1922,6 +1922,14 @@
       "triggers": "Trigger",
       "addNotification": "Aggiungi notifica"
     },
+    "oidcAudiences": {
+      "audiences": "Audience",
+      "addProvider": "Aggiungi configurazione di provider",
+      "providerPlaceholder": "aws, oppure aws.west",
+      "providerInvalid": "Un nome di provider non contiene spazi e al massimo un punto — aws, oppure aws.west.",
+      "providerDuplicate": "Quella configurazione di provider ha già una voce.",
+      "removeProviderAria": "Rimuovi la configurazione di provider {provider}"
+    },
     "autoApplyMode": {
       "never": "mai",
       "always": "sempre",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Percorsi di indirizzi Terraform + attributi con supporto glob soppressi dal classificatore di deriva. <star></star> corrisponde a zero o più caratteri diversi da <dot></dot> (copre <n></n> indici); <starIdx></starIdx> corrisponde a qualsiasi indice tra parentesi. Un indirizzo nudo senza suffisso di attributo silenzia qualsiasi modifica a quella risorsa — incluse le distruzioni. Riguarda solo la deriva, non il normale plan/apply. Consulta <docs>drift-ignore-rules.md</docs> per la grammatica completa.",
       "driftIgnoreRulesNone": "Nessuna (ogni diff del plan conta come deriva)",
       "oidcAudiences": "Audience dell''identità di esecuzione",
-      "oidcAudiencesHint": "Terrapod emette un token OpenID Connect di breve durata per ogni esecuzione di questo spazio di lavoro e lo scrive in un file che l''esecuzione può leggere. Un''audience indica a cosa serve il token, e ogni destinazione di federazione scelta la propria stringa opaca — sts.amazonaws.com, api://AzureADTokenExchange, o qualunque cosa accetti la destinazione verso cui federi. Lascia l''elenco vuoto e questo spazio di lavoro non emette nulla: le sue esecuzioni si autenticano come oggi, con l''identità propria del pool di agenti. Quale provider consuma il token, e come, resta la tua configurazione.",
+      "oidcAudiencesHint": "Terrapod emette un token OpenID Connect di breve durata per ogni configurazione di provider che un''esecuzione utilizza e lo scrive in un file che l''esecuzione può leggere. Indicizza una voce sul provider come lo chiama la tua configurazione — aws, oppure aws.west per una configurazione con alias — ed elenca le audience che quel target accetta. Ogni voce sovrascrive la configurazione propria del deployment per quel provider; rimuovila e quel provider torna alle audience del deployment. Un''audience è una stringa opaca scelta dal target di federazione, quindi viene salvata esattamente come la digiti.",
       "oidcAudiencesPlaceholder": "es. sts.amazonaws.com",
-      "oidcAudiencesNone": "Nessuna (le esecuzioni usano l''identità propria del pool di agenti)",
+      "oidcAudiencesNone": "Nessuna sovrascrittura (questo spazio di lavoro usa le audience configurate nel deployment)",
       "oidcAudiencesAdd": "Aggiungi audience"
     },
     "vcsWorkflowWarning": {

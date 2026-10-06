@@ -10,6 +10,9 @@ import { EmptyState } from '@/components/empty-state'
 import { LabelsEditor } from '@/components/labels-editor'
 import {
   StringListEditor,
+  OidcAudiencesEditor,
+  sanitizeOidcAudiences,
+  type OidcAudiences,
   RunTaskTemplatesEditor,
   NotificationTemplatesEditor,
   type RunTaskSpec,
@@ -134,11 +137,13 @@ export default function BulkUpdatePage() {
   const [uLabels, setULabels] = useState<Record<string, string>>({})
   const [uSetVarFiles, setUSetVarFiles] = useState(false)
   const [uVarFiles, setUVarFiles] = useState<string[]>([])
-  // A checkbox gate, not a bare list: an EMPTY list is a meaningful value here
-  // (it turns run identity off), so there is no in-band way to say "leave this
-  // alone" (#1901). Same shape as var-files for the same reason.
+  // A checkbox gate, not a bare editor: an EMPTY map is a meaningful value
+  // here — it clears every override, so each provider falls back to the
+  // deployment's own configured audiences — and there is therefore no in-band
+  // way to say "leave this alone" (#1901). Same shape as var-files, for the
+  // same reason.
   const [uSetOidcAudiences, setUSetOidcAudiences] = useState(false)
-  const [uOidcAudiences, setUOidcAudiences] = useState<string[]>([])
+  const [uOidcAudiences, setUOidcAudiences] = useState<OidcAudiences>({})
   const [uSetRunTasks, setUSetRunTasks] = useState(false)
   const [uRunTasks, setURunTasks] = useState<RunTaskSpec[]>([])
   const [uSetNotifications, setUSetNotifications] = useState(false)
@@ -221,10 +226,11 @@ export default function BulkUpdatePage() {
     if (uAllowForkPrPlans) u['allow-fork-pr-plans'] = uAllowForkPrPlans === 'true'
     if (uSetLabels) u.labels = uLabels
     if (uSetVarFiles) u['var-files'] = uVarFiles.map((s) => s.trim()).filter(Boolean)
-    // Blank entries are refused by the server rather than dropped, so an empty
-    // row left in the editor would 422 the whole fleet update.
-    if (uSetOidcAudiences)
-      u['oidc-audiences'] = uOidcAudiences.map((s) => s.trim()).filter(Boolean)
+    // Blank audience rows are refused by the server rather than dropped, and
+    // so is a provider whose list came out empty — removing the key is the way
+    // to stop overriding one. An empty row left in the editor would otherwise
+    // 422 the whole fleet update.
+    if (uSetOidcAudiences) u['oidc-audiences'] = sanitizeOidcAudiences(uOidcAudiences)
     if (uSetRunTasks) u['run-tasks'] = uRunTasks
     if (uSetNotifications) u['notification-configurations'] = uNotifications
     return u
@@ -861,11 +867,11 @@ export default function BulkUpdatePage() {
             {uSetOidcAudiences && (
               <div className="space-y-2">
                 <p className="text-xs text-slate-400">{tWs('fields.oidcAudiencesHint')}</p>
-                <StringListEditor
-                  values={uOidcAudiences}
+                <OidcAudiencesEditor
+                  value={uOidcAudiences}
                   onChange={setUOidcAudiences}
-                  placeholder={tWs('fields.oidcAudiencesPlaceholder')}
-                  addLabel={tWs('fields.oidcAudiencesAdd')}
+                  audiencePlaceholder={tWs('fields.oidcAudiencesPlaceholder')}
+                  addAudienceLabel={tWs('fields.oidcAudiencesAdd')}
                 />
               </div>
             )}

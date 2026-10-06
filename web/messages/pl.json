@@ -1050,7 +1050,7 @@
       "varFiles": "Pliki zmiennych (dziedziczone przez utworzone obszary robocze)",
       "varFilesHint": "Względne ścieżki <code>.tfvars</code> przekazywane do plan/apply.",
       "oidcAudiences": "Audience tożsamości uruchomienia (dziedziczone przez utworzone obszary robocze)",
-      "oidcAudiencesHint": "Audience, dla których każda utworzona przez tę regułę przestrzeń robocza wystawia token tożsamości uruchomienia. Zostaw pustą i nic nie wystawią.",
+      "oidcAudiencesHint": "Nadpisania audience nakładane na każdą przestrzeń roboczą tworzoną przez tę regułę, zaindeksowane na konfiguracji providera, dla której jest token — aws lub aws.west dla konfiguracji z aliasem. Zostaw puste i te przestrzenie robocze użyją własnej konfiguracji wdrożenia.",
       "addVarFile": "Dodaj plik zmiennych",
       "executionHooks": "Punkty zaczepienia wykonania (powiązane z każdym nowym obszarem roboczym)",
       "executionHooksHint": "Wybierz spośród punktów zaczepienia zdefiniowanych na stronie administracyjnej <page>Punkty zaczepienia wykonania</page> — każdy wybrany punkt zaczepienia jest powiązany z każdym obszarem roboczym, który tworzy ta reguła.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Ustaw etykiety (zastępuje mapę etykiet na każdym dopasowanym obszarze roboczym)",
       "setVarFiles": "Ustaw pliki zmiennych",
       "addVarFile": "Dodaj plik zmiennych",
-      "setOidcAudiences": "Ustaw audience tożsamości uruchomienia (zastępuje listę w każdej dopasowanej przestrzeni roboczej; pusta lista wyłącza tożsamość uruchomienia)",
+      "setOidcAudiences": "Ustaw audience tożsamości uruchomienia (zastępuje nadpisania w każdej dopasowanej przestrzeni roboczej; pusta mapa je czyści, więc każdy provider wraca do konfiguracji wdrożenia)",
       "setRunTasks": "Ustaw zadania przebiegu (upsert po nazwie na każdym dopasowanym obszarze roboczym)",
       "setNotifications": "Ustaw konfiguracje powiadomień (upsert po nazwie)",
       "dryRun": "Przebieg próbny (tylko podgląd — brak zapisu zmian)",
@@ -1922,6 +1922,14 @@
       "triggers": "Wyzwalacze",
       "addNotification": "Dodaj powiadomienie"
     },
+    "oidcAudiences": {
+      "audiences": "Audience",
+      "addProvider": "Dodaj konfigurację providera",
+      "providerPlaceholder": "aws lub aws.west",
+      "providerInvalid": "Nazwa providera nie zawiera spacji i ma co najwyżej jedną kropkę — aws lub aws.west.",
+      "providerDuplicate": "Ta konfiguracja providera ma już wpis.",
+      "removeProviderAria": "Usuń konfigurację providera {provider}"
+    },
     "autoApplyMode": {
       "never": "nigdy",
       "always": "zawsze",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Ścieżki adresów Terraform + atrybutów obsługujące globy, tłumione przez klasyfikator dryfu. <star></star> dopasowuje zero lub więcej znaków innych niż <dot></dot> (obejmuje <n></n> indeksów); <starIdx></starIdx> dopasowuje dowolny indeks w nawiasach. Sam adres bez przyrostka atrybutu wycisza każdą zmianę tego zasobu — w tym niszczenie. Wpływa tylko na dryf, nie na zwykły plan/apply. Pełną gramatykę zobacz w <docs>drift-ignore-rules.md</docs>.",
       "driftIgnoreRulesNone": "Brak (każda różnica planu liczy się jako dryf)",
       "oidcAudiences": "Audience tożsamości uruchomienia",
-      "oidcAudiencesHint": "Terrapod wystawia dla każdego uruchomienia tej przestrzeni roboczej krótkotrwały token OpenID Connect i zapisuje go do pliku, który uruchomienie może odczytać. Audience określa, do czego służy token, a każdy cel federacji wybiera własny nieprzejrzysty ciąg — sts.amazonaws.com, api://AzureADTokenExchange albo cokolwiek przyjmuje cel, z którym się federujesz. Zostaw listę pustą i ta przestrzeń robocza nic nie wystawia: jej uruchomienia uwierzytelniają się tak jak dziś, własną tożsamością puli agentów. Który provider korzysta z tokenu i w jaki sposób, pozostaje twoją własną konfiguracją.",
+      "oidcAudiencesHint": "Terrapod wystawia krótkotrwały token OpenID Connect dla każdej konfiguracji providera, której używa uruchomienie, i zapisuje go do pliku, który uruchomienie może odczytać. Zaindeksuj wpis na providerze tak, jak nazywa go twoja konfiguracja — aws lub aws.west dla konfiguracji z aliasem — i wypisz audience, które ten cel przyjmuje. Każdy wpis nadpisuje własną konfigurację wdrożenia dla tego providera; usuń go i ten provider wraca do audience wdrożenia. Audience to nieprzejrzysty ciąg wybrany przez cel federacji, więc jest przechowywany dokładnie tak, jak go wpiszesz.",
       "oidcAudiencesPlaceholder": "np. sts.amazonaws.com",
-      "oidcAudiencesNone": "Brak (uruchomienia używają własnej tożsamości puli agentów)",
+      "oidcAudiencesNone": "Brak nadpisań (ta przestrzeń robocza używa audience skonfigurowanych we wdrożeniu)",
       "oidcAudiencesAdd": "Dodaj audience"
     },
     "vcsWorkflowWarning": {

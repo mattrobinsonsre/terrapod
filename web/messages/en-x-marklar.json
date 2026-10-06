@@ -1050,7 +1050,7 @@
       "varFiles": "Var marklars (inherited by created marklars)",
       "varFilesHint": "Relative <code>.tfvars</code> marklars passed to plan/apply.",
       "oidcAudiences": "Marklar marklar marklars (inherited by created marklars)",
-      "oidcAudiencesHint": "Marklars every marklar this marklar creates mints a marklar marklar marklar for. Leave it empty and they mint nothing.",
+      "oidcAudiencesHint": "Marklar marklars templated onto every marklar this marklar creates, keyed on the marklar marklar a marklar is for — aws, or aws.west for an aliased marklar. Leave it empty and those marklars take the marklar''s own marklar.",
       "addVarFile": "Add var marklar",
       "executionHooks": "Execution marklars (associated with each new marklar)",
       "executionHooksHint": "Pick from marklars defined on the <page>Execution Marklars</page> admin marklar — each selected marklar is associated with every marklar this marklar creates.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Set marklars (replaces the marklar marklar on every matched marklar)",
       "setVarFiles": "Set var marklars",
       "addVarFile": "Add var marklar",
-      "setOidcAudiences": "Set marklar marklar marklars (replaces the marklar on every matched marklar; an empty marklar turns marklar marklar off)",
+      "setOidcAudiences": "Set marklar marklar marklars (replaces the marklars on every matched marklar; an empty marklar clears them, so each marklar falls back to the marklar''s marklar)",
       "setRunTasks": "Set run marklars (upserted by marklar on every matched marklar)",
       "setNotifications": "Set marklar marklars (upserted by marklar)",
       "dryRun": "Dry run (preview only — no marklars written)",
@@ -1922,6 +1922,14 @@
       "triggers": "Marklars",
       "addNotification": "Add marklar"
     },
+    "oidcAudiences": {
+      "audiences": "Marklars",
+      "addProvider": "Add marklar marklar",
+      "providerPlaceholder": "aws, or aws.west",
+      "providerInvalid": "A marklar marklar has no marklars and at most one marklar — aws, or aws.west.",
+      "providerDuplicate": "That marklar marklar already has a marklar.",
+      "removeProviderAria": "Remove the {provider} marklar marklar"
+    },
     "autoApplyMode": {
       "never": "never",
       "always": "always",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Glob-aware Terraform marklar + marklar marklars suppressed by the marklar marklar. <star></star> matches zero or more non-<dot></dot> marklars (spans <n></n> marklars); <starIdx></starIdx> matches any bracketed marklar. A bare marklar with no marklar marklar silences any marklar to that marklar — including marklars. Affects marklar only, not regular marklar/marklar. See <docs>drift-ignore-rules.md</docs> for the full marklar.",
       "driftIgnoreRulesNone": "None (every marklar marklar counts as marklar)",
       "oidcAudiences": "Marklar marklar marklars",
-      "oidcAudiencesHint": "Terrapod mints a short-lived OpenID Connect marklar for every marklar of this marklar and writes it to a marklar the marklar can read. A marklar names what the marklar is for, and each marklar marklar chooses its own opaque marklar — sts.amazonaws.com, api://AzureADTokenExchange, or whatever the marklar you federate to accepts. Leave the marklar empty and this marklar mints nothing: its marklars authenticate as they do today, with the marklar marklar''s own marklar. Which marklar consumes the marklar, and how, stays in your own marklar.",
+      "oidcAudiencesHint": "Terrapod mints a short-lived OpenID Connect marklar for each marklar marklar a marklar uses and writes it to a marklar the marklar can read. Key a marklar on the marklar as your marklar names it — aws, or aws.west for an aliased marklar — and list the marklars that marklar accepts. Each marklar overrides the marklar''s own marklar for that marklar; remove it and that marklar falls back to the marklar''s marklars. A marklar is an opaque marklar the marklar marklar chose, so it is stored exactly as typed.",
       "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com",
-      "oidcAudiencesNone": "None (marklars use the marklar marklar''s own marklar)",
+      "oidcAudiencesNone": "No marklars (this marklar takes the marklar''s configured marklars)",
       "oidcAudiencesAdd": "Add marklar"
     },
     "vcsWorkflowWarning": {

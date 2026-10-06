@@ -1050,7 +1050,7 @@
       "varFiles": "Var-filer (nedarves af oprettede arbejdsområder)",
       "varFilesHint": "Relative <code>.tfvars</code>-stier videregivet til plan/apply.",
       "oidcAudiences": "Audiences for kørselsidentitet (nedarves af oprettede arbejdsområder)",
-      "oidcAudiencesHint": "Audiences, som hvert arbejdsområde denne regel opretter udsteder et kørselsidentitetstoken til. Lad den være tom, så udsteder de ingenting.",
+      "oidcAudiencesHint": "Audience-tilsidesættelser, der lægges på hvert arbejdsområde denne regel opretter, med providerkonfigurationen som nøgle for det token, der gælder — aws, eller aws.west for en konfiguration med alias. Lad den være tom, så bruger de arbejdsområder deploymentets egen konfiguration.",
       "addVarFile": "Tilføj var-fil",
       "executionHooks": "Eksekverings-hooks (tilknyttet hvert nyt arbejdsområde)",
       "executionHooksHint": "Vælg blandt hooks defineret på administrationssiden <page>Eksekverings-hooks</page> — hvert valgt hook tilknyttes hvert arbejdsområde, denne regel opretter.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Angiv labels (erstatter labelkortet på hvert matchet arbejdsområde)",
       "setVarFiles": "Angiv var-filer",
       "addVarFile": "Tilføj var-fil",
-      "setOidcAudiences": "Angiv audiences for kørselsidentitet (erstatter listen i hvert matchet arbejdsområde; en tom liste slår kørselsidentitet fra)",
+      "setOidcAudiences": "Angiv audiences for kørselsidentitet (erstatter tilsidesættelserne i hvert matchet arbejdsområde; et tomt map rydder dem, så hver provider falder tilbage til deploymentets konfiguration)",
       "setRunTasks": "Angiv kørselsopgaver (upsertes efter navn på hvert matchet arbejdsområde)",
       "setNotifications": "Angiv notifikationskonfigurationer (upsertes efter navn)",
       "dryRun": "Prøvekørsel (kun forhåndsvisning — ingen ændringer skrives)",
@@ -1922,6 +1922,14 @@
       "triggers": "Triggere",
       "addNotification": "Tilføj notifikation"
     },
+    "oidcAudiences": {
+      "audiences": "Audiences",
+      "addProvider": "Tilføj providerkonfiguration",
+      "providerPlaceholder": "aws eller aws.west",
+      "providerInvalid": "Et providernavn indeholder ingen mellemrum og højst ét punktum — aws eller aws.west.",
+      "providerDuplicate": "Den providerkonfiguration har allerede en post.",
+      "removeProviderAria": "Fjern providerkonfigurationen {provider}"
+    },
     "autoApplyMode": {
       "never": "aldrig",
       "always": "altid",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Glob-bevidste Terraform-adresse- + attributstier, der undertrykkes af afdriftsklassificeringen. <star></star> matcher nul eller flere ikke-<dot></dot>-tegn (spænder over <n></n> indekser); <starIdx></starIdx> matcher ethvert indeks i firkantede parenteser. En bar adresse uden attributsuffiks lyddæmper enhver ændring af den ressource — inklusive nedrivninger. Påvirker kun afdrift, ikke almindelig plan/apply. Se <docs>drift-ignore-rules.md</docs> for den fulde grammatik.",
       "driftIgnoreRulesNone": "Ingen (hver plan-diff tæller som afdrift)",
       "oidcAudiences": "Audiences for kørselsidentitet",
-      "oidcAudiencesHint": "Terrapod udsteder et kortlivet OpenID Connect-token til hver kørsel i dette arbejdsområde og skriver det til en fil, som kørslen kan læse. En audience angiver, hvad tokenet gælder for, og hvert føderationsmål vælger sin egen uigennemsigtige streng — sts.amazonaws.com, api://AzureADTokenExchange, eller hvad målet, du fødererer mod, nu accepterer. Lad listen være tom, og dette arbejdsområde udsteder ingenting: dets kørsler autentificerer præcis som i dag, med agentpuljens egen identitet. Hvilken provider der bruger tokenet, og hvordan, er din egen konfiguration.",
+      "oidcAudiencesHint": "Terrapod udsteder et kortlivet OpenID Connect-token for hver providerkonfiguration en kørsel bruger og skriver det til en fil, kørslen kan læse. Angiv en post med provideren som nøgle, som din konfiguration kalder den — aws, eller aws.west for en konfiguration med alias — og angiv de audiences, det mål accepterer. Hver post tilsidesætter deploymentets egen konfiguration for den provider; fjern den, og provideren falder tilbage til deploymentets audiences. En audience er en uigennemsigtig streng, som føderationsmålet har valgt, så den gemmes præcis som du skriver den.",
       "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com",
-      "oidcAudiencesNone": "Ingen (kørsler bruger agentpuljens egen identitet)",
+      "oidcAudiencesNone": "Ingen tilsidesættelser (dette arbejdsområde bruger de audiences, der er konfigureret i deploymentet)",
       "oidcAudiencesAdd": "Tilføj audience"
     },
     "vcsWorkflowWarning": {

@@ -1050,7 +1050,7 @@
       "varFiles": "Arquivos de variáveis (herdados pelos workspaces criados)",
       "varFilesHint": "Caminhos <code>.tfvars</code> relativos passados para plan/apply.",
       "oidcAudiences": "Audiences da identidade de execução (herdadas pelos workspaces criados)",
-      "oidcAudiencesHint": "Audiences para as quais cada espaço de trabalho criado por esta regra emite um token de identidade de execução. Deixe vazia e eles não emitem nada.",
+      "oidcAudiencesHint": "Sobreposições de audiences aplicadas a cada espaço de trabalho que esta regra cria, indexadas pela configuração de provider à qual um token corresponde — aws, ou aws.west para uma configuração com alias. Deixe vazia e esses espaços de trabalho usam a configuração própria da implantação.",
       "addVarFile": "Adicionar arquivo de variáveis",
       "executionHooks": "Hooks de execução (associados a cada novo workspace)",
       "executionHooksHint": "Escolha entre os hooks definidos na página de administração <page>Hooks de Execução</page> — cada hook selecionado é associado a todos os workspaces que esta regra cria.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Definir rótulos (substitui o mapa de rótulos em cada workspace correspondente)",
       "setVarFiles": "Definir arquivos de variáveis",
       "addVarFile": "Adicionar arquivo de variáveis",
-      "setOidcAudiences": "Definir audiences da identidade de execução (substitui a lista em cada espaço de trabalho correspondente; uma lista vazia desliga a identidade de execução)",
+      "setOidcAudiences": "Definir audiences da identidade de execução (substitui as sobreposições em cada espaço de trabalho correspondente; um map vazio as limpa, então cada provider volta à configuração da implantação)",
       "setRunTasks": "Definir run tasks (inseridas/atualizadas por nome em cada workspace correspondente)",
       "setNotifications": "Definir configurações de notificação (inseridas/atualizadas por nome)",
       "dryRun": "Simulação (apenas prévia — nenhuma alteração é gravada)",
@@ -1922,6 +1922,14 @@
       "triggers": "Gatilhos",
       "addNotification": "Adicionar notificação"
     },
+    "oidcAudiences": {
+      "audiences": "Audiences",
+      "addProvider": "Adicionar configuração de provider",
+      "providerPlaceholder": "aws, ou aws.west",
+      "providerInvalid": "Um nome de provider não tem espaços e tem no máximo um ponto — aws, ou aws.west.",
+      "providerDuplicate": "Essa configuração de provider já tem uma entrada.",
+      "removeProviderAria": "Remover a configuração de provider {provider}"
+    },
     "autoApplyMode": {
       "never": "nunca",
       "always": "sempre",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Caminhos de endereço + atributo do Terraform com reconhecimento de glob, suprimidos pelo classificador de drift. <star></star> corresponde a zero ou mais caracteres não-<dot></dot> (abrange <n></n> índices); <starIdx></starIdx> corresponde a qualquer índice entre colchetes. Um endereço isolado, sem sufixo de atributo, silencia qualquer alteração naquele recurso — incluindo destroys. Afeta apenas o drift, não o plan/apply normal. Consulte <docs>drift-ignore-rules.md</docs> para a gramática completa.",
       "driftIgnoreRulesNone": "Nenhuma (toda diferença de plano conta como drift)",
       "oidcAudiences": "Audiences da identidade de execução",
-      "oidcAudiencesHint": "O Terrapod emite um token OpenID Connect de curta duração para cada execução deste espaço de trabalho e o escreve em um arquivo que a execução pode ler. Uma audience nomeia para que serve o token, e cada destino de federação escolhe sua própria string opaca — sts.amazonaws.com, api://AzureADTokenExchange, ou o que o destino com que você federa aceitar. Deixe a lista vazia e este espaço de trabalho não emite nada: suas execuções se autenticam exatamente como hoje, com a identidade própria do agent pool. Qual provider consome o token, e como, continua sendo sua própria configuração.",
+      "oidcAudiencesHint": "O Terrapod emite um token OpenID Connect de curta duração para cada configuração de provider que uma execução usa e o grava em um arquivo que a execução pode ler. Indexe cada entrada pelo provider como a sua configuração o nomeia — aws, ou aws.west para uma configuração com alias — e liste as audiences que esse destino aceita. Cada entrada sobrepõe a configuração própria da implantação para aquele provider; remova-a e aquele provider volta às audiences da implantação. Uma audience é uma string opaca escolhida pelo destino de federação, por isso é armazenada exatamente como você a digita.",
       "oidcAudiencesPlaceholder": "ex.: sts.amazonaws.com",
-      "oidcAudiencesNone": "Nenhuma (as execuções usam a identidade própria do agent pool)",
+      "oidcAudiencesNone": "Nenhuma sobreposição (este espaço de trabalho usa as audiences configuradas na implantação)",
       "oidcAudiencesAdd": "Adicionar audience"
     },
     "vcsWorkflowWarning": {

@@ -1419,23 +1419,30 @@ test.describe('AI policy gate (#1766)', () => {
 })
 
 test.describe('Per-workspace run identity (#1901)', () => {
-  // The mobile guard for the three surfaces #1901 adds an audience-list editor
-  // to. A row is an input plus a Remove button on one line, and an audience is
-  // a long opaque string (`api://AzureADTokenExchange`) — exactly the shape
-  // that pushes a page sideways when a value is allowed to set the row width.
+  // The mobile guard for the three surfaces #1901 adds the audience editor to.
+  // The value is a MAP of provider configuration -> audiences, so each entry is
+  // a card holding its own key and its own list of rows, and an audience is a
+  // long opaque string (`api://AzureADTokenExchange`) — exactly the shape that
+  // pushes a page sideways when a value is allowed to set a card's width.
 
-  test('the workspace audience list reads and edits at phone width', async ({ page }) => {
+  test('the workspace audience map reads and edits at phone width', async ({ page }) => {
     const token = getStoredToken()
+    // Two entries, and the second is ALIASED: `aws.west` is one key, never
+    // split on the dot, so the read view has to show it whole.
     const wsId = await createWorkspace(token, uniqueName('e2erespoidc'), {
-      'oidc-audiences': ['sts.amazonaws.com', 'api://AzureADTokenExchange'],
+      'oidc-audiences': {
+        aws: ['sts.amazonaws.com'],
+        'aws.west': ['api://AzureADTokenExchange'],
+      },
     })
 
-    // Read-only: both audiences stay visible, not hidden behind a breakpoint
-    // to make the grid fit. Someone checking which audiences a workspace mints
-    // for on a phone is the whole point of showing them.
+    // Read-only: both the provider keys and every audience stay visible, not
+    // hidden behind a breakpoint to make the grid fit. Someone checking which
+    // audiences a workspace mints for on a phone is the whole point.
     await page.goto(`/workspaces/${wsId}`)
     const shown = page.getByTestId('oidc-audiences')
     await expect(shown).toBeVisible({ timeout: 15_000 })
+    await expect(shown).toContainText('aws.west')
     await expect(shown).toContainText('api://AzureADTokenExchange')
     await expectNoHorizontalPageScroll(page)
 
@@ -1446,14 +1453,21 @@ test.describe('Per-workspace run identity (#1901)', () => {
     page.on('dialog', spy)
 
     await page.getByRole('button', { name: 'Edit' }).first().click()
-    const add = page.getByRole('button', { name: 'Add audience' })
-    await expect(add).toBeVisible({ timeout: 15_000 })
+
+    // Each existing entry carries its own audience list, so 'Add audience'
+    // belongs to a card while 'Add provider configuration' is the top-level one.
+    const addProvider = page.getByRole('button', { name: 'Add provider configuration' })
+    await expect(addProvider).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Add audience' }).first()).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 
-    // The row's action is a real button with a tap target, not bare coloured
-    // text, and adding one keeps the page inside the viewport.
-    await add.click()
-    await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
+    // A row's action is a real button with a tap target, not bare coloured
+    // text, and adding a third entry keeps the page inside the viewport.
+    await expect(addProvider).toBeDisabled()
+    await page.getByTestId('oidc-provider-input').fill('vault')
+    await expect(addProvider).toBeEnabled()
+    await addProvider.click()
+    await expect(page.getByRole('button', { name: 'Remove' })).toHaveCount(3)
     await expectNoHorizontalPageScroll(page)
 
     expect(dialogFired).toBe(false)
@@ -1476,7 +1490,9 @@ test.describe('Per-workspace run identity (#1901)', () => {
       .locator('input[type="checkbox"]')
     await expect(gate).toBeVisible({ timeout: 15_000 })
 
-    const add = page.getByRole('button', { name: 'Add audience' })
+    // An empty map has no entries, so the only control the gate reveals is the
+    // top-level one; 'Add audience' lives inside an entry and does not exist yet.
+    const add = page.getByRole('button', { name: 'Add provider configuration' })
     await expect(add).toHaveCount(0)
 
     // Retried, and only while the list is still closed, so a handler that
@@ -1486,6 +1502,13 @@ test.describe('Per-workspace run identity (#1901)', () => {
       await expect(add).toBeVisible({ timeout: 1_000 })
     }).toPass({ timeout: 15_000 })
 
+    await expectNoHorizontalPageScroll(page)
+
+    // Naming a provider reveals that entry's own audience list, still inside
+    // the viewport once a card and its row are both on the page.
+    await page.getByTestId('oidc-provider-input').fill('aws.west')
+    await add.click()
+    await expect(page.getByRole('button', { name: 'Add audience' })).toBeVisible()
     await expectNoHorizontalPageScroll(page)
   })
 
@@ -1503,7 +1526,7 @@ test.describe('Per-workspace run identity (#1901)', () => {
     //
     // Both steps are inside the retry and both are guarded on the editor still
     // being absent: clicking the summary a second time would collapse it again.
-    const add = page.getByRole('button', { name: 'Add audience' })
+    const add = page.getByRole('button', { name: 'Add provider configuration' })
     await expect(async () => {
       if ((await add.count()) > 0) {
         await expect(add).toBeVisible({ timeout: 1_000 })
@@ -1518,8 +1541,12 @@ test.describe('Per-workspace run identity (#1901)', () => {
 
     await expectNoHorizontalPageScroll(page)
 
+    // An aliased key is one key: typing the dot must not split it into a
+    // nested anything, and the card's heading carries it whole.
+    await page.getByTestId('oidc-provider-input').fill('vault.eu')
     await add.click()
     await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
+    await expect(page.getByText('vault.eu', { exact: true })).toBeVisible()
     await expectNoHorizontalPageScroll(page)
   })
 })

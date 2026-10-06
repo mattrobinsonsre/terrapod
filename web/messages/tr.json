@@ -1050,7 +1050,7 @@
       "varFiles": "Var dosyaları (oluşturulan çalışma alanlarına devralınır)",
       "varFilesHint": "plan/apply''a iletilen göreli <code>.tfvars</code> yolları.",
       "oidcAudiences": "Çalıştırma kimliği audience''ları (oluşturulan çalışma alanlarına devralınır)",
-      "oidcAudiencesHint": "Bu kuralın oluşturduğu her çalışma alanının çalıştırma kimliği token''ı ürettiği audience''lar. Boş bırakın, hiçbir şey üretmezler.",
+      "oidcAudiencesHint": "Bu kuralın oluşturduğu her çalışma alanına uygulanan audience geçersiz kılmaları; bir token''ın ait olduğu provider yapılandırmasına göre anahtarlanır — aws ya da alias''lı bir yapılandırma için aws.west. Boş bırakın, o çalışma alanları dağıtımın kendi yapılandırmasını kullanır.",
       "addVarFile": "Var dosyası ekle",
       "executionHooks": "Yürütme kancaları (her yeni çalışma alanıyla ilişkilendirilir)",
       "executionHooksHint": "<page>Yürütme Kancaları</page> yönetim sayfasında tanımlanan kancalardan seçin — seçilen her kanca, bu kuralın oluşturduğu her çalışma alanıyla ilişkilendirilir.",
@@ -1269,7 +1269,7 @@
       "setLabels": "Etiketleri ayarla (eşleşen her çalışma alanındaki etiket eşlemesini değiştirir)",
       "setVarFiles": "Var dosyalarını ayarla",
       "addVarFile": "Var dosyası ekle",
-      "setOidcAudiences": "Çalıştırma kimliği audience''larını ayarla (eşleşen her çalışma alanındaki listeyi değiştirir; boş liste çalıştırma kimliğini kapatır)",
+      "setOidcAudiences": "Çalıştırma kimliği audience''larını ayarla (eşleşen her çalışma alanındaki geçersiz kılmaları değiştirir; boş bir map bunları temizler, böylece her provider dağıtımın yapılandırmasına geri döner)",
       "setRunTasks": "Çalıştırma görevlerini ayarla (eşleşen her çalışma alanında ada göre eklenir/güncellenir)",
       "setNotifications": "Bildirim yapılandırmalarını ayarla (ada göre eklenir/güncellenir)",
       "dryRun": "Deneme çalıştırması (yalnızca önizleme — hiçbir değişiklik yazılmaz)",
@@ -1922,6 +1922,14 @@
       "triggers": "Tetikleyiciler",
       "addNotification": "Bildirim ekle"
     },
+    "oidcAudiences": {
+      "audiences": "Audience''lar",
+      "addProvider": "Provider yapılandırması ekle",
+      "providerPlaceholder": "aws ya da aws.west",
+      "providerInvalid": "Bir provider adında boşluk olmaz ve en fazla bir nokta bulunur — aws ya da aws.west.",
+      "providerDuplicate": "Bu provider yapılandırmasının zaten bir kaydı var.",
+      "removeProviderAria": "{provider} provider yapılandırmasını kaldır"
+    },
     "autoApplyMode": {
       "never": "asla",
       "always": "her zaman",
@@ -2536,9 +2544,9 @@
       "driftIgnoreRulesHint": "Sürüklenme sınıflandırıcısı tarafından bastırılan glob duyarlı Terraform adres + öznitelik yolları. <star></star> sıfır veya daha fazla <dot></dot> olmayan karakterle eşleşir (<n></n> dizin boyunca yayılır); <starIdx></starIdx> herhangi bir köşeli parantezli dizinle eşleşir. Öznitelik son eki olmayan çıplak bir adres, o kaynağa yapılan her değişikliği — yok etmeler dahil — susturur. Yalnızca sürüklenmeyi etkiler, normal plan/apply''ı değil. Tam dilbilgisi için <docs>drift-ignore-rules.md</docs> bölümüne bakın.",
       "driftIgnoreRulesNone": "Yok (her plan farkı sürüklenme sayılır)",
       "oidcAudiences": "Çalıştırma kimliği audience''ları",
-      "oidcAudiencesHint": "Terrapod bu çalışma alanının her çalıştırması için kısa ömürlü bir OpenID Connect token''ı üretir ve onu çalıştırmanın okuyabileceği bir dosyaya yazar. Bir audience, token''ın ne için olduğunu adlandırır ve her federasyon hedefi kendi opak dizesini seçer — sts.amazonaws.com, api://AzureADTokenExchange ya da federe olduğunuz hedef ne kabul ediyorsa. Listeyi boş bırakın, bu çalışma alanı hiçbir şey üretmez: çalıştırmaları bugün olduğu gibi, agent havuzunun kendi kimliğiyle kimlik doğrular. Token''ı hangi provider''ın nasıl kullandığı sizin kendi yapılandırmanızda kalır.",
+      "oidcAudiencesHint": "Terrapod, bir çalıştırmanın kullandığı her provider yapılandırması için kısa ömürlü bir OpenID Connect token''ı üretir ve onu çalıştırmanın okuyabileceği bir dosyaya yazar. Bir kaydı, yapılandırmanızın provider''ı adlandırdığı biçimde anahtarlayın — aws ya da alias''lı bir yapılandırma için aws.west — ve o hedefin kabul ettiği audience''ları listeleyin. Her kayıt, o provider için dağıtımın kendi yapılandırmasını geçersiz kılar; kaydı kaldırırsanız o provider dağıtımın audience''larına geri döner. Audience, federasyon hedefinin seçtiği opak bir dizedir; bu yüzden tam yazdığınız gibi saklanır.",
       "oidcAudiencesPlaceholder": "örn. sts.amazonaws.com",
-      "oidcAudiencesNone": "Yok (çalıştırmalar agent havuzunun kendi kimliğini kullanır)",
+      "oidcAudiencesNone": "Geçersiz kılma yok (bu çalışma alanı dağıtımda yapılandırılmış audience''ları kullanır)",
       "oidcAudiencesAdd": "Audience ekle"
     },
     "vcsWorkflowWarning": {
