@@ -224,6 +224,20 @@ async def init_oidc_signing(db: AsyncSession) -> list[SigningKey]:
     grace = settings.auth.oidc_issuer.retired_key_grace_seconds
     live_cutoff = datetime.now(UTC) - timedelta(seconds=grace)
     live = [r for r in rows if r.retired_at is None or r.retired_at > live_cutoff]
+    # Raise BEFORE assigning, exactly as `reload_signing_keys` does, and for a
+    # sharper reason here. `_choose_signing_kid` raises on an empty `live`, and
+    # the lifespan catches that and only WARNS — so assigning first would leave
+    # `_keys == []` rather than None. `get_jwks` guards on `is None`, so the
+    # empty list sails through it and the issuer publishes `{"keys": []}` with a
+    # 300s cache: every federation target caches an empty trust root, and a
+    # later successful rotation does not take effect until those caches expire.
+    # Failing here keeps `_keys` None, which `get_jwks` refuses loudly.
+    if not live:
+        raise RuntimeError(
+            "No live OIDC issuer signing key — every row is retired beyond "
+            "retired_key_grace_seconds. Rotate to mint a new one."
+        )
+
     _keys = [SigningKey(kid=r.kid, private_key_pem=r.private_key_pem, row_id=r.id) for r in live]
     _signing_kid = _choose_signing_kid(live, grace_seconds=grace)
     logger.info(

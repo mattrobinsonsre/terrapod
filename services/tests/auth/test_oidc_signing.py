@@ -408,3 +408,56 @@ class TestThePublishedJWKCarriesNothingPrivate:
 
         assert [k["kid"] for k in before["keys"]] == [first.kid]
         assert [k["kid"] for k in after["keys"]] == [first.kid, second.kid]
+
+
+class TestAnExhaustedKeyTableNeverPublishesAnEmptyTrustRoot:
+    """`init_oidc_signing` must raise BEFORE assigning `_keys`.
+
+    The ordering is the whole test. `_choose_signing_kid` raises on an empty
+    `live`, and the app lifespan catches that and only WARNS — so assigning
+    first leaves `_keys == []` rather than None. `get_jwks` guards on `is None`,
+    so an empty list sails straight through it and the issuer serves
+    `{"keys": []}` with a 300s cache. Every federation target then caches an
+    empty trust root and a later successful rotation does not take effect until
+    those caches expire.
+
+    Reachable after the emergency `propagation=0 / grace=0` rotation the chart
+    advertises, or on a restart following a long outage. `reload_signing_keys`
+    already had this order; `init` did not, and nothing looked at it.
+    """
+
+    def _db_returning(self, rows):
+        import asyncio  # noqa: F401
+
+        scalars = MagicMock()
+        scalars.all.return_value = rows
+        result = MagicMock()
+        result.scalars.return_value = scalars
+
+        class _DB:
+            async def execute(self, *a, **k):
+                return result
+
+            async def commit(self):
+                return None
+
+        return _DB()
+
+    def test_init_raises_and_leaves_the_published_set_unset(self, key):
+        import asyncio
+        from datetime import UTC, datetime, timedelta
+
+        long_ago = datetime.now(UTC) - timedelta(days=365)
+        row = MagicMock()
+        row.kid = "stale"
+        row.private_key_pem = oidc_signing.serialize_private_key(key)
+        row.id = 1
+        row.retired_at = long_ago
+
+        with patch.object(oidc_signing, "_configured_key_pem", return_value=None):
+            with pytest.raises(RuntimeError, match="No live OIDC issuer signing key"):
+                asyncio.run(oidc_signing.init_oidc_signing(self._db_returning([row])))
+
+        # The property the ordering exists for: NOT `{"keys": []}`.
+        with pytest.raises(RuntimeError, match="not initialised"):
+            oidc_signing.get_jwks()
