@@ -20,7 +20,7 @@ Endpoints (all under /api/terrapod/v1):
         POST /oidc/signing-keys/actions/rotate      add a key, retire the current one
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,26 +49,57 @@ def _rfc3339(dt) -> str | None:
 @router.post("/runs/{run_id}/cloud-identity-token")
 async def mint_cloud_identity_token(
     run_id: str = Path(...),
+    target: str = Query(
+        default="",
+        description=(
+            "The provider configuration this token is for, as the runner "
+            "discovered it: `aws`, or `provider.alias` for one aliased "
+            "configuration. Resolved specific-then-general."
+        ),
+    ),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Mint this run's cloud identity token.
+    """Mint one target's cloud identity token for this run.
 
-    **204 when the workspace mints nothing.** The runner calls this
-    unconditionally — it has no other way to know whether the workspace opted in,
-    and giving it one would mean a new wire field and a new way for a lagging
-    listener to be wrong. So "not opted in" has to be distinguishable from
-    "broken", because the runner's behaviour differs completely: on 204 it takes
-    no action and the run authenticates to the cloud with the agent pool's own
-    identity, exactly as before; on anything else it fails the run (#1442's rule
-    — credentials were asked for and could not be had, and continuing would mean
-    silently running under broader permissions than the operator chose).
+    **One token per target, carrying only that target's audiences.** A token
+    audienced for several targets is replayable between them, and AWS refuses a
+    multi-valued `aud` outright, so the runner asks once per provider
+    configuration it discovered and writes each answer to its own path.
+
+    **204 means "nothing to deliver", and the runner must not treat it as an
+    error.** Three distinct cases answer 204, deliberately:
+
+    * the deployment publishes no issuer — not opted in at all;
+    * nothing maps to this target — most providers in most workspaces;
+    * **the request named no target at all**, which is a runner image older than
+      per-target minting. That one matters: 400 would be the obvious answer and
+      it would make every run on a lagging runner FAIL, when the designed
+      behaviour is that it falls through to the agent pool's own identity
+      exactly as before this feature existed. The fall-through is permanent and
+      supported, so a request we cannot serve must look like "nothing here"
+      rather than like a fault.
 
     **The phase comes from the presented token, never from the request.** A
     plan-phase runner asking for the apply identity is the whole thing this
     guards: put write permissions behind a trust condition on `phase: apply` and
-    a speculative pull-request plan structurally cannot assume that role, because
-    every PR-driven run is plan-only.
+    a speculative pull-request plan structurally cannot assume that role,
+    because every PR-driven run is plan-only.
+
+    **The run's snapshot is checked, not merely used.** `Run.oidc_audiences` is
+    the mapping resolved when the run was created — what the plan was reviewed
+    under — and this re-resolves the requested target from live configuration
+    and refuses when the two disagree. Minting from the snapshot alone would
+    hand an apply a token that matches the reviewed plan while the cloud has
+    moved on, and it would then be rejected at the cloud's token exchange, deep
+    inside the engine and possibly after a partial apply. Refusing here is the
+    same shape as a saved plan refused because the state serial moved: fail
+    before anything executes, and say what changed.
+
+    The check is deliberately one lookup on each side. The runner asks about one
+    target at a time, so there is no map to diff and no need to know which
+    targets the plan used — the richer, named comparison belongs on the confirm
+    path, where it costs nothing and a human is reading it.
 
     A token minted before the phase claim existed carries no phase. That is read
     as "makes no claim" and the minted JWT carries no `phase` either, so an
@@ -78,6 +109,7 @@ async def mint_cloud_identity_token(
     from terrapod.api.routers.oidc_issuer import issuer_url
     from terrapod.auth.oidc_signing import sign_identity_token
     from terrapod.config import settings
+    from terrapod.services import cloud_identity_resolver
 
     require_runner_for_run(user, run_id)
 
@@ -86,17 +118,39 @@ async def mint_cloud_identity_token(
         # published an issuer has not opted this deployment in at all.
         return Response(status_code=204)
 
+    if not target:
+        # A lagging runner image. See the docstring — 204, never 400.
+        logger.info("cloud identity mint with no target — lagging runner image", run_id=run_id)
+        return Response(status_code=204)
+
     run = await db.get(Run, parse_id(run_id, "run-", detail="Run not found"))
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    audiences = list(run.oidc_audiences or [])
-    if not audiences:
+    snapshot = run.oidc_audiences or {}
+    audiences = cloud_identity_resolver.audiences_for_target(snapshot, target)
+    if audiences is None:
+        # Nothing maps to this provider for this run. The common answer.
         return Response(status_code=204)
 
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
+
+    live = cloud_identity_resolver.resolve_for_workspace(ws, settings=settings)
+    if cloud_identity_resolver.target_changed(snapshot, live, target):
+        # 409, not 404 or 422: the request is well formed and the caller is
+        # entitled to it — the world moved underneath the run. The operator's
+        # action is to re-plan, so say that rather than describing a mismatch.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"The cloud identity configuration for {target!r} has changed since this "
+                f"run was created, so the identity this run would present is no longer the "
+                f"one its plan was reviewed under. Queue a new run to pick up the current "
+                f"configuration."
+            ),
+        )
 
     phase = user.run_phase
     claims: dict = {
@@ -128,6 +182,7 @@ async def mint_cloud_identity_token(
         run_id=str(run.id),
         workspace=ws.name,
         phase=phase,
+        target=target,
         audiences=audiences,
     )
     return JSONResponse(
@@ -135,6 +190,10 @@ async def mint_cloud_identity_token(
             "token": token,
             "expires_in": settings.auth.oidc_issuer.token_ttl_seconds,
             "phase": phase,
+            # Echoed so the runner writes the file under the name it asked for
+            # rather than re-deriving it, and so a log line names which target a
+            # token was for without the token being in it.
+            "target": target,
             "audiences": audiences,
         }
     )
