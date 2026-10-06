@@ -458,3 +458,88 @@ class TestTheTargetsRoute:
         with pytest.raises(HTTPException) as exc:
             await _call_targets(_user(run_id=str(uuid.uuid4()), phase="plan"), run, ws, cfg=cfg)
         assert exc.value.status_code == 403
+
+
+async def _call_defaults(user, *, cfg=None):
+    settings = MagicMock()
+    settings.auth.oidc_issuer = cfg or _enabled()
+    with patch("terrapod.config.settings", settings):
+        return await router.get_oidc_audience_defaults(user=user)
+
+
+class TestTheAudienceDefaults:
+    """What a workspace's own map merges OVER.
+
+    Exists so the two-level merge is observable: a workspace read returns the
+    merged map with no marker for which entries the workspace owns, so without
+    this an operator cannot tell an inherited entry from one of their own.
+    """
+
+    async def test_the_catalogue_is_returned(self):
+        import json
+
+        cfg = _enabled(audiences={"aws": [AWS], "vault": ["https://vault.example.com"]})
+        resp = await _call_defaults(_user(method="session"), cfg=cfg)
+        body = json.loads(resp.body)["data"]["attributes"]
+        assert body["audiences"] == {"aws": [AWS], "vault": ["https://vault.example.com"]}
+
+    async def test_an_unconfigured_catalogue_is_empty_not_an_error(self):
+        import json
+
+        resp = await _call_defaults(_user(method="session"), cfg=_enabled(audiences={}))
+        assert resp.status_code == 200
+        assert json.loads(resp.body)["data"]["attributes"]["audiences"] == {}
+
+    async def test_the_issuer_state_is_reported_separately_from_the_catalogue(self):
+        """An empty catalogue and a disabled issuer are different things, and an
+        operator debugging "why did my workspace mint nothing" needs to tell
+        them apart."""
+        import json
+
+        cfg = _enabled(audiences={"aws": [AWS]})
+        cfg.enabled = False
+        attrs = json.loads((await _call_defaults(_user(method="session"), cfg=cfg)).body)["data"][
+            "attributes"
+        ]
+        assert attrs["issuer-enabled"] is False
+        assert attrs["audiences"] == {"aws": [AWS]}
+
+    async def test_the_response_hands_out_copies_not_the_live_config_lists(self):
+        """The lists are copied. A serializer handing out the live config
+        object's own lists lets anything downstream of it edit process-wide
+        settings — so this captures what the route actually built and asserts
+        it is not the same object, rather than asserting on a dict the test
+        made itself."""
+        catalogue = {"aws": [AWS]}
+        cfg = _enabled(audiences=catalogue)
+
+        captured: dict = {}
+
+        class _Capture:
+            def __init__(self, content=None, **kw):
+                captured["content"] = content
+                self.status_code = kw.get("status_code", 200)
+
+        settings = MagicMock()
+        settings.auth.oidc_issuer = cfg
+        with (
+            patch("terrapod.config.settings", settings),
+            patch.object(router, "JSONResponse", _Capture),
+        ):
+            await router.get_oidc_audience_defaults(user=_user(method="session"))
+
+        served = captured["content"]["data"]["attributes"]["audiences"]
+        assert served == {"aws": [AWS]}, "the catalogue was not served correctly"
+        assert served["aws"] is not catalogue["aws"], (
+            "the route handed out the live config object's own list"
+        )
+        served["aws"].append("injected")
+        assert catalogue["aws"] == [AWS], "mutating the served value reached live settings"
+
+    async def test_a_runner_token_is_not_the_intended_caller_but_is_authenticated(self):
+        """Documented asymmetry: the runner-facing targets route returns names
+        only, because a runner writes a file and the engine reads it. This route
+        is for a person composing configuration. It does not special-case the
+        runner, and does not need to — the runner never calls it."""
+        resp = await _call_defaults(_user(run_id="r", phase="plan"), cfg=_enabled(audiences={}))
+        assert resp.status_code == 200

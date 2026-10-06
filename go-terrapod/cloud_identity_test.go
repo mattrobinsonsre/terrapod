@@ -372,3 +372,91 @@ func TestUpdateWorkspaceRoundTripsOIDCAudiences(t *testing.T) {
 		t.Error("the inherited target was lost on read-back")
 	}
 }
+
+// ── the deployment-wide audience catalogue ───────────────────────────
+
+func TestGetOIDCAudienceDefaults(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/terrapod/v1/oidc/audience-defaults" {
+			t.Errorf("requested %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"type":"oidc-audience-defaults","id":"default",
+			"attributes":{"audiences":{"aws":["sts.example.com"],
+			"vault":["https://a","https://b"]},"issuer-enabled":true}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	got, err := c.GetOIDCAudienceDefaults(context.Background())
+	if err != nil {
+		t.Fatalf("GetOIDCAudienceDefaults: %v", err)
+	}
+	if !got.IssuerEnabled {
+		t.Error("issuer-enabled did not decode")
+	}
+	if v := got.Audiences["aws"]; len(v) != 1 || v[0] != "sts.example.com" {
+		t.Errorf("audiences[aws] = %v", v)
+	}
+	// Order is preserved: several audiences for one target is a deliberate
+	// "these are interchangeable" statement, and some targets refuse a
+	// multi-valued aud outright, so neither collapsing nor reordering is safe.
+	if v := got.Audiences["vault"]; len(v) != 2 || v[0] != "https://a" || v[1] != "https://b" {
+		t.Errorf("audiences[vault] = %v, want both in order", v)
+	}
+}
+
+// An unconfigured catalogue is the DEFAULT, not an error — and it must not come
+// back as a nil map, or every consumer has to special-case ranging over it.
+func TestGetOIDCAudienceDefaultsNormalisesAnEmptyCatalogue(t *testing.T) {
+	for _, body := range []string{
+		`{"data":{"attributes":{"audiences":{},"issuer-enabled":false}}}`,
+		`{"data":{"attributes":{"issuer-enabled":false}}}`,
+		`{"data":{"attributes":{"audiences":null,"issuer-enabled":false}}}`,
+	} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/vnd.api+json")
+			_, _ = w.Write([]byte(body))
+		}))
+		c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+		if err != nil {
+			t.Fatalf("NewClient: %v", err)
+		}
+		got, err := c.GetOIDCAudienceDefaults(context.Background())
+		srv.Close()
+		if err != nil {
+			t.Fatalf("GetOIDCAudienceDefaults(%s): %v", body, err)
+		}
+		if got.Audiences == nil {
+			t.Errorf("%s decoded Audiences as nil, want an empty map", body)
+		}
+		if len(got.Audiences) != 0 {
+			t.Errorf("%s decoded %v, want empty", body, got.Audiences)
+		}
+	}
+}
+
+// The issuer being off and the catalogue being empty are different states with
+// the same symptom, so a consumer must be able to tell them apart.
+func TestGetOIDCAudienceDefaultsReportsADisabledIssuerWithEntriesPresent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":{"attributes":{"audiences":{"aws":["x"]},
+			"issuer-enabled":false}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	got, err := c.GetOIDCAudienceDefaults(context.Background())
+	if err != nil {
+		t.Fatalf("GetOIDCAudienceDefaults: %v", err)
+	}
+	if got.IssuerEnabled {
+		t.Error("issuer-enabled = true, want false")
+	}
+	if len(got.Audiences) != 1 {
+		t.Error("a configured catalogue was dropped because the issuer is off")
+	}
+}

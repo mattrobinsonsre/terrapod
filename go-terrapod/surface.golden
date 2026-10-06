@@ -607,6 +607,8 @@ field NotificationConfiguration.Triggers []string `json:"triggers,omitempty"`
 field NotificationConfiguration.URL string `json:"url,omitempty"`
 field NotificationConfiguration.UpdatedAt string `json:"updated-at,omitempty"`
 field NotificationConfiguration.WorkspaceID string `json:"workspace-id,omitempty"`
+field OIDCAudienceDefaults.Audiences map[string][]string `json:"audiences"`
+field OIDCAudienceDefaults.IssuerEnabled bool `json:"issuer-enabled"`
 field OIDCSigningKey.ActivatesAt string `json:"activates-at,omitempty"`
 field OIDCSigningKey.CreatedAt string `json:"created-at,omitempty"`
 field OIDCSigningKey.Kid string `json:"kid"`
@@ -1450,6 +1452,7 @@ method (*Client) GetModuleAutodiscoveryRule(ctx context.Context, id string) (*Mo
 method (*Client) GetModuleInterface(ctx context.Context, name, provider, version string) (*ModuleInterface, error)
 method (*Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) (*ModuleWorkspaceLink, error)
 method (*Client) GetNotificationConfiguration(ctx context.Context, id string) (*NotificationConfiguration, error)
+method (*Client) GetOIDCAudienceDefaults(ctx context.Context) (*OIDCAudienceDefaults, error)
 method (*Client) GetOnboardingAvailability(ctx context.Context) (*OnboardingAvailability, error)
 method (*Client) GetOnboardingSession(ctx context.Context, sessionID string) (*OnboardingSession, error)
 method (*Client) GetPlanLog(ctx context.Context, runID string, opts *LogOptions) ([]byte, error)
@@ -1711,6 +1714,7 @@ type ModuleInterface struct
 type ModuleWorkspaceLink struct
 type NotFoundError struct
 type NotificationConfiguration struct
+type OIDCAudienceDefaults struct
 type OIDCSigningKey struct
 type OIDCSigningKeyRotation struct
 type OIDCSigningKeySet struct

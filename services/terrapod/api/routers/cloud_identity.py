@@ -16,6 +16,8 @@ Endpoints (all under /api/terrapod/v1):
     Runner protocol (runner token, run_id-scoped):
         GET  /runs/{run_id}/cloud-identity-targets  which providers this run mints for
         POST /runs/{run_id}/cloud-identity-token    mint this run's identity token
+    Deployment configuration (any authenticated user):
+        GET  /oidc/audience-defaults                the deployment-wide audience catalogue
     Signing keys (platform admin):
         GET  /oidc/signing-keys                     what is published, and when it signs
         POST /oidc/signing-keys/actions/rotate      add a key, retire the current one
@@ -251,6 +253,57 @@ async def list_cloud_identity_targets(
         return Response(status_code=204)
 
     return JSONResponse(content={"targets": targets})
+
+
+@router.get("/oidc/audience-defaults")
+async def get_oidc_audience_defaults(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> JSONResponse:
+    """The deployment-wide audience catalogue a workspace's own map merges over.
+
+    Exists so a practitioner composing `oidc_audiences` can see what they would
+    INHERIT. Without it the two-level merge is only observable through its
+    result: a workspace read returns the merged map with no indication of which
+    entries the workspace owns, so an operator cannot tell an inherited entry
+    from one of their own, and a consumer that writes the merged value back
+    promotes every inherited entry into an override.
+
+    **Any authenticated user, not platform admin.** The gate is deliberate
+    rather than lax. A workspace read already returns the merged map to anyone
+    who can read the workspace, so the effective audiences for a workspace are
+    disclosed at that tier today; this adds only the entries a workspace does
+    not override. Requiring admin would put it out of reach of exactly the
+    person it is for -- a workspace owner deciding whether to override a key --
+    while disclosing nothing that tier cannot already see. Knowing an audience
+    grants nothing on its own: the cloud's own trust policy is the gate, and
+    minting needs a phase-bound runner token scoped to a run on that workspace.
+
+    Contrast the runner-facing targets route above, which returns NAMES only.
+    The asymmetry is the point: a runner writes a file and the engine reads it,
+    so it has no use for the values, and the set of audiences names the roles
+    this deployment can ask to assume.
+
+    Empty when the deployment configures no catalogue, which is the default --
+    not an error, and not the same as the issuer being disabled.
+    """
+    from terrapod.config import settings
+
+    cfg = settings.auth.oidc_issuer
+    return JSONResponse(
+        content={
+            "data": {
+                "type": "oidc-audience-defaults",
+                "id": "default",
+                "attributes": {
+                    # Copied, not handed out: this is a live config object and a
+                    # serializer must never be the thing that lets a caller
+                    # mutate process-wide settings.
+                    "audiences": {k: list(v) for k, v in (cfg.audiences or {}).items()},
+                    "issuer-enabled": bool(cfg.enabled),
+                },
+            }
+        }
+    )
 
 
 @router.get("/oidc/signing-keys")
