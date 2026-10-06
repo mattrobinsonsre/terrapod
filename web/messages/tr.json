@@ -1269,7 +1269,7 @@
       "setLabels": "Etiketleri ayarla (eşleşen her çalışma alanındaki etiket eşlemesini değiştirir)",
       "setVarFiles": "Var dosyalarını ayarla",
       "addVarFile": "Var dosyası ekle",
-      "setOidcAudiences": "Çalıştırma kimliği audience''larını ayarla (eşleşen her çalışma alanındaki geçersiz kılmaları değiştirir; boş bir map bunları temizler, böylece her provider dağıtımın yapılandırmasına geri döner)",
+      "setOidcAudiences": "OIDC çalıştırma kimliği audience''larını ayarla (eşleşen her çalışma alanındaki eşlemeyi değiştirir)",
       "setRunTasks": "Çalıştırma görevlerini ayarla (eşleşen her çalışma alanında ada göre eklenir/güncellenir)",
       "setNotifications": "Bildirim yapılandırmalarını ayarla (ada göre eklenir/güncellenir)",
       "dryRun": "Deneme çalıştırması (yalnızca önizleme — hiçbir değişiklik yazılmaz)",

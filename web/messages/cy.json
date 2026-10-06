@@ -1269,7 +1269,7 @@
       "setLabels": "Gosod labeli (yn amnewid map y labeli ar bob gweithfan gyfatebol)",
       "setVarFiles": "Gosod ffeiliau var",
       "addVarFile": "Ychwanegu ffeil var",
-      "setOidcAudiences": "Gosod cynulleidfaoedd hunaniaeth rhediad (yn disodli'r disodliadau ar bob gweithle sy'n cyfateb; mae map gwag yn eu clirio, felly mae pob provider yn dychwelyd at gyfluniad y defnydd)",
+      "setOidcAudiences": "Gosod cynulleidfaoedd hunaniaeth rhediad OIDC (yn amnewid y map ar bob gweithfan gyfatebol)",
       "setRunTasks": "Gosod tasgau rhediad (upsertir yn ôl enw ar bob gweithfan gyfatebol)",
       "setNotifications": "Gosod ffurfweddiadau hysbysu (upsertir yn ôl enw)",
       "dryRun": "Rhediad sych (rhagolwg yn unig — ni ysgrifennir unrhyw newidiadau)",

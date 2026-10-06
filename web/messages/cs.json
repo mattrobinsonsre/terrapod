@@ -1269,7 +1269,7 @@
       "setLabels": "Nastavit štítky (nahradí mapu štítků na každém odpovídajícím pracovním prostoru)",
       "setVarFiles": "Nastavit var soubory",
       "addVarFile": "Přidat var soubor",
-      "setOidcAudiences": "Nastavit audience identity běhu (nahradí přepisy v každém odpovídajícím pracovním prostoru; prázdná mapa je smaže, takže se každý provider vrátí ke konfiguraci nasazení)",
+      "setOidcAudiences": "Nastavit OIDC audience identity běhu (nahradí mapu na každém odpovídajícím pracovním prostoru)",
       "setRunTasks": "Nastavit run tasky (upsertovány podle názvu na každém odpovídajícím pracovním prostoru)",
       "setNotifications": "Nastavit konfigurace oznámení (upsertovány podle názvu)",
       "dryRun": "Zkušební běh (pouze náhled — žádné změny nezapsány)",

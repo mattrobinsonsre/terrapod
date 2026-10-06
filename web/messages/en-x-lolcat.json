@@ -1269,7 +1269,7 @@
       "setLabels": "Set labels (replacez teh labels map on every matchd workspace)",
       "setVarFiles": "Set var files",
       "addVarFile": "Add var file",
-      "setOidcAudiences": "Set run identitee audiencez (replacez da overridez on evry matchd werkspace; an empty map clearz dem, so evry providr fallz bak ta da deployment''z configurashun)",
+      "setOidcAudiences": "Set OIDC run identitee audiencez (replacez teh map on every matchd workspace)",
       "setRunTasks": "Set run tasks (upsertd by naem on every matchd workspace)",
       "setNotifications": "Set notificashun configurashuns (upsertd by naem)",
       "dryRun": "Dry run (preview only — no chaenges writtn)",

@@ -1269,7 +1269,7 @@
       "setLabels": "Beschriftungen setzen (ersetzt die Beschriftungszuordnung auf jedem getroffenen Arbeitsbereich)",
       "setVarFiles": "Variablendateien setzen",
       "addVarFile": "Var-Datei hinzufügen",
-      "setOidcAudiences": "Audiences der Lauf-Identität setzen (ersetzt die Überschreibungen in jedem zutreffenden Arbeitsbereich; eine leere Zuordnung löscht sie, sodass jeder Provider auf die Konfiguration der Bereitstellung zurückfällt)",
+      "setOidcAudiences": "OIDC-Audiences der Lauf-Identität setzen (ersetzt die Zuordnung auf jedem getroffenen Arbeitsbereich)",
       "setRunTasks": "Ausführungsaufgaben setzen (per Name auf jedem getroffenen Arbeitsbereich aktualisiert/eingefügt)",
       "setNotifications": "Benachrichtigungskonfigurationen setzen (per Name aktualisiert/eingefügt)",
       "dryRun": "Probelauf (nur Vorschau — keine Änderungen geschrieben)",

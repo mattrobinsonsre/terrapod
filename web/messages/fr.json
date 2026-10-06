@@ -1269,7 +1269,7 @@
       "setLabels": "Définir les labels (remplace la carte de labels sur chaque espace de travail correspondant)",
       "setVarFiles": "Définir les fichiers de variables",
       "addVarFile": "Ajouter un fichier de variables",
-      "setOidcAudiences": "Définir les audiences de l''identité d''exécution (remplace les surcharges dans chaque espace de travail correspondant ; une map vide les efface, de sorte que chaque provider revient à la configuration du déploiement)",
+      "setOidcAudiences": "Définir les audiences OIDC de l''identité d''exécution (remplace la carte sur chaque espace de travail correspondant)",
       "setRunTasks": "Définir les tâches d'exécution (insérées ou mises à jour par nom sur chaque espace de travail correspondant)",
       "setNotifications": "Définir les configurations de notification (insérées ou mises à jour par nom)",
       "dryRun": "Simulation (aperçu uniquement — aucune modification écrite)",

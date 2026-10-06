@@ -1269,7 +1269,7 @@
       "setLabels": "Imposta etichette (sostituisce la mappa delle etichette su ogni workspace corrispondente)",
       "setVarFiles": "Imposta file di variabili",
       "addVarFile": "Aggiungi file di variabili",
-      "setOidcAudiences": "Imposta le audience dell''identità di esecuzione (sostituisce le sovrascritture in ogni spazio di lavoro corrispondente; una map vuota le cancella, così ogni provider torna alla configurazione del deployment)",
+      "setOidcAudiences": "Imposta le audience OIDC dell''identità di esecuzione (sostituisce la mappa su ogni workspace corrispondente)",
       "setRunTasks": "Imposta run task (upsert per nome su ogni workspace corrispondente)",
       "setNotifications": "Imposta configurazioni di notifica (upsert per nome)",
       "dryRun": "Dry run (solo anteprima — nessuna modifica scritta)",

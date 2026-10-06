@@ -1269,7 +1269,7 @@
       "setLabels": "Set labels (replaces th'' labels map on every matched work-deck)",
       "setVarFiles": "Set var files",
       "addVarFile": "Add a var file",
-      "setOidcAudiences": "Set voyage colours audiences (replaces th'' overrides on every matched work-deck; an empty map douses th'' lot, so every provider falls back t'' th'' deployment''s riggin'')",
+      "setOidcAudiences": "Set OIDC voyage colours audiences (replaces th'' map on every matched work-deck)",
       "setRunTasks": "Set run tasks (upserted by name on every matched work-deck)",
       "setNotifications": "Set notification configurations (upserted by name)",
       "dryRun": "Dry run (preview only — nay changes written)",

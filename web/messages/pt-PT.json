@@ -1269,7 +1269,7 @@
       "setLabels": "Definir etiquetas (substitui o mapa de etiquetas em cada workspace correspondente)",
       "setVarFiles": "Definir ficheiros de variáveis",
       "addVarFile": "Adicionar ficheiro de variáveis",
-      "setOidcAudiences": "Definir audiences da identidade de execução (substitui as sobreposições em cada espaço de trabalho correspondente; um map vazio limpa-as, pelo que cada provider volta à configuração da implementação)",
+      "setOidcAudiences": "Definir audiences OIDC da identidade de execução (substitui o mapa em cada workspace correspondente)",
       "setRunTasks": "Definir run tasks (inseridas/atualizadas por nome em cada workspace correspondente)",
       "setNotifications": "Definir configurações de notificação (inseridas/atualizadas por nome)",
       "dryRun": "Simulação (apenas pré-visualização — nenhuma alteração é gravada)",

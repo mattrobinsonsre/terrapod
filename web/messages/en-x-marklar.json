@@ -1269,7 +1269,7 @@
       "setLabels": "Set marklars (replaces the marklar marklar on every matched marklar)",
       "setVarFiles": "Set var marklars",
       "addVarFile": "Add var marklar",
-      "setOidcAudiences": "Set marklar marklar marklars (replaces the marklars on every matched marklar; an empty marklar clears them, so each marklar falls back to the marklar''s marklar)",
+      "setOidcAudiences": "Set OIDC marklar marklar marklars (replaces the marklar on every matched marklar)",
       "setRunTasks": "Set run marklars (upserted by marklar on every matched marklar)",
       "setNotifications": "Set marklar marklars (upserted by marklar)",
       "dryRun": "Dry run (preview only — no marklars written)",

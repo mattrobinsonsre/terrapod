@@ -1269,7 +1269,7 @@
       "setLabels": "Ange etiketter (ersätter etikettkartan på varje matchad arbetsyta)",
       "setVarFiles": "Ange var-filer",
       "addVarFile": "Lägg till var-fil",
-      "setOidcAudiences": "Ange audiences för körningsidentitet (ersätter åsidosättandena i varje matchad arbetsyta; en tom map rensar dem, så varje provider faller tillbaka på deploymentets konfiguration)",
+      "setOidcAudiences": "Ange OIDC-audiences för körningsidentitet (ersätter kartan på varje matchad arbetsyta)",
       "setRunTasks": "Ange körningsuppgifter (uppdateras/skapas efter namn på varje matchad arbetsyta)",
       "setNotifications": "Ange aviseringskonfigurationer (uppdateras/skapas efter namn)",
       "dryRun": "Torrkörning (endast förhandsgranskning — inga ändringar skrivs)",

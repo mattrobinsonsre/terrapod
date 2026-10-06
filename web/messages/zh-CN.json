@@ -1269,7 +1269,7 @@
       "setLabels": "设置标签（替换每个匹配工作区上的标签映射）",
       "setVarFiles": "设置变量文件",
       "addVarFile": "添加变量文件",
-      "setOidcAudiences": "设置运行身份受众（替换每个匹配工作区上的覆盖；空映射会将其清除，于是每个 provider 回退到部署的配置）",
+      "setOidcAudiences": "设置运行身份的 OIDC 受众（替换每个匹配工作区上的映射）",
       "setRunTasks": "设置运行任务（在每个匹配工作区上按名称更新插入）",
       "setNotifications": "设置通知配置（按名称更新插入）",
       "dryRun": "试运行（仅预览 — 不写入任何更改）",

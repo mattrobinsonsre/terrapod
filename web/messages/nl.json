@@ -1269,7 +1269,7 @@
       "setLabels": "Labels instellen (vervangt de labelmap op elke overeengekomen workspace)",
       "setVarFiles": "Var-bestanden instellen",
       "addVarFile": "Var-bestand toevoegen",
-      "setOidcAudiences": "Audiences van de uitvoeringsidentiteit instellen (vervangt de overschrijvingen in elke overeenkomende werkruimte; een lege map wist ze, zodat elke provider terugvalt op de configuratie van het deployment)",
+      "setOidcAudiences": "OIDC-audiences van de uitvoeringsidentiteit instellen (vervangt de map op elke overeengekomen workspace)",
       "setRunTasks": "Run-tasks instellen (op naam bijgewerkt of toegevoegd op elke overeengekomen workspace)",
       "setNotifications": "Notificatieconfiguraties instellen (op naam bijgewerkt of toegevoegd)",
       "dryRun": "Proefdraaien (alleen voorbeeld — geen wijzigingen weggeschreven)",

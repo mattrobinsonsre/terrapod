@@ -1269,7 +1269,7 @@
       "setLabels": "Angiv labels (erstatter labelkortet på hvert matchet arbejdsområde)",
       "setVarFiles": "Angiv var-filer",
       "addVarFile": "Tilføj var-fil",
-      "setOidcAudiences": "Angiv audiences for kørselsidentitet (erstatter tilsidesættelserne i hvert matchet arbejdsområde; et tomt map rydder dem, så hver provider falder tilbage til deploymentets konfiguration)",
+      "setOidcAudiences": "Angiv OIDC-audiences for kørselsidentitet (erstatter mappet på hvert matchet arbejdsområde)",
       "setRunTasks": "Angiv kørselsopgaver (upsertes efter navn på hvert matchet arbejdsområde)",
       "setNotifications": "Angiv notifikationskonfigurationer (upsertes efter navn)",
       "dryRun": "Prøvekørsel (kun forhåndsvisning — ingen ændringer skrives)",

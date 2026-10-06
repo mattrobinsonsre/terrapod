@@ -1269,7 +1269,7 @@
       "setLabels": "Sett etiketter (erstatter etikettkartet på hvert samsvarende arbeidsområde)",
       "setVarFiles": "Sett var-filer",
       "addVarFile": "Legg til var-fil",
-      "setOidcAudiences": "Sett audiences for kjøringsidentitet (erstatter overstyringene i hvert treffende arbeidsområde; et tomt map tømmer dem, så hver provider faller tilbake til utrullingens konfigurasjon)",
+      "setOidcAudiences": "Sett OIDC-audiences for kjøringsidentitet (erstatter kartet på hvert samsvarende arbeidsområde)",
       "setRunTasks": "Sett kjøringsoppgaver (oppdateres/settes inn etter navn på hvert samsvarende arbeidsområde)",
       "setNotifications": "Sett varselkonfigurasjoner (oppdateres/settes inn etter navn)",
       "dryRun": "Prøvekjøring (kun forhåndsvisning – ingen endringer skrives)",

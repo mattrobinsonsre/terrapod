@@ -1269,7 +1269,7 @@
       "setLabels": "permey choq (Hoch rurbogh Qumwo' permey chartlh DIvI')",
       "setVarFiles": "choHlaH teywI'mey choq",
       "addVarFile": "choHlaH teywI' chel",
-      "setOidcAudiences": "vum pong HevwI''mey choq (Hoch rurbogh Qumwo''Daq ngoDmey chartlh; ngoD chIm Hoch teq, vaj Hoch provider nISwI'' chenmoHghachDaq chegh)",
+      "setOidcAudiences": "OIDC vum pong HevwI''mey choq (Hoch rurbogh Qumwo''Daq chart chartlh)",
       "setRunTasks": "Sar Qu'mey choq (Hoch rurbogh Qumwo' pongmo' choHlu')",
       "setNotifications": "QIn numtaHmey choq (pongmo' choHlu')",
       "dryRun": "QaD Sar (tI'ang neH — choH ghItlhbe'lu')",

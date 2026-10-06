@@ -1269,7 +1269,7 @@
       "setLabels": "設定標籤（替換每個匹配工作區上的標籤對映）",
       "setVarFiles": "設定變數檔案",
       "addVarFile": "新增變數檔案",
-      "setOidcAudiences": "設定執行身分受眾（替換每個相符工作區上的覆寫；空映射會將其清除，於是每個 provider 回退到部署的設定）",
+      "setOidcAudiences": "設定執行身分的 OIDC 受眾（替換每個相符工作區上的對映）",
       "setRunTasks": "設定執行任務（在每個匹配工作區上按名稱更新插入）",
       "setNotifications": "設定通知配置（按名稱更新插入）",
       "dryRun": "試執行（僅預覽 — 不寫入任何更改）",

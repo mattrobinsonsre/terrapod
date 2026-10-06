@@ -1269,7 +1269,7 @@
       "setLabels": "Establecer etiquetas (reemplaza el mapa de etiquetas en cada espacio de trabajo coincidente)",
       "setVarFiles": "Establecer archivos de variables",
       "addVarFile": "Añadir archivo de variables",
-      "setOidcAudiences": "Establecer audiencias de la identidad de ejecución (reemplaza las sustituciones en cada espacio de trabajo coincidente; un mapa vacío las borra, de modo que cada provider vuelve a la configuración del despliegue)",
+      "setOidcAudiences": "Establecer audiencias OIDC de la identidad de ejecución (reemplaza el mapa en cada espacio de trabajo coincidente)",
       "setRunTasks": "Establecer tareas de ejecución (insertadas o actualizadas por nombre en cada espacio de trabajo coincidente)",
       "setNotifications": "Establecer configuraciones de notificación (insertadas o actualizadas por nombre)",
       "dryRun": "Simulación (solo vista previa — no se escriben cambios)",

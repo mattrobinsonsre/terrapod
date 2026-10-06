@@ -1269,7 +1269,7 @@
       "setLabels": "Ustaw etykiety (zastępuje mapę etykiet na każdym dopasowanym obszarze roboczym)",
       "setVarFiles": "Ustaw pliki zmiennych",
       "addVarFile": "Dodaj plik zmiennych",
-      "setOidcAudiences": "Ustaw audience tożsamości uruchomienia (zastępuje nadpisania w każdej dopasowanej przestrzeni roboczej; pusta mapa je czyści, więc każdy provider wraca do konfiguracji wdrożenia)",
+      "setOidcAudiences": "Ustaw audience OIDC tożsamości uruchomienia (zastępuje mapę na każdym dopasowanym obszarze roboczym)",
       "setRunTasks": "Ustaw zadania przebiegu (upsert po nazwie na każdym dopasowanym obszarze roboczym)",
       "setNotifications": "Ustaw konfiguracje powiadomień (upsert po nazwie)",
       "dryRun": "Przebieg próbny (tylko podgląd — brak zapisu zmian)",

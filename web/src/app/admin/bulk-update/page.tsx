@@ -156,7 +156,6 @@ export default function BulkUpdatePage() {
   const [uSetNotifications, setUSetNotifications] = useState(false)
   const [uNotifications, setUNotifications] = useState<NotificationSpec[]>([])
 
-  const [dryRun, setDryRun] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [confirmApply, setConfirmApply] = useState(false)
   const [dryResult, setDryResult] = useState<DryRunResult | null>(null)
@@ -298,10 +297,8 @@ export default function BulkUpdatePage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (dryRun) {
-      runBulkUpdate(true)
-      return
-    }
+    // Submit is Apply only — Preview is a separate button that calls
+    // runBulkUpdate(true) directly, so there is no mode to read here.
     // Destructive apply requires an explicit confirm click.
     if (!confirmApply) {
       setConfirmApply(true)
@@ -916,23 +913,29 @@ export default function BulkUpdatePage() {
             )}
           </div>
 
-          <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input
-                type="checkbox"
-                checked={dryRun}
-                onChange={(e) => {
-                  setDryRun(e.target.checked)
-                  setConfirmApply(false)
-                }}
-              />
-              {t('update.dryRun')}
-            </label>
-            {!dryRun && confirmApply ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-amber-300">
-                  {t('update.confirmWarning')}
-                </span>
+          {/* BOTH actions are always present. The previous shape put a single
+              button next to a `Dry run` checkbox that was ticked by default, so
+              the only control that looked like a save performed a no-op and
+              nothing said so — you had to UNTICK something to reach Apply.
+              Preview and Apply are two different intentions, so they are two
+              buttons, and neither is reachable only by changing a checkbox
+              first. The confirm step stays: this writes to every matched
+              workspace, which is tier 1 of the #719 confirm policy. */}
+          <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmApply(false)
+                runBulkUpdate(true)
+              }}
+              disabled={submitting}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-100 transition-colors"
+            >
+              {submitting ? t('update.working') : t('update.previewDryRun')}
+            </button>
+            {confirmApply ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-amber-300">{t('update.confirmWarning')}</span>
                 <button
                   type="submit"
                   disabled={submitting}
@@ -952,17 +955,9 @@ export default function BulkUpdatePage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50 ${
-                  dryRun
-                    ? 'bg-brand-600 hover:bg-brand-500'
-                    : 'bg-amber-700 hover:bg-amber-600'
-                }`}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-white transition-colors"
               >
-                {submitting
-                  ? t('update.working')
-                  : dryRun
-                    ? t('update.previewDryRun')
-                    : t('update.applyChanges')}
+                {t('update.applyChanges')}
               </button>
             )}
           </div>

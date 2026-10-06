@@ -1269,7 +1269,7 @@
       "setLabels": "Aseta tunnisteet (korvaa tunnistekartan jokaisessa vastaavassa työtilassa)",
       "setVarFiles": "Aseta muuttujatiedostot",
       "addVarFile": "Lisää muuttujatiedosto",
-      "setOidcAudiences": "Aseta ajoidentiteetin audiencet (korvaa ohitukset jokaisessa osuvassa työtilassa; tyhjä map tyhjentää ne, joten jokainen provider palaa käyttöönoton konfiguraatioon)",
+      "setOidcAudiences": "Aseta ajoidentiteetin OIDC-audiencet (korvaa kartan jokaisessa vastaavassa työtilassa)",
       "setRunTasks": "Aseta ajotehtävät (päivitetään nimen mukaan jokaisessa vastaavassa työtilassa)",
       "setNotifications": "Aseta ilmoitusmääritykset (päivitetään nimen mukaan)",
       "dryRun": "Testiajo (vain esikatselu — muutoksia ei kirjoiteta)",

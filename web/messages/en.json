@@ -1269,7 +1269,7 @@
       "setLabels": "Set labels (replaces the labels map on every matched workspace)",
       "setVarFiles": "Set var files",
       "addVarFile": "Add var file",
-      "setOidcAudiences": "Set run identity audiences (replaces the overrides on every matched workspace; an empty map clears them, so each provider falls back to the deployment's configuration)",
+      "setOidcAudiences": "Set OIDC run identity audiences (replaces the map on every matched workspace)",
       "setRunTasks": "Set run tasks (upserted by name on every matched workspace)",
       "setNotifications": "Set notification configurations (upserted by name)",
       "dryRun": "Dry run (preview only — no changes written)",

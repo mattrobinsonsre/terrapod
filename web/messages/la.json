@@ -1269,7 +1269,7 @@
       "setLabels": "Titulos ponere (chartam titulorum in omni loco operis conveniente substituit)",
       "setVarFiles": "Tabulas variabilium ponere",
       "addVarFile": "Tabulam variabilium addere",
-      "setOidcAudiences": "Auditores identitatis exsecutionis statuere (superscriptiones in omni loco operis congruenti reponit; tabula vacua eas delet, ita ut omnis provider ad configurationem instructionis redeat)",
+      "setOidcAudiences": "Auditores OIDC identitatis exsecutionis statuere (chartam in omni loco operis conveniente substituit)",
       "setRunTasks": "Munera exsecutionis ponere (per nomen in omni loco operis conveniente inserta-vel-renovata)",
       "setNotifications": "Configurationes nuntiationum ponere (per nomen insertae-vel-renovatae)",
       "dryRun": "Cursus siccus (sola praevisio — nullae mutationes scriptae)",
