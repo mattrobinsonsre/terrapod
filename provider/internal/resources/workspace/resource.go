@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
@@ -571,6 +572,9 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Optional:    true,
 				Computed:    true,
 				ElementType: audienceElemType,
+				// Plan-time, so an empty list is refused before anything is
+				// applied rather than by the server's 422 mid-apply.
+				Validators: []validator.Map{audienceListsAreNonEmpty{}},
 				PlanModifiers: []planmodifier.Map{
 					mapplanmodifier.UseStateForUnknown(),
 				},
