@@ -26,7 +26,6 @@ matters; the API can.
 """
 
 import json
-import os
 import stat
 import subprocess
 
@@ -527,13 +526,20 @@ class TestItMintsAndFails:
     def test_an_unwritable_path_raises_naming_the_path(self, tmp_path):
         """The release blocker this very nearly shipped as: the container runs
         with a read-only root filesystem, so the token directory must be under a
-        writable mount or every federated run fails here."""
-        blocked = tmp_path / "blocked"
-        blocked.mkdir(mode=0o500)
+        writable mount or every federated run fails here.
+
+        Made unwritable by giving the directory a REGULAR FILE as its parent,
+        not by a restrictive mode. A mode is a permission check, and CI runs
+        pytest as root, which holds `CAP_DAC_OVERRIDE` and walks straight
+        through one -- so the first version of this test passed locally as an
+        ordinary user and, in CI, cheerfully wrote the token into the directory
+        it had just declared unwritable. `ENOTDIR` is a type error rather than a
+        permission check, so no privilege bypasses it and the test means the
+        same thing for every uid that runs it.
+        """
+        parent = tmp_path / "a-file-not-a-directory"
+        parent.write_text("")
         handler, _ = _api(mint=["aws"])
-        try:
-            msg = self._expect_raise(tmp_path, handler, token_dir=blocked / "oidc")
-            assert "aws" in msg
-            assert str(blocked) in msg
-        finally:
-            os.chmod(blocked, 0o700)
+        msg = self._expect_raise(tmp_path, handler, token_dir=parent / "oidc")
+        assert "aws" in msg
+        assert str(parent) in msg
