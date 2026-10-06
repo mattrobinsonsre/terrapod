@@ -110,7 +110,7 @@ type autodiscoveryRuleModel struct {
 	SecurityScanEngine            types.String `tfsdk:"security_scan_engine"`
 	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
 	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
-	OIDCAudiences                 types.List   `tfsdk:"oidc_audiences"`
+	OIDCAudiences                 types.Map    `tfsdk:"oidc_audiences"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
@@ -360,13 +360,13 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:    true,
 				ElementType: types.StringType,
 			},
-			"oidc_audiences": schema.ListAttribute{
-				Description: "Audiences a run identity token is minted for on workspaces this rule creates (#1901), and their cloud identity opt-in. Empty (the default) means those workspaces mint nothing and authenticate with the agent pool's own identity. Each entry is an opaque string the federation target itself names; nothing here is specific to any one cloud. Changing it affects workspaces the rule creates from now on, not ones it has already created.",
+			"oidc_audiences": schema.MapAttribute{
+				Description: "Per-provider-configuration audiences templated onto workspaces this rule creates (#1901), and their cloud identity override. A key is the provider configuration the token is for, exactly as written in a `provider` block — `aws`, `vault`, or `aws.west` for one aliased configuration; the alias is part of the key, not a nested structure. The value is always a list, even for a single audience, because several mean \"these are interchangeable for this target\" and some targets refuse a multi-valued `aud`. Each audience is an opaque string the federation target itself names; nothing here is specific to any one cloud. Unset (the default) means those workspaces take the deployment's audience catalogue alone. Changing it affects workspaces the rule creates from now on, not ones it has already created.",
 				Optional:    true,
 				Computed:    true,
-				ElementType: types.StringType,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
+				ElementType: audienceElemType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"ai_summary_mode": schema.StringAttribute{
@@ -709,6 +709,44 @@ func (r *autodiscoveryRuleResource) ImportState(ctx context.Context, req resourc
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
+// audienceElemType is the element type of oidc_audiences (#1901): a LIST of
+// audiences per provider configuration. One audience is still a one-element
+// list; several mean "interchangeable for this target", which some federation
+// targets refuse — so the shape never collapses to a scalar.
+var audienceElemType = types.ListType{ElemType: types.StringType}
+
+// audienceMapForAttrs converts a planned oidc_audiences map into the wire
+// shape, returning nil when the attribute must be omitted from the request
+// (#1901).
+//
+// nil and an empty map are different instructions: nil means "the configuration
+// does not mention this, leave the rule's value alone", while an explicit `{}`
+// drops every templated override so new workspaces take the deployment's
+// audience catalogue alone. The caller sends on `!= nil`, so collapsing them
+// would make the opt-out a silent no-op.
+func audienceMapForAttrs(m types.Map) map[string][]string {
+	if m.IsNull() || m.IsUnknown() {
+		return nil
+	}
+	out := make(map[string][]string, len(m.Elements()))
+	for k, v := range m.Elements() {
+		l, ok := v.(types.List)
+		if !ok || l.IsNull() || l.IsUnknown() {
+			// Send the key with no audiences rather than dropping it: the
+			// server refuses an empty list (422) and names the key, which is
+			// more use than silently omitting what the config wrote.
+			out[k] = []string{}
+			continue
+		}
+		auds := make([]string, 0, len(l.Elements()))
+		for _, e := range l.Elements() {
+			auds = append(auds, e.(types.String).ValueString())
+		}
+		out[k] = auds
+	}
+	return out
+}
+
 // buildAutodiscoveryRuleAttrs converts the Terraform model into JSON:API
 // attributes for create/update. Computed-only attributes are omitted.
 func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
@@ -825,11 +863,7 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		}
 		attrs["security-scan-skip-rules"] = rules
 	}
-	if !m.OIDCAudiences.IsNull() && !m.OIDCAudiences.IsUnknown() {
-		auds := make([]string, 0, len(m.OIDCAudiences.Elements()))
-		for _, v := range m.OIDCAudiences.Elements() {
-			auds = append(auds, v.(types.String).ValueString())
-		}
+	if auds := audienceMapForAttrs(m.OIDCAudiences); auds != nil {
 		attrs["oidc-audiences"] = auds
 	}
 	for _, f := range []struct {
@@ -1061,12 +1095,17 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	} else {
 		m.SecurityScanSkipRules = types.ListNull(types.StringType)
 	}
-	if auds := terrapod.GetListAttr(res, "oidc-audiences"); len(auds) > 0 {
-		v, d := types.ListValueFrom(ctx, types.StringType, auds)
+	// A FULL read, unlike the workspace resource's selective one (#1901). A rule
+	// is a template, not a workspace: the server stores and returns the rule's
+	// own map with nothing merged into it, so every key that comes back is one
+	// this configuration wrote. The deployment catalogue is merged per workspace
+	// at mint time, which is downstream of here.
+	if auds := terrapod.GetAudienceMapAttr(res, "oidc-audiences"); len(auds) > 0 {
+		v, d := types.MapValueFrom(ctx, audienceElemType, auds)
 		diags.Append(d...)
 		m.OIDCAudiences = v
 	} else {
-		m.OIDCAudiences = types.ListNull(types.StringType)
+		m.OIDCAudiences = types.MapNull(audienceElemType)
 	}
 
 	// Optional templating fields (#318). Tolerate missing/empty: an
