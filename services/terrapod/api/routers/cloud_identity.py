@@ -219,6 +219,19 @@ async def mint_cloud_identity_tokens(
     # once. The order is taken from `sorted` below rather than from here.
     resolved: dict[str, list[str]] = {}
     for t in payload.providers:
+        # Refuse before resolving, because a target is echoed back and the
+        # runner joins it into `<token dir>/<target>/token`. `max_length` above
+        # bounds the LIST, never an item, and the lookup splits on the FIRST
+        # dot -- so `aws./../vault` resolves through an ordinary `aws` entry and
+        # would land an AWS-audienced token at the path the operator's `vault`
+        # block reads. Anything holding this run's token can send it, including
+        # the workspace's own configuration.
+        unsafe = cloud_identity_resolver.unsafe_target_reason(t)
+        if unsafe:
+            raise HTTPException(
+                status_code=400,
+                detail=f"provider configuration name {t!r} {unsafe}",
+            )
         audiences = cloud_identity_resolver.audiences_for_target(snapshot, t)
         if audiences is not None:
             resolved[t] = audiences

@@ -32,6 +32,34 @@ from typing import Any
 #: a configuration writes and `tofu graph` reports.
 ALIAS_SEP = "."
 
+#: Characters that are path-significant, because a target name becomes a
+#: DIRECTORY NAME: the runner writes `<token dir>/<target>/token`. The sibling
+#: checks in `workspace_settings.validate_oidc_audiences` are deliberately
+#: conservative rather than a grammar -- a provider name is whatever the
+#: configuration calls it, so inventing a pattern risks refusing a legitimate
+#: key -- and that reasoning is right for everything except this. A name
+#: carrying a separator or a parent reference is not a provider name under any
+#: reading, and left alone `aws./../vault` resolves through the `aws` entry
+#: (the lookup splits on the FIRST dot) and then lands an AWS-audienced token
+#: at the path the operator's `vault` block reads. Enforced here, at the mint
+#: request, and again in the runner before the join, because the runner is a
+#: separate image that may be older or newer than the API.
+_PATH_SIGNIFICANT = ("/", "\\", "\x00")
+
+
+def unsafe_target_reason(name: str) -> str | None:
+    """Why `name` cannot be used as a target, or None when it can.
+
+    Returns a reason rather than raising so each caller can phrase its own
+    error -- a 422 on a workspace write and a 400 on a mint read differently.
+    """
+    for ch in _PATH_SIGNIFICANT:
+        if ch in name:
+            return f"cannot contain {ch!r}"
+    if name in (".", "..") or any(part == ".." for part in name.split(ALIAS_SEP)):
+        return "cannot be or contain a parent reference"
+    return None
+
 
 def _clean(raw: Any) -> dict[str, list[str]]:
     """Tolerate what the database and config can hold, without transforming it.

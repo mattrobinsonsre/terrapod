@@ -861,3 +861,46 @@ class TestTheWorkspaceReadIsMerged:
         got = self._serialized(override=override, catalogue={})
         got["aws"].append("injected")
         assert override["aws"] == [AWS], "mutating the served value reached the ORM object"
+
+
+class TestATargetCannotEscapeItsOwnDirectory:
+    """A target is echoed back and the runner joins it into
+    `<token dir>/<target>/token`, so an unchecked one is a filesystem write
+    primitive, not a label.
+
+    `providers`'s `max_length` bounds the LIST and never an item, and
+    `audiences_for_target` splits on the FIRST dot — so `aws./../vault`
+    resolves through an ordinary `aws` entry that any workspace might have.
+    Reachable by anything holding this run's token, which includes the
+    workspace's own configuration and a fork-PR speculative plan.
+    """
+
+    @pytest.mark.parametrize(
+        "target",
+        [
+            "aws./../vault",  # resolves via `aws`, lands on the `vault` path
+            "aws./../../../tmp/x",  # leaves the token directory entirely
+            "/etc/evil",  # absolute, ignores the directory altogether
+            "foo/bar",  # no dot at all, so the one-dot rule never sees it
+            "a\\b",
+        ],
+    )
+    async def test_a_path_significant_target_is_refused(self, target):
+        ws, run, cfg = _scenario(catalogue={"aws": [AWS]})
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc:
+            await _call(_user(run_id=str(run.id), phase="plan"), run, ws, target=target, cfg=cfg)
+        assert exc.value.status_code == 400
+        # The repr, because that is what the message carries — a backslash in a
+        # target is escaped there and the raw string would not match.
+        assert repr(target) in exc.value.detail
+
+    @pytest.mark.parametrize("target", ["aws", "aws.west", "vault.eu"])
+    async def test_an_ordinary_target_still_mints(self, target):
+        """The guard must not narrow the documented `provider[.alias]` form."""
+        ws, run, cfg = _scenario(catalogue={target.split(".")[0]: [AWS]})
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, target=target, cfg=cfg
+        )
+        assert resp.status_code == 200

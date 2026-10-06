@@ -115,12 +115,14 @@ logger = structlog.get_logger("runner.phase.cloud_identity")
 #: delivered-file area stay in one place.
 TOKEN_DIR = Path("/var/run/terrapod/oidc")
 
-#: Names the directory, not any one file. An operator's provider block builds
-#: the path it needs -- `"${var.terrapod_oidc_token_dir}/aws/token"` -- because a
-#: target name may carry a dot (`aws.west`) and there is no sane environment
-#: variable name for that. One documented convention beats a mangling rule.
+#: Names the directory, not any one file, for a shell hook or script that would
+#: rather not hard-code it. There is deliberately NO `TF_VAR_` counterpart: a
+#: provider block names the documented path directly
+#: (`/var/run/terrapod/oidc/<target>/token`), because exporting a Terraform
+#: variable would reserve a name inside the operator's own configuration to say
+#: something the path already says. The path is the contract; a second way to
+#: spell it is a misdirect.
 TOKEN_DIR_ENV = "TERRAPOD_OIDC_TOKEN_DIR"
-TOKEN_DIR_TFVAR_ENV = "TF_VAR_terrapod_oidc_token_dir"
 
 #: The run's phase, exported so a configuration can switch role by phase -- the
 #: only way to do that, because HCL cannot otherwise see which phase it is in.
@@ -396,6 +398,19 @@ def run(
                 "so there is no way to tell which identity it is for."
             )
 
+        # The API refuses these too, but this is a separate image that may be
+        # older or newer than the API it is talking to, and `directory / target`
+        # silently accepts a separator or a parent reference: `aws./../vault`
+        # lands at the `vault` path and an absolute target escapes the directory
+        # entirely. The token is a credential, so the check belongs at the write
+        # as well as at the request.
+        if "/" in target or "\\" in target or "\x00" in target or ".." in target.split("."):
+            raise CloudIdentityUnavailable(
+                f"The API returned a cloud identity target {target!r} that is not a provider "
+                "configuration name — it would not resolve to a path inside this run's token "
+                "directory, so it has not been written."
+            )
+
         path = directory / target / "token"
         try:
             _write_private(path, token)
@@ -418,7 +433,7 @@ def run(
         )
 
     phase = (body or {}).get("phase") or cfg.phase or ""
-    env = {TOKEN_DIR_ENV: str(directory), TOKEN_DIR_TFVAR_ENV: str(directory)}
+    env = {TOKEN_DIR_ENV: str(directory)}
     if phase:
         env[PHASE_ENV] = phase
         env[PHASE_TFVAR_ENV] = phase

@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import re
 
+from terrapod.services.cloud_identity_resolver import unsafe_target_reason
+
 SCAN_ENFORCEMENTS = frozenset({"off", "advisory", "enforced"})
 SCAN_ENGINES = frozenset({"checkov", "trivy", "both"})
 SCAN_SEVERITY_THRESHOLDS = frozenset({"critical", "high", "medium", "low"})
@@ -380,6 +382,11 @@ def validate_oidc_audiences(raw: object) -> dict[str, list[str]]:
             )
         if key.startswith(".") or key.endswith("."):
             raise ValueError(f"oidc-audiences provider name {key!r} cannot start or end with '.'")
+        # The one place the conservative-not-a-grammar stance above does not
+        # hold: this key becomes a DIRECTORY NAME under the runner's token dir.
+        unsafe = unsafe_target_reason(key)
+        if unsafe:
+            raise ValueError(f"oidc-audiences provider name {key!r} {unsafe}")
 
         if not isinstance(value, list):
             raise ValueError(f"oidc-audiences[{key!r}] must be a list of audience strings")
