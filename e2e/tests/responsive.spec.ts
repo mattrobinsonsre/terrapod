@@ -1460,23 +1460,66 @@ test.describe('Per-workspace run identity (#1901)', () => {
     page.off('dialog', spy)
   })
 
-  // The two admin forms that also carry this editor -- /admin/bulk-update and
-  // /admin/autodiscovery -- are covered in `admin.spec.ts` at desktop width
-  // instead, and deliberately NOT here.
-  //
-  // On /admin/bulk-update the controls are provably unreachable at 412px:
-  // Playwright reports `<div class="grid grid-cols-1 sm:grid-cols-2 ...">
-  // intercepts pointer events` through every retry of a check on the gate
-  // checkbox, and both that grid and the `<form>` it also named belong to that
-  // page. So no retry, locator or wait can get a pointer to it. That is
-  // pre-existing and affects every control there, not just this one:
-  // `web/RESPONSIVE-AUDIT.md` lists the page under "1-2 unwrapped tables" at
-  // **Stage 4** of #719, undone. Clearing it means doing Stage 4.
-  //
-  // On /admin/autodiscovery the field sits inside the collapsed "Workspace
-  // template defaults" <details>, which the desktop test expands first.
-  //
-  // Nothing is lost by their absence here: the editor's own phone-width
-  // behaviour, scroll assertions included, is covered by the workspace test
-  // above, which renders the same component.
+  test('the fleet form gates the list behind a checkbox and fits a phone', async ({ page }) => {
+    // The gate is load-bearing, not decoration: an empty list is a real value
+    // here (it turns run identity off), so it cannot also mean "leave alone".
+    await page.goto('/admin/bulk-update')
+    await expectNoHorizontalPageScroll(page)
+
+    // The checkbox INSIDE its label, not the label's text. This checkbox has no
+    // `aria-label` and would be named by the label wrapping it, while the one
+    // checkbox this suite already finds by name carries an explicit one -- so
+    // that is no precedent. `.check()` also drives the input and waits for
+    // actionability, where clicking the long label row did not.
+    const gate = page
+      .locator('label', { hasText: /Set run identity audiences/i })
+      .locator('input[type="checkbox"]')
+    await expect(gate).toBeVisible({ timeout: 15_000 })
+
+    const add = page.getByRole('button', { name: 'Add audience' })
+    await expect(add).toHaveCount(0)
+
+    // Retried, and only while the list is still closed, so a handler that
+    // hydrates after the first click cannot toggle it back shut.
+    await expect(async () => {
+      if ((await add.count()) === 0) await gate.check()
+      await expect(add).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 15_000 })
+
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('the autodiscovery rule form carries the audience list at phone width', async ({ page }) => {
+    await page.goto('/admin/autodiscovery')
+    await expectNoHorizontalPageScroll(page)
+
+    // Two things have to happen before the editor exists: open the form, and
+    // expand the collapsed "Workspace template defaults" <details> the field
+    // lives in. The <details> is worth naming because it fails misleadingly in
+    // two different ways -- a closed one keeps its content in the DOM, so
+    // `getByText` finds the label and then fails `toBeVisible`, while
+    // `getByRole` reports "element(s) not found" because browsers drop that
+    // content from the accessibility tree. Neither message mentions a section.
+    //
+    // Both steps are inside the retry and both are guarded on the editor still
+    // being absent: clicking the summary a second time would collapse it again.
+    const add = page.getByRole('button', { name: 'Add audience' })
+    await expect(async () => {
+      if ((await add.count()) > 0) {
+        await expect(add).toBeVisible({ timeout: 1_000 })
+        return
+      }
+      const newRule = page.getByRole('button', { name: 'New Rule' })
+      if ((await newRule.count()) > 0) await newRule.click()
+      const summary = page.getByText('Workspace template defaults')
+      if ((await summary.count()) > 0) await summary.click()
+      await expect(add).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 20_000 })
+
+    await expectNoHorizontalPageScroll(page)
+
+    await add.click()
+    await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
 })

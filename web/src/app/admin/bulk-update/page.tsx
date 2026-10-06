@@ -378,7 +378,16 @@ export default function BulkUpdatePage() {
           </label>
           <fieldset
             disabled={fAll}
-            className={fAll ? 'opacity-40 pointer-events-none space-y-3' : 'space-y-3'}
+            // `min-w-0`: a `fieldset` defaults to `min-inline-size: min-content`,
+            // so it refuses to shrink below its content however narrow the
+            // viewport and `w-full` on the children cannot save it. Measured at
+            // 412px it sat 501px wide and was the outermost cause of the page's
+            // horizontal scroll.
+            className={
+              fAll
+                ? 'opacity-40 pointer-events-none space-y-3 min-w-0'
+                : 'space-y-3 min-w-0'
+            }
           >
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
