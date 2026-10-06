@@ -504,7 +504,7 @@ api:
       platform_tools:
         opa_version: "1.21.1"
         trivy_version: "0.75.0"
-        checkov_version: "3.3.21"
+        checkov_version: "3.3.23"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
         checkov_mirror_url: "https://github.com/bridgecrewio/checkov/releases/download"
