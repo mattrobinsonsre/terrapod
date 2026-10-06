@@ -540,6 +540,7 @@ class TestEveryTemplatedSettingReachesTheWorkspace:
         "slack_channel",
         "debug_mode",
         "allow_fork_pr_plans",
+        "oidc_audiences",
     )
 
     def _materialisation_source(self) -> str:

@@ -1113,7 +1113,9 @@
       "noExpiry": "Bez wygaśnięcia",
       "addDriftIgnoreRule": "Dodaj regułę",
       "debugModeHint": "Utrzymuj pody nieudanych runnerów otwarte w przestrzeniach roboczych tworzonych przez tę regułę. Domyślnie wyłączone — utrzymywany pod przechowuje poświadczenia tej przestrzeni roboczej.",
-      "allowForkPrPlansHint": "Dotyczy każdej przestrzeni roboczej tworzonej przez tę regułę. Domyślnie wyłączone: pull request z forka nie otrzymuje planu spekulatywnego, ponieważ uruchomiłby kod swojego autora z poświadczeniami przestrzeni roboczej."
+      "allowForkPrPlansHint": "Dotyczy każdej przestrzeni roboczej tworzonej przez tę regułę. Domyślnie wyłączone: pull request z forka nie otrzymuje planu spekulatywnego, ponieważ uruchomiłby kod swojego autora z poświadczeniami przestrzeni roboczej.",
+      "oidcAudiences": "Audience tożsamości uruchomienia (dziedziczone przez utworzone obszary robocze)",
+      "oidcAudiencesHint": "Nadpisania audience nakładane na każdą przestrzeń roboczą tworzoną przez tę regułę, zaindeksowane na konfiguracji providera, dla której jest token — aws lub aws.west dla konfiguracji z aliasem. Zostaw puste i te przestrzenie robocze użyją własnej konfiguracji wdrożenia."
     },
     "table": {
       "name": "Nazwa",
@@ -1307,7 +1309,8 @@
       "cancel": "Anuluj",
       "working": "Pracowanie...",
       "previewDryRun": "Podgląd (przebieg próbny)",
-      "applyChanges": "Zastosuj zmiany"
+      "applyChanges": "Zastosuj zmiany",
+      "setOidcAudiences": "Ustaw audience OIDC tożsamości uruchomienia (zastępuje mapę na każdym dopasowanym obszarze roboczym)"
     },
     "diff": {
       "colWorkspace": "Obszar roboczy",
@@ -1956,6 +1959,19 @@
       "always": "zawsze",
       "create": "tworzenie",
       "createUpdate": "tworzenie/aktualizacja"
+    },
+    "oidcAudiences": {
+      "addProvider": "Dodaj konfigurację providera",
+      "audiences": "Audience",
+      "badgeInherited": "Domyślne wdrożenia",
+      "badgeOwned": "Przestrzeń robocza",
+      "issuerDisabled": "To wdrożenie nie publikuje żadnego wystawcy OpenID Connect, więc nic, co zostanie tu skonfigurowane, nie może zadziałać.",
+      "override": "Nadpisz",
+      "overrideAria": "Nadpisz audience dla {provider} w tej przestrzeni roboczej",
+      "providerDuplicate": "Ta konfiguracja providera ma już wpis.",
+      "providerInvalid": "Nazwa providera nie zawiera spacji i ma co najwyżej jedną kropkę — aws lub aws.west.",
+      "providerPlaceholder": "aws lub aws.west",
+      "removeProviderAria": "Usuń konfigurację providera {provider}"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Dwie części oddzielone '::' — project::stack. Tylko litery, cyfry, myślniki i podkreślenia; każda część musi zaczynać się od litery lub cyfry.",
       "bindPlan": "Zablokuj aktualizację na zatwierdzonym podglądzie",
-      "bindPlanHelp": "Gdy włączone, aktualizacja stosuje dokładnie plan zapisany przez podgląd, więc wszystko, co zmieniło się od podglądu, powoduje niepowodzenie aktualizacji zamiast zostać zastosowane. Opiera się to na planach aktualizacji Pulumi, które wciąż są eksperymentalne. Gdy wyłączone, aktualizacja sama ustala swoje zmiany, tak jak zwykłe pulumi up. <docs>Jak działają uruchomienia Pulumi</docs>"
+      "bindPlanHelp": "Gdy włączone, aktualizacja stosuje dokładnie plan zapisany przez podgląd, więc wszystko, co zmieniło się od podglądu, powoduje niepowodzenie aktualizacji zamiast zostać zastosowane. Opiera się to na planach aktualizacji Pulumi, które wciąż są eksperymentalne. Gdy wyłączone, aktualizacja sama ustala swoje zmiany, tak jak zwykłe pulumi up. <docs>Jak działają uruchomienia Pulumi</docs>",
+      "oidcAudiences": "Audience tożsamości uruchomienia",
+      "oidcAudiencesAdd": "Dodaj audience",
+      "oidcAudiencesHint": "Terrapod wystawia krótkotrwały token OpenID Connect dla każdej konfiguracji providera, której używa uruchomienie, i zapisuje go do pliku, który uruchomienie może odczytać. Zaindeksuj wpis na providerze tak, jak nazywa go twoja konfiguracja — aws lub aws.west dla konfiguracji z aliasem — i wypisz audience, które ten cel przyjmuje. Każdy wpis nadpisuje własną konfigurację wdrożenia dla tego providera; usuń go i ten provider wraca do audience wdrożenia. Audience to nieprzejrzysty ciąg wybrany przez cel federacji, więc jest przechowywany dokładnie tak, jak go wpiszesz.",
+      "oidcAudiencesLoading": "Sprawdzanie audience skonfigurowanych we wdrożeniu …",
+      "oidcAudiencesNone": "Brak (uruchomienia używają własnej tożsamości puli agentów)",
+      "oidcAudiencesPlaceholder": "np. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",

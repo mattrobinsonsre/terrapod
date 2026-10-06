@@ -44,7 +44,24 @@ a catalog item resolves to, with a computed `interface_error` that is non-null
 when the module could not be parsed), `terrapod_module_autodiscovery_rule_repositories`
 (the repositories a module autodiscovery rule looks at, each with its status,
 origin and candidates; kept out of the rule resource so polls never change its
-state).
+state), `terrapod_oidc_audience_defaults` (the deployment-wide cloud-identity
+audience catalogue a workspace's `oidc_audiences` merges over — what a workspace
+would INHERIT if it overrode nothing).
+
+**`terrapod_workspace.oidc_audiences` holds what you set, not the effective
+map**, and that pairing is deliberate. The API returns the merged result, so the
+resource reconciles only the keys your configuration declares and ignores the
+rest — exactly as `aws_instance.tags` round-trips what you wrote while the
+provider's `default_tags` are merged in beneath it. Without that, a plan would
+disagree with its own apply the moment the deployment catalogue contained a key
+the workspace did not override. Read the effective map off the
+`terrapod_workspace` **data source**, which has no round-trip requirement and so
+carries it, and the catalogue off `terrapod_oidc_audience_defaults`.
+
+The one case neither can distinguish is an override whose value happens to equal
+the catalogue's: it reads as inherited. Nothing changes if you drop it, because
+it falls back to the identical default — the same fidelity loss `tags` and
+`default_tags` have lived with for years.
 
 A `terrapod_module_autodiscovery_rule`'s `repo_url` may name one repository,
 an org or group, or a repository-name pattern such as

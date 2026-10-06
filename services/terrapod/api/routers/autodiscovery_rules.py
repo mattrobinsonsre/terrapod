@@ -86,6 +86,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "resource-cpu": rule.resource_cpu,
             "parallelism": rule.parallelism,
             "resource-memory": rule.resource_memory,
+            "oidc-audiences": dict(rule.oidc_audiences or {}),
             "auto-apply": rule.auto_apply,
             "auto-apply-mode": run_service.resolve_auto_apply_mode(rule),
             "on-directory-delete": rule.on_directory_delete,
@@ -411,6 +412,7 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
             workspace_settings.validate_plan_expiry_seconds,
         ),
         ("slack-channel", "slack_channel", workspace_settings.validate_slack_channel),
+        ("oidc-audiences", "oidc_audiences", workspace_settings.validate_oidc_audiences),
     ):
         if key in attrs:
             try:
@@ -703,10 +705,11 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         # defaults to satisfy the in-memory construction.
         execution_mode=fields.get("execution_mode", "agent"),
         execution_backend=fields.get("execution_backend", "tofu"),
-        engine_version=fields.get("engine_version", "1.12"),
+        engine_version=fields.get("engine_version", "1.13"),
         resource_cpu=fields.get("resource_cpu", "1"),
         parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
         resource_memory=fields.get("resource_memory", "2Gi"),
+        oidc_audiences=fields.get("oidc_audiences", {}),
         auto_apply=fields.get("auto_apply", False),
         auto_apply_mode=fields.get("auto_apply_mode", "never"),
         labels=fields.get("labels", {}),

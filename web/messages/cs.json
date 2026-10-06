@@ -1113,7 +1113,9 @@
       "noExpiry": "Bez vypršení",
       "addDriftIgnoreRule": "Přidat pravidlo",
       "debugModeHint": "Ponechat pody neúspěšných runnerů otevřené v pracovních prostorech, které toto pravidlo vytvoří. Ve výchozím stavu vypnuto — ponechaný pod si drží přihlašovací údaje daného pracovního prostoru.",
-      "allowForkPrPlansHint": "Platí pro každý pracovní prostor, který toto pravidlo vytvoří. Ve výchozím stavu vypnuto: pull request z forku nedostane spekulativní plán, protože by spustil kód svého autora s přihlašovacími údaji pracovního prostoru."
+      "allowForkPrPlansHint": "Platí pro každý pracovní prostor, který toto pravidlo vytvoří. Ve výchozím stavu vypnuto: pull request z forku nedostane spekulativní plán, protože by spustil kód svého autora s přihlašovacími údaji pracovního prostoru.",
+      "oidcAudiences": "Audience identity běhu (zděděné vytvořenými pracovními prostory)",
+      "oidcAudiencesHint": "Přepisy audience vložené do každého pracovního prostoru, který toto pravidlo vytvoří, zaklíčované na konfiguraci provideru, pro kterou token platí — aws, nebo aws.west pro konfiguraci s aliasem. Nechte prázdné a tyto pracovní prostory použijí vlastní konfiguraci nasazení."
     },
     "table": {
       "name": "Název",
@@ -1307,7 +1309,8 @@
       "cancel": "Zrušit",
       "working": "Pracuji...",
       "previewDryRun": "Náhled (zkušební běh)",
-      "applyChanges": "Aplikovat změny"
+      "applyChanges": "Aplikovat změny",
+      "setOidcAudiences": "Nastavit OIDC audience identity běhu (nahradí mapu na každém odpovídajícím pracovním prostoru)"
     },
     "diff": {
       "colWorkspace": "Pracovní prostor",
@@ -1956,6 +1959,19 @@
       "always": "vždy",
       "create": "vytvoření",
       "createUpdate": "vytvoření/změna"
+    },
+    "oidcAudiences": {
+      "addProvider": "Přidat konfiguraci provideru",
+      "audiences": "Audience",
+      "badgeInherited": "Výchozí nastavení nasazení",
+      "badgeOwned": "Pracovní prostor",
+      "issuerDisabled": "Toto nasazení nepublikuje žádného vydavatele OpenID Connect, takže nic, co se zde nastaví, nemůže nabýt účinnosti.",
+      "override": "Přepsat",
+      "overrideAria": "Přepsat audience pro {provider} v tomto pracovním prostoru",
+      "providerDuplicate": "Tato konfigurace provideru už má záznam.",
+      "providerInvalid": "Název provideru neobsahuje mezery a nejvýše jednu tečku — aws, nebo aws.west.",
+      "providerPlaceholder": "aws, nebo aws.west",
+      "removeProviderAria": "Odebrat konfiguraci provideru {provider}"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Dvě části oddělené '::' — project::stack. Pouze písmena, číslice, pomlčky a podtržítka; každá část musí začínat písmenem nebo číslicí.",
       "bindPlan": "Uzamknout aktualizaci na schválený náhled",
-      "bindPlanHelp": "Když je zapnuto, aktualizace použije přesně plán uložený náhledem, takže cokoli, co se od náhledu změnilo, aktualizaci zastaví, místo aby se to použilo. Opírá se to o plány aktualizací Pulumi, které jsou stále experimentální. Když je vypnuto, aktualizace si změny určí sama, stejně jako prosté pulumi up. <docs>Jak fungují běhy Pulumi</docs>"
+      "bindPlanHelp": "Když je zapnuto, aktualizace použije přesně plán uložený náhledem, takže cokoli, co se od náhledu změnilo, aktualizaci zastaví, místo aby se to použilo. Opírá se to o plány aktualizací Pulumi, které jsou stále experimentální. Když je vypnuto, aktualizace si změny určí sama, stejně jako prosté pulumi up. <docs>Jak fungují běhy Pulumi</docs>",
+      "oidcAudiences": "Audience identity běhu",
+      "oidcAudiencesAdd": "Přidat audience",
+      "oidcAudiencesHint": "Terrapod vydává krátkodobý token OpenID Connect pro každou konfiguraci provideru, kterou běh používá, a zapisuje ho do souboru, který si běh může přečíst. Záznam zaklíčujte na provider tak, jak ho pojmenovává vaše konfigurace — aws, nebo aws.west pro konfiguraci s aliasem — a vypište audience, které ten cíl přijímá. Každý záznam přepisuje vlastní konfiguraci nasazení pro daný provider; odeberte ho a ten provider se vrátí k audience nasazení. Audience je neprůhledný řetězec, který si vybral cíl federace, takže se ukládá přesně tak, jak ji napíšete.",
+      "oidcAudiencesLoading": "Kontrolují se audience nakonfigurované v nasazení …",
+      "oidcAudiencesNone": "Žádné (běhy používají vlastní identitu fondu agentů)",
+      "oidcAudiencesPlaceholder": "např. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Autorizace delegována na váš VCS repozitář.",

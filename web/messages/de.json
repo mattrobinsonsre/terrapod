@@ -1113,7 +1113,9 @@
       "noExpiry": "Kein Ablauf",
       "addDriftIgnoreRule": "Regel hinzufügen",
       "debugModeHint": "Pods fehlgeschlagener Runner auf den von dieser Regel erstellten Arbeitsbereichen offen halten. Standardmäßig deaktiviert – ein offen gehaltener Pod behält die Zugangsdaten dieses Arbeitsbereichs.",
-      "allowForkPrPlansHint": "Gilt für jeden Arbeitsbereich, den diese Regel erstellt. Standardmäßig aus: Ein Pull Request aus einem Fork erhält keinen spekulativen Plan, weil dabei der Code seines Autors mit den Zugangsdaten des Arbeitsbereichs ausgeführt würde."
+      "allowForkPrPlansHint": "Gilt für jeden Arbeitsbereich, den diese Regel erstellt. Standardmäßig aus: Ein Pull Request aus einem Fork erhält keinen spekulativen Plan, weil dabei der Code seines Autors mit den Zugangsdaten des Arbeitsbereichs ausgeführt würde.",
+      "oidcAudiences": "Audiences der Lauf-Identität (von angelegten Arbeitsbereichen geerbt)",
+      "oidcAudiencesHint": "Audience-Überschreibungen, die auf jeden von dieser Regel angelegten Arbeitsbereich übertragen werden, geschlüsselt auf die Provider-Konfiguration, für die ein Token gilt — aws, oder aws.west für eine mit Alias versehene Konfiguration. Leer lassen, dann übernehmen diese Arbeitsbereiche die Konfiguration der Bereitstellung."
     },
     "table": {
       "name": "Name",
@@ -1307,7 +1309,8 @@
       "cancel": "Abbrechen",
       "working": "Wird verarbeitet...",
       "previewDryRun": "Vorschau (Probelauf)",
-      "applyChanges": "Änderungen anwenden"
+      "applyChanges": "Änderungen anwenden",
+      "setOidcAudiences": "OIDC-Audiences der Lauf-Identität setzen (ersetzt die Zuordnung auf jedem getroffenen Arbeitsbereich)"
     },
     "diff": {
       "colWorkspace": "Arbeitsbereich",
@@ -1956,6 +1959,19 @@
       "always": "immer",
       "create": "erstellen",
       "createUpdate": "erstellen/ändern"
+    },
+    "oidcAudiences": {
+      "addProvider": "Provider-Konfiguration hinzufügen",
+      "audiences": "Audiences",
+      "badgeInherited": "Standard der Bereitstellung",
+      "badgeOwned": "Arbeitsbereich",
+      "issuerDisabled": "Diese Bereitstellung veröffentlicht keinen OpenID-Connect-Issuer, daher kann hier nichts Konfiguriertes wirksam werden.",
+      "override": "Überschreiben",
+      "overrideAria": "Audiences für {provider} in diesem Arbeitsbereich überschreiben",
+      "providerDuplicate": "Für diese Provider-Konfiguration gibt es bereits einen Eintrag.",
+      "providerInvalid": "Ein Provider-Name enthält keine Leerzeichen und höchstens einen Punkt — aws oder aws.west.",
+      "providerPlaceholder": "aws oder aws.west",
+      "removeProviderAria": "Provider-Konfiguration {provider} entfernen"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Zwei durch '::' getrennte Teile — project::stack. Nur Buchstaben, Zahlen, Bindestriche und Unterstriche; jeder Teil muss mit einem Buchstaben oder einer Zahl beginnen.",
       "bindPlan": "Update an die genehmigte Vorschau binden",
-      "bindPlanHelp": "Wenn aktiviert, wendet das Update genau den Plan an, den die Vorschau gespeichert hat. Was sich seit der Vorschau geändert hat, lässt das Update fehlschlagen, statt angewendet zu werden. Das beruht auf Pulumi-Update-Plänen, die noch experimentell sind. Wenn deaktiviert, ermittelt das Update seine Änderungen selbst, wie ein einfaches pulumi up. <docs>So funktionieren Pulumi-Läufe</docs>"
+      "bindPlanHelp": "Wenn aktiviert, wendet das Update genau den Plan an, den die Vorschau gespeichert hat. Was sich seit der Vorschau geändert hat, lässt das Update fehlschlagen, statt angewendet zu werden. Das beruht auf Pulumi-Update-Plänen, die noch experimentell sind. Wenn deaktiviert, ermittelt das Update seine Änderungen selbst, wie ein einfaches pulumi up. <docs>So funktionieren Pulumi-Läufe</docs>",
+      "oidcAudiences": "Audiences der Lauf-Identität",
+      "oidcAudiencesAdd": "Audience hinzufügen",
+      "oidcAudiencesHint": "Terrapod stellt für jede Provider-Konfiguration, die ein Lauf verwendet, ein kurzlebiges OpenID-Connect-Token aus und schreibt es in eine Datei, die der Lauf lesen kann. Schlüsseln Sie einen Eintrag auf den Provider, wie ihn Ihre Konfiguration benennt — aws, oder aws.west für eine mit Alias versehene Konfiguration — und listen Sie die Audiences auf, die dieses Ziel akzeptiert. Jeder Eintrag überschreibt die Konfiguration der Bereitstellung für diesen Provider; entfernen Sie ihn, und dieser Provider fällt auf die Audiences der Bereitstellung zurück. Eine Audience ist eine opake Zeichenfolge, die das Föderationsziel gewählt hat, und wird daher genau so gespeichert, wie sie eingegeben wurde.",
+      "oidcAudiencesLoading": "Die in der Bereitstellung konfigurierten Audiences werden geprüft …",
+      "oidcAudiencesNone": "Keine (Läufe verwenden die eigene Identität des Agent-Pools)",
+      "oidcAudiencesPlaceholder": "z. B. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisierung an Ihr VCS-Repository delegiert.",

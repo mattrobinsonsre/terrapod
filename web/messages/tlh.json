@@ -1113,7 +1113,9 @@
       "noExpiry": "van Hutlh",
       "addDriftIgnoreRule": "chu'wI' chel",
       "debugModeHint": "Qumwo'mey chenmoHbogh chu'wI'vam, pa' poSqu'moH vumwI' pod lujpu'bogh. motlh chu'Ha'lu' — pod pollu'bogh Qumwo'vetlh pegh pol.",
-      "allowForkPrPlansHint": "Qumwo'mey chenmoHbogh chu'wI'vam Hoch chel. motlh chu'Ha'lu': fork-vo' PR Hech nab Hevbe', qaStaHvIS Qumwo' pegh lo'taHvIS qonwI'Daj ngoq vumqu'."
+      "allowForkPrPlansHint": "Qumwo'mey chenmoHbogh chu'wI'vam Hoch chel. motlh chu'Ha'lu': fork-vo' PR Hech nab Hevbe', qaStaHvIS Qumwo' pegh lo'taHvIS qonwI'Daj ngoq vumqu'.",
+      "oidcAudiences": "vum pong HevwI''mey (Qumwo''mey chenmoHlu''bogh Hev)",
+      "oidcAudiencesHint": "HevwI'' ngoDmey, nabvam chenmoHbogh Hoch Qumwo''Daq lanlu''; chaw'' ngaSbogh provider chenmoHghach ngaQHa''wI'' — aws, pagh pongqa''bogh chenmoHghachvaD aws.west. chIm yIlan ''ej Qumwo''mey nISwI'' chenmoHghach lo''."
     },
     "table": {
       "name": "pong",
@@ -1307,7 +1309,8 @@
       "cancel": "qIl",
       "working": "vumtaH...",
       "previewDryRun": "tI'ang (QaD Sar)",
-      "applyChanges": "choHmey lo'"
+      "applyChanges": "choHmey lo'",
+      "setOidcAudiences": "OIDC vum pong HevwI''mey choq (Hoch rurbogh Qumwo''Daq chart chartlh)"
     },
     "diff": {
       "colWorkspace": "Qumwo'",
@@ -1956,6 +1959,19 @@
       "always": "reH",
       "create": "chenmoH",
       "createUpdate": "chenmoH/choH"
+    },
+    "oidcAudiences": {
+      "addProvider": "provider chenmoHghach chel",
+      "audiences": "HevwI''mey",
+      "badgeInherited": "nISwI'' motlh",
+      "badgeOwned": "Qumwo''",
+      "issuerDisabled": "nISwI''vam OpenID Connect nobwI'' pagh ngeH; vaj naDev chenmoHlu''bogh pagh Qap.",
+      "override": "chartlh",
+      "overrideAria": "Qumwo''vamDaq {provider} HevwI''mey chartlh",
+      "providerDuplicate": "provider chenmoHghachvam ngoD ghajtaH.",
+      "providerInvalid": "provider pong: Daq chIm Hutlh ''ej wa'' per neH ghaj — aws, pagh aws.west.",
+      "providerPlaceholder": "Da aws, pagh aws.west",
+      "removeProviderAria": "{provider} provider chenmoHghach teq"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "cha' 'ay' '::' Sepbogh — project::stack. ghItlh mI' je neH; ghItlh mI' joq taghnIS 'ay' Hoch.",
       "bindPlan": "chovnatlh lulaj''pu''bogh yIbagh",
-      "bindPlanHelp": "chu''lu''DI'' chovnatlh nab lulaj''pu''bogh ta''. chovnatlh ret choHmoHlu''chugh, Qapbe'' ta''. Pulumi nab ghun ''oH, chu''qu''be''. chu''be''lu''DI'' pulumi up rur. <docs>Pulumi Qu'' mIw</docs>"
+      "bindPlanHelp": "chu''lu''DI'' chovnatlh nab lulaj''pu''bogh ta''. chovnatlh ret choHmoHlu''chugh, Qapbe'' ta''. Pulumi nab ghun ''oH, chu''qu''be''. chu''be''lu''DI'' pulumi up rur. <docs>Pulumi Qu'' mIw</docs>",
+      "oidcAudiences": "vum pong HevwI''mey",
+      "oidcAudiencesAdd": "HevwI'' chel",
+      "oidcAudiencesHint": "vum lo''bogh Hoch provider chenmoHghachvaD, Terrapod OpenID Connect chaw'' ngaj chenmoH ''ej vum laDlaHbogh teywI''Daq lan. chenmoHghachlIj provider pongbogh rur ngoD ngaQHa''wI'' yIlan — aws, pagh pongqa''bogh chenmoHghachvaD aws.west — ''ej ghochvetlh Hevbogh HevwI''mey yItetlh. Hoch ngoD provider''vetlhvaD nISwI'' chenmoHghach chartlh; yIteq ''ej provider''vetlh nISwI'' HevwI''meyDaq chegh. HevwI'' ''oH DIvI'' ghoch wIvbogh pegh ngaD; vaj DaghItlhbogh rur lan.",
+      "oidcAudiencesLoading": "nISwI''Daq chenmoHlu''bogh HevwI''mey wIlegh …",
+      "oidcAudiencesNone": "pagh (vummey Duy bIQ''a'' pong lo'')",
+      "oidcAudiencesPlaceholder": "Da sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "VCS repolIjDaq chaw'moH nobbogh.",

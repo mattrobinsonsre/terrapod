@@ -87,6 +87,7 @@
     "name",
     "name-template",
     "notification-templates",
+    "oidc-audiences",
     "on-directory-delete",
     "owner-email",
     "parallelism",
@@ -219,6 +220,30 @@
   ],
   "catalog.show_catalog_instance": [
     "input-values"
+  ],
+  "cloud_identity.get_oidc_audience_defaults": [
+    "audiences",
+    "issuer-enabled"
+  ],
+  "cloud_identity.list_signing_keys": [
+    "activates-at",
+    "created-at",
+    "kid",
+    "retired-at",
+    "signing"
+  ],
+  "cloud_identity.list_signing_keys:meta": [
+    "signing-kid"
+  ],
+  "cloud_identity.rotate_signing_key_route": [
+    "activates-at",
+    "created-at",
+    "kid",
+    "retired-at",
+    "signing"
+  ],
+  "cloud_identity.rotate_signing_key_route:meta": [
+    "note"
   ],
   "config_versions._cv_json": [
     "auto-queue-runs",
@@ -937,6 +962,7 @@
     "locked",
     "locked-by",
     "name",
+    "oidc-audiences",
     "operations",
     "owner-email",
     "parallelism",

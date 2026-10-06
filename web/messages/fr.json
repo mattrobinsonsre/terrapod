@@ -1113,7 +1113,9 @@
       "noExpiry": "Pas d'expiration",
       "addDriftIgnoreRule": "Ajouter une règle",
       "debugModeHint": "Maintenir ouverts les pods des runners en échec sur les espaces de travail créés par cette règle. Désactivé par défaut — un pod maintenu ouvert conserve les identifiants de cet espace de travail.",
-      "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Désactivé par défaut : une pull request depuis un fork ne reçoit aucun plan spéculatif, car cela exécuterait le code de son auteur avec les identifiants de l'espace de travail."
+      "allowForkPrPlansHint": "S'applique à chaque espace de travail créé par cette règle. Désactivé par défaut : une pull request depuis un fork ne reçoit aucun plan spéculatif, car cela exécuterait le code de son auteur avec les identifiants de l'espace de travail.",
+      "oidcAudiences": "Audiences de l''identité d''exécution (héritées par les espaces de travail créés)",
+      "oidcAudiencesHint": "Surcharges d''audiences appliquées à chaque espace de travail créé par cette règle, indexées sur la configuration de provider à laquelle un jeton correspond — aws, ou aws.west pour une configuration avec alias. Laissez vide et ces espaces de travail utilisent la configuration propre du déploiement."
     },
     "table": {
       "name": "Nom",
@@ -1307,7 +1309,8 @@
       "cancel": "Annuler",
       "working": "Traitement...",
       "previewDryRun": "Aperçu (simulation)",
-      "applyChanges": "Appliquer les modifications"
+      "applyChanges": "Appliquer les modifications",
+      "setOidcAudiences": "Définir les audiences OIDC de l''identité d''exécution (remplace la carte sur chaque espace de travail correspondant)"
     },
     "diff": {
       "colWorkspace": "Espace de travail",
@@ -1956,6 +1959,19 @@
       "always": "toujours",
       "create": "créer",
       "createUpdate": "créer/mettre à jour"
+    },
+    "oidcAudiences": {
+      "addProvider": "Ajouter une configuration de provider",
+      "audiences": "Audiences",
+      "badgeInherited": "Valeur du déploiement",
+      "badgeOwned": "Espace de travail",
+      "issuerDisabled": "Ce déploiement ne publie aucun émetteur OpenID Connect ; rien de ce qui est configuré ici ne peut donc prendre effet.",
+      "override": "Surcharger",
+      "overrideAria": "Surcharger les audiences de {provider} dans cet espace de travail",
+      "providerDuplicate": "Cette configuration de provider a déjà une entrée.",
+      "providerInvalid": "Un nom de provider ne contient pas d''espace et au plus un point — aws, ou aws.west.",
+      "providerPlaceholder": "aws, ou aws.west",
+      "removeProviderAria": "Retirer la configuration de provider {provider}"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Deux parties séparées par '::' — project::stack. Uniquement lettres, chiffres, tirets et traits de soulignement ; chaque partie doit commencer par une lettre ou un chiffre.",
       "bindPlan": "Lier la mise à jour à l''aperçu approuvé",
-      "bindPlanHelp": "Si activé, la mise à jour applique exactement le plan enregistré par l''aperçu : tout ce qui a changé depuis l''aperçu fait échouer la mise à jour au lieu d''être appliqué. Cela repose sur les plans de mise à jour de Pulumi, encore expérimentaux. Si désactivé, la mise à jour détermine elle-même ses changements, comme un simple pulumi up. <docs>Fonctionnement des exécutions Pulumi</docs>"
+      "bindPlanHelp": "Si activé, la mise à jour applique exactement le plan enregistré par l''aperçu : tout ce qui a changé depuis l''aperçu fait échouer la mise à jour au lieu d''être appliqué. Cela repose sur les plans de mise à jour de Pulumi, encore expérimentaux. Si désactivé, la mise à jour détermine elle-même ses changements, comme un simple pulumi up. <docs>Fonctionnement des exécutions Pulumi</docs>",
+      "oidcAudiences": "Audiences de l''identité d''exécution",
+      "oidcAudiencesAdd": "Ajouter une audience",
+      "oidcAudiencesHint": "Terrapod émet un jeton OpenID Connect de courte durée pour chaque configuration de provider qu''une exécution utilise et l''écrit dans un fichier que l''exécution peut lire. Indexez une entrée sur le provider tel que votre configuration le nomme — aws, ou aws.west pour une configuration avec alias — puis listez les audiences que cette cible accepte. Chaque entrée surcharge la configuration propre du déploiement pour ce provider ; retirez-la et ce provider revient aux audiences du déploiement. Une audience est une chaîne opaque choisie par la cible de fédération : elle est donc enregistrée exactement telle que vous la saisissez.",
+      "oidcAudiencesLoading": "Vérification des audiences configurées dans le déploiement …",
+      "oidcAudiencesNone": "Aucune (les exécutions utilisent l''identité propre du pool d''agents)",
+      "oidcAudiencesPlaceholder": "par ex. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisation déléguée à votre dépôt VCS.",

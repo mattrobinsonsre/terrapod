@@ -1113,7 +1113,9 @@
       "noExpiry": "Ei vanhenemista",
       "addDriftIgnoreRule": "Lisää sääntö",
       "debugModeHint": "Pidä epäonnistuneiden suorittajien podit auki työtiloissa, jotka tämä sääntö luo. Oletuksena pois päältä – auki pidetty podi säilyttää kyseisen työtilan tunnukset.",
-      "allowForkPrPlansHint": "Koskee jokaista työtilaa, jonka tämä sääntö luo. Oletuksena pois päältä: forkista avattu pull request ei saa spekulatiivista suunnitelmaa, koska se ajaisi tekijänsä koodin työtilan tunnuksilla."
+      "allowForkPrPlansHint": "Koskee jokaista työtilaa, jonka tämä sääntö luo. Oletuksena pois päältä: forkista avattu pull request ei saa spekulatiivista suunnitelmaa, koska se ajaisi tekijänsä koodin työtilan tunnuksilla.",
+      "oidcAudiences": "Ajoidentiteetin audiencet (peritään luoduille työtiloille)",
+      "oidcAudiencesHint": "Audience-ohitukset, jotka asetetaan jokaiseen tämän säännön luomaan työtilaan, avaimena provider-konfiguraatio, jota token koskee — aws tai aws.west alias-konfiguraatiolle. Jätä tyhjäksi, niin nämä työtilat käyttävät käyttöönoton omaa konfiguraatiota."
     },
     "table": {
       "name": "Nimi",
@@ -1307,7 +1309,8 @@
       "cancel": "Peruuta",
       "working": "Työskennellään...",
       "previewDryRun": "Esikatsele (testiajo)",
-      "applyChanges": "Käytä muutoksia"
+      "applyChanges": "Käytä muutoksia",
+      "setOidcAudiences": "Aseta ajoidentiteetin OIDC-audiencet (korvaa kartan jokaisessa vastaavassa työtilassa)"
     },
     "diff": {
       "colWorkspace": "Työtila",
@@ -1956,6 +1959,19 @@
       "always": "aina",
       "create": "luonti",
       "createUpdate": "luonti/päivitys"
+    },
+    "oidcAudiences": {
+      "addProvider": "Lisää provider-konfiguraatio",
+      "audiences": "Audiencet",
+      "badgeInherited": "Käyttöönoton oletus",
+      "badgeOwned": "Työtila",
+      "issuerDisabled": "Tämä käyttöönotto ei julkaise lainkaan OpenID Connect -myöntäjää, joten mikään tässä määritetty ei voi tulla voimaan.",
+      "override": "Ohita",
+      "overrideAria": "Ohita {provider}-audiencet tässä työtilassa",
+      "providerDuplicate": "Tällä provider-konfiguraatiolla on jo merkintä.",
+      "providerInvalid": "Provider-nimessä ei ole välilyöntejä ja enintään yksi piste — aws tai aws.west.",
+      "providerPlaceholder": "aws tai aws.west",
+      "removeProviderAria": "Poista provider-konfiguraatio {provider}"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Kaksi osaa erotettuna merkeillä '::' — project::stack. Vain kirjaimia, numeroita, väliviivoja ja alaviivoja; kummankin osan on alettava kirjaimella tai numerolla.",
       "bindPlan": "Lukitse päivitys hyväksyttyyn esikatseluun",
-      "bindPlanHelp": "Kun asetus on päällä, päivitys soveltaa täsmälleen esikatselun tallentamaa suunnitelmaa, joten kaikki esikatselun jälkeen muuttunut kaataa päivityksen sen sijaan, että se sovellettaisiin. Tämä perustuu Pulumin päivityssuunnitelmiin, jotka ovat vielä kokeellisia. Kun asetus on pois päältä, päivitys selvittää muutoksensa itse, kuten tavallinen pulumi up. <docs>Näin Pulumi-ajot toimivat</docs>"
+      "bindPlanHelp": "Kun asetus on päällä, päivitys soveltaa täsmälleen esikatselun tallentamaa suunnitelmaa, joten kaikki esikatselun jälkeen muuttunut kaataa päivityksen sen sijaan, että se sovellettaisiin. Tämä perustuu Pulumin päivityssuunnitelmiin, jotka ovat vielä kokeellisia. Kun asetus on pois päältä, päivitys selvittää muutoksensa itse, kuten tavallinen pulumi up. <docs>Näin Pulumi-ajot toimivat</docs>",
+      "oidcAudiences": "Ajoidentiteetin audiencet",
+      "oidcAudiencesAdd": "Lisää audience",
+      "oidcAudiencesHint": "Terrapod myöntää lyhytikäisen OpenID Connect -tokenin jokaiselle provider-konfiguraatiolle, jota ajo käyttää, ja kirjoittaa sen tiedostoon, jonka ajo voi lukea. Avaimena merkinnässä on provider sellaisena kuin konfiguraatiosi sen nimeää — aws tai aws.west alias-konfiguraatiolle — ja luettele audiencet, jotka kohde hyväksyy. Jokainen merkintä ohittaa käyttöönoton oman konfiguraation kyseiselle providerille; poista se, niin provider palaa käyttöönoton audienceihin. Audience on läpinäkymätön merkkijono, jonka federaatiokohde valitsi, joten se tallennetaan täsmälleen kirjoittamassasi muodossa.",
+      "oidcAudiencesLoading": "Tarkistetaan käyttöönotossa määritetyt audiencet …",
+      "oidcAudiencesNone": "Ei mitään (ajot käyttävät agenttipoolin omaa identiteettiä)",
+      "oidcAudiencesPlaceholder": "esim. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Valtuutus delegoitu VCS-repositoriollesi.",

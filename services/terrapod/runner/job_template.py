@@ -4,6 +4,7 @@ import re
 
 from terrapod.config import RunnerConfig
 from terrapod.logging_config import get_logger
+from terrapod.runner.phases.cloud_identity import TOKEN_DIR as OIDC_TOKEN_DIR
 from terrapod.runner.reserved_env import is_reserved_env_key
 
 logger = get_logger(__name__)
@@ -474,6 +475,20 @@ def build_job_spec(
                         # and equally affects anything else consulting it: helm's
                         # repository cache, kubectl's, the AWS CLI's config.
                         {"name": "home", "emptyDir": {}},
+                        # The cloud identity tokens the credential phase writes
+                        # (#1901). Needed for exactly the #1442 reason three
+                        # lines above: `readOnlyRootFilesystem` below makes
+                        # /var/run/terrapod read-only, and the sibling paths
+                        # there (vars, files) are read-only Secret mounts, so
+                        # without this the phase's first `mkdir` fails EROFS —
+                        # which it reports as CloudIdentityUnavailable, failing
+                        # every federated run.
+                        #
+                        # `medium: Memory` because these are bearer credentials
+                        # for the workspace's cloud identity: a tmpfs keeps them
+                        # off the node's disk, and they live only as long as the
+                        # Job.
+                        {"name": "oidc", "emptyDir": {"medium": "Memory"}},
                     ],
                     "containers": [
                         {
@@ -504,6 +519,7 @@ def build_job_spec(
                                 {"name": "workspace", "mountPath": "/workspace"},
                                 {"name": "tmp", "mountPath": "/tmp"},
                                 {"name": "home", "mountPath": "/home/runner"},
+                                {"name": "oidc", "mountPath": str(OIDC_TOKEN_DIR)},
                             ],
                         }
                     ],

@@ -1113,7 +1113,9 @@
       "noExpiry": "만료 없음",
       "addDriftIgnoreRule": "규칙 추가",
       "debugModeHint": "이 규칙이 만드는 워크스페이스에서 실패한 러너 파드를 유지합니다. 기본값은 꺼짐 — 유지된 파드는 해당 워크스페이스의 자격 증명을 보관합니다.",
-      "allowForkPrPlansHint": "이 규칙이 만드는 모든 워크스페이스에 적용됩니다. 기본값은 꺼짐: 포크에서 온 풀 리퀘스트는 예상 계획을 받지 않습니다. 작성자의 코드를 워크스페이스의 자격 증명으로 실행하게 되기 때문입니다."
+      "allowForkPrPlansHint": "이 규칙이 만드는 모든 워크스페이스에 적용됩니다. 기본값은 꺼짐: 포크에서 온 풀 리퀘스트는 예상 계획을 받지 않습니다. 작성자의 코드를 워크스페이스의 자격 증명으로 실행하게 되기 때문입니다.",
+      "oidcAudiences": "실행 ID 대상 (생성된 워크스페이스에 상속됨)",
+      "oidcAudiencesHint": "이 규칙이 생성하는 각 워크스페이스에 적용되는 대상 재정의. 키는 토큰이 해당하는 프로바이더 구성입니다 — aws, 별칭이 있는 구성이면 aws.west. 비워 두면 해당 워크스페이스는 배포 자체의 구성을 사용합니다."
     },
     "table": {
       "name": "이름",
@@ -1307,7 +1309,8 @@
       "cancel": "취소",
       "working": "작업 중...",
       "previewDryRun": "미리 보기 (드라이 런)",
-      "applyChanges": "변경 사항 적용"
+      "applyChanges": "변경 사항 적용",
+      "setOidcAudiences": "실행 ID의 OIDC 대상 설정 (일치하는 모든 워크스페이스의 맵을 대체)"
     },
     "diff": {
       "colWorkspace": "워크스페이스",
@@ -1956,6 +1959,19 @@
       "always": "항상",
       "create": "생성",
       "createUpdate": "생성/수정"
+    },
+    "oidcAudiences": {
+      "addProvider": "프로바이더 구성 추가",
+      "audiences": "대상",
+      "badgeInherited": "배포 기본값",
+      "badgeOwned": "워크스페이스",
+      "issuerDisabled": "이 배포는 OpenID Connect 발급자를 전혀 공개하지 않으므로, 여기서 구성한 어떤 것도 적용될 수 없습니다.",
+      "override": "재정의",
+      "overrideAria": "이 워크스페이스에서 {provider} 대상 재정의",
+      "providerDuplicate": "해당 프로바이더 구성에는 이미 항목이 있습니다.",
+      "providerInvalid": "프로바이더 이름에는 공백이 없고 점은 최대 하나입니다 — aws 또는 aws.west.",
+      "providerPlaceholder": "aws 또는 aws.west",
+      "removeProviderAria": "프로바이더 구성 {provider} 제거"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "'::' 로 구분된 두 부분 — project::stack. 문자, 숫자, 하이픈, 밑줄만 사용할 수 있으며 각 부분은 문자 또는 숫자로 시작해야 합니다.",
       "bindPlan": "승인된 미리보기에 업데이트 고정",
-      "bindPlanHelp": "켜면 업데이트는 미리보기가 저장한 계획을 그대로 적용하므로, 미리보기 이후 바뀐 것이 있으면 적용되는 대신 업데이트가 실패합니다. 이 기능은 아직 실험적인 Pulumi 업데이트 계획에 기반합니다. 끄면 일반 pulumi up처럼 업데이트가 스스로 변경 사항을 판단합니다. <docs>Pulumi 실행 방식</docs>"
+      "bindPlanHelp": "켜면 업데이트는 미리보기가 저장한 계획을 그대로 적용하므로, 미리보기 이후 바뀐 것이 있으면 적용되는 대신 업데이트가 실패합니다. 이 기능은 아직 실험적인 Pulumi 업데이트 계획에 기반합니다. 끄면 일반 pulumi up처럼 업데이트가 스스로 변경 사항을 판단합니다. <docs>Pulumi 실행 방식</docs>",
+      "oidcAudiences": "실행 ID 대상(audience)",
+      "oidcAudiencesAdd": "대상 추가",
+      "oidcAudiencesHint": "Terrapod는 실행이 사용하는 각 프로바이더 구성마다 단기 OpenID Connect 토큰을 발급하고, 실행이 읽을 수 있는 파일에 기록합니다. 항목의 키는 사용자의 구성이 그 프로바이더를 부르는 이름으로 지정하고 — aws, 별칭이 있는 구성이면 aws.west — 그 대상이 받아들이는 대상(audience)을 나열하세요. 각 항목은 그 프로바이더에 대해 배포 자체의 구성을 재정의합니다. 항목을 제거하면 그 프로바이더는 배포의 대상으로 되돌아갑니다. 대상은 페더레이션 대상이 선택한 불투명한 문자열이므로, 입력한 그대로 저장됩니다.",
+      "oidcAudiencesLoading": "배포에 구성된 대상을 확인하고 있습니다 …",
+      "oidcAudiencesNone": "없음 (실행은 에이전트 풀 자신의 ID를 사용)",
+      "oidcAudiencesPlaceholder": "예: sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "권한 부여가 VCS 저장소에 위임되었습니다.",

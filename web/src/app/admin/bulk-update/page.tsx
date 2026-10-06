@@ -10,11 +10,15 @@ import { EmptyState } from '@/components/empty-state'
 import { LabelsEditor } from '@/components/labels-editor'
 import {
   StringListEditor,
+  OidcAudiencesEditor,
+  sanitizeOidcAudiences,
+  type OidcAudiences,
   RunTaskTemplatesEditor,
   NotificationTemplatesEditor,
   type RunTaskSpec,
   type NotificationSpec,
 } from '@/components/template-editors'
+import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
 
@@ -136,12 +140,24 @@ export default function BulkUpdatePage() {
   const [uLabels, setULabels] = useState<Record<string, string>>({})
   const [uSetVarFiles, setUSetVarFiles] = useState(false)
   const [uVarFiles, setUVarFiles] = useState<string[]>([])
+  // Only to tell the operator when the deployment publishes no issuer, so an
+  // entry added here could never be minted for. No partition on this surface:
+  // the value IS the override — unlike a workspace read, nothing is merged
+  // into it — so there is nothing to subtract and nothing to inherit.
+  const oidcDefaults = useOidcAudienceDefaults()
+
+  // A checkbox gate, not a bare editor: an EMPTY map is a meaningful value
+  // here — it clears every override, so each provider falls back to the
+  // deployment's own configured audiences — and there is therefore no in-band
+  // way to say "leave this alone" (#1901). Same shape as var-files, for the
+  // same reason.
+  const [uSetOidcAudiences, setUSetOidcAudiences] = useState(false)
+  const [uOidcAudiences, setUOidcAudiences] = useState<OidcAudiences>({})
   const [uSetRunTasks, setUSetRunTasks] = useState(false)
   const [uRunTasks, setURunTasks] = useState<RunTaskSpec[]>([])
   const [uSetNotifications, setUSetNotifications] = useState(false)
   const [uNotifications, setUNotifications] = useState<NotificationSpec[]>([])
 
-  const [dryRun, setDryRun] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [confirmApply, setConfirmApply] = useState(false)
   const [dryResult, setDryResult] = useState<DryRunResult | null>(null)
@@ -223,6 +239,11 @@ export default function BulkUpdatePage() {
     if (uAllowForkPrPlans) u['allow-fork-pr-plans'] = uAllowForkPrPlans === 'true'
     if (uSetLabels) u.labels = uLabels
     if (uSetVarFiles) u['var-files'] = uVarFiles.map((s) => s.trim()).filter(Boolean)
+    // Blank audience rows are refused by the server rather than dropped, and
+    // so is a provider whose list came out empty — removing the key is the way
+    // to stop overriding one. An empty row left in the editor would otherwise
+    // 422 the whole fleet update.
+    if (uSetOidcAudiences) u['oidc-audiences'] = sanitizeOidcAudiences(uOidcAudiences)
     if (uSetRunTasks) u['run-tasks'] = uRunTasks
     if (uSetNotifications) u['notification-configurations'] = uNotifications
     return u
@@ -283,10 +304,8 @@ export default function BulkUpdatePage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (dryRun) {
-      runBulkUpdate(true)
-      return
-    }
+    // Submit is Apply only — Preview is a separate button that calls
+    // runBulkUpdate(true) directly, so there is no mode to read here.
     // Destructive apply requires an explicit confirm click.
     if (!confirmApply) {
       setConfirmApply(true)
@@ -376,7 +395,16 @@ export default function BulkUpdatePage() {
           </label>
           <fieldset
             disabled={fAll}
-            className={fAll ? 'opacity-40 pointer-events-none space-y-3' : 'space-y-3'}
+            // `min-w-0`: a `fieldset` defaults to `min-inline-size: min-content`,
+            // so it refuses to shrink below its content however narrow the
+            // viewport and `w-full` on the children cannot save it. Measured at
+            // 412px it sat 501px wide and was the outermost cause of the page's
+            // horizontal scroll.
+            className={
+              fAll
+                ? 'opacity-40 pointer-events-none space-y-3 min-w-0'
+                : 'space-y-3 min-w-0'
+            }
           >
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -868,6 +896,29 @@ export default function BulkUpdatePage() {
             <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
               <input
                 type="checkbox"
+                checked={uSetOidcAudiences}
+                onChange={(e) => setUSetOidcAudiences(e.target.checked)}
+              />
+              {t('update.setOidcAudiences')}
+            </label>
+            {uSetOidcAudiences && (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400">{tWs('fields.oidcAudiencesHint')}</p>
+                <OidcAudiencesEditor
+                  value={uOidcAudiences}
+                  inert={!oidcDefaults.issuerEnabled}
+                  onChange={setUOidcAudiences}
+                  audiencePlaceholder={tWs('fields.oidcAudiencesPlaceholder')}
+                  addAudienceLabel={tWs('fields.oidcAudiencesAdd')}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="pt-3 border-t border-slate-800">
+            <label className="flex items-center gap-2 text-sm text-slate-300 mb-2">
+              <input
+                type="checkbox"
                 checked={uSetRunTasks}
                 onChange={(e) => setUSetRunTasks(e.target.checked)}
               />
@@ -895,23 +946,29 @@ export default function BulkUpdatePage() {
             )}
           </div>
 
-          <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input
-                type="checkbox"
-                checked={dryRun}
-                onChange={(e) => {
-                  setDryRun(e.target.checked)
-                  setConfirmApply(false)
-                }}
-              />
-              {t('update.dryRun')}
-            </label>
-            {!dryRun && confirmApply ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-amber-300">
-                  {t('update.confirmWarning')}
-                </span>
+          {/* BOTH actions are always present. The previous shape put a single
+              button next to a `Dry run` checkbox that was ticked by default, so
+              the only control that looked like a save performed a no-op and
+              nothing said so — you had to UNTICK something to reach Apply.
+              Preview and Apply are two different intentions, so they are two
+              buttons, and neither is reachable only by changing a checkbox
+              first. The confirm step stays: this writes to every matched
+              workspace, which is tier 1 of the #719 confirm policy. */}
+          <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmApply(false)
+                runBulkUpdate(true)
+              }}
+              disabled={submitting}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-100 transition-colors"
+            >
+              {submitting ? t('update.working') : t('update.previewDryRun')}
+            </button>
+            {confirmApply ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-amber-300">{t('update.confirmWarning')}</span>
                 <button
                   type="submit"
                   disabled={submitting}
@@ -931,17 +988,9 @@ export default function BulkUpdatePage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50 ${
-                  dryRun
-                    ? 'bg-brand-600 hover:bg-brand-500'
-                    : 'bg-amber-700 hover:bg-amber-600'
-                }`}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-700 hover:bg-amber-600 disabled:opacity-50 text-white transition-colors"
               >
-                {submitting
-                  ? t('update.working')
-                  : dryRun
-                    ? t('update.previewDryRun')
-                    : t('update.applyChanges')}
+                {t('update.applyChanges')}
               </button>
             )}
           </div>

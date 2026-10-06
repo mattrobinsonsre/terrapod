@@ -1113,7 +1113,9 @@
       "noExpiry": "不過期",
       "addDriftIgnoreRule": "新增規則",
       "debugModeHint": "在此規則建立的工作區上讓失敗執行器的 Pod 保持開啟。預設關閉 — 保持開啟的 Pod 會保留該工作區的憑證。",
-      "allowForkPrPlansHint": "適用於此規則建立的每個工作區。預設關閉：來自 fork 的拉取請求不會取得推測性計畫，因為那會以工作區的憑證執行其作者的程式碼。"
+      "allowForkPrPlansHint": "適用於此規則建立的每個工作區。預設關閉：來自 fork 的拉取請求不會取得推測性計畫，因為那會以工作區的憑證執行其作者的程式碼。",
+      "oidcAudiences": "執行身分受眾（由所建立的工作區繼承）",
+      "oidcAudiencesHint": "套用到此規則建立的每個工作區上的受眾覆寫，以權杖所對應的 provider 設定為鍵 — aws，或帶別名的設定用 aws.west。留空則這些工作區使用部署自身的設定。"
     },
     "table": {
       "name": "名稱",
@@ -1307,7 +1309,8 @@
       "cancel": "取消",
       "working": "正在處理...",
       "previewDryRun": "預覽（試執行）",
-      "applyChanges": "應用更改"
+      "applyChanges": "應用更改",
+      "setOidcAudiences": "設定執行身分的 OIDC 受眾（替換每個相符工作區上的對映）"
     },
     "diff": {
       "colWorkspace": "工作區",
@@ -1956,6 +1959,19 @@
       "always": "一律",
       "create": "建立",
       "createUpdate": "建立/更新"
+    },
+    "oidcAudiences": {
+      "addProvider": "新增 provider 設定",
+      "audiences": "受眾",
+      "badgeInherited": "部署預設值",
+      "badgeOwned": "工作區",
+      "issuerDisabled": "此部署未簽發任何 OpenID Connect 簽發者，因此這裡設定的任何內容都不會生效。",
+      "override": "覆寫",
+      "overrideAria": "在此工作區覆寫 {provider} 的受眾",
+      "providerDuplicate": "該 provider 設定已有一筆項目。",
+      "providerInvalid": "provider 名稱不含空格，且最多一個點 — aws，或 aws.west。",
+      "providerPlaceholder": "aws，或 aws.west",
+      "removeProviderAria": "移除 provider 設定 {provider}"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "由 '::' 分隔的兩部分 — project::stack。僅限字母、數字、連字號與底線；每部分必須以字母或數字開頭。",
       "bindPlan": "將更新鎖定至已核准的預覽",
-      "bindPlanHelp": "開啟後，更新會嚴格套用預覽儲存的計畫，因此自預覽以來的任何變化都會使更新失敗，而不會被套用。此功能仰賴 Pulumi 的更新計畫，目前仍屬實驗性質。關閉後，更新會像一般的 pulumi up 一樣自行判斷變更。<docs>Pulumi 執行的運作方式</docs>"
+      "bindPlanHelp": "開啟後，更新會嚴格套用預覽儲存的計畫，因此自預覽以來的任何變化都會使更新失敗，而不會被套用。此功能仰賴 Pulumi 的更新計畫，目前仍屬實驗性質。關閉後，更新會像一般的 pulumi up 一樣自行判斷變更。<docs>Pulumi 執行的運作方式</docs>",
+      "oidcAudiences": "執行身分受眾",
+      "oidcAudiencesAdd": "新增受眾",
+      "oidcAudiencesHint": "Terrapod 為執行所使用的每個 provider 設定簽發一個短期的 OpenID Connect 權杖，並寫入執行可讀取的檔案。項目的鍵使用你的設定對該 provider 的命名 — aws，或帶別名的設定用 aws.west — 然後列出該目標接受的受眾。每筆項目會覆寫部署自身針對該 provider 的設定；移除它，該 provider 便回退到部署的受眾。受眾是聯合目標自行選定的不透明字串，因此會依你輸入的原樣儲存。",
+      "oidcAudiencesLoading": "正在檢查部署中設定的受眾 …",
+      "oidcAudiencesNone": "無（執行使用代理池自身的身分）",
+      "oidcAudiencesPlaceholder": "例如 sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "授權已委託給您的 VCS 倉庫。",

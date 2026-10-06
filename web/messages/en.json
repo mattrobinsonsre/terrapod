@@ -1113,7 +1113,9 @@
       "noExpiry": "No expiry",
       "addDriftIgnoreRule": "Add rule",
       "debugModeHint": "Hold failed runner pods open on the workspaces this rule creates. Off by default — a held pod keeps that workspace's credentials.",
-      "allowForkPrPlansHint": "Applies to every workspace this rule creates. Off by default: a pull request from a fork gets no speculative plan, because it would run its author's code with the workspace's credentials."
+      "allowForkPrPlansHint": "Applies to every workspace this rule creates. Off by default: a pull request from a fork gets no speculative plan, because it would run its author's code with the workspace's credentials.",
+      "oidcAudiences": "Run identity audiences (inherited by created workspaces)",
+      "oidcAudiencesHint": "Audience overrides templated onto every workspace this rule creates, keyed on the provider configuration a token is for — aws, or aws.west for an aliased configuration. Leave it empty and those workspaces take the deployment's own configuration."
     },
     "table": {
       "name": "Name",
@@ -1307,7 +1309,8 @@
       "cancel": "Cancel",
       "working": "Working...",
       "previewDryRun": "Preview (dry run)",
-      "applyChanges": "Apply changes"
+      "applyChanges": "Apply changes",
+      "setOidcAudiences": "Set OIDC run identity audiences (replaces the map on every matched workspace)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -1956,6 +1959,19 @@
       "always": "always",
       "create": "create",
       "createUpdate": "create/update"
+    },
+    "oidcAudiences": {
+      "addProvider": "Add provider configuration",
+      "audiences": "Audiences",
+      "badgeInherited": "Deployment default",
+      "badgeOwned": "Workspace",
+      "issuerDisabled": "This deployment publishes no OpenID Connect issuer, so nothing configured here can take effect.",
+      "override": "Override",
+      "overrideAria": "Override the {provider} audiences for this workspace",
+      "providerDuplicate": "That provider configuration already has an entry.",
+      "providerInvalid": "A provider name has no spaces and at most one dot — aws, or aws.west.",
+      "providerPlaceholder": "aws, or aws.west",
+      "removeProviderAria": "Remove the {provider} provider configuration"
     }
   },
   "planSummary": {
@@ -2559,7 +2575,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Two parts separated by '::' — project::stack. Letters, numbers, hyphens and underscores only; each part must start with a letter or number.",
       "bindPlan": "Lock the update to the approved preview",
-      "bindPlanHelp": "When on, the update applies exactly the plan the preview saved, so anything that changed since the preview fails the update instead of being applied. This rests on Pulumi update plans, which are still experimental. When off, the update works out its own changes, as a plain pulumi up does. <docs>How Pulumi runs work</docs>"
+      "bindPlanHelp": "When on, the update applies exactly the plan the preview saved, so anything that changed since the preview fails the update instead of being applied. This rests on Pulumi update plans, which are still experimental. When off, the update works out its own changes, as a plain pulumi up does. <docs>How Pulumi runs work</docs>",
+      "oidcAudiences": "Run identity audiences",
+      "oidcAudiencesAdd": "Add audience",
+      "oidcAudiencesHint": "Terrapod mints a short-lived OpenID Connect token for each provider configuration a run uses and writes it to a file the run can read. Key an entry on the provider as your configuration names it — aws, or aws.west for an aliased configuration — and list the audiences that target accepts. Each entry overrides the deployment's own configuration for that provider; remove it and that provider falls back to the deployment's audiences. An audience is an opaque string the federation target chose, so it is stored exactly as typed.",
+      "oidcAudiencesLoading": "Checking the deployment's configured audiences…",
+      "oidcAudiencesNone": "None (runs use the agent pool's own identity)",
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization delegated to your VCS repository.",

@@ -9,9 +9,13 @@ import (
 
 // The #1091 warning turns on two predicates: the config value being null, and
 // the state value holding at least one element. `hasElements` is the second, and
-// it has to be right about every shape a list attribute can be in — a null or
-// unknown list is not "a value the config isn't managing", and neither is an
-// empty one (the server default), so none of them should raise a warning.
+// it has to be right about every shape a collection attribute can be in — a
+// null or unknown collection is not "a value the config isn't managing", and
+// neither is an empty one (the server default), so none of them should raise a
+// warning. Both shapes in unmanagedCollections are covered: lists, and the map
+// of lists that oidc_audiences became in #1901 — a map arm that was simply
+// missing would read as "no unmanaged value" for every workspace and silently
+// retire the warning for that attribute.
 func TestHasElements(t *testing.T) {
 	strList := func(vals ...string) types.List {
 		elems := make([]attr.Value, 0, len(vals))
@@ -31,7 +35,16 @@ func TestHasElements(t *testing.T) {
 		{"empty list is the server default, not an unmanaged value", strList(), false},
 		{"one element is an unmanaged value", strList("envs/prod.tfvars"), true},
 		{"several elements likewise", strList("a.tfvars", "b.tfvars"), true},
-		{"a non-list value never warns", types.StringValue("nope"), false},
+		{"null map is not a value to warn about", types.MapNull(audienceElemType), false},
+		{"unknown map is not a value to warn about", types.MapUnknown(audienceElemType), false},
+		{"empty map is the server default, not an unmanaged value",
+			types.MapValueMust(audienceElemType, map[string]attr.Value{}), false},
+		{"one key is an unmanaged value",
+			types.MapValueMust(audienceElemType, map[string]attr.Value{
+				"aws": types.ListValueMust(types.StringType,
+					[]attr.Value{types.StringValue("sts.example.com")}),
+			}), true},
+		{"a value of neither shape never warns", types.StringValue("nope"), false},
 	}
 
 	for _, tc := range cases {
@@ -60,6 +73,7 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 		m.TriggerPrefixes = types.ListNull(types.StringType)
 		m.DriftIgnoreRules = types.ListNull(types.StringType)
 		m.SecurityScanSkipRules = types.ListNull(types.StringType)
+		m.OIDCAudiences = types.MapNull(audienceElemType)
 
 		switch target.name {
 		case "agent_pool_ids":
@@ -72,6 +86,13 @@ func TestUnmanagedCollectionAccessorsAreDistinct(t *testing.T) {
 			m.DriftIgnoreRules = strList("aws_iam_role.foo")
 		case "security_scan_skip_rules":
 			m.SecurityScanSkipRules = strList("CKV_AWS_24")
+		case "oidc_audiences":
+			// A map of lists since #1901, not a list — the one entry in
+			// unmanagedCollections whose shape differs.
+			m.OIDCAudiences = types.MapValueMust(audienceElemType, map[string]attr.Value{
+				"aws": types.ListValueMust(types.StringType,
+					[]attr.Value{types.StringValue("sts.example.com")}),
+			})
 		default:
 			t.Fatalf("unmanagedCollections gained %q with no case here — extend this test", target.name)
 		}

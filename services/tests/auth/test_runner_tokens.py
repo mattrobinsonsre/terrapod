@@ -138,6 +138,8 @@ class TestVerifyRunnerToken:
         # Six fields IS a shape now (the phase claim), but `b` is not a phase a
         # Job runs, so this stays refused.
         assert verify_runner_token("runtok:a:b:c:d:e") is None
+        # Six fields IS a shape now (the phase claim), but `b` is not a phase a
+        # Job runs, so this stays refused.
         assert verify_runner_token("runtok:a:plan:b:c:d:e") is None
 
     def test_rejects_non_numeric_ttl(self, _mock_settings):
@@ -195,7 +197,8 @@ class TestVerifyRunnerToken:
 
 class TestThePhaseClaim:
     """A token says which Job phase it may act in, so a plan-phase token cannot
-    drive the apply-phase routes. The claim is inside the signed message, which
+    drive the apply-phase routes, nor ask for the apply
+        cloud identity (#1901). The claim is inside the signed message, which
     is the only reason it is worth anything."""
 
     def test_a_phased_token_round_trips_its_phase(self, _mock_settings, _mock_runner_config):
@@ -225,6 +228,14 @@ class TestThePhaseClaim:
         """The whole point. Rewriting `plan` to `apply` must invalidate the
         signature, or the claim is a suggestion."""
         token = generate_runner_token(str(uuid.uuid4()), ttl=3600, phase="plan")
+
+        # Assert the honest token verifies FIRST. Without this the test passes
+        # under any mutation that breaks six-field verification outright, since
+        # a wholly broken verifier also answers None — which is not the same
+        # claim at all.
+        honest = verify_runner_token_claims(token)
+        assert honest is not None and honest.phase == "plan"
+
         parts = token.split(":")
         parts[2] = "apply"
         assert verify_runner_token_claims(":".join(parts)) is None

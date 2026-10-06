@@ -1113,7 +1113,9 @@
       "noExpiry": "Süre dolumu yok",
       "addDriftIgnoreRule": "Kural ekle",
       "debugModeHint": "Bu kuralın oluşturduğu çalışma alanlarında başarısız çalıştırıcı pod'larını açık tutun. Varsayılan olarak kapalı — açık tutulan bir pod o çalışma alanının kimlik bilgilerini barındırır.",
-      "allowForkPrPlansHint": "Bu kuralın oluşturduğu her çalışma alanı için geçerlidir. Varsayılan olarak kapalı: bir fork''tan gelen pull request spekülatif plan almaz, çünkü yazarının kodunu çalışma alanının kimlik bilgileriyle çalıştırırdı."
+      "allowForkPrPlansHint": "Bu kuralın oluşturduğu her çalışma alanı için geçerlidir. Varsayılan olarak kapalı: bir fork''tan gelen pull request spekülatif plan almaz, çünkü yazarının kodunu çalışma alanının kimlik bilgileriyle çalıştırırdı.",
+      "oidcAudiences": "Çalıştırma kimliği audience''ları (oluşturulan çalışma alanlarına devralınır)",
+      "oidcAudiencesHint": "Bu kuralın oluşturduğu her çalışma alanına uygulanan audience geçersiz kılmaları; bir token''ın ait olduğu provider yapılandırmasına göre anahtarlanır — aws ya da alias''lı bir yapılandırma için aws.west. Boş bırakın, o çalışma alanları dağıtımın kendi yapılandırmasını kullanır."
     },
     "table": {
       "name": "Ad",
@@ -1307,7 +1309,8 @@
       "cancel": "İptal",
       "working": "Çalışıyor...",
       "previewDryRun": "Önizleme (deneme çalıştırması)",
-      "applyChanges": "Değişiklikleri uygula"
+      "applyChanges": "Değişiklikleri uygula",
+      "setOidcAudiences": "OIDC çalıştırma kimliği audience''larını ayarla (eşleşen her çalışma alanındaki eşlemeyi değiştirir)"
     },
     "diff": {
       "colWorkspace": "Çalışma Alanı",
@@ -1956,6 +1959,19 @@
       "always": "her zaman",
       "create": "oluşturma",
       "createUpdate": "oluşturma/güncelleme"
+    },
+    "oidcAudiences": {
+      "addProvider": "Provider yapılandırması ekle",
+      "audiences": "Audience''lar",
+      "badgeInherited": "Dağıtım varsayılanı",
+      "badgeOwned": "Çalışma alanı",
+      "issuerDisabled": "Bu dağıtım hiçbir OpenID Connect sağlayıcısı yayımlamıyor; bu nedenle burada yapılandırılan hiçbir şey etkili olamaz.",
+      "override": "Geçersiz kıl",
+      "overrideAria": "Bu çalışma alanında {provider} audience''larını geçersiz kıl",
+      "providerDuplicate": "Bu provider yapılandırmasının zaten bir kaydı var.",
+      "providerInvalid": "Bir provider adında boşluk olmaz ve en fazla bir nokta bulunur — aws ya da aws.west.",
+      "providerPlaceholder": "aws ya da aws.west",
+      "removeProviderAria": "{provider} provider yapılandırmasını kaldır"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "'::' ile ayrılmış iki bölüm — project::stack. Yalnızca harf, rakam, tire ve alt çizgi; her bölüm bir harf veya rakamla başlamalıdır.",
       "bindPlan": "Güncellemeyi onaylanan önizlemeye kilitle",
-      "bindPlanHelp": "Açıkken güncelleme, önizlemenin kaydettiği planı birebir uygular; önizlemeden bu yana değişen her şey uygulanmak yerine güncellemenin başarısız olmasına yol açar. Bu, hâlâ deneysel olan Pulumi güncelleme planlarına dayanır. Kapalıyken güncelleme, sıradan bir pulumi up gibi değişikliklerini kendisi belirler. <docs>Pulumi çalıştırmaları nasıl işler</docs>"
+      "bindPlanHelp": "Açıkken güncelleme, önizlemenin kaydettiği planı birebir uygular; önizlemeden bu yana değişen her şey uygulanmak yerine güncellemenin başarısız olmasına yol açar. Bu, hâlâ deneysel olan Pulumi güncelleme planlarına dayanır. Kapalıyken güncelleme, sıradan bir pulumi up gibi değişikliklerini kendisi belirler. <docs>Pulumi çalıştırmaları nasıl işler</docs>",
+      "oidcAudiences": "Çalıştırma kimliği audience''ları",
+      "oidcAudiencesAdd": "Audience ekle",
+      "oidcAudiencesHint": "Terrapod, bir çalıştırmanın kullandığı her provider yapılandırması için kısa ömürlü bir OpenID Connect token''ı üretir ve onu çalıştırmanın okuyabileceği bir dosyaya yazar. Bir kaydı, yapılandırmanızın provider''ı adlandırdığı biçimde anahtarlayın — aws ya da alias''lı bir yapılandırma için aws.west — ve o hedefin kabul ettiği audience''ları listeleyin. Her kayıt, o provider için dağıtımın kendi yapılandırmasını geçersiz kılar; kaydı kaldırırsanız o provider dağıtımın audience''larına geri döner. Audience, federasyon hedefinin seçtiği opak bir dizedir; bu yüzden tam yazdığınız gibi saklanır.",
+      "oidcAudiencesLoading": "Dağıtımda yapılandırılmış audience''lar denetleniyor …",
+      "oidcAudiencesNone": "Yok (çalıştırmalar agent havuzunun kendi kimliğini kullanır)",
+      "oidcAudiencesPlaceholder": "örn. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Yetkilendirme VCS deponuza devredildi.",

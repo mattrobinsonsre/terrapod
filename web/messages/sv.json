@@ -1113,7 +1113,9 @@
       "noExpiry": "Ingen utgång",
       "addDriftIgnoreRule": "Lägg till regel",
       "debugModeHint": "Håll misslyckade runner-poddar öppna på de arbetsytor som den här regeln skapar. Av som standard – en kvarhållen podd behåller den arbetsytans autentiseringsuppgifter.",
-      "allowForkPrPlansHint": "Gäller varje arbetsyta som den här regeln skapar. Av som standard: en pull request från en fork får ingen spekulativ plan, eftersom den skulle köra författarens kod med arbetsytans autentiseringsuppgifter."
+      "allowForkPrPlansHint": "Gäller varje arbetsyta som den här regeln skapar. Av som standard: en pull request från en fork får ingen spekulativ plan, eftersom den skulle köra författarens kod med arbetsytans autentiseringsuppgifter.",
+      "oidcAudiences": "Audiences för körningsidentitet (ärvs av skapade arbetsytor)",
+      "oidcAudiencesHint": "Audience-åsidosättanden som läggs på varje arbetsyta den här regeln skapar, nycklade på den providerkonfiguration ett token gäller för — aws, eller aws.west för en konfiguration med alias. Lämna tomt och de arbetsytorna använder deploymentets egen konfiguration."
     },
     "table": {
       "name": "Namn",
@@ -1307,7 +1309,8 @@
       "cancel": "Avbryt",
       "working": "Arbetar...",
       "previewDryRun": "Förhandsgranska (torrkörning)",
-      "applyChanges": "Tillämpa ändringar"
+      "applyChanges": "Tillämpa ändringar",
+      "setOidcAudiences": "Ange OIDC-audiences för körningsidentitet (ersätter kartan på varje matchad arbetsyta)"
     },
     "diff": {
       "colWorkspace": "Arbetsyta",
@@ -1956,6 +1959,19 @@
       "always": "alltid",
       "create": "skapa",
       "createUpdate": "skapa/uppdatera"
+    },
+    "oidcAudiences": {
+      "addProvider": "Lägg till providerkonfiguration",
+      "audiences": "Audiences",
+      "badgeInherited": "Deploymentets standard",
+      "badgeOwned": "Arbetsyta",
+      "issuerDisabled": "Det här deploymentet publicerar ingen OpenID Connect-utfärdare, så inget som konfigureras här kan få effekt.",
+      "override": "Åsidosätt",
+      "overrideAria": "Åsidosätt audiences för {provider} i den här arbetsytan",
+      "providerDuplicate": "Den providerkonfigurationen har redan en post.",
+      "providerInvalid": "Ett providernamn innehåller inga blanksteg och högst en punkt — aws eller aws.west.",
+      "providerPlaceholder": "aws eller aws.west",
+      "removeProviderAria": "Ta bort providerkonfigurationen {provider}"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Två delar åtskilda av '::' — project::stack. Endast bokstäver, siffror, bindestreck och understreck; varje del måste börja med en bokstav eller siffra.",
       "bindPlan": "Lås uppdateringen till den godkända förhandsgranskningen",
-      "bindPlanHelp": "När det är på tillämpar uppdateringen exakt den plan som förhandsgranskningen sparade, så allt som har ändrats sedan förhandsgranskningen får uppdateringen att misslyckas i stället för att tillämpas. Det bygger på Pulumis uppdateringsplaner, som fortfarande är experimentella. När det är av räknar uppdateringen själv ut sina ändringar, precis som en vanlig pulumi up. <docs>Så fungerar Pulumi-körningar</docs>"
+      "bindPlanHelp": "När det är på tillämpar uppdateringen exakt den plan som förhandsgranskningen sparade, så allt som har ändrats sedan förhandsgranskningen får uppdateringen att misslyckas i stället för att tillämpas. Det bygger på Pulumis uppdateringsplaner, som fortfarande är experimentella. När det är av räknar uppdateringen själv ut sina ändringar, precis som en vanlig pulumi up. <docs>Så fungerar Pulumi-körningar</docs>",
+      "oidcAudiences": "Audiences för körningsidentitet",
+      "oidcAudiencesAdd": "Lägg till audience",
+      "oidcAudiencesHint": "Terrapod utfärdar ett kortlivat OpenID Connect-token för varje providerkonfiguration en körning använder och skriver det till en fil som körningen kan läsa. Nyckla en post på providern så som din konfiguration namnger den — aws, eller aws.west för en konfiguration med alias — och lista de audiences som målet accepterar. Varje post åsidosätter deploymentets egen konfiguration för den providern; ta bort den och providern faller tillbaka på deploymentets audiences. En audience är en opak sträng som federationsmålet har valt, så den lagras exakt som du skriver den.",
+      "oidcAudiencesLoading": "Kontrollerar de audiences som är konfigurerade i deploymentet …",
+      "oidcAudiencesNone": "Ingen (körningar använder agentpoolens egen identitet)",
+      "oidcAudiencesPlaceholder": "t.ex. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Auktorisering delegerad till ditt VCS-repositorie.",

@@ -1113,7 +1113,9 @@
       "noExpiry": "Dim dod i ben",
       "addDriftIgnoreRule": "Ychwanegu rheol",
       "debugModeHint": "Cadw podiau rhedwyr a fethodd ar agor ar y gweithleoedd y mae'r rheol hon yn eu creu. I ffwrdd yn ddiofyn — mae pod sy'n cael ei gadw yn cadw tystlythyrau'r gweithle hwnnw.",
-      "allowForkPrPlansHint": "Mae'n berthnasol i bob gweithle y mae'r rheol hon yn ei greu. I ffwrdd yn ddiofyn: nid yw cais tynnu o fforch yn cael cynllun tybiannol, am y byddai'n rhedeg cod ei awdur gyda thystlythyrau'r gweithle."
+      "allowForkPrPlansHint": "Mae'n berthnasol i bob gweithle y mae'r rheol hon yn ei greu. I ffwrdd yn ddiofyn: nid yw cais tynnu o fforch yn cael cynllun tybiannol, am y byddai'n rhedeg cod ei awdur gyda thystlythyrau'r gweithle.",
+      "oidcAudiences": "Cynulleidfaoedd hunaniaeth rhediad (etifeddir gan weithfannau a grëir)",
+      "oidcAudiencesHint": "Disodliadau cynulleidfa a roddir ar bob gweithle a grëir gan y rheol hon, wedi'u hallweddu ar y cyfluniad provider y mae tocyn ar ei gyfer — aws, neu aws.west ar gyfer cyfluniad ag alias. Gadewch yn wag ac mae'r gweithleoedd hynny'n defnyddio cyfluniad y defnydd ei hun."
     },
     "table": {
       "name": "Enw",
@@ -1307,7 +1309,8 @@
       "cancel": "Canslo",
       "working": "Wrthi'n gweithio...",
       "previewDryRun": "Rhagolwg (rhediad sych)",
-      "applyChanges": "Gweithredu newidiadau"
+      "applyChanges": "Gweithredu newidiadau",
+      "setOidcAudiences": "Gosod cynulleidfaoedd hunaniaeth rhediad OIDC (yn amnewid y map ar bob gweithfan gyfatebol)"
     },
     "diff": {
       "colWorkspace": "Gweithfan",
@@ -1956,6 +1959,19 @@
       "always": "bob amser",
       "create": "creu",
       "createUpdate": "creu/diweddaru"
+    },
+    "oidcAudiences": {
+      "addProvider": "Ychwanegu cyfluniad provider",
+      "audiences": "Cynulleidfaoedd",
+      "badgeInherited": "Rhagosodiad y defnydd",
+      "badgeOwned": "Gweithle",
+      "issuerDisabled": "Nid yw'r defnydd hwn yn cyhoeddi unrhyw gyhoeddwr OpenID Connect, felly ni all unrhyw beth a gyflunnir yma gael effaith.",
+      "override": "Disodli",
+      "overrideAria": "Disodli cynulleidfaoedd {provider} yn y gweithle hwn",
+      "providerDuplicate": "Mae cofnod gan y cyfluniad provider hwnnw'n barod.",
+      "providerInvalid": "Nid oes bylchau yn enw provider, ac un dot ar y mwyaf — aws, neu aws.west.",
+      "providerPlaceholder": "aws, neu aws.west",
+      "removeProviderAria": "Tynnu cyfluniad provider {provider}"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Dwy ran wedi'u gwahanu gan '::' — project::stack. Llythrennau, rhifau, cysylltnodau a thanlinellau yn unig; rhaid i bob rhan ddechrau â llythyren neu rif.",
       "bindPlan": "Cloi''r diweddariad i''r rhagolwg a gymeradwywyd",
-      "bindPlanHelp": "Pan fydd ymlaen, mae''r diweddariad yn gweithredu''r union gynllun a gadwodd y rhagolwg, felly mae unrhyw beth a newidiodd ers y rhagolwg yn methu''r diweddariad yn hytrach na chael ei weithredu. Mae hyn yn dibynnu ar gynlluniau diweddaru Pulumi, sy''n dal yn arbrofol. Pan fydd i ffwrdd, mae''r diweddariad yn cyfrifo ei newidiadau ei hun, fel y mae pulumi up plaen yn ei wneud. <docs>Sut mae rhediadau Pulumi yn gweithio</docs>"
+      "bindPlanHelp": "Pan fydd ymlaen, mae''r diweddariad yn gweithredu''r union gynllun a gadwodd y rhagolwg, felly mae unrhyw beth a newidiodd ers y rhagolwg yn methu''r diweddariad yn hytrach na chael ei weithredu. Mae hyn yn dibynnu ar gynlluniau diweddaru Pulumi, sy''n dal yn arbrofol. Pan fydd i ffwrdd, mae''r diweddariad yn cyfrifo ei newidiadau ei hun, fel y mae pulumi up plaen yn ei wneud. <docs>Sut mae rhediadau Pulumi yn gweithio</docs>",
+      "oidcAudiences": "Cynulleidfaoedd hunaniaeth rhediad",
+      "oidcAudiencesAdd": "Ychwanegu cynulleidfa",
+      "oidcAudiencesHint": "Mae Terrapod yn cyhoeddi tocyn OpenID Connect byrhoedlog ar gyfer pob cyfluniad provider y mae rhediad yn ei ddefnyddio, ac yn ei ysgrifennu i ffeil y gall y rhediad ei darllen. Allweddwch gofnod ar y provider fel y mae eich cyfluniad yn ei enwi — aws, neu aws.west ar gyfer cyfluniad ag alias — a rhestrwch y cynulleidfaoedd y mae'r targed hwnnw'n eu derbyn. Mae pob cofnod yn disodli cyfluniad y defnydd ei hun ar gyfer y provider hwnnw; tynnwch e ac mae'r provider hwnnw'n dychwelyd at gynulleidfaoedd y defnydd. Llinyn afloyw a ddewiswyd gan y targed ffederasiwn yw cynulleidfa, felly caiff ei storio yn union fel yr ydych yn ei deipio.",
+      "oidcAudiencesLoading": "Yn gwirio'r cynulleidfaoedd a gyflunnir yn y defnydd …",
+      "oidcAudiencesNone": "Dim (mae rhediadau yn defnyddio hunaniaeth y pwll asiantau ei hun)",
+      "oidcAudiencesPlaceholder": "e.e. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Awdurdodi wedi'i ddirprwyo i'ch storfa VCS.",

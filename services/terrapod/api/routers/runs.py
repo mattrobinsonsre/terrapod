@@ -2723,10 +2723,13 @@ async def create_runner_token(
 
     The listener names the Job's `phase` in the body, which is bound into the
     token so a plan-phase Job cannot drive the apply-phase routes
-    (GHSA-xmrf-hxq9-m59m). **Optional, and it has to stay optional**: a listener
-    image older than the claim sends no phase, and must still get a working
-    token — so an absent or unrecognised phase mints the older unphased form
-    rather than failing or guessing one.
+    (GHSA-xmrf-hxq9-m59m). The federation-token mint for per-workspace cloud
+    identity (#1901) reads the phase from the presented token rather than from
+    its own request body, so a plan-phase Job cannot ask for the apply identity
+    either. **Optional, and it has to stay optional**: a listener image older
+    than the claim sends no phase, and must still get a working token — so an
+    absent or unrecognised phase mints the older unphased form rather than
+    failing or guessing one.
     """
     from terrapod.auth.runner_tokens import RUNNER_PHASES, generate_runner_token
     from terrapod.config import load_runner_config

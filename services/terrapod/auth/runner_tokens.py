@@ -10,7 +10,10 @@ Two formats, and both are accepted for ever:
     runtok:{run_id}:{ttl}:{timestamp}:{hmac_signature}           (no phase claim)
 
 The phase claim (GHSA-xmrf-hxq9-m59m) is what stops a plan-phase token driving an
-apply-phase endpoint. It is **additive on the wire**: a listener that does not
+apply-phase endpoint, and per-workspace cloud identity (#1901) depends on it: the
+federation-token mint endpoint takes the phase from the presented token rather
+than from a request field, so a plan-phase runner cannot ask for the apply
+identity. It is **additive on the wire**: a listener that does not
 send a phase when it mints a token gets the older five-field form, which verifies
 exactly as before and carries no phase — so a listener image lagging the API
 keeps working, and the endpoints that check a phase skip the check rather than

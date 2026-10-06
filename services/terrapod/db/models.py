@@ -340,7 +340,7 @@ class Workspace(Base):
     #: The version of whichever engine `execution_backend` names (#1559).
     #: Partial versions resolve to the newest matching release; empty means the
     #: deployment's default for that engine.
-    engine_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.12")
+    engine_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.13")
     # Terragrunt single-unit support (#534): when enabled the runner invokes
     # `terragrunt` wrapping the tofu/terraform binary (via TG_TF_PATH). Version
     # is partial (e.g. "0.67"), resolved via the binary cache like
@@ -397,6 +397,34 @@ class Workspace(Base):
     #: is itself a per-workspace setting — so resizing a runner would otherwise
     #: silently change concurrency, with nothing in the configuration saying so.
     parallelism: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    # Per-workspace cloud identity (#1901). **The workspace's OVERRIDE**, merged
+    # over the deployment catalogue in `api.config.auth.oidc_issuer.audiences` —
+    # see `services/cloud_identity_resolver.py`. Keyed on the provider name as
+    # the configuration writes it, optionally with an alias
+    # (`aws`, `vault`, `vault.eu`), each value the audiences for that one target.
+    #
+    # A map rather than a flat list because **one token is minted per target,
+    # each carrying only that target's audience**: a token audienced for two
+    # targets is replayable between them, and AWS refuses a multi-valued `aud`
+    # outright (its `aud` condition key maps to `azp` when present, and the real
+    # claim is exposed as `oaud`). A list *within* one entry is the deliberate
+    # "these are interchangeable" statement, which is safe for a Vault-like
+    # consumer whose `bound_audiences` intersects and unsafe for AWS — Terrapod
+    # cannot tell which, so the docs say one audience per entry is the norm.
+    #
+    # Empty here does NOT mean "mints nothing": the catalogue still applies.
+    # A workspace mints nothing only when the resolved merge is empty, in which
+    # case its runs authenticate with the agent pool's own ServiceAccount
+    # exactly as before — the permanent fall-through, not a degraded state.
+    #
+    # Nothing cloud-specific lives here on purpose. The audience is the one value
+    # every federation target names for itself (`sts.amazonaws.com`,
+    # `api://AzureADTokenExchange`, whatever a Vault role's `bound_audiences`
+    # says), and which provider maps to which audience is entirely the
+    # operator's — Terrapod assumes none of it.
+    oidc_audiences: Mapped[dict[str, list[str]]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
 
     # RBAC
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
@@ -1315,6 +1343,51 @@ class CachedPackageFile(Base):
 # --- Certificate Authority ---
 
 
+class OIDCSigningKey(Base):
+    """An RSA keypair Terrapod signs run identity tokens with (#1901).
+
+    Several rows, not one: a published trust root cannot be swapped atomically,
+    because the clouds fetch the JWKS on their own schedule and cache it. So a
+    rotation adds a key, waits for it to propagate, and only then starts signing
+    with it — which means more than one key is live at a time and the JWKS is a
+    set rather than a single entry.
+
+    Three timestamps say which is which:
+
+    * `activates_at` — the earliest this key may SIGN. A freshly rotated key is
+      published immediately and signs only once the propagation window passes,
+      so no token is ever signed with a key the clouds have not had a chance to
+      see. The signing key is the newest activated, unretired row.
+    * `retired_at` — the moment it stopped signing. It stays in the JWKS for the
+      grace window afterwards, because tokens it already signed are still valid.
+    * `created_at` — ordering, and nothing else.
+
+    An operator-supplied key (BYO) is never stored here at all: it wins on every
+    startup and rotating it is something the operator does to their own secret.
+    """
+
+    __tablename__ = "oidc_signing_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    #: RFC 7638 JWK thumbprint. Derived from the key itself rather than assigned,
+    #: so it is stable, collision-free, and computed the same way for a generated
+    #: key and an operator's own.
+    kid: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    #: PKCS8 PEM. EncryptedText for the same reason as the CA key (#553) — this
+    #: is the private half of a published trust root, so whoever holds it can
+    #: mint an identity for any workspace in the deployment.
+    private_key_pem: Mapped[str] = mapped_column(EncryptedText, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=now_utc
+    )
+    activates_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=now_utc
+    )
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class CertificateAuthorityModel(Base):
     """CA certificate and key, persisted for cross-restart identity.
 
@@ -1569,13 +1642,20 @@ class AutodiscoveryRule(Base):
         nullable=True,
     )
     execution_backend: Mapped[str] = mapped_column(String(20), nullable=False, default="tofu")
-    engine_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.12")
+    engine_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.13")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
     #: Templated onto workspaces this rule materialises (#1431), alongside the
     #: resources above — a monorepo's directories are rarely uniform in weight, so
     #: a rule that can size the runner should be able to say how hard to drive it.
     parallelism: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    # Templated onto workspaces this rule materialises (#1901). Same override
+    # shape as `Workspace.oidc_audiences` — provider name (optionally
+    # `provider.alias`) to that target's audiences — and merged over the
+    # deployment catalogue the same way once materialised.
+    oidc_audiences: Mapped[dict[str, list[str]]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
     auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Templated onto workspaces this rule materialises (#1274).
     auto_apply_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="never")
@@ -2368,6 +2448,47 @@ class Run(Base):
     #: Snapshotted from the workspace at run creation, like the resources above,
     #: so editing the workspace mid-flight cannot change a run already under way.
     parallelism: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    # The **RESOLVED** map — the workspace's override already merged over the
+    # deployment catalogue — snapshotted at creation like the resources above
+    # (#1901).
+    #
+    # Snapshotted so a run executes against the configuration it was created
+    # under: both phases mint from this, so a catalogue edit between a plan and
+    # the apply a human spent twenty minutes reviewing cannot silently change
+    # which identity the apply presents.
+    #
+    # **But the snapshot is what the apply CHECKS AGAINST, not a licence to use
+    # a stale value.** Minting from it blindly would hand the apply a token that
+    # agrees with the reviewed plan while the *cloud* has moved on, and it would
+    # then be rejected at `AssumeRoleWithWebIdentity` deep inside the engine,
+    # possibly after a partial apply. So the mint path re-resolves the requested
+    # target and refuses when it no longer matches this snapshot — a controlled
+    # failure before anything executes, the same shape as a saved plan refused
+    # because the state serial moved.
+    #
+    # Each phase still mints its OWN tokens: the apply runs in its own Job and
+    # presents `phase: apply`, which resolves to the base identity plus any
+    # extra apply identity. Plan and apply are *supposed* to differ.
+    oidc_audiences: Mapped[dict[str, list[str]]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
+    # Which targets a token was ACTUALLY minted for on this run, appended by the
+    # mint endpoint as it serves each one (#1901).
+    #
+    # Recorded rather than derived, because the two sets differ in a way that
+    # matters. `oidc_audiences` above is the snapshot of CONFIGURED targets, and
+    # it is the merged map — so it carries deployment-wide entries a workspace
+    # may never use. Scoping the confirm-time staleness check to the configured
+    # set would mean one edit to the deployment catalogue refusing every pending
+    # apply in the fleet, including runs whose own identity had not moved. This
+    # is the set the check is actually about: what the plan presented.
+    #
+    # Written sequentially by the runner (one mint at a time per phase), so the
+    # read-modify-write here needs no locking. It only ever grows, so a retry
+    # that re-mints is harmless and a superset is still sound.
+    oidc_minted_targets: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
     # `pool_id` is the pool this run is currently associated with: at creation
     # it is element 0 of the workspace's pool set, and on claim it is rewritten
     # to the pool that actually took the run — so cancellation, job-status

@@ -1113,7 +1113,9 @@
       "noExpiry": "No expiry. srsly.",
       "addDriftIgnoreRule": "Add rule",
       "debugModeHint": "Hold faild runnr podz open on da werkspaces dis rule makez. Off by defalt — a held pod keepz dat werkspace credenshulz.",
-      "allowForkPrPlansHint": "Applyz ta evry werkspace dis rule makez. Off by defalt: a pull rekwest from a fork getz no speculativ plan, coz it wud run itz authrs code wif da werkspace credenshulz."
+      "allowForkPrPlansHint": "Applyz ta evry werkspace dis rule makez. Off by defalt: a pull rekwest from a fork getz no speculativ plan, coz it wud run itz authrs code wif da werkspace credenshulz.",
+      "oidcAudiences": "Run identitee audiencez (inheritd by createded werkspaces)",
+      "oidcAudiencesHint": "Audienz overridez templaytd onto evry werkspace dis rool makez, keyd on da providr configurashun a tokin iz fer — aws, or aws.west fer an aliasd configurashun. Leev it empty an doze werkspacez take da deployment''z own configurashun."
     },
     "table": {
       "name": "Naym",
@@ -1307,7 +1309,8 @@
       "cancel": "Cancul",
       "working": "Workin...",
       "previewDryRun": "Preview (dry run)",
-      "applyChanges": "Apply chaenges"
+      "applyChanges": "Apply chaenges",
+      "setOidcAudiences": "Set OIDC run identitee audiencez (replacez teh map on every matchd workspace)"
     },
     "diff": {
       "colWorkspace": "Werkspace",
@@ -1956,6 +1959,19 @@
       "always": "alwaiz",
       "create": "makez",
       "createUpdate": "makez/fixez"
+    },
+    "oidcAudiences": {
+      "addProvider": "Add providr configurashun",
+      "audiences": "Audiencez",
+      "badgeInherited": "Deployment defawlt",
+      "badgeOwned": "Werkspace",
+      "issuerDisabled": "Dis deployment publishez no OpenID Connect issuer, so nuffin configurd heer can do anyfing.",
+      "override": "Overrid",
+      "overrideAria": "Overrid da {provider} audiencez fer dis werkspace",
+      "providerDuplicate": "Dat providr configurashun awreddy haz an entree.",
+      "providerInvalid": "A providr naim haz no spacez an at most wun dot — aws, or aws.west.",
+      "providerPlaceholder": "aws, or aws.west",
+      "removeProviderAria": "Remoov da {provider} providr configurashun"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Two partz separatd by '::' — projekt::stak. Letterz, numberz, hyfenz an underskorez only; each part gotta start wif a letter or number. KTHX",
       "bindPlan": "Lok teh updayt 2 teh approvd preview",
-      "bindPlanHelp": "Wen on, teh updayt applyz exakly teh plan teh preview savd, so anyfin dat changd sinse teh preview failz teh updayt insted ov gettin applyd. Dis sitz on Pulumi updayt planz, wich r stil experimentul. Wen off, teh updayt werkz out itz own changez, liek a plain pulumi up duz. <docs>How Pulumi runz werk</docs>"
+      "bindPlanHelp": "Wen on, teh updayt applyz exakly teh plan teh preview savd, so anyfin dat changd sinse teh preview failz teh updayt insted ov gettin applyd. Dis sitz on Pulumi updayt planz, wich r stil experimentul. Wen off, teh updayt werkz out itz own changez, liek a plain pulumi up duz. <docs>How Pulumi runz werk</docs>",
+      "oidcAudiences": "Run Identitee Audiencez",
+      "oidcAudiencesAdd": "Add audienz",
+      "oidcAudiencesHint": "Terrapod mintz a short-livd OpenID Connect tokin fer evry providr configurashun a run yuzez an ritez it ta a file da run can reed. Key an entree on da providr liek ur configurashun namez it — aws, or aws.west fer an aliasd configurashun — an list da audiencez dat targit akceptz. Evry entree overridez da deployment''z own configurashun fer dat providr; remoov it an dat providr fallz bak ta da deployment''z audiencez. An audienz iz an opayk string da federashun targit choze, so itz stord exackly as typd.",
+      "oidcAudiencesLoading": "Checkin da deployment''z configurd audiencez …",
+      "oidcAudiencesNone": "Noes (runz yuze da agent pool''z own identitee)",
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Authorizashun delegayted ta ur VCS repozitory.",

@@ -57,12 +57,13 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `execution-mode` | enum | no | Must be `agent` (default). Autodiscovery is VCS-driven; `local` mode would create workspaces with queued runs and no executor. |
 | `agent-pool-id` | UUID | no | Inherited by created workspaces in `agent` mode. |
 | `execution-backend` | enum | no | `tofu` or `terraform`. Default `tofu`. |
-| `engine-version` | string | no | Default `1.12`. Also accepted as `terraform-version`. |
+| `engine-version` | string | no | Default `1.13`. Also accepted as `terraform-version`. |
 | `resource-cpu` / `resource-memory` | string | no | Defaults `1` / `2Gi`. |
 | `parallelism` | integer | no | Concurrent engine operations on workspaces this rule creates. Default `10`. |
 | `auto-apply` | bool | no | Default `false`. Superseded by `auto-apply-mode` when that is set. |
 | `auto-apply-mode` | string | no | Conditional auto-apply templated onto created workspaces: `never`, `always`, `create`, `create_update`. `create`/`create_update` never auto-apply a plan that destroys or replaces a resource. Set this **or** `auto-apply`, not both (422). |
 | `on-directory-delete` | enum | no | `flag` (default — mark `pending_deletion`, require explicit operator action) or `destroy` (opt-in — real destroy run then archive). See the Lifecycle section (#314). |
+| `oidc-audiences` | map | no | Templated onto created workspaces: the cloud-identity audience override for [per-workspace cloud identity](cloud-identity.md), keyed on the provider configuration (`aws`, `aws.west`). **A rule returns what it stores, where a workspace returns the map MERGED over the deployment catalogue** — the same attribute name with different read semantics, because a rule is a template and has nothing to merge against until a workspace exists. |
 | `labels` | map | no | Inherited by created workspaces — feeds Terrapod's label-based RBAC and filtering. Reserved keys (`status`, `owner`) are rejected with `422` at rule create/update — they are virtual filter terms and would otherwise produce workspaces that can't be saved. |
 | `owner-email` | string | no | Inherited by created workspaces; if unset, created workspaces have no owner and label-RBAC alone determines access. |
 | `var-files` | list | no | Var-file paths set on every created workspace. |

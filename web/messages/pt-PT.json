@@ -1113,7 +1113,9 @@
       "noExpiry": "Sem expiração",
       "addDriftIgnoreRule": "Adicionar regra",
       "debugModeHint": "Manter abertos os pods de runners falhados nos espaços de trabalho criados por esta regra. Desativado por predefinição — um pod mantido aberto conserva as credenciais desse espaço de trabalho.",
-      "allowForkPrPlansHint": "Aplica-se a todos os espaços de trabalho que esta regra cria. Desativado por predefinição: uma pull request de um fork não recebe plano especulativo, porque executaria o código do seu autor com as credenciais do espaço de trabalho."
+      "allowForkPrPlansHint": "Aplica-se a todos os espaços de trabalho que esta regra cria. Desativado por predefinição: uma pull request de um fork não recebe plano especulativo, porque executaria o código do seu autor com as credenciais do espaço de trabalho.",
+      "oidcAudiences": "Audiences da identidade de execução (herdadas pelos workspaces criados)",
+      "oidcAudiencesHint": "Sobreposições de audiences aplicadas a cada espaço de trabalho que esta regra cria, indexadas pela configuração de provider à qual um token corresponde — aws, ou aws.west para uma configuração com alias. Deixe-a vazia e esses espaços de trabalho usam a configuração própria da implementação."
     },
     "table": {
       "name": "Nome",
@@ -1307,7 +1309,8 @@
       "cancel": "Cancelar",
       "working": "A trabalhar...",
       "previewDryRun": "Pré-visualização (simulação)",
-      "applyChanges": "Aplicar alterações"
+      "applyChanges": "Aplicar alterações",
+      "setOidcAudiences": "Definir audiences OIDC da identidade de execução (substitui o mapa em cada workspace correspondente)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -1956,6 +1959,19 @@
       "always": "sempre",
       "create": "criar",
       "createUpdate": "criar/atualizar"
+    },
+    "oidcAudiences": {
+      "addProvider": "Adicionar configuração de provider",
+      "audiences": "Audiences",
+      "badgeInherited": "Valor da implementação",
+      "badgeOwned": "Espaço de trabalho",
+      "issuerDisabled": "Esta implementação não publica nenhum emissor OpenID Connect, pelo que nada configurado aqui pode entrar em vigor.",
+      "override": "Sobrepor",
+      "overrideAria": "Sobrepor as audiences de {provider} neste espaço de trabalho",
+      "providerDuplicate": "Essa configuração de provider já tem uma entrada.",
+      "providerInvalid": "Um nome de provider não tem espaços e tem no máximo um ponto — aws, ou aws.west.",
+      "providerPlaceholder": "aws, ou aws.west",
+      "removeProviderAria": "Remover a configuração de provider {provider}"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Duas partes separadas por '::' — project::stack. Apenas letras, números, hífenes e sublinhados; cada parte deve começar por uma letra ou número.",
       "bindPlan": "Vincular a atualização à pré-visualização aprovada",
-      "bindPlanHelp": "Quando ativado, a atualização aplica exatamente o plano que a pré-visualização guardou, pelo que tudo o que tenha mudado desde a pré-visualização faz falhar a atualização em vez de ser aplicado. Isto assenta nos planos de atualização do Pulumi, que ainda são experimentais. Quando desativado, a atualização determina as próprias alterações, tal como um pulumi up simples. <docs>Como funcionam as execuções do Pulumi</docs>"
+      "bindPlanHelp": "Quando ativado, a atualização aplica exatamente o plano que a pré-visualização guardou, pelo que tudo o que tenha mudado desde a pré-visualização faz falhar a atualização em vez de ser aplicado. Isto assenta nos planos de atualização do Pulumi, que ainda são experimentais. Quando desativado, a atualização determina as próprias alterações, tal como um pulumi up simples. <docs>Como funcionam as execuções do Pulumi</docs>",
+      "oidcAudiences": "Audiences da identidade de execução",
+      "oidcAudiencesAdd": "Adicionar audience",
+      "oidcAudiencesHint": "O Terrapod emite um token OpenID Connect de curta duração para cada configuração de provider que uma execução usa e escreve-o num ficheiro que a execução pode ler. Indexe cada entrada pelo provider tal como a sua configuração o nomeia — aws, ou aws.west para uma configuração com alias — e liste as audiences que esse destino aceita. Cada entrada sobrepõe-se à configuração própria da implementação para aquele provider; remova-a e aquele provider volta às audiences da implementação. Uma audience é uma cadeia opaca escolhida pelo destino de federação, pelo que é guardada exatamente como a escreve.",
+      "oidcAudiencesLoading": "A verificar as audiences configuradas na implementação …",
+      "oidcAudiencesNone": "Nenhuma (as execuções usam a identidade própria do agent pool)",
+      "oidcAudiencesPlaceholder": "ex.: sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Autorização delegada ao seu repositório VCS.",

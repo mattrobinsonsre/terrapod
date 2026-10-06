@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import re
 
+from terrapod.services.cloud_identity_resolver import unsafe_target_reason
+
 SCAN_ENFORCEMENTS = frozenset({"off", "advisory", "enforced"})
 SCAN_ENGINES = frozenset({"checkov", "trivy", "both"})
 SCAN_SEVERITY_THRESHOLDS = frozenset({"critical", "high", "medium", "low"})
@@ -306,3 +308,124 @@ def validate_bool(raw: object, field: str) -> bool:
     if not isinstance(raw, bool):
         raise ValueError(f"{field} must be true or false, not a string or number")
     return raw
+
+
+#: Two dimensions now that one token is minted per target, and both want a
+#: bound. The target cap limits how many tokens a single run mints — each is an
+#: HTTP round trip and a file on disk — and the per-target cap is where the
+#: original reasoning lands: a token carrying several audiences is replayable
+#: between those targets, so a deployment that allowed unlimited audiences on
+#: one target would allow exactly the thing per-target minting exists to stop.
+MAX_OIDC_TARGETS = 10
+MAX_OIDC_AUDIENCES_PER_TARGET = 10
+MAX_OIDC_AUDIENCE_LEN = 255
+MAX_OIDC_TARGET_LEN = 128
+
+
+def validate_oidc_audiences(raw: object) -> dict[str, list[str]]:
+    """The workspace's cloud-identity audience OVERRIDE (#1901).
+
+    A map of provider name to that provider's audiences — `aws`, `vault`, or
+    `provider.alias` for one aliased configuration (`vault.eu`). One token is
+    minted per key, carrying only that key's audiences, because a token
+    audienced for two targets is replayable between them and AWS refuses a
+    multi-valued `aud` outright.
+
+    **An empty map is valid and is the common case.** It does not mean "mints
+    nothing": this is an override *over* the deployment catalogue in
+    `api.config.auth.oidc_issuer.audiences`, so an empty map means "take the
+    catalogue as it stands". A workspace mints nothing only when the resolved
+    merge is empty, and then its runs authenticate with the agent pool's own
+    identity exactly as before.
+
+    **An explicitly empty list for a key is REFUSED**, because it has no
+    meaning. Removing a key falls back to the catalogue — that is the defined
+    way to stop overriding — so an empty list is neither an override nor a
+    removal, and accepting it would let an operator believe they had suppressed
+    a target when they had not.
+
+    **Stored byte-for-byte after rejecting the unacceptable, never normalised.**
+    The Terraform provider writes the server's response back into state, so
+    lower-casing or trimming here would make every plan disagree with its own
+    apply ("Provider produced inconsistent result after apply") — the defect
+    that bit `terrapod_vcs_connection` in v1.9.0. An audience is an opaque
+    string the federation target chose; there is nothing to canonicalise even
+    if it were safe to.
+
+    Deliberately NOT validated: whether an audience suits the provider it is
+    keyed under. Any provider may be mapped to any audience — the cloud-side
+    trust policy is the gate, and Terrapod holds no per-cloud knowledge. Nor is
+    the same audience under two keys refused: it may be two Vault instances that
+    genuinely share a `bound_audiences`, and we cannot tell that from a replay.
+    """
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError(
+            "oidc-audiences must be an object mapping a provider name to its audiences, "
+            'e.g. {"aws": ["sts.amazonaws.com"]}'
+        )
+    if len(raw) > MAX_OIDC_TARGETS:
+        raise ValueError(f"oidc-audiences accepts at most {MAX_OIDC_TARGETS} providers")
+
+    out: dict[str, list[str]] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str):
+            raise ValueError("every oidc-audiences key must be a provider name")
+        if not key.strip():
+            raise ValueError("oidc-audiences provider names cannot be blank")
+        if len(key) > MAX_OIDC_TARGET_LEN:
+            raise ValueError(
+                f"oidc-audiences provider names must be {MAX_OIDC_TARGET_LEN} characters or fewer"
+            )
+        # Conservative rather than a grammar: a provider name is whatever the
+        # configuration calls it, so inventing a pattern risks refusing a
+        # legitimate key. These three catch the mistakes without guessing —
+        # whitespace is never part of a provider name, and `provider.alias` has
+        # exactly one dot, so a second is a typo rather than a deeper namespace.
+        if any(c.isspace() for c in key):
+            raise ValueError(f"oidc-audiences provider name {key!r} cannot contain whitespace")
+        if key.count(".") > 1:
+            raise ValueError(
+                f"oidc-audiences provider name {key!r} has more than one '.' — the form is "
+                "'provider' or 'provider.alias'"
+            )
+        if key.startswith(".") or key.endswith("."):
+            raise ValueError(f"oidc-audiences provider name {key!r} cannot start or end with '.'")
+        # The one place the conservative-not-a-grammar stance above does not
+        # hold: this key becomes a DIRECTORY NAME under the runner's token dir.
+        unsafe = unsafe_target_reason(key)
+        if unsafe:
+            raise ValueError(f"oidc-audiences provider name {key!r} {unsafe}")
+
+        if not isinstance(value, list):
+            raise ValueError(f"oidc-audiences[{key!r}] must be a list of audience strings")
+        if not value:
+            raise ValueError(
+                f"oidc-audiences[{key!r}] cannot be an empty list — remove the key instead, "
+                "which falls back to the deployment's configured audiences for that provider"
+            )
+        if len(value) > MAX_OIDC_AUDIENCES_PER_TARGET:
+            raise ValueError(
+                f"oidc-audiences[{key!r}] accepts at most {MAX_OIDC_AUDIENCES_PER_TARGET} audiences"
+            )
+
+        entries: list[str] = []
+        for entry in value:
+            if not isinstance(entry, str):
+                raise ValueError(f"every oidc-audiences[{key!r}] entry must be a string")
+            if not entry.strip():
+                # Refused rather than dropped. A blank entry is a mistake, and a
+                # silently-dropped one means an operator who believes they
+                # granted an audience did not.
+                raise ValueError(f"oidc-audiences[{key!r}] entries cannot be blank")
+            if len(entry) > MAX_OIDC_AUDIENCE_LEN:
+                raise ValueError(
+                    f"oidc-audiences[{key!r}] entries must be "
+                    f"{MAX_OIDC_AUDIENCE_LEN} characters or fewer"
+                )
+            if entry in entries:
+                raise ValueError(f"oidc-audiences[{key!r}] contains {entry!r} twice")
+            entries.append(entry)
+        out[key] = entries
+    return out

@@ -1113,7 +1113,9 @@
       "noExpiry": "Expiry, there is none",
       "addDriftIgnoreRule": "A rule, add",
       "debugModeHint": "Open failed runner pods hold, on the workspaces this rule creates. Off by default, it is — that workspace's credentials, a held pod keeps.",
-      "allowForkPrPlansHint": "To every workspace this rule creates, applies it. Off by default, it is: no speculative plan a pull request from a fork gets, because run its author's code with the workspace's credentials, it would."
+      "allowForkPrPlansHint": "To every workspace this rule creates, applies it. Off by default, it is: no speculative plan a pull request from a fork gets, because run its author's code with the workspace's credentials, it would.",
+      "oidcAudiences": "Audiences, run identity (by created workspaces, inherited)",
+      "oidcAudiencesHint": "Audience overrides templated onto every workspace this rule creates, keyed on the provider configuration a token is for — aws, or aws.west for an aliased configuration. Empty it leave, and the deployment''s own configuration those workspaces take."
     },
     "table": {
       "name": "Name",
@@ -1307,7 +1309,8 @@
       "cancel": "Cancel",
       "working": "Working, we are...",
       "previewDryRun": "Preview (run, dry)",
-      "applyChanges": "changes, Apply"
+      "applyChanges": "changes, Apply",
+      "setOidcAudiences": "audiences, Set OIDC run identity (on every matched workspace, the map replaces)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -1956,6 +1959,19 @@
       "always": "always",
       "create": "create only",
       "createUpdate": "create or update only"
+    },
+    "oidcAudiences": {
+      "addProvider": "provider configuration, Add",
+      "audiences": "Audiences",
+      "badgeInherited": "Deployment default",
+      "badgeOwned": "Workspace",
+      "issuerDisabled": "No OpenID Connect issuer, this deployment publishes, so take effect, nothing configured here can.",
+      "override": "Override",
+      "overrideAria": "For this workspace, the {provider} audiences override",
+      "providerDuplicate": "An entry that provider configuration already has.",
+      "providerInvalid": "No spaces a provider name has, and at most one dot — aws, or aws.west.",
+      "providerPlaceholder": "aws, or aws.west",
+      "removeProviderAria": "{provider} provider configuration, Remove"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Separated by '::', two parts there are — project::stack. Only letters, numbers, hyphens and underscores; start with a letter or number, each part must.",
       "bindPlan": "To the approved preview, lock the update",
-      "bindPlanHelp": "When on, exactly the plan the preview saved, the update applies — so fail the update, anything changed since the preview does, instead of applied being. On Pulumi update plans this rests; experimental still, they are. When off, its own changes the update works out, as a plain pulumi up does. <docs>How Pulumi runs work, learn you will</docs>"
+      "bindPlanHelp": "When on, exactly the plan the preview saved, the update applies — so fail the update, anything changed since the preview does, instead of applied being. On Pulumi update plans this rests; experimental still, they are. When off, its own changes the update works out, as a plain pulumi up does. <docs>How Pulumi runs work, learn you will</docs>",
+      "oidcAudiences": "Audiences, run identity",
+      "oidcAudiencesAdd": "audience, Add",
+      "oidcAudiencesHint": "A short-lived OpenID Connect token for each provider configuration a run uses, Terrapod mints, and to a file the run can read, it writes. On the provider as your configuration names it, an entry key — aws, or aws.west for an aliased configuration — and the audiences that target accepts, list. The deployment''s own configuration for that provider, each entry overrides; remove it, and to the deployment''s audiences that provider falls back. An opaque string the federation target chose, an audience is, so exactly as typed, stored it is.",
+      "oidcAudiencesLoading": "The deployment''s configured audiences, checking …",
+      "oidcAudiencesNone": "None (the agent pool''s own identity, runs use)",
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "To your VCS repository, authorization delegated it is.",

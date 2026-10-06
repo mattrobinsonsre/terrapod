@@ -104,6 +104,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         # siblings in the same directory on the (directory, stack) lookup.
         "stack": ws.stack,
         "var_files": list(ws.var_files or []),
+        "oidc_audiences": dict(ws.oidc_audiences or {}),
         "resource_cpu": ws.resource_cpu,
         "parallelism": ws.parallelism,
         "resource_memory": ws.resource_memory,
@@ -563,12 +564,17 @@ async def restore_workspace(
         # the default version.
         engine_version=settings.get("engine_version")
         or settings.get("terraform_version")
-        or "1.12",
+        or "1.13",
         terragrunt_enabled=bool(settings.get("terragrunt_enabled")),
         terragrunt_version=settings.get("terragrunt_version") or "1.0",
         working_directory=settings.get("working_directory") or "",
         stack=settings.get("stack"),
         var_files=list(settings.get("var_files") or []),
+        # Empty for a snapshot taken before this column existed, which is the
+        # opted-OUT direction on purpose. Restoring a workspace must never hand
+        # it a cloud identity nobody granted it — the mirror of the fork-PR flag
+        # whose restore path defaulted the permissive way.
+        oidc_audiences=settings.get("oidc_audiences") or {},
         resource_cpu=settings.get("resource_cpu") or "1",
         parallelism=settings.get("parallelism") or DEFAULT_PARALLELISM,
         resource_memory=settings.get("resource_memory") or "2Gi",

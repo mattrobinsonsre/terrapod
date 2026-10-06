@@ -1113,7 +1113,9 @@
       "noExpiry": "No expiry, matey",
       "addDriftIgnoreRule": "Add a rule",
       "debugModeHint": "Keep failed runner pods open on the work-decks this rule creates. Off by default — a held pod keeps that work-deck''s credentials.",
-      "allowForkPrPlansHint": "Applies t'' every work-deck this rule creates. Off by default: a pull request from a fork gets no speculative plan, fer it would run its author''s code with the work-deck''s credentials."
+      "allowForkPrPlansHint": "Applies t'' every work-deck this rule creates. Off by default: a pull request from a fork gets no speculative plan, fer it would run its author''s code with the work-deck''s credentials.",
+      "oidcAudiences": "Voyage colours audiences (inherited by created work-decks)",
+      "oidcAudiencesHint": "Audience overrides lashed onto every work-deck this rule creates, keyed on th'' provider riggin'' a token be fer — aws, or aws.west fer a riggin'' wi'' an alias. Leave it empty an'' those work-decks take th'' deployment''s own riggin''."
     },
     "table": {
       "name": "Name",
@@ -1307,7 +1309,8 @@
       "cancel": "Belay",
       "working": "Workin''...",
       "previewDryRun": "Preview (dry run)",
-      "applyChanges": "Apply changes"
+      "applyChanges": "Apply changes",
+      "setOidcAudiences": "Set OIDC voyage colours audiences (replaces th'' map on every matched work-deck)"
     },
     "diff": {
       "colWorkspace": "Work-deck",
@@ -1956,6 +1959,19 @@
       "always": "allus",
       "create": "hoist",
       "createUpdate": "hoist/mend"
+    },
+    "oidcAudiences": {
+      "addProvider": "Add a provider riggin''",
+      "audiences": "Audiences",
+      "badgeInherited": "Deployment''s own",
+      "badgeOwned": "Work-deck",
+      "issuerDisabled": "This deployment hoists no OpenID Connect issuer, so naught rigged here can ever bite.",
+      "override": "Override",
+      "overrideAria": "Override th'' {provider} audiences fer this work-deck",
+      "providerDuplicate": "That provider riggin'' be already on th'' books.",
+      "providerInvalid": "A provider name bears no spaces an'' one dot at most — aws, or aws.west.",
+      "providerPlaceholder": "aws, or aws.west",
+      "removeProviderAria": "Remove th'' {provider} provider riggin''"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Two parts split by '::' — project::stack, matey. Letters, numbers, hyphens and underscores only; each part must start with a letter or number.",
       "bindPlan": "Lash the update to the approved preview",
-      "bindPlanHelp": "When she be on, the update hoists exactly the plan the preview stowed away, so anythin'' that shifted since the preview scuttles the update instead o'' bein'' applied. This rests on Pulumi update plans, which be still experimental. When she be off, the update charts its own course, as a plain pulumi up does. <docs>How Pulumi voyages work</docs>"
+      "bindPlanHelp": "When she be on, the update hoists exactly the plan the preview stowed away, so anythin'' that shifted since the preview scuttles the update instead o'' bein'' applied. This rests on Pulumi update plans, which be still experimental. When she be off, the update charts its own course, as a plain pulumi up does. <docs>How Pulumi voyages work</docs>",
+      "oidcAudiences": "Voyage colours audiences",
+      "oidcAudiencesAdd": "Add an audience",
+      "oidcAudiencesHint": "Terrapod strikes a short-lived OpenID Connect token fer every provider riggin'' a voyage uses an'' scrawls it t'' a file th'' voyage can read. Key an entry on th'' provider as yer riggin'' names it — aws, or aws.west fer a riggin'' wi'' an alias — an'' list th'' audiences that port will accept. Every entry overrides th'' deployment''s own riggin'' fer that provider; strike it off an'' that provider falls back t'' th'' deployment''s audiences. An audience be an opaque string th'' federation port chose, so it be stowed exactly as ye typed it.",
+      "oidcAudiencesLoading": "Checkin'' th'' audiences th'' deployment has rigged …",
+      "oidcAudiencesNone": "None (voyages sail under th'' Agent Crew''s own colours)",
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Authorization handed o''er t'' yer VCS repository.",

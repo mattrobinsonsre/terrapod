@@ -105,6 +105,7 @@ class TestAutodiscoveryRule:
             drift_ignore_rules=[],
             plan_expiry_seconds=None,
             slack_channel="",
+            oidc_audiences=[],
             created_at=None,
             updated_at=None,
         )

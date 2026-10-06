@@ -122,6 +122,34 @@ data:
       legacy_callback_url: {{ .Values.api.config.auth.legacy_callback_url }}
       {{- end }}
       session_ttl_hours: {{ .Values.api.config.auth.session_ttl_hours | default 12 | int64 }}
+      {{- /* Per-workspace cloud identity (#1901). `signing_key_pem` is
+             deliberately ABSENT here and always will be: it is a private key,
+             so it arrives via secretKeyRef on the Deployment
+             (api.oidcSigningKey) and must never reach a ConfigMap. */}}
+      oidc_issuer:
+        enabled: {{ ((.Values.api.config.auth).oidc_issuer).enabled | default false }}
+        public_url: {{ ((.Values.api.config.auth).oidc_issuer).public_url | default "" | quote }}
+        token_ttl_seconds: {{ ((.Values.api.config.auth).oidc_issuer).token_ttl_seconds | default 900 | int64 }}
+        {{- /* No `| default` on these two, unlike token_ttl_seconds above. Both
+               accept 0 (schema `minimum: 0`, config `ge=0`) and Go templates treat
+               0 as empty, so `| default 600` silently rewrites a configured 0 to
+               600. 0/0 is exactly what an emergency rotation after a key
+               compromise asks for -- sign with the new key now, stop publishing
+               the old one now -- and the swallow would keep the compromised key
+               published and verifying for another hour. `token_ttl_seconds` is
+               safe only because its schema minimum is 60, so 0 is refused
+               earlier. Same reasoning as the four auth keys below. */}}
+        key_propagation_seconds: {{ ((.Values.api.config.auth).oidc_issuer).key_propagation_seconds | int64 }}
+        retired_key_grace_seconds: {{ ((.Values.api.config.auth).oidc_issuer).retired_key_grace_seconds | int64 }}
+        {{- with ((.Values.api.config.auth).oidc_issuer).audiences }}
+        audiences:
+          {{- range $target, $auds := . }}
+          {{ $target | quote }}:
+            {{- range $auds }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
       api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 8760 | int64 }}
       {{- /* Rendered directly (no `| default`): 0 is meaningful for these and
              Helm's `default` would silently rewrite a configured 0 to the default. */}}
@@ -835,7 +863,7 @@ data:
       {{- end }}
     {{- end }}
     default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
-    default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.12" | quote }}
+    default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.13" | quote }}
     default_pulumi_version: {{ .Values.api.config.default_pulumi_version | default "3.208" | quote }}
     default_node_version: {{ .Values.api.config.default_node_version | default "22" | quote }}
     default_go_version: {{ .Values.api.config.default_go_version | default "1.25" | quote }}

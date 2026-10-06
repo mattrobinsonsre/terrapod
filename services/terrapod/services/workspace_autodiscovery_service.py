@@ -391,6 +391,7 @@ async def find_or_autocreate_workspace(
         execution_mode=rule.execution_mode,
         execution_backend=rule.execution_backend,
         engine_version=rule.engine_version,
+        oidc_audiences=dict(rule.oidc_audiences or {}),
         resource_cpu=rule.resource_cpu,
         parallelism=rule.parallelism,
         resource_memory=rule.resource_memory,

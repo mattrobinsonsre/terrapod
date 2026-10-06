@@ -1113,7 +1113,9 @@
       "noExpiry": "N0 3xp1ry",
       "addDriftIgnoreRule": "4dd rul3",
       "debugModeHint": "H0ld f41l3d runn3r p0d5 0p3n 0n 7h3 w0rk5p4c35 7h15 rul3 cr34735. 0ff by d3f4ul7 — 4 h3ld p0d k33p5 7h47 w0rk5p4c3'5 cr3d3n714l5.",
-      "allowForkPrPlansHint": "4ppl135 70 3v3ry w0rk5p4c3 7h15 rul3 cr34735. 0ff by d3f4ul7: 4 pull r3qu357 fr0m 4 f0rk g375 n0 5p3cul471v3 pl4n, b3c4u53 17 w0uld run 175 4u7h0r'5 c0d3 w17h 7h3 w0rk5p4c3'5 cr3d3n714l5."
+      "allowForkPrPlansHint": "4ppl135 70 3v3ry w0rk5p4c3 7h15 rul3 cr34735. 0ff by d3f4ul7: 4 pull r3qu357 fr0m 4 f0rk g375 n0 5p3cul471v3 pl4n, b3c4u53 17 w0uld run 175 4u7h0r'5 c0d3 w17h 7h3 w0rk5p4c3'5 cr3d3n714l5.",
+      "oidcAudiences": "Run 1d3n717y 4ud13nc35 (1nh3r173d by cr3473d w0rk5p4c35)",
+      "oidcAudiencesHint": "4ud13nc3 0v3rr1d35 73mpl473d 0n70 3v3ry w0rk5p4c3 7h15 rul3 cr34735, k3y3d 0n 7h3 pr0v1d3r c0nf1gur4710n 4 70k3n 15 f0r — 4w5, 0r 4w5.w357 f0r 4n 4l1453d c0nf1gur4710n. L34v3 17 3mp7y 4nd 7h053 w0rk5p4c35 74k3 7h3 d3pl0ym3n7'5 0wn c0nf1gur4710n."
     },
     "table": {
       "name": "N4m3",
@@ -1307,7 +1309,8 @@
       "cancel": "C4nc3l",
       "working": "W0rk1ng...",
       "previewDryRun": "Pr3v13w (dry run)",
-      "applyChanges": "4pply ch4ng35"
+      "applyChanges": "4pply ch4ng35",
+      "setOidcAudiences": "537 01DC run 1d3n717y 4ud13nc35 (r3pl4c35 7h3 m4p 0n 3v3ry m47ch3d w0rk5p4c3)"
     },
     "diff": {
       "colWorkspace": "W0rk5p4c3",
@@ -1956,6 +1959,19 @@
       "always": "4lw4y5",
       "create": "cr3473",
       "createUpdate": "cr3473/upd473"
+    },
+    "oidcAudiences": {
+      "addProvider": "4dd pr0v1d3r c0nf1gur4710n",
+      "audiences": "4ud13nc35",
+      "badgeInherited": "D3pl0ym3n7 d3f4ul7",
+      "badgeOwned": "W0rk5p4c3",
+      "issuerDisabled": "7h15 d3pl0ym3n7 publ15h35 n0 0p3n1D C0nn3c7 155u3r, 50 n07h1ng c0nf1gur3d h3r3 c4n 74k3 3ff3c7.",
+      "override": "0v3rr1d3",
+      "overrideAria": "0v3rr1d3 7h3 {provider} 4ud13nc35 f0r 7h15 w0rk5p4c3",
+      "providerDuplicate": "7h47 pr0v1d3r c0nf1gur4710n 4lr34dy h45 4n 3n7ry.",
+      "providerInvalid": "4 pr0v1d3r n4m3 h45 n0 5p4c35 4nd 47 m057 0n3 d07 — 4w5, 0r 4w5.w357.",
+      "providerPlaceholder": "4w5, 0r 4w5.w357",
+      "removeProviderAria": "R3m0v3 7h3 {provider} pr0v1d3r c0nf1gur4710n"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "7w0 p4r75 53p4r473d by '::' — pr0j3c7::574ck. L3773r5, numb3r5, hyph3n5 4nd und3r5c0r35 0nly; 34ch p4r7 mu57 574r7 w17h 4 l3773r 0r numb3r.",
       "bindPlan": "L0ck 7h3 upd473 70 7h3 4ppr0v3d pr3v13w",
-      "bindPlanHelp": "Wh3n 0n, 7h3 upd473 4ppl135 3x4c7ly 7h3 pl4n 7h3 pr3v13w 54v3d, 50 4ny7h1ng 7h47 ch4ng3d 51nc3 7h3 pr3v13w f41l5 7h3 upd473 1n5734d 0f b31ng 4ppl13d. 7h15 r3575 0n Pulum1 upd473 pl4n5, wh1ch 4r3 571ll 3xp3r1m3n74l. Wh3n 0ff, 7h3 upd473 w0rk5 0u7 175 0wn ch4ng35, 45 4 pl41n pulum1 up d035. <docs>H0w Pulum1 run5 w0rk</docs>"
+      "bindPlanHelp": "Wh3n 0n, 7h3 upd473 4ppl135 3x4c7ly 7h3 pl4n 7h3 pr3v13w 54v3d, 50 4ny7h1ng 7h47 ch4ng3d 51nc3 7h3 pr3v13w f41l5 7h3 upd473 1n5734d 0f b31ng 4ppl13d. 7h15 r3575 0n Pulum1 upd473 pl4n5, wh1ch 4r3 571ll 3xp3r1m3n74l. Wh3n 0ff, 7h3 upd473 w0rk5 0u7 175 0wn ch4ng35, 45 4 pl41n pulum1 up d035. <docs>H0w Pulum1 run5 w0rk</docs>",
+      "oidcAudiences": "Run 1d3n717y 4ud13nc35",
+      "oidcAudiencesAdd": "4dd 4ud13nc3",
+      "oidcAudiencesHint": "73rr4p0d m1n75 4 5h0r7-l1v3d 0p3n1D C0nn3c7 70k3n f0r 34ch pr0v1d3r c0nf1gur4710n 4 run u535 4nd wr1735 17 70 4 f1l3 7h3 run c4n r34d. K3y 4n 3n7ry 0n 7h3 pr0v1d3r 45 y0ur c0nf1gur4710n n4m35 17 — 4w5, 0r 4w5.w357 f0r 4n 4l1453d c0nf1gur4710n — 4nd l157 7h3 4ud13nc35 7h47 74rg37 4cc3p75. 34ch 3n7ry 0v3rr1d35 7h3 d3pl0ym3n7'5 0wn c0nf1gur4710n f0r 7h47 pr0v1d3r; r3m0v3 17 4nd 7h47 pr0v1d3r f4ll5 b4ck 70 7h3 d3pl0ym3n7'5 4ud13nc35. 4n 4ud13nc3 15 4n 0p4qu3 57r1ng 7h3 f3d3r4710n 74rg37 ch053, 50 17 15 570r3d 3x4c7ly 45 7yp3d.",
+      "oidcAudiencesLoading": "Ch3ck1ng 7h3 d3pl0ym3n7'5 c0nf1gur3d 4ud13nc35…",
+      "oidcAudiencesNone": "N0n3 (run5 u53 7h3 4g3n7 p00l'5 0wn 1d3n717y)",
+      "oidcAudiencesPlaceholder": "3.g. 575.4m4z0n4w5.c0m"
     },
     "vcsWorkflowWarning": {
       "title": "4u7h0r1z4710n d3l3g473d 70 y0ur VC5 r3p05170ry.",

@@ -217,6 +217,26 @@ func GetMapAttr(r *Resource, key string) map[string]string {
 	return m
 }
 
+// GetAudienceMapAttr returns a map[string][]string-typed attribute from r,
+// returning nil when the value is absent OR JSON null.
+//
+// Terrapod's `oidc-audiences` shape (#1901): a provider configuration name
+// (`aws`, or `aws.west` for one aliased configuration) to the audiences a run
+// identity token for it is minted with. ALWAYS a list even for one entry,
+// because a federation target's audience is one value and a list of several is
+// a deliberate "these are interchangeable" statement.
+func GetAudienceMapAttr(r *Resource, key string) map[string][]string {
+	raw, ok := r.Attributes[key]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var m map[string][]string
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil
+	}
+	return m
+}
+
 // GetListAttr returns a []string-typed attribute from r, nil-safe.
 func GetListAttr(r *Resource, key string) []string {
 	raw, ok := r.Attributes[key]

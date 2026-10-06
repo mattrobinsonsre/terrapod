@@ -1113,7 +1113,9 @@
       "noExpiry": "Geen verval",
       "addDriftIgnoreRule": "Regel toevoegen",
       "debugModeHint": "Pods van mislukte runners openhouden op de werkruimten die deze regel aanmaakt. Standaard uit — een opengehouden pod behoudt de referenties van die werkruimte.",
-      "allowForkPrPlansHint": "Geldt voor elke werkruimte die deze regel aanmaakt. Standaard uit: een pull request uit een fork krijgt geen speculatief plan, omdat daarbij de code van de auteur met de referenties van de werkruimte zou draaien."
+      "allowForkPrPlansHint": "Geldt voor elke werkruimte die deze regel aanmaakt. Standaard uit: een pull request uit een fork krijgt geen speculatief plan, omdat daarbij de code van de auteur met de referenties van de werkruimte zou draaien.",
+      "oidcAudiences": "Audiences van de uitvoeringsidentiteit (overgenomen door aangemaakte workspaces)",
+      "oidcAudiencesHint": "Audience-overschrijvingen die worden toegepast op elke werkruimte die deze regel aanmaakt, met als sleutel de providerconfiguratie waarvoor een token geldt — aws, of aws.west voor een configuratie met alias. Laat leeg en die werkruimten nemen de eigen configuratie van het deployment over."
     },
     "table": {
       "name": "Naam",
@@ -1307,7 +1309,8 @@
       "cancel": "Annuleren",
       "working": "Bezig...",
       "previewDryRun": "Voorbeeld (proefdraaien)",
-      "applyChanges": "Wijzigingen toepassen"
+      "applyChanges": "Wijzigingen toepassen",
+      "setOidcAudiences": "OIDC-audiences van de uitvoeringsidentiteit instellen (vervangt de map op elke overeengekomen workspace)"
     },
     "diff": {
       "colWorkspace": "Workspace",
@@ -1956,6 +1959,19 @@
       "always": "altijd",
       "create": "aanmaken",
       "createUpdate": "aanmaken/bijwerken"
+    },
+    "oidcAudiences": {
+      "addProvider": "Providerconfiguratie toevoegen",
+      "audiences": "Audiences",
+      "badgeInherited": "Standaard van deployment",
+      "badgeOwned": "Werkruimte",
+      "issuerDisabled": "Dit deployment publiceert geen OpenID Connect-issuer, dus niets wat hier is geconfigureerd kan effect hebben.",
+      "override": "Overschrijven",
+      "overrideAria": "Audiences voor {provider} in deze werkruimte overschrijven",
+      "providerDuplicate": "Voor deze providerconfiguratie bestaat al een vermelding.",
+      "providerInvalid": "Een providernaam bevat geen spaties en maximaal één punt — aws of aws.west.",
+      "providerPlaceholder": "aws of aws.west",
+      "removeProviderAria": "Providerconfiguratie {provider} verwijderen"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Twee delen gescheiden door '::' — project::stack. Alleen letters, cijfers, koppeltekens en underscores; elk deel moet met een letter of cijfer beginnen.",
       "bindPlan": "Update vastleggen op de goedgekeurde preview",
-      "bindPlanHelp": "Als dit aan staat, past de update precies het plan toe dat de preview heeft opgeslagen, zodat alles wat sinds de preview is veranderd de update laat mislukken in plaats van te worden toegepast. Dit steunt op Pulumi-updateplannen, die nog experimenteel zijn. Als dit uit staat, bepaalt de update zelf zijn wijzigingen, zoals een gewone pulumi up doet. <docs>Hoe Pulumi-runs werken</docs>"
+      "bindPlanHelp": "Als dit aan staat, past de update precies het plan toe dat de preview heeft opgeslagen, zodat alles wat sinds de preview is veranderd de update laat mislukken in plaats van te worden toegepast. Dit steunt op Pulumi-updateplannen, die nog experimenteel zijn. Als dit uit staat, bepaalt de update zelf zijn wijzigingen, zoals een gewone pulumi up doet. <docs>Hoe Pulumi-runs werken</docs>",
+      "oidcAudiences": "Audiences van de uitvoeringsidentiteit",
+      "oidcAudiencesAdd": "Audience toevoegen",
+      "oidcAudiencesHint": "Terrapod geeft voor elke providerconfiguratie die een uitvoering gebruikt een kortlevend OpenID Connect-token uit en schrijft het naar een bestand dat de uitvoering kan lezen. Geef een vermelding de provider als sleutel zoals je configuratie die noemt — aws, of aws.west voor een configuratie met alias — en noem de audiences die dat doel accepteert. Elke vermelding overschrijft de eigen configuratie van het deployment voor die provider; verwijder hem en die provider valt terug op de audiences van het deployment. Een audience is een ondoorzichtige tekenreeks die het federatiedoel heeft gekozen, dus hij wordt precies zo opgeslagen als je hem typt.",
+      "oidcAudiencesLoading": "De in het deployment geconfigureerde audiences worden gecontroleerd …",
+      "oidcAudiencesNone": "Geen (uitvoeringen gebruiken de eigen identiteit van de agent-pool)",
+      "oidcAudiencesPlaceholder": "bijv. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisatie gedelegeerd aan uw VCS-repository.",

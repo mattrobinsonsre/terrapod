@@ -14,10 +14,14 @@ Owns the whole life of a single Terrapod run inside a Job pod:
   10. Build var-file / target / replace argv pieces
   11. Run init (FATAL on non-zero)
   12. Backend backstop (FATAL if backend != local)
-  13. Plan phase only: lock-file h1 injection + lock-file upload
-  14. Plan: run plan; on success run show -json + OPA + plan-result
+  13. Per-workspace cloud identity: discover the provider configurations
+      this root module uses and mint one OIDC token each (FATAL if the
+      workspace mints and a token cannot be had). After init because
+      discovery asks the engine, and after any Terragrunt relocation
+  14. Plan phase only: lock-file h1 injection + lock-file upload
+  15. Plan: run plan; on success run show -json + OPA + plan-result
       + plan-file + plan-json upload
-  15. Apply: download plan file (if exists); run apply; upload state
+  16. Apply: download plan file (if exists); run apply; upload state
       (FATAL on state upload failure); apply-result
 
 EXIT trap equivalent: a try/finally around the entire body uploads
@@ -41,6 +45,7 @@ import structlog
 from terrapod.runner import debug_linger, lock_extender, plan_artifacts
 from terrapod.runner.phases import (
     backend_backstop,
+    cloud_identity,
     cost,
     discovery,
     execution_hooks,
@@ -806,6 +811,33 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     except backend_backstop.BackendBackstopError as exc:
         log.error("backend backstop failed", err=str(exc))
         return 1
+
+    # 10b. Per-workspace cloud identity (#1901): mint this run's OIDC tokens and
+    # write one per provider configuration where the operator's provider blocks
+    # expect them.
+    #
+    # AFTER init, unlike the git auth at 4b, and the position is load-bearing
+    # twice over. Discovering which provider configurations this root module
+    # actually uses means asking the engine, which cannot answer before the
+    # providers are installed; and with Terragrunt step 9b moves the working
+    # directory after init, so `cwd` here is the only one that holds the
+    # configuration the run will execute. It is also after the backend backstop
+    # deliberately: a run that is about to be failed for a remote backend should
+    # not mint credentials first.
+    #
+    # The cost of the position is that a pre_init hook can no longer see the
+    # tokens. A hook that talks to a cloud belongs at pre_plan or pre_apply,
+    # both of which run after this point.
+    #
+    # `{}` when this workspace mints nothing, which is most of them: the run then
+    # authenticates with the agent pool's own identity exactly as before, and
+    # does not invoke the engine for discovery at all. Anything else propagates
+    # — there is deliberately no warn-and-continue here, because falling through
+    # does not mean no credentials, it means the POOL's, broader than the ones
+    # this workspace was moved off, so the run would succeed against real
+    # infrastructure under permissions nobody chose.
+    for _k, _v in cloud_identity.run(cfg, binary=binary, cwd=cwd).items():
+        os.environ[_k] = _v
 
     # 11. Phase-specific execution. Terraform only — Pulumi returned at 7b.
     if cfg.phase == "plan":

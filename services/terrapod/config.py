@@ -95,7 +95,7 @@ class RunnerConfig(BaseSettings):
         "(e.g. http://terrapod-api:8000). Also the base for presigned storage URLs. "
         "Env override: TERRAPOD_SERVER_URL.",
     )
-    default_terraform_version: str = Field(default="1.12")
+    default_terraform_version: str = Field(default="1.13")
     default_pulumi_version: str = Field(default="3.208")
     default_execution_backend: str = Field(default="tofu")
     # --- Listener operational settings (non-sensitive; from runners.yaml) ---
@@ -566,6 +566,94 @@ class SSOConfig(BaseModel):
     )
 
 
+class OIDCIssuerConfig(BaseSettings):
+    """Terrapod as an OIDC issuer for runs (#1901).
+
+    Off by default, and off means the routes are **not mounted** rather than
+    mounted and refusing: a deployment that has not opted in publishes no trust
+    root at all, which is a stronger statement than a 404.
+
+    Opting in is two decisions, not one. The operator decides whether the
+    install publishes an issuer and which audiences each provider maps to
+    (here); a workspace may then override that mapping for itself. Neither
+    implies the other, and a published issuer whose resolved mapping is empty
+    grants nothing.
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description=(
+            "Publish an OIDC discovery document and JWKS so clouds can federate "
+            "to this Terrapod as an identity provider. Requires the two issuer "
+            "paths on a publicly reachable Ingress — the clouds fetch them "
+            "anonymously, so a tailnet-only hostname will not do."
+        ),
+    )
+    public_url: str = Field(
+        default="",
+        description=(
+            "The issuer URL, exactly as the cloud is configured with it. One "
+            "source for three consumers inside the API — the token's `iss`, the "
+            "discovery document's `issuer`, and its `jwks_uri` — because OIDC "
+            "issuer matching is exact and computing it three times means one of "
+            "them uses the private hostname. Empty derives it from "
+            "webhookIngress.hostname, falling back to external_url."
+        ),
+    )
+    audiences: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description=(
+            "The deployment's audience catalogue: a provider name to the "
+            "audiences a token minted for it should carry. Keyed on the provider "
+            "name as a configuration writes it (`aws`, `google`, `vault`); one "
+            "token is minted per key, carrying only that key's audiences. A "
+            "workspace's own oidc-audiences is MERGED OVER this, so removing a "
+            "workspace override falls back to the value here. Terrapod assumes "
+            "nothing per-cloud — any provider may be mapped to any audience, and "
+            "the cloud-side trust policy is the gate."
+        ),
+    )
+    signing_key_pem: str = Field(
+        default="",
+        description=(
+            "An operator-supplied RSA private key (PKCS8 PEM) to sign with. Wins "
+            "on every startup and is never stored, so rotating it means replacing "
+            "the secret. Empty means Terrapod generates one on first startup and "
+            "persists it, which is what most deployments want."
+        ),
+    )
+    token_ttl_seconds: int = Field(
+        default=900,
+        ge=60,
+        le=43200,
+        description=(
+            "Lifetime of a run identity token. Short because the cloud exchanges "
+            "it for its own credentials immediately and never needs it again; "
+            "note azurerm reads the token file exactly once, at provider init."
+        ),
+    )
+    key_propagation_seconds: int = Field(
+        default=600,
+        ge=0,
+        description=(
+            "How long a rotated-in key is published before it starts signing. A "
+            "published trust root cannot be swapped atomically: the clouds cache "
+            "the JWKS, so signing with a brand-new key produces tokens they "
+            "cannot verify until they next fetch it. Raise this if your cloud "
+            "caches for longer."
+        ),
+    )
+    retired_key_grace_seconds: int = Field(
+        default=3600,
+        ge=0,
+        description=(
+            "How long a retired key stays in the published JWKS. It has to outlive "
+            "token_ttl_seconds, or a token signed moments before a rotation stops "
+            "verifying while it is still inside its own lifetime."
+        ),
+    )
+
+
 class AuthConfig(BaseSettings):
     """Authentication configuration."""
 
@@ -587,6 +675,7 @@ class AuthConfig(BaseSettings):
         ),
     )
     sso: SSOConfig = Field(default_factory=SSOConfig)
+    oidc_issuer: OIDCIssuerConfig = Field(default_factory=OIDCIssuerConfig)
     session_ttl_hours: int = Field(
         default=12,
         description="Session TTL in hours",
@@ -3490,7 +3579,7 @@ class Settings(BaseSettings):
         description="Default execution backend for new workspaces (tofu or terraform)",
     )
     default_terraform_version: str = Field(
-        default="1.12",
+        default="1.13",
         description="Default terraform/tofu version for new workspaces",
     )
     default_dotnet_version: str = Field(

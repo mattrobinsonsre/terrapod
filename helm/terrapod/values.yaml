@@ -68,6 +68,21 @@ api:
     # (GHSA-hc47-q72v-4vcm). Replace it by setting this, or accept it.
     # api.config.require_strong_secrets makes the warning fatal instead.
 
+  # The RSA private key Terrapod signs run identity tokens with (#1901), when
+  # you want to hold it yourself rather than let Terrapod generate and persist
+  # one. A key supplied here WINS ON EVERY STARTUP and is never copied into the
+  # database, so rotating it means replacing this Secret and restarting the API
+  # — and `POST /oidc/signing-keys/actions/rotate` is refused, because the key
+  # is yours. Leave unset unless you have a key-custody requirement: the
+  # generated key is persisted, shared across replicas, and rotatable in place.
+  #
+  # Must be an RSA private key in PKCS8 PEM form. An Ed25519 or EC key is
+  # refused at startup by name, because workload identity federation does not
+  # accept EdDSA at every cloud.
+  oidcSigningKey:
+    existingSecret: ""                      # name of a K8s Secret holding the PEM
+    existingSecretKey: "oidc_signing_key"   # key within that Secret
+
   # CA bundle for database TLS server-cert verification, used when
   # config.database.ssl_mode is "verify-ca"/"verify-full" (cloud-IAM DB auth).
   # A CA bundle is public, non-secret material, so provide it as a ConfigMap —
@@ -189,7 +204,7 @@ api:
 
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform
-    default_terraform_version: "1.12"
+    default_terraform_version: "1.13"
     # What a new Pulumi workspace gets when it pins no engine-version. Partial,
     # like its Terraform counterpart: resolved to the newest matching release.
     default_pulumi_version: "3.208"
@@ -277,6 +292,76 @@ api:
       # session_ttl_hours. 0 removes the ceiling (not recommended).
       session_absolute_ttl_hours: 24
       api_token_max_ttl_hours: 8760  # 1 year; upper bound on any token. 0 = no limit
+
+      # Terrapod as an OIDC issuer for runs (#1901) — per-workspace cloud
+      # identity. A run gets a short-lived RS256 JWT describing itself (which
+      # workspace, which phase) and a cloud federates to Terrapod as an
+      # identity provider, so two workspaces on one agent pool can hold
+      # different cloud permissions without a second listener. Terrapod writes
+      # the token to a file and knows nothing about any cloud; the provider
+      # configuration is yours. See docs/cloud-identity.md.
+      #
+      # Enabling this publishes TWO PUBLIC PATHS that the clouds fetch
+      # ANONYMOUSLY, so they must be reachable from the internet — add them to
+      # `webhookIngress.paths` (below), which is the surface that exists for
+      # exactly this. A tailnet-only management hostname will not do.
+      #
+      #   /.well-known/openid-configuration
+      #   /.well-known/jwks.json
+      #
+      # Off means those routes are NOT MOUNTED, not mounted-and-404ing: a
+      # deployment that has not opted in publishes no trust root at all. And
+      # enabling it alone grants nothing — a workspace mints a token only once
+      # someone sets its `oidc-audiences`.
+      oidc_issuer:
+        enabled: false
+        # The issuer URL, exactly as the cloud is configured with it. OIDC
+        # issuer matching is EXACT. Empty derives it from
+        # webhookIngress.hostname, falling back to external_url — which is the
+        # right answer for almost everyone, and wrong only if the clouds reach
+        # you on a third hostname.
+        public_url: ""
+        # A run identity token's lifetime. Short because the cloud exchanges it
+        # for its own credentials at provider init and never reads it again.
+        token_ttl_seconds: 900
+        # How long a rotated-in key is PUBLISHED before it starts SIGNING. A
+        # published trust root cannot be swapped atomically: the clouds cache
+        # the JWKS, so a token signed with a brand-new key cannot be verified
+        # until they next fetch it. Raise this if your cloud caches longer.
+        key_propagation_seconds: 600
+        # How long a retired key stays published. Must exceed
+        # token_ttl_seconds, or a token signed moments before a rotation stops
+        # verifying while it is still inside its own lifetime.
+        retired_key_grace_seconds: 3600
+        # ── The audience catalogue: deployment defaults, per provider ──
+        #
+        # Keyed on the BARE PROVIDER TYPE exactly as it appears in a `provider`
+        # block — `aws`, `azurerm`, `google`, `vault` — optionally with an alias
+        # (`aws.west`). The runner discovers which provider configurations a
+        # root module actually uses and asks for one token per used target, so a
+        # key nothing references costs nothing.
+        #
+        # The value is the `aud` claim for that target, ALWAYS A LIST even when
+        # it holds one entry. Keep it to one entry unless you genuinely mean
+        # "these are interchangeable": a multi-valued `aud` is replayable
+        # between the targets it names, and AWS refuses one outright — it fails
+        # at the cloud's token exchange, not here, so Terrapod cannot warn you.
+        #
+        # A workspace's own `oidc_audiences` is MERGED OVER this, per key, so
+        # one workspace can point `vault` at a different instance without
+        # restating the rest. Removing the key from the workspace falls back to
+        # what is here.
+        #
+        # Terrapod attaches no meaning to any of these strings. There is no
+        # built-in `sts.amazonaws.com`, because any provider may be federated to
+        # any audience and the only gate is the cloud's own trust policy.
+        #
+        # Example:
+        #   audiences:
+        #     aws: ["sts.amazonaws.com"]
+        #     azurerm: ["api://AzureADTokenExchange"]
+        #     vault: ["https://vault.example.com"]
+        audiences: {}
       # Lifespan of the token minted by `terraform login` — short-lived per-session
       # CLI credentials, distinct from the max cap above. 0 falls back to the cap.
       login_token_ttl_hours: 12
@@ -634,7 +719,7 @@ api:
       platform_tools:
         opa_version: "1.21.1"
         trivy_version: "0.75.0"
-        checkov_version: "3.3.21"
+        checkov_version: "3.3.23"
         opa_mirror_url: "https://github.com/open-policy-agent/opa/releases/download"
         trivy_mirror_url: "https://github.com/aquasecurity/trivy/releases/download"
         checkov_mirror_url: "https://github.com/bridgecrewio/checkov/releases/download"
@@ -1851,7 +1936,7 @@ runners:
   launchTimeoutSeconds: 300
   # Default terraform/tofu version + backend for runner Jobs when a workspace
   # doesn't pin one. Runs snapshot the resolved version at creation time.
-  defaultTerraformVersion: "1.12"
+  defaultTerraformVersion: "1.13"
   # The same for a Pulumi run whose workspace pins no version.
   defaultPulumiVersion: "3.208"
   defaultExecutionBackend: "tofu"  # tofu | terraform
@@ -2153,18 +2238,40 @@ webhookIngress:
   # routing to the web Service (the BFF). Defaults to the full set of
   # inbound-from-public-internet endpoints Terrapod exposes; operators
   # who don't use external run tasks can trim that out.
-  # BOTH prefixes are listed because this is an ALLOW-LIST: a path absent
-  # here is not routed publicly, and that shows up as a 404 at the SENDER
-  # (a VCS provider, or an external run-task service) rather than anywhere
-  # in Terrapod's own logs. The /api/v1 entries are what run-task callbacks
-  # now use and where a re-registered webhook points; the /api/terrapod/v1
-  # entries keep already-registered webhooks working. Drop the legacy pair
-  # once every sender has been re-pointed — see docs/deprecations.md.
+  #
+  # "Webhook" undersells this block: it is THE PUBLIC SURFACE, and webhooks are
+  # one use of it. Per-workspace cloud identity (#1901) is another — enabling
+  # the OIDC issuer means the clouds fetch the discovery document and the JWKS
+  # anonymously and cannot reach a tailnet-only hostname. Enabling this block
+  # with ONLY the issuer, and no webhook path at all, is a first-class
+  # configuration rather than a corner: the allow-list is what decides, so a
+  # deployment that polls VCS and wants no webhook exposed can publish an
+  # issuer and nothing else.
+  #
+  # BOTH webhook prefixes are listed because this is an ALLOW-LIST: a path
+  # absent here is not routed publicly, and that shows up as a 404 at the
+  # SENDER (a VCS provider, or an external run-task service) rather than
+  # anywhere in Terrapod's own logs. The /api/v1 entries are what run-task
+  # callbacks now use and where a re-registered webhook points; the
+  # /api/terrapod/v1 entries keep already-registered webhooks working. Drop
+  # the legacy pair once every sender has been re-pointed — see
+  # docs/deprecations.md.
   paths:
     - /api/v1/vcs-events                  # GitHub / GitLab webhook receivers
     - /api/v1/task-stage-results          # external run-task callback receiver
     - /api/terrapod/v1/vcs-events         # deprecated alias — already-registered webhooks
     - /api/terrapod/v1/task-stage-results # deprecated alias
+    # The two issuer paths are added AUTOMATICALLY when
+    # api.config.auth.oidc_issuer.enabled is true -- you do not list them here,
+    # and never as the `/.well-known` prefix, which would bring
+    # `/.well-known/terraform.json` along as a side effect of a shorter string.
+    # Publishing a trust root the clouds cannot fetch is not a degraded
+    # configuration but a broken one, and the failure surfaces at the cloud's
+    # token exchange rather than anywhere on the Terrapod side.
+    #
+    # To publish the issuer and NO webhook path, set this to `[]` with the
+    # issuer enabled. The chart supplies the two paths, so the resulting
+    # Ingress serves exactly them.
 
 # ── Internal Ingress (optional) ─────────────────────────────────────────────
 # Optional THIRD Ingress for the internal-only surface: listener pods

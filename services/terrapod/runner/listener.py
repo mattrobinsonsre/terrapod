@@ -1214,7 +1214,7 @@ class RunnerListener:
 
         The Job's phase is sent so the API can bind it into the token
         (GHSA-xmrf-hxq9-m59m) — a plan-phase token then cannot drive the
-        apply-phase routes. An API older than the claim ignores the field and
+        apply-phase routes, nor ask for the apply cloud identity (#1901). An API older than the claim ignores the field and
         returns an unphased token, which works exactly as it always did; the
         field is additive in both directions.
         """

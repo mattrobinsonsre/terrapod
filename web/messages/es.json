@@ -1113,7 +1113,9 @@
       "noExpiry": "Sin caducidad",
       "addDriftIgnoreRule": "Añadir regla",
       "debugModeHint": "Mantener abiertos los pods de runners fallidos en los espacios de trabajo que crea esta regla. Desactivado de forma predeterminada: un pod mantenido abierto conserva las credenciales de ese espacio de trabajo.",
-      "allowForkPrPlansHint": "Se aplica a todos los espacios de trabajo que crea esta regla. Desactivado de forma predeterminada: una pull request desde un fork no recibe ningún plan especulativo, porque ejecutaría el código de su autor con las credenciales del espacio de trabajo."
+      "allowForkPrPlansHint": "Se aplica a todos los espacios de trabajo que crea esta regla. Desactivado de forma predeterminada: una pull request desde un fork no recibe ningún plan especulativo, porque ejecutaría el código de su autor con las credenciales del espacio de trabajo.",
+      "oidcAudiences": "Audiencias de la identidad de ejecución (heredadas por los espacios de trabajo creados)",
+      "oidcAudiencesHint": "Sustituciones de audiencias aplicadas a cada espacio de trabajo que crea esta regla, indexadas por la configuración de provider a la que corresponde un token: aws, o aws.west para una configuración con alias. Déjalas vacías y esos espacios de trabajo usan la configuración propia del despliegue."
     },
     "table": {
       "name": "Nombre",
@@ -1307,7 +1309,8 @@
       "cancel": "Cancelar",
       "working": "Trabajando...",
       "previewDryRun": "Vista previa (simulación)",
-      "applyChanges": "Aplicar cambios"
+      "applyChanges": "Aplicar cambios",
+      "setOidcAudiences": "Establecer audiencias OIDC de la identidad de ejecución (reemplaza el mapa en cada espacio de trabajo coincidente)"
     },
     "diff": {
       "colWorkspace": "Espacio de trabajo",
@@ -1956,6 +1959,19 @@
       "always": "siempre",
       "create": "crear",
       "createUpdate": "crear/actualizar"
+    },
+    "oidcAudiences": {
+      "addProvider": "Añadir configuración de provider",
+      "audiences": "Audiencias",
+      "badgeInherited": "Valor del despliegue",
+      "badgeOwned": "Espacio de trabajo",
+      "issuerDisabled": "Este despliegue no publica ningún emisor de OpenID Connect, así que nada de lo configurado aquí puede surtir efecto.",
+      "override": "Sustituir",
+      "overrideAria": "Sustituir las audiencias de {provider} en este espacio de trabajo",
+      "providerDuplicate": "Esa configuración de provider ya tiene una entrada.",
+      "providerInvalid": "Un nombre de provider no lleva espacios y admite un punto como máximo: aws, o aws.west.",
+      "providerPlaceholder": "aws, o aws.west",
+      "removeProviderAria": "Quitar la configuración de provider {provider}"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Dos partes separadas por '::' — project::stack. Solo letras, números, guiones y guiones bajos; cada parte debe empezar por una letra o un número.",
       "bindPlan": "Vincular la actualización a la vista previa aprobada",
-      "bindPlanHelp": "Si está activado, la actualización aplica exactamente el plan que guardó la vista previa, así que cualquier cambio desde la vista previa hace fallar la actualización en lugar de aplicarse. Se basa en los planes de actualización de Pulumi, que siguen siendo experimentales. Si está desactivado, la actualización calcula sus propios cambios, como hace un pulumi up normal. <docs>Cómo funcionan las ejecuciones de Pulumi</docs>"
+      "bindPlanHelp": "Si está activado, la actualización aplica exactamente el plan que guardó la vista previa, así que cualquier cambio desde la vista previa hace fallar la actualización en lugar de aplicarse. Se basa en los planes de actualización de Pulumi, que siguen siendo experimentales. Si está desactivado, la actualización calcula sus propios cambios, como hace un pulumi up normal. <docs>Cómo funcionan las ejecuciones de Pulumi</docs>",
+      "oidcAudiences": "Audiencias de la identidad de ejecución",
+      "oidcAudiencesAdd": "Añadir audiencia",
+      "oidcAudiencesHint": "Terrapod emite un token OpenID Connect de vida corta para cada configuración de provider que usa una ejecución y lo escribe en un archivo que la ejecución puede leer. Indexa cada entrada por el provider tal como lo nombra tu configuración —aws, o aws.west para una configuración con alias— y enumera las audiencias que acepta ese destino. Cada entrada sustituye la configuración propia del despliegue para ese provider; quítala y ese provider vuelve a las audiencias del despliegue. Una audiencia es una cadena opaca que eligió el destino de federación, así que se guarda exactamente como la escribes.",
+      "oidcAudiencesLoading": "Comprobando las audiencias configuradas en el despliegue …",
+      "oidcAudiencesNone": "Ninguna (las ejecuciones usan la identidad propia del grupo de agentes)",
+      "oidcAudiencesPlaceholder": "p. ej. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Autorización delegada a su repositorio VCS.",

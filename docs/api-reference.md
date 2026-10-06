@@ -539,6 +539,7 @@ All workspace responses (show and list) include a `permissions` object reflectin
     "can-read-settings": true
   }
 }
+```
 
 ### Delete Workspace
 
@@ -643,6 +644,12 @@ Workspaces support the following drift detection attributes (settable on create 
 | Attribute | Type | Default | Description |
 |---|---|---|---|
 | `allow-fork-pr-plans` | boolean | `false` | Whether a pull request opened **from a fork** gets a speculative plan ([GHSA-gp5w-76rw-c452](https://github.com/mattrobinsonsre/terrapod/security/advisories/GHSA-gp5w-76rw-c452)). Off by default: that plan runs the pull request author's code with the workspace's full credential set — `env`-category variables, sensitive values, OpenBao/Vault-resolved values, minted git credentials and the Job's cloud workload identity — and a fork author has neither write access nor the ability to merge, so the plan is the only path by which their code reaches any of it. **Pull requests from a branch in the repository itself are unaffected and always plan.** It gates [module-impact](registry.md#module-impact-analysis) runs the same way, per consuming workspace. See [vcs-integration.md → Pull requests from forks](vcs-integration.md#pull-requests-from-forks) |
+
+### Cloud Identity Attributes
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `oidc-audiences` | object | `{}` | The workspace's **override** of the deployment's cloud-identity audience catalogue, and its half of the opt-in for [per-workspace cloud identity](cloud-identity.md). A map keyed on the provider configuration a token is for — the bare provider type as a `provider` block writes it (`aws`, `azurerm`, `vault`), optionally with an alias (`aws.west`, where the alias is part of the key). Each value is **always a list**, even for one entry. One token is minted per key: a token audienced for two targets is replayable between them, and AWS refuses a multi-valued `aud` outright. Lookup is specific-then-general, so `vault.eu` is answered by an entry for `vault.eu` if there is one and by `vault` otherwise. **Merged over** `api.config.auth.oidc_issuer.audiences` per key, replacing that key's whole list — so an empty map is valid and common, and means "take the catalogue as it stands"; removing a key is the defined way to stop overriding it, and an explicitly empty list for a key is **refused** because it is neither. **This attribute returns the MERGED map, not the stored override** — so an entry the workspace does not override still appears, and a client that writes the read straight back would promote it into one. Subtract the catalogue (`GET /api/terrapod/v1/oidc/audience-defaults`) and send only what the workspace owns; the Terraform provider reconciles only the keys the practitioner declared, for exactly this reason. At most 10 keys, 10 audiences per key, 255 characters per audience and 128 per key; a key carries no whitespace and at most one `.`; a blank or duplicate audience is **refused**, not dropped. Stored byte-for-byte and never normalised: an audience is an opaque string the federation target chose. Terrapod attaches no meaning to any of them — any provider may be mapped to any audience, and the cloud's own trust policy is the only gate. Inert unless the deployment also sets `api.config.auth.oidc_issuer.enabled`. Settable on create and update, in the autodiscovery rule template, and via [bulk update](#bulk-workspace-operations). See [Per-Workspace Cloud Identity](#per-workspace-cloud-identity-oidc-federation) for the endpoints |
 
 ### Terragrunt Attributes
 
@@ -2973,7 +2980,7 @@ POST /api/v1/autodiscovery-rules
       "execution-mode": "agent",
       "execution-backend": "tofu",
       "agent-pool-id": "apool-019e01db-...",
-      "engine-version": "1.12",
+      "engine-version": "1.13",
       "resource-cpu": "1",
       "resource-memory": "2Gi",
       "auto-apply": false,
@@ -3286,7 +3293,7 @@ Apply `update` to every workspace matching `filter`, in a **single all-or-nothin
 ```json
 { "filter": { "labels": {"team": "foundations"} },
   "update": {
-    "engine-version": "1.12",
+    "engine-version": "1.13",
     "execution-backend": "tofu",
     "auto-apply": false,
     "agent-pool-id": "apool-...",
@@ -3953,6 +3960,256 @@ same status shape as above. **409** when encryption is disabled.
 > Rotation propagates to all API replicas within ~30s via the
 > `encryption_key_refresh` background task (no restart needed); see the
 > [rotation notes](encryption-at-rest.md#key-rotation).
+
+---
+
+## Per-Workspace Cloud Identity (OIDC Federation)
+
+Terrapod can publish an OIDC discovery document and JWKS so a cloud federates to
+it as an identity provider, and mint a short-lived RS256 JWT per run describing
+the workspace and phase. Off by default
+(`api.config.auth.oidc_issuer.enabled`); when off, the two `/.well-known`
+routes below are **not mounted at all** rather than mounted and refusing.
+
+Configuration is two levels, merged per key: the deployment's catalogue in
+`api.config.auth.oidc_issuer.audiences`, and a workspace's own
+[`oidc-audiences`](#cloud-identity-attributes) override over it. A workspace
+mints nothing when the **resolved** map is empty, and its runs then authenticate
+with the agent pool's own identity exactly as before.
+
+**One token is minted per provider configuration**, each carrying only that
+target's audiences, and the runner writes each to its own path
+(`/var/run/terrapod/oidc/<target>/token`). A token audienced for several targets
+is replayable between them, and AWS refuses a multi-valued `aud` outright — at
+the cloud's token exchange, not at configuration time.
+
+See [cloud-identity.md](cloud-identity.md) for the per-provider configuration,
+which is the operator's own: Terrapod mints a token and writes it to a file, and
+holds nothing cloud-specific.
+
+### Discovery Document
+
+```
+GET /.well-known/openid-configuration
+```
+
+**Unauthenticated**, by necessity: a cloud fetches this anonymously, before any
+token exists, to decide whether to trust one. Publishes only the issuer's own URL
+and the claim names. Deliberately minimal — there is no authorization endpoint,
+no token endpoint and no client registration, because the only consumer is a
+target validating a token Terrapod already minted.
+
+`issuer` is resolved from `api.config.auth.oidc_issuer.public_url`, falling back
+to the public webhook URL and then `external_url`. OIDC issuer matching is
+**exact**, so this value must equal what the cloud is configured with, trailing
+slash included.
+
+**Cacheable**: `Cache-Control: public, max-age=300`. Modest, because the document
+carries no key material but a corrected issuer URL should take effect in minutes.
+
+### JWKS
+
+```
+GET /.well-known/jwks.json
+```
+
+**Unauthenticated**, same reason. Public key material only. Returns a key *set*,
+not one key: a rotation publishes the incoming key before it starts signing and
+keeps the retired one until the tokens it signed expire. A cloud selects by the
+token's `kid`, which is an RFC 7638 thumbprint of the key itself.
+
+**Cacheable, and the lifetime is derived rather than configured**:
+`Cache-Control: public, max-age=<key_propagation_seconds / 2>`, with a floor of
+60 seconds. The propagation window exists *because* the clouds cache this
+document, so advertising a longer lifetime would mean a cloud still holding the
+old key set at the moment we begin signing with the new one; half rather than all
+of it avoids a clock-skew race at the boundary.
+
+Both issuer documents also have **their own rate-limit bucket**, at
+`authenticated_requests_per_minute` rather than the anonymous per-IP limit. A
+`429` on the JWKS would fail token verification for every federated run at once,
+including runs whose own traffic had nothing to do with filling the bucket.
+
+### Mint Run Identity Tokens
+
+```
+POST /api/terrapod/v1/runs/{run_id}/cloud-identity-tokens
+```
+
+**Runner token, scoped to that run.** One request per run, **after `init`** —
+discovery asks the engine, which cannot answer before the providers are
+installed. The body carries what the runner discovered:
+
+```json
+{
+  "providers": ["aws", "vault.eu"],
+  "discovery": "ok",
+  "discovery-detail": ""
+}
+```
+
+`providers` are audience-map keys: `aws`, or `provider.alias` for one aliased
+configuration. Each is resolved **specific-then-general**, so `vault.eu` is
+answered by an entry for `vault.eu` if there is one and by `vault` otherwise —
+which is what lets an operator alias a provider five times without naming every
+alias in the catalogue. An empty list is meaningful: a configuration may declare
+no provider.
+
+`discovery` is how much the runner trusts its own list — `ok`, `failed` (the
+graph command errored or timed out) or `unparsed` (it ran and named provider
+nodes, none of which could be read). The field exists because `failed` and
+`unparsed` both arrive as an empty list, which is indistinguishable from a
+provider-less configuration; taking them at face value would be a silent
+fall-through to the agent pool's broader identity. The body accepts no other
+field — `extra` is forbidden — and in particular **it cannot name a phase**,
+which comes from the presented runner token.
+
+| Status | Meaning | What the runner does |
+|---|---|---|
+| **200** | `{"tokens": [{"target", "token", "audiences"}], "phase", "expires_in"}` | Writes each to `/var/run/terrapod/oidc/<target>/token` (mode `0600`) and exports `TERRAPOD_OIDC_TOKEN_DIR`, `TERRAPOD_RUN_PHASE` and `TF_VAR_terrapod_run_phase` |
+| **204** | The workspace maps nothing; the issuer is not enabled deployment-wide; the configuration declares no provider; or nothing it uses is mapped | Takes no action. The run authenticates with the agent pool's identity, exactly as before |
+| **404** | This API does not serve the route | Read as "nothing to do" — an API older than the runner image, which in agent mode upgrades independently |
+| **409** | The resolved audiences changed since the run was created, **or** discovery was not `ok` for a workspace that maps targets | **Fails the run**, carrying the reason |
+| **Other 4xx / 5xx** | Credentials were asked for and could not be had | **Fails the run.** Continuing would mean silently running under broader permissions than the operator chose |
+
+The `204` is load-bearing: "not opted in" has to be distinguishable from
+"broken", because those require opposite behaviour from the runner, and the
+fall-through to the pool's identity is permanent and supported rather than a
+migration step.
+
+**The order of the checks is part of the contract.** A workspace that maps
+nothing is answered `204` *before* `discovery` is examined, so a graph failure
+can never fail a run that was not using the feature. Only then is a bad outcome
+refused, and only then is the intersection computed.
+
+**The `409` compares the run's snapshot against live configuration.**
+`Run.oidc_audiences` is the mapping resolved when the run was created; this
+endpoint re-resolves each requested target and refuses when the two disagree,
+order included, naming the targets that moved. Minting from the snapshot alone
+would hand an apply a token matching the reviewed plan while the cloud had moved
+on, and the rejection would land inside the engine, possibly after a partial
+apply.
+
+The same comparison runs **at confirm time** as well, beside the state-drift and
+plan-expiry staleness guards, so an apply is refused before a Job is scheduled —
+scoped to the targets the run actually minted for, so one edit to the deployment
+catalogue does not refuse every pending apply in the fleet. See
+[cloud-identity.md](cloud-identity.md#when-the-configuration-moves-between-plan-and-apply).
+
+**Response** (200):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `token` | string | The signed JWT |
+| `expires_in` | int | `api.config.auth.oidc_issuer.token_ttl_seconds` |
+| `phase` | string \| null | `plan` or `apply`, taken from the presented runner token. `null` when the token made no phase claim |
+| `target` | string | Echoed, so the runner writes the file under the name it asked for |
+| `audiences` | array&lt;string&gt; | **This target's** audiences, verbatim and in order |
+
+**The phase comes from the presented runner token, never from the request body.**
+A plan-phase runner asking for the apply identity is what this guards: put write
+permissions behind a trust condition on `phase: apply` and a speculative
+pull-request plan structurally cannot assume that role, because every PR-driven
+run is plan-only.
+
+**Claims:** `iss`, `sub` (`workspace:<name>:phase:<plan|apply>`), `aud` (this
+target's audiences only), `workspace`, `workspace_id`, `phase` (absent when the
+runner token made no phase claim), `run_id`, `terrapod_organization` (always the
+literal `default`), plus `iat`, `nbf`, `exp`, `jti`. The header carries `kid`. `sub` carries the phase
+as well as the discrete `phase` claim because Azure federated identity
+credentials match on issuer, subject and audience only, with no access to
+arbitrary claims — so `sub` is the one place a phase condition can be expressed
+there. Targets that can read arbitrary claims should condition on the discrete
+ones, which needs no wildcard. See
+[the claim set](cloud-identity.md#the-claim-set).
+
+### Audience Defaults
+
+```
+GET /api/terrapod/v1/oidc/audience-defaults
+```
+
+**Any authenticated user** — not platform admin. The deployment-wide audience
+catalogue (`api.config.auth.oidc_issuer.audiences`) that a workspace's own
+`oidc-audiences` map merges over, plus whether the issuer is published at all.
+
+It exists because the two-level merge is otherwise hard to observe: a workspace
+read returns the **merged** map, so it says what the workspace will actually
+mint for but not which of those entries the workspace itself owns. Reading the catalogue beside it is what makes
+the effective mapping visible.
+
+**Response:**
+
+```json
+{"data": {"type": "oidc-audience-defaults", "id": "default",
+  "attributes": {"audiences": {"aws": ["sts.amazonaws.com"]}, "issuer-enabled": true}}}
+```
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `audiences` | object | The catalogue: provider configuration → its audiences. `{}` by default, which is not an error |
+| `issuer-enabled` | bool | `api.config.auth.oidc_issuer.enabled`. Reported separately because an empty catalogue and a disabled issuer are different states with the same symptom, and only one is fixed by adding audiences |
+
+The gate is reasoned rather than lax: a workspace read already discloses that
+workspace's audiences to anyone who can read it, so this adds only the entries a
+workspace does not override — and requiring admin would put it out of reach of
+exactly the person it is for, a workspace owner deciding whether to override a
+key. Knowing an audience grants nothing on its own: the federation target's own
+trust policy is the gate, and minting needs a phase-bound runner token scoped to
+a run on that workspace.
+
+Note what the runner-facing surface does **not** return: the catalogue. [Mint
+Run Identity Tokens](#mint-run-identity-tokens) echoes the audiences for the
+targets that run actually uses, because the runner asked for exactly those — but
+it never enumerates the rest. The set of audiences names the roles this
+deployment can ask to assume, so the whole of it stays on the authenticated
+surface a person reads rather than on the one a Job holds a token for.
+
+### List Signing Keys
+
+```
+GET /api/terrapod/v1/oidc/signing-keys
+```
+
+Platform `admin`. **Public key material only** — the private half never leaves
+the API.
+
+**Response attributes** (`data[].type` = `oidc-signing-keys`, `id` = `kid`):
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `kid` | string | RFC 7638 JWK thumbprint — the same value a cloud sees in a token header |
+| `created-at` | string | RFC3339 |
+| `activates-at` | string | When this key starts signing. A rotated-in key is published immediately but signs only from here |
+| `retired-at` | string \| null | When it stopped signing. It stays published for `retired_key_grace_seconds` after this |
+| `signing` | bool | Whether this is the key currently signing |
+
+`meta.signing-kid` repeats the signing key's `kid`, or is `null` when nothing is
+loaded.
+
+### Rotate Signing Key
+
+```
+POST /api/terrapod/v1/oidc/signing-keys/actions/rotate
+```
+
+Platform `admin`. Adds a key and retires the one currently signing. **201** with
+the new key in the same shape as above, and a `meta.note`.
+
+A published trust root cannot be swapped atomically, because the clouds fetch the
+JWKS on their own schedule and cache it. So the new key is published immediately
+and starts signing only after `key_propagation_seconds`, with the **retired key
+signing across that window** — it is already in the published JWKS, so its
+tokens verify. The retired key then stays published for
+`retired_key_grace_seconds`, which must exceed both `token_ttl_seconds` and
+`key_propagation_seconds`.
+
+**409** on a deployment that supplies its own key
+(`api.oidcSigningKey.existingSecret`): the key is the operator's and so is
+rotating it — replace the Secret and restart the API.
+
+See [runbooks.md → Rotating the OIDC issuer signing
+key](runbooks.md#rotating-the-oidc-issuer-signing-key).
 
 ---
 

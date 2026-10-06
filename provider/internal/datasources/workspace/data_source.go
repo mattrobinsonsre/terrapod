@@ -59,6 +59,7 @@ type workspaceDataSourceModel struct {
 	SecurityScanEngine            types.String `tfsdk:"security_scan_engine"`
 	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
 	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
+	OIDCAudiences                 types.Map    `tfsdk:"oidc_audiences"`
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AIPolicyMode                  types.String `tfsdk:"ai_policy_mode"`
@@ -135,6 +136,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"security_scan_engine":             computedString("Security-scan engine (#1036): 'checkov' (default), 'trivy', or 'both'."),
 			"security_scan_severity_threshold": computedString("Lowest severity that counts as a scan failure (#1036): 'critical', 'high' (default), 'medium', or 'low'."),
 			"security_scan_skip_rules":         computedList("Scanner rule-ids to suppress (#1036; Checkov CKV_* / Trivy AVD-*)."),
+			"oidc_audiences":                   computedAudienceMap("The EFFECTIVE audiences a run's identity token is minted for, per provider configuration (#1901) — the workspace's own override merged over the deployment's audience catalogue, which is the set its runs actually use. A key is the provider configuration the token is for, exactly as written in a `provider` block: `aws`, `vault`, or `aws.west` for one aliased configuration. Values are verbatim opaque strings the federation target itself named. Empty means this workspace mints nothing and its runs authenticate with the agent pool's own identity. This is the merged view on purpose: the `terrapod_workspace` RESOURCE records only the keys a configuration sets, so this data source is where a config reads the full set to cross-reference against its own federation trust policy."),
 			"plan_expiry_seconds":              computedInt64("Per-workspace plan expiry TTL in seconds (#646); null/0 = disabled."),
 			"ai_policy_mode":                   computedString("Per-workspace AI policy gate override: 'default', 'enabled', or 'disabled'. 'disabled' opts out of an advisory verdict only -- a mandatory gate ignores it."),
 			"ai_summary_mode":                  computedString("Per-workspace AI plan-summary mode: 'default' (follow deployment global), 'enabled' (always summarise), or 'disabled' (never summarise)."),
@@ -334,6 +336,20 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		m.SecurityScanSkipRules = types.ListNull(types.StringType)
 	}
 
+	// The FULL merged view, not the narrowed one the resource keeps (#1901). A
+	// data source has no plan for its result to be consistent with and nothing
+	// writes back through it, so the drift that forces the resource's selective
+	// read cannot arise here — and a config cross-referencing a workspace
+	// against its own federation trust policy needs the effective set, not the
+	// subset some other configuration happens to declare.
+	if auds := terrapod.GetAudienceMapAttr(res, "oidc-audiences"); len(auds) > 0 {
+		val, d := types.MapValueFrom(ctx, audienceElemType, auds)
+		diags.Append(d...)
+		m.OIDCAudiences = val
+	} else {
+		m.OIDCAudiences = types.MapNull(audienceElemType)
+	}
+
 	if labels := terrapod.GetMapAttr(res, "labels"); len(labels) > 0 {
 		val, d := types.MapValueFrom(ctx, types.StringType, labels)
 		diags.Append(d...)
@@ -371,4 +387,14 @@ func computedList(desc string) schema.ListAttribute {
 }
 func computedMap(desc string) schema.MapAttribute {
 	return schema.MapAttribute{Description: desc, Computed: true, ElementType: types.StringType}
+}
+
+// audienceElemType is the element type of oidc_audiences (#1901): a LIST of
+// audiences per provider configuration. One audience is still a one-element
+// list, and several mean "interchangeable for this target" — so the shape never
+// collapses to a scalar.
+var audienceElemType = types.ListType{ElemType: types.StringType}
+
+func computedAudienceMap(desc string) schema.MapAttribute {
+	return schema.MapAttribute{Description: desc, Computed: true, ElementType: audienceElemType}
 }

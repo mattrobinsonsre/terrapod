@@ -180,6 +180,18 @@
         },
         "serviceAccount": {
           "$ref": "#/$defs/serviceAccountSpec"
+        },
+        "oidcSigningKey": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": {
+              "type": "string"
+            },
+            "existingSecretKey": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -1767,6 +1779,41 @@
                       }
                     }
                   }
+                }
+              }
+            },
+            "oidc_issuer": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "public_url": {
+                  "type": "string"
+                },
+                "token_ttl_seconds": {
+                  "type": "integer",
+                  "minimum": 60,
+                  "maximum": 43200
+                },
+                "audiences": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "array",
+                    "minItems": 1,
+              "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "key_propagation_seconds": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "retired_key_grace_seconds": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             }

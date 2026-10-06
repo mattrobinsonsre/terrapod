@@ -636,6 +636,20 @@ async def _resolve_live_pools(workspaces: list[Workspace]) -> frozenset[uuid.UUI
     return None if live is None else frozenset(live)
 
 
+def _merged_oidc_audiences(ws: Workspace) -> dict[str, list[str]]:
+    """This workspace's effective audience map (#1901).
+
+    Its own override merged over the deployment catalogue, per key, which is
+    the shape every read consumer is promised. Kept as a named helper rather
+    than inlined because the merge is also what `run_service` snapshots at run
+    creation, and the two must not drift.
+    """
+    from terrapod.config import settings
+    from terrapod.services import cloud_identity_resolver
+
+    return cloud_identity_resolver.resolve_for_workspace(ws, settings=settings)
+
+
 def _workspace_json(
     ws: Workspace,
     caps: frozenset[str] | None = None,
@@ -711,6 +725,23 @@ def _workspace_json(
                 "resource-cpu": ws.resource_cpu,
                 "parallelism": ws.parallelism,
                 "resource-memory": ws.resource_memory,
+                # The MERGED view, not the stored override: the workspace's own
+                # map resolved over the deployment catalogue, per key. Clients
+                # see what this workspace would actually mint for, because the
+                # override alone is unreadable on its own — a key's absence
+                # means "inherit", and without the merge a reader cannot tell
+                # that from "nothing here".
+                #
+                # No DB access: the resolver is a dict merge over
+                # `settings.auth.oidc_issuer.audiences`, so this adds no query
+                # and cannot desynchronise a test that scripts `db.execute` in
+                # order (the #1565 trap).
+                #
+                # The consequence is the provider's, and it is handled there:
+                # a read is a SUPERSET of what was written, so a consumer must
+                # reconcile only the keys it owns rather than storing this
+                # wholesale. See the `oidc_audiences` attribute.
+                "oidc-audiences": _merged_oidc_audiences(ws),
                 "vcs-repo-url": ws.vcs_repo_url,
                 "vcs-branch": ws.vcs_branch,
                 "vcs-connection-id": f"vcs-{ws.vcs_connection_id}"
@@ -1452,6 +1483,9 @@ async def _create_workspace_impl(
         parallelism=_validate_parallelism(attrs.get("parallelism", DEFAULT_PARALLELISM)),
         pulumi_bind_plan=_validate_pulumi_bind_plan(attrs.get("pulumi-bind-plan", False), engine),
         resource_memory=attrs.get("resource-memory", "2Gi"),
+        oidc_audiences=_422(
+            workspace_settings.validate_oidc_audiences, attrs.get("oidc-audiences")
+        ),
         labels=validate_labels(attrs.get("labels", {})),
         owner_email=user.email,
         vcs_connection_id=vcs_connection_id,
@@ -2126,6 +2160,10 @@ async def update_workspace(
         ws.resource_cpu = attrs["resource-cpu"]
     if "resource-memory" in attrs:
         ws.resource_memory = attrs["resource-memory"]
+    if "oidc-audiences" in attrs:
+        ws.oidc_audiences = _422(
+            workspace_settings.validate_oidc_audiences, attrs["oidc-audiences"]
+        )
     if "labels" in attrs:
         # Validate up-front (size limits + reserved-key check). Raises 422
         # before any self-lockout logic so the error path stays simple and

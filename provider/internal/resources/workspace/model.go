@@ -32,6 +32,7 @@
 //	"agent-pool-ids"                    → agent_pool_ids      (list, optional+computed)
 //	"var-files"                         → var_files           (list,   optional)
 //	"trigger-prefixes"                  → trigger_prefixes    (list,   optional)
+//	"oidc-audiences"                    → oidc_audiences      (map of lists, optional+computed)
 //	"drift-detection-enabled"           → drift_detection_enabled (bool, optional)
 //	"drift-detection-interval-seconds"  → drift_detection_interval_seconds (int, optional)
 //
@@ -56,6 +57,16 @@ package workspace
 import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+// audienceElemType is the element type of oidc_audiences (#1901): a LIST of
+// audiences per provider configuration, never a bare string.
+//
+// One audience is the common case and is still a one-element list. A list of
+// several is a deliberate "these are interchangeable for this target"
+// statement, and some federation targets refuse a multi-valued `aud` outright —
+// so the shape must not collapse to a scalar on the one-entry case, or the
+// multi-entry one stops being expressible.
+var audienceElemType = types.ListType{ElemType: types.StringType}
 
 // workspaceModel maps the Terraform schema to Go types.
 type workspaceModel struct {
@@ -96,6 +107,7 @@ type workspaceModel struct {
 	SecurityScanEngine            types.String `tfsdk:"security_scan_engine"`
 	SecurityScanSeverityThreshold types.String `tfsdk:"security_scan_severity_threshold"`
 	SecurityScanSkipRules         types.List   `tfsdk:"security_scan_skip_rules"`
+	OIDCAudiences                 types.Map    `tfsdk:"oidc_audiences"`
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	AllowForkPRPlans              types.Bool   `tfsdk:"allow_fork_pr_plans"`

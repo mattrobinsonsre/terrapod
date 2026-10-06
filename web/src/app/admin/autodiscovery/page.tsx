@@ -12,6 +12,9 @@ import { SortableHeader } from '@/components/sortable-header'
 import { LabelsEditor } from '@/components/labels-editor'
 import {
   StringListEditor,
+  OidcAudiencesEditor,
+  sanitizeOidcAudiences,
+  type OidcAudiences,
   RunTaskTemplatesEditor,
   NotificationTemplatesEditor,
   type RunTaskSpec,
@@ -19,6 +22,7 @@ import {
 } from '@/components/template-editors'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages } from '@/lib/api'
+import { useOidcAudienceDefaults } from '@/lib/use-oidc-audience-defaults'
 import { useSortable } from '@/lib/use-sortable'
 import { useFormat } from '@/lib/format'
 
@@ -48,6 +52,7 @@ interface AutodiscoveryRule {
     labels: Record<string, string>
     'owner-email': string
     'var-files': string[]
+    'oidc-audiences'?: OidcAudiences
     'execution-hook-templates'?: string[]
     'security-scan-enforcement'?: string
     'security-scan-engine'?: string
@@ -123,7 +128,7 @@ export default function AutodiscoveryPage() {
   const [executionMode, setExecutionMode] = useState<'agent'>('agent')
   const [agentPoolId, setAgentPoolId] = useState('')
   const [executionBackend, setExecutionBackend] = useState<'tofu' | 'terraform'>('tofu')
-  const [terraformVersion, setTerraformVersion] = useState('1.11')
+  const [terraformVersion, setTerraformVersion] = useState('1.13')
   const [resourceCpu, setResourceCpu] = useState('1')
   const [engine, setEngine] = useState('terraform')
   const [bindPlan, setBindPlan] = useState(false)
@@ -134,6 +139,15 @@ export default function AutodiscoveryPage() {
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [ownerEmail, setOwnerEmail] = useState('')
   const [varFiles, setVarFiles] = useState<string[]>([])
+  // Only to tell the operator when the deployment publishes no issuer, so an
+  // entry added here could never be minted for. No partition on this surface:
+  // the value IS the override — unlike a workspace read, nothing is merged
+  // into it — so there is nothing to subtract and nothing to inherit.
+  const oidcDefaults = useOidcAudienceDefaults()
+  // Templated onto every workspace the rule creates (#1901), keyed on the
+  // provider configuration a token is for. Empty is the default and overrides
+  // nothing: those workspaces take the deployment's configured audiences.
+  const [oidcAudiences, setOidcAudiences] = useState<OidcAudiences>({})
   const [executionHookTemplates, setExecutionHookTemplates] = useState<string[]>([])
   // Templated onto every workspace the rule materialises (#1763).
   const [scanEnforcement, setScanEnforcement] = useState('advisory')
@@ -237,7 +251,7 @@ export default function AutodiscoveryPage() {
     setExecutionMode('agent')
     setAgentPoolId('')
     setExecutionBackend('tofu')
-    setTerraformVersion('1.11')
+    setTerraformVersion('1.13')
     setResourceCpu('1')
     setResourceMemory('2Gi')
     setAutoApplyMode('never')
@@ -245,6 +259,7 @@ export default function AutodiscoveryPage() {
     setLabels({})
     setOwnerEmail('')
     setVarFiles([])
+    setOidcAudiences({})
     setExecutionHookTemplates([])
     setScanEnforcement('advisory')
     setScanEngine('checkov')
@@ -296,6 +311,7 @@ export default function AutodiscoveryPage() {
     setLabels(a.labels || {})
     setOwnerEmail(a['owner-email'] || '')
     setVarFiles(a['var-files'] || [])
+    setOidcAudiences(a['oidc-audiences'] || {})
     setExecutionHookTemplates(a['execution-hook-templates'] || [])
     setScanEnforcement(a['security-scan-enforcement'] || 'advisory')
     setScanEngine(a['security-scan-engine'] || 'checkov')
@@ -354,6 +370,10 @@ export default function AutodiscoveryPage() {
       labels,
       'owner-email': ownerEmail,
       'var-files': varFiles.map(s => s.trim()).filter(Boolean),
+      // Blank audience rows are refused rather than dropped, and so is a
+      // provider whose list came out empty, so an empty row left in the editor
+      // would otherwise 422 the whole rule.
+      'oidc-audiences': sanitizeOidcAudiences(oidcAudiences),
       'execution-hook-templates': executionHookTemplates.map(s => s.trim()).filter(Boolean),
       'security-scan-enforcement': scanEnforcement,
       'security-scan-engine': scanEngine,
@@ -819,6 +839,17 @@ export default function AutodiscoveryPage() {
                   onChange={setVarFiles}
                   placeholder="env/prod.tfvars"
                   addLabel={t('form.addVarFile')}
+                />
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <label className="block text-sm text-slate-300 mb-1">{t('form.oidcAudiences')}</label>
+                <p className="text-xs text-slate-500 mb-2">{t('form.oidcAudiencesHint')}</p>
+                <OidcAudiencesEditor
+                  value={oidcAudiences}
+                  inert={!oidcDefaults.issuerEnabled}
+                  onChange={setOidcAudiences}
+                  audiencePlaceholder={tWs('fields.oidcAudiencesPlaceholder')}
+                  addAudienceLabel={tWs('fields.oidcAudiencesAdd')}
                 />
               </div>
               {/* The rest of the templated workspace settings (#1763) */}

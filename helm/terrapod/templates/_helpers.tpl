@@ -360,8 +360,12 @@ Validate the optional webhook Ingress:
   - hostname is required when enabled (every public-internet caller resolves it)
   - web.enabled is required (the webhook Ingress routes to the web BFF, same
     as the management Ingress)
-  - paths must be non-empty (an empty allow-list is pointless and would
-    produce an unreachable Ingress)
+  - the RESOLVED path set must be non-empty. That is not the same as the
+    operator's list: when the OIDC issuer is enabled the chart adds its two
+    paths itself, so `paths: []` is the supported way to publish the issuer
+    and no webhook path at all — a first-class configuration for a deployment
+    that polls VCS. Judging the operator's list alone would refuse exactly
+    the arrangement values.yaml advertises.
 */}}
 {{- define "terrapod.validateWebhookIngress" -}}
 {{- if .Values.webhookIngress.enabled -}}
@@ -371,8 +375,8 @@ Validate the optional webhook Ingress:
 {{- if not .Values.web.enabled -}}
 {{- fail "webhookIngress.enabled is true but web.enabled is false. The webhook Ingress routes to the web frontend — set web.enabled=true." -}}
 {{- end -}}
-{{- if not .Values.webhookIngress.paths -}}
-{{- fail "webhookIngress.enabled is true but webhookIngress.paths is empty. The default allow-list ships in values.yaml; an empty list would produce an Ingress that accepts nothing." -}}
+{{- if and (not .Values.webhookIngress.paths) (not ((.Values.api.config.auth).oidc_issuer).enabled) -}}
+{{- fail "webhookIngress.enabled is true but webhookIngress.paths is empty and the OIDC issuer is disabled, so the Ingress would accept nothing. The default allow-list ships in values.yaml. To publish ONLY the issuer and no webhook path, set api.config.auth.oidc_issuer.enabled=true — the chart adds the two issuer paths itself." -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

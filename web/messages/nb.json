@@ -1113,7 +1113,9 @@
       "noExpiry": "Ingen utløp",
       "addDriftIgnoreRule": "Legg til regel",
       "debugModeHint": "Hold pods fra mislykkede runnere åpne på arbeidsområdene denne regelen oppretter. Av som standard – en pod som holdes åpen, beholder det arbeidsområdets legitimasjon.",
-      "allowForkPrPlansHint": "Gjelder hvert arbeidsområde denne regelen oppretter. Av som standard: en pull request fra en fork får ingen spekulativ plan, fordi den ville kjøre forfatterens kode med arbeidsområdets legitimasjon."
+      "allowForkPrPlansHint": "Gjelder hvert arbeidsområde denne regelen oppretter. Av som standard: en pull request fra en fork får ingen spekulativ plan, fordi den ville kjøre forfatterens kode med arbeidsområdets legitimasjon.",
+      "oidcAudiences": "Audiences for kjøringsidentitet (arves av opprettede arbeidsområder)",
+      "oidcAudiencesHint": "Audience-overstyringer som legges på hvert arbeidsområde denne regelen oppretter, nøklet på providerkonfigurasjonen et token gjelder for — aws, eller aws.west for en konfigurasjon med alias. La den stå tom, så bruker de arbeidsområdene utrullingens egen konfigurasjon."
     },
     "table": {
       "name": "Navn",
@@ -1307,7 +1309,8 @@
       "cancel": "Avbryt",
       "working": "Arbeider …",
       "previewDryRun": "Forhåndsvis (prøvekjøring)",
-      "applyChanges": "Anvend endringer"
+      "applyChanges": "Anvend endringer",
+      "setOidcAudiences": "Sett OIDC-audiences for kjøringsidentitet (erstatter kartet på hvert samsvarende arbeidsområde)"
     },
     "diff": {
       "colWorkspace": "Arbeidsområde",
@@ -1956,6 +1959,19 @@
       "always": "alltid",
       "create": "opprett",
       "createUpdate": "opprett/oppdater"
+    },
+    "oidcAudiences": {
+      "addProvider": "Legg til providerkonfigurasjon",
+      "audiences": "Audiences",
+      "badgeInherited": "Utrullingens standard",
+      "badgeOwned": "Arbeidsområde",
+      "issuerDisabled": "Denne utrullingen publiserer ingen OpenID Connect-utsteder, så ingenting som konfigureres her kan få virkning.",
+      "override": "Overstyr",
+      "overrideAria": "Overstyr audiences for {provider} i dette arbeidsområdet",
+      "providerDuplicate": "Den providerkonfigurasjonen har allerede en oppføring.",
+      "providerInvalid": "Et providernavn inneholder ingen mellomrom og høyst ett punktum — aws eller aws.west.",
+      "providerPlaceholder": "aws eller aws.west",
+      "removeProviderAria": "Fjern providerkonfigurasjonen {provider}"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "To deler atskilt av '::' — project::stack. Bare bokstaver, tall, bindestreker og understreker; hver del må begynne med en bokstav eller et tall.",
       "bindPlan": "Lås oppdateringen til den godkjente forhåndsvisningen",
-      "bindPlanHelp": "Når dette er på, bruker oppdateringen nøyaktig planen forhåndsvisningen lagret, så alt som har endret seg siden forhåndsvisningen får oppdateringen til å feile i stedet for å bli tatt i bruk. Dette bygger på Pulumis oppdateringsplaner, som fortsatt er eksperimentelle. Når dette er av, finner oppdateringen selv ut av endringene sine, slik en vanlig pulumi up gjør. <docs>Slik fungerer Pulumi-kjøringer</docs>"
+      "bindPlanHelp": "Når dette er på, bruker oppdateringen nøyaktig planen forhåndsvisningen lagret, så alt som har endret seg siden forhåndsvisningen får oppdateringen til å feile i stedet for å bli tatt i bruk. Dette bygger på Pulumis oppdateringsplaner, som fortsatt er eksperimentelle. Når dette er av, finner oppdateringen selv ut av endringene sine, slik en vanlig pulumi up gjør. <docs>Slik fungerer Pulumi-kjøringer</docs>",
+      "oidcAudiences": "Audiences for kjøringsidentitet",
+      "oidcAudiencesAdd": "Legg til audience",
+      "oidcAudiencesHint": "Terrapod utsteder et kortlevd OpenID Connect-token for hver providerkonfigurasjon en kjøring bruker, og skriver det til en fil kjøringen kan lese. Nøkle en oppføring på provideren slik konfigurasjonen din navngir den — aws, eller aws.west for en konfigurasjon med alias — og list opp audiences målet godtar. Hver oppføring overstyrer utrullingens egen konfigurasjon for den provideren; fjern den, og provideren faller tilbake til utrullingens audiences. En audience er en ugjennomsiktig streng føderasjonsmålet har valgt, så den lagres nøyaktig slik du skriver den.",
+      "oidcAudiencesLoading": "Sjekker audiences som er konfigurert i utrullingen …",
+      "oidcAudiencesNone": "Ingen (kjøringer bruker agentpuljens egen identitet)",
+      "oidcAudiencesPlaceholder": "f.eks. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Autorisasjon delegert til ditt VCS-repositorium.",

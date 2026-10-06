@@ -156,6 +156,21 @@ def _get_client_ip(
 # re-created #1075 — the bug this function exists to prevent.
 _CAPABILITY_PATH_RE = re.compile(r"^/api/(?:tfe/)?v2/(?:plans|applies)/([^/]+)/log$")
 
+# The OIDC issuer's two public documents (#1901). Anonymous by necessity -- a
+# cloud fetches them before any token exists -- so without a tier of their own
+# they land in the unauthenticated IP bucket, and behind the BFF that is ONE
+# bucket shared with every other anonymous request. This is the #1075 shape with
+# a far worse blast radius: exhaust that bucket and the JWKS 429s, so every
+# cloud fails to verify every token and every federated run breaks at once,
+# including runs whose own traffic had nothing to do with filling it.
+#
+# Their own prefix therefore isolates them in both directions -- unrelated
+# traffic cannot starve the trust root, and a cloud retry storm cannot starve
+# anything else. Matched EXACTLY, not by prefix: `/.well-known` would drag in
+# the terraform service-discovery document, which should be a decision rather
+# than a side effect of a bucketing rule.
+_OIDC_ISSUER_PATHS = frozenset({"/.well-known/openid-configuration", "/.well-known/jwks.json"})
+
 
 def _capability_bucket(path: str) -> str | None:
     """Per-capability bucket id for the anonymous log-polling endpoints.
@@ -271,6 +286,11 @@ class RateLimitMiddleware:
       which is how npm/pip/NuGet clients authenticate — one per package, and
       NuGet cannot be configured out of it — so the public bucket is the wrong
       size for them and a restore exhausts it (#1566).
+    - OIDC issuer documents (`/.well-known/{openid-configuration,jwks.json}`):
+      `authenticated_requests_per_minute` in their own bucket. Anonymous by
+      necessity and shared by every cloud, so they must not sit in the
+      unauthenticated IP bucket — a 429 there fails token verification for
+      every federated run at once (#1901).
     - Unauthenticated: base limit (`requests_per_minute`), IP-keyed.
     - Auth endpoints (`/api/v1/auth/*` and its deprecated alias, `/oauth/*`):
       always `auth_requests_per_minute`
@@ -350,6 +370,15 @@ class RateLimitMiddleware:
         if capability is not None:
             limit = self.authenticated_requests_per_minute
             prefix = "api_capability"
+        elif path in _OIDC_ISSUER_PATHS:
+            # Generous, and in its own bucket. These are small, cacheable and
+            # fetched by machines, so legitimate volume is low -- but a 429 here
+            # breaks token verification for every cloud, so the limit exists to
+            # bound abuse rather than to shape normal use. The response carries
+            # a derived `Cache-Control` (see routers/oidc_issuer.py), which is
+            # the real defence; this is the backstop for a client ignoring it.
+            limit = self.authenticated_requests_per_minute
+            prefix = "api_oidc_issuer"
         elif is_auth_endpoint:
             limit = self.auth_requests_per_minute
             prefix = "auth"

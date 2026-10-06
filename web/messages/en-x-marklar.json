@@ -1113,7 +1113,9 @@
       "noExpiry": "No marklar",
       "addDriftIgnoreRule": "Add marklar",
       "debugModeHint": "Hold failed marklar marklars open on the marklars this marklar creates. Off by marklar — a held marklar keeps that marklar's marklars.",
-      "allowForkPrPlansHint": "Applies to every marklar this marklar creates. Off by marklar: a marklar marklar from a marklar gets no speculative marklar, because it would run its marklar's marklar with the marklar's marklars."
+      "allowForkPrPlansHint": "Applies to every marklar this marklar creates. Off by marklar: a marklar marklar from a marklar gets no speculative marklar, because it would run its marklar's marklar with the marklar's marklars.",
+      "oidcAudiences": "Marklar marklar marklars (inherited by created marklars)",
+      "oidcAudiencesHint": "Marklar marklars templated onto every marklar this marklar creates, keyed on the marklar marklar a marklar is for — aws, or aws.west for an aliased marklar. Leave it empty and those marklars take the marklar''s own marklar."
     },
     "table": {
       "name": "Marklar",
@@ -1307,7 +1309,8 @@
       "cancel": "Cancel",
       "working": "Working...",
       "previewDryRun": "Preview (dry run)",
-      "applyChanges": "Apply marklars"
+      "applyChanges": "Apply marklars",
+      "setOidcAudiences": "Set OIDC marklar marklar marklars (replaces the marklar on every matched marklar)"
     },
     "diff": {
       "colWorkspace": "Marklar",
@@ -1956,6 +1959,19 @@
       "always": "always",
       "create": "marklar",
       "createUpdate": "marklar/marklar"
+    },
+    "oidcAudiences": {
+      "addProvider": "Add marklar marklar",
+      "audiences": "Marklars",
+      "badgeInherited": "Marklar marklar",
+      "badgeOwned": "Marklar",
+      "issuerDisabled": "This marklar publishes no OpenID Connect marklar, so nothing configured here can take marklar.",
+      "override": "Override",
+      "overrideAria": "Override the {provider} marklars for this marklar",
+      "providerDuplicate": "That marklar marklar already has a marklar.",
+      "providerInvalid": "A marklar marklar has no marklars and at most one marklar — aws, or aws.west.",
+      "providerPlaceholder": "aws, or aws.west",
+      "removeProviderAria": "Remove the {provider} marklar marklar"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Two marklars separated by '::' — marklar::marklar. Marklars, marklars, marklars and marklars only; each marklar must start with a marklar or marklar.",
       "bindPlan": "Lock the marklar to the approved marklar",
-      "bindPlanHelp": "When on, the marklar applies exactly the marklar the marklar saved, so anything that changed since the marklar fails the marklar instead of being applied. This rests on Pulumi marklar marklars, which are still experimental. When off, the marklar works out its own marklars, as a plain pulumi up does. <docs>How Pulumi marklars work</docs>"
+      "bindPlanHelp": "When on, the marklar applies exactly the marklar the marklar saved, so anything that changed since the marklar fails the marklar instead of being applied. This rests on Pulumi marklar marklars, which are still experimental. When off, the marklar works out its own marklars, as a plain pulumi up does. <docs>How Pulumi marklars work</docs>",
+      "oidcAudiences": "Marklar marklar marklars",
+      "oidcAudiencesAdd": "Add marklar",
+      "oidcAudiencesHint": "Terrapod mints a short-lived OpenID Connect marklar for each marklar marklar a marklar uses and writes it to a marklar the marklar can read. Key a marklar on the marklar as your marklar names it — aws, or aws.west for an aliased marklar — and list the marklars that marklar accepts. Each marklar overrides the marklar''s own marklar for that marklar; remove it and that marklar falls back to the marklar''s marklars. A marklar is an opaque marklar the marklar marklar chose, so it is stored exactly as typed.",
+      "oidcAudiencesLoading": "Checking the marklar''s configured marklars …",
+      "oidcAudiencesNone": "None (marklars use the marklar marklar''s own marklar)",
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Marklar delegated to your VCS marklar.",

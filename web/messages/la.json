@@ -1113,7 +1113,9 @@
       "noExpiry": "Nulla expiratio",
       "addDriftIgnoreRule": "Regulam addere",
       "debugModeHint": "Podes cursorum defectorum apertos tenere in locis operis quos haec regula creat. Praedefinite exstinctus — pod retentus credentias illius loci operis servat.",
-      "allowForkPrPlansHint": "Ad omnem locum operis quem haec regula creat pertinet. Praedefinite exstinctum: rogatio tractionis e furca nullum consilium speculativum accipit, quia codicem auctoris sui cum credentiis loci operis exsequeretur."
+      "allowForkPrPlansHint": "Ad omnem locum operis quem haec regula creat pertinet. Praedefinite exstinctum: rogatio tractionis e furca nullum consilium speculativum accipit, quia codicem auctoris sui cum credentiis loci operis exsequeretur.",
+      "oidcAudiences": "Auditores identitatis exsecutionis (a locis operis creatis hereditati)",
+      "oidcAudiencesHint": "Superscriptiones auditorum omni loco operis quem haec regula creat impositae, sub configuratione provider ad quam tessera pertinet — aws, vel aws.west pro configuratione cum alias. Vacuas relinque et illi loci operis configurationem propriam instructionis adhibent."
     },
     "table": {
       "name": "Nomen",
@@ -1307,7 +1309,8 @@
       "cancel": "Abrogare",
       "working": "Operatur...",
       "previewDryRun": "Praevidere (cursus siccus)",
-      "applyChanges": "Mutationes applicare"
+      "applyChanges": "Mutationes applicare",
+      "setOidcAudiences": "Auditores OIDC identitatis exsecutionis statuere (chartam in omni loco operis conveniente substituit)"
     },
     "diff": {
       "colWorkspace": "Locus Operis",
@@ -1956,6 +1959,19 @@
       "always": "semper",
       "create": "creare",
       "createUpdate": "creare/mutare"
+    },
+    "oidcAudiences": {
+      "addProvider": "Configurationem provider addere",
+      "audiences": "Auditores",
+      "badgeInherited": "Praedefinitum instructionis",
+      "badgeOwned": "Locus operis",
+      "issuerDisabled": "Haec instructio nullum emissorem OpenID Connect publicat, ideo nihil hic configuratum valere potest.",
+      "override": "Supervertere",
+      "overrideAria": "Auditores pro {provider} in hoc loco operis supervertere",
+      "providerDuplicate": "Illa configuratio provider iam inscriptionem habet.",
+      "providerInvalid": "Nomen provider spatia non habet et ad summum unum punctum — aws, vel aws.west.",
+      "providerPlaceholder": "aws, vel aws.west",
+      "removeProviderAria": "Configurationem provider {provider} removere"
     }
   },
   "planSummary": {
@@ -2551,7 +2567,13 @@
       "engineTerraform": "Terraform",
       "nameTitlePulumi": "Duae partes signo '::' divisae — project::stack. Tantum litterae, numeri, lineolae et lineolae subscriptae; utraque pars littera vel numero incipiat.",
       "bindPlan": "Renovationem ad praevisionem probatam alliga",
-      "bindPlanHelp": "Cum activatum est, renovatio ipsum consilium quod praevisio servavit adhibet, ita ut quidquid post praevisionem mutatum est renovationem deficere faciat potius quam adhibeatur. Hoc consiliis renovationis Pulumi nititur, quae adhuc experimentalia sunt. Cum inactivatum est, renovatio mutationes suas ipsa invenit, sicut simplex pulumi up facit. <docs>Quomodo cursus Pulumi operantur</docs>"
+      "bindPlanHelp": "Cum activatum est, renovatio ipsum consilium quod praevisio servavit adhibet, ita ut quidquid post praevisionem mutatum est renovationem deficere faciat potius quam adhibeatur. Hoc consiliis renovationis Pulumi nititur, quae adhuc experimentalia sunt. Cum inactivatum est, renovatio mutationes suas ipsa invenit, sicut simplex pulumi up facit. <docs>Quomodo cursus Pulumi operantur</docs>",
+      "oidcAudiences": "Auditores identitatis exsecutionis",
+      "oidcAudiencesAdd": "Auditorem addere",
+      "oidcAudiencesHint": "Terrapod pro omni configuratione provider quam exsecutio adhibet tesseram OpenID Connect brevis aevi emittit eamque in tabulam scribit quam exsecutio legere potest. Inscriptionem sub provider pone, sicut configuratio tua eum nominat — aws, vel aws.west pro configuratione cum alias — et auditores quos illud propositum accipit enumera. Omnis inscriptio configurationem propriam instructionis pro illo provider supervertit; eam remove, et ille provider ad auditores instructionis redit. Auditor chorda opaca est quam propositum foederationis elegit, ideo prorsus ut eam scribis servatur.",
+      "oidcAudiencesLoading": "Auditores in instructione configurati examinantur …",
+      "oidcAudiencesNone": "Nulli (exsecutiones propria identitate copiae actorum utuntur)",
+      "oidcAudiencesPlaceholder": "e.g. sts.amazonaws.com"
     },
     "vcsWorkflowWarning": {
       "title": "Auctoritas repositorio VCS tuo delegata.",
