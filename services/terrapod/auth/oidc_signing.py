@@ -345,9 +345,18 @@ def get_jwks() -> dict[str, list[dict[str, str]]]:
     if _jwks_cache is not None and _jwks_cache[0] == kids:
         return _jwks_cache[1]
 
-    jwks = {"keys": [public_jwk(load_private_key(k.private_key_pem), k.kid) for k in _keys]}
-    _jwks_cache = (kids, jwks)
-    return jwks
+    _jwks_cache = (
+        kids,
+        {"keys": [public_jwk(load_private_key(k.private_key_pem), k.kid) for k in _keys]},
+    )
+    # Returned from the cache rather than from a local, so the docstring's "the
+    # returned dict is the cached one" holds by construction rather than by
+    # coincidence -- and the store above is read in the same scope, which is what
+    # `py/unused-global-variable` was right to flag. CodeQL does not model
+    # cross-invocation module state, so to it a memoisation store that only a
+    # LATER call reads is a store nothing reads; the alert was a false positive
+    # about the behaviour and a fair comment on the shape.
+    return _jwks_cache[1]
 
 
 async def rotate_signing_key(db: AsyncSession) -> SigningKey:
