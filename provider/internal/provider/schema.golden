@@ -252,6 +252,14 @@ resource terrapod_gpg_key.namespace required=false optional=true computed=true s
 resource terrapod_gpg_key.source required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_gpg_key.source_url required=false optional=true computed=false sensitive=false type=basetypes.StringType
 resource terrapod_gpg_key.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_inventory_item.address required=false optional=true computed=false sensitive=false type=basetypes.StringType
+resource terrapod_inventory_item.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_inventory_item.groups required=false optional=true computed=false sensitive=false type=types.SetType[basetypes.StringType]
+resource terrapod_inventory_item.id required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_inventory_item.name required=true optional=false computed=false sensitive=false type=basetypes.StringType
+resource terrapod_inventory_item.updated_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
+resource terrapod_inventory_item.vars required=false optional=true computed=false sensitive=false type=types.MapType[basetypes.StringType]
+resource terrapod_inventory_item.workspace_id required=true optional=false computed=false sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.branch required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
 resource terrapod_module_autodiscovery_rule.enabled required=false optional=true computed=true sensitive=false type=basetypes.BoolType

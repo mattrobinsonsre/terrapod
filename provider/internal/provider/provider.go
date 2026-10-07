@@ -33,6 +33,7 @@ import (
 	executionHookRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/execution_hook"
 	executionHookWsRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/execution_hook_workspace"
 	gpgKeyRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/gpg_key"
+	inventoryItemRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/inventory_item"
 	moduleAutodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_autodiscovery_rule"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
@@ -190,6 +191,7 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		registryProviderRes.NewResource,
 		moduleWorkspaceLinkRes.NewResource,
 		gpgKeyRes.NewResource,
+		inventoryItemRes.NewResource,
 	}
 }
 
