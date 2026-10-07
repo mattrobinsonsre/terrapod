@@ -553,3 +553,110 @@ class TestItMintsAndFails:
         msg = self._expect_raise(tmp_path, handler, token_dir=parent / "oidc")
         assert "aws" in msg
         assert str(parent) in msg
+
+
+class TestAnEngineThatCannotDiscover:
+    """`discover_providers=False` — Pulumi (#2006).
+
+    A Pulumi program is arbitrary code whose provider instances are built at
+    runtime, so there is nothing to enumerate before `preview` and `preview` is
+    what needs the credentials. The runner therefore runs nothing, sends an
+    empty list, and the API — which reads the engine off the workspace row —
+    mints the workspace's whole resolved mapping.
+    """
+
+    def test_the_engine_is_never_invoked(self, tmp_path):
+        """The property that matters, and the one a `providers == []` assertion
+        would not catch: discovery must not run at all.
+
+        `discover_fn` is deliberately passed AND asserted unused, so this fails
+        if the switch is ever reduced to "discover, then discard the answer" —
+        which would send the same empty list while invoking an engine that, for
+        Pulumi, has no `graph` subcommand to invoke.
+        """
+        handler, sent = _api(mint=["aws"])
+        discover_fn, calls = _found({"aws"})
+        cloud_identity.run(
+            _cfg(),
+            binary="pulumi",
+            cwd=tmp_path,
+            discover_providers=False,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+            discover_fn=discover_fn,
+        )
+        assert calls == [], "the engine was asked to graph a program it cannot graph"
+        assert len(sent) == 1, "the API is still asked exactly once"
+
+    def test_it_sends_an_empty_list_and_a_clean_outcome(self, tmp_path):
+        """`ok`, not `failed` or `unparsed`.
+
+        Nothing went wrong — there was no graph to read, and those two outcomes
+        exist to describe one that could not be. It also matters across skew: an
+        API that does read the outcome would refuse the run for an absence that
+        is entirely normal for this engine.
+        """
+        handler, sent = _api(mint=["aws"])
+        cloud_identity.run(
+            _cfg(),
+            binary="pulumi",
+            cwd=tmp_path,
+            discover_providers=False,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+        )
+        assert sent[0]["providers"] == []
+        assert sent[0]["discovery"] == "ok"
+        assert "does not discover" in sent[0]["discovery-detail"]
+
+    def test_the_tokens_the_api_mints_are_still_delivered(self, tmp_path):
+        """The whole point: the runner asked for nothing and is given several.
+
+        Delivery is unchanged — one file per target, 0600, at the documented
+        path — because nothing about writing a token depends on how its target
+        was chosen.
+        """
+        handler, _ = _api(mint=["aws", "gcp", "vault.eu"])
+        env = cloud_identity.run(
+            _cfg(),
+            binary="pulumi",
+            cwd=tmp_path,
+            discover_providers=False,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+        )
+        for target in ("aws", "gcp", "vault.eu"):
+            path = tmp_path / "oidc" / target / "token"
+            assert path.read_text() == f"jwt-for-{target}"
+            assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        assert env[cloud_identity.TOKEN_DIR_ENV] == str(tmp_path / "oidc")
+
+    def test_a_workspace_that_mints_nothing_still_falls_through(self, tmp_path):
+        """204 is not an error here either — most workspaces hold no identity,
+        and such a run keeps the agent pool's own, exactly as before #1901."""
+        handler, sent = _api(mint=None)
+        env = cloud_identity.run(
+            _cfg(),
+            binary="pulumi",
+            cwd=tmp_path,
+            discover_providers=False,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+        )
+        assert env == {}
+        assert len(sent) == 1
+
+    def test_discovery_still_runs_by_default(self, tmp_path):
+        """The default is unchanged, so the Terraform path cannot be altered by
+        a caller that forgets the argument."""
+        handler, _ = _api(mint=None)
+        discover_fn, calls = _found({"aws"})
+        cloud_identity.run(
+            _cfg(),
+            binary="tofu",
+            cwd=tmp_path,
+            token_dir=tmp_path / "oidc",
+            client=_client(handler),
+            discover_fn=discover_fn,
+        )
+        assert len(calls) == 1

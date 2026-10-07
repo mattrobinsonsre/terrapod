@@ -81,7 +81,11 @@ class TestThePhaseRunner:
 
     def _run(self, monkeypatch, *, phase: str, bind: bool) -> dict:
         from terrapod.runner import exec_subprocess, job_entrypoint
-        from terrapod.runner.phases import platform_tool, uploads
+        from terrapod.runner.phases import cloud_identity, platform_tool, uploads
+
+        # Not about cloud identity: the Pulumi branch mints per-workspace tokens
+        # since #2006, and `{}` is what a workspace federating nothing returns.
+        monkeypatch.setattr(cloud_identity, "run", lambda *a, **k: {})
 
         seen: dict = {"uploads": 0, "fetches": 0}
         monkeypatch.setenv("TP_PULUMI_PHASE", phase)

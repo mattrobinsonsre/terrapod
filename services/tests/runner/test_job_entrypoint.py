@@ -518,6 +518,22 @@ class TestThePulumiPhase:
         "PULUMI_DEBUG_COMMANDS",
     )
 
+    @pytest.fixture(autouse=True)
+    def _no_federation(self, monkeypatch):
+        """This class is about the Pulumi branch, not about cloud identity.
+
+        The branch mints per-workspace tokens since #2006, so without this every
+        test here would attempt a real HTTP call to the fixture's API host. `{}`
+        is what a workspace that federates nothing returns, which is the posture
+        these tests mean to be in.
+
+        `TestThePulumiPhaseMintsCloudIdentity` below deliberately does NOT use
+        this fixture, so stubbing here cannot hide the call going missing.
+        """
+        from terrapod.runner.phases import cloud_identity
+
+        monkeypatch.setattr(cloud_identity, "run", lambda *a, **k: {})
+
     def _cfg(self, monkeypatch):
         _env(monkeypatch)
         monkeypatch.setenv("TP_ENGINE", "pulumi")
@@ -866,3 +882,145 @@ class TestPulumiRunsGetNoTerraformVariablesOnDisk:
         Pulumi run fetches its stack itself, in the shape its CLI imports."""
         guards = self._guards_of(self._body(), "download_state")
         assert guards and self._mentions_not_pulumi(guards)
+
+
+class TestThePulumiPhaseMintsCloudIdentity:
+    """The Pulumi branch fetches per-workspace cloud identity tokens (#2006).
+
+    Deliberately NOT using `TestThePulumiPhase`'s autouse stub: that fixture
+    exists so tests about the Pulumi branch do not make a network call, and a
+    stub which also hid the call disappearing would make every one of them pass
+    against a branch that had stopped minting.
+
+    Before this, a Pulumi run returned at step 7b — above the Terraform-only
+    cloud-identity step at 10b — so a federated Pulumi workspace silently ran as
+    the agent pool.
+    """
+
+    def _cfg(self, monkeypatch, *, phase="preview"):
+        _env(monkeypatch)
+        monkeypatch.setenv("TP_ENGINE", "pulumi")
+        monkeypatch.setenv("TP_PULUMI_PHASE", phase)
+        monkeypatch.setenv("TP_PULUMI_STACK", "default/proj/dev")
+        from terrapod.runner.runner_config import RunnerConfig
+
+        return RunnerConfig.from_env()
+
+    def _drive(self, monkeypatch, *, mint, phase="preview"):
+        """Run the branch with `cloud_identity.run` replaced by `mint`."""
+        from terrapod.runner.phases import cloud_identity
+
+        calls: list[dict] = []
+
+        def fake(cfg, **kwargs):
+            calls.append(kwargs)
+            return mint(kwargs) if callable(mint) else mint
+
+        monkeypatch.setattr(cloud_identity, "run", fake)
+        cfg = self._cfg(monkeypatch, phase=phase)
+        with (
+            patch(
+                "terrapod.runner.phases.platform_tool.ensure_tool",
+                return_value="/cache/pulumi",
+            ),
+            patch("terrapod.runner.phases.pulumi_exec.select_stack"),
+            patch("terrapod.runner.exec_subprocess.run") as run,
+        ):
+            run.return_value.exit_code = 0
+            rc = job_entrypoint._run_pulumi_phase(cfg, child_grace=5)
+        return rc, calls, run
+
+    def test_the_branch_asks_for_tokens(self, monkeypatch) -> None:
+        rc, calls, _ = self._drive(monkeypatch, mint={})
+        assert rc == 0
+        assert len(calls) == 1, "the Pulumi branch did not fetch cloud identity tokens"
+
+    def test_it_asks_without_discovery(self, monkeypatch) -> None:
+        """`discover_providers=False` is the whole difference from Terraform.
+
+        True would send the runner to `pulumi graph`, which does not exist — the
+        phase would report `failed` and the API would refuse the mint with a
+        409, failing every federated Pulumi run.
+        """
+        _, calls, _ = self._drive(monkeypatch, mint={})
+        assert calls[0]["discover_providers"] is False
+
+    def test_the_returned_env_reaches_the_engine(self, monkeypatch) -> None:
+        """Merged into `os.environ` before the CLI is invoked, or the provider
+        configuration reads a token directory nothing exported."""
+        monkeypatch.delenv("TERRAPOD_OIDC_TOKEN_DIR", raising=False)
+        rc, _, _ = self._drive(
+            monkeypatch, mint={"TERRAPOD_OIDC_TOKEN_DIR": "/var/run/terrapod/oidc"}
+        )
+        assert rc == 0
+        assert os.environ["TERRAPOD_OIDC_TOKEN_DIR"] == "/var/run/terrapod/oidc"
+
+    def test_it_runs_before_the_engine_is_invoked(self, monkeypatch) -> None:
+        """Ordering, not just presence: tokens delivered after `preview` started
+        would be delivered after the provider had already tried to authenticate.
+        """
+        from terrapod.runner.phases import cloud_identity
+
+        order: list[str] = []
+        monkeypatch.setattr(cloud_identity, "run", lambda *a, **k: order.append("mint") or {})
+        cfg = self._cfg(monkeypatch)
+        with (
+            patch(
+                "terrapod.runner.phases.platform_tool.ensure_tool",
+                return_value="/cache/pulumi",
+            ),
+            patch("terrapod.runner.phases.pulumi_exec.select_stack"),
+            patch("terrapod.runner.exec_subprocess.run") as run,
+        ):
+            run.side_effect = lambda *a, **k: (
+                order.append("engine"),
+                type("R", (), {"exit_code": 0})(),
+            )[1]
+            job_entrypoint._run_pulumi_phase(cfg, child_grace=5)
+        assert order == ["mint", "engine"]
+
+    def test_a_failure_to_mint_fails_the_run(self, monkeypatch) -> None:
+        """Fatal, not advisory (#1442).
+
+        Falling through would not mean "no cloud credentials", it would mean the
+        agent POOL's — broader than the ones this workspace was moved off — so a
+        run that continued would succeed against real infrastructure under
+        permissions nobody chose.
+        """
+        from terrapod.runner.phases import cloud_identity
+
+        def boom(_kwargs):
+            raise cloud_identity.CloudIdentityUnavailable("no tokens for you")
+
+        with pytest.raises(cloud_identity.CloudIdentityUnavailable):
+            self._drive(monkeypatch, mint=boom)
+
+    def test_the_engine_never_runs_when_the_mint_fails(self, monkeypatch) -> None:
+        """The consequence of the above, asserted separately: a run that could
+        not get its identity must not reach the CLI at all."""
+        from terrapod.runner.phases import cloud_identity
+
+        def fake(cfg, **kwargs):
+            raise cloud_identity.CloudIdentityUnavailable("no tokens for you")
+
+        monkeypatch.setattr(cloud_identity, "run", fake)
+        cfg = self._cfg(monkeypatch)
+        with (
+            patch(
+                "terrapod.runner.phases.platform_tool.ensure_tool",
+                return_value="/cache/pulumi",
+            ),
+            patch("terrapod.runner.phases.pulumi_exec.select_stack"),
+            patch("terrapod.runner.exec_subprocess.run") as run,
+            pytest.raises(cloud_identity.CloudIdentityUnavailable),
+        ):
+            job_entrypoint._run_pulumi_phase(cfg, child_grace=5)
+        run.assert_not_called()
+
+    def test_an_update_phase_mints_too(self, monkeypatch) -> None:
+        """Both phases, because preview and update are separate pods and each
+        mints its own — the apply phase is the one that carries `phase: apply`.
+        """
+        _, calls, _ = self._drive(monkeypatch, mint={}, phase="update")
+        assert len(calls) == 1
+        assert calls[0]["discover_providers"] is False

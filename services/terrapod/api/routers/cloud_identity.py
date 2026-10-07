@@ -73,7 +73,9 @@ class CloudIdentityMintRequest(BaseModel):
         description=(
             "The provider configurations this run's root module uses, as "
             "`type` or `type.alias`. Empty is meaningful: a configuration may "
-            "declare no provider."
+            "declare no provider. Ignored for an engine that cannot discover "
+            "them, whose runner sends nothing and is minted the workspace's "
+            "whole resolved mapping instead."
         ),
     )
     discovery: Literal["ok", "failed", "unparsed"] = Field(
@@ -139,6 +141,25 @@ async def mint_cloud_identity_tokens(
     is answered 204 **before** the outcome is examined, so a graph failure
     cannot fail a run that was never using this feature.
 
+    **An engine that cannot discover gets every identity the workspace
+    resolves** (#2006). Terraform's runner enumerates its provider
+    configurations with a static `graph` walk; Pulumi's cannot, because a Pulumi
+    program is arbitrary code whose provider instances are built at runtime and
+    the thing that would run it is what needs the credentials. So for a
+    non-discovering engine this mints the whole resolved mapping rather than an
+    intersection, and `discovers_provider_configurations` on the engine strategy
+    is what decides -- read here off the workspace row, because the runner image
+    does not ship `terrapod.engines` and a runner's claim about its own engine
+    would be the runner's rather than the platform's.
+
+    Two consequences, both deliberate. The discovery outcome is not examined for
+    such an engine, because its runner never ran a graph command and an outcome
+    describing one carries no information. And `MAX_TARGETS` stops being slack
+    and becomes the real bound: it is enforced with a 409 rather than
+    truncating, because a silently shortened token set looks complete and is
+    not -- the missing one surfaces inside the engine at the cloud's token
+    exchange, with an error naming neither the file nor the reason.
+
     **The phase comes from the presented token, never from the request.** A
     plan-phase runner asking for the apply identity is the whole thing this
     guards: put write permissions behind a trust condition on `phase: apply` and
@@ -169,6 +190,7 @@ async def mint_cloud_identity_tokens(
     from terrapod.api.routers.oidc_issuer import issuer_url
     from terrapod.auth.oidc_signing import sign_identity_token
     from terrapod.config import settings
+    from terrapod.engines import discovers_provider_configurations
     from terrapod.services import cloud_identity_resolver
 
     require_runner_for_run(user, run_id)
@@ -189,12 +211,27 @@ async def mint_cloud_identity_tokens(
         # run that is not using this feature. See the docstring.
         return Response(status_code=204)
 
-    if payload.discovery != "ok":
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    # Whether the runner could have discovered anything is a property of the
+    # ENGINE, read here off the workspace row rather than taken from the request
+    # (#2006). Two reasons it belongs on this side: the runner image does not
+    # ship `terrapod.engines` at all, and a claim about which engine a runner is
+    # would be the runner's own, where this is the platform's.
+    discovers = discovers_provider_configurations(ws.engine)
+
+    if discovers and payload.discovery != "ok":
         # 409, not 422: the request is well formed and the caller is entitled to
         # it. The runner could not determine which identities to present, and
         # this workspace has some, so there is no safe answer -- falling through
         # would hand the run the agent pool's broader identity under the name of
         # a workspace that was moved off it.
+        #
+        # Gated on `discovers` because for an engine that cannot discover there
+        # was nothing to go wrong: its runner never runs a graph command, so an
+        # outcome describing one carries no information about this run.
         raise HTTPException(
             status_code=409,
             detail=(
@@ -205,43 +242,97 @@ async def mint_cloud_identity_tokens(
             ),
         )
 
-    # Only the intersection, and "in the mapping" means the RESOLVER says so,
-    # never raw key membership: `vault.eu` is answered by a `vault` entry, which
-    # is what lets an operator alias a provider five times without naming every
-    # alias in the catalogue. A set intersection looks equivalent and silently
-    # mints nothing for every aliased configuration.
-    #
-    # A configured target the root module never uses is not an error -- the
-    # mapping is per workspace and a configuration need not use every provider
-    # in it -- and a used provider nothing maps to is the common case for most
-    # providers in most workspaces.
-    # A dict keyed on the target, so a provider the graph named twice resolves
-    # once. The order is taken from `sorted` below rather than from here.
+    # Which targets this run gets. For an engine that discovered its own
+    # provider configurations this is the intersection of what it uses with what
+    # the workspace holds; for one that cannot discover, it is everything the
+    # workspace holds.
     resolved: dict[str, list[str]] = {}
-    for t in payload.providers:
-        # Refuse before resolving, because a target is echoed back and the
-        # runner joins it into `<token dir>/<target>/token`. `max_length` above
-        # bounds the LIST, never an item, and the lookup splits on the FIRST
-        # dot -- so `aws./../vault` resolves through an ordinary `aws` entry and
-        # would land an AWS-audienced token at the path the operator's `vault`
-        # block reads. Anything holding this run's token can send it, including
-        # the workspace's own configuration.
-        unsafe = cloud_identity_resolver.unsafe_target_reason(t)
-        if unsafe:
+
+    if discovers:
+        # Only the intersection, and "in the mapping" means the RESOLVER says so,
+        # never raw key membership: `vault.eu` is answered by a `vault` entry,
+        # which is what lets an operator alias a provider five times without
+        # naming every alias in the catalogue. A set intersection looks
+        # equivalent and silently mints nothing for every aliased configuration.
+        #
+        # A configured target the root module never uses is not an error -- the
+        # mapping is per workspace and a configuration need not use every
+        # provider in it -- and a used provider nothing maps to is the common
+        # case for most providers in most workspaces.
+        # A dict keyed on the target, so a provider the graph named twice
+        # resolves once. The order is taken from `sorted` below rather than here.
+        for t in payload.providers:
+            # Refuse before resolving, because a target is echoed back and the
+            # runner joins it into `<token dir>/<target>/token`. `max_length`
+            # above bounds the LIST, never an item, and the lookup splits on the
+            # FIRST dot -- so `aws./../vault` resolves through an ordinary `aws`
+            # entry and would land an AWS-audienced token at the path the
+            # operator's `vault` block reads. Anything holding this run's token
+            # can send it, including the workspace's own configuration.
+            unsafe = cloud_identity_resolver.unsafe_target_reason(t)
+            if unsafe:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"provider configuration name {t!r} {unsafe}",
+                )
+            audiences = cloud_identity_resolver.audiences_for_target(snapshot, t)
+            if audiences is not None:
+                resolved[t] = audiences
+    else:
+        # Mint everything this workspace resolves (#2006). The engine cannot say
+        # which subset its program will use, so narrowing would mean guessing,
+        # and a guess that comes out short fails inside the engine at the cloud's
+        # token exchange -- after the program has started, with an error naming
+        # neither the file nor the reason.
+        #
+        # Every key is taken straight from the snapshot, so `audiences_for_target`
+        # answers all of them and the resolver's alias fallback never has to run.
+        #
+        # The cap stops being slack here and becomes the actual bound, so it is
+        # enforced rather than silently truncating: dropping the tail would
+        # deliver a token set that looks complete and is not.
+        if len(snapshot) > MAX_TARGETS:
             raise HTTPException(
-                status_code=400,
-                detail=f"provider configuration name {t!r} {unsafe}",
+                status_code=409,
+                detail=(
+                    f"This workspace resolves {len(snapshot)} cloud identity targets and "
+                    f"its engine cannot determine which of them this run uses, so all of "
+                    f"them would be minted -- more than the {MAX_TARGETS} this endpoint "
+                    f"issues for one run. Narrow the workspace's `oidc_audiences` to the "
+                    f"targets it needs."
+                ),
             )
-        audiences = cloud_identity_resolver.audiences_for_target(snapshot, t)
-        if audiences is not None:
-            resolved[t] = audiences
+        if payload.providers:
+            # Not an error, because a future runner may send a list this engine
+            # cannot have discovered. Worth a line: it means one side believes
+            # discovery happened.
+            logger.info(
+                "cloud identity: provider list ignored for a non-discovering engine",
+                run_id=run_id,
+                engine=ws.engine,
+                sent=len(payload.providers),
+            )
+        for t in sorted(snapshot):
+            unsafe = cloud_identity_resolver.unsafe_target_reason(t)
+            if unsafe:
+                # 422 rather than the 400 above: this names the operator's own
+                # stored configuration, not anything in the request. Reachable
+                # only for a key written before the write-side guard existed.
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"This workspace's cloud identity configuration contains the "
+                        f"target name {t!r}, which {unsafe}. Correct the workspace's "
+                        f"`oidc_audiences` before this run can mint its tokens."
+                    ),
+                )
+            audiences = cloud_identity_resolver.audiences_for_target(snapshot, t)
+            if audiences is not None:
+                resolved[t] = audiences
+
     wanted = sorted(resolved)
     if not wanted:
         return Response(status_code=204)
-
-    ws = await db.get(Workspace, run.workspace_id)
-    if ws is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
 
     live = cloud_identity_resolver.resolve_for_workspace(ws, settings=settings)
     changed = [t for t in wanted if cloud_identity_resolver.target_changed(snapshot, live, t)]

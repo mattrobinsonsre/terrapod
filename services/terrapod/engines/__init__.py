@@ -113,6 +113,32 @@ class EngineStrategy(Protocol):
     #: fallbacks fire, because nothing errored.
     honours_drift_ignore_rules: bool
 
+    #: Whether this engine can tell the platform which provider configurations a
+    #: run uses, before the run executes (#2006). Terraform can: `graph` is a
+    #: static walk of the configuration, so the cloud-identity phase enumerates
+    #: the provider configurations and prunes the ones nothing references.
+    #:
+    #: Pulumi cannot, and the reason is structural rather than a missing feature:
+    #: a Pulumi program is arbitrary code and provider instances are constructed
+    #: at runtime, so there is nothing to walk before the program runs -- and the
+    #: thing that would run it, `preview`, is precisely what needs the
+    #: credentials. `pulumi stack graph` reads an existing stack's STATE, not the
+    #: program, so it cannot answer on a first run and never enumerates aliased
+    #: instances the program builds.
+    #:
+    #: False therefore means "mint every identity this workspace resolves",
+    #: which is a widening and is deliberate: Terrapod keeps no central
+    #: restriction on which targets a workspace may mint for, and the cloud-side
+    #: trust policy is the gate. Discovery was always described as a filter
+    #: rather than the source of truth -- an engine that cannot discover simply
+    #: does not get the filter.
+    #:
+    #: **Read by the API, not the runner.** The runner image does not ship
+    #: `terrapod.engines` (see `Dockerfile.runner`), and the API has the better
+    #: answer anyway: it reads the engine off the workspace row rather than
+    #: trusting a runner's claim about which engine it is.
+    discovers_provider_configurations: bool
+
     def build_job_spec(self, **kwargs: Any) -> dict:
         """Build the Kubernetes Job spec for one phase of a run."""
         ...
@@ -236,6 +262,26 @@ def honours_drift_ignore_rules(engine: str | None) -> bool:
     """
     strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
     return False if strategy is None else strategy.honours_drift_ignore_rules
+
+
+def discovers_provider_configurations(engine: str | None) -> bool:
+    """Whether this engine can enumerate its run's provider configurations.
+
+    **An unknown engine answers True**, which is the conservative direction
+    here even though it is the noisier one. True sends the runner to the
+    engine's graph command; for an engine nobody has vouched for that command
+    does not exist, so discovery reports `failed` and the mint is refused with a
+    409 -- loud, and only for a workspace that actually holds identity, because
+    the endpoint answers 204 on an empty mapping before it looks at the outcome.
+
+    Answering False instead would hand an unvouched-for engine a token for every
+    identity the workspace resolves, on the strength of a registry entry nobody
+    has reviewed. Between a run that fails with a reason and a run that quietly
+    gets more credentials than anyone chose, #1442 settles it: the failure mode
+    of this credential is escalation, not absence.
+    """
+    strategy = _REGISTRY.get((engine or DEFAULT_ENGINE).strip().lower())
+    return True if strategy is None else strategy.discovers_provider_configurations
 
 
 def known_engines() -> tuple[str, ...]:

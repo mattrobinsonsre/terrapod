@@ -330,6 +330,7 @@ def run(
     *,
     binary: str,
     cwd: Path,
+    discover_providers: bool = True,
     token_dir: Path | None = None,
     client: httpx.Client | None = None,
     discover_fn=None,
@@ -340,13 +341,30 @@ def run(
     nothing. Raises `CloudIdentityUnavailable` when it mints and the tokens could
     not be obtained or written.
 
+    `discover_providers=False` for an engine that cannot enumerate its own provider
+    configurations -- Pulumi, whose program is arbitrary code building provider
+    instances at runtime (#2006). Nothing is run and an empty list is sent; the
+    API reads the engine off the workspace row and mints the workspace's whole
+    resolved mapping. It is NOT reported as a discovery failure, because nothing
+    failed: there was no graph to read, and `failed`/`unparsed` exist to describe
+    one that could not be. Making this the runner's claim rather than the API's
+    judgement would also put it on the wrong side -- the runner would be
+    asserting which engine it is.
+
     `discover_fn` is injectable so a test can drive the whole phase without an
     engine binary; production passes nothing and gets `discover`.
     """
     if not cfg.has_api:
         return {}
 
-    found = (discover_fn or discover)(binary=binary, cwd=cwd)
+    if discover_providers:
+        found = (discover_fn or discover)(binary=binary, cwd=cwd)
+    else:
+        # `ok` with nothing in it, because nothing went wrong and there is
+        # nothing to report. The API knows this engine cannot discover and does
+        # not read the outcome for it; sending `failed` would make a lagging API
+        # -- one that does read it -- refuse a run for an absence that is normal.
+        found = Discovery(outcome="ok", detail="engine does not discover provider configurations")
     # Sorted and capped before it leaves. The names come from the engine's
     # output, so the request is bounded on the way out as well as on the way in,
     # and a stable order makes the API's log line and ours comparable.
@@ -354,6 +372,7 @@ def run(
     logger.info(
         "cloud identity discovery",
         outcome=found.outcome,
+        discovered=discover_providers,
         used=asking,
         detail=found.detail or None,
     )

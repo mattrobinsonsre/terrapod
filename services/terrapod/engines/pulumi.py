@@ -131,6 +131,19 @@ class PulumiStrategy:
     #: fail-open is closed first.
     honours_drift_ignore_rules = False
 
+    #: A Pulumi program is arbitrary code and its provider instances are built at
+    #: runtime, so there is nothing to walk before the program runs — and the
+    #: thing that would run it, `preview`, is what needs the credentials (#2006).
+    #: `pulumi stack graph` is not the answer: it graphs the resources in an
+    #: existing stack's STATE, so it is empty on a first run and never names the
+    #: aliased provider instances a program constructs.
+    #:
+    #: So a Pulumi run mints every identity its workspace resolves. That is a
+    #: widening, and an accepted one: the cloud-side trust policy is the gate, as
+    #: it already is for Terraform, and discovery was always a filter rather than
+    #: the source of truth.
+    discovers_provider_configurations = False
+
     #: The AI policy gate, not yet, and for a sharper reason than the scan
     #: above (#1766). A preview DOES upload a plan artifact — but it is the
     #: digest, capped at `pulumi_preview.MAX_STEPS`, and `steps_truncated` says

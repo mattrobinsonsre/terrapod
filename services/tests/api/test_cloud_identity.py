@@ -68,7 +68,7 @@ def _enabled(**over):
     return cfg
 
 
-def _scenario(*, catalogue=None, override=None, snapshot=None, name="dns-prod"):
+def _scenario(*, catalogue=None, override=None, snapshot=None, name="dns-prod", engine="terraform"):
     """A workspace, its run and the deployment config, wired as production does.
 
     `snapshot` defaults to what the resolver produces from `catalogue` and
@@ -82,6 +82,11 @@ def _scenario(*, catalogue=None, override=None, snapshot=None, name="dns-prod"):
     ws.id = uuid.uuid4()
     ws.name = name
     ws.oidc_audiences = override
+    # Explicit, because the route reads it to decide whether the runner could
+    # have discovered anything (#2006). Left as a MagicMock attribute it would
+    # resolve to an unknown engine, so every test here would exercise the
+    # unknown-engine fallback rather than the Terraform path it means to.
+    ws.engine = engine
 
     run = MagicMock()
     run.id = uuid.uuid4()
@@ -904,3 +909,187 @@ class TestATargetCannotEscapeItsOwnDirectory:
             _user(run_id=str(run.id), phase="plan"), run, ws, target=target, cfg=cfg
         )
         assert resp.status_code == 200
+
+
+class TestAnEngineThatCannotDiscover:
+    """A non-discovering engine is minted the whole resolved mapping (#2006).
+
+    Terraform's runner enumerates its provider configurations with a static
+    `graph` walk and this route intersects that list with what the workspace
+    holds. Pulumi's cannot — a Pulumi program is arbitrary code whose provider
+    instances are built at runtime, and the thing that would run it is what
+    needs the credentials — so narrowing would mean guessing, and a guess that
+    comes out short fails inside the engine at the cloud's token exchange.
+
+    The engine is read off the workspace ROW, never from the request: the runner
+    image does not ship `terrapod.engines`, and a runner's claim about which
+    engine it is would be the runner's rather than the platform's.
+    """
+
+    async def test_everything_in_the_mapping_is_minted(self):
+        """The runner asked for nothing and gets all three."""
+        ws, run, cfg = _scenario(
+            catalogue={"vault": ["https://vault.example.com"]},
+            override={"aws": ["sts.example.com"], "gcp": ["//iam.example/p"]},
+            engine="pulumi",
+        )
+        resp, cap = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, providers=[], cfg=cfg
+        )
+        assert resp.status_code == 200
+        assert sorted(t["target"] for t in _tokens(resp)) == ["aws", "gcp", "vault"]
+        # Each carries only its own audiences — the one-token-per-target rule is
+        # not relaxed just because the set was not discovered.
+        by_target = {t["target"]: t["audiences"] for t in _tokens(resp)}
+        assert by_target["aws"] == ["sts.example.com"]
+        assert by_target["vault"] == ["https://vault.example.com"]
+        assert len(cap["all"]) == 3
+
+    async def test_a_terraform_workspace_still_intersects(self):
+        """The regression guard. An empty list from a DISCOVERING engine still
+        means "this configuration declares no provider" and answers 204 — the
+        meaning of the same request must not have changed for Terraform."""
+        ws, run, cfg = _scenario(
+            override={"aws": ["sts.example.com"], "gcp": ["//iam.example/p"]},
+            engine="terraform",
+        )
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, providers=[], cfg=cfg
+        )
+        assert resp.status_code == 204
+
+    async def test_only_the_discovered_subset_for_terraform(self):
+        ws, run, cfg = _scenario(
+            override={"aws": ["sts.example.com"], "gcp": ["//iam.example/p"]},
+            engine="terraform",
+        )
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, providers=["aws"], cfg=cfg
+        )
+        assert [t["target"] for t in _tokens(resp)] == ["aws"]
+
+    async def test_a_bad_discovery_outcome_is_not_held_against_it(self):
+        """`failed`/`unparsed` describe reading a graph, and this engine never
+        read one — so refusing on the outcome would refuse every Pulumi run.
+
+        The runner sends `ok`; this pins that the route does not depend on it,
+        so a lagging or future runner reporting something else still works.
+        """
+        ws, run, cfg = _scenario(override={"aws": ["sts.example.com"]}, engine="pulumi")
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"),
+            run,
+            ws,
+            providers=[],
+            discovery="failed",
+            detail="pulumi has no graph subcommand",
+            cfg=cfg,
+        )
+        assert resp.status_code == 200
+        assert [t["target"] for t in _tokens(resp)] == ["aws"]
+
+    async def test_a_discovering_engine_is_still_refused_on_a_bad_outcome(self):
+        """The other side of the gate, so narrowing it to `discovers` did not
+        quietly disable the refusal it was introduced for."""
+        ws, run, cfg = _scenario(override={"aws": ["sts.example.com"]}, engine="terraform")
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as err:
+            await _call(
+                _user(run_id=str(run.id), phase="plan"),
+                run,
+                ws,
+                providers=[],
+                discovery="unparsed",
+                cfg=cfg,
+            )
+        assert err.value.status_code == 409
+
+    async def test_a_workspace_holding_nothing_is_unaffected(self):
+        """204 before anything else, as for every engine: a workspace that
+        configured none of this cannot be failed by it."""
+        ws, run, cfg = _scenario(engine="pulumi")
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, providers=[], cfg=cfg
+        )
+        assert resp.status_code == 204
+
+    async def test_over_the_cap_is_refused_rather_than_truncated(self):
+        """The cap stops being slack and becomes the real bound.
+
+        Truncating would deliver a token set that looks complete and is not —
+        the missing one surfaces inside the engine at the cloud's token
+        exchange, naming neither the file nor the reason.
+        """
+        many = {f"t{i}": [f"aud-{i}"] for i in range(router.MAX_TARGETS + 1)}
+        ws, run, cfg = _scenario(override=many, engine="pulumi")
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as err:
+            await _call(_user(run_id=str(run.id), phase="plan"), run, ws, providers=[], cfg=cfg)
+        assert err.value.status_code == 409
+        assert str(router.MAX_TARGETS) in err.value.detail
+        assert "oidc_audiences" in err.value.detail
+
+    async def test_exactly_the_cap_is_served(self):
+        """The boundary, so the refusal is off-by-one in the safe direction."""
+        many = {f"t{i}": [f"aud-{i}"] for i in range(router.MAX_TARGETS)}
+        ws, run, cfg = _scenario(override=many, engine="pulumi")
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, providers=[], cfg=cfg
+        )
+        assert resp.status_code == 200
+        assert len(_tokens(resp)) == router.MAX_TARGETS
+
+    async def test_a_provider_list_is_ignored_not_honoured(self):
+        """A future runner sending a list it cannot have discovered must not
+        narrow the mint — otherwise a runner bug silently withholds an identity
+        the program needs."""
+        ws, run, cfg = _scenario(
+            override={"aws": ["sts.example.com"], "gcp": ["//iam.example/p"]}, engine="pulumi"
+        )
+        resp, _ = await _call(
+            _user(run_id=str(run.id), phase="plan"), run, ws, providers=["aws"], cfg=cfg
+        )
+        assert sorted(t["target"] for t in _tokens(resp)) == ["aws", "gcp"]
+
+    async def test_a_stored_target_that_could_escape_its_directory_is_refused(self):
+        """Defence in depth on the operator's own stored data.
+
+        The write side validates these, so this is reachable only for a key
+        written before that guard existed — but the target is echoed back and
+        the runner joins it into a path, so it is checked here too, and as a 422
+        about their configuration rather than a 400 about the request.
+        """
+        ws, run, cfg = _scenario(override={"../../etc/passwd": ["x"]}, engine="pulumi")
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as err:
+            await _call(_user(run_id=str(run.id), phase="plan"), run, ws, providers=[], cfg=cfg)
+        assert err.value.status_code == 422
+        assert "oidc_audiences" in err.value.detail
+
+    async def test_a_configuration_that_moved_still_refuses(self):
+        """The staleness check is unchanged, and for Pulumi it covers the whole
+        mapping — correctly, because every entry is one this run would present."""
+        ws, run, cfg = _scenario(
+            override={"aws": ["sts.example.com"]},
+            snapshot={"aws": ["sts.old.example.com"]},
+            engine="pulumi",
+        )
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as err:
+            await _call(_user(run_id=str(run.id), phase="plan"), run, ws, providers=[], cfg=cfg)
+        assert err.value.status_code == 409
+        assert "'aws'" in err.value.detail
+
+    async def test_the_phase_still_comes_from_the_token(self):
+        """Not weakened by the engine branch: a plan-phase runner cannot obtain
+        the apply identity however its targets were chosen."""
+        ws, run, cfg = _scenario(override={"aws": ["sts.example.com"]}, engine="pulumi")
+        _, cap = await _call(
+            _user(run_id=str(run.id), phase="apply"), run, ws, providers=[], cfg=cfg
+        )
+        assert cap["claims"]["phase"] == "apply"
+        assert cap["claims"]["sub"].endswith(":phase:apply")

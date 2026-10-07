@@ -1038,6 +1038,27 @@ def _run_pulumi_phase_inner(  # type: ignore[no-untyped-def]
         log.error("could not set the workspace's Pulumi config", error=str(exc))
         return 1
 
+    # Per-workspace cloud identity (#2006), in the same relative slot a Terraform
+    # run uses: after the engine can understand the program (deps, stack, config)
+    # and BEFORE the hooks, so a pre_plan or pre_apply hook that talks to a cloud
+    # sees the tokens exactly as it does on a Terraform run.
+    #
+    # `discover_providers=False`: a Pulumi program is arbitrary code whose
+    # provider instances are built at runtime, so there is nothing to enumerate
+    # before `preview` -- and `preview` is what needs the credentials. The API
+    # reads the engine off the workspace row and mints the workspace's whole
+    # resolved mapping.
+    #
+    # Fatal when it raises, like the Terraform path: falling through would not
+    # mean "no cloud credentials", it would mean the agent POOL's, which are
+    # broader than the ones this workspace was deliberately moved off (#1442).
+    # Propagates, exactly as on the Terraform path: `main` names this failure
+    # rather than letting it read as a crash.
+    for _k, _v in cloud_identity.run(
+        cfg, binary=binary, cwd=Path.cwd(), discover_providers=False
+    ).items():
+        os.environ[_k] = _v
+
     # The same execution hooks a Terraform run gets, at the same points (#1559).
     # A workspace's hooks are a property of the workspace, not of the engine it
     # happens to use: before this, a Pulumi run silently ran none of them.
@@ -1300,6 +1321,14 @@ def main(argv: list[str] | None = None) -> int:
             # A known failure that explains itself (#1600): log it as one, not
             # as a crash whose traceback buries the cause.
             log.error("configuration archive unusable", err=str(exc))
+            exit_code = 1
+        except cloud_identity.CloudIdentityUnavailable as exc:
+            # Same reason as above. This one carries the operator's whole
+            # explanation in its message -- which identity could not be had and
+            # why continuing would have run under the agent pool's broader one --
+            # and `log.exception` would bury it under a traceback of our own call
+            # stack, which tells the operator nothing they can act on.
+            log.error("cloud identity unavailable", err=str(exc))
             exit_code = 1
         except SystemExit as exc:
             exit_code = int(exc.code) if isinstance(exc.code, int) else 1
