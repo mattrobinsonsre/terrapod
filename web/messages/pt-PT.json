@@ -2495,6 +2495,7 @@
       "architecture": "Arquitetura",
       "insights": "Perspetivas",
       "automation": "Automação",
+      "inventory": "Inventário",
       "access": "Acesso"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "Este workspace não aciona execuções em nenhum outro workspace.",
       "destinationNote": "(destino; remova a partir daí)",
       "removeConfirm": "Remover este run trigger?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Inventário",
+        "body": "Estes são os hosts que esta área de trabalho declara e para o que se resolvem. Executar um playbook sobre eles ainda não está disponível: esta versão torna o inventário observável, nada é executado a partir daqui."
+      },
+      "selectLabel": "Inventário",
+      "refreshConfirm": "Atualizar o inventário agora? Isto substitui o snapshot que todos veem.",
+      "resolved": {
+        "heading": "Hosts e grupos resolvidos",
+        "subheading": "O resultado combinado de {name}, a partir de cada origem por ordem.",
+        "hosts": "Hosts",
+        "groups": "Grupos",
+        "refresh": "Atualizar",
+        "refreshing": "A atualizar…",
+        "takenAt": "Snapshot obtido {when}",
+        "never": "nunca",
+        "producedBy": {
+          "api": "resolvido pela API",
+          "runner": "resolvido por um runner"
+        },
+        "producedByOther": "resolvido por {by}",
+        "snapshotNote": "Este é o último snapshot, não uma resolução em tempo real. Atualize para obter um novo."
+      },
+      "limit": {
+        "heading": "O que é que um limite selecionaria?",
+        "body": "Expanda um padrão ansible --limit sobre o snapshot acima, para ver que hosts seleciona antes de algo ser executado.",
+        "inputLabel": "Padrão de limite",
+        "placeholder": "web:!web-2",
+        "preview": "Pré-visualizar",
+        "previewing": "A pré-visualizar…",
+        "matched": "{count, plural, =0 {Nenhum host selecionado} one {# host selecionado} other {# hosts selecionados}} de {total}.",
+        "advisory": "Apenas informativo. A expansão autoritativa é feita pelo ansible no runner, pelo que deve tratar isto como uma orientação e não como uma garantia.",
+        "asFreshAs": "Tão recente como o snapshot sobre o qual foi calculada: {when}."
+      },
+      "items": {
+        "heading": "Hosts declarados",
+        "managedNote": "São declarados pelo próprio Terraform desta área de trabalho, pelo que aqui são apenas de leitura. Adicione, altere ou remova um host na sua configuração e aplique-a: uma edição feita fora do Terraform é revertida na aplicação seguinte.",
+        "empty": "Ainda não há hosts declarados.",
+        "name": "Host",
+        "address": "Endereço",
+        "groups": "Grupos",
+        "vars": "Variáveis",
+        "noGroups": "nenhum"
+      },
+      "sources": {
+        "heading": "Origens",
+        "body": "Resolvidas por ordem, exatamente como as flags -i repetidas: uma origem posterior prevalece sobre uma variável de host em conflito.",
+        "position": "Posição {position}",
+        "apiResolvable": "A API consegue resolver",
+        "runnerOnly": "Necessita de um runner",
+        "needsRunner": "O snapshot só pode ser atualizado por um runner enquanto estas origens estiverem presentes: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Falha ao carregar os hosts declarados",
+        "loadResolved": "Falha ao carregar o inventário resolvido",
+        "refresh": "Falha ao atualizar o inventário",
+        "preview": "Falha ao pré-visualizar o limite"
+      }
     },
     "sharing": {
       "title": "Partilha de Estado Remoto",

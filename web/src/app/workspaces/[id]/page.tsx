@@ -22,6 +22,7 @@ import { CostPanel } from '@/components/cost-panel'
 import { ResourceAccessPanel } from '@/components/resource-access-panel'
 import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
 import { StackOutputsPanel } from '@/components/stack-outputs-panel'
+import { InventoryPanel, type Inventory } from '@/components/inventory-panel'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
@@ -290,9 +291,9 @@ const ALL_TRIGGERS = [
 const ALL_STAGES = ['pre_plan', 'post_plan', 'pre_apply'] as const
 const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
-type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'architecture' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing' | 'access'
+type Tab = 'configuration' | 'variables' | 'runs' | 'state' | 'state-graph' | 'cost' | 'architecture' | 'versions' | 'notifications' | 'run-tasks' | 'run-triggers' | 'inventory' | 'sharing' | 'access'
 
-const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'sharing', 'access'])
+const VALID_TABS: Set<string> = new Set(['configuration', 'variables', 'runs', 'state', 'state-graph', 'cost', 'architecture', 'versions', 'notifications', 'run-tasks', 'run-triggers', 'inventory', 'sharing', 'access'])
 
 // Views that read TERRAFORM state specifically, so they have nothing to show on
 // a Pulumi workspace and 404 if asked (#1568). Their tabs are absent there
@@ -374,7 +375,43 @@ function WorkspaceDetailContent() {
         : status
   // Resolved once here so the loaders, the SSE handler, the tab strip and the
   // render sites all agree on which tab is showing.
-  const activeTab: Tab = isPulumi && TERRAFORM_ONLY_TABS.has(requestedTab) ? 'configuration' : requestedTab
+  // The Inventory tab is DATA-gated, not configuration-gated (#1967, #1968).
+  // An inventory is created lazily on the first declared host, so a workspace
+  // that has never declared one holds no rows and the tab is simply absent —
+  // there is nothing for a terraform/tofu-only deployment to turn off, which
+  // is the mechanism rather than a flag (#1986). The same request serves the
+  // panel's own needs, so the gate costs one fetch, not two.
+  //
+  // On any failure the list stays empty and the tab stays hidden: a 403 from a
+  // role without `inventory:read` and a transport blip both mean "do not offer
+  // a surface this reader cannot use", which is the safe direction either way.
+  const [inventories, setInventories] = useState<Inventory[]>([])
+  useEffect(() => {
+    if (!workspaceId) return
+    let cancelled = false
+    fetchAllPages<Inventory>(`/api/v1/workspaces/${workspaceId}/inventories`)
+      .then((list) => {
+        if (!cancelled) setInventories(list)
+      })
+      .catch(() => {
+        /* no inventory surface for this reader — leave the tab hidden */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceId])
+
+  // A stale `?tab=inventory` on a workspace with no inventory falls back the
+  // same way a Terraform-only tab does on Pulumi: Configuration renders a page
+  // instead of a blank pane. `inventories` is empty on the first frame too, but
+  // the page shows a spinner until the workspace resolves, so the fallback only
+  // bites once the probe has had its chance.
+  const hasInventory = inventories.length > 0
+  const activeTab: Tab =
+    (isPulumi && TERRAFORM_ONLY_TABS.has(requestedTab)) ||
+    (requestedTab === 'inventory' && !hasInventory)
+      ? 'configuration'
+      : requestedTab
 
   // Overview editing
   const [editing, setEditing] = useState(false)
@@ -2037,6 +2074,9 @@ function WorkspaceDetailContent() {
     : archEnabled
       ? ['cost', 'architecture']
       : ['cost']
+  // Empty until this workspace actually has an inventory, which is what hides
+  // the tab from every workspace that does not (#1986).
+  const inventoryMembers: Tab[] = inventories.length > 0 ? ['inventory'] : []
   const tabGroups: { key: Tab; label: string; members: Tab[] }[] = ([
     { key: 'configuration', label: t('tabs.configuration'), members: ['configuration'] },
     { key: 'variables', label: t('tabs.variables'), members: ['variables'] },
@@ -2046,6 +2086,10 @@ function WorkspaceDetailContent() {
     { key: 'versions', label: t('tabs.versions'), members: ['versions'] },
     { key: 'notifications', label: t('tabs.notifications'), members: ['notifications'] },
     { key: 'run-tasks', label: t('tabs.automation'), members: ['run-tasks', 'run-triggers'] },
+    // Data-gated: `inventories` is empty until a host has been declared, and a
+    // group with no members is dropped from the strip entirely — the same
+    // mechanism Insights uses on a Pulumi workspace (#1967, #1968).
+    { key: 'inventory', label: t('tabs.inventory'), members: inventoryMembers },
     { key: 'sharing', label: t('tabs.sharing'), members: ['sharing'] },
     { key: 'access', label: t('tabs.access'), members: ['access'] },
   ] as { key: Tab; label: string; members: Tab[] }[]).filter((g) => g.members.length > 0)
@@ -5128,6 +5172,23 @@ function WorkspaceDetailContent() {
               )}
             </div>
           </div>
+        )}
+
+        {/* Inventory Tab — declared hosts, what they resolve to, and when that
+            was taken (#1967, #1968). Rendered only when the workspace actually
+            has an inventory; `inventories` is the same list the tab gate reads.
+
+            `canWrite` rides on `can-update-variable` because `inventory:write`
+            sits in the SAME `write` level preset as `var:write` — so the two
+            flags are granted and withheld together. The workspace permissions
+            block carries no inventory flag of its own yet; when it gains one,
+            read that instead of this proxy. */}
+        {activeTab === 'inventory' && (
+          <InventoryPanel
+            workspaceId={workspaceId}
+            inventories={inventories}
+            canWrite={!!perms['can-update-variable']}
+          />
         )}
 
         {/* Sharing Tab — cross-workspace remote-state allowlist (#344, #349) */}

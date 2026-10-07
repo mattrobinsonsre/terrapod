@@ -2,7 +2,7 @@ import { test, expect, type Page, type Route, type Dialog } from '@playwright/te
 // Lives in helpers/, not here: Playwright forbids a spec importing a spec, and
 // any suite adding a surface should be able to reuse the mobile guard.
 import { expectNoHorizontalPageScroll } from '../helpers/responsive';
-import { getStoredToken, createWorkspace, lockWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, lockWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, seedInventoryItem, uniqueName } from '../helpers/api';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 
@@ -1708,6 +1708,60 @@ test.describe('Per-workspace run identity (#1901)', () => {
     await add.click()
     await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
     await expect(page.getByText('vault.eu', { exact: true })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('the Inventory tab holds up at phone width (#1967, #1968)', async ({ page }) => {
+    // Four of this tab's surfaces are the usual phone-width hazards, and all
+    // four are here on purpose: a four-column table of declared hosts, a run of
+    // host-variable text with no spaces to wrap on, a text input beside its
+    // button, and a list of matched host pills. The table reflows to cards
+    // below `md` rather than scrolling inside itself, and the primary signal —
+    // the host name, its address and its groups — stays on screen rather than
+    // being hidden along with the columns.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespinv'))
+    await seedInventoryItem(token, wsId, 'web-1', {
+      address: '10.0.0.11',
+      groups: ['web', 'frontend'],
+      // Long enough to push a narrow container sideways if nothing wraps it.
+      vars: { ansible_user: 'deploy', ansible_python_interpreter: '/usr/bin/python3' },
+    })
+    await seedInventoryItem(token, wsId, 'web-2', { address: '10.0.0.12', groups: ['web'] })
+
+    await page.goto(`/workspaces/${wsId}?tab=inventory`)
+    await expect(page.getByRole('heading', { name: 'Declared hosts' })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // The primary signal survives the reflow. A card list that dropped the
+    // address or the groups would still pass the overflow check on its own.
+    await expect(page.getByText('web-1').first()).toBeVisible()
+    await expect(page.getByText('10.0.0.11').first()).toBeVisible()
+
+    // The limit preview is the control this tab exists to offer, so it has to
+    // be usable on a phone: typable input, tappable button, readable result.
+    const input = page.getByLabel('Limit pattern')
+    await expect(input).toBeVisible()
+    await input.fill('web:!web-2')
+    await expect(input).toHaveValue('web:!web-2')
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
+    await expect(page.getByText(/1 host of 2 selected/i)).toBeVisible()
+    await expect(page.getByText(/Advisory only/i)).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // Refresh replaces what every reader of this inventory sees, so on a touch
+    // pointer it must ask first — the phone device descriptor reports a coarse
+    // pointer, which is what `useIsTouch()` keys on. Dismissing the dialog
+    // leaves the snapshot alone.
+    let refreshMsg = ''
+    page.once('dialog', async (d: Dialog) => {
+      refreshMsg = d.message()
+      await d.dismiss()
+    })
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+    // Assert the MESSAGE, not just that some dialog opened: a stray confirm
+    // from anywhere else on the page would satisfy a boolean.
+    await expect.poll(() => refreshMsg, { timeout: 5_000 }).toContain('replaces the snapshot')
     await expectNoHorizontalPageScroll(page)
   })
 })

@@ -2495,6 +2495,7 @@
       "architecture": "Pensaernïaeth",
       "insights": "Mewnwelediadau",
       "automation": "Awtomeiddio",
+      "inventory": "Rhestr Eiddo",
       "access": "Mynediad"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "Nid yw'r weithfan hon yn sbarduno rhediadau ar unrhyw weithfan arall.",
       "destinationNote": "(cyrchfan; tynnwch oddi yno)",
       "removeConfirm": "Tynnu'r sbardun rhediad hwn?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Rhestr Eiddo",
+        "body": "Dyma''r gwesteiwyr y mae''r gweithfan hon yn eu datgan, a''r hyn y maent yn datrys iddo. Nid yw rhedeg playbook yn eu herbyn ar gael eto — mae''r rhyddhad hwn yn gwneud y rhestr eiddo yn arsylladwy, nid oes dim yn cael ei weithredu o''r fan hon."
+      },
+      "selectLabel": "Rhestr Eiddo",
+      "refreshConfirm": "Adnewyddu''r rhestr eiddo nawr? Mae hyn yn disodli''r ciplun y mae pawb yn ei weld.",
+      "resolved": {
+        "heading": "Gwesteiwyr a grwpiau wedi''u datrys",
+        "subheading": "Y canlyniad cyfunol ar gyfer {name}, o bob ffynhonnell yn eu trefn.",
+        "hosts": "Gwesteiwyr",
+        "groups": "Grwpiau",
+        "refresh": "Adnewyddu",
+        "refreshing": "Yn adnewyddu…",
+        "takenAt": "Cymerwyd y ciplun {when}",
+        "never": "byth",
+        "producedBy": {
+          "api": "wedi''i ddatrys gan yr API",
+          "runner": "wedi''i ddatrys gan redwr"
+        },
+        "producedByOther": "wedi''i ddatrys gan {by}",
+        "snapshotNote": "Dyma''r ciplun diwethaf, nid datrysiad byw. Adnewyddwch i gymryd un newydd."
+      },
+      "limit": {
+        "heading": "Beth fyddai --limit yn ei dargedu?",
+        "body": "Ehangwch batrwm ansible --limit yn erbyn y ciplun uchod, fel y gallwch weld pa westeiwyr y mae''n eu dewis cyn i ddim redeg.",
+        "inputLabel": "Patrwm --limit",
+        "placeholder": "web:!web-2",
+        "preview": "Rhagolwg",
+        "previewing": "Yn rhagolygu…",
+        "matched": "{count, plural, =0 {Ni ddewiswyd unrhyw westeiwr} one {Dewiswyd # gwesteiwr} two {Dewiswyd # westeiwr} few {Dewiswyd # gwesteiwr} many {Dewiswyd # gwesteiwr} other {Dewiswyd # gwesteiwr}} o {total}.",
+        "advisory": "Cynghorol yn unig. Mae''r ehangiad awdurdodol yn cael ei wneud gan ansible yn y rhedwr, felly triniwch hyn fel canllaw yn hytrach na gwarant.",
+        "asFreshAs": "Mor ddiweddar â''r ciplun y cafodd ei gymryd yn ei erbyn: {when}."
+      },
+      "items": {
+        "heading": "Gwesteiwyr a ddatganwyd",
+        "managedNote": "Wedi''u datgan gan Terraform y gweithfan hon ei hun, felly maent yn ddarllen yn unig yma. Ychwanegwch, newidiwch neu dynnwch westeiwr yn eich ffurfweddiad a''i weithredu — caiff golygiad a wneir y tu allan i Terraform ei wrthdroi ar y gweithrediad nesaf.",
+        "empty": "Ni ddatganwyd unrhyw westeiwyr eto.",
+        "name": "Gwesteiwr",
+        "address": "Cyfeiriad",
+        "groups": "Grwpiau",
+        "vars": "Newidynnau",
+        "noGroups": "dim"
+      },
+      "sources": {
+        "heading": "Ffynonellau",
+        "body": "Yn cael eu datrys yn eu trefn, yn union fel baneri -i a ailadroddir: mae ffynhonnell ddiweddarach yn trechu newidyn gwesteiwr sy''n gwrthdaro.",
+        "position": "Safle {position}",
+        "apiResolvable": "Gall yr API ddatrys",
+        "runnerOnly": "Angen rhedwr",
+        "needsRunner": "Dim ond rhedwr all adnewyddu''r ciplun tra bod y ffynonellau hyn yn bresennol: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Methwyd llwytho''r gwesteiwyr a ddatganwyd",
+        "loadResolved": "Methwyd llwytho''r rhestr eiddo a ddatryswyd",
+        "refresh": "Methwyd adnewyddu''r rhestr eiddo",
+        "preview": "Methwyd rhagolygu''r --limit"
+      }
     },
     "sharing": {
       "title": "Rhannu Cyflwr Pell",

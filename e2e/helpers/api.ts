@@ -612,6 +612,44 @@ export async function seedStateVersionWithContent(
 }
 
 /**
+ * Declare an inventory host on a workspace (#1968). Returns the item id.
+ *
+ * Declaring the FIRST host is also what brings the workspace's `default`
+ * inventory into existence — the API creates it lazily — so this is the one
+ * call that flips the Inventory tab's data gate from absent to present. A spec
+ * asserting the tab is HIDDEN must therefore not call it.
+ */
+export async function seedInventoryItem(
+  token: string,
+  workspaceId: string,
+  name: string,
+  attrs: { address?: string; groups?: string[]; vars?: Record<string, unknown> } = {},
+): Promise<string> {
+  const res = await fetch(`${API_URL}/api/v1/workspaces/${workspaceId}/inventory-items`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      data: {
+        type: 'inventory-items',
+        attributes: {
+          name,
+          address: attrs.address ?? '',
+          groups: attrs.groups ?? [],
+          vars: attrs.vars ?? {},
+        },
+      },
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Declare inventory item failed: ${res.status} ${await res.text()}`);
+  }
+  return (await res.json()).data.id as string;
+}
+
+/**
  * Wait for the stack to be healthy by polling the API ping endpoint.
  */
 export async function waitForStack(timeoutMs = 120_000): Promise<void> {

@@ -2495,6 +2495,7 @@
       "architecture": "Architecture",
       "insights": "Insights",
       "automation": "Automation",
+      "inventory": "Ship''s Manifest",
       "access": "Boarding"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "This work-deck does not trigger voyages on any other work-deck.",
       "destinationNote": "(destination; remove from there)",
       "removeConfirm": "Remove this voyage trigger?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Ship''s Manifest",
+        "body": "These be th'' hands this work-deck signs on, an'' what they muster to. Settin'' a playbook upon ''em be not ready yet — this release lets ye LOOK at th'' manifest, naught be run from here."
+      },
+      "selectLabel": "Manifest",
+      "refreshConfirm": "Muster th'' manifest anew? This casts out th'' log every soul aboard be lookin'' at.",
+      "resolved": {
+        "heading": "Mustered hands an'' crews",
+        "subheading": "Th'' mingled tally fer {name}, from every wellspring in turn.",
+        "hosts": "Hands",
+        "groups": "Crews",
+        "refresh": "Muster Again",
+        "refreshing": "Musterin''…",
+        "takenAt": "Log taken {when}",
+        "never": "ne''er",
+        "producedBy": {
+          "api": "mustered by th'' API",
+          "runner": "mustered by a runner"
+        },
+        "producedByOther": "mustered by {by}",
+        "snapshotNote": "This be th'' last log, not a livin'' muster. Muster again t'' take a fresh one."
+      },
+      "limit": {
+        "heading": "What would a limit lay hold of?",
+        "body": "Unfurl an ansible --limit pattern against th'' log above, so ye may see which hands it picks afore aught sets sail.",
+        "inputLabel": "Limit pattern",
+        "placeholder": "web:!web-2",
+        "preview": "Spyglass",
+        "previewing": "Peerin''…",
+        "matched": "{count, plural, =0 {Naught a hand} one {# hand} other {# hands}} o'' {total} picked.",
+        "advisory": "A guess only. Th'' true reckonin'' be taken by ansible in th'' runner, so treat this as a chart an'' not a warrant.",
+        "asFreshAs": "No fresher than th'' log it were taken against: {when}."
+      },
+      "items": {
+        "heading": "Signed-on hands",
+        "managedNote": "Signed on by this work-deck’s own Terraform, so ye cannot change ''em here. Add, alter or put ashore a hand in yer configuration an'' apply it — aught ye edit outside Terraform be undone on th'' next apply.",
+        "empty": "No hands signed on yet.",
+        "name": "Hand",
+        "address": "Berth",
+        "groups": "Crews",
+        "vars": "Riggin''",
+        "noGroups": "nary a one"
+      },
+      "sources": {
+        "heading": "Wellsprings",
+        "body": "Mustered in turn, just as repeated -i flags be: a later wellspring wins a quarrelin'' hand’s riggin''.",
+        "position": "Berth {position}",
+        "apiResolvable": "API can muster",
+        "runnerOnly": "Needs a runner",
+        "needsRunner": "Th'' log can only be mustered anew by a runner while these wellsprings be aboard: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Failed t'' load th'' signed-on hands",
+        "loadResolved": "Failed t'' load th'' mustered manifest",
+        "refresh": "Failed t'' muster th'' manifest anew",
+        "preview": "Failed t'' spy th'' limit"
+      }
     },
     "sharing": {
       "title": "Remote State Sharin''",

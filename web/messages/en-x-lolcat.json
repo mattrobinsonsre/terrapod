@@ -2495,6 +2495,7 @@
       "architecture": "Architeksher",
       "insights": "Insightz",
       "automation": "Awtomashun",
+      "inventory": "Inventree",
       "access": "Akses"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "Dis workspace do not triggur runz on any othur workspace.",
       "destinationNote": "(destinashun; remoov frum dere)",
       "removeConfirm": "Remoov dis run triggur?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Inventree",
+        "body": "Deez is teh hostz dis werkspace sez it haz, an wut dey turnz into. Runnin a playbuk at em is not redy yet — dis releez jus letz u LOOK at teh inventree, nuffin getz runned frum heer."
+      },
+      "selectLabel": "Inventree",
+      "refreshConfirm": "Do It Agen rite now? Dis swapz owt teh snapshot evrywun can see.",
+      "resolved": {
+        "heading": "Rezolvd hostz an groupz",
+        "subheading": "Teh all-mushed-togethr anser for {name}, frum evry sorce in ordur.",
+        "hosts": "Hostz",
+        "groups": "Groupz",
+        "refresh": "Do It Agen",
+        "refreshing": "Doin It Agen…",
+        "takenAt": "Snapshot taked {when}",
+        "never": "nevur",
+        "producedBy": {
+          "api": "dun by teh API",
+          "runner": "dun by a runnr"
+        },
+        "producedByOther": "dun by {by}",
+        "snapshotNote": "Dis is teh last snapshot, not a liv wun. Do It Agen fer a fresh wun."
+      },
+      "limit": {
+        "heading": "Wut wud a limit hitz?",
+        "body": "Blow up an ansible --limit patturn aginst teh snapshot up ther, so u can see wich hostz it pikz b4 enythin runz.",
+        "inputLabel": "Limit patturn",
+        "placeholder": "web:!web-2",
+        "preview": "Lemme See",
+        "previewing": "Lookin…",
+        "matched": "{count, plural, =0 {No hostz} one {# host} other {# hostz}} outta {total} pikd.",
+        "advisory": "Jus a gess. Teh reel anser getz werked out by ansible in teh runnr, so take dis as a hint not a promiss.",
+        "asFreshAs": "Only as fresh as teh snapshot it wuz dun aginst: {when}."
+      },
+      "items": {
+        "heading": "Declaird hostz",
+        "managedNote": "Deez cum frum dis werkspace’s own Terraform, so u cant tuch em heer. Add, chaynge or yeet a host in ur config an apply it — enythin u edit outsyde Terraform getz undun on teh nex apply.",
+        "empty": "No hostz declaird yet.",
+        "name": "Hoast",
+        "address": "Adress",
+        "groups": "Groupz",
+        "vars": "Variablez",
+        "noGroups": "nuffin"
+      },
+      "sources": {
+        "heading": "Sorcez",
+        "body": "Dun in ordur, jus like repeetd -i flagz: a latr sorce winz a fitey host variabul.",
+        "position": "Spot {position}",
+        "apiResolvable": "API can do it",
+        "runnerOnly": "Needz a runnr",
+        "needsRunner": "Teh snapshot can only get freshend by a runnr wile deez sorcez r heer: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Coudnt load teh declaird hostz",
+        "loadResolved": "Coudnt load teh rezolvd inventree",
+        "refresh": "Coudnt refresh teh inventree",
+        "preview": "Coudnt preview teh limit"
+      }
     },
     "sharing": {
       "title": "Remote State Sharin",

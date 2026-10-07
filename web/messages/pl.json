@@ -2495,6 +2495,7 @@
       "architecture": "Architektura",
       "insights": "Analizy",
       "automation": "Automatyzacja",
+      "inventory": "Inwentarz",
       "access": "Dostęp"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "Ten obszar roboczy nie wyzwala przebiegów w żadnym innym obszarze roboczym.",
       "destinationNote": "(cel; usuń stamtąd)",
       "removeConfirm": "Usunąć ten wyzwalacz przebiegu?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Inwentarz",
+        "body": "To hosty deklarowane przez ten obszar roboczy oraz to, do czego się rozwiązują. Uruchamianie playbooka na nich nie jest jeszcze dostępne — to wydanie czyni inwentarz obserwowalnym, nic nie jest tu wykonywane."
+      },
+      "selectLabel": "Inwentarz",
+      "refreshConfirm": "Odświeżyć inwentarz teraz? Zastąpi to migawkę, którą widzą wszyscy.",
+      "resolved": {
+        "heading": "Rozwiązane hosty i grupy",
+        "subheading": "Scalony wynik dla {name}, ze wszystkich źródeł po kolei.",
+        "hosts": "Hosty",
+        "groups": "Grupy",
+        "refresh": "Odśwież",
+        "refreshing": "Odświeżanie…",
+        "takenAt": "Migawka wykonana {when}",
+        "never": "nigdy",
+        "producedBy": {
+          "api": "rozwiązane przez API",
+          "runner": "rozwiązane przez runnera"
+        },
+        "producedByOther": "rozwiązane przez {by}",
+        "snapshotNote": "To ostatnia migawka, a nie rozwiązanie na bieżąco. Odśwież, aby wykonać nową."
+      },
+      "limit": {
+        "heading": "Co obejmie --limit?",
+        "body": "Rozwiń wzorzec ansible --limit na podstawie powyższej migawki, aby zobaczyć, które hosty wybiera, przed jakimkolwiek uruchomieniem.",
+        "inputLabel": "Wzorzec --limit",
+        "placeholder": "web:!web-2",
+        "preview": "Podgląd",
+        "previewing": "Tworzenie podglądu…",
+        "matched": "{count, plural, =0 {Nie wybrano żadnego hosta} one {Wybrano # host} few {Wybrano # hosty} many {Wybrano # hostów} other {Wybrano # hosta}} z {total}.",
+        "advisory": "Tylko doradczo. Wiążące rozwinięcie wykonuje ansible w runnerze, więc traktuj to jako wskazówkę, a nie gwarancję.",
+        "asFreshAs": "Tak aktualne, jak migawka, na podstawie której je wykonano: {when}."
+      },
+      "items": {
+        "heading": "Zadeklarowane hosty",
+        "managedNote": "Zadeklarowane przez własny Terraform tego obszaru roboczego, więc tutaj są tylko do odczytu. Dodaj, zmień lub usuń hosta w swojej konfiguracji i zastosuj ją — zmiana wprowadzona poza Terraform zostanie wycofana przy następnym zastosowaniu.",
+        "empty": "Nie zadeklarowano jeszcze żadnych hostów.",
+        "name": "Host",
+        "address": "Adres",
+        "groups": "Grupy",
+        "vars": "Zmienne",
+        "noGroups": "brak"
+      },
+      "sources": {
+        "heading": "Źródła",
+        "body": "Rozwiązywane po kolei, dokładnie tak jak powtórzone flagi -i: przy konflikcie zmiennej hosta wygrywa późniejsze źródło.",
+        "position": "Pozycja {position}",
+        "apiResolvable": "API może rozwiązać",
+        "runnerOnly": "Wymaga runnera",
+        "needsRunner": "Dopóki obecne są te źródła, migawkę może odświeżyć tylko runner: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Nie udało się wczytać zadeklarowanych hostów",
+        "loadResolved": "Nie udało się wczytać rozwiązanego inwentarza",
+        "refresh": "Nie udało się odświeżyć inwentarza",
+        "preview": "Nie udało się wyświetlić podglądu --limit"
+      }
     },
     "sharing": {
       "title": "Udostępnianie zdalnego stanu",

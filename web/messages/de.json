@@ -2495,6 +2495,7 @@
       "architecture": "Architektur",
       "insights": "Einblicke",
       "automation": "Automatisierung",
+      "inventory": "Inventar",
       "access": "Zugriff"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "Dieser Arbeitsbereich löst in keinem anderen Arbeitsbereich Ausführungen aus.",
       "destinationNote": "(Ziel; dort entfernen)",
       "removeConfirm": "Diesen Ausführungsauslöser entfernen?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Inventar",
+        "body": "Dies sind die Hosts, die dieser Arbeitsbereich deklariert, und das, wozu sie aufgelöst werden. Ein Playbook auf ihnen auszuführen ist noch nicht möglich — diese Version macht das Inventar beobachtbar, von hier wird nichts ausgeführt."
+      },
+      "selectLabel": "Inventar",
+      "refreshConfirm": "Das Inventar jetzt aktualisieren? Dies ersetzt die Momentaufnahme, die alle sehen.",
+      "resolved": {
+        "heading": "Aufgelöste Hosts und Gruppen",
+        "subheading": "Das zusammengeführte Ergebnis für {name}, aus allen Quellen in ihrer Reihenfolge.",
+        "hosts": "Hosts",
+        "groups": "Gruppen",
+        "refresh": "Aktualisieren",
+        "refreshing": "Wird aktualisiert…",
+        "takenAt": "Momentaufnahme erstellt {when}",
+        "never": "nie",
+        "producedBy": {
+          "api": "von der API aufgelöst",
+          "runner": "von einem Runner aufgelöst"
+        },
+        "producedByOther": "von {by} aufgelöst",
+        "snapshotNote": "Dies ist die letzte Momentaufnahme, keine Live-Auflösung. Aktualisieren Sie, um eine neue zu erstellen."
+      },
+      "limit": {
+        "heading": "Was würde ein Limit-Muster erfassen?",
+        "body": "Ein ansible --limit-Muster anhand der Momentaufnahme oben auswerten, damit Sie sehen, welche Hosts es auswählt, bevor etwas ausgeführt wird.",
+        "inputLabel": "Limit-Muster",
+        "placeholder": "web:!web-2",
+        "preview": "Vorschau",
+        "previewing": "Vorschau wird erstellt…",
+        "matched": "{count, plural, =0 {Keine Hosts} one {# Host} other {# Hosts}} von {total} ausgewählt.",
+        "advisory": "Nur empfehlend. Die maßgebliche Auflösung des Musters nimmt ansible im Runner vor; betrachten Sie dies daher als Orientierung und nicht als Garantie.",
+        "asFreshAs": "So aktuell wie die Momentaufnahme, auf der sie beruht: {when}."
+      },
+      "items": {
+        "heading": "Deklarierte Hosts",
+        "managedNote": "Vom eigenen Terraform dieses Arbeitsbereichs deklariert und hier daher schreibgeschützt. Fügen Sie einen Host in Ihrer Konfiguration hinzu, ändern oder entfernen Sie ihn und wenden Sie die Konfiguration an — eine außerhalb von Terraform vorgenommene Änderung wird beim nächsten Apply zurückgesetzt.",
+        "empty": "Noch keine Hosts deklariert.",
+        "name": "Host",
+        "address": "Adresse",
+        "groups": "Gruppen",
+        "vars": "Variablen",
+        "noGroups": "keine"
+      },
+      "sources": {
+        "heading": "Quellen",
+        "body": "Werden in ihrer Reihenfolge aufgelöst, genau wie wiederholte -i-Flags: Bei einer widersprüchlichen Host-Variable gewinnt die spätere Quelle.",
+        "position": "Position {position}",
+        "apiResolvable": "API kann auflösen",
+        "runnerOnly": "Benötigt einen Runner",
+        "needsRunner": "Solange diese Quellen vorhanden sind, kann die Momentaufnahme nur von einem Runner aktualisiert werden: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Deklarierte Hosts konnten nicht geladen werden",
+        "loadResolved": "Das aufgelöste Inventar konnte nicht geladen werden",
+        "refresh": "Das Inventar konnte nicht aktualisiert werden",
+        "preview": "Vorschau des Limit-Musters fehlgeschlagen"
+      }
     },
     "sharing": {
       "title": "Remote-Zustandsfreigabe",

@@ -2495,6 +2495,7 @@
       "architecture": "架構",
       "insights": "洞察",
       "automation": "自動化",
+      "inventory": "清單",
       "access": "存取"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "此工作區不會在任何其他工作區上觸發執行。",
       "destinationNote": "（目標；請從那裡移除）",
       "removeConfirm": "移除此執行觸發器？"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "清單",
+        "body": "這些是此工作區宣告的主機及其解析結果。目前還無法針對它們執行 Playbook — 本次發行只是讓清單可被檢視，不會從此處執行任何操作。"
+      },
+      "selectLabel": "清單",
+      "refreshConfirm": "現在重新整理清單？這會取代所有人看到的快照。",
+      "resolved": {
+        "heading": "解析後的主機和主機組",
+        "subheading": "{name} 的合併結果，依順序取自每個來源。",
+        "hosts": "主機",
+        "groups": "主機組",
+        "refresh": "重新整理",
+        "refreshing": "正在重新整理…",
+        "takenAt": "快照時間：{when}",
+        "never": "從不",
+        "producedBy": {
+          "api": "由 API 解析",
+          "runner": "由執行器解析"
+        },
+        "producedByOther": "由 {by} 解析",
+        "snapshotNote": "這是最後一次快照，而不是即時解析結果。重新整理即可產生新的快照。"
+      },
+      "limit": {
+        "heading": "--limit 會選取哪些主機？",
+        "body": "針對上方的快照展開 ansible 的 --limit 模式，以便在任何操作執行之前檢視它會選取哪些主機。",
+        "inputLabel": "limit 模式",
+        "placeholder": "web:!web-2",
+        "preview": "預覽",
+        "previewing": "正在預覽…",
+        "matched": "{count, plural, =0 {未選取任何主機} other {已選取 # 台主機}}，共 {total} 台。",
+        "advisory": "僅供參考。權威的展開結果由執行器中的 ansible 得出，因此請將此視為參考而非保證。",
+        "asFreshAs": "只反映所依據快照的時點：{when}。"
+      },
+      "items": {
+        "heading": "已宣告的主機",
+        "managedNote": "由此工作區自身的 Terraform 宣告，因此在此處為唯讀。請在設定中新增、修改或移除主機後再套用 — 在 Terraform 之外所做的修改會在下次套用時被還原。",
+        "empty": "尚未宣告任何主機。",
+        "name": "主機",
+        "address": "位址",
+        "groups": "主機組",
+        "vars": "變數",
+        "noGroups": "無"
+      },
+      "sources": {
+        "heading": "來源",
+        "body": "依順序解析，與重複指定 -i 旗標完全一樣：主機變數衝突時，後面的來源優先。",
+        "position": "位置 {position}",
+        "apiResolvable": "API 可解析",
+        "runnerOnly": "需要執行器",
+        "needsRunner": "只要存在以下來源，快照就只能由執行器重新整理：{kinds}。"
+      },
+      "errors": {
+        "loadItems": "載入已宣告的主機失敗",
+        "loadResolved": "載入解析後的清單失敗",
+        "refresh": "重新整理清單失敗",
+        "preview": "預覽 limit 失敗"
+      }
     },
     "sharing": {
       "title": "遠端狀態共享",

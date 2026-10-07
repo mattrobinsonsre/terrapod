@@ -2495,6 +2495,7 @@
       "architecture": "Architecture",
       "insights": "Perspectives",
       "automation": "Automatisation",
+      "inventory": "Inventaire",
       "access": "Accès"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "Cet espace de travail ne déclenche d'exécution sur aucun autre espace de travail.",
       "destinationNote": "(destination ; retirer depuis là-bas)",
       "removeConfirm": "Retirer ce déclencheur d'exécution ?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Inventaire",
+        "body": "Voici les hôtes que cet espace de travail déclare et ce à quoi ils se résolvent. Exécuter un playbook sur eux n''est pas encore disponible : cette version rend l''inventaire observable, rien n''est exécuté depuis ici."
+      },
+      "selectLabel": "Inventaire",
+      "refreshConfirm": "Actualiser l''inventaire maintenant ? Cela remplace l''instantané que tout le monde voit.",
+      "resolved": {
+        "heading": "Hôtes et groupes résolus",
+        "subheading": "Le résultat fusionné pour {name}, à partir de chaque source dans l''ordre.",
+        "hosts": "Hôtes",
+        "groups": "Groupes",
+        "refresh": "Actualiser",
+        "refreshing": "Actualisation…",
+        "takenAt": "Instantané pris {when}",
+        "never": "jamais",
+        "producedBy": {
+          "api": "résolu par l''API",
+          "runner": "résolu par un runner"
+        },
+        "producedByOther": "résolu par {by}",
+        "snapshotNote": "Il s''agit du dernier instantané, pas d''une résolution en direct. Actualisez pour en prendre un nouveau."
+      },
+      "limit": {
+        "heading": "Que ciblerait une limite ?",
+        "body": "Développez un motif ansible --limit sur l''instantané ci-dessus, afin de voir quels hôtes il sélectionne avant que quoi que ce soit ne s''exécute.",
+        "inputLabel": "Motif de limite",
+        "placeholder": "web:!web-2",
+        "preview": "Aperçu",
+        "previewing": "Aperçu en cours…",
+        "matched": "{count, plural, =0 {Aucun hôte sélectionné} one {# hôte sélectionné} other {# hôtes sélectionnés}} sur {total}.",
+        "advisory": "À titre indicatif uniquement. L''expansion de référence est effectuée par ansible dans le runner : considérez ceci comme un repère plutôt que comme une garantie.",
+        "asFreshAs": "Aussi récent que l''instantané sur lequel il a été calculé : {when}."
+      },
+      "items": {
+        "heading": "Hôtes déclarés",
+        "managedNote": "Déclarés par le Terraform propre à cet espace de travail, ils sont donc en lecture seule ici. Ajoutez, modifiez ou supprimez un hôte dans votre configuration puis appliquez-la : une modification faite en dehors de Terraform est annulée à la prochaine application.",
+        "empty": "Aucun hôte déclaré pour l''instant.",
+        "name": "Hôte",
+        "address": "Adresse",
+        "groups": "Groupes",
+        "vars": "Variables",
+        "noGroups": "aucun"
+      },
+      "sources": {
+        "heading": "Sources",
+        "body": "Résolues dans l''ordre, exactement comme des indicateurs -i répétés : une source ultérieure l''emporte sur une variable d''hôte en conflit.",
+        "position": "Position {position}",
+        "apiResolvable": "L''API peut résoudre",
+        "runnerOnly": "Nécessite un runner",
+        "needsRunner": "L''instantané ne peut être actualisé que par un runner tant que ces sources sont présentes : {kinds}."
+      },
+      "errors": {
+        "loadItems": "Échec du chargement des hôtes déclarés",
+        "loadResolved": "Échec du chargement de l''inventaire résolu",
+        "refresh": "Échec de l''actualisation de l''inventaire",
+        "preview": "Échec de l''aperçu de la limite"
+      }
     },
     "sharing": {
       "title": "Partage de l'état distant",

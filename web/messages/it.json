@@ -2495,6 +2495,7 @@
       "architecture": "Architettura",
       "insights": "Approfondimenti",
       "automation": "Automazione",
+      "inventory": "Inventario",
       "access": "Accesso"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "Questo workspace non attiva esecuzioni su nessun altro workspace.",
       "destinationNote": "(destinazione; rimuovi da lì)",
       "removeConfirm": "Rimuovere questo run trigger?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Inventario",
+        "body": "Questi sono gli host che questo workspace dichiara e a cosa si risolvono. Eseguire un playbook su di essi non è ancora disponibile: questa versione rende l''inventario osservabile, da qui non viene eseguito nulla."
+      },
+      "selectLabel": "Inventario",
+      "refreshConfirm": "Aggiornare l''inventario adesso? Questo sostituisce lo snapshot che vedono tutti.",
+      "resolved": {
+        "heading": "Host e gruppi risolti",
+        "subheading": "Il risultato unito per {name}, da ogni origine in ordine.",
+        "hosts": "Host",
+        "groups": "Gruppi",
+        "refresh": "Aggiorna",
+        "refreshing": "Aggiornamento…",
+        "takenAt": "Snapshot acquisito {when}",
+        "never": "mai",
+        "producedBy": {
+          "api": "risolto dall''API",
+          "runner": "risolto da un runner"
+        },
+        "producedByOther": "risolto da {by}",
+        "snapshotNote": "Questo è l''ultimo snapshot, non una risoluzione in tempo reale. Aggiorna per acquisirne uno nuovo."
+      },
+      "limit": {
+        "heading": "Che cosa selezionerebbe un limite?",
+        "body": "Espandi un pattern ansible --limit sullo snapshot qui sopra, così puoi vedere quali host seleziona prima che venga eseguito qualcosa.",
+        "inputLabel": "Pattern di limite",
+        "placeholder": "web:!web-2",
+        "preview": "Anteprima",
+        "previewing": "Anteprima in corso…",
+        "matched": "{count, plural, =0 {Nessun host selezionato} one {# host selezionato} other {# host selezionati}} su {total}.",
+        "advisory": "Solo indicativo. L''espansione autorevole viene eseguita da ansible nel runner, quindi consideralo una guida e non una garanzia.",
+        "asFreshAs": "Aggiornata quanto lo snapshot su cui è stata calcolata: {when}."
+      },
+      "items": {
+        "heading": "Host dichiarati",
+        "managedNote": "Sono dichiarati dal Terraform di questo workspace, quindi qui sono di sola lettura. Aggiungi, modifica o rimuovi un host nella tua configurazione e applicala: una modifica fatta fuori da Terraform viene annullata alla prossima applicazione.",
+        "empty": "Nessun host dichiarato finora.",
+        "name": "Host",
+        "address": "Indirizzo",
+        "groups": "Gruppi",
+        "vars": "Variabili",
+        "noGroups": "nessuno"
+      },
+      "sources": {
+        "heading": "Origini",
+        "body": "Risolte in ordine, esattamente come i flag -i ripetuti: un''origine successiva prevale su una variabile di host in conflitto.",
+        "position": "Posizione {position}",
+        "apiResolvable": "L''API può risolverla",
+        "runnerOnly": "Richiede un runner",
+        "needsRunner": "Lo snapshot può essere aggiornato solo da un runner finché sono presenti queste origini: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Impossibile caricare gli host dichiarati",
+        "loadResolved": "Impossibile caricare l''inventario risolto",
+        "refresh": "Impossibile aggiornare l''inventario",
+        "preview": "Impossibile generare l''anteprima del limite"
+      }
     },
     "sharing": {
       "title": "Condivisione dello stato remoto",

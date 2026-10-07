@@ -128,6 +128,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // #1967/#1968: the data-gated Inventory tab. The first test asserts the
+      // tab is ABSENT on a workspace that has declared nothing, which is the
+      // only place that gate is checked.
+      name: 'inventory',
+      testMatch: 'inventory.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'runs',
       testMatch: 'runs.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

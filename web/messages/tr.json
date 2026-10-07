@@ -2495,6 +2495,7 @@
       "architecture": "Mimari",
       "insights": "İçgörüler",
       "automation": "Otomasyon",
+      "inventory": "Envanter",
       "access": "Erişim"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "Bu çalışma alanı başka hiçbir çalışma alanında çalıştırma tetiklemiyor.",
       "destinationNote": "(hedef; oradan kaldırın)",
       "removeConfirm": "Bu çalıştırma tetikleyicisi kaldırılsın mı?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Envanter",
+        "body": "Bunlar bu çalışma alanının bildirdiği ana makineler ve neye çözümlendikleridir. Üzerlerinde playbook çalıştırmak henüz mevcut değil — bu sürüm envanteri gözlemlenebilir kılar, buradan hiçbir şey yürütülmez."
+      },
+      "selectLabel": "Envanter",
+      "refreshConfirm": "Envanter şimdi yenilensin mi? Bu, herkesin gördüğü anlık görüntüyü değiştirir.",
+      "resolved": {
+        "heading": "Çözümlenen ana makineler ve gruplar",
+        "subheading": "{name} için birleştirilmiş sonuç, tüm kaynaklardan sırayla.",
+        "hosts": "Ana makineler",
+        "groups": "Gruplar",
+        "refresh": "Yenile",
+        "refreshing": "Yenileniyor…",
+        "takenAt": "Anlık görüntü {when} alındı",
+        "never": "hiç",
+        "producedBy": {
+          "api": "API tarafından çözümlendi",
+          "runner": "bir runner tarafından çözümlendi"
+        },
+        "producedByOther": "{by} tarafından çözümlendi",
+        "snapshotNote": "Bu, canlı bir çözümleme değil, son anlık görüntüdür. Yenisini almak için yenileyin."
+      },
+      "limit": {
+        "heading": "Bir --limit neyi hedefler?",
+        "body": "Yukarıdaki anlık görüntüye karşı bir ansible --limit desenini genişletin; böylece hiçbir şey çalışmadan önce hangi ana makineleri seçtiğini görebilirsiniz.",
+        "inputLabel": "--limit deseni",
+        "placeholder": "web:!web-2",
+        "preview": "Önizleme",
+        "previewing": "Önizleniyor…",
+        "matched": "Toplam {total} ana makineden {count, plural, =0 {hiçbiri seçilmedi} other {# tanesi seçildi}}.",
+        "advisory": "Yalnızca tavsiye niteliğindedir. Bağlayıcı genişletme runner içindeki ansible tarafından yapılır, bu nedenle bunu bir garanti değil, bir yol gösterici olarak değerlendirin.",
+        "asFreshAs": "Karşısında alındığı anlık görüntü kadar günceldir: {when}."
+      },
+      "items": {
+        "heading": "Bildirilen ana makineler",
+        "managedNote": "Bu çalışma alanının kendi Terraform yapılandırması tarafından bildirilir, bu nedenle burada salt okunurdur. Yapılandırmanızda bir ana makine ekleyin, değiştirin veya kaldırın ve uygulayın — Terraform dışında yapılan bir düzenleme bir sonraki uygulamada geri alınır.",
+        "empty": "Henüz bildirilen ana makine yok.",
+        "name": "Ana makine",
+        "address": "Adres",
+        "groups": "Gruplar",
+        "vars": "Değişkenler",
+        "noGroups": "yok"
+      },
+      "sources": {
+        "heading": "Kaynaklar",
+        "body": "Tekrarlanan -i bayrakları gibi sırayla çözümlenir: çakışan bir ana makine değişkeninde sonraki kaynak kazanır.",
+        "position": "Konum {position}",
+        "apiResolvable": "API çözümleyebilir",
+        "runnerOnly": "Runner gerekir",
+        "needsRunner": "Bu kaynaklar mevcutken anlık görüntü yalnızca bir runner tarafından yenilenebilir: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Bildirilen ana makineler yüklenemedi",
+        "loadResolved": "Çözümlenen envanter yüklenemedi",
+        "refresh": "Envanter yenilenemedi",
+        "preview": "--limit önizlemesi yapılamadı"
+      }
     },
     "sharing": {
       "title": "Uzak Durum Paylaşımı",

@@ -2495,6 +2495,7 @@
       "architecture": "アーキテクチャ",
       "insights": "インサイト",
       "automation": "自動化",
+      "inventory": "インベントリ",
       "access": "アクセス"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "このワークスペースは他のどのワークスペースでも実行をトリガーしません。",
       "destinationNote": "（宛先。そちらから削除してください）",
       "removeConfirm": "この実行トリガーを削除しますか？"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "インベントリ",
+        "body": "このワークスペースが宣言しているホストと、その解決結果です。これらに対してプレイブックを実行する機能はまだありません — このリリースではインベントリを確認できるようにしただけで、ここから実行されるものはありません。"
+      },
+      "selectLabel": "インベントリ",
+      "refreshConfirm": "インベントリを今すぐ更新しますか？全員が見ているスナップショットが置き換えられます。",
+      "resolved": {
+        "heading": "解決済みのホストとグループ",
+        "subheading": "{name} について、すべてのソースを順番にマージした結果です。",
+        "hosts": "ホスト",
+        "groups": "グループ",
+        "refresh": "更新",
+        "refreshing": "更新中…",
+        "takenAt": "スナップショット取得: {when}",
+        "never": "なし",
+        "producedBy": {
+          "api": "API により解決",
+          "runner": "ランナーにより解決"
+        },
+        "producedByOther": "{by} により解決",
+        "snapshotNote": "これはリアルタイムの解決結果ではなく、最後に取得したスナップショットです。新しく取得するには更新してください。"
+      },
+      "limit": {
+        "heading": "--limit はどのホストを対象にするか",
+        "body": "上のスナップショットに対して ansible の --limit パターンを展開し、何かが実行される前にどのホストが選択されるかを確認できます。",
+        "inputLabel": "limit パターン",
+        "placeholder": "web:!web-2",
+        "preview": "プレビュー",
+        "previewing": "プレビュー中…",
+        "matched": "{total} 台のホストのうち {count, plural, =0 {選択されたホストはありません} other {# 台を選択しました}}。",
+        "advisory": "参考情報です。正式な展開はランナー内の ansible が行うため、保証ではなく目安として扱ってください。",
+        "asFreshAs": "依拠したスナップショットの時点の情報です: {when}。"
+      },
+      "items": {
+        "heading": "宣言済みのホスト",
+        "managedNote": "このワークスペース自身の Terraform によって宣言されているため、ここでは読み取り専用です。ホストの追加・変更・削除は構成で行って適用してください — Terraform の外で加えた編集は次回の適用時に元に戻されます。",
+        "empty": "宣言されたホストはまだありません。",
+        "name": "ホスト",
+        "address": "アドレス",
+        "groups": "グループ",
+        "vars": "変数",
+        "noGroups": "なし"
+      },
+      "sources": {
+        "heading": "ソース",
+        "body": "-i フラグを繰り返し指定した場合とまったく同じく、順番に解決されます: ホスト変数が競合した場合は後のソースが優先されます。",
+        "position": "位置 {position}",
+        "apiResolvable": "API で解決可能",
+        "runnerOnly": "ランナーが必要",
+        "needsRunner": "これらのソースがある間、スナップショットはランナーからのみ更新できます: {kinds}。"
+      },
+      "errors": {
+        "loadItems": "宣言済みホストの読み込みに失敗しました",
+        "loadResolved": "解決済みインベントリの読み込みに失敗しました",
+        "refresh": "インベントリの更新に失敗しました",
+        "preview": "limit のプレビューに失敗しました"
+      }
     },
     "sharing": {
       "title": "リモート状態の共有",

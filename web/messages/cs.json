@@ -2495,6 +2495,7 @@
       "architecture": "Architektura",
       "insights": "Přehledy",
       "automation": "Automatizace",
+      "inventory": "Inventář",
       "access": "Přístup"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "Tento pracovní prostor nespouští běhy na žádném jiném pracovním prostoru.",
       "destinationNote": "(cíl; odeberte odtamtud)",
       "removeConfirm": "Odebrat tento run trigger?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Inventář",
+        "body": "Toto jsou hostitelé, které tento pracovní prostor deklaruje, a to, na co se vyhodnotí. Spuštění playbooku proti nim ještě není dostupné — toto vydání činí inventář pozorovatelným, odsud se nic nespouští."
+      },
+      "selectLabel": "Inventář",
+      "refreshConfirm": "Obnovit inventář nyní? Nahradí to snímek, který vidí všichni.",
+      "resolved": {
+        "heading": "Vyhodnocení hostitelé a skupiny",
+        "subheading": "Sloučený výsledek pro {name}, ze všech zdrojů v daném pořadí.",
+        "hosts": "Hostitelé",
+        "groups": "Skupiny",
+        "refresh": "Obnovit",
+        "refreshing": "Obnovování…",
+        "takenAt": "Snímek pořízen {when}",
+        "never": "nikdy",
+        "producedBy": {
+          "api": "vyhodnoceno API",
+          "runner": "vyhodnoceno runnerem"
+        },
+        "producedByOther": "vyhodnoceno: {by}",
+        "snapshotNote": "Toto je poslední snímek, nikoli aktuální vyhodnocení. Obnovte jej, chcete-li pořídit nový."
+      },
+      "limit": {
+        "heading": "Na co by mířil --limit?",
+        "body": "Rozbalte vzor ansible --limit proti výše uvedenému snímku, abyste viděli, které hostitele vybere, než se cokoli spustí.",
+        "inputLabel": "Vzor --limit",
+        "placeholder": "web:!web-2",
+        "preview": "Náhled",
+        "previewing": "Vytváření náhledu…",
+        "matched": "{count, plural, =0 {Nebyl vybrán žádný hostitel} one {Vybrán # hostitel} few {Vybráni # hostitelé} many {Vybráno # hostitele} other {Vybráno # hostitelů}} z {total}.",
+        "advisory": "Pouze doporučující. Závazné rozbalení provádí ansible v runneru, berte to tedy jako vodítko, nikoli jako záruku.",
+        "asFreshAs": "Stejně aktuální jako snímek, proti kterému bylo vytvořeno: {when}."
+      },
+      "items": {
+        "heading": "Deklarovaní hostitelé",
+        "managedNote": "Deklarováni vlastním Terraformem tohoto pracovního prostoru, takže zde jsou pouze pro čtení. Přidejte, změňte nebo odeberte hostitele ve své konfiguraci a použijte ji — úprava provedená mimo Terraform bude při dalším použití vrácena zpět.",
+        "empty": "Dosud nebyli deklarováni žádní hostitelé.",
+        "name": "Hostitel",
+        "address": "Adresa",
+        "groups": "Skupiny",
+        "vars": "Proměnné",
+        "noGroups": "žádné"
+      },
+      "sources": {
+        "heading": "Zdroje",
+        "body": "Vyhodnocují se v daném pořadí, přesně jako opakované přepínače -i: při konfliktu proměnné hostitele vítězí pozdější zdroj.",
+        "position": "Pozice {position}",
+        "apiResolvable": "API dokáže vyhodnotit",
+        "runnerOnly": "Vyžaduje runner",
+        "needsRunner": "Dokud jsou přítomny tyto zdroje, snímek může obnovit pouze runner: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Nepodařilo se načíst deklarované hostitele",
+        "loadResolved": "Nepodařilo se načíst vyhodnocený inventář",
+        "refresh": "Nepodařilo se obnovit inventář",
+        "preview": "Nepodařilo se zobrazit náhled --limit"
+      }
     },
     "sharing": {
       "title": "Sdílení remote state",

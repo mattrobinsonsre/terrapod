@@ -2495,6 +2495,7 @@
       "architecture": "Architecture",
       "insights": "Insights",
       "automation": "Automation",
+      "inventory": "Inventory",
       "access": "Access"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "On any other workspace, runs this workspace triggers not.",
       "destinationNote": "(destination; from there, remove)",
       "removeConfirm": "This run trigger, remove?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Inventory",
+        "body": "The hosts this workspace declares, these are, and what they resolve to. Run a playbook against them, you cannot yet — observable the inventory, this release makes; executed from here, nothing is."
+      },
+      "selectLabel": "Inventory",
+      "refreshConfirm": "Refresh the inventory now? The snapshot everyone sees, this replaces.",
+      "resolved": {
+        "heading": "Hosts and groups, resolved",
+        "subheading": "For {name}, the merged result — from every source, in order.",
+        "hosts": "Hosts",
+        "groups": "Groups",
+        "refresh": "Refresh",
+        "refreshing": "Refreshing, it is…",
+        "takenAt": "Taken {when}, the snapshot was",
+        "never": "never",
+        "producedBy": {
+          "api": "by the API, resolved",
+          "runner": "by a runner, resolved"
+        },
+        "producedByOther": "by {by}, resolved",
+        "snapshotNote": "The last snapshot, this is — a live resolution, it is not. Refresh, to take a new one."
+      },
+      "limit": {
+        "heading": "Target, what would a limit?",
+        "body": "An ansible --limit pattern against the snapshot above, expand — then which hosts it selects, see you will, before anything runs.",
+        "inputLabel": "Pattern of the limit",
+        "placeholder": "web:!web-2",
+        "preview": "Preview",
+        "previewing": "Previewing, it is…",
+        "matched": "{count, plural, =0 {No hosts} one {# host} other {# hosts}} of {total}, selected there are.",
+        "advisory": "Advisory only, this is. By ansible in the runner, the authoritative expansion is taken — so as a guide treat it, not as a guarantee.",
+        "asFreshAs": "As fresh as the snapshot it was taken against, it is: {when}."
+      },
+      "items": {
+        "heading": "Hosts, declared",
+        "managedNote": "By this workspace’s own Terraform, declared — so read-only here, they are. In your configuration, add, change or remove a host, and apply it. An edit made outside Terraform, reverted on the next apply it is.",
+        "empty": "No hosts declared yet, there are.",
+        "name": "Host",
+        "address": "Address",
+        "groups": "Groups",
+        "vars": "Variables",
+        "noGroups": "none"
+      },
+      "sources": {
+        "heading": "Sources",
+        "body": "In order, resolved they are — as repeated -i flags are. A conflicting host variable, a later source wins.",
+        "position": "Position {position}",
+        "apiResolvable": "Resolve, the API can",
+        "runnerOnly": "A runner, it needs",
+        "needsRunner": "Refreshed by a runner only, the snapshot can be, while present these sources are: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Load the declared hosts, it did not",
+        "loadResolved": "Load the resolved inventory, it did not",
+        "refresh": "Refresh the inventory, it did not",
+        "preview": "Preview the limit, it did not"
+      }
     },
     "sharing": {
       "title": "Sharing, Remote State",

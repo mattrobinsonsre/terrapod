@@ -2495,6 +2495,7 @@
       "architecture": "Arkitektur",
       "insights": "Insikter",
       "automation": "Automatisering",
+      "inventory": "Inventarium",
       "access": "Åtkomst"
     },
     "lifecycle": {
@@ -2854,6 +2855,65 @@
       "outboundEmpty": "Denna arbetsyta utlöser inte körningar på någon annan arbetsyta.",
       "destinationNote": "(destination; ta bort därifrån)",
       "removeConfirm": "Ta bort denna körningsutlösare?"
+    },
+    "inventory": {
+      "scope": {
+        "heading": "Inventarium",
+        "body": "Detta är de värdar som den här arbetsytan deklarerar och vad de löses upp till. Att köra en playbook mot dem är inte tillgängligt än — den här versionen gör inventariet observerbart, ingenting körs härifrån."
+      },
+      "selectLabel": "Inventarium",
+      "refreshConfirm": "Uppdatera inventariet nu? Detta ersätter ögonblicksbilden som alla ser.",
+      "resolved": {
+        "heading": "Upplösta värdar och grupper",
+        "subheading": "Det sammanslagna resultatet för {name}, från varje källa i ordning.",
+        "hosts": "Värdar",
+        "groups": "Grupper",
+        "refresh": "Uppdatera",
+        "refreshing": "Uppdaterar…",
+        "takenAt": "Ögonblicksbild tagen {when}",
+        "never": "aldrig",
+        "producedBy": {
+          "api": "upplöst av API:t",
+          "runner": "upplöst av en runner"
+        },
+        "producedByOther": "upplöst av {by}",
+        "snapshotNote": "Detta är den senaste ögonblicksbilden, inte en liveupplösning. Uppdatera för att ta en ny."
+      },
+      "limit": {
+        "heading": "Vad skulle ett limit-mönster träffa?",
+        "body": "Expandera ett ansible --limit-mönster utifrån ögonblicksbilden ovan, så att du ser vilka värdar det väljer innan något körs.",
+        "inputLabel": "Limit-mönster",
+        "placeholder": "web:!web-2",
+        "preview": "Förhandsgranska",
+        "previewing": "Förhandsgranskar…",
+        "matched": "{count, plural, =0 {Inga värdar} one {# värd} other {# värdar}} av {total} har valts.",
+        "advisory": "Endast rådgivande. Den auktoritativa expansionen görs av ansible i runnern, så betrakta detta som en vägledning snarare än en garanti.",
+        "asFreshAs": "Lika aktuell som ögonblicksbilden den bygger på: {when}."
+      },
+      "items": {
+        "heading": "Deklarerade värdar",
+        "managedNote": "Deklarerade av den här arbetsytans egen Terraform och därför skrivskyddade här. Lägg till, ändra eller ta bort en värd i din konfiguration och tillämpa den — en ändring som görs utanför Terraform återställs vid nästa apply.",
+        "empty": "Inga värdar deklarerade ännu.",
+        "name": "Värd",
+        "address": "Adress",
+        "groups": "Grupper",
+        "vars": "Variabler",
+        "noGroups": "inga"
+      },
+      "sources": {
+        "heading": "Källor",
+        "body": "Löses upp i ordning, precis som upprepade -i-flaggor: vid en motstridig värdvariabel vinner den senare källan.",
+        "position": "Position {position}",
+        "apiResolvable": "API:t kan lösa upp",
+        "runnerOnly": "Kräver en runner",
+        "needsRunner": "Så länge dessa källor finns kan ögonblicksbilden bara uppdateras av en runner: {kinds}."
+      },
+      "errors": {
+        "loadItems": "Det gick inte att läsa in deklarerade värdar",
+        "loadResolved": "Det gick inte att läsa in det upplösta inventariet",
+        "refresh": "Det gick inte att uppdatera inventariet",
+        "preview": "Förhandsgranskning av limit-mönstret misslyckades"
+      }
     },
     "sharing": {
       "title": "Delning av fjärrtillstånd",
