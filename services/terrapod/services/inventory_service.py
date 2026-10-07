@@ -53,9 +53,9 @@ from terrapod.services.inventory_resolution import (
     ResolvedInventory,
     SourceResolution,
     merge,
+    validate_declared_vars,
     validate_group_name,
     validate_host_name,
-    validate_var_names,
 )
 
 logger = structlog.get_logger(__name__)
@@ -202,7 +202,7 @@ def validate_item_fields(*, name: str, groups: list[str], host_vars: dict[str, A
     validate_host_name(name)
     for group in groups:
         validate_group_name(group)
-    validate_var_names(host_vars)
+    validate_declared_vars(host_vars)
 
 
 async def create_item(

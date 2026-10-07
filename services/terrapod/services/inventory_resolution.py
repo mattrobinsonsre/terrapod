@@ -165,21 +165,48 @@ def validate_host_name(name: str) -> str:
     return name
 
 
-def validate_var_names(host_vars: dict[str, Any]) -> dict[str, Any]:
-    """Return `host_vars` if every key is usable, else raise.
+def validate_declared_vars(host_vars: dict[str, Any]) -> dict[str, Any]:
+    """Return `host_vars` if every key and value is usable, else raise.
 
-    Deliberately laxer than the group rule. Ansible stores a variable whose name
-    is not an identifier and only warns that it is unreachable as `{{ name }}`
-    -- it is still readable via `hostvars['h']['odd-name']`, which some roles do
-    on purpose. So the key only has to be a non-empty string; refusing more
-    would block working configurations to prevent a warning.
+    **Names are deliberately laxer than the group rule.** Ansible stores a
+    variable whose name is not an identifier and only warns that it is
+    unreachable as `{{ name }}` -- it is still readable via
+    `hostvars['h']['odd-name']`, which some roles do on purpose. So the key only
+    has to be a non-empty string; refusing more would block working
+    configurations to prevent a warning.
+
+    **Values on this path must be strings**, and that is a narrower rule than
+    ansible's own, taken on purpose:
+
+    * a declared item is the surface the managing Terraform owns, and a
+      Terraform map is `map(string)` -- the provider has no shape for a nested
+      object;
+    * every Go consumer decodes vars into `map[string]string`, and
+      `encoding/json` fails the **whole** unmarshal on one non-string value. So
+      storing `{"role": "frontend", "port": 8080}` would make the SDK, the
+      provider and the MCP tools report **no variables at all** for that host --
+      not the one odd value, all of them -- with nothing anywhere saying why.
+
+    Refusing at the write turns that into a 422 naming the key. Richer values
+    are not lost to the platform: a resolved **snapshot** carries whatever
+    ansible produced, and a future file-based source carries `group_vars` and
+    `host_vars` natively. This rule is only about the flat surface Terraform
+    declares, which is why the snapshot path deliberately does not call it.
     """
     if not isinstance(host_vars, dict):
         raise InventoryValidationError("host variables must be a mapping")
-    for key in host_vars:
+    for key, value in host_vars.items():
         if not isinstance(key, str) or not key:
             raise InventoryValidationError(
                 f"host variable names must be non-empty strings; got {key!r}"
+            )
+        if not isinstance(value, str):
+            raise InventoryValidationError(
+                f"the declared value for host variable {key!r} must be a string; got "
+                f"{type(value).__name__}. A declared item is the flat surface Terraform "
+                f"owns -- every client reads these as strings, and one non-string value "
+                f"hides the whole set rather than the one odd entry. Put a list, number "
+                f"or nested object in a group_vars or host_vars source instead."
             )
     return host_vars
 

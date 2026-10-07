@@ -19,9 +19,9 @@ from terrapod.services.inventory_resolution import (
     limit_matches,
     merge,
     to_ansible_inventory,
+    validate_declared_vars,
     validate_group_name,
     validate_host_name,
-    validate_var_names,
 )
 
 
@@ -215,20 +215,65 @@ class TestNameValidation:
         with pytest.raises(InventoryValidationError, match="whitespace"):
             validate_host_name(name)
 
-    def test_var_names_are_only_required_to_be_non_empty_strings(self):
-        """Deliberately laxer than groups -- see the function's docstring."""
-        assert validate_var_names({"ansible_user": "ec2-user", "odd-name": 1}) == {
+    def test_var_NAMES_are_only_required_to_be_non_empty_strings(self):
+        """Still deliberately laxer than groups, and for the original reason:
+        ansible stores a non-identifier name and only warns, and
+        `hostvars['h']['odd-name']` works, so refusing one would block a working
+        configuration to prevent a warning. Only the VALUE rule tightened."""
+        assert validate_declared_vars({"ansible_user": "ec2-user", "odd-name": "x"}) == {
             "ansible_user": "ec2-user",
-            "odd-name": 1,
+            "odd-name": "x",
         }
 
     def test_refuses_an_empty_variable_name(self):
         with pytest.raises(InventoryValidationError):
-            validate_var_names({"": 1})
+            validate_declared_vars({"": "v"})
+
+    def test_the_NAME_is_judged_before_the_value(self):
+        """An entry that is wrong both ways should say the name is wrong -- that
+        is the one the operator fixes first, and the value message would send
+        them to a group_vars file they do not need."""
+        with pytest.raises(InventoryValidationError, match="names must be non-empty"):
+            validate_declared_vars({"": 1})
+
+    @pytest.mark.parametrize("value", [8080, 22.5, True, None, ["a", "b"], {"nested": "object"}])
+    def test_refuses_a_non_string_DECLARED_value(self, value):
+        """Narrower than ansible's own rule, on purpose.
+
+        A declared item is the flat surface Terraform owns and a Terraform map is
+        `map(string)`. More to the point, every Go consumer decodes vars into
+        `map[string]string` and `encoding/json` fails the WHOLE unmarshal on one
+        non-string value -- so storing `{"role": "frontend", "port": 8080}` made
+        the SDK, the provider and the MCP tools report no variables at all for
+        that host, with nothing saying why. A 422 naming the key replaces a
+        silent whole-set disappearance.
+        """
+        with pytest.raises(InventoryValidationError, match="must be a string"):
+            validate_declared_vars({"port": value})
+
+    def test_the_refusal_points_at_where_richer_values_belong(self):
+        """Refusing without saying where to put it would just move the dead end."""
+        with pytest.raises(InventoryValidationError, match="group_vars or host_vars"):
+            validate_declared_vars({"ports": [80, 443]})
+
+    def test_a_resolved_snapshot_is_NOT_subject_to_this(self):
+        """The rule is about the declared surface only. A snapshot carries what
+        ansible actually produced, so it must keep rich values -- and the
+        snapshot path deliberately does not call this function.
+        """
+        import inspect
+
+        from terrapod.api.routers import inventory as router
+
+        src = inspect.getsource(router.record_inventory_version)
+        assert "validate_declared_vars" not in src, (
+            "a snapshot holds ansible's own resolution; flattening it to strings would "
+            "lose the shape a configure needs"
+        )
 
     def test_refuses_host_vars_that_are_not_a_mapping(self):
         with pytest.raises(InventoryValidationError, match="mapping"):
-            validate_var_names(["not", "a", "mapping"])  # type: ignore[arg-type]
+            validate_declared_vars(["not", "a", "mapping"])  # type: ignore[arg-type]
 
 
 class TestLimitPreview:

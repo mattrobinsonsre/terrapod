@@ -302,12 +302,27 @@ unreachable as `{{ name }}` — it is still readable via
 `hostvars['h']['odd-name']`, which some roles do on purpose. Refusing more would
 block working configurations to prevent a warning.
 
-**Host variables declared through Terraform are strings.** The API stores a host
-variable as arbitrary JSON, because ansible does and because a future git or UI
-source may legitimately supply a list or a number; but a Terraform map is
-homogeneous, so the provider path types them as strings. A variable that has to
-be a list or a number belongs in the playbook repository's `group_vars` or
-`host_vars`, which is where an ansible operator keeps such a thing anyway.
+**A declared host variable's value must be a string, and the API refuses one
+that is not** with a `422` naming the key. That is narrower than ansible's own
+rule, deliberately, and for a reason that is worth knowing rather than working
+around:
+
+- a declared item is the flat surface the managing Terraform owns, and a
+  Terraform map is homogeneous — `map(string)` — so the provider has no shape
+  for a nested object;
+- every client decodes these as strings, and a decoder fails the **whole** map
+  on one non-string value. Storing `{"role": "frontend", "port": 8080}` would
+  make the SDK, the provider and the MCP tools report **no variables at all**
+  for that host — not the one odd entry, all of them — with nothing saying why.
+
+So the refusal replaces a silent whole-set disappearance with a message naming
+the key. A variable that genuinely has to be a list, a number or a nested
+object belongs in the playbook repository's `group_vars` or `host_vars`, which
+is where an ansible operator keeps such a thing anyway.
+
+**A resolved snapshot is not subject to this.** It carries whatever ansible
+actually produced, rich values included — flattening it would lose the shape a
+configure needs. The rule is only about what Terraform declares.
 
 ---
 

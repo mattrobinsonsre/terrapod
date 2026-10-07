@@ -5519,7 +5519,7 @@ Requires `inventory:write`; **apply phase** for a runner token. Declares one hos
 | `name` | Required. The inventory hostname. Refused with `422` if it contains whitespace or any of `,`, `:`, `!`, `&`, `~` — those are `--limit`'s own operators and separators, so such a host cannot be targeted and a leading `!` would silently exclude the host it names. Dots, hyphens and underscores are fine. |
 | `address` | Optional convenience that populates the `ansible_host` variable at resolution time. An explicit `ansible_host` in `vars` wins. |
 | `groups` | Optional list of declared group names. `all` and `ungrouped` are derived by ansible and refused with `422`; otherwise a name must start with a letter or underscore and contain only letters, digits and underscores. |
-| `vars` | Optional object of ansible host variables. Keys must be non-empty strings; Terrapod gives none of them special meaning. **Stored and returned in the clear.** |
+| `vars` | Optional object of ansible host variables. Keys must be non-empty strings and **values must be strings** — a non-string value is refused with `422` naming the key, because every client decodes these as a string map and one non-string entry would hide the whole set. Richer values belong in a `group_vars`/`host_vars` source; a resolved snapshot keeps them. Terrapod gives no variable special meaning. **Stored and returned in the clear.** |
 
 `409` when a host of that name is already declared in the workspace. `422` when the workspace already holds 5000 items.
 
