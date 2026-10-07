@@ -97,6 +97,7 @@ func New(cfg Config) (*mcp.Server, *terrapod.Client, error) {
 	registerCRUD(srv, client)
 	registerGround(srv, client)
 	registerDiscover(srv, client)
+	registerInventory(srv, client)
 
 	return srv, client, nil
 }
