@@ -147,6 +147,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -170,6 +174,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -333,6 +343,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -356,6 +370,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -528,6 +548,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -551,6 +575,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -723,6 +753,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -746,6 +780,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -918,6 +958,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -941,6 +985,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -1117,6 +1167,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -1140,6 +1194,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -1316,6 +1376,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -1339,6 +1403,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -1511,6 +1581,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -1534,6 +1608,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -1730,6 +1810,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -1753,6 +1837,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -1925,6 +2015,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -1948,6 +2042,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -2124,6 +2224,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -2147,6 +2251,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -2327,6 +2437,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -2350,6 +2464,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -2513,6 +2633,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -2536,6 +2660,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -2708,6 +2838,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -2731,6 +2865,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -2911,6 +3051,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -2934,6 +3078,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -3106,6 +3256,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -3129,6 +3283,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -3313,6 +3473,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -3336,6 +3500,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -3512,6 +3682,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -3535,6 +3709,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",
@@ -3707,6 +3887,10 @@
                   "name": "home"
                 },
                 {
+                  "mountPath": "/var/run/terrapod/oidc",
+                  "name": "oidc"
+                },
+                {
                   "mountPath": "/var/run/terrapod/vars",
                   "name": "tfvars",
                   "readOnly": true
@@ -3774,6 +3958,12 @@
             {
               "emptyDir": {},
               "name": "home"
+            },
+            {
+              "emptyDir": {
+                "medium": "Memory"
+              },
+              "name": "oidc"
             },
             {
               "name": "tfvars",

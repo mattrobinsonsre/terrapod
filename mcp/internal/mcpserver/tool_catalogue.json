@@ -1182,6 +1182,19 @@
           "description": "rename the workspace (empty = leave)",
           "type": "string"
         },
+        "oidc_audiences": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "description": "replace this workspace's per-provider audience overrides for its run identity tokens -- its cloud identity opt-in (#1901). Omitting the field leaves the existing overrides alone; pass an EMPTY object to clear every one of them, which drops the workspace back to inheriting the deployment's catalogue wholesale. A MAP keyed on the provider configuration a token is for, never a flat list: the bare provider type exactly as a provider block writes it (aws, vault), or type.alias for one aliased configuration (aws.west). The alias is part of the KEY -- do not split on the dot and do not fold aws.west into aws; they are separate targets, and the runner asks for whichever its configuration actually uses. Each value is ALWAYS a list even for a single entry, because a federation target's audience is one value and a list of several is a deliberate these-are-interchangeable statement; the runner mints one token per target carrying only that target's audiences. An audience is an opaque string the federation target itself names -- whatever your cloud's or secret store's trust configuration expects -- and Terrapod stores it verbatim; nothing here is specific to any one cloud, because Terrapod only mints an OIDC JWT and the runner writes it to a file. What you pass is this workspace's OVERRIDE, merged per key OVER the deployment's own catalogue, so naming one target does not restate the rest. The read side differs and this is the trap: a workspace reports its oidc-audiences as the MERGED view, so writing back what you read would promote every inherited entry into an override. A key whose list is EMPTY is refused (422) -- express no-audiences-for-this-target by leaving the key out, which falls back to the deployment's value, because an empty list is indistinguishable from a typo. A token audienced for two targets is replayable between them, so give a target only its own audiences. Setting this does NOT by itself grant anything: the federation target's own trust policy decides what a token bearing these audiences may do.",
+          "type": "object"
+        },
         "pulumi_bind_plan": {
           "description": "Pulumi workspaces only: bind the update to the approved preview (preview --save-plan then up --plan). Off by default; rejected on any other engine",
           "type": [

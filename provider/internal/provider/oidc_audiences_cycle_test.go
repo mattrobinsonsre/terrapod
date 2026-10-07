@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 
@@ -117,19 +118,34 @@ func (f *fakeWorkspaceAPI) serve(t *testing.T) http.HandlerFunc {
 			return map[string]any{"id": "ws-1", "type": "workspaces", "attributes": attrs}
 		}
 
+		// The provider addresses the canonical native surface first and falls
+		// back to the frozen TFE one (go-terrapod's nativeFirst), and a real
+		// Terrapod mounts both. So route on the path WITHOUT its surface prefix,
+		// or this fake stands in for a server that mounts only one of them and
+		// the provider's first request 404s — which Read turns into
+		// RemoveResource, emptying state and making every assertion below fail
+		// for a reason that has nothing to do with audiences.
+		path := r.URL.Path
+		for _, pre := range []string{"/api/terrapod/v1", "/api/tfe/v2", "/api/v1", "/api/v2"} {
+			if rest := strings.TrimPrefix(path, pre); rest != path {
+				path = rest
+				break
+			}
+		}
+
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/v2/organizations/default/workspaces":
+		case r.Method == http.MethodPost && (path == "/organizations/default/workspaces" || path == "/workspaces"):
 			f.attrs = map[string]any{}
 			store(decode())
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": resource()})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v2/workspaces/ws-1":
+		case r.Method == http.MethodGet && path == "/workspaces/ws-1":
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": resource()})
-		case r.Method == http.MethodPatch && r.URL.Path == "/api/v2/workspaces/ws-1":
+		case r.Method == http.MethodPatch && path == "/workspaces/ws-1":
 			f.patches++
 			store(decode())
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": resource()})
-		case r.URL.Path == "/api/terrapod/v1/workspaces/ws-1/remote-state-consumers":
+		case path == "/workspaces/ws-1/remote-state-consumers":
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": []any{}})
 		default:
 			// Includes the /.well-known version probe, whose failure is a
