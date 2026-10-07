@@ -496,6 +496,18 @@ Two consequences worth knowing:
   Checkov and Trivy still read plan JSON, so scanning is refused on a Pulumi
   workspace rather than holding every apply for a result that cannot arrive
   (#1569); the run says so in `meta.not-evaluated-reason`.
+- **Per-workspace cloud identity works, and mints every target rather than a
+  discovered subset.** A Terraform run enumerates its provider configurations
+  with a static `graph` walk and is minted only the ones it uses. There is no
+  equivalent for Pulumi: a program is arbitrary code and its provider instances
+  are built at runtime, so nothing can be walked before `preview` — and
+  `preview` is what needs the credentials. (`pulumi stack graph` reads an
+  existing stack's state, not the program, so it is empty on a first run and
+  never names aliased instances.) So a Pulumi run receives a token for every
+  target its workspace resolves. The cloud-side trust policy is the gate either
+  way, which is what makes the widening acceptable; to narrow it, narrow the
+  workspace's own `oidc_audiences`. See
+  [`docs/cloud-identity.md`](cloud-identity.md#pulumi-every-identity-because-none-can-be-discovered).
 
 ## See also
 
@@ -507,6 +519,9 @@ Two consequences worth knowing:
 - [`docs/policies.md`](policies.md) and
   [`docs/security-scanning.md`](security-scanning.md) — the gates, and what they
   currently do on a Pulumi workspace.
+- [`docs/cloud-identity.md`](cloud-identity.md#pulumi-provider-configuration) —
+  per-workspace OIDC federation, and the Pulumi provider arguments that read the
+  delivered token files.
 - [`docs/autodiscovery.md`](autodiscovery.md) — discovering stacks from a
   monorepo, and how the rename/delete lifecycle reasons per stack rather than
   per directory.

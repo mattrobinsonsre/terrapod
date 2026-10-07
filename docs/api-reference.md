@@ -4064,12 +4064,27 @@ fall-through to the agent pool's broader identity. The body accepts no other
 field — `extra` is forbidden — and in particular **it cannot name a phase**,
 which comes from the presented runner token.
 
+**An engine that cannot discover its provider configurations is minted
+everything its workspace resolves**, and `providers` and `discovery` are both
+ignored for it. Pulumi is the case: a program is arbitrary code whose provider
+instances are built at runtime, so nothing can be enumerated before the program
+runs, and the thing that would run it needs the credentials. Which engines these
+are is read from the **workspace row**, never from this body — the runner image
+does not ship the engine registry, and a runner's claim about its own engine
+would be the runner's rather than the platform's. Its runner sends an empty list
+with `discovery: "ok"`, because nothing failed; there was no graph to read.
+
+For such an engine the target limit is enforced rather than applied by
+truncation: a workspace resolving more than **100** targets is answered `409`,
+because a shortened token set looks complete and is not.
+
 | Status | Meaning | What the runner does |
 |---|---|---|
 | **200** | `{"tokens": [{"target", "token", "audiences"}], "phase", "expires_in"}` | Writes each to `/var/run/terrapod/oidc/<target>/token` (mode `0600`) and exports `TERRAPOD_OIDC_TOKEN_DIR`, `TERRAPOD_RUN_PHASE` and `TF_VAR_terrapod_run_phase` |
 | **204** | The workspace maps nothing; the issuer is not enabled deployment-wide; the configuration declares no provider; or nothing it uses is mapped | Takes no action. The run authenticates with the agent pool's identity, exactly as before |
 | **404** | This API does not serve the route | Read as "nothing to do" — an API older than the runner image, which in agent mode upgrades independently |
-| **409** | The resolved audiences changed since the run was created, **or** discovery was not `ok` for a workspace that maps targets | **Fails the run**, carrying the reason |
+| **409** | The resolved audiences changed since the run was created; discovery was not `ok` for a workspace that maps targets **and** whose engine discovers; or a non-discovering engine's workspace resolves more than 100 targets | **Fails the run**, carrying the reason |
+| **422** | A stored audience-map key is not a usable provider configuration name (reachable only for a key written before the write-side guard existed) | **Fails the run**, naming the key to correct |
 | **Other 4xx / 5xx** | Credentials were asked for and could not be had | **Fails the run.** Continuing would mean silently running under broader permissions than the operator chose |
 
 The `204` is load-bearing: "not opted in" has to be distinguishable from

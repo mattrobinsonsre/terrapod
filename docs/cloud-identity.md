@@ -489,7 +489,10 @@ and a JWT in a log is a credential in a log — so the run log records which
 
 ## How the runner knows which tokens to fetch
 
-Two steps, both after `init`:
+**On Terraform and OpenTofu**, two steps, both after `init` — a Pulumi
+workspace skips the first and is minted every target it resolves, which
+[its own section below](#pulumi-every-identity-because-none-can-be-discovered)
+explains:
 
 1. **Ask the engine which provider configurations the root module uses**, by
    running its own graph command (`tofu graph`, or `terraform graph`, whichever
@@ -537,6 +540,45 @@ because only the API knows whether the workspace holds any identity — so it
 answers `204` for a workspace that holds none **before** it looks at the outcome,
 and `409` for one that does. A graph failure therefore cannot fail a run that was
 not using this feature.
+
+### Pulumi: every identity, because none can be discovered
+
+**A Pulumi run is minted every target its workspace resolves, not a discovered
+subset.** There is no step 1 for it: a Pulumi program is arbitrary code and its
+provider instances are constructed at runtime, so there is nothing to walk
+before the program runs — and the thing that would run it, `preview`, is
+precisely what needs the credentials. `pulumi stack graph` is not the missing
+piece either: it graphs the resources in an existing stack's *state*, so it is
+empty on a first run and never names the aliased provider instances a program
+builds.
+
+So discovery is skipped rather than attempted, the request carries an empty
+list, and the engine recorded on the workspace is what decides — not anything
+the runner claims about itself.
+
+**That is a widening, and it is deliberate.** Terrapod keeps no central
+restriction on which targets a workspace may mint for; the cloud-side trust
+policy is the gate, exactly as it is for Terraform. Discovery was always a
+*filter* rather than the source of truth — an engine that cannot discover simply
+does not get the filter. The practical consequence is worth knowing: a Pulumi
+workspace whose catalogue resolves seven Vault instances gets seven tokens on
+every run, whether its program uses one or all seven.
+
+Two further differences follow:
+
+* **The discovery outcome is not examined.** `failed` and `unparsed` describe
+  reading a graph, and this engine never read one, so an outcome describing it
+  carries no information about the run.
+* **The target limit stops being slack and becomes the real bound.** A
+  workspace resolving more than **100** targets is refused with a `409` rather
+  than served a truncated set, because a shortened token set looks complete and
+  is not — the missing one surfaces inside the engine at the cloud's token
+  exchange, with an error naming neither the file nor the reason. Narrow the
+  workspace's `oidc_audiences` if you meet this.
+
+**To narrow what a Pulumi run can present, narrow the workspace.** Set its
+`oidc_audiences` override to just the targets its program uses, rather than
+inheriting the whole deployment catalogue.
 
 ### Why after `init`, and what it costs
 
@@ -807,6 +849,81 @@ narrower than the pool. Now the login is itself per-workspace — from `pre_plan
 or later, where the token file exists.
 
 ---
+
+## Pulumi provider configuration
+
+The same files, at the same paths, read by Pulumi's own provider arguments.
+**Two of the four take a file path and two take the token value**, so half of
+these read the file themselves — that asymmetry is the provider's, not
+Terrapod's, and getting it wrong is the most likely mistake here.
+
+| Target | Pulumi provider argument | Takes |
+|---|---|---|
+| **`aws`** | `assumeRoleWithWebIdentity`: `roleArn`, `webIdentityTokenFile` | a **path** |
+| **`azure-native`** | `useOidc: true`, `oidcTokenFilePath`, with `clientId` and `tenantId` | a **path** |
+| **`gcp`** | `externalCredentials`: `audience`, `serviceAccountEmail`, `identityToken` | the token **value** |
+| **`vault`** | `authLoginJwt`: `role`, `jwt`, optional `mount` | the token **value** |
+
+The map key names the directory, so a catalogue entry called `aws` is read at
+`/var/run/terrapod/oidc/aws/token` whichever engine the workspace runs. Name the
+entries after the Pulumi provider you configure (`gcp`, not `google`), so the
+path and the provider block agree.
+
+```typescript
+import * as aws from "@pulumi/aws";
+import * as gcp from "@pulumi/gcp";
+import * as vault from "@pulumi/vault";
+import * as fs from "fs";
+
+const dir = process.env.TERRAPOD_OIDC_TOKEN_DIR ?? "/var/run/terrapod/oidc";
+
+// A path. The provider reads and re-reads the file itself.
+const awsProvider = new aws.Provider("aws", {
+    region: "eu-west-1",
+    assumeRoleWithWebIdentity: {
+        roleArn: "arn:aws:iam::123456789012:role/terrapod-prod-dns",
+        sessionName: "terrapod",
+        webIdentityTokenFile: `${dir}/aws/token`,
+    },
+});
+
+// A value. Read it yourself.
+const gcpProvider = new gcp.Provider("gcp", {
+    project: "my-project",
+    externalCredentials: {
+        audience: "//iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/terrapod/providers/terrapod",
+        serviceAccountEmail: "terrapod-prod-dns@my-project.iam.gserviceaccount.com",
+        identityToken: fs.readFileSync(`${dir}/gcp/token`, "utf8").trim(),
+    },
+});
+
+// Also a value.
+const vaultProvider = new vault.Provider("vault", {
+    address: "https://vault.example.com",
+    authLoginJwt: {
+        role: "terrapod-prod-dns",
+        jwt: fs.readFileSync(`${dir}/vault/token`, "utf8").trim(),
+    },
+});
+```
+
+`TERRAPOD_OIDC_TOKEN_DIR` is exported into the program's environment, so prefer
+it over hard-coding the directory. **The documented path is the contract**;
+Terrapod does not dictate the variable you read it through, and the per-provider
+arguments above are the provider's own, which Terrapod never sets.
+
+**`.trim()` matters for the value forms.** A token is written without a trailing
+newline, but a reader that adds or keeps surrounding whitespace sends a JWT the
+cloud will reject with a signature error rather than a parse error — which reads
+as a key problem rather than a whitespace one.
+
+**Azure's client id and tenant id are still yours to supply**, exactly as in the
+Terraform form: Terrapod issues the token and knows nothing about the federated
+identity credential it is presented to.
+
+Everything else on this page applies unchanged to a Pulumi workspace — the
+catalogue, the merge semantics, the `phase` claim, the trust-policy conditions,
+rotation, and the staleness refusal between preview and update.
 
 ## The `phase` claim, and why write permissions belong behind it
 
@@ -1120,7 +1237,7 @@ quietly widening it.
 |---|---|---|
 | `GET /.well-known/openid-configuration` | **None** | Discovery document. Mounted only when enabled. `Cache-Control: max-age=300` |
 | `GET /.well-known/jwks.json` | **None** | The published signing keys. `max-age` is half `key_propagation_seconds` |
-| `POST /api/terrapod/v1/runs/{run_id}/cloud-identity-tokens` | Runner token, scoped to that run | Mint one token per provider configuration the run discovered. `204` when there is nothing to deliver; `409` when the configuration moved since the run was created, or when the graph could not be read for a workspace that maps targets |
+| `POST /api/terrapod/v1/runs/{run_id}/cloud-identity-tokens` | Runner token, scoped to that run | Mint one token per provider configuration the run discovered — or per target the workspace resolves, for an engine that cannot discover. `204` when there is nothing to deliver; `409` when the configuration moved since the run was created, when the graph could not be read for a workspace that maps targets, or when a non-discovering engine's workspace resolves more than 100 targets |
 | `GET /api/terrapod/v1/oidc/audience-defaults` | Any authenticated user | The deployment's audience catalogue a workspace's map merges over, plus `issuer-enabled` |
 | `GET /api/terrapod/v1/oidc/signing-keys` | Platform admin | What is published, and which key signs. Public key material only |
 | `POST /api/terrapod/v1/oidc/signing-keys/actions/rotate` | Platform admin | Add a key, retire the current one |
