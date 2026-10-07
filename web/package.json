@@ -51,6 +51,7 @@
   },
   "overrides": {
     "postcss": "^8.5.28",
+    "source-map-js": "^1.2.2",
     "@babel/core": "^7.29.6",
     "brace-expansion": "^2.1.7",
     "sharp": "^0.35.5",
