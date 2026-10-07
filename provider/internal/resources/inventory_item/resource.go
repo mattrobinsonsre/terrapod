@@ -45,7 +45,9 @@ func (r *inventoryItemResource) Schema(_ context.Context, _ resource.SchemaReque
 		Description: "Declares one ansible host in a Terrapod workspace's inventory — the \"inventory from the " +
 			"managing Terraform\" source. One resource per host, so `for_each` over the instances a configuration " +
 			"creates (or over the ones a configuration of nothing but data sources finds) declares them with their " +
-			"groups and variables, and each host gets its own drift detection.",
+			"groups and variables, and each host gets its own drift detection. " +
+			"Host variables are stored and returned in the clear to any reader with inventory read access, so do " +
+			"not put a credential in them. See docs/ansible-inventory.md.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description:   "The inventory item ID (invitem-<uuid>).",

@@ -384,6 +384,33 @@ async def create_inventory_item(
     return JSONResponse(content={"data": _item_json(item)}, status_code=201)
 
 
+def _unresolvable_error(sources: list[InventorySource], lead: str) -> HTTPException:
+    """The 409 for an inventory holding a source the API cannot resolve.
+
+    Shared by the resolved read and the resolve action, because they refuse for
+    the same reason and an operator meeting either asks the same question: which
+    source, and what do I do about it. They were written separately and had
+    already drifted -- the read withheld the offending kinds, which is the
+    actionable half, and the read is the one the UI calls, so it is where the
+    answer is needed most.
+
+    `lead` is the part that genuinely differs: a read is refusing because there
+    is no snapshot to serve, an action because it will not refresh one.
+    """
+    offending = sorted(
+        {s.kind for s in sources if s.kind not in InventorySource.API_RESOLVABLE_KINDS}
+    )
+    return HTTPException(
+        status_code=409,
+        detail=(
+            f"{lead} Sources {offending} need ansible to parse, and ansible is installed "
+            f"only in the runner. A configure or a resolve operation has to produce it; "
+            f"the API will not resolve the rest of the inventory, because a partial "
+            f"resolution is a target set that is silently too small."
+        ),
+    )
+
+
 def _item_integrity_error(exc: IntegrityError, name: str) -> HTTPException:
     """Translate an item write's `IntegrityError` into the status it deserves.
 
@@ -596,14 +623,7 @@ async def show_resolved_inventory(
     if version is None:
         sources = await inv.list_sources(db, inventory.id)
         if not inv.api_can_resolve(sources):
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "This inventory has never been resolved and contains a source the API "
-                    "cannot resolve. A configure or a resolve operation in a runner has to "
-                    "produce the first snapshot."
-                ),
-            )
+            raise _unresolvable_error(sources, "This inventory has never been resolved.")
         _, version = await inv.resolve_and_snapshot(db, inventory)
         await db.commit()
 
@@ -627,18 +647,7 @@ async def resolve_inventory(
 
     sources = await inv.list_sources(db, inventory.id)
     if not inv.api_can_resolve(sources):
-        offending = sorted(
-            {s.kind for s in sources if s.kind not in InventorySource.API_RESOLVABLE_KINDS}
-        )
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Sources {offending} need ansible to parse, and ansible is installed only "
-                f"in the runner. A configure or a resolve operation has to refresh this "
-                f"inventory; the API will not resolve the rest of it, because a partial "
-                f"resolution is a target set that is silently too small."
-            ),
-        )
+        raise _unresolvable_error(sources, "This inventory was not refreshed.")
 
     _, version = await inv.resolve_and_snapshot(db, inventory)
     await db.commit()

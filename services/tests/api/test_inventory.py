@@ -602,6 +602,11 @@ class TestResolvedView:
                 res = await c.get(f"/api/v1/inventories/inv-{inventory.id}/resolved", headers=_AUTH)
         assert res.status_code == 409
         snap.assert_not_awaited()
+        # And it names the offending kind. The read and the resolve action
+        # refuse for the same reason, and they had drifted: this one withheld
+        # the kinds, which is the actionable half, while being the refusal the
+        # UI actually hits. Both now compose one shared message.
+        assert "git" in res.json()["detail"], res.json()["detail"]
 
     async def test_the_resolve_action_names_the_offending_source_kinds(self):
         ws = _mock_ws()
