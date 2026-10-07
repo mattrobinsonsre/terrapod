@@ -50,6 +50,24 @@ cannot be taken separately.
 oversight: there is no runner token, nothing here runs, and the provider needs a
 host and token configured as it does today. The implicit grant is a property of
 running *inside* a run.
+
+## Terraform engines only
+
+`exec_subprocess` deliberately scrubs `TP_AUTH_TOKEN` out of the engine's
+environment, because "a provider is third-party code running against the
+operator's credentials by design; it has no business also holding the token that
+writes this run's state". The scrub covers the `TP_` prefix, so what this module
+exports is **not** scrubbed -- and it carries the same token value. That is
+unavoidable for the feature to work at all: Terraform has no per-provider
+environment, so anything the Terrapod provider can read, every other provider in
+the configuration can read too. A narrower credential is the real answer and is
+not built yet.
+
+What IS avoidable is exporting it where it cannot possibly be used. The
+`terrapod_inventory_item` resource is a **Terraform** resource; a Pulumi program
+has no equivalent today (#1987), so a Pulumi run gets the exposure and none of
+the benefit. So the export is gated on the engine, and a new engine has to opt
+in here rather than inheriting it by default.
 """
 
 from __future__ import annotations
@@ -69,7 +87,14 @@ TOKEN_VAR = "TERRAPOD_TOKEN"
 logger = structlog.get_logger("runner.phase.provider_credentials")
 
 
-def export_env(cfg, env: dict[str, str] | None = None) -> dict[str, str]:
+#: The engines whose providers can consume these credentials. Terraform and
+#: OpenTofu share one provider protocol and one resource; anything else has to
+#: be added deliberately, because the cost of exporting a credential an engine
+#: cannot use is all exposure and no benefit.
+SUPPORTED_ENGINES = frozenset({"", "terraform", "tofu", "opentofu"})
+
+
+def export_env(cfg, env: dict[str, str] | None = None, *, engine: str = "") -> dict[str, str]:
     """The provider credentials to merge into the engine's environment.
 
     Pure: returns the overrides rather than mutating `os.environ`, so a caller
@@ -77,10 +102,27 @@ def export_env(cfg, env: dict[str, str] | None = None) -> dict[str, str]:
     contract as `mirror_config.export_env`.
 
     `env` is the environment to inspect for an operator-supplied value; the
-    caller passes `os.environ`. Returns `{}` when there is nothing to do, which
-    is the no-op a workspace that declares no inventory gets.
+    caller passes `os.environ`. `engine` is the run's engine; an empty string is
+    Terraform/OpenTofu, which is how every existing caller and the Job's own
+    default present it. Returns `{}` when there is nothing to do, which is the
+    no-op a workspace that declares no inventory gets.
     """
     present = env if env is not None else {}
+
+    if engine not in SUPPORTED_ENGINES:
+        # Not a warning: a Pulumi run having no Terrapod provider is ordinary,
+        # not a misconfiguration. The message exists so that an operator reading
+        # a log does not conclude the credential export is broken.
+        logger.info(
+            "provider credentials not exported",
+            engine=engine,
+            reason=(
+                "the Terrapod provider's inventory resource is a Terraform resource and "
+                "this engine has no equivalent, so exporting the run's token into its "
+                "environment would be exposure with no use for it."
+            ),
+        )
+        return {}
 
     operator_set = [name for name in (HOSTNAME_VAR, TOKEN_VAR) if present.get(name)]
     if operator_set:

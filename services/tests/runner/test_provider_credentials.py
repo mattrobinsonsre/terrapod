@@ -116,6 +116,127 @@ class TestNothingToDo:
         assert pc.export_env(_cfg()) != {}
 
 
+class TestTheEngineGate:
+    """A credential an engine cannot use is exposure with no benefit.
+
+    `exec_subprocess` scrubs `TP_AUTH_TOKEN` out of the engine's environment --
+    "a provider is third-party code ... it has no business also holding the token
+    that writes this run's state" -- and the scrub covers the `TP_` prefix, so
+    what this module exports is NOT scrubbed and carries the same token value.
+    That is unavoidable for the feature: Terraform has no per-provider
+    environment, so anything the Terrapod provider reads, every provider reads.
+
+    What is avoidable is handing it to an engine with no resource to use it.
+    `terrapod_inventory_item` is a Terraform resource; Pulumi has no equivalent
+    (#1987), so a Pulumi run would get all of the exposure and none of the use.
+    """
+
+    def test_a_pulumi_run_gets_nothing(self):
+        assert pc.export_env(_cfg(), env={}, engine="pulumi") == {}
+
+    def test_terraform_and_opentofu_both_get_it(self):
+        for engine in ("terraform", "tofu", "opentofu"):
+            out = pc.export_env(_cfg(), env={}, engine=engine)
+            assert out != {}, engine
+
+    def test_an_absent_engine_is_terraform(self):
+        """`TP_ENGINE` is unset on a Terraform run, so the empty string is the
+        common case rather than an unknown."""
+        assert pc.export_env(_cfg(), env={}, engine="") != {}
+
+    def test_an_unrecognised_engine_gets_nothing(self):
+        """Fails closed, so a new engine opts in here rather than inheriting the
+        credential by default."""
+        assert pc.export_env(_cfg(), env={}, engine="ansible") == {}
+        assert pc.export_env(_cfg(), env={}, engine="chef") == {}
+
+    def test_the_default_argument_still_exports(self):
+        """Every pre-existing caller omits `engine`, so the default must be the
+        exporting case -- a default that silently stopped exporting would turn
+        this narrowing into a feature outage."""
+        assert pc.export_env(_cfg(), env={}) != {}
+
+
+class TestTheEntrypointActuallyEngagesTheGate:
+    """A gate the call site does not pass the engine to is decoration.
+
+    This exists because the obvious mutation proved it: dropping `engine=` from
+    the entrypoint's call left the whole runner suite green -- 1061 passed --
+    because every behavioural test calls `export_env` directly and the default
+    is the exporting case. So the gate was present and never engaged, which is
+    the weaker half of "a presence check is not an application check".
+
+    Source-introspected rather than driven, because the call sits mid-way
+    through `main()` after a chdir and a dozen side effects, and there is no seam
+    to reach it through.
+    """
+
+    def _main_source(self) -> str:
+        import inspect
+
+        from terrapod.runner import job_entrypoint
+
+        return inspect.getsource(job_entrypoint)
+
+    def test_the_call_site_passes_the_engine(self):
+        src = self._main_source()
+        assert "provider_credentials.export_env(" in src, "the phase is not wired at all"
+        assert "engine=engine" in src, (
+            "the entrypoint must pass the run's engine, or the gate never fires and a "
+            "Pulumi run is handed a credential it cannot use"
+        )
+
+    def test_the_call_comes_AFTER_the_engine_is_read(self):
+        """Positional, because Python would raise on an unbound name but a
+        future refactor could just as easily read the engine twice or default it
+        -- and a call placed above the read would have to invent a value."""
+        src = self._main_source()
+        read_at = src.index('engine = os.environ.get("TP_ENGINE"')
+        call_at = src.index("provider_credentials.export_env(")
+        assert read_at < call_at, (
+            "the export reads the engine, so it has to run after the engine is known"
+        )
+
+
+class TestTheScrubDoesNotCoverThese:
+    """Why the exposure exists at all, pinned so it cannot be forgotten.
+
+    If a future change reserved these names, `exec_subprocess` would scrub them
+    and the feature would break silently -- an empty `provider "terrapod" {}`
+    would start failing with a missing-hostname error and nothing would say why.
+    So the relationship is asserted in both directions rather than assumed.
+    """
+
+    def test_the_exported_names_survive_the_engine_env_scrub(self):
+        from terrapod.runner.reserved_env import is_reserved_env_key
+
+        assert not is_reserved_env_key(pc.HOSTNAME_VAR)
+        assert not is_reserved_env_key(pc.TOKEN_VAR)
+
+    def test_the_scrub_really_is_that_predicate(self):
+        """The two assertions above are only about the scrub if the scrub uses
+        this predicate. Checked by reading the source, because the filtering is
+        a comprehension inside `run()` and there is no seam to call."""
+        import inspect
+
+        from terrapod.runner import exec_subprocess
+
+        src = inspect.getsource(exec_subprocess.run)
+        assert "is_reserved_env_key" in src
+        assert "env=child_env" in src, (
+            "the scrubbed env has to actually be passed to the child, or the "
+            "filtering above is decoration"
+        )
+
+    def test_the_platform_token_this_duplicates_IS_scrubbed(self):
+        """`TP_AUTH_TOKEN` is removed from the child env; the value we export
+        under a different name is the same token. That asymmetry is the reason a
+        narrower credential is the real answer."""
+        from terrapod.runner.reserved_env import is_reserved_env_key
+
+        assert is_reserved_env_key("TP_AUTH_TOKEN")
+
+
 class TestTheNamesAreTheProvidersOwn:
     def test_the_exported_names_are_what_the_provider_reads(self):
         """Deliberately unprefixed: these are consumed by a third-party binary

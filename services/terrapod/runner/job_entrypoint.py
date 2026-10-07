@@ -663,22 +663,30 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     for k, v in mirror_config.export_env(config_path=_TF_RC, env={}).items():
         os.environ[k] = v
 
-    # 3b. Let the Terrapod provider authenticate from inside the run, so a
+    # 4. Chdir into working subdirectory.
+    cwd = working_dir.resolve_and_chdir(strip_dir, cfg.working_dir)
+    log.info("chdir", cwd=str(cwd))
+
+    # The engine decides four things below -- this file, the state download, the
+    # plan-lock reuse and the provider-credential export -- so it is read once,
+    # here, rather than at each.
+    engine = os.environ.get("TP_ENGINE", "")
+    is_pulumi = engine == "pulumi"
+
+    # 4a. Let the Terrapod provider authenticate from inside the run, so a
     # workspace can declare its inventory with `terrapod_inventory_item` and an
     # empty `provider "terrapod" {}` block (#1968). Exported here rather than in
     # the Job spec because only `TP_`-prefixed names are reserved, so a
     # workspace variable could otherwise redirect the provider's host while the
     # spec still supplied the real token -- see the module docstring.
-    for k, v in provider_credentials.export_env(cfg, env=os.environ).items():
+    #
+    # It sits after the engine is known rather than beside the mirror config,
+    # because the export is engine-gated: `exec_subprocess` scrubs the `TP_`
+    # prefix and not these names, so the token does reach every provider plugin
+    # the configuration loads, and an engine that cannot use it should not be
+    # handed it.
+    for k, v in provider_credentials.export_env(cfg, env=os.environ, engine=engine).items():
         os.environ[k] = v
-
-    # 4. Chdir into working subdirectory.
-    cwd = working_dir.resolve_and_chdir(strip_dir, cfg.working_dir)
-    log.info("chdir", cwd=str(cwd))
-
-    # The engine decides three things below -- this file, the state download
-    # and the plan-lock reuse -- so it is read once, here, rather than at each.
-    is_pulumi = os.environ.get("TP_ENGINE", "") == "pulumi"
 
     # 4b. Render terrapod.auto.tfvars from the mounted vars Secret (if any),
     # BEFORE init so it's part of the post-init baseline (the plan-artifacts
