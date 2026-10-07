@@ -2,17 +2,47 @@
 
 The point of these tests is the asymmetry with the runner: there, a missing OPA
 must stop the run; here it must not stop an operator editing a policy. What is
-*not* negotiable on either side is the artifact — an unverifiable download is
-rejected rather than executed.
+*not* negotiable on either side is the artifact — both sides fetch through the
+binary cache, which is the one place that decides a binary is trustworthy.
 """
 
 from __future__ import annotations
 
+import ast
+import asyncio
+import contextlib
+import inspect
+import stat
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from terrapod.services import api_opa, policy_engine
+
+
+@contextlib.contextmanager
+def _cache_serving(storage, *, cached: AsyncMock | None = None):
+    """Stand in for the binary cache and the object store behind it.
+
+    `_download` imports `get_db_session`, `get_or_cache_binary` and
+    `get_storage` lazily inside the function, so they resolve from their own
+    modules at call time -- patching them on `api_opa` would patch nothing and
+    the test would silently exercise the real cache. Patch them at the source.
+    """
+
+    @contextlib.asynccontextmanager
+    async def _session():
+        yield AsyncMock()
+
+    with (
+        patch("terrapod.db.session.get_db_session", _session),
+        patch(
+            "terrapod.services.binary_cache_service.get_or_cache_binary",
+            cached if cached is not None else AsyncMock(return_value=""),
+        ),
+        patch("terrapod.storage.get_storage", lambda: storage),
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -148,42 +178,18 @@ class TestConcurrentDownloadsDoNotClobber:
     """
 
     async def test_two_concurrent_downloads_both_succeed(self, tmp_path):
-        import asyncio
-
         payload = b"#!/bin/sh\necho opa\n"
 
-        class _FakeStream:
-            status_code = 200
-
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, *exc):
-                return False
-
-            async def aiter_bytes(self, _size):
+        class _FakeStorage:
+            async def get_stream(self, _key):
                 # Yield in two parts with a suspension between, so the two
                 # coroutines are guaranteed to interleave mid-write.
                 yield payload[:5]
                 await asyncio.sleep(0)
                 yield payload[5:]
 
-        class _FakeClient:
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, *exc):
-                return False
-
-            def stream(self, _method, _url):
-                return _FakeStream()
-
         dest = tmp_path / "opa-1.19.0"
-        with (
-            patch.object(api_opa.httpx, "AsyncClient", lambda **kw: _FakeClient()),
-            patch.object(api_opa, "download_url", lambda *a: "https://example.invalid/opa"),
-            patch.object(api_opa, "verify_platform_tool", AsyncMock()),
-        ):
+        with _cache_serving(_FakeStorage()):
             await asyncio.gather(
                 api_opa._download("1.19.0", dest),
                 api_opa._download("1.19.0", dest),
@@ -193,3 +199,81 @@ class TestConcurrentDownloadsDoNotClobber:
         assert dest.read_bytes() == payload
         # And no scratch files left behind.
         assert [p.name for p in tmp_path.iterdir()] == [dest.name]
+
+
+class TestTheApiFetchesOpaThroughTheCacheOnly:
+    """The acquisition path is the binary cache, and nothing else.
+
+    A direct upstream fetch here is not a style preference. It breaks a sealed
+    deployment (`registry.cache_only`), it re-downloads on every pod and every
+    restart instead of being served from object storage, and it puts a second
+    checksum gate beside the cache's own -- two places deciding whether an OPA
+    binary is trustworthy, which is one too many. The cache is the single path
+    allowed to reach upstream, and `_download` drives it in-process rather than
+    over the API's own HTTP surface, so there is no loopback request and no
+    credential the API would have to mint for itself.
+    """
+
+    async def test_it_populates_the_cache_then_reads_that_object(self, tmp_path):
+        from terrapod.storage.keys import binary_cache_key
+
+        read_keys: list[str] = []
+
+        class _FakeStorage:
+            async def get_stream(self, key):
+                read_keys.append(key)
+                yield b"opa-bytes"
+
+        cached = AsyncMock(return_value="https://presigned.invalid/opa")
+        dest = tmp_path / "opa-1.19.0"
+        with _cache_serving(_FakeStorage(), cached=cached):
+            await api_opa._download("1.19.0", dest)
+
+        # The cache was asked for it -- which populates it on a miss and
+        # touches `last_accessed_at` on a hit, so retention cannot reap a
+        # binary this pod depends on.
+        assert cached.await_count == 1
+        args = cached.await_args.args
+        assert args[2:5] == ("opa", "1.19.0", "linux")
+        arch = args[5]
+        assert arch in ("amd64", "arm64")
+
+        # And the bytes came back from that same cached object, by key --
+        # not from upstream, and not over a presigned URL the API would have
+        # to fetch over HTTP.
+        assert read_keys == [binary_cache_key("opa", "1.19.0", "linux", arch)]
+        assert dest.read_bytes() == b"opa-bytes"
+        assert dest.stat().st_mode & stat.S_IXUSR
+
+    def test_no_http_client_is_reachable_from_the_module(self):
+        """Asserted on the imports, not the text.
+
+        An AST walk catches a client imported lazily inside a function body --
+        which is how the cache and storage are reached here, so it is the shape
+        a reinstated upstream fetch would most plausibly take. It also ignores
+        the comments that *mention* the old path, which a grep would not.
+        """
+        tree = ast.parse(inspect.getsource(api_opa))
+        reachable: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                reachable.update(a.name.split(".")[0] for a in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    reachable.add(node.module.split(".")[0])
+                reachable.update(a.name for a in node.names)
+
+        forbidden = {
+            "httpx",
+            "requests",
+            "urllib",
+            "urllib3",
+            "aiohttp",
+            "download_url",
+            "verify_platform_tool",
+        }
+        offenders = sorted(reachable & forbidden)
+        assert not offenders, (
+            f"{offenders} is reachable from api_opa. The API's OPA fetch goes through "
+            "get_or_cache_binary, never upstream directly -- see this class's docstring."
+        )

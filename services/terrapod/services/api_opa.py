@@ -26,21 +26,17 @@ the API becoming ready.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import os
 import platform
 import stat
 import tempfile
 from pathlib import Path
 
-import httpx
 import structlog
 
 from terrapod.config import settings
 from terrapod.services.platform_tools import (
     configured_version,
-    download_url,
-    verify_platform_tool,
 )
 
 logger = structlog.get_logger(__name__)
@@ -64,16 +60,45 @@ def _tool_dir() -> Path:
 
 
 async def _download(version: str, dest: Path) -> None:
-    """Fetch the static linux binary for this pod's architecture.
+    """Put OPA on the PVC, fetched **through the binary cache**.
 
-    Streamed to disk in a worker thread — never held in memory, and never
+    Not from upstream directly, which is what this did before. Every fetch goes
+    through the cache, and that is not a preference: the cache is the one thing
+    that can reach upstream on a deployment where nothing else can, it stores
+    the artifact so a second API pod and every restart are served from object
+    storage rather than GitHub, and an install that is sealed later still holds
+    what it already fetched.
+
+    **In-process, not over the API's own HTTP surface.** `get_or_cache_binary`
+    is an ordinary async function, so the cache is driven by calling it and the
+    bytes are then read from object storage by key -- no loopback request, and
+    no credential the API would have to mint for itself.
+
+    It also removes a duplicated upstream path. The cache applies the same
+    checksum gate this function used to apply itself (`verify_platform_tool`,
+    via `artifact_verification`), so verification is no longer repeated here --
+    there is exactly one place that decides whether an OPA binary is
+    trustworthy, and it is the same one the runner's fetch goes through.
+
+    Streamed to disk in a worker thread -- never held in memory, and never
     blocking the event loop on the write (rule 13).
     """
+    from terrapod.db.session import get_db_session
+    from terrapod.services.binary_cache_service import get_or_cache_binary
+    from terrapod.storage import get_storage
+    from terrapod.storage.keys import binary_cache_key
+
     arch = "arm64" if platform.machine().lower() in ("aarch64", "arm64") else "amd64"
-    # Same upstream and same checksum gate the cache itself applies. This is the
-    # API fetching for its own use, so it goes direct rather than back through
-    # its own HTTP surface.
-    url = download_url("opa", version, "linux", arch)
+    storage = get_storage()
+
+    # Populates the cache on a miss and verifies the checksum; a hit touches
+    # `last_accessed_at` so retention does not reap a binary this pod relies on.
+    # Its own short-lived session: nothing is held open across the transfer.
+    async with get_db_session() as db:
+        await get_or_cache_binary(db, storage, "opa", version, "linux", arch)
+
+    key = binary_cache_key("opa", version, "linux", arch)
+
     # A UNIQUE scratch file per fetch, not a fixed `<dest>.partial`. Two
     # concurrent fetchers (two policy-set writes arriving together, or two
     # pytest-xdist workers) would otherwise stream into the same path, and the
@@ -84,29 +109,13 @@ async def _download(version: str, dest: Path) -> None:
     fd, tmp_name = tempfile.mkstemp(dir=dest.parent, prefix=f"{dest.name}.", suffix=".partial")
     os.close(fd)
     tmp = Path(tmp_name)
-    digest = hashlib.sha256()
     try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=120) as client:
-            async with client.stream("GET", url) as resp:
-                if resp.status_code != 200:
-                    raise RuntimeError(f"HTTP {resp.status_code} fetching {url}")
-                with tmp.open("wb") as fh:
-                    async for chunk in resp.aiter_bytes(1024 * 256):
-                        digest.update(chunk)
-                        await asyncio.to_thread(fh.write, chunk)
-            # Fail closed on the artifact even though the *feature* degrades:
-            # "we could not get OPA" is a fine outcome, "we ran an unverified
-            # binary" is not.
-            # A mapping, not a bare hex string: since #1566 a tool states its
-            # checksum in whichever algorithm its publisher uses (.NET states
-            # SHA-512 and no SHA-256), so the caller hands over everything it
-            # computed and verification picks the one that tool is checked by.
-            await verify_platform_tool(
-                client, "opa", version, "linux", arch, {"sha256": digest.hexdigest()}
-            )
+        with tmp.open("wb") as fh:
+            async for chunk in storage.get_stream(key):
+                await asyncio.to_thread(fh.write, chunk)
 
         tmp.chmod(tmp.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-        # Last writer wins, and every writer wrote a checksum-verified binary,
+        # Last writer wins, and every writer wrote a binary the cache verified,
         # so whichever lands is correct.
         tmp.replace(dest)
     except BaseException:
