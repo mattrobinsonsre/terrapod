@@ -412,11 +412,17 @@ So when an inventory contains a source the API does not own, **the API refuses
 rather than resolving the part it can**, naming the offending source kinds:
 
 ```
-409  Sources ['git'] need ansible to parse, and ansible is installed only in
-     the runner. A configure or a resolve operation has to refresh this
-     inventory; the API will not resolve the rest of it, because a partial
-     resolution is a target set that is silently too small.
+409  This inventory was not refreshed. Sources ['git'] need ansible to parse,
+     and ansible is installed only in the runner. A configure or a resolve
+     operation has to produce it; the API will not resolve the rest of the
+     inventory, because a partial resolution is a target set that is silently
+     too small.
 ```
+
+A read of the resolved view refuses the same way and names the same kinds,
+differing only in its opening clause (`This inventory has never been
+resolved.`) — the two compose one message, because an operator meeting either
+is asking which source and what to do about it.
 
 (No such source kind exists yet, so no inventory can be in that state today.
 The refusal is in place now so that the runner path is forced when the first
@@ -512,7 +518,7 @@ alias and serves all of these too. None of this is on the TFE-compatible prefix
 | `POST /api/v1/workspaces/{id}/inventories` | `inventory:write` | Create a named inventory, with its `terraform` source at position 0. `201` |
 | `GET /api/v1/inventories/{id}` | `inventory:read` | One inventory, with its ordered sources |
 | `DELETE /api/v1/inventories/{id}` | `inventory:write` | Delete an inventory, its sources and its snapshots. Declared items are untouched. `204` |
-| `GET /api/v1/inventories/{id}/resolved` | `inventory:read` | What the inventory resolves to, with `taken-at`. Resolves and records a first snapshot when there is none and every source is API-resolvable; `409` otherwise |
+| `GET /api/v1/inventories/{id}/resolved` | `inventory:read` | What the inventory resolves to, with `taken-at`. Resolves and records a first snapshot when there is none and every source is API-resolvable; `409` naming the offending source kinds otherwise |
 | `POST /api/v1/inventories/{id}/actions/resolve` | `inventory:write` | Refresh the snapshot now. `409` naming the offending source kinds when a source needs ansible |
 | `GET /api/v1/inventories/{id}/versions` | `inventory:read` | Snapshot history, newest first. Contents omitted — read one for them |
 | `POST /api/v1/inventories/{id}/versions` | **Runner token only** | A runner posts the resolution it performed. `403` for a person, pointing at the resolve action. `201` |

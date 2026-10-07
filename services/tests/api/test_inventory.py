@@ -795,6 +795,42 @@ class TestPayNothing:
         assert res.json()["data"] == []
 
 
+class TestTheUnresolvableRefusalIsQuotedInTheDocs:
+    """Both leads are quoted verbatim in `docs/ansible-inventory.md` and
+    `docs/api-reference.md`, so they are pinned here.
+
+    A doc quoting an error message is a claim that goes stale silently: the code
+    changes, the page keeps showing output nothing produces, and an operator
+    searching for the text they were given finds nothing. This file already
+    asserts that the read names the offending kinds; these pin the opening
+    clause the pages reproduce.
+    """
+
+    def test_both_leads_exist_and_differ(self):
+        from terrapod.api.routers import inventory as mod
+
+        read = mod._unresolvable_error([], "This inventory has never been resolved.")
+        action = mod._unresolvable_error([], "This inventory was not refreshed.")
+
+        assert read.detail.startswith("This inventory has never been resolved.")
+        assert action.detail.startswith("This inventory was not refreshed.")
+        assert read.status_code == action.status_code == 409
+        # Same body after the lead: one message, two openings. If they diverge
+        # again, the pages describing them as one message become false.
+        assert read.detail.split(".", 1)[1] == action.detail.split(".", 1)[1]
+
+    def test_it_names_every_offending_kind_and_only_those(self):
+        from terrapod.api.routers import inventory as mod
+
+        sources = [_mock_source("terraform", 0), _mock_source("git", 1), _mock_source("ini", 2)]
+        detail = mod._unresolvable_error(sources, "lead.").detail
+
+        assert "'git'" in detail and "'ini'" in detail
+        assert "terraform" not in detail, (
+            "naming the source the API CAN resolve would send an operator after the wrong one"
+        )
+
+
 class TestTheInventoryWireShape:
     """Sources ride in `attributes.sources`, and that is what the SDK decodes.
 

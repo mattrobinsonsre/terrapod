@@ -5597,7 +5597,15 @@ GET /api/v1/inventories/{id}/resolved
 
 Requires `inventory:read`. Serves the **newest snapshot** — not a live resolution, which is why `taken-at` is on every response. When there is no snapshot yet *and* every source is one the API owns, it resolves and records one first, so a workspace that has just declared its hosts can see them immediately.
 
-`409` when the inventory has never been resolved **and** contains a source the API cannot resolve: a configure or a resolve operation in a runner has to produce the first snapshot.
+`409` when the inventory has never been resolved **and** contains a source the API cannot resolve. The refusal **names the offending source kinds** — the same message the resolve action gives, differing only in its opening clause, because an operator meeting either asks the same question:
+
+```
+409  This inventory has never been resolved. Sources ['git'] need ansible to
+     parse, and ansible is installed only in the runner. A configure or a
+     resolve operation has to produce it; the API will not resolve the rest of
+     the inventory, because a partial resolution is a target set that is
+     silently too small.
+```
 
 **Response:**
 ```json
