@@ -5469,6 +5469,269 @@ Deletes the catalog instance's workspace record **without** destroying its infra
 
 ---
 
+## Ansible Inventory
+
+A workspace's **inventory** is an ordered set of sources that resolve into one host and group set, in the shape ansible consumes. The only source kind implemented is `terraform`: the hosts the workspace's own Terraform declares as `terrapod_inventory_item` resources, one resource per host. See [Ansible Inventory](ansible-inventory.md) for the model, the merge semantics and the two declaration patterns.
+
+**Native surface only** — nothing here is on the TFE-compatible prefix, because no `terraform`, `tofu` or `tfci` invocation consumes it. The canonical prefix is `/api/v1`; `/api/terrapod/v1` is the deprecated alias and serves every route below.
+
+Two capabilities gate it, both in the workspace axis: **`inventory:read`** (read tier) for every read, and **`inventory:write`** (write tier — deliberately not admin, because the Terraform that declares a host runs under an apply) for every write. A **runner token** is handled separately: it may manage the inventory items of **its own run's workspace** and nothing else, reads unphased and writes bound to the **apply** phase.
+
+**Configure operations do not exist yet.** These endpoints declare an inventory and make it observable; they do not run playbooks.
+
+> **Host variables are stored and returned in the clear**, in full, to any holder of `inventory:read`. There is no `sensitive` flag and no masking. Do not put a credential in one.
+
+Typed id prefixes: `invitem-` (declared host), `inv-` (inventory), `invsrc-` (source), `invver-` (snapshot).
+
+### List Workspace Inventory Items
+
+```
+GET /api/v1/workspaces/{id}/inventory-items
+```
+
+Requires `inventory:read`. The hosts this workspace declares, ordered by name. Supports the standard `page[number]` / `page[size]`. Unphased for a runner token — a plan reads the inventory to diff it.
+
+### Create Inventory Item
+
+```
+POST /api/v1/workspaces/{id}/inventory-items
+```
+
+Requires `inventory:write`; **apply phase** for a runner token. Declares one host. Returns `201`.
+
+**Request body:**
+```json
+{
+  "data": {
+    "type": "inventory-items",
+    "attributes": {
+      "name": "web-01",
+      "address": "10.0.1.20",
+      "groups": ["web", "linux"],
+      "vars": { "ansible_user": "ec2-user" }
+    }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `name` | Required. The inventory hostname. Refused with `422` if it contains whitespace or any of `,`, `:`, `!`, `&`, `~` — those are `--limit`'s own operators and separators, so such a host cannot be targeted and a leading `!` would silently exclude the host it names. Dots, hyphens and underscores are fine. |
+| `address` | Optional convenience that populates the `ansible_host` variable at resolution time. An explicit `ansible_host` in `vars` wins. |
+| `groups` | Optional list of declared group names. `all` and `ungrouped` are derived by ansible and refused with `422`; otherwise a name must start with a letter or underscore and contain only letters, digits and underscores. |
+| `vars` | Optional object of ansible host variables. Keys must be non-empty strings; Terrapod gives none of them special meaning. **Stored and returned in the clear.** |
+
+`409` when a host of that name is already declared in the workspace. `422` when the workspace already holds 5000 items.
+
+### Show / Update / Delete Inventory Item
+
+```
+GET    /api/v1/inventory-items/{id}
+PATCH  /api/v1/inventory-items/{id}
+DELETE /api/v1/inventory-items/{id}
+```
+
+`GET` requires `inventory:read`; `PATCH` and `DELETE` require `inventory:write` (apply phase for a runner token). `DELETE` returns `204`.
+
+`PATCH` is a **partial update**: an absent attribute is left alone, and an empty list or object **clears**. The distinction is load-bearing for the provider — omitting `groups` and sending `groups: []` are different requests, and collapsing them would make a cleared list impossible to express. A duplicate `name` → `409`.
+
+### List / Create Inventories
+
+```
+GET  /api/v1/workspaces/{id}/inventories
+POST /api/v1/workspaces/{id}/inventories
+```
+
+`GET` requires `inventory:read` and supports the standard paging. It is **empty for a workspace that has never declared a host** — the `default` inventory is created lazily on the first write, so a Terraform/OpenTofu-only workspace carries no inventory rows at all.
+
+`POST` requires `inventory:write`, takes `name` (required) and `description`, and returns `201`. Every new inventory is created with its `terraform` source at **position 0**. `409` on a duplicate name in the workspace.
+
+### Show / Delete Inventory
+
+```
+GET    /api/v1/inventories/{id}
+DELETE /api/v1/inventories/{id}
+```
+
+`GET` requires `inventory:read`; `DELETE` requires `inventory:write` and returns `204`.
+
+**Deleting an inventory deletes its sources and its snapshots, and leaves the declared items alone.** An item belongs to the workspace, not to any one inventory, so removing the view cannot remove the hosts.
+
+**Response:**
+```json
+{
+  "data": {
+    "id": "inv-0193...",
+    "type": "inventories",
+    "attributes": {
+      "name": "default",
+      "description": "",
+      "api-resolvable": true,
+      "sources": [
+        {
+          "id": "invsrc-0193...",
+          "position": 0,
+          "kind": "terraform",
+          "config": {},
+          "api-resolvable": true,
+          "created-at": "2026-10-07T09:00:00Z"
+        }
+      ],
+      "created-at": "2026-10-07T09:00:00Z",
+      "updated-at": "2026-10-07T09:00:00Z"
+    }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `api-resolvable` | Whether **every** source is one the API owns. `false` means a snapshot can only be produced in a runner, which is why one may be older than the declared items. |
+| `sources` | The composition, in `-i` order — a lower `position` resolves first, so a **higher** position wins a conflicting host variable. Each source reports its **own** `api-resolvable`, so a reader can see *which* source is why a snapshot is stale rather than having to infer it. A source is deliberately not a nested JSON:API resource: it has no route of its own. |
+
+### Show Resolved Inventory
+
+```
+GET /api/v1/inventories/{id}/resolved
+```
+
+Requires `inventory:read`. Serves the **newest snapshot** — not a live resolution, which is why `taken-at` is on every response. When there is no snapshot yet *and* every source is one the API owns, it resolves and records one first, so a workspace that has just declared its hosts can see them immediately.
+
+`409` when the inventory has never been resolved **and** contains a source the API cannot resolve: a configure or a resolve operation in a runner has to produce the first snapshot.
+
+**Response:**
+```json
+{
+  "data": {
+    "id": "invver-0193...",
+    "type": "inventory-versions",
+    "attributes": {
+      "host-count": 2,
+      "group-count": 1,
+      "produced-by": "api",
+      "produced-by-ref": "",
+      "taken-at": "2026-10-07T09:05:00Z",
+      "hosts": {
+        "web-01": { "ansible_host": "10.0.1.20", "ansible_user": "ec2-user" },
+        "jump": {}
+      },
+      "groups": { "web": ["web-01"] },
+      "ansible-inventory": {
+        "_meta": { "hostvars": {
+          "jump": {},
+          "web-01": { "ansible_host": "10.0.1.20", "ansible_user": "ec2-user" }
+        } },
+        "ungrouped": { "hosts": ["jump"] },
+        "all": { "children": ["web", "ungrouped"] },
+        "web": { "hosts": ["web-01"] }
+      }
+    }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `hosts` | Host name → merged variables. **Exhaustive — this is the host set**, including a host with no variables at all. |
+| `groups` | Declared group name → sorted member host names. `all` and `ungrouped` are not here; they are derived. |
+| `ansible-inventory` | The same resolution in the shape `ansible-inventory --list` produces, rendered on demand rather than stored twice. Unlike ansible's own output it includes **every** host in `_meta.hostvars` — ansible omits a var-less host entirely, and enumerating a host set from that shape loses hosts silently. |
+| `produced-by` | `api` (the API resolved sources it owns) or `runner`. |
+| `produced-by-ref` | Opaque reference to whatever produced it when a runner did — today a run id. Deliberately not a foreign key. |
+| `taken-at` | When this resolution happened. A read and a limit preview are **as fresh as this**, not live. |
+
+### Resolve Inventory
+
+```
+POST /api/v1/inventories/{id}/actions/resolve
+```
+
+Requires `inventory:write` — it replaces what every reader is shown. Resolves every source in `-i` order and records a new snapshot, returning it with contents (same shape as the resolved view above).
+
+`409` when any source needs ansible, **naming the offending source kinds**:
+
+```json
+{
+  "errors": [{
+    "status": "409",
+    "detail": "Sources ['git'] need ansible to parse, and ansible is installed only in the runner. A configure or a resolve operation has to refresh this inventory; the API will not resolve the rest of it, because a partial resolution is a target set that is silently too small."
+  }]
+}
+```
+
+It refuses rather than resolving the part it can: a partial resolution looks like an answer and is a host set missing everything the unresolvable source would have contributed.
+
+### List Inventory Versions
+
+```
+GET /api/v1/inventories/{id}/versions
+```
+
+Requires `inventory:read`. Snapshot history, newest first, supporting the standard paging. **Contents are omitted** — `hosts`, `groups` and `ansible-inventory` are absent; read the resolved view for them. History is bounded to the newest 20 snapshots per inventory, pruned as each new one is written.
+
+### Record Inventory Version (runner protocol)
+
+```
+POST /api/v1/inventories/{id}/versions
+```
+
+**Runner token only.** A runner posts the resolution it actually performed — the write path for everything the API cannot resolve itself. A person is answered `403` pointing at `POST /inventories/{id}/actions/resolve` instead, because a snapshot records what a resolve found, so it is written by the thing that ran it. Returns `201` without contents.
+
+**Request body:**
+```json
+{
+  "data": {
+    "type": "inventory-versions",
+    "attributes": {
+      "hosts": { "web-01": { "ansible_host": "10.0.1.20" }, "jump": {} },
+      "groups": { "web": ["web-01"] }
+    }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `hosts` | Host name → variables object. Every entry's value must be an object or → `422`. Include **every** host, var-less ones included. |
+| `groups` | Group name → list of member host names. A non-list member list → `422`. |
+
+`produced-by` is recorded as `runner` and `produced-by-ref` as the posting token's run id.
+
+### Preview a `--limit`
+
+```
+POST /api/v1/inventories/{id}/actions/preview-limit
+```
+
+Requires `inventory:read`. Read-only. Answers which hosts a `--limit` pattern would select **against the last snapshot**.
+
+**Request body:**
+```json
+{ "data": { "attributes": { "limit": "web:&linux:!web-02" } } }
+```
+
+An empty or whitespace-only `limit` selects every host. It expands host names, group names, `all` and `*`, globs, comma- or colon-separated terms, `!` exclusion and `&` intersection. An inclusion term unions, except that the first term starts from nothing rather than from the whole inventory.
+
+**Response:**
+```json
+{
+  "data": {
+    "id": "invver-0193...",
+    "type": "inventory-limit-previews",
+    "attributes": {
+      "limit": "web:&linux:!web-02",
+      "hosts": ["web-01"],
+      "host-count": 1,
+      "of-host-count": 12,
+      "taken-at": "2026-10-07T09:05:00Z"
+    }
+  }
+}
+```
+
+Two honesty caveats carried in the payload itself: the result is **advisory** — the authoritative expansion is always `ansible-inventory --list --limit` taken in the runner at the start of a configure — and it is **as fresh as `taken-at`**, with `of-host-count` giving the snapshot's total for context.
+
+`422` on a `~regex` term, rather than quietly matching nothing: ansible applies the expression at run time, and showing an empty target set for a pattern it would have expanded is the wrong answer dressed as an answer. `422` when `limit` is not a string. `409` when the inventory has no snapshot yet — there is nothing to limit against.
+
 ## High Availability
 
 Leader/follower pair endpoints (#960). See [High availability](high-availability.md).

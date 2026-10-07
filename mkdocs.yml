@@ -55,6 +55,7 @@ nav:
   - Features:
       - VCS Integration: vcs-integration.md
       - Per-Workspace Cloud Identity: cloud-identity.md
+      - Ansible Inventory: ansible-inventory.md
       - Drift Detection: drift-detection.md
       - Run Triggers: run-triggers.md
       - Notifications: notifications.md
