@@ -50,6 +50,7 @@
     "typescript": "^6.0.3"
   },
   "overrides": {
+    "source-map-js": "^1.2.2",
     "postcss": "^8.5.28",
     "@babel/core": "^7.29.6",
     "brace-expansion": "^2.1.7",
