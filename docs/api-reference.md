@@ -423,6 +423,30 @@ The variable-set refusal compares the rule-assigned sets reaching the workspace
 
 The refusal names the variable sets it would have pulled in — the names are not
 secret, the values are.
+### `ansible-version`
+
+The ansible-core version this workspace's **configure** operations use — a
+deployment default that a workspace may override, exactly as it overrides its
+engine version. Collection compatibility is a per-workspace concern, so one
+version for the whole deployment would be the wrong shape.
+
+| | |
+|---|---|
+| **Type** | string |
+| **Default** | `api.config.default_ansible_version` at the time the workspace was created. Raising that value moves only workspaces created afterwards — existing ones keep what they carry, exactly as the engine version does. Use bulk update to move a fleet. |
+| **Empty means** | inherit the deployment default. A row predating this attribute reads back empty; a workspace created normally carries a concrete version. |
+| **Accepted** | any non-empty string. The only write-time rule is the deployment's pre-release policy, so `binary_cache.allow_prerelease: none` 422s `2.21.5rc1` and allows `2.21.5`. There is deliberately **no format rule** — `engine-version` has none either, and pip's own message about a version PyPI does not publish beats a regex of ours guessing at what it does. |
+| **Not resolved** | a partial such as `2.18` is **not** expanded to the newest matching release, unlike `engine-version`: nothing resolves it, so the value reaches pip as written and fails at install time. Pin an exact version. `latest` likewise. |
+
+**A read returns the workspace's own value.** The deployment default is not
+substituted in for an empty one, because a client that wrote a read straight
+back would then pin every workspace to whatever the default happened to be at
+read time — the same reason `oidc_audiences` reconciles only the keys a
+practitioner declared.
+
+Settable on workspace create, workspace update, bulk update, and as an
+autodiscovery rule template field.
+
 ### `engine-version`, and its older name `terraform-version`
 
 A workspace pins the version of whichever engine it runs — OpenTofu, Terraform

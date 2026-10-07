@@ -45,6 +45,7 @@ from terrapod.engines import known_engines
 from terrapod.logging_config import get_logger
 from terrapod.services import run_service, workspace_settings
 from terrapod.services.parallelism import DEFAULT_PARALLELISM, validate_parallelism
+from terrapod.services.workspace_settings import validate_ansible_version
 
 router = APIRouter(tags=["autodiscovery-rules"])
 logger = get_logger(__name__)
@@ -85,6 +86,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "terraform-version": rule.engine_version,
             "resource-cpu": rule.resource_cpu,
             "parallelism": rule.parallelism,
+            "ansible-version": rule.ansible_version,
             "resource-memory": rule.resource_memory,
             "oidc-audiences": dict(rule.oidc_audiences or {}),
             "auto-apply": rule.auto_apply,
@@ -278,6 +280,13 @@ def _coerce_attrs(attrs: dict, *, on_create: bool, existing: Any = None) -> dict
         out["engine"] = eng
     if "engine-version" in attrs or "terraform-version" in attrs:
         out["engine_version"] = engine_version_attr(attrs, "")
+    if "ansible-version" in attrs:
+        # Wrapped like `parallelism` below: bare, the rule's ValueError escaped
+        # as a 500 where the guard exists to give a 422.
+        try:
+            out["ansible_version"] = validate_ansible_version(attrs["ansible-version"])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
     if "parallelism" in attrs:
         try:
             out["parallelism"] = validate_parallelism(attrs["parallelism"])
@@ -708,6 +717,7 @@ def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> Autodi
         engine_version=fields.get("engine_version", "1.13"),
         resource_cpu=fields.get("resource_cpu", "1"),
         parallelism=fields.get("parallelism", DEFAULT_PARALLELISM),
+        ansible_version=fields.get("ansible_version", "2.21.5"),
         resource_memory=fields.get("resource_memory", "2Gi"),
         oidc_audiences=fields.get("oidc_audiences", {}),
         auto_apply=fields.get("auto_apply", False),

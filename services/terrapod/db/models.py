@@ -341,6 +341,20 @@ class Workspace(Base):
     #: Partial versions resolve to the newest matching release; empty means the
     #: deployment's default for that engine.
     engine_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.13")
+    #: ansible-core for this workspace's configure operations (#2010). A default
+    #: overrideable per workspace, following `engine_version` above in every
+    #: respect -- including that a bump to the deployment default moves only the
+    #: server_default, never existing rows (see `3214ad466305`).
+    #:
+    #: That consistency is deliberate, and it is also the safer shape. An
+    #: ansible-core minor changes behaviour as well as fixing bugs --
+    #: deprecations, module changes, collection compatibility -- so a
+    #: `helm upgrade` must not silently move an existing workspace onto one.
+    #: Moving a fleet is a deliberate act, and bulk update is how.
+    #:
+    #: Empty still resolves to the deployment default, for a row that predates
+    #: this column -- a restore from an older snapshot, say.
+    ansible_version: Mapped[str] = mapped_column(String(20), nullable=False, default="2.21.5")
     # Terragrunt single-unit support (#534): when enabled the runner invokes
     # `terragrunt` wrapping the tofu/terraform binary (via TG_TF_PATH). Version
     # is partial (e.g. "0.67"), resolved via the binary cache like
@@ -1643,6 +1657,12 @@ class AutodiscoveryRule(Base):
     )
     execution_backend: Mapped[str] = mapped_column(String(20), nullable=False, default="tofu")
     engine_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.13")
+    #: Template for a materialised workspace's ansible-core version (#2010),
+    #: following `engine_version` above -- including the literal default, which
+    #: mirrors `api.config.default_ansible_version` and moves with it, exactly
+    #: as this column's `engine_version` sibling mirrors
+    #: `default_terraform_version`.
+    ansible_version: Mapped[str] = mapped_column(String(20), nullable=False, default="2.21.5")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
     #: Templated onto workspaces this rule materialises (#1431), alongside the

@@ -49,6 +49,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.auto_apply = False
     ws.execution_mode = "agent"
     ws.engine_version = "1.11"
+    ws.ansible_version = "2.21.5"
     ws.terragrunt_enabled = False
     ws.terragrunt_version = "1.0"
     ws.working_directory = ""

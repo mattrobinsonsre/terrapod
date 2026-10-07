@@ -61,6 +61,7 @@ type Workspace struct {
 	WorkingDirectory  string `json:"working-directory,omitempty"`
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
 	Parallelism       int64  `json:"parallelism,omitempty"`
+	AnsibleVersion    string `json:"ansible-version,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity opt-in (#1901), keyed
 	// on the provider configuration a token is for: `aws`, or `aws.west` for
@@ -223,6 +224,7 @@ type CreateWorkspaceRequest struct {
 	WorkingDirectory  string `json:"working-directory,omitempty"`
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
 	Parallelism       int64  `json:"parallelism,omitempty"`
+	AnsibleVersion    string `json:"ansible-version,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
 	// on the provider configuration: `aws`, or `aws.west` for one aliased
@@ -318,6 +320,7 @@ type UpdateWorkspaceRequest struct {
 	WorkingDirectory  string `json:"working-directory,omitempty"`
 	ResourceCPU       string `json:"resource-cpu,omitempty"`
 	Parallelism       int64  `json:"parallelism,omitempty"`
+	AnsibleVersion    string `json:"ansible-version,omitempty"`
 	ResourceMemory    string `json:"resource-memory,omitempty"`
 	// OIDCAudiences is the per-workspace cloud identity override (#1901), keyed
 	// on the provider configuration: `aws`, or `aws.west` for one aliased
@@ -639,6 +642,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.WorkingDirectory != "" {
 		attrs["working-directory"] = req.WorkingDirectory
 	}
+	if req.AnsibleVersion != "" {
+		attrs["ansible-version"] = req.AnsibleVersion
+	}
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
 	}
@@ -772,6 +778,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.WorkingDirectory != "" {
 		attrs["working-directory"] = req.WorkingDirectory
+	}
+	if req.AnsibleVersion != "" {
+		attrs["ansible-version"] = req.AnsibleVersion
 	}
 	if req.Parallelism != 0 {
 		attrs["parallelism"] = req.Parallelism
@@ -927,6 +936,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		WorkingDirectory:              GetStringAttr(res, "working-directory"),
 		ResourceCPU:                   GetStringAttr(res, "resource-cpu"),
 		Parallelism:                   GetIntAttr(res, "parallelism"),
+		AnsibleVersion:                GetStringAttr(res, "ansible-version"),
 		ResourceMemory:                GetStringAttr(res, "resource-memory"),
 		VCSRepoURL:                    GetStringAttr(res, "vcs-repo-url"),
 		VCSBranch:                     GetStringAttr(res, "vcs-branch"),

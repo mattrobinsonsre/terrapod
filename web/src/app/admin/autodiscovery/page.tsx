@@ -43,6 +43,7 @@ interface AutodiscoveryRule {
     'pulumi-bind-plan'?: boolean
     'agent-pool-id': string | null
     'terraform-version': string
+    'ansible-version'?: string
     'resource-cpu': string
     parallelism: number
     'resource-memory': string
@@ -129,6 +130,13 @@ export default function AutodiscoveryPage() {
   const [agentPoolId, setAgentPoolId] = useState('')
   const [executionBackend, setExecutionBackend] = useState<'tofu' | 'terraform'>('tofu')
   const [terraformVersion, setTerraformVersion] = useState('1.13')
+  // Deliberately NOT pre-filled, unlike the engine version beside it. Empty is
+  // a real value here and means "inherit api.config.default_ansible_version"
+  // at run time (#2010, the semantics `engine_version_attr` documents), so
+  // pre-filling would pin every rule the UI creates to whatever the default
+  // happened to be the day it was created -- which is the thing that goes
+  // stale. An operator who wants a pin types one.
+  const [ansibleVersion, setAnsibleVersion] = useState('')
   const [resourceCpu, setResourceCpu] = useState('1')
   const [engine, setEngine] = useState('terraform')
   const [bindPlan, setBindPlan] = useState(false)
@@ -252,6 +260,7 @@ export default function AutodiscoveryPage() {
     setAgentPoolId('')
     setExecutionBackend('tofu')
     setTerraformVersion('1.13')
+    setAnsibleVersion('')
     setResourceCpu('1')
     setResourceMemory('2Gi')
     setAutoApplyMode('never')
@@ -300,6 +309,7 @@ export default function AutodiscoveryPage() {
     setAgentPoolId(a['agent-pool-id'] ? `apool-${a['agent-pool-id']}` : '')
     setExecutionBackend((a['execution-backend'] as 'tofu' | 'terraform') || 'tofu')
     setTerraformVersion(a['terraform-version'])
+    setAnsibleVersion(a['ansible-version'] || '')
     setResourceCpu(a['resource-cpu'])
     setParallelism(String(a.parallelism ?? 10))
     setEngine(a.engine || 'terraform')
@@ -360,6 +370,7 @@ export default function AutodiscoveryPage() {
       'execution-backend': executionBackend,
       'agent-pool-id': agentPoolId || null,
       'engine-version': terraformVersion,
+      'ansible-version': ansibleVersion.trim(),
       'resource-cpu': resourceCpu,
       'parallelism': Number(parallelism),
       engine,
@@ -716,6 +727,20 @@ export default function AutodiscoveryPage() {
                   <input
                     value={terraformVersion}
                     onChange={e => setTerraformVersion(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label
+                    className="block text-sm text-slate-300 mb-1"
+                    title={tWs('fields.ansibleVersionTitle')}
+                  >
+                    {tWs('fields.ansibleVersion')}
+                  </label>
+                  <input
+                    value={ansibleVersion}
+                    onChange={e => setAnsibleVersion(e.target.value)}
+                    placeholder={tWs('fields.ansibleVersionPlaceholder')}
                     className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
                   />
                 </div>

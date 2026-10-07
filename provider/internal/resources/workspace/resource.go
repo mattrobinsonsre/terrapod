@@ -468,6 +468,24 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"ansible_version": schema.StringAttribute{
+				Description: "The ansible-core version this workspace's configure " +
+					"operations use. An exact version such as `2.21.5`, optionally with a " +
+					"pre-release suffix (`2.21.5rc1`); no HCL constraint operators and not " +
+					"`latest`. Left unset the server supplies the deployment default " +
+					"(`api.config.default_ansible_version`) at creation, which is then the " +
+					"workspace's own value — raising that default moves only workspaces " +
+					"created afterwards, exactly as `engine_version` behaves.",
+				// Optional+Computed with UseStateForUnknown, following
+				// `engine_version` above. The server always returns a concrete
+				// version, so Optional alone would put the server's value into
+				// state against a null config and diff for ever.
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"working_directory": schema.StringAttribute{
 				Description: "Working directory relative to the repo root.",
 				Optional:    true,
@@ -1069,6 +1087,9 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.TerragruntVersion.IsNull() && !m.TerragruntVersion.IsUnknown() {
 		req.TerragruntVersion = m.TerragruntVersion.ValueString()
 	}
+	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
+		req.AnsibleVersion = m.AnsibleVersion.ValueString()
+	}
 	if !m.WorkingDirectory.IsNull() && !m.WorkingDirectory.IsUnknown() {
 		req.WorkingDirectory = m.WorkingDirectory.ValueString()
 	}
@@ -1231,6 +1252,9 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.TerragruntVersion.IsNull() && !m.TerragruntVersion.IsUnknown() {
 		req.TerragruntVersion = m.TerragruntVersion.ValueString()
 	}
+	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
+		req.AnsibleVersion = m.AnsibleVersion.ValueString()
+	}
 	if !m.WorkingDirectory.IsNull() && !m.WorkingDirectory.IsUnknown() {
 		req.WorkingDirectory = m.WorkingDirectory.ValueString()
 	}
@@ -1390,6 +1414,14 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.TerragruntVersion = types.StringValue(ws.TerragruntVersion)
 	} else {
 		m.TerragruntVersion = types.StringNull()
+	}
+	// Empty from the server means "inherit the deployment default" (#2010),
+	// which is the normal case; null keeps an unpinned workspace out of the
+	// diff for this Optional-only attribute.
+	if ws.AnsibleVersion != "" {
+		m.AnsibleVersion = types.StringValue(ws.AnsibleVersion)
+	} else {
+		m.AnsibleVersion = types.StringNull()
 	}
 	if ws.VCSRepoURL != "" {
 		m.VCSRepoURL = types.StringValue(ws.VCSRepoURL)

@@ -25,6 +25,7 @@
 //	"agent-pool-id"      -> agent_pool_id       (string, optional)
 //	"engine-version"     -> engine_version      (string, optional+computed; `terraform_version` is its deprecated alias)
 //	"terraform-version"  -> terraform_version   (string, optional+computed, deprecated)
+//	"ansible-version"    -> ansible_version     (string, optional; empty inherits the deployment default)
 //	"parallelism"        -> parallelism
 //	"resource-cpu"       -> resource_cpu        (string, optional, default "1")
 //	"resource-memory"    -> resource_memory     (string, optional, default "2Gi")
@@ -101,6 +102,7 @@ type autodiscoveryRuleModel struct {
 	AgentPoolID       types.String `tfsdk:"agent_pool_id"`
 	EngineVersion     types.String `tfsdk:"engine_version"`
 	TerraformVersion  types.String `tfsdk:"terraform_version"`
+	AnsibleVersion    types.String `tfsdk:"ansible_version"`
 	ResourceCPU       types.String `tfsdk:"resource_cpu"`
 	Parallelism       types.Int64  `tfsdk:"parallelism"`
 	ResourceMemory    types.String `tfsdk:"resource_memory"`
@@ -321,6 +323,24 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				// the plan. The server's column default ("1.13") supplies it instead
 				// — which also fixes this attribute having defaulted to "1.11",
 				// contradicting the server, since the rule resource shipped (#1559).
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"ansible_version": schema.StringAttribute{
+				Description: "The ansible-core version this workspace's configure " +
+					"operations use. An exact version such as `2.21.5`, optionally with a " +
+					"pre-release suffix (`2.21.5rc1`); no HCL constraint operators and not " +
+					"`latest`. Left unset the server supplies the deployment default " +
+					"(`api.config.default_ansible_version`) at creation, which is then the " +
+					"workspace's own value — raising that default moves only workspaces " +
+					"created afterwards, exactly as `engine_version` behaves.",
+				// Optional+Computed with UseStateForUnknown, following
+				// `engine_version` above. The server always returns a concrete
+				// version, so Optional alone would put the server's value into
+				// state against a null config and diff for ever.
+				Optional: true,
+				Computed: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -873,6 +893,9 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 	} else if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
 		attrs["engine-version"] = m.TerraformVersion.ValueString()
 	}
+	if !m.AnsibleVersion.IsNull() && !m.AnsibleVersion.IsUnknown() {
+		attrs["ansible-version"] = m.AnsibleVersion.ValueString()
+	}
 	if !m.Parallelism.IsNull() && !m.Parallelism.IsUnknown() {
 		attrs["parallelism"] = m.Parallelism.ValueInt64()
 	}
@@ -1113,6 +1136,14 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 	}
 	m.EngineVersion = types.StringValue(engineVersion)
 	m.TerraformVersion = types.StringValue(engineVersion)
+	// Optional-only (#2010): empty means a created workspace pins no version
+	// and inherits the deployment default, so an unset rule stays null and
+	// produces no spurious diff.
+	if v := terrapod.GetStringAttr(res, "ansible-version"); v != "" {
+		m.AnsibleVersion = types.StringValue(v)
+	} else {
+		m.AnsibleVersion = types.StringNull()
+	}
 	m.Parallelism = types.Int64Value(terrapod.GetIntAttr(res, "parallelism"))
 	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
 	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))

@@ -6,6 +6,7 @@ stores it in object storage, and returns a presigned download URL.
 Subsequent requests serve from cache.
 """
 
+import re
 from datetime import UTC, datetime
 
 import httpx
@@ -109,6 +110,47 @@ def _parse_stability(version: str) -> str:
 def _is_version_allowed(version: str, policy: str) -> bool:
     """True if `version` satisfies the pre-release `policy`."""
     return _STABILITY_RANK[_parse_stability(version)] >= _POLICY_FLOOR.get(
+        policy, _STABILITY_RANK["stable"]
+    )
+
+
+#: PEP 440 spells a pre-release WITHOUT the hyphen the CLI tools use -- `2.21.5rc1`,
+#: not `2.21.5-rc1` -- and allows several spellings per tier. `_parse_stability`
+#: above looks for `-rc`/`-beta`/`-alpha`/`-dev`, so handed a PyPI version it
+#: returns "stable" for every one of them and the policy silently never fires.
+#: That is why this exists rather than reusing it; the TIERS are shared, so a
+#: deployment's `allow_prerelease` means the same thing for both.
+#:
+#: `.postN` is deliberately absent: a post-release is a packaging fix on top of a
+#: release, so it is at least as stable as the release it follows.
+_PEP440_STABILITY = (
+    (re.compile(r"\.dev\d*$", re.I), "dev"),
+    (re.compile(r"(a|alpha)\d*$", re.I), "alpha"),
+    (re.compile(r"(b|beta)\d*$", re.I), "beta"),
+    (re.compile(r"(rc|c|pre|preview)\d*$", re.I), "rc"),
+)
+
+
+def pep440_stability(version: str) -> str:
+    """The stability tier of a PyPI version string, in `_STABILITY_RANK`'s terms."""
+    v = (version or "").strip()
+    for pattern, tier in _PEP440_STABILITY:
+        if pattern.search(v):
+            return tier
+    return "stable"
+
+
+def is_pypi_version_allowed(version: str, policy: str | None = None) -> bool:
+    """Whether a PyPI version satisfies this deployment's pre-release policy.
+
+    The same policy that gates a CLI tool's version (`allow_prerelease`), applied
+    to a package version. A deployment set to GA only must not end up running an
+    ansible-core release candidate just because PyPI spells "rc" differently from
+    GitHub.
+    """
+    if policy is None:
+        policy = settings.registry.binary_cache.allow_prerelease
+    return _STABILITY_RANK[pep440_stability(version)] >= _POLICY_FLOOR.get(
         policy, _STABILITY_RANK["stable"]
     )
 

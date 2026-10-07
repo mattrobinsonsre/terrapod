@@ -107,6 +107,7 @@ def _settings_snapshot(ws: Workspace) -> dict[str, Any]:
         "oidc_audiences": dict(ws.oidc_audiences or {}),
         "resource_cpu": ws.resource_cpu,
         "parallelism": ws.parallelism,
+        "ansible_version": ws.ansible_version,
         "resource_memory": ws.resource_memory,
         "auto_apply": ws.auto_apply,
         # The boolean above is only a projection — it is true for `always`,
@@ -577,6 +578,9 @@ async def restore_workspace(
         oidc_audiences=settings.get("oidc_audiences") or {},
         resource_cpu=settings.get("resource_cpu") or "1",
         parallelism=settings.get("parallelism") or DEFAULT_PARALLELISM,
+        # "" is the correct fallback, not the deployment default: a snapshot
+        # predating this column means the workspace never pinned one.
+        ansible_version=settings.get("ansible_version") or "",
         resource_memory=settings.get("resource_memory") or "2Gi",
         drift_ignore_rules=list(settings.get("drift_ignore_rules") or []),
         # Settings that only describe how a run is evaluated, and cannot start

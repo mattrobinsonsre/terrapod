@@ -348,6 +348,7 @@ field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitemp
 field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field CreateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field CreateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
+field CreateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field CreateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
@@ -1089,6 +1090,7 @@ field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitemp
 field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
 field UpdateWorkspaceRequest.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field UpdateWorkspaceRequest.AllowForkPRPlans *bool `json:"allow-fork-pr-plans,omitempty"`
+field UpdateWorkspaceRequest.AnsibleVersion string `json:"ansible-version,omitempty"`
 field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
 field UpdateWorkspaceRequest.AutoApplyMode *string `json:"auto-apply-mode,omitempty"`
 field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
@@ -1284,6 +1286,7 @@ field Workspace.AgentPoolIDs []string `json:"agent-pool-ids,omitempty"`
 field Workspace.AgentPoolName string `json:"agent-pool-name,omitempty"`
 field Workspace.AgentPoolNames []string `json:"agent-pool-names,omitempty"`
 field Workspace.AllowForkPRPlans bool `json:"allow-fork-pr-plans"`
+field Workspace.AnsibleVersion string `json:"ansible-version,omitempty"`
 field Workspace.AutoApply bool `json:"auto-apply"`
 field Workspace.AutoApplyMode string `json:"auto-apply-mode"`
 field Workspace.AutoMerge bool `json:"auto-merge"`

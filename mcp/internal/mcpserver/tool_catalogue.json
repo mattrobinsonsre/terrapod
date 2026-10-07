@@ -971,6 +971,10 @@
             "boolean"
           ]
         },
+        "ansible_version": {
+          "description": "exact ansible-core version for this workspace's configure operations, e.g. 2.21.5; omit or empty to inherit the deployment default",
+          "type": "string"
+        },
         "auto_apply": {
           "description": "auto-apply successful plans (default false)",
           "type": [
@@ -1144,6 +1148,10 @@
             "null",
             "boolean"
           ]
+        },
+        "ansible_version": {
+          "description": "exact ansible-core version for this workspace's configure operations, e.g. 2.21.5; omit or empty to inherit the deployment default",
+          "type": "string"
         },
         "auto_apply": {
           "description": "auto-apply successful plans",

@@ -50,6 +50,7 @@ def _mock_workspace(
     auto_apply=False,
     execution_mode="local",
     engine_version="1.11",
+    ansible_version="2.21.5",
     resource_cpu="1",
     parallelism=10,
     resource_memory="2Gi",
@@ -64,6 +65,7 @@ def _mock_workspace(
     ws.auto_apply = auto_apply
     ws.execution_mode = execution_mode
     ws.engine_version = engine_version
+    ws.ansible_version = ansible_version
     ws.terragrunt_enabled = False
     ws.terragrunt_version = "1.0"
     ws.working_directory = ""
@@ -2369,3 +2371,255 @@ class TestTheRoutesTranslateAConstraintViolationNotJustTheHelper:
         assert resp.status_code == 500, resp.text
         # And the driver's own text is not echoed to the caller.
         assert "unique constraint" not in resp.text
+
+
+# ── ansible-version (#2010) ─────────────────────────────────────────────
+
+
+class TestAnsibleVersionOnTheWorkspaceRoutes:
+    """The attribute's contract on create, read and update.
+
+    It follows `engine-version` throughout: an omitted attribute takes the
+    deployment default, an explicit empty string is the "inherit at run time"
+    value, and a pre-release answers to `binary_cache.allow_prerelease`.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_a_read_returns_the_workspaces_own_value(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace(name="ansible-ws", ansible_version="2.19.3")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/organizations/default/workspaces/ansible-ws", headers=_AUTH)
+
+        assert resp.status_code == 200
+        assert resp.json()["data"]["attributes"]["ansible-version"] == "2.19.3"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_a_read_does_not_substitute_the_default_for_an_empty_one(
+        self, mock_resolve, *mocks
+    ):
+        """An empty value reads back empty, not filled in.
+
+        A client that wrote a read straight back would otherwise pin every
+        inheriting workspace to whatever the default happened to be at read
+        time -- the same reason `oidc_audiences` reconciles only the keys a
+        practitioner declared. This is the case that catches it: with a concrete
+        version stored, substitution and no substitution look identical.
+        """
+        from terrapod.config import settings
+
+        mock_resolve.return_value = caps_for_level("read")
+        ws = _mock_workspace(name="inherit-ws", ansible_version="")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result, _no_inert_vars()]
+
+        with patch.object(settings, "default_ansible_version", "2.20.4"):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(
+                    "/api/v2/organizations/default/workspaces/inherit-ws", headers=_AUTH
+                )
+
+        assert resp.status_code == 200
+        assert resp.json()["data"]["attributes"]["ansible-version"] == ""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_without_the_attribute_takes_the_deployment_default(
+        self, _mock_publish, *mocks
+    ):
+        from terrapod.config import settings
+
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        with patch.object(settings, "default_ansible_version", "2.20.4"):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    "/api/v2/organizations/default/workspaces",
+                    json={"data": {"attributes": {"name": "ws-a"}}},
+                    headers=_AUTH,
+                )
+
+        assert resp.status_code == 201
+        assert resp.json()["data"]["attributes"]["ansible-version"] == "2.20.4"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_with_a_prerelease_is_422_under_a_ga_only_policy(
+        self, _mock_publish, *mocks
+    ):
+        from terrapod.config import settings
+
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        with patch.object(settings.registry.binary_cache, "allow_prerelease", "none"):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    "/api/v2/organizations/default/workspaces",
+                    json={"data": {"attributes": {"name": "ws-b", "ansible-version": "2.21.5rc1"}}},
+                    headers=_AUTH,
+                )
+
+        assert resp.status_code == 422
+        assert "allow_prerelease" in resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_a_prerelease_DEFAULT_does_not_422_every_create(self, _mock_publish, *mocks):
+        """Only what the CLIENT supplied is policy-checked.
+
+        The deployment default is the operator's own pin, and
+        `get_or_cache_binary` draws exactly this line already: the policy
+        governs a version a *user* picks, not one an operator deliberately set
+        in Helm. Checking the default here made every workspace create on such
+        a deployment a 422 -- including creates that never mentioned ansible.
+        """
+        from terrapod.config import settings
+
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        with (
+            patch.object(settings, "default_ansible_version", "2.22.0rc1"),
+            patch.object(settings.registry.binary_cache, "allow_prerelease", "none"),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    "/api/v2/organizations/default/workspaces",
+                    json={"data": {"attributes": {"name": "ws-c"}}},
+                    headers=_AUTH,
+                )
+
+        assert resp.status_code == 201
+        assert resp.json()["data"]["attributes"]["ansible-version"] == "2.22.0rc1"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_with_an_explicit_empty_string_means_inherit(self, _mock_publish, *mocks):
+        """Empty is a value, not an absence -- it must NOT be replaced by the
+        default, or there would be no way to say "follow the deployment"."""
+        from terrapod.config import settings
+
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        with patch.object(settings, "default_ansible_version", "2.20.4"):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    "/api/v2/organizations/default/workspaces",
+                    json={"data": {"attributes": {"name": "ws-d", "ansible-version": ""}}},
+                    headers=_AUTH,
+                )
+
+        assert resp.status_code == 201
+        assert resp.json()["data"]["attributes"]["ansible-version"] == ""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_update_sets_it(self, mock_resolve, *mocks):
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(ansible_version="2.19.3")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"ansible-version": "2.21.5"}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        assert ws.ansible_version == "2.21.5", (
+            "the attribute was accepted with a 2xx but changed nothing"
+        )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_update_without_the_attribute_leaves_it_alone(self, mock_resolve, *mocks):
+        """A PATCH is partial: touching another field must not reset this one."""
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(ansible_version="2.19.3")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"auto-apply": True}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        assert ws.ansible_version == "2.19.3"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_update_to_a_prerelease_is_422_under_a_ga_only_policy(self, mock_resolve, *mocks):
+        from terrapod.config import settings
+
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(ansible_version="2.19.3")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        with patch.object(settings.registry.binary_cache, "allow_prerelease", "none"):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.patch(
+                    f"/api/v2/workspaces/ws-{ws.id}",
+                    json={"data": {"attributes": {"ansible-version": "2.21.5rc1"}}},
+                    headers=_AUTH,
+                )
+
+        assert resp.status_code == 422
+        assert ws.ansible_version == "2.19.3", "the refused value was written anyway"

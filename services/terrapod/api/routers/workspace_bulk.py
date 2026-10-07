@@ -71,6 +71,7 @@ _FIELD_MAP: dict[str, str] = {
     # each writes two columns from one input key, so they are validated
     # separately (_validate_pool_set / _validate_auto_apply below).
     "parallelism": "parallelism",
+    "ansible-version": "ansible_version",
     "resource-cpu": "resource_cpu",
     "resource-memory": "resource_memory",
     # Per-workspace cloud identity (#1901). An ordinary mapped field: one input
@@ -361,6 +362,7 @@ _SETTING_RULES: dict[str, Any] = {
     "trigger-prefixes": workspace_settings.validate_trigger_prefixes,
     "auto-merge-strategy": workspace_settings.validate_auto_merge_strategy,
     "oidc-audiences": workspace_settings.validate_oidc_audiences,
+    "ansible-version": workspace_settings.validate_ansible_version,
     "plan-expiry-seconds": workspace_settings.validate_plan_expiry_seconds,
     "drift-detection-interval-seconds": workspace_settings.clamp_drift_interval,
     "drift-ignore-rules": workspace_settings.validate_drift_ignore_rules,

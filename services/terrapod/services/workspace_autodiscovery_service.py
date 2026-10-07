@@ -394,6 +394,7 @@ async def find_or_autocreate_workspace(
         oidc_audiences=dict(rule.oidc_audiences or {}),
         resource_cpu=rule.resource_cpu,
         parallelism=rule.parallelism,
+        ansible_version=rule.ansible_version,
         resource_memory=rule.resource_memory,
         auto_apply=rule.auto_apply,
         # Inherit the rule's conditional mode too (#1274) — carrying only

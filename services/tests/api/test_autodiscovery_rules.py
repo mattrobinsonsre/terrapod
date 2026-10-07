@@ -1,5 +1,6 @@
 """Tests for autodiscovery rule CRUD endpoints (terrapod #283, admin-only)."""
 
+import textwrap
 import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -51,6 +52,7 @@ def _mock_rule(
     r.engine = "terraform"
     r.pulumi_bind_plan = False
     r.engine_version = "1.11"
+    r.ansible_version = "2.21.5"
     r.resource_cpu = "1"
     r.parallelism = 10
     r.resource_memory = "2Gi"
@@ -467,6 +469,133 @@ class TestUpdateRule:
 
 
 # ── on-directory-delete (#314) ───────────────────────────────────────────
+
+
+class TestThePreviewShowsWhatTheRuleWillActuallyDo:
+    """Every template default the preview invents must equal the model's.
+
+    `POST /autodiscovery-rules/preview` builds a transient rule rather than
+    persisting one, so the ORM's column defaults never run and
+    `_build_transient_rule` supplies its own literals instead. Nothing made
+    those agree with the model, and when they disagree the preview is a lie in
+    the one direction that matters: it shows the operator workspaces that are
+    not what saving the rule would produce. #2010's `ansible_version` shipped
+    as `""` here against a model default of `2.21.5` -- the preview showed no
+    ansible version and a real create gave every workspace one.
+
+    Asserted over the whole kwargs list rather than for one column, because the
+    next template field added will be written the same way.
+    """
+
+    def test_every_preview_default_matches_the_model(self):
+        import ast
+        import inspect
+
+        from terrapod.api.routers import autodiscovery_rules as mod
+        from terrapod.db.models import AutodiscoveryRule
+
+        tree = ast.parse(textwrap.dedent(inspect.getsource(mod._build_transient_rule)))
+        columns = AutodiscoveryRule.__table__.columns
+
+        checked, mismatched = [], []
+        for node in ast.walk(tree):
+            # `name=fields.get("name", <default>)`
+            if not (
+                isinstance(node, ast.keyword)
+                and isinstance(node.value, ast.Call)
+                and isinstance(node.value.func, ast.Attribute)
+                and node.value.func.attr == "get"
+                and isinstance(node.value.func.value, ast.Name)
+                and node.value.func.value.id == "fields"
+                and len(node.value.args) == 2
+            ):
+                continue
+            key = node.value.args[0]
+            if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
+                continue
+            col = columns.get(key.value)
+            if col is None or col.default is None or col.default.is_callable:
+                continue
+
+            # The literal is either inline or a module-level constant; both are
+            # resolvable in the router's own namespace.
+            supplied = eval(  # noqa: S307 - our own source, literals only
+                compile(ast.Expression(node.value.args[1]), "<preview>", "eval"),
+                vars(mod),
+            )
+            checked.append(key.value)
+            if supplied != col.default.arg:
+                mismatched.append(f"{key.value}: preview={supplied!r} model={col.default.arg!r}")
+
+        # If this drops to nothing the gate has stopped reading the function
+        # -- a renamed helper or a reshaped call -- and would pass silently.
+        assert len(checked) >= 8, f"only inspected {checked}; is the gate still reading the source?"
+        assert not mismatched, (
+            "the preview would show workspaces the rule does not create: " + "; ".join(mismatched)
+        )
+
+
+class TestTheRuleValidatesItsAnsibleVersion:
+    """A bad version is a 422 on the rule too, not a 500 (#2010).
+
+    The template feeds every workspace the rule materialises, so a value the
+    single-workspace PATCH would refuse must be refused here as well — or the
+    rule becomes the way around the policy, and the workspaces it creates carry
+    a version the deployment has said no to everywhere else.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_prerelease_is_422_under_a_ga_only_policy(self, *_mocks):
+        from terrapod.config import settings
+
+        conn_id = uuid.uuid4()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[MagicMock(id=conn_id)])  # _validate_connection
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "r",
+                    "vcs-connection-id": f"vcs-{conn_id}",
+                    "repo-url": "https://example.invalid/org/repo",
+                    "pattern": "**",
+                    "ansible-version": "2.21.5rc1",
+                }
+            }
+        }
+        with patch.object(settings.registry.binary_cache, "allow_prerelease", "none"):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    "/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH
+                )
+
+        assert resp.status_code == 422
+        assert "allow_prerelease" in resp.text
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_a_non_string_on_patch_is_422_not_500(self, *_mocks):
+        rule = _mock_rule()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}",
+                json={"data": {"attributes": {"ansible-version": 2.21}}},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422
+        db.commit.assert_not_awaited()
 
 
 class TestOnDirectoryDelete:

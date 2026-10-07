@@ -21,6 +21,7 @@
 //	"pulumi-bind-plan"                  → pulumi_bind_plan    (bool,   optional+computed)
 //	"engine-version"                    → engine_version      (string, optional; `terraform_version` is its deprecated alias)
 //	"terraform-version"                 → terraform_version   (string, optional, deprecated)
+//	"ansible-version"                   → ansible_version     (string, optional; empty inherits the deployment default)
 //	"working-directory"                 → working_directory   (string, optional)
 //	"parallelism"                       → parallelism
 //	"resource-cpu"                      → resource_cpu        (string, optional, default "1")
@@ -84,6 +85,7 @@ type workspaceModel struct {
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
+	AnsibleVersion                types.String `tfsdk:"ansible_version"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
 	Parallelism                   types.Int64  `tfsdk:"parallelism"`

@@ -60,6 +60,7 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `engine-version` | string | no | Default `1.13`. Also accepted as `terraform-version`. |
 | `resource-cpu` / `resource-memory` | string | no | Defaults `1` / `2Gi`. |
 | `parallelism` | integer | no | Concurrent engine operations on workspaces this rule creates. Default `10`. |
+| `ansible-version` | string | no | ansible-core version for workspaces this rule creates. Default `2.21.5`; send an explicit empty string to have them inherit the deployment default instead, as with `engine-version`. |
 | `auto-apply` | bool | no | Default `false`. Superseded by `auto-apply-mode` when that is set. |
 | `auto-apply-mode` | string | no | Conditional auto-apply templated onto created workspaces: `never`, `always`, `create`, `create_update`. `create`/`create_update` never auto-apply a plan that destroys or replaces a resource. Set this **or** `auto-apply`, not both (422). |
 | `on-directory-delete` | enum | no | `flag` (default — mark `pending_deletion`, require explicit operator action) or `destroy` (opt-in — real destroy run then archive). See the Lifecycle section (#314). |

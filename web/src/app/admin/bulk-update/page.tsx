@@ -110,6 +110,7 @@ export default function BulkUpdatePage() {
 
   // ---- Update form state ----
   const [uTfVersion, setUTfVersion] = useState('')
+  const [uAnsibleVersion, setUAnsibleVersion] = useState('')
   const [uExecBackend, setUExecBackend] = useState('')
   const [uExecMode, setUExecMode] = useState('')
   // '' means "leave unchanged"; anything else is an auto-apply mode (#1276).
@@ -209,6 +210,7 @@ export default function BulkUpdatePage() {
     // #1559 alias the endpoint still normalises. Sending the canonical one
     // keeps the UI off a deprecated spelling.
     if (uTfVersion.trim()) u['engine-version'] = uTfVersion.trim()
+    if (uAnsibleVersion.trim()) u['ansible-version'] = uAnsibleVersion.trim()
     if (uExecBackend) u['execution-backend'] = uExecBackend
     if (uExecMode) u['execution-mode'] = uExecMode
     // Send the mode, never the boolean — the endpoint 422s if both are set.
@@ -544,6 +546,18 @@ export default function BulkUpdatePage() {
                 type="text"
                 value={uTfVersion}
                 onChange={(e) => setUTfVersion(e.target.value)}
+                placeholder={t('unchanged')}
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className={labelCls} title={tWs('fields.ansibleVersionTitle')}>
+                {tWs('fields.ansibleVersion')}
+              </label>
+              <input
+                type="text"
+                value={uAnsibleVersion}
+                onChange={(e) => setUAnsibleVersion(e.target.value)}
                 placeholder={t('unchanged')}
                 className={inputCls}
               />

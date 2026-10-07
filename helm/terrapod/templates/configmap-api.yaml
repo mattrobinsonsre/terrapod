@@ -864,6 +864,7 @@ data:
     {{- end }}
     default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
     default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.13" | quote }}
+    default_ansible_version: {{ .Values.api.config.default_ansible_version | default "2.21.5" | quote }}
     default_pulumi_version: {{ .Values.api.config.default_pulumi_version | default "3.208" | quote }}
     default_node_version: {{ .Values.api.config.default_node_version | default "22" | quote }}
     default_go_version: {{ .Values.api.config.default_go_version | default "1.25" | quote }}

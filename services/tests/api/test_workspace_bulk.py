@@ -225,6 +225,38 @@ class TestBulkUpdateValidation:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
+    async def test_ansible_version_prerelease_422_no_commit(self, *_mocks):
+        """The same policy the single-workspace routes apply (#2010).
+
+        Bulk update is the documented way to move a fleet's ansible version, so
+        it is also the way to move a whole fleet onto a release candidate a
+        GA-only deployment has refused everywhere else. It validates once up
+        front and the transaction is all-or-nothing, so a refusal must leave
+        nothing committed.
+        """
+        from terrapod.config import settings
+
+        body = {"filter": {"all": True}, "update": {"ansible-version": "2.21.5rc1"}}
+        with patch.object(settings.registry.binary_cache, "allow_prerelease", "none"):
+            resp, db = await self._post(body)
+        assert resp.status_code == 422
+        assert "allow_prerelease" in resp.json()["detail"]
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_ansible_version_non_string_422(self, *_mocks):
+        """Unvalidated this reached a `String(20)` column raw and became a
+        DataError at commit -- a 500 where the guard exists to give a 422."""
+        body = {"filter": {"all": True}, "update": {"ansible-version": 2.21}}
+        resp, db = await self._post(body)
+        assert resp.status_code == 422
+        db.commit.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
     async def test_bad_execution_mode_422(self, *_mocks):
         body = {"filter": {"all": True}, "update": {"execution-mode": "remote"}}
         resp, db = await self._post(body)

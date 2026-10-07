@@ -205,6 +205,28 @@ api:
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform
     default_terraform_version: "1.13"
+    # Default ansible-core version for NEW workspaces (#2010), overrideable per
+    # workspace exactly as default_terraform_version is -- collection
+    # compatibility is a per-workspace concern, so one version for the whole
+    # deployment would be the wrong shape.
+    #
+    # Raising this moves only workspaces created afterwards; existing ones keep
+    # the version they carry, the same as the engine version. That is deliberate:
+    # an ansible-core minor changes behaviour as well as fixing bugs, so an
+    # upgrade must not silently change what someone's playbooks run against. To
+    # move a fleet, use bulk update.
+    #
+    # Deliberately NOT under registry.platform_tools: that block is
+    # platform-scoped by design, with no per-workspace field. Unlike those tools
+    # ansible publishes no release binary either, so it is pip-installed from
+    # Terrapod's own PyPI pull-through proxy -- hence no *_mirror_url sibling,
+    # and the runner needs no upstream reach.
+    #
+    # INERT UNTIL THE ANSIBLE WORK LANDS: the acquisition mechanism is complete
+    # and tested, but nothing calls it yet -- inventory resolution (#1967) and
+    # executing a configure (#1972) are what will. The fetch is lazy, so a
+    # deployment that never uses Ansible never downloads it.
+    default_ansible_version: "2.21.5"
     # What a new Pulumi workspace gets when it pins no engine-version. Partial,
     # like its Terraform counterpart: resolved to the newest matching release.
     default_pulumi_version: "3.208"

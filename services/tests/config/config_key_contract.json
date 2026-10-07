@@ -192,6 +192,7 @@
   "database.ssl_root_cert",
   "database_url",
   "debug",
+  "default_ansible_version",
   "default_dotnet_version",
   "default_execution_backend",
   "default_go_version",

@@ -91,6 +91,7 @@ from terrapod.services.workspace_name import validate_workspace_name
 from terrapod.services.workspace_rbac_service import (
     resolve_workspace_capabilities_for,
 )
+from terrapod.services.workspace_settings import validate_ansible_version
 from terrapod.storage import get_storage
 from terrapod.storage.keys import state_key
 
@@ -279,6 +280,14 @@ def _validate_pulumi_bind_plan(raw: object, engine: str) -> bool:
             status_code=422, detail="pulumi-bind-plan applies only to Pulumi workspaces"
         )
     return raw
+
+
+def _validate_ansible_version(raw: object) -> str:
+    """HTTP wrapper over the canonical rule in `services.workspace_settings`."""
+    try:
+        return validate_ansible_version(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 def _validate_parallelism(raw: object) -> int:
@@ -713,6 +722,11 @@ def _workspace_json(
                 # `structured`/`hcl` on variables.
                 "engine-version": ws.engine_version or "",
                 "terraform-version": ws.engine_version or "",
+                # Empty means "the deployment default", which is what most
+                # workspaces carry -- the resolved value is not substituted in,
+                # because a client writing a read straight back would then pin
+                # every workspace to whatever the default was at read time.
+                "ansible-version": ws.ansible_version or "",
                 "terragrunt-enabled": ws.terragrunt_enabled,
                 "terragrunt-version": ws.terragrunt_version or "",
                 "working-directory": ws.working_directory,
@@ -1465,6 +1479,17 @@ async def _create_workspace_impl(
         auto_apply_mode=auto_apply_mode,
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
         engine_version=_engine_version_attr(attrs, default_engine_version(engine)),
+        # Only what the CLIENT supplied is policy-checked. The deployment
+        # default is the operator's own pin, and `get_or_cache_binary` already
+        # draws exactly this line: the pre-release policy governs the version a
+        # USER picks, not one an operator deliberately set in Helm. Validating
+        # the default here would 422 every workspace create on a deployment
+        # whose default is a pre-release.
+        ansible_version=(
+            _validate_ansible_version(attrs["ansible-version"])
+            if "ansible-version" in attrs
+            else settings.default_ansible_version
+        ),
         terragrunt_enabled=_422(
             workspace_settings.validate_bool,
             attrs.get("terragrunt-enabled", False),
@@ -2136,6 +2161,8 @@ async def update_workspace(
         ws.execution_backend = backend
     if "engine-version" in attrs or "terraform-version" in attrs:
         ws.engine_version = _engine_version_attr(attrs, ws.engine_version)
+    if "ansible-version" in attrs:
+        ws.ansible_version = _validate_ansible_version(attrs["ansible-version"])
     if "slack-channel" in attrs:
         # Slack opt-in channel (#556): empty clears it (workspace goes silent).
         ws.slack_channel = (attrs["slack-channel"] or "").strip()[:128]

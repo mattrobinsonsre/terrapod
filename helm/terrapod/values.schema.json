@@ -1802,7 +1802,7 @@
                   "additionalProperties": {
                     "type": "array",
                     "minItems": 1,
-              "items": {
+                    "items": {
                       "type": "string"
                     }
                   }
@@ -3177,6 +3177,9 @@
         },
         "require_strong_secrets": {
           "type": "boolean"
+        },
+        "default_ansible_version": {
+          "type": "string"
         }
       }
     }

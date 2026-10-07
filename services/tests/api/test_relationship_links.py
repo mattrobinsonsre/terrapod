@@ -72,6 +72,7 @@ class TestAutodiscoveryRule:
             execution_backend="tofu",
             agent_pool_id=pool,
             engine_version="1.12",
+            ansible_version="2.21.5",
             resource_cpu="1",
             parallelism=10,
             resource_memory="2Gi",

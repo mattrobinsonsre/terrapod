@@ -3582,6 +3582,17 @@ class Settings(BaseSettings):
         default="1.13",
         description="Default terraform/tofu version for new workspaces",
     )
+    default_ansible_version: str = Field(
+        default="2.21.5",
+        description="Default ansible-core version for new workspaces (#2010). A "
+        "workspace may override it, exactly as it overrides its engine version — "
+        "collection compatibility is a per-workspace concern, so one version for the "
+        "whole deployment would be the wrong shape. Deliberately NOT in "
+        "registry.platform_tools: that block is explicitly platform-scoped with no "
+        "per-workspace field. Also unlike those three, ansible-core publishes no "
+        "release binary, so it is pip-installed from the PyPI pull-through proxy "
+        "rather than unpacked from an archive. Review at every minor release.",
+    )
     default_dotnet_version: str = Field(
         default="9.0",
         description="Default .NET SDK version for a Pulumi C# program (#1566). "

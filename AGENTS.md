@@ -878,14 +878,30 @@ pulled through the binary cache, and their versions are Helm values in
 for operators instead of a Terrapod release, which is the whole point; the
 trade is that **nothing bumps them but us**.
 
-So **every minor release checks and updates those three defaults in
-`values.yaml`**. It takes a minute:
+So **every minor release checks and updates those defaults in `values.yaml`**.
+It takes a minute:
 
 ```sh
 gh api repos/open-policy-agent/opa/releases/latest --jq .tag_name
 gh api repos/aquasecurity/trivy/releases/latest    --jq .tag_name
 gh api repos/bridgecrewio/checkov/releases/latest  --jq .tag_name
+# ansible-core is a PyPI package, not a GitHub release, so ask PyPI
+curl -s https://pypi.org/pypi/ansible-core/json | jq -r .info.version
 ```
+
+**`ansible-core` belongs to the same review and is in neither of the same
+places.** Its default is `api.config.default_ansible_version`, not an entry
+under `registry.platform_tools`, because a fleet does not move to a new ansible
+in one step — one workspace's playbooks are ready before another's — so a
+workspace overrides it in `ansible_version`, exactly as it overrides
+`default_terraform_version` in `engine_version`. Bumping the default therefore
+moves every workspace that has not pinned one and leaves the pinned ones alone,
+which is the opposite of a platform-tool bump: those move everybody.
+
+It is also not acquired the same way. `ansible-core` publishes no release
+binary, so it is pip-installed into a virtualenv from the PyPI pull-through
+proxy rather than unpacked from an archive — hence no `*_mirror_url` sibling,
+and no entry in `PLATFORM_TOOLS`.
 
 This is now the mechanism that clears a whole class of finding. Before #1208
 these tools' vendored modules were reported against Terrapod's own artifacts and

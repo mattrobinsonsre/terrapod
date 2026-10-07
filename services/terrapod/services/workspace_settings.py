@@ -32,6 +32,45 @@ AI_SUMMARY_MODES = frozenset({"default", "enabled", "disabled"})
 VCS_WORKFLOWS = frozenset({"merge_then_apply", "apply_then_merge"})
 AUTO_MERGE_STRATEGIES = frozenset({"merge", "squash", "rebase"})
 
+
+def validate_ansible_version(raw: object) -> str:
+    """An ansible-core version for a workspace, or "" to inherit the default.
+
+    **The only rule is the deployment's pre-release policy** -- the same
+    `binary_cache.allow_prerelease` that decides whether a workspace may pin a
+    terraform/tofu release candidate. No format rule beyond that, deliberately:
+    `engine_version` has none either, and a version that does not exist fails at
+    install time with pip's own message, which is a better error than a regex of
+    ours guessing at what PyPI publishes.
+
+    It needs its own check rather than the engine version's because **PEP 440
+    spells a pre-release without a hyphen** -- `2.21.5rc1`, not `2.21.5-rc1` --
+    and `binary_cache_service._parse_stability` looks for the hyphenated form.
+    Handed a PyPI version it returns "stable" for every pre-release, so a
+    GA-only deployment would silently accept an ansible-core release candidate.
+    `is_pypi_version_allowed` shares the tiers, so the policy means one thing.
+    """
+    from terrapod.services.binary_cache_service import is_pypi_version_allowed
+
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise ValueError("ansible-version must be a string")
+    value = raw.strip()
+    if not value:
+        return ""
+    if not is_pypi_version_allowed(value):
+        from terrapod.config import settings
+
+        policy = settings.registry.binary_cache.allow_prerelease
+        raise ValueError(
+            f"ansible-version {value!r} is a pre-release, which this deployment's "
+            f"binary_cache.allow_prerelease policy ({policy!r}) does not permit. Set the "
+            f"policy to 'rc', 'beta', 'alpha' or 'dev' to allow it, or pin a GA version."
+        )
+    return value
+
+
 #: A guard against a value that is certainly a mistake, not a limit the
 #: scanners impose.
 MAX_SCAN_SKIP_RULES = 200

@@ -106,6 +106,7 @@
   "api.config.database.pool_timeout",
   "api.config.database.ssl_mode",
   "api.config.database.ssl_root_cert",
+  "api.config.default_ansible_version",
   "api.config.default_dotnet_version",
   "api.config.default_execution_backend",
   "api.config.default_go_version",

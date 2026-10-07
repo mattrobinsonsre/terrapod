@@ -37,6 +37,7 @@ type workspaceDataSourceModel struct {
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
 	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
 	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
+	AnsibleVersion                types.String `tfsdk:"ansible_version"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	DebugMode                     types.Bool   `tfsdk:"debug_mode"`
 	AllowForkPRPlans              types.Bool   `tfsdk:"allow_fork_pr_plans"`
@@ -114,6 +115,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"terraform_version":                computedString("The same version under its original name; `engine_version` is the current one."),
 			"terragrunt_enabled":               computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
 			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
+			"ansible_version":                  computedString("The ansible-core version this workspace pins. Null when it pins none and inherits the deployment default."),
 			"working_directory":                computedString("Working directory."),
 			"parallelism":                      computedInt64("How many operations the engine performs at once."),
 			"debug_mode":                       computedBool("Whether a failed run's pod is held open for inspection (#1764)."),
@@ -251,6 +253,10 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	setOptionalString(&m.TerraformVersion, engineVersion)
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
 	setOptionalString(&m.TerragruntVersion, terrapod.GetStringAttr(res, "terragrunt-version"))
+	// Empty means the workspace inherits `api.config.default_ansible_version`
+	// rather than pinning one (#2010); the server does not substitute the
+	// resolved default, so null is the honest reading.
+	setOptionalString(&m.AnsibleVersion, terrapod.GetStringAttr(res, "ansible-version"))
 	m.DebugMode = types.BoolValue(terrapod.GetBoolAttr(res, "debug-mode"))
 	m.AllowForkPRPlans = types.BoolValue(terrapod.GetBoolAttr(res, "allow-fork-pr-plans"))
 	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))

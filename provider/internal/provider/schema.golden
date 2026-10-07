@@ -77,6 +77,7 @@ data terrapod_workspace.ai_policy_mode required=false optional=false computed=tr
 data terrapod_workspace.ai_summary_context required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.ai_summary_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.allow_fork_pr_plans required=false optional=false computed=true sensitive=false type=basetypes.BoolType
+data terrapod_workspace.ansible_version required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.auto_apply required=false optional=false computed=true sensitive=false type=basetypes.BoolType
 data terrapod_workspace.auto_apply_mode required=false optional=false computed=true sensitive=false type=basetypes.StringType
 data terrapod_workspace.created_at required=false optional=false computed=true sensitive=false type=basetypes.StringType
@@ -165,6 +166,7 @@ resource terrapod_autodiscovery_rule.ai_policy_mode required=false optional=true
 resource terrapod_autodiscovery_rule.ai_summary_context required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.allow_fork_pr_plans required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_autodiscovery_rule.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_autodiscovery_rule.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_autodiscovery_rule.auto_merge required=false optional=true computed=true sensitive=false type=basetypes.BoolType
@@ -470,6 +472,7 @@ resource terrapod_workspace.ai_policy_mode required=false optional=true computed
 resource terrapod_workspace.ai_summary_context required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.ai_summary_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.allow_fork_pr_plans required=false optional=true computed=true sensitive=false type=basetypes.BoolType
+resource terrapod_workspace.ansible_version required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_apply required=false optional=true computed=true sensitive=false type=basetypes.BoolType
 resource terrapod_workspace.auto_apply_mode required=false optional=true computed=true sensitive=false type=basetypes.StringType
 resource terrapod_workspace.auto_merge required=false optional=true computed=true sensitive=false type=basetypes.BoolType

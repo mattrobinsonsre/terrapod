@@ -46,6 +46,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		ExecutionBackend string              `json:"execution_backend,omitempty" jsonschema:"which binary runs a Terraform-engine workspace: tofu or terraform. A choice WITHIN the Terraform engine — Pulumi has one binary, so this has no meaning on a pulumi workspace (default: server default)"`
 		EngineVersion    string              `json:"engine_version,omitempty" jsonschema:"version of the engine this workspace runs; partial like 1.15 (means 1.15.*), no HCL operators"`
 		TerraformVersion string              `json:"terraform_version,omitempty" jsonschema:"the same version under its original name; prefer engine_version. Setting both to different values is rejected"`
+		AnsibleVersion   string              `json:"ansible_version,omitempty" jsonschema:"exact ansible-core version for this workspace's configure operations, e.g. 2.21.5; omit or empty to inherit the deployment default"`
 		AutoApply        *bool               `json:"auto_apply,omitempty" jsonschema:"auto-apply successful plans (default false)"`
 		AutoApplyMode    *string             `json:"auto_apply_mode,omitempty" jsonschema:"conditional auto-apply: never, always, create (only plans that add resources), create_update (also in-place updates). create and create_update never auto-apply a destroy or replace. Set this OR auto_apply, not both."`
 		AgentPoolID      string              `json:"agent_pool_id,omitempty" jsonschema:"agent pool id (apool-...) for agent execution mode; assigns exactly one pool. Mutually exclusive with agent_pool_ids"`
@@ -80,6 +81,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			ExecutionMode:    in.ExecutionMode,
 			ExecutionBackend: in.ExecutionBackend,
 			EngineVersion:    version,
+			AnsibleVersion:   in.AnsibleVersion,
 			AutoApply:        in.AutoApply,
 			AutoApplyMode:    in.AutoApplyMode,
 			AgentPoolID:      in.AgentPoolID,
@@ -118,6 +120,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 		ExecutionBackend string              `json:"execution_backend,omitempty" jsonschema:"which binary runs a Terraform-engine workspace: tofu or terraform. A choice WITHIN the Terraform engine — Pulumi has one binary, so this has no meaning on a pulumi workspace"`
 		EngineVersion    string              `json:"engine_version,omitempty" jsonschema:"version of the engine this workspace runs; partial like 1.15 (means 1.15.*)"`
 		TerraformVersion string              `json:"terraform_version,omitempty" jsonschema:"the same version under its original name; prefer engine_version. Setting both to different values is rejected"`
+		AnsibleVersion   string              `json:"ansible_version,omitempty" jsonschema:"exact ansible-core version for this workspace's configure operations, e.g. 2.21.5; omit or empty to inherit the deployment default"`
 		AutoApply        *bool               `json:"auto_apply,omitempty" jsonschema:"auto-apply successful plans"`
 		AutoApplyMode    *string             `json:"auto_apply_mode,omitempty" jsonschema:"conditional auto-apply: never, always, create, create_update. Set this OR auto_apply, not both."`
 		AgentPoolID      string              `json:"agent_pool_id,omitempty" jsonschema:"agent pool id (apool-...); assigns exactly one pool, REPLACING any existing set. Mutually exclusive with agent_pool_ids"`
@@ -146,6 +149,7 @@ func registerCRUD(s *mcp.Server, c *terrapod.Client) {
 			ExecutionMode:    in.ExecutionMode,
 			ExecutionBackend: in.ExecutionBackend,
 			EngineVersion:    version,
+			AnsibleVersion:   in.AnsibleVersion,
 			AutoApply:        in.AutoApply,
 			AutoApplyMode:    in.AutoApplyMode,
 			AgentPoolID:      in.AgentPoolID,
