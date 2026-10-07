@@ -155,14 +155,25 @@ def from_npm_audit(data) -> dict[str, dict]:
 
     npm keys by package rather than advisory, so the ids come out of `via` —
     the same path the CI gate walks. `fixAvailable` is a bool or an object
-    describing the upgrade; both mean a fix exists, and the object's version is
-    worth carrying through.
+    describing the upgrade, and the object's version is worth carrying through.
+
+    A fix existing is NOT the same as a fix being worth taking. When npm sets
+    `isSemVerMajor` the only resolution on offer crosses a major version, and it
+    may even be a *downgrade* — npm reshuffling the tree rather than fixing
+    anything, which it does whenever every published version of the vulnerable
+    package is in range. So the flag is carried through rather than flattened,
+    and `classify` keeps those entries out of "take the fix". The `(major)`
+    suffix matches rescan_normalise._npm_fix, which already labelled them.
     """
     found: dict[str, dict] = {}
     for name, v in ((data or {}).get("vulnerabilities") or {}).items():
         fix = v.get("fixAvailable")
+        major = False
         if isinstance(fix, dict):
             fixed = f"{fix.get('name', name)}@{fix.get('version', '?')}"
+            major = bool(fix.get("isSemVerMajor"))
+            if major:
+                fixed += " (major)"
         else:
             fixed = "available" if fix else ""
         for via in v.get("via") or []:
@@ -174,6 +185,7 @@ def from_npm_audit(data) -> dict[str, dict]:
                     "package": name,
                     "installed": v.get("range", "?"),
                     "fixed": fixed,
+                    "major": major,
                 },
             )
     return found
@@ -207,7 +219,7 @@ def collect(scan_dir: pathlib.Path) -> tuple[dict[str, dict[str, dict]], set[str
 
 
 def classify(registers: dict[str, list[str]], found: dict[str, dict[str, dict]]):
-    fixable, unmatched, holding = [], [], []
+    fixable, unmatched, holding, major = [], [], [], []
     for scanner, ids in registers.items():
         for vid in ids:
             hit = found.get(scanner, {}).get(vid)
@@ -215,10 +227,13 @@ def classify(registers: dict[str, list[str]], found: dict[str, dict[str, dict]])
             if hit is None:
                 unmatched.append(row)
             elif hit.get("fixed"):
-                fixable.append(row)
+                # A major-version offer is a decision, not a bump, so it is
+                # reported separately. Filing it under "take the fix" is how the
+                # review comes to recommend something that fixes nothing.
+                (major if hit.get("major") else fixable).append(row)
             else:
                 holding.append(row)
-    return fixable, unmatched, holding
+    return fixable, unmatched, holding, major
 
 
 def _table(rows: list[dict], with_fix: bool) -> list[str]:
@@ -247,7 +262,7 @@ def main() -> int:
 
     registers = {s: read_register(pathlib.Path(p)) for s, p in REGISTERS.items()}
     found, scanned = collect(scan_dir)
-    fixable, unmatched, holding = classify(registers, found)
+    fixable, unmatched, holding, major = classify(registers, found)
 
     # A scanner whose output never arrived cannot distinguish "this entry
     # matches nothing" from "nothing looked for it", so its entries are not
@@ -260,7 +275,11 @@ def main() -> int:
         json.dumps(
             sorted(
                 (r["scanner"], r["id"], kind)
-                for kind, rows in (("fixable", fixable), ("unmatched", unmatched))
+                for kind, rows in (
+                    ("fixable", fixable),
+                    ("unmatched", unmatched),
+                    ("major", major),
+                )
                 for r in rows
             ),
         ).encode()
@@ -296,6 +315,30 @@ def main() -> int:
                 "entry's written exit condition — the exit is a guess about how "
                 "upstream would fix it, and a backport to an older line is exactly "
                 "the case that guess misses."
+            ),
+            "",
+        ]
+
+    if major:
+        body += [
+            "## Only a major change on offer — a decision, not a bump",
+            "",
+            (
+                "npm can resolve these, but only by crossing a major version, so "
+                "none of them is a drop-in. A major can change or remove "
+                "behaviour, and npm will offer a **downgrade** just as readily — "
+                "which resolves nothing when every published version of the "
+                "vulnerable package is in the advisory's range."
+            ),
+            "",
+            *_table(major, with_fix=True),
+            "",
+            (
+                "Read the advisory's own affected/patched range before acting: "
+                "`gh api /advisories/<id>` prints both, and a "
+                "`first_patched_version` of `NONE` means there is nothing to "
+                "take. In that case the entry stays and its comment is refreshed "
+                "to say so — which is rule 1 working, not an exception to it."
             ),
             "",
         ]
@@ -343,7 +386,14 @@ def main() -> int:
     out.write_text("\n".join(body) + "\n")
 
     print(f"fingerprint={fp}")
-    print(f"has_findings={'true' if (fixable or unmatched) else 'false'}")
+    # A major-only offer counts. `has_findings=false` does not close an open
+    # issue — it means "do not raise or refresh" — so leaving it out would make
+    # a major-only offer invisible rather than quiet. The fingerprint is what
+    # stops it nagging: the issue is refreshed every run and only comments when
+    # the entry set actually changes.
+    print(
+        f"has_findings={'true' if (fixable or unmatched or major) else 'false'}"
+    )
     return 0
 
 

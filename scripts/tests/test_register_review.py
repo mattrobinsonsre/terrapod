@@ -154,7 +154,7 @@ def test_entry_with_a_fix_is_fixable_and_one_without_is_holding():
     """The distinction the whole report rests on. Getting it backwards would
     either bury a real bump among entries doing their job, or nag weekly about
     something with nothing to bump to."""
-    fixable, unmatched, holding = rr.classify(
+    fixable, unmatched, holding, major = rr.classify(
         {"trivy": ["CVE-A"], "pip-audit": ["PYSEC-B"], "npm-audit": []},
         {
             "trivy": {"CVE-A": {"package": "p", "installed": "1", "fixed": "2"}},
@@ -192,7 +192,7 @@ def test_an_unfixed_trivy_finding_is_holding_not_stale():
             ]
         }
     )
-    fixable, unmatched, holding = rr.classify(
+    fixable, unmatched, holding, major = rr.classify(
         {"trivy": ["CVE-2025-69720"], "pip-audit": [], "npm-audit": []},
         {"trivy": found},
     )
@@ -231,11 +231,66 @@ def test_the_workflow_does_not_scan_fix_only():
 
 
 def test_entry_reported_by_nobody_is_stale():
-    fixable, unmatched, holding = rr.classify(
+    fixable, unmatched, holding, major = rr.classify(
         {"trivy": ["CVE-GONE"], "pip-audit": [], "npm-audit": []}, {"trivy": {}}
     )
     assert [r["id"] for r in unmatched] == ["CVE-GONE"]
     assert fixable == [] and holding == []
+
+
+def test_npm_major_fix_is_labelled_and_flagged():
+    """`isSemVerMajor` is in npm's own output, so no version arithmetic is
+    needed to tell a drop-in bump from a decision. The `(major)` suffix matches
+    what rescan_normalise._npm_fix has always emitted."""
+    found = rr.from_npm_audit(
+        {
+            "vulnerabilities": {
+                "braces": {
+                    "severity": "high",
+                    "range": "*",
+                    "fixAvailable": {
+                        "name": "eslint-config-next",
+                        "version": "14.2.35",
+                        "isSemVerMajor": True,
+                    },
+                    "via": [{"url": "https://x/advisories/GHSA-major"}],
+                }
+            }
+        }
+    )
+    assert found["GHSA-major"]["fixed"] == "eslint-config-next@14.2.35 (major)"
+    assert found["GHSA-major"]["major"] is True
+
+
+def test_a_major_only_offer_is_not_reported_as_take_the_fix():
+    """The real case: braces is `<= 3.0.3` with no patched version anywhere, and
+    npm's only offer is a two-major DOWNGRADE of eslint-config-next. Filing that
+    under "take the fix" tells the reader to make a large risky change that
+    resolves nothing — and then repeats it weekly until the issue is ignored."""
+    fixable, unmatched, holding, major = rr.classify(
+        {"trivy": [], "pip-audit": [], "npm-audit": ["GHSA-major", "GHSA-minor"]},
+        {
+            "npm-audit": {
+                "GHSA-major": {
+                    "package": "braces",
+                    "installed": "*",
+                    "fixed": "eslint-config-next@14.2.35 (major)",
+                    "major": True,
+                },
+                "GHSA-minor": {
+                    "package": "p",
+                    "installed": "1",
+                    "fixed": "p@1.0.1",
+                    "major": False,
+                },
+            }
+        },
+    )
+    assert [r["id"] for r in major] == ["GHSA-major"]
+    assert [r["id"] for r in fixable] == ["GHSA-minor"], (
+        "an ordinary in-major bump must still be reported as take-the-fix"
+    )
+    assert unmatched == [] and holding == []
 
 
 # ── end to end ──────────────────────────────────────────────────────
@@ -291,6 +346,45 @@ def test_a_newly_fixable_entry_is_reported_with_its_bump(tmp_path, monkeypatch, 
     assert rc == 0
     assert "Fixable now" in body
     assert "CVE-2026-69247" in body and "50.0.0" in body
+    assert "has_findings=true" in capsys.readouterr().out
+
+
+def test_the_report_never_tells_you_to_take_a_major_change(
+    tmp_path, monkeypatch, capsys
+):
+    """End to end, because the defect was in what the reader is TOLD, not in any
+    one function. `braces` is `<= 3.0.3` with no patched version anywhere and
+    npm's only offer is a two-major downgrade; the review used to file that under
+    "Fixable now — take the fix", so the issue recommended a large risky change
+    that resolves nothing, every week, until it stopped being read."""
+    rc, body = _run(
+        tmp_path,
+        monkeypatch,
+        {
+            "npm-audit.json": {
+                "vulnerabilities": {
+                    "braces": {
+                        "severity": "high",
+                        "range": "*",
+                        "fixAvailable": {
+                            "name": "eslint-config-next",
+                            "version": "14.2.35",
+                            "isSemVerMajor": True,
+                        },
+                        "via": [{"url": "https://x/advisories/GHSA-vfj7-8cjw-p6xm"}],
+                    }
+                }
+            }
+        },
+        {"npm-audit": "# reasoning\nGHSA-vfj7-8cjw-p6xm\n"},
+    )
+    assert rc == 0
+    assert "Only a major change on offer" in body
+    assert "GHSA-vfj7-8cjw-p6xm" in body and "(major)" in body
+    assert "Fixable now" not in body, (
+        "a major-only offer must never be presented as a drop-in bump"
+    )
+    # It still has to notify, or the bucket appears and changes in silence.
     assert "has_findings=true" in capsys.readouterr().out
 
 
