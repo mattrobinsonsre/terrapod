@@ -12,6 +12,7 @@ import ast
 import asyncio
 import contextlib
 import inspect
+import shutil
 import stat
 from unittest.mock import AsyncMock, patch
 
@@ -155,9 +156,22 @@ class TestCheckRegoDegrades:
         # unavailable signal rather than being reported as broken Rego.
         assert result == policy_engine.VALIDATION_UNAVAILABLE
 
+    @pytest.mark.skipif(shutil.which("opa") is None, reason="opa binary not on PATH")
     async def test_still_reports_genuinely_broken_rego(self):
-        """Degrading must not swallow the thing this check exists for."""
-        err = await policy_engine.check_rego("package terrapod\n\nthis is not rego {{{")
+        """Degrading must not swallow the thing this check exists for.
+
+        **Supplies the binary, like both siblings above.** Omitting it sent this
+        test through the acquisition path, so it needed a *working* fetch to
+        prove a point about compile errors -- and in a tier whose database is
+        mocked, "working" meant reaching upstream over the network. Once the
+        fetch went through the cache that stopped resolving, and the assertion
+        failed claiming the error was the unavailable signal, which is exactly
+        the conflation this class exists to rule out. A test that needs a real
+        OPA should say so and skip without one.
+        """
+        err = await policy_engine.check_rego(
+            "package terrapod\n\nthis is not rego {{{", opa_binary="opa"
+        )
         assert err is not None
         assert err != policy_engine.VALIDATION_UNAVAILABLE
 
