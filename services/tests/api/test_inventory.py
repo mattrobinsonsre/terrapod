@@ -413,6 +413,38 @@ class TestValidation:
                 )
         assert res.status_code == 422
 
+    async def test_a_non_string_var_value_is_422_through_the_route(self, ws):
+        """The validator is tested directly elsewhere; this proves the router
+        turns it into a 422 rather than a 500, and that the message names the
+        key the caller has to fix.
+
+        Worth driving through the route because the alternative is the failure
+        this rule exists to remove: accepted at the write, then invisible to
+        every client that reads vars as a string map.
+        """
+        app, patches = self._writer(ws)
+        with (
+            patches[0],
+            patches[1],
+            patch(f"{_R}.inv.count_items", AsyncMock(return_value=0)),
+            patch(
+                f"{_R}.inv.create_item",
+                AsyncMock(
+                    side_effect=InventoryValidationError(
+                        "the declared value for host variable 'port' must be a string; got int"
+                    )
+                ),
+            ),
+        ):
+            async with await _client(app) as c:
+                res = await c.post(
+                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
+                    json={"data": {"attributes": {"name": "web-1", "vars": {"port": 8080}}}},
+                    headers=_AUTH,
+                )
+        assert res.status_code == 422, res.text
+        assert "port" in res.json()["detail"]
+
     async def test_a_name_ansible_cannot_target_is_422_not_500(self, ws):
         """The service raises `InventoryValidationError`; the router owes a 422."""
         app, patches = self._writer(ws)
