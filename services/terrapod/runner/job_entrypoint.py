@@ -56,6 +56,7 @@ from terrapod.runner.phases import (
     mirror_config,
     opa,
     plan_apply,
+    provider_credentials,
     resource_profile,
     security_scan,
     terragrunt,
@@ -660,6 +661,15 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         config_path=_TF_RC,
     )
     for k, v in mirror_config.export_env(config_path=_TF_RC, env={}).items():
+        os.environ[k] = v
+
+    # 3b. Let the Terrapod provider authenticate from inside the run, so a
+    # workspace can declare its inventory with `terrapod_inventory_item` and an
+    # empty `provider "terrapod" {}` block (#1968). Exported here rather than in
+    # the Job spec because only `TP_`-prefixed names are reserved, so a
+    # workspace variable could otherwise redirect the provider's host while the
+    # spec still supplied the real token -- see the module docstring.
+    for k, v in provider_credentials.export_env(cfg, env=os.environ).items():
         os.environ[k] = v
 
     # 4. Chdir into working subdirectory.

@@ -352,6 +352,39 @@
     "node-id",
     "role"
   ],
+  "inventory._inventory_json": [
+    "api-resolvable",
+    "created-at",
+    "description",
+    "name",
+    "sources",
+    "updated-at"
+  ],
+  "inventory._item_json": [
+    "address",
+    "created-at",
+    "groups",
+    "name",
+    "updated-at",
+    "vars"
+  ],
+  "inventory._version_json": [
+    "ansible-inventory",
+    "group-count",
+    "groups",
+    "host-count",
+    "hosts",
+    "produced-by",
+    "produced-by-ref",
+    "taken-at"
+  ],
+  "inventory.preview_limit": [
+    "host-count",
+    "hosts",
+    "limit",
+    "of-host-count",
+    "taken-at"
+  ],
   "module_autodiscovery_rules._preview_json": [
     "entries",
     "files-walked",

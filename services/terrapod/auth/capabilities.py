@@ -62,6 +62,7 @@ CONFIG_READ = "config:read"  # list/download configuration versions, diff, ticke
 RUN_TASK_READ = "run-task:read"  # list/show run tasks + task stages
 NOTIFICATION_READ = "notification:read"  # list/show notification configs
 RUN_TRIGGER_READ = "run-trigger:read"  # list/show run triggers
+INVENTORY_READ = "inventory:read"  # list/show declared hosts + the resolved inventory
 
 # ── Workspace / runs — plan tier ────────────────────────────────────────────
 RUN_PLAN = "run:plan"  # create or retry a plan-only run
@@ -91,6 +92,7 @@ def confirm_capability(is_destroy: bool) -> str:
 
 
 VAR_WRITE = "var:write"  # create / update / delete variables
+INVENTORY_WRITE = "inventory:write"  # declare / change / remove inventory hosts (#1968)
 STATE_WRITE = "state:write"  # create state version, manual upload, rollback
 CONFIG_UPLOAD = "config:upload"  # create a configuration version
 
@@ -174,6 +176,7 @@ _WORKSPACE_LEVELS: dict[str, frozenset[str]] = {
             RUN_TASK_READ,
             NOTIFICATION_READ,
             RUN_TRIGGER_READ,
+            INVENTORY_READ,
         }
     ),
 }
@@ -195,6 +198,7 @@ _WORKSPACE_LEVELS["write"] = _WORKSPACE_LEVELS["plan"] | {
     VAR_WRITE,
     STATE_WRITE,
     CONFIG_UPLOAD,
+    INVENTORY_WRITE,
 }
 _WORKSPACE_LEVELS["admin"] = _WORKSPACE_LEVELS["write"] | {
     WORKSPACE_SETTINGS,

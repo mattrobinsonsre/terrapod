@@ -4078,3 +4078,240 @@ def subject_matches(model, identity_subject: str | None):
     if identity_subject is None:
         return model.subject.is_(None)
     return or_(model.subject.is_(None), model.subject == identity_subject)
+
+
+# --- Ansible inventory (#1967, #1968) ---
+
+
+class Inventory(Base):
+    """A workspace's inventory: an ordered set of sources, resolved into hosts.
+
+    **Workspace-scoped, not a reusable platform resource** (#1967). The primary
+    source is produced by a workspace's own apply, so a platform-scoped
+    inventory holding those rows would immediately raise "which workspace's
+    apply owns this row". Sharing stays expressible the way #1407 point 7
+    describes: a configure-only workspace composing inventory from other
+    workspaces' remote state, inside the operator's own configuration.
+
+    Named, and several per workspace, because a configure definition (#1971)
+    references *an* inventory: "the terraform items plus git file A" and "the
+    terraform items plus git file B" are two different target sets over the same
+    workspace. A `default` one is created lazily on the first write, so a
+    deployment that never declares a host carries no rows at all -- which is how
+    "terraform/tofu users pay nothing" is delivered here, by data rather than by
+    a flag (#1986).
+    """
+
+    __tablename__ = "inventories"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    workspace: Mapped[Workspace] = relationship()
+    sources: Mapped[list["InventorySource"]] = relationship(
+        back_populates="inventory",
+        cascade="all, delete-orphan",
+        order_by="InventorySource.position",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "name", name="uq_inventories_workspace_name"),
+        Index("ix_inventories_workspace_id", "workspace_id"),
+    )
+
+
+class InventorySource(Base):
+    """One entry in an inventory's ordered source list.
+
+    **The order is an `-i` ordering and nothing more** (#1967). Terrapod
+    implements no merge scheme of its own: hosts union, group membership unions,
+    and a later source wins a conflicting host variable -- which is ansible's
+    own multiple-`-i` behaviour, measured in both directions. So an operator's
+    existing mental model transfers, and `position` means exactly what the
+    position of a `-i` flag means.
+
+    Only `terraform` is implemented. git (#1929) and UI-edited YAML (#1969) are
+    separate issues, and this table exists rather than the terraform source
+    being implied precisely so they have a position to occupy without a
+    migration that reorders anything.
+    """
+
+    __tablename__ = "inventory_sources"
+
+    #: The only source kind implemented. Resolves to "this workspace's declared
+    #: `inventory_items`" -- rows Terrapod already owns, so resolving it is a
+    #: query with nothing to fetch, parse or time out. That is what lets the API
+    #: resolve an inventory made only of these without running ansible.
+    KIND_TERRAFORM = "terraform"
+
+    #: Kinds the API can resolve by itself. A source outside this set must be
+    #: resolved by a runner, because it needs ansible to parse -- the API
+    #: deliberately does not install ansible (#2010). Resolution refuses rather
+    #: than partially resolving, so adding a kind here without a resolver is a
+    #: visible failure instead of a silently shrinking host set.
+    API_RESOLVABLE_KINDS = frozenset({KIND_TERRAFORM})
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    inventory_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("inventories.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    #: 0-based. Lower resolves first, so a higher position wins a conflicting
+    #: host variable.
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: Per-kind settings. Empty for `terraform`, which needs none: the source is
+    #: "every item this workspace declares".
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    inventory: Mapped[Inventory] = relationship(back_populates="sources")
+
+    __table_args__ = (
+        UniqueConstraint("inventory_id", "position", name="uq_inventory_sources_position"),
+        Index("ix_inventory_sources_inventory_id", "inventory_id"),
+    )
+
+
+class InventoryItem(Base):
+    """One host declared by the workspace's own Terraform (#1968).
+
+    Written through the API by `terrapod_inventory_item`, so these are rows
+    Terrapod owns rather than something it infers. The alternative -- deriving
+    hosts from state via a resource-type descriptor table -- was withdrawn: it
+    is unbounded work, permanently incomplete, and wrong in ways an operator
+    cannot fix without us shipping a change. Declaring in HCL deletes that
+    problem, because `for_each`, conditionals and module outputs are more
+    expressive than any table we would write.
+
+    **Workspace-scoped, not inventory-scoped.** The resource carries no
+    `inventory` attribute, so an item belongs to the workspace and every
+    inventory's `terraform` source draws on the same pool. Partitioning stays
+    additive through the source's `config` if it is ever wanted.
+    """
+
+    __tablename__ = "inventory_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    #: The inventory hostname. Validated against `--limit`'s own operators --
+    #: see `inventory_resolution.validate_host_name`, which refuses the
+    #: characters that would make a host unselectable or silently change which
+    #: other hosts a pattern selects.
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: Convenience for `ansible_host`. Optional, because a host whose name
+    #: already resolves needs none. An explicit `ansible_host` in `vars` wins:
+    #: an operator who writes the raw variable is deliberately reaching past
+    #: this field.
+    address: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    #: Declared group names. Never `all` or `ungrouped`, which ansible derives.
+    groups: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    #: Ansible host variables. Terrapod gives none of them special meaning
+    #: because ansible does not either.
+    vars: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    workspace: Mapped[Workspace] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "name", name="uq_inventory_items_workspace_name"),
+        Index("ix_inventory_items_workspace_id", "workspace_id"),
+    )
+
+
+class InventoryVersion(Base):
+    """A snapshot of a resolved inventory (#1967).
+
+    **Load-bearing, and that is forced by measurement rather than chosen.**
+    `v2_playbook_on_play_start` fires once per batch under `serial:`, and in a
+    `serial` + `any_errors_fatal` abort the untouched hosts appear in no
+    callback event and in no PLAY RECAP at all. So "hosts targeted minus hosts
+    completed" cannot be computed from parsed results -- a retry built that way
+    fixes the failure, reports success, and silently leaves the rest
+    unconfigured (#1973). The snapshot taken up front is the only thing that
+    knows the full target set.
+
+    So one artifact is both the targeting basis and the partial-recovery basis.
+
+    `hosts` holds **every** host explicitly, including hosts with no variables.
+    `ansible-inventory --list` does not -- its `_meta.hostvars` omits a var-less
+    host entirely -- so enumerating from that shape loses hosts silently.
+    Ansible's shape is rendered on demand by
+    `inventory_resolution.to_ansible_inventory` instead, leaving one source of
+    truth rather than two representations to keep in step.
+    """
+
+    __tablename__ = "inventory_versions"
+
+    #: Produced by the API, resolving sources it owns. See
+    #: `InventorySource.API_RESOLVABLE_KINDS`.
+    SOURCE_API = "api"
+    #: Produced by a runner, which is the only place ansible is installed and
+    #: therefore the only place a non-API-owned source can be resolved (#2010).
+    SOURCE_RUNNER = "runner"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    inventory_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("inventories.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    #: host name -> merged variables. Exhaustive; this is the host set.
+    hosts: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    #: group name -> sorted member host names. Declared groups only.
+    groups: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    #: Denormalised so a list view does not have to load the JSONB to say how
+    #: big a snapshot is.
+    host_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    group_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    #: SOURCE_API or SOURCE_RUNNER -- what produced this snapshot.
+    produced_by: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: Opaque reference to whatever produced it, when a runner did: today that
+    #: is a run id. Deliberately **not** a foreign key, because the thing a
+    #: configure *is* has not been built yet (#1971, #1972, #1988) and a column
+    #: presuming its table would be a guess this schema cannot take back.
+    produced_by_ref: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    inventory: Mapped[Inventory] = relationship()
+
+    __table_args__ = (Index("ix_inventory_versions_inventory_id", "inventory_id"),)

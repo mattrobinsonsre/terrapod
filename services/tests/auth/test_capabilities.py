@@ -40,6 +40,7 @@ def test_workspace_read_tier_membership():
         cap.RUN_TASK_READ,
         cap.NOTIFICATION_READ,
         cap.RUN_TRIGGER_READ,
+        cap.INVENTORY_READ,
     } == read
     assert cap.STATE_READ not in read and cap.RUN_PLAN not in read
 
@@ -66,8 +67,16 @@ def test_workspace_write_tier_membership():
         cap.VAR_WRITE,
         cap.STATE_WRITE,
         cap.CONFIG_UPLOAD,
+        # Declaring an inventory host is write, deliberately, not admin: the
+        # Terraform that declares one runs under an apply, so requiring admin to
+        # do it through the API would be stricter than the path every item
+        # actually arrives by (#1968).
+        cap.INVENTORY_WRITE,
     } <= write
     assert cap.WORKSPACE_SETTINGS not in write and cap.WORKSPACE_DELETE not in write
+    assert cap.INVENTORY_WRITE not in _ws("plan"), (
+        "a plan-tier grant must not be able to rewrite the target set a configure uses"
+    )
 
 
 def test_workspace_admin_tier_membership():
