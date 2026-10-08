@@ -79,12 +79,14 @@ func (r *inventoryGlobalVarResource) Schema(_ context.Context, _ resource.Schema
 				Default:  booldefault.StaticBool(false),
 			},
 			"sensitive": schema.BoolAttribute{
-				Description: "Whether the API masks the value in every response. A display flag, not " +
-					"encryption: every inventory variable value is encrypted at rest regardless, because a " +
-					"column cannot be conditionally encrypted and a variable under `all` is an ordinary place " +
-					"for a become password. A sensitive variable therefore never reads back — Terraform keeps " +
-					"what the configuration says, and an IMPORTED one takes the mask until the next apply " +
-					"sets it.",
+				Description: "Whether the API masks the value in every response. A display flag, and it " +
+					"says NOTHING about how the value is stored: app-layer encryption is a deployment-wide " +
+					"setting, so where an operator has enabled it every value is enveloped whatever this flag " +
+					"says, and where they have not (the default) the column is plaintext and the protection " +
+					"is the datastore's own at-rest encryption — the same position as a workspace variable. " +
+					"What this flag does change is readability: a sensitive variable never reads back, so " +
+					"Terraform keeps what the configuration says, and an IMPORTED one takes the mask until " +
+					"the next apply sets it.",
 				Optional: true,
 				Computed: true,
 				Default:  booldefault.StaticBool(false),
