@@ -345,26 +345,26 @@ outlives its subject deliberately, because destroying the record that an image w
 signed is not something a delete should do quietly.
 
 
-## Engine gating
+## Turning the registry off
 
 This registry exists to serve Ansible execution environments. If you do not run
-Ansible, set `api.config.engines.ansible.enabled: false` and it is not deployed
-at all — the `/v2/` routes are never registered, the collector and upload reaper
-never scheduled. Anything already pushed or mirrored stays in storage and returns
-if you re-enable it.
+Ansible, set `api.config.registry.oci.enabled: false` and it is not deployed at
+all — the `/v2/` routes are never registered, the collector and upload reaper
+never scheduled, and nothing appears in the UI or the OpenAPI schema.
 
-The engine switches sit **above** the per-capability flags in `registry`. A
-capability serves only when its own flag is on *and* an engine that needs it is
-enabled, so `registry.oci.enabled: true` does not bring the registry back once
-Ansible is off. That is deliberate: switching an engine off should be one
-decision, not a hunt for every capability that belongs to it.
+That flag is the only thing deciding it. There is **no engine on/off switch above
+it**: Terrapod offers every engine it can run, and a deployment that does not run
+Ansible simply never pushes an execution environment.
 
-| Capability | Needs |
-|---|---|
-| Container registry (`/v2/`) | `engines.ansible` |
-| PyPI proxy | `engines.ansible` **or** `engines.pulumi` |
-| npm proxy | `engines.pulumi` |
+**Never destructive.** Anything already pushed or mirrored stays in storage and
+returns untouched if you turn the registry on again.
 
-Terraform and OpenTofu's own caches — the provider network mirror, the engine
-binary cache, the module registry — are not gateable and are unaffected by any of
-this.
+Off means *absent*, not present-and-refusing. A surface that 404s every request
+is still a surface — it sits in the schema, carries its dependencies, and reads
+to anyone auditing the deployment as something you do.
+
+The package proxies have their own flags, documented in
+[package-cache.md](package-cache.md#turning-a-proxy-off). Terraform and
+OpenTofu's own caches — the provider network mirror, the engine binary cache, the
+module registry — have no such switch: they are what Terrapod is, not an optional
+engine's supporting cast.

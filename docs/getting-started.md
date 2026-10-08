@@ -385,22 +385,14 @@ for. Pulumi is the same platform — same workspaces, runs, variables, RBAC,
 policy sets, notifications and audit trail — so this section is short by design:
 it covers only what differs.
 
-**The engine is on by default** — `api.config.engines.pulumi.enabled` ships
-`true`, so there is nothing to turn on. Turn it *off* if you do not want it:
+**There is nothing to turn on, and nothing to decide.** Terrapod offers every
+engine it can run; a deployment that came for Terraform simply never names
+another one, and pays nothing for it either way — an engine's CLI is fetched only
+when a run of that engine happens, so nothing extra is deployed.
 
-```yaml
-# values.yaml
-api:
-  config:
-    engines:
-      pulumi:
-        enabled: false
-```
-
-With it off there is no Pulumi surface at all — no routes, no workspaces, no
-mention in the UI. Off means absent, not present-and-refusing. That is
-deliberate: a deployment that came for Terraform pays nothing for an engine it
-does not use, and an auditor can see the difference.
+The Pulumi surface is always there. It is not reachable without a Pulumi
+workspace to name, and nothing in the UI offers you an engine choice until you
+have more than one engine's workspaces to choose between.
 
 **A workspace is one stack, and its name says so.** Pulumi identifies a stack as
 `organization/project/stack`; a Terrapod workspace has one flat name, so the two

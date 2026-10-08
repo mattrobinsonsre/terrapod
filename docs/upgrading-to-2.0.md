@@ -789,6 +789,51 @@ still live.
 `api.tokenSigningKey.existingSecret` and `existingSecretKey` are unchanged, so
 no values edit is required.
 
+### The engine on/off switch is removed
+
+**Affects:** any deployment whose `values.yaml` sets `api.config.engines`.
+
+`api.config.engines.ansible.enabled` and `api.config.engines.pulumi.enabled` are
+gone, along with the `engines:` block that held them. Because
+`values.schema.json` refuses keys it does not declare, a `values.yaml` that still
+sets them **fails `helm lint` and `helm upgrade`** rather than ignoring them —
+which is the useful direction: it tells you at upgrade time instead of leaving
+dead configuration behind.
+
+```yaml
+# remove this block entirely
+api:
+  config:
+    engines:
+      pulumi:
+        enabled: true
+      ansible:
+        enabled: true
+```
+
+**There is nothing to replace it with, and nothing to decide.** The platform
+offers every engine it can run; a deployment that uses only Terraform or OpenTofu
+simply never names another one. Switching an engine off never deployed less — it
+left routers unmounted and filtered a list — and an engine's CLI is still fetched
+only when a run of that engine happens, so a Terraform-only deployment is
+unaffected either way.
+
+**What this does change,** if you were relying on the switch:
+
+| was | now |
+|---|---|
+| `GET /api/v1/engines` omitted a disabled engine | lists every engine the build contains |
+| creating a workspace with a disabled engine was refused | accepted; the engine must simply be one Terrapod can run |
+| the Pulumi service surface was unmounted | always mounted (nothing there is reachable without a Pulumi workspace to name) |
+
+**Per-capability switches are unaffected and are what to use instead.** If your
+reason for switching an engine off was to stop a *surface* serving, that control
+survives and is unchanged — `api.config.registry.oci.enabled` for the container
+registry, and `api.config.registry.package_cache.enabled` plus its six
+per-ecosystem flags (`pypi`, `npm`, `galaxy`, `pulumi`, `go`, `nuget`) for the
+package proxies. Each of those is read, and switching one off unmounts its
+routes rather than leaving them answering 404.
+
 ## Before you upgrade
 
 1. Read the sections above and make the edits they name.

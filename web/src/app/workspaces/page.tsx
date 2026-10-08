@@ -514,7 +514,13 @@ function WorkspacesPageInner() {
   const [agentPools, setAgentPools] = useState<{ id: string; attributes: { name: string } }[]>([])
   const [agentPoolsLoaded, setAgentPoolsLoaded] = useState(false)
 
-  // Engines this deployment enables (#1555). Terraform alone means no engine UI.
+  // Engines this build can run (#1555). The picker appears only when there is a
+  // choice to make, which is still the right condition — but note it is now keyed
+  // on what the BUILD contains rather than on what an operator enabled, because
+  // the engine on/off switch is gone (#1986). So a Terraform-only deployment does
+  // see the picker, defaulted to Terraform. There is deliberately nothing
+  // deployment-specific left to key on: keying it on "has a Pulumi workspace
+  // already" would make the first one impossible to create.
   const [engines, setEngines] = useState<string[]>(['terraform'])
   useEffect(() => {
     apiFetch('/api/v1/engines')

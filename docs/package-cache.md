@@ -355,31 +355,31 @@ bounded; a `.nupkg` at a version is **immutable** and needs no TTL.
 this only appears in local testing.
 
 
-## Engine gating
+## Turning a proxy off
 
-These proxies exist to serve Pulumi programs and Ansible collections. PyPI serves
-both, npm serves Pulumi only and Galaxy Ansible only — so npm goes away with
-`api.config.engines.pulumi.enabled: false`, Galaxy with
-`api.config.engines.ansible.enabled: false`, and PyPI only once *both* engines
-are off. Cached artifacts are never deleted by turning an engine off. See
-[engine gating](#engine-gating).
+Every proxy is on by default and each has its own switch. There is **no engine
+on/off switch above them** — Terrapod offers every engine it can run, so these
+flags are the only thing that decides whether a proxy serves.
 
-The engine switches sit **above** the per-capability flags in `registry`. A
-capability serves only when its own flag is on *and* an engine that needs it is
-enabled, so `registry.oci.enabled: true` does not bring the registry back once
-Ansible is off. That is deliberate: switching an engine off should be one
-decision, not a hunt for every capability that belongs to it.
-
-| Capability | Needs |
+| Proxy | Switch |
 |---|---|
-| Container registry (`/v2/`) | `engines.ansible` |
-| PyPI proxy | `engines.ansible` **or** `engines.pulumi` |
-| npm proxy | `engines.pulumi` |
-| Galaxy proxy | `engines.ansible` |
-| Pulumi plugin proxy | `engines.pulumi` |
-| Go module proxy | `engines.pulumi` |
-| NuGet proxy | `engines.pulumi` |
+| all six at once | `api.config.registry.package_cache.enabled` |
+| PyPI | `api.config.registry.package_cache.pypi.enabled` |
+| npm | `api.config.registry.package_cache.npm.enabled` |
+| Galaxy | `api.config.registry.package_cache.galaxy.enabled` |
+| Pulumi plugins | `api.config.registry.package_cache.pulumi.enabled` |
+| Go modules | `api.config.registry.package_cache.go.enabled` |
+| NuGet | `api.config.registry.package_cache.nuget.enabled` |
+
+Setting one to `false` means the routes are **never registered** — the proxy is
+absent from the API and from the OpenAPI schema, not mounted and answering 404.
+A surface that refuses every request is still a surface: it sits in the schema,
+carries its dependencies, and reads to anyone auditing the deployment as
+something you do.
+
+**Never destructive.** Cached artifacts stay exactly where they are and come
+back untouched when you turn the proxy on again.
 
 Terraform and OpenTofu's own caches — the provider network mirror, the engine
-binary cache, the module registry — are not gateable and are unaffected by any of
-this.
+binary cache, the module registry — have no such switch. They are what Terrapod
+is, not an optional engine's supporting cast.

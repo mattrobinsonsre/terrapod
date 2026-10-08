@@ -97,15 +97,20 @@ state, a run you review then apply, one set of permissions, policies and
 history — as far as each engine allows, and where one cannot be, Terrapod says
 so rather than implying parity.
 
-**Only interested in Terraform and OpenTofu?** Then say so, and none of the rest is
-deployed. The container registry and the PyPI and npm proxies are there to serve
-Ansible and Pulumi work; two Helm switches —
-`api.config.engines.ansible.enabled` and `api.config.engines.pulumi.enabled` —
-turn each off completely. Their routes are never registered, their background
-tasks never scheduled, and nothing appears in the UI or the API schema. Terraform
-and OpenTofu are unaffected either way: the provider mirror, the engine binary
-cache and the module registry are what Terrapod is, and are never gated. Turning
-one off is not destructive — anything already stored stays put and comes back if
+**Only interested in Terraform and OpenTofu?** Then there is nothing to switch
+off and nothing to decide. Terrapod offers every engine it can run, and a
+deployment that only writes HCL never names another one — an engine's CLI is
+fetched only when a run of that engine happens, so nothing extra is deployed
+either way. The provider mirror, the engine binary cache and the module registry
+are what Terrapod is.
+
+The supporting surfaces for Ansible and Pulumi work — the container registry and
+the PyPI, npm, Galaxy, Pulumi-plugin, Go and NuGet proxies — each keep their own
+Helm switch (`api.config.registry.oci.enabled`,
+`api.config.registry.package_cache.enabled` and one flag per ecosystem), for
+operators who want a smaller surface. Off means the routes are never registered,
+the background tasks never scheduled, and nothing in the UI or the API schema.
+Never destructive: anything already stored stays put and comes back untouched if
 you turn it on again.
 
 The one hard requirement is Kubernetes, and that's a low bar: Terrapod is a single Helm release, a one-node [k3s](https://k3s.io/) VM is plenty to start, and `make eval` spins up a throwaway [k3d](https://k3d.io/)/kind cluster in one command.
