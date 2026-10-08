@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventaris",
-        "body": "Dit zijn de hosts die deze workspace declareert en waartoe ze worden opgelost. Een playbook erop uitvoeren is nog niet beschikbaar — deze release maakt de inventaris observeerbaar, er wordt hier niets uitgevoerd."
+        "body": "De hosts en groepen die deze workspace bevat, en waartoe ansible ze oplost. Elke regel is hier te bewerken; een playbook erop uitvoeren is nog niet beschikbaar."
       },
-      "selectLabel": "Inventaris",
-      "resolved": {
-        "heading": "Opgeloste hosts en groepen",
-        "subheading": "Het samengevoegde resultaat voor {name}, uit elke bron op volgorde.",
+      "nav": {
+        "label": "Inventarisonderdelen",
         "hosts": "Hosts",
         "groups": "Groepen",
-        "liveNote": "Dit is live. Elke bron hier is in uw configuratie gedeclareerd, dus oplossen is een query."
-      },
-      "limit": {
-        "heading": "Wat zou een limit-patroon selecteren?",
-        "body": "Breid een ansible --limit-patroon uit op basis van de hierboven opgeloste hosts, zodat u kunt zien welke daarvan het selecteert voordat er iets wordt uitgevoerd.",
-        "inputLabel": "Limit-patroon",
-        "placeholder": "web:!web-2",
-        "preview": "Voorbeeld",
-        "previewing": "Voorbeeld wordt gemaakt…",
-        "matched": "{count, plural, =0 {Geen hosts} one {# host} other {# hosts}} van {total} geselecteerd.",
-        "advisory": "Alleen adviserend. De gezaghebbende uitbreiding van het patroon wordt door ansible in de runner uitgevoerd, dus beschouw dit als een richtlijn en niet als een garantie."
-      },
-      "items": {
-        "heading": "Gedeclareerde hosts",
-        "managedNote": "Gedeclareerd door de eigen Terraform van deze workspace en hier dus alleen-lezen. Voeg een host toe, wijzig of verwijder er een in uw configuratie en pas die toe — een wijziging buiten Terraform wordt bij de volgende apply teruggedraaid.",
-        "empty": "Nog geen hosts gedeclareerd.",
-        "name": "Host",
-        "address": "Adres",
-        "groups": "Groepen",
         "vars": "Variabelen",
-        "noGroups": "geen"
+        "resolved": "Opgelost",
+        "settings": "Instellingen"
       },
-      "sources": {
-        "heading": "Bronnen",
-        "body": "Worden in volgorde opgelost, precies zoals herhaalde -i-vlaggen: bij een conflicterende hostvariabele wint de latere bron.",
-        "position": "Positie {position}"
+      "actions": {
+        "save": "Opslaan",
+        "saving": "Bezig met opslaan…",
+        "cancel": "Annuleren",
+        "edit": "Bewerken",
+        "delete": "Verwijderen",
+        "remove": "Ontkoppelen",
+        "add": "Toevoegen",
+        "adding": "Bezig met toevoegen…",
+        "rename": "Naam wijzigen"
+      },
+      "hosts": {
+        "heading": "Hosts",
+        "body": "Eén regel per host. Open een host om zijn variabelen en de groepen waartoe hij behoort te bewerken.",
+        "empty": "Nog geen hosts.",
+        "colName": "Host",
+        "colGroups": "Groepen",
+        "colVars": "Variabelen",
+        "newLabel": "Naam van de nieuwe host",
+        "newPlaceholder": "web-1",
+        "add": "Host toevoegen",
+        "confirmDelete": "De host {name} verwijderen? Zijn variabelen en zijn groepslidmaatschappen verdwijnen mee.",
+        "renameLabel": "Hostnaam"
+      },
+      "groups": {
+        "heading": "Groepen",
+        "body": "Eén regel per groep. Open een groep om haar variabelen, haar lid-hosts en de groepen die erin genest zijn te bewerken.",
+        "empty": "Nog geen groepen.",
+        "colName": "Groep",
+        "colMembers": "Hosts",
+        "colChildren": "Subgroepen",
+        "colVars": "Variabelen",
+        "newLabel": "Naam van de nieuwe groep",
+        "newPlaceholder": "web",
+        "add": "Groep toevoegen",
+        "confirmDelete": "De groep {name} verwijderen? Haar variabelen en haar lidmaatschappen verdwijnen mee; de hosts zelf blijven.",
+        "renameLabel": "Groepsnaam"
+      },
+      "vars": {
+        "actions": "Acties",
+        "key": "Sleutel",
+        "keyPlaceholder": "ansible_user",
+        "value": "Waarde",
+        "structured": "Gestructureerd",
+        "sensitive": "Gevoelig",
+        "structuredHelp": "Een lijst, getal of object is een gestructureerde waarde: vink Gestructureerd aan en schrijf de literale broncode in de waarde. Een gevoelige waarde wordt nooit teruggelezen — het veld toont in plaats daarvan een masker.",
+        "structuredBadge": "gestructureerd",
+        "sensitiveKeep": "Laat dit leeg om de opgeslagen waarde te behouden.",
+        "empty": "Hier staan geen variabelen.",
+        "add": "Variabele toevoegen",
+        "confirmDelete": "De variabele {key} verwijderen?"
+      },
+      "hostDetail": {
+        "heading": "Host {name}",
+        "body": "Alles wat deze ene host bevat.",
+        "back": "Terug naar hosts",
+        "gone": "Die host bestaat niet meer.",
+        "vars": "Hostvariabelen",
+        "varsBody": "Variabelen die alleen voor deze host gelden. Ze krijgen voorrang boven een groepsvariabele met dezelfde naam.",
+        "memberships": "Groepen",
+        "membershipsBody": "De groepen waartoe deze host behoort. Een lidmaatschap is een koppeling, dus als je er hier een weghaalt, blijven zowel de host als de groep bestaan.",
+        "membershipsEmpty": "Deze host zit in geen enkele groep, dus ansible plaatst hem in ungrouped.",
+        "addGroup": "Aan groep toevoegen",
+        "addGroupLabel": "Kies een groep",
+        "removeGroupAria": "Deze host ontkoppelen van {name}",
+        "confirmRemoveGroup": "Deze host uit {name} halen?"
+      },
+      "groupDetail": {
+        "heading": "Groep {name}",
+        "body": "Alles wat deze ene groep bevat.",
+        "back": "Terug naar groepen",
+        "gone": "Die groep bestaat niet meer.",
+        "vars": "Groepsvariabelen",
+        "varsBody": "Variabelen die gelden voor elke host in deze groep, direct of via nesting.",
+        "members": "Lid-hosts",
+        "membersBody": "De hosts die direct in deze groep zitten. Een host die alleen via een geneste groep wordt bereikt, staat hier niet.",
+        "membersEmpty": "Geen hosts direct in deze groep.",
+        "addHost": "Host toevoegen",
+        "addHostLabel": "Kies een host",
+        "removeHostAria": "{name} ontkoppelen van deze groep",
+        "confirmRemoveHost": "{name} uit deze groep halen?",
+        "children": "Subgroepen",
+        "childrenBody": "Groepen die in deze zijn genest. Hun hosts zijn ook lid van deze groep, en de variabelen van deze groep bereiken ze.",
+        "childrenEmpty": "Er is geen groep in deze genest.",
+        "addChild": "Subgroep toevoegen",
+        "addChildLabel": "Kies een groep om te nesten",
+        "removeChildAria": "{name} uit de subgroepen van deze groep halen",
+        "confirmRemoveChild": "{name} niet langer in deze groep nesten?",
+        "parents": "Bovenliggende groepen",
+        "parentsBody": "De groepen waarin deze is genest. Een groep kan meerdere bovenliggende groepen hebben.",
+        "parentsEmpty": "Deze groep is in niets genest.",
+        "addParent": "Bovenliggende groep toevoegen",
+        "addParentLabel": "Kies een bovenliggende groep",
+        "removeParentAria": "Deze groep ontkoppelen van {name}",
+        "confirmRemoveParent": "Deze groep niet langer in {name} nesten?"
+      },
+      "globalVars": {
+        "heading": "Inventarisvariabelen",
+        "body": "Variabelen die voor elke host gelden — de group_vars/all van ansible. Een groeps- of hostvariabele met dezelfde naam krijgt voorrang boven een die hier is ingesteld."
+      },
+      "resolved": {
+        "heading": "Opgeloste hosts",
+        "body": "Wat ansible van de regels maakt: elke host met de variabelen die hij uiteindelijk draagt, na de samenvoeging en de voorrangsregels.",
+        "hosts": "Hosts",
+        "groups": "Groepen",
+        "liveNote": "Dit is live. Elke bron hier is statisch, dus het lezen lost de regels zelf op — er is niets om te verversen.",
+        "noHosts": "Niets is tot een host opgelost.",
+        "noVars": "geen variabelen",
+        "groupsHeading": "Groepslidmaatschap",
+        "directOnly": "Alleen direct lidmaatschap, precies zoals ansible het rapporteert: een groep waarvan alle hosts via een geneste groep binnenkomen, toont er geen van zichzelf. De nesting staat hieronder.",
+        "noGroups": "Geen groepen opgelost.",
+        "noDirectMembers": "geen directe hosts",
+        "nestingHeading": "Groepsnesting",
+        "nestingBody": "Welke groepen in welke zitten. Een limit op een bovenliggende groep bereikt elke host daaronder.",
+        "noNesting": "Er is geen groep genest.",
+        "limitHeading": "Wat zou een limit selecteren?",
+        "limitBody": "Breid een ansible --limit-patroon uit op deze inventaris en zie precies welke hosts het selecteert voordat er iets wordt uitgevoerd. Ansible doet de uitbreiding, dus een groep, een uitsluiting en een ~regex gedragen zich precies zoals tijdens de uitvoering.",
+        "limitLabel": "Limit-patroon",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Limit toepassen",
+        "limitClear": "Wissen",
+        "limitApplied": "Beperkt tot {limit}. Alles hieronder is wat dat patroon selecteert."
+      },
+      "settings": {
+        "heading": "Instellingen",
+        "body": "Of de regels die hier staan meetellen, en de repository waaruit ook een inventaris wordt gelezen.",
+        "absent": "Geen instellingen, wat de standaard is: de hosts en groepen die hier staan zijn de hele inventaris.",
+        "includePlatform": "De hosts en groepen gebruiken die hier staan",
+        "includePlatformHelp": "Standaard aan. Zet het uit om alleen uit de repository op te lossen; de regels blijven staan, maar vallen buiten het antwoord.",
+        "included": "ja",
+        "excluded": "nee",
+        "vcsConnection": "VCS-verbinding",
+        "vcsNone": "Geen",
+        "field": {
+          "repo-url": "Repository",
+          "branch": "Branch",
+          "working-directory": "Map"
+        },
+        "branchHelp": "Laat leeg om de standaardbranch van de repository te volgen.",
+        "ignorePaths": "Genegeerde paden",
+        "ignorePathsHelp": "Eén glob per regel. Alles wat overeenkomt blijft buiten de inventaris die uit de repository wordt gelezen.",
+        "unset": "niet ingesteld",
+        "create": "Instellingen toevoegen",
+        "clear": "Instellingen wissen",
+        "confirmClear": "Deze instellingen wissen? De koppeling met de repository verdwijnt mee; de hosts en groepen die hier staan blijven."
       },
       "errors": {
-        "loadItems": "Kan gedeclareerde hosts niet laden",
-        "loadResolved": "Kan de opgeloste inventaris niet laden",
-        "preview": "Voorbeeld van het limit-patroon mislukt"
+        "load": "Kan de inventaris niet laden",
+        "save": "Opslaan mislukt",
+        "delete": "Verwijderen mislukt",
+        "resolved": "Kan de inventaris niet oplossen",
+        "settings": "Kan de inventarisinstellingen niet opslaan"
       }
     },
     "sharing": {

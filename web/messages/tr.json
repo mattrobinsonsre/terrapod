@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Envanter",
-        "body": "Bunlar bu çalışma alanının bildirdiği ana makineler ve neye çözümlendikleridir. Üzerlerinde playbook çalıştırmak henüz mevcut değil — bu sürüm envanteri gözlemlenebilir kılar, buradan hiçbir şey yürütülmez."
+        "body": "Bu çalışma alanının tuttuğu ana makineler ve gruplar ile ansible’ın bunları neye çözümlediği. Her satır burada düzenlenebilir; üzerlerinde playbook çalıştırmak henüz mevcut değil."
       },
-      "selectLabel": "Envanter",
-      "resolved": {
-        "heading": "Çözümlenen ana makineler ve gruplar",
-        "subheading": "{name} için birleştirilmiş sonuç, tüm kaynaklardan sırayla.",
+      "nav": {
+        "label": "Envanter bölümleri",
         "hosts": "Ana makineler",
         "groups": "Gruplar",
-        "liveNote": "Bu canlıdır. Buradaki her kaynak yapılandırmanızda bildirilmiştir, dolayısıyla çözümleme bir veritabanı sorgusudur."
-      },
-      "limit": {
-        "heading": "Bir --limit neyi hedefler?",
-        "body": "Yukarıda çözümlenen ana makinelere karşı bir ansible --limit desenini genişletin; böylece hiçbir şey çalışmadan önce bunlardan hangilerini seçtiğini görebilirsiniz.",
-        "inputLabel": "--limit deseni",
-        "placeholder": "web:!web-2",
-        "preview": "Önizleme",
-        "previewing": "Önizleniyor…",
-        "matched": "Toplam {total} ana makineden {count, plural, =0 {hiçbiri seçilmedi} other {# tanesi seçildi}}.",
-        "advisory": "Yalnızca tavsiye niteliğindedir. Bağlayıcı genişletme runner içindeki ansible tarafından yapılır, bu nedenle bunu bir garanti değil, bir yol gösterici olarak değerlendirin."
-      },
-      "items": {
-        "heading": "Bildirilen ana makineler",
-        "managedNote": "Bu çalışma alanının kendi Terraform yapılandırması tarafından bildirilir, bu nedenle burada salt okunurdur. Yapılandırmanızda bir ana makine ekleyin, değiştirin veya kaldırın ve uygulayın — Terraform dışında yapılan bir düzenleme bir sonraki uygulamada geri alınır.",
-        "empty": "Henüz bildirilen ana makine yok.",
-        "name": "Ana makine",
-        "address": "Adres",
-        "groups": "Gruplar",
         "vars": "Değişkenler",
-        "noGroups": "yok"
+        "resolved": "Çözümlenen",
+        "settings": "Ayarlar"
       },
-      "sources": {
-        "heading": "Kaynaklar",
-        "body": "Tekrarlanan -i bayrakları gibi sırayla çözümlenir: çakışan bir ana makine değişkeninde sonraki kaynak kazanır.",
-        "position": "Konum {position}"
+      "actions": {
+        "save": "Kaydet",
+        "saving": "Kaydediliyor…",
+        "cancel": "İptal",
+        "edit": "Düzenle",
+        "delete": "Sil",
+        "remove": "Çıkar",
+        "add": "Ekle",
+        "adding": "Ekleniyor…",
+        "rename": "Yeniden adlandır"
+      },
+      "hosts": {
+        "heading": "Ana makineler",
+        "body": "Ana makine başına bir satır. Değişkenlerini ve ait olduğu grupları düzenlemek için bir ana makineyi açın.",
+        "empty": "Henüz ana makine yok.",
+        "colName": "Ana makine",
+        "colGroups": "Gruplar",
+        "colVars": "Değişkenler",
+        "newLabel": "Yeni ana makine adı",
+        "newPlaceholder": "web-1",
+        "add": "Ana makine ekle",
+        "confirmDelete": "{name} adlı ana makine silinsin mi? Değişkenleri ve grup üyelikleri de onunla birlikte gider.",
+        "renameLabel": "Ana makine adı"
+      },
+      "groups": {
+        "heading": "Gruplar",
+        "body": "Grup başına bir satır. Değişkenlerini, üye ana makinelerini ve içine yerleştirilmiş grupları düzenlemek için bir grubu açın.",
+        "empty": "Henüz grup yok.",
+        "colName": "Grup",
+        "colMembers": "Ana makineler",
+        "colChildren": "Alt gruplar",
+        "colVars": "Değişkenler",
+        "newLabel": "Yeni grup adı",
+        "newPlaceholder": "web",
+        "add": "Grup ekle",
+        "confirmDelete": "{name} adlı grup silinsin mi? Değişkenleri ve üyelikleri de onunla birlikte gider; ana makinelerin kendileri kalır.",
+        "renameLabel": "Grup adı"
+      },
+      "vars": {
+        "actions": "Eylemler",
+        "key": "Anahtar",
+        "keyPlaceholder": "ansible_user",
+        "value": "Değer",
+        "structured": "Yapılandırılmış",
+        "sensitive": "Hassas",
+        "structuredHelp": "Liste, sayı veya nesne yapılandırılmış bir değerdir: Yapılandırılmış’ı işaretleyin ve değere kaynağını olduğu gibi yazın. Hassas bir değer asla geri okunmaz — alan onun yerine bir maske gösterir.",
+        "structuredBadge": "yapılandırılmış",
+        "sensitiveKeep": "Saklanan değeri korumak için burayı boş bırakın.",
+        "empty": "Burada değişken yok.",
+        "add": "Değişken ekle",
+        "confirmDelete": "{key} değişkeni silinsin mi?"
+      },
+      "hostDetail": {
+        "heading": "{name} ana makinesi",
+        "body": "Bu tek ana makinenin taşıdığı her şey.",
+        "back": "Ana makinelere dön",
+        "gone": "Bu ana makine artık yok.",
+        "vars": "Ana makine değişkenleri",
+        "varsBody": "Yalnızca bu ana makine için geçerli olan değişkenler. Aynı addaki bir grup değişkenine karşı bunlar kazanır.",
+        "memberships": "Gruplar",
+        "membershipsBody": "Bu ana makinenin ait olduğu gruplar. Üyelik bir bağdır, dolayısıyla burada birini kaldırmak hem ana makineyi hem grubu yerinde bırakır.",
+        "membershipsEmpty": "Bu ana makine hiçbir grupta değil, bu yüzden ansible onu ungrouped içine koyar.",
+        "addGroup": "Gruba ekle",
+        "addGroupLabel": "Bir grup seçin",
+        "removeGroupAria": "Bu ana makineyi {name} grubundan çıkar",
+        "confirmRemoveGroup": "Bu ana makine {name} grubundan çıkarılsın mı?"
+      },
+      "groupDetail": {
+        "heading": "{name} grubu",
+        "body": "Bu tek grubun taşıdığı her şey.",
+        "back": "Gruplara dön",
+        "gone": "Bu grup artık yok.",
+        "vars": "Grup değişkenleri",
+        "varsBody": "Bu gruptaki her ana makine için — doğrudan ya da yerleştirme yoluyla — geçerli olan değişkenler.",
+        "members": "Üye ana makineler",
+        "membersBody": "Bu gruba doğrudan ait olan ana makineler. Yalnızca yerleştirilmiş bir grup üzerinden erişilen bir ana makine burada listelenmez.",
+        "membersEmpty": "Bu gruba doğrudan ait ana makine yok.",
+        "addHost": "Ana makine ekle",
+        "addHostLabel": "Bir ana makine seçin",
+        "removeHostAria": "{name} öğesini bu gruptan çıkar",
+        "confirmRemoveHost": "{name} bu gruptan çıkarılsın mı?",
+        "children": "Alt gruplar",
+        "childrenBody": "Bunun içine yerleştirilmiş gruplar. Onların ana makineleri de bu grubun üyesidir ve bu grubun değişkenleri onlara ulaşır.",
+        "childrenEmpty": "Bunun içine yerleştirilmiş grup yok.",
+        "addChild": "Alt grup ekle",
+        "addChildLabel": "Yerleştirilecek bir grup seçin",
+        "removeChildAria": "{name} öğesini bu grubun alt gruplarından çıkar",
+        "confirmRemoveChild": "{name} bu gruptan alt grup olarak çıkarılsın mı?",
+        "parents": "Üst gruplar",
+        "parentsBody": "Bunun içine yerleştirildiği gruplar. Bir grubun birkaç üst grubu olabilir.",
+        "parentsEmpty": "Bu grup hiçbir şeyin içine yerleştirilmemiş.",
+        "addParent": "Üst grup ekle",
+        "addParentLabel": "Bir üst grup seçin",
+        "removeParentAria": "Bu grubu {name} grubundan çıkar",
+        "confirmRemoveParent": "Bu grup {name} grubunun içinden çıkarılsın mı?"
+      },
+      "globalVars": {
+        "heading": "Envanter değişkenleri",
+        "body": "Her ana makine için geçerli olan değişkenler — ansible’ın group_vars/all dosyası. Aynı addaki bir grup ya da ana makine değişkeni, burada ayarlanana karşı kazanır."
+      },
+      "resolved": {
+        "heading": "Çözümlenen ana makineler",
+        "body": "ansible’ın bu satırlardan çıkardığı sonuç: birleştirme ve öncelik uygulandıktan sonra her ana makine, elinde kalan değişkenlerle birlikte.",
+        "hosts": "Ana makineler",
+        "groups": "Gruplar",
+        "liveNote": "Bu canlıdır. Buradaki her kaynak statiktir, dolayısıyla okuma yanıtı vermek için satırları kendisi çözümler — yenilenecek bir şey yok.",
+        "noHosts": "Hiçbir satır bir ana makineye çözümlenmedi.",
+        "noVars": "değişken yok",
+        "groupsHeading": "Grup üyeliği",
+        "directOnly": "Yalnızca doğrudan üyelik, tam olarak ansible’ın bildirdiği gibi: tüm ana makineleri yerleştirilmiş bir grup üzerinden gelen bir grup, kendisine ait hiçbirini listelemez. Yerleştirme aşağıda.",
+        "noGroups": "Hiçbir grup çözümlenmedi.",
+        "noDirectMembers": "doğrudan ana makine yok",
+        "nestingHeading": "Grup yerleştirme",
+        "nestingBody": "Hangi grupların hangilerinin içinde olduğu. Bir üst gruba uygulanan --limit, altındaki her ana makineye ulaşır.",
+        "noNesting": "Hiçbir grup yerleştirilmiş değil.",
+        "limitHeading": "Bir --limit neyi hedefler?",
+        "limitBody": "Bir ansible --limit desenini bu envantere karşı genişletin ve hiçbir şey çalışmadan önce hangi ana makineleri seçtiğini tam olarak görün. Genişletmeyi ansible yapar, dolayısıyla bir grup, bir dışlama ve bir ~regex hepsi çalışma anındaki gibi davranır.",
+        "limitLabel": "--limit deseni",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Limiti uygula",
+        "limitClear": "Temizle",
+        "limitApplied": "{limit} ile sınırlandı. Aşağıdaki her şey, bu desenin hedeflediğidir."
+      },
+      "settings": {
+        "heading": "Ayarlar",
+        "body": "Burada tutulan satırların sayılıp sayılmadığı ve envanterin ayrıca okunduğu depo.",
+        "absent": "Ayar yok, ki varsayılan budur: burada tutulan ana makineler ve gruplar envanterin tamamıdır.",
+        "includePlatform": "Burada tutulan ana makineleri ve grupları kullan",
+        "includePlatformHelp": "Varsayılan olarak açık. Yalnızca depodan çözümlemek için kapatın; bu satırlar yerinde kalır ama yanıtın dışında olur.",
+        "included": "evet",
+        "excluded": "hayır",
+        "vcsConnection": "VCS bağlantısı",
+        "vcsNone": "Yok",
+        "field": {
+          "repo-url": "Depo",
+          "branch": "Dal",
+          "working-directory": "Dizin"
+        },
+        "branchHelp": "Deponun varsayılan dalını izlemek için boş bırakın.",
+        "ignorePaths": "Yok sayılan yollar",
+        "ignorePathsHelp": "Satır başına bir glob. Eşleşen her şey, depodan okunan envanterin dışında bırakılır.",
+        "unset": "ayarlanmadı",
+        "create": "Ayar ekle",
+        "clear": "Ayarları temizle",
+        "confirmClear": "Bu ayarlar temizlensin mi? Depo bağlantısı da onlarla birlikte gider; burada tutulan ana makineler ve gruplar kalır."
       },
       "errors": {
-        "loadItems": "Bildirilen ana makineler yüklenemedi",
-        "loadResolved": "Çözümlenen envanter yüklenemedi",
-        "preview": "--limit önizlemesi yapılamadı"
+        "load": "Envanter yüklenemedi",
+        "save": "Kaydedilemedi",
+        "delete": "Silinemedi",
+        "resolved": "Envanter çözümlenemedi",
+        "settings": "Envanter ayarları kaydedilemedi"
       }
     },
     "sharing": {

@@ -22,7 +22,7 @@ import { CostPanel } from '@/components/cost-panel'
 import { ResourceAccessPanel } from '@/components/resource-access-panel'
 import { ArchitectureCritiquePanel } from '@/components/architecture-critique-panel'
 import { StackOutputsPanel } from '@/components/stack-outputs-panel'
-import { InventoryPanel, type Inventory } from '@/components/inventory-panel'
+import { InventoryPanel, useInventoryPresence } from '@/components/inventory-panel'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
@@ -375,38 +375,23 @@ function WorkspaceDetailContent() {
         : status
   // Resolved once here so the loaders, the SSE handler, the tab strip and the
   // render sites all agree on which tab is showing.
-  // The Inventory tab is DATA-gated, not configuration-gated (#1967, #1968).
-  // An inventory is created lazily on the first declared host, so a workspace
-  // that has never declared one holds no rows and the tab is simply absent —
-  // there is nothing for a terraform/tofu-only deployment to turn off, which
-  // is the mechanism rather than a flag (#1986). The same request serves the
-  // panel's own needs, so the gate costs one fetch, not two.
+  // The Inventory tab is DATA-gated, not configuration-gated (#1967, #1968,
+  // #1969). A workspace with no hosts, no groups and no inventory settings has
+  // nothing to show, so the tab is simply absent — there is nothing for a
+  // terraform/tofu-only deployment to turn off, which is the mechanism rather
+  // than a flag (#1986).
   //
-  // On any failure the list stays empty and the tab stays hidden: a 403 from a
-  // role without `inventory:read` and a transport blip both mean "do not offer
-  // a surface this reader cannot use", which is the safe direction either way.
-  const [inventories, setInventories] = useState<Inventory[]>([])
-  useEffect(() => {
-    if (!workspaceId) return
-    let cancelled = false
-    fetchAllPages<Inventory>(`/api/v1/workspaces/${workspaceId}/inventories`)
-      .then((list) => {
-        if (!cancelled) setInventories(list)
-      })
-      .catch(() => {
-        /* no inventory surface for this reader — leave the tab hidden */
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [workspaceId])
-
+  // The probe lives with the panel because the three questions it asks are the
+  // panel's own; on any failure it answers false and the tab stays hidden, so a
+  // 403 from a role without `inventory:read` and a transport blip both mean "do
+  // not offer a surface this reader cannot use".
+  //
   // A stale `?tab=inventory` on a workspace with no inventory falls back the
   // same way a Terraform-only tab does on Pulumi: Configuration renders a page
-  // instead of a blank pane. `inventories` is empty on the first frame too, but
-  // the page shows a spinner until the workspace resolves, so the fallback only
-  // bites once the probe has had its chance.
-  const hasInventory = inventories.length > 0
+  // instead of a blank pane. The probe answers false on the first frame too,
+  // but the page shows a spinner until the workspace resolves, so the fallback
+  // only bites once the probe has had its chance.
+  const hasInventory = useInventoryPresence(workspaceId)
   const activeTab: Tab =
     (isPulumi && TERRAFORM_ONLY_TABS.has(requestedTab)) ||
     (requestedTab === 'inventory' && !hasInventory)
@@ -2076,7 +2061,7 @@ function WorkspaceDetailContent() {
       : ['cost']
   // Empty until this workspace actually has an inventory, which is what hides
   // the tab from every workspace that does not (#1986).
-  const inventoryMembers: Tab[] = inventories.length > 0 ? ['inventory'] : []
+  const inventoryMembers: Tab[] = hasInventory ? ['inventory'] : []
   const tabGroups: { key: Tab; label: string; members: Tab[] }[] = ([
     { key: 'configuration', label: t('tabs.configuration'), members: ['configuration'] },
     { key: 'variables', label: t('tabs.variables'), members: ['variables'] },
@@ -2086,7 +2071,7 @@ function WorkspaceDetailContent() {
     { key: 'versions', label: t('tabs.versions'), members: ['versions'] },
     { key: 'notifications', label: t('tabs.notifications'), members: ['notifications'] },
     { key: 'run-tasks', label: t('tabs.automation'), members: ['run-tasks', 'run-triggers'] },
-    // Data-gated: `inventories` is empty until a host has been declared, and a
+    // Data-gated: the probe answers false until a row exists, and a
     // group with no members is dropped from the strip entirely — the same
     // mechanism Insights uses on a Pulumi workspace (#1967, #1968).
     { key: 'inventory', label: t('tabs.inventory'), members: inventoryMembers },
@@ -5174,16 +5159,11 @@ function WorkspaceDetailContent() {
           </div>
         )}
 
-        {/* Inventory Tab — the declared hosts and what they resolve to (#1967,
-            #1968). Rendered only when the workspace actually has an inventory;
-            `inventories` is the same list the tab gate reads.
-
-            Read-only throughout, so it takes no write flag: the managing
-            Terraform owns the rows, and the resolved view is live rather than a
-            snapshot a reader could be offered a button to replace. */}
-        {activeTab === 'inventory' && (
-          <InventoryPanel workspaceId={workspaceId} inventories={inventories} />
-        )}
+        {/* Inventory Tab — the eight structures an ansible inventory has, each
+            editable per row (#1967, #1968, #1969). Rendered only when the
+            workspace actually has one; the panel owns its own data and its own
+            `?inv=` sub-view, so the page passes nothing but the id. */}
+        {activeTab === 'inventory' && <InventoryPanel workspaceId={workspaceId} />}
 
         {/* Sharing Tab — cross-workspace remote-state allowlist (#344, #349) */}
         {activeTab === 'access' && (

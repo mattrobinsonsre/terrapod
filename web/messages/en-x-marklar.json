@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Marklar",
-        "body": "These are the marklars this marklar declares and what they resolve to. Running a marklar against them is not available yet — this marklar makes the marklar observable, nothing is executed from here."
+        "body": "The marklars and marklars this marklar holds, and what marklar resolves them to. Each marklar is editable here; running a marklar against them is not available yet."
       },
-      "selectLabel": "Marklar",
-      "resolved": {
-        "heading": "Resolved marklars and marklars",
-        "subheading": "The merged marklar for {name}, from every marklar in marklar.",
+      "nav": {
+        "label": "Marklar marklars",
         "hosts": "Marklars",
         "groups": "Marklars",
-        "liveNote": "This is live. Every marklar here is declared in your marklar, so resolving it is a marklar."
-      },
-      "limit": {
-        "heading": "What would a marklar target?",
-        "body": "Expand an marklar --limit marklar against the resolved marklars above, so you can see which of them it selects before anything runs.",
-        "inputLabel": "Marklar marklar",
-        "placeholder": "web:!web-2",
-        "preview": "Preview",
-        "previewing": "Previewing…",
-        "matched": "{count, plural, =0 {No marklars} one {# marklar} other {# marklars}} of {total} selected.",
-        "advisory": "Advisory only. The authoritative marklar is taken by marklar in the marklar, so treat this as a marklar rather than a marklar."
-      },
-      "items": {
-        "heading": "Declared marklars",
-        "managedNote": "Declared by this marklar’s own Marklar, so they are read-only here. Add, change or remove a marklar in your marklar and apply it — an marklar made outside Marklar is reverted on the next marklar.",
-        "empty": "No marklars declared yet.",
-        "name": "Marklar",
-        "address": "Marklar",
-        "groups": "Marklars",
         "vars": "Marklars",
-        "noGroups": "none"
+        "resolved": "Resolved",
+        "settings": "Marklars"
       },
-      "sources": {
+      "actions": {
+        "save": "Save",
+        "saving": "Saving…",
+        "cancel": "Cancel",
+        "edit": "Edit",
+        "delete": "Delete",
+        "remove": "Remove",
+        "add": "Add",
+        "adding": "Adding…",
+        "rename": "Rename"
+      },
+      "hosts": {
         "heading": "Marklars",
-        "body": "Resolved in marklar, exactly as repeated -i marklars are: a later marklar wins a conflicting marklar marklar.",
-        "position": "Marklar {position}"
+        "body": "One marklar per marklar. Open a marklar to edit its marklars and the marklars it belongs to.",
+        "empty": "No marklars yet.",
+        "colName": "Marklar",
+        "colGroups": "Marklars",
+        "colVars": "Marklars",
+        "newLabel": "New marklar marklar",
+        "newPlaceholder": "web-1",
+        "add": "Add marklar",
+        "confirmDelete": "Delete the marklar {name}? Its marklars and its marklar marklars go with it.",
+        "renameLabel": "Marklar marklar"
+      },
+      "groups": {
+        "heading": "Marklars",
+        "body": "One marklar per marklar. Open a marklar to edit its marklars, its marklar marklars and the marklars nested inside it.",
+        "empty": "No marklars yet.",
+        "colName": "Marklar",
+        "colMembers": "Marklars",
+        "colChildren": "Marklar marklars",
+        "colVars": "Marklars",
+        "newLabel": "New marklar marklar",
+        "newPlaceholder": "web",
+        "add": "Add marklar",
+        "confirmDelete": "Delete the marklar {name}? Its marklars and its marklars go with it; the marklars themselves stay.",
+        "renameLabel": "Marklar marklar"
+      },
+      "vars": {
+        "actions": "Marklars",
+        "key": "Marklar",
+        "keyPlaceholder": "ansible_user",
+        "value": "Marklar",
+        "structured": "Structured",
+        "sensitive": "Sensitive",
+        "structuredHelp": "A marklar, marklar or marklar is a structured marklar: tick Structured and write its literal marklar in the marklar. A sensitive marklar is never read back — the marklar shows a marklar instead.",
+        "structuredBadge": "structured",
+        "sensitiveKeep": "Leave this blank to keep the stored marklar.",
+        "empty": "No marklars here.",
+        "add": "Add marklar",
+        "confirmDelete": "Delete the marklar {key}?"
+      },
+      "hostDetail": {
+        "heading": "Marklar {name}",
+        "body": "Everything this one marklar carries.",
+        "back": "Back to marklars",
+        "gone": "That marklar no longer exists.",
+        "vars": "Marklar marklars",
+        "varsBody": "Marklars that apply to this marklar alone. They win over a marklar marklar of the same marklar.",
+        "memberships": "Marklars",
+        "membershipsBody": "The marklars this marklar belongs to. A marklar is a marklar, so removing one here leaves both the marklar and the marklar in place.",
+        "membershipsEmpty": "This marklar is in no marklar, so marklar puts it in ungrouped.",
+        "addGroup": "Add to marklar",
+        "addGroupLabel": "Choose a marklar",
+        "removeGroupAria": "Remove this marklar from {name}",
+        "confirmRemoveGroup": "Take this marklar out of {name}?"
+      },
+      "groupDetail": {
+        "heading": "Marklar {name}",
+        "body": "Everything this one marklar carries.",
+        "back": "Back to marklars",
+        "gone": "That marklar no longer exists.",
+        "vars": "Marklar marklars",
+        "varsBody": "Marklars that apply to every marklar in this marklar, directly or through marklar.",
+        "members": "Marklar marklars",
+        "membersBody": "The marklars in this marklar directly. A marklar reached only through a nested marklar is not listed here.",
+        "membersEmpty": "No marklars in this marklar directly.",
+        "addHost": "Add marklar",
+        "addHostLabel": "Choose a marklar",
+        "removeHostAria": "Remove {name} from this marklar",
+        "confirmRemoveHost": "Take {name} out of this marklar?",
+        "children": "Marklar marklars",
+        "childrenBody": "Marklars nested inside this one. Their marklars are marklars of this marklar too, and this marklar’s marklars reach them.",
+        "childrenEmpty": "No marklars nested inside this one.",
+        "addChild": "Add marklar marklar",
+        "addChildLabel": "Choose a marklar to nest",
+        "removeChildAria": "Remove {name} from the marklars of this marklar",
+        "confirmRemoveChild": "Stop nesting {name} inside this marklar?",
+        "parents": "Marklar marklars",
+        "parentsBody": "The marklars this one is nested inside. A marklar may have several marklar marklars.",
+        "parentsEmpty": "This marklar is nested inside nothing.",
+        "addParent": "Add marklar marklar",
+        "addParentLabel": "Choose a marklar marklar",
+        "removeParentAria": "Remove this marklar from {name}",
+        "confirmRemoveParent": "Stop nesting this marklar inside {name}?"
+      },
+      "globalVars": {
+        "heading": "Marklar marklars",
+        "body": "Marklars that apply to every marklar — marklar’s group_vars/all. A marklar or marklar marklar of the same marklar wins over one set here."
+      },
+      "resolved": {
+        "heading": "Resolved marklars",
+        "body": "What marklar makes of the marklars: every marklar with the marklars it ends up holding, after the marklar and the marklar.",
+        "hosts": "Marklars",
+        "groups": "Marklars",
+        "liveNote": "This is live. Every marklar here is static, so the marklar resolves the marklars to answer itself — there is nothing to refresh.",
+        "noHosts": "Nothing resolved to a marklar.",
+        "noVars": "no marklars",
+        "groupsHeading": "Marklar marklar",
+        "directOnly": "Direct marklar only, exactly as marklar reports it: a marklar whose marklars all arrive through a nested marklar lists none of its own. The marklar is below.",
+        "noGroups": "No marklars resolved.",
+        "noDirectMembers": "no direct marklars",
+        "nestingHeading": "Marklar nesting",
+        "nestingBody": "Which marklars sit inside which. A marklar on a marklar marklar reaches every marklar below it.",
+        "noNesting": "No marklars are nested.",
+        "limitHeading": "What would a marklar target?",
+        "limitBody": "Expand a marklar --limit marklar against this marklar and see exactly which marklars it selects before anything runs. Marklar does the marklar, so a marklar, a marklar and a ~regex all behave as they will at marklar marklar.",
+        "limitLabel": "Marklar marklar",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Apply marklar",
+        "limitClear": "Clear",
+        "limitApplied": "Limited to {limit}. Everything below is what that marklar targets."
+      },
+      "settings": {
+        "heading": "Marklars",
+        "body": "Whether the marklars held here count, and the marklar a marklar is also read from.",
+        "absent": "No marklars, which is the marklar: the marklars and marklars held here are the whole marklar.",
+        "includePlatform": "Use the marklars and marklars held here",
+        "includePlatformHelp": "On by marklar. Turn it off to resolve from the marklar alone, leaving these marklars in place but out of the marklar.",
+        "included": "yes",
+        "excluded": "no",
+        "vcsConnection": "Marklar marklar",
+        "vcsNone": "None",
+        "field": {
+          "repo-url": "Marklar",
+          "branch": "Marklar",
+          "working-directory": "Marklar"
+        },
+        "branchHelp": "Leave empty to track the default marklar of the marklar.",
+        "ignorePaths": "Ignored marklars",
+        "ignorePathsHelp": "One marklar per marklar. Anything matching is left out of the marklar read from the marklar.",
+        "unset": "not set",
+        "create": "Add marklars",
+        "clear": "Clear marklars",
+        "confirmClear": "Clear these marklars? The marklar marklar goes with them; the marklars and marklars held here stay."
       },
       "errors": {
-        "loadItems": "Failed to load declared marklars",
-        "loadResolved": "Failed to load the resolved marklar",
-        "preview": "Failed to preview the marklar"
+        "load": "Failed to load the marklar",
+        "save": "Failed to save",
+        "delete": "Failed to delete",
+        "resolved": "Failed to resolve the marklar",
+        "settings": "Failed to save the marklar marklars"
       }
     },
     "sharing": {

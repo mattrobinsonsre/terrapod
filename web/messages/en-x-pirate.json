@@ -2858,46 +2858,169 @@
     },
     "inventory": {
       "scope": {
-        "heading": "Ship''s Manifest",
-        "body": "These be th'' hands this work-deck signs on, an'' what they muster to. Settin'' a playbook upon ''em be not ready yet — this release lets ye LOOK at th'' manifest, naught be run from here."
+        "heading": "Manifest",
+        "body": "Th'' hands an'' crews this work-deck holds, an'' what ansible musters ''em to. Every line be yours to change here; settin'' a playbook upon ''em be not ready yet."
       },
-      "selectLabel": "Manifest",
-      "resolved": {
-        "heading": "Mustered hands an'' crews",
-        "subheading": "Th'' mingled tally fer {name}, from every wellspring in turn.",
+      "nav": {
+        "label": "Quarters o'' th'' manifest",
         "hosts": "Hands",
         "groups": "Crews",
-        "liveNote": "This be livin''. Every wellspring here be signed into yer own configuration, so musterin'' it be naught but a glance at th'' ledger."
-      },
-      "limit": {
-        "heading": "What would a limit lay hold of?",
-        "body": "Unfurl an ansible --limit pattern against th'' mustered hands above, so ye may see which o'' ''em it picks afore aught sets sail.",
-        "inputLabel": "Limit markin''s",
-        "placeholder": "web:!web-2",
-        "preview": "Spyglass",
-        "previewing": "Peerin''…",
-        "matched": "{count, plural, =0 {Naught a hand} one {# hand} other {# hands}} o'' {total} picked.",
-        "advisory": "A guess only. Th'' true reckonin'' be taken by ansible in th'' runner, so treat this as a chart an'' not a warrant."
-      },
-      "items": {
-        "heading": "Signed-on hands",
-        "managedNote": "Signed on by this work-deck’s own Terraform, so ye cannot change ''em here. Add, alter or put ashore a hand in yer configuration an'' apply it — aught ye edit outside Terraform be undone on th'' next apply.",
-        "empty": "No hands signed on yet.",
-        "name": "Hand",
-        "address": "Berth",
-        "groups": "Crews",
         "vars": "Riggin''",
-        "noGroups": "nary a one"
+        "resolved": "Mustered",
+        "settings": "Orders"
       },
-      "sources": {
-        "heading": "Wellsprings",
-        "body": "Mustered in turn, just as repeated -i flags be: a later wellspring wins a quarrelin'' hand’s riggin''.",
-        "position": "Berth {position}"
+      "actions": {
+        "save": "Stow",
+        "saving": "Stowin''…",
+        "cancel": "Belay",
+        "edit": "Alter",
+        "delete": "Scuttle",
+        "remove": "Put ashore",
+        "add": "Sign on",
+        "adding": "Signin'' on…",
+        "rename": "Rechristen"
+      },
+      "hosts": {
+        "heading": "Hands",
+        "body": "One line per hand. Open a hand to alter its riggin'' an'' th'' crews it answers to.",
+        "empty": "No hands yet.",
+        "colName": "Hand",
+        "colGroups": "Crews",
+        "colVars": "Riggin''",
+        "newLabel": "Name o'' th'' new hand",
+        "newPlaceholder": "web-1",
+        "add": "Sign on a hand",
+        "confirmDelete": "Scuttle th'' hand {name}? Its riggin'' an'' its crew papers go down with it.",
+        "renameLabel": "Hand''s name"
+      },
+      "groups": {
+        "heading": "Crews",
+        "body": "One line per crew. Open a crew to alter its riggin'', th'' hands aboard an'' th'' crews berthed inside it.",
+        "empty": "No crews yet.",
+        "colName": "Crew",
+        "colMembers": "Hands",
+        "colChildren": "Young crews",
+        "colVars": "Riggin''",
+        "newLabel": "Name o'' th'' new crew",
+        "newPlaceholder": "web",
+        "add": "Muster a crew",
+        "confirmDelete": "Scuttle th'' crew {name}? Its riggin'' an'' its papers go down with it; th'' hands themselves keep their berths.",
+        "renameLabel": "Crew''s name"
+      },
+      "vars": {
+        "actions": "Deeds",
+        "key": "Name",
+        "keyPlaceholder": "ansible_user",
+        "value": "Settin''",
+        "structured": "Built",
+        "sensitive": "Sealed",
+        "structuredHelp": "A list, a number or an object be a built settin'': mark it Built an'' write th'' plain source in th'' settin''. A sealed settin'' be never read back — th'' box shows ye a mask instead.",
+        "structuredBadge": "built",
+        "sensitiveKeep": "Leave this bare to keep th'' settin'' already stowed.",
+        "empty": "No riggin'' here.",
+        "add": "Sign on riggin''",
+        "confirmDelete": "Scuttle th'' riggin'' {key}?"
+      },
+      "hostDetail": {
+        "heading": "Hand {name}",
+        "body": "All that this one hand carries.",
+        "back": "Back to th'' hands",
+        "gone": "That hand sails no more.",
+        "vars": "Hand''s riggin''",
+        "varsBody": "Riggin'' that holds for this hand alone. It beats a crew''s riggin'' o'' th'' same name.",
+        "memberships": "Crews",
+        "membershipsBody": "Th'' crews this hand answers to. A crew paper be but a line, so tearin'' one up here leaves both th'' hand an'' th'' crew where they were.",
+        "membershipsEmpty": "This hand answers to no crew, so ansible berths it in ungrouped.",
+        "addGroup": "Sign on to a crew",
+        "addGroupLabel": "Pick a crew",
+        "removeGroupAria": "Put this hand ashore from {name}",
+        "confirmRemoveGroup": "Put this hand ashore from {name}?"
+      },
+      "groupDetail": {
+        "heading": "Crew {name}",
+        "body": "All that this one crew carries.",
+        "back": "Back to th'' crews",
+        "gone": "That crew sails no more.",
+        "vars": "Crew''s riggin''",
+        "varsBody": "Riggin'' that holds for every hand in this crew, aboard or by way o'' a berthed crew.",
+        "members": "Hands aboard",
+        "membersBody": "Th'' hands aboard this crew outright. A hand reached only by way o'' a berthed crew be not named here.",
+        "membersEmpty": "No hands aboard this crew outright.",
+        "addHost": "Sign on a hand",
+        "addHostLabel": "Pick a hand",
+        "removeHostAria": "Put {name} ashore from this crew",
+        "confirmRemoveHost": "Put {name} ashore from this crew?",
+        "children": "Young crews",
+        "childrenBody": "Crews berthed inside this one. Their hands sail under this crew too, an'' this crew''s riggin'' reaches ''em.",
+        "childrenEmpty": "No crew be berthed inside this one.",
+        "addChild": "Berth a young crew",
+        "addChildLabel": "Pick a crew to berth",
+        "removeChildAria": "Put {name} out o'' this crew''s young",
+        "confirmRemoveChild": "Stop berthin'' {name} inside this crew?",
+        "parents": "Elder crews",
+        "parentsBody": "Th'' crews this one be berthed inside. A crew may answer to several elders.",
+        "parentsEmpty": "This crew be berthed inside naught.",
+        "addParent": "Berth under an elder crew",
+        "addParentLabel": "Pick an elder crew",
+        "removeParentAria": "Put this crew out o'' {name}",
+        "confirmRemoveParent": "Stop berthin'' this crew inside {name}?"
+      },
+      "globalVars": {
+        "heading": "Manifest riggin''",
+        "body": "Riggin'' that holds for every hand — ansible''s group_vars/all. A crew''s or a hand''s riggin'' o'' th'' same name beats aught set here."
+      },
+      "resolved": {
+        "heading": "Mustered hands",
+        "body": "What ansible makes o'' th'' lines: every hand with th'' riggin'' it ends up wearin'', after th'' mergin'' an'' th'' order o'' precedence.",
+        "hosts": "Hands",
+        "groups": "Crews",
+        "liveNote": "This be livin''. Every wellspring here stands still, so th'' readin'' musters th'' lines to answer itself — there be naught to refresh.",
+        "noHosts": "Naught mustered to a hand.",
+        "noVars": "no riggin''",
+        "groupsHeading": "Who sails with whom",
+        "directOnly": "Only th'' hands aboard outright, exactly as ansible reports ''em: a crew whose hands all arrive by way o'' a berthed crew names none o'' its own. Th'' berthin'' be below.",
+        "noGroups": "No crews mustered.",
+        "noDirectMembers": "no hands aboard outright",
+        "nestingHeading": "Crews berthed in crews",
+        "nestingBody": "Which crews lie inside which. A limit laid on an elder reaches every hand beneath it.",
+        "noNesting": "No crew be berthed in another.",
+        "limitHeading": "What would a limit strike?",
+        "limitBody": "Unfurl an ansible --limit pattern against this manifest an'' see exactly which hands it picks afore aught sets sail. Ansible does th'' unfurlin'', so a crew, an exclusion an'' a ~regex all behave as they will when th'' guns run out.",
+        "limitLabel": "Limit pattern",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Lay th'' limit on",
+        "limitClear": "Strike it",
+        "limitApplied": "Held to {limit}. All below be what that pattern strikes."
+      },
+      "settings": {
+        "heading": "Orders",
+        "body": "Whether th'' lines kept here count, an'' th'' port a manifest be also read from.",
+        "absent": "No orders, which be th'' usual: th'' hands an'' crews kept here be th'' whole manifest.",
+        "includePlatform": "Use th'' hands an'' crews kept here",
+        "includePlatformHelp": "On unless ye say otherwise. Strike it to muster from th'' port alone, leavin'' these lines where they lie but out o'' th'' answer.",
+        "included": "aye",
+        "excluded": "nay",
+        "vcsConnection": "VCS mooring",
+        "vcsNone": "None",
+        "field": {
+          "repo-url": "Port",
+          "branch": "Branch",
+          "working-directory": "Quarters"
+        },
+        "branchHelp": "Leave it bare to follow th'' port''s own default branch.",
+        "ignorePaths": "Waters passed by",
+        "ignorePathsHelp": "One glob a line. Aught that matches be left out o'' th'' manifest read from th'' port.",
+        "unset": "not set",
+        "create": "Write orders",
+        "clear": "Tear up th'' orders",
+        "confirmClear": "Tear up these orders? Th'' port mooring goes with ''em; th'' hands an'' crews kept here keep their berths."
       },
       "errors": {
-        "loadItems": "Failed t'' load th'' signed-on hands",
-        "loadResolved": "Failed t'' load th'' mustered manifest",
-        "preview": "Failed t'' spy th'' limit"
+        "load": "Could not fetch th'' manifest",
+        "save": "Could not stow it",
+        "delete": "Could not scuttle it",
+        "resolved": "Could not muster th'' manifest",
+        "settings": "Could not stow th'' manifest orders"
       }
     },
     "sharing": {

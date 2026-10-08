@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "清单",
-        "body": "这些是此工作区声明的主机及其解析结果。目前还无法针对它们运行 Playbook — 本次发布只是让清单可被查看，不会从此处执行任何操作。"
+        "body": "此工作区持有的主机和主机组，以及 ansible 对它们的解析结果。每一行都可以在此编辑；但还无法针对它们运行 Playbook。"
       },
-      "selectLabel": "清单",
-      "resolved": {
-        "heading": "解析后的主机和主机组",
-        "subheading": "{name} 的合并结果，按顺序取自每个来源。",
+      "nav": {
+        "label": "清单分区",
         "hosts": "主机",
         "groups": "主机组",
-        "liveNote": "这是实时的。此处的每个来源都在你的配置中声明，因此解析只是一次数据库查询。"
-      },
-      "limit": {
-        "heading": "--limit 会选中哪些主机？",
-        "body": "针对上方已解析的主机展开 ansible 的 --limit 模式，以便在任何操作执行之前查看它会选中其中哪些。",
-        "inputLabel": "limit 模式",
-        "placeholder": "web:!web-2",
-        "preview": "预览",
-        "previewing": "正在预览…",
-        "matched": "{count, plural, =0 {未选中任何主机} other {已选中 # 台主机}}，共 {total} 台。",
-        "advisory": "仅供参考。权威的展开结果由运行器中的 ansible 得出，因此请将此视为参考而非保证。"
-      },
-      "items": {
-        "heading": "已声明的主机",
-        "managedNote": "由此工作区自身的 Terraform 声明，因此在此处为只读。请在配置中添加、修改或移除主机后再应用 — 在 Terraform 之外所做的修改会在下次应用时被还原。",
-        "empty": "尚未声明任何主机。",
-        "name": "主机",
-        "address": "地址",
-        "groups": "主机组",
         "vars": "变量",
-        "noGroups": "无"
+        "resolved": "解析结果",
+        "settings": "设置"
       },
-      "sources": {
-        "heading": "来源",
-        "body": "按顺序解析，与重复指定 -i 标志完全一样：主机变量冲突时，后面的来源优先。",
-        "position": "位置 {position}"
+      "actions": {
+        "save": "保存",
+        "saving": "正在保存…",
+        "cancel": "取消",
+        "edit": "编辑",
+        "delete": "删除",
+        "remove": "移除",
+        "add": "添加",
+        "adding": "正在添加…",
+        "rename": "重命名"
+      },
+      "hosts": {
+        "heading": "主机",
+        "body": "每行一台主机。打开某台主机即可编辑它的变量和它所属的主机组。",
+        "empty": "尚无主机。",
+        "colName": "主机",
+        "colGroups": "主机组",
+        "colVars": "变量",
+        "newLabel": "新主机名称",
+        "newPlaceholder": "web-1",
+        "add": "添加主机",
+        "confirmDelete": "删除主机 {name}？它的变量和它的主机组归属会一并删除。",
+        "renameLabel": "主机名称"
+      },
+      "groups": {
+        "heading": "主机组",
+        "body": "每行一个主机组。打开某个主机组即可编辑它的变量、它的成员主机，以及嵌套在它里面的主机组。",
+        "empty": "尚无主机组。",
+        "colName": "主机组",
+        "colMembers": "主机",
+        "colChildren": "子组",
+        "colVars": "变量",
+        "newLabel": "新主机组名称",
+        "newPlaceholder": "web",
+        "add": "添加主机组",
+        "confirmDelete": "删除主机组 {name}？它的变量和成员关系会一并删除，但主机本身保留。",
+        "renameLabel": "主机组名称"
+      },
+      "vars": {
+        "actions": "操作",
+        "key": "键",
+        "keyPlaceholder": "ansible_user",
+        "value": "值",
+        "structured": "结构化",
+        "sensitive": "敏感",
+        "structuredHelp": "列表、数字或对象属于结构化值：勾选“结构化”，并在值中写出它的字面源码。敏感值永远不会被回读 — 该字段改为显示掩码。",
+        "structuredBadge": "结构化",
+        "sensitiveKeep": "留空以保留已存储的值。",
+        "empty": "此处没有变量。",
+        "add": "添加变量",
+        "confirmDelete": "删除变量 {key}？"
+      },
+      "hostDetail": {
+        "heading": "主机 {name}",
+        "body": "这一台主机所承载的全部内容。",
+        "back": "返回主机列表",
+        "gone": "该主机已不存在。",
+        "vars": "主机变量",
+        "varsBody": "仅适用于这台主机的变量。它们会覆盖同名的主机组变量。",
+        "memberships": "主机组",
+        "membershipsBody": "这台主机所属的主机组。成员关系只是一条关联，因此在此移除其中一条后，主机和主机组都会保留。",
+        "membershipsEmpty": "这台主机不属于任何主机组，因此 ansible 会把它放进 ungrouped。",
+        "addGroup": "添加到主机组",
+        "addGroupLabel": "选择主机组",
+        "removeGroupAria": "将这台主机从 {name} 中移除",
+        "confirmRemoveGroup": "要把这台主机从 {name} 中移出吗？"
+      },
+      "groupDetail": {
+        "heading": "主机组 {name}",
+        "body": "这一个主机组所承载的全部内容。",
+        "back": "返回主机组列表",
+        "gone": "该主机组已不存在。",
+        "vars": "主机组变量",
+        "varsBody": "适用于此主机组中每一台主机的变量，无论是直接归属还是通过嵌套。",
+        "members": "成员主机",
+        "membersBody": "直接属于此主机组的主机。仅通过嵌套的主机组才到达的主机不会列在这里。",
+        "membersEmpty": "此主机组没有直接归属的主机。",
+        "addHost": "添加主机",
+        "addHostLabel": "选择主机",
+        "removeHostAria": "将 {name} 从此主机组中移除",
+        "confirmRemoveHost": "要把 {name} 从此主机组中移出吗？",
+        "children": "子组",
+        "childrenBody": "嵌套在此主机组内的主机组。它们的主机同样是此主机组的成员，此主机组的变量也会作用于它们。",
+        "childrenEmpty": "此主机组内没有嵌套任何主机组。",
+        "addChild": "添加子组",
+        "addChildLabel": "选择要嵌套的主机组",
+        "removeChildAria": "将 {name} 从此主机组的子组中移除",
+        "confirmRemoveChild": "不再把 {name} 嵌套在此主机组内吗？",
+        "parents": "父组",
+        "parentsBody": "此主机组被嵌套进的那些主机组。一个主机组可以有多个父组。",
+        "parentsEmpty": "此主机组没有被嵌套在任何主机组内。",
+        "addParent": "添加父组",
+        "addParentLabel": "选择父组",
+        "removeParentAria": "将此主机组从 {name} 中移除",
+        "confirmRemoveParent": "不再把此主机组嵌套在 {name} 内吗？"
+      },
+      "globalVars": {
+        "heading": "清单变量",
+        "body": "适用于每一台主机的变量 — 即 ansible 的 group_vars/all。同名的主机组变量或主机变量会覆盖在此设置的值。"
+      },
+      "resolved": {
+        "heading": "解析后的主机",
+        "body": "ansible 对这些行的解读：经过合并和优先级之后，每台主机最终持有的变量。",
+        "hosts": "主机",
+        "groups": "主机组",
+        "liveNote": "这是实时的。此处的每个来源都是静态的，因此每次读取都会就地解析这些行来给出答案 — 没有什么需要刷新。",
+        "noHosts": "没有任何内容解析为主机。",
+        "noVars": "无变量",
+        "groupsHeading": "主机组成员关系",
+        "directOnly": "只显示直接成员关系，与 ansible 的报告完全一致：若某个主机组的主机全都是通过嵌套的主机组而来，它便不会列出任何自己的主机。嵌套关系见下方。",
+        "noGroups": "没有解析出任何主机组。",
+        "noDirectMembers": "无直接主机",
+        "nestingHeading": "主机组嵌套",
+        "nestingBody": "显示哪些主机组位于哪些主机组之内。对父组施加的 limit 会覆盖它之下的每一台主机。",
+        "noNesting": "没有任何主机组被嵌套。",
+        "limitHeading": "limit 会选中什么？",
+        "limitBody": "针对此清单展开 ansible 的 --limit 模式，在任何操作执行之前准确查看它会选中哪些主机。展开由 ansible 自己完成，因此主机组、排除项和 ~regex 的行为都与运行时完全一致。",
+        "limitLabel": "limit 模式",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "应用 limit",
+        "limitClear": "清除",
+        "limitApplied": "已限定为 {limit}。下方的内容全部是该模式所选中的。"
+      },
+      "settings": {
+        "heading": "设置",
+        "body": "此处持有的行是否计入，以及另外从哪个仓库读取清单。",
+        "absent": "没有设置，这也是默认情况：此处持有的主机和主机组就是整份清单。",
+        "includePlatform": "使用此处持有的主机和主机组",
+        "includePlatformHelp": "默认开启。关闭后将仅从仓库解析，这些行仍会保留，但不会出现在结果中。",
+        "included": "是",
+        "excluded": "否",
+        "vcsConnection": "VCS 连接",
+        "vcsNone": "无",
+        "field": {
+          "repo-url": "仓库",
+          "branch": "分支",
+          "working-directory": "目录"
+        },
+        "branchHelp": "留空则跟踪仓库的默认分支。",
+        "ignorePaths": "忽略的路径",
+        "ignorePathsHelp": "每行一个 glob 模式。匹配到的内容会从仓库读取的清单中排除。",
+        "unset": "未设置",
+        "create": "添加设置",
+        "clear": "清除设置",
+        "confirmClear": "清除这些设置？与仓库的绑定会一并消失，但此处持有的主机和主机组会保留。"
       },
       "errors": {
-        "loadItems": "加载已声明的主机失败",
-        "loadResolved": "加载解析后的清单失败",
-        "preview": "预览 limit 失败"
+        "load": "加载清单失败",
+        "save": "保存失败",
+        "delete": "删除失败",
+        "resolved": "解析清单失败",
+        "settings": "保存清单设置失败"
       }
     },
     "sharing": {

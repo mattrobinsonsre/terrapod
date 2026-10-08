@@ -49,8 +49,12 @@ export function MobileCard({ title, badge, fields, actions, href }: MobileCardPr
       </div>
       {fields.length > 0 && (
         <dl className="space-y-1 text-xs">
-          {fields.map((f) => (
-            <div key={f.label} className="flex items-baseline justify-between gap-3">
+          {/* Keyed by POSITION, not by label: the fields array is positional and
+              two labels can legitimately coincide once the UI is translated —
+              a locale where "Hosts" and "Variables" render as the same word
+              would otherwise give one card two children with the same key. */}
+          {fields.map((f, i) => (
+            <div key={i} className="flex items-baseline justify-between gap-3">
               <dt className="shrink-0 text-slate-500">{f.label}</dt>
               <dd className={`min-w-0 break-words text-end ${f.valueClassName ?? 'text-slate-300'}`}>
                 {f.value}

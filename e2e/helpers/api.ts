@@ -612,41 +612,176 @@ export async function seedStateVersionWithContent(
 }
 
 /**
- * Declare an inventory host on a workspace (#1968). Returns the item id.
+ * Inventory seeding (#1967, #1968, #1969).
  *
- * Declaring the FIRST host is also what brings the workspace's `default`
- * inventory into existence — the API creates it lazily — so this is the one
- * call that flips the Inventory tab's data gate from absent to present. A spec
- * asserting the tab is HIDDEN must therefore not call it.
+ * The inventory is eight structures, each its own resource, so seeding one is
+ * several small calls rather than one nested payload: a host, a group, the link
+ * between them, the link between two groups, and a variable at one of three
+ * scopes. That shape is the point of the model — a spec seeds exactly the rows
+ * the behaviour under test needs.
+ *
+ * Any ONE of a host, a group or the settings row flips the Inventory tab's data
+ * gate from absent to present, so a spec asserting the tab is HIDDEN must call
+ * none of these.
  */
-export async function seedInventoryItem(
+
+async function inventoryPost(
   token: string,
-  workspaceId: string,
-  name: string,
-  attrs: { address?: string; groups?: string[]; vars?: Record<string, unknown> } = {},
+  path: string,
+  body: unknown,
+  what: string,
 ): Promise<string> {
-  const res = await fetch(`${API_URL}/api/v1/workspaces/${workspaceId}/inventory-items`, {
+  const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/vnd.api+json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      data: {
-        type: 'inventory-items',
-        attributes: {
-          name,
-          address: attrs.address ?? '',
-          groups: attrs.groups ?? [],
-          vars: attrs.vars ?? {},
-        },
-      },
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`Declare inventory item failed: ${res.status} ${await res.text()}`);
+    throw new Error(`${what} failed: ${res.status} ${await res.text()}`);
   }
   return (await res.json()).data.id as string;
+}
+
+/** Declare a host. Returns its `invhost-…` id. */
+export async function seedInventoryHost(
+  token: string,
+  workspaceId: string,
+  name: string,
+): Promise<string> {
+  return inventoryPost(
+    token,
+    `/api/v1/workspaces/${workspaceId}/inventory/hosts`,
+    { data: { type: 'inventory-hosts', attributes: { name } } },
+    `Declare inventory host ${name}`,
+  );
+}
+
+/** Declare a group. Returns its `invgroup-…` id. */
+export async function seedInventoryGroup(
+  token: string,
+  workspaceId: string,
+  name: string,
+): Promise<string> {
+  return inventoryPost(
+    token,
+    `/api/v1/workspaces/${workspaceId}/inventory/groups`,
+    { data: { type: 'inventory-groups', attributes: { name } } },
+    `Declare inventory group ${name}`,
+  );
+}
+
+/**
+ * Put a host in a group. Returns the `invhg-…` id of the LINK, which is what
+ * the remove action addresses — the membership is a resource in its own right,
+ * not a field on either end.
+ */
+export async function seedInventoryMembership(
+  token: string,
+  groupId: string,
+  hostId: string,
+): Promise<string> {
+  return inventoryPost(
+    token,
+    `/api/v1/inventory-groups/${groupId}/hosts`,
+    { data: { relationships: { host: { data: { id: hostId, type: 'inventory-hosts' } } } } },
+    `Add ${hostId} to ${groupId}`,
+  );
+}
+
+/** Nest one group inside another — `[parent:children]`. Returns the `invgc-…` link id. */
+export async function seedInventoryNesting(
+  token: string,
+  parentGroupId: string,
+  childGroupId: string,
+): Promise<string> {
+  return inventoryPost(
+    token,
+    `/api/v1/inventory-groups/${parentGroupId}/children`,
+    {
+      data: {
+        relationships: {
+          'child-group': { data: { id: childGroupId, type: 'inventory-groups' } },
+        },
+      },
+    },
+    `Nest ${childGroupId} in ${parentGroupId}`,
+  );
+}
+
+/**
+ * A variable at one of the three scopes. `scope` picks the collection:
+ * a host's own, a group's, or the workspace's `group_vars/all`.
+ *
+ * `sensitive` is a display flag — the value is encrypted at rest either way,
+ * and a sensitive one reads back as a mask rather than as itself.
+ */
+export async function seedInventoryVar(
+  token: string,
+  scope: { host: string } | { group: string } | { workspace: string },
+  key: string,
+  value: string,
+  opts: { structured?: boolean; sensitive?: boolean } = {},
+): Promise<string> {
+  const path =
+    'host' in scope
+      ? `/api/v1/inventory-hosts/${scope.host}/vars`
+      : 'group' in scope
+        ? `/api/v1/inventory-groups/${scope.group}/vars`
+        : `/api/v1/workspaces/${scope.workspace}/inventory/vars`;
+  return inventoryPost(
+    token,
+    path,
+    {
+      data: {
+        attributes: {
+          key,
+          value,
+          structured: opts.structured ?? false,
+          sensitive: opts.sensitive ?? false,
+        },
+      },
+    },
+    `Set inventory variable ${key}`,
+  );
+}
+
+/**
+ * Wait until the API can RESOLVE this workspace's inventory, and fail loudly
+ * naming its own reason if it cannot.
+ *
+ * Resolution runs `ansible-inventory`, and the API image does not carry
+ * ansible-core — it installs it on first use through Terrapod's own PyPI
+ * pull-through cache. So the very first resolution in a fresh stack is slow,
+ * and in a stack with no route to the cache's upstream it answers 503 for ever.
+ *
+ * Both of those would otherwise surface as a Playwright timeout on an assertion
+ * about host counts, which says nothing about the cause. This turns the first
+ * into a wait and the second into a named failure carrying the API's message.
+ */
+export async function waitForInventoryResolution(
+  token: string,
+  workspaceId: string,
+  timeoutMs = 180_000,
+): Promise<void> {
+  const url = `${API_URL}/api/v1/workspaces/${workspaceId}/inventory/resolved`;
+  const start = Date.now();
+  let last = '';
+  while (Date.now() - start < timeoutMs) {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) return;
+    last = `${res.status} ${await res.text()}`;
+    // 422 is a refusal the operator has to act on, not something a wait fixes.
+    if (res.status === 422) break;
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+  throw new Error(
+    `The API could not resolve the inventory for ${workspaceId}. ` +
+      `It obtains ansible-core through its own PyPI cache on first use, so this ` +
+      `is usually no route to that cache's upstream. Last response: ${last}`,
+  );
 }
 
 /**

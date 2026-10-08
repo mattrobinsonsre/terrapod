@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "インベントリ",
-        "body": "このワークスペースが宣言しているホストと、その解決結果です。これらに対してプレイブックを実行する機能はまだありません — このリリースではインベントリを確認できるようにしただけで、ここから実行されるものはありません。"
+        "body": "このワークスペースが保持しているホストとグループ、そして ansible がそれらを解決した結果です。各行はここで編集できますが、これらに対してプレイブックを実行する機能はまだありません。"
       },
-      "selectLabel": "インベントリ",
-      "resolved": {
-        "heading": "解決済みのホストとグループ",
-        "subheading": "{name} について、すべてのソースを順番にマージした結果です。",
+      "nav": {
+        "label": "インベントリのセクション",
         "hosts": "ホスト",
         "groups": "グループ",
-        "liveNote": "これはリアルタイムです。ここにあるソースはすべて設定で宣言されているため、解決はデータベースへの問い合わせにすぎません。"
-      },
-      "limit": {
-        "heading": "--limit はどのホストを対象にするか",
-        "body": "上で解決されたホストに対して ansible の --limit パターンを展開し、何かが実行される前にそのうちどれが選択されるかを確認できます。",
-        "inputLabel": "limit パターン",
-        "placeholder": "web:!web-2",
-        "preview": "プレビュー",
-        "previewing": "プレビュー中…",
-        "matched": "{total} 台のホストのうち {count, plural, =0 {選択されたホストはありません} other {# 台を選択しました}}。",
-        "advisory": "参考情報です。正式な展開はランナー内の ansible が行うため、保証ではなく目安として扱ってください。"
-      },
-      "items": {
-        "heading": "宣言済みのホスト",
-        "managedNote": "このワークスペース自身の Terraform によって宣言されているため、ここでは読み取り専用です。ホストの追加・変更・削除は構成で行って適用してください — Terraform の外で加えた編集は次回の適用時に元に戻されます。",
-        "empty": "宣言されたホストはまだありません。",
-        "name": "ホスト",
-        "address": "アドレス",
-        "groups": "グループ",
         "vars": "変数",
-        "noGroups": "なし"
+        "resolved": "解決結果",
+        "settings": "設定"
       },
-      "sources": {
-        "heading": "ソース",
-        "body": "-i フラグを繰り返し指定した場合とまったく同じく、順番に解決されます: ホスト変数が競合した場合は後のソースが優先されます。",
-        "position": "位置 {position}"
+      "actions": {
+        "save": "保存",
+        "saving": "保存中…",
+        "cancel": "キャンセル",
+        "edit": "編集",
+        "delete": "削除",
+        "remove": "解除",
+        "add": "追加",
+        "adding": "追加中…",
+        "rename": "名前を変更"
+      },
+      "hosts": {
+        "heading": "ホスト",
+        "body": "1 行が 1 台のホストです。ホストを開くと、その変数と所属グループを編集できます。",
+        "empty": "ホストはまだありません。",
+        "colName": "ホスト",
+        "colGroups": "グループ",
+        "colVars": "変数",
+        "newLabel": "新しいホスト名",
+        "newPlaceholder": "web-1",
+        "add": "ホストを追加",
+        "confirmDelete": "ホスト {name} を削除しますか？その変数とグループへの所属も一緒に削除されます。",
+        "renameLabel": "ホスト名"
+      },
+      "groups": {
+        "heading": "グループ",
+        "body": "1 行が 1 つのグループです。グループを開くと、その変数、所属ホスト、そしてその中に入れ子にされたグループを編集できます。",
+        "empty": "グループはまだありません。",
+        "colName": "グループ",
+        "colMembers": "ホスト",
+        "colChildren": "子グループ",
+        "colVars": "変数",
+        "newLabel": "新しいグループ名",
+        "newPlaceholder": "web",
+        "add": "グループを追加",
+        "confirmDelete": "グループ {name} を削除しますか？その変数と所属関係も一緒に削除されますが、ホスト自体は残ります。",
+        "renameLabel": "グループ名"
+      },
+      "vars": {
+        "actions": "操作",
+        "key": "キー",
+        "keyPlaceholder": "ansible_user",
+        "value": "値",
+        "structured": "構造化",
+        "sensitive": "機密",
+        "structuredHelp": "リスト、数値、オブジェクトは構造化された値です。「構造化」をオンにして、値にはそのリテラルのソースを書いてください。機密の値は読み戻されることがなく、フィールドには代わりにマスクが表示されます。",
+        "structuredBadge": "構造化",
+        "sensitiveKeep": "保存されている値をそのまま使う場合は空欄のままにしてください。",
+        "empty": "ここに変数はありません。",
+        "add": "変数を追加",
+        "confirmDelete": "変数 {key} を削除しますか？"
+      },
+      "hostDetail": {
+        "heading": "ホスト {name}",
+        "body": "このホスト 1 台が持つすべての情報です。",
+        "back": "ホスト一覧に戻る",
+        "gone": "そのホストはもう存在しません。",
+        "vars": "ホスト変数",
+        "varsBody": "このホストにのみ適用される変数です。同じ名前のグループ変数よりも優先されます。",
+        "memberships": "グループ",
+        "membershipsBody": "このホストが所属しているグループです。所属はリンクなので、ここで解除してもホストとグループはどちらも残ります。",
+        "membershipsEmpty": "このホストはどのグループにも属していないため、ansible は ungrouped に入れます。",
+        "addGroup": "グループに追加",
+        "addGroupLabel": "グループを選択",
+        "removeGroupAria": "このホストを {name} から外す",
+        "confirmRemoveGroup": "このホストを {name} から外しますか？"
+      },
+      "groupDetail": {
+        "heading": "グループ {name}",
+        "body": "このグループ 1 つが持つすべての情報です。",
+        "back": "グループ一覧に戻る",
+        "gone": "そのグループはもう存在しません。",
+        "vars": "グループ変数",
+        "varsBody": "直接または入れ子を通じて、このグループに属するすべてのホストに適用される変数です。",
+        "members": "所属ホスト",
+        "membersBody": "このグループに直接属しているホストです。入れ子のグループを経由してのみ到達するホストは、ここには表示されません。",
+        "membersEmpty": "このグループに直接属しているホストはありません。",
+        "addHost": "ホストを追加",
+        "addHostLabel": "ホストを選択",
+        "removeHostAria": "{name} をこのグループから外す",
+        "confirmRemoveHost": "{name} をこのグループから外しますか？",
+        "children": "子グループ",
+        "childrenBody": "このグループの中に入れ子にされたグループです。それらのホストもこのグループの一員となり、このグループの変数が及びます。",
+        "childrenEmpty": "このグループの中に入れ子にされたグループはありません。",
+        "addChild": "子グループを追加",
+        "addChildLabel": "入れ子にするグループを選択",
+        "removeChildAria": "{name} をこのグループの子グループから外す",
+        "confirmRemoveChild": "{name} をこのグループの入れ子から外しますか？",
+        "parents": "親グループ",
+        "parentsBody": "このグループが入れ子にされている側のグループです。1 つのグループが複数の親を持つこともあります。",
+        "parentsEmpty": "このグループはどのグループにも入れ子にされていません。",
+        "addParent": "親グループを追加",
+        "addParentLabel": "親グループを選択",
+        "removeParentAria": "このグループを {name} から外す",
+        "confirmRemoveParent": "このグループを {name} の入れ子から外しますか？"
+      },
+      "globalVars": {
+        "heading": "インベントリ変数",
+        "body": "すべてのホストに適用される変数、つまり ansible の group_vars/all です。同じ名前のグループ変数やホスト変数は、ここで設定した値よりも優先されます。"
+      },
+      "resolved": {
+        "heading": "解決済みのホスト",
+        "body": "ansible が各行をどう解釈するかです。マージと優先順位を適用したあと、各ホストが最終的に持つ変数を示します。",
+        "hosts": "ホスト",
+        "groups": "グループ",
+        "liveNote": "これはリアルタイムです。ここにあるソースはすべて静的なので、読み取りのたびに各行がその場で解決されます。更新する必要はありません。",
+        "noHosts": "ホストとして解決されたものはありません。",
+        "noVars": "変数なし",
+        "groupsHeading": "グループの所属",
+        "directOnly": "ansible が報告するとおり、直接の所属のみを示します。ホストがすべて入れ子のグループ経由で入ってくるグループは、自身のホストを 1 台も挙げません。入れ子の関係は下に示します。",
+        "noGroups": "解決されたグループはありません。",
+        "noDirectMembers": "直接のホストなし",
+        "nestingHeading": "グループの入れ子",
+        "nestingBody": "どのグループがどのグループの中にあるかを示します。親に対する limit は、その下にあるすべてのホストに及びます。",
+        "noNesting": "入れ子にされたグループはありません。",
+        "limitHeading": "limit は何を対象にするか",
+        "limitBody": "ansible の --limit パターンをこのインベントリに対して展開し、何かが実行される前にどのホストが選択されるかを正確に確認できます。展開は ansible 自身が行うため、グループ、除外指定、~regex のいずれも実行時とまったく同じように振る舞います。",
+        "limitLabel": "limit パターン",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "limit を適用",
+        "limitClear": "クリア",
+        "limitApplied": "{limit} に絞り込んでいます。以下はそのパターンが対象とするものすべてです。"
+      },
+      "settings": {
+        "heading": "設定",
+        "body": "ここで保持している行を有効とするかどうか、そしてインベントリをあわせて読み取るリポジトリの設定です。",
+        "absent": "設定はありません（これがデフォルトです）。ここで保持しているホストとグループがインベントリのすべてです。",
+        "includePlatform": "ここで保持しているホストとグループを使用する",
+        "includePlatformHelp": "デフォルトでオンです。オフにするとリポジトリのみから解決し、これらの行はそのまま残りますが結果には含まれません。",
+        "included": "はい",
+        "excluded": "いいえ",
+        "vcsConnection": "VCS 接続",
+        "vcsNone": "なし",
+        "field": {
+          "repo-url": "リポジトリ",
+          "branch": "ブランチ",
+          "working-directory": "ディレクトリ"
+        },
+        "branchHelp": "空欄にすると、リポジトリのデフォルトブランチを追跡します。",
+        "ignorePaths": "無視するパス",
+        "ignorePathsHelp": "1 行に 1 つの glob を書きます。一致したものは、リポジトリから読み取るインベントリから除外されます。",
+        "unset": "未設定",
+        "create": "設定を追加",
+        "clear": "設定をクリア",
+        "confirmClear": "これらの設定をクリアしますか？リポジトリとの紐付けも一緒になくなりますが、ここで保持しているホストとグループは残ります。"
       },
       "errors": {
-        "loadItems": "宣言済みホストの読み込みに失敗しました",
-        "loadResolved": "解決済みインベントリの読み込みに失敗しました",
-        "preview": "limit のプレビューに失敗しました"
+        "load": "インベントリの読み込みに失敗しました",
+        "save": "保存に失敗しました",
+        "delete": "削除に失敗しました",
+        "resolved": "インベントリの解決に失敗しました",
+        "settings": "インベントリ設定の保存に失敗しました"
       }
     },
     "sharing": {

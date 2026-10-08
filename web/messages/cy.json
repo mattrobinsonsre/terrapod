@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Rhestr Eiddo",
-        "body": "Dyma''r gwesteiwyr y mae''r gweithfan hon yn eu datgan, a''r hyn y maent yn datrys iddo. Nid yw rhedeg playbook yn eu herbyn ar gael eto — mae''r rhyddhad hwn yn gwneud y rhestr eiddo yn arsylladwy, nid oes dim yn cael ei weithredu o''r fan hon."
+        "body": "Y gwesteiwyr a’r grwpiau y mae’r gweithfan hon yn eu dal, a’r hyn y mae ansible yn eu datrys iddo. Mae pob rhes yn olygadwy yma; nid yw rhedeg playbook yn eu herbyn ar gael eto."
       },
-      "selectLabel": "Rhestr Eiddo",
-      "resolved": {
-        "heading": "Gwesteiwyr a grwpiau wedi''u datrys",
-        "subheading": "Y canlyniad cyfunol ar gyfer {name}, o bob ffynhonnell yn eu trefn.",
+      "nav": {
+        "label": "Adrannau’r rhestr eiddo",
         "hosts": "Gwesteiwyr",
         "groups": "Grwpiau",
-        "liveNote": "Mae hyn yn fyw. Mae pob ffynhonnell yma wedi''i datgan yn eich cyfluniad, felly ymholiad yw ei datrys."
-      },
-      "limit": {
-        "heading": "Beth fyddai --limit yn ei dargedu?",
-        "body": "Ehangwch batrwm ansible --limit yn erbyn y gwesteiwyr a ddatryswyd uchod, fel y gallwch weld pa rai ohonynt y mae''n eu dewis cyn i ddim redeg.",
-        "inputLabel": "Patrwm --limit",
-        "placeholder": "web:!web-2",
-        "preview": "Rhagolwg",
-        "previewing": "Yn rhagolygu…",
-        "matched": "{count, plural, =0 {Ni ddewiswyd unrhyw westeiwr} one {Dewiswyd # gwesteiwr} two {Dewiswyd # westeiwr} few {Dewiswyd # gwesteiwr} many {Dewiswyd # gwesteiwr} other {Dewiswyd # gwesteiwr}} o {total}.",
-        "advisory": "Cynghorol yn unig. Mae''r ehangiad awdurdodol yn cael ei wneud gan ansible yn y rhedwr, felly triniwch hyn fel canllaw yn hytrach na gwarant."
-      },
-      "items": {
-        "heading": "Gwesteiwyr a ddatganwyd",
-        "managedNote": "Wedi''u datgan gan Terraform y gweithfan hon ei hun, felly maent yn ddarllen yn unig yma. Ychwanegwch, newidiwch neu dynnwch westeiwr yn eich ffurfweddiad a''i weithredu — caiff golygiad a wneir y tu allan i Terraform ei wrthdroi ar y gweithrediad nesaf.",
-        "empty": "Ni ddatganwyd unrhyw westeiwyr eto.",
-        "name": "Gwesteiwr",
-        "address": "Cyfeiriad",
-        "groups": "Grwpiau",
         "vars": "Newidynnau",
-        "noGroups": "dim"
+        "resolved": "Wedi’u datrys",
+        "settings": "Gosodiadau"
       },
-      "sources": {
-        "heading": "Ffynonellau",
-        "body": "Yn cael eu datrys yn eu trefn, yn union fel baneri -i a ailadroddir: mae ffynhonnell ddiweddarach yn trechu newidyn gwesteiwr sy''n gwrthdaro.",
-        "position": "Safle {position}"
+      "actions": {
+        "save": "Cadw",
+        "saving": "Yn cadw…",
+        "cancel": "Canslo",
+        "edit": "Golygu",
+        "delete": "Dileu",
+        "remove": "Tynnu",
+        "add": "Ychwanegu",
+        "adding": "Yn ychwanegu…",
+        "rename": "Ailenwi"
+      },
+      "hosts": {
+        "heading": "Gwesteiwyr",
+        "body": "Un rhes i bob gwesteiwr. Agorwch westeiwr i olygu ei newidynnau a’r grwpiau y mae’n perthyn iddynt.",
+        "empty": "Dim gwesteiwyr eto.",
+        "colName": "Gwesteiwr",
+        "colGroups": "Grwpiau",
+        "colVars": "Newidynnau",
+        "newLabel": "Enw’r gwesteiwr newydd",
+        "newPlaceholder": "web-1",
+        "add": "Ychwanegu gwesteiwr",
+        "confirmDelete": "Dileu’r gwesteiwr {name}? Mae ei newidynnau a’i aelodaeth o grwpiau yn mynd gydag ef.",
+        "renameLabel": "Enw’r gwesteiwr"
+      },
+      "groups": {
+        "heading": "Grwpiau",
+        "body": "Un rhes i bob grŵp. Agorwch grŵp i olygu ei newidynnau, y gwesteiwyr sy’n aelodau ohono a’r grwpiau sydd wedi’u nythu y tu mewn iddo.",
+        "empty": "Dim grwpiau eto.",
+        "colName": "Grŵp",
+        "colMembers": "Gwesteiwyr",
+        "colChildren": "Is-grwpiau",
+        "colVars": "Newidynnau",
+        "newLabel": "Enw’r grŵp newydd",
+        "newPlaceholder": "web",
+        "add": "Ychwanegu grŵp",
+        "confirmDelete": "Dileu’r grŵp {name}? Mae ei newidynnau a’i aelodaethau yn mynd gydag ef; mae’r gwesteiwyr eu hunain yn aros.",
+        "renameLabel": "Enw’r grŵp"
+      },
+      "vars": {
+        "actions": "Gweithredoedd",
+        "key": "Allwedd",
+        "keyPlaceholder": "ansible_user",
+        "value": "Gwerth",
+        "structured": "Strwythuredig",
+        "sensitive": "Sensitif",
+        "structuredHelp": "Mae rhestr, rhif neu wrthrych yn werth strwythuredig: ticiwch Strwythuredig ac ysgrifennwch ei ffynhonnell lythrennol yn y gwerth. Nid yw gwerth sensitif byth yn cael ei ddarllen yn ôl — mae’r maes yn dangos mwgwd yn ei le.",
+        "structuredBadge": "strwythuredig",
+        "sensitiveKeep": "Gadewch hwn yn wag i gadw’r gwerth sydd wedi’i storio.",
+        "empty": "Dim newidynnau yma.",
+        "add": "Ychwanegu newidyn",
+        "confirmDelete": "Dileu’r newidyn {key}?"
+      },
+      "hostDetail": {
+        "heading": "Gwesteiwr {name}",
+        "body": "Popeth y mae’r un gwesteiwr hwn yn ei gario.",
+        "back": "Yn ôl i’r gwesteiwyr",
+        "gone": "Nid yw’r gwesteiwr hwnnw’n bodoli mwyach.",
+        "vars": "Newidynnau’r gwesteiwr",
+        "varsBody": "Newidynnau sy’n berthnasol i’r gwesteiwr hwn yn unig. Maent yn trechu newidyn grŵp o’r un enw.",
+        "memberships": "Grwpiau",
+        "membershipsBody": "Y grwpiau y mae’r gwesteiwr hwn yn perthyn iddynt. Cyswllt yw aelodaeth, felly mae tynnu un yma yn gadael y gwesteiwr a’r grŵp yn eu lle.",
+        "membershipsEmpty": "Nid yw’r gwesteiwr hwn yn unrhyw grŵp, felly mae ansible yn ei roi yn ungrouped.",
+        "addGroup": "Ychwanegu at grŵp",
+        "addGroupLabel": "Dewiswch grŵp",
+        "removeGroupAria": "Tynnu’r gwesteiwr hwn o’r grŵp {name}",
+        "confirmRemoveGroup": "Tynnu’r gwesteiwr hwn allan o’r grŵp {name}?"
+      },
+      "groupDetail": {
+        "heading": "Grŵp {name}",
+        "body": "Popeth y mae’r un grŵp hwn yn ei gario.",
+        "back": "Yn ôl i’r grwpiau",
+        "gone": "Nid yw’r grŵp hwnnw’n bodoli mwyach.",
+        "vars": "Newidynnau’r grŵp",
+        "varsBody": "Newidynnau sy’n berthnasol i bob gwesteiwr yn y grŵp hwn, yn uniongyrchol neu drwy nythu.",
+        "members": "Gwesteiwyr sy’n aelodau",
+        "membersBody": "Y gwesteiwyr sydd yn y grŵp hwn yn uniongyrchol. Nid yw gwesteiwr a gyrchir drwy grŵp wedi’i nythu yn unig wedi’i restru yma.",
+        "membersEmpty": "Dim gwesteiwyr yn y grŵp hwn yn uniongyrchol.",
+        "addHost": "Ychwanegu gwesteiwr",
+        "addHostLabel": "Dewiswch westeiwr",
+        "removeHostAria": "Tynnu {name} o’r grŵp hwn",
+        "confirmRemoveHost": "Tynnu {name} allan o’r grŵp hwn?",
+        "children": "Is-grwpiau",
+        "childrenBody": "Grwpiau sydd wedi’u nythu y tu mewn i hwn. Mae eu gwesteiwyr yn aelodau o’r grŵp hwn hefyd, ac mae newidynnau’r grŵp hwn yn eu cyrraedd.",
+        "childrenEmpty": "Dim grwpiau wedi’u nythu y tu mewn i hwn.",
+        "addChild": "Ychwanegu is-grŵp",
+        "addChildLabel": "Dewiswch grŵp i’w nythu",
+        "removeChildAria": "Tynnu {name} o is-grwpiau’r grŵp hwn",
+        "confirmRemoveChild": "Rhoi’r gorau i nythu {name} y tu mewn i’r grŵp hwn?",
+        "parents": "Grwpiau rhiant",
+        "parentsBody": "Y grwpiau y mae hwn wedi’i nythu y tu mewn iddynt. Gall grŵp fod â sawl rhiant.",
+        "parentsEmpty": "Nid yw’r grŵp hwn wedi’i nythu y tu mewn i ddim.",
+        "addParent": "Ychwanegu grŵp rhiant",
+        "addParentLabel": "Dewiswch grŵp rhiant",
+        "removeParentAria": "Tynnu’r grŵp hwn o’r grŵp {name}",
+        "confirmRemoveParent": "Rhoi’r gorau i nythu’r grŵp hwn y tu mewn i’r grŵp {name}?"
+      },
+      "globalVars": {
+        "heading": "Newidynnau’r rhestr eiddo",
+        "body": "Newidynnau sy’n berthnasol i bob gwesteiwr — group_vars/all ansible. Mae newidyn grŵp neu westeiwr o’r un enw yn trechu un a osodir yma."
+      },
+      "resolved": {
+        "heading": "Gwesteiwyr wedi’u datrys",
+        "body": "Yr hyn y mae ansible yn ei wneud o’r rhesi: pob gwesteiwr gyda’r newidynnau sydd gydag ef yn y pen draw, ar ôl y cyfuno a’r blaenoriaethu.",
+        "hosts": "Gwesteiwyr",
+        "groups": "Grwpiau",
+        "liveNote": "Mae hyn yn fyw. Mae pob ffynhonnell yma yn statig, felly mae’r darlleniad yn datrys y rhesi ei hun i ateb — nid oes dim i’w adnewyddu.",
+        "noHosts": "Ni ddatryswyd dim i westeiwr.",
+        "noVars": "dim newidynnau",
+        "groupsHeading": "Aelodaeth o grwpiau",
+        "directOnly": "Aelodaeth uniongyrchol yn unig, yn union fel y mae ansible yn ei adrodd: nid yw grŵp y mae ei westeiwyr i gyd yn cyrraedd drwy grŵp wedi’i nythu yn rhestru dim o’i rai ei hun. Mae’r nythu isod.",
+        "noGroups": "Ni ddatryswyd unrhyw grwpiau.",
+        "noDirectMembers": "dim gwesteiwyr uniongyrchol",
+        "nestingHeading": "Nythu grwpiau",
+        "nestingBody": "Pa grwpiau sydd y tu mewn i ba rai. Mae --limit ar riant yn cyrraedd pob gwesteiwr sydd oddi tano.",
+        "noNesting": "Nid yw unrhyw grwpiau wedi’u nythu.",
+        "limitHeading": "Beth fyddai --limit yn ei dargedu?",
+        "limitBody": "Ehangwch batrwm ansible --limit yn erbyn y rhestr eiddo hon a gweld yn union pa westeiwyr y mae’n eu dewis cyn i ddim redeg. Ansible sy’n gwneud yr ehangu, felly mae grŵp, eithriad a ~regex i gyd yn ymddwyn fel y byddant ar amser rhedeg.",
+        "limitLabel": "Patrwm --limit",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Cymhwyso’r limit",
+        "limitClear": "Clirio",
+        "limitApplied": "Wedi’i gyfyngu i {limit}. Mae popeth isod yn yr hyn y mae’r patrwm hwnnw’n ei dargedu."
+      },
+      "settings": {
+        "heading": "Gosodiadau",
+        "body": "A yw’r rhesi a ddelir yma yn cyfrif, a’r ystorfa y darllenir rhestr eiddo ohoni hefyd.",
+        "absent": "Dim gosodiadau, sef y rhagosodiad: y gwesteiwyr a’r grwpiau a ddelir yma yw’r rhestr eiddo gyfan.",
+        "includePlatform": "Defnyddio’r gwesteiwyr a’r grwpiau a ddelir yma",
+        "includePlatformHelp": "Ymlaen yn ddiofyn. Diffoddwch ef i ddatrys o’r ystorfa yn unig, gan adael y rhesi hyn yn eu lle ond allan o’r ateb.",
+        "included": "ie",
+        "excluded": "na",
+        "vcsConnection": "Cysylltiad VCS",
+        "vcsNone": "Dim",
+        "field": {
+          "repo-url": "Ystorfa",
+          "branch": "Cangen",
+          "working-directory": "Cyfeiriadur"
+        },
+        "branchHelp": "Gadewch yn wag i ddilyn cangen ddiofyn yr ystorfa.",
+        "ignorePaths": "Llwybrau a anwybyddir",
+        "ignorePathsHelp": "Un glob fesul llinell. Caiff unrhyw beth sy’n cyfateb ei adael allan o’r rhestr eiddo a ddarllenir o’r ystorfa.",
+        "unset": "heb ei osod",
+        "create": "Ychwanegu gosodiadau",
+        "clear": "Clirio gosodiadau",
+        "confirmClear": "Clirio’r gosodiadau hyn? Mae’r rhwymiad i’r ystorfa yn mynd gyda hwy; mae’r gwesteiwyr a’r grwpiau a ddelir yma yn aros."
       },
       "errors": {
-        "loadItems": "Methwyd llwytho''r gwesteiwyr a ddatganwyd",
-        "loadResolved": "Methwyd llwytho''r rhestr eiddo a ddatryswyd",
-        "preview": "Methwyd rhagolygu''r --limit"
+        "load": "Methwyd llwytho’r rhestr eiddo",
+        "save": "Methwyd cadw",
+        "delete": "Methwyd dileu",
+        "resolved": "Methwyd datrys y rhestr eiddo",
+        "settings": "Methwyd cadw gosodiadau’r rhestr eiddo"
       }
     },
     "sharing": {

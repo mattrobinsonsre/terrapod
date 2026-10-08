@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventree",
-        "body": "Deez is teh hostz dis werkspace sez it haz, an wut dey turnz into. Runnin a playbuk at em is not redy yet — dis releez jus letz u LOOK at teh inventree, nuffin getz runned frum heer."
+        "body": "Teh hostz an groupz dis werkspace holdz, an wut ansibul turnz em into. Evry row u can edit rite heer; runnin a playbuk at em is not redy yet."
       },
-      "selectLabel": "Inventree",
-      "resolved": {
-        "heading": "Rezolvd hostz an groupz",
-        "subheading": "Teh all-mushed-togethr anser for {name}, frum evry sorce in ordur.",
+      "nav": {
+        "label": "Inventree bitz",
         "hosts": "Hostz",
         "groups": "Groupz",
-        "liveNote": "Dis is liv. Evry sorce heer is declaird in ur config, so werkin it owt is jus a peek."
-      },
-      "limit": {
-        "heading": "Wut wud a limit hitz?",
-        "body": "Blow up an ansible --limit patturn aginst teh rezolvd hostz up ther, so u can see wich wunz it pikz b4 enythin runz.",
-        "inputLabel": "Limit patturn",
-        "placeholder": "web:!web-2",
-        "preview": "Lemme See",
-        "previewing": "Lookin…",
-        "matched": "{count, plural, =0 {No hostz} one {# host} other {# hostz}} outta {total} pikd.",
-        "advisory": "Jus a gess. Teh reel anser getz werked out by ansible in teh runnr, so take dis as a hint not a promiss."
-      },
-      "items": {
-        "heading": "Declaird hostz",
-        "managedNote": "Deez cum frum dis werkspace’s own Terraform, so u cant tuch em heer. Add, chaynge or yeet a host in ur config an apply it — enythin u edit outsyde Terraform getz undun on teh nex apply.",
-        "empty": "No hostz declaird yet.",
-        "name": "Hoast",
-        "address": "Adress",
-        "groups": "Groupz",
         "vars": "Variablez",
-        "noGroups": "nuffin"
+        "resolved": "Werked owt",
+        "settings": "Settingz"
       },
-      "sources": {
-        "heading": "Sorcez",
-        "body": "Dun in ordur, jus like repeetd -i flagz: a latr sorce winz a fitey host variabul.",
-        "position": "Spot {position}"
+      "actions": {
+        "save": "Sayv",
+        "saving": "Sayvin…",
+        "cancel": "Cancul",
+        "edit": "Edit",
+        "delete": "Yeet",
+        "remove": "Taek owt",
+        "add": "Add",
+        "adding": "Addin…",
+        "rename": "Renaem"
+      },
+      "hosts": {
+        "heading": "Hostz",
+        "body": "Wun row per host. Opun a host 2 edit its variablez an teh groupz it belongz 2.",
+        "empty": "No hostz yet.",
+        "colName": "Host",
+        "colGroups": "Groupz",
+        "colVars": "Variablez",
+        "newLabel": "Nu host naem",
+        "newPlaceholder": "web-1",
+        "add": "Add host",
+        "confirmDelete": "Yeet teh host {name}? Its variablez an its group belongingz go wif it.",
+        "renameLabel": "Host naem"
+      },
+      "groups": {
+        "heading": "Groupz",
+        "body": "Wun row per group. Opun a group 2 edit its variablez, its membur hostz an teh groupz tuckd insyde it.",
+        "empty": "No groupz yet.",
+        "colName": "Group",
+        "colMembers": "Hostz",
+        "colChildren": "Bebe groupz",
+        "colVars": "Variablez",
+        "newLabel": "Nu group naem",
+        "newPlaceholder": "web",
+        "add": "Add group",
+        "confirmDelete": "Yeet teh group {name}? Its variablez an its belongingz go wif it; teh hostz demselvz stayz.",
+        "renameLabel": "Group naem"
+      },
+      "vars": {
+        "actions": "Stuf u can do",
+        "key": "Key",
+        "keyPlaceholder": "ansible_user",
+        "value": "Valyoo",
+        "structured": "Shaypd",
+        "sensitive": "Sneeky",
+        "structuredHelp": "A list, numbur or objekt is a shaypd valyoo: tik Shaypd an rite its litrul sorce in teh valyoo. A sneeky valyoo nevr getz red bak — teh box showz u a mask insted.",
+        "structuredBadge": "shaypd",
+        "sensitiveKeep": "Leev dis empy 2 keep teh valyoo wot is sayvd.",
+        "empty": "No variablez heer.",
+        "add": "Add variabul",
+        "confirmDelete": "Yeet teh variabul {key}?"
+      },
+      "hostDetail": {
+        "heading": "Host {name}",
+        "body": "Evrythin dis wun host carryz.",
+        "back": "Bak 2 teh hostz",
+        "gone": "Dat host is not heer no moar.",
+        "vars": "Host variablez",
+        "varsBody": "Variablez wot apply 2 dis host alone. Dey beetz a group variabul wif teh saem naem.",
+        "memberships": "Groupz",
+        "membershipsBody": "Teh groupz dis host belongz 2. A belongin is jus a linky, so takin wun owt heer leevz boaf teh host an teh group rite wer dey wuz.",
+        "membershipsEmpty": "Dis host is in no group, so ansibul shovz it in ungrouped.",
+        "addGroup": "Add 2 group",
+        "addGroupLabel": "Pik a group",
+        "removeGroupAria": "Taek dis host owt uv {name}",
+        "confirmRemoveGroup": "Taek dis host owt uv {name}?"
+      },
+      "groupDetail": {
+        "heading": "Group {name}",
+        "body": "Evrythin dis wun group carryz.",
+        "back": "Bak 2 teh groupz",
+        "gone": "Dat group is not heer no moar.",
+        "vars": "Group variablez",
+        "varsBody": "Variablez wot apply 2 evry host in dis group, strait up or froo teh tuckd-in wunz.",
+        "members": "Membur hostz",
+        "membersBody": "Teh hostz in dis group strait up. A host u only reech froo a tuckd-in group is not listid heer.",
+        "membersEmpty": "No hostz in dis group strait up.",
+        "addHost": "Add host",
+        "addHostLabel": "Pik a host",
+        "removeHostAria": "Taek {name} owt uv dis group",
+        "confirmRemoveHost": "Taek {name} owt uv dis group?",
+        "children": "Bebe groupz",
+        "childrenBody": "Groupz tuckd insyde dis wun. Deir hostz is memburz uv dis group 2, an dis groupz variablez reechz em.",
+        "childrenEmpty": "No groupz tuckd insyde dis wun.",
+        "addChild": "Add bebe group",
+        "addChildLabel": "Pik a group 2 tuk in",
+        "removeChildAria": "Taek {name} owt uv dis groupz bebes",
+        "confirmRemoveChild": "Stop tuckin {name} insyde dis group?",
+        "parents": "Mama groupz",
+        "parentsBody": "Teh groupz dis wun is tuckd insyde. A group can haz lotz uv mamas.",
+        "parentsEmpty": "Dis group is tuckd insyde nuffin.",
+        "addParent": "Add mama group",
+        "addParentLabel": "Pik a mama group",
+        "removeParentAria": "Taek dis group owt uv {name}",
+        "confirmRemoveParent": "Stop tuckin dis group insyde {name}?"
+      },
+      "globalVars": {
+        "heading": "Inventree variablez",
+        "body": "Variablez wot apply 2 evry host — ansibulz group_vars/all. A group or host variabul wif teh saem naem beetz wun u set heer."
+      },
+      "resolved": {
+        "heading": "Werked-owt hostz",
+        "body": "Wut ansibul maekz uv teh rowz: evry host wif teh variablez it endz up holdin, aftr teh mush-togevr an teh pekkin ordr.",
+        "hosts": "Hostz",
+        "groups": "Groupz",
+        "liveNote": "Dis is liv. Evry sorce heer sitz stil, so teh peek werkz owt teh rowz 2 ansr itself — ther is nuffin 2 refresh.",
+        "noHosts": "Nuffin werked owt 2 a host.",
+        "noVars": "no variablez",
+        "groupsHeading": "Hoo belongz wer",
+        "directOnly": "Only teh strait-up belongingz, jus liek ansibul sez em: a group wooz hostz all cum froo a tuckd-in group listz nun uv its own. Teh tuckin is down ther.",
+        "noGroups": "No groupz werked owt.",
+        "noDirectMembers": "no strait-up hostz",
+        "nestingHeading": "Wot is tuckd in wot",
+        "nestingBody": "Wich groupz sitz insyde wich. A limit on a mama reechz evry host undr it.",
+        "noNesting": "No groupz is tuckd in.",
+        "limitHeading": "Wut wud a limit hit?",
+        "limitBody": "Blow up an ansible --limit patturn aginst dis inventree an see xaktly wich hostz it pikz b4 enythin runz. Ansibul doz teh blowin up, so a group, a not-dis-wun an a ~regex all behayvz liek dey will wen it reely runz.",
+        "limitLabel": "Limit patturn",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Do teh limit",
+        "limitClear": "Wipe it",
+        "limitApplied": "Limitd 2 {limit}. Evrythin down ther is wut dat patturn hitz."
+      },
+      "settings": {
+        "heading": "Settingz",
+        "body": "Wevr teh rowz held heer countz, an teh repo wot an inventree also getz red frum.",
+        "absent": "No settingz, wich is teh normul: teh hostz an groupz held heer is teh hole inventree.",
+        "includePlatform": "Yooz teh hostz an groupz held heer",
+        "includePlatformHelp": "On by defawlt. Turn it off 2 werk it owt frum teh repo alone, leevin deez rowz wer dey is but owt uv teh ansr.",
+        "included": "yis",
+        "excluded": "nope",
+        "vcsConnection": "VCS hookup",
+        "vcsNone": "Nuffin",
+        "field": {
+          "repo-url": "Repo",
+          "branch": "Branch",
+          "working-directory": "Foldr"
+        },
+        "branchHelp": "Leev it empy 2 folow teh repoz defawlt branch.",
+        "ignorePaths": "Ignord pafs",
+        "ignorePathsHelp": "Wun glob per line. Enythin wot matchz getz left owt uv teh inventree red frum teh repo.",
+        "unset": "nuffin set",
+        "create": "Add settingz",
+        "clear": "Wipe settingz",
+        "confirmClear": "Wipe deez settingz? Teh repo hookup goez wif em; teh hostz an groupz held heer stayz."
       },
       "errors": {
-        "loadItems": "Coudnt load teh declaird hostz",
-        "loadResolved": "Coudnt load teh rezolvd inventree",
-        "preview": "Coudnt preview teh limit"
+        "load": "Culdnt get teh inventree",
+        "save": "Culdnt sayv",
+        "delete": "Culdnt yeet it",
+        "resolved": "Culdnt werk owt teh inventree",
+        "settings": "Culdnt sayv teh inventree settingz"
       }
     },
     "sharing": {

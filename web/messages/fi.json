@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventaario",
-        "body": "Nämä ovat isännät, jotka tämä työtila määrittelee, ja se, mihin ne ratkeavat. Playbookin ajaminen niitä vasten ei ole vielä käytettävissä — tämä julkaisu tekee inventaariosta havaittavan, täältä ei suoriteta mitään."
+        "body": "Isännät ja ryhmät, jotka tämä työtila pitää hallussaan, ja se, mihin ansible ne ratkaisee. Jokaista riviä voi muokata täällä; playbookin ajaminen niitä vasten ei ole vielä käytettävissä."
       },
-      "selectLabel": "Inventaario",
-      "resolved": {
-        "heading": "Ratkaistut isännät ja ryhmät",
-        "subheading": "Yhdistetty tulos kohteelle {name}, kaikista lähteistä järjestyksessä.",
+      "nav": {
+        "label": "Inventaarion osiot",
         "hosts": "Isännät",
         "groups": "Ryhmät",
-        "liveNote": "Tämä on reaaliaikainen. Jokainen lähde täällä on määritelty konfiguraatiossasi, joten ratkaiseminen on tietokantakysely."
-      },
-      "limit": {
-        "heading": "Mihin --limit kohdistuisi?",
-        "body": "Laajenna ansible --limit -kuvio yllä ratkaistuja isäntiä vasten, jotta näet mitkä niistä se valitsee ennen kuin mitään ajetaan.",
-        "inputLabel": "--limit-kuvio",
-        "placeholder": "web:!web-2",
-        "preview": "Esikatsele",
-        "previewing": "Esikatsellaan…",
-        "matched": "{count, plural, =0 {Yhtään isäntää ei valittu} one {Valittu # isäntä} other {Valittu # isäntää}} {total}:sta.",
-        "advisory": "Vain neuvoa-antava. Sitovan laajennuksen tekee ansible runnerissa, joten pidä tätä ohjeena eikä takuuna."
-      },
-      "items": {
-        "heading": "Määritellyt isännät",
-        "managedNote": "Määritelty tämän työtilan omalla Terraform-konfiguraatiolla, joten ne ovat täällä vain luettavissa. Lisää, muuta tai poista isäntä konfiguraatiossasi ja ota se käyttöön — Terraformin ulkopuolella tehty muutos peruutetaan seuraavassa käyttöönotossa.",
-        "empty": "Isäntiä ei ole vielä määritelty.",
-        "name": "Isäntä",
-        "address": "Osoite",
-        "groups": "Ryhmät",
         "vars": "Muuttujat",
-        "noGroups": "ei mitään"
+        "resolved": "Ratkaistu",
+        "settings": "Asetukset"
       },
-      "sources": {
-        "heading": "Lähteet",
-        "body": "Ratkaistaan järjestyksessä, täsmälleen kuten toistetut -i-liput: ristiriitaisessa isäntämuuttujassa voittaa myöhempi lähde.",
-        "position": "Sijainti {position}"
+      "actions": {
+        "save": "Tallenna",
+        "saving": "Tallennetaan…",
+        "cancel": "Peruuta",
+        "edit": "Muokkaa",
+        "delete": "Poista",
+        "remove": "Irrota",
+        "add": "Lisää",
+        "adding": "Lisätään…",
+        "rename": "Nimeä uudelleen"
+      },
+      "hosts": {
+        "heading": "Isännät",
+        "body": "Yksi rivi isäntää kohden. Avaa isäntä muokataksesi sen muuttujia ja ryhmiä, joihin se kuuluu.",
+        "empty": "Ei vielä isäntiä.",
+        "colName": "Isäntä",
+        "colGroups": "Ryhmät",
+        "colVars": "Muuttujat",
+        "newLabel": "Uuden isännän nimi",
+        "newPlaceholder": "web-1",
+        "add": "Lisää isäntä",
+        "confirmDelete": "Poistetaanko isäntä {name}? Sen muuttujat ja sen ryhmäjäsenyydet lähtevät sen mukana.",
+        "renameLabel": "Isännän nimi"
+      },
+      "groups": {
+        "heading": "Ryhmät",
+        "body": "Yksi rivi ryhmää kohden. Avaa ryhmä muokataksesi sen muuttujia, sen jäsenisäntiä ja sen sisään sijoitettuja ryhmiä.",
+        "empty": "Ei vielä ryhmiä.",
+        "colName": "Ryhmä",
+        "colMembers": "Isännät",
+        "colChildren": "Aliryhmät",
+        "colVars": "Muuttujat",
+        "newLabel": "Uuden ryhmän nimi",
+        "newPlaceholder": "web",
+        "add": "Lisää ryhmä",
+        "confirmDelete": "Poistetaanko ryhmä {name}? Sen muuttujat ja sen jäsenyydet lähtevät sen mukana; isännät itse jäävät.",
+        "renameLabel": "Ryhmän nimi"
+      },
+      "vars": {
+        "actions": "Toiminnot",
+        "key": "Avain",
+        "keyPlaceholder": "ansible_user",
+        "value": "Arvo",
+        "structured": "Rakenteinen",
+        "sensitive": "Arkaluonteinen",
+        "structuredHelp": "Lista, luku tai objekti on rakenteinen arvo: rastita Rakenteinen ja kirjoita sen kirjaimellinen lähde arvoon. Arkaluonteista arvoa ei koskaan lueta takaisin — kenttä näyttää sen sijaan peitteen.",
+        "structuredBadge": "rakenteinen",
+        "sensitiveKeep": "Jätä tämä tyhjäksi, niin tallennettu arvo säilyy.",
+        "empty": "Täällä ei ole muuttujia.",
+        "add": "Lisää muuttuja",
+        "confirmDelete": "Poistetaanko muuttuja {key}?"
+      },
+      "hostDetail": {
+        "heading": "Isäntä {name}",
+        "body": "Kaikki, mitä tämä yksi isäntä kantaa.",
+        "back": "Takaisin isäntiin",
+        "gone": "Tätä isäntää ei ole enää.",
+        "vars": "Isännän muuttujat",
+        "varsBody": "Muuttujat, jotka koskevat vain tätä isäntää. Ne voittavat samannimisen ryhmämuuttujan.",
+        "memberships": "Ryhmät",
+        "membershipsBody": "Ryhmät, joihin tämä isäntä kuuluu. Jäsenyys on linkki, joten sen irrottaminen täällä jättää sekä isännän että ryhmän paikoilleen.",
+        "membershipsEmpty": "Tämä isäntä ei ole missään ryhmässä, joten ansible sijoittaa sen ryhmään ungrouped.",
+        "addGroup": "Lisää ryhmään",
+        "addGroupLabel": "Valitse ryhmä",
+        "removeGroupAria": "Irrota tämä isäntä ryhmästä {name}",
+        "confirmRemoveGroup": "Otetaanko tämä isäntä pois ryhmästä {name}?"
+      },
+      "groupDetail": {
+        "heading": "Ryhmä {name}",
+        "body": "Kaikki, mitä tämä yksi ryhmä kantaa.",
+        "back": "Takaisin ryhmiin",
+        "gone": "Tätä ryhmää ei ole enää.",
+        "vars": "Ryhmän muuttujat",
+        "varsBody": "Muuttujat, jotka koskevat jokaista tämän ryhmän isäntää, suoraan tai sijoittelun kautta.",
+        "members": "Jäsenisännät",
+        "membersBody": "Tähän ryhmään suoraan kuuluvat isännät. Isäntää, joka saavutetaan vain sijoitetun ryhmän kautta, ei luetella täällä.",
+        "membersEmpty": "Tähän ryhmään ei kuulu suoraan yhtään isäntää.",
+        "addHost": "Lisää isäntä",
+        "addHostLabel": "Valitse isäntä",
+        "removeHostAria": "Irrota {name} tästä ryhmästä",
+        "confirmRemoveHost": "Otetaanko {name} pois tästä ryhmästä?",
+        "children": "Aliryhmät",
+        "childrenBody": "Tämän sisään sijoitetut ryhmät. Niiden isännät ovat myös tämän ryhmän jäseniä, ja tämän ryhmän muuttujat tavoittavat ne.",
+        "childrenEmpty": "Tämän sisään ei ole sijoitettu yhtään ryhmää.",
+        "addChild": "Lisää aliryhmä",
+        "addChildLabel": "Valitse sijoitettava ryhmä",
+        "removeChildAria": "Irrota {name} tämän ryhmän aliryhmistä",
+        "confirmRemoveChild": "Lopetetaanko {name} sijoittaminen tämän ryhmän sisään?",
+        "parents": "Yläryhmät",
+        "parentsBody": "Ryhmät, joiden sisään tämä on sijoitettu. Ryhmällä voi olla useita yläryhmiä.",
+        "parentsEmpty": "Tätä ryhmää ei ole sijoitettu minkään sisään.",
+        "addParent": "Lisää yläryhmä",
+        "addParentLabel": "Valitse yläryhmä",
+        "removeParentAria": "Irrota tämä ryhmä ryhmästä {name}",
+        "confirmRemoveParent": "Lopetetaanko tämän ryhmän sijoittaminen ryhmän {name} sisään?"
+      },
+      "globalVars": {
+        "heading": "Inventaarion muuttujat",
+        "body": "Muuttujat, jotka koskevat jokaista isäntää — ansiblen group_vars/all. Samanniminen ryhmä- tai isäntämuuttuja voittaa täällä asetetun."
+      },
+      "resolved": {
+        "heading": "Ratkaistut isännät",
+        "body": "Se, mitä ansible näistä riveistä tekee: jokainen isäntä niillä muuttujilla, jotka sille lopulta jäävät, yhdistämisen ja etusijajärjestyksen jälkeen.",
+        "hosts": "Isännät",
+        "groups": "Ryhmät",
+        "liveNote": "Tämä on reaaliaikainen. Jokainen lähde täällä on staattinen, joten luku ratkaisee rivit itse vastatakseen — mitään ei tarvitse päivittää.",
+        "noHosts": "Mikään ei ratkennut isännäksi.",
+        "noVars": "ei muuttujia",
+        "groupsHeading": "Ryhmäjäsenyys",
+        "directOnly": "Vain suora jäsenyys, täsmälleen niin kuin ansible sen ilmoittaa: ryhmä, jonka isännät saapuvat kaikki sijoitetun ryhmän kautta, ei luettele yhtään omaa. Sijoittelu on alla.",
+        "noGroups": "Yhtään ryhmää ei ratkennut.",
+        "noDirectMembers": "ei suoria isäntiä",
+        "nestingHeading": "Ryhmien sijoittelu",
+        "nestingBody": "Mitkä ryhmät ovat minkä sisällä. Yläryhmään osuva --limit tavoittaa jokaisen sen alla olevan isännän.",
+        "noNesting": "Yhtään ryhmää ei ole sijoitettu toisen sisään.",
+        "limitHeading": "Mihin --limit kohdistuisi?",
+        "limitBody": "Laajenna ansible --limit -kuvio tätä inventaariota vasten ja näe tarkalleen, mitkä isännät se valitsee ennen kuin mitään ajetaan. Laajennuksen tekee ansible itse, joten ryhmä, poissulku ja ~regex käyttäytyvät kaikki niin kuin ne käyttäytyvät ajohetkellä.",
+        "limitLabel": "--limit-kuvio",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Käytä rajausta",
+        "limitClear": "Tyhjennä",
+        "limitApplied": "Rajattu kuviolla {limit}. Kaikki alla oleva on se, mihin kuvio kohdistuu."
+      },
+      "settings": {
+        "heading": "Asetukset",
+        "body": "Lasketaanko täällä pidetyt rivit mukaan, ja mistä tietovarastosta inventaario myös luetaan.",
+        "absent": "Ei asetuksia, mikä on oletus: täällä pidetyt isännät ja ryhmät ovat koko inventaario.",
+        "includePlatform": "Käytä täällä pidettyjä isäntiä ja ryhmiä",
+        "includePlatformHelp": "Oletuksena päällä. Ota pois päältä, jos haluat ratkaista vain tietovarastosta — nämä rivit jäävät paikoilleen mutta vastauksen ulkopuolelle.",
+        "included": "kyllä",
+        "excluded": "ei",
+        "vcsConnection": "VCS-yhteys",
+        "vcsNone": "Ei mitään",
+        "field": {
+          "repo-url": "Tietovarasto",
+          "branch": "Haara",
+          "working-directory": "Hakemisto"
+        },
+        "branchHelp": "Jätä tyhjäksi, niin seurataan tietovaraston oletushaaraa.",
+        "ignorePaths": "Ohitetut polut",
+        "ignorePathsHelp": "Yksi glob riviä kohden. Kaikki osuva jätetään pois tietovarastosta luetusta inventaariosta.",
+        "unset": "ei asetettu",
+        "create": "Lisää asetukset",
+        "clear": "Tyhjennä asetukset",
+        "confirmClear": "Tyhjennetäänkö nämä asetukset? Tietovarastosidos lähtee niiden mukana; täällä pidetyt isännät ja ryhmät jäävät."
       },
       "errors": {
-        "loadItems": "Määriteltyjen isäntien lataaminen epäonnistui",
-        "loadResolved": "Ratkaistun inventaarion lataaminen epäonnistui",
-        "preview": "--limit-kuvion esikatselu epäonnistui"
+        "load": "Inventaarion lataaminen epäonnistui",
+        "save": "Tallentaminen epäonnistui",
+        "delete": "Poistaminen epäonnistui",
+        "resolved": "Inventaarion ratkaiseminen epäonnistui",
+        "settings": "Inventaarion asetusten tallentaminen epäonnistui"
       }
     },
     "sharing": {

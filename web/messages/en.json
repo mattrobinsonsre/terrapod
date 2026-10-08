@@ -2867,45 +2867,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventory",
-        "body": "These are the hosts this workspace declares and what they resolve to. Running a playbook against them is not available yet — this release makes the inventory observable, nothing is executed from here."
+        "body": "The hosts and groups this workspace holds, and what ansible resolves them to. Each row is editable here; running a playbook against them is not available yet."
       },
-      "selectLabel": "Inventory",
-      "resolved": {
-        "heading": "Resolved hosts and groups",
-        "subheading": "The merged result for {name}, from every source in order.",
+      "nav": {
+        "label": "Inventory sections",
         "hosts": "Hosts",
         "groups": "Groups",
-        "liveNote": "This is live. Every source here is declared in your configuration, so resolving it is a lookup."
-      },
-      "limit": {
-        "heading": "What would a limit target?",
-        "body": "Expand an ansible --limit pattern against the resolved hosts above, so you can see which of them it selects before anything runs.",
-        "inputLabel": "Limit pattern",
-        "placeholder": "web:!web-2",
-        "preview": "Preview",
-        "previewing": "Previewing…",
-        "matched": "{count, plural, =0 {No hosts} one {# host} other {# hosts}} of {total} selected.",
-        "advisory": "Advisory only. The authoritative expansion is taken by ansible in the runner, so treat this as a guide rather than a guarantee."
-      },
-      "items": {
-        "heading": "Declared hosts",
-        "managedNote": "Declared by this workspace’s own Terraform, so they are read-only here. Add, change or remove a host in your configuration and apply it — an edit made outside Terraform is reverted on the next apply.",
-        "empty": "No hosts declared yet.",
-        "name": "Host",
-        "address": "Address",
-        "groups": "Groups",
         "vars": "Variables",
-        "noGroups": "none"
+        "resolved": "Resolved",
+        "settings": "Settings"
       },
-      "sources": {
-        "heading": "Sources",
-        "body": "Resolved in order, exactly as repeated -i flags are: a later source wins a conflicting host variable.",
-        "position": "Position {position}"
+      "actions": {
+        "save": "Save",
+        "saving": "Saving…",
+        "cancel": "Cancel",
+        "edit": "Edit",
+        "delete": "Delete",
+        "remove": "Remove",
+        "add": "Add",
+        "adding": "Adding…",
+        "rename": "Rename"
+      },
+      "hosts": {
+        "heading": "Hosts",
+        "body": "One row per host. Open a host to edit its variables and the groups it belongs to.",
+        "empty": "No hosts yet.",
+        "colName": "Host",
+        "colGroups": "Groups",
+        "colVars": "Variables",
+        "newLabel": "New host name",
+        "newPlaceholder": "web-1",
+        "add": "Add host",
+        "confirmDelete": "Delete the host {name}? Its variables and its group memberships go with it.",
+        "renameLabel": "Host name"
+      },
+      "groups": {
+        "heading": "Groups",
+        "body": "One row per group. Open a group to edit its variables, its member hosts and the groups nested inside it.",
+        "empty": "No groups yet.",
+        "colName": "Group",
+        "colMembers": "Hosts",
+        "colChildren": "Child groups",
+        "colVars": "Variables",
+        "newLabel": "New group name",
+        "newPlaceholder": "web",
+        "add": "Add group",
+        "confirmDelete": "Delete the group {name}? Its variables and its memberships go with it; the hosts themselves stay.",
+        "renameLabel": "Group name"
+      },
+      "vars": {
+        "actions": "Actions",
+        "key": "Key",
+        "keyPlaceholder": "ansible_user",
+        "value": "Value",
+        "structured": "Structured",
+        "sensitive": "Sensitive",
+        "structuredHelp": "A list, number or object is a structured value: tick Structured and write its literal source in the value. A sensitive value is never read back — the field shows a mask instead.",
+        "structuredBadge": "structured",
+        "sensitiveKeep": "Leave this blank to keep the stored value.",
+        "empty": "No variables here.",
+        "add": "Add variable",
+        "confirmDelete": "Delete the variable {key}?"
+      },
+      "hostDetail": {
+        "heading": "Host {name}",
+        "body": "Everything this one host carries.",
+        "back": "Back to hosts",
+        "gone": "That host no longer exists.",
+        "vars": "Host variables",
+        "varsBody": "Variables that apply to this host alone. They win over a group variable of the same name.",
+        "memberships": "Groups",
+        "membershipsBody": "The groups this host belongs to. A membership is a link, so removing one here leaves both the host and the group in place.",
+        "membershipsEmpty": "This host is in no group, so ansible puts it in ungrouped.",
+        "addGroup": "Add to group",
+        "addGroupLabel": "Choose a group",
+        "removeGroupAria": "Remove this host from {name}",
+        "confirmRemoveGroup": "Take this host out of {name}?"
+      },
+      "groupDetail": {
+        "heading": "Group {name}",
+        "body": "Everything this one group carries.",
+        "back": "Back to groups",
+        "gone": "That group no longer exists.",
+        "vars": "Group variables",
+        "varsBody": "Variables that apply to every host in this group, directly or through nesting.",
+        "members": "Member hosts",
+        "membersBody": "The hosts in this group directly. A host reached only through a nested group is not listed here.",
+        "membersEmpty": "No hosts in this group directly.",
+        "addHost": "Add host",
+        "addHostLabel": "Choose a host",
+        "removeHostAria": "Remove {name} from this group",
+        "confirmRemoveHost": "Take {name} out of this group?",
+        "children": "Child groups",
+        "childrenBody": "Groups nested inside this one. Their hosts are members of this group too, and this group’s variables reach them.",
+        "childrenEmpty": "No groups nested inside this one.",
+        "addChild": "Add child group",
+        "addChildLabel": "Choose a group to nest",
+        "removeChildAria": "Remove {name} from the children of this group",
+        "confirmRemoveChild": "Stop nesting {name} inside this group?",
+        "parents": "Parent groups",
+        "parentsBody": "The groups this one is nested inside. A group may have several parents.",
+        "parentsEmpty": "This group is nested inside nothing.",
+        "addParent": "Add parent group",
+        "addParentLabel": "Choose a parent group",
+        "removeParentAria": "Remove this group from {name}",
+        "confirmRemoveParent": "Stop nesting this group inside {name}?"
+      },
+      "globalVars": {
+        "heading": "Inventory variables",
+        "body": "Variables that apply to every host — ansible’s group_vars/all. A group or host variable of the same name wins over one set here."
+      },
+      "resolved": {
+        "heading": "Resolved hosts",
+        "body": "What ansible makes of the rows: every host with the variables it ends up holding, after the merge and the precedence.",
+        "hosts": "Hosts",
+        "groups": "Groups",
+        "liveNote": "This is live. Every source here is static, so the read resolves the rows to answer itself — there is nothing to refresh.",
+        "noHosts": "Nothing resolved to a host.",
+        "noVars": "no variables",
+        "groupsHeading": "Group membership",
+        "directOnly": "Direct membership only, exactly as ansible reports it: a group whose hosts all arrive through a nested group lists none of its own. The nesting is below.",
+        "noGroups": "No groups resolved.",
+        "noDirectMembers": "no direct hosts",
+        "nestingHeading": "Group nesting",
+        "nestingBody": "Which groups sit inside which. A limit on a parent reaches every host below it.",
+        "noNesting": "No groups are nested.",
+        "limitHeading": "What would a limit target?",
+        "limitBody": "Expand an ansible --limit pattern against this inventory and see exactly which hosts it selects before anything runs. Ansible does the expansion, so a group, an exclusion and a ~regex all behave as they will at run time.",
+        "limitLabel": "Limit pattern",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Apply limit",
+        "limitClear": "Clear",
+        "limitApplied": "Limited to {limit}. Everything below is what that pattern targets."
+      },
+      "settings": {
+        "heading": "Settings",
+        "body": "Whether the rows held here count, and the repository an inventory is also read from.",
+        "absent": "No settings, which is the default: the hosts and groups held here are the whole inventory.",
+        "includePlatform": "Use the hosts and groups held here",
+        "includePlatformHelp": "On by default. Turn it off to resolve from the repository alone, leaving these rows in place but out of the answer.",
+        "included": "yes",
+        "excluded": "no",
+        "vcsConnection": "VCS connection",
+        "vcsNone": "None",
+        "field": {
+          "repo-url": "Repository",
+          "branch": "Branch",
+          "working-directory": "Directory"
+        },
+        "branchHelp": "Leave empty to track the default branch of the repository.",
+        "ignorePaths": "Ignored paths",
+        "ignorePathsHelp": "One glob per line. Anything matching is left out of the inventory read from the repository.",
+        "unset": "not set",
+        "create": "Add settings",
+        "clear": "Clear settings",
+        "confirmClear": "Clear these settings? The repository binding goes with them; the hosts and groups held here stay."
       },
       "errors": {
-        "loadItems": "Failed to load declared hosts",
-        "loadResolved": "Failed to load the resolved inventory",
-        "preview": "Failed to preview the limit"
+        "load": "Failed to load the inventory",
+        "save": "Failed to save",
+        "delete": "Failed to delete",
+        "resolved": "Failed to resolve the inventory",
+        "settings": "Failed to save the inventory settings"
       }
     },
     "sharing": {

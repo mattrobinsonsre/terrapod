@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventarium",
-        "body": "Detta är de värdar som den här arbetsytan deklarerar och vad de löses upp till. Att köra en playbook mot dem är inte tillgängligt än — den här versionen gör inventariet observerbart, ingenting körs härifrån."
+        "body": "Värdarna och grupperna som den här arbetsytan håller, och vad ansible löser upp dem till. Varje rad kan redigeras här; att köra en playbook mot dem är inte tillgängligt än."
       },
-      "selectLabel": "Inventarium",
-      "resolved": {
-        "heading": "Upplösta värdar och grupper",
-        "subheading": "Det sammanslagna resultatet för {name}, från varje källa i ordning.",
+      "nav": {
+        "label": "Inventarieavsnitt",
         "hosts": "Värdar",
         "groups": "Grupper",
-        "liveNote": "Detta är live. Varje källa här är deklarerad i din konfiguration, så att lösa upp den är en databasfråga."
-      },
-      "limit": {
-        "heading": "Vad skulle ett limit-mönster träffa?",
-        "body": "Expandera ett ansible --limit-mönster utifrån de upplösta värdarna ovan, så att du ser vilka av dem det väljer innan något körs.",
-        "inputLabel": "Limit-mönster",
-        "placeholder": "web:!web-2",
-        "preview": "Förhandsgranska",
-        "previewing": "Förhandsgranskar…",
-        "matched": "{count, plural, =0 {Inga värdar} one {# värd} other {# värdar}} av {total} har valts.",
-        "advisory": "Endast rådgivande. Den auktoritativa expansionen görs av ansible i runnern, så betrakta detta som en vägledning snarare än en garanti."
-      },
-      "items": {
-        "heading": "Deklarerade värdar",
-        "managedNote": "Deklarerade av den här arbetsytans egen Terraform och därför skrivskyddade här. Lägg till, ändra eller ta bort en värd i din konfiguration och tillämpa den — en ändring som görs utanför Terraform återställs vid nästa apply.",
-        "empty": "Inga värdar deklarerade ännu.",
-        "name": "Värd",
-        "address": "Adress",
-        "groups": "Grupper",
         "vars": "Variabler",
-        "noGroups": "inga"
+        "resolved": "Upplöst",
+        "settings": "Inställningar"
       },
-      "sources": {
-        "heading": "Källor",
-        "body": "Löses upp i ordning, precis som upprepade -i-flaggor: vid en motstridig värdvariabel vinner den senare källan.",
-        "position": "Position {position}"
+      "actions": {
+        "save": "Spara",
+        "saving": "Sparar…",
+        "cancel": "Avbryt",
+        "edit": "Redigera",
+        "delete": "Ta bort",
+        "remove": "Koppla bort",
+        "add": "Lägg till",
+        "adding": "Lägger till…",
+        "rename": "Byt namn"
+      },
+      "hosts": {
+        "heading": "Värdar",
+        "body": "En rad per värd. Öppna en värd för att redigera dess variabler och de grupper den tillhör.",
+        "empty": "Inga värdar ännu.",
+        "colName": "Värd",
+        "colGroups": "Grupper",
+        "colVars": "Variabler",
+        "newLabel": "Namn på den nya värden",
+        "newPlaceholder": "web-1",
+        "add": "Lägg till värd",
+        "confirmDelete": "Ta bort värden {name}? Dess variabler och dess gruppmedlemskap följer med.",
+        "renameLabel": "Värdnamn"
+      },
+      "groups": {
+        "heading": "Grupper",
+        "body": "En rad per grupp. Öppna en grupp för att redigera dess variabler, dess medlemsvärdar och grupperna som är nästlade i den.",
+        "empty": "Inga grupper ännu.",
+        "colName": "Grupp",
+        "colMembers": "Värdar",
+        "colChildren": "Undergrupper",
+        "colVars": "Variabler",
+        "newLabel": "Namn på den nya gruppen",
+        "newPlaceholder": "web",
+        "add": "Lägg till grupp",
+        "confirmDelete": "Ta bort gruppen {name}? Dess variabler och dess medlemskap följer med; värdarna själva blir kvar.",
+        "renameLabel": "Gruppnamn"
+      },
+      "vars": {
+        "actions": "Åtgärder",
+        "key": "Nyckel",
+        "keyPlaceholder": "ansible_user",
+        "value": "Värde",
+        "structured": "Strukturerad",
+        "sensitive": "Känslig",
+        "structuredHelp": "En lista, ett tal eller ett objekt är ett strukturerat värde: kryssa i Strukturerad och skriv dess literala källtext i värdet. Ett känsligt värde läses aldrig tillbaka — fältet visar en mask i stället.",
+        "structuredBadge": "strukturerad",
+        "sensitiveKeep": "Lämna detta tomt för att behålla det lagrade värdet.",
+        "empty": "Inga variabler här.",
+        "add": "Lägg till variabel",
+        "confirmDelete": "Ta bort variabeln {key}?"
+      },
+      "hostDetail": {
+        "heading": "Värd {name}",
+        "body": "Allt den här enda värden bär.",
+        "back": "Tillbaka till värdar",
+        "gone": "Den värden finns inte längre.",
+        "vars": "Värdvariabler",
+        "varsBody": "Variabler som bara gäller den här värden. De har företräde framför en gruppvariabel med samma namn.",
+        "memberships": "Grupper",
+        "membershipsBody": "Grupperna som den här värden tillhör. Ett medlemskap är en länk, så att koppla bort ett här lämnar både värden och gruppen på plats.",
+        "membershipsEmpty": "Den här värden är inte i någon grupp, så ansible lägger den i ungrouped.",
+        "addGroup": "Lägg till i grupp",
+        "addGroupLabel": "Välj en grupp",
+        "removeGroupAria": "Koppla bort den här värden från {name}",
+        "confirmRemoveGroup": "Ta ut den här värden ur {name}?"
+      },
+      "groupDetail": {
+        "heading": "Grupp {name}",
+        "body": "Allt den här enda gruppen bär.",
+        "back": "Tillbaka till grupper",
+        "gone": "Den gruppen finns inte längre.",
+        "vars": "Gruppvariabler",
+        "varsBody": "Variabler som gäller varje värd i den här gruppen, direkt eller genom nästling.",
+        "members": "Medlemsvärdar",
+        "membersBody": "Värdarna som ligger direkt i den här gruppen. En värd som bara nås genom en nästlad grupp listas inte här.",
+        "membersEmpty": "Inga värdar direkt i den här gruppen.",
+        "addHost": "Lägg till värd",
+        "addHostLabel": "Välj en värd",
+        "removeHostAria": "Koppla bort {name} från den här gruppen",
+        "confirmRemoveHost": "Ta ut {name} ur den här gruppen?",
+        "children": "Undergrupper",
+        "childrenBody": "Grupper som är nästlade i den här. Deras värdar är medlemmar i den här gruppen också, och den här gruppens variabler når dem.",
+        "childrenEmpty": "Ingen grupp är nästlad i den här.",
+        "addChild": "Lägg till undergrupp",
+        "addChildLabel": "Välj en grupp att nästla",
+        "removeChildAria": "Koppla bort {name} från den här gruppens undergrupper",
+        "confirmRemoveChild": "Sluta nästla {name} i den här gruppen?",
+        "parents": "Överordnade grupper",
+        "parentsBody": "Grupperna som den här är nästlad i. En grupp kan ha flera överordnade grupper.",
+        "parentsEmpty": "Den här gruppen är inte nästlad i någonting.",
+        "addParent": "Lägg till överordnad grupp",
+        "addParentLabel": "Välj en överordnad grupp",
+        "removeParentAria": "Koppla bort den här gruppen från {name}",
+        "confirmRemoveParent": "Sluta nästla den här gruppen i {name}?"
+      },
+      "globalVars": {
+        "heading": "Inventarievariabler",
+        "body": "Variabler som gäller varje värd — ansibles group_vars/all. En grupp- eller värdvariabel med samma namn har företräde framför en som sätts här."
+      },
+      "resolved": {
+        "heading": "Upplösta värdar",
+        "body": "Vad ansible gör av raderna: varje värd med de variabler den till slut bär, efter sammanslagningen och företrädet.",
+        "hosts": "Värdar",
+        "groups": "Grupper",
+        "liveNote": "Detta är live. Varje källa här är statisk, så läsningen löser upp raderna själv — det finns ingenting att uppdatera.",
+        "noHosts": "Ingenting löstes upp till en värd.",
+        "noVars": "inga variabler",
+        "groupsHeading": "Gruppmedlemskap",
+        "directOnly": "Endast direkt medlemskap, precis som ansible rapporterar det: en grupp vars värdar alla kommer in via en nästlad grupp listar inga egna. Nästlingen står nedan.",
+        "noGroups": "Inga grupper löstes upp.",
+        "noDirectMembers": "inga direkta värdar",
+        "nestingHeading": "Gruppnästling",
+        "nestingBody": "Vilka grupper som ligger i vilka. Ett limit på en överordnad grupp når varje värd under den.",
+        "noNesting": "Ingen grupp är nästlad.",
+        "limitHeading": "Vad skulle ett limit träffa?",
+        "limitBody": "Expandera ett ansible --limit-mönster mot det här inventariet och se exakt vilka värdar det väljer innan något körs. Ansible gör expansionen, så en grupp, en uteslutning och ett ~regex beter sig precis som de kommer att göra vid körning.",
+        "limitLabel": "Limit-mönster",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Tillämpa limit",
+        "limitClear": "Rensa",
+        "limitApplied": "Begränsat till {limit}. Allt nedan är vad det mönstret träffar."
+      },
+      "settings": {
+        "heading": "Inställningar",
+        "body": "Om raderna som hålls här räknas, och repositoriet som ett inventarium också läses från.",
+        "absent": "Inga inställningar, vilket är standard: värdarna och grupperna som hålls här är hela inventariet.",
+        "includePlatform": "Använd värdarna och grupperna som hålls här",
+        "includePlatformHelp": "På som standard. Stäng av den för att lösa upp enbart från repositoriet; raderna blir kvar men står utanför svaret.",
+        "included": "ja",
+        "excluded": "nej",
+        "vcsConnection": "VCS-anslutning",
+        "vcsNone": "Ingen",
+        "field": {
+          "repo-url": "Repositorie",
+          "branch": "Gren",
+          "working-directory": "Katalog"
+        },
+        "branchHelp": "Lämna tomt för att följa repositoriets standardgren.",
+        "ignorePaths": "Ignorerade sökvägar",
+        "ignorePathsHelp": "En glob per rad. Allt som matchar lämnas utanför inventariet som läses från repositoriet.",
+        "unset": "inte satt",
+        "create": "Lägg till inställningar",
+        "clear": "Rensa inställningar",
+        "confirmClear": "Rensa dessa inställningar? Bindningen till repositoriet följer med; värdarna och grupperna som hålls här blir kvar."
       },
       "errors": {
-        "loadItems": "Det gick inte att läsa in deklarerade värdar",
-        "loadResolved": "Det gick inte att läsa in det upplösta inventariet",
-        "preview": "Förhandsgranskning av limit-mönstret misslyckades"
+        "load": "Det gick inte att läsa in inventariet",
+        "save": "Det gick inte att spara",
+        "delete": "Det gick inte att ta bort",
+        "resolved": "Det gick inte att lösa upp inventariet",
+        "settings": "Det gick inte att spara inventarieinställningarna"
       }
     },
     "sharing": {

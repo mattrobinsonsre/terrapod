@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "清單",
-        "body": "這些是此工作區宣告的主機及其解析結果。目前還無法針對它們執行 Playbook — 本次發行只是讓清單可被檢視，不會從此處執行任何操作。"
+        "body": "此工作區持有的主機和主機組，以及 ansible 對它們的解析結果。每一行都可以在此編輯；但還無法針對它們執行 Playbook。"
       },
-      "selectLabel": "清單",
-      "resolved": {
-        "heading": "解析後的主機和主機組",
-        "subheading": "{name} 的合併結果，依順序取自每個來源。",
+      "nav": {
+        "label": "清單區段",
         "hosts": "主機",
         "groups": "主機組",
-        "liveNote": "這是即時的。此處的每個來源都在你的設定中宣告，因此解析只是一次資料庫查詢。"
-      },
-      "limit": {
-        "heading": "--limit 會選取哪些主機？",
-        "body": "針對上方已解析的主機展開 ansible 的 --limit 模式，以便在任何操作執行之前檢視它會選取其中哪些。",
-        "inputLabel": "limit 模式",
-        "placeholder": "web:!web-2",
-        "preview": "預覽",
-        "previewing": "正在預覽…",
-        "matched": "{count, plural, =0 {未選取任何主機} other {已選取 # 台主機}}，共 {total} 台。",
-        "advisory": "僅供參考。權威的展開結果由執行器中的 ansible 得出，因此請將此視為參考而非保證。"
-      },
-      "items": {
-        "heading": "已宣告的主機",
-        "managedNote": "由此工作區自身的 Terraform 宣告，因此在此處為唯讀。請在設定中新增、修改或移除主機後再套用 — 在 Terraform 之外所做的修改會在下次套用時被還原。",
-        "empty": "尚未宣告任何主機。",
-        "name": "主機",
-        "address": "位址",
-        "groups": "主機組",
         "vars": "變數",
-        "noGroups": "無"
+        "resolved": "解析結果",
+        "settings": "設定"
       },
-      "sources": {
-        "heading": "來源",
-        "body": "依順序解析，與重複指定 -i 旗標完全一樣：主機變數衝突時，後面的來源優先。",
-        "position": "位置 {position}"
+      "actions": {
+        "save": "儲存",
+        "saving": "正在儲存…",
+        "cancel": "取消",
+        "edit": "編輯",
+        "delete": "刪除",
+        "remove": "移除",
+        "add": "新增",
+        "adding": "正在新增…",
+        "rename": "重新命名"
+      },
+      "hosts": {
+        "heading": "主機",
+        "body": "每行一台主機。開啟某台主機即可編輯它的變數和它所屬的主機組。",
+        "empty": "尚無主機。",
+        "colName": "主機",
+        "colGroups": "主機組",
+        "colVars": "變數",
+        "newLabel": "新主機名稱",
+        "newPlaceholder": "web-1",
+        "add": "新增主機",
+        "confirmDelete": "刪除主機 {name}？它的變數和它的主機組歸屬會一併刪除。",
+        "renameLabel": "主機名稱"
+      },
+      "groups": {
+        "heading": "主機組",
+        "body": "每行一個主機組。開啟某個主機組即可編輯它的變數、它的成員主機，以及巢狀在它裡面的主機組。",
+        "empty": "尚無主機組。",
+        "colName": "主機組",
+        "colMembers": "主機",
+        "colChildren": "子組",
+        "colVars": "變數",
+        "newLabel": "新主機組名稱",
+        "newPlaceholder": "web",
+        "add": "新增主機組",
+        "confirmDelete": "刪除主機組 {name}？它的變數和成員關係會一併刪除，但主機本身保留。",
+        "renameLabel": "主機組名稱"
+      },
+      "vars": {
+        "actions": "操作",
+        "key": "鍵",
+        "keyPlaceholder": "ansible_user",
+        "value": "值",
+        "structured": "結構化",
+        "sensitive": "敏感",
+        "structuredHelp": "列表、數字或物件屬於結構化值：勾選「結構化」，並在值中寫出它的字面原始碼。敏感值永遠不會被回讀 — 該欄位改為顯示遮罩。",
+        "structuredBadge": "結構化",
+        "sensitiveKeep": "留空以保留已儲存的值。",
+        "empty": "此處沒有變數。",
+        "add": "新增變數",
+        "confirmDelete": "刪除變數 {key}？"
+      },
+      "hostDetail": {
+        "heading": "主機 {name}",
+        "body": "這一台主機所承載的全部內容。",
+        "back": "返回主機列表",
+        "gone": "該主機已不存在。",
+        "vars": "主機變數",
+        "varsBody": "僅適用於這台主機的變數。它們會覆蓋同名的主機組變數。",
+        "memberships": "主機組",
+        "membershipsBody": "這台主機所屬的主機組。成員關係只是一條關聯，因此在此移除其中一條後，主機和主機組都會保留。",
+        "membershipsEmpty": "這台主機不屬於任何主機組，因此 ansible 會把它放進 ungrouped。",
+        "addGroup": "新增到主機組",
+        "addGroupLabel": "選擇主機組",
+        "removeGroupAria": "將這台主機從 {name} 中移除",
+        "confirmRemoveGroup": "要把這台主機從 {name} 中移出嗎？"
+      },
+      "groupDetail": {
+        "heading": "主機組 {name}",
+        "body": "這一個主機組所承載的全部內容。",
+        "back": "返回主機組列表",
+        "gone": "該主機組已不存在。",
+        "vars": "主機組變數",
+        "varsBody": "適用於此主機組中每一台主機的變數，無論是直接歸屬還是透過巢狀。",
+        "members": "成員主機",
+        "membersBody": "直接屬於此主機組的主機。僅透過巢狀的主機組才到達的主機不會列在這裡。",
+        "membersEmpty": "此主機組沒有直接歸屬的主機。",
+        "addHost": "新增主機",
+        "addHostLabel": "選擇主機",
+        "removeHostAria": "將 {name} 從此主機組中移除",
+        "confirmRemoveHost": "要把 {name} 從此主機組中移出嗎？",
+        "children": "子組",
+        "childrenBody": "巢狀在此主機組內的主機組。它們的主機同樣是此主機組的成員，此主機組的變數也會作用於它們。",
+        "childrenEmpty": "此主機組內沒有巢狀任何主機組。",
+        "addChild": "新增子組",
+        "addChildLabel": "選擇要巢狀的主機組",
+        "removeChildAria": "將 {name} 從此主機組的子組中移除",
+        "confirmRemoveChild": "不再把 {name} 巢狀在此主機組內嗎？",
+        "parents": "父組",
+        "parentsBody": "此主機組被巢狀進的那些主機組。一個主機組可以有多個父組。",
+        "parentsEmpty": "此主機組沒有被巢狀在任何主機組內。",
+        "addParent": "新增父組",
+        "addParentLabel": "選擇父組",
+        "removeParentAria": "將此主機組從 {name} 中移除",
+        "confirmRemoveParent": "不再把此主機組巢狀在 {name} 內嗎？"
+      },
+      "globalVars": {
+        "heading": "清單變數",
+        "body": "適用於每一台主機的變數 — 即 ansible 的 group_vars/all。同名的主機組變數或主機變數會覆蓋在此設定的值。"
+      },
+      "resolved": {
+        "heading": "解析後的主機",
+        "body": "ansible 對這些行的解讀：經過合併和優先順序之後，每台主機最終持有的變數。",
+        "hosts": "主機",
+        "groups": "主機組",
+        "liveNote": "這是即時的。此處的每個來源都是靜態的，因此每次讀取都會就地解析這些行來給出答案 — 沒有什麼需要重新整理。",
+        "noHosts": "沒有任何內容解析為主機。",
+        "noVars": "無變數",
+        "groupsHeading": "主機組成員關係",
+        "directOnly": "只顯示直接成員關係，與 ansible 的報告完全一致：若某個主機組的主機全都是透過巢狀的主機組而來，它便不會列出任何自己的主機。巢狀關係見下方。",
+        "noGroups": "沒有解析出任何主機組。",
+        "noDirectMembers": "無直接主機",
+        "nestingHeading": "主機組巢狀",
+        "nestingBody": "顯示哪些主機組位於哪些主機組之內。對父組施加的 limit 會涵蓋它之下的每一台主機。",
+        "noNesting": "沒有任何主機組被巢狀。",
+        "limitHeading": "limit 會選取什麼？",
+        "limitBody": "針對此清單展開 ansible 的 --limit 模式，在任何操作執行之前準確檢視它會選取哪些主機。展開由 ansible 自己完成，因此主機組、排除項和 ~regex 的行為都與執行時完全一致。",
+        "limitLabel": "limit 模式",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "套用 limit",
+        "limitClear": "清除",
+        "limitApplied": "已限定為 {limit}。下方的內容全部是該模式所選取的。"
+      },
+      "settings": {
+        "heading": "設定",
+        "body": "此處持有的行是否計入，以及另外從哪個儲存庫讀取清單。",
+        "absent": "沒有設定，這也是預設情況：此處持有的主機和主機組就是整份清單。",
+        "includePlatform": "使用此處持有的主機和主機組",
+        "includePlatformHelp": "預設開啟。關閉後將僅從儲存庫解析，這些行仍會保留，但不會出現在結果中。",
+        "included": "是",
+        "excluded": "否",
+        "vcsConnection": "VCS 連線",
+        "vcsNone": "無",
+        "field": {
+          "repo-url": "儲存庫",
+          "branch": "分支",
+          "working-directory": "目錄"
+        },
+        "branchHelp": "留空則追蹤儲存庫的預設分支。",
+        "ignorePaths": "忽略的路徑",
+        "ignorePathsHelp": "每行一個 glob 模式。比對到的內容會從儲存庫讀取的清單中排除。",
+        "unset": "未設定",
+        "create": "新增設定",
+        "clear": "清除設定",
+        "confirmClear": "清除這些設定？與儲存庫的綁定會一併消失，但此處持有的主機和主機組會保留。"
       },
       "errors": {
-        "loadItems": "載入已宣告的主機失敗",
-        "loadResolved": "載入解析後的清單失敗",
-        "preview": "預覽 limit 失敗"
+        "load": "載入清單失敗",
+        "save": "儲存失敗",
+        "delete": "刪除失敗",
+        "resolved": "解析清單失敗",
+        "settings": "儲存清單設定失敗"
       }
     },
     "sharing": {

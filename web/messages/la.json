@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventarium",
-        "body": "Hi sunt hospites quos hoc locus operis declarat et ad quos resolvuntur. Playbook in eos exsequi nondum praesto est: haec editio inventarium observabile reddit, nihil hinc exsequitur."
+        "body": "Hospites et greges quos hoc locus operis tenet, et in quae eos ansible resolvit. Quaeque linea hic redigi potest; playbook in eos exsequi nondum praesto est."
       },
-      "selectLabel": "Inventarium",
-      "resolved": {
-        "heading": "Hospites et greges resoluti",
-        "subheading": "Effectus coniunctus pro {name}, ex omni fonte ordine.",
+      "nav": {
+        "label": "Partes inventarii",
         "hosts": "Hospites",
         "groups": "Greges",
-        "liveNote": "Haec viva est. Omnis fons hic in configuratione tua declaratus est, itaque resolvere interrogatio est."
-      },
-      "limit": {
-        "heading": "Quid limes peteret?",
-        "body": "Exemplar ansible --limit contra hospites supra resolutos extende, ut videas quos ex eis eligat antequam quidquam exsequatur.",
-        "inputLabel": "Exemplar limitis",
-        "placeholder": "web:!web-2",
-        "preview": "Praevidere",
-        "previewing": "Praevidetur…",
-        "matched": "{count, plural, =0 {Nullus hospes selectus} one {# hospes selectus} other {# hospites selecti}} ex {total}.",
-        "advisory": "Tantum monitorium. Extensio auctoritativa ab ansible in cursore sumitur, itaque hoc pro indicio, non pro sponsione habe."
-      },
-      "items": {
-        "heading": "Hospites declarati",
-        "managedNote": "Ab ipso Terraform huius loci operis declarantur, itaque hic tantum legi possunt. Hospitem in configuratione tua adde, muta aut remove et eam applica: mutatio extra Terraform facta in proxima applicatione revocatur.",
-        "empty": "Nulli adhuc hospites declarati.",
-        "name": "Hospes",
-        "address": "Inscriptio",
-        "groups": "Greges",
         "vars": "Variabiles",
-        "noGroups": "nulli"
+        "resolved": "Resolutum",
+        "settings": "Optiones"
       },
-      "sources": {
-        "heading": "Fontes",
-        "body": "Ordine resolvuntur, prorsus ut vexilla -i iterata: fons posterior variabilem hospitis repugnantem vincit.",
-        "position": "Positio {position}"
+      "actions": {
+        "save": "Servare",
+        "saving": "Servatur…",
+        "cancel": "Abrogare",
+        "edit": "Redigere",
+        "delete": "Delere",
+        "remove": "Removere",
+        "add": "Addere",
+        "adding": "Additur…",
+        "rename": "Renominare"
+      },
+      "hosts": {
+        "heading": "Hospites",
+        "body": "Una linea pro quoque hospite. Hospitem aperi ut variabiles eius et greges ad quos pertinet redigas.",
+        "empty": "Nulli adhuc hospites.",
+        "colName": "Hospes",
+        "colGroups": "Greges",
+        "colVars": "Variabiles",
+        "newLabel": "Nomen novi hospitis",
+        "newPlaceholder": "web-1",
+        "add": "Hospitem addere",
+        "confirmDelete": "Hospitem {name} delere? Variabiles eius et pertinentiae eius ad greges cum eo abeunt.",
+        "renameLabel": "Nomen hospitis"
+      },
+      "groups": {
+        "heading": "Greges",
+        "body": "Una linea pro quoque grege. Gregem aperi ut variabiles eius, hospites membros eius et greges intus insertos redigas.",
+        "empty": "Nulli adhuc greges.",
+        "colName": "Grex",
+        "colMembers": "Hospites",
+        "colChildren": "Greges filii",
+        "colVars": "Variabiles",
+        "newLabel": "Nomen novi gregis",
+        "newPlaceholder": "web",
+        "add": "Gregem addere",
+        "confirmDelete": "Gregem {name} delere? Variabiles eius et pertinentiae eius cum eo abeunt; ipsi hospites manent.",
+        "renameLabel": "Nomen gregis"
+      },
+      "vars": {
+        "actions": "Actiones",
+        "key": "Clavis",
+        "keyPlaceholder": "ansible_user",
+        "value": "Valor",
+        "structured": "Structuratum",
+        "sensitive": "Sensibile",
+        "structuredHelp": "Index, numerus aut obiectum valor structuratus est: Structuratum signa et fontem eius litteralem in valore scribe. Valor sensibilis numquam relegitur — campus pro eo velamen ostendit.",
+        "structuredBadge": "structuratum",
+        "sensitiveKeep": "Hoc vacuum relinque ut valor servatus maneat.",
+        "empty": "Nullae hic variabiles.",
+        "add": "Variabilem addere",
+        "confirmDelete": "Variabilem {key} delere?"
+      },
+      "hostDetail": {
+        "heading": "Hospes {name}",
+        "body": "Omnia quae hic unus hospes fert.",
+        "back": "Ad hospites redire",
+        "gone": "Ille hospes iam non exstat.",
+        "vars": "Variabiles hospitis",
+        "varsBody": "Variabiles quae ad hunc solum hospitem pertinent. Variabilem gregis eiusdem nominis vincunt.",
+        "memberships": "Greges",
+        "membershipsBody": "Greges ad quos hic hospes pertinet. Pertinentia nexus est, itaque unam hic removere et hospitem et gregem suo loco relinquit.",
+        "membershipsEmpty": "Hic hospes in nullo grege est, itaque ansible eum in ungrouped ponit.",
+        "addGroup": "Ad gregem addere",
+        "addGroupLabel": "Gregem elige",
+        "removeGroupAria": "Hunc hospitem ex {name} removere",
+        "confirmRemoveGroup": "Hunc hospitem ex {name} eximere?"
+      },
+      "groupDetail": {
+        "heading": "Grex {name}",
+        "body": "Omnia quae hic unus grex fert.",
+        "back": "Ad greges redire",
+        "gone": "Ille grex iam non exstat.",
+        "vars": "Variabiles gregis",
+        "varsBody": "Variabiles quae ad omnem hospitem huius gregis pertinent, sive directe sive per insertionem.",
+        "members": "Hospites membri",
+        "membersBody": "Hospites qui directe in hoc grege sunt. Hospes per gregem insertum solum attactus hic non enumeratur.",
+        "membersEmpty": "Nulli hospites directe in hoc grege.",
+        "addHost": "Hospitem addere",
+        "addHostLabel": "Hospitem elige",
+        "removeHostAria": "{name} ex hoc grege removere",
+        "confirmRemoveHost": "{name} ex hoc grege eximere?",
+        "children": "Greges filii",
+        "childrenBody": "Greges intra hunc inserti. Hospites eorum huius quoque gregis membri sunt, et variabiles huius gregis ad eos perveniunt.",
+        "childrenEmpty": "Nulli greges intra hunc inserti.",
+        "addChild": "Gregem filium addere",
+        "addChildLabel": "Gregem inserendum elige",
+        "removeChildAria": "{name} ex filiis huius gregis removere",
+        "confirmRemoveChild": "{name} intra hunc gregem inserere desinere?",
+        "parents": "Greges parentes",
+        "parentsBody": "Greges intra quos hic insertus est. Grex plures parentes habere potest.",
+        "parentsEmpty": "Hic grex intra nihil insertus est.",
+        "addParent": "Gregem parentem addere",
+        "addParentLabel": "Gregem parentem elige",
+        "removeParentAria": "Hunc gregem ex {name} removere",
+        "confirmRemoveParent": "Hunc gregem intra {name} inserere desinere?"
+      },
+      "globalVars": {
+        "heading": "Variabiles inventarii",
+        "body": "Variabiles quae ad omnem hospitem pertinent — group_vars/all ansibilis. Variabilis gregis aut hospitis eiusdem nominis eam hic positam vincit."
+      },
+      "resolved": {
+        "heading": "Hospites resoluti",
+        "body": "Quid ansible ex lineis faciat: quisque hospes cum variabilibus quas tandem tenet, post coniunctionem et praecedentiam.",
+        "hosts": "Hospites",
+        "groups": "Greges",
+        "liveNote": "Haec viva sunt. Omnis fons hic staticus est, itaque lectio lineas resolvit ut sibi ipsa respondeat — nihil est quod renovetur.",
+        "noHosts": "Nihil in hospitem resolutum est.",
+        "noVars": "nullae variabiles",
+        "groupsHeading": "Pertinentia ad greges",
+        "directOnly": "Pertinentia directa tantum, prorsus ut ansible eam refert: grex cuius hospites omnes per gregem insertum adveniunt nullos proprios enumerat. Insertio infra est.",
+        "noGroups": "Nulli greges resoluti.",
+        "noDirectMembers": "nulli hospites directi",
+        "nestingHeading": "Insertio gregum",
+        "nestingBody": "Qui greges intra quos sedeant. Limes in parente positus ad omnem hospitem infra eum pervenit.",
+        "noNesting": "Nulli greges inserti sunt.",
+        "limitHeading": "Quid limes peteret?",
+        "limitBody": "Exemplar ansible --limit contra hoc inventarium extende et vide prorsus quos hospites eligat antequam quidquam exsequatur. Ansible extensionem facit, itaque grex, exclusio et ~regex omnia ita se gerunt ut tempore exsecutionis se gerent.",
+        "limitLabel": "Exemplar limitis",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Limitem applicare",
+        "limitClear": "Purgare",
+        "limitApplied": "Ad {limit} limitatum. Omnia infra sunt quae illud exemplar petit."
+      },
+      "settings": {
+        "heading": "Optiones",
+        "body": "Utrum lineae hic tentae valeant, et promptuarium ex quo inventarium quoque legitur.",
+        "absent": "Nullae optiones, quod praestitutum est: hospites et greges hic tenti totum inventarium sunt.",
+        "includePlatform": "Hospitibus et gregibus hic tentis uti",
+        "includePlatformHelp": "Praestituto accensum. Id exstingue ut ex solo promptuario resolvatur, his lineis suo loco relictis sed extra responsum.",
+        "included": "ita",
+        "excluded": "non",
+        "vcsConnection": "Nexus VCS",
+        "vcsNone": "Nullus",
+        "field": {
+          "repo-url": "Promptuarium",
+          "branch": "Ramus",
+          "working-directory": "Directorium"
+        },
+        "branchHelp": "Vacuum relinque ut ramum praestitutum promptuarii sequaris.",
+        "ignorePaths": "Semitae neglectae",
+        "ignorePathsHelp": "Unum glob per lineam. Quidquid congruit ex inventario ex promptuario lecto excluditur.",
+        "unset": "non positum",
+        "create": "Optiones addere",
+        "clear": "Optiones purgare",
+        "confirmClear": "Has optiones purgare? Vinculum promptuarii cum eis abit; hospites et greges hic tenti manent."
       },
       "errors": {
-        "loadItems": "Hospites declarati onerari non potuerunt",
-        "loadResolved": "Inventarium resolutum onerari non potuit",
-        "preview": "Limes praevideri non potuit"
+        "load": "Inventarium onerari non potuit",
+        "save": "Servari non potuit",
+        "delete": "Deleri non potuit",
+        "resolved": "Inventarium resolvi non potuit",
+        "settings": "Optiones inventarii servari non potuerunt"
       }
     },
     "sharing": {

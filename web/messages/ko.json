@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "인벤토리",
-        "body": "이 워크스페이스가 선언한 호스트와 그 해석 결과입니다. 아직 이 호스트들을 대상으로 플레이북을 실행할 수는 없습니다 — 이번 릴리스는 인벤토리를 확인할 수 있게 한 것이며, 여기서 실행되는 것은 없습니다."
+        "body": "이 워크스페이스가 보유한 호스트와 그룹, 그리고 ansible이 그것들을 해석한 결과입니다. 각 행은 여기서 편집할 수 있지만, 아직 이들을 대상으로 플레이북을 실행할 수는 없습니다."
       },
-      "selectLabel": "인벤토리",
-      "resolved": {
-        "heading": "해석된 호스트 및 그룹",
-        "subheading": "{name}의 모든 소스를 순서대로 병합한 결과입니다.",
+      "nav": {
+        "label": "인벤토리 섹션",
         "hosts": "호스트",
         "groups": "그룹",
-        "liveNote": "이것은 실시간입니다. 여기의 모든 소스는 구성에 선언되어 있으므로 해석은 데이터베이스 조회에 불과합니다."
-      },
-      "limit": {
-        "heading": "--limit은 어떤 호스트를 대상으로 하나요?",
-        "body": "위에서 해석된 호스트를 대상으로 ansible의 --limit 패턴을 전개하여, 아무것도 실행되기 전에 그중 어떤 것이 선택되는지 확인할 수 있습니다.",
-        "inputLabel": "limit 패턴",
-        "placeholder": "web:!web-2",
-        "preview": "미리 보기",
-        "previewing": "미리 보는 중…",
-        "matched": "호스트 {total}개 중 {count, plural, =0 {선택된 호스트가 없습니다} other {#개가 선택되었습니다}}.",
-        "advisory": "참고용입니다. 정식 전개는 러너 안의 ansible이 수행하므로, 보장이 아니라 참고 자료로 다루세요."
-      },
-      "items": {
-        "heading": "선언된 호스트",
-        "managedNote": "이 워크스페이스의 자체 Terraform이 선언하므로 여기서는 읽기 전용입니다. 호스트를 추가, 변경 또는 제거할 때는 구성에서 수정한 뒤 적용하세요 — Terraform 외부에서 가한 편집은 다음 적용 시 되돌려집니다.",
-        "empty": "아직 선언된 호스트가 없습니다.",
-        "name": "호스트",
-        "address": "주소",
-        "groups": "그룹",
         "vars": "변수",
-        "noGroups": "없음"
+        "resolved": "해석 결과",
+        "settings": "설정"
       },
-      "sources": {
-        "heading": "소스",
-        "body": "-i 플래그를 반복해서 지정한 것과 똑같이 순서대로 해석됩니다. 호스트 변수가 충돌하면 나중 소스가 우선합니다.",
-        "position": "{position}번째"
+      "actions": {
+        "save": "저장",
+        "saving": "저장 중…",
+        "cancel": "취소",
+        "edit": "편집",
+        "delete": "삭제",
+        "remove": "제거",
+        "add": "추가",
+        "adding": "추가 중…",
+        "rename": "이름 변경"
+      },
+      "hosts": {
+        "heading": "호스트",
+        "body": "호스트 하나가 한 행입니다. 호스트를 열면 그 변수와 소속 그룹을 편집할 수 있습니다.",
+        "empty": "아직 호스트가 없습니다.",
+        "colName": "호스트",
+        "colGroups": "그룹",
+        "colVars": "변수",
+        "newLabel": "새 호스트 이름",
+        "newPlaceholder": "web-1",
+        "add": "호스트 추가",
+        "confirmDelete": "호스트 {name}을(를) 삭제할까요? 그 변수와 그룹 소속도 함께 사라집니다.",
+        "renameLabel": "호스트 이름"
+      },
+      "groups": {
+        "heading": "그룹",
+        "body": "그룹 하나가 한 행입니다. 그룹을 열면 그 변수, 소속 호스트, 그리고 그 안에 중첩된 그룹을 편집할 수 있습니다.",
+        "empty": "아직 그룹이 없습니다.",
+        "colName": "그룹",
+        "colMembers": "호스트",
+        "colChildren": "하위 그룹",
+        "colVars": "변수",
+        "newLabel": "새 그룹 이름",
+        "newPlaceholder": "web",
+        "add": "그룹 추가",
+        "confirmDelete": "그룹 {name}을(를) 삭제할까요? 그 변수와 소속 관계도 함께 사라지지만, 호스트 자체는 남습니다.",
+        "renameLabel": "그룹 이름"
+      },
+      "vars": {
+        "actions": "작업",
+        "key": "키",
+        "keyPlaceholder": "ansible_user",
+        "value": "값",
+        "structured": "구조화됨",
+        "sensitive": "민감",
+        "structuredHelp": "목록, 숫자, 객체는 구조화된 값입니다. “구조화됨”을 체크하고 값에는 그 리터럴 소스를 적으세요. 민감한 값은 다시 읽히지 않으며, 필드에는 대신 마스크가 표시됩니다.",
+        "structuredBadge": "구조화됨",
+        "sensitiveKeep": "저장된 값을 그대로 유지하려면 비워 두세요.",
+        "empty": "여기에는 변수가 없습니다.",
+        "add": "변수 추가",
+        "confirmDelete": "변수 {key}을(를) 삭제할까요?"
+      },
+      "hostDetail": {
+        "heading": "호스트 {name}",
+        "body": "이 호스트 하나가 지닌 모든 것입니다.",
+        "back": "호스트 목록으로 돌아가기",
+        "gone": "그 호스트는 더 이상 존재하지 않습니다.",
+        "vars": "호스트 변수",
+        "varsBody": "이 호스트에만 적용되는 변수입니다. 같은 이름의 그룹 변수보다 우선합니다.",
+        "memberships": "그룹",
+        "membershipsBody": "이 호스트가 속한 그룹입니다. 소속은 연결이므로, 여기서 하나를 제거해도 호스트와 그룹은 모두 그대로 남습니다.",
+        "membershipsEmpty": "이 호스트는 어떤 그룹에도 속하지 않으므로 ansible이 ungrouped에 넣습니다.",
+        "addGroup": "그룹에 추가",
+        "addGroupLabel": "그룹 선택",
+        "removeGroupAria": "이 호스트를 {name}에서 제거",
+        "confirmRemoveGroup": "이 호스트를 {name}에서 빼낼까요?"
+      },
+      "groupDetail": {
+        "heading": "그룹 {name}",
+        "body": "이 그룹 하나가 지닌 모든 것입니다.",
+        "back": "그룹 목록으로 돌아가기",
+        "gone": "그 그룹은 더 이상 존재하지 않습니다.",
+        "vars": "그룹 변수",
+        "varsBody": "직접이든 중첩을 통해서든, 이 그룹에 속한 모든 호스트에 적용되는 변수입니다.",
+        "members": "소속 호스트",
+        "membersBody": "이 그룹에 직접 속한 호스트입니다. 중첩된 그룹을 통해서만 도달하는 호스트는 여기에 나오지 않습니다.",
+        "membersEmpty": "이 그룹에 직접 속한 호스트가 없습니다.",
+        "addHost": "호스트 추가",
+        "addHostLabel": "호스트 선택",
+        "removeHostAria": "{name}을(를) 이 그룹에서 제거",
+        "confirmRemoveHost": "{name}을(를) 이 그룹에서 빼낼까요?",
+        "children": "하위 그룹",
+        "childrenBody": "이 그룹 안에 중첩된 그룹입니다. 그 호스트들도 이 그룹의 구성원이 되며, 이 그룹의 변수가 그들에게도 미칩니다.",
+        "childrenEmpty": "이 그룹 안에 중첩된 그룹이 없습니다.",
+        "addChild": "하위 그룹 추가",
+        "addChildLabel": "중첩할 그룹 선택",
+        "removeChildAria": "{name}을(를) 이 그룹의 하위 그룹에서 제거",
+        "confirmRemoveChild": "{name}을(를) 이 그룹 안에 중첩하지 않도록 할까요?",
+        "parents": "상위 그룹",
+        "parentsBody": "이 그룹이 중첩되어 있는 상위 그룹입니다. 한 그룹이 여러 상위 그룹을 가질 수도 있습니다.",
+        "parentsEmpty": "이 그룹은 어디에도 중첩되어 있지 않습니다.",
+        "addParent": "상위 그룹 추가",
+        "addParentLabel": "상위 그룹 선택",
+        "removeParentAria": "이 그룹을 {name}에서 제거",
+        "confirmRemoveParent": "이 그룹을 {name} 안에 중첩하지 않도록 할까요?"
+      },
+      "globalVars": {
+        "heading": "인벤토리 변수",
+        "body": "모든 호스트에 적용되는 변수 — ansible의 group_vars/all입니다. 같은 이름의 그룹 변수나 호스트 변수가 여기서 설정한 값보다 우선합니다."
+      },
+      "resolved": {
+        "heading": "해석된 호스트",
+        "body": "ansible이 이 행들을 어떻게 해석하는지입니다. 병합과 우선순위를 적용한 뒤 각 호스트가 최종적으로 지니는 변수를 보여 줍니다.",
+        "hosts": "호스트",
+        "groups": "그룹",
+        "liveNote": "이것은 실시간입니다. 여기의 모든 소스는 정적이므로, 읽을 때마다 행들을 그 자리에서 해석해 답합니다 — 새로 고칠 것이 없습니다.",
+        "noHosts": "호스트로 해석된 것이 없습니다.",
+        "noVars": "변수 없음",
+        "groupsHeading": "그룹 소속",
+        "directOnly": "ansible이 보고하는 그대로, 직접 소속만 표시합니다. 호스트가 모두 중첩된 그룹을 통해 들어오는 그룹은 자신의 호스트를 하나도 나열하지 않습니다. 중첩 관계는 아래에 있습니다.",
+        "noGroups": "해석된 그룹이 없습니다.",
+        "noDirectMembers": "직접 소속 호스트 없음",
+        "nestingHeading": "그룹 중첩",
+        "nestingBody": "어떤 그룹이 어떤 그룹 안에 있는지 보여 줍니다. 상위 그룹에 걸린 limit은 그 아래의 모든 호스트에 미칩니다.",
+        "noNesting": "중첩된 그룹이 없습니다.",
+        "limitHeading": "limit은 무엇을 대상으로 하나요?",
+        "limitBody": "ansible의 --limit 패턴을 이 인벤토리에 대해 전개하여, 아무것도 실행되기 전에 어떤 호스트가 선택되는지 정확히 확인할 수 있습니다. 전개는 ansible이 직접 수행하므로 그룹, 제외 지정, ~regex 모두 실행 시점과 똑같이 동작합니다.",
+        "limitLabel": "limit 패턴",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "limit 적용",
+        "limitClear": "지우기",
+        "limitApplied": "{limit}(으)로 제한했습니다. 아래의 모든 것이 그 패턴이 대상으로 하는 것입니다."
+      },
+      "settings": {
+        "heading": "설정",
+        "body": "여기에 보유한 행을 반영할지 여부와, 인벤토리를 함께 읽어 올 저장소입니다.",
+        "absent": "설정이 없으며, 이것이 기본값입니다. 여기에 보유한 호스트와 그룹이 인벤토리 전체입니다.",
+        "includePlatform": "여기에 보유한 호스트와 그룹을 사용",
+        "includePlatformHelp": "기본적으로 켜져 있습니다. 끄면 저장소만으로 해석하며, 이 행들은 그대로 남지만 결과에는 포함되지 않습니다.",
+        "included": "예",
+        "excluded": "아니요",
+        "vcsConnection": "VCS 연결",
+        "vcsNone": "없음",
+        "field": {
+          "repo-url": "저장소",
+          "branch": "브랜치",
+          "working-directory": "디렉터리"
+        },
+        "branchHelp": "비워 두면 저장소의 기본 브랜치를 추적합니다.",
+        "ignorePaths": "무시할 경로",
+        "ignorePathsHelp": "한 줄에 glob 하나씩 적습니다. 일치하는 것은 저장소에서 읽어 오는 인벤토리에서 제외됩니다.",
+        "unset": "설정되지 않음",
+        "create": "설정 추가",
+        "clear": "설정 지우기",
+        "confirmClear": "이 설정을 지울까요? 저장소 연결도 함께 사라지지만, 여기에 보유한 호스트와 그룹은 남습니다."
       },
       "errors": {
-        "loadItems": "선언된 호스트를 불러오지 못했습니다",
-        "loadResolved": "해석된 인벤토리를 불러오지 못했습니다",
-        "preview": "limit을 미리 보지 못했습니다"
+        "load": "인벤토리를 불러오지 못했습니다",
+        "save": "저장하지 못했습니다",
+        "delete": "삭제하지 못했습니다",
+        "resolved": "인벤토리를 해석하지 못했습니다",
+        "settings": "인벤토리 설정을 저장하지 못했습니다"
       }
     },
     "sharing": {

@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventar",
-        "body": "Dies sind die Hosts, die dieser Arbeitsbereich deklariert, und das, wozu sie aufgelöst werden. Ein Playbook auf ihnen auszuführen ist noch nicht möglich — diese Version macht das Inventar beobachtbar, von hier wird nichts ausgeführt."
+        "body": "Die Hosts und Gruppen dieses Workspace und das, was Ansible daraus auflöst. Jede Zeile ist hier bearbeitbar; ein Playbook dagegen auszuführen ist noch nicht verfügbar."
       },
-      "selectLabel": "Inventar",
-      "resolved": {
-        "heading": "Aufgelöste Hosts und Gruppen",
-        "subheading": "Das zusammengeführte Ergebnis für {name}, aus allen Quellen in ihrer Reihenfolge.",
+      "nav": {
+        "label": "Inventarbereiche",
         "hosts": "Hosts",
         "groups": "Gruppen",
-        "liveNote": "Dies ist live. Jede Quelle hier ist in Ihrer Konfiguration deklariert, die Auflösung ist also eine Abfrage."
-      },
-      "limit": {
-        "heading": "Was würde ein Limit-Muster erfassen?",
-        "body": "Ein ansible --limit-Muster anhand der oben aufgelösten Hosts auswerten, damit Sie sehen, welche davon es auswählt, bevor etwas ausgeführt wird.",
-        "inputLabel": "Limit-Muster",
-        "placeholder": "web:!web-2",
-        "preview": "Vorschau",
-        "previewing": "Vorschau wird erstellt…",
-        "matched": "{count, plural, =0 {Keine Hosts} one {# Host} other {# Hosts}} von {total} ausgewählt.",
-        "advisory": "Nur empfehlend. Die maßgebliche Auflösung des Musters nimmt ansible im Runner vor; betrachten Sie dies daher als Orientierung und nicht als Garantie."
-      },
-      "items": {
-        "heading": "Deklarierte Hosts",
-        "managedNote": "Vom eigenen Terraform dieses Arbeitsbereichs deklariert und hier daher schreibgeschützt. Fügen Sie einen Host in Ihrer Konfiguration hinzu, ändern oder entfernen Sie ihn und wenden Sie die Konfiguration an — eine außerhalb von Terraform vorgenommene Änderung wird beim nächsten Apply zurückgesetzt.",
-        "empty": "Noch keine Hosts deklariert.",
-        "name": "Host",
-        "address": "Adresse",
-        "groups": "Gruppen",
         "vars": "Variablen",
-        "noGroups": "keine"
+        "resolved": "Aufgelöst",
+        "settings": "Einstellungen"
       },
-      "sources": {
-        "heading": "Quellen",
-        "body": "Werden in ihrer Reihenfolge aufgelöst, genau wie wiederholte -i-Flags: Bei einer widersprüchlichen Host-Variable gewinnt die spätere Quelle.",
-        "position": "Position {position}"
+      "actions": {
+        "save": "Speichern",
+        "saving": "Wird gespeichert…",
+        "cancel": "Abbrechen",
+        "edit": "Bearbeiten",
+        "delete": "Löschen",
+        "remove": "Entfernen",
+        "add": "Hinzufügen",
+        "adding": "Wird hinzugefügt…",
+        "rename": "Umbenennen"
+      },
+      "hosts": {
+        "heading": "Hosts",
+        "body": "Eine Zeile pro Host. Öffne einen Host, um seine Variablen und seine Gruppenzugehörigkeiten zu bearbeiten.",
+        "empty": "Noch keine Hosts.",
+        "colName": "Host",
+        "colGroups": "Gruppen",
+        "colVars": "Variablen",
+        "newLabel": "Name des neuen Hosts",
+        "newPlaceholder": "web-1",
+        "add": "Host hinzufügen",
+        "confirmDelete": "Den Host {name} löschen? Seine Variablen und seine Gruppenzugehörigkeiten verschwinden mit ihm.",
+        "renameLabel": "Hostname"
+      },
+      "groups": {
+        "heading": "Gruppen",
+        "body": "Eine Zeile pro Gruppe. Öffne eine Gruppe, um ihre Variablen, ihre Mitglieds-Hosts und die darin verschachtelten Gruppen zu bearbeiten.",
+        "empty": "Noch keine Gruppen.",
+        "colName": "Gruppe",
+        "colMembers": "Hosts",
+        "colChildren": "Untergruppen",
+        "colVars": "Variablen",
+        "newLabel": "Name der neuen Gruppe",
+        "newPlaceholder": "web",
+        "add": "Gruppe hinzufügen",
+        "confirmDelete": "Die Gruppe {name} löschen? Ihre Variablen und Zugehörigkeiten verschwinden mit ihr; die Hosts selbst bleiben.",
+        "renameLabel": "Gruppenname"
+      },
+      "vars": {
+        "actions": "Aktionen",
+        "key": "Schlüssel",
+        "keyPlaceholder": "ansible_user",
+        "value": "Wert",
+        "structured": "Strukturiert",
+        "sensitive": "Sensibel",
+        "structuredHelp": "Eine Liste, Zahl oder ein Objekt ist ein strukturierter Wert: Setze „Strukturiert“ und schreibe den literalen Quelltext in den Wert. Ein sensibler Wert wird nie zurückgelesen — das Feld zeigt stattdessen eine Maske.",
+        "structuredBadge": "strukturiert",
+        "sensitiveKeep": "Leer lassen, um den gespeicherten Wert zu behalten.",
+        "empty": "Hier gibt es keine Variablen.",
+        "add": "Variable hinzufügen",
+        "confirmDelete": "Die Variable {key} löschen?"
+      },
+      "hostDetail": {
+        "heading": "Host {name}",
+        "body": "Alles, was dieser eine Host trägt.",
+        "back": "Zurück zu den Hosts",
+        "gone": "Dieser Host existiert nicht mehr.",
+        "vars": "Host-Variablen",
+        "varsBody": "Variablen, die nur für diesen Host gelten. Sie setzen sich gegen eine Gruppenvariable gleichen Namens durch.",
+        "memberships": "Gruppen",
+        "membershipsBody": "Die Gruppen, zu denen dieser Host gehört. Eine Zugehörigkeit ist eine Verknüpfung, also bleiben Host und Gruppe erhalten, wenn du eine davon hier entfernst.",
+        "membershipsEmpty": "Dieser Host ist in keiner Gruppe, also legt Ansible ihn in „ungrouped“.",
+        "addGroup": "Zu Gruppe hinzufügen",
+        "addGroupLabel": "Gruppe auswählen",
+        "removeGroupAria": "Diesen Host aus {name} entfernen",
+        "confirmRemoveGroup": "Diesen Host aus {name} herausnehmen?"
+      },
+      "groupDetail": {
+        "heading": "Gruppe {name}",
+        "body": "Alles, was diese eine Gruppe trägt.",
+        "back": "Zurück zu den Gruppen",
+        "gone": "Diese Gruppe existiert nicht mehr.",
+        "vars": "Gruppenvariablen",
+        "varsBody": "Variablen, die für jeden Host dieser Gruppe gelten, direkt oder über Verschachtelung.",
+        "members": "Mitglieds-Hosts",
+        "membersBody": "Die Hosts, die direkt in dieser Gruppe sind. Ein Host, der nur über eine verschachtelte Gruppe erreicht wird, steht hier nicht.",
+        "membersEmpty": "Keine Hosts direkt in dieser Gruppe.",
+        "addHost": "Host hinzufügen",
+        "addHostLabel": "Host auswählen",
+        "removeHostAria": "{name} aus dieser Gruppe entfernen",
+        "confirmRemoveHost": "{name} aus dieser Gruppe herausnehmen?",
+        "children": "Untergruppen",
+        "childrenBody": "Gruppen, die in dieser verschachtelt sind. Ihre Hosts sind auch Mitglieder dieser Gruppe, und die Variablen dieser Gruppe erreichen sie.",
+        "childrenEmpty": "In dieser Gruppe ist keine Gruppe verschachtelt.",
+        "addChild": "Untergruppe hinzufügen",
+        "addChildLabel": "Zu verschachtelnde Gruppe auswählen",
+        "removeChildAria": "{name} aus den Untergruppen dieser Gruppe entfernen",
+        "confirmRemoveChild": "{name} nicht mehr in dieser Gruppe verschachteln?",
+        "parents": "Übergeordnete Gruppen",
+        "parentsBody": "Die Gruppen, in denen diese verschachtelt ist. Eine Gruppe kann mehrere übergeordnete Gruppen haben.",
+        "parentsEmpty": "Diese Gruppe ist in nichts verschachtelt.",
+        "addParent": "Übergeordnete Gruppe hinzufügen",
+        "addParentLabel": "Übergeordnete Gruppe auswählen",
+        "removeParentAria": "Diese Gruppe aus {name} entfernen",
+        "confirmRemoveParent": "Diese Gruppe nicht mehr in {name} verschachteln?"
+      },
+      "globalVars": {
+        "heading": "Inventarvariablen",
+        "body": "Variablen, die für jeden Host gelten — Ansibles group_vars/all. Eine Gruppen- oder Host-Variable gleichen Namens setzt sich gegen eine hier gesetzte durch."
+      },
+      "resolved": {
+        "heading": "Aufgelöste Hosts",
+        "body": "Was Ansible aus den Zeilen macht: jeder Host mit den Variablen, die er am Ende trägt, nach Zusammenführung und Vorrang.",
+        "hosts": "Hosts",
+        "groups": "Gruppen",
+        "liveNote": "Das ist live. Jede Quelle hier ist statisch, also löst der Lesevorgang die Zeilen selbst auf — es gibt nichts zu aktualisieren.",
+        "noHosts": "Nichts wurde zu einem Host aufgelöst.",
+        "noVars": "keine Variablen",
+        "groupsHeading": "Gruppenzugehörigkeit",
+        "directOnly": "Nur direkte Zugehörigkeit, genau wie Ansible sie meldet: eine Gruppe, deren Hosts alle über eine verschachtelte Gruppe kommen, listet keine eigenen. Die Verschachtelung steht unten.",
+        "noGroups": "Keine Gruppen aufgelöst.",
+        "noDirectMembers": "keine direkten Hosts",
+        "nestingHeading": "Gruppenverschachtelung",
+        "nestingBody": "Welche Gruppen in welchen liegen. Ein Limit auf eine übergeordnete Gruppe erreicht jeden Host darunter.",
+        "noNesting": "Keine Gruppe ist verschachtelt.",
+        "limitHeading": "Was würde ein Limit treffen?",
+        "limitBody": "Erweitere ein Ansible-Muster für --limit gegen dieses Inventar und sieh genau, welche Hosts es auswählt, bevor etwas läuft. Ansible führt die Erweiterung aus, also verhalten sich eine Gruppe, ein Ausschluss und ein ~regex genau so wie zur Laufzeit.",
+        "limitLabel": "Limit-Muster",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Limit anwenden",
+        "limitClear": "Leeren",
+        "limitApplied": "Begrenzt auf {limit}. Alles darunter ist, was dieses Muster trifft."
+      },
+      "settings": {
+        "heading": "Einstellungen",
+        "body": "Ob die hier gehaltenen Zeilen zählen, und das Repository, aus dem ein Inventar ebenfalls gelesen wird.",
+        "absent": "Keine Einstellungen, was der Standard ist: die hier gehaltenen Hosts und Gruppen sind das gesamte Inventar.",
+        "includePlatform": "Die hier gehaltenen Hosts und Gruppen verwenden",
+        "includePlatformHelp": "Standardmäßig aktiv. Schalte es aus, um allein aus dem Repository aufzulösen; die Zeilen bleiben erhalten, aber außerhalb der Antwort.",
+        "included": "ja",
+        "excluded": "nein",
+        "vcsConnection": "VCS-Verbindung",
+        "vcsNone": "Keine",
+        "field": {
+          "repo-url": "Repository",
+          "branch": "Branch",
+          "working-directory": "Verzeichnis"
+        },
+        "branchHelp": "Leer lassen, um dem Standard-Branch des Repositorys zu folgen.",
+        "ignorePaths": "Ignorierte Pfade",
+        "ignorePathsHelp": "Ein Glob pro Zeile. Alles Passende bleibt aus dem Inventar heraus, das aus dem Repository gelesen wird.",
+        "unset": "nicht gesetzt",
+        "create": "Einstellungen hinzufügen",
+        "clear": "Einstellungen löschen",
+        "confirmClear": "Diese Einstellungen löschen? Die Repository-Bindung verschwindet mit ihnen; die hier gehaltenen Hosts und Gruppen bleiben."
       },
       "errors": {
-        "loadItems": "Deklarierte Hosts konnten nicht geladen werden",
-        "loadResolved": "Das aufgelöste Inventar konnte nicht geladen werden",
-        "preview": "Vorschau des Limit-Musters fehlgeschlagen"
+        "load": "Inventar konnte nicht geladen werden",
+        "save": "Speichern fehlgeschlagen",
+        "delete": "Löschen fehlgeschlagen",
+        "resolved": "Inventar konnte nicht aufgelöst werden",
+        "settings": "Inventareinstellungen konnten nicht gespeichert werden"
       }
     },
     "sharing": {

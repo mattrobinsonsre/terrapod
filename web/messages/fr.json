@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventaire",
-        "body": "Voici les hôtes que cet espace de travail déclare et ce à quoi ils se résolvent. Exécuter un playbook sur eux n''est pas encore disponible : cette version rend l''inventaire observable, rien n''est exécuté depuis ici."
+        "body": "Les hôtes et les groupes que cet espace de travail contient, et ce à quoi ansible les résout. Chaque ligne est modifiable ici ; exécuter un playbook sur eux n’est pas encore disponible."
       },
-      "selectLabel": "Inventaire",
-      "resolved": {
-        "heading": "Hôtes et groupes résolus",
-        "subheading": "Le résultat fusionné pour {name}, à partir de chaque source dans l''ordre.",
+      "nav": {
+        "label": "Sections de l’inventaire",
         "hosts": "Hôtes",
         "groups": "Groupes",
-        "liveNote": "Ceci est en direct. Chaque source ici est déclarée dans votre configuration, la résoudre est donc une requête."
-      },
-      "limit": {
-        "heading": "Que ciblerait une limite ?",
-        "body": "Développez un motif ansible --limit sur les hôtes résolus ci-dessus, afin de voir lesquels il sélectionne avant que quoi que ce soit ne s''exécute.",
-        "inputLabel": "Motif de limite",
-        "placeholder": "web:!web-2",
-        "preview": "Aperçu",
-        "previewing": "Aperçu en cours…",
-        "matched": "{count, plural, =0 {Aucun hôte sélectionné} one {# hôte sélectionné} other {# hôtes sélectionnés}} sur {total}.",
-        "advisory": "À titre indicatif uniquement. L''expansion de référence est effectuée par ansible dans le runner : considérez ceci comme un repère plutôt que comme une garantie."
-      },
-      "items": {
-        "heading": "Hôtes déclarés",
-        "managedNote": "Déclarés par le Terraform propre à cet espace de travail, ils sont donc en lecture seule ici. Ajoutez, modifiez ou supprimez un hôte dans votre configuration puis appliquez-la : une modification faite en dehors de Terraform est annulée à la prochaine application.",
-        "empty": "Aucun hôte déclaré pour l''instant.",
-        "name": "Hôte",
-        "address": "Adresse",
-        "groups": "Groupes",
         "vars": "Variables",
-        "noGroups": "aucun"
+        "resolved": "Résolu",
+        "settings": "Paramètres"
       },
-      "sources": {
-        "heading": "Sources",
-        "body": "Résolues dans l''ordre, exactement comme des indicateurs -i répétés : une source ultérieure l''emporte sur une variable d''hôte en conflit.",
-        "position": "Position {position}"
+      "actions": {
+        "save": "Enregistrer",
+        "saving": "Enregistrement…",
+        "cancel": "Annuler",
+        "edit": "Modifier",
+        "delete": "Supprimer",
+        "remove": "Retirer",
+        "add": "Ajouter",
+        "adding": "Ajout…",
+        "rename": "Renommer"
+      },
+      "hosts": {
+        "heading": "Hôtes",
+        "body": "Une ligne par hôte. Ouvrez un hôte pour modifier ses variables et les groupes auxquels il appartient.",
+        "empty": "Aucun hôte pour l’instant.",
+        "colName": "Hôte",
+        "colGroups": "Groupes",
+        "colVars": "Variables",
+        "newLabel": "Nom du nouvel hôte",
+        "newPlaceholder": "web-1",
+        "add": "Ajouter un hôte",
+        "confirmDelete": "Supprimer l’hôte {name} ? Ses variables et ses appartenances aux groupes disparaissent avec lui.",
+        "renameLabel": "Nom de l’hôte"
+      },
+      "groups": {
+        "heading": "Groupes",
+        "body": "Une ligne par groupe. Ouvrez un groupe pour modifier ses variables, les hôtes qui en sont membres et les groupes qui y sont imbriqués.",
+        "empty": "Aucun groupe pour l’instant.",
+        "colName": "Groupe",
+        "colMembers": "Hôtes",
+        "colChildren": "Groupes enfants",
+        "colVars": "Variables",
+        "newLabel": "Nom du nouveau groupe",
+        "newPlaceholder": "web",
+        "add": "Ajouter un groupe",
+        "confirmDelete": "Supprimer le groupe {name} ? Ses variables et ses appartenances disparaissent avec lui ; les hôtes eux-mêmes restent.",
+        "renameLabel": "Nom du groupe"
+      },
+      "vars": {
+        "actions": "Actions",
+        "key": "Clé",
+        "keyPlaceholder": "ansible_user",
+        "value": "Valeur",
+        "structured": "Structurée",
+        "sensitive": "Sensible",
+        "structuredHelp": "Une liste, un nombre ou un objet est une valeur structurée : cochez Structurée et écrivez sa source littérale dans la valeur. Une valeur sensible n’est jamais relue — le champ affiche un masque à la place.",
+        "structuredBadge": "structurée",
+        "sensitiveKeep": "Laissez ce champ vide pour conserver la valeur enregistrée.",
+        "empty": "Aucune variable ici.",
+        "add": "Ajouter une variable",
+        "confirmDelete": "Supprimer la variable {key} ?"
+      },
+      "hostDetail": {
+        "heading": "Hôte {name}",
+        "body": "Tout ce que porte cet hôte.",
+        "back": "Retour aux hôtes",
+        "gone": "Cet hôte n’existe plus.",
+        "vars": "Variables d’hôte",
+        "varsBody": "Les variables qui s’appliquent à cet hôte seul. Elles l’emportent sur une variable de groupe du même nom.",
+        "memberships": "Groupes",
+        "membershipsBody": "Les groupes auxquels cet hôte appartient. Une appartenance est un lien : en retirer une ici laisse l’hôte et le groupe en place.",
+        "membershipsEmpty": "Cet hôte n’est dans aucun groupe, ansible le place donc dans ungrouped.",
+        "addGroup": "Ajouter à un groupe",
+        "addGroupLabel": "Choisissez un groupe",
+        "removeGroupAria": "Retirer cet hôte de {name}",
+        "confirmRemoveGroup": "Retirer cet hôte de {name} ?"
+      },
+      "groupDetail": {
+        "heading": "Groupe {name}",
+        "body": "Tout ce que porte ce groupe.",
+        "back": "Retour aux groupes",
+        "gone": "Ce groupe n’existe plus.",
+        "vars": "Variables de groupe",
+        "varsBody": "Les variables qui s’appliquent à chaque hôte de ce groupe, directement ou par imbrication.",
+        "members": "Hôtes membres",
+        "membersBody": "Les hôtes qui sont dans ce groupe directement. Un hôte atteint uniquement par un groupe imbriqué n’est pas listé ici.",
+        "membersEmpty": "Aucun hôte directement dans ce groupe.",
+        "addHost": "Ajouter un hôte",
+        "addHostLabel": "Choisissez un hôte",
+        "removeHostAria": "Retirer {name} de ce groupe",
+        "confirmRemoveHost": "Retirer {name} de ce groupe ?",
+        "children": "Groupes enfants",
+        "childrenBody": "Les groupes imbriqués dans celui-ci. Leurs hôtes sont aussi membres de ce groupe, et les variables de ce groupe les atteignent.",
+        "childrenEmpty": "Aucun groupe imbriqué dans celui-ci.",
+        "addChild": "Ajouter un groupe enfant",
+        "addChildLabel": "Choisissez un groupe à imbriquer",
+        "removeChildAria": "Retirer {name} des enfants de ce groupe",
+        "confirmRemoveChild": "Cesser d’imbriquer {name} dans ce groupe ?",
+        "parents": "Groupes parents",
+        "parentsBody": "Les groupes dans lesquels celui-ci est imbriqué. Un groupe peut avoir plusieurs parents.",
+        "parentsEmpty": "Ce groupe n’est imbriqué dans rien.",
+        "addParent": "Ajouter un groupe parent",
+        "addParentLabel": "Choisissez un groupe parent",
+        "removeParentAria": "Retirer ce groupe de {name}",
+        "confirmRemoveParent": "Cesser d’imbriquer ce groupe dans {name} ?"
+      },
+      "globalVars": {
+        "heading": "Variables d’inventaire",
+        "body": "Les variables qui s’appliquent à chaque hôte — le group_vars/all d’ansible. Une variable de groupe ou d’hôte du même nom l’emporte sur celle définie ici."
+      },
+      "resolved": {
+        "heading": "Hôtes résolus",
+        "body": "Ce qu’ansible fait des lignes : chaque hôte avec les variables qu’il porte au bout du compte, après la fusion et la précédence.",
+        "hosts": "Hôtes",
+        "groups": "Groupes",
+        "liveNote": "Ceci est en direct. Chaque source ici est statique, la lecture résout donc les lignes pour répondre d’elle-même — il n’y a rien à rafraîchir.",
+        "noHosts": "Rien ne s’est résolu en hôte.",
+        "noVars": "aucune variable",
+        "groupsHeading": "Appartenance aux groupes",
+        "directOnly": "Appartenance directe uniquement, exactement comme ansible la rapporte : un groupe dont tous les hôtes arrivent par un groupe imbriqué n’en liste aucun en propre. L’imbrication figure ci-dessous.",
+        "noGroups": "Aucun groupe résolu.",
+        "noDirectMembers": "aucun hôte direct",
+        "nestingHeading": "Imbrication des groupes",
+        "nestingBody": "Quels groupes sont dans quels autres. Une limite posée sur un parent atteint chaque hôte situé en dessous.",
+        "noNesting": "Aucun groupe n’est imbriqué.",
+        "limitHeading": "Que ciblerait une limite ?",
+        "limitBody": "Développez un motif ansible --limit sur cet inventaire et voyez exactement quels hôtes il sélectionne avant que quoi que ce soit ne s’exécute. C’est ansible qui fait le développement, donc un groupe, une exclusion et un ~regex se comportent comme ils le feront à l’exécution.",
+        "limitLabel": "Motif de limite",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Appliquer la limite",
+        "limitClear": "Effacer",
+        "limitApplied": "Limité à {limit}. Tout ce qui suit est ce que ce motif cible."
+      },
+      "settings": {
+        "heading": "Paramètres",
+        "body": "Si les lignes contenues ici comptent, et le dépôt depuis lequel un inventaire est aussi lu.",
+        "absent": "Aucun paramètre, ce qui est la valeur par défaut : les hôtes et les groupes contenus ici constituent tout l’inventaire.",
+        "includePlatform": "Utiliser les hôtes et les groupes contenus ici",
+        "includePlatformHelp": "Activé par défaut. Désactivez-le pour résoudre depuis le dépôt seul, en laissant ces lignes en place mais hors de la réponse.",
+        "included": "oui",
+        "excluded": "non",
+        "vcsConnection": "Connexion VCS",
+        "vcsNone": "Aucune",
+        "field": {
+          "repo-url": "Dépôt",
+          "branch": "Branche",
+          "working-directory": "Répertoire"
+        },
+        "branchHelp": "Laissez vide pour suivre la branche par défaut du dépôt.",
+        "ignorePaths": "Chemins ignorés",
+        "ignorePathsHelp": "Un glob par ligne. Tout ce qui correspond est exclu de l’inventaire lu depuis le dépôt.",
+        "unset": "non défini",
+        "create": "Ajouter des paramètres",
+        "clear": "Effacer les paramètres",
+        "confirmClear": "Effacer ces paramètres ? La liaison au dépôt disparaît avec eux ; les hôtes et les groupes contenus ici restent."
       },
       "errors": {
-        "loadItems": "Échec du chargement des hôtes déclarés",
-        "loadResolved": "Échec du chargement de l''inventaire résolu",
-        "preview": "Échec de l''aperçu de la limite"
+        "load": "Échec du chargement de l’inventaire",
+        "save": "Échec de l’enregistrement",
+        "delete": "Échec de la suppression",
+        "resolved": "Échec de la résolution de l’inventaire",
+        "settings": "Échec de l’enregistrement des paramètres de l’inventaire"
       }
     },
     "sharing": {

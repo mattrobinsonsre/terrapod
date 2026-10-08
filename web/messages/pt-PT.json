@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventário",
-        "body": "Estes são os hosts que esta área de trabalho declara e para o que se resolvem. Executar um playbook sobre eles ainda não está disponível: esta versão torna o inventário observável, nada é executado a partir daqui."
+        "body": "Os hosts e os grupos que esta área de trabalho guarda, e aquilo em que o ansible os resolve. Cada linha é editável aqui; executar um playbook sobre eles ainda não está disponível."
       },
-      "selectLabel": "Inventário",
-      "resolved": {
-        "heading": "Hosts e grupos resolvidos",
-        "subheading": "O resultado combinado de {name}, a partir de cada origem por ordem.",
+      "nav": {
+        "label": "Secções do inventário",
         "hosts": "Hosts",
         "groups": "Grupos",
-        "liveNote": "Isto é em tempo real. Cada origem aqui é declarada na sua configuração, pelo que resolvê-la é uma consulta."
-      },
-      "limit": {
-        "heading": "O que é que um limite selecionaria?",
-        "body": "Expanda um padrão ansible --limit sobre os hosts resolvidos acima, para ver quais deles seleciona antes de algo ser executado.",
-        "inputLabel": "Padrão de limite",
-        "placeholder": "web:!web-2",
-        "preview": "Pré-visualizar",
-        "previewing": "A pré-visualizar…",
-        "matched": "{count, plural, =0 {Nenhum host selecionado} one {# host selecionado} other {# hosts selecionados}} de {total}.",
-        "advisory": "Apenas informativo. A expansão autoritativa é feita pelo ansible no runner, pelo que deve tratar isto como uma orientação e não como uma garantia."
-      },
-      "items": {
-        "heading": "Hosts declarados",
-        "managedNote": "São declarados pelo próprio Terraform desta área de trabalho, pelo que aqui são apenas de leitura. Adicione, altere ou remova um host na sua configuração e aplique-a: uma edição feita fora do Terraform é revertida na aplicação seguinte.",
-        "empty": "Ainda não há hosts declarados.",
-        "name": "Host",
-        "address": "Endereço",
-        "groups": "Grupos",
         "vars": "Variáveis",
-        "noGroups": "nenhum"
+        "resolved": "Resolvido",
+        "settings": "Definições"
       },
-      "sources": {
-        "heading": "Origens",
-        "body": "Resolvidas por ordem, exatamente como as flags -i repetidas: uma origem posterior prevalece sobre uma variável de host em conflito.",
-        "position": "Posição {position}"
+      "actions": {
+        "save": "Guardar",
+        "saving": "A guardar…",
+        "cancel": "Cancelar",
+        "edit": "Editar",
+        "delete": "Eliminar",
+        "remove": "Remover",
+        "add": "Adicionar",
+        "adding": "A adicionar…",
+        "rename": "Mudar o nome"
+      },
+      "hosts": {
+        "heading": "Hosts",
+        "body": "Uma linha por host. Abra um host para editar as suas variáveis e os grupos a que pertence.",
+        "empty": "Ainda não há hosts.",
+        "colName": "Host",
+        "colGroups": "Grupos",
+        "colVars": "Variáveis",
+        "newLabel": "Nome do novo host",
+        "newPlaceholder": "web-1",
+        "add": "Adicionar host",
+        "confirmDelete": "Eliminar o host {name}? As suas variáveis e as suas pertenças a grupos vão com ele.",
+        "renameLabel": "Nome do host"
+      },
+      "groups": {
+        "heading": "Grupos",
+        "body": "Uma linha por grupo. Abra um grupo para editar as suas variáveis, os hosts que o compõem e os grupos aninhados no seu interior.",
+        "empty": "Ainda não há grupos.",
+        "colName": "Grupo",
+        "colMembers": "Hosts",
+        "colChildren": "Grupos filhos",
+        "colVars": "Variáveis",
+        "newLabel": "Nome do novo grupo",
+        "newPlaceholder": "web",
+        "add": "Adicionar grupo",
+        "confirmDelete": "Eliminar o grupo {name}? As suas variáveis e as suas pertenças vão com ele; os próprios hosts ficam.",
+        "renameLabel": "Nome do grupo"
+      },
+      "vars": {
+        "actions": "Ações",
+        "key": "Chave",
+        "keyPlaceholder": "ansible_user",
+        "value": "Valor",
+        "structured": "Estruturado",
+        "sensitive": "Sensível",
+        "structuredHelp": "Uma lista, um número ou um objeto é um valor estruturado: assinale Estruturado e escreva o código literal no valor. Um valor sensível nunca é lido de volta — em vez disso, o campo mostra uma máscara.",
+        "structuredBadge": "estruturado",
+        "sensitiveKeep": "Deixe em branco para manter o valor guardado.",
+        "empty": "Não há variáveis aqui.",
+        "add": "Adicionar variável",
+        "confirmDelete": "Eliminar a variável {key}?"
+      },
+      "hostDetail": {
+        "heading": "Host {name}",
+        "body": "Tudo aquilo que este host transporta.",
+        "back": "Voltar aos hosts",
+        "gone": "Esse host já não existe.",
+        "vars": "Variáveis do host",
+        "varsBody": "Variáveis que se aplicam apenas a este host. Prevalecem sobre uma variável de grupo com o mesmo nome.",
+        "memberships": "Grupos",
+        "membershipsBody": "Os grupos a que este host pertence. Uma pertença é uma ligação, pelo que remover uma aqui deixa no lugar tanto o host como o grupo.",
+        "membershipsEmpty": "Este host não está em nenhum grupo, pelo que o ansible coloca-o em ungrouped.",
+        "addGroup": "Adicionar a um grupo",
+        "addGroupLabel": "Escolha um grupo",
+        "removeGroupAria": "Remover este host de {name}",
+        "confirmRemoveGroup": "Retirar este host de {name}?"
+      },
+      "groupDetail": {
+        "heading": "Grupo {name}",
+        "body": "Tudo aquilo que este grupo transporta.",
+        "back": "Voltar aos grupos",
+        "gone": "Esse grupo já não existe.",
+        "vars": "Variáveis do grupo",
+        "varsBody": "Variáveis que se aplicam a todos os hosts deste grupo, diretamente ou através do aninhamento.",
+        "members": "Hosts membros",
+        "membersBody": "Os hosts que estão diretamente neste grupo. Um host alcançado apenas através de um grupo aninhado não é listado aqui.",
+        "membersEmpty": "Não há hosts diretamente neste grupo.",
+        "addHost": "Adicionar host",
+        "addHostLabel": "Escolha um host",
+        "removeHostAria": "Remover {name} deste grupo",
+        "confirmRemoveHost": "Retirar {name} deste grupo?",
+        "children": "Grupos filhos",
+        "childrenBody": "Grupos aninhados no interior deste. Os seus hosts são membros deste grupo também, e as variáveis deste grupo chegam até eles.",
+        "childrenEmpty": "Não há grupos aninhados no interior deste.",
+        "addChild": "Adicionar grupo filho",
+        "addChildLabel": "Escolha um grupo para aninhar",
+        "removeChildAria": "Remover {name} dos filhos deste grupo",
+        "confirmRemoveChild": "Deixar de aninhar {name} dentro deste grupo?",
+        "parents": "Grupos pais",
+        "parentsBody": "Os grupos no interior dos quais este está aninhado. Um grupo pode ter vários pais.",
+        "parentsEmpty": "Este grupo não está aninhado em nada.",
+        "addParent": "Adicionar grupo pai",
+        "addParentLabel": "Escolha um grupo pai",
+        "removeParentAria": "Remover este grupo de {name}",
+        "confirmRemoveParent": "Deixar de aninhar este grupo dentro de {name}?"
+      },
+      "globalVars": {
+        "heading": "Variáveis do inventário",
+        "body": "Variáveis que se aplicam a todos os hosts — o group_vars/all do ansible. Uma variável de grupo ou de host com o mesmo nome prevalece sobre uma definida aqui."
+      },
+      "resolved": {
+        "heading": "Hosts resolvidos",
+        "body": "Aquilo que o ansible faz das linhas: cada host com as variáveis que acaba por ter, depois da fusão e da precedência.",
+        "hosts": "Hosts",
+        "groups": "Grupos",
+        "liveNote": "Isto é em tempo real. Todas as origens aqui são estáticas, pelo que a leitura resolve as linhas para se responder a si mesma — não há nada para atualizar.",
+        "noHosts": "Nada se resolveu num host.",
+        "noVars": "sem variáveis",
+        "groupsHeading": "Pertença a grupos",
+        "directOnly": "Apenas pertença direta, exatamente como o ansible a reporta: um grupo cujos hosts chegam todos através de um grupo aninhado não lista nenhum próprio. O aninhamento está mais abaixo.",
+        "noGroups": "Nenhum grupo resolvido.",
+        "noDirectMembers": "sem hosts diretos",
+        "nestingHeading": "Aninhamento de grupos",
+        "nestingBody": "Que grupos estão dentro de que outros. Um limite sobre um pai chega a todos os hosts por baixo dele.",
+        "noNesting": "Nenhum grupo está aninhado.",
+        "limitHeading": "O que é que um limite selecionaria?",
+        "limitBody": "Expanda um padrão ansible --limit sobre este inventário e veja exatamente quais hosts seleciona antes de algo ser executado. É o ansible que faz a expansão, pelo que um grupo, uma exclusão e um ~regex comportam-se tal como se comportarão em tempo de execução.",
+        "limitLabel": "Padrão de limite",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Aplicar o limite",
+        "limitClear": "Limpar",
+        "limitApplied": "Limitado a {limit}. Tudo o que está abaixo é o que esse padrão seleciona."
+      },
+      "settings": {
+        "heading": "Definições",
+        "body": "Se as linhas guardadas aqui contam, e o repositório a partir do qual um inventário também é lido.",
+        "absent": "Sem definições, o que é a predefinição: os hosts e os grupos guardados aqui são todo o inventário.",
+        "includePlatform": "Usar os hosts e os grupos guardados aqui",
+        "includePlatformHelp": "Ativado por predefinição. Desative-o para resolver apenas a partir do repositório, deixando estas linhas no lugar mas fora da resposta.",
+        "included": "sim",
+        "excluded": "não",
+        "vcsConnection": "Ligação VCS",
+        "vcsNone": "Nenhuma",
+        "field": {
+          "repo-url": "Repositório",
+          "branch": "Branch",
+          "working-directory": "Diretório"
+        },
+        "branchHelp": "Deixe vazio para acompanhar o branch predefinido do repositório.",
+        "ignorePaths": "Caminhos ignorados",
+        "ignorePathsHelp": "Um glob por linha. Tudo o que corresponder fica fora do inventário lido a partir do repositório.",
+        "unset": "não definido",
+        "create": "Adicionar definições",
+        "clear": "Limpar as definições",
+        "confirmClear": "Limpar estas definições? A ligação ao repositório vai com elas; os hosts e os grupos guardados aqui ficam."
       },
       "errors": {
-        "loadItems": "Falha ao carregar os hosts declarados",
-        "loadResolved": "Falha ao carregar o inventário resolvido",
-        "preview": "Falha ao pré-visualizar o limite"
+        "load": "Falha ao carregar o inventário",
+        "save": "Falha ao guardar",
+        "delete": "Falha ao eliminar",
+        "resolved": "Falha ao resolver o inventário",
+        "settings": "Falha ao guardar as definições do inventário"
       }
     },
     "sharing": {

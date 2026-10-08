@@ -2,7 +2,7 @@ import { test, expect, type Page, type Route, type Dialog } from '@playwright/te
 // Lives in helpers/, not here: Playwright forbids a spec importing a spec, and
 // any suite adding a surface should be able to reuse the mobile guard.
 import { expectNoHorizontalPageScroll } from '../helpers/responsive';
-import { getStoredToken, createWorkspace, lockWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, seedInventoryItem, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, lockWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, seedInventoryHost, seedInventoryGroup, seedInventoryMembership, seedInventoryVar, uniqueName } from '../helpers/api';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 
@@ -1711,59 +1711,107 @@ test.describe('Per-workspace run identity (#1901)', () => {
     await expectNoHorizontalPageScroll(page)
   })
 
-  test('the Inventory tab holds up at phone width (#1967, #1968)', async ({ page }) => {
-    // Four of this tab's surfaces are the usual phone-width hazards, and all
-    // four are here on purpose: a four-column table of declared hosts, a run of
-    // host-variable text with no spaces to wrap on, a text input beside its
-    // button, and a list of matched host pills. The table reflows to cards
-    // below `md` rather than scrolling inside itself, and the primary signal —
-    // the host name, its address and its groups — stays on screen rather than
-    // being hidden along with the columns.
+})
+
+// The inventory tab is its own feature, not part of the run-identity work the
+// block above covers; it was sitting in that describe by accident.
+test.describe('Workspace inventory (#1967, #1968, #1969)', () => {
+  test('the Inventory tab holds up at phone width (#1967, #1968, #1969)', async ({ page }) => {
+    // Five sub-views, and every one of them is a phone-width hazard: two
+    // multi-column tables of rows, a variable table whose values have no spaces
+    // to wrap on, a text input beside its button, a run of resolved host
+    // variables, and a form built on a `<fieldset>` — which defaults to
+    // `min-inline-size: min-content` and will not shrink below its content
+    // unless it is told to, which is how /admin/bulk-update once overflowed by
+    // 122px. All five are walked here.
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2erespinv'))
-    await seedInventoryItem(token, wsId, 'web-1', {
-      address: '10.0.0.11',
-      groups: ['web', 'frontend'],
-      // Long enough to push a narrow container sideways if nothing wraps it.
-      vars: { ansible_user: 'deploy', ansible_python_interpreter: '/usr/bin/python3' },
-    })
-    await seedInventoryItem(token, wsId, 'web-2', { address: '10.0.0.12', groups: ['web'] })
+    const web = await seedInventoryGroup(token, wsId, 'web')
+    const h1 = await seedInventoryHost(token, wsId, 'web-1')
+    const h2 = await seedInventoryHost(token, wsId, 'web-2')
+    await seedInventoryMembership(token, web, h1)
+    await seedInventoryMembership(token, web, h2)
+    // Long enough to push a narrow container sideways if nothing wraps it.
+    await seedInventoryVar(token, { host: h1 }, 'ansible_python_interpreter', '/usr/bin/python3')
+    await seedInventoryVar(token, { workspace: wsId }, 'ansible_user', 'deploy')
 
     await page.goto(`/workspaces/${wsId}?tab=inventory`)
-    await expect(page.getByRole('heading', { name: 'Declared hosts' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Hosts', exact: true })).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 
     // The primary signal survives the reflow. A card list that dropped the
-    // address or the groups would still pass the overflow check on its own.
+    // group or variable counts would still pass the overflow check on its own.
     //
     // Scoped to what is VISIBLE, not `.first()`. Both renders sit in the DOM at
-    // every width -- the desktop table is `hidden md:block` and the card list is
-    // `md:hidden` -- so `.first()` takes the table's cell in DOM order and then
-    // asserts a hidden element is visible. It failed in CI for exactly that
-    // reason, naming the `<td>` it had resolved to 14 times. `visible` asserts
-    // the thing this test is about: the value reached the phone-width render.
+    // every width — the desktop table is `hidden md:block` and the card list is
+    // `md:hidden` — so `.first()` takes the table's cell in DOM order and then
+    // asserts a hidden element is visible.
     await expect(page.getByText('web-1').filter({ visible: true }).first()).toBeVisible()
-    await expect(page.getByText('10.0.0.11').filter({ visible: true }).first()).toBeVisible()
-    await expect(page.getByText('frontend').filter({ visible: true }).first()).toBeVisible()
+    await expect(page.getByText('web-2').filter({ visible: true }).first()).toBeVisible()
+    const card = page.locator('li', { hasText: 'web-1' }).filter({ visible: true }).first()
+    await expect(card.getByText('Groups')).toBeVisible()
+    await expect(card.getByText('Variables')).toBeVisible()
+    // Row actions are real buttons with a background, not clickable text, so
+    // they are tappable at this width.
+    await expect(card.getByRole('button', { name: 'Edit', exact: true })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
 
-    // The limit preview is the control this tab exists to offer, so it has to
-    // be usable on a phone: typable input, tappable button, readable result.
+    // The sub-view nav wraps rather than scrolling inside itself: an inner
+    // scroller hides whichever entry the reader needs.
+    for (const view of ['Groups', 'Variables', 'Resolved', 'Settings']) {
+      await page.getByRole('button', { name: view, exact: true }).click()
+      await expectNoHorizontalPageScroll(page)
+    }
+
+    // The settings form — the `<fieldset>` case. Opened, because a collapsed
+    // form cannot overflow and so proves nothing.
+    await expect(page.getByRole('button', { name: 'Add settings', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Add settings', exact: true }).click()
+    await expect(page.getByLabel('Repository')).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // The variable table, whose values are unbroken identifier-ish runs.
+    await page.getByRole('button', { name: 'Variables', exact: true }).click()
+    await expect(page.getByText('ansible_user').filter({ visible: true }).first()).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+
+    // The limit control is what this tab exists to offer before anything runs,
+    // so it has to be usable on a phone: typable input, tappable button.
+    await page.getByRole('button', { name: 'Resolved', exact: true }).click()
     const input = page.getByLabel('Limit pattern')
     await expect(input).toBeVisible()
     await input.fill('web:!web-2')
     await expect(input).toHaveValue('web:!web-2')
-    await page.getByRole('button', { name: 'Preview', exact: true }).click()
-    await expect(page.getByText(/1 host of 2 selected/i)).toBeVisible()
-    await expect(page.getByText(/Advisory only/i)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Apply limit', exact: true })).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 
-    // The resolution is live, so the whole tab is read-only: there is no
-    // Refresh to tap and therefore no touch confirm to guard it. Asserted
-    // here as well as in inventory.spec.ts because a mutating control
-    // reintroduced on a phone is the worst place for one — the mis-tap this
-    // suite exists to think about.
+    // The resolution is live, so there is no Refresh to mis-tap.
     await expect(page.getByRole('button', { name: /refresh/i })).toHaveCount(0)
-    await expect(page.getByText(/This is live/i)).toBeVisible()
+  })
+
+  test('removing a group membership prompts a touch confirm (#1969)', async ({ page }) => {
+    // Tier 2 of the #719 policy: a reversible single-tap mutation prompts on a
+    // COARSE pointer, where a mis-tap is easy, and proceeds without one on a
+    // precise pointer (asserted in confirm-guards.spec.ts and inventory.spec.ts).
+    // A membership removal is the reversible case — the link can be recreated —
+    // so it must not be promoted to the unconditional delete tier either.
+    const token = getStoredToken()
+    const wsId = await createWorkspace(token, uniqueName('e2erespinvmem'))
+    const web = await seedInventoryGroup(token, wsId, 'web')
+    const h1 = await seedInventoryHost(token, wsId, 'web-1')
+    await seedInventoryMembership(token, web, h1)
+
+    await page.goto(`/workspaces/${wsId}?tab=inventory&inv=${h1}`)
+    await expect(page.getByRole('heading', { name: 'Host web-1' })).toBeVisible()
+
+    let message = ''
+    page.once('dialog', async (d: Dialog) => {
+      message = d.message()
+      await d.accept()
+    })
+    await page.getByRole('button', { name: /Remove this host from web/ }).click()
+    await expect.poll(() => message, { timeout: 5_000 }).toContain('web')
+    await expect(page.getByText(/in no group/i)).toBeVisible({ timeout: 10_000 })
     await expectNoHorizontalPageScroll(page)
   })
 })

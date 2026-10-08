@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventar",
-        "body": "Dette er vertene dette arbeidsområdet erklærer, og hva de løses opp til. Å kjøre en playbook mot dem er ikke tilgjengelig ennå — denne utgivelsen gjør inventaret observerbart, ingenting kjøres herfra."
+        "body": "Vertene og gruppene dette arbeidsområdet inneholder, og hva ansible løser dem opp til. Hver rad kan redigeres her; å kjøre en playbook mot dem er ikke tilgjengelig ennå."
       },
-      "selectLabel": "Inventar",
-      "resolved": {
-        "heading": "Oppløste verter og grupper",
-        "subheading": "Det sammenslåtte resultatet for {name}, fra hver kilde i rekkefølge.",
+      "nav": {
+        "label": "Inventarseksjoner",
         "hosts": "Verter",
         "groups": "Grupper",
-        "liveNote": "Dette er sanntid. Hver kilde her er deklarert i konfigurasjonen din, så å løse den opp er et databasespørsmål."
-      },
-      "limit": {
-        "heading": "Hva ville et limit-mønster treffe?",
-        "body": "Utvid et ansible --limit-mønster ut fra de oppløste vertene ovenfor, slik at du ser hvilke av dem det velger før noe kjøres.",
-        "inputLabel": "Limit-mønster",
-        "placeholder": "web:!web-2",
-        "preview": "Forhåndsvis",
-        "previewing": "Forhåndsviser …",
-        "matched": "{count, plural, =0 {Ingen verter} one {# vert} other {# verter}} av {total} valgt.",
-        "advisory": "Kun rådgivende. Den autoritative utvidelsen gjøres av ansible i runneren, så betrakt dette som en veiledning og ikke en garanti."
-      },
-      "items": {
-        "heading": "Erklærte verter",
-        "managedNote": "Erklært av dette arbeidsområdets egen Terraform, og derfor skrivebeskyttet her. Legg til, endre eller fjern en vert i konfigurasjonen din og ta den i bruk — en endring gjort utenfor Terraform tilbakestilles ved neste apply.",
-        "empty": "Ingen verter erklært ennå.",
-        "name": "Vert",
-        "address": "Adresse",
-        "groups": "Grupper",
         "vars": "Variabler",
-        "noGroups": "ingen"
+        "resolved": "Oppløst",
+        "settings": "Innstillinger"
       },
-      "sources": {
-        "heading": "Kilder",
-        "body": "Løses opp i rekkefølge, akkurat som gjentatte -i-flagg: ved en konflikt om en vertsvariabel vinner den senere kilden.",
-        "position": "Posisjon {position}"
+      "actions": {
+        "save": "Lagre",
+        "saving": "Lagrer …",
+        "cancel": "Avbryt",
+        "edit": "Rediger",
+        "delete": "Slett",
+        "remove": "Fjern",
+        "add": "Legg til",
+        "adding": "Legger til …",
+        "rename": "Gi nytt navn"
+      },
+      "hosts": {
+        "heading": "Verter",
+        "body": "Én rad per vert. Åpne en vert for å redigere variablene dens og gruppene den tilhører.",
+        "empty": "Ingen verter ennå.",
+        "colName": "Vert",
+        "colGroups": "Grupper",
+        "colVars": "Variabler",
+        "newLabel": "Navn på den nye verten",
+        "newPlaceholder": "web-1",
+        "add": "Legg til vert",
+        "confirmDelete": "Slette verten {name}? Variablene og gruppemedlemskapene dens følger med.",
+        "renameLabel": "Vertsnavn"
+      },
+      "groups": {
+        "heading": "Grupper",
+        "body": "Én rad per gruppe. Åpne en gruppe for å redigere variablene dens, medlemsvertene dens og gruppene som er nestet inni den.",
+        "empty": "Ingen grupper ennå.",
+        "colName": "Gruppe",
+        "colMembers": "Verter",
+        "colChildren": "Undergrupper",
+        "colVars": "Variabler",
+        "newLabel": "Navn på den nye gruppen",
+        "newPlaceholder": "web",
+        "add": "Legg til gruppe",
+        "confirmDelete": "Slette gruppen {name}? Variablene og medlemskapene dens følger med; selve vertene blir værende.",
+        "renameLabel": "Gruppenavn"
+      },
+      "vars": {
+        "actions": "Handlinger",
+        "key": "Nøkkel",
+        "keyPlaceholder": "ansible_user",
+        "value": "Verdi",
+        "structured": "Strukturert",
+        "sensitive": "Sensitiv",
+        "structuredHelp": "En liste, et tall eller et objekt er en strukturert verdi: kryss av for Strukturert og skriv den literale kildeteksten i verdien. En sensitiv verdi leses aldri tilbake — feltet viser en maske i stedet.",
+        "structuredBadge": "strukturert",
+        "sensitiveKeep": "La dette stå tomt for å beholde den lagrede verdien.",
+        "empty": "Ingen variabler her.",
+        "add": "Legg til variabel",
+        "confirmDelete": "Slette variabelen {key}?"
+      },
+      "hostDetail": {
+        "heading": "Vert {name}",
+        "body": "Alt denne ene verten bærer.",
+        "back": "Tilbake til verter",
+        "gone": "Den verten finnes ikke lenger.",
+        "vars": "Vertsvariabler",
+        "varsBody": "Variabler som bare gjelder denne verten. De har forrang foran en gruppevariabel med samme navn.",
+        "memberships": "Grupper",
+        "membershipsBody": "Gruppene denne verten tilhører. Et medlemskap er en kobling, så å fjerne ett her lar både verten og gruppen bli værende.",
+        "membershipsEmpty": "Denne verten er ikke i noen gruppe, så ansible legger den i ungrouped.",
+        "addGroup": "Legg til i gruppe",
+        "addGroupLabel": "Velg en gruppe",
+        "removeGroupAria": "Fjern denne verten fra {name}",
+        "confirmRemoveGroup": "Ta denne verten ut av {name}?"
+      },
+      "groupDetail": {
+        "heading": "Gruppe {name}",
+        "body": "Alt denne ene gruppen bærer.",
+        "back": "Tilbake til grupper",
+        "gone": "Den gruppen finnes ikke lenger.",
+        "vars": "Gruppevariabler",
+        "varsBody": "Variabler som gjelder hver vert i denne gruppen, direkte eller gjennom nesting.",
+        "members": "Medlemsverter",
+        "membersBody": "Vertene som ligger direkte i denne gruppen. En vert som bare nås gjennom en nestet gruppe, står ikke her.",
+        "membersEmpty": "Ingen verter direkte i denne gruppen.",
+        "addHost": "Legg til vert",
+        "addHostLabel": "Velg en vert",
+        "removeHostAria": "Fjern {name} fra denne gruppen",
+        "confirmRemoveHost": "Ta {name} ut av denne gruppen?",
+        "children": "Undergrupper",
+        "childrenBody": "Grupper som er nestet inni denne. Vertene deres er medlemmer av denne gruppen også, og variablene til denne gruppen når dem.",
+        "childrenEmpty": "Ingen gruppe er nestet inni denne.",
+        "addChild": "Legg til undergruppe",
+        "addChildLabel": "Velg en gruppe som skal nestes",
+        "removeChildAria": "Fjern {name} fra undergruppene til denne gruppen",
+        "confirmRemoveChild": "Slutte å neste {name} inni denne gruppen?",
+        "parents": "Overordnede grupper",
+        "parentsBody": "Gruppene denne er nestet inni. En gruppe kan ha flere overordnede grupper.",
+        "parentsEmpty": "Denne gruppen er ikke nestet inni noe.",
+        "addParent": "Legg til overordnet gruppe",
+        "addParentLabel": "Velg en overordnet gruppe",
+        "removeParentAria": "Fjern denne gruppen fra {name}",
+        "confirmRemoveParent": "Slutte å neste denne gruppen inni {name}?"
+      },
+      "globalVars": {
+        "heading": "Inventarvariabler",
+        "body": "Variabler som gjelder hver vert — ansibles group_vars/all. En gruppe- eller vertsvariabel med samme navn har forrang foran en som settes her."
+      },
+      "resolved": {
+        "heading": "Oppløste verter",
+        "body": "Hva ansible gjør av radene: hver vert med variablene den ender opp med å bære, etter sammenslåingen og forrangen.",
+        "hosts": "Verter",
+        "groups": "Grupper",
+        "liveNote": "Dette er sanntid. Hver kilde her er statisk, så lesingen løser opp radene selv — det er ingenting å oppdatere.",
+        "noHosts": "Ingenting ble løst opp til en vert.",
+        "noVars": "ingen variabler",
+        "groupsHeading": "Gruppemedlemskap",
+        "directOnly": "Bare direkte medlemskap, akkurat slik ansible rapporterer det: en gruppe der alle vertene kommer inn via en nestet gruppe, lister ingen av sine egne. Nestingen står nedenfor.",
+        "noGroups": "Ingen grupper ble løst opp.",
+        "noDirectMembers": "ingen direkte verter",
+        "nestingHeading": "Gruppenesting",
+        "nestingBody": "Hvilke grupper som ligger inni hvilke. Et limit på en overordnet gruppe når hver vert under den.",
+        "noNesting": "Ingen gruppe er nestet.",
+        "limitHeading": "Hva ville et limit treffe?",
+        "limitBody": "Utvid et ansible --limit-mønster mot dette inventaret og se nøyaktig hvilke verter det velger før noe kjøres. Ansible gjør utvidelsen, så en gruppe, en utelukkelse og et ~regex oppfører seg akkurat slik de vil gjøre ved kjøring.",
+        "limitLabel": "Limit-mønster",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Bruk limit",
+        "limitClear": "Tøm",
+        "limitApplied": "Begrenset til {limit}. Alt nedenfor er det mønsteret treffer."
+      },
+      "settings": {
+        "heading": "Innstillinger",
+        "body": "Om radene som holdes her teller, og repositoriet et inventar også leses fra.",
+        "absent": "Ingen innstillinger, som er standard: vertene og gruppene som holdes her er hele inventaret.",
+        "includePlatform": "Bruk vertene og gruppene som holdes her",
+        "includePlatformHelp": "På som standard. Slå den av for å løse opp fra repositoriet alene; radene blir værende, men står utenfor svaret.",
+        "included": "ja",
+        "excluded": "nei",
+        "vcsConnection": "VCS-tilkobling",
+        "vcsNone": "Ingen",
+        "field": {
+          "repo-url": "Repositorium",
+          "branch": "Gren",
+          "working-directory": "Katalog"
+        },
+        "branchHelp": "La feltet stå tomt for å følge standardgrenen til repositoriet.",
+        "ignorePaths": "Ignorerte stier",
+        "ignorePathsHelp": "Én glob per linje. Alt som treffer holdes utenfor inventaret som leses fra repositoriet.",
+        "unset": "ikke satt",
+        "create": "Legg til innstillinger",
+        "clear": "Tøm innstillinger",
+        "confirmClear": "Tømme disse innstillingene? Bindingen til repositoriet følger med; vertene og gruppene som holdes her blir værende."
       },
       "errors": {
-        "loadItems": "Kunne ikke laste erklærte verter",
-        "loadResolved": "Kunne ikke laste det oppløste inventaret",
-        "preview": "Forhåndsvisning av limit-mønsteret mislyktes"
+        "load": "Kunne ikke laste inventaret",
+        "save": "Kunne ikke lagre",
+        "delete": "Kunne ikke slette",
+        "resolved": "Kunne ikke løse opp inventaret",
+        "settings": "Kunne ikke lagre inventarinnstillingene"
       }
     },
     "sharing": {

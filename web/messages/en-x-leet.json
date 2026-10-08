@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "1nv3n70ry",
-        "body": "7h353 4r3 7h3 h0575 7h15 w0rk5p4c3 d3cl4r35 4nd wh47 7h3y r350lv3 70. Runn1ng 4 pl4yb00k 4g41n57 7h3m 15 n07 4v41l4bl3 y37 — 7h15 r3l3453 m4k35 7h3 1nv3n70ry 0b53rv4bl3, n07h1ng 15 3x3cu73d fr0m h3r3."
+        "body": "7h3 h0575 4nd gr0up5 7h15 w0rk5p4c3 h0ld5, 4nd wh47 4n51bl3 r350lv35 7h3m 70. 34ch r0w 15 3d174bl3 h3r3; runn1ng 4 pl4yb00k 4g41n57 7h3m 15 n07 4v41l4bl3 y37."
       },
-      "selectLabel": "1nv3n70ry",
-      "resolved": {
-        "heading": "R350lv3d h0575 4nd gr0up5",
-        "subheading": "7h3 m3rg3d r35ul7 f0r {name}, fr0m 3v3ry 50urc3 1n 0rd3r.",
+      "nav": {
+        "label": "1nv3n70ry 53c710n5",
         "hosts": "H0575",
         "groups": "Gr0up5",
-        "liveNote": "7h15 15 l1v3. 3v3ry 50urc3 h3r3 15 d3cl4r3d 1n y0ur c0nf1gur4710n, 50 r350lv1ng 17 15 4 l00kup."
-      },
-      "limit": {
-        "heading": "Wh47 w0uld 4 l1m17 74rg37?",
-        "body": "3xp4nd 4n 4n51bl3 --l1m17 p4773rn 4g41n57 7h3 r350lv3d h0575 4b0v3, 50 y0u c4n 533 wh1ch 0f 7h3m 17 53l3c75 b3f0r3 4ny7h1ng run5.",
-        "inputLabel": "L1m17 p4773rn",
-        "placeholder": "web:!web-2",
-        "preview": "Pr3v13w",
-        "previewing": "Pr3v13w1ng…",
-        "matched": "{count, plural, =0 {N0 h0575} one {# h057} other {# h0575}} 0f {total} 53l3c73d.",
-        "advisory": "4dv150ry 0nly. 7h3 4u7h0r17471v3 3xp4n510n 15 74k3n by 4n51bl3 1n 7h3 runn3r, 50 7r347 7h15 45 4 gu1d3 r47h3r 7h4n 4 gu4r4n733."
-      },
-      "items": {
-        "heading": "D3cl4r3d h0575",
-        "managedNote": "D3cl4r3d by 7h15 w0rk5p4c3’5 0wn 73rr4f0rm, 50 7h3y 4r3 r34d-0nly h3r3. 4dd, ch4ng3 0r r3m0v3 4 h057 1n y0ur c0nf1gur4710n 4nd 4pply 17 — 4n 3d17 m4d3 0u751d3 73rr4f0rm 15 r3v3r73d 0n 7h3 n3x7 4pply.",
-        "empty": "N0 h0575 d3cl4r3d y37.",
-        "name": "H057",
-        "address": "4ddr355",
-        "groups": "Gr0up5",
         "vars": "V4r14bl35",
-        "noGroups": "n0n3"
+        "resolved": "R350lv3d",
+        "settings": "53771ng5"
       },
-      "sources": {
-        "heading": "50urc35",
-        "body": "R350lv3d 1n 0rd3r, 3x4c7ly 45 r3p3473d -1 fl4g5 4r3: 4 l473r 50urc3 w1n5 4 c0nfl1c71ng h057 v4r14bl3.",
-        "position": "P051710n {position}"
+      "actions": {
+        "save": "54v3",
+        "saving": "54v1ng…",
+        "cancel": "C4nc3l",
+        "edit": "3d17",
+        "delete": "D3l373",
+        "remove": "R3m0v3",
+        "add": "4dd",
+        "adding": "4dd1ng…",
+        "rename": "R3n4m3"
+      },
+      "hosts": {
+        "heading": "H0575",
+        "body": "0n3 r0w p3r h057. 0p3n 4 h057 70 3d17 175 v4r14bl35 4nd 7h3 gr0up5 17 b3l0ng5 70.",
+        "empty": "N0 h0575 y37.",
+        "colName": "H057",
+        "colGroups": "Gr0up5",
+        "colVars": "V4r14bl35",
+        "newLabel": "N3w h057 n4m3",
+        "newPlaceholder": "web-1",
+        "add": "4dd h057",
+        "confirmDelete": "D3l373 7h3 h057 {name}? 175 v4r14bl35 4nd 175 gr0up m3mb3r5h1p5 g0 w17h 17.",
+        "renameLabel": "H057 n4m3"
+      },
+      "groups": {
+        "heading": "Gr0up5",
+        "body": "0n3 r0w p3r gr0up. 0p3n 4 gr0up 70 3d17 175 v4r14bl35, 175 m3mb3r h0575 4nd 7h3 gr0up5 n3573d 1n51d3 17.",
+        "empty": "N0 gr0up5 y37.",
+        "colName": "Gr0up",
+        "colMembers": "H0575",
+        "colChildren": "Ch1ld gr0up5",
+        "colVars": "V4r14bl35",
+        "newLabel": "N3w gr0up n4m3",
+        "newPlaceholder": "web",
+        "add": "4dd gr0up",
+        "confirmDelete": "D3l373 7h3 gr0up {name}? 175 v4r14bl35 4nd 175 m3mb3r5h1p5 g0 w17h 17; 7h3 h0575 7h3m53lv35 574y.",
+        "renameLabel": "Gr0up n4m3"
+      },
+      "vars": {
+        "actions": "4c710n5",
+        "key": "K3y",
+        "keyPlaceholder": "ansible_user",
+        "value": "V4lu3",
+        "structured": "57ruc7ur3d",
+        "sensitive": "53n5171v3",
+        "structuredHelp": "4 l157, numb3r 0r 0bj3c7 15 4 57ruc7ur3d v4lu3: 71ck 57ruc7ur3d 4nd wr173 175 l173r4l 50urc3 1n 7h3 v4lu3. 4 53n5171v3 v4lu3 15 n3v3r r34d b4ck — 7h3 f13ld 5h0w5 4 m45k 1n5734d.",
+        "structuredBadge": "57ruc7ur3d",
+        "sensitiveKeep": "L34v3 7h15 bl4nk 70 k33p 7h3 570r3d v4lu3.",
+        "empty": "N0 v4r14bl35 h3r3.",
+        "add": "4dd v4r14bl3",
+        "confirmDelete": "D3l373 7h3 v4r14bl3 {key}?"
+      },
+      "hostDetail": {
+        "heading": "H057 {name}",
+        "body": "3v3ry7h1ng 7h15 0n3 h057 c4rr135.",
+        "back": "B4ck 70 h0575",
+        "gone": "7h47 h057 n0 l0ng3r 3x1575.",
+        "vars": "H057 v4r14bl35",
+        "varsBody": "V4r14bl35 7h47 4pply 70 7h15 h057 4l0n3. 7h3y w1n 0v3r 4 gr0up v4r14bl3 0f 7h3 54m3 n4m3.",
+        "memberships": "Gr0up5",
+        "membershipsBody": "7h3 gr0up5 7h15 h057 b3l0ng5 70. 4 m3mb3r5h1p 15 4 l1nk, 50 r3m0v1ng 0n3 h3r3 l34v35 b07h 7h3 h057 4nd 7h3 gr0up 1n pl4c3.",
+        "membershipsEmpty": "7h15 h057 15 1n n0 gr0up, 50 4n51bl3 pu75 17 1n ungr0up3d.",
+        "addGroup": "4dd 70 gr0up",
+        "addGroupLabel": "Ch0053 4 gr0up",
+        "removeGroupAria": "R3m0v3 7h15 h057 fr0m {name}",
+        "confirmRemoveGroup": "74k3 7h15 h057 0u7 0f {name}?"
+      },
+      "groupDetail": {
+        "heading": "Gr0up {name}",
+        "body": "3v3ry7h1ng 7h15 0n3 gr0up c4rr135.",
+        "back": "B4ck 70 gr0up5",
+        "gone": "7h47 gr0up n0 l0ng3r 3x1575.",
+        "vars": "Gr0up v4r14bl35",
+        "varsBody": "V4r14bl35 7h47 4pply 70 3v3ry h057 1n 7h15 gr0up, d1r3c7ly 0r 7hr0ugh n3571ng.",
+        "members": "M3mb3r h0575",
+        "membersBody": "7h3 h0575 1n 7h15 gr0up d1r3c7ly. 4 h057 r34ch3d 0nly 7hr0ugh 4 n3573d gr0up 15 n07 l1573d h3r3.",
+        "membersEmpty": "N0 h0575 1n 7h15 gr0up d1r3c7ly.",
+        "addHost": "4dd h057",
+        "addHostLabel": "Ch0053 4 h057",
+        "removeHostAria": "R3m0v3 {name} fr0m 7h15 gr0up",
+        "confirmRemoveHost": "74k3 {name} 0u7 0f 7h15 gr0up?",
+        "children": "Ch1ld gr0up5",
+        "childrenBody": "Gr0up5 n3573d 1n51d3 7h15 0n3. 7h31r h0575 4r3 m3mb3r5 0f 7h15 gr0up 700, 4nd 7h15 gr0up’5 v4r14bl35 r34ch 7h3m.",
+        "childrenEmpty": "N0 gr0up5 n3573d 1n51d3 7h15 0n3.",
+        "addChild": "4dd ch1ld gr0up",
+        "addChildLabel": "Ch0053 4 gr0up 70 n357",
+        "removeChildAria": "R3m0v3 {name} fr0m 7h3 ch1ldr3n 0f 7h15 gr0up",
+        "confirmRemoveChild": "570p n3571ng {name} 1n51d3 7h15 gr0up?",
+        "parents": "P4r3n7 gr0up5",
+        "parentsBody": "7h3 gr0up5 7h15 0n3 15 n3573d 1n51d3. 4 gr0up m4y h4v3 53v3r4l p4r3n75.",
+        "parentsEmpty": "7h15 gr0up 15 n3573d 1n51d3 n07h1ng.",
+        "addParent": "4dd p4r3n7 gr0up",
+        "addParentLabel": "Ch0053 4 p4r3n7 gr0up",
+        "removeParentAria": "R3m0v3 7h15 gr0up fr0m {name}",
+        "confirmRemoveParent": "570p n3571ng 7h15 gr0up 1n51d3 {name}?"
+      },
+      "globalVars": {
+        "heading": "1nv3n70ry v4r14bl35",
+        "body": "V4r14bl35 7h47 4pply 70 3v3ry h057 — 4n51bl3’5 gr0up_v4r5/4ll. 4 gr0up 0r h057 v4r14bl3 0f 7h3 54m3 n4m3 w1n5 0v3r 0n3 537 h3r3."
+      },
+      "resolved": {
+        "heading": "R350lv3d h0575",
+        "body": "Wh47 4n51bl3 m4k35 0f 7h3 r0w5: 3v3ry h057 w17h 7h3 v4r14bl35 17 3nd5 up h0ld1ng, 4f73r 7h3 m3rg3 4nd 7h3 pr3c3d3nc3.",
+        "hosts": "H0575",
+        "groups": "Gr0up5",
+        "liveNote": "7h15 15 l1v3. 3v3ry 50urc3 h3r3 15 57471c, 50 7h3 r34d r350lv35 7h3 r0w5 70 4n5w3r 1753lf — 7h3r3 15 n07h1ng 70 r3fr35h.",
+        "noHosts": "N07h1ng r350lv3d 70 4 h057.",
+        "noVars": "n0 v4r14bl35",
+        "groupsHeading": "Gr0up m3mb3r5h1p",
+        "directOnly": "D1r3c7 m3mb3r5h1p 0nly, 3x4c7ly 45 4n51bl3 r3p0r75 17: 4 gr0up wh053 h0575 4ll 4rr1v3 7hr0ugh 4 n3573d gr0up l1575 n0n3 0f 175 0wn. 7h3 n3571ng 15 b3l0w.",
+        "noGroups": "N0 gr0up5 r350lv3d.",
+        "noDirectMembers": "n0 d1r3c7 h0575",
+        "nestingHeading": "Gr0up n3571ng",
+        "nestingBody": "Wh1ch gr0up5 517 1n51d3 wh1ch. 4 l1m17 0n 4 p4r3n7 r34ch35 3v3ry h057 b3l0w 17.",
+        "noNesting": "N0 gr0up5 4r3 n3573d.",
+        "limitHeading": "Wh47 w0uld 4 l1m17 74rg37?",
+        "limitBody": "3xp4nd 4n 4n51bl3 --l1m17 p4773rn 4g41n57 7h15 1nv3n70ry 4nd 533 3x4c7ly wh1ch h0575 17 53l3c75 b3f0r3 4ny7h1ng run5. 4n51bl3 d035 7h3 3xp4n510n, 50 4 gr0up, 4n 3xclu510n 4nd 4 ~r3g3x 4ll b3h4v3 45 7h3y w1ll 47 run 71m3.",
+        "limitLabel": "L1m17 p4773rn",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "4pply l1m17",
+        "limitClear": "Cl34r",
+        "limitApplied": "L1m173d 70 {limit}. 3v3ry7h1ng b3l0w 15 wh47 7h47 p4773rn 74rg375."
+      },
+      "settings": {
+        "heading": "53771ng5",
+        "body": "Wh37h3r 7h3 r0w5 h3ld h3r3 c0un7, 4nd 7h3 r3p05170ry 4n 1nv3n70ry 15 4l50 r34d fr0m.",
+        "absent": "N0 53771ng5, wh1ch 15 7h3 d3f4ul7: 7h3 h0575 4nd gr0up5 h3ld h3r3 4r3 7h3 wh0l3 1nv3n70ry.",
+        "includePlatform": "U53 7h3 h0575 4nd gr0up5 h3ld h3r3",
+        "includePlatformHelp": "0n by d3f4ul7. 7urn 17 0ff 70 r350lv3 fr0m 7h3 r3p05170ry 4l0n3, l34v1ng 7h353 r0w5 1n pl4c3 bu7 0u7 0f 7h3 4n5w3r.",
+        "included": "y35",
+        "excluded": "n0",
+        "vcsConnection": "VC5 c0nn3c710n",
+        "vcsNone": "N0n3",
+        "field": {
+          "repo-url": "R3p05170ry",
+          "branch": "Br4nch",
+          "working-directory": "D1r3c70ry"
+        },
+        "branchHelp": "L34v3 3mp7y 70 7r4ck 7h3 d3f4ul7 br4nch 0f 7h3 r3p05170ry.",
+        "ignorePaths": "1gn0r3d p47h5",
+        "ignorePathsHelp": "0n3 gl0b p3r l1n3. 4ny7h1ng m47ch1ng 15 l3f7 0u7 0f 7h3 1nv3n70ry r34d fr0m 7h3 r3p05170ry.",
+        "unset": "n07 537",
+        "create": "4dd 53771ng5",
+        "clear": "Cl34r 53771ng5",
+        "confirmClear": "Cl34r 7h353 53771ng5? 7h3 r3p05170ry b1nd1ng g035 w17h 7h3m; 7h3 h0575 4nd gr0up5 h3ld h3r3 574y."
       },
       "errors": {
-        "loadItems": "F41l3d 70 l04d d3cl4r3d h0575",
-        "loadResolved": "F41l3d 70 l04d 7h3 r350lv3d 1nv3n70ry",
-        "preview": "F41l3d 70 pr3v13w 7h3 l1m17"
+        "load": "F41l3d 70 l04d 7h3 1nv3n70ry",
+        "save": "F41l3d 70 54v3",
+        "delete": "F41l3d 70 d3l373",
+        "resolved": "F41l3d 70 r350lv3 7h3 1nv3n70ry",
+        "settings": "F41l3d 70 54v3 7h3 1nv3n70ry 53771ng5"
       }
     },
     "sharing": {

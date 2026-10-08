@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inwentarz",
-        "body": "To hosty deklarowane przez ten obszar roboczy oraz to, do czego się rozwiązują. Uruchamianie playbooka na nich nie jest jeszcze dostępne — to wydanie czyni inwentarz obserwowalnym, nic nie jest tu wykonywane."
+        "body": "Hosty i grupy, które przechowuje ten obszar roboczy, oraz to, do czego je rozwiązuje ansible. Każdy wiersz można tu edytować; uruchamianie playbooka na nich nie jest jeszcze dostępne."
       },
-      "selectLabel": "Inwentarz",
-      "resolved": {
-        "heading": "Rozwiązane hosty i grupy",
-        "subheading": "Scalony wynik dla {name}, ze wszystkich źródeł po kolei.",
+      "nav": {
+        "label": "Sekcje inwentarza",
         "hosts": "Hosty",
         "groups": "Grupy",
-        "liveNote": "To jest na bieżąco. Każde źródło tutaj jest zadeklarowane w twojej konfiguracji, więc rozwiązanie to zapytanie do bazy danych."
-      },
-      "limit": {
-        "heading": "Co obejmie --limit?",
-        "body": "Rozwiń wzorzec ansible --limit na podstawie rozwiązanych powyżej hostów, aby zobaczyć, które z nich wybiera, przed jakimkolwiek uruchomieniem.",
-        "inputLabel": "Wzorzec --limit",
-        "placeholder": "web:!web-2",
-        "preview": "Podgląd",
-        "previewing": "Tworzenie podglądu…",
-        "matched": "{count, plural, =0 {Nie wybrano żadnego hosta} one {Wybrano # host} few {Wybrano # hosty} many {Wybrano # hostów} other {Wybrano # hosta}} z {total}.",
-        "advisory": "Tylko doradczo. Wiążące rozwinięcie wykonuje ansible w runnerze, więc traktuj to jako wskazówkę, a nie gwarancję."
-      },
-      "items": {
-        "heading": "Zadeklarowane hosty",
-        "managedNote": "Zadeklarowane przez własny Terraform tego obszaru roboczego, więc tutaj są tylko do odczytu. Dodaj, zmień lub usuń hosta w swojej konfiguracji i zastosuj ją — zmiana wprowadzona poza Terraform zostanie wycofana przy następnym zastosowaniu.",
-        "empty": "Nie zadeklarowano jeszcze żadnych hostów.",
-        "name": "Host",
-        "address": "Adres",
-        "groups": "Grupy",
         "vars": "Zmienne",
-        "noGroups": "brak"
+        "resolved": "Rozwiązane",
+        "settings": "Ustawienia"
       },
-      "sources": {
-        "heading": "Źródła",
-        "body": "Rozwiązywane po kolei, dokładnie tak jak powtórzone flagi -i: przy konflikcie zmiennej hosta wygrywa późniejsze źródło.",
-        "position": "Pozycja {position}"
+      "actions": {
+        "save": "Zapisz",
+        "saving": "Zapisywanie…",
+        "cancel": "Anuluj",
+        "edit": "Edytuj",
+        "delete": "Usuń",
+        "remove": "Odłącz",
+        "add": "Dodaj",
+        "adding": "Dodawanie…",
+        "rename": "Zmień nazwę"
+      },
+      "hosts": {
+        "heading": "Hosty",
+        "body": "Jeden wiersz na host. Otwórz host, aby edytować jego zmienne i grupy, do których należy.",
+        "empty": "Jeszcze żadnych hostów.",
+        "colName": "Host",
+        "colGroups": "Grupy",
+        "colVars": "Zmienne",
+        "newLabel": "Nazwa nowego hosta",
+        "newPlaceholder": "web-1",
+        "add": "Dodaj host",
+        "confirmDelete": "Usunąć host {name}? Jego zmienne i jego przynależności do grup znikną razem z nim.",
+        "renameLabel": "Nazwa hosta"
+      },
+      "groups": {
+        "heading": "Grupy",
+        "body": "Jeden wiersz na grupę. Otwórz grupę, aby edytować jej zmienne, hosty do niej należące i grupy w niej zagnieżdżone.",
+        "empty": "Jeszcze żadnych grup.",
+        "colName": "Grupa",
+        "colMembers": "Hosty",
+        "colChildren": "Grupy podrzędne",
+        "colVars": "Zmienne",
+        "newLabel": "Nazwa nowej grupy",
+        "newPlaceholder": "web",
+        "add": "Dodaj grupę",
+        "confirmDelete": "Usunąć grupę {name}? Jej zmienne i jej powiązania znikną razem z nią; same hosty pozostaną.",
+        "renameLabel": "Nazwa grupy"
+      },
+      "vars": {
+        "actions": "Akcje",
+        "key": "Klucz",
+        "keyPlaceholder": "ansible_user",
+        "value": "Wartość",
+        "structured": "Strukturalna",
+        "sensitive": "Wrażliwa",
+        "structuredHelp": "Lista, liczba lub obiekt to wartość strukturalna: zaznacz „Strukturalna” i wpisz w wartość jej dosłowne źródło. Wartość wrażliwa nigdy nie jest odczytywana z powrotem — pole pokazuje zamiast niej maskę.",
+        "structuredBadge": "strukturalna",
+        "sensitiveKeep": "Zostaw to pole puste, aby zachować zapisaną wartość.",
+        "empty": "Brak zmiennych w tym miejscu.",
+        "add": "Dodaj zmienną",
+        "confirmDelete": "Usunąć zmienną {key}?"
+      },
+      "hostDetail": {
+        "heading": "Host {name}",
+        "body": "Wszystko, co niesie ten jeden host.",
+        "back": "Powrót do hostów",
+        "gone": "Ten host już nie istnieje.",
+        "vars": "Zmienne hosta",
+        "varsBody": "Zmienne, które dotyczą wyłącznie tego hosta. Wygrywają z grupową zmienną o tej samej nazwie.",
+        "memberships": "Grupy",
+        "membershipsBody": "Grupy, do których należy ten host. Przynależność jest powiązaniem, więc odłączenie jej tutaj pozostawia na miejscu i host, i grupę.",
+        "membershipsEmpty": "Ten host nie jest w żadnej grupie, więc ansible umieszcza go w ungrouped.",
+        "addGroup": "Dodaj do grupy",
+        "addGroupLabel": "Wybierz grupę",
+        "removeGroupAria": "Odłącz ten host od grupy {name}",
+        "confirmRemoveGroup": "Wypisać ten host z grupy {name}?"
+      },
+      "groupDetail": {
+        "heading": "Grupa {name}",
+        "body": "Wszystko, co niesie ta jedna grupa.",
+        "back": "Powrót do grup",
+        "gone": "Ta grupa już nie istnieje.",
+        "vars": "Zmienne grupy",
+        "varsBody": "Zmienne, które dotyczą każdego hosta w tej grupie — bezpośrednio lub przez zagnieżdżenie.",
+        "members": "Hosty należące",
+        "membersBody": "Hosty należące do tej grupy bezpośrednio. Host osiągalny tylko przez zagnieżdżoną grupę nie jest tu wymieniony.",
+        "membersEmpty": "Żaden host nie należy do tej grupy bezpośrednio.",
+        "addHost": "Dodaj host",
+        "addHostLabel": "Wybierz host",
+        "removeHostAria": "Odłącz {name} od tej grupy",
+        "confirmRemoveHost": "Wypisać {name} z tej grupy?",
+        "children": "Grupy podrzędne",
+        "childrenBody": "Grupy zagnieżdżone w tej. Ich hosty należą też do tej grupy, a zmienne tej grupy do nich docierają.",
+        "childrenEmpty": "W tej grupie nie jest zagnieżdżona żadna grupa.",
+        "addChild": "Dodaj grupę podrzędną",
+        "addChildLabel": "Wybierz grupę do zagnieżdżenia",
+        "removeChildAria": "Odłącz {name} od grup podrzędnych tej grupy",
+        "confirmRemoveChild": "Przestać zagnieżdżać {name} w tej grupie?",
+        "parents": "Grupy nadrzędne",
+        "parentsBody": "Grupy, w których ta jest zagnieżdżona. Grupa może mieć kilka nadrzędnych.",
+        "parentsEmpty": "Ta grupa nie jest w niczym zagnieżdżona.",
+        "addParent": "Dodaj grupę nadrzędną",
+        "addParentLabel": "Wybierz grupę nadrzędną",
+        "removeParentAria": "Odłącz tę grupę od grupy {name}",
+        "confirmRemoveParent": "Przestać zagnieżdżać tę grupę w grupie {name}?"
+      },
+      "globalVars": {
+        "heading": "Zmienne inwentarza",
+        "body": "Zmienne, które dotyczą każdego hosta — group_vars/all w ansible. Zmienna grupy lub hosta o tej samej nazwie wygrywa z ustawioną tutaj."
+      },
+      "resolved": {
+        "heading": "Rozwiązane hosty",
+        "body": "To, co ansible robi z tych wierszy: każdy host ze zmiennymi, które ostatecznie posiada, po scaleniu i zastosowaniu pierwszeństwa.",
+        "hosts": "Hosty",
+        "groups": "Grupy",
+        "liveNote": "To jest na bieżąco. Każde źródło tutaj jest statyczne, więc odczyt sam rozwiązuje wiersze, aby odpowiedzieć — nie ma czego odświeżać.",
+        "noHosts": "Żaden wiersz nie rozwiązał się do hosta.",
+        "noVars": "brak zmiennych",
+        "groupsHeading": "Skład grup",
+        "directOnly": "Tylko bezpośrednia przynależność, dokładnie tak, jak podaje ją ansible: grupa, której wszystkie hosty przychodzą przez zagnieżdżoną grupę, nie wymienia żadnego własnego. Zagnieżdżenie jest poniżej.",
+        "noGroups": "Nie rozwiązano żadnej grupy.",
+        "noDirectMembers": "brak bezpośrednich hostów",
+        "nestingHeading": "Zagnieżdżenie grup",
+        "nestingBody": "Które grupy znajdują się w których. --limit na grupie nadrzędnej obejmuje każdy host pod nią.",
+        "noNesting": "Żadna grupa nie jest zagnieżdżona.",
+        "limitHeading": "Co obejmie --limit?",
+        "limitBody": "Rozwiń wzorzec ansible --limit na tym inwentarzu i zobacz dokładnie, które hosty wybiera, przed jakimkolwiek uruchomieniem. Rozwinięcie wykonuje sam ansible, więc grupa, wykluczenie i ~regex zachowują się dokładnie tak, jak w czasie uruchomienia.",
+        "limitLabel": "Wzorzec --limit",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Zastosuj limit",
+        "limitClear": "Wyczyść",
+        "limitApplied": "Ograniczono do {limit}. Wszystko poniżej to, co obejmuje ten wzorzec."
+      },
+      "settings": {
+        "heading": "Ustawienia",
+        "body": "Czy wiersze przechowywane tutaj się liczą oraz z jakiego repozytorium inwentarz jest dodatkowo czytany.",
+        "absent": "Brak ustawień, co jest domyślne: hosty i grupy przechowywane tutaj stanowią cały inwentarz.",
+        "includePlatform": "Używaj hostów i grup przechowywanych tutaj",
+        "includePlatformHelp": "Domyślnie włączone. Wyłącz, aby rozwiązywać wyłącznie z repozytorium — te wiersze pozostaną na miejscu, ale poza odpowiedzią.",
+        "included": "tak",
+        "excluded": "nie",
+        "vcsConnection": "Połączenie VCS",
+        "vcsNone": "Brak",
+        "field": {
+          "repo-url": "Repozytorium",
+          "branch": "Gałąź",
+          "working-directory": "Katalog"
+        },
+        "branchHelp": "Zostaw puste, aby śledzić domyślną gałąź repozytorium.",
+        "ignorePaths": "Ignorowane ścieżki",
+        "ignorePathsHelp": "Jeden wzorzec glob na wiersz. Wszystko, co się dopasuje, zostaje pominięte w inwentarzu czytanym z repozytorium.",
+        "unset": "nie ustawiono",
+        "create": "Dodaj ustawienia",
+        "clear": "Wyczyść ustawienia",
+        "confirmClear": "Wyczyścić te ustawienia? Powiązanie z repozytorium zniknie razem z nimi; hosty i grupy przechowywane tutaj pozostaną."
       },
       "errors": {
-        "loadItems": "Nie udało się wczytać zadeklarowanych hostów",
-        "loadResolved": "Nie udało się wczytać rozwiązanego inwentarza",
-        "preview": "Nie udało się wyświetlić podglądu --limit"
+        "load": "Nie udało się wczytać inwentarza",
+        "save": "Nie udało się zapisać",
+        "delete": "Nie udało się usunąć",
+        "resolved": "Nie udało się rozwiązać inwentarza",
+        "settings": "Nie udało się zapisać ustawień inwentarza"
       }
     },
     "sharing": {

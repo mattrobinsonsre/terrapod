@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventář",
-        "body": "Toto jsou hostitelé, které tento pracovní prostor deklaruje, a to, na co se vyhodnotí. Spuštění playbooku proti nim ještě není dostupné — toto vydání činí inventář pozorovatelným, odsud se nic nespouští."
+        "body": "Hostitelé a skupiny, které tento pracovní prostor obsahuje, a to, na co je ansible vyhodnotí. Každý řádek lze zde upravit; spuštění playbooku proti nim ještě není dostupné."
       },
-      "selectLabel": "Inventář",
-      "resolved": {
-        "heading": "Vyhodnocení hostitelé a skupiny",
-        "subheading": "Sloučený výsledek pro {name}, ze všech zdrojů v daném pořadí.",
+      "nav": {
+        "label": "Sekce inventáře",
         "hosts": "Hostitelé",
         "groups": "Skupiny",
-        "liveNote": "Toto je aktuální. Každý zdroj zde je deklarován ve vaší konfiguraci, takže vyhodnocení je dotaz do databáze."
-      },
-      "limit": {
-        "heading": "Na co by mířil --limit?",
-        "body": "Rozbalte vzor ansible --limit proti výše vyhodnoceným hostitelům, abyste viděli, které z nich vybere, než se cokoli spustí.",
-        "inputLabel": "Vzor --limit",
-        "placeholder": "web:!web-2",
-        "preview": "Náhled",
-        "previewing": "Vytváření náhledu…",
-        "matched": "{count, plural, =0 {Nebyl vybrán žádný hostitel} one {Vybrán # hostitel} few {Vybráni # hostitelé} many {Vybráno # hostitele} other {Vybráno # hostitelů}} z {total}.",
-        "advisory": "Pouze doporučující. Závazné rozbalení provádí ansible v runneru, berte to tedy jako vodítko, nikoli jako záruku."
-      },
-      "items": {
-        "heading": "Deklarovaní hostitelé",
-        "managedNote": "Deklarováni vlastním Terraformem tohoto pracovního prostoru, takže zde jsou pouze pro čtení. Přidejte, změňte nebo odeberte hostitele ve své konfiguraci a použijte ji — úprava provedená mimo Terraform bude při dalším použití vrácena zpět.",
-        "empty": "Dosud nebyli deklarováni žádní hostitelé.",
-        "name": "Hostitel",
-        "address": "Adresa",
-        "groups": "Skupiny",
         "vars": "Proměnné",
-        "noGroups": "žádné"
+        "resolved": "Vyhodnoceno",
+        "settings": "Nastavení"
       },
-      "sources": {
-        "heading": "Zdroje",
-        "body": "Vyhodnocují se v daném pořadí, přesně jako opakované přepínače -i: při konfliktu proměnné hostitele vítězí pozdější zdroj.",
-        "position": "Pozice {position}"
+      "actions": {
+        "save": "Uložit",
+        "saving": "Ukládání…",
+        "cancel": "Zrušit",
+        "edit": "Upravit",
+        "delete": "Smazat",
+        "remove": "Odebrat",
+        "add": "Přidat",
+        "adding": "Přidávání…",
+        "rename": "Přejmenovat"
+      },
+      "hosts": {
+        "heading": "Hostitelé",
+        "body": "Jeden řádek na hostitele. Otevřete hostitele a upravte jeho proměnné a skupiny, do kterých patří.",
+        "empty": "Zatím žádní hostitelé.",
+        "colName": "Hostitel",
+        "colGroups": "Skupiny",
+        "colVars": "Proměnné",
+        "newLabel": "Název nového hostitele",
+        "newPlaceholder": "web-1",
+        "add": "Přidat hostitele",
+        "confirmDelete": "Smazat hostitele {name}? Jeho proměnné a jeho členství ve skupinách zmizí s ním.",
+        "renameLabel": "Název hostitele"
+      },
+      "groups": {
+        "heading": "Skupiny",
+        "body": "Jeden řádek na skupinu. Otevřete skupinu a upravte její proměnné, hostitele, kteří do ní patří, a skupiny v ní vnořené.",
+        "empty": "Zatím žádné skupiny.",
+        "colName": "Skupina",
+        "colMembers": "Hostitelé",
+        "colChildren": "Podřízené skupiny",
+        "colVars": "Proměnné",
+        "newLabel": "Název nové skupiny",
+        "newPlaceholder": "web",
+        "add": "Přidat skupinu",
+        "confirmDelete": "Smazat skupinu {name}? Její proměnné a její členství zmizí s ní; samotní hostitelé zůstanou.",
+        "renameLabel": "Název skupiny"
+      },
+      "vars": {
+        "actions": "Akce",
+        "key": "Klíč",
+        "keyPlaceholder": "ansible_user",
+        "value": "Hodnota",
+        "structured": "Strukturovaná",
+        "sensitive": "Citlivá",
+        "structuredHelp": "Seznam, číslo nebo objekt je strukturovaná hodnota: zaškrtněte „Strukturovaná“ a napište do hodnoty její literální zdroj. Citlivá hodnota se nikdy nečte zpět — pole místo ní zobrazí masku.",
+        "structuredBadge": "strukturovaná",
+        "sensitiveKeep": "Nechte prázdné, chcete-li zachovat uloženou hodnotu.",
+        "empty": "Zde nejsou žádné proměnné.",
+        "add": "Přidat proměnnou",
+        "confirmDelete": "Smazat proměnnou {key}?"
+      },
+      "hostDetail": {
+        "heading": "Hostitel {name}",
+        "body": "Vše, co tento jeden hostitel nese.",
+        "back": "Zpět na hostitele",
+        "gone": "Tento hostitel již neexistuje.",
+        "vars": "Proměnné hostitele",
+        "varsBody": "Proměnné, které platí pouze pro tohoto hostitele. Vítězí nad skupinovou proměnnou stejného názvu.",
+        "memberships": "Skupiny",
+        "membershipsBody": "Skupiny, do kterých tento hostitel patří. Členství je vazba, takže jeho odebrání zde ponechá na místě hostitele i skupinu.",
+        "membershipsEmpty": "Tento hostitel není v žádné skupině, takže jej ansible zařadí do ungrouped.",
+        "addGroup": "Přidat do skupiny",
+        "addGroupLabel": "Vyberte skupinu",
+        "removeGroupAria": "Odebrat tohoto hostitele ze skupiny {name}",
+        "confirmRemoveGroup": "Vyjmout tohoto hostitele ze skupiny {name}?"
+      },
+      "groupDetail": {
+        "heading": "Skupina {name}",
+        "body": "Vše, co tato jedna skupina nese.",
+        "back": "Zpět na skupiny",
+        "gone": "Tato skupina již neexistuje.",
+        "vars": "Proměnné skupiny",
+        "varsBody": "Proměnné, které platí pro každého hostitele v této skupině — přímo nebo přes vnoření.",
+        "members": "Členští hostitelé",
+        "membersBody": "Hostitelé, kteří patří do této skupiny přímo. Hostitel dosažitelný pouze přes vnořenou skupinu zde uveden není.",
+        "membersEmpty": "Do této skupiny nepatří přímo žádný hostitel.",
+        "addHost": "Přidat hostitele",
+        "addHostLabel": "Vyberte hostitele",
+        "removeHostAria": "Odebrat {name} z této skupiny",
+        "confirmRemoveHost": "Vyjmout {name} z této skupiny?",
+        "children": "Podřízené skupiny",
+        "childrenBody": "Skupiny vnořené v této. Jejich hostitelé jsou členy i této skupiny a proměnné této skupiny k nim dosáhnou.",
+        "childrenEmpty": "V této skupině není vnořena žádná skupina.",
+        "addChild": "Přidat podřízenou skupinu",
+        "addChildLabel": "Vyberte skupinu k vnoření",
+        "removeChildAria": "Odebrat {name} z podřízených skupin této skupiny",
+        "confirmRemoveChild": "Přestat vnořovat {name} do této skupiny?",
+        "parents": "Nadřazené skupiny",
+        "parentsBody": "Skupiny, do kterých je tato vnořena. Skupina může mít několik nadřazených.",
+        "parentsEmpty": "Tato skupina není vnořena do ničeho.",
+        "addParent": "Přidat nadřazenou skupinu",
+        "addParentLabel": "Vyberte nadřazenou skupinu",
+        "removeParentAria": "Odebrat tuto skupinu ze skupiny {name}",
+        "confirmRemoveParent": "Přestat vnořovat tuto skupinu do skupiny {name}?"
+      },
+      "globalVars": {
+        "heading": "Proměnné inventáře",
+        "body": "Proměnné, které platí pro každého hostitele — group_vars/all v ansible. Proměnná skupiny nebo hostitele stejného názvu vítězí nad tou nastavenou zde."
+      },
+      "resolved": {
+        "heading": "Vyhodnocení hostitelé",
+        "body": "Co z těchto řádků ansible udělá: každý hostitel s proměnnými, které nakonec drží, po sloučení a uplatnění přednosti.",
+        "hosts": "Hostitelé",
+        "groups": "Skupiny",
+        "liveNote": "Toto je aktuální. Každý zdroj zde je statický, takže čtení si řádky vyhodnotí samo, aby odpovědělo — není co obnovovat.",
+        "noHosts": "Žádný řádek se nevyhodnotil na hostitele.",
+        "noVars": "žádné proměnné",
+        "groupsHeading": "Členství ve skupinách",
+        "directOnly": "Pouze přímé členství, přesně jak jej hlásí ansible: skupina, jejíž hostitelé všichni přicházejí přes vnořenou skupinu, neuvádí žádného vlastního. Vnoření je níže.",
+        "noGroups": "Nevyhodnotila se žádná skupina.",
+        "noDirectMembers": "žádní přímí hostitelé",
+        "nestingHeading": "Vnoření skupin",
+        "nestingBody": "Které skupiny leží v kterých. --limit na nadřazené skupině zasáhne každého hostitele pod ní.",
+        "noNesting": "Žádná skupina není vnořena.",
+        "limitHeading": "Na co by mířil --limit?",
+        "limitBody": "Rozbalte vzor ansible --limit proti tomuto inventáři a uvidíte přesně, které hostitele vybere, než se cokoli spustí. Rozbalení provádí sám ansible, takže skupina, vyloučení i ~regex se chovají přesně tak, jak se budou chovat při běhu.",
+        "limitLabel": "Vzor --limit",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Použít limit",
+        "limitClear": "Vymazat",
+        "limitApplied": "Omezeno na {limit}. Vše níže je to, na co tento vzor míří."
+      },
+      "settings": {
+        "heading": "Nastavení",
+        "body": "Zda se řádky držené zde počítají a z jakého repozitáře se inventář také čte.",
+        "absent": "Žádné nastavení, což je výchozí stav: hostitelé a skupiny držené zde tvoří celý inventář.",
+        "includePlatform": "Používat hostitele a skupiny držené zde",
+        "includePlatformHelp": "Výchozí stav je zapnuto. Vypněte, chcete-li vyhodnocovat pouze z repozitáře — tyto řádky zůstanou na místě, ale mimo odpověď.",
+        "included": "ano",
+        "excluded": "ne",
+        "vcsConnection": "VCS připojení",
+        "vcsNone": "Žádné",
+        "field": {
+          "repo-url": "Repozitář",
+          "branch": "Větev",
+          "working-directory": "Adresář"
+        },
+        "branchHelp": "Nechte prázdné, chcete-li sledovat výchozí větev repozitáře.",
+        "ignorePaths": "Ignorované cesty",
+        "ignorePathsHelp": "Jeden glob na řádek. Vše, co odpovídá, je z inventáře čteného z repozitáře vynecháno.",
+        "unset": "nenastaveno",
+        "create": "Přidat nastavení",
+        "clear": "Vymazat nastavení",
+        "confirmClear": "Vymazat toto nastavení? Vazba na repozitář zmizí s ním; hostitelé a skupiny držené zde zůstanou."
       },
       "errors": {
-        "loadItems": "Nepodařilo se načíst deklarované hostitele",
-        "loadResolved": "Nepodařilo se načíst vyhodnocený inventář",
-        "preview": "Nepodařilo se zobrazit náhled --limit"
+        "load": "Nepodařilo se načíst inventář",
+        "save": "Nepodařilo se uložit",
+        "delete": "Nepodařilo se smazat",
+        "resolved": "Nepodařilo se vyhodnotit inventář",
+        "settings": "Nepodařilo se uložit nastavení inventáře"
       }
     },
     "sharing": {

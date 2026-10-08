@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "Inventar",
-        "body": "Dette er de værter, som dette arbejdsområde erklærer, og hvad de opløses til. At køre en playbook mod dem er endnu ikke muligt — denne udgivelse gør inventaret observerbart, intet udføres herfra."
+        "body": "De værter og grupper, dette arbejdsområde indeholder, og hvad ansible opløser dem til. Hver række kan redigeres her; at køre en playbook mod dem er endnu ikke muligt."
       },
-      "selectLabel": "Inventar",
-      "resolved": {
-        "heading": "Opløste værter og grupper",
-        "subheading": "Det sammenflettede resultat for {name}, fra hver kilde i rækkefølge.",
+      "nav": {
+        "label": "Inventarafsnit",
         "hosts": "Værter",
         "groups": "Grupper",
-        "liveNote": "Dette er live. Hver kilde her er erklæret i din konfiguration, så det at opløse den er en databaseforespørgsel."
-      },
-      "limit": {
-        "heading": "Hvad ville et limit-mønster ramme?",
-        "body": "Udvid et ansible --limit-mønster ud fra de opløste værter ovenfor, så du kan se, hvilke af dem det vælger, før noget kører.",
-        "inputLabel": "Limit-mønster",
-        "placeholder": "web:!web-2",
-        "preview": "Forhåndsvis",
-        "previewing": "Forhåndsviser…",
-        "matched": "{count, plural, =0 {Ingen værter} one {# vært} other {# værter}} af {total} valgt.",
-        "advisory": "Kun vejledende. Den autoritative udvidelse foretages af ansible i runneren, så betragt dette som en vejledning frem for en garanti."
-      },
-      "items": {
-        "heading": "Erklærede værter",
-        "managedNote": "Erklæret af dette arbejdsområdes egen Terraform og derfor skrivebeskyttet her. Tilføj, ændr eller fjern en vært i din konfiguration og anvend den — en ændring foretaget uden for Terraform rulles tilbage ved næste apply.",
-        "empty": "Ingen værter erklæret endnu.",
-        "name": "Vært",
-        "address": "Adresse",
-        "groups": "Grupper",
         "vars": "Variabler",
-        "noGroups": "ingen"
+        "resolved": "Opløst",
+        "settings": "Indstillinger"
       },
-      "sources": {
-        "heading": "Kilder",
-        "body": "Opløses i rækkefølge, præcis som gentagne -i-flag: ved en modstridende værtsvariabel vinder den senere kilde.",
-        "position": "Position {position}"
+      "actions": {
+        "save": "Gem",
+        "saving": "Gemmer…",
+        "cancel": "Annuller",
+        "edit": "Rediger",
+        "delete": "Slet",
+        "remove": "Fjern",
+        "add": "Tilføj",
+        "adding": "Tilføjer…",
+        "rename": "Omdøb"
+      },
+      "hosts": {
+        "heading": "Værter",
+        "body": "Én række per vært. Åbn en vært for at redigere dens variabler og de grupper, den tilhører.",
+        "empty": "Endnu ingen værter.",
+        "colName": "Vært",
+        "colGroups": "Grupper",
+        "colVars": "Variabler",
+        "newLabel": "Navn på den nye vært",
+        "newPlaceholder": "web-1",
+        "add": "Tilføj vært",
+        "confirmDelete": "Slet værten {name}? Dens variabler og dens gruppemedlemskaber følger med.",
+        "renameLabel": "Værtsnavn"
+      },
+      "groups": {
+        "heading": "Grupper",
+        "body": "Én række per gruppe. Åbn en gruppe for at redigere dens variabler, dens medlemsværter og de grupper, der er indlejret i den.",
+        "empty": "Endnu ingen grupper.",
+        "colName": "Gruppe",
+        "colMembers": "Værter",
+        "colChildren": "Undergrupper",
+        "colVars": "Variabler",
+        "newLabel": "Navn på den nye gruppe",
+        "newPlaceholder": "web",
+        "add": "Tilføj gruppe",
+        "confirmDelete": "Slet gruppen {name}? Dens variabler og dens medlemskaber følger med; selve værterne bliver.",
+        "renameLabel": "Gruppenavn"
+      },
+      "vars": {
+        "actions": "Handlinger",
+        "key": "Nøgle",
+        "keyPlaceholder": "ansible_user",
+        "value": "Værdi",
+        "structured": "Struktureret",
+        "sensitive": "Følsom",
+        "structuredHelp": "En liste, et tal eller et objekt er en struktureret værdi: sæt flueben i Struktureret og skriv dens literale kildetekst i værdien. En følsom værdi læses aldrig tilbage — feltet viser i stedet en maske.",
+        "structuredBadge": "struktureret",
+        "sensitiveKeep": "Lad dette stå tomt for at beholde den gemte værdi.",
+        "empty": "Ingen variabler her.",
+        "add": "Tilføj variabel",
+        "confirmDelete": "Slet variablen {key}?"
+      },
+      "hostDetail": {
+        "heading": "Vært {name}",
+        "body": "Alt, hvad denne ene vært bærer.",
+        "back": "Tilbage til værter",
+        "gone": "Den vært findes ikke længere.",
+        "vars": "Værtsvariabler",
+        "varsBody": "Variabler, der kun gælder for denne vært. De har forrang over en gruppevariabel med samme navn.",
+        "memberships": "Grupper",
+        "membershipsBody": "De grupper, denne vært tilhører. Et medlemskab er en forbindelse, så hvis du fjerner et her, bliver både værten og gruppen bevaret.",
+        "membershipsEmpty": "Denne vært er ikke i nogen gruppe, så ansible placerer den i ungrouped.",
+        "addGroup": "Tilføj til gruppe",
+        "addGroupLabel": "Vælg en gruppe",
+        "removeGroupAria": "Fjern denne vært fra {name}",
+        "confirmRemoveGroup": "Tag denne vært ud af {name}?"
+      },
+      "groupDetail": {
+        "heading": "Gruppe {name}",
+        "body": "Alt, hvad denne ene gruppe bærer.",
+        "back": "Tilbage til grupper",
+        "gone": "Den gruppe findes ikke længere.",
+        "vars": "Gruppevariabler",
+        "varsBody": "Variabler, der gælder for hver vært i denne gruppe, direkte eller gennem indlejring.",
+        "members": "Medlemsværter",
+        "membersBody": "Værterne, der ligger direkte i denne gruppe. En vært, der kun nås gennem en indlejret gruppe, står ikke her.",
+        "membersEmpty": "Ingen værter direkte i denne gruppe.",
+        "addHost": "Tilføj vært",
+        "addHostLabel": "Vælg en vært",
+        "removeHostAria": "Fjern {name} fra denne gruppe",
+        "confirmRemoveHost": "Tag {name} ud af denne gruppe?",
+        "children": "Undergrupper",
+        "childrenBody": "Grupper, der er indlejret i denne. Deres værter er også medlemmer af denne gruppe, og denne gruppes variabler når dem.",
+        "childrenEmpty": "Ingen gruppe er indlejret i denne.",
+        "addChild": "Tilføj undergruppe",
+        "addChildLabel": "Vælg en gruppe, der skal indlejres",
+        "removeChildAria": "Fjern {name} fra denne gruppes undergrupper",
+        "confirmRemoveChild": "Stop med at indlejre {name} i denne gruppe?",
+        "parents": "Overordnede grupper",
+        "parentsBody": "De grupper, denne er indlejret i. En gruppe kan have flere overordnede grupper.",
+        "parentsEmpty": "Denne gruppe er ikke indlejret i noget.",
+        "addParent": "Tilføj overordnet gruppe",
+        "addParentLabel": "Vælg en overordnet gruppe",
+        "removeParentAria": "Fjern denne gruppe fra {name}",
+        "confirmRemoveParent": "Stop med at indlejre denne gruppe i {name}?"
+      },
+      "globalVars": {
+        "heading": "Inventarvariabler",
+        "body": "Variabler, der gælder for hver vært — ansibles group_vars/all. En gruppe- eller værtsvariabel med samme navn har forrang over en, der sættes her."
+      },
+      "resolved": {
+        "heading": "Opløste værter",
+        "body": "Hvad ansible gør af rækkerne: hver vært med de variabler, den ender med at bære, efter sammenfletningen og forrangen.",
+        "hosts": "Værter",
+        "groups": "Grupper",
+        "liveNote": "Dette er live. Hver kilde her er statisk, så læsningen opløser rækkerne selv — der er intet at opdatere.",
+        "noHosts": "Intet blev opløst til en vært.",
+        "noVars": "ingen variabler",
+        "groupsHeading": "Gruppemedlemskab",
+        "directOnly": "Kun direkte medlemskab, præcis som ansible rapporterer det: en gruppe, hvis værter alle kommer ind via en indlejret gruppe, lister ingen af sine egne. Indlejringen står nedenfor.",
+        "noGroups": "Ingen grupper blev opløst.",
+        "noDirectMembers": "ingen direkte værter",
+        "nestingHeading": "Gruppeindlejring",
+        "nestingBody": "Hvilke grupper der ligger i hvilke. Et limit på en overordnet gruppe når hver vært under den.",
+        "noNesting": "Ingen gruppe er indlejret.",
+        "limitHeading": "Hvad ville et limit ramme?",
+        "limitBody": "Udvid et ansible --limit-mønster mod dette inventar og se præcis, hvilke værter det vælger, før noget kører. Ansible foretager udvidelsen, så en gruppe, en udelukkelse og et ~regex opfører sig præcis, som de vil gøre under kørsel.",
+        "limitLabel": "Limit-mønster",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "Anvend limit",
+        "limitClear": "Ryd",
+        "limitApplied": "Begrænset til {limit}. Alt nedenfor er, hvad det mønster rammer."
+      },
+      "settings": {
+        "heading": "Indstillinger",
+        "body": "Om de rækker, der holdes her, tæller, og det repositorie, et inventar også læses fra.",
+        "absent": "Ingen indstillinger, hvilket er standard: de værter og grupper, der holdes her, er hele inventaret.",
+        "includePlatform": "Brug de værter og grupper, der holdes her",
+        "includePlatformHelp": "Slået til som standard. Slå den fra for at opløse alene fra repositoriet; rækkerne bliver bevaret, men står uden for svaret.",
+        "included": "ja",
+        "excluded": "nej",
+        "vcsConnection": "VCS-forbindelse",
+        "vcsNone": "Ingen",
+        "field": {
+          "repo-url": "Repositorie",
+          "branch": "Branch",
+          "working-directory": "Mappe"
+        },
+        "branchHelp": "Lad feltet stå tomt for at følge repositoriets standardbranch.",
+        "ignorePaths": "Ignorerede stier",
+        "ignorePathsHelp": "Én glob per linje. Alt, der matcher, holdes uden for det inventar, der læses fra repositoriet.",
+        "unset": "ikke angivet",
+        "create": "Tilføj indstillinger",
+        "clear": "Ryd indstillinger",
+        "confirmClear": "Ryd disse indstillinger? Bindingen til repositoriet følger med; de værter og grupper, der holdes her, bliver bevaret."
       },
       "errors": {
-        "loadItems": "Kunne ikke indlæse erklærede værter",
-        "loadResolved": "Kunne ikke indlæse det opløste inventar",
-        "preview": "Forhåndsvisning af limit-mønstret mislykkedes"
+        "load": "Kunne ikke indlæse inventaret",
+        "save": "Kunne ikke gemme",
+        "delete": "Kunne ikke slette",
+        "resolved": "Kunne ikke opløse inventaret",
+        "settings": "Kunne ikke gemme inventarindstillingerne"
       }
     },
     "sharing": {

@@ -2859,45 +2859,168 @@
     "inventory": {
       "scope": {
         "heading": "tetlh",
-        "body": "Qumwo''vam maqbogh hostmey je Dotlh ''oH tetlhvam''e''. DaH vang paq lo''laHbe''lu''. mI'' chu''vam tetlh legh''eghmoH neH; naDev vanglu''be''."
+        "body": "Qumwo''vam hostmey ghommey je, ''ej ansible chay'' wIv. naDev Hoch ''ay'' DachoHlaH; ''ach DaH paq vanglaHbe''lu''."
       },
-      "selectLabel": "tetlh",
-      "resolved": {
-        "heading": "wIvlu''pu''bogh hostmey ghommey je",
-        "subheading": "{name} tetlh boQDu'' tay'': Hoch mung mIwDaq.",
+      "nav": {
+        "label": "tetlh ''ay''mey",
         "hosts": "hostmey",
         "groups": "ghommey",
-        "liveNote": "DaH wIvlu''. naDev Hoch mung Terraform maq; vaj wIv ghel neH ''oH."
-      },
-      "limit": {
-        "heading": "nuq wIv veH''e''?",
-        "body": "wIvlu''pu''bogh hostmeyDaq ansible --limit per Sov; vaj vangpa'', wIvbogh Dalegh.",
-        "inputLabel": "veH per",
-        "placeholder": "web:!web-2",
-        "preview": "tI''ang",
-        "previewing": "tI''angtaH…",
-        "matched": "{total} hostmeyvo'' {count, plural, =0 {pagh wIvlu''} one {# wIvlu''} other {# wIvlu''}}.",
-        "advisory": "qechHom neH. vumwI''Daq ansible wIv''a''. vaj ghojmoHwI'' rur, ''ach lI''be''."
-      },
-      "items": {
-        "heading": "maqlu''bogh hostmey",
-        "managedNote": "Qumwo''vam Terraform maq hostmeyvam; naDev DachoHlaHbe''. Terraformvo'' host chel, choH, pagh teq, ''ej vang. Terraform Hutlhbogh choH vanglaHpa'' Qaw''lu''.",
-        "empty": "host maqlu''be''.",
-        "name": "host",
-        "address": "Daq",
-        "groups": "ghommey",
         "vars": "choHlaHmey",
-        "noGroups": "pagh"
+        "resolved": "wIvlu''pu''bogh",
+        "settings": "numtaHmey"
       },
-      "sources": {
-        "heading": "mungmey",
-        "body": "mIwDaq wIvlu'', -i per qa''mey rur: mung tlhaQ choHlaHmey Qap.",
-        "position": "Daq {position}"
+      "actions": {
+        "save": "pol",
+        "saving": "poltaH…",
+        "cancel": "qIl",
+        "edit": "choH",
+        "delete": "Qaw''",
+        "remove": "teq",
+        "add": "chel",
+        "adding": "cheltaH…",
+        "rename": "pong choH"
+      },
+      "hosts": {
+        "heading": "hostmey",
+        "body": "wa'' host, wa'' ''ay''. host poSmoH; vaj choHlaHmey ghommey je DachoHlaH.",
+        "empty": "DaH host tu''be''lu''.",
+        "colName": "host",
+        "colGroups": "ghommey",
+        "colVars": "choHlaHmey",
+        "newLabel": "host chu'' pong",
+        "newPlaceholder": "web-1",
+        "add": "host chel",
+        "confirmDelete": "host {name} Qaw''? choHlaHmey ghom patmey je Qaw''lu'' je.",
+        "renameLabel": "host pong"
+      },
+      "groups": {
+        "heading": "ghommey",
+        "body": "wa'' ghom, wa'' ''ay''. ghom poSmoH; vaj choHlaHmey, hostmey, ''ej qoDDaq ghommey DachoHlaH.",
+        "empty": "DaH ghom tu''be''lu''.",
+        "colName": "ghom",
+        "colMembers": "hostmey",
+        "colChildren": "puqghommey",
+        "colVars": "choHlaHmey",
+        "newLabel": "ghom chu'' pong",
+        "newPlaceholder": "web",
+        "add": "ghom chel",
+        "confirmDelete": "ghom {name} Qaw''? choHlaHmey patmey je Qaw''lu''; ''ach hostmey taH.",
+        "renameLabel": "ghom pong"
+      },
+      "vars": {
+        "actions": "vangmey",
+        "key": "ngaQHa''wI''",
+        "keyPlaceholder": "ansible_user",
+        "value": "nap",
+        "structured": "chenmoHlu''bogh",
+        "sensitive": "pegh",
+        "structuredHelp": "tetlh, mI'' pagh Doch ''oH chenmoHlu''bogh nap. chenmoHlu''bogh wIv ''ej napDaq Hal qon. pegh nap laDlu''be'' — per So''lu''bogh ''anglu'' neH.",
+        "structuredBadge": "chenmoHlu''bogh",
+        "sensitiveKeep": "polbogh nap polqa''meH, naDev chIm chaw''.",
+        "empty": "naDev choHlaHmey tu''be''lu''.",
+        "add": "choHlaH chel",
+        "confirmDelete": "choHlaH {key} Qaw''?"
+      },
+      "hostDetail": {
+        "heading": "host {name}",
+        "body": "Hoch qengbogh hostvam.",
+        "back": "hostmeyDaq chegh",
+        "gone": "hostvetlh taHbe''.",
+        "vars": "host choHlaHmey",
+        "varsBody": "hostvam neH lI''bogh choHlaHmey. rap pongbogh ghom choHlaH Qap.",
+        "memberships": "ghommey",
+        "membershipsBody": "hostvam patmey ghommey. pat ''oH rar, vaj naDev wa'' teqlu''chugh host ghom je taH.",
+        "membershipsEmpty": "hostvam pagh ghomDaq; vaj ansible ungrouped ghomDaq lan.",
+        "addGroup": "ghomDaq chel",
+        "addGroupLabel": "ghom wIv",
+        "removeGroupAria": "{name}vo'' hostvam teq",
+        "confirmRemoveGroup": "{name}vo'' hostvam teq?"
+      },
+      "groupDetail": {
+        "heading": "ghom {name}",
+        "body": "Hoch qengbogh ghomvam.",
+        "back": "ghommeyDaq chegh",
+        "gone": "ghomvetlh taHbe''.",
+        "vars": "ghom choHlaHmey",
+        "varsBody": "ghomvamDaq Hoch host lI''bogh choHlaHmey, nIteb pagh puqghomvo''.",
+        "members": "pat hostmey",
+        "membersBody": "ghomvamDaq nIteb tu''lu''bogh hostmey. puqghom neH tlhejbogh host naDev tu''be''lu''.",
+        "membersEmpty": "ghomvamDaq nIteb host tu''be''lu''.",
+        "addHost": "host chel",
+        "addHostLabel": "host wIv",
+        "removeHostAria": "ghomvamvo'' {name} teq",
+        "confirmRemoveHost": "ghomvamvo'' {name} teq?",
+        "children": "puqghommey",
+        "childrenBody": "ghomvam qoDDaq ghommey. chaj hostmey ghomvam pat je, ''ej ghomvam choHlaHmey chaH SIch.",
+        "childrenEmpty": "ghomvam qoDDaq ghom tu''be''lu''.",
+        "addChild": "puqghom chel",
+        "addChildLabel": "qoDDaq lanmeH ghom wIv",
+        "removeChildAria": "ghomvam puqghommeyvo'' {name} teq",
+        "confirmRemoveChild": "ghomvam qoDDaq {name} lanQo''?",
+        "parents": "vav ghommey",
+        "parentsBody": "ghomvam qengbogh ghommey. ghom law'' vav ghommey ghajlaH.",
+        "parentsEmpty": "pagh ghom qoDDaq ghomvam.",
+        "addParent": "vav ghom chel",
+        "addParentLabel": "vav ghom wIv",
+        "removeParentAria": "{name}vo'' ghomvam teq",
+        "confirmRemoveParent": "{name} qoDDaq ghomvam lanQo''?"
+      },
+      "globalVars": {
+        "heading": "tetlh choHlaHmey",
+        "body": "Hoch host lI''bogh choHlaHmey — ansible group_vars/all. rap pongbogh ghom pagh host choHlaH Qap; naDev lanbogh choHlaH Qapbe''."
+      },
+      "resolved": {
+        "heading": "wIvlu''pu''bogh hostmey",
+        "body": "''ay''mey ansible chenmoHbogh: Hoch host, ''ej boSlu''pu'' potlh je ghoSpu''DI'' qengbogh choHlaHmey.",
+        "hosts": "hostmey",
+        "groups": "ghommey",
+        "liveNote": "DaH wIvlu''. naDev Hoch mung taH, vaj laDlu''DI'' ''ay''mey wIvlu'' — pagh qa''moHnISlu''.",
+        "noHosts": "pagh host wIvlu''pu''.",
+        "noVars": "choHlaHmey tu''be''lu''",
+        "groupsHeading": "ghom pat",
+        "directOnly": "nIteb pat neH, ansible maq rur: puqghomvo'' neH ghoSbogh hostmey ghajbogh ghom, pagh nIteb host maq. bIngDaq qoD pat tu''lu''.",
+        "noGroups": "pagh ghom wIvlu''pu''.",
+        "noDirectMembers": "nIteb hostmey tu''be''lu''",
+        "nestingHeading": "ghom qoD pat",
+        "nestingBody": "nuq ghom qoDDaq nuq ghom. vav ghomDaq per lanlu''chugh, bIngDaq Hoch host SIch.",
+        "noNesting": "pagh ghom qoDDaq lanlu''.",
+        "limitHeading": "nuq per SIch?",
+        "limitBody": "tetlhvamDaq ansible --limit per Sov, vaj vangpa'' wIvbogh hostmey Dalegh. ansible per Sov, vaj ghom, teqwI'' ''ej ~regex vangDI'' rur.",
+        "limitLabel": "--limit per",
+        "limitPlaceholder": "web:!web-2",
+        "limitApply": "per lan",
+        "limitClear": "teq",
+        "limitApplied": "{limit} per lanlu''. bIngDaq Hoch, per SIchbogh."
+      },
+      "settings": {
+        "heading": "numtaHmey",
+        "body": "naDev polbogh ''ay''mey lo''lu''bogh, ''ej tetlh laDmeH qawHaq.",
+        "absent": "numtaHmey tu''be''lu'' — motlh: naDev polbogh hostmey ghommey je ''oH Hoch tetlh.",
+        "includePlatform": "naDev polbogh hostmey ghommey je lo''",
+        "includePlatformHelp": "motlh chu''lu''pu''. chu''Ha''; vaj qawHaqvo'' neH wIvlu'', ''ej naDev ''ay''mey taH ''ach wIvDaq tu''be''lu''.",
+        "included": "HISlaH",
+        "excluded": "ghobe''",
+        "vcsConnection": "VCS rar",
+        "vcsNone": "pagh",
+        "field": {
+          "repo-url": "qawHaq",
+          "branch": "paQ",
+          "working-directory": "Daq"
+        },
+        "branchHelp": "chIm chaw''; vaj qawHaq motlh paQ tlha''lu''.",
+        "ignorePaths": "buSHa''lu''bogh Hemey",
+        "ignorePathsHelp": "wa'' glob, wa'' tlhegh. rarbogh Hoch, qawHaqvo'' laDlu''bogh tetlhvo'' teqlu''.",
+        "unset": "lanlu''be''",
+        "create": "numtaHmey chel",
+        "clear": "numtaHmey teq",
+        "confirmClear": "numtaHmeyvam teq? qawHaq rar teqlu'' je; ''ach naDev polbogh hostmey ghommey je taH."
       },
       "errors": {
-        "loadItems": "maqlu''bogh hostmey ghelmeH lujpu''",
-        "loadResolved": "wIvlu''pu''bogh tetlh ghelmeH lujpu''",
-        "preview": "veH tI''angmeH lujpu''"
+        "load": "tetlh ghelmeH lujpu''",
+        "save": "polmeH lujpu''",
+        "delete": "Qaw'' lujpu''",
+        "resolved": "tetlh wIvmeH lujpu''",
+        "settings": "tetlh numtaHmey polmeH lujpu''"
       }
     },
     "sharing": {
