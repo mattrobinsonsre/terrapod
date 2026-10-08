@@ -403,3 +403,82 @@ func TestInventoryToolsRequireTheirIDs(t *testing.T) {
 		t.Fatal("a missing id must not reach Terrapod")
 	}
 }
+
+// TestTheInventoryToolsDoNotTellAnAgentAReadIsStale guards the claim an agent
+// acts on, which no other gate reaches.
+//
+// This exists because the four descriptions it checks were all FALSE for a
+// release, and every gate was green. They said a read served "the newest
+// snapshot", that the limit preview was "only as FRESH as the last snapshot,
+// not live", and that an agent finding `taken-at` old should refresh before
+// previewing. Each was true when written and stopped being true when the read
+// path became live — and nothing noticed, because the catalogue golden freezes
+// names, annotations and input schemas and NOT descriptions (see
+// liveToolsByName). The docs had a gate that quotes the API's own literals and
+// the web tab had an e2e assertion; MCP had neither, so MCP is the surface that
+// shipped the falsehood.
+//
+// It is deliberately NOT a golden of description text. A golden would only
+// catch an unreviewed EDIT, and nobody edited these — the code moved
+// underneath them. What is pinned instead is the property: the claim is
+// conditional on what Terrapod can resolve, and the retired absolute phrasing
+// appears nowhere.
+func TestTheInventoryToolsDoNotTellAnAgentAReadIsStale(t *testing.T) {
+	tools := liveToolsByName(t)
+
+	// Phrasings that were true before the read path became live, and are now
+	// the wrong answer in the direction that matters: an agent told its data
+	// may be stale either refuses to act on it or writes a snapshot it does
+	// not need, and the history is bounded.
+	retired := []string{
+		"only as FRESH as the last snapshot",
+		"only as fresh as the last snapshot",
+		"Serves the newest snapshot",
+		"stale target set is brought up to date",
+	}
+	for name, desc := range tools {
+		if !strings.HasPrefix(name, "terrapod_inventory") &&
+			name != "terrapod_workspace_inventories" {
+			continue
+		}
+		for _, phrase := range retired {
+			if strings.Contains(desc, phrase) {
+				t.Errorf("%s describes a read as stale unconditionally (%q); it is live "+
+					"for every source kind Terrapod can resolve itself, which is every "+
+					"kind that exists today", name, phrase)
+			}
+		}
+	}
+
+	// And the two tools whose answer an operator acts on must SAY the read is
+	// live, with the condition attached. Asserting the absence of the retired
+	// phrasing alone would pass on a description that said nothing at all,
+	// which is the same disservice more quietly.
+	for _, name := range []string{"terrapod_inventory_resolved", "terrapod_inventory_limit_preview"} {
+		desc, ok := tools[name]
+		if !ok {
+			t.Fatalf("%s is not registered", name)
+		}
+		if !strings.Contains(desc, "LIVE") && !strings.Contains(desc, "live") {
+			t.Errorf("%s does not tell an agent the resolution is live", name)
+		}
+		// The condition, not an unqualified promise: an inventory carrying a
+		// source that needs ansible really is served from a snapshot, and an
+		// agent that believes otherwise reports a stale host set as current.
+		if !strings.Contains(desc, "resolve itself") {
+			t.Errorf("%s claims liveness without the condition it depends on "+
+				"(an inventory Terrapod can resolve itself)", name)
+		}
+	}
+
+	// The write tool must not sell itself as the way to get fresh data, or an
+	// agent spends a bounded history slot on a no-op per read.
+	refresh := tools["terrapod_inventory_refresh"]
+	if refresh == "" {
+		t.Fatal("terrapod_inventory_refresh is not registered")
+	}
+	if !strings.Contains(refresh, "do NOT need this") {
+		t.Error("terrapod_inventory_refresh does not say a read is already live, " +
+			"so an agent will reach for it to refresh data that was never stale")
+	}
+}
