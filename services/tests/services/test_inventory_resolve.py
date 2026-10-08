@@ -37,6 +37,7 @@ import yaml
 from terrapod.services.inventory_resolve import (
     CACHE_TTL_SECONDS,
     InventorySourceRefused,
+    _apply_ignore_paths,
     _refuse_plugin_sources,
     _write_ansible_cfg,
     cache_key,
@@ -507,3 +508,167 @@ class TestTheCacheKey:
         """Only because of the git source -- a derived `platform_rev` cannot be
         stale, but a git sha is only knowable by fetching."""
         assert 0 < CACHE_TTL_SECONDS <= 3600
+
+
+class TestIgnorePathsIsActuallyApplied:
+    """`ignore_paths` was stored, serialised and honoured by NOTHING (#1967).
+
+    It was validated on the way in, persisted, returned by the API and carried
+    by replication -- and the resolution never looked at it. That is the
+    "a flag exists and something must read it" shape this project has shipped
+    before (the OCI `enabled` flag that disabled two scheduled tasks while the
+    registry happily served push and pull), and here it failed in the direction
+    that reads as harmless: the source stayed WIDER than the operator asked
+    for, so hosts they had excluded appeared.
+
+    Ansible reads a directory as one source and takes every file in it, so
+    pruning the tree before ansible sees it is the only way to leave a file out.
+    """
+
+    def test_a_named_directory_and_its_contents_are_removed(self, tmp_path: Path):
+        (tmp_path / "hosts.yml").write_text("all:\n")
+        (tmp_path / "archive").mkdir()
+        (tmp_path / "archive" / "retired.yml").write_text("all:\n")
+
+        _apply_ignore_paths(tmp_path, ["archive"])
+
+        assert (tmp_path / "hosts.yml").exists()
+        assert not (tmp_path / "archive").exists()
+
+    def test_a_glob_matches_the_same_way_an_autodiscovery_rule_does(self, tmp_path: Path):
+        """Same matcher, so the two settings mean the same thing to an
+        operator who has written one of them before."""
+        (tmp_path / "hosts.yml").write_text("all:\n")
+        (tmp_path / "README.txt").write_text("notes\n")
+        (tmp_path / "staging.ini").write_text("[web]\n")
+
+        _apply_ignore_paths(tmp_path, ["*.txt", "staging.ini"])
+
+        assert (tmp_path / "hosts.yml").exists()
+        assert not (tmp_path / "README.txt").exists()
+        assert not (tmp_path / "staging.ini").exists()
+
+    def test_patterns_are_relative_to_the_working_directory(self, tmp_path: Path):
+        """`root` is already narrowed by `working_directory`, so a pattern is
+        written against that -- an operator never prefixes a path they did not
+        choose."""
+        (tmp_path / "group_vars").mkdir()
+        (tmp_path / "group_vars" / "all.yml").write_text("k: v\n")
+        (tmp_path / "group_vars" / "secret.yml").write_text("k: v\n")
+
+        _apply_ignore_paths(tmp_path, ["group_vars/secret.yml"])
+
+        assert (tmp_path / "group_vars" / "all.yml").exists()
+        assert not (tmp_path / "group_vars" / "secret.yml").exists()
+
+    def test_an_empty_or_blank_list_removes_nothing(self, tmp_path: Path):
+        """The default, and the overwhelmingly common case. A pattern list of
+        blanks must not become a pattern that matches everything."""
+        (tmp_path / "hosts.yml").write_text("all:\n")
+
+        for patterns in ([], ["", "  "]):
+            _apply_ignore_paths(tmp_path, patterns)
+            assert (tmp_path / "hosts.yml").exists(), patterns
+
+    def test_a_pattern_matching_nothing_leaves_the_tree_alone(self, tmp_path: Path):
+        (tmp_path / "hosts.yml").write_text("all:\n")
+
+        _apply_ignore_paths(tmp_path, ["does-not-exist/**"])
+
+        assert (tmp_path / "hosts.yml").exists()
+
+    @pytest.mark.skipif(_working_ansible() is None, reason="needs ansible-inventory")
+    def test_an_ignored_source_contributes_no_hosts_to_a_real_resolution(self, tmp_path: Path):
+        """The property, driven through ansible rather than asserted about the
+        filesystem: a host in an ignored file must not reach the inventory.
+
+        Asserting only that the file is gone would pass on a pruner that ran
+        after ansible had already read the directory.
+        """
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "keep.yml").write_text("all:\n  hosts:\n    kept-01:\n")
+        (src / "drop.yml").write_text("all:\n  hosts:\n    dropped-01:\n")
+
+        _apply_ignore_paths(src, ["drop.yml"])
+
+        cfg = _write_ansible_cfg(tmp_path)
+        out = subprocess.run(  # noqa: S603
+            [_working_ansible(), "--list", "-i", str(src)],
+            capture_output=True,
+            text=True,
+            check=True,
+            env={**os.environ, "ANSIBLE_CONFIG": str(cfg), "ANSIBLE_HOME": str(tmp_path)},
+        )
+        hosts = normalise(json.loads(out.stdout))["hosts"]
+        assert "kept-01" in hosts
+        assert "dropped-01" not in hosts
+
+
+class TestTheFetchPathReadsIgnorePaths:
+    """A positional gate, because no behavioural test can see this.
+
+    The defect was not a wrong pruner -- it was a pruner that was never called.
+    A test that drives `_apply_ignore_paths` directly passes whether or not the
+    fetch path invokes it, which is precisely how `ignore_paths` came to be
+    stored and ignored. So this reads the source: the call must exist, must be
+    passed the settings row's own list, and must come BEFORE the plugin scan,
+    since scanning a file the operator excluded would refuse the resolution
+    over something already out of the source.
+    """
+
+    def _calls(self) -> list[tuple[str, str]]:
+        """Every call in `_fetch_vcs_source`, as (callee, unparsed arguments).
+
+        Read from the AST rather than by searching the text, which matters more
+        than it looks: `_refuse_plugin_sources` is NAMED IN THE DOCSTRING above
+        the code, so a substring search finds the prose first and reports the
+        order backwards. The first version of this gate did exactly that and
+        failed against correct code.
+        """
+        import ast
+        import inspect
+        import textwrap
+
+        from terrapod.services import inventory_resolve
+
+        tree = ast.parse(textwrap.dedent(inspect.getsource(inventory_resolve._fetch_vcs_source)))
+        out: list[tuple[str, str]] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                out.append((ast.unparse(node.func), " ".join(ast.unparse(a) for a in node.args)))
+        return out
+
+    def test_the_fetch_passes_the_settings_rows_own_ignore_paths(self):
+        calls = self._calls()
+        pruning = [
+            args for callee, args in calls if "_apply_ignore_paths" in (callee, *args.split())
+        ]
+        # The pruner is handed to `asyncio.to_thread`, so it is an ARGUMENT of
+        # that call rather than the callee -- which is also how the real
+        # rule-13 pattern looks everywhere else in this module.
+        threaded = [
+            args
+            for callee, args in calls
+            if callee.endswith("to_thread") and "_apply_ignore_paths" in args
+        ]
+        assert pruning or threaded, (
+            "the fetch path does not prune the source, so `ignore_paths` is "
+            "stored and honoured by nothing"
+        )
+        assert any("settings_row.ignore_paths" in args for args in (*pruning, *threaded)), (
+            "the pruner is called with something other than the settings row's "
+            "own list, so what an operator configured is not what is applied"
+        )
+
+    def test_the_prune_comes_before_the_plugin_scan(self):
+        order = [
+            name
+            for callee, args in self._calls()
+            for name in ("_apply_ignore_paths", "_refuse_plugin_sources")
+            if name in args or name == callee
+        ]
+        assert order.index("_apply_ignore_paths") < order.index("_refuse_plugin_sources"), (
+            f"the plugin scan runs before the prune ({order}), so an excluded "
+            f"file can refuse the whole resolution"
+        )

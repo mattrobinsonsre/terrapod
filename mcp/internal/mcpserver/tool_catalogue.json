@@ -282,7 +282,7 @@
           "type": "string"
         },
         "sensitive": {
-          "description": "mask the value in every response; default false. Independent of encryption — every value is encrypted at rest regardless",
+          "description": "mask the value in every response; default false. Independent of app-layer encryption, which is a deployment-wide setting and covers every value or none",
           "type": [
             "null",
             "boolean"

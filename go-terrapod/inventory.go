@@ -43,10 +43,15 @@ import (
 // # A sensitive value never comes back
 //
 // `Sensitive` is a display flag: the server masks the value in every response,
-// so reading a sensitive variable yields the mask and not the secret. It is
-// orthogonal to encryption -- every value is encrypted at rest regardless,
-// because a column cannot be conditionally encrypted and a host variable is an
-// ordinary place for a become password.
+// so reading a sensitive variable yields the mask and not the secret. It says
+// nothing about how the value is STORED.
+//
+// Storage is a separate, deployment-wide decision. The column is registered for
+// app-layer encryption, so where an operator has enabled it every value is
+// enveloped whatever `Sensitive` says -- a column cannot be conditionally
+// encrypted -- and where they have not, which is the default, the column is
+// plaintext and the protection is the datastore's own at-rest encryption. The
+// same position as a workspace variable's value.
 
 // MaskedValue is what the server returns in place of a sensitive variable's
 // value. Compare against it rather than against a literal: a round-trip that

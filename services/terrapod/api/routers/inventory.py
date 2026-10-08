@@ -234,11 +234,22 @@ def _var_json(
 ) -> dict:
     """One variable. A sensitive value is masked, never returned.
 
-    `sensitive` is a DISPLAY flag and nothing more: every value is encrypted at
-    rest (`EncryptedText`, registered in `crypto/columns.py`), because a column
-    cannot be conditionally encrypted and a host variable is an ordinary place
-    for a become password. So this flag decides what a reader sees, not what the
-    database holds.
+    `sensitive` is a DISPLAY flag and nothing more: it decides what a reader
+    sees, not how the value is stored.
+
+    Storage is a separate, deployment-wide decision. The column is
+    `EncryptedText` and registered in `crypto/columns.py`, so where an operator
+    has turned app-layer encryption on every value is enveloped whatever
+    `sensitive` says -- a column cannot be conditionally encrypted -- and where
+    they have not, which is `encryption.enabled`'s default, `EncryptedText` is a
+    passthrough and the protection is the datastore's own at-rest encryption.
+    The same position as a workspace variable's value, and the same reason: the
+    CSP-native control is the right answer, and the app-layer option is for a
+    deployment that cannot use one or an infosec policy that mandates it.
+
+    So do not read `sensitive: true` as a claim about the database. A host
+    variable is an ordinary place for a become password, which is why the column
+    is registered at all, but registering it is not the same as encrypting it.
 
     `var_id` arrives already prefixed rather than being assembled from a prefix
     argument here. The prefix then sits as a literal beside the type name it

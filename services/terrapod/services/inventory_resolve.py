@@ -712,8 +712,56 @@ async def _fetch_vcs_source(db, settings_row, git_sha: str, workdir: Path) -> Pa
             f"have at that commit"
         )
 
+    # BEFORE the plugin scan, not after: an ignored file should not be read at
+    # all, and scanning one would refuse the resolution over a file the
+    # operator had already taken out of the source.
+    await asyncio.to_thread(_apply_ignore_paths, root, list(settings_row.ignore_paths or []))
     await asyncio.to_thread(_refuse_plugin_sources, root)
     return root
+
+
+def _apply_ignore_paths(root: Path, patterns: list[str]) -> None:
+    """Remove anything under `root` an ignore pattern matches.
+
+    Ansible reads a directory as one source, taking every file in it, so this
+    is the only way to leave a file out of an inventory whose source is a
+    directory. Without it `ignore_paths` would be accepted, stored, serialised
+    and honoured by nothing -- and the failure is in the direction that reads
+    as harmless: the source stays WIDER than the operator asked for, so hosts
+    they had excluded appear. Hosts appearing is as wrong as hosts
+    disappearing, and far less alarming to look at.
+
+    Patterns are globs against the path RELATIVE TO `root`, so they are
+    relative to `working_directory` where one is set. That is the only coherent
+    reading -- the two are configured together and one names the source the
+    other narrows -- and it means an operator never writes a prefix they did
+    not choose. Same matcher as an autodiscovery rule's `ignore_patterns`
+    (`_match_glob`), so the two mean the same thing.
+
+    Synchronous, called through `asyncio.to_thread`: a directory walk and
+    unlinks are blocking I/O over something that could realistically be large.
+    """
+    if not patterns:
+        return
+
+    import shutil
+
+    from terrapod.services.workspace_autodiscovery_service import _match_glob
+
+    cleaned = [p.strip() for p in patterns if p.strip()]
+    if not cleaned:
+        return
+
+    # Deepest first, so removing a directory cannot invalidate a path already
+    # queued beneath it.
+    for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        rel = path.relative_to(root).as_posix()
+        if not any(_match_glob(rel, pattern) for pattern in cleaned):
+            continue
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)
 
 
 def _extract(tarball: str, dest: Path) -> None:

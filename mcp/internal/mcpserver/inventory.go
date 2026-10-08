@@ -424,13 +424,13 @@ func registerInventoryWrites(s *mcp.Server, c *terrapod.Client) {
 		WorkspaceID string `json:"workspace_id,omitempty" jsonschema:"set for every host — ansible's group_vars/all"`
 		Value       string `json:"value" jsonschema:"the value. Text unless structured is true"`
 		Structured  *bool  `json:"structured,omitempty" jsonschema:"read value as literal source for a list, number, bool or object rather than as text; default false"`
-		Sensitive   *bool  `json:"sensitive,omitempty" jsonschema:"mask the value in every response; default false. Independent of encryption — every value is encrypted at rest regardless"`
+		Sensitive   *bool  `json:"sensitive,omitempty" jsonschema:"mask the value in every response; default false. Independent of app-layer encryption, which is a deployment-wide setting and covers every value or none"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "terrapod_inventory_var_set",
 		Description: "Set an ansible inventory variable, creating it or changing it. Pass exactly ONE of `host_id` (host_vars), `group_id` (group_vars) or `workspace_id` (group_vars/all) to say where it lives. " +
 			"A list, number, bool or object is expressed by setting `structured` and sending its literal source in `value` — the same arrangement a structured workspace variable has. " +
-			"`sensitive` masks the value in every response as `***`; it is a DISPLAY flag and not encryption. Every value is encrypted at rest regardless, because a column cannot be conditionally encrypted and a host variable is an ordinary place for a become password. " +
+			"`sensitive` masks the value in every response as `***`; it is a DISPLAY flag and it is NOT encryption. The two are independent: a column cannot be conditionally encrypted, so where the deployment has app-layer encryption enabled every value is enveloped whatever `sensitive` says, and where it does not (the default) the column is plaintext and the protection is the datastore's own at-rest encryption -- the same position as a workspace variable. So do not read `sensitive: true` as a statement about how the value is stored. " +
 			"So reading a sensitive variable back gives the mask, and writing that mask back would store it as the secret. " +
 			"Each variable is its own row with ONE writer, which is why variables are rows here rather than a map on their parent: a second concern can contribute one without owning the host or the group. " +
 			"Precedence between `all`, a group and a host is ANSIBLE's to apply at resolution, not something this tool decides.",
