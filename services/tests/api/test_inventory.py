@@ -1,9 +1,10 @@
-"""The inventory routers: authorization, phase binding and request validation.
+"""The inventory router: authorization, phase binding and request validation.
 
-#1967 (the inventory object and what it resolves to) and #1968 (declared items).
+#1967 (the eight structures) and #1968 (declared by the workspace's own
+Terraform).
 
 The interesting half is authorization, because this router has **two** kinds of
-caller and one of them carries a new implicit grant. The cases that matter:
+caller and one of them carries an implicit grant. The cases that matter:
 
 * a runner token may manage its own run's workspace and **nothing else** -- the
   cross-workspace case is the one that would be a vulnerability rather than a
@@ -13,6 +14,11 @@ caller and one of them carries a new implicit grant. The cases that matter:
 * a token carrying **no** phase claim passes any phase, matching how
   `require_runner_for_run` treats a listener older than the claim -- refusing it
   would break every run on a lagging listener image.
+
+The structural properties -- the composite keys, the cascades, the cycle guard,
+encryption at rest -- are the engine's, so they live in the integration tier
+where a real constraint can raise. A mocked session would answer from its
+fixture.
 """
 
 from __future__ import annotations
@@ -23,22 +29,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.exc import IntegrityError
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import caps_for_level
-from terrapod.db.models import InventorySource
 from terrapod.db.session import get_db
-from terrapod.services.inventory_resolution import (
-    InventoryValidationError,
-    ResolvedInventory,
-)
 
 _BASE = "http://test"
 _AUTH = {"Authorization": "Bearer dummy"}
 _R = "terrapod.api.routers.inventory"
+V1 = "/api/v1"
 
 
 def _user(
@@ -67,50 +68,50 @@ def _mock_ws(ws_id=None, name="test-ws"):
     return ws
 
 
-def _mock_item(*, workspace_id, name="host1", address="10.0.0.4", groups=None, host_vars=None):
-    item = MagicMock()
-    item.id = uuid.uuid4()
-    item.workspace_id = workspace_id
-    item.name = name
-    item.address = address
-    item.groups = groups if groups is not None else ["web"]
-    item.vars = host_vars if host_vars is not None else {}
-    item.created_at = datetime(2026, 1, 1, tzinfo=UTC)
-    item.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
-    return item
+def _ts(obj):
+    obj.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+    obj.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
+    return obj
 
 
-def _mock_inventory(*, workspace_id, name="default"):
-    inventory = MagicMock()
-    inventory.id = uuid.uuid4()
-    inventory.workspace_id = workspace_id
-    inventory.name = name
-    inventory.description = ""
-    inventory.created_at = datetime(2026, 1, 1, tzinfo=UTC)
-    inventory.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
-    return inventory
+def _mock_host(*, workspace_id, name="web-1"):
+    host = _ts(MagicMock())
+    host.id = uuid.uuid4()
+    host.workspace_id = workspace_id
+    host.name = name
+    return host
 
 
-def _resolved(hosts=None, groups=None) -> ResolvedInventory:
-    """A real `ResolvedInventory`, not a mock.
-
-    The router renders ansible's shape from it, so a MagicMock standing in for
-    one would make every assertion about that shape a statement about the mock.
-    """
-    return ResolvedInventory(
-        hosts=hosts if hosts is not None else {"host1": {}},
-        groups=groups if groups is not None else {"web": ["host1"]},
-    )
+def _mock_group(*, workspace_id, name="web"):
+    group = _ts(MagicMock())
+    group.id = uuid.uuid4()
+    group.workspace_id = workspace_id
+    group.name = name
+    return group
 
 
-def _mock_source(kind=InventorySource.KIND_PLATFORM, position=0):
-    source = MagicMock()
-    source.id = uuid.uuid4()
-    source.kind = kind
-    source.position = position
-    source.config = {}
-    source.created_at = datetime(2026, 1, 1, tzinfo=UTC)
-    return source
+def _mock_var(*, workspace_id, parent_attr, parent_id, key="ansible_user", sensitive=False):
+    var = _ts(MagicMock())
+    var.id = uuid.uuid4()
+    var.workspace_id = workspace_id
+    setattr(var, parent_attr, parent_id)
+    var.key = key
+    var.value = "deploy"
+    var.structured = False
+    var.sensitive = sensitive
+    return var
+
+
+def _mock_settings(*, workspace_id, vcs_connection_id=None):
+    s = _ts(MagicMock())
+    s.workspace_id = workspace_id
+    s.include_platform = True
+    s.vcs_connection_id = vcs_connection_id
+    s.repo_url = ""
+    s.branch = ""
+    s.working_directory = ""
+    s.ignore_paths = []
+    return s
 
 
 def _make_app(user):
@@ -125,643 +126,582 @@ async def _client(app):
     return AsyncClient(transport=ASGITransport(app=app), base_url=_BASE)
 
 
+def _zero_counts():
+    """Every count query returns nothing, which is the common fixture.
+
+    The serializers take counts as keyword arguments defaulting to 0, so a
+    missing count renders as 0 rather than raising -- which is what lets these
+    tests say nothing about counts unless they are the point.
+    """
+    return {
+        f"{_R}.inv.host_group_counts": AsyncMock(return_value={}),
+        f"{_R}.inv.host_var_counts": AsyncMock(return_value={}),
+        f"{_R}.inv.group_member_counts": AsyncMock(return_value={}),
+        f"{_R}.inv.group_child_counts": AsyncMock(return_value={}),
+        f"{_R}.inv.group_var_counts": AsyncMock(return_value={}),
+    }
+
+
+class _Patches:
+    """Apply a dict of patches as one context manager."""
+
+    def __init__(self, mapping):
+        self._ctx = [patch(target, value) for target, value in mapping.items()]
+
+    def __enter__(self):
+        for c in self._ctx:
+            c.__enter__()
+        return self
+
+    def __exit__(self, *exc):
+        for c in reversed(self._ctx):
+            c.__exit__(*exc)
+        return False
+
+
 # ── Authorization: capability-based callers ──────────────────────────────────
 
 
 class TestCapabilityAuthorization:
-    async def test_read_caps_can_list_items(self):
+    """`inventory:read` to read and `inventory:write` to change.
+
+    `write` rather than `admin` is deliberate: the Terraform that declares hosts
+    runs under an apply, so an API stricter than the path every row arrives by
+    would be incoherent.
+    """
+
+    @pytest.mark.parametrize(
+        ("method", "path_for", "level", "expect"),
+        [
+            ("get", lambda ws, _: f"{V1}/workspaces/ws-{ws.id}/inventory/hosts", "read", 200),
+            ("get", lambda ws, _: f"{V1}/workspaces/ws-{ws.id}/inventory/hosts", "none", 403),
+            ("get", lambda ws, _: f"{V1}/workspaces/ws-{ws.id}/inventory/groups", "read", 200),
+            ("get", lambda ws, _: f"{V1}/workspaces/ws-{ws.id}/inventory/vars", "read", 200),
+            ("get", lambda ws, _: f"{V1}/workspaces/ws-{ws.id}/inventory/vars", "none", 403),
+        ],
+    )
+    async def test_reads_need_read(self, method, path_for, level, expect):
         ws = _mock_ws()
         app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}.inv.list_items", AsyncMock(return_value=[_mock_item(workspace_id=ws.id)])),
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level(level) if level != "none" else []
+                ),
+                f"{_R}.inv.list_hosts": AsyncMock(return_value=[]),
+                f"{_R}.inv.list_groups": AsyncMock(return_value=[]),
+                f"{_R}.inv.list_global_vars": AsyncMock(return_value=[]),
+                **_zero_counts(),
+            }
         ):
             async with await _client(app) as c:
-                res = await c.get(f"/api/v1/workspaces/ws-{ws.id}/inventory-items", headers=_AUTH)
-        assert res.status_code == 200
-        assert res.json()["data"][0]["attributes"]["name"] == "host1"
+                res = await getattr(c, method)(path_for(ws, None), headers=_AUTH)
+        assert res.status_code == expect, res.text
 
-    async def test_no_caps_cannot_list_items(self):
+    async def test_a_read_capability_cannot_declare_a_host(self):
+        """The one that would matter: read must not be able to write."""
         ws = _mock_ws()
         app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}.resolve_workspace_capabilities_for", AsyncMock(return_value=frozenset())),
-        ):
-            async with await _client(app) as c:
-                res = await c.get(f"/api/v1/workspaces/ws-{ws.id}/inventory-items", headers=_AUTH)
-        assert res.status_code == 403
-        assert cap.INVENTORY_READ in res.json()["detail"]
-
-    async def test_read_is_not_enough_to_declare_a_host(self):
-        """The write capability is a separate grant from the read one."""
-        ws = _mock_ws()
-        app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("read")
+                ),
+            }
         ):
             async with await _client(app) as c:
                 res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "host1"}}},
+                    f"{V1}/workspaces/ws-{ws.id}/inventory/hosts",
+                    json={"data": {"attributes": {"name": "web-1"}}},
                     headers=_AUTH,
                 )
-        assert res.status_code == 403
+        assert res.status_code == 403, res.text
+        assert cap.INVENTORY_WRITE in res.json()["detail"]
 
-    async def test_write_caps_can_declare_a_host(self):
+    async def test_write_can_declare_a_host(self):
         ws = _mock_ws()
+        host = _mock_host(workspace_id=ws.id)
         app, db = _make_app(_user())
-        item = _mock_item(workspace_id=ws.id)
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("write")),
-            ),
-            patch(f"{_R}.inv.count_items", AsyncMock(return_value=0)),
-            patch(f"{_R}.inv.create_item", AsyncMock(return_value=item)) as create,
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("write")
+                ),
+                f"{_R}.inv.create_host": AsyncMock(return_value=host),
+            }
         ):
             async with await _client(app) as c:
                 res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={
-                        "data": {
-                            "attributes": {
-                                "name": "host1",
-                                "address": "10.0.0.4",
-                                "groups": ["web"],
-                                "vars": {"ansible_user": "ec2-user"},
-                            }
-                        }
-                    },
+                    f"{V1}/workspaces/ws-{ws.id}/inventory/hosts",
+                    json={"data": {"attributes": {"name": "web-1"}}},
                     headers=_AUTH,
                 )
-        assert res.status_code == 201
-        assert create.await_args.kwargs["name"] == "host1"
-        assert create.await_args.kwargs["host_vars"] == {"ansible_user": "ec2-user"}
+        assert res.status_code == 201, res.text
+        assert res.json()["data"]["attributes"]["name"] == "web-1"
         db.commit.assert_awaited()
 
-    async def test_the_write_capability_is_in_the_write_tier_not_admin(self):
-        """A declared host arrives by an apply, so requiring admin to write one
-        through the API would be stricter than the path every item takes."""
-        assert cap.INVENTORY_WRITE in caps_for_level("write")
-        assert cap.INVENTORY_READ in caps_for_level("read")
 
-
-# ── Authorization: the runner-token implicit grant ───────────────────────────
+# ── Authorization: the runner-token grant ────────────────────────────────────
 
 
 class TestRunnerTokenGrant:
-    async def test_a_runner_token_may_declare_on_its_own_workspace(self):
+    """A runner token may manage its OWN run's workspace and nothing else.
+
+    The same shape as the implicit registry read runner tokens already carry,
+    and for the same reason: `terraform apply` cannot work without it.
+    """
+
+    async def test_a_runner_token_may_write_its_own_workspace(self):
         ws = _mock_ws()
+        host = _mock_host(workspace_id=ws.id)
         run_id = uuid.uuid4()
         app, _ = _make_app(_user(auth_method="runner_token", run_id=str(run_id), run_phase="apply"))
-        item = _mock_item(workspace_id=ws.id)
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}._runner_run_workspace", AsyncMock(return_value=ws.id)),
-            patch(f"{_R}.inv.count_items", AsyncMock(return_value=0)),
-            patch(f"{_R}.inv.create_item", AsyncMock(return_value=item)),
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}._runner_run_workspace": AsyncMock(return_value=ws.id),
+                f"{_R}.inv.create_host": AsyncMock(return_value=host),
+            }
         ):
             async with await _client(app) as c:
                 res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "host1"}}},
+                    f"{V1}/workspaces/ws-{ws.id}/inventory/hosts",
+                    json={"data": {"attributes": {"name": "web-1"}}},
                     headers=_AUTH,
                 )
-        assert res.status_code == 201
+        assert res.status_code == 201, res.text
 
-    async def test_a_runner_token_may_NOT_declare_on_another_workspace(self):
-        """The grant is scoped to the run's own workspace.
-
-        This is the case that would be a vulnerability rather than a bug: a
-        token from any run could otherwise rewrite the target set of a configure
-        on a workspace it has nothing to do with.
-        """
+    async def test_a_runner_token_cannot_reach_another_workspace(self):
+        """The vulnerability case, pinned directly rather than inferred."""
         ws = _mock_ws()
         other = uuid.uuid4()
         app, _ = _make_app(
             _user(auth_method="runner_token", run_id=str(uuid.uuid4()), run_phase="apply")
         )
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}._runner_run_workspace", AsyncMock(return_value=other)),
-            patch(f"{_R}.inv.create_item", AsyncMock()) as create,
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                # Its run belongs to a DIFFERENT workspace.
+                f"{_R}._runner_run_workspace": AsyncMock(return_value=other),
+                f"{_R}.inv.create_host": AsyncMock(),
+            }
         ):
             async with await _client(app) as c:
                 res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "host1"}}},
+                    f"{V1}/workspaces/ws-{ws.id}/inventory/hosts",
+                    json={"data": {"attributes": {"name": "web-1"}}},
                     headers=_AUTH,
                 )
-        assert res.status_code == 403
+        assert res.status_code == 403, res.text
         assert "not scoped to a run on this workspace" in res.json()["detail"]
-        create.assert_not_awaited()
 
     async def test_a_runner_token_naming_no_run_is_refused(self):
         ws = _mock_ws()
         app, _ = _make_app(_user(auth_method="runner_token", run_id=None))
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}._runner_run_workspace", AsyncMock(return_value=None)),
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.inv.list_hosts": AsyncMock(return_value=[]),
+                **_zero_counts(),
+            }
         ):
             async with await _client(app) as c:
-                res = await c.get(f"/api/v1/workspaces/ws-{ws.id}/inventory-items", headers=_AUTH)
-        assert res.status_code == 403
-
-    async def test_the_runner_grant_does_not_consult_workspace_capabilities(self):
-        """A runner token carries `everyone` only, so if the grant fell through
-        to the capability check it would never work."""
-        ws = _mock_ws()
-        app, _ = _make_app(
-            _user(auth_method="runner_token", run_id=str(uuid.uuid4()), run_phase="apply")
-        )
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}._runner_run_workspace", AsyncMock(return_value=ws.id)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=frozenset()),
-            ) as resolve,
-            patch(f"{_R}.inv.list_items", AsyncMock(return_value=[])),
-        ):
-            async with await _client(app) as c:
-                res = await c.get(f"/api/v1/workspaces/ws-{ws.id}/inventory-items", headers=_AUTH)
-        assert res.status_code == 200
-        resolve.assert_not_awaited()
+                res = await c.get(f"{V1}/workspaces/ws-{ws.id}/inventory/hosts", headers=_AUTH)
+        assert res.status_code == 403, res.text
 
 
 class TestPhaseBinding:
-    async def test_a_plan_phase_token_cannot_declare_a_host(self):
-        """Writes are apply-phase. A speculative pull-request plan's own token
-        must not be able to rewrite the inventory a later configure targets."""
+    """Writes are bound to the apply phase; reads are unphased.
+
+    A plan reads inventory to diff it and never writes, so this follows the
+    phase claim without needing a new concept (GHSA-xmrf-hxq9-m59m).
+    """
+
+    async def test_a_plan_phase_token_cannot_write(self):
         ws = _mock_ws()
         app, _ = _make_app(
             _user(auth_method="runner_token", run_id=str(uuid.uuid4()), run_phase="plan")
         )
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}._runner_run_workspace", AsyncMock(return_value=ws.id)),
-            patch(f"{_R}.inv.create_item", AsyncMock()) as create,
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}._runner_run_workspace": AsyncMock(return_value=ws.id),
+                f"{_R}.inv.create_host": AsyncMock(),
+            }
         ):
             async with await _client(app) as c:
                 res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "host1"}}},
+                    f"{V1}/workspaces/ws-{ws.id}/inventory/hosts",
+                    json={"data": {"attributes": {"name": "web-1"}}},
                     headers=_AUTH,
                 )
-        assert res.status_code == 403
+        assert res.status_code == 403, res.text
         assert "apply phase" in res.json()["detail"]
-        create.assert_not_awaited()
 
-    async def test_a_plan_phase_token_CAN_read_inventory(self):
-        """A plan has to read inventory to diff it, so reads are unphased."""
+    async def test_a_plan_phase_token_can_read(self):
+        """Unphased on purpose: a plan diffs the inventory."""
         ws = _mock_ws()
         app, _ = _make_app(
             _user(auth_method="runner_token", run_id=str(uuid.uuid4()), run_phase="plan")
         )
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}._runner_run_workspace", AsyncMock(return_value=ws.id)),
-            patch(f"{_R}.inv.list_items", AsyncMock(return_value=[])),
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}._runner_run_workspace": AsyncMock(return_value=ws.id),
+                f"{_R}.inv.list_hosts": AsyncMock(return_value=[]),
+                **_zero_counts(),
+            }
         ):
             async with await _client(app) as c:
-                res = await c.get(f"/api/v1/workspaces/ws-{ws.id}/inventory-items", headers=_AUTH)
-        assert res.status_code == 200
+                res = await c.get(f"{V1}/workspaces/ws-{ws.id}/inventory/hosts", headers=_AUTH)
+        assert res.status_code == 200, res.text
 
     async def test_a_token_with_no_phase_claim_passes_any_phase(self):
-        """A listener older than the phase claim. Refusing it would break every
-        run on a lagging listener image for a defence in depth; the run-scoping
-        still holds."""
+        """A listener older than the claim. Refusing it would break every run on
+        a lagging listener image; the run-scoping still holds."""
         ws = _mock_ws()
+        host = _mock_host(workspace_id=ws.id)
         app, _ = _make_app(
             _user(auth_method="runner_token", run_id=str(uuid.uuid4()), run_phase=None)
         )
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(f"{_R}._runner_run_workspace", AsyncMock(return_value=ws.id)),
-            patch(f"{_R}.inv.count_items", AsyncMock(return_value=0)),
-            patch(
-                f"{_R}.inv.create_item",
-                AsyncMock(return_value=_mock_item(workspace_id=ws.id)),
-            ),
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}._runner_run_workspace": AsyncMock(return_value=ws.id),
+                f"{_R}.inv.create_host": AsyncMock(return_value=host),
+            }
         ):
             async with await _client(app) as c:
                 res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "host1"}}},
+                    f"{V1}/workspaces/ws-{ws.id}/inventory/hosts",
+                    json={"data": {"attributes": {"name": "web-1"}}},
                     headers=_AUTH,
                 )
-        assert res.status_code == 201
+        assert res.status_code == 201, res.text
 
 
 # ── Request validation ───────────────────────────────────────────────────────
 
 
 class TestValidation:
-    @pytest.fixture
-    def ws(self):
-        return _mock_ws()
-
-    def _writer(self, ws):
+    async def test_a_host_needs_a_name(self):
+        ws = _mock_ws()
         app, _ = _make_app(_user())
-        return app, (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("write")),
-            ),
-        )
-
-    async def test_a_missing_name_is_422(self, ws):
-        app, patches = self._writer(ws)
-        with patches[0], patches[1]:
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"address": "10.0.0.4"}}},
-                    headers=_AUTH,
-                )
-        assert res.status_code == 422
-
-    async def test_groups_must_be_a_list_of_strings(self, ws):
-        app, patches = self._writer(ws)
-        with patches[0], patches[1], patch(f"{_R}.inv.count_items", AsyncMock(return_value=0)):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "h", "groups": [{"nope": 1}]}}},
-                    headers=_AUTH,
-                )
-        assert res.status_code == 422
-        assert "groups" in res.json()["detail"]
-
-    async def test_vars_must_be_an_object(self, ws):
-        app, patches = self._writer(ws)
-        with patches[0], patches[1], patch(f"{_R}.inv.count_items", AsyncMock(return_value=0)):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "h", "vars": ["nope"]}}},
-                    headers=_AUTH,
-                )
-        assert res.status_code == 422
-
-    async def test_a_non_string_var_value_is_422_through_the_route(self, ws):
-        """The validator is tested directly elsewhere; this proves the router
-        turns it into a 422 rather than a 500, and that the message names the
-        key the caller has to fix.
-
-        Worth driving through the route because the alternative is the failure
-        this rule exists to remove: accepted at the write, then invisible to
-        every client that reads vars as a string map.
-        """
-        app, patches = self._writer(ws)
-        with (
-            patches[0],
-            patches[1],
-            patch(f"{_R}.inv.count_items", AsyncMock(return_value=0)),
-            patch(
-                f"{_R}.inv.create_item",
-                AsyncMock(
-                    side_effect=InventoryValidationError(
-                        "the declared value for host variable 'port' must be a string; got int"
-                    )
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("write")
                 ),
-            ),
+            }
         ):
             async with await _client(app) as c:
                 res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "web-1", "vars": {"port": 8080}}}},
+                    f"{V1}/workspaces/ws-{ws.id}/inventory/hosts",
+                    json={"data": {"attributes": {}}},
                     headers=_AUTH,
                 )
         assert res.status_code == 422, res.text
-        assert "port" in res.json()["detail"]
 
-    async def test_a_name_ansible_cannot_target_is_422_not_500(self, ws):
-        """The service raises `InventoryValidationError`; the router owes a 422."""
-        app, patches = self._writer(ws)
-        with (
-            patches[0],
-            patches[1],
-            patch(f"{_R}.inv.count_items", AsyncMock(return_value=0)),
-            patch(
-                f"{_R}.inv.create_item",
-                AsyncMock(side_effect=InventoryValidationError("host name '!web' contains")),
-            ),
-        ):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "!web"}}},
-                    headers=_AUTH,
-                )
-        assert res.status_code == 422
+    @pytest.mark.parametrize("name", ["web 1", "!web", "web,db", "a:b", "x&y", "~re"])
+    async def test_a_host_name_that_breaks_limit_is_refused(self, name):
+        """Every refused character means something to `--limit`, so a host named
+        with one is unselectable -- and a leading `!` silently excludes the host
+        it names from any pattern mentioning it."""
+        from terrapod.services.inventory_resolution import validate_host_name
 
-    async def test_a_duplicate_host_is_409_not_500(self, ws):
-        """Two applies racing, or a name already declared. Answered 500 before
-        the handler existed."""
-        app, patches = self._writer(ws)
-        orig = MagicMock()
-        orig.sqlstate = "23505"
-        with (
-            patches[0],
-            patches[1],
-            patch(f"{_R}.inv.count_items", AsyncMock(return_value=0)),
-            patch(
-                f"{_R}.inv.create_item",
-                AsyncMock(side_effect=IntegrityError("stmt", {}, orig)),
-            ),
-        ):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "host1"}}},
-                    headers=_AUTH,
-                )
-        assert res.status_code == 409
-        assert "already declared" in res.json()["detail"]
-
-    async def test_the_per_workspace_ceiling_is_enforced(self, ws):
-        from terrapod.api.routers.inventory import MAX_ITEMS_PER_WORKSPACE
-
-        app, patches = self._writer(ws)
-        with (
-            patches[0],
-            patches[1],
-            patch(f"{_R}.inv.count_items", AsyncMock(return_value=MAX_ITEMS_PER_WORKSPACE)),
-            patch(f"{_R}.inv.create_item", AsyncMock()) as create,
-        ):
-            async with await _client(app) as c:
-                res = await c.post(
-                    f"/api/v1/workspaces/ws-{ws.id}/inventory-items",
-                    json={"data": {"attributes": {"name": "host1"}}},
-                    headers=_AUTH,
-                )
-        assert res.status_code == 422
-        create.assert_not_awaited()
-
-    async def test_a_bad_workspace_id_is_404_not_500(self):
-        """`parse_id_for`, not a bare `uuid.UUID` on request input."""
+        ws = _mock_ws()
         app, _ = _make_app(_user())
-        async with await _client(app) as c:
-            res = await c.get("/api/v1/workspaces/ws-not-a-uuid/inventory-items", headers=_AUTH)
-        assert res.status_code == 404
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("write")
+                ),
+                # The real validator, reached through the real service call.
+                f"{_R}.inv.create_host": AsyncMock(
+                    side_effect=lambda *a, **k: validate_host_name(k["name"])
+                ),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.post(
+                    f"{V1}/workspaces/ws-{ws.id}/inventory/hosts",
+                    json={"data": {"attributes": {"name": name}}},
+                    headers=_AUTH,
+                )
+        assert res.status_code == 422, res.text
 
+    @pytest.mark.parametrize("name", ["all", "ungrouped"])
+    async def test_a_derived_group_name_is_refused(self, name):
+        from terrapod.services.inventory_resolution import validate_group_name
 
-class TestPartialUpdate:
-    async def test_an_absent_attribute_is_left_alone_and_an_empty_list_clears(self):
-        """Omitting `groups` and sending `groups: []` are different requests.
-
-        Collapsing them would make a cleared group list impossible to express,
-        which the provider needs in order to remove a host from every group.
-        """
         ws = _mock_ws()
-        item = _mock_item(workspace_id=ws.id)
         app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_item", AsyncMock(return_value=item)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("write")),
-            ),
-            patch(f"{_R}.inv.update_item", AsyncMock(return_value=item)) as update,
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("write")
+                ),
+                f"{_R}.inv.create_group": AsyncMock(
+                    side_effect=lambda *a, **k: validate_group_name(k["name"])
+                ),
+            }
         ):
             async with await _client(app) as c:
-                await c.patch(
-                    f"/api/v1/inventory-items/invitem-{item.id}",
-                    json={"data": {"attributes": {"address": "10.0.0.9"}}},
+                res = await c.post(
+                    f"{V1}/workspaces/ws-{ws.id}/inventory/groups",
+                    json={"data": {"attributes": {"name": name}}},
                     headers=_AUTH,
                 )
-                omitted = update.await_args.kwargs
-                await c.patch(
-                    f"/api/v1/inventory-items/invitem-{item.id}",
-                    json={"data": {"attributes": {"groups": []}}},
-                    headers=_AUTH,
-                )
-                cleared = update.await_args.kwargs
+        assert res.status_code == 422, res.text
+        assert "derived by ansible" in res.json()["detail"]
 
-        assert omitted["groups"] is None, "an omitted list must not be touched"
-        assert omitted["address"] == "10.0.0.9"
-        assert cleared["groups"] == [], "an empty list must clear, not be ignored"
-        assert cleared["address"] is None
-
-
-# ── Resolution ───────────────────────────────────────────────────────────────
-
-
-class TestResolvedView:
-    """What the inventory resolves to, resolved to answer the request."""
-
-    async def _get(self, *, resolved=None, level="read"):
+    async def test_a_membership_needs_a_host_relationship(self):
+        """And the refusal shows the shape, because a caller that got the
+        nesting wrong cannot guess it from "host is required"."""
         ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        app, db = _make_app(_user())
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level(level)),
-            ),
-            patch(f"{_R}.inv.resolve", AsyncMock(return_value=resolved or _resolved())) as resolve,
+        group = _mock_group(workspace_id=ws.id)
+        app, _ = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._group": AsyncMock(return_value=group),
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("write")
+                ),
+            }
         ):
             async with await _client(app) as c:
-                res = await c.get(f"/api/v1/inventories/inv-{inventory.id}/resolved", headers=_AUTH)
-        return res, resolve, db
+                res = await c.post(
+                    f"{V1}/inventory-groups/invgroup-{group.id}/hosts",
+                    json={"data": {"attributes": {}}},
+                    headers=_AUTH,
+                )
+        assert res.status_code == 422, res.text
+        detail = res.json()["detail"]
+        assert "relationships" in detail and "inventory-hosts" in detail
 
-    async def test_it_resolves_the_rows_to_answer_the_read(self):
-        res, resolve, _ = await self._get()
-        assert res.status_code == 200
-        resolve.assert_awaited_once()
-
-        attrs = res.json()["data"]["attributes"]
-        assert attrs["host-count"] == 1
-        # Ansible's own shape, rendered rather than stored twice.
-        assert attrs["ansible-inventory"]["all"]["children"] == ["web"]
-
-    async def test_it_writes_nothing(self):
-        """The property, not the absence of a route.
-
-        A read that resolves live has nothing to record, and recording one
-        anyway is what would let a dashboard left open evict a target set a
-        configure is pinned to. Asserting the route is gone proves only that
-        the route is gone; asserting the commit proves the read is read-only.
-        """
-        _, _, db = await self._get()
-        db.commit.assert_not_awaited()
-
-    async def test_an_empty_inventory_resolves_to_the_empty_set(self):
-        """Not a refusal, and not a 404.
-
-        The empty set is a real resolution, and it is the answer at exactly the
-        moment an operator is checking what they have just declared.
-        """
-        res, _, _ = await self._get(resolved=_resolved(hosts={}, groups={}))
-        assert res.status_code == 200
-        attrs = res.json()["data"]["attributes"]
-        assert attrs["host-count"] == 0
-        assert attrs["group-count"] == 0
-
-    async def test_it_carries_no_freshness_field(self):
-        """Pinned, because the field it replaced was read as staleness.
-
-        `taken-at` on a live answer invites a reader to ask whether it is
-        current, which is a question the read has already answered by
-        resolving. A revert that reintroduces it fails here.
-        """
-        res, _, _ = await self._get()
-        attrs = res.json()["data"]["attributes"]
-        for gone in ("taken-at", "produced-by", "produced-by-ref", "api-resolvable"):
-            assert gone not in attrs, f"{gone} came back"
-
-
-class TestLimitPreview:
-    async def _preview(self, limit: str, *, resolved=None):
-        """Drive the preview against a live resolution."""
+    async def test_a_non_string_variable_value_is_refused_with_the_alternative(self):
+        """A list or a number is expressed with `structured`, the same way a
+        structured workspace variable is -- so the refusal says so rather than
+        leaving the caller with no route for it."""
         ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        resolved = resolved or _resolved(
-            hosts={"host1": {}, "host2": {}, "switch1": {}},
-            groups={"web": ["host1", "host2"], "net": ["host2", "switch1"]},
+        host = _mock_host(workspace_id=ws.id)
+        app, _ = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._host": AsyncMock(return_value=host),
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("write")
+                ),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.post(
+                    f"{V1}/inventory-hosts/invhost-{host.id}/vars",
+                    json={"data": {"attributes": {"key": "ports", "value": [80, 443]}}},
+                    headers=_AUTH,
+                )
+        assert res.status_code == 422, res.text
+        assert "structured" in res.json()["detail"]
+
+
+# ── The wire shape ───────────────────────────────────────────────────────────
+
+
+class TestTheWireShape:
+    """Links are relationships, and a sensitive value never leaves the server.
+
+    The first because the house style says a link is a relationship and there
+    is no legacy `*-id` attribute to keep compatible -- none of this exists on
+    any release, so the canonical form is the only form.
+    """
+
+    async def test_a_membership_carries_both_sides_as_relationships(self):
+        ws = _mock_ws()
+        link = MagicMock()
+        link.id = uuid.uuid4()
+        link.workspace_id = ws.id
+        link.host_id = uuid.uuid4()
+        link.group_id = uuid.uuid4()
+        link.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        group = _mock_group(workspace_id=ws.id)
+        app, _ = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._group": AsyncMock(return_value=group),
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("read")
+                ),
+                f"{_R}.inv.list_host_groups": AsyncMock(return_value=[link]),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.get(f"{V1}/inventory-groups/invgroup-{group.id}/hosts", headers=_AUTH)
+        entry = res.json()["data"][0]
+        rels = entry["relationships"]
+        assert rels["host"]["data"]["id"] == f"invhost-{link.host_id}"
+        assert rels["group"]["data"]["id"] == f"invgroup-{link.group_id}"
+        # Not an attribute: a link is a relationship in this house style.
+        assert "host-id" not in entry["attributes"]
+        assert "group-id" not in entry["attributes"]
+
+    async def test_a_sensitive_value_is_masked_and_the_real_one_is_absent(self):
+        ws = _mock_ws()
+        host_id = uuid.uuid4()
+        var = _mock_var(
+            workspace_id=ws.id, parent_attr="host_id", parent_id=host_id, sensitive=True
         )
+        var.value = "hunter2"
         app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}.inv.resolve", AsyncMock(return_value=resolved)),
+        with _Patches(
+            {
+                f"{_R}.inv.get_host_var": AsyncMock(return_value=var),
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("read")
+                ),
+            }
         ):
             async with await _client(app) as c:
-                return await c.post(
-                    f"/api/v1/inventories/inv-{inventory.id}/actions/preview-limit",
-                    json={"data": {"attributes": {"limit": limit}}},
-                    headers=_AUTH,
-                )
+                res = await c.get(f"{V1}/inventory-host-vars/invhvar-{var.id}", headers=_AUTH)
 
-    async def test_it_answers_what_a_limit_would_target(self):
-        """Visibility is the control here rather than prevention, because
-        auto-configure is deliberately broad (#1974)."""
-        res = await self._preview("web:!host2")
-        assert res.status_code == 200
+        body = res.text
         attrs = res.json()["data"]["attributes"]
-        assert attrs["hosts"] == ["host1"]
-        assert attrs["of-host-count"] == 3
+        assert attrs["value"] == "***"
+        assert attrs["sensitive"] is True
+        # The whole response, not just the field: a masked value that leaks
+        # through some other key is the same disclosure.
+        assert "hunter2" not in body
 
-    async def test_an_empty_limit_is_the_whole_inventory(self):
-        res = await self._preview("")
-        assert res.json()["data"]["attributes"]["host-count"] == 3
+    async def test_a_host_carries_its_counts_rather_than_its_rows(self):
+        """A list shows "3 groups, 2 variables"; embedding either would make one
+        request grow with the whole inventory."""
+        ws = _mock_ws()
+        host = _mock_host(workspace_id=ws.id)
+        app, _ = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("read")
+                ),
+                f"{_R}.inv.list_hosts": AsyncMock(return_value=[host]),
+                f"{_R}.inv.host_group_counts": AsyncMock(return_value={host.id: 3}),
+                f"{_R}.inv.host_var_counts": AsyncMock(return_value={host.id: 2}),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.get(f"{V1}/workspaces/ws-{ws.id}/inventory/hosts", headers=_AUTH)
+        attrs = res.json()["data"][0]["attributes"]
+        assert attrs["group-count"] == 3
+        assert attrs["variable-count"] == 2
+        assert "groups" not in attrs and "vars" not in attrs
 
-    async def test_a_regex_limit_is_refused_rather_than_matching_nothing(self):
-        """An empty target set for a pattern ansible would expand is the wrong
-        answer dressed as an answer."""
-        res = await self._preview("~web.*")
-        assert res.status_code == 422
-        assert "regular expression" in res.json()["detail"]
-
-    async def test_an_empty_inventory_always_has_something_to_limit_against(self):
-        """Including the empty set, rather than the old "no snapshot yet"
-        refusal that fired at exactly the wrong moment."""
-        res = await self._preview("all", resolved=_resolved(hosts={}, groups={}))
-        assert res.status_code == 200, res.text
-
-    async def test_the_preview_carries_no_freshness_field(self):
-        res = await self._preview("all")
-        assert "taken-at" not in res.json()["data"]["attributes"]
+    async def test_the_settings_are_identified_by_the_workspace(self):
+        """One inventory per workspace, so there is no surrogate id to carry and
+        the workspace id is the only honest identifier."""
+        ws = _mock_ws()
+        settings = _mock_settings(workspace_id=ws.id)
+        app, _ = _make_app(_user())
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("read")
+                ),
+                f"{_R}.inv.get_settings": AsyncMock(return_value=settings),
+            }
+        ):
+            async with await _client(app) as c:
+                res = await c.get(f"{V1}/workspaces/ws-{ws.id}/inventory/settings", headers=_AUTH)
+        data = res.json()["data"]
+        assert data["id"] == f"ws-{ws.id}"
+        assert data["relationships"]["vcs-connection"]["data"] is None
 
 
 class TestPayNothing:
-    async def test_a_workspace_that_declares_nothing_has_no_inventories(self):
-        """Keyed on data, not on a flag (#1986): nothing is created until
-        something uses it, so a terraform/tofu-only deployment sees an empty
-        list rather than a surface it has to turn off.
-        """
-        ws = _mock_ws()
-        app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}.inv.list_inventories", AsyncMock(return_value=[])),
-        ):
-            async with await _client(app) as c:
-                res = await c.get(f"/api/v1/workspaces/ws-{ws.id}/inventories", headers=_AUTH)
-        assert res.status_code == 200
-        assert res.json()["data"] == []
+    """A terraform/tofu-only workspace sees nothing, keyed on DATA not a flag.
 
-
-class TestTheInventoryWireShape:
-    """Sources ride in `attributes.sources`, and that is what the SDK decodes.
-
-    This is here because the shape drifted once and nothing noticed: the server
-    emitted the list under a top-level `included-sources` key it had invented,
-    go-terrapod declared `json:"sources"`, and the field was permanently nil.
-    No fixture on either side held a source, so both halves passed.
+    #1986 withdrew the engine on/off switch, so "those users pay nothing" is
+    delivered by there being no rows rather than by a setting an operator could
+    get wrong.
     """
 
-    async def test_sources_are_an_attribute_not_an_invented_top_level_key(self):
+    async def test_a_workspace_with_no_inventory_has_no_settings(self):
         ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        sources = [_mock_source(InventorySource.KIND_PLATFORM, 0), _mock_source("ini", 1)]
         app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=sources)),
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("read")
+                ),
+                f"{_R}.inv.get_settings": AsyncMock(return_value=None),
+            }
         ):
             async with await _client(app) as c:
-                res = await c.get(f"/api/v1/inventories/inv-{inventory.id}", headers=_AUTH)
+                res = await c.get(f"{V1}/workspaces/ws-{ws.id}/inventory/settings", headers=_AUTH)
+        assert res.status_code == 404, res.text
+        # And it says the absence is the default, so a reader does not go
+        # looking for what they did wrong.
+        assert "default" in res.json()["detail"]
 
-        assert res.status_code == 200, res.text
-        data = res.json()["data"]
-        assert "sources" in data["attributes"], "the SDK reads attributes.sources"
-        assert "included-sources" not in data, "an invented top-level key is not the contract"
-        assert "sources" not in data.get("relationships", {}), (
-            "a source has no route of its own, so a relationship would link to nowhere"
-        )
-
-    async def test_a_source_entry_is_flat_and_carries_its_position_and_kind(self):
-        """Flat, because it is part of the inventory's composition rather than a
-        nested resource object -- and position is the `-i` order that decides
-        which source wins a conflicting host variable."""
+    async def test_an_empty_host_list_is_an_empty_list_not_an_error(self):
         ws = _mock_ws()
-        inventory = _mock_inventory(workspace_id=ws.id)
-        sources = [_mock_source(InventorySource.KIND_PLATFORM, 0), _mock_source("ini", 1)]
         app, _ = _make_app(_user())
-        with (
-            patch(f"{_R}._get_workspace", AsyncMock(return_value=ws)),
-            patch(
-                f"{_R}.resolve_workspace_capabilities_for",
-                AsyncMock(return_value=caps_for_level("read")),
-            ),
-            patch(f"{_R}._get_inventory", AsyncMock(return_value=inventory)),
-            patch(f"{_R}.inv.list_sources", AsyncMock(return_value=sources)),
+        with _Patches(
+            {
+                f"{_R}._get_workspace": AsyncMock(return_value=ws),
+                f"{_R}.resolve_workspace_capabilities_for": AsyncMock(
+                    return_value=caps_for_level("read")
+                ),
+                f"{_R}.inv.list_hosts": AsyncMock(return_value=[]),
+                **_zero_counts(),
+            }
         ):
             async with await _client(app) as c:
-                res = await c.get(f"/api/v1/inventories/inv-{inventory.id}", headers=_AUTH)
+                res = await c.get(f"{V1}/workspaces/ws-{ws.id}/inventory/hosts", headers=_AUTH)
+        assert res.status_code == 200
+        assert res.json()["data"] == []
+        assert res.json()["meta"]["pagination"]["total-count"] == 0
 
-        entries = res.json()["data"]["attributes"]["sources"]
-        assert [e["position"] for e in entries] == [0, 1]
-        assert [e["kind"] for e in entries] == ["platform", "ini"]
-        assert all(e["id"].startswith("invsrc-") for e in entries)
-        # Flat: no nested resource envelope inside an attribute value.
-        assert "attributes" not in entries[0]
+
+class TestTheRoutesAreNativeOnly:
+    async def test_nothing_is_mounted_on_a_tfe_prefix(self):
+        """No `terraform`, `tofu` or `tfci` invocation consumes any of this, so
+        by the rule in `docs/tfe-cli-surface.md` it is native-only."""
+        app = create_app()
+        offenders = [
+            r.path
+            for r in app.routes
+            if "inventory" in getattr(r, "path", "")
+            and ("/api/v2" in r.path or "/api/tfe/" in r.path)
+        ]
+        assert offenders == [], offenders
+
+    async def test_every_route_is_on_the_alias_too(self):
+        """`include_terrapod` mounts both. A route on the canonical prefix alone
+        is a removal for a runner or listener that lags the server."""
+        app = create_app()
+
+        def paths(prefix):
+            return {
+                f"{m} {r.path.replace(prefix, '/api/v1/')}"
+                for r in app.routes
+                if getattr(r, "methods", None)
+                for m in r.methods
+                if "inventory" in r.path and r.path.startswith(prefix)
+            }
+
+        canonical = paths("/api/v1/")
+        alias = paths("/api/terrapod/v1/")
+        assert canonical, "no canonical inventory routes at all"
+        assert alias == canonical

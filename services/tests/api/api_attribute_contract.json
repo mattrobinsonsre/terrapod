@@ -352,33 +352,43 @@
     "node-id",
     "role"
   ],
-  "inventory._inventory_json": [
-    "created-at",
-    "description",
-    "name",
-    "sources",
-    "updated-at"
+  "inventory._group_child_json": [
+    "created-at"
   ],
-  "inventory._item_json": [
-    "address",
+  "inventory._group_json": [
+    "child-count",
     "created-at",
-    "groups",
+    "member-count",
     "name",
     "updated-at",
-    "vars"
+    "variable-count"
   ],
-  "inventory._resolved_json": [
-    "ansible-inventory",
+  "inventory._host_group_json": [
+    "created-at"
+  ],
+  "inventory._host_json": [
+    "created-at",
     "group-count",
-    "groups",
-    "host-count",
-    "hosts"
+    "name",
+    "updated-at",
+    "variable-count"
   ],
-  "inventory.preview_limit": [
-    "host-count",
-    "hosts",
-    "limit",
-    "of-host-count"
+  "inventory._settings_json": [
+    "branch",
+    "created-at",
+    "ignore-paths",
+    "include-platform",
+    "repo-url",
+    "updated-at",
+    "working-directory"
+  ],
+  "inventory._var_json": [
+    "created-at",
+    "key",
+    "sensitive",
+    "structured",
+    "updated-at",
+    "value"
   ],
   "module_autodiscovery_rules._preview_json": [
     "entries",

@@ -35,4 +35,12 @@ ENCRYPTED_COLUMNS: list[tuple[str, str]] = [
     # cannot decode, so a DEK rotation that skipped this column would not degrade
     # quietly — the API would fail to start.
     ("token_signing_keys", "key"),
+    # The three ansible inventory variable surfaces (#1967). A host variable is
+    # an ordinary place for an `ansible_become_password`, so the column is
+    # encrypted and `sensitive` is left to mean masking alone -- a column cannot
+    # be conditionally encrypted, so the two are orthogonal rather than one
+    # implying the other.
+    ("inventory_host_vars", "value"),
+    ("inventory_group_vars", "value"),
+    ("inventory_global_vars", "value"),
 ]

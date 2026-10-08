@@ -1,368 +1,189 @@
-"""The inventory merge, pinned against the measurements recorded on #1967.
+"""What ansible will accept as an inventory name, and what it will not (#1967).
 
-The precedence cases below are not invented: #1967 records them as measured on
-ansible-core 2.18.3 over three source types at once, in both orders. They are
-reproduced here so that a future change to `merge` has to disagree with ansible
-out loud rather than quietly.
+Pure functions, so a plain unit test. The module used to carry Terrapod's own
+merge -- union the hosts, union the memberships, let a later source win a
+conflicting variable -- measured against ansible-core 2.18.3. Those measurements
+were right and the implementation was still the wrong shape: ansible performs
+the merge, the precedence, the group DAG and the `--limit` expansion itself, so
+Terrapod renders the input and reads the output.
+
+What stays is the part ansible will NOT do: refuse a name at the boundary,
+before it is stored. Ansible is laxer and warns about the rest, but a name it
+warns about cannot be used reliably in a `--limit` pattern or a `group_vars`
+filename -- so the refusal belongs at the write, where it can name the offending
+value, rather than at the point a playbook mysteriously targets nothing.
 """
 
 from __future__ import annotations
 
 import pathlib
+import re
 
 import pytest
 
 from terrapod.services.inventory_resolution import (
     DERIVED_GROUPS,
-    HostEntry,
     InventoryValidationError,
-    ResolvedInventory,
-    SourceResolution,
-    limit_matches,
-    merge,
-    to_ansible_inventory,
-    validate_declared_vars,
     validate_group_name,
     validate_host_name,
+    validate_var_key,
 )
 
 
-def _source(label: str, *hosts: HostEntry) -> SourceResolution:
-    return SourceResolution(label=label, hosts=hosts)
+class TestHostNames:
+    """The forbidden set is not cosmetic: every character in it means something
+    to `--limit`."""
 
-
-def _service_path() -> str:
-    """`inventory_service.py`, under either layout.
-
-    The test image flattens `services/` into `/app`, so a path relative to this
-    file's grandparent is right locally and resolves outside the image in CI.
-    """
-    here = pathlib.Path(__file__).resolve()
-    for root in (here.parents[2], here.parents[1]):
-        candidate = root / "terrapod" / "services" / "inventory_service.py"
-        if candidate.is_file():
-            return str(candidate)
-    raise AssertionError("inventory_service.py not found under either layout")
-
-
-class TestMergeTakesAnsiblesSemantics:
-    """hosts union, groups union, later source wins per variable."""
-
-    def test_hosts_are_unioned_across_sources(self):
-        resolved = merge(
-            [
-                _source("a", HostEntry("host1"), HostEntry("host2")),
-                _source("b", HostEntry("host3"), HostEntry("host4")),
-            ]
-        )
-
-        assert sorted(resolved.hosts) == ["host1", "host2", "host3", "host4"]
-
-    def test_a_group_named_by_two_sources_holds_the_hosts_from_both(self):
-        # #1967's measurement: `web` merged from the YAML and the INI gave
-        # host1 host2 host4.
-        resolved = merge(
-            [
-                _source(
-                    "yaml",
-                    HostEntry("host1", groups=("web",)),
-                    HostEntry("host2", groups=("web",)),
-                ),
-                _source("ini", HostEntry("host4", groups=("web",))),
-            ]
-        )
-
-        assert resolved.groups["web"] == ["host1", "host2", "host4"]
-
-    def test_the_later_source_wins_a_conflicting_variable(self):
-        resolved = merge(
-            [
-                _source("a", HostEntry("h", vars={"who": "from_A"})),
-                _source("b", HostEntry("h", vars={"who": "from_B"})),
-            ]
-        )
-
-        assert resolved.hosts["h"]["who"] == "from_B"
-
-    def test_and_wins_in_the_other_order_too(self):
-        """The half that makes it precedence rather than a coincidence."""
-        resolved = merge(
-            [
-                _source("b", HostEntry("h", vars={"who": "from_B"})),
-                _source("a", HostEntry("h", vars={"who": "from_A"})),
-            ]
-        )
-
-        assert resolved.hosts["h"]["who"] == "from_A"
-
-    def test_a_non_conflicting_variable_survives_the_later_source(self):
-        resolved = merge(
-            [
-                _source("a", HostEntry("h", vars={"only_in_A": 1, "who": "from_A"})),
-                _source("b", HostEntry("h", vars={"who": "from_B"})),
-            ]
-        )
-
-        assert resolved.hosts["h"] == {"only_in_A": 1, "who": "from_B"}
-
-    def test_group_membership_crosses_source_boundaries(self):
-        # `net` drew host2 from one source and switch1 from another.
-        resolved = merge(
-            [
-                _source("yaml", HostEntry("host2", groups=("web", "net"))),
-                _source("script", HostEntry("switch1", groups=("net",))),
-            ]
-        )
-
-        assert resolved.groups["net"] == ["host2", "switch1"]
-
-    def test_one_source_is_a_degenerate_case_not_a_special_case(self):
-        resolved = merge([_source("platform", HostEntry("h", groups=("web",)))])
-
-        assert resolved.hosts == {"h": {}}
-        assert resolved.groups == {"web": ["h"]}
-
-    def test_no_sources_resolves_to_nothing_rather_than_failing(self):
-        resolved = merge([])
-
-        assert resolved.hosts == {}
-        assert resolved.groups == {}
-        assert resolved.host_count == 0
-
-    def test_group_members_are_sorted_so_a_snapshot_is_byte_stable(self):
-        """Two identical resolutions must not produce differing snapshots."""
-        one = merge([_source("a", HostEntry("b", groups=("g",)), HostEntry("a", groups=("g",)))])
-        two = merge([_source("a", HostEntry("a", groups=("g",)), HostEntry("b", groups=("g",)))])
-
-        assert one.groups == two.groups == {"g": ["a", "b"]}
-
-    def test_provenance_records_which_sources_named_a_host(self):
-        resolved = merge(
-            [
-                _source("platform", HostEntry("h")),
-                _source("git", HostEntry("h")),
-            ]
-        )
-
-        assert resolved.provenance["h"] == ["platform", "git"]
-
-
-class TestAnsibleRendering:
-    def test_every_host_appears_in_hostvars_including_var_less_ones(self):
-        """The omission trap #1967 records, which our output must not carry.
-
-        `ansible-inventory --list` leaves a host with no vars out of
-        `_meta.hostvars` entirely -- measured, `switch1` was in group `net` and
-        absent from hostvars. Anything enumerating the host set from hostvars
-        therefore loses it.
-        """
-        resolved = merge(
-            [
-                _source(
-                    "a",
-                    HostEntry("has_vars", vars={"x": 1}, groups=("net",)),
-                    HostEntry("switch1", groups=("net",)),
-                )
-            ]
-        )
-
-        rendered = to_ansible_inventory(resolved)
-
-        assert set(rendered["_meta"]["hostvars"]) == {"has_vars", "switch1"}
-        assert rendered["_meta"]["hostvars"]["switch1"] == {}
-
-    def test_hosts_in_no_declared_group_land_in_ungrouped(self):
-        resolved = merge([_source("a", HostEntry("lonely"), HostEntry("grouped", groups=("web",)))])
-
-        rendered = to_ansible_inventory(resolved)
-
-        assert rendered["ungrouped"] == {"hosts": ["lonely"]}
-        assert rendered["web"] == {"hosts": ["grouped"]}
-        assert set(rendered["all"]["children"]) == {"web", "ungrouped"}
-
-    def test_ungrouped_is_omitted_when_every_host_has_a_group(self):
-        resolved = merge([_source("a", HostEntry("h", groups=("web",)))])
-
-        rendered = to_ansible_inventory(resolved)
-
-        assert "ungrouped" not in rendered
-        assert rendered["all"]["children"] == ["web"]
-
-    def test_all_is_always_present_even_for_an_empty_inventory(self):
-        """A consumer reading all.children should not have to handle absence."""
-        rendered = to_ansible_inventory(ResolvedInventory())
-
-        assert rendered["all"] == {"children": []}
-        assert rendered["_meta"] == {"hostvars": {}}
-
-
-class TestNameValidation:
-    @pytest.mark.parametrize("name", ["web", "env_prod", "_internal", "a1"])
-    def test_accepts_names_ansible_uses_without_warning(self, name):
-        assert validate_group_name(name) == name
-
-    @pytest.mark.parametrize("name", sorted(DERIVED_GROUPS))
-    def test_refuses_the_groups_ansible_derives(self, name):
-        with pytest.raises(InventoryValidationError, match="derived by ansible"):
-            validate_group_name(name)
-
-    @pytest.mark.parametrize("name", ["1web", "web-prod", "web prod", "web.prod", ""])
-    def test_refuses_group_names_ansible_would_warn_about(self, name):
-        with pytest.raises(InventoryValidationError):
-            validate_group_name(name)
-
-    @pytest.mark.parametrize("name", ["host1", "web-01.example.com", "10.0.0.4", "a_b", "HOST"])
-    def test_accepts_host_names_that_can_be_targeted(self, name):
+    @pytest.mark.parametrize("name", ["web-01", "db.internal", "host_1", "a", "WEB01"])
+    def test_an_ordinary_host_name_is_accepted(self, name):
+        """Dots, hyphens and underscores are fine, which is what most real
+        inventories are made of."""
         assert validate_host_name(name) == name
 
-    @pytest.mark.parametrize("bad", [",", ":", "!", "&", "~"])
-    def test_refuses_host_names_containing_a_limit_operator(self, bad):
-        """Each of these makes the host unselectable or changes other matches."""
-        with pytest.raises(InventoryValidationError, match="limit's own"):
-            validate_host_name(f"web{bad}01")
-
-    def test_refuses_a_leading_exclusion_marker_specifically(self):
-        """`!web` would silently exclude `web` from any pattern naming it."""
+    @pytest.mark.parametrize(
+        ("name", "why"),
+        [
+            ("web 1", "whitespace, which --limit splits on"),
+            ("\tweb", "whitespace"),
+            ("web\n", "whitespace"),
+            ("web,db", "a separator"),
+            ("a:b", "a separator"),
+            ("!web", "the exclusion operator"),
+            ("x&y", "the intersection operator"),
+            ("~re", "the regex operator"),
+        ],
+    )
+    def test_a_name_that_cannot_be_targeted_is_refused(self, name, why):
         with pytest.raises(InventoryValidationError):
-            validate_host_name("!web")
-
-    @pytest.mark.parametrize("name", ["has space", " leading", "trailing ", "tab\there"])
-    def test_refuses_whitespace_because_limit_splits_on_it(self, name):
-        with pytest.raises(InventoryValidationError, match="whitespace"):
             validate_host_name(name)
 
-    def test_var_NAMES_are_only_required_to_be_non_empty_strings(self):
-        """Still deliberately laxer than groups, and for the original reason:
-        ansible stores a non-identifier name and only warns, and
-        `hostvars['h']['odd-name']` works, so refusing one would block a working
-        configuration to prevent a warning. Only the VALUE rule tightened."""
-        assert validate_declared_vars({"ansible_user": "ec2-user", "odd-name": "x"}) == {
-            "ansible_user": "ec2-user",
-            "odd-name": "x",
-        }
+    def test_the_leading_bang_refusal_says_why_it_is_worse_than_unusable(self):
+        """`!web` cannot be selected AND silently excludes `web` from any
+        pattern naming it, which is the half that makes it dangerous rather
+        than merely broken. The message has to carry that."""
+        with pytest.raises(InventoryValidationError) as exc:
+            validate_host_name("!web")
+        assert "silently exclude" in str(exc.value)
 
-    def test_refuses_an_empty_variable_name(self):
+    @pytest.mark.parametrize("name", ["", None, 123])
+    def test_a_non_string_or_empty_name_is_refused(self, name):
         with pytest.raises(InventoryValidationError):
-            validate_declared_vars({"": "v"})
+            validate_host_name(name)  # type: ignore[arg-type]
 
-    def test_the_NAME_is_judged_before_the_value(self):
-        """An entry that is wrong both ways should say the name is wrong -- that
-        is the one the operator fixes first, and the value message would send
-        them to a group_vars file they do not need."""
-        with pytest.raises(InventoryValidationError, match="names must be non-empty"):
-            validate_declared_vars({"": 1})
 
-    @pytest.mark.parametrize("value", [8080, 22.5, True, None, ["a", "b"], {"nested": "object"}])
-    def test_refuses_a_non_string_DECLARED_value(self, value):
-        """Narrower than ansible's own rule, on purpose.
+class TestGroupNames:
+    @pytest.mark.parametrize("name", ["web", "_internal", "db2", "A", "web_prod"])
+    def test_an_identifier_is_accepted(self, name):
+        assert validate_group_name(name) == name
 
-        A declared item is the flat surface Terraform owns and a Terraform map is
-        `map(string)`. More to the point, every Go consumer decodes vars into
-        `map[string]string` and `encoding/json` fails the WHOLE unmarshal on one
-        non-string value -- so storing `{"role": "frontend", "port": 8080}` made
-        the SDK, the provider and the MCP tools report no variables at all for
-        that host, with nothing saying why. A 422 naming the key replaces a
-        silent whole-set disappearance.
+    @pytest.mark.parametrize("name", ["web-prod", "2web", "web.prod", "web prod", ""])
+    def test_a_name_ansible_would_warn_about_is_refused(self, name):
+        """Stricter than ansible on purpose: ansible stores these and warns, and
+        a name it warns about cannot be used reliably in a `--limit` pattern or
+        a `group_vars` filename."""
+        with pytest.raises(InventoryValidationError):
+            validate_group_name(name)
+
+    @pytest.mark.parametrize("name", sorted(DERIVED_GROUPS))
+    def test_a_derived_name_is_refused(self, name):
+        with pytest.raises(InventoryValidationError) as exc:
+            validate_group_name(name)
+        assert "derived by ansible" in str(exc.value)
+
+    def test_the_derived_refusal_points_at_where_global_variables_go(self):
+        """`all` is the one an operator actually wants, and they usually want it
+        for variables rather than for membership. Refusing without saying where
+        those go would just move the dead end -- `group_vars/all` is a real
+        ansible structure and Terrapod stores it as one.
         """
-        with pytest.raises(InventoryValidationError, match="must be a string"):
-            validate_declared_vars({"port": value})
+        with pytest.raises(InventoryValidationError) as exc:
+            validate_group_name("all")
+        message = str(exc.value)
+        assert "group_vars/all" in message
+        assert "on the inventory itself" in message
 
-    def test_the_refusal_points_at_where_richer_values_belong(self):
-        """Refusing without saying where to put it would just move the dead end."""
-        with pytest.raises(InventoryValidationError, match="group_vars or host_vars"):
-            validate_declared_vars({"ports": [80, 443]})
+    def test_all_is_refused_because_the_document_is_rooted_at_it(self):
+        """Pinned as its own case because the reason differs from `ungrouped`.
 
-    def test_the_rule_reaches_the_DECLARED_surface_and_nothing_else(self):
-        """Derived from the source, because the alternative drifts silently.
-
-        A resolution carries whatever its sources produced, and a file-based
-        source carries `group_vars` and `host_vars` natively -- lists, numbers,
-        nested objects. Applying the declared-surface rule there would flatten
-        them to strings and lose the shape a configure needs.
-
-        So this asserts WHERE the function is called from rather than that some
-        particular caller omits it: naming one caller leaves every future one
-        unguarded, and the caller this replaced has since been deleted, which is
-        how an assertion of that shape stops meaning anything.
+        `ungrouped` is merely derived. `all` is the rendered document's own root
+        key, so a declared group of that name would collide with the structure
+        rather than duplicate a computed one -- which is why the renderer can
+        put inventory-wide variables at that root without ambiguity.
         """
-        import re
+        assert "all" in DERIVED_GROUPS
+        assert "ungrouped" in DERIVED_GROUPS
 
-        service = pathlib.Path(_service_path()).read_text()
-        # Walk the file keeping the most recent function name, and record the
-        # ones from which the validator is actually reached.
-        current, reached = None, []
-        for line in service.splitlines():
-            m = re.match(r"^(?:async )?def (\w+)\(", line)
-            if m:
-                current = m.group(1)
-            elif "validate_declared_vars(" in line and current:
-                reached.append(current)
 
-        assert reached == ["validate_item_fields"], (
-            f"validate_declared_vars is reached from {reached}; it must apply to the "
-            f"declared-item surface only. A resolution holds what its sources produced, "
-            f"and flattening that to strings would lose the shape a configure needs."
+class TestVariableNames:
+    """Deliberately laxer than the group rule."""
+
+    @pytest.mark.parametrize(
+        "key", ["ansible_host", "odd-name", "with.dots", "UPPER", "2leading", "x"]
+    )
+    def test_anything_non_empty_is_accepted(self, key):
+        """Ansible stores a variable whose name is not an identifier and only
+        warns that it is unreachable as `{{ name }}` -- it is still readable via
+        `hostvars['h']['odd-name']`, which some roles do on purpose. Refusing
+        more would block working configurations to prevent a warning.
+        """
+        assert validate_var_key(key) == key
+
+    @pytest.mark.parametrize("key", ["", None, 42, " "])
+    def test_an_empty_or_non_string_key_is_refused(self, key):
+        with pytest.raises(InventoryValidationError):
+            validate_var_key(key)  # type: ignore[arg-type]
+
+    @pytest.mark.parametrize("key", [" ansible_host", "ansible_host ", "\tx"])
+    def test_surrounding_whitespace_is_refused(self, key):
+        """Almost certainly a mistake, and invisible in every surface that
+        displays it -- so the one place to catch it is the write."""
+        with pytest.raises(InventoryValidationError) as exc:
+            validate_var_key(key)
+        assert "whitespace" in str(exc.value)
+
+
+class TestTerrapodImplementsNoMergeOfItsOwn:
+    """Derived from the source, because this is the decision most likely to be
+    quietly undone.
+
+    Ansible performs the merge, the precedence, the group DAG, the derivation of
+    `all` and `ungrouped`, and the expansion of `--limit`. A reimplementation
+    here would be a second answer to every one of those questions, and the two
+    would diverge the first time ansible changed. The measurements that were
+    taken to write the old version are the reason to trust ansible's, not a
+    reason to keep ours.
+    """
+
+    def _source(self) -> str:
+        here = pathlib.Path(__file__).resolve()
+        for root in (here.parents[2], here.parents[1]):
+            candidate = root / "terrapod" / "services" / "inventory_resolution.py"
+            if candidate.is_file():
+                return candidate.read_text()
+        raise AssertionError("inventory_resolution.py not found under either layout")
+
+    @pytest.mark.parametrize(
+        "name", ["def merge(", "def to_ansible_inventory(", "def limit_matches("]
+    )
+    def test_the_retired_merge_functions_are_not_back(self, name):
+        assert name not in self._source(), (
+            f"{name} is back. Ansible performs the merge, the precedence, the group DAG "
+            f"and the --limit expansion; a second implementation here is a second answer "
+            f"that will diverge from it."
         )
 
-    def test_refuses_host_vars_that_are_not_a_mapping(self):
-        with pytest.raises(InventoryValidationError, match="mapping"):
-            validate_declared_vars(["not", "a", "mapping"])  # type: ignore[arg-type]
+    def test_the_module_touches_no_database_network_or_subprocess(self):
+        """It is the pure half on purpose, so it can be tested without standing
+        anything up -- and so the ansible invocation has exactly one home."""
+        source = self._source()
+        for forbidden in ("import subprocess", "AsyncSession", "httpx", "ansible-inventory"):
+            assert forbidden not in source, f"{forbidden} does not belong in the pure half"
 
-
-class TestLimitPreview:
-    @pytest.fixture
-    def resolved(self) -> ResolvedInventory:
-        return merge(
-            [
-                _source(
-                    "a",
-                    HostEntry("host1", groups=("web",)),
-                    HostEntry("host2", groups=("web", "net")),
-                    HostEntry("host4", groups=("web",)),
-                    HostEntry("switch1", groups=("net",)),
-                    HostEntry("lonely"),
-                )
-            ]
+    def test_it_declares_only_the_validators_and_their_constants(self):
+        """A floor, so a renamed module cannot pass by exporting nothing, and a
+        ceiling, so the merge cannot creep back under a new name."""
+        source = self._source()
+        functions = set(re.findall(r"^def (\w+)\(", source, re.M))
+        assert functions == {"validate_group_name", "validate_host_name", "validate_var_key"}, (
+            f"unexpected public surface: {sorted(functions)}"
         )
-
-    def test_an_empty_limit_is_the_whole_inventory(self, resolved):
-        assert limit_matches(resolved, "") == sorted(resolved.hosts)
-        assert limit_matches(resolved, "   ") == sorted(resolved.hosts)
-
-    def test_a_group_selects_its_members(self, resolved):
-        # #1967's measurement: `web` -> 3 hosts.
-        assert limit_matches(resolved, "web") == ["host1", "host2", "host4"]
-
-    def test_exclusion_narrows_a_group(self, resolved):
-        # `web:!host4` -> 2.
-        assert limit_matches(resolved, "web:!host4") == ["host1", "host2"]
-
-    def test_a_group_spanning_sources_selects_across_them(self, resolved):
-        # `net` -> host2 switch1.
-        assert limit_matches(resolved, "net") == ["host2", "switch1"]
-
-    def test_all_and_star_both_mean_everything(self, resolved):
-        assert limit_matches(resolved, "all") == sorted(resolved.hosts)
-        assert limit_matches(resolved, "*") == sorted(resolved.hosts)
-
-    def test_a_bare_host_name_selects_that_host(self, resolved):
-        assert limit_matches(resolved, "switch1") == ["switch1"]
-
-    def test_comma_and_colon_both_separate_terms(self, resolved):
-        assert limit_matches(resolved, "host1,switch1") == ["host1", "switch1"]
-        assert limit_matches(resolved, "host1:switch1") == ["host1", "switch1"]
-
-    def test_intersection_keeps_only_hosts_in_both(self, resolved):
-        assert limit_matches(resolved, "web:&net") == ["host2"]
-
-    def test_a_glob_matches_host_and_group_names(self, resolved):
-        assert limit_matches(resolved, "host*") == ["host1", "host2", "host4"]
-
-    def test_an_unmatched_term_selects_nothing_rather_than_everything(self, resolved):
-        assert limit_matches(resolved, "nosuchgroup") == []
-
-    def test_a_regex_term_is_refused_rather_than_silently_matching_nothing(self, resolved):
-        """Showing an empty target set for a limit ansible would expand is worse
-        than refusing to preview it."""
-        with pytest.raises(InventoryValidationError, match="regular expression"):
-            limit_matches(resolved, "~web.*")
