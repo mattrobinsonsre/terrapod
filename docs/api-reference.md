@@ -5669,7 +5669,7 @@ It is a write because it is one: it adds a row to a history bounded at twenty pe
 {
   "errors": [{
     "status": "409",
-    "detail": "This inventory was not refreshed. Sources ['git'] need ansible to parse, and ansible is installed only in the runner. A configure or a resolve operation has to produce it; the API will not resolve the rest of the inventory, because a partial resolution is a target set that is silently too small."
+    "detail": "This inventory was not resolved. Sources ['git'] need ansible to parse, and ansible is installed only in the runner. A configure or a resolve operation has to produce it; the API will not resolve the rest of the inventory, because a partial resolution is a target set that is silently too small."
   }]
 }
 ```

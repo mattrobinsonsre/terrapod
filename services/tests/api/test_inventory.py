@@ -934,7 +934,7 @@ class TestTheUnresolvableRefusalIsQuotedInTheDocs:
     #: are pinned -- the preview's was added later and was the one left out.
     LEADS = (
         "This inventory has never been resolved.",
-        "This inventory was not refreshed.",
+        "This inventory was not resolved.",
         "This inventory has no resolution to limit against.",
     )
 
@@ -968,6 +968,45 @@ class TestTheUnresolvableRefusalIsQuotedInTheDocs:
 
         for lead in self.LEADS:
             assert mod._unresolvable_error([], lead).status_code == 409
+
+    def test_the_leads_are_the_ones_the_call_sites_actually_pass(self):
+        """LEADS is DERIVED from the router, not declared beside it.
+
+        This is the hole the rest of the class had: every other test here feeds
+        a lead from the tuple INTO `_unresolvable_error`, so it only ever proves
+        the helper formats whatever it is handed. A call site passing a lead no
+        page quotes was invisible -- proven by mutation: changing one call
+        site's lead and leaving the tuple and the docs alone left all 44 tests
+        green, which is precisely the drift the class exists to catch arriving
+        through the one door it was not watching.
+
+        So the tuple is checked against the literals the module really passes.
+        Add a refusal and this fails until it is pinned and documented.
+        """
+        import ast
+
+        src = pathlib.Path("terrapod/api/routers/inventory.py").read_text()
+        passed: set[str] = set()
+        for node in ast.walk(ast.parse(src)):
+            if not isinstance(node, ast.Call):
+                continue
+            fn = node.func
+            if not (isinstance(fn, ast.Name) and fn.id == "_unresolvable_error"):
+                continue
+            # The lead is the second positional argument. A non-literal would be
+            # unpinnable by construction, so it is refused rather than skipped.
+            assert len(node.args) >= 2, ast.unparse(node)
+            lead = node.args[1]
+            assert isinstance(lead, ast.Constant) and isinstance(lead.value, str), (
+                f"a refusal lead must be a literal to be pinned: {ast.unparse(node)}"
+            )
+            passed.add(lead.value)
+
+        assert passed, "no call site found -- has the helper been renamed?"
+        assert passed == set(self.LEADS), (
+            f"the router passes leads this class does not pin: {sorted(passed - set(self.LEADS))}; "
+            f"pinned but unused: {sorted(set(self.LEADS) - passed)}"
+        )
 
     def test_the_docs_quote_every_lead(self):
         """The pages are the reason these strings are pinned at all, so the

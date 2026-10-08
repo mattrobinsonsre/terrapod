@@ -678,7 +678,7 @@ async def resolve_inventory(
 
     sources = await inv.list_sources(db, inventory.id)
     if not inv.api_can_resolve(sources):
-        raise _unresolvable_error(sources, "This inventory was not refreshed.")
+        raise _unresolvable_error(sources, "This inventory was not resolved.")
 
     version = await inv.resolve_if_stale(db, inventory)
     await db.commit()

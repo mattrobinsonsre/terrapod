@@ -463,7 +463,7 @@ So when an inventory contains a source the API does not own, **the API refuses
 rather than resolving the part it can**, naming the offending source kinds:
 
 ```
-409  This inventory was not refreshed. Sources ['git'] need ansible to parse,
+409  This inventory was not resolved. Sources ['git'] need ansible to parse,
      and ansible is installed only in the runner. A configure or a resolve
      operation has to produce it; the API will not resolve the rest of the
      inventory, because a partial resolution is a target set that is silently
@@ -480,7 +480,7 @@ Everything after the opening clause is identical.
 
 | Where | Opening clause |
 |---|---|
-| `POST .../actions/resolve` | `This inventory was not refreshed.` |
+| `POST .../actions/resolve` | `This inventory was not resolved.` |
 | `GET .../resolved` | `This inventory has never been resolved.` |
 | `POST .../actions/preview-limit` | `This inventory has no resolution to limit against.` |
 

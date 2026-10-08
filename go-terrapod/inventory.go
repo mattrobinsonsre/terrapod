@@ -94,8 +94,11 @@ type InventoryVersion struct {
 	// ProducedBy is "api" or "runner".
 	ProducedBy    string `json:"produced-by"`
 	ProducedByRef string `json:"produced-by-ref,omitempty"`
-	// TakenAt is when this resolution happened. A preview is as fresh as its
-	// snapshot, not live, so this is the field a reader needs.
+	// TakenAt is when this resolution came to be -- NOT how stale it is.
+	// A read resolves live for an inventory the API can resolve itself, so
+	// this moves only when the resolution does. It IS a staleness reading for
+	// an inventory carrying a source that needs ansible, because that one is
+	// served from the newest snapshot a runner posted.
 	TakenAt string `json:"taken-at"`
 
 	// Populated by a read of one snapshot; absent from a list.
@@ -321,11 +324,16 @@ func (c *Client) DeleteInventory(ctx context.Context, id string) error {
 
 // GetResolvedInventory reads what an inventory currently resolves to.
 //
-// Serves the newest snapshot, resolving first when there is none and every
-// source is one the API owns. Returns a ConflictError when a source needs
-// ansible and no snapshot exists yet -- the API refuses rather than resolving
-// what it can, because a partial resolution is a target set that is silently
-// too small.
+// LIVE for an inventory the API can resolve itself -- which is every inventory
+// that exists today, because the only declared source kind is terraform and
+// resolving that is a database query. A row is written only when the
+// resolution has actually moved, so reading does not evict the bounded
+// snapshot history a configure pins.
+//
+// Where a source needs ansible the newest snapshot a runner posted is served
+// instead, and a ConflictError is returned when there is none -- the API
+// refuses rather than resolving what it can, because a partial resolution is
+// a target set that is silently too small.
 func (c *Client) GetResolvedInventory(
 	ctx context.Context, inventoryID string,
 ) (*InventoryVersion, error) {
@@ -336,7 +344,14 @@ func (c *Client) GetResolvedInventory(
 	return parseInventoryVersion(data)
 }
 
-// ResolveInventory refreshes the snapshot now.
+// ResolveInventory records a snapshot of what the inventory resolves to now.
+//
+// It is NOT how a caller gets fresh data: GetResolvedInventory and the limit
+// preview are already live for an inventory the API can resolve itself. What
+// this guarantees is that the bounded snapshot history HOLDS a row describing
+// the current resolution, which is what a configure pins. It takes the same
+// stamped path a read does, so it returns the existing row unchanged when the
+// resolution has not moved.
 func (c *Client) ResolveInventory(
 	ctx context.Context, inventoryID string,
 ) (*InventoryVersion, error) {
