@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import WarmBinaryEntry, WarmPlatform, WarmProviderEntry, settings
-from terrapod.engines import engine_enabled
 from terrapod.logging_config import get_logger
 from terrapod.services import binary_cache_service, platform_tools, provider_cache_service
 from terrapod.storage.protocol import ObjectStore
@@ -85,9 +84,10 @@ def platform_tool_entries() -> list[WarmBinaryEntry]:
         WarmBinaryEntry(tool=tool, version=platform_tools.configured_version(tool))
         for tool in sorted(platform_tools.PLATFORM_TOOLS)
     ]
-    # Only when the engine is on: sealing a Terraform-only deployment should
-    # not pull down a Pulumi binary it will never run (#1429).
-    if settings.default_pulumi_version and engine_enabled("pulumi"):
+    # Keyed on the data rather than on a switch (#1986): a deployment that pins no
+    # `default_pulumi_version` is not running Pulumi, so sealing it still does not
+    # pull down a binary it will never run -- and nobody had to decide that.
+    if settings.default_pulumi_version:
         entries.append(WarmBinaryEntry(tool="pulumi", version=settings.default_pulumi_version))
     return sorted(entries, key=lambda e: e.tool)
 

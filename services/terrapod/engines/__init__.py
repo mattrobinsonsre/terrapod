@@ -144,28 +144,6 @@ class EngineStrategy(Protocol):
         ...
 
 
-def engine_enabled(engine: str) -> bool:
-    """Whether an engine is offered by this deployment (#1429).
-
-    Defined here rather than in `services/engine_gating.py` because the listener
-    image ships `engines/` and no `services/` — so a gate living there could not
-    be consulted by the strategy registry, and the registry is where gating a
-    *strategy* has to happen. `engine_gating` imports this rather than declaring
-    a second copy, so there is one answer to "is this engine on".
-
-    Terraform is always enabled: it is not an optional engine, it is what
-    Terrapod is.
-    """
-    if engine == DEFAULT_ENGINE:
-        return True
-    from terrapod.config import settings
-
-    config = getattr(settings.engines, engine, None)
-    if config is None:
-        raise ValueError(f"unknown engine: {engine}")
-    return bool(config.enabled)
-
-
 def strategy_for(engine: str | None) -> EngineStrategy:
     """Resolve the strategy for an engine value.
 
@@ -175,14 +153,6 @@ def strategy_for(engine: str | None) -> EngineStrategy:
     """
     key = (engine or DEFAULT_ENGINE).strip().lower()
     strategy = _REGISTRY.get(key)
-    if strategy is not None and not engine_enabled(key):
-        # Distinguished from "unknown" deliberately. An operator who turned the
-        # engine off wants to be told that, not that Terrapod has never heard of
-        # it — the two have completely different fixes.
-        raise ValueError(
-            f"engine {key!r} is not enabled on this deployment "
-            f"(set engines.{key}.enabled to turn it on)"
-        )
     if strategy is None:
         # Deliberately not a silent fallback. An unknown engine means a row was
         # written by a newer replica mid-rollout, or by hand; running it as
@@ -287,10 +257,11 @@ def discovers_provider_configurations(engine: str | None) -> bool:
 def known_engines() -> tuple[str, ...]:
     """Every engine this deployment can run, for validation and error messages.
 
-    Filtered by the gate, so a gated-off engine is absent rather than listed and
-    then refused — the same rule the surfaces follow.
+    Every registered engine, unconditionally. There is no on/off switch to filter
+    by (#1986): the platform offers what it can run, and a deployment that uses
+    only terraform/tofu simply never names another one.
     """
-    return tuple(sorted(name for name in _REGISTRY if engine_enabled(name)))
+    return tuple(sorted(_REGISTRY))
 
 
 def _build_registry() -> dict[str, EngineStrategy]:

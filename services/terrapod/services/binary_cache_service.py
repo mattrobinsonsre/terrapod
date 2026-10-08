@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.metrics import BINARY_CACHE_REQUESTS
 from terrapod.config import settings
 from terrapod.db.models import CachedBinary
-from terrapod.engines import engine_enabled
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.services.artifact_verification import VerificationError, verify_binary
@@ -55,12 +54,6 @@ logger = get_logger(__name__)
 # its upstream facts live (services/platform_tools.py still owns its asset
 # layout) and in having no signature to check. See CHECKSUM_ONLY_TOOLS.
 CLI_TOOLS = {"terraform", "tofu", "terragrunt", "pulumi", "node", "go", "dotnet"}
-
-#: Tools that exist only to serve the Pulumi engine, and are refused when it is
-#: off (#1429). `node` is here because `pulumi-language-nodejs` shells out to it:
-#: it is the runtime a TypeScript program needs, not something Terrapod offers
-#: in its own right (#1566).
-_PULUMI_ONLY_TOOLS = {"pulumi", "node", "go", "dotnet"}
 
 #: Tools whose publisher signs nothing, so the strongest check available is the
 #: artifact's SHA-256 against a checksum the publisher published. Verification
@@ -550,16 +543,6 @@ async def list_available_versions(tool: str) -> list[str]:
     """
     if tool not in VALID_TOOLS:
         raise ValueError(f"Invalid tool: {tool}. Must be one of {VALID_TOOLS}")
-    # Engine gating (#1429). Listing reaches an upstream index, and a deployment
-    # that has not switched Pulumi on should neither make requests on its behalf
-    # nor offer its versions in a picker. The route stays mounted -- it is the
-    # binary cache, which is what Terrapod is and is never gateable -- so this
-    # refuses the tool value, exactly as `strategy_for` refuses a disabled
-    # engine. Deliberately NOT applied to get_or_cache_binary or purge_binary:
-    # gating hides and halts, never destroys, and an operator must still be able
-    # to purge a Pulumi binary cached before the engine was switched off.
-    if tool in _PULUMI_ONLY_TOOLS and not engine_enabled("pulumi"):
-        raise ValueError(f"{tool} is only served for the pulumi engine, which is not enabled")
 
     # A platform tool has exactly one version: the one this deployment pins
     # (#1208). There is no menu to offer and no upstream index to consult.

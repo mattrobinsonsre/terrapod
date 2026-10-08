@@ -39,7 +39,7 @@ from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import registry_collection_service as collections
-from terrapod.services.engine_gating import capability_enabled
+from terrapod.services.capabilities import capability_enabled
 from terrapod.services.package_cache import (
     galaxy,
     goproxy,

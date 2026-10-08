@@ -453,17 +453,16 @@ async def _enqueue_pulumi_run_ended(db: AsyncSession, run: Run) -> None:
     workspace lock holds the next apply back. Terrapod already knows the Job is
     gone at this point, so it need not wait to be told again.
 
-    Three gates, cheapest first, so a Terraform-only deployment pays nothing:
+    Two gates, cheapest first, so a Terraform-only deployment pays nothing:
 
-    - the **engine gate** (#1429), which also decides whether the handler is
-      registered at all — enqueuing while it is off would push items nothing
-      drains;
     - **not plan-only**, because a preview takes neither the stack mutex nor the
       workspace lock, and `_runner_caps_on` grants a plan-only run no capability
       to begin anything else;
     - the **workspace's engine**, which is where a run's engine is recorded
       (#1536). `db.get` is identity-mapped, so this shares the row with the
-      blocks below rather than costing a second read.
+      blocks below rather than costing a second read — which is why dropping the
+      engine gate that used to sit ahead of these (#1986) costs a Terraform
+      deployment nothing: the row it reads is already in the session.
 
     Deliberately a triggered task rather than inline work: promoting a checkpoint
     and releasing a lock both commit, and the not-ours path rolls back — on this
@@ -474,11 +473,10 @@ async def _enqueue_pulumi_run_ended(db: AsyncSession, run: Run) -> None:
     Best-effort by construction: a failed enqueue is logged and the run
     transition carries on, with the sweep still the backstop.
     """
-    from terrapod.services.engine_gating import engine_enabled
     from terrapod.services.scheduler import enqueue_trigger
 
     try:
-        if not engine_enabled("pulumi") or run.plan_only:
+        if run.plan_only:
             return
         ws = await db.get(Workspace, run.workspace_id)
         if ws is None or ws.engine != "pulumi":

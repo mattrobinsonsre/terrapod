@@ -28,7 +28,7 @@ from terrapod.config import settings
 from terrapod.db.session import close_db, get_db_session, init_db
 from terrapod.logging_config import configure_logging, get_logger
 from terrapod.redis.client import close_redis, init_redis
-from terrapod.services.engine_gating import capability_enabled
+from terrapod.services.capabilities import capability_enabled
 from terrapod.storage import close_storage, init_storage
 
 from .errors import UPSTREAM_FAILURE_HEADER
@@ -144,7 +144,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             )
 
     # Register and start distributed scheduler (multi-replica safe)
-    from terrapod.services.engine_gating import engine_enabled as _engine_enabled
+    # A local Pulumi update holds the workspace lock while it runs (#1562); this
+    # releases the lock of one whose CLI died and stopped renewing its lease.
+    # Registered unconditionally (#1986): there is no engine switch to ask, and a
+    # deployment that runs no Pulumi has no `pulumi-update:` locks for the sweep
+    # to find, so it costs one idle scheduled task rather than a decision.
+    from terrapod.services.pulumi_update_locks import (
+        RUN_ENDED_TRIGGER,
+        handle_run_ended,
+        sweep_abandoned_updates,
+    )
     from terrapod.services.scheduler import (
         AI_LANE,
         register_periodic_task,
@@ -153,32 +162,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         stop_scheduler,
     )
 
-    # A local Pulumi update holds the workspace lock while it runs (#1562); this
-    # releases the lock of one whose CLI died and stopped renewing its lease.
-    # Registered only with the engine on, like every Pulumi surface (#1429).
-    if _engine_enabled("pulumi"):
-        from terrapod.services.pulumi_update_locks import (
-            RUN_ENDED_TRIGGER,
-            handle_run_ended,
-            sweep_abandoned_updates,
-        )
-
-        register_periodic_task(
-            "pulumi_update_sweep",
-            interval_seconds=60,
-            handler=sweep_abandoned_updates,
-            description="Release the workspace lock of an abandoned local Pulumi update",
-        )
-        # The sweep above infers an update's death from a lapsed lease. For an
-        # agent run Terrapod knows the Job is gone, so it ends that run's update
-        # at once rather than a poll interval later (#1882). Registered inside
-        # the same gate: with the engine off nothing enqueues these, and an
-        # unregistered type would only log "no handler".
-        register_trigger_handler(
-            RUN_ENDED_TRIGGER,
-            handler=handle_run_ended,
-            description="End the Pulumi update an agent run left behind when it ended",
-        )
+    register_periodic_task(
+        "pulumi_update_sweep",
+        interval_seconds=60,
+        handler=sweep_abandoned_updates,
+        description="Release the workspace lock of an abandoned local Pulumi update",
+    )
+    # The sweep above infers an update's death from a lapsed lease. For an
+    # agent run Terrapod knows the Job is gone, so it ends that run's update
+    # at once rather than a poll interval later (#1882). Registered inside
+    # the same gate: with the engine off nothing enqueues these, and an
+    # unregistered type would only log "no handler".
+    register_trigger_handler(
+        RUN_ENDED_TRIGGER,
+        handler=handle_run_ended,
+        description="End the Pulumi update an agent run left behind when it ended",
+    )
 
     if settings.vcs.enabled:
         from terrapod.services.vcs_poller import handle_immediate_poll, poll_cycle
@@ -1585,28 +1584,23 @@ def create_application() -> FastAPI:
     # The Pulumi service surface (#1522) — `pulumi login` and a stack's state,
     # secrets and update lifecycle.
     #
-    # Gated on the engine itself, not a capability flag: unlike the caches in
-    # engine_gating's table this surface has no separate `enabled` of its own —
-    # it exists exactly when the Pulumi engine does. And it is NOT MOUNTED when
-    # gated off rather than mounted-and-404ing: a surface that refuses every
-    # request is still in the schema, still carries its dependencies, and still
-    # reads to an auditor as something this deployment does (#1429).
-    from terrapod.services.engine_gating import engine_enabled
+    # Mounted unconditionally (#1986). It has no `enabled` flag of its own and
+    # there is no longer an engine switch above it: the surface exists because
+    # Terrapod can run Pulumi, and a deployment that does not simply never calls
+    # it. Nothing here is reachable without a Pulumi workspace to name.
+    from terrapod.api.routers.pulumi_service import router as pulumi_router
+    from terrapod.api.routers.run_artifacts import (
+        pulumi_router as pulumi_run_artifacts_router,
+    )
 
-    if engine_enabled("pulumi"):
-        from terrapod.api.routers.pulumi_service import router as pulumi_router
-        from terrapod.api.routers.run_artifacts import (
-            pulumi_router as pulumi_run_artifacts_router,
-        )
-
-        include_terrapod(pulumi_router)
-        # The stack-handover artifact routes, gated with the engine like the
-        # surface above. An agent run no longer uses them: since #1881 it drives
-        # the service surface directly and its state is checkpointed there, so
-        # nothing fetches or uploads a deployment through these. They are kept
-        # because retiring an API surface is its own decision, not a side effect
-        # of changing where the runner puts its state.
-        include_terrapod(pulumi_run_artifacts_router)
+    include_terrapod(pulumi_router)
+    # The stack-handover artifact routes, mounted beside the surface above and
+    # on the same reasoning. An agent run no longer uses them: since #1881 it drives
+    # the service surface directly and its state is checkpointed there, so
+    # nothing fetches or uploads a deployment through these. They are kept
+    # because retiring an API surface is its own decision, not a side effect
+    # of changing where the runner puts its state.
+    include_terrapod(pulumi_run_artifacts_router)
 
     # Per-workspace cloud identity (#1901). The mint and the key admin ride the
     # native surface; the two issuer GETs are mounted at the ROOT, beside

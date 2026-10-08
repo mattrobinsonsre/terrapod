@@ -6,7 +6,7 @@ operations an operator actually reaches for, so they live here on the native
 surface rather than being invented under `/v2/`, which is a contract with
 container clients rather than with people.
 
-Mounted only when the registry is (`engine_gating.capability_enabled("oci")`), so
+Mounted only when the registry is (`capabilities.capability_enabled("oci")`), so
 a deployment that has switched Ansible off carries none of it — see #1429.
 """
 

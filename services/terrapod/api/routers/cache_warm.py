@@ -20,7 +20,7 @@ from terrapod.api.dependencies import AuthenticatedUser, require_admin
 from terrapod.config import settings
 from terrapod.logging_config import get_logger
 from terrapod.services import warm_ahead
-from terrapod.services.engine_gating import capability_enabled
+from terrapod.services.capabilities import capability_enabled
 from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.warm_ahead import MAX_ITEMS, WarmItem
 

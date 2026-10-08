@@ -664,11 +664,10 @@ async def create_workspace(
     whose `stack init` used to create one implicitly (#1535). A CLI creating a
     platform resource means no RBAC review and no record of where it came from.
 
-    `engine` is validated against `known_engines()`, which is already filtered by
-    the engine gate — so an engine this deployment has turned off is *absent*
-    from the list rather than listed and then refused, and the error names what
-    is actually available. Omitting it yields Terraform, which is what every
-    existing caller sends, so this stays additive.
+    `engine` is validated against `known_engines()`, which is every engine this
+    build contains — there is no on/off switch to filter it (#1986), so a name
+    that is absent is one Terrapod cannot run at all. Omitting it yields
+    Terraform, which is what every existing caller sends, so this stays additive.
     """
     from terrapod.api.routers.tfe_v2 import _create_workspace_impl
     from terrapod.engines import DEFAULT_ENGINE, known_engines
@@ -678,15 +677,14 @@ async def create_workspace(
 
     available = known_engines()
     if engine not in available:
-        # One message for "never heard of it" and "turned off" would send an
-        # operator to the wrong fix, so say which engines this deployment offers
-        # and let the difference be visible.
+        # There is no setting to point at any more (#1986): an engine Terrapod
+        # can run is always listed, so an unlisted name is one this build does
+        # not contain — a typo, or a row written by a newer replica.
         raise HTTPException(
             status_code=422,
             detail=(
                 f"engine must be one of: {', '.join(available)} "
-                f"(got {engine!r}; an engine that is installed but disabled is "
-                f"not listed — enable it with engines.{engine}.enabled)"
+                f"(got {engine!r}, which this Terrapod cannot run)"
             ),
         )
 
