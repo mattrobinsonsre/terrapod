@@ -5523,7 +5523,7 @@ On a `PATCH`, **an omitted `vcs-connection` relationship means "leave it alone" 
 | `repo-url` | The repository holding the inventory. **A repository needs a VCS connection to fetch it with** — `repo-url` with no `vcs-connection` relationship is a `422` naming the field, checked against the merged state on a `PATCH` so clearing the connection and leaving the repository behind is refused too |
 | `branch` | The branch to read. Empty means the repository's default branch |
 | `working-directory` | The **directory** ansible reads as one source. A directory rather than a file, because ansible reads a directory lexically, so one binding already carries arbitrarily many inventory files in an order the operator controls through filenames |
-| `ignore-paths` | Accepted and stored. **The resolution does not yet apply it** — narrow the source with `working-directory` instead |
+| `ignore-paths` | Globs matched against paths **relative to `working-directory`**, pruned from the fetched source before anything reads it. Ansible takes every file in a directory, so this is the only way to leave one out |
 
 The `vcs-connection` relationship is the binding, and it is **independent of the workspace's own Terraform VCS binding**: even in one repository the root directory differs, and a workspace with no infrastructure of its own has no Terraform binding at all.
 

@@ -106,10 +106,18 @@ that is why these are their own fields rather than a reference to it. Even in on
 repository the root directory differs — `terraform/` against `ansible/` — and a
 workspace with no infrastructure of its own has no Terraform binding at all.
 
-`ignore-paths` is accepted and stored alongside the rest of the binding, and the
-resolution does not yet apply it. Narrow the source with `working-directory`
-instead, which is honoured: it is the path the repository is fetched and read
-from.
+`working-directory` and `ignore-paths` are the two ways to narrow the source,
+and they work at different scales. `working-directory` is the path the
+repository is fetched and read from, so it decides what arrives at all.
+`ignore-paths` then prunes what did: each entry is a glob matched against paths
+**relative to `working-directory`**, so an operator never writes a prefix they
+did not choose, and the same matcher an autodiscovery rule's `ignore-patterns`
+uses applies here.
+
+Pruning is the only way to leave a file out of this source, because ansible
+reads a directory as one source and takes every file in it. The prune happens
+before anything else reads the tree, so an excluded file is never scanned and
+cannot refuse the resolution on its own account.
 
 ### Merge order is fixed: the declared rows win
 
