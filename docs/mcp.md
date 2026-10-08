@@ -163,6 +163,28 @@ Every tool is namespaced `terrapod_*` and carries a safety annotation
 | `terrapod_registry_provider_list` | List the private registry providers published here. |
 | `terrapod_registry_provider_get` | One provider by name — namespace, owner, labels. |
 
+### Inventory (gated) — build and read an ansible inventory
+
+A workspace's [ansible inventory](ansible-inventory.md) as the structures ansible
+has: hosts, groups, the memberships and nestings between them, and variables on a
+host, a group or the inventory. Each row is addressable by its typed id, and
+these tools **write** as well as read — a row an agent creates that a
+configuration later claims collides with a `409`, and the practitioner imports
+it, which is how every other Terraform-managed thing behaves.
+
+| Tool | Safety | What it does |
+|---|---|---|
+| `terrapod_inventory_settings` | read-only | The workspace's inventory settings. `configured: false` means no git source is bound, which is the normal default rather than a problem. |
+| `terrapod_inventory_settings_set` | — | Create or change them — bind a repository directory, or turn the declared rows off. Patches, falling back to a full write on first use. |
+| `terrapod_inventory_list` | read-only | A workspace's hosts, groups and the variables under `all`, each carrying counts rather than the rows themselves. |
+| `terrapod_inventory_detail` | read-only | One host or group with its variables and links. Dispatches on the typed id prefix, so there is no `kind` argument to get wrong. |
+| `terrapod_inventory_resolved` | read-only | The merged resolution — every host with its variables, each group's **direct** membership, and the nesting. An optional `limit` is expanded by ansible itself, **through** the nesting, which is the authoritative "what would this target". |
+| `terrapod_inventory_host_declare` | — | Declare a host. |
+| `terrapod_inventory_group_declare` | — | Declare a group. `all` and `ungrouped` are refused: ansible derives both. |
+| `terrapod_inventory_link` | — | A membership (host in group) or a nesting (group in group). |
+| `terrapod_inventory_var_set` | — | Set a variable on a host, on a group, or on the inventory (`group_vars/all`). |
+| `terrapod_inventory_remove` | destructive | Remove any row by its typed id. A host takes its memberships and variables with it; a group takes its memberships, nestings and variables. |
+
 ### Discover (gated) — onboard existing resources
 
 Tofu-native resource discovery: bring existing cloud resources under management.

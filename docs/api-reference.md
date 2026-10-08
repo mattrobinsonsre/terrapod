@@ -5471,204 +5471,271 @@ Deletes the catalog instance's workspace record **without** destroying its infra
 
 ## Ansible Inventory
 
-A workspace's **inventory** is an ordered set of sources that resolve into one host and group set, in the shape ansible consumes. The only source kind implemented is `terraform`: the hosts the workspace's own Terraform declares as `terrapod_inventory_item` resources, one resource per host. See [Ansible Inventory](ansible-inventory.md) for the model, the merge semantics and the two declaration patterns.
+A workspace carries **one inventory**, made of the structures ansible's inventory has: hosts, groups, the memberships between them, the nestings between groups, and variables on a host, on a group or inventory-wide. Each is its own addressable resource. Terrapod stores and renders them; **`ansible-inventory` performs the merge**, the precedence, the group DAG, the derivation of `all` and `ungrouped`, and the expansion of `--limit`. See [Ansible Inventory](ansible-inventory.md) for the model, the two sources and the declaration patterns.
 
 **Native surface only** — nothing here is on the TFE-compatible prefix, because no `terraform`, `tofu` or `tfci` invocation consumes it. The canonical prefix is `/api/v1`; `/api/terrapod/v1` is the deprecated alias and serves every route below.
 
-Two capabilities gate it, both in the workspace axis: **`inventory:read`** (read tier) for every read, and **`inventory:write`** (write tier — deliberately not admin, because the Terraform that declares a host runs under an apply) for every write. A **runner token** is handled separately: it may manage the inventory items of **its own run's workspace** and nothing else, reads unphased and writes bound to the **apply** phase.
+Two capabilities gate it, both in the workspace axis: **`inventory:read`** (read tier) for every read, and **`inventory:write`** (write tier — deliberately not admin, because the Terraform that declares a host runs under an apply) for every write. A **runner token** is handled separately: it may manage the inventory of **its own run's workspace** and nothing else, reads unphased and writes bound to the **apply** phase.
 
-**Configure operations do not exist yet.** These endpoints declare an inventory and make it observable; they do not run playbooks.
+**Configure operations do not exist yet.** These endpoints build an inventory and make it observable; they do not run playbooks.
 
-> **Host variables are stored and returned in the clear**, in full, to any holder of `inventory:read`. There is no `sensitive` flag and no masking. Do not put a credential in one.
+Typed id prefixes: `invhost-` (host), `invgroup-` (group), `invhg-` (host membership), `invgc-` (group nesting), `invhvar-` (host variable), `invgvar-` (group variable), `invvar-` (inventory variable). The settings are identified by the **workspace id**, because one inventory per workspace means there is no surrogate id to carry.
 
-Typed id prefixes: `invitem-` (declared host), `inv-` (inventory), `invsrc-` (source).
+Common statuses across every write here: **409** on a duplicate (a second host of the same name in the workspace, a second variable with the same key on the same parent, a membership or nesting that already exists) — which is what makes a Terraform import the next step; **422** on a parent that is absent or in another workspace, on a name ansible cannot use, and on a ceiling, with the limit named in the message.
 
-### List Workspace Inventory Items
-
-```
-GET /api/v1/workspaces/{id}/inventory-items
-```
-
-Requires `inventory:read`. The hosts this workspace declares, ordered by name. Supports the standard `page[number]` / `page[size]`. Unphased for a runner token — a plan reads the inventory to diff it.
-
-### Create Inventory Item
+### Show / Replace / Update / Delete Inventory Settings
 
 ```
-POST /api/v1/workspaces/{id}/inventory-items
+GET    /api/v1/workspaces/{id}/inventory/settings
+PUT    /api/v1/workspaces/{id}/inventory/settings
+PATCH  /api/v1/workspaces/{id}/inventory/settings
+DELETE /api/v1/workspaces/{id}/inventory/settings
 ```
 
-Requires `inventory:write`; **apply phase** for a runner token. Declares one host. Returns `201`.
+`GET` requires `inventory:read`; the rest require `inventory:write` (apply phase for a runner token). `DELETE` returns `204` and clears the VCS binding without touching a single row.
 
-**Request body:**
+**`GET` answers `404` when there are none, and that is the default** — not an error. It means no VCS source is bound and the declared rows are the whole inventory.
+
+`PUT` is a full replace, because the route is a singleton: the body is the complete intended state, so an attribute left out takes its default rather than keeping the stored value. `PATCH` changes only what it names, so a caller does not have to read the row to change one field.
+
+On a `PATCH`, **an omitted `vcs-connection` relationship means "leave it alone" and an explicit `{"data": null}` means "remove it"** — the distinction a partial update depends on, since collapsing the two would make a binding impossible to clear without a full `PUT`. Clearing it while leaving a `repo-url` behind is the same incoherent row as setting both at once, so the check runs against the **merged** state and refuses it with `422`.
+
 ```json
 {
   "data": {
-    "type": "inventory-items",
+    "type": "inventory-settings",
     "attributes": {
-      "name": "web-01",
-      "address": "10.0.1.20",
-      "groups": ["web", "linux"],
-      "vars": { "ansible_user": "ec2-user" }
+      "include-platform": true,
+      "repo-url": "https://github.com/acme/ansible",
+      "branch": "main",
+      "working-directory": "inventory"
+    },
+    "relationships": {
+      "vcs-connection": {"data": {"id": "vcs-...", "type": "vcs-connections"}}
     }
   }
 }
 ```
 
-| Attribute | Description |
+| Attribute | Meaning |
 |---|---|
-| `name` | Required. The inventory hostname. Refused with `422` if it contains whitespace or any of `,`, `:`, `!`, `&`, `~` — those are `--limit`'s own operators and separators, so such a host cannot be targeted and a leading `!` would silently exclude the host it names. Dots, hyphens and underscores are fine. |
-| `address` | Optional convenience that populates the `ansible_host` variable at resolution time. An explicit `ansible_host` in `vars` wins. |
-| `groups` | Optional list of declared group names. `all` and `ungrouped` are derived by ansible and refused with `422`; otherwise a name must start with a letter or underscore and contain only letters, digits and underscores. |
-| `vars` | Optional object of ansible host variables. Keys must be non-empty strings and **values must be strings** — a non-string value is refused with `422` naming the key, because every client decodes these as a string map and one non-string entry would hide the whole set. Richer values belong in a `group_vars`/`host_vars` source; a resolved snapshot keeps them. Terrapod gives no variable special meaning. **Stored and returned in the clear.** |
+| `include-platform` | Whether the declared rows take part in resolution. Default `true`. `false` resolves the repository alone, which is how a committed inventory is moved in before anything is declared |
+| `repo-url` | The repository holding the inventory. **A repository needs a VCS connection to fetch it with** — `repo-url` with no `vcs-connection` relationship is a `422` naming the field, checked against the merged state on a `PATCH` so clearing the connection and leaving the repository behind is refused too |
+| `branch` | The branch to read. Empty means the repository's default branch |
+| `working-directory` | The **directory** ansible reads as one source. A directory rather than a file, because ansible reads a directory lexically, so one binding already carries arbitrarily many inventory files in an order the operator controls through filenames |
+| `ignore-paths` | Accepted and stored. **The resolution does not yet apply it** — narrow the source with `working-directory` instead |
 
-`409` when a host of that name is already declared in the workspace. `422` when the workspace already holds 5000 items.
+The `vcs-connection` relationship is the binding, and it is **independent of the workspace's own Terraform VCS binding**: even in one repository the root directory differs, and a workspace with no infrastructure of its own has no Terraform binding at all.
 
-### Show / Update / Delete Inventory Item
-
-```
-GET    /api/v1/inventory-items/{id}
-PATCH  /api/v1/inventory-items/{id}
-DELETE /api/v1/inventory-items/{id}
-```
-
-`GET` requires `inventory:read`; `PATCH` and `DELETE` require `inventory:write` (apply phase for a runner token). `DELETE` returns `204`.
-
-`PATCH` is a **partial update**: an absent attribute is left alone, and an empty list or object **clears**. The distinction is load-bearing for the provider — omitting `groups` and sending `groups: []` are different requests, and collapsing them would make a cleared list impossible to express. A duplicate `name` → `409`.
-
-### List / Create Inventories
+### List / Create Inventory Hosts
 
 ```
-GET  /api/v1/workspaces/{id}/inventories
-POST /api/v1/workspaces/{id}/inventories
+GET  /api/v1/workspaces/{id}/inventory/hosts
+POST /api/v1/workspaces/{id}/inventory/hosts
 ```
 
-`GET` requires `inventory:read` and supports the standard paging. It is **empty for a workspace that has never declared a host** — the `default` inventory is created lazily on the first write, so a Terraform/OpenTofu-only workspace carries no inventory rows at all.
+`GET` requires `inventory:read`, is ordered by name, and supports the standard `page[number]` / `page[size]`. Unphased for a runner token — a plan reads the inventory to diff it. `POST` requires `inventory:write` (apply phase for a runner token) and returns `201`.
 
-`POST` requires `inventory:write`, takes `name` (required) and `description`, and returns `201`. Every new inventory is created with its `platform` source at **position 0**. `409` on a duplicate name in the workspace.
-
-### Show / Delete Inventory
-
-```
-GET    /api/v1/inventories/{id}
-DELETE /api/v1/inventories/{id}
+```json
+{"data": {"type": "inventory-hosts", "attributes": {"name": "web-01"}}}
 ```
 
-`GET` requires `inventory:read`; `DELETE` requires `inventory:write` and returns `204`.
+| Attribute | Meaning |
+|---|---|
+| `name` | Required. Ansible's `inventory_hostname`. Refused with `422` if it contains whitespace or any of `,`, `:`, `!`, `&`, `~` — those are `--limit`'s own operators and separators, so such a host cannot be targeted and a leading `!` would silently exclude the host it names. Dots, hyphens and underscores are fine |
 
-**Deleting an inventory deletes its sources and leaves the declared items alone.** An item belongs to the workspace, not to any one inventory, so removing the view cannot remove the hosts.
+**A host has no other field.** There is no `address`: `ansible_host` is a variable like any other, because that is what it is to ansible.
 
-**Response:**
+A read carries `group-count` and `variable-count` rather than the rows themselves — a list view shows "3 groups, 2 variables", and embedding either would make one request grow with the whole inventory. The rows are one drill-down away.
+
+### Show / Update / Delete Inventory Host
+
+```
+GET    /api/v1/inventory-hosts/{id}
+PATCH  /api/v1/inventory-hosts/{id}
+DELETE /api/v1/inventory-hosts/{id}
+```
+
+`GET` requires `inventory:read`; `PATCH` and `DELETE` require `inventory:write` (apply phase for a runner token). `DELETE` returns `204`, and the host's memberships and variables go with it — the database's own cascade.
+
+`PATCH` renames: `name` is the only mutable field a host has.
+
+### List / Create Inventory Groups
+
+```
+GET  /api/v1/workspaces/{id}/inventory/groups
+POST /api/v1/workspaces/{id}/inventory/groups
+```
+
+Same gating and paging as hosts. `POST` returns `201`.
+
+```json
+{"data": {"type": "inventory-groups", "attributes": {"name": "web"}}}
+```
+
+| Attribute | Meaning |
+|---|---|
+| `name` | Required. Must start with a letter or underscore and contain only letters, digits and underscores — `422` otherwise, because a name ansible merely warns about cannot be used reliably in a `--limit` pattern or as a `group_vars` filename. **`all` and `ungrouped` are refused**: ansible derives both, and the rendered inventory document is rooted at `all:`, so a declared group of that name would collide with the document's own structure. For variables that apply to every host, use the inventory variables below — that is ansible's `group_vars/all` |
+
+A read carries `member-count`, `child-count` and `variable-count`.
+
+### Show / Update / Delete Inventory Group
+
+```
+GET    /api/v1/inventory-groups/{id}
+PATCH  /api/v1/inventory-groups/{id}
+DELETE /api/v1/inventory-groups/{id}
+```
+
+As for a host: `PATCH` renames, `DELETE` returns `204` and takes the group's memberships, nestings and variables with it.
+
+### Host memberships
+
+```
+GET  /api/v1/inventory-groups/{id}/hosts
+GET  /api/v1/inventory-hosts/{id}/groups
+POST /api/v1/inventory-groups/{id}/hosts
+POST /api/v1/inventory-hosts/{id}/groups
+GET    /api/v1/inventory-host-groups/{id}
+DELETE /api/v1/inventory-host-groups/{id}
+```
+
+One `[groupname]` line, many-to-many, and its own row rather than a list on either side — so a membership has an id a Terraform resource can address, and two concerns can each put their own hosts in a shared group without owning it.
+
+**Both sides can create one, and the result is identical.** A loop over a group's intended members wants the group route; a loop over a host's groups wants the host route; forcing either to invert its loop buys nothing. The row, the constraint and the response are the same.
+
+The other end is a **relationship**, not an `*-id` attribute, because it is a link:
+
+```json
+POST /api/v1/inventory-groups/invgroup-.../hosts
+
+{"data": {"relationships": {
+  "host": {"data": {"id": "invhost-...", "type": "inventory-hosts"}}}}}
+```
+
+`POST` returns `201`; `DELETE` returns `204`. A host in another workspace is a `422` from the composite foreign key rather than a check the API performs first — the constraint answers both "does it exist" and "is it ours", and a `SELECT` first would be check-then-act.
+
+### Group nestings
+
+```
+GET  /api/v1/inventory-groups/{id}/children
+GET  /api/v1/inventory-groups/{id}/parents
+POST /api/v1/inventory-groups/{id}/children
+POST /api/v1/inventory-groups/{id}/parents
+GET    /api/v1/inventory-group-children/{id}
+DELETE /api/v1/inventory-group-children/{id}
+```
+
+One `[groupname:children]` entry. Many-to-many too — **a group may have several parents**, which ansible allows — so the same symmetry applies: `…/children` names the child, `…/parents` names the parent, and both create the same row.
+
+```json
+POST /api/v1/inventory-groups/invgroup-PARENT/children
+
+{"data": {"relationships": {
+  "child-group": {"data": {"id": "invgroup-...", "type": "inventory-groups"}}}}}
+```
+
+A nesting that would close a **cycle** is refused with `422`. The one-step case is a database constraint; a longer one is checked before the write, because a constraint cannot walk a graph.
+
+### Variables
+
+```
+GET  /api/v1/inventory-hosts/{id}/vars
+POST /api/v1/inventory-hosts/{id}/vars
+GET    /api/v1/inventory-host-vars/{id}
+PATCH  /api/v1/inventory-host-vars/{id}
+DELETE /api/v1/inventory-host-vars/{id}
+
+GET  /api/v1/inventory-groups/{id}/vars
+POST /api/v1/inventory-groups/{id}/vars
+GET    /api/v1/inventory-group-vars/{id}
+PATCH  /api/v1/inventory-group-vars/{id}
+DELETE /api/v1/inventory-group-vars/{id}
+
+GET  /api/v1/workspaces/{id}/inventory/vars
+POST /api/v1/workspaces/{id}/inventory/vars
+GET    /api/v1/inventory-global-vars/{id}
+PATCH  /api/v1/inventory-global-vars/{id}
+DELETE /api/v1/inventory-global-vars/{id}
+```
+
+Three surfaces, one shape: a host's `host_vars`, a group's `group_vars`, and the inventory's `group_vars/all`. **The inventory variables are parented on the workspace rather than on a group**, because `all` cannot be a declared group name — they land at the rendered document's root `vars:`, which is the consequence of that refusal rather than a way round it.
+
+Each variable is a row with **one writer**, which is the point of the shape: a second concern can contribute a variable to a host or group it does not own.
+
 ```json
 {
   "data": {
-    "id": "inv-0193...",
-    "type": "inventories",
+    "type": "inventory-host-vars",
     "attributes": {
-      "name": "default",
-      "description": "",
-      "api-resolvable": true,
-      "sources": [
-        {
-          "id": "invsrc-0193...",
-          "position": 0,
-          "kind": "terraform",
-          "config": {},
-          "api-resolvable": true,
-          "created-at": "2026-10-07T09:00:00Z"
-        }
-      ],
-      "created-at": "2026-10-07T09:00:00Z",
-      "updated-at": "2026-10-07T09:00:00Z"
+      "key": "ansible_host",
+      "value": "10.0.0.5",
+      "structured": false,
+      "sensitive": false
     }
   }
 }
 ```
 
-| Attribute | Description |
+| Attribute | Meaning |
 |---|---|
-| `api-resolvable` | Whether **every** source is one the API owns. `true` means a read of the resolved view is **live**. `false` means a resolution can only be produced in a runner, so a read serves the newest one a runner posted. |
-| `sources` | The composition, in `-i` order — a lower `position` resolves first, so a **higher** position wins a conflicting host variable. A source is deliberately not a nested JSON:API resource: it has no route of its own. |
+| `key` | Required. Unique per parent (`409` otherwise). Only has to be a non-empty string with no leading or trailing whitespace — deliberately laxer than a group name, because ansible stores a non-identifier variable and only warns that it is unreachable as a bare `{{ name }}`, while it is still readable through `hostvars`, which some roles do on purpose |
+| `value` | The value. **A `sensitive` value reads back as a fixed mask**, never its own length or shape |
+| `structured` | Whether `value` is a typed expression rather than a plain string — a list, a number, a nested object, which is what ansible's own `group_vars` carries natively. Parsed as YAML, so both `[80, 443]` and a block sequence work. Default `false` |
+| `sensitive` | A **display** flag: it decides what a reader sees, not what the database holds. All three surfaces are registered for Terrapod's [app-layer encryption](encryption-at-rest.md), so where a deployment has that enabled every value is enveloped whatever this flag says. Default `false` |
+
+`POST` returns `201`; `DELETE` returns `204`. `PATCH` changes `value`, `structured` and `sensitive`.
+
+Every list route in this section supports the standard `page[number]` / `page[size]` and returns `meta.pagination`. Hosts and groups are ordered by name, variables by key, and memberships and nestings by when they were created.
 
 ### Show Resolved Inventory
 
 ```
-GET /api/v1/inventories/{id}/resolved
+GET /api/v1/workspaces/{id}/inventory/resolved[?limit=<pattern>]
 ```
 
-Requires `inventory:read`. **This is live, and it writes nothing.** Every source kind is static — dynamic inventory was declined ([#1970](https://github.com/mattrobinsonsre/terrapod/issues/1970)) — so resolving one is a database query, Terrapod resolves the rows to answer the request, and a reader is never shown a target set that has drifted from the declared rows.
+Requires `inventory:read`; unphased for a runner token. **Resolved by ansible, not by Terrapod** — `ansible-inventory --list` does the merge, the precedence, the group DAG, the derivation of `all` and `ungrouped`, and with `?limit=` the expansion of a `--limit` pattern, so the answer is ansible's own, `~regex` terms included.
 
-There is deliberately **no timestamp and no freshness field**. There is no other resolution this could be, so a date beside the result would only invite a reader to ask whether it is current — a question the read has already answered.
+**It is live, and it writes nothing.** Every source is static — dynamic inventory was declined ([#1970](https://github.com/mattrobinsonsre/terrapod/issues/1970), closed as not-planned) — so the resolution is a function of the rows and the resolved commit. A Redis entry backs it and is keyed on their content, so a write supersedes it rather than needing an invalidation: there is no timestamp, no freshness field and no refresh action, because there is no other resolution the answer could be.
 
-The target set a *configure* runs against is a separate artifact, owned by the run and written when the run is created, because a partial-failure recovery has to subtract against a set that is fixed for the life of the run ([#1973](https://github.com/mattrobinsonsre/terrapod/issues/1973)).
-
-**Response:**
 ```json
 {
   "data": {
-    "id": "inv-0193...",
+    "id": "ws-...",
     "type": "resolved-inventories",
     "attributes": {
-      "host-count": 2,
-      "group-count": 1,
       "hosts": {
-        "web-01": { "ansible_host": "10.0.1.20", "ansible_user": "ec2-user" },
-        "jump": {}
+        "web-01": {"ansible_host": "10.0.0.5", "ansible_user": "deploy"},
+        "web-02": {"ansible_host": "10.0.0.6"}
       },
-      "groups": { "web": ["web-01"] },
-      "ansible-inventory": {
-        "_meta": { "hostvars": {
-          "jump": {},
-          "web-01": { "ansible_host": "10.0.1.20", "ansible_user": "ec2-user" }
-        } },
-        "ungrouped": { "hosts": ["jump"] },
-        "all": { "children": ["web", "ungrouped"] },
-        "web": { "hosts": ["web-01"] }
-      }
+      "groups": {"web": ["web-01", "web-02"], "eu": []},
+      "group-children": {"eu": ["web"]},
+      "host-count": 2,
+      "group-count": 2
     }
   }
 }
 ```
 
-| Attribute | Description |
+| Attribute | Meaning |
 |---|---|
-| `hosts` | Host name → merged variables. **Exhaustive — this is the host set**, including a host with no variables at all. |
-| `groups` | Declared group name → sorted member host names. `all` and `ungrouped` are not here; they are derived. |
-| `ansible-inventory` | The same resolution in the shape `ansible-inventory --list` produces, rendered on demand rather than stored twice. Unlike ansible's own output it includes **every** host in `_meta.hostvars` — ansible omits a var-less host entirely, and enumerating a host set from that shape loses hosts silently. |
+| `hosts` | Every host, with its merged variables. A host with no variables is present with an empty object |
+| `groups` | Each group's **direct** membership. Ansible does not flatten nesting into a group's host list, so a parent whose members all arrive through a child reports none of its own — `eu` above is the example. **Do not read an empty list as "this group targets nothing"** |
+| `group-children` | The nesting, carried rather than resolved. Taking the transitive closure would be Terrapod computing the group DAG, which is ansible's job |
+| `host-count`, `group-count` | The sizes of the two maps above |
+| `limit` | Echoed back when `?limit=` was supplied |
 
-### Preview a `--limit`
+**`?limit=<pattern>` is the authoritative "what would this target"**, and it is the one that expands **through** nesting — so it, not a group's host list, is how the effective set of a parent group is read. The pattern goes straight to `ansible-inventory --limit`: host names, group names, `all` and `*`, globs, comma- or colon-separated terms, `!` exclusion, `&` intersection, and `~regex`.
 
-```
-POST /api/v1/inventories/{id}/actions/preview-limit
-```
+This is the safety surface rather than a convenience: auto-configure is deliberately broad — at scale the hazard is hosts left unconfigured, not hosts configured — so visibility is the control, and the question has to be answerable before anything runs.
 
-Requires `inventory:read`. Read-only. Answers which hosts a `--limit` pattern would select, **against a live resolution** — by the same route as the resolved view, and for a sharper reason: previewing against a target set that has since changed is the wrong answer in the one place an operator came to check.
+Statuses worth knowing, because the three say different things:
 
-**Request body:**
-```json
-{ "data": { "attributes": { "limit": "web:&linux:!web-02" } } }
-```
-
-An empty or whitespace-only `limit` selects every host. It expands host names, group names, `all` and `*`, globs, comma- or colon-separated terms, `!` exclusion and `&` intersection. An inclusion term unions, except that the first term starts from nothing rather than from the whole inventory.
-
-**Response:**
-```json
-{
-  "data": {
-    "id": "inv-0193...",
-    "type": "inventory-limit-previews",
-    "attributes": {
-      "limit": "web:&linux:!web-02",
-      "hosts": ["web-01"],
-      "host-count": 1,
-      "of-host-count": 12
-    }
-  }
-}
-```
-
-One honesty caveat: the result is **advisory**. The authoritative expansion is always `ansible-inventory --list --limit`, taken in the runner at the start of a configure. `of-host-count` is the size of the resolution the pattern was expanded against, so an operator can see how much of the inventory it selects.
-
-`422` on a `~regex` term, rather than quietly matching nothing: ansible applies the expression at run time, and showing an empty target set for a pattern it would have expanded is the wrong answer dressed as an answer. `422` when `limit` is not a string. There is always something to limit against, including the empty set of a workspace that has declared no host.
+| Status | Meaning |
+|---|---|
+| `422` | A fetched source was **declined**: a file whose top level carries a `plugin:` key is an inventory plugin configuration, and Terrapod does not run inventory plugins. The message names the file and the plugin it asks for. The resolution did not fail — there is something to do about it |
+| `503` | The resolution could not be performed: a repository that cannot be fetched, a branch that is gone, a source ansible cannot parse, or `ansible-core` itself not obtainable from Terrapod's own PyPI cache. **It fails closed** rather than degrading into a partial host list, because a silently short target set is the failure mode this whole surface exists to prevent |
+| `200` with empty maps | A workspace that has declared nothing and bound no repository. A defined empty result, not an error |
 
 ## High Availability
 

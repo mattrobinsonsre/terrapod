@@ -31,6 +31,7 @@ otherwise click through in the web UI or call over the API, expressed as HCL:
 | Governance | `terrapod_policy_set`, `terrapod_policy`, `terrapod_run_task`, `terrapod_run_trigger`, `terrapod_notification_configuration`, `terrapod_execution_hook`, `terrapod_execution_hook_workspace` |
 | Registry | `terrapod_registry_module`, `terrapod_module_autodiscovery_rule`, `terrapod_registry_provider`, `terrapod_gpg_key` |
 | Service catalog | `terrapod_catalog_item`, `terrapod_catalog_instance`, `terrapod_provider_template` |
+| [Ansible inventory](ansible-inventory.md) | `terrapod_inventory_settings`, `terrapod_inventory_host`, `terrapod_inventory_group`, `terrapod_inventory_host_group`, `terrapod_inventory_group_child`, `terrapod_inventory_host_var`, `terrapod_inventory_group_var`, `terrapod_inventory_global_var` |
 
 **Data sources** (`terrapod_*`): `terrapod_workspace`, `terrapod_workspaces`
 (each entry reports its `engine`, and an optional `engine` argument returns only
@@ -46,7 +47,13 @@ when the module could not be parsed), `terrapod_module_autodiscovery_rule_reposi
 origin and candidates; kept out of the rule resource so polls never change its
 state), `terrapod_oidc_audience_defaults` (the deployment-wide cloud-identity
 audience catalogue a workspace's `oidc_audiences` merges over — what a workspace
-would INHERIT if it overrode nothing).
+would INHERIT if it overrode nothing), `terrapod_inventory_resolved` (what a
+workspace's [ansible inventory](ansible-inventory.md) resolves to — every host
+with its merged variables, each group's **direct** membership, and the nesting
+carried separately, with an optional `limit` that ansible itself expands through
+that nesting; a data source rather than an attribute on a resource for the same
+reason as `oidc_audiences` below, since a data source has no round-trip
+requirement and a derived value belongs there).
 
 **`terrapod_workspace.oidc_audiences` holds what you set, not the effective
 map**, and that pairing is deliberate. The API returns the merged result, so the
