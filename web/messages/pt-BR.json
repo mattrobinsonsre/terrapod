@@ -2862,33 +2862,29 @@
         "body": "Estes são os hosts que este workspace declara e para o que eles resolvem. Executar um playbook contra eles ainda não está disponível: esta versão torna o inventário observável, nada é executado a partir daqui."
       },
       "selectLabel": "Inventário",
-      "refreshConfirm": "Atualizar o inventário agora? Isso substitui o snapshot que todos veem.",
       "resolved": {
         "heading": "Hosts e grupos resolvidos",
         "subheading": "O resultado combinado de {name}, a partir de cada origem em ordem.",
         "hosts": "Hosts",
         "groups": "Grupos",
-        "refresh": "Atualizar",
-        "refreshing": "Atualizando…",
-        "takenAt": "Snapshot capturado {when}",
+        "takenAt": "Esta resolução é de {when}",
         "never": "nunca",
         "producedBy": {
           "api": "resolvido pela API",
           "runner": "resolvido por um runner"
         },
         "producedByOther": "resolvido por {by}",
-        "snapshotNote": "Este é o último snapshot, não uma resolução ao vivo. Atualize para capturar um novo."
+        "liveNote": "Isto é ao vivo. Cada origem aqui é declarada na sua configuração, então resolvê-la é uma consulta: a data acima indica quando este resultado surgiu, não quão desatualizado ele está."
       },
       "limit": {
         "heading": "O que um limite selecionaria?",
-        "body": "Expanda um padrão ansible --limit sobre o snapshot acima, para ver quais hosts ele seleciona antes de qualquer execução.",
+        "body": "Expanda um padrão ansible --limit sobre os hosts resolvidos acima, para ver quais deles ele seleciona antes de qualquer execução.",
         "inputLabel": "Padrão de limite",
         "placeholder": "web:!web-2",
         "preview": "Prévia",
         "previewing": "Gerando prévia…",
         "matched": "{count, plural, =0 {Nenhum host selecionado} one {# host selecionado} other {# hosts selecionados}} de {total}.",
-        "advisory": "Apenas informativo. A expansão autoritativa é feita pelo ansible no runner, então trate isto como um guia e não como uma garantia.",
-        "asFreshAs": "Tão recente quanto o snapshot sobre o qual foi calculada: {when}."
+        "advisory": "Apenas informativo. A expansão autoritativa é feita pelo ansible no runner, então trate isto como um guia e não como uma garantia."
       },
       "items": {
         "heading": "Hosts declarados",
@@ -2906,12 +2902,11 @@
         "position": "Posição {position}",
         "apiResolvable": "A API pode resolver",
         "runnerOnly": "Precisa de um runner",
-        "needsRunner": "O snapshot só pode ser atualizado por um runner enquanto estas origens estiverem presentes: {kinds}."
+        "needsRunner": "Estas origens precisam do ansible, que só um runner tem, então o resultado acima é a última resolução publicada por um runner e não uma resolução ao vivo: {kinds}."
       },
       "errors": {
         "loadItems": "Falha ao carregar os hosts declarados",
         "loadResolved": "Falha ao carregar o inventário resolvido",
-        "refresh": "Falha ao atualizar o inventário",
         "preview": "Falha ao gerar a prévia do limite"
       }
     },

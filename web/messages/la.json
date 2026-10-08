@@ -2862,33 +2862,29 @@
         "body": "Hi sunt hospites quos hoc locus operis declarat et ad quos resolvuntur. Playbook in eos exsequi nondum praesto est: haec editio inventarium observabile reddit, nihil hinc exsequitur."
       },
       "selectLabel": "Inventarium",
-      "refreshConfirm": "Inventarium nunc renovare? Hoc imaginem quam omnes vident substituit.",
       "resolved": {
         "heading": "Hospites et greges resoluti",
         "subheading": "Effectus coniunctus pro {name}, ex omni fonte ordine.",
         "hosts": "Hospites",
         "groups": "Greges",
-        "refresh": "Renovare",
-        "refreshing": "Renovatur…",
-        "takenAt": "Imago capta {when}",
+        "takenAt": "Haec resolutio orta est {when}",
         "never": "numquam",
         "producedBy": {
           "api": "ab API resolutum",
           "runner": "a cursore resolutum"
         },
         "producedByOther": "per {by} resolutum",
-        "snapshotNote": "Haec est ultima imago, non resolutio viva. Renova ut novam capias."
+        "liveNote": "Haec viva est. Omnis fons hic in configuratione tua declaratus est, itaque resolvere interrogatio est. Dies supra dicit quando hoc effectum ortum sit, non quam vetus sit."
       },
       "limit": {
         "heading": "Quid limes peteret?",
-        "body": "Exemplar ansible --limit contra imaginem supra positam extende, ut videas quos hospites eligat antequam quidquam exsequatur.",
+        "body": "Exemplar ansible --limit contra hospites supra resolutos extende, ut videas quos ex eis eligat antequam quidquam exsequatur.",
         "inputLabel": "Exemplar limitis",
         "placeholder": "web:!web-2",
         "preview": "Praevidere",
         "previewing": "Praevidetur…",
         "matched": "{count, plural, =0 {Nullus hospes selectus} one {# hospes selectus} other {# hospites selecti}} ex {total}.",
-        "advisory": "Tantum monitorium. Extensio auctoritativa ab ansible in cursore sumitur, itaque hoc pro indicio, non pro sponsione habe.",
-        "asFreshAs": "Tam recens quam imago contra quam sumpta est: {when}."
+        "advisory": "Tantum monitorium. Extensio auctoritativa ab ansible in cursore sumitur, itaque hoc pro indicio, non pro sponsione habe."
       },
       "items": {
         "heading": "Hospites declarati",
@@ -2906,12 +2902,11 @@
         "position": "Positio {position}",
         "apiResolvable": "API resolvere potest",
         "runnerOnly": "Cursorem requirit",
-        "needsRunner": "Imago a cursore solo renovari potest dum hi fontes adsunt: {kinds}."
+        "needsRunner": "Hi fontes ansible requirunt, quod solus cursor habet, itaque effectum supra est ultima resolutio a cursore missa, non resolutio viva: {kinds}."
       },
       "errors": {
         "loadItems": "Hospites declarati onerari non potuerunt",
         "loadResolved": "Inventarium resolutum onerari non potuit",
-        "refresh": "Inventarium renovari non potuit",
         "preview": "Limes praevideri non potuit"
       }
     },

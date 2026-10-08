@@ -2862,33 +2862,29 @@
         "body": "Estos son los hosts que declara este espacio de trabajo y a qué se resuelven. Ejecutar un playbook contra ellos todavía no está disponible: esta versión hace observable el inventario, desde aquí no se ejecuta nada."
       },
       "selectLabel": "Inventario",
-      "refreshConfirm": "¿Actualizar el inventario ahora? Esto reemplaza la instantánea que todos ven.",
       "resolved": {
         "heading": "Hosts y grupos resueltos",
         "subheading": "El resultado combinado de {name}, a partir de todos los orígenes en orden.",
         "hosts": "Hosts",
         "groups": "Grupos",
-        "refresh": "Actualizar",
-        "refreshing": "Actualizando…",
-        "takenAt": "Instantánea tomada {when}",
+        "takenAt": "Esta resolución data de {when}",
         "never": "nunca",
         "producedBy": {
           "api": "resuelto por la API",
           "runner": "resuelto por un runner"
         },
         "producedByOther": "resuelto por {by}",
-        "snapshotNote": "Esta es la última instantánea, no una resolución en vivo. Actualice para tomar una nueva."
+        "liveNote": "Esto es en vivo. Cada origen aquí está declarado en su configuración, así que resolverlo es una consulta: la fecha de arriba indica cuándo surgió este resultado, no lo desactualizado que está."
       },
       "limit": {
         "heading": "¿A qué apuntaría un límite?",
-        "body": "Expanda un patrón ansible --limit contra la instantánea anterior, para ver qué hosts selecciona antes de que se ejecute nada.",
+        "body": "Expanda un patrón ansible --limit contra los hosts resueltos arriba, para ver cuáles de ellos selecciona antes de que se ejecute nada.",
         "inputLabel": "Patrón de límite",
         "placeholder": "web:!web-2",
         "preview": "Vista previa",
         "previewing": "Generando vista previa…",
         "matched": "{count, plural, =0 {Ningún host seleccionado} one {# host seleccionado} other {# hosts seleccionados}} de {total}.",
-        "advisory": "Solo informativo. La expansión autoritativa la realiza ansible en el runner, así que tómelo como una guía y no como una garantía.",
-        "asFreshAs": "Tan reciente como la instantánea contra la que se calculó: {when}."
+        "advisory": "Solo informativo. La expansión autoritativa la realiza ansible en el runner, así que tómelo como una guía y no como una garantía."
       },
       "items": {
         "heading": "Hosts declarados",
@@ -2906,12 +2902,11 @@
         "position": "Posición {position}",
         "apiResolvable": "La API puede resolverlo",
         "runnerOnly": "Necesita un runner",
-        "needsRunner": "La instantánea solo puede actualizarla un runner mientras estén presentes estos orígenes: {kinds}."
+        "needsRunner": "Estos orígenes necesitan ansible, que solo tiene un runner, así que el resultado de arriba es la última resolución que publicó un runner y no una resolución en vivo: {kinds}."
       },
       "errors": {
         "loadItems": "No se pudieron cargar los hosts declarados",
         "loadResolved": "No se pudo cargar el inventario resuelto",
-        "refresh": "No se pudo actualizar el inventario",
         "preview": "No se pudo generar la vista previa del límite"
       }
     },

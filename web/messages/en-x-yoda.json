@@ -2862,33 +2862,29 @@
         "body": "The hosts this workspace declares, these are, and what they resolve to. Run a playbook against them, you cannot yet — observable the inventory, this release makes; executed from here, nothing is."
       },
       "selectLabel": "Inventory",
-      "refreshConfirm": "Refresh the inventory now? The snapshot everyone sees, this replaces.",
       "resolved": {
         "heading": "Hosts and groups, resolved",
         "subheading": "For {name}, the merged result — from every source, in order.",
         "hosts": "Hosts",
         "groups": "Groups",
-        "refresh": "Refresh",
-        "refreshing": "Refreshing, it is…",
-        "takenAt": "Taken {when}, the snapshot was",
+        "takenAt": "From {when}, this resolution dates",
         "never": "never",
         "producedBy": {
           "api": "by the API, resolved",
           "runner": "by a runner, resolved"
         },
         "producedByOther": "by {by}, resolved",
-        "snapshotNote": "The last snapshot, this is — a live resolution, it is not. Refresh, to take a new one."
+        "liveNote": "Live, this is. In your configuration, every source here is declared — so a lookup, resolving it is. When this result came to be, the date above says; how stale it is, it does not."
       },
       "limit": {
         "heading": "Target, what would a limit?",
-        "body": "An ansible --limit pattern against the snapshot above, expand — then which hosts it selects, see you will, before anything runs.",
+        "body": "An ansible --limit pattern against the resolved hosts above, expand — then which of them it selects, see you will, before anything runs.",
         "inputLabel": "Pattern of the limit",
         "placeholder": "web:!web-2",
         "preview": "Preview",
         "previewing": "Previewing, it is…",
         "matched": "{count, plural, =0 {No hosts} one {# host} other {# hosts}} of {total}, selected there are.",
-        "advisory": "Advisory only, this is. By ansible in the runner, the authoritative expansion is taken — so as a guide treat it, not as a guarantee.",
-        "asFreshAs": "As fresh as the snapshot it was taken against, it is: {when}."
+        "advisory": "Advisory only, this is. By ansible in the runner, the authoritative expansion is taken — so as a guide treat it, not as a guarantee."
       },
       "items": {
         "heading": "Hosts, declared",
@@ -2906,12 +2902,11 @@
         "position": "Position {position}",
         "apiResolvable": "Resolve, the API can",
         "runnerOnly": "A runner, it needs",
-        "needsRunner": "Refreshed by a runner only, the snapshot can be, while present these sources are: {kinds}."
+        "needsRunner": "Ansible these sources need, and only a runner has it — so the last resolution a runner posted, the result above is; a live one, it is not: {kinds}."
       },
       "errors": {
         "loadItems": "Load the declared hosts, it did not",
         "loadResolved": "Load the resolved inventory, it did not",
-        "refresh": "Refresh the inventory, it did not",
         "preview": "Preview the limit, it did not"
       }
     },

@@ -2862,33 +2862,29 @@
         "body": "这些是此工作区声明的主机及其解析结果。目前还无法针对它们运行 Playbook — 本次发布只是让清单可被查看，不会从此处执行任何操作。"
       },
       "selectLabel": "清单",
-      "refreshConfirm": "现在刷新清单？这会替换所有人看到的快照。",
       "resolved": {
         "heading": "解析后的主机和主机组",
         "subheading": "{name} 的合并结果，按顺序取自每个来源。",
         "hosts": "主机",
         "groups": "主机组",
-        "refresh": "刷新",
-        "refreshing": "正在刷新…",
-        "takenAt": "快照时间：{when}",
+        "takenAt": "此解析结果的时间：{when}",
         "never": "从不",
         "producedBy": {
           "api": "由 API 解析",
           "runner": "由运行器解析"
         },
         "producedByOther": "由 {by} 解析",
-        "snapshotNote": "这是最后一次快照，而不是实时解析结果。刷新即可生成新的快照。"
+        "liveNote": "这是实时的。此处的每个来源都在你的配置中声明，因此解析只是一次数据库查询。上面的时间是该结果产生的时刻，而不是它有多陈旧。"
       },
       "limit": {
         "heading": "--limit 会选中哪些主机？",
-        "body": "针对上方的快照展开 ansible 的 --limit 模式，以便在任何操作执行之前查看它会选中哪些主机。",
+        "body": "针对上方已解析的主机展开 ansible 的 --limit 模式，以便在任何操作执行之前查看它会选中其中哪些。",
         "inputLabel": "limit 模式",
         "placeholder": "web:!web-2",
         "preview": "预览",
         "previewing": "正在预览…",
         "matched": "{count, plural, =0 {未选中任何主机} other {已选中 # 台主机}}，共 {total} 台。",
-        "advisory": "仅供参考。权威的展开结果由运行器中的 ansible 得出，因此请将此视为参考而非保证。",
-        "asFreshAs": "只反映所依据快照的时点：{when}。"
+        "advisory": "仅供参考。权威的展开结果由运行器中的 ansible 得出，因此请将此视为参考而非保证。"
       },
       "items": {
         "heading": "已声明的主机",
@@ -2906,12 +2902,11 @@
         "position": "位置 {position}",
         "apiResolvable": "API 可解析",
         "runnerOnly": "需要运行器",
-        "needsRunner": "只要存在以下来源，快照就只能由运行器刷新：{kinds}。"
+        "needsRunner": "这些来源需要 ansible，而只有运行器才有，因此上面的结果是运行器最后提交的解析结果，而不是实时解析：{kinds}。"
       },
       "errors": {
         "loadItems": "加载已声明的主机失败",
         "loadResolved": "加载解析后的清单失败",
-        "refresh": "刷新清单失败",
         "preview": "预览 limit 失败"
       }
     },

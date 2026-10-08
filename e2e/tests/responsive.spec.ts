@@ -1749,19 +1749,13 @@ test.describe('Per-workspace run identity (#1901)', () => {
     await expect(page.getByText(/Advisory only/i)).toBeVisible()
     await expectNoHorizontalPageScroll(page)
 
-    // Refresh replaces what every reader of this inventory sees, so on a touch
-    // pointer it must ask first — the phone device descriptor reports a coarse
-    // pointer, which is what `useIsTouch()` keys on. Dismissing the dialog
-    // leaves the snapshot alone.
-    let refreshMsg = ''
-    page.once('dialog', async (d: Dialog) => {
-      refreshMsg = d.message()
-      await d.dismiss()
-    })
-    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
-    // Assert the MESSAGE, not just that some dialog opened: a stray confirm
-    // from anywhere else on the page would satisfy a boolean.
-    await expect.poll(() => refreshMsg, { timeout: 5_000 }).toContain('replaces the snapshot')
+    // The resolution is live, so the whole tab is read-only: there is no
+    // Refresh to tap and therefore no touch confirm to guard it. Asserted
+    // here as well as in inventory.spec.ts because a mutating control
+    // reintroduced on a phone is the worst place for one — the mis-tap this
+    // suite exists to think about.
+    await expect(page.getByRole('button', { name: /refresh/i })).toHaveCount(0)
+    await expect(page.getByText(/This is live/i)).toBeVisible()
     await expectNoHorizontalPageScroll(page)
   })
 })

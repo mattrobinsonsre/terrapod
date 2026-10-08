@@ -2862,33 +2862,29 @@
         "body": "7h353 4r3 7h3 h0575 7h15 w0rk5p4c3 d3cl4r35 4nd wh47 7h3y r350lv3 70. Runn1ng 4 pl4yb00k 4g41n57 7h3m 15 n07 4v41l4bl3 y37 — 7h15 r3l3453 m4k35 7h3 1nv3n70ry 0b53rv4bl3, n07h1ng 15 3x3cu73d fr0m h3r3."
       },
       "selectLabel": "1nv3n70ry",
-      "refreshConfirm": "R3fr35h 7h3 1nv3n70ry n0w? 7h15 r3pl4c35 7h3 5n4p5h07 3v3ry0n3 5335.",
       "resolved": {
         "heading": "R350lv3d h0575 4nd gr0up5",
         "subheading": "7h3 m3rg3d r35ul7 f0r {name}, fr0m 3v3ry 50urc3 1n 0rd3r.",
         "hosts": "H0575",
         "groups": "Gr0up5",
-        "refresh": "R3fr35h",
-        "refreshing": "R3fr35h1ng…",
-        "takenAt": "5n4p5h07 74k3n {when}",
+        "takenAt": "7h15 r350lu710n d4735 fr0m {when}",
         "never": "n3v3r",
         "producedBy": {
           "api": "r350lv3d by 7h3 4P1",
           "runner": "r350lv3d by 4 runn3r"
         },
         "producedByOther": "r350lv3d by {by}",
-        "snapshotNote": "7h15 15 7h3 l457 5n4p5h07, n07 4 l1v3 r350lu710n. R3fr35h 70 74k3 4 n3w 0n3."
+        "liveNote": "7h15 15 l1v3. 3v3ry 50urc3 h3r3 15 d3cl4r3d 1n y0ur c0nf1gur4710n, 50 r350lv1ng 17 15 4 l00kup — 7h3 d473 4b0v3 15 wh3n 7h15 r35ul7 c4m3 70 b3, n07 h0w 574l3 17 15."
       },
       "limit": {
         "heading": "Wh47 w0uld 4 l1m17 74rg37?",
-        "body": "3xp4nd 4n 4n51bl3 --l1m17 p4773rn 4g41n57 7h3 5n4p5h07 4b0v3, 50 y0u c4n 533 wh1ch h0575 17 53l3c75 b3f0r3 4ny7h1ng run5.",
+        "body": "3xp4nd 4n 4n51bl3 --l1m17 p4773rn 4g41n57 7h3 r350lv3d h0575 4b0v3, 50 y0u c4n 533 wh1ch 0f 7h3m 17 53l3c75 b3f0r3 4ny7h1ng run5.",
         "inputLabel": "L1m17 p4773rn",
         "placeholder": "web:!web-2",
         "preview": "Pr3v13w",
         "previewing": "Pr3v13w1ng…",
         "matched": "{count, plural, =0 {N0 h0575} one {# h057} other {# h0575}} 0f {total} 53l3c73d.",
-        "advisory": "4dv150ry 0nly. 7h3 4u7h0r17471v3 3xp4n510n 15 74k3n by 4n51bl3 1n 7h3 runn3r, 50 7r347 7h15 45 4 gu1d3 r47h3r 7h4n 4 gu4r4n733.",
-        "asFreshAs": "45 fr35h 45 7h3 5n4p5h07 17 w45 74k3n 4g41n57: {when}."
+        "advisory": "4dv150ry 0nly. 7h3 4u7h0r17471v3 3xp4n510n 15 74k3n by 4n51bl3 1n 7h3 runn3r, 50 7r347 7h15 45 4 gu1d3 r47h3r 7h4n 4 gu4r4n733."
       },
       "items": {
         "heading": "D3cl4r3d h0575",
@@ -2906,12 +2902,11 @@
         "position": "P051710n {position}",
         "apiResolvable": "4P1 c4n r350lv3",
         "runnerOnly": "N33d5 4 runn3r",
-        "needsRunner": "7h3 5n4p5h07 c4n 0nly b3 r3fr35h3d by 4 runn3r wh1l3 7h353 50urc35 4r3 pr353n7: {kinds}."
+        "needsRunner": "7h353 50urc35 n33d 4n51bl3, wh1ch 0nly 4 runn3r h45, 50 7h3 r35ul7 4b0v3 15 7h3 l457 0n3 4 runn3r p0573d r47h3r 7h4n 4 l1v3 r350lu710n: {kinds}."
       },
       "errors": {
         "loadItems": "F41l3d 70 l04d d3cl4r3d h0575",
         "loadResolved": "F41l3d 70 l04d 7h3 r350lv3d 1nv3n70ry",
-        "refresh": "F41l3d 70 r3fr35h 7h3 1nv3n70ry",
         "preview": "F41l3d 70 pr3v13w 7h3 l1m17"
       }
     },

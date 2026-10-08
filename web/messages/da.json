@@ -2862,33 +2862,29 @@
         "body": "Dette er de værter, som dette arbejdsområde erklærer, og hvad de opløses til. At køre en playbook mod dem er endnu ikke muligt — denne udgivelse gør inventaret observerbart, intet udføres herfra."
       },
       "selectLabel": "Inventar",
-      "refreshConfirm": "Opdater inventaret nu? Dette erstatter det øjebliksbillede, alle ser.",
       "resolved": {
         "heading": "Opløste værter og grupper",
         "subheading": "Det sammenflettede resultat for {name}, fra hver kilde i rækkefølge.",
         "hosts": "Værter",
         "groups": "Grupper",
-        "refresh": "Opdater",
-        "refreshing": "Opdaterer…",
-        "takenAt": "Øjebliksbillede taget {when}",
+        "takenAt": "Denne opløsning er fra {when}",
         "never": "aldrig",
         "producedBy": {
           "api": "opløst af API''et",
           "runner": "opløst af en runner"
         },
         "producedByOther": "opløst af {by}",
-        "snapshotNote": "Dette er det seneste øjebliksbillede, ikke en live-opløsning. Opdater for at tage et nyt."
+        "liveNote": "Dette er live. Hver kilde her er erklæret i din konfiguration, så det at opløse den er en databaseforespørgsel. Datoen ovenfor siger, hvornår dette resultat blev til, ikke hvor gammelt det er."
       },
       "limit": {
         "heading": "Hvad ville et limit-mønster ramme?",
-        "body": "Udvid et ansible --limit-mønster ud fra øjebliksbilledet ovenfor, så du kan se, hvilke værter det vælger, før noget kører.",
+        "body": "Udvid et ansible --limit-mønster ud fra de opløste værter ovenfor, så du kan se, hvilke af dem det vælger, før noget kører.",
         "inputLabel": "Limit-mønster",
         "placeholder": "web:!web-2",
         "preview": "Forhåndsvis",
         "previewing": "Forhåndsviser…",
         "matched": "{count, plural, =0 {Ingen værter} one {# vært} other {# værter}} af {total} valgt.",
-        "advisory": "Kun vejledende. Den autoritative udvidelse foretages af ansible i runneren, så betragt dette som en vejledning frem for en garanti.",
-        "asFreshAs": "Lige så aktuelt som det øjebliksbillede, det bygger på: {when}."
+        "advisory": "Kun vejledende. Den autoritative udvidelse foretages af ansible i runneren, så betragt dette som en vejledning frem for en garanti."
       },
       "items": {
         "heading": "Erklærede værter",
@@ -2906,12 +2902,11 @@
         "position": "Position {position}",
         "apiResolvable": "API''et kan opløse",
         "runnerOnly": "Kræver en runner",
-        "needsRunner": "Så længe disse kilder er til stede, kan øjebliksbilledet kun opdateres af en runner: {kinds}."
+        "needsRunner": "Disse kilder kræver ansible, som kun en runner har, så resultatet ovenfor er den seneste opløsning, en runner har sendt, og ikke en live-opløsning: {kinds}."
       },
       "errors": {
         "loadItems": "Kunne ikke indlæse erklærede værter",
         "loadResolved": "Kunne ikke indlæse det opløste inventar",
-        "refresh": "Kunne ikke opdatere inventaret",
         "preview": "Forhåndsvisning af limit-mønstret mislykkedes"
       }
     },

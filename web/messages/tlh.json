@@ -2862,33 +2862,29 @@
         "body": "Qumwo''vam maqbogh hostmey je Dotlh ''oH tetlhvam''e''. DaH vang paq lo''laHbe''lu''. mI'' chu''vam tetlh legh''eghmoH neH; naDev vanglu''be''."
       },
       "selectLabel": "tetlh",
-      "refreshConfirm": "DaH tetlh tI''ang qa''? Dotlh ta'' legh Hoch; chu''lu''.",
       "resolved": {
         "heading": "wIvlu''pu''bogh hostmey ghommey je",
         "subheading": "{name} tetlh boQDu'' tay'': Hoch mung mIwDaq.",
         "hosts": "hostmey",
         "groups": "ghommey",
-        "refresh": "tI''ang qa''",
-        "refreshing": "tI''ang qa''taH…",
-        "takenAt": "{when} Dotlh ta'' qonlu''",
+        "takenAt": "{when} wIvlu''pu''",
         "never": "not",
         "producedBy": {
           "api": "API wIvta''",
           "runner": "vumwI'' wIvta''"
         },
         "producedByOther": "{by} wIvta''",
-        "snapshotNote": "Dotlh ta'' Qav ''oH; DaH wIvlu''be''. tI''ang qa'' ''ej ta'' chu'' qon."
+        "liveNote": "DaH wIvlu''. naDev Hoch mung Terraform maq; vaj wIv ghel neH ''oH. poH Dung: ghorgh boQ chenpu'' ''oH; qantaHghach ''oHbe''."
       },
       "limit": {
         "heading": "nuq wIv veH''e''?",
-        "body": "Dotlh ta''Daq ansible --limit per Sov; vaj vangpa'', hostmey wIvbogh Dalegh.",
+        "body": "wIvlu''pu''bogh hostmeyDaq ansible --limit per Sov; vaj vangpa'', wIvbogh Dalegh.",
         "inputLabel": "veH per",
         "placeholder": "web:!web-2",
         "preview": "tI''ang",
         "previewing": "tI''angtaH…",
         "matched": "{total} hostmeyvo'' {count, plural, =0 {pagh wIvlu''} one {# wIvlu''} other {# wIvlu''}}.",
-        "advisory": "qechHom neH. vumwI''Daq ansible wIv''a''. vaj ghojmoHwI'' rur, ''ach lI''be''.",
-        "asFreshAs": "Dotlh ta'' rap: {when}."
+        "advisory": "qechHom neH. vumwI''Daq ansible wIv''a''. vaj ghojmoHwI'' rur, ''ach lI''be''."
       },
       "items": {
         "heading": "maqlu''bogh hostmey",
@@ -2906,12 +2902,11 @@
         "position": "Daq {position}",
         "apiResolvable": "API wIvlaH",
         "runnerOnly": "vumwI'' poQ",
-        "needsRunner": "mungmeyvam tu''lu''DI'', vumwI'' neH Dotlh ta'' tI''ang qa''laH: {kinds}."
+        "needsRunner": "mungmeyvam ansible poQ; vumwI''Daq neH ansible tu''lu''. vaj boQ Dung ''oH vumwI'' ngeHpu''bogh wIv Qav''e''; DaH wIvlu''be''bogh: {kinds}."
       },
       "errors": {
         "loadItems": "maqlu''bogh hostmey ghelmeH lujpu''",
         "loadResolved": "wIvlu''pu''bogh tetlh ghelmeH lujpu''",
-        "refresh": "tetlh tI''ang qa''meH lujpu''",
         "preview": "veH tI''angmeH lujpu''"
       }
     },

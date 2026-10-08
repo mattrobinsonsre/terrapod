@@ -1,7 +1,7 @@
 'use client'
 
-// Ansible inventory tab (#1967, #1968) — the declared hosts, what they resolve
-// to, and when that was taken.
+// Ansible inventory tab (#1967, #1968) — the declared hosts and what they
+// resolve to.
 //
 // ## This tab is DATA-GATED, and the gate is the design
 //
@@ -19,21 +19,34 @@
 // be an affordance for losing work. The tab says so in as many words, because an
 // operator who is not told goes looking for the button.
 //
-// ## Freshness is load-bearing, not decoration
+// ## The resolved view is LIVE — which is why there is no Refresh here
 //
-// A reader sees the LAST SNAPSHOT, never a live resolution: `taken-at` and
-// `produced-by` are stated next to the numbers they qualify, and the refresh
-// action is offered beside them. A stale snapshot presented as if it were live
-// is the wrong answer dressed as an answer, which is exactly what the limit
-// preview below would then be built on.
+// Dynamic inventory is banned (#1970, closed `NOT_PLANNED`), so every source
+// Terrapod implements is static — declared rows the managing Terraform owns —
+// and resolving one is a database query. A read is therefore live: there is no
+// cached-versus-fresh distinction left to surface and no staleness for a reader
+// to reason about, so the panel states what the numbers ARE rather than how old
+// they might be. `taken-at` survives and now says when this resolution came to
+// be, not how stale it is.
+//
+// There is deliberately **no refresh action**. `POST …/actions/resolve` still
+// exists and still records a version, but the version history is bounded and is
+// what a partial-configure retry subtracts against (#1973) — which is exactly
+// why a read does NOT write: a page left open on a dashboard must not be able
+// to evict the snapshot a configure is pinned to. A button here would hand that
+// same eviction to every reader who happens to hold write, and buy them
+// nothing, because the answer already on screen is the live one. It was also
+// only ever offered when `api-resolvable` was true — precisely the case that is
+// now live — so no narrower honest purpose survives for it.
 //
 // ## The limit preview is the safety surface
 //
 // Auto-configure is deliberately broad, so **visibility is the control rather
 // than prevention**: "what would this target" is the question an operator needs
-// answered before anything runs. Both caveats are on screen whenever a result
-// is — it is ADVISORY (the authoritative expansion is `ansible-inventory
-// --list --limit` in the runner) and it is only as fresh as the snapshot. A
+// answered before anything runs. It expands against the same live resolution,
+// so the freshness caveat is gone; the one that remains is on screen whenever a
+// result is, and still matters — the expansion here is ADVISORY, because the
+// authoritative one is `ansible-inventory --list --limit` taken in the runner. A
 // `~regex` term is refused by the API with a 422, and that message is shown
 // rather than an empty list, because an empty target set for a pattern ansible
 // would have expanded reads as "nothing matches".
@@ -41,7 +54,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { apiFetch, fetchAllPages, parseApiError } from '@/lib/api'
-import { useIsTouch } from '@/lib/use-media-query'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { EmptyState } from '@/components/empty-state'
 import { MobileCard, MobileCardList } from '@/components/mobile-card-list'
@@ -97,6 +109,8 @@ interface LimitPreviewAttrs {
   hosts: string[]
   'host-count': number
   'of-host-count': number
+  // Still on the wire and deliberately not rendered: the expansion is taken
+  // against a live resolution, so there is no snapshot age to qualify it with.
   'taken-at': string
 }
 
@@ -110,16 +124,13 @@ function formatVars(vars: Record<string, unknown>): string {
 export function InventoryPanel({
   workspaceId,
   inventories,
-  canWrite,
 }: {
   workspaceId: string
   // Fetched by the parent, which needs them for the tab gate anyway — one
   // request serves both rather than the panel re-asking the same question.
   inventories: Inventory[]
-  canWrite: boolean
 }) {
   const t = useTranslations('workspaceDetail.inventory')
-  const isTouch = useIsTouch()
 
   const [selectedId, setSelectedId] = useState(inventories[0]?.id ?? '')
   const inventory = inventories.find((i) => i.id === selectedId) ?? inventories[0]
@@ -133,7 +144,6 @@ export function InventoryPanel({
   // replaced with a generic "unavailable".
   const [resolvedError, setResolvedError] = useState('')
   const [resolvedLoading, setResolvedLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
 
   const [limit, setLimit] = useState('')
   const [preview, setPreview] = useState<LimitPreviewAttrs | null>(null)
@@ -184,32 +194,6 @@ export function InventoryPanel({
     setPreviewError('')
   }, [loadResolved])
 
-  async function refresh() {
-    // Replaces what every other reader of this inventory is shown, so it is a
-    // mutation: guarded on touch, where a mis-tap is easy (#719).
-    if (isTouch && !window.confirm(t('refreshConfirm'))) return
-    setRefreshing(true)
-    setResolvedError('')
-    try {
-      const res = await apiFetch(`/api/v1/inventories/${inventory!.id}/actions/resolve`, {
-        method: 'POST',
-      })
-      if (!res.ok) {
-        setResolvedError(await parseApiError(res, t('errors.refresh')))
-        return
-      }
-      const body = await res.json()
-      setResolved(body.data?.attributes ?? null)
-      // The preview was taken against the previous snapshot, so it is now a
-      // statement about a host set that no longer exists.
-      setPreview(null)
-    } catch (err) {
-      setResolvedError(err instanceof Error ? err.message : t('errors.refresh'))
-    } finally {
-      setRefreshing(false)
-    }
-  }
-
   async function runPreview() {
     setPreviewing(true)
     setPreviewError('')
@@ -220,8 +204,9 @@ export function InventoryPanel({
         body: JSON.stringify({ data: { attributes: { limit } } }),
       })
       if (!res.ok) {
-        // 422 for a `~regex` term, 409 when there is no snapshot to limit
-        // against. Both messages name the reason, so both are shown as-is.
+        // 422 for a `~regex` term, 409 when a source needs ansible and no
+        // runner has posted a resolution to limit against. Both messages name
+        // the reason, so both are shown as-is.
         setPreview(null)
         setPreviewError(await parseApiError(res, t('errors.preview')))
         return
@@ -277,25 +262,13 @@ export function InventoryPanel({
         </div>
       )}
 
-      {/* ── Resolution + freshness ─────────────────────────────────────────── */}
+      {/* ── Resolution ─────────────────────────────────────────────────────── */}
       <section className="rounded-lg border border-slate-700/50 bg-slate-800/50 p-4">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-slate-200">{t('resolved.heading')}</h3>
-            <p className="text-xs text-slate-500 break-words">
-              {t('resolved.subheading', { name: attrs.name })}
-            </p>
-          </div>
-          {canWrite && attrs['api-resolvable'] && (
-            <button
-              type="button"
-              onClick={refresh}
-              disabled={refreshing}
-              className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-slate-100 transition-colors hover:bg-slate-600 disabled:opacity-50"
-            >
-              {refreshing ? t('resolved.refreshing') : t('resolved.refresh')}
-            </button>
-          )}
+        <div className="mb-3 min-w-0">
+          <h3 className="text-sm font-semibold text-slate-200">{t('resolved.heading')}</h3>
+          <p className="text-xs text-slate-500 break-words">
+            {t('resolved.subheading', { name: attrs.name })}
+          </p>
         </div>
 
         {resolvedLoading && <LoadingSpinner />}
@@ -312,8 +285,10 @@ export function InventoryPanel({
               <StatChip label={t('resolved.hosts')} value={resolved['host-count']} />
               <StatChip label={t('resolved.groups')} value={resolved['group-count']} />
             </div>
-            {/* The honest statement of what the numbers above are: a snapshot,
-                with its age and its author. */}
+            {/* When this resolution came to be, and who produced it. A version
+                is recorded only when the declared hosts actually move, so for
+                an API-resolvable inventory this date is also "nothing has
+                changed since" — not an age to discount the numbers by. */}
             <p className="mt-3 text-xs text-slate-500 break-words">
               {t('resolved.takenAt', {
                 when: resolved['taken-at']
@@ -326,7 +301,13 @@ export function InventoryPanel({
                 : t('resolved.producedByOther', { by: resolved['produced-by'] })}
               {resolved['produced-by-ref'] ? ` (${resolved['produced-by-ref']})` : ''}
             </p>
-            <p className="mt-1 text-xs text-slate-500">{t('resolved.snapshotNote')}</p>
+            {/* Only said where it is TRUE. An inventory carrying a source the
+                API cannot resolve is served from the last version a runner
+                posted, and `sources.needsRunner` below says so for that case
+                rather than this line claiming live for both. */}
+            {attrs['api-resolvable'] && (
+              <p className="mt-1 text-xs text-slate-500">{t('resolved.liveNote')}</p>
+            )}
 
             {groupNames.length > 0 && (
               <dl className="mt-4 space-y-2">
@@ -399,17 +380,12 @@ export function InventoryPanel({
                 ))}
               </ul>
             )}
-            {/* Both caveats are rendered with the result, never under a
-                disclosure: a target list read without them is a target list an
-                operator will act on. */}
+            {/* Rendered with the result, never under a disclosure: a target
+                list read without it is a target list an operator will act on.
+                The freshness caveat that used to sit beside it is gone — the
+                expansion is taken against a live resolution now, so there is no
+                snapshot age for it to be bounded by. */}
             <p className="mt-3 text-xs text-amber-400/90">{t('limit.advisory')}</p>
-            <p className="mt-1 text-xs text-slate-500">
-              {t('limit.asFreshAs', {
-                when: preview['taken-at']
-                  ? new Date(preview['taken-at']).toLocaleString()
-                  : t('resolved.never'),
-              })}
-            </p>
           </div>
         )}
       </section>
@@ -531,8 +507,10 @@ export function InventoryPanel({
         <h3 className="text-sm font-semibold text-slate-200">{t('sources.heading')}</h3>
         <p className="mt-1 text-sm text-slate-400">{t('sources.body')}</p>
         {/* Per-source `api-resolvable` is what lets a reader say WHICH source is
-            why a snapshot is as old as it is, rather than inferring it from the
-            inventory's rolled-up flag. */}
+            why the resolution above came from a runner rather than live, rather
+            than inferring it from the inventory's rolled-up flag. No such kind
+            exists yet — `terraform` is the only one — so this is the seam git
+            (#1929) will be the first to light up. */}
         {stale.length > 0 && (
           <p className="mt-2 text-xs text-amber-400/90">
             {t('sources.needsRunner', { kinds: stale.map((s) => s.kind).join(', ') })}

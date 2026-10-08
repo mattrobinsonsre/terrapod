@@ -2862,33 +2862,29 @@
         "body": "Dette er vertene dette arbeidsområdet erklærer, og hva de løses opp til. Å kjøre en playbook mot dem er ikke tilgjengelig ennå — denne utgivelsen gjør inventaret observerbart, ingenting kjøres herfra."
       },
       "selectLabel": "Inventar",
-      "refreshConfirm": "Oppdatere inventaret nå? Dette erstatter øyeblikksbildet alle ser.",
       "resolved": {
         "heading": "Oppløste verter og grupper",
         "subheading": "Det sammenslåtte resultatet for {name}, fra hver kilde i rekkefølge.",
         "hosts": "Verter",
         "groups": "Grupper",
-        "refresh": "Oppdater",
-        "refreshing": "Oppdaterer …",
-        "takenAt": "Øyeblikksbilde tatt {when}",
+        "takenAt": "Denne oppløsningen er fra {when}",
         "never": "aldri",
         "producedBy": {
           "api": "løst opp av API-et",
           "runner": "løst opp av en runner"
         },
         "producedByOther": "løst opp av {by}",
-        "snapshotNote": "Dette er det siste øyeblikksbildet, ikke en sanntidsoppløsning. Oppdater for å ta et nytt."
+        "liveNote": "Dette er sanntid. Hver kilde her er deklarert i konfigurasjonen din, så å løse den opp er et databasespørsmål. Datoen ovenfor sier når dette resultatet ble til, ikke hvor gammelt det er."
       },
       "limit": {
         "heading": "Hva ville et limit-mønster treffe?",
-        "body": "Utvid et ansible --limit-mønster ut fra øyeblikksbildet ovenfor, slik at du ser hvilke verter det velger før noe kjøres.",
+        "body": "Utvid et ansible --limit-mønster ut fra de oppløste vertene ovenfor, slik at du ser hvilke av dem det velger før noe kjøres.",
         "inputLabel": "Limit-mønster",
         "placeholder": "web:!web-2",
         "preview": "Forhåndsvis",
         "previewing": "Forhåndsviser …",
         "matched": "{count, plural, =0 {Ingen verter} one {# vert} other {# verter}} av {total} valgt.",
-        "advisory": "Kun rådgivende. Den autoritative utvidelsen gjøres av ansible i runneren, så betrakt dette som en veiledning og ikke en garanti.",
-        "asFreshAs": "Like aktuelt som øyeblikksbildet det bygger på: {when}."
+        "advisory": "Kun rådgivende. Den autoritative utvidelsen gjøres av ansible i runneren, så betrakt dette som en veiledning og ikke en garanti."
       },
       "items": {
         "heading": "Erklærte verter",
@@ -2906,12 +2902,11 @@
         "position": "Posisjon {position}",
         "apiResolvable": "API-et kan løse opp",
         "runnerOnly": "Krever en runner",
-        "needsRunner": "Så lenge disse kildene finnes, kan øyeblikksbildet bare oppdateres av en runner: {kinds}."
+        "needsRunner": "Disse kildene krever ansible, som bare en runner har, så resultatet ovenfor er den siste oppløsningen en runner sendte inn, og ikke en sanntidsoppløsning: {kinds}."
       },
       "errors": {
         "loadItems": "Kunne ikke laste erklærte verter",
         "loadResolved": "Kunne ikke laste det oppløste inventaret",
-        "refresh": "Kunne ikke oppdatere inventaret",
         "preview": "Forhåndsvisning av limit-mønsteret mislyktes"
       }
     },

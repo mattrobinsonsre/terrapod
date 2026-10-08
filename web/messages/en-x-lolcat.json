@@ -2862,33 +2862,29 @@
         "body": "Deez is teh hostz dis werkspace sez it haz, an wut dey turnz into. Runnin a playbuk at em is not redy yet — dis releez jus letz u LOOK at teh inventree, nuffin getz runned frum heer."
       },
       "selectLabel": "Inventree",
-      "refreshConfirm": "Do It Agen rite now? Dis swapz owt teh snapshot evrywun can see.",
       "resolved": {
         "heading": "Rezolvd hostz an groupz",
         "subheading": "Teh all-mushed-togethr anser for {name}, frum evry sorce in ordur.",
         "hosts": "Hostz",
         "groups": "Groupz",
-        "refresh": "Do It Agen",
-        "refreshing": "Doin It Agen…",
-        "takenAt": "Snapshot taked {when}",
+        "takenAt": "Dis anser cummd frum {when}",
         "never": "nevur",
         "producedBy": {
           "api": "dun by teh API",
           "runner": "dun by a runnr"
         },
         "producedByOther": "dun by {by}",
-        "snapshotNote": "Dis is teh last snapshot, not a liv wun. Do It Agen fer a fresh wun."
+        "liveNote": "Dis is liv. Evry sorce heer is declaird in ur config, so werkin it owt is jus a peek — teh date up ther sez wen dis anser showd up, not how old it is."
       },
       "limit": {
         "heading": "Wut wud a limit hitz?",
-        "body": "Blow up an ansible --limit patturn aginst teh snapshot up ther, so u can see wich hostz it pikz b4 enythin runz.",
+        "body": "Blow up an ansible --limit patturn aginst teh rezolvd hostz up ther, so u can see wich wunz it pikz b4 enythin runz.",
         "inputLabel": "Limit patturn",
         "placeholder": "web:!web-2",
         "preview": "Lemme See",
         "previewing": "Lookin…",
         "matched": "{count, plural, =0 {No hostz} one {# host} other {# hostz}} outta {total} pikd.",
-        "advisory": "Jus a gess. Teh reel anser getz werked out by ansible in teh runnr, so take dis as a hint not a promiss.",
-        "asFreshAs": "Only as fresh as teh snapshot it wuz dun aginst: {when}."
+        "advisory": "Jus a gess. Teh reel anser getz werked out by ansible in teh runnr, so take dis as a hint not a promiss."
       },
       "items": {
         "heading": "Declaird hostz",
@@ -2906,12 +2902,11 @@
         "position": "Spot {position}",
         "apiResolvable": "API can do it",
         "runnerOnly": "Needz a runnr",
-        "needsRunner": "Teh snapshot can only get freshend by a runnr wile deez sorcez r heer: {kinds}."
+        "needsRunner": "Deez sorcez needz ansible, an only a runnr haz it, so teh anser up ther is teh last wun a runnr sended, not a liv wun: {kinds}."
       },
       "errors": {
         "loadItems": "Coudnt load teh declaird hostz",
         "loadResolved": "Coudnt load teh rezolvd inventree",
-        "refresh": "Coudnt refresh teh inventree",
         "preview": "Coudnt preview teh limit"
       }
     },

@@ -5174,21 +5174,15 @@ function WorkspaceDetailContent() {
           </div>
         )}
 
-        {/* Inventory Tab — declared hosts, what they resolve to, and when that
-            was taken (#1967, #1968). Rendered only when the workspace actually
-            has an inventory; `inventories` is the same list the tab gate reads.
+        {/* Inventory Tab — the declared hosts and what they resolve to (#1967,
+            #1968). Rendered only when the workspace actually has an inventory;
+            `inventories` is the same list the tab gate reads.
 
-            `canWrite` rides on `can-update-variable` because `inventory:write`
-            sits in the SAME `write` level preset as `var:write` — so the two
-            flags are granted and withheld together. The workspace permissions
-            block carries no inventory flag of its own yet; when it gains one,
-            read that instead of this proxy. */}
+            Read-only throughout, so it takes no write flag: the managing
+            Terraform owns the rows, and the resolved view is live rather than a
+            snapshot a reader could be offered a button to replace. */}
         {activeTab === 'inventory' && (
-          <InventoryPanel
-            workspaceId={workspaceId}
-            inventories={inventories}
-            canWrite={!!perms['can-update-variable']}
-          />
+          <InventoryPanel workspaceId={workspaceId} inventories={inventories} />
         )}
 
         {/* Sharing Tab — cross-workspace remote-state allowlist (#344, #349) */}

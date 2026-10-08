@@ -2862,33 +2862,29 @@
         "body": "Dit zijn de hosts die deze workspace declareert en waartoe ze worden opgelost. Een playbook erop uitvoeren is nog niet beschikbaar — deze release maakt de inventaris observeerbaar, er wordt hier niets uitgevoerd."
       },
       "selectLabel": "Inventaris",
-      "refreshConfirm": "De inventaris nu vernieuwen? Dit vervangt de momentopname die iedereen ziet.",
       "resolved": {
         "heading": "Opgeloste hosts en groepen",
         "subheading": "Het samengevoegde resultaat voor {name}, uit elke bron op volgorde.",
         "hosts": "Hosts",
         "groups": "Groepen",
-        "refresh": "Vernieuwen",
-        "refreshing": "Bezig met vernieuwen…",
-        "takenAt": "Momentopname gemaakt {when}",
+        "takenAt": "Deze oplossing dateert van {when}",
         "never": "nooit",
         "producedBy": {
           "api": "opgelost door de API",
           "runner": "opgelost door een runner"
         },
         "producedByOther": "opgelost door {by}",
-        "snapshotNote": "Dit is de laatste momentopname, geen live-oplossing. Vernieuw om een nieuwe te maken."
+        "liveNote": "Dit is live. Elke bron hier is in uw configuratie gedeclareerd, dus oplossen is een query — de datum hierboven geeft aan wanneer dit resultaat is ontstaan, niet hoe verouderd het is."
       },
       "limit": {
         "heading": "Wat zou een limit-patroon selecteren?",
-        "body": "Breid een ansible --limit-patroon uit op basis van de momentopname hierboven, zodat u kunt zien welke hosts het selecteert voordat er iets wordt uitgevoerd.",
+        "body": "Breid een ansible --limit-patroon uit op basis van de hierboven opgeloste hosts, zodat u kunt zien welke daarvan het selecteert voordat er iets wordt uitgevoerd.",
         "inputLabel": "Limit-patroon",
         "placeholder": "web:!web-2",
         "preview": "Voorbeeld",
         "previewing": "Voorbeeld wordt gemaakt…",
         "matched": "{count, plural, =0 {Geen hosts} one {# host} other {# hosts}} van {total} geselecteerd.",
-        "advisory": "Alleen adviserend. De gezaghebbende uitbreiding van het patroon wordt door ansible in de runner uitgevoerd, dus beschouw dit als een richtlijn en niet als een garantie.",
-        "asFreshAs": "Even actueel als de momentopname waarop die is gebaseerd: {when}."
+        "advisory": "Alleen adviserend. De gezaghebbende uitbreiding van het patroon wordt door ansible in de runner uitgevoerd, dus beschouw dit als een richtlijn en niet als een garantie."
       },
       "items": {
         "heading": "Gedeclareerde hosts",
@@ -2906,12 +2902,11 @@
         "position": "Positie {position}",
         "apiResolvable": "API kan oplossen",
         "runnerOnly": "Vereist een runner",
-        "needsRunner": "Zolang deze bronnen aanwezig zijn, kan de momentopname alleen door een runner worden vernieuwd: {kinds}."
+        "needsRunner": "Deze bronnen hebben ansible nodig, dat alleen een runner heeft, dus het resultaat hierboven is de laatste oplossing die een runner heeft gepubliceerd en geen live-oplossing: {kinds}."
       },
       "errors": {
         "loadItems": "Kan gedeclareerde hosts niet laden",
         "loadResolved": "Kan de opgeloste inventaris niet laden",
-        "refresh": "Kan de inventaris niet vernieuwen",
         "preview": "Voorbeeld van het limit-patroon mislukt"
       }
     },

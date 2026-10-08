@@ -2862,33 +2862,29 @@
         "body": "Voici les hôtes que cet espace de travail déclare et ce à quoi ils se résolvent. Exécuter un playbook sur eux n''est pas encore disponible : cette version rend l''inventaire observable, rien n''est exécuté depuis ici."
       },
       "selectLabel": "Inventaire",
-      "refreshConfirm": "Actualiser l''inventaire maintenant ? Cela remplace l''instantané que tout le monde voit.",
       "resolved": {
         "heading": "Hôtes et groupes résolus",
         "subheading": "Le résultat fusionné pour {name}, à partir de chaque source dans l''ordre.",
         "hosts": "Hôtes",
         "groups": "Groupes",
-        "refresh": "Actualiser",
-        "refreshing": "Actualisation…",
-        "takenAt": "Instantané pris {when}",
+        "takenAt": "Cette résolution date de {when}",
         "never": "jamais",
         "producedBy": {
           "api": "résolu par l''API",
           "runner": "résolu par un runner"
         },
         "producedByOther": "résolu par {by}",
-        "snapshotNote": "Il s''agit du dernier instantané, pas d''une résolution en direct. Actualisez pour en prendre un nouveau."
+        "liveNote": "Ceci est en direct. Chaque source ici est déclarée dans votre configuration, la résoudre est donc une requête : la date ci-dessus indique quand ce résultat est apparu, pas à quel point il est périmé."
       },
       "limit": {
         "heading": "Que ciblerait une limite ?",
-        "body": "Développez un motif ansible --limit sur l''instantané ci-dessus, afin de voir quels hôtes il sélectionne avant que quoi que ce soit ne s''exécute.",
+        "body": "Développez un motif ansible --limit sur les hôtes résolus ci-dessus, afin de voir lesquels il sélectionne avant que quoi que ce soit ne s''exécute.",
         "inputLabel": "Motif de limite",
         "placeholder": "web:!web-2",
         "preview": "Aperçu",
         "previewing": "Aperçu en cours…",
         "matched": "{count, plural, =0 {Aucun hôte sélectionné} one {# hôte sélectionné} other {# hôtes sélectionnés}} sur {total}.",
-        "advisory": "À titre indicatif uniquement. L''expansion de référence est effectuée par ansible dans le runner : considérez ceci comme un repère plutôt que comme une garantie.",
-        "asFreshAs": "Aussi récent que l''instantané sur lequel il a été calculé : {when}."
+        "advisory": "À titre indicatif uniquement. L''expansion de référence est effectuée par ansible dans le runner : considérez ceci comme un repère plutôt que comme une garantie."
       },
       "items": {
         "heading": "Hôtes déclarés",
@@ -2906,12 +2902,11 @@
         "position": "Position {position}",
         "apiResolvable": "L''API peut résoudre",
         "runnerOnly": "Nécessite un runner",
-        "needsRunner": "L''instantané ne peut être actualisé que par un runner tant que ces sources sont présentes : {kinds}."
+        "needsRunner": "Ces sources nécessitent ansible, que seul un runner possède : le résultat ci-dessus est donc la dernière résolution publiée par un runner, et non une résolution en direct : {kinds}."
       },
       "errors": {
         "loadItems": "Échec du chargement des hôtes déclarés",
         "loadResolved": "Échec du chargement de l''inventaire résolu",
-        "refresh": "Échec de l''actualisation de l''inventaire",
         "preview": "Échec de l''aperçu de la limite"
       }
     },

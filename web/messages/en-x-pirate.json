@@ -2862,33 +2862,29 @@
         "body": "These be th'' hands this work-deck signs on, an'' what they muster to. Settin'' a playbook upon ''em be not ready yet — this release lets ye LOOK at th'' manifest, naught be run from here."
       },
       "selectLabel": "Manifest",
-      "refreshConfirm": "Muster th'' manifest anew? This casts out th'' log every soul aboard be lookin'' at.",
       "resolved": {
         "heading": "Mustered hands an'' crews",
         "subheading": "Th'' mingled tally fer {name}, from every wellspring in turn.",
         "hosts": "Hands",
         "groups": "Crews",
-        "refresh": "Muster Again",
-        "refreshing": "Musterin''…",
-        "takenAt": "Log taken {when}",
+        "takenAt": "This muster hails from {when}",
         "never": "ne''er",
         "producedBy": {
           "api": "mustered by th'' API",
           "runner": "mustered by a runner"
         },
         "producedByOther": "mustered by {by}",
-        "snapshotNote": "This be th'' last log, not a livin'' muster. Muster again t'' take a fresh one."
+        "liveNote": "This be livin''. Every wellspring here be signed into yer own configuration, so musterin'' it be naught but a glance at th'' ledger — th'' date above tells when this tally came t'' be, not how long it''s been sittin''."
       },
       "limit": {
         "heading": "What would a limit lay hold of?",
-        "body": "Unfurl an ansible --limit pattern against th'' log above, so ye may see which hands it picks afore aught sets sail.",
+        "body": "Unfurl an ansible --limit pattern against th'' mustered hands above, so ye may see which o'' ''em it picks afore aught sets sail.",
         "inputLabel": "Limit markin''s",
         "placeholder": "web:!web-2",
         "preview": "Spyglass",
         "previewing": "Peerin''…",
         "matched": "{count, plural, =0 {Naught a hand} one {# hand} other {# hands}} o'' {total} picked.",
-        "advisory": "A guess only. Th'' true reckonin'' be taken by ansible in th'' runner, so treat this as a chart an'' not a warrant.",
-        "asFreshAs": "No fresher than th'' log it were taken against: {when}."
+        "advisory": "A guess only. Th'' true reckonin'' be taken by ansible in th'' runner, so treat this as a chart an'' not a warrant."
       },
       "items": {
         "heading": "Signed-on hands",
@@ -2906,12 +2902,11 @@
         "position": "Berth {position}",
         "apiResolvable": "API can muster",
         "runnerOnly": "Be needin'' a runner",
-        "needsRunner": "Th'' log can only be mustered anew by a runner while these wellsprings be aboard: {kinds}."
+        "needsRunner": "These wellsprings be needin'' ansible, an'' only a runner carries it — so th'' tally above be th'' last muster a runner sent in, not a livin'' one: {kinds}."
       },
       "errors": {
         "loadItems": "Failed t'' load th'' signed-on hands",
         "loadResolved": "Failed t'' load th'' mustered manifest",
-        "refresh": "Failed t'' muster th'' manifest anew",
         "preview": "Failed t'' spy th'' limit"
       }
     },

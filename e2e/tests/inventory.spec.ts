@@ -9,8 +9,9 @@
  * asserted on its own, against a workspace that has declared nothing.
  *
  * The rest cover what the tab is for: the declared hosts (read-only, because
- * the managing Terraform owns them), the resolution with the freshness that
- * qualifies it, and the limit preview with both of its caveats on screen.
+ * the managing Terraform owns them), the resolution — which is LIVE, so it
+ * says so and offers no refresh — and the limit preview with its advisory
+ * caveat on screen.
  */
 import { test, expect } from '@playwright/test'
 import { getStoredToken, createWorkspace, seedInventoryItem, uniqueName } from '../helpers/api'
@@ -56,7 +57,7 @@ test.describe('Workspace Inventory tab', () => {
     }
   })
 
-  test('the resolution says it is a snapshot and when it was taken', async ({ page }) => {
+  test('the resolution says it is live, and offers nothing to refresh', async ({ page }) => {
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2einvres'))
     await seedInventoryItem(token, wsId, 'db-1', { address: '10.0.0.21', groups: ['db'] })
@@ -65,16 +66,23 @@ test.describe('Workspace Inventory tab', () => {
     await page.goto(`/workspaces/${wsId}?tab=inventory`)
     await expect(page.getByRole('heading', { name: 'Resolved hosts and groups' })).toBeVisible()
 
-    // Two declared hosts in two groups. The API resolves a terraform-sourced
-    // inventory on first read, so this needs no runner.
+    // Two declared hosts in two groups. Every source is one the API owns, so
+    // the read resolves them itself and this needs no runner.
     await expect(page.getByText('Hosts', { exact: true })).toBeVisible()
     await expect(page.getByText('Groups', { exact: true })).toBeVisible()
 
-    // The freshness, which is the honest part: a reader sees the LAST snapshot.
-    await expect(page.getByText(/Snapshot taken/i)).toBeVisible()
-    await expect(page.getByText(/last snapshot, not a live resolution/i)).toBeVisible()
+    // The honest part. The read is live, so the panel says so and the date is
+    // when this resolution came to be rather than how stale it is.
+    await expect(page.getByText(/This is live/i)).toBeVisible()
+    await expect(page.getByText(/This resolution dates from/i)).toBeVisible()
     await expect(page.getByText(/resolved by the API/i)).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeVisible()
+
+    // And NO refresh action, which is the point: `POST …/actions/resolve`
+    // records a version, the history is bounded, and a read that is already
+    // live buys a reader nothing by writing one. A button here would hand the
+    // eviction of a pinned snapshot to anyone holding write (#1973).
+    await expect(page.getByRole('button', { name: /refresh/i })).toHaveCount(0)
+    await expect(page.getByText(/not a live resolution/i)).toHaveCount(0)
 
     // And which source is why — per-source, not just the inventory's rollup.
     await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible()
@@ -82,7 +90,7 @@ test.describe('Workspace Inventory tab', () => {
     await expect(page.getByText('API can resolve')).toBeVisible()
   })
 
-  test('the limit preview expands a pattern and shows both caveats', async ({ page }) => {
+  test('the limit preview expands a pattern and shows its caveat', async ({ page }) => {
     const token = getStoredToken()
     const wsId = await createWorkspace(token, uniqueName('e2einvlimit'))
     await seedInventoryItem(token, wsId, 'web-1', { groups: ['web'] })
@@ -102,10 +110,13 @@ test.describe('Workspace Inventory tab', () => {
     const matched = page.locator('li', { hasText: /^web-1$/ })
     await expect(matched.first()).toBeVisible()
 
-    // Both caveats ride WITH the result. A target list read without them is a
-    // target list an operator will act on.
+    // The caveat that still applies rides WITH the result: a target list read
+    // without it is a target list an operator will act on. The freshness
+    // caveat that used to sit beside it is gone, because the expansion is
+    // taken against a live resolution — asserted absent so a revert of the
+    // copy cannot pass unnoticed.
     await expect(page.getByText(/Advisory only/i)).toBeVisible()
-    await expect(page.getByText(/As fresh as the snapshot/i)).toBeVisible()
+    await expect(page.getByText(/As fresh as/i)).toHaveCount(0)
   })
 
   test('a ~regex limit is refused with the reason, not an empty list', async ({ page }) => {

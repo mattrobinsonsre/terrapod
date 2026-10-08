@@ -2862,33 +2862,29 @@
         "body": "Nämä ovat isännät, jotka tämä työtila määrittelee, ja se, mihin ne ratkeavat. Playbookin ajaminen niitä vasten ei ole vielä käytettävissä — tämä julkaisu tekee inventaariosta havaittavan, täältä ei suoriteta mitään."
       },
       "selectLabel": "Inventaario",
-      "refreshConfirm": "Päivitetäänkö inventaario nyt? Tämä korvaa tilannevedoksen, jonka kaikki näkevät.",
       "resolved": {
         "heading": "Ratkaistut isännät ja ryhmät",
         "subheading": "Yhdistetty tulos kohteelle {name}, kaikista lähteistä järjestyksessä.",
         "hosts": "Isännät",
         "groups": "Ryhmät",
-        "refresh": "Päivitä",
-        "refreshing": "Päivitetään…",
-        "takenAt": "Tilannevedos otettu {when}",
+        "takenAt": "Tämä ratkaisu on ajankohdalta {when}",
         "never": "ei koskaan",
         "producedBy": {
           "api": "API:n ratkaisema",
           "runner": "runnerin ratkaisema"
         },
         "producedByOther": "ratkaisija: {by}",
-        "snapshotNote": "Tämä on viimeisin tilannevedos, ei reaaliaikainen ratkaisu. Päivitä ottaaksesi uuden."
+        "liveNote": "Tämä on reaaliaikainen. Jokainen lähde täällä on määritelty konfiguraatiossasi, joten ratkaiseminen on tietokantakysely. Yllä oleva ajankohta kertoo, milloin tämä tulos syntyi, ei sitä kuinka vanha se on."
       },
       "limit": {
         "heading": "Mihin --limit kohdistuisi?",
-        "body": "Laajenna ansible --limit -kuvio yllä olevaa tilannevedosta vasten, jotta näet mitkä isännät se valitsee ennen kuin mitään ajetaan.",
+        "body": "Laajenna ansible --limit -kuvio yllä ratkaistuja isäntiä vasten, jotta näet mitkä niistä se valitsee ennen kuin mitään ajetaan.",
         "inputLabel": "--limit-kuvio",
         "placeholder": "web:!web-2",
         "preview": "Esikatsele",
         "previewing": "Esikatsellaan…",
         "matched": "{count, plural, =0 {Yhtään isäntää ei valittu} one {Valittu # isäntä} other {Valittu # isäntää}} {total}:sta.",
-        "advisory": "Vain neuvoa-antava. Sitovan laajennuksen tekee ansible runnerissa, joten pidä tätä ohjeena eikä takuuna.",
-        "asFreshAs": "Yhtä tuore kuin tilannevedos, jota vasten se otettiin: {when}."
+        "advisory": "Vain neuvoa-antava. Sitovan laajennuksen tekee ansible runnerissa, joten pidä tätä ohjeena eikä takuuna."
       },
       "items": {
         "heading": "Määritellyt isännät",
@@ -2906,12 +2902,11 @@
         "position": "Sijainti {position}",
         "apiResolvable": "API voi ratkaista",
         "runnerOnly": "Vaatii runnerin",
-        "needsRunner": "Niin kauan kuin nämä lähteet ovat läsnä, tilannevedoksen voi päivittää vain runner: {kinds}."
+        "needsRunner": "Nämä lähteet tarvitsevat ansiblea, joka on vain runnerilla, joten yllä oleva tulos on viimeisin runnerin lähettämä ratkaisu eikä reaaliaikainen ratkaisu: {kinds}."
       },
       "errors": {
         "loadItems": "Määriteltyjen isäntien lataaminen epäonnistui",
         "loadResolved": "Ratkaistun inventaarion lataaminen epäonnistui",
-        "refresh": "Inventaarion päivittäminen epäonnistui",
         "preview": "--limit-kuvion esikatselu epäonnistui"
       }
     },
