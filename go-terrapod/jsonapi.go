@@ -217,15 +217,12 @@ func GetMapAttr(r *Resource, key string) map[string]string {
 	return m
 }
 
-// GetAudienceMapAttr returns a map[string][]string-typed attribute from r,
+// GetStringListMapAttr returns a map[string][]string-typed attribute from r,
 // returning nil when the value is absent OR JSON null.
 //
-// Terrapod's `oidc-audiences` shape (#1901): a provider configuration name
-// (`aws`, or `aws.west` for one aliased configuration) to the audiences a run
-// identity token for it is minted with. ALWAYS a list even for one entry,
-// because a federation target's audience is one value and a list of several is
-// a deliberate "these are interchangeable" statement.
-func GetAudienceMapAttr(r *Resource, key string) map[string][]string {
+// The generic name, for the several attributes that have this shape: an OIDC
+// audience map, an inventory group's members, a group's children.
+func GetStringListMapAttr(r *Resource, key string) map[string][]string {
 	raw, ok := r.Attributes[key]
 	if !ok || len(raw) == 0 || string(raw) == "null" {
 		return nil
@@ -235,6 +232,18 @@ func GetAudienceMapAttr(r *Resource, key string) map[string][]string {
 		return nil
 	}
 	return m
+}
+
+// GetAudienceMapAttr is GetStringListMapAttr under the name it was introduced
+// with, kept for its existing callers.
+//
+// Terrapod's `oidc-audiences` shape (#1901): a provider configuration name
+// (`aws`, or `aws.west` for one aliased configuration) to the audiences a run
+// identity token for it is minted with. ALWAYS a list even for one entry,
+// because a federation target's audience is one value and a list of several is
+// a deliberate "these are interchangeable" statement.
+func GetAudienceMapAttr(r *Resource, key string) map[string][]string {
+	return GetStringListMapAttr(r, key)
 }
 
 // GetListAttr returns a []string-typed attribute from r, nil-safe.

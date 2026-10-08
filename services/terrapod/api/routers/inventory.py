@@ -1489,10 +1489,16 @@ def _var_routes(kind: str) -> None:
         db: AsyncSession = Depends(get_db),
         _kind: str = kind,
     ) -> JSONResponse:
-        """Partial update. `key` is immutable -- it is half the row's identity.
+        """Partial update. An absent attribute is left alone.
 
-        An absent attribute is left alone, which is what lets a caller set
-        `sensitive` without resending a value it may have read back masked.
+        That is what lets a caller set `sensitive` without resending a value it
+        may have read back masked.
+
+        `key` is renameable, which it need not have been -- a rename could have
+        been a delete and a create. But the row carries three other fields, and
+        making a caller rebuild them to correct a typo is work with nothing
+        behind it. The rename can collide, so it is the one new way this write
+        fails with a 409.
         """
         var, serializer = await _var_row(_kind, var_id, db)
         ws = await _get_workspace(f"ws-{var.workspace_id}", db)

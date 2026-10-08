@@ -7,6 +7,7 @@ const CategoryGitSSH
 const CategoryNative
 const CategoryTerraform
 const DiscoveryPath
+const MaskedValue
 const ModuleAutodiscoveryTargetNamespace
 const ModuleAutodiscoveryTargetPattern
 const ModuleAutodiscoveryTargetRepository
@@ -227,12 +228,10 @@ field CreateGPGKeyRequest.ASCIIArmor string
 field CreateGPGKeyRequest.Namespace string
 field CreateGPGKeyRequest.Source string
 field CreateGPGKeyRequest.SourceURL string
-field CreateInventoryItemRequest.Address string
-field CreateInventoryItemRequest.Groups []string
-field CreateInventoryItemRequest.Name string
-field CreateInventoryItemRequest.Vars map[string]string
-field CreateInventoryRequest.Description string
-field CreateInventoryRequest.Name string
+field CreateInventoryVarRequest.Key string
+field CreateInventoryVarRequest.Sensitive bool
+field CreateInventoryVarRequest.Structured bool
+field CreateInventoryVarRequest.Value string
 field CreateModuleWorkspaceLinkRequest.ModuleName string
 field CreateModuleWorkspaceLinkRequest.ModuleProvider string
 field CreateModuleWorkspaceLinkRequest.WorkspaceID string
@@ -497,32 +496,51 @@ field ImpactGraphNode.Module string `json:"module"`
 field ImpactGraphNode.Name string `json:"name"`
 field ImpactGraphNode.Provider string `json:"provider"`
 field ImpactGraphNode.Type string `json:"type"`
-field Inventory.APIResolvable bool `json:"api-resolvable"`
-field Inventory.CreatedAt string `json:"created-at,omitempty"`
-field Inventory.Description string `json:"description,omitempty"`
-field Inventory.ID string `json:"id"`
-field Inventory.Name string `json:"name"`
-field Inventory.Sources []InventorySource `json:"sources,omitempty"`
-field Inventory.UpdatedAt string `json:"updated-at,omitempty"`
-field Inventory.WorkspaceID string `json:"workspace-id,omitempty"`
-field InventoryItem.Address string `json:"address,omitempty"`
-field InventoryItem.CreatedAt string `json:"created-at,omitempty"`
-field InventoryItem.Groups []string `json:"groups,omitempty"`
-field InventoryItem.ID string `json:"id"`
-field InventoryItem.Name string `json:"name"`
-field InventoryItem.UpdatedAt string `json:"updated-at,omitempty"`
-field InventoryItem.Vars map[string]string `json:"vars,omitempty"`
-field InventoryItem.WorkspaceID string `json:"workspace-id,omitempty"`
-field InventoryLimitPreview.HostCount int `json:"host-count"`
-field InventoryLimitPreview.Hosts []string `json:"hosts"`
-field InventoryLimitPreview.Limit string `json:"limit"`
-field InventoryLimitPreview.OfHostCount int `json:"of-host-count"`
-field InventorySource.APIResolvable bool `json:"api-resolvable"`
-field InventorySource.Config map[string]any `json:"config,omitempty"`
-field InventorySource.CreatedAt string `json:"created-at,omitempty"`
-field InventorySource.ID string `json:"id"`
-field InventorySource.Kind string `json:"kind"`
-field InventorySource.Position int `json:"position"`
+field InventoryGroup.ChildCount int `json:"child-count"`
+field InventoryGroup.CreatedAt string `json:"created-at,omitempty"`
+field InventoryGroup.ID string `json:"id"`
+field InventoryGroup.MemberCount int `json:"member-count"`
+field InventoryGroup.Name string `json:"name"`
+field InventoryGroup.UpdatedAt string `json:"updated-at,omitempty"`
+field InventoryGroup.VariableCount int `json:"variable-count"`
+field InventoryGroup.WorkspaceID string `json:"workspace-id,omitempty"`
+field InventoryGroupChild.ChildGroupID string `json:"child-group-id,omitempty"`
+field InventoryGroupChild.CreatedAt string `json:"created-at,omitempty"`
+field InventoryGroupChild.ID string `json:"id"`
+field InventoryGroupChild.ParentGroupID string `json:"parent-group-id,omitempty"`
+field InventoryGroupChild.WorkspaceID string `json:"workspace-id,omitempty"`
+field InventoryHost.CreatedAt string `json:"created-at,omitempty"`
+field InventoryHost.GroupCount int `json:"group-count"`
+field InventoryHost.ID string `json:"id"`
+field InventoryHost.Name string `json:"name"`
+field InventoryHost.UpdatedAt string `json:"updated-at,omitempty"`
+field InventoryHost.VariableCount int `json:"variable-count"`
+field InventoryHost.WorkspaceID string `json:"workspace-id,omitempty"`
+field InventoryHostGroup.CreatedAt string `json:"created-at,omitempty"`
+field InventoryHostGroup.GroupID string `json:"group-id,omitempty"`
+field InventoryHostGroup.HostID string `json:"host-id,omitempty"`
+field InventoryHostGroup.ID string `json:"id"`
+field InventoryHostGroup.WorkspaceID string `json:"workspace-id,omitempty"`
+field InventorySettings.Branch string `json:"branch,omitempty"`
+field InventorySettings.CreatedAt string `json:"created-at,omitempty"`
+field InventorySettings.ID string `json:"id"`
+field InventorySettings.IgnorePaths []string `json:"ignore-paths,omitempty"`
+field InventorySettings.IncludePlatform bool `json:"include-platform"`
+field InventorySettings.RepoURL string `json:"repo-url,omitempty"`
+field InventorySettings.UpdatedAt string `json:"updated-at,omitempty"`
+field InventorySettings.VCSConnectionID string `json:"vcs-connection-id,omitempty"`
+field InventorySettings.WorkingDirectory string `json:"working-directory,omitempty"`
+field InventorySettings.WorkspaceID string `json:"workspace-id,omitempty"`
+field InventoryVar.CreatedAt string `json:"created-at,omitempty"`
+field InventoryVar.GroupID string `json:"group-id,omitempty"`
+field InventoryVar.HostID string `json:"host-id,omitempty"`
+field InventoryVar.ID string `json:"id"`
+field InventoryVar.Key string `json:"key"`
+field InventoryVar.Sensitive bool `json:"sensitive"`
+field InventoryVar.Structured bool `json:"structured"`
+field InventoryVar.UpdatedAt string `json:"updated-at,omitempty"`
+field InventoryVar.Value string `json:"value"`
+field InventoryVar.WorkspaceID string `json:"workspace-id,omitempty"`
 field LabelEntity.ID string `json:"id"`
 field LabelEntity.Labels map[string]string `json:"labels"`
 field LabelEntity.Name string `json:"name"`
@@ -784,6 +802,12 @@ field ProviderTemplate.Attributes map[string]any
 field ProviderTemplate.CreatedAt string
 field ProviderTemplate.ID string
 field ProviderTemplate.UpdatedAt string
+field PutInventorySettingsRequest.Branch string
+field PutInventorySettingsRequest.IgnorePaths []string
+field PutInventorySettingsRequest.IncludePlatform bool
+field PutInventorySettingsRequest.RepoURL string
+field PutInventorySettingsRequest.VCSConnectionID string
+field PutInventorySettingsRequest.WorkingDirectory string
 field RegisteredModuleRef.Name string `json:"name"`
 field RegisteredModuleRef.Provider string `json:"provider"`
 field RegistryModule.CreatedAt string `json:"created-at,omitempty"`
@@ -818,13 +842,14 @@ field RemoteStateConsumer.CreatedBy string `json:"created-by,omitempty"`
 field RemoteStateConsumer.ID string `json:"id"`
 field RemoteStateConsumer.ProducerWorkspaceID string `json:"producer-workspace-id"`
 field RemoteStateConsumer.ProducerWorkspaceName string `json:"producer-workspace-name"`
-field ResolvedInventory.AnsibleInventory map[string]any `json:"ansible-inventory,omitempty"`
+field ResolvedInventory.GroupChildren map[string][]string `json:"group-children,omitempty"`
 field ResolvedInventory.GroupCount int `json:"group-count"`
 field ResolvedInventory.Groups map[string][]string `json:"groups,omitempty"`
 field ResolvedInventory.HostCount int `json:"host-count"`
 field ResolvedInventory.Hosts map[string]map[string]any `json:"hosts,omitempty"`
 field ResolvedInventory.ID string `json:"id"`
-field ResolvedInventory.InventoryID string `json:"inventory-id,omitempty"`
+field ResolvedInventory.Limit string `json:"limit,omitempty"`
+field ResolvedInventory.WorkspaceID string `json:"workspace-id,omitempty"`
 field Resource.Attributes map[string]json.RawMessage `json:"attributes"`
 field Resource.ID string `json:"id"`
 field Resource.Relationships map[string]Relationship `json:"relationships,omitempty"`
@@ -1043,10 +1068,17 @@ field UpdateExecutionHookRequest.HookPoint *string
 field UpdateExecutionHookRequest.Name string
 field UpdateExecutionHookRequest.Priority *int64
 field UpdateExecutionHookRequest.Script *string
-field UpdateInventoryItemRequest.Address *string
-field UpdateInventoryItemRequest.Groups *[]string
-field UpdateInventoryItemRequest.Name string
-field UpdateInventoryItemRequest.Vars *map[string]string
+field UpdateInventorySettingsRequest.Branch *string
+field UpdateInventorySettingsRequest.ClearVCSConnection bool
+field UpdateInventorySettingsRequest.IgnorePaths *[]string
+field UpdateInventorySettingsRequest.IncludePlatform *bool
+field UpdateInventorySettingsRequest.RepoURL *string
+field UpdateInventorySettingsRequest.VCSConnectionID *string
+field UpdateInventorySettingsRequest.WorkingDirectory *string
+field UpdateInventoryVarRequest.Key *string
+field UpdateInventoryVarRequest.Sensitive *bool
+field UpdateInventoryVarRequest.Structured *bool
+field UpdateInventoryVarRequest.Value *string
 field UpdateNotificationConfigurationRequest.EmailAddresses *[]string
 field UpdateNotificationConfigurationRequest.Enabled *bool
 field UpdateNotificationConfigurationRequest.Name string
@@ -1442,6 +1474,7 @@ func GetMapAttr(r *Resource, key string) map[string]string
 func GetObjectAttr(r *Resource, key string) map[string]any
 func GetRelationshipID(r *Resource, name string) string
 func GetStringAttr(r *Resource, key string) string
+func GetStringListMapAttr(r *Resource, key string) map[string][]string
 func IsAuth(err error) bool
 func IsConflict(err error) bool
 func IsNotFound(err error) bool
@@ -1459,6 +1492,10 @@ method (*AIPolicyStatus) IsBlocking() bool
 method (*APIError) Error() string
 method (*AuthenticationError) Error() string
 method (*AuthorizationError) Error() string
+method (*Client) AddHostToInventoryGroup( ctx context.Context, groupID, hostID string, ) (*InventoryHostGroup, error)
+method (*Client) AddInventoryGroupChild( ctx context.Context, parentGroupID, childGroupID string, ) (*InventoryGroupChild, error)
+method (*Client) AddInventoryGroupParent( ctx context.Context, childGroupID, parentGroupID string, ) (*InventoryGroupChild, error)
+method (*Client) AddInventoryGroupToHost( ctx context.Context, hostID, groupID string, ) (*InventoryHostGroup, error)
 method (*Client) AddPolicy(ctx context.Context, policySetID string, req AddPolicyRequest) (*Policy, error)
 method (*Client) AddRoleToIdentity(ctx context.Context, providerName, email, roleName string) error
 method (*Client) ApplyRun(ctx context.Context, runID string) (*Run, error)
@@ -1477,8 +1514,11 @@ method (*Client) CreateAutodiscoveryRule(ctx context.Context, attrs map[string]a
 method (*Client) CreateCatalogItem(ctx context.Context, attrs map[string]any) (*CatalogItem, error)
 method (*Client) CreateExecutionHook(ctx context.Context, req CreateExecutionHookRequest) (*ExecutionHook, error)
 method (*Client) CreateGPGKey(ctx context.Context, req CreateGPGKeyRequest) (*GPGKey, error)
-method (*Client) CreateInventory( ctx context.Context, workspaceID string, req CreateInventoryRequest, ) (*Inventory, error)
-method (*Client) CreateInventoryItem( ctx context.Context, workspaceID string, req CreateInventoryItemRequest, ) (*InventoryItem, error)
+method (*Client) CreateInventoryGlobalVar( ctx context.Context, workspaceID string, req CreateInventoryVarRequest, ) (*InventoryVar, error)
+method (*Client) CreateInventoryGroup( ctx context.Context, workspaceID, name string, ) (*InventoryGroup, error)
+method (*Client) CreateInventoryGroupVar( ctx context.Context, groupID string, req CreateInventoryVarRequest, ) (*InventoryVar, error)
+method (*Client) CreateInventoryHost( ctx context.Context, workspaceID, name string, ) (*InventoryHost, error)
+method (*Client) CreateInventoryHostVar( ctx context.Context, hostID string, req CreateInventoryVarRequest, ) (*InventoryVar, error)
 method (*Client) CreateModuleAutodiscoveryRule(ctx context.Context, req ModuleAutodiscoveryRuleRequest) (*ModuleAutodiscoveryRule, error)
 method (*Client) CreateModuleWorkspaceLink(ctx context.Context, req CreateModuleWorkspaceLinkRequest) (*ModuleWorkspaceLink, error)
 method (*Client) CreateNotificationConfiguration(ctx context.Context, workspaceID string, req CreateNotificationConfigurationRequest) (*NotificationConfiguration, error)
@@ -1506,8 +1546,14 @@ method (*Client) DeleteAutodiscoveryRule(ctx context.Context, id string) error
 method (*Client) DeleteCatalogItem(ctx context.Context, id string) error
 method (*Client) DeleteExecutionHook(ctx context.Context, id string) error
 method (*Client) DeleteGPGKey(ctx context.Context, id string) error
-method (*Client) DeleteInventory(ctx context.Context, id string) error
-method (*Client) DeleteInventoryItem(ctx context.Context, id string) error
+method (*Client) DeleteInventoryGlobalVar(ctx context.Context, id string) error
+method (*Client) DeleteInventoryGroup(ctx context.Context, id string) error
+method (*Client) DeleteInventoryGroupChild(ctx context.Context, id string) error
+method (*Client) DeleteInventoryGroupVar(ctx context.Context, id string) error
+method (*Client) DeleteInventoryHost(ctx context.Context, id string) error
+method (*Client) DeleteInventoryHostGroup(ctx context.Context, id string) error
+method (*Client) DeleteInventoryHostVar(ctx context.Context, id string) error
+method (*Client) DeleteInventorySettings(ctx context.Context, workspaceID string) error
 method (*Client) DeleteModuleAutodiscoveryRule(ctx context.Context, id string) error
 method (*Client) DeleteModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) error
 method (*Client) DeleteNotificationConfiguration(ctx context.Context, id string) error
@@ -1549,8 +1595,14 @@ method (*Client) GetEstateGraph(ctx context.Context) (*EstateGraph, error)
 method (*Client) GetExecutionHook(ctx context.Context, id string) (*ExecutionHook, error)
 method (*Client) GetGPGKey(ctx context.Context, id string) (*GPGKey, error)
 method (*Client) GetHAStatus(ctx context.Context) (*HAStatus, error)
-method (*Client) GetInventory(ctx context.Context, id string) (*Inventory, error)
-method (*Client) GetInventoryItem(ctx context.Context, id string) (*InventoryItem, error)
+method (*Client) GetInventoryGlobalVar(ctx context.Context, id string) (*InventoryVar, error)
+method (*Client) GetInventoryGroup(ctx context.Context, id string) (*InventoryGroup, error)
+method (*Client) GetInventoryGroupChild( ctx context.Context, id string, ) (*InventoryGroupChild, error)
+method (*Client) GetInventoryGroupVar(ctx context.Context, id string) (*InventoryVar, error)
+method (*Client) GetInventoryHost(ctx context.Context, id string) (*InventoryHost, error)
+method (*Client) GetInventoryHostGroup( ctx context.Context, id string, ) (*InventoryHostGroup, error)
+method (*Client) GetInventoryHostVar(ctx context.Context, id string) (*InventoryVar, error)
+method (*Client) GetInventorySettings( ctx context.Context, workspaceID string, ) (*InventorySettings, error)
 method (*Client) GetModuleAutodiscoveryRule(ctx context.Context, id string) (*ModuleAutodiscoveryRule, error)
 method (*Client) GetModuleInterface(ctx context.Context, name, provider, version string) (*ModuleInterface, error)
 method (*Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) (*ModuleWorkspaceLink, error)
@@ -1568,7 +1620,8 @@ method (*Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderT
 method (*Client) GetRegistryModule(ctx context.Context, name, providerName string) (*RegistryModule, error)
 method (*Client) GetRegistryProvider(ctx context.Context, name string) (*RegistryProvider, error)
 method (*Client) GetRemoteStateConsumer(ctx context.Context, id string) (*RemoteStateConsumer, error)
-method (*Client) GetResolvedInventory( ctx context.Context, inventoryID string, ) (*ResolvedInventory, error)
+method (*Client) GetResolvedInventory( ctx context.Context, workspaceID string, ) (*ResolvedInventory, error)
+method (*Client) GetResolvedInventoryWithLimit( ctx context.Context, workspaceID, limit string, ) (*ResolvedInventory, error)
 method (*Client) GetResourceAccess(ctx context.Context, kind, id string) (*ResourceAccess, error)
 method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
 method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
@@ -1602,7 +1655,9 @@ method (*Client) ListAllAPITokens(ctx context.Context, kind string) ([]APIToken,
 method (*Client) ListAllAgentPools(ctx context.Context) ([]AgentPool, error)
 method (*Client) ListAllCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
 method (*Client) ListAllDeletedWorkspaces(ctx context.Context) ([]DeletedWorkspace, error)
-method (*Client) ListAllInventoryItems( ctx context.Context, workspaceID string, ) ([]InventoryItem, error)
+method (*Client) ListAllInventoryGroupMembers( ctx context.Context, groupID string, ) ([]InventoryHostGroup, error)
+method (*Client) ListAllInventoryGroups( ctx context.Context, workspaceID string, ) ([]InventoryGroup, error)
+method (*Client) ListAllInventoryHosts( ctx context.Context, workspaceID string, ) ([]InventoryHost, error)
 method (*Client) ListAllModuleAutodiscoveryRuleRepositories(ctx context.Context, id, status string) ([]ModuleAutodiscoveryRepository, error)
 method (*Client) ListAllModuleAutodiscoveryRules(ctx context.Context) ([]ModuleAutodiscoveryRule, error)
 method (*Client) ListAllVCSConnections(ctx context.Context) ([]VCSConnection, error)
@@ -1617,8 +1672,15 @@ method (*Client) ListExecutionHooks(ctx context.Context) ([]ExecutionHook, error
 method (*Client) ListExpiringAPITokens(ctx context.Context) ([]APIToken, error)
 method (*Client) ListGPGKeys(ctx context.Context) ([]GPGKey, error)
 method (*Client) ListInboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error)
-method (*Client) ListInventories( ctx context.Context, workspaceID string, ) ([]Inventory, error)
-method (*Client) ListInventoryItems( ctx context.Context, workspaceID string, ) ([]InventoryItem, error)
+method (*Client) ListInventoryGlobalVars( ctx context.Context, workspaceID string, ) ([]InventoryVar, error)
+method (*Client) ListInventoryGroupChildren( ctx context.Context, groupID string, ) ([]InventoryGroupChild, error)
+method (*Client) ListInventoryGroupMembers( ctx context.Context, groupID string, ) ([]InventoryHostGroup, error)
+method (*Client) ListInventoryGroupParents( ctx context.Context, groupID string, ) ([]InventoryGroupChild, error)
+method (*Client) ListInventoryGroupVars( ctx context.Context, groupID string, ) ([]InventoryVar, error)
+method (*Client) ListInventoryGroups( ctx context.Context, workspaceID string, ) ([]InventoryGroup, error)
+method (*Client) ListInventoryHostMemberships( ctx context.Context, hostID string, ) ([]InventoryHostGroup, error)
+method (*Client) ListInventoryHostVars( ctx context.Context, hostID string, ) ([]InventoryVar, error)
+method (*Client) ListInventoryHosts( ctx context.Context, workspaceID string, ) ([]InventoryHost, error)
 method (*Client) ListLabelEntities(ctx context.Context, key, value string) (map[string][]LabelEntity, error)
 method (*Client) ListLabelKeys(ctx context.Context) ([]LabelKey, error)
 method (*Client) ListLabelValues(ctx context.Context, key string) ([]LabelValue, error)
@@ -1662,7 +1724,6 @@ method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte,
 method (*Client) PostArchitectureCritiqueMessage( ctx context.Context, workspaceID, content string, ) (*ArchitectureCritiqueMessage, error)
 method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
 method (*Client) PostRunCostSummaryMessage(ctx context.Context, runID, content string) (*CostSummaryMessage, error)
-method (*Client) PreviewInventoryLimit( ctx context.Context, inventoryID, limit string, ) (*InventoryLimitPreview, error)
 method (*Client) PreviewModuleAutodiscoveryRule(ctx context.Context, id string) (*ModuleAutodiscoveryPreview, error)
 method (*Client) PreviewModuleAutodiscoveryRuleWithOptions(ctx context.Context, id string, opts ModuleAutodiscoveryPreviewOptions) (*ModuleAutodiscoveryPreview, error)
 method (*Client) PreviewRoleReach(ctx context.Context, name string, opts *RoleReachOptions) (*RoleReach, error)
@@ -1671,6 +1732,7 @@ method (*Client) PreviewUnsavedModuleAutodiscoveryRuleWithOptions(ctx context.Co
 method (*Client) PreviewUnsavedRoleReach(ctx context.Context, req CreateRoleRequest, opts *RoleReachOptions) (*RoleReach, error)
 method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs map[string]any) (*CatalogInstance, error)
 method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
+method (*Client) PutInventorySettings( ctx context.Context, workspaceID string, req PutInventorySettingsRequest, ) (*InventorySettings, error)
 method (*Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error)
 method (*Client) ReconfigureCatalogInstance(ctx context.Context, wsID string, attrs map[string]any) (*CatalogRunRef, error)
 method (*Client) RegenerateArchitectureCritique( ctx context.Context, workspaceID string, ) (*ArchitectureCritique, error)
@@ -1699,7 +1761,12 @@ method (*Client) UpdateAgentPool(ctx context.Context, id string, req UpdateAgent
 method (*Client) UpdateAutodiscoveryRule(ctx context.Context, id string, attrs map[string]any) (*AutodiscoveryRule, error)
 method (*Client) UpdateCatalogItem(ctx context.Context, id string, attrs map[string]any) (*CatalogItem, error)
 method (*Client) UpdateExecutionHook(ctx context.Context, id string, req UpdateExecutionHookRequest) (*ExecutionHook, error)
-method (*Client) UpdateInventoryItem( ctx context.Context, id string, req UpdateInventoryItemRequest, ) (*InventoryItem, error)
+method (*Client) UpdateInventoryGlobalVar( ctx context.Context, id string, req UpdateInventoryVarRequest, ) (*InventoryVar, error)
+method (*Client) UpdateInventoryGroup( ctx context.Context, id, name string, ) (*InventoryGroup, error)
+method (*Client) UpdateInventoryGroupVar( ctx context.Context, id string, req UpdateInventoryVarRequest, ) (*InventoryVar, error)
+method (*Client) UpdateInventoryHost( ctx context.Context, id, name string, ) (*InventoryHost, error)
+method (*Client) UpdateInventoryHostVar( ctx context.Context, id string, req UpdateInventoryVarRequest, ) (*InventoryVar, error)
+method (*Client) UpdateInventorySettings( ctx context.Context, workspaceID string, req UpdateInventorySettingsRequest, ) (*InventorySettings, error)
 method (*Client) UpdateModuleAutodiscoveryRule(ctx context.Context, id string, req ModuleAutodiscoveryRuleRequest) (*ModuleAutodiscoveryRule, error)
 method (*Client) UpdateNotificationConfiguration(ctx context.Context, id string, req UpdateNotificationConfigurationRequest) (*NotificationConfiguration, error)
 method (*Client) UpdatePolicy(ctx context.Context, policyID string, req UpdatePolicyRequest) (*Policy, error)
@@ -1766,8 +1833,7 @@ type CreateAgentPoolRequest struct
 type CreateAgentPoolTokenRequest struct
 type CreateExecutionHookRequest struct
 type CreateGPGKeyRequest struct
-type CreateInventoryItemRequest struct
-type CreateInventoryRequest struct
+type CreateInventoryVarRequest struct
 type CreateModuleWorkspaceLinkRequest struct
 type CreateNotificationConfigurationRequest struct
 type CreateOnboardingSessionRequest struct
@@ -1808,10 +1874,12 @@ type ImpactGraph struct
 type ImpactGraphEdge struct
 type ImpactGraphMeta struct
 type ImpactGraphNode struct
-type Inventory struct
-type InventoryItem struct
-type InventoryLimitPreview struct
-type InventorySource struct
+type InventoryGroup struct
+type InventoryGroupChild struct
+type InventoryHost struct
+type InventoryHostGroup struct
+type InventorySettings struct
+type InventoryVar struct
 type LabelEntity struct
 type LabelKey struct
 type LabelValue struct
@@ -1851,6 +1919,7 @@ type Policy struct
 type PolicyCheck struct
 type PolicySet struct
 type ProviderTemplate struct
+type PutInventorySettingsRequest struct
 type RegisteredModuleRef struct
 type RegistryModule struct
 type RegistryProvider struct
@@ -1887,7 +1956,8 @@ type StateVersion struct
 type UnpricedResource struct
 type UpdateAgentPoolRequest struct
 type UpdateExecutionHookRequest struct
-type UpdateInventoryItemRequest struct
+type UpdateInventorySettingsRequest struct
+type UpdateInventoryVarRequest struct
 type UpdateNotificationConfigurationRequest struct
 type UpdatePolicyRequest struct
 type UpdatePolicySetRequest struct
