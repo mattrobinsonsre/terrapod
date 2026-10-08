@@ -912,28 +912,76 @@ class TestPayNothing:
 
 
 class TestTheUnresolvableRefusalIsQuotedInTheDocs:
-    """Both leads are quoted verbatim in `docs/ansible-inventory.md` and
-    `docs/api-reference.md`, so they are pinned here.
+    """Every lead, and the shared tail, quoted verbatim in
+    `docs/ansible-inventory.md` and `docs/api-reference.md`.
 
     A doc quoting an error message is a claim that goes stale silently: the code
     changes, the page keeps showing output nothing produces, and an operator
-    searching for the text they were given finds nothing. This file already
-    asserts that the read names the offending kinds; these pin the opening
-    clause the pages reproduce.
+    searching for the text they were given finds nothing.
+
+    **This class used to assert that the tails agree with EACH OTHER and never
+    against a literal, and that is not the same thing.** Two tails can agree
+    perfectly while both having moved away from what the pages reproduce --
+    which is exactly what had happened: `docs/api-reference.md` quoted "has to
+    refresh this inventory; the API will not resolve the rest of it" against a
+    code tail reading "has to produce it; the API will not resolve the rest of
+    the inventory". The defect this class exists to catch had already occurred
+    inside the page it names. So the tail is pinned as a literal now, and a
+    mutual-agreement assertion is kept only as the weaker extra check it is.
     """
 
-    def test_both_leads_exist_and_differ(self):
+    #: The three openings. All three are reproduced in the docs, so all three
+    #: are pinned -- the preview's was added later and was the one left out.
+    LEADS = (
+        "This inventory has never been resolved.",
+        "This inventory was not refreshed.",
+        "This inventory has no resolution to limit against.",
+    )
+
+    #: Everything after the lead, character for character.
+    TAIL = (
+        " Sources [] need ansible to parse, and ansible is installed only in the runner. "
+        "A configure or a resolve operation has to produce it; the API will not resolve "
+        "the rest of the inventory, because a partial resolution is a target set that is "
+        "silently too small."
+    )
+
+    def test_every_lead_is_pinned_and_they_differ(self):
         from terrapod.api.routers import inventory as mod
 
-        read = mod._unresolvable_error([], "This inventory has never been resolved.")
-        action = mod._unresolvable_error([], "This inventory was not refreshed.")
+        details = [mod._unresolvable_error([], lead).detail for lead in self.LEADS]
 
-        assert read.detail.startswith("This inventory has never been resolved.")
-        assert action.detail.startswith("This inventory was not refreshed.")
-        assert read.status_code == action.status_code == 409
-        # Same body after the lead: one message, two openings. If they diverge
-        # again, the pages describing them as one message become false.
-        assert read.detail.split(".", 1)[1] == action.detail.split(".", 1)[1]
+        for lead, detail in zip(self.LEADS, details, strict=True):
+            assert detail.startswith(lead), detail
+        assert len(set(details)) == len(self.LEADS), "two refusals read identically"
+
+    def test_the_shared_tail_is_pinned_as_a_literal(self):
+        """Not merely "the tails agree" -- see the class docstring."""
+        from terrapod.api.routers import inventory as mod
+
+        for lead in self.LEADS:
+            detail = mod._unresolvable_error([], lead).detail
+            assert detail[len(lead) :] == self.TAIL, detail[len(lead) :]
+
+    def test_the_status_is_409_on_every_lead(self):
+        from terrapod.api.routers import inventory as mod
+
+        for lead in self.LEADS:
+            assert mod._unresolvable_error([], lead).status_code == 409
+
+    def test_the_docs_quote_every_lead(self):
+        """The pages are the reason these strings are pinned at all, so the
+        pinning is worth nothing if a page stops quoting one."""
+        pages = [
+            pathlib.Path("../docs/ansible-inventory.md"),
+            pathlib.Path("../docs/api-reference.md"),
+        ]
+        present = [p for p in pages if p.is_file()]
+        assert present, "neither page found -- has this test stopped checking anything?"
+
+        corpus = " ".join(" ".join(p.read_text().split()) for p in present)
+        for lead in self.LEADS:
+            assert " ".join(lead.split()) in corpus, f"no page quotes: {lead}"
 
     def test_it_names_every_offending_kind_and_only_those(self):
         from terrapod.api.routers import inventory as mod

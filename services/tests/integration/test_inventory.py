@@ -638,3 +638,47 @@ class TestTheSourceStampDecidesWhenARowIsWritten:
         assert second.status_code == 200, second.text
         assert second.json()["data"]["attributes"]["hosts"] == ["web-1", "web-2"]
         assert second.json()["data"]["attributes"]["of-host-count"] == 2
+
+    async def test_an_inventory_with_no_sources_is_stamped_rather_than_unstampable(
+        self, client, app
+    ):
+        """`api_can_resolve([])` is vacuously True, so the stamp must not answer
+        "cannot say" for the same input -- the caller would resolve, the empty
+        stamp would never match, and a row would be written on every read, which
+        is the eviction the stamp exists to prevent.
+
+        Unreachable through the API (an inventory is created with a terraform
+        source and no route removes one), so the source row is deleted through
+        the ORM to reach it at all. That is the point: the two helpers disagreed
+        about one input, and a latent disagreement is worth closing while it is
+        still cheap.
+        """
+        set_auth(app, admin_user())
+        ws_id = await _workspace(client)
+        await _declare(client, ws_id, "web-1")
+        inv_id = (await _default_inventory(client, ws_id)).removeprefix("inv-")
+
+        from sqlalchemy import delete
+
+        from terrapod.db.models import InventorySource
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as db:
+            await db.execute(
+                delete(InventorySource).where(InventorySource.inventory_id == uuid.UUID(inv_id))
+            )
+            await db.commit()
+
+        first = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
+        assert first.status_code == 200, first.text
+        # No sources resolves to the empty set, deterministically.
+        assert first.json()["data"]["attributes"]["host-count"] == 0
+        baseline = await self._versions(inv_id)
+
+        for _ in range(3):
+            again = await client.get(f"{V1}/inventories/inv-{inv_id}/resolved", headers=AUTH)
+            assert again.status_code == 200, again.text
+
+        assert await self._versions(inv_id) == baseline, (
+            "a sourceless inventory wrote a row per read"
+        )

@@ -459,8 +459,20 @@ async def source_stamp(db: AsyncSession, inventory: Inventory) -> str:
     way a derived one cannot.
     """
     sources = await list_sources(db, inventory.id)
-    if not sources or not api_can_resolve(sources):
+    if not api_can_resolve(sources):
         return ""
+
+    if not sources:
+        # No sources resolves to the empty set, deterministically, so it has a
+        # perfectly good stamp -- and it must have one. `api_can_resolve([])` is
+        # vacuously True, so returning "cannot say" here would have the two
+        # helpers give contradictory answers about one inventory: the caller
+        # would resolve, the empty stamp would never match, and a row would be
+        # written on *every* read -- precisely the eviction the stamp exists to
+        # prevent. Unreachable today (an inventory is created with a terraform
+        # source and there is no route to remove one), so this is the latent
+        # case closed rather than a bug fixed.
+        return "none:0"
 
     result = await db.execute(
         select(func.count(), func.max(InventoryItem.updated_at)).where(

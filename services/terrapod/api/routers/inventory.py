@@ -182,9 +182,11 @@ def _version_json(version: InventoryVersion, *, include_contents: bool) -> dict:
         "group-count": version.group_count,
         "produced-by": version.produced_by,
         "produced-by-ref": version.produced_by_ref or "",
-        # The freshness an operator has to be able to see: a preview is as fresh
-        # as the last resolve, and saying when that was is the honest surface
-        # for it rather than implying it is live.
+        # When this resolution came to be -- NOT how stale it is. A read is
+        # live, and an unchanged inventory returns the row it already has
+        # because the source stamp still matches, so an old `taken-at` on a
+        # fresh answer means "nothing has changed since", not "this is out of
+        # date". The superseded reading of this field was the opposite.
         "taken-at": _rfc3339(version.created_at),
     }
     if include_contents:
@@ -204,7 +206,6 @@ def _version_json(version: InventoryVersion, *, include_contents: bool) -> dict:
                 "data": {"id": f"inv-{version.inventory_id}", "type": "inventories"},
             },
         },
-        "links": {"self": f"/api/v1/inventory-versions/{ver_id}"},
     }
 
 
@@ -650,10 +651,19 @@ async def resolve_inventory(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Refresh the snapshot now, for an inventory the API can resolve.
+    """Record a resolution now, for an inventory the API can resolve.
 
-    The "way to refresh it" the freshness surface needs. Requires write, because
-    it replaces what a reader is shown.
+    It does **not** change what a reader is shown -- a read resolves live, so it
+    already reflects the declared rows whether this has ever been called. What
+    it does is add a row to the history, unconditionally, even when the source
+    stamp has not moved.
+
+    That is why it still requires write. The history is bounded at
+    `MAX_VERSIONS_PER_INVENTORY` and is the basis a partial-configure retry
+    subtracts against (#1973), so writing to it prunes the oldest entry -- a
+    read-tier caller must not be able to evict a snapshot a configure is pinned
+    to, which is the whole reason a read compares the stamp instead of
+    recording.
     """
     inventory = await _get_inventory(inventory_id, db)
     ws = await _get_workspace(f"ws-{inventory.workspace_id}", db)
