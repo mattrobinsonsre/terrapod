@@ -912,12 +912,20 @@ class TestPayNothing:
 
 
 class TestTheUnresolvableRefusalIsQuotedInTheDocs:
-    """Every lead, and the shared tail, quoted verbatim in
-    `docs/ansible-inventory.md` and `docs/api-reference.md`.
+    """Every lead is the one a call site passes, distinct, and byte-exact after
+    the lead.
 
     A doc quoting an error message is a claim that goes stale silently: the code
     changes, the page keeps showing output nothing produces, and an operator
     searching for the text they were given finds nothing.
+
+    **The pages are checked by `scripts/docs-audit/check_refusal_leads.py`, not
+    here.** `docker/Dockerfile.test` ships one file out of `docs/`, so a test in
+    this tier resolving `../docs/...` finds nothing and either fails outright --
+    which it did -- or quietly stops checking. The docs-audit job sees the whole
+    checkout. What stays here is what this tier can see, and it is the half that
+    matters most: that the pinned tuple is the set of literals the router really
+    passes.
 
     **This class used to assert that the tails agree with EACH OTHER and never
     against a literal, and that is not the same thing.** Two tails can agree
@@ -985,7 +993,9 @@ class TestTheUnresolvableRefusalIsQuotedInTheDocs:
         """
         import ast
 
-        src = pathlib.Path("terrapod/api/routers/inventory.py").read_text()
+        from terrapod.api.routers import inventory as mod
+
+        src = pathlib.Path(mod.__file__).read_text()
         passed: set[str] = set()
         for node in ast.walk(ast.parse(src)):
             if not isinstance(node, ast.Call):
@@ -1007,20 +1017,6 @@ class TestTheUnresolvableRefusalIsQuotedInTheDocs:
             f"the router passes leads this class does not pin: {sorted(passed - set(self.LEADS))}; "
             f"pinned but unused: {sorted(set(self.LEADS) - passed)}"
         )
-
-    def test_the_docs_quote_every_lead(self):
-        """The pages are the reason these strings are pinned at all, so the
-        pinning is worth nothing if a page stops quoting one."""
-        pages = [
-            pathlib.Path("../docs/ansible-inventory.md"),
-            pathlib.Path("../docs/api-reference.md"),
-        ]
-        present = [p for p in pages if p.is_file()]
-        assert present, "neither page found -- has this test stopped checking anything?"
-
-        corpus = " ".join(" ".join(p.read_text().split()) for p in present)
-        for lead in self.LEADS:
-            assert " ".join(lead.split()) in corpus, f"no page quotes: {lead}"
 
     def test_it_names_every_offending_kind_and_only_those(self):
         from terrapod.api.routers import inventory as mod

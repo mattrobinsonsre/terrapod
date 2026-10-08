@@ -68,8 +68,15 @@ test.describe('Workspace Inventory tab', () => {
 
     // Two declared hosts in two groups. Every source is one the API owns, so
     // the read resolves them itself and this needs no runner.
-    await expect(page.getByText('Hosts', { exact: true })).toBeVisible()
-    await expect(page.getByText('Groups', { exact: true })).toBeVisible()
+    //
+    // The COUNTS, not the labels. `getByText('Groups', { exact: true })` was a
+    // strict-mode violation on four elements -- the stat label, the table
+    // header, and a field label in each mobile card -- and asserting a label
+    // exists proved nothing about whether anything resolved. A stat chip
+    // renders its label and value adjacently, so an anchored regex matches that
+    // chip alone and says what the resolution actually found.
+    await expect(page.getByText(/^Hosts\s*2$/)).toBeVisible()
+    await expect(page.getByText(/^Groups\s*2$/)).toBeVisible()
 
     // The honest part. The read is live, so the panel says so and the date is
     // when this resolution came to be rather than how stale it is.

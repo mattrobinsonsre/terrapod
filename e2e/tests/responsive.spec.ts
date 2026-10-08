@@ -1735,8 +1735,16 @@ test.describe('Per-workspace run identity (#1901)', () => {
 
     // The primary signal survives the reflow. A card list that dropped the
     // address or the groups would still pass the overflow check on its own.
-    await expect(page.getByText('web-1').first()).toBeVisible()
-    await expect(page.getByText('10.0.0.11').first()).toBeVisible()
+    //
+    // Scoped to what is VISIBLE, not `.first()`. Both renders sit in the DOM at
+    // every width -- the desktop table is `hidden md:block` and the card list is
+    // `md:hidden` -- so `.first()` takes the table's cell in DOM order and then
+    // asserts a hidden element is visible. It failed in CI for exactly that
+    // reason, naming the `<td>` it had resolved to 14 times. `visible` asserts
+    // the thing this test is about: the value reached the phone-width render.
+    await expect(page.getByText('web-1').filter({ visible: true }).first()).toBeVisible()
+    await expect(page.getByText('10.0.0.11').filter({ visible: true }).first()).toBeVisible()
+    await expect(page.getByText('frontend').filter({ visible: true }).first()).toBeVisible()
 
     // The limit preview is the control this tab exists to offer, so it has to
     // be usable on a phone: typable input, tappable button, readable result.
