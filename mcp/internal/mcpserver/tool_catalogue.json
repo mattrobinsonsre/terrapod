@@ -57,23 +57,84 @@
     }
   },
   {
-    "name": "terrapod_inventory_limit_preview",
+    "name": "terrapod_inventory_detail",
     "read_only": true,
     "input_schema": {
       "additionalProperties": false,
       "properties": {
-        "inventory_id": {
-          "description": "the inventory id, from terrapod_workspace_inventories",
-          "type": "string"
-        },
-        "limit": {
-          "description": "the ansible --limit pattern to expand: host names, group names, 'all' or '*', comma- or colon-separated terms, '!' to exclude and '\u0026' to intersect. Pass 'all' explicitly to see every host; an empty pattern is refused so that the broadest possible target set is always something you asked for",
+        "id": {
+          "description": "a host id (invhost-...) or a group id (invgroup-...). The prefix says which, so there is no kind to pass",
           "type": "string"
         }
       },
       "required": [
-        "inventory_id",
-        "limit"
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_inventory_group_declare",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "the group name. 'all' and 'ungrouped' are refused: ansible derives both, and 'all' is the rendered document's own root key",
+          "type": "string"
+        },
+        "workspace_id": {
+          "description": "the workspace id (ws-...) to declare the group in",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id",
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_inventory_host_declare",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "the inventory hostname (ansible's inventory_hostname). Names containing --limit's own operators and separators (comma, colon, '!', '\u0026', '~') or whitespace are refused, because a host named with one of those cannot be targeted",
+          "type": "string"
+        },
+        "workspace_id": {
+          "description": "the workspace id (ws-...) to declare the host in",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id",
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_inventory_link",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "child_group_id": {
+          "description": "a group id (invgroup-...) to nest inside the group — a '[groupname:children]' entry",
+          "type": "string"
+        },
+        "group_id": {
+          "description": "the group id (invgroup-...) to add to",
+          "type": "string"
+        },
+        "host_id": {
+          "description": "a host id (invhost-...) to put in the group — a '[groupname]' host line",
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_id"
       ],
       "type": "object"
     }
@@ -85,7 +146,7 @@
       "additionalProperties": false,
       "properties": {
         "workspace_id": {
-          "description": "the workspace id (ws-...) whose declared hosts to list",
+          "description": "the workspace id (ws-...) whose inventory to list",
           "type": "string"
         }
       },
@@ -96,22 +157,156 @@
     }
   },
   {
+    "name": "terrapod_inventory_remove",
+    "destructive": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "the id of the row to remove. The typed prefix says what it is: invhost- a host, invgroup- a group, invhg- a membership, invgc- a nesting, invhvar-/invgvar-/invvar- a variable, ws- a workspace's inventory settings",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "name": "terrapod_inventory_resolved",
     "read_only": true,
     "input_schema": {
       "additionalProperties": false,
       "properties": {
-        "include_ansible_shape": {
-          "description": "also return the same resolution in the shape 'ansible-inventory --list' produces. Off by default; reason over 'hosts' instead, and ask for this only to hand the literal document to something that wants it",
-          "type": "boolean"
+        "limit": {
+          "description": "an ansible --limit pattern to apply: host names, group names, globs, 'all', comma- or colon-separated terms, '!' to exclude, '\u0026' to intersect, '~' for a regex. Omit it to resolve the whole inventory",
+          "type": "string"
         },
-        "inventory_id": {
-          "description": "the inventory id, from terrapod_workspace_inventories",
+        "workspace_id": {
+          "description": "the workspace id (ws-...) whose inventory to resolve",
           "type": "string"
         }
       },
       "required": [
-        "inventory_id"
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_inventory_settings",
+    "read_only": true,
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": {
+          "description": "the workspace id (ws-...)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_inventory_settings_set",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "description": "the branch to read; empty means the repository default",
+          "type": "string"
+        },
+        "clear_vcs_connection": {
+          "description": "remove the git binding entirely, leaving the declared rows as the whole inventory",
+          "type": "boolean"
+        },
+        "ignore_paths": {
+          "description": "paths within the source to skip",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "include_platform": {
+          "description": "whether the declared rows contribute to the resolution; default true",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "repo_url": {
+          "description": "the repository holding the inventory",
+          "type": "string"
+        },
+        "vcs_connection_id": {
+          "description": "the VCS connection to fetch the git inventory source with. Pass an empty string with clear_vcs_connection to remove the binding",
+          "type": "string"
+        },
+        "working_directory": {
+          "description": "the DIRECTORY within the repository that ansible reads as one source; empty means the root",
+          "type": "string"
+        },
+        "workspace_id": {
+          "description": "the workspace id (ws-...)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terrapod_inventory_var_set",
+    "input_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "group_id": {
+          "description": "set on one group — ansible's group_vars/\u003cgroup\u003e",
+          "type": "string"
+        },
+        "host_id": {
+          "description": "set on one host — ansible's host_vars/\u003chost\u003e",
+          "type": "string"
+        },
+        "key": {
+          "description": "the variable name, e.g. ansible_host or http_port",
+          "type": "string"
+        },
+        "sensitive": {
+          "description": "mask the value in every response; default false. Independent of encryption — every value is encrypted at rest regardless",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "structured": {
+          "description": "read value as literal source for a list, number, bool or object rather than as text; default false",
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "value": {
+          "description": "the value. Text unless structured is true",
+          "type": "string"
+        },
+        "workspace_id": {
+          "description": "set for every host — ansible's group_vars/all",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
       ],
       "type": "object"
     }
@@ -1157,23 +1352,6 @@
       },
       "required": [
         "workspace"
-      ],
-      "type": "object"
-    }
-  },
-  {
-    "name": "terrapod_workspace_inventories",
-    "read_only": true,
-    "input_schema": {
-      "additionalProperties": false,
-      "properties": {
-        "workspace_id": {
-          "description": "the workspace id (ws-...) whose inventories to list",
-          "type": "string"
-        }
-      },
-      "required": [
-        "workspace_id"
       ],
       "type": "object"
     }
