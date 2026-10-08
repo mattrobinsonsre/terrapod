@@ -202,6 +202,12 @@ inventory files and UI-edited YAML are separate work; the source table exists
 now — rather than the `terraform` source being implied — precisely so they have
 a position to occupy without a migration that reorders anything.
 
+**Every kind Terrapod implements is static.** An external, AWX-style source that
+executes a script or a plugin to discover hosts is not among the kinds to come:
+it was considered and declined, and
+[the reasoning is recorded](https://github.com/mattrobinsonsre/terrapod/issues/1970).
+That is what makes a read of the resolved view live.
+
 **Declared items are workspace-scoped, not inventory-scoped.**
 `terrapod_inventory_item` carries no `inventory` attribute, so an item belongs to
 the workspace and every inventory's `terraform` source draws on the same pool.
@@ -326,14 +332,50 @@ configure needs. The rule is only about what Terraform declares.
 
 ---
 
-## Snapshots, and why a reader is not seeing a live resolution
+## A read is live, and what a snapshot is still for
 
-Every resolution is recorded as a **snapshot** — an `inventory-versions`
+**Every source Terrapod implements is static** — declared rows the workspace's
+own Terraform owns — so resolving one is a database query with nothing to fetch,
+parse or time out. A read of the resolved view is therefore **live**. There is no
+cached-versus-fresh distinction to surface, and no staleness for a reader to
+reason about.
+
+That follows from a decision rather than from an optimisation. **Dynamic
+inventory was considered and declined** — an external, AWX-style source that
+executes a script or a plugin to discover hosts. The reasoning is recorded in
+[#1970](https://github.com/mattrobinsonsre/terrapod/issues/1970), and it is the
+same reasoning as for deriving hosts from state: Pattern A above already covers
+the case a plugin was wanted for, and covers it better. A data source plus
+`for_each` plus `terrapod_inventory_item` is what an inventory plugin gives you,
+except versioned in git, reviewed in a pull request and visible in a plan. A
+dynamic source is also arbitrary code execution, which ansible performs whether
+it is invoked through the CLI or through its Python API.
+
+### Live does not mean a write per read
+
+Each resolution is still recorded as a **snapshot** — an `inventory-versions`
 resource holding the merged hosts, the groups, the counts, what produced it
-(`api` or `runner`), and **`taken-at`**.
+(`api` or `runner`), and **`taken-at`**. The history is **bounded**: the newest
+twenty per inventory are kept and older ones are pruned as each new one is
+written. That bound is exactly why a read must not write one every time — a
+dashboard left open on the resolved view would evict the snapshot something else
+is pinned to.
 
-The snapshot is load-bearing rather than a convenience, and that is forced by
-measurement rather than chosen. Under `serial:`, ansible's
+So a read compares an internal **source stamp** — an equality token for "what
+every source currently says" — against the newest recorded snapshot's. If they
+match, nothing has moved, and that snapshot *is* the live answer: it is returned
+unchanged and nothing is written. Only a moved stamp resolves and records a new
+one. The token is deliberately opaque, is not on the wire and is not an
+attribute of anything — no client sees it, and nothing parses it, orders it or
+reads a time out of it.
+
+**So `taken-at` says when the resolution came to be, not how stale it is.** A
+`taken-at` of last Tuesday, on an inventory whose hosts nothing has touched
+since, is both correct and current.
+
+### Why a snapshot exists at all
+
+It is forced by measurement rather than chosen. Under `serial:`, ansible's
 `v2_playbook_on_play_start` fires once per batch, and in a `serial` +
 `any_errors_fatal` abort the untouched hosts appear in **no callback event and
 in no PLAY RECAP at all**. So "hosts targeted minus hosts completed" cannot be
@@ -342,24 +384,18 @@ success, and silently leaves the rest unconfigured. A snapshot taken up front is
 the only thing that knows the full target set, so one artifact is both the
 targeting basis and the partial-recovery basis.
 
-Two consequences an operator should know rather than discover:
-
-**A read shows the last snapshot, not a live resolution.** `taken-at` is on every
-read for exactly that reason — it is the honest surface for freshness, rather
-than implying the answer is current. Refresh it with:
+### `POST .../actions/resolve` records one on demand
 
 ```
 POST /api/v1/inventories/{id}/actions/resolve
 ```
 
-which requires `inventory:write`, because it replaces what every reader is shown.
-As a convenience, reading the resolved view of an inventory that has **never**
-been resolved will resolve and record one first, so a workspace that has just
-declared its hosts can see them immediately.
+Records a new snapshot **unconditionally** — whether or not the source stamp has
+moved. It requires `inventory:write` because it is genuinely a write: it adds a
+row to that bounded history and prunes the oldest to stay inside the twenty.
 
-**History is bounded.** The newest twenty snapshots per inventory are kept and
-older ones are pruned as each new one is written, because a resolve writes one
-every time and nothing else would remove them.
+It is **not** how a reader gets a current answer, because a read is already
+live. It is how a point in the history gets pinned.
 
 ### The exhaustive host map, and the trap it removes
 
@@ -384,32 +420,32 @@ representations to keep in step.
 POST /api/v1/inventories/{id}/actions/preview-limit
 ```
 
-Answers "which hosts would this `--limit` select", against the last snapshot.
-Read-only and read-gated. It expands the forms an operator writes in a limit:
-host names, group names, `all` and `*`, comma- or colon-separated terms, globs,
-`!` exclusion and `&` intersection. An inclusion term unions, except that the
-first term starts from nothing rather than from the whole inventory.
+Answers "which hosts would this `--limit` select". Read-only and read-gated. It
+expands the forms an operator writes in a limit: host names, group names, `all`
+and `*`, comma- or colon-separated terms, globs, `!` exclusion and `&`
+intersection. An inclusion term unions, except that the first term starts from
+nothing rather than from the whole inventory.
 
-Two honesty caveats, both of which matter more than they sound:
+**It expands against a live resolution**, by the same route as the resolved view
+and for a sharper reason: previewing against a target set that has since changed
+is the wrong answer in the one place an operator came to check. For an inventory
+the API owns there is always something to limit against, including the empty set
+of a workspace that has declared no host.
+
+And two caveats, both of which matter more than they sound:
 
 **It is advisory.** The authoritative expansion is always
 `ansible-inventory --list --limit`, taken in the runner at the start of a
 configure, and that is what a snapshot records. This is a preview so the
 question can be asked before a Job exists.
 
-**It is as fresh as the last snapshot.** The response carries that snapshot's
-`taken-at` alongside the matched hosts and the total host count, so the age is
-visible in the same payload as the answer.
-
-And one refusal:
-
 **A `~regex` term is refused, with `422`.** Ansible will apply the regular
 expression at run time; quietly matching nothing here would show an empty target
 set for a pattern ansible would have expanded — the wrong answer dressed as an
 answer. Declining is the honest result.
 
-An inventory with no snapshot yet answers `409`: there is nothing to limit
-against.
+The response carries `taken-at` and `of-host-count` from the resolution it
+expanded against, so an operator can see which host set produced the answer.
 
 ---
 
@@ -434,28 +470,55 @@ rather than resolving the part it can**, naming the offending source kinds:
      too small.
 ```
 
-A read of the resolved view refuses the same way and names the same kinds,
-differing only in its opening clause (`This inventory has never been
-resolved.`) — the two compose one message, because an operator meeting either
-is asking which source and what to do about it.
-
-(No such source kind exists yet, so no inventory can be in that state today.
-The refusal is in place now so that the runner path is forced when the first
-one lands, rather than remembered.)
-
 That last clause is the whole reason. A partial resolution looks like an answer
 and is a host set missing everything the unresolvable source would have
 contributed — and nothing in the result says so. Refusing is louder and safer.
 
-Each source reports its own `api-resolvable`, not just the inventory's rolled-up
-one, so a reader can see **which** source is why a snapshot is as old as it is
-rather than having to infer it.
+It is **one message with three openings**, because an operator meeting any of
+them is asking the same two questions: which source, and what do I do about it.
+Everything after the opening clause is identical.
 
-A runner posts the resolution it performed to
-`POST /api/v1/inventories/{id}/versions`. That endpoint is **runner-token only**:
-a snapshot records what a resolve actually found, so it is written by the thing
-that ran it, and a person posting one by hand is answered `403` with a pointer to
-the resolve action instead.
+| Where | Opening clause |
+|---|---|
+| `POST .../actions/resolve` | `This inventory was not refreshed.` |
+| `GET .../resolved` | `This inventory has never been resolved.` |
+| `POST .../actions/preview-limit` | `This inventory has no resolution to limit against.` |
+
+For such an inventory, the read and the preview serve **the newest resolution a
+runner posted**, and refuse only when there is none. A runner posts one to
+`POST /api/v1/inventories/{id}/versions`, which is **runner-token only**: a
+snapshot records what a resolve actually found, so it is written by the thing
+that ran it, and a person posting one by hand is answered `403` with a pointer
+to the resolve action instead.
+
+Each source reports its own `api-resolvable`, not just the inventory's rolled-up
+one, so a reader can see **which** source is why a read is served from a posted
+snapshot rather than having to infer it.
+
+### For an inventory the API owns, a posted snapshot is history
+
+This is the one behaviour worth stating plainly rather than leaving to be
+discovered. The `terraform` source is one the API resolves from the declared
+rows, so for an inventory holding only that source **the live answer is
+authoritative and a posted snapshot is not what a reader sees** — however
+recently it arrived. It is kept, it appears in the history, and something can be
+pinned to it; it simply does not win a read.
+
+A runner's resolution wins only where the API cannot resolve at all.
+
+### No such source kind exists yet
+
+No kind other than `terraform` exists, so no inventory can be in that state
+today. The refusal is in place now so the runner path is forced when the first
+one lands rather than remembered, and the first will be
+[#1929](https://github.com/mattrobinsonsre/terrapod/issues/1929),
+git-supplied inventory files and directories.
+
+That is also where a **stored** source stamp and a short expiry belong. Terrapod
+stores no stamp today and puts no expiry on a resolution at all, because a
+`terraform` stamp is *derived* from the rows it summarises and a derived stamp
+cannot be stale. A stamp you can only learn by fetching — git's resolved commit
+— is the one case an expiry buys anything.
 
 ---
 
@@ -466,7 +529,7 @@ Two capabilities in the workspace axis:
 | Capability | Tier | Grants |
 |---|---|---|
 | `inventory:read` | **read** | List and show declared hosts, inventories, snapshots, the resolved view, and the limit preview |
-| `inventory:write` | **write** | Declare, change and remove hosts; create and delete inventories; refresh a snapshot |
+| `inventory:write` | **write** | Declare, change and remove hosts; create and delete inventories; record a snapshot |
 
 Both are granted by the existing presets, so no role became more or less
 powerful when they were introduced.
@@ -533,11 +596,11 @@ alias and serves all of these too. None of this is on the TFE-compatible prefix
 | `POST /api/v1/workspaces/{id}/inventories` | `inventory:write` | Create a named inventory, with its `terraform` source at position 0. `201` |
 | `GET /api/v1/inventories/{id}` | `inventory:read` | One inventory, with its ordered sources |
 | `DELETE /api/v1/inventories/{id}` | `inventory:write` | Delete an inventory, its sources and its snapshots. Declared items are untouched. `204` |
-| `GET /api/v1/inventories/{id}/resolved` | `inventory:read` | What the inventory resolves to, with `taken-at`. Resolves and records a first snapshot when there is none and every source is API-resolvable; `409` naming the offending source kinds otherwise |
-| `POST /api/v1/inventories/{id}/actions/resolve` | `inventory:write` | Refresh the snapshot now. `409` naming the offending source kinds when a source needs ansible |
-| `GET /api/v1/inventories/{id}/versions` | `inventory:read` | Snapshot history, newest first. Contents omitted — read one for them |
+| `GET /api/v1/inventories/{id}/resolved` | `inventory:read` | What the inventory resolves to. **Live** when every source is one the API owns, recording a snapshot only when the source stamp has moved. Otherwise the newest resolution a runner posted, or `409` naming the offending source kinds when there is none |
+| `POST /api/v1/inventories/{id}/actions/resolve` | `inventory:write` | Record a snapshot now, whether or not anything has moved. `409` naming the offending source kinds when a source needs ansible |
+| `GET /api/v1/inventories/{id}/versions` | `inventory:read` | Snapshot history, newest first. Contents omitted — the resolved view carries the current resolution's |
 | `POST /api/v1/inventories/{id}/versions` | **Runner token only** | A runner posts the resolution it performed. `403` for a person, pointing at the resolve action. `201` |
-| `POST /api/v1/inventories/{id}/actions/preview-limit` | `inventory:read` | Which hosts a `--limit` pattern would select, against the last snapshot. `422` on a `~regex` term; `409` with no snapshot |
+| `POST /api/v1/inventories/{id}/actions/preview-limit` | `inventory:read` | Which hosts a `--limit` pattern would select, against a live resolution. `422` on a `~regex` term; `409` only when no source is one the API owns and no runner has posted a resolution |
 
 Typed id prefixes: `invitem-` for a declared host, `inv-` for an inventory,
 `invsrc-` for a source, `invver-` for a snapshot.
