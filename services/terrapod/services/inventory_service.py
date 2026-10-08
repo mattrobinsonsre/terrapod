@@ -32,7 +32,6 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,8 +51,6 @@ from terrapod.services.inventory_resolution import (
     validate_host_name,
     validate_var_key,
 )
-
-logger = structlog.get_logger(__name__)
 
 #: Defensive ceilings, per workspace. Generous: a few hundred hosts is an
 #: ordinary fleet and `for_each` over them is the documented shape. They exist

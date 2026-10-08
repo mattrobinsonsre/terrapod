@@ -243,9 +243,11 @@ class TestTheCascades:
         link = (await _member(client, group, host)).json()["data"]["id"]
         var = (await _host_var(client, host, "ansible_user")).json()["data"]["id"]
 
-        assert (
-            await client.delete(f"{V1}/inventory-hosts/{host}", headers=AUTH)
-        ).status_code == 204
+        # The call is hoisted out of the assert deliberately: `python -O` strips
+        # asserts, and a DELETE inside one would not happen -- leaving every
+        # 404 below asserting against a row that was never removed.
+        gone = await client.delete(f"{V1}/inventory-hosts/{host}", headers=AUTH)
+        assert gone.status_code == 204
 
         assert (
             await client.get(f"{V1}/inventory-host-groups/{link}", headers=AUTH)
@@ -265,9 +267,11 @@ class TestTheCascades:
         group = await _mk_group(client, ws, "web")
         await _member(client, group, host)
 
-        assert (
-            await client.delete(f"{V1}/inventory-groups/{group}", headers=AUTH)
-        ).status_code == 204
+        # The call is hoisted out of the assert deliberately: `python -O` strips
+        # asserts, and a DELETE inside one would not happen -- leaving every
+        # 404 below asserting against a row that was never removed.
+        gone = await client.delete(f"{V1}/inventory-groups/{group}", headers=AUTH)
+        assert gone.status_code == 204
 
         still = await client.get(f"{V1}/inventory-hosts/{host}", headers=AUTH)
         assert still.status_code == 200, still.text

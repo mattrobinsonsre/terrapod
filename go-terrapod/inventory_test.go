@@ -415,7 +415,7 @@ func TestListAllInventoryHostsPages(t *testing.T) {
 			id = "invhost-b"
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		fmt.Fprintf(w, `{"data":[{"id":%q,"type":"inventory-hosts",
+		_, _ = fmt.Fprintf(w, `{"data":[{"id":%q,"type":"inventory-hosts",
 		  "attributes":{"name":"h-%s"}}],
 		  "meta":{"pagination":{"current-page":%s,"page-size":100,
 		    "total-count":2,"total-pages":2}}}`, id, page, page)

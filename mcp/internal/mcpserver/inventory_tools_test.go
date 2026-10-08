@@ -533,11 +533,11 @@ func TestInventoryVarSetCreatesThenPatchesOnConflict(t *testing.T) {
 	sess := inventoryToolCaller(t, func(w http.ResponseWriter, r *http.Request) {
 		methods = append(methods, r.Method+" "+r.URL.Path)
 		w.Header().Set("Content-Type", "application/vnd.api+json")
-		switch {
-		case r.Method == http.MethodPost:
+		switch r.Method {
+		case http.MethodPost:
 			w.WriteHeader(http.StatusConflict)
 			_, _ = w.Write([]byte(`{"errors":[{"detail":"already exists","status":"409"}]}`))
-		case r.Method == http.MethodGet:
+		case http.MethodGet:
 			_, _ = w.Write([]byte(`{"data":[{"id":"invhvar-1","type":"inventory-host-vars",
 			  "attributes":{"key":"ansible_host","value":"10.0.0.4"}}]}`))
 		default:
